@@ -1,0 +1,24 @@
+{
+  "name": "skillforge",
+  "version": "0.1.0",
+  "description": "Minimal-dependency CLI for reviewing AI-agent skills and repo instructions.",
+  "type": "module",
+  "bin": {
+    "skillforge": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.17"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "test": "tsc -p tsconfig.test.json && node --test dist-test/test/*.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "typescript": "^5.8.3"
+  }
+}
