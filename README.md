@@ -2,7 +2,7 @@
 
 Renma is a minimal-dependency TypeScript CLI for reviewing AI-agent skills, repository instructions, profile overlays, references, and eval manifests.
 
-The MVP scanner reads known skill-related files, runs deterministic quality and safety rules, and emits text or JSON reports with file and line evidence.
+The scanner reads known skill-related files, runs deterministic quality and safety rules, and emits text or JSON reports with file and line evidence.
 
 ## Requirements
 
@@ -66,7 +66,7 @@ skills/**/SKILL.md
 AGENTS.md
 skills/**/profiles/**/*.md
 skills/**/references/**/*.md
-evals/**/eval.json
+evals/**/eval.{json,yaml,yml}
 ```
 
 It skips `node_modules`, `dist`, and `.git`, ignores symbolic links, enforces a maximum file size, and reports paths in stable POSIX-style form.
@@ -75,7 +75,7 @@ It skips `node_modules`, `dist`, and `.git`, ignores symbolic links, enforces a 
 
 Renma automatically looks for `renma.config.json`, then `.renma.json`.
 
-For compatibility with early SkillForge builds, `skillforge.config.json` and `.skillforge.json` are also accepted after the Renma config names.
+For compatibility with early SkillForge builds, `skillforge.config.json` and `.skillforge.json` are accepted after the Renma config names.
 
 Configuration is applied in this order:
 
@@ -114,7 +114,7 @@ Supported fields:
 - `max_depth`: positive integer
 - `concurrency`: positive integer
 
-Unknown fields or invalid enum values are usage errors and exit with code `2`.
+Invalid config fields exit code `2`.
 
 ## Exit Codes
 
@@ -124,9 +124,12 @@ Unknown fields or invalid enum values are usage errors and exit with code `2`.
 
 ## Checks
 
-The current rules cover early MVP quality and safety signals, including:
+Current rules cover early quality and safety signals, including:
 
-- missing skill description, examples, preflight, verification, or negative routing
+- missing skill description, examples, preflight, verification, negative routing, or explicit routing clarity
+- short frontmatter descriptions that make skill routing ambiguous
+- oversized `SKILL.md` entrypoints that should move detailed procedures into `references/`
+- missing top-level eval coverage for each skill
 - literal credential-like values and private key material
 - destructive command examples without nearby confirmation or recovery guidance
 - risky remote access defaults

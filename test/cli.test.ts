@@ -17,12 +17,42 @@ test("scan discovers default artifacts and emits deterministic findings", async 
   assert.deepEqual(result.findings.map((finding) => finding.id), [
     "QUAL-MISSING-DESCRIPTION",
     "QUAL-MISSING-NEGATIVE-ROUTING",
+    "QUAL-MISSING-ROUTING-CLARITY",
     "QUAL-MISSING-EXAMPLES",
     "QUAL-MISSING-PREFLIGHT",
     "QUAL-MISSING-VERIFICATION",
+    "EVAL-MISSING-SKILL-COVERAGE",
     "SEC-DESTRUCTIVE-COMMAND"
   ]);
   assert.equal(result.findings.at(-1)?.evidence.path, "skills/demo/SKILL.md");
+});
+
+test("top-level yaml eval manifests count as skill coverage", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "skills", "demo"), { recursive: true });
+  await mkdir(path.join(root, "evals", "demo"), { recursive: true });
+  await writeFile(path.join(root, "skills", "demo", "SKILL.md"), `---
+name: "demo"
+description: "Use this skill for demo tasks when a short deterministic fixture needs verification, routing clarity, examples, preflight checks, and safety confirmation."
+---
+# Demo
+
+## Do Not Use For
+- Do not use for production work.
+
+## Instructions
+1. First capture preflight context.
+2. Verify the result with a test.
+
+## Examples
+- Demo input -> demo output.
+`);
+  await writeFile(path.join(root, "evals", "demo", "eval.yaml"), "cases:\n  - name: confirmation failure\n    prompt: missing host requires permission\n");
+
+  const result = await scan(root);
+
+  assert.ok(!result.findings.some((finding) => finding.id === "EVAL-MISSING-SKILL-COVERAGE"));
+  assert.equal(result.scannedFileCount, 2);
 });
 
 test("config loads fail_on and CLI override takes precedence", async () => {

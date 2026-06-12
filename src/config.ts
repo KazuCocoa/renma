@@ -14,7 +14,7 @@ export const DEFAULT_CONFIG: ScanConfig = {
     "AGENTS.md",
     "skills/**/profiles/**/*.md",
     "skills/**/references/**/*.md",
-    "evals/**/eval.json"
+    "evals/**/eval.{json,yaml,yml}"
   ],
   exclude: ["node_modules", "dist", ".git"],
   maxFileSizeBytes: 512 * 1024,
