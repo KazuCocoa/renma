@@ -27,7 +27,7 @@ test("scan discovers default artifacts and emits deterministic findings", async 
 
 test("config loads fail_on and CLI override takes precedence", async () => {
   const root = await fixture();
-  await writeFile(path.join(root, "skillforge.config.json"), JSON.stringify({ fail_on: "critical", format: "json" }));
+  await writeFile(path.join(root, "renma.config.json"), JSON.stringify({ fail_on: "critical", format: "json" }));
   await mkdir(path.join(root, "skills", "demo"), { recursive: true });
   await writeFile(path.join(root, "skills", "demo", "SKILL.md"), "# Demo\n\npassword = \"supersecretvalue\"\n");
 
@@ -37,12 +37,12 @@ test("config loads fail_on and CLI override takes precedence", async () => {
   assert.equal(fromConfig.exitThreshold, "critical");
   assert.equal(fromConfig.format, "json");
   assert.equal(fromCli.exitThreshold, "medium");
-  assert.equal(fromConfig.configPath, "skillforge.config.json");
+  assert.equal(fromConfig.configPath, "renma.config.json");
 });
 
 test("CLI honors format from config", async () => {
   const root = await fixture();
-  await writeFile(path.join(root, "skillforge.config.json"), JSON.stringify({ format: "json" }));
+  await writeFile(path.join(root, "renma.config.json"), JSON.stringify({ format: "json" }));
 
   const exitCode = await withCapturedConsole(() => main(["scan", root]));
   const report = JSON.parse(exitCode.stdout) as { format: string };
@@ -78,13 +78,13 @@ test("help and invalid commands have expected exit codes", async () => {
   const invalid = await withCapturedConsole(() => main(["inspect"]));
 
   assert.equal(help.code, 0);
-  assert.match(help.stdout, /Usage: skillforge scan/);
+  assert.match(help.stdout, /Usage: renma scan/);
   assert.equal(invalid.code, 2);
   assert.match(invalid.stderr, /Unknown command "inspect"/);
 });
 
 async function fixture(): Promise<string> {
-  return mkdtemp(path.join(os.tmpdir(), "skillforge-"));
+  return mkdtemp(path.join(os.tmpdir(), "renma-"));
 }
 
 async function withCapturedConsole(callback: () => Promise<number>): Promise<{ code: number; stdout: string; stderr: string }> {

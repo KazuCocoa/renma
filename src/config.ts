@@ -47,7 +47,7 @@ export async function loadConfig(root: string, overrides: ConfigOverrides): Prom
 }
 
 async function findDefaultConfig(root: string): Promise<string | undefined> {
-  for (const name of ["skillforge.config.json", ".skillforge.json"]) {
+  for (const name of ["renma.config.json", ".renma.json", "skillforge.config.json", ".skillforge.json"]) {
     const candidate = path.join(root, name);
     try {
       await access(candidate);

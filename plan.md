@@ -1,8 +1,8 @@
-# SkillForge Minimal-Dependency CLI MVP Plan
+# Renma Minimal-Dependency CLI MVP Plan
 
 ## Summary
 
-Build SkillForge as a TypeScript npm CLI with a small dependency footprint. Prefer Node 22.17+ built-ins, but allow minimal runtime dependencies when they clearly improve correctness, maintainability, or CLI ergonomics.
+Build Renma as a TypeScript npm CLI with a small dependency footprint. Prefer Node 22.17+ built-ins, but allow minimal runtime dependencies when they clearly improve correctness, maintainability, or CLI ergonomics.
 
 The MVP is a scanner: it reads skill and agent instruction files, runs deterministic quality and safety rules, and emits text or JSON reports with evidence ranges. It should avoid blocking the event loop during repository scans by using async filesystem APIs and bounded concurrency.
 
@@ -11,7 +11,7 @@ The MVP is a scanner: it reads skill and agent instruction files, runs determini
 - Runtime target: Node 22.17+.
 - Add `package.json` `engines.node: ">=22.17"`.
 - Add a startup version check that exits with a clear error on unsupported Node versions.
-- Publish an npm package with a `skillforge` bin pointing to compiled `dist/index.js`.
+- Publish an npm package with a `renma` bin pointing to compiled `dist/index.js`.
 - Build with `tsc`.
 - Use ESM or CommonJS consistently across source, build output, and package metadata.
 
@@ -33,7 +33,7 @@ The MVP is a scanner: it reads skill and agent instruction files, runs determini
 
 ## CLI Contract
 
-- Implement `skillforge scan [path]`.
+- Implement `renma scan [path]`.
 - Default `[path]` to the current working directory.
 - Support flags:
   - `--config <path>`
@@ -50,8 +50,9 @@ The MVP is a scanner: it reads skill and agent instruction files, runs determini
 
 ## Config
 
-- Support `skillforge.config.json`.
-- Support `.skillforge.json`.
+- Support `renma.config.json`.
+- Support `.renma.json`.
+- Accept `skillforge.config.json` and `.skillforge.json` as legacy compatibility aliases during the rename.
 - Defer YAML support until after MVP.
 - Use `fail_on` in config and map it to the CLI `--fail-on` flag.
 - Define precedence as defaults, then config file, then CLI flags.
@@ -90,7 +91,7 @@ The MVP is a scanner: it reads skill and agent instruction files, runs determini
   - code fences
   - frontmatter-like metadata blocks
   - line numbers and evidence ranges
-- Lightweight Markdown parsing is sufficient for v1 because SkillForge needs evidence ranges, headings, links, and code fences, not a full Markdown renderer.
+- Lightweight Markdown parsing is sufficient for v1 because Renma needs evidence ranges, headings, links, and code fences, not a full Markdown renderer.
 - Preserve enough source context to produce actionable findings without loading entire large files into reports.
 
 ## Rule Model

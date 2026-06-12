@@ -47,7 +47,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   const [command, target = "."] = parsed.positionals;
   if (command !== "scan") {
     console.error(command ? `Unknown command "${command}".` : "Missing command.");
-    console.error("Run skillforge --help for usage.");
+    console.error("Run renma --help for usage.");
     return 2;
   }
 
@@ -88,12 +88,12 @@ function checkNodeVersion(version: string): string | undefined {
   const major = Number(majorRaw);
   const minor = Number(minorRaw);
   if (major > NODE_MAJOR || (major === NODE_MAJOR && minor >= NODE_MINOR)) return undefined;
-  return `SkillForge requires Node >=${NODE_MAJOR}.${NODE_MINOR}. Current Node is ${version}.`;
+  return `Renma requires Node >=${NODE_MAJOR}.${NODE_MINOR}. Current Node is ${version}.`;
 }
 
 function helpText(): string {
   return [
-    "Usage: skillforge scan [path] [options]",
+    "Usage: renma scan [path] [options]",
     "",
     "Options:",
     "  -c, --config <path>      Read JSON config from path",

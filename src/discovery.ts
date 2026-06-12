@@ -62,7 +62,14 @@ function classify(relativePath: string): ArtifactKind {
   if (relativePath.includes("/profiles/")) return "profile";
   if (relativePath.includes("/references/")) return "reference";
   if (relativePath.endsWith("/eval.json")) return "eval";
-  if (relativePath.endsWith("skillforge.config.json") || relativePath.endsWith(".skillforge.json")) return "config";
+  if (
+    relativePath.endsWith("renma.config.json") ||
+    relativePath.endsWith(".renma.json") ||
+    relativePath.endsWith("skillforge.config.json") ||
+    relativePath.endsWith(".skillforge.json")
+  ) {
+    return "config";
+  }
   return "unknown";
 }
 

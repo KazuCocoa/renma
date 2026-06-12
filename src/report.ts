@@ -6,7 +6,7 @@ export function formatJson(result: ScanResult): string {
 
 export function formatText(result: ScanResult): string {
   const lines = [
-    `SkillForge scan`,
+    `Renma scan`,
     `Root: ${result.root}`,
     `Config: ${result.configPath ?? "(defaults)"}`,
     `Files scanned: ${result.scannedFileCount}`,

@@ -1,6 +1,6 @@
-# SkillForge
+# Renma - 練磨
 
-SkillForge is a minimal-dependency TypeScript CLI for reviewing AI-agent skills, repository instructions, profile overlays, references, and eval manifests.
+Renma is a minimal-dependency TypeScript CLI for reviewing AI-agent skills, repository instructions, profile overlays, references, and eval manifests.
 
 The MVP scanner reads known skill-related files, runs deterministic quality and safety rules, and emits text or JSON reports with file and line evidence.
 
@@ -27,13 +27,13 @@ node dist/index.js scan .
 When installed as a package, the binary name is:
 
 ```bash
-skillforge scan .
+renma scan .
 ```
 
 ## Usage
 
 ```bash
-skillforge scan [path] [options]
+renma scan [path] [options]
 ```
 
 Options:
@@ -50,15 +50,15 @@ Options:
 Examples:
 
 ```bash
-skillforge scan .
-skillforge scan ./my-repo --json
-skillforge scan . --fail-on medium
-skillforge scan . --config ./skillforge.config.json
+renma scan .
+renma scan ./my-repo --json
+renma scan . --fail-on medium
+renma scan . --config ./renma.config.json
 ```
 
 ## What Gets Scanned
 
-By default, SkillForge looks for:
+By default, Renma looks for:
 
 ```text
 skills/**/SKILL.md
@@ -73,7 +73,9 @@ It skips `node_modules`, `dist`, and `.git`, ignores symbolic links, enforces a 
 
 ## Configuration
 
-SkillForge automatically looks for `skillforge.config.json`, then `.skillforge.json`.
+Renma automatically looks for `renma.config.json`, then `.renma.json`.
+
+For compatibility with early SkillForge builds, `skillforge.config.json` and `.skillforge.json` are also accepted after the Renma config names.
 
 Configuration is applied in this order:
 
