@@ -159,6 +159,15 @@ npm test
 
 The package build emits the CLI to `dist/index.js`. Tests compile to `dist-test/`.
 
+## Inspirations
+
+Renma is inspired by ideas from:
+
+- [Waza](https://github.com/microsoft/waza), especially skill eval coverage, task-based regression checks, and readiness-oriented validation.
+- [SkillSpector](https://github.com/NVIDIA/skillspector), especially deterministic security scanning, risk-oriented findings, SARIF/reporting direction, and analyzer-style rule organization.
+
+Renma is an independent implementation focused on lightweight deterministic preflight checks for AI-agent skill repositories.
+
 ## License
 
 MIT. See [LICENSE](./LICENSE).
