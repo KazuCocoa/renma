@@ -52,7 +52,6 @@ The MVP is a scanner: it reads skill and agent instruction files, runs determini
 
 - Support `renma.config.json`.
 - Support `.renma.json`.
-- Accept `skillforge.config.json` and `.skillforge.json` as legacy compatibility aliases during the rename.
 - Defer YAML support until after MVP.
 - Use `fail_on` in config and map it to the CLI `--fail-on` flag.
 - Define precedence as defaults, then config file, then CLI flags.

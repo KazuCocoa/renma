@@ -120,7 +120,7 @@ function profileFindings(document: ParsedDocument): Finding[] {
 function evalFindings(document: ParsedDocument): Finding[] {
   if (document.artifact.kind !== "eval") return [];
   const text = document.artifact.content.toLowerCase();
-  const findings: Finding[] = [];
+  const findings: Finding[] = evalShapeFindings(document);
 
   if (!/refusal|confirmation|permission/.test(text)) {
     findings.push(documentFinding(document, "EVAL-MISSING-SAFETY-CASE", "Eval manifest lacks a refusal or confirmation safety case", "eval", "medium", "Add an eval that proves destructive or privileged work requires confirmation."));
@@ -128,6 +128,60 @@ function evalFindings(document: ParsedDocument): Finding[] {
 
   if (!/missing|credential|host|failure/.test(text)) {
     findings.push(documentFinding(document, "EVAL-MISSING-FAILURE-CASE", "Eval manifest lacks a missing-context or failure case", "eval", "low", "Add an eval for missing credentials, unavailable tools, or unspecified targets."));
+  }
+
+  return findings;
+}
+
+function evalShapeFindings(document: ParsedDocument): Finding[] {
+  const content = document.artifact.content;
+  const ext = path.extname(document.artifact.path).toLowerCase();
+
+  if (ext === ".json") {
+    return jsonEvalShapeFindings(document, content);
+  }
+
+  return yamlEvalShapeFindings(document, content);
+}
+
+function jsonEvalShapeFindings(document: ParsedDocument, content: string): Finding[] {
+  let value: unknown;
+  try {
+    value = JSON.parse(content);
+  } catch {
+    return [
+      documentFinding(document, "EVAL-MALFORMED-MANIFEST", "Eval manifest is not valid JSON", "eval", "medium", "Fix the eval manifest so it can be parsed before Waza or another eval runner consumes it.")
+    ];
+  }
+
+  if (!isRecord(value) || !Array.isArray(value.tasks) || !value.tasks.every((task) => typeof task === "string" && task.trim().length > 0)) {
+    return [
+      documentFinding(document, "EVAL-MALFORMED-MANIFEST", "Eval manifest does not declare a Waza-style tasks list", "eval", "medium", "Use a top-level tasks array such as tasks: [\"tasks/*.yaml\"] or YAML list entries.")
+    ];
+  }
+
+  return malformedRegexMatchValues(value)
+    ? [documentFinding(document, "EVAL-MALFORMED-GRADER", "Eval grader has malformed regex_match parameters", "eval", "medium", "Set regex_match to a list of regex strings, matching Waza grader schema expectations.")]
+    : [];
+}
+
+function yamlEvalShapeFindings(document: ParsedDocument, content: string): Finding[] {
+  const findings: Finding[] = [];
+  const tasksLine = content.match(/^tasks:[^\S\r\n]*(.*)$/m);
+
+  if (!tasksLine) {
+    findings.push(documentFinding(document, "EVAL-MALFORMED-MANIFEST", "Eval manifest does not declare a Waza-style tasks list", "eval", "medium", "Use top-level tasks entries that point at task YAML files, for example tasks/*.yaml."));
+  } else {
+    const inlineValue = tasksLine[1]?.trim() ?? "";
+    const hasListBlock = /^tasks:[^\S\r\n]*$/m.test(content) && /^tasks:[^\S\r\n]*$[\s\S]*?^[^\S\r\n]*-[^\S\r\n]+\S/m.test(content);
+    const hasInlineList = /^\[[^\]]+\]$/.test(inlineValue);
+    if (inlineValue !== "" && !hasInlineList || inlineValue === "" && !hasListBlock) {
+      findings.push(documentFinding(document, "EVAL-MALFORMED-MANIFEST", "Eval manifest tasks field is not a list", "eval", "medium", "Make tasks a YAML list of task file globs, matching Waza eval.yaml shape."));
+    }
+  }
+
+  if (/^[^\S\r\n]*(?:-[^\S\r\n]*)?regex_match:[^\S\r\n]*(?!$|\[|-)/m.test(content)) {
+    findings.push(documentFinding(document, "EVAL-MALFORMED-GRADER", "Eval grader has malformed regex_match parameters", "eval", "medium", "Set regex_match to a YAML list of regex strings, not a scalar value."));
   }
 
   return findings;
@@ -218,6 +272,24 @@ function evidence(document: ParsedDocument, line: number, snippet: string): Evid
     endLine: line,
     snippet: snippet.trim().slice(0, 240)
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function malformedRegexMatchValues(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some((item) => malformedRegexMatchValues(item));
+  if (!isRecord(value)) return false;
+
+  for (const [key, child] of Object.entries(value)) {
+    if (key === "regex_match") {
+      return !Array.isArray(child) || !child.every((item) => typeof item === "string" && item.trim().length > 0);
+    }
+    if (malformedRegexMatchValues(child)) return true;
+  }
+
+  return false;
 }
 
 function approximateTokenCount(text: string): number {

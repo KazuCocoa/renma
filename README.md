@@ -75,8 +75,6 @@ It skips `node_modules`, `dist`, and `.git`, ignores symbolic links, enforces a 
 
 Renma automatically looks for `renma.config.json`, then `.renma.json`.
 
-For compatibility with early SkillForge builds, `skillforge.config.json` and `.skillforge.json` are accepted after the Renma config names.
-
 Configuration is applied in this order:
 
 1. Defaults
@@ -136,6 +134,7 @@ Current rules cover early quality and safety signals, including:
 - broad environment copying into subprocess execution
 - profile overlays that do not declare a base skill
 - eval manifests missing safety or failure cases
+- malformed Waza-style eval manifests, including missing `tasks` lists and scalar `regex_match` grader parameters
 
 Static checks are only evidence. Passing a scan does not prove a skill or workflow is safe.
 

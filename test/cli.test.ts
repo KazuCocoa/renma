@@ -47,12 +47,25 @@ description: "Use this skill for demo tasks when a short deterministic fixture n
 ## Examples
 - Demo input -> demo output.
 `);
-  await writeFile(path.join(root, "evals", "demo", "eval.yaml"), "cases:\n  - name: confirmation failure\n    prompt: missing host requires permission\n");
+  await writeFile(path.join(root, "evals", "demo", "eval.yaml"), "tasks:\n  - tasks/*.yaml\n# confirmation failure: missing host requires permission\n");
 
   const result = await scan(root);
 
   assert.ok(!result.findings.some((finding) => finding.id === "EVAL-MISSING-SKILL-COVERAGE"));
   assert.equal(result.scannedFileCount, 2);
+});
+
+test("eval manifests report malformed Waza-style shapes", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "evals", "demo"), { recursive: true });
+  await writeFile(path.join(root, "evals", "demo", "eval.yaml"), "cases:\n  - name: confirmation failure\n    prompt: missing host requires permission\n    graders:\n      - regex_match: passed\n");
+
+  const result = await scan(root);
+
+  assert.deepEqual(result.findings.map((finding) => finding.id), [
+    "EVAL-MALFORMED-MANIFEST",
+    "EVAL-MALFORMED-GRADER"
+  ]);
 });
 
 test("config loads fail_on and CLI override takes precedence", async () => {
@@ -83,7 +96,7 @@ test("CLI honors format from config", async () => {
 
 test("invalid config field is a usage error in CLI", async () => {
   const root = await fixture();
-  await writeFile(path.join(root, ".skillforge.json"), JSON.stringify({ failOn: "high" }));
+  await writeFile(path.join(root, ".renma.json"), JSON.stringify({ failOn: "high" }));
 
   const exitCode = await withCapturedConsole(() => main(["scan", root]));
 

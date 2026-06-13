@@ -64,9 +64,7 @@ function classify(relativePath: string): ArtifactKind {
   if (/\/eval\.(?:json|ya?ml)$/.test(relativePath)) return "eval";
   if (
     relativePath.endsWith("renma.config.json") ||
-    relativePath.endsWith(".renma.json") ||
-    relativePath.endsWith("skillforge.config.json") ||
-    relativePath.endsWith(".skillforge.json")
+    relativePath.endsWith(".renma.json")
   ) {
     return "config";
   }
