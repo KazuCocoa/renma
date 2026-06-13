@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { Evidence, Finding, ParsedDocument, Severity } from "./types.js";
+import type { Evidence, Finding, ParsedDocument, ScanConfig, Severity } from "./types.js";
 
 const SECRET_PATTERN =
   /\b(?:password|passwd|token|api[_-]?key|secret|credential|private[_-]?key)\b\s*[:=]\s*["']?([A-Za-z0-9_./+=-]{8,})/i;
@@ -14,16 +14,18 @@ const ENV_COPY_PATTERN =
 const SKILL_TOKEN_LIMIT = 500;
 const DESCRIPTION_MIN_CHARS = 150;
 
-export function runRules(documents: ParsedDocument[]): Finding[] {
+export function runRules(documents: ParsedDocument[], config: ScanConfig): Finding[] {
   const findings = documents.flatMap((document) => [
     ...secretFindings(document),
     ...commandFindings(document),
     ...shapeFindings(document),
     ...profileFindings(document),
-    ...evalFindings(document)
+    ...evalFindings(document, config),
+    ...evalTaskFindings(document)
   ]);
 
   findings.push(...skillCoverageFindings(documents));
+  findings.push(...evalTaskReferenceFindings(documents));
   return findings.sort((a, b) => {
     const byPath = a.evidence.path.localeCompare(b.evidence.path);
     if (byPath !== 0) return byPath;
@@ -117,10 +119,11 @@ function profileFindings(document: ParsedDocument): Finding[] {
   return [documentFinding(document, "PROF-MISSING-BASE", "Profile overlay does not declare its base skill", "structure", "medium", "Declare the base skill and profile id so routing and conflicts are auditable.")];
 }
 
-function evalFindings(document: ParsedDocument): Finding[] {
+function evalFindings(document: ParsedDocument, config: ScanConfig): Finding[] {
   if (document.artifact.kind !== "eval") return [];
   const text = document.artifact.content.toLowerCase();
   const findings: Finding[] = evalShapeFindings(document);
+  findings.push(...evalExecutorFindings(document, config));
 
   if (!/refusal|confirmation|permission/.test(text)) {
     findings.push(documentFinding(document, "EVAL-MISSING-SAFETY-CASE", "Eval manifest lacks a refusal or confirmation safety case", "eval", "medium", "Add an eval that proves destructive or privileged work requires confirmation."));
@@ -131,6 +134,25 @@ function evalFindings(document: ParsedDocument): Finding[] {
   }
 
   return findings;
+}
+
+function evalExecutorFindings(document: ParsedDocument, config: ScanConfig): Finding[] {
+  const executor = extractScalar(document.artifact.content, "executor");
+  if (!executor) return [];
+
+  const normalized = executor.toLowerCase();
+  const expected = config.evalExecutor.toLowerCase();
+  if (normalized === expected || normalized === "mock") return [];
+
+  if (normalized.includes("copilot")) {
+    return [
+      documentFinding(document, "EVAL-COPILOT-EXECUTOR", "Eval manifest still uses a Copilot executor", "eval", "medium", `Use executor: ${config.evalExecutor}, or set RENMA_EVAL_EXECUTOR when this repository intentionally targets another runner.`)
+    ];
+  }
+
+  return [
+    documentFinding(document, "EVAL-UNEXPECTED-EXECUTOR", "Eval manifest uses a different executor than configured", "eval", "low", `Use executor: ${config.evalExecutor}, or set eval_executor / RENMA_EVAL_EXECUTOR to the intended runner.`)
+  ];
 }
 
 function evalShapeFindings(document: ParsedDocument): Finding[] {
@@ -185,6 +207,80 @@ function yamlEvalShapeFindings(document: ParsedDocument, content: string): Findi
   }
 
   return findings;
+}
+
+function evalTaskFindings(document: ParsedDocument): Finding[] {
+  if (document.artifact.kind !== "eval_task") return [];
+
+  const content = document.artifact.content;
+  const ext = path.extname(document.artifact.path).toLowerCase();
+  if (ext === ".json") {
+    return jsonEvalTaskFindings(document, content);
+  }
+
+  return yamlEvalTaskFindings(document, content);
+}
+
+function jsonEvalTaskFindings(document: ParsedDocument, content: string): Finding[] {
+  let value: unknown;
+  try {
+    value = JSON.parse(content);
+  } catch {
+    return [
+      documentFinding(document, "EVAL-TASK-MALFORMED", "Eval task file is not valid JSON", "eval", "medium", "Fix the task file so the eval runner can parse it.")
+    ];
+  }
+
+  if (!isRecord(value)) {
+    return [
+      documentFinding(document, "EVAL-TASK-MALFORMED", "Eval task file is not an object", "eval", "medium", "Make the task file a single task object with id, name, and prompt or prompt_file.")
+    ];
+  }
+
+  const findings: Finding[] = [];
+  if (!hasNonEmptyString(value, "prompt") && !hasNonEmptyString(value, "prompt_file")) {
+    findings.push(documentFinding(document, "EVAL-TASK-MISSING-PROMPT", "Eval task lacks prompt or prompt_file", "eval", "medium", "Add prompt or prompt_file so the eval runner has a scenario to execute."));
+  }
+  if (!hasNonEmptyString(value, "id") || !hasNonEmptyString(value, "name")) {
+    findings.push(documentFinding(document, "EVAL-TASK-MISSING-IDENTITY", "Eval task lacks id or name", "eval", "low", "Add stable id and name fields so task results are readable and comparable."));
+  }
+  if (hasMalformedStringList(value, "output_contains") || hasMalformedStringList(value, "output_not_contains")) {
+    findings.push(documentFinding(document, "EVAL-TASK-MALFORMED-ASSERTIONS", "Eval task assertion fields are not string lists", "eval", "medium", "Make output_contains and output_not_contains arrays of strings."));
+  }
+
+  return findings;
+}
+
+function yamlEvalTaskFindings(document: ParsedDocument, content: string): Finding[] {
+  const findings: Finding[] = [];
+  if (!extractScalar(content, "prompt") && !extractScalar(content, "prompt_file")) {
+    findings.push(documentFinding(document, "EVAL-TASK-MISSING-PROMPT", "Eval task lacks prompt or prompt_file", "eval", "medium", "Add prompt or prompt_file so the eval runner has a scenario to execute."));
+  }
+  if (!extractScalar(content, "id") || !extractScalar(content, "name")) {
+    findings.push(documentFinding(document, "EVAL-TASK-MISSING-IDENTITY", "Eval task lacks id or name", "eval", "low", "Add stable id and name fields so task results are readable and comparable."));
+  }
+  if (yamlScalarListField(content, "output_contains") || yamlScalarListField(content, "output_not_contains")) {
+    findings.push(documentFinding(document, "EVAL-TASK-MALFORMED-ASSERTIONS", "Eval task assertion fields are not string lists", "eval", "medium", "Make output_contains and output_not_contains YAML lists of strings."));
+  }
+
+  return findings;
+}
+
+function evalTaskReferenceFindings(documents: ParsedDocument[]): Finding[] {
+  const taskPaths = documents.filter((document) => document.artifact.kind === "eval_task").map((document) => document.artifact.path);
+  return documents.filter((document) => document.artifact.kind === "eval").flatMap((document) => {
+    const patterns = extractTaskPatterns(document);
+    if (patterns.length === 0) return [];
+
+    const base = path.posix.dirname(document.artifact.path);
+    return patterns.flatMap((pattern) => {
+      const resolvedPattern = path.posix.normalize(path.posix.join(base, pattern));
+      const matches = taskPaths.some((taskPath) => globMatch(resolvedPattern, taskPath));
+      return matches
+        ? []
+        : [documentFinding(document, "EVAL-TASKS-NOT-FOUND", "Eval manifest tasks entry does not match any scanned task file", "eval", "medium", `Create task files matching ${pattern}, or update tasks to point at existing files.`)];
+    });
+  });
 }
 
 function skillCoverageFindings(documents: ParsedDocument[]): Finding[] {
@@ -278,6 +374,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function hasNonEmptyString(value: Record<string, unknown>, key: string): boolean {
+  return typeof value[key] === "string" && value[key].trim().length > 0;
+}
+
+function hasMalformedStringList(value: Record<string, unknown>, key: string): boolean {
+  return value[key] !== undefined && (!Array.isArray(value[key]) || !value[key].every((item) => typeof item === "string" && item.trim().length > 0));
+}
+
 function malformedRegexMatchValues(value: unknown): boolean {
   if (Array.isArray(value)) return value.some((item) => malformedRegexMatchValues(item));
   if (!isRecord(value)) return false;
@@ -290,6 +394,64 @@ function malformedRegexMatchValues(value: unknown): boolean {
   }
 
   return false;
+}
+
+function extractScalar(content: string, key: string): string | undefined {
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = content.match(new RegExp(`^[^\\S\\r\\n]*(?:-[^\\S\\r\\n]*)?${escapedKey}:[^\\S\\r\\n]*(.+)$`, "m"));
+  const value = match?.[1]?.trim();
+  if (!value || value === "[]" || value === "{}") return undefined;
+  return unquote(value);
+}
+
+function extractTaskPatterns(document: ParsedDocument): string[] {
+  const content = document.artifact.content;
+  if (path.extname(document.artifact.path).toLowerCase() === ".json") {
+    try {
+      const value = JSON.parse(content) as unknown;
+      return isRecord(value) && Array.isArray(value.tasks)
+        ? value.tasks.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+        : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return extractYamlStringList(content, "tasks");
+}
+
+function extractYamlStringList(content: string, key: string): string[] {
+  const inline = extractScalar(content, key);
+  if (inline?.startsWith("[") && inline.endsWith("]")) {
+    return inline
+      .slice(1, -1)
+      .split(",")
+      .map((item) => unquote(item.trim()))
+      .filter(Boolean);
+  }
+
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = content.match(new RegExp(`^[^\\S\\r\\n]*${escapedKey}:[^\\S\\r\\n]*\\r?\\n([\\s\\S]*?)(?=^[^\\S\\r\\n]*[A-Za-z0-9_-]+:|\\s*$)`, "m"));
+  if (!match) return [];
+  return (match[1] ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.match(/^[^\S\r\n]*-[^\S\r\n]+(.+)$/)?.[1]?.trim())
+    .filter((item): item is string => Boolean(item))
+    .map(unquote);
+}
+
+function yamlScalarListField(content: string, key: string): boolean {
+  const value = extractScalar(content, key);
+  return value !== undefined && !value.startsWith("[");
+}
+
+function globMatch(pattern: string, value: string): boolean {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*");
+  return new RegExp(`^${escaped}$`).test(value);
+}
+
+function unquote(value: string): string {
+  return value.replace(/^["']|["']$/g, "");
 }
 
 function approximateTokenCount(text: string): number {

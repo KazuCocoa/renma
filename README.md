@@ -67,6 +67,7 @@ AGENTS.md
 skills/**/profiles/**/*.md
 skills/**/references/**/*.md
 evals/**/eval.{json,yaml,yml}
+evals/**/tasks/*.{json,yaml,yml}
 ```
 
 It skips `node_modules`, `dist`, and `.git`, ignores symbolic links, enforces a maximum file size, and reports paths in stable POSIX-style form.
@@ -79,7 +80,8 @@ Configuration is applied in this order:
 
 1. Defaults
 2. Config file
-3. CLI flags
+3. Environment variables
+4. CLI flags
 
 Example:
 
@@ -98,7 +100,8 @@ Example:
   ],
   "max_file_size_bytes": 524288,
   "max_depth": 16,
-  "concurrency": 16
+  "concurrency": 16,
+  "eval_executor": "codex"
 }
 ```
 
@@ -111,6 +114,11 @@ Supported fields:
 - `max_file_size_bytes`: positive integer
 - `max_depth`: positive integer
 - `concurrency`: positive integer
+- `eval_executor`: expected eval runner name, defaults to `codex`
+
+Environment variables:
+
+- `RENMA_EVAL_EXECUTOR`: overrides `eval_executor`
 
 Invalid config fields exit code `2`.
 
@@ -135,6 +143,9 @@ Current rules cover early quality and safety signals, including:
 - profile overlays that do not declare a base skill
 - eval manifests missing safety or failure cases
 - malformed Waza-style eval manifests, including missing `tasks` lists and scalar `regex_match` grader parameters
+- eval task entries that do not match scanned task files
+- eval task files missing `prompt` / `prompt_file`, `id`, `name`, or list-shaped assertions
+- eval manifests that still use Copilot executor names instead of the configured executor
 
 Static checks are only evidence. Passing a scan does not prove a skill or workflow is safe.
 

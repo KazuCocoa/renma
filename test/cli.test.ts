@@ -31,6 +31,7 @@ test("top-level yaml eval manifests count as skill coverage", async () => {
   const root = await fixture();
   await mkdir(path.join(root, "skills", "demo"), { recursive: true });
   await mkdir(path.join(root, "evals", "demo"), { recursive: true });
+  await mkdir(path.join(root, "evals", "demo", "tasks"), { recursive: true });
   await writeFile(path.join(root, "skills", "demo", "SKILL.md"), `---
 name: "demo"
 description: "Use this skill for demo tasks when a short deterministic fixture needs verification, routing clarity, examples, preflight checks, and safety confirmation."
@@ -48,11 +49,12 @@ description: "Use this skill for demo tasks when a short deterministic fixture n
 - Demo input -> demo output.
 `);
   await writeFile(path.join(root, "evals", "demo", "eval.yaml"), "tasks:\n  - tasks/*.yaml\n# confirmation failure: missing host requires permission\n");
+  await writeFile(path.join(root, "evals", "demo", "tasks", "basic.yaml"), "id: demo-basic\nname: Demo basic\nprompt: missing host requires permission\n");
 
   const result = await scan(root);
 
   assert.ok(!result.findings.some((finding) => finding.id === "EVAL-MISSING-SKILL-COVERAGE"));
-  assert.equal(result.scannedFileCount, 2);
+  assert.equal(result.scannedFileCount, 3);
 });
 
 test("eval manifests report malformed Waza-style shapes", async () => {
@@ -66,6 +68,42 @@ test("eval manifests report malformed Waza-style shapes", async () => {
     "EVAL-MALFORMED-MANIFEST",
     "EVAL-MALFORMED-GRADER"
   ]);
+});
+
+test("eval task files and executor config are checked", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "evals", "demo", "tasks"), { recursive: true });
+  await writeFile(path.join(root, "evals", "demo", "eval.yaml"), "config:\n  executor: copilot-sdk\ntasks:\n  - tasks/missing.yaml\n# confirmation failure: missing host requires permission\n");
+  await writeFile(path.join(root, "evals", "demo", "tasks", "basic.yaml"), "id: demo-basic\nname: Demo basic\noutput_contains: verify\n");
+
+  const result = await scan(root);
+
+  assert.deepEqual(result.findings.map((finding) => finding.id), [
+    "EVAL-COPILOT-EXECUTOR",
+    "EVAL-TASKS-NOT-FOUND",
+    "EVAL-TASK-MISSING-PROMPT",
+    "EVAL-TASK-MALFORMED-ASSERTIONS"
+  ]);
+});
+
+test("RENMA_EVAL_EXECUTOR overrides expected eval executor", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "evals", "demo", "tasks"), { recursive: true });
+  await writeFile(path.join(root, "evals", "demo", "eval.yaml"), "config:\n  executor: local-runner\ntasks:\n  - tasks/basic.yaml\n# confirmation failure: missing host requires permission\n");
+  await writeFile(path.join(root, "evals", "demo", "tasks", "basic.yaml"), "id: demo-basic\nname: Demo basic\nprompt: missing host requires permission\n");
+
+  const previous = process.env.RENMA_EVAL_EXECUTOR;
+  process.env.RENMA_EVAL_EXECUTOR = "local-runner";
+  try {
+    const result = await scan(root);
+    assert.ok(!result.findings.some((finding) => finding.id === "EVAL-UNEXPECTED-EXECUTOR"));
+  } finally {
+    if (previous === undefined) {
+      delete process.env.RENMA_EVAL_EXECUTOR;
+    } else {
+      process.env.RENMA_EVAL_EXECUTOR = previous;
+    }
+  }
 });
 
 test("config loads fail_on and CLI override takes precedence", async () => {

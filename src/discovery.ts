@@ -62,6 +62,7 @@ function classify(relativePath: string): ArtifactKind {
   if (relativePath.includes("/profiles/")) return "profile";
   if (relativePath.includes("/references/")) return "reference";
   if (/\/eval\.(?:json|ya?ml)$/.test(relativePath)) return "eval";
+  if (/\/tasks\/[^/]+\.(?:json|ya?ml)$/.test(relativePath)) return "eval_task";
   if (
     relativePath.endsWith("renma.config.json") ||
     relativePath.endsWith(".renma.json")

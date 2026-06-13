@@ -6,6 +6,7 @@ export type ArtifactKind =
   | "profile"
   | "reference"
   | "eval"
+  | "eval_task"
   | "config"
   | "unknown";
 
@@ -41,6 +42,7 @@ export interface ScanConfig {
   maxFileSizeBytes: number;
   maxDepth: number;
   concurrency: number;
+  evalExecutor: string;
 }
 
 export interface LoadedConfig {
