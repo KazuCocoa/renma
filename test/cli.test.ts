@@ -154,7 +154,7 @@ Do not use for production work.
 
 ## Examples
 Demo input -> demo output.
-`);
+`);I m
   await writeFile(path.join(root, "skills", "demo", "examples", "happy-path.md"), "# Happy Path\n\nInput -> output.\n");
 
   const result = await scan(root);
