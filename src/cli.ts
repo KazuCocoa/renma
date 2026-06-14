@@ -1,21 +1,12 @@
 import { parseArgs } from "node:util";
+import packageJson from "../package.json" with { type: "json" };
 import { ConfigError } from "./config.js";
 import { formatJson, formatText } from "./report.js";
 import { scan } from "./scanner.js";
 import { severityMeets } from "./rules.js";
 import type { Severity } from "./types.js";
 
-const VERSION = "0.1.0";
-const NODE_MAJOR = 22;
-const NODE_MINOR = 17;
-
 export async function main(argv = process.argv.slice(2)): Promise<number> {
-  const versionError = checkNodeVersion(process.versions.node);
-  if (versionError) {
-    console.error(versionError);
-    return 2;
-  }
-
   let parsed;
   try {
     parsed = parseArgs({
@@ -40,7 +31,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     return 0;
   }
   if (parsed.values.version) {
-    console.log(VERSION);
+    console.log(packageJson.version ?? "unknown");
     return 0;
   }
 
@@ -98,15 +89,6 @@ function parseSeverity(value: string | undefined): Severity | undefined {
   )
     return value;
   return undefined;
-}
-
-function checkNodeVersion(version: string): string | undefined {
-  const [majorRaw, minorRaw] = version.split(".");
-  const major = Number(majorRaw);
-  const minor = Number(minorRaw);
-  if (major > NODE_MAJOR || (major === NODE_MAJOR && minor >= NODE_MINOR))
-    return undefined;
-  return `Renma requires Node >=${NODE_MAJOR}.${NODE_MINOR}. Current Node is ${version}.`;
 }
 
 function helpText(): string {
