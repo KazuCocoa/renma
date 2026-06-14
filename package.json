@@ -20,7 +20,7 @@
     "format:check": "prettier --check \"src/**/*.{ts,js,json}\""
   },
   "devDependencies": {
-    "@types/node": "^22.19.21",
+    "@types/node": "^22.15.30",
     "eslint-config-prettier": "10.1.8",
     "prettier": "^3.5.3",
     "typescript": "^5.8.3"
