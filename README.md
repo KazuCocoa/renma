@@ -1,6 +1,6 @@
 # Renma - 練磨
 
-Renma is a minimal-dependency TypeScript CLI for reviewing AI-agent skills, repository instructions, profile overlays, references, and eval manifests.
+Renma is a minimal-dependency TypeScript CLI for reviewing AI-agent skills, repository instructions, profile overlays, references, and examples.
 
 The scanner reads known skill-related files, runs deterministic quality and safety rules, and emits text or JSON reports with file and line evidence.
 
@@ -67,8 +67,6 @@ AGENTS.md
 skills/**/profiles/**/*.md
 skills/**/references/**/*.md
 skills/**/examples/**/*.md
-evals/**/eval.{json,yaml,yml}
-evals/**/tasks/*.{json,yaml,yml}
 ```
 
 It skips `node_modules`, `dist`, and `.git`, ignores symbolic links, enforces a maximum file size, and reports paths in stable POSIX-style form.
@@ -81,8 +79,7 @@ Configuration is applied in this order:
 
 1. Defaults
 2. Config file
-3. Environment variables
-4. CLI flags
+3. CLI flags
 
 Example:
 
@@ -101,8 +98,7 @@ Example:
   ],
   "max_file_size_bytes": 524288,
   "max_depth": 16,
-  "concurrency": 16,
-  "eval_executor": "codex"
+  "concurrency": 16
 }
 ```
 
@@ -115,11 +111,6 @@ Supported fields:
 - `max_file_size_bytes`: positive integer
 - `max_depth`: positive integer
 - `concurrency`: positive integer
-- `eval_executor`: expected eval runner name, defaults to `codex`
-
-Environment variables:
-
-- `RENMA_EVAL_EXECUTOR`: overrides `eval_executor`
 
 Invalid config fields exit code `2`.
 
@@ -136,18 +127,12 @@ Current rules cover early quality and safety signals, including:
 - missing skill description, examples, preflight, verification, negative routing, or explicit routing clarity
 - short frontmatter descriptions that make skill routing ambiguous
 - oversized `SKILL.md` entrypoints that should move detailed procedures into `references/`
-- missing top-level eval coverage for each skill
 - literal credential-like values and private key material
 - destructive command examples without nearby confirmation or recovery guidance
 - risky remote access defaults
 - broad environment copying into subprocess execution
 - profile overlays that do not declare a base skill
 - context files under profiles, references, and examples that are not routed from the top-level skill
-- eval manifests missing safety or failure cases
-- malformed Waza-style eval manifests, including missing `tasks` lists and scalar `regex_match` grader parameters
-- eval task entries that do not match scanned task files
-- eval task files missing `prompt` / `prompt_file`, `id`, `name`, or list-shaped assertions
-- eval manifests that still use Copilot executor names instead of the configured executor
 
 Static checks are only evidence. Passing a scan does not prove a skill or workflow is safe.
 

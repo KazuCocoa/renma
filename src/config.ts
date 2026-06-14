@@ -14,15 +14,12 @@ export const DEFAULT_CONFIG: ScanConfig = {
     "AGENTS.md",
     "skills/**/profiles/**/*.md",
     "skills/**/references/**/*.md",
-    "skills/**/examples/**/*.md",
-    "evals/**/eval.{json,yaml,yml}",
-    "evals/**/tasks/*.{json,yaml,yml}"
+    "skills/**/examples/**/*.md"
   ],
   exclude: ["node_modules", "dist", ".git"],
   maxFileSizeBytes: 512 * 1024,
   maxDepth: 16,
-  concurrency: 16,
-  evalExecutor: "codex"
+  concurrency: 16
 };
 
 export class ConfigError extends Error {}
@@ -36,10 +33,7 @@ export interface ConfigOverrides {
 export async function loadConfig(root: string, overrides: ConfigOverrides): Promise<LoadedConfig> {
   const discoveredPath = overrides.configPath ?? await findDefaultConfig(root);
   const fileConfig = discoveredPath ? await readConfigFile(discoveredPath) : {};
-  const config = {
-    ...normalizeConfig(fileConfig, discoveredPath),
-    ...envConfig()
-  };
+  const config = normalizeConfig(fileConfig, discoveredPath);
 
   return {
     config: {
@@ -93,8 +87,7 @@ function normalizeConfig(value: unknown, configPath?: string): Partial<ScanConfi
     "exclude",
     "max_file_size_bytes",
     "max_depth",
-    "concurrency",
-    "eval_executor"
+    "concurrency"
   ]);
   for (const key of Object.keys(value)) {
     if (!allowed.has(key)) {
@@ -112,14 +105,8 @@ function normalizeConfig(value: unknown, configPath?: string): Partial<ScanConfi
   }
   if (value.max_depth !== undefined) config.maxDepth = positiveInteger("max_depth", value.max_depth);
   if (value.concurrency !== undefined) config.concurrency = positiveInteger("concurrency", value.concurrency);
-  if (value.eval_executor !== undefined) config.evalExecutor = nonEmptyString("eval_executor", value.eval_executor);
 
   return config;
-}
-
-function envConfig(): Partial<ScanConfig> {
-  const executor = process.env.RENMA_EVAL_EXECUTOR?.trim();
-  return executor ? { evalExecutor: executor } : {};
 }
 
 function enumValue<const T extends readonly string[]>(field: string, value: unknown, allowed: T): T[number] {
@@ -135,11 +122,6 @@ function stringArray(field: string, value: unknown): string[] {
 function positiveInteger(field: string, value: unknown): number {
   if (Number.isInteger(value) && typeof value === "number" && value > 0) return value;
   throw new ConfigError(`${field} must be a positive integer.`);
-}
-
-function nonEmptyString(field: string, value: unknown): string {
-  if (typeof value === "string" && value.trim().length > 0) return value.trim();
-  throw new ConfigError(`${field} must be a non-empty string.`);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

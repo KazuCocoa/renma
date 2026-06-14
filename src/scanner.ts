@@ -10,7 +10,7 @@ export async function scan(targetPath: string, overrides: ConfigOverrides = {}):
   const { config, configPath } = await loadConfig(root, overrides);
   const { artifacts, diagnostics } = await discoverArtifacts(root, config);
   const documents = artifacts.map(parseDocument);
-  const findings = runRules(documents, config);
+  const findings = runRules(documents);
 
   return {
     root,

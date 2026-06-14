@@ -4,7 +4,7 @@
 
 Renma is a deterministic, minimal-dependency CLI for reviewing AI-agent skills and related repository instructions.
 
-It should stay fast enough for local development and CI. It should catch structural, safety, and eval-readiness issues before a heavier tool such as Waza or SkillSpector runs.
+It should stay fast enough for local development and CI. It should catch structural, safety, and context-readiness issues before a heavier tool such as Waza or SkillSpector runs.
 
 Renma is not currently an eval runner, LLM judge, or full malware scanner. Those can remain future directions unless there is a clear reason to expand scope.
 
@@ -64,8 +64,7 @@ Renma should validate that this orchestration stays understandable:
 - Applies config in this order:
   1. Defaults
   2. Config file
-  3. Environment variables
-  4. CLI flags
+  3. CLI flags
 - Supports `fail_on`.
 - Supports `format`.
 - Supports `globs`.
@@ -73,8 +72,6 @@ Renma should validate that this orchestration stays understandable:
 - Supports `max_file_size_bytes`.
 - Supports `max_depth`.
 - Supports `concurrency`.
-- Supports `eval_executor`, defaulting to `codex`.
-- Supports `RENMA_EVAL_EXECUTOR`.
 
 ### Discovery
 
@@ -86,8 +83,6 @@ Default globs:
 - `skills/**/profiles/**/*.md`
 - `skills/**/references/**/*.md`
 - `skills/**/examples/**/*.md`
-- `evals/**/eval.{json,yaml,yml}`
-- `evals/**/tasks/*.{json,yaml,yml}`
 
 Scan behavior:
 
@@ -133,15 +128,6 @@ Scan behavior:
   - destructive commands without nearby confirmation
   - risky remote defaults
   - broad environment copying into subprocesses
-- Eval readiness:
-  - missing top-level eval coverage
-  - malformed Waza-style eval manifests
-  - missing or malformed `tasks` list
-  - scalar `regex_match`
-  - missing referenced task files
-  - task files missing `id`, `name`, `prompt`, or `prompt_file`
-  - malformed task assertion lists
-  - Copilot executor migration warning
 
 ### Reporting
 
@@ -173,8 +159,7 @@ Current Renma conventions are useful defaults, but they should become configurab
 
 - `profiles` are scanned as files under `skills/**/profiles/**/*.md`.
 - `references` are scanned as files under `skills/**/references/**/*.md`.
-- `evals` are scanned under top-level `evals/**`.
-- Renma checks for missing eval coverage and basic eval/task shape.
+- Eval support is planned, but not part of the current implementation.
 - Renma does not yet understand which references or profiles are relevant for a specific request.
 - Renma does not yet understand which examples are relevant for a specific request.
 - Renma does not yet verify that `SKILL.md` gives good context-routing instructions.
