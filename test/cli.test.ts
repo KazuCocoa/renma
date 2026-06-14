@@ -106,6 +106,63 @@ test("RENMA_EVAL_EXECUTOR overrides expected eval executor", async () => {
   }
 });
 
+test("context examples are scanned and must be routed by the skill", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "skills", "demo", "examples"), { recursive: true });
+  await writeFile(path.join(root, "skills", "demo", "SKILL.md"), `---
+name: "demo"
+description: "Use this skill for demo tasks when a short deterministic fixture needs verification, routing clarity, examples, preflight checks, and safety confirmation."
+---
+# Demo
+
+## Do Not Use For
+Do not use for production work.
+
+## Instructions
+1. First capture preflight context.
+2. Verify the result with a test.
+
+## Examples
+Demo input -> demo output.
+`);
+  await writeFile(path.join(root, "skills", "demo", "examples", "happy-path.md"), "# Happy Path\n\nInput -> output.\n");
+
+  const result = await scan(root);
+
+  assert.ok(result.findings.some((finding) => finding.id === "CTX-MISSING-ROUTING-MAP"));
+  assert.ok(result.findings.some((finding) => finding.id === "CTX-UNUSED-EXAMPLE"));
+});
+
+test("routed context examples do not report unused example findings", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "skills", "demo", "examples"), { recursive: true });
+  await writeFile(path.join(root, "skills", "demo", "SKILL.md"), `---
+name: "demo"
+description: "Use this skill for demo tasks when a short deterministic fixture needs verification, routing clarity, examples, preflight checks, and safety confirmation."
+---
+# Demo
+
+## Context Selection
+- For the happy path, load examples/happy-path.md.
+
+## Do Not Use For
+Do not use for production work.
+
+## Instructions
+1. First capture preflight context.
+2. Verify the result with a test.
+
+## Examples
+Demo input -> demo output.
+`);
+  await writeFile(path.join(root, "skills", "demo", "examples", "happy-path.md"), "# Happy Path\n\nInput -> output.\n");
+
+  const result = await scan(root);
+
+  assert.ok(!result.findings.some((finding) => finding.id === "CTX-MISSING-ROUTING-MAP"));
+  assert.ok(!result.findings.some((finding) => finding.id === "CTX-UNUSED-EXAMPLE"));
+});
+
 test("config loads fail_on and CLI override takes precedence", async () => {
   const root = await fixture();
   await writeFile(path.join(root, "renma.config.json"), JSON.stringify({ fail_on: "critical", format: "json" }));

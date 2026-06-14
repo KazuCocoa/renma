@@ -85,6 +85,7 @@ Default globs:
 - `AGENTS.md`
 - `skills/**/profiles/**/*.md`
 - `skills/**/references/**/*.md`
+- `skills/**/examples/**/*.md`
 - `evals/**/eval.{json,yaml,yml}`
 - `evals/**/tasks/*.{json,yaml,yml}`
 
@@ -122,6 +123,10 @@ Scan behavior:
   - oversized `SKILL.md`
 - Profile overlays:
   - missing base skill declaration
+- Context mixin foundation:
+  - profiles, references, and examples scanned as context artifacts
+  - context files should be routed from top-level `SKILL.md`
+  - unused profiles, references, and examples can be reported
 - Safety and command risks:
   - literal secret-like values
   - private key material

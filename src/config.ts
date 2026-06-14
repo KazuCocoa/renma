@@ -14,6 +14,7 @@ export const DEFAULT_CONFIG: ScanConfig = {
     "AGENTS.md",
     "skills/**/profiles/**/*.md",
     "skills/**/references/**/*.md",
+    "skills/**/examples/**/*.md",
     "evals/**/eval.{json,yaml,yml}",
     "evals/**/tasks/*.{json,yaml,yml}"
   ],

@@ -5,6 +5,7 @@ export type ArtifactKind =
   | "agent"
   | "profile"
   | "reference"
+  | "example"
   | "eval"
   | "eval_task"
   | "config"

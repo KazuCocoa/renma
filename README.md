@@ -66,6 +66,7 @@ skills/**/SKILL.md
 AGENTS.md
 skills/**/profiles/**/*.md
 skills/**/references/**/*.md
+skills/**/examples/**/*.md
 evals/**/eval.{json,yaml,yml}
 evals/**/tasks/*.{json,yaml,yml}
 ```
@@ -141,6 +142,7 @@ Current rules cover early quality and safety signals, including:
 - risky remote access defaults
 - broad environment copying into subprocess execution
 - profile overlays that do not declare a base skill
+- context files under profiles, references, and examples that are not routed from the top-level skill
 - eval manifests missing safety or failure cases
 - malformed Waza-style eval manifests, including missing `tasks` lists and scalar `regex_match` grader parameters
 - eval task entries that do not match scanned task files

@@ -25,6 +25,7 @@ export function runRules(documents: ParsedDocument[], config: ScanConfig): Findi
   ]);
 
   findings.push(...skillCoverageFindings(documents));
+  findings.push(...contextOrchestrationFindings(documents));
   findings.push(...evalTaskReferenceFindings(documents));
   return findings.sort((a, b) => {
     const byPath = a.evidence.path.localeCompare(b.evidence.path);
@@ -283,6 +284,36 @@ function evalTaskReferenceFindings(documents: ParsedDocument[]): Finding[] {
   });
 }
 
+function contextOrchestrationFindings(documents: ParsedDocument[]): Finding[] {
+  const skills = documents.filter((document) => document.artifact.kind === "skill");
+  return skills.flatMap((skill) => {
+    const skillDir = path.posix.dirname(skill.artifact.path);
+    const contextDocs = documents.filter((document) =>
+      ["profile", "reference", "example"].includes(document.artifact.kind) &&
+      document.artifact.path.startsWith(`${skillDir}/`)
+    );
+    if (contextDocs.length === 0) return [];
+
+    const findings: Finding[] = [];
+    const text = skill.artifact.content.toLowerCase();
+    const hasContextRouting = /context selection|context map|mixin|profiles?\/|references?\/|examples?\/|load .*?(?:profile|reference|example)|select .*?(?:profile|reference|example)/.test(text);
+    if (!hasContextRouting) {
+      findings.push(documentFinding(skill, "CTX-MISSING-ROUTING-MAP", "Skill has context files but no routing map", "structure", "medium", "Add context-selection guidance so the top-level skill tells the LLM when to load profiles, references, examples, or scripts."));
+    }
+
+    for (const document of contextDocs) {
+      const name = path.posix.basename(document.artifact.path, path.posix.extname(document.artifact.path));
+      const routedByPath = skill.artifact.content.includes(document.artifact.path);
+      const routedByName = new RegExp(`\\b${escapeRegExp(name)}\\b`, "i").test(skill.artifact.content);
+      if (!routedByPath && !routedByName) {
+        findings.push(documentFinding(document, contextUnusedRuleId(document.artifact.kind), "Context file is not routed from the skill", "structure", "low", "Reference this context from SKILL.md or a context map with clear when-to-load guidance."));
+      }
+    }
+
+    return findings;
+  });
+}
+
 function skillCoverageFindings(documents: ParsedDocument[]): Finding[] {
   const evalPaths = new Set(documents.filter((document) => document.artifact.kind === "eval").map((document) => document.artifact.path));
   const skills = documents.filter((document) => document.artifact.kind === "skill");
@@ -394,6 +425,16 @@ function malformedRegexMatchValues(value: unknown): boolean {
   }
 
   return false;
+}
+
+function contextUnusedRuleId(kind: ParsedDocument["artifact"]["kind"]): string {
+  if (kind === "profile") return "CTX-UNUSED-PROFILE";
+  if (kind === "example") return "CTX-UNUSED-EXAMPLE";
+  return "CTX-UNUSED-REFERENCE";
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function extractScalar(content: string, key: string): string | undefined {
