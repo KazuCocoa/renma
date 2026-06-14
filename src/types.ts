@@ -5,8 +5,7 @@ export type ArtifactKind =
   | "agent"
   | "profile"
   | "reference"
-  | "eval"
-  | "eval_task"
+  | "example"
   | "config"
   | "unknown";
 
@@ -20,7 +19,7 @@ export interface Evidence {
 export interface Finding {
   id: string;
   title: string;
-  category: "quality" | "safety" | "structure" | "eval" | "maintenance";
+  category: "quality" | "safety" | "structure" | "maintenance";
   severity: Severity;
   confidence: "low" | "medium" | "high";
   evidence: Evidence;
@@ -42,7 +41,6 @@ export interface ScanConfig {
   maxFileSizeBytes: number;
   maxDepth: number;
   concurrency: number;
-  evalExecutor: string;
 }
 
 export interface LoadedConfig {

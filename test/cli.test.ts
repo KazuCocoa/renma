@@ -21,17 +21,14 @@ test("scan discovers default artifacts and emits deterministic findings", async 
     "QUAL-MISSING-EXAMPLES",
     "QUAL-MISSING-PREFLIGHT",
     "QUAL-MISSING-VERIFICATION",
-    "EVAL-MISSING-SKILL-COVERAGE",
     "SEC-DESTRUCTIVE-COMMAND"
   ]);
   assert.equal(result.findings.at(-1)?.evidence.path, "skills/demo/SKILL.md");
 });
 
-test("top-level yaml eval manifests count as skill coverage", async () => {
+test("context examples are scanned and must be routed by the skill", async () => {
   const root = await fixture();
-  await mkdir(path.join(root, "skills", "demo"), { recursive: true });
-  await mkdir(path.join(root, "evals", "demo"), { recursive: true });
-  await mkdir(path.join(root, "evals", "demo", "tasks"), { recursive: true });
+  await mkdir(path.join(root, "skills", "demo", "examples"), { recursive: true });
   await writeFile(path.join(root, "skills", "demo", "SKILL.md"), `---
 name: "demo"
 description: "Use this skill for demo tasks when a short deterministic fixture needs verification, routing clarity, examples, preflight checks, and safety confirmation."
@@ -39,71 +36,51 @@ description: "Use this skill for demo tasks when a short deterministic fixture n
 # Demo
 
 ## Do Not Use For
-- Do not use for production work.
+Do not use for production work.
 
 ## Instructions
 1. First capture preflight context.
 2. Verify the result with a test.
 
 ## Examples
-- Demo input -> demo output.
+Demo input -> demo output.
 `);
-  await writeFile(path.join(root, "evals", "demo", "eval.yaml"), "tasks:\n  - tasks/*.yaml\n# confirmation failure: missing host requires permission\n");
-  await writeFile(path.join(root, "evals", "demo", "tasks", "basic.yaml"), "id: demo-basic\nname: Demo basic\nprompt: missing host requires permission\n");
+  await writeFile(path.join(root, "skills", "demo", "examples", "happy-path.md"), "# Happy Path\n\nInput -> output.\n");
 
   const result = await scan(root);
 
-  assert.ok(!result.findings.some((finding) => finding.id === "EVAL-MISSING-SKILL-COVERAGE"));
-  assert.equal(result.scannedFileCount, 3);
+  assert.ok(result.findings.some((finding) => finding.id === "CTX-MISSING-ROUTING-MAP"));
+  assert.ok(result.findings.some((finding) => finding.id === "CTX-UNUSED-EXAMPLE"));
 });
 
-test("eval manifests report malformed Waza-style shapes", async () => {
+test("routed context examples do not report unused example findings", async () => {
   const root = await fixture();
-  await mkdir(path.join(root, "evals", "demo"), { recursive: true });
-  await writeFile(path.join(root, "evals", "demo", "eval.yaml"), "cases:\n  - name: confirmation failure\n    prompt: missing host requires permission\n    graders:\n      - regex_match: passed\n");
+  await mkdir(path.join(root, "skills", "demo", "examples"), { recursive: true });
+  await writeFile(path.join(root, "skills", "demo", "SKILL.md"), `---
+name: "demo"
+description: "Use this skill for demo tasks when a short deterministic fixture needs verification, routing clarity, examples, preflight checks, and safety confirmation."
+---
+# Demo
+
+## Context Selection
+- For the happy path, load examples/happy-path.md.
+
+## Do Not Use For
+Do not use for production work.
+
+## Instructions
+1. First capture preflight context.
+2. Verify the result with a test.
+
+## Examples
+Demo input -> demo output.
+`);
+  await writeFile(path.join(root, "skills", "demo", "examples", "happy-path.md"), "# Happy Path\n\nInput -> output.\n");
 
   const result = await scan(root);
 
-  assert.deepEqual(result.findings.map((finding) => finding.id), [
-    "EVAL-MALFORMED-MANIFEST",
-    "EVAL-MALFORMED-GRADER"
-  ]);
-});
-
-test("eval task files and executor config are checked", async () => {
-  const root = await fixture();
-  await mkdir(path.join(root, "evals", "demo", "tasks"), { recursive: true });
-  await writeFile(path.join(root, "evals", "demo", "eval.yaml"), "config:\n  executor: copilot-sdk\ntasks:\n  - tasks/missing.yaml\n# confirmation failure: missing host requires permission\n");
-  await writeFile(path.join(root, "evals", "demo", "tasks", "basic.yaml"), "id: demo-basic\nname: Demo basic\noutput_contains: verify\n");
-
-  const result = await scan(root);
-
-  assert.deepEqual(result.findings.map((finding) => finding.id), [
-    "EVAL-COPILOT-EXECUTOR",
-    "EVAL-TASKS-NOT-FOUND",
-    "EVAL-TASK-MISSING-PROMPT",
-    "EVAL-TASK-MALFORMED-ASSERTIONS"
-  ]);
-});
-
-test("RENMA_EVAL_EXECUTOR overrides expected eval executor", async () => {
-  const root = await fixture();
-  await mkdir(path.join(root, "evals", "demo", "tasks"), { recursive: true });
-  await writeFile(path.join(root, "evals", "demo", "eval.yaml"), "config:\n  executor: local-runner\ntasks:\n  - tasks/basic.yaml\n# confirmation failure: missing host requires permission\n");
-  await writeFile(path.join(root, "evals", "demo", "tasks", "basic.yaml"), "id: demo-basic\nname: Demo basic\nprompt: missing host requires permission\n");
-
-  const previous = process.env.RENMA_EVAL_EXECUTOR;
-  process.env.RENMA_EVAL_EXECUTOR = "local-runner";
-  try {
-    const result = await scan(root);
-    assert.ok(!result.findings.some((finding) => finding.id === "EVAL-UNEXPECTED-EXECUTOR"));
-  } finally {
-    if (previous === undefined) {
-      delete process.env.RENMA_EVAL_EXECUTOR;
-    } else {
-      process.env.RENMA_EVAL_EXECUTOR = previous;
-    }
-  }
+  assert.ok(!result.findings.some((finding) => finding.id === "CTX-MISSING-ROUTING-MAP"));
+  assert.ok(!result.findings.some((finding) => finding.id === "CTX-UNUSED-EXAMPLE"));
 });
 
 test("config loads fail_on and CLI override takes precedence", async () => {
@@ -147,7 +124,7 @@ test("CLI reports JSON and fail-on exit code", async () => {
   await mkdir(path.join(root, "skills", "demo"), { recursive: true });
   await writeFile(path.join(root, "skills", "demo", "SKILL.md"), "# Demo\n\napi_key = \"abcd1234abcd1234\"\n");
 
-  const exitCode = await withCapturedConsole(() => main(["scan", root, "--json", "--fail-on", "critical"]));
+  const exitCode = await withCapturedConsole(() => main(["scan", root, "--json", "--fail-on", "high"]));
   const report = JSON.parse(exitCode.stdout) as { findings: Array<{ id: string }> };
 
   assert.equal(exitCode.code, 1);
