@@ -27,8 +27,8 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         format: { type: "string" },
         json: { type: "boolean" },
         help: { type: "boolean", short: "h" },
-        version: { type: "boolean", short: "v" }
-      }
+        version: { type: "boolean", short: "v" },
+      },
     });
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
@@ -46,7 +46,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
   const [command, target = "."] = parsed.positionals;
   if (command !== "scan") {
-    console.error(command ? `Unknown command "${command}".` : "Missing command.");
+    console.error(
+      command ? `Unknown command "${command}".` : "Missing command.",
+    );
     console.error("Run renma --help for usage.");
     return 2;
   }
@@ -67,19 +69,34 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     const result = await scan(target, {
       ...(parsed.values.config ? { configPath: parsed.values.config } : {}),
       ...(failOn ? { failOn } : {}),
-      ...(format ? { format } : {})
+      ...(format ? { format } : {}),
     });
-    const output = result.format === "json" ? formatJson(result) : formatText(result);
+    const output =
+      result.format === "json" ? formatJson(result) : formatText(result);
     process.stdout.write(output);
-    return result.findings.some((finding) => severityMeets(finding.severity, result.exitThreshold)) ? 1 : 0;
+    return result.findings.some((finding) =>
+      severityMeets(finding.severity, result.exitThreshold),
+    )
+      ? 1
+      : 0;
   } catch (error) {
-    console.error(error instanceof ConfigError || error instanceof Error ? error.message : String(error));
+    console.error(
+      error instanceof ConfigError || error instanceof Error
+        ? error.message
+        : String(error),
+    );
     return 2;
   }
 }
 
 function parseSeverity(value: string | undefined): Severity | undefined {
-  if (value === "low" || value === "medium" || value === "high" || value === "critical") return value;
+  if (
+    value === "low" ||
+    value === "medium" ||
+    value === "high" ||
+    value === "critical"
+  )
+    return value;
   return undefined;
 }
 
@@ -87,7 +104,8 @@ function checkNodeVersion(version: string): string | undefined {
   const [majorRaw, minorRaw] = version.split(".");
   const major = Number(majorRaw);
   const minor = Number(minorRaw);
-  if (major > NODE_MAJOR || (major === NODE_MAJOR && minor >= NODE_MINOR)) return undefined;
+  if (major > NODE_MAJOR || (major === NODE_MAJOR && minor >= NODE_MINOR))
+    return undefined;
   return `Renma requires Node >=${NODE_MAJOR}.${NODE_MINOR}. Current Node is ${version}.`;
 }
 
@@ -101,6 +119,6 @@ function helpText(): string {
     "      --format <format>    Output format: text or json",
     "      --json               Shortcut for --format json",
     "  -h, --help               Show help",
-    "  -v, --version            Show version"
+    "  -v, --version            Show version",
   ].join("\n");
 }

@@ -1,4 +1,10 @@
-import type { Artifact, CodeFence, Heading, Link, ParsedDocument } from "./types.js";
+import type {
+  Artifact,
+  CodeFence,
+  Heading,
+  Link,
+  ParsedDocument,
+} from "./types.js";
 
 export function parseDocument(artifact: Artifact): ParsedDocument {
   const lines = artifact.content.split(/\r?\n/);
@@ -23,7 +29,7 @@ export function parseDocument(artifact: Artifact): ParsedDocument {
           language: fenceLanguage,
           content: fenceLines.join("\n"),
           startLine: fenceStart,
-          endLine: lineNumber
+          endLine: lineNumber,
         });
         fenceStart = undefined;
         fenceLanguage = "";
@@ -39,11 +45,19 @@ export function parseDocument(artifact: Artifact): ParsedDocument {
 
     const heading = line.match(/^(#{1,6})\s+(.+?)\s*#*$/);
     if (heading) {
-      headings.push({ depth: heading[1]?.length ?? 1, text: heading[2]?.trim() ?? "", line: lineNumber });
+      headings.push({
+        depth: heading[1]?.length ?? 1,
+        text: heading[2]?.trim() ?? "",
+        line: lineNumber,
+      });
     }
 
     for (const match of line.matchAll(/\[([^\]]+)\]\(([^)]+)\)/g)) {
-      links.push({ text: match[1] ?? "", target: match[2] ?? "", line: lineNumber });
+      links.push({
+        text: match[1] ?? "",
+        target: match[2] ?? "",
+        line: lineNumber,
+      });
     }
   });
 
@@ -52,7 +66,7 @@ export function parseDocument(artifact: Artifact): ParsedDocument {
       language: fenceLanguage,
       content: fenceLines.join("\n"),
       startLine: fenceStart,
-      endLine: lines.length
+      endLine: lines.length,
     });
   }
 

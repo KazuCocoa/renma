@@ -5,7 +5,10 @@ import { parseDocument } from "./markdown.js";
 import { runRules } from "./rules.js";
 import type { ScanResult } from "./types.js";
 
-export async function scan(targetPath: string, overrides: ConfigOverrides = {}): Promise<ScanResult> {
+export async function scan(
+  targetPath: string,
+  overrides: ConfigOverrides = {},
+): Promise<ScanResult> {
   const root = path.resolve(targetPath);
   const { config, configPath } = await loadConfig(root, overrides);
   const { artifacts, diagnostics } = await discoverArtifacts(root, config);
@@ -19,6 +22,6 @@ export async function scan(targetPath: string, overrides: ConfigOverrides = {}):
     format: config.format,
     findings,
     diagnostics,
-    exitThreshold: config.failOn
+    exitThreshold: config.failOn,
   };
 }
