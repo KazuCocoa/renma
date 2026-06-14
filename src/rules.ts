@@ -78,7 +78,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
   }
 
   if (document.artifact.kind === "skill" && tokenCount > SKILL_TOKEN_LIMIT) {
-    findings.push(documentFinding(document, "QUAL-SKILL-TOKEN-BUDGET", "Skill entrypoint exceeds token budget", "quality", "medium", `Keep SKILL.md under about ${SKILL_TOKEN_LIMIT} tokens by moving procedures, catalogs, and troubleshooting tables into references/.`));
+    findings.push(documentFinding(document, "QUAL-SKILL-TOKEN-BUDGET", "Skill entrypoint exceeds token budget", "quality", "medium", `Keep SKILL.md under about ${SKILL_TOKEN_LIMIT} tokens by losslessly extracting detailed procedures, commands, prerequisites, edge cases, and troubleshooting tables into references/. Do not summarize away concrete steps; keep SKILL.md as the router that links to the preserved details.`));
   }
 
   if (!/do not use for|non-goals|out of scope/.test(text)) {
@@ -129,7 +129,7 @@ function contextOrchestrationFindings(documents: ParsedDocument[]): Finding[] {
     const text = skill.artifact.content.toLowerCase();
     const hasContextRouting = /context selection|context map|mixin|profiles?\/|references?\/|examples?\/|load .*?(?:profile|reference|example)|select .*?(?:profile|reference|example)/.test(text);
     if (!hasContextRouting) {
-      findings.push(documentFinding(skill, "CTX-MISSING-ROUTING-MAP", "Skill has context files but no routing map", "structure", "medium", "Add context-selection guidance so the top-level skill tells the LLM when to load profiles, references, examples, or scripts."));
+      findings.push(documentFinding(skill, "CTX-MISSING-ROUTING-MAP", "Skill has context files but no routing map", "structure", "medium", "Add context-selection guidance so the top-level skill tells the LLM when to load profiles, references, examples, or scripts. Preserve the original concrete steps in those context files and route to them explicitly instead of replacing them with a high-level summary."));
     }
 
     for (const document of contextDocs) {
@@ -137,7 +137,7 @@ function contextOrchestrationFindings(documents: ParsedDocument[]): Finding[] {
       const routedByPath = skill.artifact.content.includes(document.artifact.path);
       const routedByName = new RegExp(`\\b${escapeRegExp(name)}\\b`, "i").test(skill.artifact.content);
       if (!routedByPath && !routedByName) {
-        findings.push(documentFinding(document, contextUnusedRuleId(document.artifact.kind), "Context file is not routed from the skill", "structure", "low", "Reference this context from SKILL.md or a context map with clear when-to-load guidance."));
+        findings.push(documentFinding(document, contextUnusedRuleId(document.artifact.kind), "Context file is not routed from the skill", "structure", "low", "Reference this context from SKILL.md or a context map with clear when-to-load guidance so preserved details remain reachable to the LLM."));
       }
     }
 

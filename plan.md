@@ -155,6 +155,21 @@ Scan behavior:
 
 Current Renma conventions are useful defaults, but they should become configurable enough for a top-level skill to act as a context-mixin orchestrator. The orchestrator should tell an LLM what context to load, when to load it, and what not to load.
 
+### Lossless Refactoring Principle
+
+When Renma suggests splitting a large `SKILL.md` into references, examples, scripts, or mixins, the fix should preserve the original operational content.
+
+LLM-oriented remediation should say:
+
+- do not delete concrete commands, prerequisites, edge cases, or verification steps
+- move detailed procedures into context files instead of summarizing them away
+- keep the top-level `SKILL.md` as a router/index
+- link each moved section from the relevant context mixin or routing branch
+- preserve warnings, safety gates, and rollback/verification guidance
+- after restructuring, compare the original and new files to confirm no required step was lost
+
+This is especially important for shared team skills: the goal is better context selection, not less domain knowledge.
+
 ### Current Behavior
 
 - `profiles` are scanned as files under `skills/**/profiles/**/*.md`.
