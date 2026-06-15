@@ -527,6 +527,7 @@ SkillSpector is more security-scanner-heavy than Renma. The best ideas to borrow
 
 ## Recommended Priority
 
+0. Add a new rule to suggest not using user local specific paths like `~` or `$HOME` in skill instructions, since they can cause unexpected behavior when an LLM tries to follow them on a different machine or environment. This is a common source of confusion and errors, and it's a relatively simple check to implement.
 1. LLM-friendly output and finding metadata: `risk`, `fixability`, and ordered actions.
 2. Deterministic script opportunity suggestions for token-heavy or flaky workflows.
 3. Context mixins and orchestration maps for profiles, references, examples, scripts, and evals.
