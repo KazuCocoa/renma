@@ -8,8 +8,8 @@ dependency CLI foundation.
 ## Strategic Sequence
 
 1. **Metadata and validation**: parse stable skill/context metadata, validate
-   ownership, status, versions, lifecycle fields, routing hints, and duplicate
-   IDs.
+   ownership, status, versions, lifecycle fields, routing hints, duplicate IDs,
+   and token guidance for skill entrypoints plus nested context files.
 2. **Catalog**: generate static `CATALOG.md` and `catalog.json` artifacts so
    teams can discover skills, context units, owners, statuses, and required
    context without a server.

@@ -70,6 +70,51 @@ test("scan preserves security finding evidence paths", async () => {
   assert.match(secretFinding?.evidence.snippet ?? "", /password/);
 });
 
+test("scan warns when nested context files exceed token guidance", async () => {
+  const root = await fixture();
+  const skillDir = path.join(root, "skills", "demo");
+  await mkdir(path.join(skillDir, "references"), { recursive: true });
+  await writeFile(
+    path.join(skillDir, "SKILL.md"),
+    `---
+description: This skill routes to references for detailed context and includes enough description to avoid the short-description finding.
+---
+# Demo Skill
+
+## Context Selection
+For detailed reference material, load references/large.md.
+
+## Do Not Use For
+Do not use for unrelated tasks.
+
+## Preflight
+Collect the target context first.
+
+## Verification
+Verify the result with a test.
+`,
+  );
+  await writeFile(
+    path.join(skillDir, "references", "large.md"),
+    `# Large Reference\n\n${repeatWords("context", 850)}\n`,
+  );
+
+  const result = await scan(root);
+  const contextBudgetFinding = result.findings.find(
+    (finding) => finding.id === "QUAL-CONTEXT-TOKEN-BUDGET",
+  );
+
+  assert.equal(
+    contextBudgetFinding?.evidence.path,
+    "skills/demo/references/large.md",
+  );
+  assert.match(contextBudgetFinding?.title ?? "", /Context file exceeds/);
+});
+
 async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
+}
+
+function repeatWords(word: string, count: number): string {
+  return Array.from({ length: count }, () => word).join(" ");
 }

@@ -99,11 +99,7 @@ requires_context: demo.guide
   assert.equal(result.catalog.entries[0]?.sourcePath, "skills/demo/SKILL.md");
 });
 
-function artifact(
-  path: string,
-  kind: ArtifactKind,
-  content: string,
-): Artifact {
+function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
   return {
     path,
     absolutePath: `/tmp/${path}`,

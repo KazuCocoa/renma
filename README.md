@@ -129,6 +129,7 @@ Current rules cover early quality and safety signals, including:
 - missing skill description, examples, preflight, verification, negative routing, or explicit routing clarity
 - short frontmatter descriptions that make skill routing ambiguous
 - oversized `SKILL.md` entrypoints that should move detailed procedures into `references/`
+- oversized nested context files in `profiles/`, `references/`, and `examples/`
 - literal credential-like values and private key material
 - destructive command examples without nearby confirmation or recovery guidance
 - risky remote access defaults

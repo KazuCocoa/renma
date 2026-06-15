@@ -9,27 +9,37 @@ import { scan } from "../src/scanner.js";
 test("scan discovers default artifacts and emits deterministic findings", async () => {
   const root = await fixture();
   await mkdir(path.join(root, "skills", "demo"), { recursive: true });
-  await writeFile(path.join(root, "skills", "demo", "SKILL.md"), "# Demo\n\nRun `rm -rf /tmp/demo`.\n");
+  await writeFile(
+    path.join(root, "skills", "demo", "SKILL.md"),
+    "# Demo\n\nRun `rm -rf /tmp/demo`.\n",
+  );
 
   const result = await scan(root);
 
   assert.equal(result.scannedFileCount, 1);
-  assert.deepEqual(result.findings.map((finding) => finding.id), [
-    "QUAL-MISSING-DESCRIPTION",
-    "QUAL-MISSING-NEGATIVE-ROUTING",
-    "QUAL-MISSING-ROUTING-CLARITY",
-    "QUAL-MISSING-EXAMPLES",
-    "QUAL-MISSING-PREFLIGHT",
-    "QUAL-MISSING-VERIFICATION",
-    "SEC-DESTRUCTIVE-COMMAND"
-  ]);
+  assert.deepEqual(
+    result.findings.map((finding) => finding.id),
+    [
+      "QUAL-MISSING-DESCRIPTION",
+      "QUAL-MISSING-NEGATIVE-ROUTING",
+      "QUAL-MISSING-ROUTING-CLARITY",
+      "QUAL-MISSING-EXAMPLES",
+      "QUAL-MISSING-PREFLIGHT",
+      "QUAL-MISSING-VERIFICATION",
+      "SEC-DESTRUCTIVE-COMMAND",
+    ],
+  );
   assert.equal(result.findings.at(-1)?.evidence.path, "skills/demo/SKILL.md");
 });
 
 test("context examples are scanned and must be routed by the skill", async () => {
   const root = await fixture();
-  await mkdir(path.join(root, "skills", "demo", "examples"), { recursive: true });
-  await writeFile(path.join(root, "skills", "demo", "SKILL.md"), `---
+  await mkdir(path.join(root, "skills", "demo", "examples"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "skills", "demo", "SKILL.md"),
+    `---
 name: "demo"
 description: "Use this skill for demo tasks when a short deterministic fixture needs verification, routing clarity, examples, preflight checks, and safety confirmation."
 ---
@@ -44,19 +54,31 @@ Do not use for production work.
 
 ## Examples
 Demo input -> demo output.
-`);
-  await writeFile(path.join(root, "skills", "demo", "examples", "happy-path.md"), "# Happy Path\n\nInput -> output.\n");
+`,
+  );
+  await writeFile(
+    path.join(root, "skills", "demo", "examples", "happy-path.md"),
+    "# Happy Path\n\nInput -> output.\n",
+  );
 
   const result = await scan(root);
 
-  assert.ok(result.findings.some((finding) => finding.id === "CTX-MISSING-ROUTING-MAP"));
-  assert.ok(result.findings.some((finding) => finding.id === "CTX-UNUSED-EXAMPLE"));
+  assert.ok(
+    result.findings.some((finding) => finding.id === "CTX-MISSING-ROUTING-MAP"),
+  );
+  assert.ok(
+    result.findings.some((finding) => finding.id === "CTX-UNUSED-EXAMPLE"),
+  );
 });
 
 test("routed context examples do not report unused example findings", async () => {
   const root = await fixture();
-  await mkdir(path.join(root, "skills", "demo", "examples"), { recursive: true });
-  await writeFile(path.join(root, "skills", "demo", "SKILL.md"), `---
+  await mkdir(path.join(root, "skills", "demo", "examples"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "skills", "demo", "SKILL.md"),
+    `---
 name: "demo"
 description: "Use this skill for demo tasks when a short deterministic fixture needs verification, routing clarity, examples, preflight checks, and safety confirmation."
 ---
@@ -74,20 +96,36 @@ Do not use for production work.
 
 ## Examples
 Demo input -> demo output.
-`);
-  await writeFile(path.join(root, "skills", "demo", "examples", "happy-path.md"), "# Happy Path\n\nInput -> output.\n");
+`,
+  );
+  await writeFile(
+    path.join(root, "skills", "demo", "examples", "happy-path.md"),
+    "# Happy Path\n\nInput -> output.\n",
+  );
 
   const result = await scan(root);
 
-  assert.ok(!result.findings.some((finding) => finding.id === "CTX-MISSING-ROUTING-MAP"));
-  assert.ok(!result.findings.some((finding) => finding.id === "CTX-UNUSED-EXAMPLE"));
+  assert.ok(
+    !result.findings.some(
+      (finding) => finding.id === "CTX-MISSING-ROUTING-MAP",
+    ),
+  );
+  assert.ok(
+    !result.findings.some((finding) => finding.id === "CTX-UNUSED-EXAMPLE"),
+  );
 });
 
 test("config loads fail_on and CLI override takes precedence", async () => {
   const root = await fixture();
-  await writeFile(path.join(root, "renma.config.json"), JSON.stringify({ fail_on: "critical", format: "json" }));
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({ fail_on: "critical", format: "json" }),
+  );
   await mkdir(path.join(root, "skills", "demo"), { recursive: true });
-  await writeFile(path.join(root, "skills", "demo", "SKILL.md"), "# Demo\n\npassword = \"supersecretvalue\"\n");
+  await writeFile(
+    path.join(root, "skills", "demo", "SKILL.md"),
+    '# Demo\n\npassword = "supersecretvalue"\n',
+  );
 
   const fromConfig = await scan(root);
   const fromCli = await scan(root, { failOn: "medium" });
@@ -100,7 +138,10 @@ test("config loads fail_on and CLI override takes precedence", async () => {
 
 test("CLI honors format from config", async () => {
   const root = await fixture();
-  await writeFile(path.join(root, "renma.config.json"), JSON.stringify({ format: "json" }));
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({ format: "json" }),
+  );
 
   const exitCode = await withCapturedConsole(() => main(["scan", root]));
   const report = JSON.parse(exitCode.stdout) as { format: string };
@@ -111,7 +152,10 @@ test("CLI honors format from config", async () => {
 
 test("invalid config field is a usage error in CLI", async () => {
   const root = await fixture();
-  await writeFile(path.join(root, ".renma.json"), JSON.stringify({ failOn: "high" }));
+  await writeFile(
+    path.join(root, ".renma.json"),
+    JSON.stringify({ failOn: "high" }),
+  );
 
   const exitCode = await withCapturedConsole(() => main(["scan", root]));
 
@@ -122,13 +166,22 @@ test("invalid config field is a usage error in CLI", async () => {
 test("CLI reports JSON and fail-on exit code", async () => {
   const root = await fixture();
   await mkdir(path.join(root, "skills", "demo"), { recursive: true });
-  await writeFile(path.join(root, "skills", "demo", "SKILL.md"), "# Demo\n\napi_key = \"abcd1234abcd1234\"\n");
+  await writeFile(
+    path.join(root, "skills", "demo", "SKILL.md"),
+    '# Demo\n\napi_key = "abcd1234abcd1234"\n',
+  );
 
-  const exitCode = await withCapturedConsole(() => main(["scan", root, "--json", "--fail-on", "high"]));
-  const report = JSON.parse(exitCode.stdout) as { findings: Array<{ id: string }> };
+  const exitCode = await withCapturedConsole(() =>
+    main(["scan", root, "--json", "--fail-on", "high"]),
+  );
+  const report = JSON.parse(exitCode.stdout) as {
+    findings: Array<{ id: string }>;
+  };
 
   assert.equal(exitCode.code, 1);
-  assert.ok(report.findings.some((finding) => finding.id === "SEC-LITERAL-SECRET"));
+  assert.ok(
+    report.findings.some((finding) => finding.id === "SEC-LITERAL-SECRET"),
+  );
 });
 
 test("help and invalid commands have expected exit codes", async () => {
@@ -145,7 +198,9 @@ async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-"));
 }
 
-async function withCapturedConsole(callback: () => Promise<number>): Promise<{ code: number; stdout: string; stderr: string }> {
+async function withCapturedConsole(
+  callback: () => Promise<number>,
+): Promise<{ code: number; stdout: string; stderr: string }> {
   const stdoutWrite = process.stdout.write;
   const stderrWrite = process.stderr.write;
   let stdout = "";

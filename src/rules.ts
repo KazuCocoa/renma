@@ -15,6 +15,11 @@ const ENV_COPY_PATTERN =
 
 const SKILL_TOKEN_LIMIT = 500;
 const DESCRIPTION_MIN_CHARS = 150;
+const CONTEXT_TOKEN_LIMITS = {
+  profile: 500,
+  reference: 800,
+  example: 800,
+} as const;
 
 /** Run all deterministic rules and return findings in stable source order. */
 export function runRules(documents: ParsedDocument[]): Finding[] {
@@ -40,6 +45,7 @@ const RULES: Rule[] = [
     run: ({ documents }) =>
       documents.flatMap((document) => [
         ...shapeFindings(document),
+        ...contextBudgetFindings(document),
         ...profileFindings(document),
       ]),
   },
@@ -263,6 +269,31 @@ function shapeFindings(document: ParsedDocument): Finding[] {
   }
 
   return findings;
+}
+
+function contextBudgetFindings(document: ParsedDocument): Finding[] {
+  if (
+    document.artifact.kind !== "profile" &&
+    document.artifact.kind !== "reference" &&
+    document.artifact.kind !== "example"
+  ) {
+    return [];
+  }
+
+  const limit = CONTEXT_TOKEN_LIMITS[document.artifact.kind];
+  const tokenCount = approximateTokenCount(document.artifact.content);
+  if (tokenCount <= limit) return [];
+
+  return [
+    documentFinding(
+      document,
+      "QUAL-CONTEXT-TOKEN-BUDGET",
+      "Context file exceeds token guidance",
+      "quality",
+      "low",
+      `Keep ${document.artifact.kind} context files under about ${limit} tokens where practical. Split large files by concept, task relevance, owner, or update frequency so LLMs can load precise context without losing concrete details.`,
+    ),
+  ];
 }
 
 function profileFindings(document: ParsedDocument): Finding[] {

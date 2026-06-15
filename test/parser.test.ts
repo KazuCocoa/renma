@@ -4,7 +4,8 @@ import { parseDocument } from "../src/markdown.js";
 import type { Artifact } from "../src/types.js";
 
 test("parseDocument extracts frontmatter, headings, links, and code fences", () => {
-  const document = parseDocument(artifact(`---
+  const document = parseDocument(
+    artifact(`---
 id: demo-skill
 owner: qa-platform
 ---
@@ -15,19 +16,25 @@ Read [the guide](references/guide.md).
 \`\`\`bash
 npm test
 \`\`\`
-`));
+`),
+  );
 
   assert.deepEqual(document.metadata, {
     id: "demo-skill",
     owner: "qa-platform",
   });
-  assert.deepEqual(document.headings.map((heading) => heading.text), [
-    "Demo Skill",
-  ]);
-  assert.deepEqual(document.links.map((link) => link.target), [
-    "references/guide.md",
-  ]);
-  assert.deepEqual(document.codeFences.map((fence) => fence.language), ["bash"]);
+  assert.deepEqual(
+    document.headings.map((heading) => heading.text),
+    ["Demo Skill"],
+  );
+  assert.deepEqual(
+    document.links.map((link) => link.target),
+    ["references/guide.md"],
+  );
+  assert.deepEqual(
+    document.codeFences.map((fence) => fence.language),
+    ["bash"],
+  );
   assert.match(document.codeFences[0]?.content ?? "", /npm test/);
 });
 
