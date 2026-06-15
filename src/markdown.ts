@@ -6,6 +6,7 @@ import type {
   ParsedDocument,
 } from "./types.js";
 
+/** Parse a markdown artifact into headings, links, code fences, and frontmatter metadata. */
 export function parseDocument(artifact: Artifact): ParsedDocument {
   const lines = artifact.content.split(/\r?\n/);
   const headings: Heading[] = [];

@@ -4,6 +4,8 @@ Renma is a minimal-dependency TypeScript CLI for reviewing AI-agent skills, repo
 
 The scanner reads known skill-related files, runs deterministic quality and safety rules, and emits text or JSON reports with file and line evidence.
 
+Renma's longer-term direction is a Git-native context engineering toolkit: validation, cataloging, context resolution, traceability, lockfiles, semantic diff, and local context packaging. It is designed for skill and context repositories that multiple teams can consume through normal Git versioning, pinned revisions, and CI review workflows. See [architecture.md](./architecture.md) and [plan.md](./plan.md) for the design direction.
+
 ## Requirements
 
 - Node.js 22.17 or newer

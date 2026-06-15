@@ -1,5 +1,43 @@
 # Renma Roadmap
 
+This roadmap should be read with [architecture.md](./architecture.md). The
+direction is to evolve Renma from a skill scanner into a Git-native context
+engineering toolkit, while preserving its current deterministic, minimal
+dependency CLI foundation.
+
+## Strategic Sequence
+
+1. **Metadata and validation**: parse stable skill/context metadata, validate
+   ownership, status, versions, lifecycle fields, routing hints, and duplicate
+   IDs.
+2. **Catalog**: generate static `CATALOG.md` and `catalog.json` artifacts so
+   teams can discover skills, context units, owners, statuses, and required
+   context without a server.
+3. **Normalized model**: introduce internal model types for skills,
+   context units, metadata, relationships, and findings. Markdown/YAML remain
+   user-facing adapters.
+4. **Resolution and trace**: deterministically select required and optional
+   context for a task, then explain selected and rejected candidates with
+   reasons.
+5. **Lockfiles**: freeze resolved context packages with paths, versions, hashes,
+   and policy decisions for reproducibility.
+6. **Semantic diff**: report AI-context behavioral changes such as routing,
+   priority, ownership, lifecycle, conflict, and risk changes.
+7. **Run packaging**: keep `renma run` focused on deterministic local context
+   packaging and execution manifests, without owning provider gateways or
+   synchronization.
+
+Gateway, hosted dashboard, and synchronization features are out of scope for
+this project. Metadata, catalog, trace, lock, diff, and local packaging are
+smaller, closer to the current architecture, and provide independent value.
+
+Renma should still assume multi-team Git usage. A shared skills repository may be
+used by 10+ or 50+ teams through normal Git mechanics such as tags, branches,
+commit SHAs, submodules, package mirrors, or vendored snapshots. Renma's job is
+to make those Git-managed assets easy to validate, catalog, resolve, trace, lock,
+and review; it should not implement the synchronization transport itself.
+
+
 ## Product Shape
 
 Renma is a deterministic, minimal-dependency CLI for reviewing AI-agent skills and related repository instructions.

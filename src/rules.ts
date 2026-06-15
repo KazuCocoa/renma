@@ -1,4 +1,5 @@
 import path from "node:path";
+import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import type { Evidence, Finding, ParsedDocument, Severity } from "./types.js";
 
 const SECRET_PATTERN =
@@ -15,15 +16,9 @@ const ENV_COPY_PATTERN =
 const SKILL_TOKEN_LIMIT = 500;
 const DESCRIPTION_MIN_CHARS = 150;
 
+/** Run all deterministic rules and return findings in stable source order. */
 export function runRules(documents: ParsedDocument[]): Finding[] {
-  const findings = documents.flatMap((document) => [
-    ...secretFindings(document),
-    ...commandFindings(document),
-    ...shapeFindings(document),
-    ...profileFindings(document),
-  ]);
-
-  findings.push(...contextOrchestrationFindings(documents));
+  const findings = runRuleRegistry(documents, RULES);
   return findings.sort((a, b) => {
     const byPath = a.evidence.path.localeCompare(b.evidence.path);
     if (byPath !== 0) return byPath;
@@ -31,6 +26,30 @@ export function runRules(documents: ParsedDocument[]): Finding[] {
   });
 }
 
+const RULES: Rule[] = [
+  {
+    id: "security",
+    run: ({ documents }) =>
+      documents.flatMap((document) => [
+        ...secretFindings(document),
+        ...commandFindings(document),
+      ]),
+  },
+  {
+    id: "shape",
+    run: ({ documents }) =>
+      documents.flatMap((document) => [
+        ...shapeFindings(document),
+        ...profileFindings(document),
+      ]),
+  },
+  {
+    id: "context-orchestration",
+    run: ({ documents }) => contextOrchestrationFindings(documents),
+  },
+];
+
+/** Return whether a severity is at least as severe as a configured threshold. */
 export function severityMeets(value: Severity, threshold: Severity): boolean {
   const order: Record<Severity, number> = {
     low: 0,
