@@ -1,0 +1,43 @@
+name: Code Quality and Unit Tests
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-format-and-test:
+    name: ESLint, Prettier, and Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 'lts/*'
+
+      - uses: SocketDev/action@v1
+        with:
+          mode: firewall-free
+
+      - name: Install dependencies
+        run: sfw npm install
+
+      - name: List installed packages
+        run: npm list --depth=0
+
+      - name: Run TypeCheck
+        run: npm run typecheck
+
+      - name: Run Prettier check
+        run: npm run format:check
+
+      - run: npm run build
+        name: Build
+
+      - name: Run Unit Tests
+        run: npm run test
