@@ -30,6 +30,9 @@ jobs:
       - name: List installed packages
         run: npm list --depth=0
 
+      - name: Run ESLint
+        run: npm run lint
+
       - name: Run TypeCheck
         run: npm run typecheck
 

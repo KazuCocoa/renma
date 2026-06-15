@@ -17,12 +17,16 @@
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "test": "tsc -p tsconfig.test.json && node --test dist-test/test/*.test.js",
     "format": "prettier --write \"**/*.{ts,js,json}\"",
-    "format:check": "prettier --check \"**/*.{ts,js,json}\""
+    "format:check": "prettier --check \"**/*.{ts,js,json}\"",
+    "lint": "eslint \"{src,test}/**/*.ts\""
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.15.30",
+    "eslint": "^10.5.0",
     "eslint-config-prettier": "10.1.8",
     "prettier": "^3.5.3",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.61.0"
   }
 }
