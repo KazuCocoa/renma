@@ -111,6 +111,58 @@ Verify the result with a test.
   assert.match(contextBudgetFinding?.title ?? "", /Context file exceeds/);
 });
 
+test("scan treats context routed through an index reference as reachable", async () => {
+  const root = await fixture();
+  const skillDir = path.join(root, "skills", "setup");
+  const referenceDir = path.join(skillDir, "references");
+  await mkdir(referenceDir, { recursive: true });
+  await writeFile(
+    path.join(skillDir, "SKILL.md"),
+    `---
+description: This skill uses an index reference to route ordered Android setup context parts without listing every part in the skill.
+---
+# Setup Skill
+
+## Context Selection
+For Android setup, load references/android.md.
+
+## Do Not Use For
+Do not use for iOS setup.
+
+## Preflight
+Collect the target platform first.
+
+## Verification
+Verify the setup with a test.
+`,
+  );
+  await writeFile(
+    path.join(referenceDir, "android.md"),
+    `# Android Index
+
+Load these ordered parts:
+
+1. android-01.md
+2. android-02.md
+`,
+  );
+  await writeFile(
+    path.join(referenceDir, "android-01.md"),
+    "# Android Part 1\n",
+  );
+  await writeFile(
+    path.join(referenceDir, "android-02.md"),
+    "# Android Part 2\n",
+  );
+
+  const result = await scan(root);
+  const unusedReferencePaths = result.findings
+    .filter((finding) => finding.id === "CTX-UNUSED-REFERENCE")
+    .map((finding) => finding.evidence.path);
+
+  assert.deepEqual(unusedReferencePaths, []);
+});
+
 async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
 }

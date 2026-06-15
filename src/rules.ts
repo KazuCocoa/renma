@@ -344,18 +344,9 @@ function contextOrchestrationFindings(documents: ParsedDocument[]): Finding[] {
       );
     }
 
+    const reachableContextPaths = reachableContextDocuments(skill, contextDocs);
     for (const document of contextDocs) {
-      const name = path.posix.basename(
-        document.artifact.path,
-        path.posix.extname(document.artifact.path),
-      );
-      const routedByPath = skill.artifact.content.includes(
-        document.artifact.path,
-      );
-      const routedByName = new RegExp(`\\b${escapeRegExp(name)}\\b`, "i").test(
-        skill.artifact.content,
-      );
-      if (!routedByPath && !routedByName) {
+      if (!reachableContextPaths.has(document.artifact.path)) {
         findings.push(
           documentFinding(
             document,
@@ -371,6 +362,46 @@ function contextOrchestrationFindings(documents: ParsedDocument[]): Finding[] {
 
     return findings;
   });
+}
+
+function reachableContextDocuments(
+  skill: ParsedDocument,
+  contextDocs: ParsedDocument[],
+): Set<string> {
+  const reachable = new Set<string>();
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    for (const document of contextDocs) {
+      if (reachable.has(document.artifact.path)) continue;
+      const possibleRouters = [
+        skill,
+        ...contextDocs.filter((candidate) =>
+          reachable.has(candidate.artifact.path),
+        ),
+      ];
+      if (possibleRouters.some((router) => routesTo(router, document))) {
+        reachable.add(document.artifact.path);
+        changed = true;
+      }
+    }
+  }
+
+  return reachable;
+}
+
+function routesTo(source: ParsedDocument, target: ParsedDocument): boolean {
+  const name = path.posix.basename(
+    target.artifact.path,
+    path.posix.extname(target.artifact.path),
+  );
+  const basename = path.posix.basename(target.artifact.path);
+  return (
+    source.artifact.content.includes(target.artifact.path) ||
+    source.artifact.content.includes(basename) ||
+    new RegExp(`\\b${escapeRegExp(name)}\\b`, "i").test(source.artifact.content)
+  );
 }
 
 function matchingLineFindings(

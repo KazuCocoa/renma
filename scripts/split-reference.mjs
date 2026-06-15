@@ -23,7 +23,7 @@ try {
   for (const [index, part] of parts.entries()) {
     const partPath = path.join(
       outputDir,
-      `${prefix}.part-${String(index + 1).padStart(3, "0")}${extension}`,
+      `${prefix}-${String(index + 1).padStart(2, "0")}${extension}`,
     );
     await writeFile(partPath, part, "utf8");
     writtenPaths.push(partPath);
@@ -128,7 +128,7 @@ async function ensureNoExistingParts(outputDir, prefix, extension, force) {
     throw error;
   });
   const pattern = new RegExp(
-    `^${escapeRegExp(prefix)}\\.part-\\d{3}${escapeRegExp(extension)}$`,
+    `^${escapeRegExp(prefix)}-\\d{2}${escapeRegExp(extension)}$`,
   );
   const collisions = existing.filter((fileName) => pattern.test(fileName));
   if (collisions.length) {
@@ -159,7 +159,7 @@ function escapeRegExp(value) {
 function printHelp() {
   process.stdout.write(`Usage: node scripts/split-reference.mjs <file> [options]
 
-Split a reference file into ordered part files without losing content.
+Split a reference file into ordered part files such as android-01.md without losing content.
 The script verifies reconstruction byte-for-byte before succeeding.
 
 Options:

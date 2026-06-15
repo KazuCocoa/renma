@@ -37,7 +37,7 @@ test("split-reference writes ordered parts and verifies reconstruction", async (
     ),
   ).toString("utf8");
 
-  assert.deepEqual(partNames, ["large.part-001.md", "large.part-002.md"]);
+  assert.deepEqual(partNames, ["large-01.md", "large-02.md"]);
   assert.equal(reconstructed, original);
   assert.match(stdout, /Verified reconstruction byte-for-byte/);
 });
