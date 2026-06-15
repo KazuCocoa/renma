@@ -5,6 +5,7 @@ import type { LoadedConfig, ScanConfig, Severity } from "./types.js";
 const SEVERITIES = ["low", "medium", "high", "critical"] as const;
 const FORMATS = ["text", "json"] as const;
 
+/** Default scan configuration used when no config file or CLI overrides apply. */
 export const DEFAULT_CONFIG: ScanConfig = {
   failOn: "high",
   format: "text",
@@ -22,14 +23,17 @@ export const DEFAULT_CONFIG: ScanConfig = {
   concurrency: 16,
 };
 
+/** Error raised for invalid Renma configuration or CLI configuration input. */
 export class ConfigError extends Error {}
 
+/** CLI-level overrides merged on top of discovered configuration. */
 export interface ConfigOverrides {
   configPath?: string;
   failOn?: Severity;
   format?: "text" | "json";
 }
 
+/** Load, validate, and merge scan configuration for a repository root. */
 export async function loadConfig(
   root: string,
   overrides: ConfigOverrides,

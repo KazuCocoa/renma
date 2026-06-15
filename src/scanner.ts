@@ -5,6 +5,7 @@ import { parseDocument } from "./markdown.js";
 import { runRules } from "./rules.js";
 import type { ScanResult } from "./types.js";
 
+/** Run the complete deterministic scan pipeline for a target path. */
 export async function scan(
   targetPath: string,
   overrides: ConfigOverrides = {},

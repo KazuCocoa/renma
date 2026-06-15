@@ -1,5 +1,7 @@
+/** Finding severity used for scan reports and failure thresholds. */
 export type Severity = "low" | "medium" | "high" | "critical";
 
+/** Classified artifact kind discovered from repository paths. */
 export type ArtifactKind =
   | "skill"
   | "agent"
@@ -9,6 +11,7 @@ export type ArtifactKind =
   | "config"
   | "unknown";
 
+/** Source location and snippet used to justify a finding. */
 export interface Evidence {
   path: string;
   startLine: number;
@@ -16,6 +19,7 @@ export interface Evidence {
   snippet: string;
 }
 
+/** Rule finding emitted by deterministic scans. */
 export interface Finding {
   id: string;
   title: string;
@@ -27,12 +31,14 @@ export interface Finding {
   remediation: string;
 }
 
+/** Non-finding diagnostic produced while loading, discovering, or parsing input. */
 export interface Diagnostic {
   severity: "info" | "warning" | "error";
   message: string;
   path?: string;
 }
 
+/** Effective scan configuration after defaults, config files, and CLI overrides. */
 export interface ScanConfig {
   failOn: Severity;
   format: "text" | "json";
@@ -43,11 +49,13 @@ export interface ScanConfig {
   concurrency: number;
 }
 
+/** Loaded configuration plus the path it came from, when applicable. */
 export interface LoadedConfig {
   config: ScanConfig;
   configPath?: string;
 }
 
+/** File artifact read from the scanned repository. */
 export interface Artifact {
   path: string;
   absolutePath: string;
@@ -56,12 +64,14 @@ export interface Artifact {
   content: string;
 }
 
+/** Markdown heading extracted from a parsed artifact. */
 export interface Heading {
   depth: number;
   text: string;
   line: number;
 }
 
+/** Markdown fenced code block extracted from a parsed artifact. */
 export interface CodeFence {
   language: string;
   content: string;
@@ -69,12 +79,14 @@ export interface CodeFence {
   endLine: number;
 }
 
+/** Markdown link extracted from a parsed artifact. */
 export interface Link {
   text: string;
   target: string;
   line: number;
 }
 
+/** Parsed representation of an artifact used by rules and catalog builders. */
 export interface ParsedDocument {
   artifact: Artifact;
   lines: string[];
@@ -84,6 +96,7 @@ export interface ParsedDocument {
   metadata: Record<string, string>;
 }
 
+/** Complete result returned by a scan operation. */
 export interface ScanResult {
   root: string;
   configPath?: string;

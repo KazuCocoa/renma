@@ -1,4 +1,5 @@
 import path from "node:path";
+import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import type { Evidence, Finding, ParsedDocument, Severity } from "./types.js";
 
 const SECRET_PATTERN =
@@ -14,16 +15,15 @@ const ENV_COPY_PATTERN =
 
 const SKILL_TOKEN_LIMIT = 500;
 const DESCRIPTION_MIN_CHARS = 150;
+const CONTEXT_TOKEN_LIMITS = {
+  profile: 500,
+  reference: 800,
+  example: 800,
+} as const;
 
+/** Run all deterministic rules and return findings in stable source order. */
 export function runRules(documents: ParsedDocument[]): Finding[] {
-  const findings = documents.flatMap((document) => [
-    ...secretFindings(document),
-    ...commandFindings(document),
-    ...shapeFindings(document),
-    ...profileFindings(document),
-  ]);
-
-  findings.push(...contextOrchestrationFindings(documents));
+  const findings = runRuleRegistry(documents, RULES);
   return findings.sort((a, b) => {
     const byPath = a.evidence.path.localeCompare(b.evidence.path);
     if (byPath !== 0) return byPath;
@@ -31,6 +31,31 @@ export function runRules(documents: ParsedDocument[]): Finding[] {
   });
 }
 
+const RULES: Rule[] = [
+  {
+    id: "security",
+    run: ({ documents }) =>
+      documents.flatMap((document) => [
+        ...secretFindings(document),
+        ...commandFindings(document),
+      ]),
+  },
+  {
+    id: "shape",
+    run: ({ documents }) =>
+      documents.flatMap((document) => [
+        ...shapeFindings(document),
+        ...contextBudgetFindings(document),
+        ...profileFindings(document),
+      ]),
+  },
+  {
+    id: "context-orchestration",
+    run: ({ documents }) => contextOrchestrationFindings(documents),
+  },
+];
+
+/** Return whether a severity is at least as severe as a configured threshold. */
 export function severityMeets(value: Severity, threshold: Severity): boolean {
   const order: Record<Severity, number> = {
     low: 0,
@@ -151,7 +176,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
         "Skill entrypoint exceeds token budget",
         "quality",
         "medium",
-        `Keep SKILL.md under about ${SKILL_TOKEN_LIMIT} tokens by losslessly extracting detailed procedures, commands, prerequisites, edge cases, and troubleshooting tables into references/. Do not summarize away concrete steps; keep SKILL.md as the router that links to the preserved details.`,
+        `Keep SKILL.md under about ${SKILL_TOKEN_LIMIT} tokens as a compact router. Move detailed procedures into reference files, but preserve them losslessly in ordered parts when needed. Do not delete, summarize, or merge away procedural steps. SKILL.md should route to every required reference or index without embedding the full procedure.`,
       ),
     );
   }
@@ -246,6 +271,31 @@ function shapeFindings(document: ParsedDocument): Finding[] {
   return findings;
 }
 
+function contextBudgetFindings(document: ParsedDocument): Finding[] {
+  if (
+    document.artifact.kind !== "profile" &&
+    document.artifact.kind !== "reference" &&
+    document.artifact.kind !== "example"
+  ) {
+    return [];
+  }
+
+  const limit = CONTEXT_TOKEN_LIMITS[document.artifact.kind];
+  const tokenCount = approximateTokenCount(document.artifact.content);
+  if (tokenCount <= limit) return [];
+
+  return [
+    documentFinding(
+      document,
+      "QUAL-CONTEXT-TOKEN-BUDGET",
+      "Context file exceeds token guidance",
+      "quality",
+      "low",
+      `Keep ${document.artifact.kind} context files under about ${limit} tokens where practical. If a file is too large, split it losslessly into ordered part files. Do not delete, summarize, or merge away procedural steps. The parent reference or SKILL.md must route to every part in order, and the split should preserve the original procedure text exactly. Verify by reconstructing the parts and comparing them to the original content before accepting the fix.`,
+    ),
+  ];
+}
+
 function profileFindings(document: ParsedDocument): Finding[] {
   if (document.artifact.kind !== "profile") return [];
   const text = document.artifact.content.toLowerCase();
@@ -289,23 +339,14 @@ function contextOrchestrationFindings(documents: ParsedDocument[]): Finding[] {
           "Skill has context files but no routing map",
           "structure",
           "medium",
-          "Add context-selection guidance so the top-level skill tells the LLM when to load profiles, references, examples, or scripts. Preserve the original concrete steps in those context files and route to them explicitly instead of replacing them with a high-level summary.",
+          "Add context-selection guidance so the top-level skill tells the LLM when to load profiles, references, examples, or scripts. If context was split into ordered parts, route to the index or all parts in order. Preserve original concrete steps. Do not delete, summarize, or merge away procedural steps.",
         ),
       );
     }
 
+    const reachableContextPaths = reachableContextDocuments(skill, contextDocs);
     for (const document of contextDocs) {
-      const name = path.posix.basename(
-        document.artifact.path,
-        path.posix.extname(document.artifact.path),
-      );
-      const routedByPath = skill.artifact.content.includes(
-        document.artifact.path,
-      );
-      const routedByName = new RegExp(`\\b${escapeRegExp(name)}\\b`, "i").test(
-        skill.artifact.content,
-      );
-      if (!routedByPath && !routedByName) {
+      if (!reachableContextPaths.has(document.artifact.path)) {
         findings.push(
           documentFinding(
             document,
@@ -313,7 +354,7 @@ function contextOrchestrationFindings(documents: ParsedDocument[]): Finding[] {
             "Context file is not routed from the skill",
             "structure",
             "low",
-            "Reference this context from SKILL.md or a context map with clear when-to-load guidance so preserved details remain reachable to the LLM.",
+            "Reference this context from SKILL.md or from the selected parent reference with clear when-to-load guidance. If this file is a split part, ensure the parent skill routes to the index or all ordered parts so preserved details remain reachable. Do not delete, summarize, or merge away procedural steps just to satisfy routing.",
           ),
         );
       }
@@ -321,6 +362,46 @@ function contextOrchestrationFindings(documents: ParsedDocument[]): Finding[] {
 
     return findings;
   });
+}
+
+function reachableContextDocuments(
+  skill: ParsedDocument,
+  contextDocs: ParsedDocument[],
+): Set<string> {
+  const reachable = new Set<string>();
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    for (const document of contextDocs) {
+      if (reachable.has(document.artifact.path)) continue;
+      const possibleRouters = [
+        skill,
+        ...contextDocs.filter((candidate) =>
+          reachable.has(candidate.artifact.path),
+        ),
+      ];
+      if (possibleRouters.some((router) => routesTo(router, document))) {
+        reachable.add(document.artifact.path);
+        changed = true;
+      }
+    }
+  }
+
+  return reachable;
+}
+
+function routesTo(source: ParsedDocument, target: ParsedDocument): boolean {
+  const name = path.posix.basename(
+    target.artifact.path,
+    path.posix.extname(target.artifact.path),
+  );
+  const basename = path.posix.basename(target.artifact.path);
+  return (
+    source.artifact.content.includes(target.artifact.path) ||
+    source.artifact.content.includes(basename) ||
+    new RegExp(`\\b${escapeRegExp(name)}\\b`, "i").test(source.artifact.content)
+  );
 }
 
 function matchingLineFindings(

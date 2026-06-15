@@ -1,9 +1,11 @@
 import type { ScanResult } from "./types.js";
 
+/** Format a scan result as stable pretty-printed JSON. */
 export function formatJson(result: ScanResult): string {
   return `${JSON.stringify(result, null, 2)}\n`;
 }
 
+/** Format a scan result as human-readable terminal text. */
 export function formatText(result: ScanResult): string {
   const lines = [
     `Renma scan`,

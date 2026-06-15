@@ -7,6 +7,7 @@ import type {
   ScanConfig,
 } from "./types.js";
 
+/** Discover and read scan artifacts according to the provided scan configuration. */
 export async function discoverArtifacts(
   root: string,
   config: ScanConfig,

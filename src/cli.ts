@@ -1,11 +1,10 @@
 import { parseArgs } from "node:util";
 import packageJson from "../package.json" with { type: "json" };
+import { runScanCommand } from "./commands/scan.js";
 import { ConfigError } from "./config.js";
-import { formatJson, formatText } from "./report.js";
-import { scan } from "./scanner.js";
-import { severityMeets } from "./rules.js";
 import type { Severity } from "./types.js";
 
+/** Execute the Renma CLI and return the intended process exit code. */
 export async function main(argv = process.argv.slice(2)): Promise<number> {
   let parsed;
   try {
@@ -57,19 +56,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   }
 
   try {
-    const result = await scan(target, {
+    return await runScanCommand(target, {
       ...(parsed.values.config ? { configPath: parsed.values.config } : {}),
       ...(failOn ? { failOn } : {}),
       ...(format ? { format } : {}),
     });
-    const output =
-      result.format === "json" ? formatJson(result) : formatText(result);
-    process.stdout.write(output);
-    return result.findings.some((finding) =>
-      severityMeets(finding.severity, result.exitThreshold),
-    )
-      ? 1
-      : 0;
   } catch (error) {
     console.error(
       error instanceof ConfigError || error instanceof Error
