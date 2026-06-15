@@ -176,7 +176,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
         "Skill entrypoint exceeds token budget",
         "quality",
         "medium",
-        `Keep SKILL.md under about ${SKILL_TOKEN_LIMIT} tokens as a compact router. Move detailed procedures into reference files, but preserve them losslessly in ordered parts when needed. SKILL.md should route to every required reference or index without embedding the full procedure.`,
+        `Keep SKILL.md under about ${SKILL_TOKEN_LIMIT} tokens as a compact router. Move detailed procedures into reference files, but preserve them losslessly in ordered parts when needed. Do not delete, summarize, or merge away procedural steps. SKILL.md should route to every required reference or index without embedding the full procedure.`,
       ),
     );
   }
@@ -291,7 +291,7 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
       "Context file exceeds token guidance",
       "quality",
       "low",
-      `Keep ${document.artifact.kind} context files under about ${limit} tokens where practical. If a file is too large, split it losslessly into ordered part files instead of summarizing or deleting steps. The parent reference or SKILL.md must route to every part in order, and the split should preserve the original procedure text exactly. Verify by reconstructing the parts and comparing them to the original content before accepting the fix.`,
+      `Keep ${document.artifact.kind} context files under about ${limit} tokens where practical. If a file is too large, split it losslessly into ordered part files. Do not delete, summarize, or merge away procedural steps. The parent reference or SKILL.md must route to every part in order, and the split should preserve the original procedure text exactly. Verify by reconstructing the parts and comparing them to the original content before accepting the fix.`,
     ),
   ];
 }
@@ -339,7 +339,7 @@ function contextOrchestrationFindings(documents: ParsedDocument[]): Finding[] {
           "Skill has context files but no routing map",
           "structure",
           "medium",
-          "Add context-selection guidance so the top-level skill tells the LLM when to load profiles, references, examples, or scripts. If context was split into ordered parts, route to the index or all parts in order. Preserve original concrete steps and do not replace them with a high-level summary.",
+          "Add context-selection guidance so the top-level skill tells the LLM when to load profiles, references, examples, or scripts. If context was split into ordered parts, route to the index or all parts in order. Preserve original concrete steps. Do not delete, summarize, or merge away procedural steps.",
         ),
       );
     }
@@ -363,7 +363,7 @@ function contextOrchestrationFindings(documents: ParsedDocument[]): Finding[] {
             "Context file is not routed from the skill",
             "structure",
             "low",
-            "Reference this context from SKILL.md or from the selected parent reference with clear when-to-load guidance. If this file is a split part, ensure the parent skill routes to the index or all ordered parts so preserved details remain reachable. Do not remove or summarize the part just to satisfy routing.",
+            "Reference this context from SKILL.md or from the selected parent reference with clear when-to-load guidance. If this file is a split part, ensure the parent skill routes to the index or all ordered parts so preserved details remain reachable. Do not delete, summarize, or merge away procedural steps just to satisfy routing.",
           ),
         );
       }

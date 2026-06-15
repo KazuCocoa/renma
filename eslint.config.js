@@ -6,6 +6,15 @@ export default tseslint.config(
   {
     ignores: ["dist/**", "dist-test/**", "node_modules/**"],
   },
+  {
+    languageOptions: {
+      globals: {
+        Buffer: "readonly",
+        console: "readonly",
+        process: "readonly",
+      },
+    },
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   eslintConfigPrettier,
