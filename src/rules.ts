@@ -12,6 +12,8 @@ const REMOTE_PATTERN =
   /\b(?:curl|wget)\b.*(?:\|\s*(?:sh|bash)|\b(?:example\.com|prod|production|--insecure|-k)\b)|\b(?:ssh|scp)\b.*\b(?:example\.com|prod|production|root@|--insecure|-k|StrictHostKeyChecking=no|UserKnownHostsFile=\/dev\/null)\b/i;
 const ENV_COPY_PATTERN =
   /\b(?:process\.env|env)\b.*\b(?:spawn|exec|execFile|system|subprocess|child_process)\b|\b(?:spawn|exec|execFile|system|subprocess|child_process)\b.*\b(?:process\.env|env)\b/i;
+const USER_LOCAL_PATH_PATTERN =
+  /(?:^|[^a-z0-9_])(?:\/Users\/[^/\\]+|\/home\/[^/\\]+|[A-Za-z]:\\Users\\[^\\]+)(?:\/|$)/iu;
 
 const SKILL_TOKEN_LIMIT = 500;
 const DESCRIPTION_MIN_CHARS = 150;
@@ -177,6 +179,22 @@ function shapeFindings(document: ParsedDocument): Finding[] {
         "quality",
         "medium",
         `Keep SKILL.md under about ${SKILL_TOKEN_LIMIT} tokens as a compact router. Move detailed procedures into reference files, but preserve them losslessly in ordered parts when needed. Do not delete, summarize, or merge away procedural steps. SKILL.md should route to every required reference or index without embedding the full procedure.`,
+      ),
+    );
+  }
+
+  if (
+    document.artifact.kind === "skill" &&
+    USER_LOCAL_PATH_PATTERN.test(text)
+  ) {
+    findings.push(
+      documentFinding(
+        document,
+        "QUAL-USER-LOCAL-PATHS",
+        "Skill uses user-local path shortcuts in instructions",
+        "quality",
+        "medium",
+        "Use repo-relative or environment-agnostic paths in skill instructions. If a local path is unavoidable, parameterize it and avoid hardcoding a user-specific home directory such as `/Users/alice/...` or `/home/alice/...`.",
       ),
     );
   }
