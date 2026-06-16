@@ -163,6 +163,33 @@ Load these ordered parts:
   assert.deepEqual(unusedReferencePaths, []);
 });
 
+test("scan warns on hardcoded user home paths in skill instructions", async () => {
+  const root = await fixture();
+  const skillDir = path.join(root, "skills", "demo");
+  await mkdir(skillDir, { recursive: true });
+
+  await writeFile(
+    path.join(skillDir, "SKILL.md"),
+    `---
+description: Demo skill for local path guidance.
+---
+
+# Demo Skill
+
+## Preflight
+Use /Users/😺/ for temporary files.
+
+## Verification
+Verify the result with a command.
+`,
+  );
+
+  const result = await scan(root);
+  const ids = result.findings.map((finding) => finding.id);
+
+  assert.ok(ids.includes("QUAL-USER-LOCAL-PATHS"));
+});
+
 async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
 }
