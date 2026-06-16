@@ -13,7 +13,7 @@ const REMOTE_PATTERN =
 const ENV_COPY_PATTERN =
   /\b(?:process\.env|env)\b.*\b(?:spawn|exec|execFile|system|subprocess|child_process)\b|\b(?:spawn|exec|execFile|system|subprocess|child_process)\b.*\b(?:process\.env|env)\b/i;
 const USER_LOCAL_PATH_PATTERN =
-  /(?:^|[^a-z0-9_])(?:\/Users\/[^/\\]+|\/home\/[^/\\]+|[A-Za-z]:\\Users\\[^\\]+)(?:\/|$)/iu;
+  /(?:^|[^a-z0-9_])(?:\/Users\/[^\s/\\]+|\/home\/[^\s/\\]+|[A-Za-z]:\\Users\\[^\s\\]+)(?:\/|$)/iu;
 
 const SKILL_TOKEN_LIMIT = 500;
 const DESCRIPTION_MIN_CHARS = 150;
@@ -191,7 +191,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
       documentFinding(
         document,
         "QUAL-USER-LOCAL-PATHS",
-        "Skill uses user-local path shortcuts in instructions",
+        "Skill uses hardcoded user home paths in instructions",
         "quality",
         "medium",
         "Use repo-relative or environment-agnostic paths in skill instructions. If a local path is unavoidable, parameterize it and avoid hardcoding a user-specific home directory such as `/Users/alice/...` or `/home/alice/...`.",
