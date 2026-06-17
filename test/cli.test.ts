@@ -184,6 +184,71 @@ test("CLI reports JSON and fail-on exit code", async () => {
   );
 });
 
+test("CLI prints a Codex semantic split prompt", async () => {
+  const root = await fixture();
+  const skillDir = path.join(root, "skills", "setup");
+  const referencesDir = path.join(skillDir, "references");
+  await mkdir(referencesDir, { recursive: true });
+  await writeFile(
+    path.join(skillDir, "SKILL.md"),
+    [
+      "---\n",
+      'name: "setup"\n',
+      "---\n",
+      "# Setup\n",
+      "Route environment setup requests to the relevant reference.\n",
+    ].join(""),
+  );
+  await writeFile(
+    path.join(referencesDir, "index.md"),
+    "# References\n\n- Android setup\n",
+  );
+
+  const source = path.join(referencesDir, "environment-setup-android.md");
+  await writeFile(
+    source,
+    [
+      "# Android setup\n",
+      "\n",
+      "macOS/Linux users should export ANDROID_HOME from a shell.\n",
+      "\n",
+      "Windows users should set persistent environment variables in PowerShell.\n",
+    ].join(""),
+  );
+
+  const prompt = await withCapturedConsole(() =>
+    main(["suggest-semantic-split", source]),
+  );
+  assert.equal(prompt.code, 0);
+  assert.match(prompt.stdout, /# Codex Task: Suggest Semantic Reference Split/);
+  assert.match(
+    prompt.stdout,
+    /Infer the best split direction as a human maintainer/,
+  );
+  assert.match(prompt.stdout, /Name files by meaning, not by part number/);
+  assert.match(prompt.stdout, /L0003: macOS\/Linux users/);
+  assert.match(prompt.stdout, /Route environment setup/);
+
+  const json = await withCapturedConsole(() =>
+    main(["suggest-semantic-split", source, "--format", "json"]),
+  );
+  const contextPackage = JSON.parse(json.stdout) as {
+    context: {
+      siblingFiles: Array<{ path: string }>;
+    };
+    mode: string;
+    mutatesFiles: boolean;
+  };
+  assert.equal(json.code, 0);
+  assert.equal(contextPackage.mode, "codex-semantic-split-prompt");
+  assert.equal(contextPackage.mutatesFiles, false);
+  assert.ok(
+    contextPackage.context.siblingFiles.some((file) =>
+      file.path.endsWith("references/index.md"),
+    ),
+  );
+});
+
 test("help and invalid commands have expected exit codes", async () => {
   const help = await withCapturedConsole(() => main(["--help"]));
   const invalid = await withCapturedConsole(() => main(["inspect"]));

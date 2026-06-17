@@ -41,3 +41,79 @@ test("split-reference writes ordered parts and verifies reconstruction", async (
   assert.equal(reconstructed, original);
   assert.match(stdout, /Verified reconstruction byte-for-byte/);
 });
+
+test("suggest-semantic-split builds a Codex prompt that asks for inferred categories", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-semantic-split-"));
+  const skillDir = path.join(root, "skills", "setup");
+  const referencesDir = path.join(skillDir, "references");
+  await mkdir(referencesDir, { recursive: true });
+  await writeFile(
+    path.join(skillDir, "SKILL.md"),
+    [
+      "---\n",
+      'name: "setup"\n',
+      "---\n",
+      "# Setup\n",
+      "Route environment setup requests to the relevant reference.\n",
+    ].join(""),
+  );
+  await writeFile(
+    path.join(referencesDir, "index.md"),
+    "# References\n\n- Android setup\n",
+  );
+
+  const source = path.join(referencesDir, "environment-setup-android.md");
+  await writeFile(
+    source,
+    [
+      "# Android setup\n",
+      "\n",
+      "macOS/Linux users should export ANDROID_HOME from a shell.\n",
+      "\n",
+      "Windows users should set persistent environment variables in PowerShell.\n",
+    ].join(""),
+  );
+
+  const { stdout: prompt } = await execFileAsync(process.execPath, [
+    "scripts/suggest-semantic-split.mjs",
+    source,
+  ]);
+
+  assert.match(prompt, /# Codex Task: Suggest Semantic Reference Split/);
+  assert.match(prompt, /Infer the best split direction as a human maintainer/);
+  assert.match(prompt, /Name files by meaning, not by part number/);
+  assert.match(prompt, /Return JSON only/);
+  assert.match(prompt, /L0003: macOS\/Linux users/);
+  assert.match(prompt, /Route environment setup/);
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    "scripts/suggest-semantic-split.mjs",
+    source,
+    "--format",
+    "json",
+  ]);
+  const contextPackage = JSON.parse(stdout) as {
+    mutatesFiles: boolean;
+    source: {
+      numberedText: string;
+    };
+    context: {
+      skill: {
+        text: string;
+      };
+      siblingFiles: Array<{
+        path: string;
+        preview: string;
+      }>;
+    };
+  };
+
+  assert.equal(contextPackage.mutatesFiles, false);
+  assert.match(contextPackage.source.numberedText, /L0003: macOS\/Linux users/);
+  assert.match(contextPackage.context.skill.text, /Route environment setup/);
+  assert.ok(
+    contextPackage.context.siblingFiles.some((file) =>
+      file.path.endsWith("references/index.md"),
+    ),
+  );
+});
