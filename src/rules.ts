@@ -309,7 +309,7 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
       "Context file exceeds token guidance",
       "quality",
       "low",
-      `Keep ${document.artifact.kind} context files under about ${limit} tokens where practical. If a file is too large, split it losslessly into ordered part files. Do not delete, summarize, or merge away procedural steps. The parent reference or SKILL.md must route to every part in order, and the split should preserve the original procedure text exactly. Verify by reconstructing the parts and comparing them to the original content before accepting the fix.`,
+      `Keep ${document.artifact.kind} context files under about ${limit} tokens where practical. If a file is too large, run \`renma suggest-semantic-split ${document.artifact.path}\` to get a semantic split proposal, then split it losslessly into meaning-based ordered part files. Do not delete, summarize, or merge away procedural steps. The parent reference or SKILL.md must route to every part in order, and the split should preserve the original procedure text exactly. Verify by reconstructing the parts and comparing them to the original content before accepting the fix.`,
     ),
   ];
 }

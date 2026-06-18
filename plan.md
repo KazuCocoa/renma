@@ -1,355 +1,613 @@
 # Renma Roadmap
 
-This roadmap should be read with [architecture.md](./architecture.md). The
-direction is to evolve Renma from a skill scanner into a Git-native context
-engineering toolkit, while preserving its current deterministic, minimal
-dependency CLI foundation.
+Renma is evolving from a deterministic skill scanner into a Git-native context
+engineering toolkit.
 
-## Strategic Sequence
+The goal is not only better linting. The goal is to help teams treat context as
+a software asset: versioned, reviewable, reusable, composable, traceable, and
+reproducible.
 
-1. **Metadata and validation**: parse stable skill/context metadata, validate
-   ownership, status, versions, lifecycle fields, routing hints, duplicate IDs,
-   and token guidance for skill entrypoints plus nested context files.
-2. **Catalog**: generate static `CATALOG.md` and `catalog.json` artifacts so
-   teams can discover skills, context units, owners, statuses, and required
-   context without a server.
-3. **Normalized model**: introduce internal model types for skills,
-   context units, metadata, relationships, and findings. Markdown/YAML remain
-   user-facing adapters.
-4. **Resolution and trace**: deterministically select required and optional
-   context for a task, then explain selected and rejected candidates with
-   reasons.
-5. **Lockfiles**: freeze resolved context packages with paths, versions, hashes,
-   and policy decisions for reproducibility.
-6. **Semantic diff**: report AI-context behavioral changes such as routing,
-   priority, ownership, lifecycle, conflict, and risk changes.
-7. **Run packaging**: keep `renma run` focused on deterministic local context
-   packaging and execution manifests, without owning provider gateways or
-   synchronization.
+Renma should remain:
 
-Gateway, hosted dashboard, and synchronization features are out of scope for
-this project. Metadata, catalog, trace, lock, diff, and local packaging are
-smaller, closer to the current architecture, and provide independent value.
+- deterministic by default
+- minimal-dependency
+- CLI-first
+- Git-native
+- useful in local development and CI
+- independent of LLMs for core analysis
 
-Renma should still assume multi-team Git usage. A shared skills repository may be
-used by 10+ or 50+ teams through normal Git mechanics such as tags, branches,
-commit SHAs, submodules, package mirrors, or vendored snapshots. Renma's job is
-to make those Git-managed assets easy to validate, catalog, resolve, trace, lock,
-and review; it should not implement the synchronization transport itself.
+LLMs may later help with advisory review, duplicate detection, or suggested
+refactors, but the core model, validation, resolution, and trace output should
+remain deterministic.
 
+## Product Direction
 
-## Product Shape
+Large AI-agent repositories develop the same failure modes as large software
+systems:
 
-Renma is a deterministic, minimal-dependency CLI for reviewing AI-agent skills and related repository instructions.
+- knowledge is copied across skills
+- references drift out of date
+- instructions become too large to reason about
+- ownership becomes unclear
+- reuse is informal and hard to validate
+- prompt assembly becomes difficult to reproduce
 
-It should stay fast enough for local development and CI. It should catch structural, safety, and context-readiness issues before a heavier tool such as Waza or SkillSpector runs.
+Renma should help teams answer:
 
-Renma is not currently an eval runner, LLM judge, or full malware scanner. Those can remain future directions unless there is a clear reason to expand scope.
+- What context exists?
+- Who owns it?
+- Which skills use it?
+- Why was this context selected?
+- What was rejected, and why?
+- What changed between two revisions?
+- Can this context package be reproduced exactly?
 
-## Key Direction: Context Mixins
+## Core Thesis
 
-Renma should help teams maintain one shared skill repository without splitting every small variation into a separate top-level skill.
+Skills should become orchestration and routing layers.
 
-The core model is:
+Context should become reusable building blocks.
 
-> One shared skill, many composable context slices. The top-level skill routes; mixins provide focused context.
+Example:
 
-This is similar to mixins in programming. A top-level `SKILL.md` should act as an orchestrator that selects the right context for the user's request. Context mixins can represent platform, tool, workflow phase, risk level, setup mode, troubleshooting mode, or team-specific conventions.
+```text
+context/
+  appium/
+    setup.md
+    android.md
+    ios.md
+    troubleshooting.md
 
-Examples:
+skills/
+  mobile-testing/
+    SKILL.md
+  enterprise-testing/
+    SKILL.md
+  onboarding/
+    SKILL.md
+```
 
-- `platform:android`
-- `platform:ios`
-- `target:simulator`
-- `target:real-device`
-- `tool:appium`
-- `flow:setup`
-- `flow:troubleshooting`
-- `safety:privileged-change`
+Instead of duplicating Appium knowledge in several skills, skills should route
+to shared context units.
 
-Each mixin can route to the right profiles, references, examples, scripts, and evals. This gives an LLM better context without loading every file or forcing teams to maintain many nearly identical top-level skills.
-
-Renma should validate that this orchestration stays understandable:
-
-- mixins have clear triggers
-- conflicts and required base mixins are explicit
-- references and examples are not orphaned
-- deterministic checks are offered as scripts when useful
-- eval coverage maps to important mixins and combinations
-- token-heavy prose moves out of `SKILL.md`
-- eval files stay out of runtime context
-
-## Current Features
-
-### CLI
-
-- `renma scan [path]`
-- `--config <path>`
-- `--fail-on <level>`
-- `--format text|json`
-- `--json`
-- `--help`
-- `--version`
-- Exit `0` when no finding meets the threshold.
-- Exit `1` when findings meet `--fail-on`.
-- Exit `2` for CLI usage errors, invalid config, or unreadable required input.
-
-### Config
-
-- Supports `renma.config.json`.
-- Supports `.renma.json`.
-- Uses JSON config.
-- Applies config in this order:
-  1. Defaults
-  2. Config file
-  3. CLI flags
-- Supports `fail_on`.
-- Supports `format`.
-- Supports `globs`.
-- Supports `exclude`.
-- Supports `max_file_size_bytes`.
-- Supports `max_depth`.
-- Supports `concurrency`.
-
-### Discovery
-
-Default globs:
-
-- `skills/**/SKILL.md`
-- `.agents/**/*.md`
-- `AGENTS.md`
-- `skills/**/profiles/**/*.md`
-- `skills/**/references/**/*.md`
-- `skills/**/examples/**/*.md`
-
-Scan behavior:
-
-- Async glob expansion.
-- Async file reads and stats.
-- Bounded concurrency, default `16`.
-- Deterministic sorted file order.
-- Max file size.
-- Max depth.
-- Skips symlinks.
-- Default excludes: `node_modules`, `dist`, `.git`.
-- Stable repo-relative POSIX-style report paths.
-
-### Parsing
-
-- Lightweight Markdown scanning.
-- Headings.
-- Links.
-- Code fences.
-- Frontmatter-like metadata.
-- Line numbers and evidence snippets.
-
-### Current Rule Areas
-
-- Skill structure and quality:
-  - missing description
-  - short description
-  - missing routing clarity
-  - missing negative routing
-  - missing examples
-  - missing preflight
-  - missing verification
-  - oversized `SKILL.md`
-- Profile overlays:
-  - missing base skill declaration
-- Context mixin foundation:
-  - profiles, references, and examples scanned as context artifacts
-  - context files should be routed from top-level `SKILL.md`
-  - unused profiles, references, and examples can be reported
-- Safety and command risks:
-  - literal secret-like values
-  - private key material
-  - destructive commands without nearby confirmation
-  - risky remote defaults
-  - broad environment copying into subprocesses
-
-### Reporting
-
-- Text output.
-- JSON output.
-- Finding fields:
-  - id
-  - title
-  - category
-  - severity
-  - confidence
-  - evidence
-  - why it matters
-  - remediation
-- Scan result fields:
-  - root
-  - config path
-  - scanned file count
-  - format
-  - findings
-  - diagnostics
-  - exit threshold
-
-## Context Mixin Orchestration
-
-Current Renma conventions are useful defaults, but they should become configurable enough for a top-level skill to act as a context-mixin orchestrator. The orchestrator should tell an LLM what context to load, when to load it, and what not to load.
-
-### Lossless Refactoring Principle
-
-When Renma suggests splitting a large `SKILL.md` into references, examples, scripts, or mixins, the fix should preserve the original operational content.
-
-LLM-oriented remediation should say:
-
-- do not delete concrete commands, prerequisites, edge cases, or verification steps
-- move detailed procedures into context files instead of summarizing them away
-- keep the top-level `SKILL.md` as a router/index
-- link each moved section from the relevant context mixin or routing branch
-- preserve warnings, safety gates, and rollback/verification guidance
-- after restructuring, compare the original and new files to confirm no required step was lost
-
-This is especially important for shared team skills: the goal is better context selection, not less domain knowledge.
-
-### Current Behavior
-
-- `profiles` are scanned as files under `skills/**/profiles/**/*.md`.
-- `references` are scanned as files under `skills/**/references/**/*.md`.
-- Eval support is planned, but not part of the current implementation.
-- Renma does not yet understand which references or profiles are relevant for a specific request.
-- Renma does not yet understand which examples are relevant for a specific request.
-- Renma does not yet verify that `SKILL.md` gives good context-routing instructions.
-
-### Desired Model
-
-The top-level `SKILL.md` should be an orchestrator, not a giant context dump.
-
-It should provide:
+The top-level `SKILL.md` should explain:
 
 - when to use the skill
 - when not to use the skill
 - required preflight questions
-- which profiles apply to which modes, platforms, tools, or user intents
-- which references to load for each branch
-- which examples to show for each branch
-- which deterministic scripts to run before asking the LLM to reason
-- which evals or task examples cover expected behavior
-- what context should stay out of the LLM prompt unless requested
+- which context applies to which modes, platforms, tools, and intents
+- which examples or references should be loaded for each branch
+- which deterministic scripts should run before LLM reasoning
+- which checks or evals cover expected behavior
+- what context should stay out of the prompt unless explicitly needed
 
-### Configurable Context Map
+## Current State
 
-Add a future config or manifest shape for routing context mixins:
+Renma currently provides deterministic scanning for AI-agent skill and context
+repositories.
+
+Current capabilities:
+
+- bounded filesystem discovery
+- stable POSIX-style repo-relative paths
+- Markdown parsing for headings, links, code fences, metadata, and line evidence
+- text and JSON reports
+- CI-friendly exit behavior with `--fail-on`
+- config loading from `renma.config.json` and `.renma.json`
+- structural, quality, maintenance, and safety findings
+- early catalog support for skills, profiles, references, and examples
+- context extraction helper through `renma context`
+- semantic split suggestion helper through `renma suggest-semantic-split`
+
+Default scanned paths include:
+
+```text
+skills/**/SKILL.md
+.agents/**/*.md
+AGENTS.md
+skills/**/profiles/**/*.md
+skills/**/references/**/*.md
+skills/**/examples/**/*.md
+```
+
+Current rule areas:
+
+- missing or weak skill description
+- missing routing clarity
+- missing negative routing
+- missing examples
+- missing preflight guidance
+- missing verification guidance
+- oversized `SKILL.md`
+- oversized profile, reference, or example files
+- unused profiles, references, and examples
+- profile overlays missing base skill declaration
+- literal secret-like values
+- private key material
+- destructive commands without nearby confirmation or recovery context
+- risky remote defaults
+- broad environment copying into subprocesses
+- hardcoded user-local paths
+
+Current limitations:
+
+- Renma does not yet have a complete internal graph model.
+- Renma does not yet resolve context for a specific task, profile, or platform.
+- Renma does not yet explain selected and rejected context candidates.
+- Renma does not yet produce execution manifests or lockfiles.
+- Renma does not yet understand transitive context dependencies.
+- Renma does not yet perform semantic duplicate detection.
+- Eval support is planned but not part of the core implementation.
+
+## Target Architecture
+
+Renma should use a normalized internal representation as the contract between
+source files and all higher-level features.
+
+```text
+Markdown, YAML, docs snapshots, generated context
+        |
+        v
+Importers and parsers
+        |
+        v
+Normalized internal model
+        |
+        v
+Validation and graph checks
+        |
+        v
+Context resolution
+        |
+        v
+Execution manifest
+        |
+        v
+Trace, lockfile, catalog, reports
+```
+
+Users should mostly work with normal Markdown and small metadata blocks. The
+internal model exists so Renma can stay deterministic, extensible, and testable.
+
+## Minimal Internal Representation
+
+The internal representation should be small at first. It should separate assets
+from relationships between assets.
+
+### Asset
+
+An asset is a repository object Renma can catalog, validate, reference, or
+compose.
+
+Required fields:
+
+- `id`
+- `kind`
+- `source_path`
+- `content_hash`
+- `metadata`
+
+Recommended metadata:
+
+- `version`
+- `owner`
+- `status`
+- `tags`
+- `when_to_use`
+- `when_not_to_use`
+
+Possible asset kinds:
+
+- `skill`
+- `context`
+- `profile`
+- `reference`
+- `example`
+- `script`
+- `eval`
+- `agent`
+- `config`
+
+### Skill
+
+A skill is LLM-facing behavior: role, task boundaries, routing, workflow,
+safety gates, and verification expectations.
+
+Additional fields:
+
+- `routes`
+- `required_context`
+- `optional_context`
+- `conflicts`
+
+### Context Unit
+
+A context unit is a coherent reusable block of knowledge.
+
+Good context boundaries follow:
+
+- concept
+- owner
+- update frequency
+- task relevance
+- conflict surface
+- expected consumers
+
+A context unit should be smaller than a full manual and more durable than a
+single prompt snippet.
+
+### Dependency
+
+A dependency is a typed edge between assets.
+
+Dependency types:
+
+- `requires`
+- `optional`
+- `conflicts`
+- `extends`
+- `includes`
+- `routes_to`
+- `covered_by`
+
+Each dependency should preserve source evidence when possible:
+
+- source path
+- line range
+- declaration form
+- reason
+
+### Composition
+
+A composition is the resolved context package for a skill, task, profile, or
+set of explicit inputs.
+
+Fields:
+
+- selected skill
+- selected assets
+- rejected assets with reasons
+- ordered context
+- dependency edges used
+- source paths
+- content hashes
+- token estimates
+- policy decisions
+- generation timestamp
+
+Composition should be reproducible: the same repository state and the same
+inputs should produce the same manifest.
+
+## Metadata Direction
+
+Renma should start with a small stable metadata subset and expand only when a
+command uses the field.
+
+Initial stable fields:
+
+```yaml
+id: appium.android
+version: 1.0.0
+owner: mobile-platform
+status: stable
+tags:
+  - appium
+  - android
+when_to_use:
+  - Android Appium setup
+  - Android emulator troubleshooting
+when_not_to_use:
+  - iOS-only workflows
+requires_context:
+  - appium.setup
+optional_context:
+  - appium.troubleshooting
+conflicts:
+  - platform.ios
+```
+
+Status values:
+
+- `experimental`
+- `stable`
+- `deprecated`
+- `archived`
+
+Renma should validate:
+
+- duplicate IDs
+- invalid status values
+- missing required metadata for published assets
+- unknown dependencies
+- dependencies on deprecated or archived context
+- conflicts that cannot be resolved
+- stale or expired context once freshness fields exist
+
+## Context Catalog
+
+The catalog is the first major step from scanner to platform.
+
+The catalog should answer:
+
+- what assets exist
+- what type each asset is
+- where each asset lives
+- who owns it
+- what status it is in
+- what it depends on
+- what depends on it
+- which assets are unused
+- which assets are deprecated or archived
+
+Commands:
+
+```bash
+renma catalog --format json
+renma catalog --format markdown
+```
+
+Generated files may include:
+
+```text
+catalog.json
+CATALOG.md
+```
+
+Catalog output should be deterministic and commit-friendly.
+
+## Context Dependency Graph
+
+After cataloging, Renma should build a graph from asset relationships.
+
+Graph checks:
+
+- duplicate asset IDs
+- missing dependencies
+- dependency cycles
+- unused context
+- orphaned examples
+- orphaned profiles
+- skills depending on archived context
+- context units with no owner
+- references that are linked but not routable
+- conflicts that are declared but never enforced
+- overloaded skills that route to too many unrelated branches
+
+Possible command:
+
+```bash
+renma graph --format json
+```
+
+The graph should power validation, catalog output, resolution, semantic diff,
+and future visualizations.
+
+## Context Resolution
+
+Resolution is the feature that makes Renma more than a linter.
+
+Resolution selects context for a skill or task using deterministic inputs.
+
+Inputs may include:
+
+- skill ID
+- task or intent tags
+- platform
+- tool
+- product
+- environment
+- profile
+- explicit include IDs
+- explicit exclude IDs
+- repo or project overlay
+
+Example:
+
+```bash
+renma resolve --skill mobile-testing --tag appium --platform ios
+```
+
+Resolution output should include:
+
+- selected skill
+- selected context units
+- selected profiles
+- selected examples
+- selected scripts
+- rejected candidates
+- rejection reasons
+- conflicts encountered
+- source evidence
+- ordered prompt/context package
+
+Example trace:
+
+```text
+Selected:
+  appium.setup
+    reason: required by mobile-testing
+
+  appium.ios
+    reason: matched platform ios
+
+Rejected:
+  appium.android
+    reason: conflicts with platform ios
+```
+
+Resolution should not hide complexity. It should make routing visible and
+reviewable.
+
+## Execution Manifest
+
+Resolution should produce an execution manifest describing the exact context
+package that would be sent to an LLM or agent runtime.
+
+Manifest fields:
+
+- schema version
+- repository root
+- selected skill
+- selected assets
+- rejected candidates and reasons
+- dependency edges
+- source paths
+- versions
+- content hashes
+- token estimates
+- policy decisions
+- generated timestamp
+
+Possible command:
+
+```bash
+renma resolve --skill mobile-testing --platform ios --format manifest
+```
+
+The manifest is the bridge between static repository analysis and runtime
+behavior.
+
+## Lockfiles
+
+Lockfiles should come after resolution is stable.
+
+A lockfile should pin context dependencies across repositories or packages.
+
+It may include:
+
+- asset ID
+- version
+- source repository
+- source revision
+- content hash
+- resolved transitive dependencies
+
+Example:
 
 ```json
 {
-  "contexts": [
-    {
-      "id": "target:ios-real-device",
-      "requires": ["platform:ios", "tool:appium"],
-      "conflicts": ["platform:android"],
-      "when": ["real device", "WebDriverAgent", "provisioning"],
-      "profiles": ["profiles/ios-real-device.md"],
-      "references": ["references/wda-signing.md"],
-      "examples": ["examples/real-device-session.md"],
-      "scripts": ["scripts/check-xcode.sh"],
-      "evals": ["evals/xcuitest-real-device-config/eval.yaml"]
+  "schema": "renma.lock.v1",
+  "context": {
+    "appium.ios": {
+      "version": "1.2.0",
+      "source": "github:org/context-repo",
+      "revision": "abc123",
+      "hash": "sha256:..."
     }
-  ]
+  }
 }
 ```
 
-This can live in `renma.config.json`, a future `skill.context.json`, or frontmatter in `SKILL.md`. The exact location should be decided after testing the ergonomics.
+Do not build lockfiles before Renma can explain resolution clearly.
 
-### New Checks
+## Semantic Diff
 
-Add rules that help an orchestrator give better context:
+Semantic diff should compare context meaningfully, not just file text.
 
-- `CTX-MISSING-ROUTING-MAP`: skill has profiles/references but no routing map.
-- `CTX-MIXIN-MISSING-TRIGGERS`: mixin has no clear `when` triggers.
-- `CTX-MIXIN-CONFLICT`: selected mixins can conflict but no conflict rule is declared.
-- `CTX-MIXIN-MISSING-REQUIREMENT`: mixin depends on base context but does not declare `requires`.
-- `CTX-UNUSED-REFERENCE`: reference exists but is not linked or routed.
-- `CTX-UNUSED-PROFILE`: profile exists but no trigger/mode points to it.
-- `CTX-UNUSED-EXAMPLE`: example exists but no trigger/mode points to it.
-- `CTX-AMBIGUOUS-REFERENCE`: many references are listed without when-to-use guidance.
-- `CTX-AMBIGUOUS-EXAMPLE`: examples exist but are not tied to concrete request shapes.
-- `CTX-OVERLOADED-SKILL`: `SKILL.md` includes too much procedure that should move to references or scripts.
-- `CTX-MISSING-SCRIPT-HANDOFF`: deterministic checks are described in prose but no script/helper is offered.
-- `CTX-EVAL-NOT-LINKED`: eval coverage exists but is not tied to the behavior or context branch it protects.
+Initial deterministic diff should compare:
 
-### LLM Benefits
+- asset IDs
+- metadata changes
+- dependency changes
+- status changes
+- ownership changes
+- route changes
+- content hash changes
+- selected manifest changes for known resolution inputs
 
-This makes Renma output more useful for coding agents:
+Possible command:
 
-- smaller prompts
-- fewer irrelevant references loaded
-- more deterministic setup checks
-- less flaky LLM execution
-- clearer fix instructions
-- better mapping from findings to files the agent should edit
-
-## LLM-Friendly Output
-
-Renma should be easy for another coding agent to run, understand, and act on. Findings should include enough structured context for an LLM to fix straightforward issues with minimal extra exploration.
-
-### Definitions
-
-`severity` describes the impact if the issue remains unfixed:
-
-- `low`: quality or maintainability issue; unlikely to cause direct harm.
-- `medium`: could cause wrong routing, incomplete execution, missing tests, or unsafe ambiguity.
-- `high`: could cause data loss, secret exposure, privilege misuse, or dangerous command execution.
-- `critical`: clear malicious behavior, credential exfiltration, destructive automation, persistence, or severe command execution blast radius.
-
-`risk` describes how dangerous it is for an LLM to apply the suggested fix:
-
-- `safe`: docs-only or additive clarification; unlikely to break behavior.
-- `needs-review`: changes behavior, policy, routing, eval expectations, or security posture.
-- `dangerous`: could remove safety guardrails, modify commands, touch credentials, or authorize privileged/destructive behavior.
-
-`fixability` describes how automatically the issue can be repaired:
-
-- `automatic`: deterministic patch can be generated with low ambiguity.
-- `assisted`: an LLM can draft a likely fix, but should inspect context.
-- `manual`: requires human/project knowledge or external validation.
-- `not_applicable`: informational finding or intentionally not fixable.
-
-### Agent-Oriented Reporting
-
-Add an LLM-focused output mode:
-
-- `--format llm-json` or `--agent`
-- Stable schema version, for example `renma.llm.v1`
-- Group findings by file
-- Order actions by safe fix sequence
-- Include `risk` and `fixability`
-- Include related files when useful
-- Include conservative suggested patches only for `safe` / `automatic` findings
-- Include verification commands where Renma knows them
-
-Candidate action shape:
-
-```json
-{
-  "id": "QUAL-MISSING-VERIFICATION",
-  "path": "skills/demo/SKILL.md",
-  "startLine": 12,
-  "problem": "Skill lacks verification guidance.",
-  "fix": "Add a verification step after the main workflow.",
-  "severity": "medium",
-  "risk": "safe",
-  "fixability": "assisted"
-}
+```bash
+renma diff main...HEAD --format json
 ```
 
-### Deterministic Script Opportunities
+Later advisory diff may include:
 
-Renma should optionally suggest when a skill could move repetitive or fragile instructions into a deterministic script. The goal is to reduce token usage, reduce LLM interpretation work, and avoid flaky multi-step behavior.
+- changed requirements
+- removed safety steps
+- weakened verification
+- duplicated concepts
+- conflicting instructions
 
-This should be a suggestion, not a requirement. Some skills are mostly reasoning or coordination and should remain instruction-first.
+LLM-assisted or embedding-assisted diff should remain optional and clearly
+marked as advisory.
+
+## Duplicate Detection
+
+Duplicate detection is valuable but should not be the next foundation.
+
+Start deterministic:
+
+- identical content hashes
+- repeated headings
+- repeated link sets
+- same metadata IDs
+- highly similar filenames
+- matching code blocks
+- matching command sequences
+
+Then add advisory semantic detection:
+
+- near-duplicate context units
+- copied procedures with small edits
+- overlapping troubleshooting guides
+- skills that duplicate reference material instead of routing to it
+
+Duplicate detection should suggest extraction and reuse, not automatic deletion.
+
+## Reporting Direction
+
+Existing text and JSON output should remain.
+
+Future report modes:
+
+- `json`
+- `text`
+- `markdown`
+- `sarif`
+- `agent-json`
+
+Findings should eventually include:
+
+- stable rule ID
+- title
+- category
+- severity
+- confidence
+- risk
+- fixability
+- source evidence
+- related assets
+- suggested remediation
+- verification hint when available
+
+Risk values:
+
+- `safe`
+- `needs-review`
+- `dangerous`
+
+Fixability values:
+
+- `automatic`
+- `assisted`
+- `manual`
+- `not_applicable`
+
+Agent-oriented output should group actions by file and order them by safe fix
+sequence. Suggested patches should be conservative and limited to low-risk,
+deterministic cases.
+
+## Deterministic Script Opportunities
+
+Renma should identify instructions that are better handled by deterministic
+scripts than by LLM interpretation.
 
 Good candidates:
 
 - repeated shell command sequences
-- long environment diagnostics
-- version/path detection
+- environment diagnostics
+- version and path detection
 - dependency presence checks
 - structured report generation
 - file inventory or validation steps
@@ -361,10 +619,10 @@ Poor candidates:
 - judgment-heavy troubleshooting
 - ambiguous user-intent routing
 - safety decisions that require context
-- privileged/destructive actions unless the script is a dry-run checker
-- anything that would hide important reasoning from the user
+- privileged or destructive actions, except dry-run checkers
+- anything that hides important reasoning from the user
 
-Suggested finding shape:
+Example finding:
 
 ```json
 {
@@ -377,202 +635,280 @@ Suggested finding shape:
 }
 ```
 
-### Implementation Tasks
+## Rule Areas To Add
 
-1. Extend `Finding` with `risk` and `fixability`.
-2. Move rule defaults for `severity`, `risk`, and `fixability` into rule metadata.
-3. Add `--format llm-json` or `--agent`.
-4. Group LLM output by file and ordered action.
-5. Add tests for stable machine-readable output.
-6. Keep generated patches conservative and avoid auto-patches for security-sensitive behavior.
-7. Add optional script-opportunity suggestions for deterministic, repetitive, or token-heavy workflows.
+Context architecture:
 
-## Near-Term Roadmap
+- `CTX-DUPLICATE-ID`
+- `CTX-MISSING-DEPENDENCY`
+- `CTX-DEPENDENCY-CYCLE`
+- `CTX-UNUSED-ASSET`
+- `CTX-ORPHANED-PROFILE`
+- `CTX-ORPHANED-EXAMPLE`
+- `CTX-DEPRECATED-DEPENDENCY`
+- `CTX-ARCHIVED-DEPENDENCY`
+- `CTX-MISSING-OWNER`
+- `CTX-MISSING-ROUTING-MAP`
+- `CTX-AMBIGUOUS-ROUTE`
+- `CTX-CONFLICT-NOT-ENFORCED`
+- `CTX-OVERLOADED-SKILL`
 
-### Waza-Inspired Improvements
+Skill quality:
 
-1. **Real YAML parsing and schema validation**
-   Current YAML checks are lightweight structural checks. Add a small YAML parser or parser boundary and validate eval/task files more faithfully.
+- missing or vague trigger guidance
+- missing negative routing
+- missing preflight questions
+- missing verification instructions
+- missing rollback or recovery guidance for mutable workflows
+- too much procedure text in `SKILL.md`
+- references mentioned but not linked
+- examples mentioned but not linked
 
-2. **Full eval task schema checks**
-   Validate more Waza task fields:
-   - repositories
-   - workdir constraints
-   - environment blocks
-   - follow-up prompts
-   - task-level skill directories
-   - output assertions
+Security and safety:
 
-3. **Grader schema validation by type**
-   Validate common grader configs beyond `regex_match`, including text, code, file, JSON schema, behavior, tool-call, and prompt graders.
+- literal credentials
+- private key material
+- unsafe remote defaults
+- destructive commands without confirmation or recovery
+- environment copying into subprocesses
+- unpinned network install commands
+- suspicious prompt-injection patterns in imported context
+- MCP server configuration risks
 
-4. **Coverage strength**
-   Add Waza-like coverage grades:
-   - none
-   - partial
-   - full
+Maintenance:
 
-   A likely first version: full coverage requires at least one task and at least two grader types.
+- stale context
+- expired context
+- missing owner
+- archived context still routed
+- duplicated scripts or command blocks
+- broken local references
 
-5. **Readiness summary**
-   Add an optional summary similar to Waza `check`:
-   - quality status
-   - token status
-   - eval status
-   - link/reference status
-   - next steps
+## Packaging And Distribution
 
-6. **Configurable token limits**
-   Replace the fixed `SKILL.md` budget with config/env values.
+Packaging should come after local composition and resolution work.
 
-### General Quality Improvements
+Possible future package concepts:
 
-1. **Broken link checks**
-   Verify local Markdown links and report broken references.
+- context package
+- skill package
+- organization context catalog
+- pinned context dependency
+- reusable rule pack
 
-2. **Orphan reference checks**
-   Detect reference files that are never linked from `SKILL.md` or related docs.
+The architecture should resemble package managers, but Renma should avoid
+becoming a package registry too early.
 
-3. **Markdown report output**
-   Generate human-readable scan reports for PR comments and audits.
+Initial distribution can stay Git-native:
 
-4. **Better confidence values**
-   Current confidence is mostly static. Let each rule set confidence based on evidence quality.
+- tags
+- branches
+- submodules or vendored snapshots where teams already use them
+- committed catalogs
+- committed lockfiles
 
-## SkillSpector-Inspired Future Features
+Hosted registries, dashboards, or API serving modes are future options, not
+near-term requirements.
 
-SkillSpector is more security-scanner-heavy than Renma. The best ideas to borrow are deterministic security features that fit Renma’s lightweight preflight role.
+## Existing Systems To Learn From
 
-### Highest Value
+Renma overlaps with several established patterns:
 
-1. **SARIF output**
-   Add `--format sarif` for GitHub code scanning, CI integrations, and IDE security tooling.
+- package managers: dependency resolution, versioning, lockfiles
+- build systems: deterministic graphs and reproducible outputs
+- documentation systems: reusable pages, includes, generated indexes
+- SBOM tools: provenance, ownership, hashes, manifests
+- knowledge graphs: typed nodes and edges
+- Terraform modules and Kustomize overlays: composable configuration
+- static analyzers: rule IDs, evidence, severity, CI integration
+- SARIF tooling: machine-readable findings for code review systems
 
-2. **Risk score**
-   Compute a deterministic risk score from severity, category, confidence, and finding count.
+Renma should borrow the durable ideas, not the full complexity.
 
-3. **Security rule packs**
-   Organize security checks into optional packs:
-   - prompt injection
-   - data exfiltration
-   - privilege escalation
-   - supply chain
-   - excessive agency
-   - output handling
-   - system prompt leakage
-   - memory poisoning
-   - tool misuse
-   - rogue agent behavior
-   - trigger abuse
+## Development Sequence
 
-4. **MCP security checks**
-   Add checks for:
-   - overprivileged MCP tool access
-   - underdeclared permissions
-   - least-privilege mismatch
-   - tool poisoning
-   - rug-pull behavior
+### Phase 1: Stabilize Scanner And Metadata
 
-5. **Dangerous code pattern scanning**
-   Start with lightweight static checks for:
-   - `eval`
-   - `exec`
-   - dynamic imports
-   - subprocess shell execution
-   - network exfiltration patterns
-   - persistence hooks
+Purpose: make current linting dependable while preparing for the model layer.
 
-### Medium Value
+Work:
 
-1. **YARA-like rule packs**
-   Add built-in or external signature support for:
-   - malware
-   - webshells
-   - cryptominers
-   - hacktools
+- keep text and JSON scan output stable
+- tighten metadata parsing
+- validate metadata status values
+- add duplicate ID checks
+- add missing owner checks for stable assets
+- add broken local reference checks
+- keep current quality and safety rules deterministic
+- add tests for metadata edge cases
 
-   Start with regex-based signatures before considering a YARA runtime dependency.
+Success criteria:
 
-2. **Remote and archive input scanning**
-   Support scanning:
-   - single files
-   - zip files
-   - Git repos
-   - URLs
+- current CLI remains fast and predictable
+- metadata fields are stable enough for catalog and graph work
+- findings include clear evidence and source paths
 
-   This should require explicit design because it adds network and temporary-file concerns.
+### Phase 2: Promote The Normalized Model
 
-3. **Risk threshold exits**
-   Add `--fail-score <number>` alongside `--fail-on`.
+Purpose: make the IR the core Renma abstraction.
 
-4. **Rule/analyzer registry**
-   Organize rules by category and support enabling/disabling packs.
+Work:
 
-### Lower Priority / Larger Scope
+- define `Asset`, `Skill`, `ContextUnit`, `Dependency`, and `Composition` types
+- make catalog construction produce normalized assets and edges
+- preserve source evidence for dependency declarations
+- compute content hashes for assets
+- keep artifact parsing separate from model construction
 
-1. **Optional LLM semantic analysis**
-   Useful for intent and deception checks, but conflicts with Renma’s deterministic/minimal default.
+Success criteria:
 
-2. **Taint tracking**
-   Powerful for security analysis, but much heavier than the current architecture.
+- rules can consume the model instead of only raw parsed documents
+- catalog, graph, and future resolution share the same data structure
 
-3. **OSV or package vulnerability lookup**
-   Useful for dependency security, but not central to skill linting.
+### Phase 3: Catalog
 
-4. **REST/API serving mode**
-   Useful for hosted scanning, but not needed for the CLI-first roadmap.
+Purpose: make context inventory visible and reviewable.
 
-5. **Eval execution, grading, comparison, and result cache**
-   These overlap strongly with Waza. Renma should only add them if the project intentionally grows beyond preflight scanning.
+Work:
 
-## Recommended Priority
+- add `renma catalog --format json`
+- add `renma catalog --format markdown`
+- list assets by kind, owner, status, path, and dependency summary
+- include reverse dependency information
+- make output deterministic and commit-friendly
+- add catalog tests
 
-1. LLM-friendly output and finding metadata: `risk`, `fixability`, and ordered actions.
-2. Deterministic script opportunity suggestions for token-heavy or flaky workflows.
-3. Context mixins and orchestration maps for profiles, references, examples, scripts, and evals.
-4. SARIF output.
-5. Real YAML parsing for eval/task validation.
-6. Coverage strength findings.
-7. MCP security checks.
-8. Security rule pack for prompt injection, exfiltration, and privilege escalation.
-9. Risk score and `--fail-score`.
-10. Markdown report output.
-11. Link/reference integrity checks.
-12. Configurable token budgets.
-13. Optional external rule packs.
+Success criteria:
 
-## Test Plan
+- a team can see what context exists and who owns it
+- catalog output can be committed or consumed by other tools
 
-Use compiled tests with Node test runner.
+### Phase 4: Dependency Graph
 
-Cover:
+Purpose: make relationships explicit and validate reuse.
 
-- CLI argument parsing.
-- Help, version, and invalid-command behavior.
-- JSON config loading and validation.
-- Config, env, and CLI precedence.
-- Async glob-based artifact discovery.
-- Bounded file reads and stats.
-- Deterministic file ordering.
-- Scan bounds and default excludes.
-- Path normalization.
-- Markdown heading, code fence, link, metadata, and line extraction.
-- Profile overlay findings.
-- Secret, destructive command, and weak skill-shape rules.
-- Eval manifest and eval task findings.
-- Future context-mixin and orchestrator findings for profiles, references, examples, scripts, and evals.
-- Text and JSON report output.
-- Future LLM-friendly output, including `risk`, `fixability`, grouped actions, and stable schema version.
-- Future deterministic script opportunity suggestions.
-- `--fail-on` and config `fail_on` exit-code behavior.
-- Future SARIF and Markdown output once added.
-- Future risk score and `--fail-score` behavior once added.
+Work:
 
-## Assumptions
+- build graph edges from metadata and links
+- add graph validation rules
+- detect missing dependencies, cycles, unused assets, and deprecated dependencies
+- optionally add `renma graph --format json`
+- use graph data in scan findings
 
-- Minimal dependencies are preferred.
-- Correctness can justify small runtime dependencies.
-- Node 22.17+ compatibility is acceptable.
-- JSON config is enough for the current CLI.
-- `util.parseArgs` is stable in modern Node.
-- `fs.promises.glob` is stable in Node 22.17+ / 24+.
+Success criteria:
+
+- Renma can explain context structure, not just file quality
+- graph checks catch broken reuse before resolution exists
+
+### Phase 5: Resolution And Trace
+
+Purpose: deterministically select context for a skill or task.
+
+Work:
+
+- add `renma resolve`
+- accept skill ID and deterministic filters such as platform, tag, profile, include, and exclude
+- select required and optional context
+- enforce conflicts
+- order selected context
+- emit selected and rejected candidates with reasons
+- add manifest output
+
+Success criteria:
+
+- Renma can answer why context was selected or rejected
+- the same inputs produce the same manifest
+
+### Phase 6: Lockfiles And Reproducibility
+
+Purpose: make resolved context portable and reproducible.
+
+Work:
+
+- define `renma.lock.v1`
+- pin asset IDs, versions, hashes, and source revisions
+- verify lockfile integrity
+- report drift between current files and lockfile
+- support committed execution manifests for known workflows
+
+Success criteria:
+
+- teams can reproduce a context package across machines and repositories
+
+### Phase 7: Semantic Diff And Duplicate Detection
+
+Purpose: help teams safely evolve context.
+
+Work:
+
+- add deterministic semantic diff for model-level changes
+- compare manifests across revisions
+- detect exact and near-exact duplicate content
+- detect duplicated command blocks and headings
+- add optional advisory semantic duplicate detection later
+
+Success criteria:
+
+- reviewers can understand the context impact of a change
+- duplicated knowledge can be extracted into reusable context units
+
+### Phase 8: Packaging And Ecosystem
+
+Purpose: support reuse across many repositories.
+
+Work:
+
+- define context package conventions
+- support package namespaces
+- support external catalogs or vendored catalog snapshots
+- support reusable rule packs
+- evaluate SARIF and markdown reports
+- evaluate hosted or API modes only after CLI workflows are strong
+
+Success criteria:
+
+- multiple repositories can share context without copying it manually
+
+## Recommended Near-Term Priority
+
+The next major milestone should be:
+
+1. normalized internal model
+2. catalog command
+3. dependency graph
+4. graph-backed validation rules
+5. resolution trace prototype
+
+Defer:
+
+- lockfiles until resolution is stable
+- semantic duplicate detection until catalog and graph exist
+- hosted serving modes until CLI workflows are proven
+- LLM-assisted review until deterministic evidence is strong
+
+## Non-Goals For Now
+
+Renma should not become these yet:
+
+- hosted prompt registry
+- LLM judge
+- eval runner
+- malware scanner
+- package registry
+- runtime agent framework
+- synchronization service
+
+Those may be adjacent future integrations, but they should not drive the core
+architecture.
+
+## Design Principles
+
+- Prefer explicit IDs over implicit path conventions when composing context.
+- Prefer deterministic graph checks before semantic inference.
+- Prefer small metadata fields that directly power commands.
+- Prefer source evidence for every finding and graph edge.
+- Prefer additive warnings before strict failures for new schema fields.
+- Keep `SKILL.md` concise, but preserve operational detail in routed context.
+- Do not delete or summarize procedures when splitting context.
+- Make selected and rejected context equally visible.
+- Make every generated artifact deterministic and reviewable in Git.
