@@ -81,6 +81,7 @@ function contentHash(content: string): string {
   return `sha256:${createHash("sha256").update(content).digest("hex")}`;
 }
 
+/** Convert metadata relationship lists into graph edges for a catalog entry. */
 function dependenciesForEntry(entry: CatalogEntry): Dependency[] {
   return [
     ...metadataDependencies(entry, "requires", entry.metadata.requiresContext),
@@ -103,6 +104,7 @@ function metadataDependencies(
   }));
 }
 
+/** Evidence points at frontmatter until metadata parsing preserves field line ranges. */
 function metadataEvidence(path: string): Evidence {
   return {
     path,
@@ -112,6 +114,7 @@ function metadataEvidence(path: string): Evidence {
   };
 }
 
+/** Keep catalog output stable across filesystems and Node versions. */
 function kindOrder(kind: CatalogEntry["kind"]): number {
   if (kind === "skill") return 0;
   if (kind === "profile") return 1;
@@ -119,6 +122,7 @@ function kindOrder(kind: CatalogEntry["kind"]): number {
   return 3;
 }
 
+/** Keep dependency output stable while grouping the most important edges first. */
 function dependencyKindOrder(kind: DependencyKind): number {
   if (kind === "requires") return 0;
   if (kind === "optional") return 1;

@@ -3,8 +3,10 @@ import type { ArtifactKind, Evidence } from "./types.js";
 /** Lifecycle state for a skill or context asset. */
 export type AssetStatus = "experimental" | "stable" | "deprecated" | "archived";
 
+/** Artifact kinds Renma keeps in the normalized model. */
 export type AssetKind = Exclude<ArtifactKind, "unknown">;
 
+/** Relationship kinds used by graph and future resolution work. */
 export type DependencyKind =
   | "requires"
   | "optional"
@@ -38,6 +40,7 @@ export interface Asset {
 
 export interface Skill extends Asset {
   kind: "skill";
+  /** Routing declarations extracted from skill metadata. */
   routes: string[];
   requiredContext: string[];
   optionalContext: string[];
@@ -52,7 +55,9 @@ export interface ContextUnit extends Asset {
 export type CatalogEntry = Skill | ContextUnit;
 
 export interface Dependency {
+  /** Asset ID declaring the relationship. */
   from: string;
+  /** Asset ID or unresolved target named by the relationship. */
   to: string;
   kind: DependencyKind;
   sourcePath: string;

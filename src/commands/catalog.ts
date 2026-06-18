@@ -8,6 +8,7 @@ import type { Diagnostic } from "../types.js";
 
 export type CatalogFormat = "json" | "markdown";
 
+/** Complete result emitted by the catalog command before formatting. */
 export interface CatalogResult {
   root: string;
   configPath?: string;
@@ -16,6 +17,7 @@ export interface CatalogResult {
   diagnostics: Diagnostic[];
 }
 
+/** Run catalog discovery, format output, and return a CLI-style exit code. */
 export async function runCatalogCommand(
   targetPath: string,
   options: { format: CatalogFormat; overrides?: ConfigOverrides },
@@ -33,6 +35,7 @@ export async function runCatalogCommand(
     : 0;
 }
 
+/** Discover repository artifacts and build their normalized catalog model. */
 export async function catalog(
   targetPath: string,
   overrides: ConfigOverrides = {},
@@ -52,10 +55,12 @@ export async function catalog(
   };
 }
 
+/** Format the catalog command result as deterministic pretty JSON. */
 export function formatCatalogJson(result: CatalogResult): string {
   return `${JSON.stringify(result, null, 2)}\n`;
 }
 
+/** Format a compact Markdown catalog intended for code review and generated docs. */
 export function formatCatalogMarkdown(result: CatalogResult): string {
   const lines = [
     "# Renma Catalog",
@@ -96,6 +101,7 @@ export function formatCatalogMarkdown(result: CatalogResult): string {
   return `${lines.join("\n")}\n`;
 }
 
+/** Summarize outgoing dependency edges for one asset. */
 function dependencySummary(
   entry: CatalogEntry,
   dependencies: Dependency[],
@@ -109,6 +115,7 @@ function dependencySummary(
     .join(", ");
 }
 
+/** Summarize incoming dependency edges for one asset. */
 function dependentSummary(
   entry: CatalogEntry,
   dependencies: Dependency[],
@@ -122,6 +129,7 @@ function dependentSummary(
     .join(", ");
 }
 
+/** Render an empty-aware comma-delimited list for Markdown output. */
 function list(values: string[]): string {
   return values.length > 0 ? values.join(", ") : "(none)";
 }
