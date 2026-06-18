@@ -101,6 +101,7 @@ Today Renma provides:
 
 - Skill repository linting
 - Structural validation
+- Deterministic normalized context cataloging
 - Context routing checks
 - Risk detection
 - CI integration
@@ -145,6 +146,7 @@ renma scan .
 
 ```bash
 renma scan [path] [options]
+renma catalog [path] [options]
 renma context <file> [options]
 renma suggest-semantic-split <file> [options]
 ```
@@ -154,7 +156,7 @@ Options:
 ```text
 -c, --config <path>       Read JSON config from path
     --fail-on <level>     Exit 1 when findings meet severity: low, medium, high, critical
-    --format <format>     scan/context/suggest output format
+    --format <format>     scan/context/catalog/suggest output format
     --json                Shortcut for --format json
     --lines <range>       context: exact line range, e.g. L10-L42
     --max-source-bytes <n>
@@ -172,6 +174,8 @@ renma scan .
 renma scan ./my-repo --json
 renma scan . --fail-on medium
 renma scan . --config ./renma.config.json
+renma catalog . --format markdown
+renma catalog . --json
 renma context skills/setup/references/android.md --format json
 renma context skills/setup/references/android.md --lines L40-L90 --format text
 renma suggest-semantic-split skills/setup/references/android.md | codex exec

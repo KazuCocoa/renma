@@ -1,5 +1,6 @@
 import { parseArgs } from "node:util";
 import packageJson from "../package.json" with { type: "json" };
+import { runCatalogCommand, type CatalogFormat } from "./commands/catalog.js";
 import { runContextCommand, type ContextFormat } from "./commands/context.js";
 import { runScanCommand } from "./commands/scan.js";
 import {
@@ -47,6 +48,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   const [command = "scan", target = "."] = parsed.positionals;
   if (
     command !== "scan" &&
+    command !== "catalog" &&
     command !== "suggest-semantic-split" &&
     command !== "context"
   ) {
@@ -63,6 +65,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
   if (command === "context") {
     return runContext(parsed.values, target);
+  }
+
+  if (command === "catalog") {
+    return runCatalog(parsed.values, target);
   }
 
   return runScan(parsed.values, target);
@@ -90,6 +96,33 @@ async function runScan(values: CliValues, target: string): Promise<number> {
   };
   try {
     return await runScanCommand(target, overrides);
+  } catch (error) {
+    console.error(
+      error instanceof ConfigError || error instanceof Error
+        ? error.message
+        : String(error),
+    );
+    return 2;
+  }
+}
+
+async function runCatalog(values: CliValues, target: string): Promise<number> {
+  const format = values.json ? "json" : (stringValue(values.format) ?? "json");
+  if (format !== "json" && format !== "markdown") {
+    console.error("--format must be either json or markdown.");
+    return 2;
+  }
+
+  const configPath = stringValue(values.config);
+  const overrides: ConfigOverrides = {
+    ...(configPath ? { configPath } : {}),
+  };
+
+  try {
+    return await runCatalogCommand(target, {
+      format: format as CatalogFormat,
+      overrides,
+    });
   } catch (error) {
     console.error(
       error instanceof ConfigError || error instanceof Error
@@ -187,18 +220,20 @@ function helpText(): string {
     "",
     "Additional usage:",
     "  renma scan [path] [options]",
+    "  renma catalog [path] [options]",
     "  renma context <file> [options]",
     "  renma suggest-semantic-split <file> [options]",
     "",
     "Commands:",
     "  scan                       Scan a repository or skill directory",
+    "  catalog                    Print deterministic normalized asset catalog",
     "  context                    Print compact outline or exact line slice",
     "  suggest-semantic-split     Print a Codex-ready semantic split prompt",
     "",
     "Options:",
     "  -c, --config <path>        scan: read JSON config from path",
     "      --fail-on <level>      scan: exit 1 when findings meet severity: low, medium, high, critical",
-    "      --format <format>      scan: text or json; suggest-semantic-split: prompt or json",
+    "      --format <format>      scan: text or json; catalog: json or markdown; suggest-semantic-split: prompt or json",
     "      --json                 Shortcut for --format json",
     "      --lines <range>        context: exact line range, e.g. L10-L42",
     "      --max-source-bytes <n> suggest-semantic-split: source file byte budget",

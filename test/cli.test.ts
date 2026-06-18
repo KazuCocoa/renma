@@ -184,6 +184,69 @@ test("CLI reports JSON and fail-on exit code", async () => {
   );
 });
 
+test("CLI prints catalog JSON and markdown", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "skills", "demo", "references"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "skills", "demo", "SKILL.md"),
+    [
+      "---",
+      "id: demo",
+      "owner: qa-platform",
+      "status: stable",
+      "tags: appium, android",
+      "requires_context: demo.guide",
+      "---",
+      "# Demo",
+      "Use for demo requests.",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(root, "skills", "demo", "references", "guide.md"),
+    "---\nid: demo.guide\nowner: qa-platform\n---\n# Guide\n",
+  );
+
+  const json = await withCapturedConsole(() => main(["catalog", root]));
+  assert.equal(json.code, 0);
+  const report = JSON.parse(json.stdout) as {
+    catalog: {
+      assets: Array<{ id: string; contentHash: string }>;
+      dependencies: Array<{ from: string; to: string; kind: string }>;
+    };
+  };
+  assert.deepEqual(
+    report.catalog.assets.map((asset) => asset.id),
+    ["demo", "demo.guide"],
+  );
+  assert.match(report.catalog.assets[0]?.contentHash ?? "", /^sha256:/);
+  assert.deepEqual(report.catalog.dependencies, [
+    {
+      from: "demo",
+      to: "demo.guide",
+      kind: "requires",
+      sourcePath: "skills/demo/SKILL.md",
+      evidence: {
+        path: "skills/demo/SKILL.md",
+        startLine: 1,
+        endLine: 1,
+        snippet: "frontmatter dependency metadata",
+      },
+    },
+  ]);
+
+  const markdown = await withCapturedConsole(() =>
+    main(["catalog", root, "--format", "markdown"]),
+  );
+  assert.equal(markdown.code, 0);
+  assert.match(markdown.stdout, /# Renma Catalog/);
+  assert.match(markdown.stdout, /### demo/);
+  assert.match(markdown.stdout, /Dependencies: requires:demo\.guide/);
+  assert.match(markdown.stdout, /Dependents: requires:demo/);
+});
+
 test("CLI prints a Codex semantic split prompt", async () => {
   const root = await fixture();
   const skillDir = path.join(root, "skills", "setup");
