@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { buildCatalog } from "../src/catalog.js";
 import { parseDocument } from "../src/markdown.js";
@@ -33,6 +34,7 @@ conflicts: android
     version: "1.2.3",
     owner: "qa-platform",
     status: "stable",
+    tags: [],
     whenToUse: ["tests", "reviews"],
     whenNotToUse: ["production deploys"],
     requiresContext: ["product.overview", "environment"],
@@ -97,6 +99,85 @@ requires_context: demo.guide
     ["demo", "demo.guide"],
   );
   assert.equal(result.catalog.entries[0]?.sourcePath, "skills/demo/SKILL.md");
+});
+
+test("buildCatalog emits normalized asset hashes and dependency edges", () => {
+  const skillContent = `---
+id: demo
+requires_context: product.overview, environment
+optional_context: incidents
+conflicts: android
+---
+# Demo
+`;
+  const { catalog } = buildCatalog([
+    parseDocument(artifact("skills/demo/SKILL.md", "skill", skillContent)),
+  ]);
+
+  assert.equal(catalog.assets, catalog.entries);
+  assert.equal(
+    catalog.entries[0]?.contentHash,
+    `sha256:${createHash("sha256").update(skillContent).digest("hex")}`,
+  );
+  assert.deepEqual(
+    catalog.dependencies.map((dependency) => ({
+      from: dependency.from,
+      to: dependency.to,
+      kind: dependency.kind,
+      sourcePath: dependency.sourcePath,
+      evidence: dependency.evidence,
+    })),
+    [
+      {
+        from: "demo",
+        to: "environment",
+        kind: "requires",
+        sourcePath: "skills/demo/SKILL.md",
+        evidence: {
+          path: "skills/demo/SKILL.md",
+          startLine: 1,
+          endLine: 1,
+          snippet: "frontmatter dependency metadata",
+        },
+      },
+      {
+        from: "demo",
+        to: "product.overview",
+        kind: "requires",
+        sourcePath: "skills/demo/SKILL.md",
+        evidence: {
+          path: "skills/demo/SKILL.md",
+          startLine: 1,
+          endLine: 1,
+          snippet: "frontmatter dependency metadata",
+        },
+      },
+      {
+        from: "demo",
+        to: "incidents",
+        kind: "optional",
+        sourcePath: "skills/demo/SKILL.md",
+        evidence: {
+          path: "skills/demo/SKILL.md",
+          startLine: 1,
+          endLine: 1,
+          snippet: "frontmatter dependency metadata",
+        },
+      },
+      {
+        from: "demo",
+        to: "android",
+        kind: "conflicts",
+        sourcePath: "skills/demo/SKILL.md",
+        evidence: {
+          path: "skills/demo/SKILL.md",
+          startLine: 1,
+          endLine: 1,
+          snippet: "frontmatter dependency metadata",
+        },
+      },
+    ],
+  );
 });
 
 function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
