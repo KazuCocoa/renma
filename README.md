@@ -1,10 +1,95 @@
 # Renma - 練磨
 
-Renma is a minimal-dependency TypeScript CLI for reviewing AI-agent skills, repository instructions, profile overlays, references, and examples.
+Renma helps teams build maintainable and reusable context for AI systems.
 
-The scanner reads known skill-related files, runs deterministic quality and safety rules, and emits text or JSON reports with file and line evidence.
+As skill repositories grow, knowledge becomes duplicated across skills, agents, and projects. The challenge is no longer writing instructions. The challenge is organizing context so that it can be reused, maintained, and evolved over time.
 
-Renma's longer-term direction is a Git-native context engineering toolkit: validation, cataloging, context resolution, traceability, lockfiles, semantic diff, and local context packaging. It is designed for skill and context repositories that multiple teams can consume through normal Git versioning, pinned revisions, and CI review workflows. See [architecture.md](./architecture.md) and [plan.md](./plan.md) for the design direction.
+Renma starts as a linter for skills and context repositories, but its broader goal is to help teams move toward composable context.
+
+Today, Renma is a minimal-dependency TypeScript CLI for reviewing AI-agent skills, repository instructions, profile overlays, references, and examples. The scanner reads known skill-related files, runs deterministic quality and safety rules, and emits text or JSON reports with file and line evidence.
+
+Renma's longer-term direction is a Git-native context engineering toolkit: validation, cataloging, context resolution, traceability, lockfiles, semantic diff, and local context packaging for skill and context repositories that multiple teams can consume through normal Git versioning, pinned revisions, and CI review workflows. See [architecture.md](./architecture.md) and [plan.md](./plan.md) for the design direction.
+
+## Why Renma?
+
+Many AI projects eventually end up with:
+
+- Duplicated knowledge across multiple skills
+- Large instruction files that are difficult to maintain
+- Context that should be shared but is copied instead
+- Unused or orphaned context files
+- Growing repositories with unclear structure
+
+For example:
+
+Skill A
+
+- Appium setup
+- Android setup
+
+Skill B
+
+- Appium setup
+- iOS setup
+
+Skill C
+
+- Appium setup
+- Troubleshooting
+
+Over time, the same knowledge appears in multiple places.
+
+Renma helps identify these structural issues and encourages reusable context instead.
+
+## Long-Term Vision
+
+The long-term goal is not simply better skills.
+
+The goal is composable context.
+
+Instead of copying knowledge across repositories:
+
+```text
+context/
+  appium/
+    setup.md
+    android.md
+    ios.md
+    troubleshooting.md
+
+skills/
+  mobile-testing/
+  enterprise-testing/
+  onboarding/
+```
+
+Skills become routers and orchestrators.
+
+Context becomes reusable building blocks.
+
+As repositories evolve, shared knowledge can be extracted, reused, and maintained in a single place.
+
+Renma is evolving from a skill linter into infrastructure for reusable context.
+
+## Today
+
+Today Renma provides:
+
+- Skill repository linting
+- Structural validation
+- Context routing checks
+- Risk detection
+- CI integration
+
+## Future
+
+Potential future directions include:
+
+- Semantic context analysis
+- Duplicate knowledge detection
+- Context extraction suggestions
+- Shared context recommendations
+- Composable context architecture support
 
 ## Requirements
 
@@ -43,17 +128,17 @@ renma suggest-semantic-split <file> [options]
 Options:
 
 ```text
--c, --config <path>      Read JSON config from path
-    --fail-on <level>    Exit 1 when findings meet severity: low, medium, high, critical
-    --format <format>    scan/context/suggest output format
-    --json               Shortcut for --format json
-    --lines <range>      context: exact line range, e.g. L10-L42
+-c, --config <path>       Read JSON config from path
+    --fail-on <level>     Exit 1 when findings meet severity: low, medium, high, critical
+    --format <format>     scan/context/suggest output format
+    --json                Shortcut for --format json
+    --lines <range>       context: exact line range, e.g. L10-L42
     --max-source-bytes <n>
-                         suggest-semantic-split: source file byte budget
+                          suggest-semantic-split: source file byte budget
     --max-context-bytes <n>
-                         suggest-semantic-split: nearby context byte budget
--h, --help               Show help
--v, --version            Show version
+                          suggest-semantic-split: nearby context byte budget
+-h, --help                Show help
+-v, --version             Show version
 ```
 
 Examples:
