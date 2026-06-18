@@ -36,6 +36,8 @@ renma scan .
 
 ```bash
 renma scan [path] [options]
+renma context <file> [options]
+renma suggest-semantic-split <file> [options]
 ```
 
 Options:
@@ -43,8 +45,13 @@ Options:
 ```text
 -c, --config <path>      Read JSON config from path
     --fail-on <level>    Exit 1 when findings meet severity: low, medium, high, critical
-    --format <format>    Output format: text or json
+    --format <format>    scan/context/suggest output format
     --json               Shortcut for --format json
+    --lines <range>      context: exact line range, e.g. L10-L42
+    --max-source-bytes <n>
+                         suggest-semantic-split: source file byte budget
+    --max-context-bytes <n>
+                         suggest-semantic-split: nearby context byte budget
 -h, --help               Show help
 -v, --version            Show version
 ```
@@ -56,6 +63,9 @@ renma scan .
 renma scan ./my-repo --json
 renma scan . --fail-on medium
 renma scan . --config ./renma.config.json
+renma context skills/setup/references/android.md --format json
+renma context skills/setup/references/android.md --lines L40-L90 --format text
+renma suggest-semantic-split skills/setup/references/android.md | codex exec
 ```
 
 ## What Gets Scanned
@@ -89,15 +99,8 @@ Example:
 {
   "fail_on": "high",
   "format": "json",
-  "globs": [
-    "skills/**/SKILL.md",
-    "AGENTS.md"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    ".git"
-  ],
+  "globs": ["skills/**/SKILL.md", "AGENTS.md"],
+  "exclude": ["node_modules", "dist", ".git"],
   "max_file_size_bytes": 524288,
   "max_depth": 16,
   "concurrency": 16

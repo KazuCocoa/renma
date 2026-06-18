@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { buildContextOutline, type ContextOutline } from "./context.js";
 
-const DEFAULT_MAX_SOURCE_BYTES = 120 * 1024;
 const DEFAULT_MAX_CONTEXT_BYTES = 32 * 1024;
 const CONTEXT_DIRS = new Set(["references", "profiles", "examples", "r"]);
 
@@ -37,13 +37,15 @@ interface SemanticSplitContextPackage {
     };
     skillDir: null | string;
   };
+  helperCommands: {
+    outline: string;
+    sliceExample: string;
+  };
   mode: "codex-semantic-split-prompt";
   mutatesFiles: false;
   source: {
-    bytesRead: number;
-    numberedText: string;
+    outline: ContextOutline;
     path: string;
-    truncated: boolean;
   };
 }
 
@@ -66,10 +68,7 @@ async function buildContextPackage(
   options: SuggestSemanticSplitOptions,
 ): Promise<SemanticSplitContextPackage> {
   const sourcePath = path.resolve(target);
-  const source = await readLimitedText(
-    sourcePath,
-    options.maxSourceBytes ?? DEFAULT_MAX_SOURCE_BYTES,
-  );
+  const sourceOutline = await buildContextOutline(sourcePath);
   const skillDir = await findSkillDir(path.dirname(sourcePath));
   const skillPath = skillDir ? path.join(skillDir, "SKILL.md") : null;
   const skill = skillPath
@@ -101,13 +100,15 @@ async function buildContextPackage(
       skill: skillContext,
       skillDir,
     },
+    helperCommands: {
+      outline: `renma context ${shellQuote(sourcePath)} --format json`,
+      sliceExample: `renma context ${shellQuote(sourcePath)} --lines L10-L42 --format text`,
+    },
     mode: "codex-semantic-split-prompt",
     mutatesFiles: false,
     source: {
-      bytesRead: source.bytesRead,
-      numberedText: numberLines(source.text),
+      outline: sourceOutline,
       path: sourcePath,
-      truncated: source.truncated,
     },
   };
 }
@@ -134,9 +135,13 @@ function renderCodexPrompt(
     "",
     "You are improving an AI-agent skill repository.",
     "",
-    "Read the provided source file and nearby context. Suggest a semantic split plan for the source file based on meaning, not byte size and not predefined categories.",
+    "Read the compact source outline and nearby context. Suggest a semantic split plan for the source file based on meaning, not byte size and not predefined categories.",
     "",
     "Infer the best split direction as a human maintainer would. For example, choose platform-specific files only if the content itself separates macOS/Linux, Windows, etc. If the better boundary is setup phase, troubleshooting area, tool, workflow, runtime, audience, prerequisite, verification, or something else, choose that instead.",
+    "",
+    "Use deterministic context helpers when the outline is not enough. Prefer these helpers over ad hoc cat/sed calls so token usage stays low:",
+    `- Outline: \`${contextPackage.helperCommands.outline}\``,
+    `- Exact slice: \`${contextPackage.helperCommands.sliceExample}\``,
     "",
     "Do not rewrite files. Return only a proposal.",
     "",
@@ -167,19 +172,16 @@ function renderCodexPrompt(
 }`),
     "",
     "Rules:",
-    "- Use source line ranges from the numbered source file.",
+    "- Use source line ranges from the outline and exact context slices.",
     "- Do not split inside fenced code blocks.",
     "- Do not drop warnings, prerequisites, rollback, or verification steps.",
     "- Name files by meaning, not by part number.",
     "- If the source should remain one file, set shouldSplit to false and suggestedFiles to [].",
     "- Return JSON only. Do not include Markdown outside the JSON.",
     "",
-    "## Source",
+    "## Source Outline",
     "",
-    `Path: ${source.path}`,
-    `Bytes read: ${source.bytesRead}${source.truncated ? " (truncated)" : ""}`,
-    "",
-    fence(source.numberedText),
+    fence(JSON.stringify(source.outline, null, 2)),
     "",
     "## Nearby SKILL.md",
     "",
@@ -304,13 +306,10 @@ function previewMarkdown(text: string): string {
   return preview.length > 0 ? preview.join("\n") : lines.slice(0, 8).join("\n");
 }
 
-function numberLines(text: string): string {
-  return text
-    .split(/\n/)
-    .map((line, index) => `L${String(index + 1).padStart(4, "0")}: ${line}`)
-    .join("\n");
-}
-
 function fence(text: string): string {
   return `\`\`\`text\n${text}\n\`\`\``;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
 }
