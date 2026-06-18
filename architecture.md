@@ -256,7 +256,29 @@ Questions answered:
 
 Generated artifacts such as `CATALOG.md` and `catalog.json` can be committed, published, or consumed by future dashboards.
 
-### Layer 3: Resolution And Trace
+### Layer 3: Repeated Context Discovery
+
+Repeated context discovery helps teams find reusable context boundaries before
+they already have explicit shared context units.
+
+It should start with deterministic evidence:
+
+- exact normalized section hashes
+- near-duplicate token shingles
+- repeated command blocks
+- repeated headings, path terms, tags, tools, and links
+- repeated workflow skeletons across skills, references, examples, and agents
+
+The output should be a human-reviewable set of context pattern candidates. Each
+candidate should include source paths, line ranges, signal kinds, confidence,
+and a suggested shared path such as `context/appium/setup.md`. Renma should also
+support intentionally skill-specific context through metadata or reviewer
+suppression, so local exceptions do not become noisy findings.
+
+LLMs may later label clusters or propose refactors, but deterministic evidence
+should remain the authority.
+
+### Layer 4: Resolution And Trace
 
 Resolution is where Renma moves beyond scanning.
 
@@ -276,7 +298,7 @@ Questions answered:
 
 This layer should not call an LLM. It should only produce a deterministic context package and explanation.
 
-### Layer 4: Lockfiles
+### Layer 5: Lockfiles
 
 Lockfiles make resolved context reproducible.
 
@@ -300,7 +322,7 @@ resolved_files:
 
 Lockfiles should freeze the selected context set, not replace Git history.
 
-### Layer 5: Semantic Diff
+### Layer 6: Semantic Diff
 
 Git shows textual changes. Renma should explain AI-behavior-relevant changes.
 
@@ -318,9 +340,10 @@ Diff categories:
 - status or lifecycle changes
 - conflict changes
 - required context changes
+- repeated context candidate changes
 - risk changes
 
-### Layer 6: Local Context Packaging
+### Layer 7: Local Context Packaging
 
 Execution should remain local and thin.
 
@@ -418,11 +441,12 @@ The next practical sequence should be:
 1. Parse and validate metadata.
 2. Build a repository catalog.
 3. Introduce normalized model types for skills and context units.
-4. Add deterministic context resolution.
-5. Add trace output for selected and rejected context.
-6. Add lockfiles for reproducible resolved context.
-7. Add semantic diff over the normalized model and lockfiles.
-8. Add `run` as deterministic context packaging.
-9. Keep gateway, provider execution, hosted dashboards, and synchronization out of scope.
+4. Add deterministic repeated context discovery.
+5. Add deterministic context resolution.
+6. Add trace output for selected and rejected context.
+7. Add lockfiles for reproducible resolved context.
+8. Add semantic diff over the normalized model, lockfiles, and context pattern candidates.
+9. Add `run` as deterministic context packaging.
+10. Keep gateway, provider execution, hosted dashboards, and synchronization out of scope.
 
 This sequencing preserves the current strengths while expanding toward the larger product vision one useful layer at a time.

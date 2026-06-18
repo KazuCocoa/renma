@@ -136,6 +136,8 @@ Current limitations:
 - Renma does not yet explain selected and rejected context candidates.
 - Renma does not yet produce execution manifests or lockfiles.
 - Renma does not yet understand transitive context dependencies.
+- Renma does not yet discover repeated context patterns across skills, references,
+  examples, agents, or repositories.
 - Renma does not yet perform semantic duplicate detection.
 - Eval support is planned but not part of the core implementation.
 
@@ -354,6 +356,52 @@ CATALOG.md
 ```
 
 Catalog output should be deterministic and commit-friendly.
+
+## Repeated Context Discovery
+
+Repeated context discovery is the bridge between cataloging what exists and
+refactoring knowledge into reusable context units.
+
+The goal is not only exact duplicate detection. Renma should also identify
+natural context boundaries that appear across multiple skills, references,
+examples, agents, or repositories. Similar Appium setup notes, Android driver
+selection guidance, failure log collection steps, secret handling policy, CI
+test execution instructions, and troubleshooting workflows may represent the
+same reusable context unit even when the wording differs.
+
+This feature should remain deterministic first. Initial signals can include:
+
+- repeated normalized headings
+- repeated command blocks
+- repeated links, domains, tool names, and package names
+- shared metadata tags and `when_to_use` terms
+- shared path segments such as `appium`, `android`, `ci`, or `secrets`
+- shared keyword fingerprints from headings, lists, and short paragraphs
+- similar workflow skeletons such as setup, run, collect logs, troubleshoot
+
+The internal representation should support section-level evidence before any
+LLM-assisted review is added:
+
+- `ContextFragment`: source path, line range, heading path, normalized text
+  hash, token fingerprint, command fingerprints, links, keywords, metadata
+- `ContextPatternCandidate`: label, fragments, signal kinds, score, suggested
+  shared context path, classification, and source evidence
+
+Classifications should distinguish:
+
+- `exact_duplicate`: same normalized text hash
+- `near_duplicate`: high deterministic shingle or command similarity
+- `semantic_candidate`: shared topic or workflow signals with weaker text
+  overlap
+- `skill_specific`: intentionally local context, usually backed by metadata,
+  owner/scope differences, platform conflicts, or reviewer suppression
+
+Reports should be human-reviewable and refactor-oriented. A useful report
+groups evidence by candidate context unit, proposes a shared path such as
+`context/appium/setup.md`, lists source ranges, explains deterministic signals,
+and calls out what should remain skill-specific. LLMs may later label clusters
+or draft refactor proposals, but Renma should keep deterministic evidence
+authoritative.
 
 ## Context Dependency Graph
 
@@ -835,7 +883,30 @@ Success criteria:
 
 - teams can reproduce a context package across machines and repositories
 
-### Phase 7: Semantic Diff And Duplicate Detection
+### Phase 7: Repeated Context Discovery
+
+Purpose: help teams discover reusable context boundaries before formal
+refactors.
+
+Work:
+
+- add section-level `ContextFragment` fingerprints for Markdown assets
+- detect exact duplicate fragments by normalized text hash
+- detect near duplicates with deterministic token shingles and command
+  fingerprints
+- cluster repeated headings, path terms, tags, tools, links, and workflow
+  skeletons into `ContextPatternCandidate` groups
+- report suggested shared context paths and source line evidence
+- allow metadata-based suppression for intentionally skill-specific context
+- keep LLM review optional and advisory
+
+Success criteria:
+
+- teams can see repeated context patterns across skills and repositories
+- candidates are useful before semantic embeddings or LLM review exist
+- reports help humans decide what to extract into shared context units
+
+### Phase 8: Semantic Diff And Duplicate Detection
 
 Purpose: help teams safely evolve context.
 
@@ -845,6 +916,7 @@ Work:
 - compare manifests across revisions
 - detect exact and near-exact duplicate content
 - detect duplicated command blocks and headings
+- compare repeated-context candidates across revisions
 - add optional advisory semantic duplicate detection later
 
 Success criteria:
@@ -852,7 +924,7 @@ Success criteria:
 - reviewers can understand the context impact of a change
 - duplicated knowledge can be extracted into reusable context units
 
-### Phase 8: Packaging And Ecosystem
+### Phase 9: Packaging And Ecosystem
 
 Purpose: support reuse across many repositories.
 
