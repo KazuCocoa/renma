@@ -71,6 +71,30 @@ As repositories evolve, shared knowledge can be extracted, reused, and maintaine
 
 Renma is evolving from a skill linter into infrastructure for reusable context.
 
+## Philosophy
+
+Large AI repositories often evolve the same way large software systems do.
+
+Knowledge becomes duplicated.
+
+Context becomes fragmented.
+
+Instructions become difficult to maintain.
+
+Renma treats context as software.
+
+Context should be:
+
+- Reusable
+- Composable
+- Reviewable
+- Versioned
+- Maintainable
+
+Skills are orchestration layers.
+
+Context is the long-term asset.
+
 ## Today
 
 Today Renma provides:
