@@ -17,6 +17,7 @@ export function parseAssetMetadata(document: ParsedDocument): {
   const rawStatus = document.metadata.status;
   const status = parseStatus(rawStatus);
   const metadata: AssetMetadata = {
+    tags: listValue(document.metadata.tags),
     whenToUse: listValue(document.metadata.when_to_use),
     whenNotToUse: listValue(document.metadata.when_not_to_use),
     requiresContext: listValue(document.metadata.requires_context),
