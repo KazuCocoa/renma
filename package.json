@@ -20,7 +20,8 @@
     "format": "prettier --write \"**/*.{ts,js,json}\"",
     "format:check": "prettier --check \"**/*.{ts,js,json}\"",
     "lint": "eslint \"{src,test}/**/*.ts\" \"scripts/**/*.mjs\" \"eslint.config.js\"",
-    "split-reference": "node scripts/split-reference.mjs"
+    "split-reference": "node scripts/split-reference.mjs",
+    "suggest-semantic-split": "node scripts/suggest-semantic-split.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
