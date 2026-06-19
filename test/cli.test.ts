@@ -388,6 +388,92 @@ test("help and invalid commands have expected exit codes", async () => {
   assert.match(invalid.stderr, /Unknown command "inspect"/);
 });
 
+test("CLI discovers repeated context pattern candidates", async () => {
+  const root = await fixture();
+  const mobileSkill = path.join(root, "skills", "mobile-testing");
+  const ciSkill = path.join(root, "skills", "ci-mobile");
+  await mkdir(path.join(mobileSkill, "references"), { recursive: true });
+  await mkdir(path.join(ciSkill, "references"), { recursive: true });
+
+  await writeFile(
+    path.join(mobileSkill, "SKILL.md"),
+    "# Mobile Testing\n\nRoute Appium setup to references/appium.md.\n",
+  );
+  await writeFile(
+    path.join(ciSkill, "SKILL.md"),
+    "# CI Mobile\n\nRoute CI Appium setup to references/appium-ci.md.\n",
+  );
+  await writeFile(
+    path.join(mobileSkill, "references", "appium.md"),
+    [
+      "# Appium Setup\n",
+      "Install the Appium server before running Android tests.",
+      "Select the UiAutomator2 driver for Android automation.",
+      "Collect Appium server logs when sessions fail.",
+      "",
+      "```bash",
+      "appium driver list --installed",
+      "```",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(ciSkill, "references", "appium-ci.md"),
+    [
+      "# Appium Setup\n",
+      "Install the Appium server before running CI Android tests.",
+      "Select the UiAutomator2 driver for Android automation.",
+      "Collect Appium server logs when sessions fail.",
+      "",
+      "```bash",
+      "appium driver list --installed",
+      "```",
+      "",
+    ].join("\n"),
+  );
+
+  const json = await withCapturedConsole(() =>
+    main(["discover-context-patterns", root, "--format", "json"]),
+  );
+  assert.equal(json.code, 0);
+  const report = JSON.parse(json.stdout) as {
+    candidates: Array<{
+      classification: string;
+      label: string;
+      signalKinds: string[];
+      suggestedContextPath: string;
+    }>;
+  };
+  assert.ok(report.candidates.length > 0);
+  assert.ok(
+    report.candidates.some(
+      (candidate) =>
+        candidate.label === "Appium Setup" &&
+        candidate.classification === "semantic_candidate" &&
+        candidate.signalKinds.includes("heading"),
+    ),
+  );
+  assert.ok(
+    report.candidates.some((candidate) =>
+      candidate.signalKinds.includes("command_fingerprint"),
+    ),
+  );
+  assert.ok(
+    report.candidates.some(
+      (candidate) =>
+        candidate.suggestedContextPath === "context/appium-setup.md",
+    ),
+  );
+
+  const markdown = await withCapturedConsole(() =>
+    main(["discover-context-patterns", root]),
+  );
+  assert.equal(markdown.code, 0);
+  assert.match(markdown.stdout, /# Repeated Context Patterns/);
+  assert.match(markdown.stdout, /Appium Setup/);
+  assert.match(markdown.stdout, /context\/appium-setup\.md/);
+});
+
 async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-"));
 }
