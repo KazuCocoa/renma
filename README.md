@@ -80,6 +80,7 @@ Completed baseline:
 - Safety checks for risky instructions and literal secrets
 - Deterministic catalog output for assets and dependency metadata
 - Deterministic ownership coverage reporting for cataloged assets
+- Context graph snapshot reporting
 - Deterministic metadata governance for duplicate asset IDs, unknown declared references, references to deprecated or archived assets, and orphaned shared context assets
 - Repository file outline and line-slice inspection helper
 - Semantic split prompt helper for oversized context files
@@ -88,7 +89,6 @@ Completed baseline:
 
 Near-term direction:
 
-- Context graph snapshot and reporting
 - Agent readiness report
 - Repeated context and duplicate knowledge discovery
 - Semantic diff for context changes
@@ -126,6 +126,7 @@ renma scan .
 ```bash
 renma scan [path] [options]
 renma catalog [path] [options]
+renma graph [path] [options]
 renma ownership [path] [options]
 renma inspect <file> [options]
 renma suggest-semantic-split <file> [options]
@@ -138,7 +139,7 @@ Options:
 ```text
 -c, --config <path>      Read JSON config from path
     --fail-on <level>    Exit 1 when findings meet severity: low, medium, high, critical
-    --format <format>    scan: text or json; catalog/ownership: json or markdown; suggest: prompt or json
+    --format <format>    scan: text or json; catalog/ownership/graph: json or markdown; suggest: prompt or json
     --include-owned      ownership: include owned asset details
     --json               Shortcut for --format json
     --lines <range>      inspect: exact line range, e.g. L10-L42
@@ -159,6 +160,8 @@ renma scan . --fail-on medium
 renma scan . --config ./renma.config.json
 renma catalog . --format markdown
 renma catalog . --json
+renma graph . --format markdown
+renma graph . --json
 renma ownership . --format markdown
 renma ownership . --json
 renma ownership . --json --include-owned

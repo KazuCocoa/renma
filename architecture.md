@@ -289,10 +289,11 @@ The graph should represent assets and typed dependencies. It should power:
 - Semantic diff
 - Future visualization
 
-Possible command:
+Current command:
 
 ```bash
 renma graph --format json
+renma graph --format markdown
 ```
 
 The graph is not a runtime selection engine. It is repository evidence.
@@ -404,15 +405,15 @@ Completed baseline:
 3. Catalog generation
 4. Graph-backed metadata governance for duplicate IDs, unknown references, deprecated or archived references, and orphaned context assets
 5. Ownership coverage reporting
+6. Context graph snapshot reporting
 
 Near-term implementation:
 
-1. Context graph snapshot and reporting
-2. Agent readiness report
-3. Repeated context and duplicate knowledge discovery
-4. Semantic diff for context changes
-5. Optional LLM-assisted repository evaluation bundles
-6. Optional external signal import
+1. Agent readiness report
+2. Repeated context and duplicate knowledge discovery
+3. Semantic diff for context changes
+4. Optional LLM-assisted repository evaluation bundles
+5. Optional external signal import
 
 This sequence prioritizes shared context assets and repository health before external signal import.
 
@@ -423,6 +424,7 @@ Current CLI commands:
 ```bash
 renma scan [path]
 renma catalog [path]
+renma graph [path]
 renma ownership [path]
 renma inspect <file>
 renma suggest-semantic-split <file>
@@ -446,7 +448,6 @@ Baseline now in place:
 
 Near-term implementation work:
 
-- Context graph snapshot and reporting.
 - Agent readiness report.
 - Repeated context discovery across shared contexts, skills, agents, references, profiles, and examples.
 - Optional LLM-assisted repository evaluation bundles.
