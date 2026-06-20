@@ -446,7 +446,6 @@ Baseline now in place:
 
 Near-term implementation work:
 
-- Ownership coverage reporting.
 - Context graph snapshot and reporting.
 - Agent readiness report.
 - Repeated context discovery across shared contexts, skills, agents, references, profiles, and examples.
