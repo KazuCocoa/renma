@@ -95,6 +95,7 @@ Renma should:
 - Detect repeated or duplicate knowledge with deterministic evidence.
 - Produce catalog snapshots and repository manifest artifacts for Git review and CI.
 - Produce agent readiness reports that describe repository health.
+- Emit structured, LLM-actionable diagnostics that humans and agents can use to repair the repository safely.
 - Suggest improvements without requiring an LLM.
 
 Renma should not:
@@ -106,6 +107,35 @@ Renma should not:
 - Execute tools on behalf of an agent.
 - Own provider gateways, hosted dashboards, or package synchronization.
 - Replace human ownership review.
+
+## LLM-Actionable Diagnostics
+
+Renma should detect repository problems and emit structured diagnostics that are
+useful as repair prompts for humans and LLM coding agents. Findings should
+explain what is wrong, why it matters, where the evidence is, what a safe repair
+should do, what constraints must be preserved, and how to verify the fix.
+
+Core loop:
+
+```text
+renma scan / validate
+  -> structured diagnostics
+  -> Codex / Claude reads diagnostics
+  -> agent proposes repository patch
+  -> human reviews
+  -> renma validates again
+```
+
+Central repair workflow: a single `SKILL.md` contains reusable domain
+knowledge, tool guidance, and QA heuristics. Renma reports that the skill is too
+monolithic and mixes usage guidance with reusable context. Codex or Claude moves
+the reusable knowledge into first-class context assets under `contexts/`, keeps
+the skill concise, adds metadata, updates declared context references, and then
+Renma validates the healthier separation.
+
+Future output modes may include human-readable diagnostics, machine-readable
+JSON diagnostics, and LLM-friendly repair instructions. Core validation should
+remain deterministic and should not call an LLM.
 
 ## Terminology
 

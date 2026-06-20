@@ -54,6 +54,66 @@ wrappers, Codex plugins, Claude extensions, or other agent integrations. Those
 signals are offline review evidence. Renma itself should not become
 telemetry-responsible.
 
+## LLM-Actionable Diagnostics
+
+Renma findings should be useful not only to humans, but also to LLM coding
+agents. A good Renma diagnostic should explain what is wrong, why it matters for
+repository governance, where the evidence is, what direction a safe fix should
+take, what constraints must be preserved, and how to verify the fix.
+
+Renma should not apply large semantic rewrites by itself. It should produce
+structured diagnostics that can be pasted into Codex, Claude, Cursor, or another
+agent to guide a reviewable repository patch.
+
+Existing findings already include evidence, `whyItMatters`, and `remediation`.
+Over time, findings may also include repair constraints, verification steps, and
+LLM-specific hints. These fields should remain deterministic rule output, not
+LLM-generated validation.
+
+Example diagnostic shape:
+
+```json
+{
+  "id": "RMA-SKILL-TOO-MONOLITHIC",
+  "severity": "medium",
+  "category": "structure",
+  "title": "Skill mixes reusable knowledge with usage guidance",
+  "evidence": {
+    "path": "skills/testing/test-case-generation.skill.md",
+    "startLine": 42,
+    "endLine": 78,
+    "snippet": "boundary value analysis"
+  },
+  "whyItMatters": "Reusable QA and domain knowledge should be owned, reviewed, and reused as shared context assets instead of being buried in one skill.",
+  "remediation": "Split reusable knowledge into first-class shared context assets and keep the skill as an LLM-facing usage guide.",
+  "constraints": [
+    "Do not introduce task context selection.",
+    "Do not create prompt packages.",
+    "Keep the skill as a routing contract / usage guide.",
+    "Each context asset should have id, owner, status, and short scope."
+  ],
+  "verificationSteps": [
+    "Run npm test.",
+    "Run renma scan.",
+    "Ensure the skill no longer mixes reusable domain knowledge with usage guidance."
+  ],
+  "llmHint": "Create shared context assets for reusable QA knowledge, update skill metadata, and preserve the skill as a concise usage guide."
+}
+```
+
+Central repair workflow:
+
+1. A single `SKILL.md` contains reusable domain knowledge, tool guidance, and
+   QA heuristics.
+2. Renma emits structured findings explaining that the skill is too monolithic
+   and mixes usage guidance with reusable context.
+3. Codex or Claude reads the diagnostics and proposes a patch that moves
+   reusable knowledge into first-class context assets under `contexts/`, keeps
+   the skill concise, adds metadata, and updates declared context references.
+4. A human reviews the patch.
+5. Renma scans the repository again and confirms the skill/context separation is
+   healthier.
+
 ## Repository Model
 
 The target repository shape gives shared context assets first-class space:

@@ -64,6 +64,13 @@ contexts/
 
 Today Renma is a minimal-dependency TypeScript CLI that scans AI-agent skills, repository instructions, shared context Markdown, profile overlays, references, and examples. It runs deterministic quality, structure, and safety rules, then emits text or JSON reports with file and line evidence.
 
+Renma findings are intended to be actionable repair prompts for humans and LLM
+tools such as Codex, Claude, and Cursor. Findings should explain what is wrong,
+why it matters, where the evidence is, what a safe repair should preserve, and
+how to verify the fix. Renma does not apply large semantic rewrites itself; it
+emits structured diagnostics so a human or agent can propose a reviewable patch
+and run Renma again.
+
 Current capabilities:
 
 - Bounded filesystem discovery

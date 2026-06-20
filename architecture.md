@@ -170,9 +170,24 @@ Validation, repeated-context discovery, semantic diff
   |
   v
 Reports, repository manifests, agent readiness output
+ |
+ v
+Humans and LLM coding agents review diagnostics, propose patches, and rerun Renma
 ```
 
 The normalized model is the contract between files and higher-level features. Users work with Markdown and small metadata blocks. Renma uses the model internally to keep output deterministic and testable.
+
+## LLM-Actionable Diagnostics
+
+Renma diagnostics are repository evidence and repair guidance. They should be
+structured enough for humans to review and for LLM coding agents to turn into a
+safe patch. A diagnostic should carry the rule code, severity, source evidence,
+why the issue matters, the recommended repair direction, constraints to
+preserve, and verification steps when available.
+
+Renma core remains deterministic: scan, catalog, validate, and emit structured
+findings. Optional helpers may produce LLM-friendly suggestions, but core
+validation does not call an LLM or apply semantic rewrites.
 
 ## Metadata
 
