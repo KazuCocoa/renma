@@ -71,7 +71,7 @@ how to verify the fix. Renma does not apply large semantic rewrites itself; it
 emits structured diagnostics so a human or agent can propose a reviewable patch
 and run Renma again.
 
-Current capabilities:
+Completed baseline:
 
 - Bounded filesystem discovery
 - Stable POSIX-style repo-relative paths
@@ -85,15 +85,14 @@ Current capabilities:
 - CI-friendly exit behavior with `--fail-on`
 - Config loading from `renma.config.json` and `.renma.json`
 
-Planned direction:
+Near-term direction:
 
-- First-class shared context asset validation
-- Catalog snapshots
-- Dependency and reference graph snapshots
-- Graph-backed validation
+- Ownership coverage reporting
+- Context graph snapshot and reporting
+- Agent readiness report
 - Repeated context and duplicate knowledge discovery
 - Semantic diff for context changes
-- Agent readiness reports
+- Optional LLM-assisted repository evaluation bundles
 - Optional external signal import
 
 See [architecture.md](./architecture.md) and [plan.md](./plan.md) for the current design direction.

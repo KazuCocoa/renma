@@ -312,6 +312,37 @@ Renma keeps those assets clean, owned, validated, deduplicated, and easy for age
 
 ## Roadmap
 
+### Completed Baseline
+
+- First-class `context` assets under `contexts/**/*.md` and `context/**/*.md`
+- Context discovery distinct from skill-local `references/`, `profiles/`, and `examples/`
+- Deterministic scan and catalog metadata consistency
+- Invalid lifecycle status detection
+- Missing shared context `id` and `owner` diagnostics
+- Semantic context path advisory for process-state folders
+- Duplicate asset ID detection
+- Unknown declared reference detection
+- Deprecated or archived declared reference validation
+- Orphaned shared context asset detection
+- Superseded local support asset reference advisories
+- LLM-actionable finding fields for safe external repair loops
+
+### Near-Term Implementation
+
+- Ownership coverage reporting
+- Context graph snapshot and reporting
+- Agent readiness report
+- Repeated context and duplicate knowledge discovery
+- Semantic diff for context changes
+- Optional LLM-assisted repository evaluation bundles
+
+### Later / External Evidence
+
+- Optional external signal import as repository evidence
+- Runtime telemetry ownership, dashboards, provider gateways, and prompt wrappers remain out of scope
+
+### Historical Roadmap Detail
+
 ### 1. Scanner And Metadata Stabilization
 
 Current Renma lives here. Continue strengthening deterministic scanning, config loading, path normalization, Markdown parsing, and metadata parsing.

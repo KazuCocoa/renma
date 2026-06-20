@@ -397,15 +397,22 @@ Renma may import these as repository evidence. Ownership of telemetry collection
 
 ## Roadmap Layers
 
+Completed baseline:
+
 1. Scanner and metadata stabilization
 2. First-class context assets
 3. Catalog generation
-4. Dependency and reference graph
-5. Graph-backed validation
-6. Repeated context and duplicate knowledge discovery
-7. Semantic diff for context changes
-8. Agent readiness reports
-9. Optional external signal import
+4. Graph-backed metadata governance for duplicate IDs, unknown references, deprecated or archived references, and orphaned context assets
+
+Near-term implementation:
+
+1. Ownership coverage reporting
+2. Context graph snapshot and reporting
+3. Agent readiness report
+4. Repeated context and duplicate knowledge discovery
+5. Semantic diff for context changes
+6. Optional LLM-assisted repository evaluation bundles
+7. Optional external signal import
 
 This sequence prioritizes shared context assets and repository health before external signal import.
 
@@ -431,17 +438,18 @@ Baseline now in place:
 - `skill-local-support-reachability` validates static skill-local support files.
 - `renma inspect` provides repository file inspection by outline or line range.
 - Basic shared context metadata diagnostics.
-
-Near-term implementation work:
-
 - Duplicate asset ID detection.
 - Unknown dependency and reference detection.
 - Deprecated or archived dependency validation.
 - Orphaned context asset detection.
+
+Near-term implementation work:
+
 - Ownership coverage reporting.
 - Context graph snapshot and reporting.
 - Agent readiness report.
 - Repeated context discovery across shared contexts, skills, agents, references, profiles, and examples.
+- Optional LLM-assisted repository evaluation bundles.
 
 ## Principle
 
