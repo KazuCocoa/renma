@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { scan } from "../src/scanner.js";
 
-test("scan preserves context orchestration and profile findings", async () => {
+test("scan preserves context routing and profile findings", async () => {
   const root = await fixture();
   const skillDir = path.join(root, "skills", "demo");
   await mkdir(path.join(skillDir, "profiles"), { recursive: true });

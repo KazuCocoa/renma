@@ -1,129 +1,102 @@
 # Renma - 練磨
 
-Renma helps teams build maintainable and reusable context for AI systems.
+Renma helps teams keep LLM-ready context assets and skills healthy in Git.
 
-As skill repositories grow, knowledge becomes duplicated across skills, agents, and projects. The challenge is no longer writing instructions. The challenge is organizing context so that it can be reused, maintained, and evolved over time.
+Renma is a Git-native governance and quality layer for shared context repositories. It prepares repositories so Codex, Claude, Cursor, and future agents can consume team-owned expertise correctly. Renma does not select, compose, inject, or execute runtime context; agents and runtimes decide how to use the assets for a task.
 
-Renma starts as a linter for skills and context repositories, but its broader goal is to help teams move toward composable context.
-
-Today, Renma is a minimal-dependency TypeScript CLI for reviewing AI-agent skills, repository instructions, profile overlays, references, and examples. The scanner reads known skill-related files, runs deterministic quality and safety rules, and emits text or JSON reports with file and line evidence.
-
-Renma's longer-term direction is a Git-native context engineering toolkit: validation, cataloging, context resolution, traceability, lockfiles, semantic diff, and local context packaging for skill and context repositories that multiple teams can consume through normal Git versioning, pinned revisions, and CI review workflows. See [architecture.md](./architecture.md) and [plan.md](./plan.md) for the design direction.
+```text
+Skill = LLM-facing entrypoint / routing contract / usage guide
+Context = independently owned source-of-truth knowledge asset
+```
 
 ## Why Renma?
 
-Many AI projects eventually end up with:
+As AI-agent repositories grow, expertise often gets copied into many skills. Testing heuristics, domain risks, tool usage notes, and team-specific contracts drift apart. Ownership becomes unclear, references break, deprecated guidance remains reachable, and new engineers or agents cannot tell which knowledge is authoritative.
 
-- Duplicated knowledge across multiple skills
-- Large instruction files that are difficult to maintain
-- Context that should be shared but is copied instead
-- Unused or orphaned context files
-- Growing repositories with unclear structure
-
-For example:
-
-Skill A
-
-- Appium setup
-- Android setup
-
-Skill B
-
-- Appium setup
-- iOS setup
-
-Skill C
-
-- Appium setup
-- Troubleshooting
-
-Over time, the same knowledge appears in multiple places.
-
-Renma helps identify these structural issues and encourages reusable context instead.
-
-## Long-Term Vision
-
-The long-term goal is not simply better skills.
-
-The goal is composable context.
-
-Instead of copying knowledge across repositories:
-
-```text
-context/
-  appium/
-    setup.md
-    android.md
-    ios.md
-    troubleshooting.md
-
-skills/
-  mobile-testing/
-  enterprise-testing/
-  onboarding/
-```
-
-Skills become routers and orchestrators.
-
-Context becomes reusable building blocks.
-
-As repositories evolve, shared knowledge can be extracted, reused, and maintained in a single place.
-
-Renma is evolving from a skill linter into infrastructure for reusable context.
-
-## Philosophy
-
-Large AI repositories often evolve the same way large software systems do.
-
-Knowledge becomes duplicated.
-
-Context becomes fragmented.
-
-Instructions become difficult to maintain.
-
-Renma treats context as software.
-
-Context should be:
+Renma treats context as a software asset:
 
 - Reusable
-- Composable
+- Owned
 - Reviewable
 - Versioned
-- Maintainable
+- Composable
+- Validated
+- Easy to inspect in CI and code review
 
-Skills are orchestration layers.
+The first strong product focus is QA/testing: boundary value analysis, negative testing, regression risk, payment idempotency, duplicate charge prevention, refund edge cases, mobile offline behavior, Appium usage, internal test strategy, and known team-specific risks can live as shared context assets instead of being buried inside individual skills.
 
-Context is the long-term asset.
+## Repository Shape
 
-## Today
+Renma supports skill-local references, profiles, and examples, but the target repository model gives shared context assets first-class space:
 
-Today Renma provides:
+```text
+skills/
+  testing/
+    test-case-generation.skill.md
+    spec-review.skill.md
+    regression-planning.skill.md
+contexts/
+  testing/
+    boundary-value-analysis.md
+    negative-testing.md
+    regression-risk.md
+  domain/
+    payment/
+      idempotency.md
+      duplicate-charge.md
+      refund-risk.md
+    mobile/
+      offline-behavior.md
+      background-resume.md
+  tools/
+    appium/
+      usage-guideline.md
+      limitations.md
+  teams/
+    checkout/
+      payment-api-contracts.md
+      known-risk-patterns.md
+```
 
-- Skill repository linting
-- Structural validation
-- Deterministic normalized context cataloging
-- Context routing checks
-- Risk detection
-- CI integration
+`contexts/` is preferred. `context/` is also scanned for compatibility.
 
-## Future
+## What Renma Does
 
-Potential future directions include:
+Today Renma is a minimal-dependency TypeScript CLI that scans AI-agent skills, repository instructions, shared context Markdown, profile overlays, references, and examples. It runs deterministic quality, structure, and safety rules, then emits text or JSON reports with file and line evidence.
 
-- Semantic context analysis
-- Duplicate knowledge detection
-- Context extraction suggestions
-- Shared context recommendations
-- Composable context architecture support
+Current capabilities:
+
+- Bounded filesystem discovery
+- Stable POSIX-style repo-relative paths
+- Markdown parsing for headings, links, code fences, metadata, and evidence
+- Structural quality checks for skills and context files
+- Safety checks for risky instructions and literal secrets
+- Deterministic catalog output for assets and dependency metadata
+- Context outline and line-slice helper
+- Semantic split prompt helper for oversized context files
+- CI-friendly exit behavior with `--fail-on`
+- Config loading from `renma.config.json` and `.renma.json`
+
+Planned direction:
+
+- First-class shared context asset validation
+- Catalog snapshots
+- Dependency and reference graph snapshots
+- Graph-backed validation
+- Orphaned, deprecated, missing, invalid, and conflicting context detection
+- Repeated context and duplicate knowledge discovery
+- Semantic diff for context changes
+- Agent readiness reports
+- Optional external signal import
+
+See [architecture.md](./architecture.md) and [plan.md](./plan.md) for the current design direction.
 
 ## Requirements
 
 - Node.js 22.17 or newer
 - npm
 
-## Install
-
-For local development:
+Install:
 
 ```bash
 npm install
@@ -154,17 +127,17 @@ renma suggest-semantic-split <file> [options]
 Options:
 
 ```text
--c, --config <path>       Read JSON config from path
-    --fail-on <level>     Exit 1 when findings meet severity: low, medium, high, critical
-    --format <format>     scan/context/catalog/suggest output format
-    --json                Shortcut for --format json
-    --lines <range>       context: exact line range, e.g. L10-L42
+-c, --config <path>      Read JSON config from path
+    --fail-on <level>    Exit 1 when findings meet severity: low, medium, high, critical
+    --format <format>    scan: text or json; catalog: json or markdown; suggest: prompt or json
+    --json               Shortcut for --format json
+    --lines <range>      context: exact line range, e.g. L10-L42
     --max-source-bytes <n>
                           suggest-semantic-split: source file byte budget
     --max-context-bytes <n>
                           suggest-semantic-split: nearby context byte budget
--h, --help                Show help
--v, --version             Show version
+-h, --help               Show help
+-v, --version            Show version
 ```
 
 Examples:
@@ -176,9 +149,9 @@ renma scan . --fail-on medium
 renma scan . --config ./renma.config.json
 renma catalog . --format markdown
 renma catalog . --json
-renma context skills/setup/references/android.md --format json
-renma context skills/setup/references/android.md --lines L40-L90 --format text
-renma suggest-semantic-split skills/setup/references/android.md | codex exec
+renma context contexts/testing/boundary-value-analysis.md --format json
+renma context contexts/testing/boundary-value-analysis.md --lines L40-L90 --format text
+renma suggest-semantic-split contexts/tools/appium/usage-guideline.md
 ```
 
 ## What Gets Scanned
@@ -189,6 +162,8 @@ By default, Renma looks for:
 skills/**/SKILL.md
 .agents/**/*.md
 AGENTS.md
+context/**/*.md
+contexts/**/*.md
 skills/**/profiles/**/*.md
 skills/**/references/**/*.md
 skills/**/examples/**/*.md
@@ -212,7 +187,11 @@ Example:
 {
   "fail_on": "high",
   "format": "json",
-  "globs": ["skills/**/SKILL.md", "AGENTS.md"],
+  "globs": [
+    "skills/**/SKILL.md",
+    "AGENTS.md",
+    "contexts/**/*.md"
+  ],
   "exclude": ["node_modules", "dist", ".git"],
   "max_file_size_bytes": 524288,
   "max_depth": 16,
@@ -230,7 +209,7 @@ Supported fields:
 - `max_depth`: positive integer
 - `concurrency`: positive integer
 
-Invalid config fields exit code `2`.
+Invalid config fields exit with code `2`.
 
 ## Exit Codes
 
@@ -240,20 +219,22 @@ Invalid config fields exit code `2`.
 
 ## Checks
 
-Current rules cover early quality and safety signals, including:
+Current rules include:
 
-- missing skill description, examples, preflight, verification, negative routing, or explicit routing clarity
-- short frontmatter descriptions that make skill routing ambiguous
-- oversized `SKILL.md` entrypoints that should move detailed procedures into `references/`
-- oversized nested context files in `profiles/`, `references/`, and `examples/`
-- literal credential-like values and private key material
-- destructive command examples without nearby confirmation or recovery guidance
-- risky remote access defaults
-- broad environment copying into subprocess execution
-- profile overlays that do not declare a base skill
-- context files under profiles, references, and examples that are not routed from the top-level skill
+- Missing skill description, examples, preflight, verification, negative routing, or explicit routing clarity
+- Short frontmatter descriptions
+- Oversized `SKILL.md` entrypoints
+- Oversized context files in `contexts/`, `context/`, `profiles/`, `references/`, and `examples/`
+- Unused or unreachable profiles, references, and examples
+- Profile overlays missing base skill declaration
+- Literal secret-like values
+- Private key material
+- Destructive commands without nearby confirmation or recovery context
+- Risky remote defaults
+- Broad environment copying into subprocesses
+- Hardcoded user-local paths
 
-Static checks are only evidence. Passing a scan does not prove a skill or workflow is safe.
+Static checks are evidence. Passing a scan does not prove a repository or agent workflow is safe.
 
 ## Development
 
@@ -267,12 +248,12 @@ The package build emits the CLI to `dist/index.js`. Tests compile to `dist-test/
 
 ## Inspirations
 
-Renma is inspired by ideas from:
+Renma is inspired by:
 
 - [Waza](https://github.com/microsoft/waza), especially skill eval coverage, task-based regression checks, and readiness-oriented validation.
 - [SkillSpector](https://github.com/NVIDIA/skillspector), especially deterministic security scanning, risk-oriented findings, SARIF/reporting direction, and analyzer-style rule organization.
 
-Renma is an independent implementation focused on lightweight deterministic preflight checks for AI-agent skill repositories.
+Renma is an independent implementation focused on lightweight deterministic governance checks for AI-agent skill and context repositories.
 
 ## License
 

@@ -52,8 +52,8 @@ const RULES: Rule[] = [
       ]),
   },
   {
-    id: "context-orchestration",
-    run: ({ documents }) => contextOrchestrationFindings(documents),
+    id: "context-routing",
+    run: ({ documents }) => contextRoutingFindings(documents),
   },
 ];
 
@@ -330,7 +330,7 @@ function profileFindings(document: ParsedDocument): Finding[] {
   ];
 }
 
-function contextOrchestrationFindings(documents: ParsedDocument[]): Finding[] {
+function contextRoutingFindings(documents: ParsedDocument[]): Finding[] {
   const skills = documents.filter(
     (document) => document.artifact.kind === "skill",
   );

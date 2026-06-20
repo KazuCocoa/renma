@@ -189,6 +189,7 @@ test("CLI prints catalog JSON and markdown", async () => {
   await mkdir(path.join(root, "skills", "demo", "references"), {
     recursive: true,
   });
+  await mkdir(path.join(root, "contexts", "testing"), { recursive: true });
   await writeFile(
     path.join(root, "skills", "demo", "SKILL.md"),
     [
@@ -197,7 +198,7 @@ test("CLI prints catalog JSON and markdown", async () => {
       "owner: qa-platform",
       "status: stable",
       "tags: appium, android",
-      "requires_context: demo.guide",
+      "requires_context: demo.guide, testing.boundary-value-analysis",
       "---",
       "# Demo",
       "Use for demo requests.",
@@ -207,6 +208,10 @@ test("CLI prints catalog JSON and markdown", async () => {
   await writeFile(
     path.join(root, "skills", "demo", "references", "guide.md"),
     "---\nid: demo.guide\nowner: qa-platform\n---\n# Guide\n",
+  );
+  await writeFile(
+    path.join(root, "contexts", "testing", "boundary-value-analysis.md"),
+    "---\nid: testing.boundary-value-analysis\nowner: qa-platform\nstatus: stable\n---\n# Boundary Value Analysis\n",
   );
 
   const json = await withCapturedConsole(() => main(["catalog", root]));
@@ -219,13 +224,25 @@ test("CLI prints catalog JSON and markdown", async () => {
   };
   assert.deepEqual(
     report.catalog.assets.map((asset) => asset.id),
-    ["demo", "demo.guide"],
+    ["demo", "testing.boundary-value-analysis", "demo.guide"],
   );
   assert.match(report.catalog.assets[0]?.contentHash ?? "", /^sha256:/);
   assert.deepEqual(report.catalog.dependencies, [
     {
       from: "demo",
       to: "demo.guide",
+      kind: "requires",
+      sourcePath: "skills/demo/SKILL.md",
+      evidence: {
+        path: "skills/demo/SKILL.md",
+        startLine: 1,
+        endLine: 1,
+        snippet: "frontmatter dependency metadata",
+      },
+    },
+    {
+      from: "demo",
+      to: "testing.boundary-value-analysis",
       kind: "requires",
       sourcePath: "skills/demo/SKILL.md",
       evidence: {

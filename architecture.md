@@ -1,452 +1,385 @@
 # Renma Architecture Direction
 
-Renma should evolve from a deterministic skill scanner into a Git-native context engineering toolkit.
+Renma is a Git-native governance and quality layer for LLM-ready context assets and skills. It keeps shared repositories healthy so agents can consume team-owned expertise correctly.
 
-The core product is not prompt storage, package synchronization, or a hosted dashboard. The core product is deterministic resolution of AI skills and context, with enough provenance that teams can answer:
-
-- What context exists?
-- Who owns it?
-- Why was this context selected?
-- What was rejected?
-- What changed?
-- Can this run be reproduced?
-
-## Product Thesis
-
-Organizations do not only need better prompts. They need a way to engineer knowledge so AI agents can consume the right context at the right time.
-
-Renma should treat context as software:
-
-- versioned
-- reviewable
-- owned
-- composable
-- traceable
-- reproducible
-
-The product should remain CLI-first and Git-native. Hosted servers, dashboards, provider gateways, and synchronization transports are out of scope for this project.
-
-## Git-Native Multi-Team Usage
-
-Renma should work well when one shared skills and context repository is consumed by many teams, including organizations with 10+ or 50+ teams.
-
-Renma should not implement synchronization itself. Instead, it should produce deterministic artifacts that fit normal Git workflows:
-
-- tags and release branches for shared skill repositories
-- commit SHA pinning for consumers
-- generated catalogs committed or published from CI
-- lockfiles that record selected context versions and hashes
-- semantic diffs for code review
-- trace reports that explain why a pinned revision selected specific context
-- local overlays that can be reviewed separately from shared foundations
-
-In this model, Git and CI handle distribution, review, and adoption mechanics. Renma handles validation, cataloging, resolution, provenance, and reproducibility for the files under version control.
-
-## Current Baseline
-
-Renma currently provides:
-
-- deterministic discovery of skill-related files
-- bounded filesystem scanning
-- markdown parsing
-- quality, structure, and safety findings
-- text and JSON reports
-- config-driven scan behavior
-- CI-friendly exit codes
-
-This is a good foundation for traceability because Renma already operates on explicit files, stable paths, line evidence, and deterministic rules.
-
-## Target Architecture
+Renma sits at the repository governance layer, not the runtime layer.
 
 ```text
-Source artifacts
-  Markdown, YAML, docs snapshots, generated context
-        |
-        v
-Importers and parsers
-        |
-        v
-Normalized model
-        |
-        v
-Validation and semantic checks
-        |
-        v
-Context resolution
-        |
-        v
-Execution manifest
-        |
-        v
-Trace, lockfile, catalog, reports
+Shared repository
+  skills/
+  contexts/
+  metadata/
+  graph/
+  catalog/
+
+Renma
+  scan
+  validate
+  catalog
+  graph
+  report
+  suggest improvements
+
+Agents and runtimes
+  Codex
+  Claude
+  Cursor
+  future agents
+
+External signal producers
+  Codex plugin
+  Claude extension
+  prompt wrapper
+  CI/runtime integrations
 ```
 
-The normalized model is the contract. Markdown, YAML, URLs, internal docs, future MCP adapters, and LLM-assisted imports are adapters into the model.
+Renma does not select, compose, inject, or execute runtime context. Agents and runtimes perform skill selection and runtime context usage.
 
-Users should not need to understand the model directly. They should work with normal files and commands. The model exists to keep Renma deterministic, extensible, and testable.
+## Goals
+
+- Keep skills and context assets discoverable, owned, and reviewable.
+- Treat shared context as a first-class repository asset outside individual skill directories.
+- Validate references, metadata, lifecycle, and dependency graph health.
+- Detect orphaned, deprecated, conflicting, missing, and repeated context.
+- Provide deterministic catalog and graph snapshots for Git review and CI.
+- Produce repository-level agent readiness reports.
+- Allow optional LLM assistance for suggestions and semantic review without making LLMs required for core analysis.
+
+## Non-Goals
+
+- Runtime context resolution
+- Prompt assembly
+- Agent execution
+- Provider gateways
+- Hosted dashboards
+- Package synchronization
+- Organization-wide distribution transport
+- Runtime telemetry ownership
+
+Renma is telemetry-aware, but not telemetry-responsible. It may import external signals later as evidence for repository review.
+
+## Source Layout
+
+Preferred repository layout:
+
+```text
+skills/
+  testing/
+    test-case-generation.skill.md
+    spec-review.skill.md
+    regression-planning.skill.md
+contexts/
+  testing/
+    boundary-value-analysis.md
+    negative-testing.md
+    regression-risk.md
+  domain/
+    payment/
+      idempotency.md
+      duplicate-charge.md
+      refund-risk.md
+    mobile/
+      offline-behavior.md
+      background-resume.md
+  tools/
+    appium/
+      usage-guideline.md
+      limitations.md
+  teams/
+    checkout/
+      payment-api-contracts.md
+      known-risk-patterns.md
+metadata/
+graph/
+catalog/
+```
+
+`contexts/` is preferred. `context/` is also scanned for compatibility.
+
+Skill-local `profiles/`, `references/`, and `examples/` remain supported, but shared context assets should become the durable source of truth when knowledge is reused across skills, teams, tools, or agents.
 
 ## Core Concepts
 
 ### Skill
 
-A skill defines LLM-facing behavior: role, task boundaries, workflow, safety gates, and verification expectations.
+A skill is an LLM-facing entrypoint and routing contract. It tells an agent when and how to use a capability, what preflight questions matter, which safety and verification steps apply, and which context assets are relevant.
 
-`SKILL.md` should remain concise. It should behave like an orchestrator and routing entrypoint, not a dumping ground for every reference detail.
+A skill should not be the only source of truth for reusable expert knowledge.
 
-### Context Unit
+### Context Asset
 
-A context unit is a coherent unit of reasoning, not an arbitrary text chunk.
+A context asset is an independently owned knowledge unit. It may be maintained by QA, domain teams, tooling teams, product teams, or platform teams.
 
-Good context boundaries follow:
+Good context assets have:
 
-- concept
-- owner
-- update frequency
-- task relevance
-- conflict surface
+- Stable ID
+- Clear owner
+- Lifecycle status
+- Usage guidance
+- Scope boundaries
+- References or dependencies where needed
 
-Example:
+### Asset
 
-```text
-product/
-  overview.md
-  terminology.md
-  business-rules.md
-  edge-cases.md
-  integrations.md
-```
+An asset is any repository object Renma can catalog, validate, reference, or include in graph checks.
 
-Large source documents can remain authoritative elsewhere. Renma snapshots should be reproducible, reviewable working copies prepared for AI consumption.
+Initial asset kinds:
 
-```text
-source of truth
-        |
-        v
-snapshot / normalized context
-        |
-        v
-validated normalized model
-        |
-        v
-context injection
-```
+- `skill`
+- `context`
+- `profile`
+- `reference`
+- `example`
+- `agent`
+- `config`
 
-### Metadata
+The current implementation maps shared context Markdown onto the existing reference-like catalog model. The target model should introduce a dedicated `context` kind.
 
-Skills and context units need machine-readable metadata so Renma can validate, catalog, resolve, and trace them.
+### Dependency
 
-Example:
+A dependency is a typed edge between assets.
 
-```yaml
-id: ios-release-process
-version: 1.4.2
-owner: mobile-platform
-scope: org
-priority: 70
-status: stable
-when_to_use:
-  - releasing iOS apps
-  - TestFlight workflows
-when_not_to_use:
-  - Android releases
-freshness: 2026-06-01
-expires_at: 2026-12-31
-```
+Initial edge kinds:
 
-Metadata should be useful before it is complete. The first implementation can validate a small stable subset:
-
-- `id`
-- `version`
-- `owner`
-- `status`
-- `when_to_use`
-- `when_not_to_use`
-- `requires_context`
-- `optional_context`
+- `requires`
+- `optional`
 - `conflicts`
+- `extends`
+- `routes_to`
 
-### Resolution
+Edges should carry source evidence: source path, line range, declaration form, and reason where available.
 
-Resolution selects the skill and context units for a task.
-
-Inputs may include:
-
-- task or intent
-- product
-- platform
-- device
-- environment
-- profile
-- explicit include or exclude flags
-- repo, project, user, or conversation overlays
-
-Resolution output should include selected and rejected candidates, with reasons.
+## Architecture
 
 ```text
-Selected:
-  product.overview
-    reason: required by test-design
-  device.iphone-15-pro
-    reason: matched --device iphone-15-pro
-
-Rejected:
-  android-device-context
-    reason: conflicts with platform: ios
+Markdown, frontmatter, config, docs snapshots
+  |
+  v
+Importers and parsers
+  |
+  v
+Normalized asset model
+  |
+  v
+Catalog snapshot + context graph snapshot
+  |
+  v
+Validation, repeated-context discovery, semantic diff
+  |
+  v
+Reports, repository manifests, agent readiness output
 ```
 
-### Execution Manifest
+The normalized model is the contract between files and higher-level features. Users work with Markdown and small metadata blocks. Renma uses the model internally to keep output deterministic and testable.
 
-A run should produce a manifest describing the exact context package that would be sent to an LLM or agent runtime.
+## Metadata
 
-The manifest should include:
-
-- selected skill
-- selected context units
-- rejected candidates and reasons
-- source paths
-- versions
-- content hashes
-- policy decisions
-- token estimates
-- generation timestamp
-
-The manifest is the bridge between static repository state and runtime behavior.
-
-## Layered Roadmap
-
-### Layer 1: Validation
-
-Current Renma lives here.
-
-Responsibilities:
-
-- scan files
-- parse markdown and metadata
-- detect quality issues
-- detect safety risks
-- detect structure problems
-- report evidence
-
-Near-term additions:
-
-- stricter metadata parsing
-- duplicate ID checks
-- stale and expired context checks
-- context routing checks
-- context size guidance
-
-### Layer 2: Catalog
-
-Catalog makes context discoverable without a server.
-
-Commands:
-
-```bash
-renma catalog --format markdown
-renma catalog --format json
-```
-
-Questions answered:
-
-- What skills and context units exist?
-- Who owns them?
-- What status are they in?
-- Which files are stale or deprecated?
-- What context does a skill require?
-
-Generated artifacts such as `CATALOG.md` and `catalog.json` can be committed, published, or consumed by future dashboards.
-
-### Layer 3: Repeated Context Discovery
-
-Repeated context discovery helps teams find reusable context boundaries before
-they already have explicit shared context units.
-
-It should start with deterministic evidence:
-
-- exact normalized section hashes
-- near-duplicate token shingles
-- repeated command blocks
-- repeated headings, path terms, tags, tools, and links
-- repeated workflow skeletons across skills, references, examples, and agents
-
-The output should be a human-reviewable set of context pattern candidates. Each
-candidate should include source paths, line ranges, signal kinds, confidence,
-and a suggested shared path such as `context/appium/setup.md`. Renma should also
-support intentionally skill-specific context through metadata or reviewer
-suppression, so local exceptions do not become noisy findings.
-
-LLMs may later label clusters or propose refactors, but deterministic evidence
-should remain the authority.
-
-### Layer 4: Resolution And Trace
-
-Resolution is where Renma moves beyond scanning.
-
-Commands:
-
-```bash
-renma resolve test-design --product my-app --platform ios --environment staging
-renma trace test-design --product my-app --platform ios --environment staging
-```
-
-Questions answered:
-
-- Which context would be selected?
-- Why was it selected?
-- What was rejected?
-- Which conflicts or missing requirements exist?
-
-This layer should not call an LLM. It should only produce a deterministic context package and explanation.
-
-### Layer 5: Lockfiles
-
-Lockfiles make resolved context reproducible.
-
-Command:
-
-```bash
-renma lock test-design --product my-app --platform ios --environment staging
-```
-
-Output:
+Renma should validate a small stable subset first:
 
 ```yaml
-skill_id: test-design
-generated_at: 2026-06-15T00:00:00Z
-resolved_files:
-  - path: skills/test-design/SKILL.md
-    hash: sha256:...
-  - path: context/product/overview.md
-    hash: sha256:...
+id: domain.payment.idempotency
+version: 1.0.0
+owner: payments
+status: stable
+tags:
+  - payment
+  - qa
+when_to_use:
+  - Testing payment retry or duplicate-submit behavior
+when_not_to_use:
+  - Non-payment checkout UI copy review
+requires_context:
+  - testing.negative-testing
+optional_context:
+  - testing.regression-risk
+conflicts:
+  - archived.payment.retry-v0
 ```
 
-Lockfiles should freeze the selected context set, not replace Git history.
+Status values:
 
-### Layer 6: Semantic Diff
+- `experimental`
+- `stable`
+- `deprecated`
+- `archived`
 
-Git shows textual changes. Renma should explain AI-behavior-relevant changes.
+Fields should be added only when a command or rule uses them.
 
-Command:
+## Catalog Snapshot
+
+`renma catalog` should provide deterministic inventory.
+
+Catalog entries should include:
+
+- ID
+- Kind
+- Source path
+- Content hash
+- Owner
+- Status
+- Tags
+- Declared dependencies
+- Dependents
+- Diagnostics
+
+Catalog output should be stable across filesystems and Node versions.
+
+## Context Graph Snapshot
+
+The graph should represent assets and typed dependencies. It should power:
+
+- Missing reference checks
+- Deprecated or archived dependency checks
+- Orphaned context detection
+- Conflict visibility
+- Affected asset reporting
+- Catalog enrichment
+- Semantic diff
+- Future visualization
+
+Possible command:
+
+```bash
+renma graph --format json
+```
+
+The graph is not a runtime selection engine. It is repository evidence.
+
+## Validation
+
+Validation should combine local file checks and graph-backed checks.
+
+Rule areas:
+
+- Missing or weak skill description
+- Missing negative routing
+- Missing usage guidance
+- Missing preflight guidance
+- Missing verification guidance
+- Oversized skills or context assets
+- Missing shared context owner or ID
+- Invalid status values
+- Unknown dependencies
+- Deprecated or archived referenced context
+- Orphaned context assets
+- Conflicting context declarations
+- Repeated or duplicate knowledge
+- Secret-like literal values
+- Private key material
+- Destructive commands without confirmation or recovery context
+- Risky remote defaults
+- Broad environment copying into subprocesses
+- Hardcoded user-local paths
+
+Static checks are evidence. Passing a scan does not prove an agent workflow is safe.
+
+## Repeated Context Discovery
+
+Repeated context discovery is a bridge from "what exists" to "what should become shared context."
+
+Deterministic signals:
+
+- Normalized section hashes
+- Token shingles
+- Repeated headings
+- Repeated command blocks
+- Repeated links
+- Repeated tool, domain, path, or product terms
+- Similar workflow skeletons
+
+Output should be a human-reviewable set of candidates with source paths, line ranges, signal kinds, confidence, and suggested context boundaries.
+
+Optional LLM support may label clusters or draft refactors, but deterministic evidence remains authoritative.
+
+## Semantic Diff
+
+Semantic diff should explain repository-health changes that normal Git diffs make hard to see.
+
+Categories:
+
+- Ownership changes
+- Lifecycle status changes
+- Dependency changes
+- Conflict changes
+- Missing reference changes
+- Orphaned context changes
+- Repeated-context candidate changes
+- Safety and risk changes
+
+Possible command:
 
 ```bash
 renma diff --from main --to HEAD
 ```
 
-Diff categories:
+## Agent Readiness Report
 
-- routing changes
-- ownership changes
-- priority changes
-- status or lifecycle changes
-- conflict changes
-- required context changes
-- repeated context candidate changes
-- risk changes
+An agent readiness report should describe whether a repository is healthy enough for agents to consume.
 
-### Layer 7: Local Context Packaging
+It should include:
 
-Execution should remain local and thin.
+- Broken references
+- Missing owners
+- Missing usage boundaries
+- Deprecated or archived reachable context
+- Orphaned context
+- Oversized assets
+- Repeated knowledge
+- Risk findings
+- Affected skills and context assets
 
-Command:
+It should not select runtime context for a task.
+
+## External Signals
+
+External tools may later emit signals into Renma:
+
+- Context assets loaded by agents
+- Context assets ignored by agents
+- Repeated confusion around an asset
+- Runtime failures mapped back to source paths
+- CI findings attached to owners
+
+Renma may import these as repository evidence. Ownership of telemetry collection, storage, runtime tracing, and dashboards remains outside Renma.
+
+## Roadmap Layers
+
+1. Scanner and metadata stabilization
+2. First-class context assets
+3. Catalog generation
+4. Dependency and reference graph
+5. Graph-backed validation
+6. Repeated context and duplicate knowledge discovery
+7. Semantic diff for context changes
+8. Agent readiness reports
+9. Optional external signal import
+
+This sequence prioritizes shared context assets and repository health before any runtime integration.
+
+## Implementation Notes
+
+Current CLI commands:
 
 ```bash
-renma run test-design --product my-app --platform ios --environment staging
+renma scan [path]
+renma catalog [path]
+renma context <file>
+renma suggest-semantic-split <file>
 ```
 
-Initial behavior can produce an LLM-ready context package plus manifest. Invoking configured agent runtimes or providers is out of scope.
+Near-term implementation work:
 
-Renma should keep local packaging provider-neutral:
+- Add dedicated `context` asset kind.
+- Keep shared `contexts/**/*.md` and `context/**/*.md` in default discovery.
+- Expand catalog entries with owner, status, dependency, and dependent summaries.
+- Add graph output once the model is stable.
+- Add graph-backed validation rules.
+- Broaden repeated context discovery across shared contexts, skills, agents, references, profiles, and examples.
 
-- no required hosted LLM
-- no required server
-- deterministic dry-run mode
-- clear provenance for any generated prompt package
-
-### Out Of Scope: Gateway And Synchronization
-
-Renma should not own provider gateways, hosted dashboards, package synchronization, or organization-wide distribution workflows in this project.
-
-Out-of-scope commands include:
-
-```bash
-renma install
-renma update
-renma sync
-```
-
-OpenTelemetry-style runtime observability, provider invocation, dependency resolution, version negotiation, rollout strategy, and cross-repository governance are separate product surfaces. Renma should instead focus on context provenance in Git-managed local artifacts: selected context, rejected context, versions, hashes, and policy decisions.
-
-## Layered Context Precedence
-
-Renma should support shared foundations and local specialization.
-
-Recommended precedence:
-
-```text
-platform
-  > organization
-  > team
-  > project
-  > user
-  > conversation
-```
-
-Higher-precedence layers should not silently override safety-critical instructions. Overrides need trace entries so reviewers can see when local context changed behavior.
-
-## LLM-Assisted Authoring
-
-LLMs can help users create or repair Renma artifacts, but deterministic validation remains authoritative.
-
-Principle:
+## Principle
 
 ```text
 LLM proposes. Renma verifies. Human approves.
 ```
 
-Workflow:
-
-```text
-rough docs or source material
-        |
-        v
-LLM-assisted draft
-        |
-        v
-renma scan
-        |
-        v
-renma repair / import suggestions
-        |
-        v
-human review in Git
-        |
-        v
-canonical Renma artifacts
-```
-
-Potential commands:
-
-```bash
-renma import ./docs --suggest
-renma repair scan-report.json --print-prompt
-renma repair scan-report.json --apply
-```
-
-No-LLM workflows must remain first-class.
-
-## MVP Sequence
-
-The next practical sequence should be:
-
-1. Parse and validate metadata.
-2. Build a repository catalog.
-3. Introduce normalized model types for skills and context units.
-4. Add deterministic repeated context discovery.
-5. Add deterministic context resolution.
-6. Add trace output for selected and rejected context.
-7. Add lockfiles for reproducible resolved context.
-8. Add semantic diff over the normalized model, lockfiles, and context pattern candidates.
-9. Add `run` as deterministic context packaging.
-10. Keep gateway, provider execution, hosted dashboards, and synchronization out of scope.
-
-This sequencing preserves the current strengths while expanding toward the larger product vision one useful layer at a time.
+No-LLM workflows stay first-class. Renma's core value is deterministic repository evidence.

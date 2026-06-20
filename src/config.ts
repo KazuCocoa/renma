@@ -13,6 +13,8 @@ export const DEFAULT_CONFIG: ScanConfig = {
     "skills/**/SKILL.md",
     ".agents/**/*.md",
     "AGENTS.md",
+    "context/**/*.md",
+    "contexts/**/*.md",
     "skills/**/profiles/**/*.md",
     "skills/**/references/**/*.md",
     "skills/**/examples/**/*.md",
