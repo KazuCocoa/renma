@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { scan } from "../src/scanner.js";
 
-test("scan preserves context orchestration and profile findings", async () => {
+test("scan preserves local support reachability and profile findings", async () => {
   const root = await fixture();
   const skillDir = path.join(root, "skills", "demo");
   await mkdir(path.join(skillDir, "profiles"), { recursive: true });
@@ -14,7 +14,7 @@ test("scan preserves context orchestration and profile findings", async () => {
   await writeFile(
     path.join(skillDir, "SKILL.md"),
     `---
-description: This skill has a long enough description for deterministic scanning but intentionally omits context routing details so the context checks remain visible.
+description: This skill has a long enough description for deterministic scanning but intentionally omits the fixture file map so the support checks remain visible.
 ---
 # Demo Skill
 
@@ -44,10 +44,10 @@ Do not use for production credential changes.
   const result = await scan(root);
   const ids = result.findings.map((finding) => finding.id);
 
-  assert.ok(ids.includes("CTX-MISSING-ROUTING-MAP"));
-  assert.ok(ids.includes("CTX-UNUSED-PROFILE"));
-  assert.ok(ids.includes("CTX-UNUSED-REFERENCE"));
-  assert.ok(ids.includes("CTX-UNUSED-EXAMPLE"));
+  assert.ok(ids.includes("SUPPORT-MISSING-REACHABILITY-GUIDANCE"));
+  assert.ok(ids.includes("SUPPORT-UNREACHABLE-PROFILE"));
+  assert.ok(ids.includes("SUPPORT-UNREACHABLE-REFERENCE"));
+  assert.ok(ids.includes("SUPPORT-UNREACHABLE-EXAMPLE"));
   assert.ok(ids.includes("PROF-MISSING-BASE"));
   assert.ok(ids.includes("SEC-LITERAL-SECRET"));
 });
@@ -70,7 +70,7 @@ test("scan preserves security finding evidence paths", async () => {
   assert.match(secretFinding?.evidence.snippet ?? "", /password/);
 });
 
-test("scan warns when nested context files exceed token guidance", async () => {
+test("scan warns when nested support assets exceed token guidance", async () => {
   const root = await fixture();
   const skillDir = path.join(root, "skills", "demo");
   await mkdir(path.join(skillDir, "references"), { recursive: true });
@@ -81,7 +81,7 @@ description: This skill routes to references for detailed context and includes e
 ---
 # Demo Skill
 
-## Context Selection
+## Local Support Guidance
 For detailed reference material, load references/large.md.
 
 ## Do Not Use For
@@ -101,17 +101,17 @@ Verify the result with a test.
 
   const result = await scan(root);
   const contextBudgetFinding = result.findings.find(
-    (finding) => finding.id === "QUAL-CONTEXT-TOKEN-BUDGET",
+    (finding) => finding.id === "QUAL-SUPPORT-ASSET-TOKEN-BUDGET",
   );
 
   assert.equal(
     contextBudgetFinding?.evidence.path,
     "skills/demo/references/large.md",
   );
-  assert.match(contextBudgetFinding?.title ?? "", /Context file exceeds/);
+  assert.match(contextBudgetFinding?.title ?? "", /Support asset exceeds/);
 });
 
-test("scan treats context routed through an index reference as reachable", async () => {
+test("scan treats support files referenced through an index reference as reachable", async () => {
   const root = await fixture();
   const skillDir = path.join(root, "skills", "setup");
   const referenceDir = path.join(skillDir, "references");
@@ -123,7 +123,7 @@ description: This skill uses an index reference to route ordered Android setup c
 ---
 # Setup Skill
 
-## Context Selection
+## Local Support Guidance
 For Android setup, load references/android.md.
 
 ## Do Not Use For
@@ -157,7 +157,7 @@ Load these ordered parts:
 
   const result = await scan(root);
   const unusedReferencePaths = result.findings
-    .filter((finding) => finding.id === "CTX-UNUSED-REFERENCE")
+    .filter((finding) => finding.id === "SUPPORT-UNREACHABLE-REFERENCE")
     .map((finding) => finding.evidence.path);
 
   assert.deepEqual(unusedReferencePaths, []);

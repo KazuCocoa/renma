@@ -18,6 +18,7 @@ const USER_LOCAL_PATH_PATTERN =
 const SKILL_TOKEN_LIMIT = 500;
 const DESCRIPTION_MIN_CHARS = 150;
 const CONTEXT_TOKEN_LIMITS = {
+  context: 1200,
   profile: 500,
   reference: 800,
   example: 800,
@@ -52,8 +53,8 @@ const RULES: Rule[] = [
       ]),
   },
   {
-    id: "context-orchestration",
-    run: ({ documents }) => contextOrchestrationFindings(documents),
+    id: "skill-local-support-reachability",
+    run: ({ documents }) => skillLocalSupportReachabilityFindings(documents),
   },
 ];
 
@@ -87,7 +88,7 @@ function secretFindings(document: ParsedDocument): Finding[] {
         "safety",
         "high",
         document,
-        "Move secrets to user-approved runtime input or a secret manager, and keep only placeholders in repository files.",
+        "Move secrets to user-approved inputs or a secret manager, and keep only placeholders in repository files.",
       );
     }
     return undefined;
@@ -213,9 +214,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
   }
 
   if (
-    !/use this skill|when to use|trigger|routing|context selection|mixin/.test(
-      text,
-    )
+    !/use this skill|when to use|trigger|routing|context route|mixin/.test(text)
   ) {
     findings.push(
       documentFinding(
@@ -291,6 +290,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
 
 function contextBudgetFindings(document: ParsedDocument): Finding[] {
   if (
+    document.artifact.kind !== "context" &&
     document.artifact.kind !== "profile" &&
     document.artifact.kind !== "reference" &&
     document.artifact.kind !== "example"
@@ -305,11 +305,11 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
   return [
     documentFinding(
       document,
-      "QUAL-CONTEXT-TOKEN-BUDGET",
-      "Context file exceeds token guidance",
+      "QUAL-SUPPORT-ASSET-TOKEN-BUDGET",
+      "Support asset exceeds token guidance",
       "quality",
       "low",
-      `Keep ${document.artifact.kind} context files under about ${limit} tokens where practical. If a file is too large, run \`renma suggest-semantic-split ${document.artifact.path}\` to get a semantic split proposal, then split it losslessly into meaning-based ordered part files. Do not delete, summarize, or merge away procedural steps. The parent reference or SKILL.md must route to every part in order, and the split should preserve the original procedure text exactly. Verify by reconstructing the parts and comparing them to the original content before accepting the fix.`,
+      `Keep ${document.artifact.kind} assets under about ${limit} tokens where practical. If a file is too large, run \`renma suggest-semantic-split ${document.artifact.path}\` to get a semantic split proposal, then split it losslessly into meaning-based ordered part files. Do not delete, summarize, or merge away procedural steps. The parent file or SKILL.md should reference every part in order, and the split should preserve the original procedure text exactly. Verify by reconstructing the parts and comparing them to the original content before accepting the fix.`,
     ),
   ];
 }
@@ -330,49 +330,54 @@ function profileFindings(document: ParsedDocument): Finding[] {
   ];
 }
 
-function contextOrchestrationFindings(documents: ParsedDocument[]): Finding[] {
+function skillLocalSupportReachabilityFindings(
+  documents: ParsedDocument[],
+): Finding[] {
   const skills = documents.filter(
     (document) => document.artifact.kind === "skill",
   );
   return skills.flatMap((skill) => {
     const skillDir = path.posix.dirname(skill.artifact.path);
-    const contextDocs = documents.filter(
+    const localSupportDocs = documents.filter(
       (document) =>
         ["profile", "reference", "example"].includes(document.artifact.kind) &&
         document.artifact.path.startsWith(`${skillDir}/`),
     );
-    if (contextDocs.length === 0) return [];
+    if (localSupportDocs.length === 0) return [];
 
     const findings: Finding[] = [];
     const text = skill.artifact.content.toLowerCase();
-    const hasContextRouting =
-      /context selection|context map|mixin|profiles?\/|references?\/|examples?\/|load .*?(?:profile|reference|example)|select .*?(?:profile|reference|example)/.test(
+    const hasLocalSupportGuidance =
+      /support file|local support|context route|context map|mixin|profiles?\/|references?\/|examples?\/|load .*?(?:profile|reference|example)|reference .*?(?:profile|reference|example)/.test(
         text,
       );
-    if (!hasContextRouting) {
+    if (!hasLocalSupportGuidance) {
       findings.push(
         documentFinding(
           skill,
-          "CTX-MISSING-ROUTING-MAP",
-          "Skill has context files but no routing map",
+          "SUPPORT-MISSING-REACHABILITY-GUIDANCE",
+          "Skill has local support files but no reachability guidance",
           "structure",
           "medium",
-          "Add context-selection guidance so the top-level skill tells the LLM when to load profiles, references, examples, or scripts. If context was split into ordered parts, route to the index or all parts in order. Preserve original concrete steps. Do not delete, summarize, or merge away procedural steps.",
+          "Add local support file reachability guidance so the top-level skill declares when profiles, references, examples, or scripts are reachable. If support content was split into ordered parts, reference the index or all parts in order. Preserve original concrete steps. Do not delete, summarize, or merge away procedural steps.",
         ),
       );
     }
 
-    const reachableContextPaths = reachableContextDocuments(skill, contextDocs);
-    for (const document of contextDocs) {
-      if (!reachableContextPaths.has(document.artifact.path)) {
+    const reachableLocalSupportPaths = reachableLocalSupportDocuments(
+      skill,
+      localSupportDocs,
+    );
+    for (const document of localSupportDocs) {
+      if (!reachableLocalSupportPaths.has(document.artifact.path)) {
         findings.push(
           documentFinding(
             document,
-            contextUnusedRuleId(document.artifact.kind),
-            "Context file is not routed from the skill",
+            localSupportUnreachableRuleId(document.artifact.kind),
+            "Local support file is not reachable from the skill",
             "structure",
             "low",
-            "Reference this context from SKILL.md or from the selected parent reference with clear when-to-load guidance. If this file is a split part, ensure the parent skill routes to the index or all ordered parts so preserved details remain reachable. Do not delete, summarize, or merge away procedural steps just to satisfy routing.",
+            "Reference this local support file from SKILL.md or from a referenced parent support file with clear reachability guidance. If this file is a split part, ensure the parent skill references the index or all ordered parts so preserved details remain reachable. Do not delete, summarize, or merge away procedural steps just to satisfy the check.",
           ),
         );
       }
@@ -382,20 +387,20 @@ function contextOrchestrationFindings(documents: ParsedDocument[]): Finding[] {
   });
 }
 
-function reachableContextDocuments(
+function reachableLocalSupportDocuments(
   skill: ParsedDocument,
-  contextDocs: ParsedDocument[],
+  localSupportDocs: ParsedDocument[],
 ): Set<string> {
   const reachable = new Set<string>();
   let changed = true;
 
   while (changed) {
     changed = false;
-    for (const document of contextDocs) {
+    for (const document of localSupportDocs) {
       if (reachable.has(document.artifact.path)) continue;
       const possibleRouters = [
         skill,
-        ...contextDocs.filter((candidate) =>
+        ...localSupportDocs.filter((candidate) =>
           reachable.has(candidate.artifact.path),
         ),
       ];
@@ -501,10 +506,12 @@ function evidence(
   };
 }
 
-function contextUnusedRuleId(kind: ParsedDocument["artifact"]["kind"]): string {
-  if (kind === "profile") return "CTX-UNUSED-PROFILE";
-  if (kind === "example") return "CTX-UNUSED-EXAMPLE";
-  return "CTX-UNUSED-REFERENCE";
+function localSupportUnreachableRuleId(
+  kind: ParsedDocument["artifact"]["kind"],
+): string {
+  if (kind === "profile") return "SUPPORT-UNREACHABLE-PROFILE";
+  if (kind === "example") return "SUPPORT-UNREACHABLE-EXAMPLE";
+  return "SUPPORT-UNREACHABLE-REFERENCE";
 }
 
 function escapeRegExp(value: string): string {

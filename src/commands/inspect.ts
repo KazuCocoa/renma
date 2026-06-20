@@ -5,14 +5,14 @@ import type { Artifact } from "../types.js";
 
 const DEFAULT_SECTION_PREVIEW_LINES = 3;
 
-export type ContextFormat = "json" | "text";
+export type InspectFormat = "json" | "text";
 
-export interface ContextOptions {
-  format?: ContextFormat;
+export interface InspectOptions {
+  format?: InspectFormat;
   lines?: string;
 }
 
-export interface ContextOutline {
+export interface InspectOutline {
   path: string;
   bytes: number;
   lineCount: number;
@@ -36,18 +36,18 @@ export interface ContextOutline {
   }>;
 }
 
-export interface ContextSlice {
+export interface InspectSlice {
   path: string;
   range: string;
   text: string;
 }
 
-export async function runContextCommand(
+export async function runInspectCommand(
   target: string,
-  options: ContextOptions = {},
+  options: InspectOptions = {},
 ): Promise<number> {
   if (options.lines) {
-    const slice = await buildContextSlice(target, options.lines);
+    const slice = await buildInspectSlice(target, options.lines);
     process.stdout.write(
       options.format === "text"
         ? `${slice.text}\n`
@@ -56,7 +56,7 @@ export async function runContextCommand(
     return 0;
   }
 
-  const outline = await buildContextOutline(target);
+  const outline = await buildInspectOutline(target);
   process.stdout.write(
     options.format === "text"
       ? renderTextOutline(outline)
@@ -65,9 +65,9 @@ export async function runContextCommand(
   return 0;
 }
 
-export async function buildContextOutline(
+export async function buildInspectOutline(
   target: string,
-): Promise<ContextOutline> {
+): Promise<InspectOutline> {
   const absolutePath = path.resolve(target);
   const content = await readFile(absolutePath, "utf8");
   const artifact: Artifact = {
@@ -111,15 +111,15 @@ export async function buildContextOutline(
   };
 }
 
-async function buildContextSlice(
+async function buildInspectSlice(
   target: string,
   requestedRange: string,
-): Promise<ContextSlice> {
+): Promise<InspectSlice> {
   const absolutePath = path.resolve(target);
   const content = await readFile(absolutePath, "utf8");
   const lines = content.split(/\r?\n/);
   const { end, start } = parseLineRange(requestedRange, lines.length);
-  const selected = lines
+  const slicedText = lines
     .slice(start - 1, end)
     .map((line, index) => `L${String(start + index).padStart(4, "0")}: ${line}`)
     .join("\n");
@@ -127,7 +127,7 @@ async function buildContextSlice(
   return {
     path: absolutePath,
     range: formatRange(start, end),
-    text: selected,
+    text: slicedText,
   };
 }
 
@@ -188,7 +188,7 @@ function parseLineRange(
   return { end, start };
 }
 
-function renderTextOutline(outline: ContextOutline): string {
+function renderTextOutline(outline: InspectOutline): string {
   const lines = [
     `Path: ${outline.path}`,
     `Lines: ${outline.lineCount}`,

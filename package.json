@@ -1,7 +1,7 @@
 {
   "name": "renma",
   "version": "0.1.0",
-  "description": "Minimal-dependency CLI for reviewing AI-agent skills and repo instructions.",
+  "description": "Git-native governance and quality CLI for LLM-ready skills and shared context assets.",
   "type": "module",
   "bin": {
     "renma": "./dist/index.js"
@@ -14,14 +14,16 @@
     "node": ">=22.17"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "clean": "node -e \"const fs=require('node:fs'); for (const dir of ['dist','dist-test']) fs.rmSync(dir,{recursive:true,force:true});\"",
+    "clean:test": "node -e \"require('node:fs').rmSync('dist-test',{recursive:true,force:true});\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
-    "test": "tsc -p tsconfig.test.json && node --test dist-test/test/*.test.js",
+    "test": "npm run clean:test && tsc -p tsconfig.test.json && node --test dist-test/test/*.test.js",
     "format": "prettier --write \"**/*.{ts,js,json}\"",
     "format:check": "prettier --check \"**/*.{ts,js,json}\"",
     "lint": "eslint \"{src,test}/**/*.ts\" \"scripts/**/*.mjs\" \"eslint.config.js\"",
     "split-reference": "node scripts/split-reference.mjs",
-    "suggest-semantic-split": "node scripts/suggest-semantic-split.mjs"
+    "suggest-semantic-split": "node dist/index.js suggest-semantic-split"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1,6 +1,6 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import { buildContextOutline, type ContextOutline } from "./context.js";
+import { buildInspectOutline, type InspectOutline } from "./inspect.js";
 
 const DEFAULT_MAX_CONTEXT_BYTES = 32 * 1024;
 const CONTEXT_DIRS = new Set(["references", "profiles", "examples", "r"]);
@@ -26,7 +26,7 @@ interface ContextFile {
   truncated: boolean;
 }
 
-interface SemanticSplitContextPackage {
+interface SemanticSplitReviewBundle {
   context: {
     siblingFiles: ContextFile[];
     skill: null | {
@@ -44,7 +44,7 @@ interface SemanticSplitContextPackage {
   mode: "codex-semantic-split-prompt";
   mutatesFiles: false;
   source: {
-    outline: ContextOutline;
+    outline: InspectOutline;
     path: string;
   };
 }
@@ -53,22 +53,25 @@ export async function runSuggestSemanticSplitCommand(
   target: string,
   options: SuggestSemanticSplitOptions = {},
 ): Promise<number> {
-  const contextPackage = await buildContextPackage(target, options);
+  const semanticSplitReviewBundle = await buildSemanticSplitReviewBundle(
+    target,
+    options,
+  );
   const format = options.format ?? "prompt";
   process.stdout.write(
     format === "json"
-      ? `${JSON.stringify(contextPackage, null, 2)}\n`
-      : renderCodexPrompt(contextPackage),
+      ? `${JSON.stringify(semanticSplitReviewBundle, null, 2)}\n`
+      : renderCodexPrompt(semanticSplitReviewBundle),
   );
   return 0;
 }
 
-async function buildContextPackage(
+async function buildSemanticSplitReviewBundle(
   target: string,
   options: SuggestSemanticSplitOptions,
-): Promise<SemanticSplitContextPackage> {
+): Promise<SemanticSplitReviewBundle> {
   const sourcePath = path.resolve(target);
-  const sourceOutline = await buildContextOutline(sourcePath);
+  const sourceOutline = await buildInspectOutline(sourcePath);
   const skillDir = await findSkillDir(path.dirname(sourcePath));
   const skillPath = skillDir ? path.join(skillDir, "SKILL.md") : null;
   const skill = skillPath
@@ -101,8 +104,8 @@ async function buildContextPackage(
       skillDir,
     },
     helperCommands: {
-      outline: `renma context ${shellQuote(sourcePath)} --format json`,
-      sliceExample: `renma context ${shellQuote(sourcePath)} --lines L10-L42 --format text`,
+      outline: `renma inspect ${shellQuote(sourcePath)} --format json`,
+      sliceExample: `renma inspect ${shellQuote(sourcePath)} --lines L10-L42 --format text`,
     },
     mode: "codex-semantic-split-prompt",
     mutatesFiles: false,
@@ -114,10 +117,10 @@ async function buildContextPackage(
 }
 
 function renderCodexPrompt(
-  contextPackage: SemanticSplitContextPackage,
+  semanticSplitReviewBundle: SemanticSplitReviewBundle,
 ): string {
-  const { source } = contextPackage;
-  const { context } = contextPackage;
+  const { source } = semanticSplitReviewBundle;
+  const { context } = semanticSplitReviewBundle;
   const siblingSummary =
     context.siblingFiles.length > 0
       ? context.siblingFiles
@@ -137,11 +140,11 @@ function renderCodexPrompt(
     "",
     "Read the compact source outline and nearby context. Suggest a semantic split plan for the source file based on meaning, not byte size and not predefined categories.",
     "",
-    "Infer the best split direction as a human maintainer would. For example, choose platform-specific files only if the content itself separates macOS/Linux, Windows, etc. If the better boundary is setup phase, troubleshooting area, tool, workflow, runtime, audience, prerequisite, verification, or something else, choose that instead.",
+    "Infer the best split direction as a human maintainer would. For example, choose platform-specific files only if the content itself separates macOS/Linux, Windows, etc. If the better boundary is setup phase, troubleshooting area, tool, workflow mode, audience, prerequisite, verification, or something else, choose that instead.",
     "",
-    "Use deterministic context helpers when the outline is not enough. Prefer these helpers over ad hoc cat/sed calls so token usage stays low:",
-    `- Outline: \`${contextPackage.helperCommands.outline}\``,
-    `- Exact slice: \`${contextPackage.helperCommands.sliceExample}\``,
+    "Use deterministic inspection helpers when the outline is not enough. Prefer these helpers over ad hoc cat/sed calls so token usage stays low:",
+    `- Outline: \`${semanticSplitReviewBundle.helperCommands.outline}\``,
+    `- Exact slice: \`${semanticSplitReviewBundle.helperCommands.sliceExample}\``,
     "",
     "Do not rewrite files. Return only a proposal.",
     "",
@@ -172,7 +175,7 @@ function renderCodexPrompt(
 }`),
     "",
     "Rules:",
-    "- Use source line ranges from the outline and exact context slices.",
+    "- Use source line ranges from the outline and exact line slices.",
     "- Do not split inside fenced code blocks.",
     "- Do not drop warnings, prerequisites, rollback, or verification steps.",
     "- Name files by meaning, not by part number.",

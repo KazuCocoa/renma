@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type {
+  AssetMetadata,
   Catalog,
   CatalogEntry,
   Dependency,
@@ -18,6 +19,9 @@ export function buildCatalog(documents: ParsedDocument[]): {
     .map((document): CatalogEntry | undefined => {
       const result = parseAssetMetadata(document);
       diagnostics.push(...result.diagnostics);
+      diagnostics.push(
+        ...sharedContextMetadataDiagnostics(document, result.metadata),
+      );
 
       const base = {
         id: result.metadata.id ?? document.artifact.path,
@@ -30,7 +34,6 @@ export function buildCatalog(documents: ParsedDocument[]): {
         return {
           ...base,
           kind: "skill",
-          routes: result.metadata.requiresContext,
           requiredContext: result.metadata.requiresContext,
           optionalContext: result.metadata.optionalContext,
           conflicts: result.metadata.conflicts,
@@ -38,6 +41,7 @@ export function buildCatalog(documents: ParsedDocument[]): {
       }
 
       if (
+        document.artifact.kind === "context" ||
         document.artifact.kind === "profile" ||
         document.artifact.kind === "reference" ||
         document.artifact.kind === "example"
@@ -81,6 +85,32 @@ function contentHash(content: string): string {
   return `sha256:${createHash("sha256").update(content).digest("hex")}`;
 }
 
+function sharedContextMetadataDiagnostics(
+  document: ParsedDocument,
+  metadata: AssetMetadata,
+): Diagnostic[] {
+  if (document.artifact.kind !== "context") return [];
+
+  const diagnostics: Diagnostic[] = [];
+  if (!metadata.id) {
+    diagnostics.push({
+      severity: "warning",
+      path: document.artifact.path,
+      message: "Shared context asset is missing an id.",
+    });
+  }
+
+  if (!metadata.owner) {
+    diagnostics.push({
+      severity: "warning",
+      path: document.artifact.path,
+      message: "Shared context asset is missing an owner.",
+    });
+  }
+
+  return diagnostics;
+}
+
 /** Convert metadata relationship lists into graph edges for a catalog entry. */
 function dependenciesForEntry(entry: CatalogEntry): Dependency[] {
   return [
@@ -117,9 +147,10 @@ function metadataEvidence(path: string): Evidence {
 /** Keep catalog output stable across filesystems and Node versions. */
 function kindOrder(kind: CatalogEntry["kind"]): number {
   if (kind === "skill") return 0;
-  if (kind === "profile") return 1;
-  if (kind === "reference") return 2;
-  return 3;
+  if (kind === "context") return 1;
+  if (kind === "profile") return 2;
+  if (kind === "reference") return 3;
+  return 4;
 }
 
 /** Keep dependency output stable while grouping the most important edges first. */

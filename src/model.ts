@@ -6,7 +6,7 @@ export type AssetStatus = "experimental" | "stable" | "deprecated" | "archived";
 /** Artifact kinds Renma keeps in the normalized model. */
 export type AssetKind = Exclude<ArtifactKind, "unknown">;
 
-/** Relationship kinds used by graph and future resolution work. */
+/** Relationship kinds used by graph analysis and repository validation. */
 export type DependencyKind =
   | "requires"
   | "optional"
@@ -29,7 +29,7 @@ export interface AssetMetadata {
   conflicts: string[];
 }
 
-/** Repository object Renma can catalog, validate, reference, or compose. */
+/** Repository object Renma can catalog, validate, reference, or report on. */
 export interface Asset {
   id: string;
   kind: AssetKind;
@@ -40,35 +40,26 @@ export interface Asset {
 
 export interface Skill extends Asset {
   kind: "skill";
-  /** Routing declarations extracted from skill metadata. */
-  routes: string[];
   requiredContext: string[];
   optionalContext: string[];
   conflicts: string[];
 }
 
-export interface ContextUnit extends Asset {
+export interface SupportAsset extends Asset {
   kind: Exclude<AssetKind, "skill" | "agent" | "config">;
 }
 
 /** Backwards-compatible catalog entry name for callers already using catalog output. */
-export type CatalogEntry = Skill | ContextUnit;
+export type CatalogEntry = Skill | SupportAsset;
 
 export interface Dependency {
   /** Asset ID declaring the relationship. */
   from: string;
-  /** Asset ID or unresolved target named by the relationship. */
+  /** Asset ID or declared target named by the relationship. */
   to: string;
   kind: DependencyKind;
   sourcePath: string;
   evidence?: Evidence;
-}
-
-export interface Composition {
-  selectedSkill: string;
-  selectedAssets: string[];
-  rejectedAssets: Array<{ id: string; reason: string }>;
-  dependencies: Dependency[];
 }
 
 /** Deterministic catalog of normalized repository assets and their declared edges. */
