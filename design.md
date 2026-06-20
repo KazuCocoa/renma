@@ -230,6 +230,11 @@ a compatibility shim. Renma can warn when a skill still routes readers through a
 deprecated or superseded local support asset instead of referencing the
 canonical shared context directly.
 
+Renma can also warn when other repository assets continue to reference a
+deprecated or superseded support file instead of the canonical shared context.
+This broader advisory helps remove hidden indirection after context promotion
+while preserving compatibility shims when they are intentionally needed.
+
 Renma should start with deterministic validation for fields it actually uses:
 duplicate IDs, invalid statuses, missing owner or ID on published shared context,
 unknown dependencies, dependencies on deprecated or archived assets, and

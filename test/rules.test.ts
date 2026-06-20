@@ -238,14 +238,19 @@ status: active
   assert.equal(finding?.confidence, "high");
   assert.equal(finding?.evidence.path, "contexts/testing/workflow.md");
   assert.match(finding?.evidence.snippet ?? "", /Invalid status "active"/);
-  assert.match(finding?.remediation ?? "", /experimental, stable, deprecated, archived/);
+  assert.match(
+    finding?.remediation ?? "",
+    /experimental, stable, deprecated, archived/,
+  );
   assert.match(finding?.llmHint ?? "", /superseded_by/);
 });
 
 test("scan advises when skill body context references are not declared", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
   await mkdir(path.join(root, "skills", "demo"), { recursive: true });
-  await mkdir(path.join(root, "contexts", "tools", "demo"), { recursive: true });
+  await mkdir(path.join(root, "contexts", "tools", "demo"), {
+    recursive: true,
+  });
   await writeFile(
     path.join(root, "skills", "demo", "SKILL.md"),
     `---
@@ -304,7 +309,10 @@ status: stable
   assert.equal(findings.length, 1);
   assert.equal(findings[0]?.evidence.path, "skills/demo/SKILL.md");
   assert.match(findings[0]?.evidence.snippet ?? "", /troubleshooting/);
-  assert.match(findings[0]?.llmHint ?? "", /contexts\/tools\/demo\/troubleshooting\.md/);
+  assert.match(
+    findings[0]?.llmHint ?? "",
+    /contexts\/tools\/demo\/troubleshooting\.md/,
+  );
   assert.doesNotMatch(JSON.stringify(findings[0]), /runtime[- ]resolver/i);
 });
 
@@ -369,8 +377,7 @@ status: stable
 
   const result = await scan(root);
   const finding = result.findings.find(
-    (candidate) =>
-      candidate.id === "MAINT-SKILL-REFERENCES-SUPERSEDED-ASSET",
+    (candidate) => candidate.id === "MAINT-SKILL-REFERENCES-SUPERSEDED-ASSET",
   );
 
   assert.equal(finding?.severity, "low");
@@ -392,6 +399,12 @@ status: stable
   assert.match(JSON.stringify(finding?.verificationSteps), /Run renma catalog/);
   assert.match(finding?.llmHint ?? "", /canonical/);
   assert.doesNotMatch(JSON.stringify(finding), /runtime[- ]resolver/i);
+  assert.equal(
+    result.findings.some(
+      (candidate) => candidate.id === "MAINT-ASSET-REFERENCES-SUPERSEDED-ASSET",
+    ),
+    false,
+  );
 });
 
 test("scan does not advise when skill references an active local support asset", async () => {
@@ -443,8 +456,7 @@ Local setup notes.
 
   assert.equal(
     result.findings.some(
-      (candidate) =>
-        candidate.id === "MAINT-SKILL-REFERENCES-SUPERSEDED-ASSET",
+      (candidate) => candidate.id === "MAINT-SKILL-REFERENCES-SUPERSEDED-ASSET",
     ),
     false,
   );
@@ -514,8 +526,265 @@ status: stable
 
   assert.equal(
     result.findings.some(
-      (candidate) =>
-        candidate.id === "MAINT-SKILL-REFERENCES-SUPERSEDED-ASSET",
+      (candidate) => candidate.id === "MAINT-SKILL-REFERENCES-SUPERSEDED-ASSET",
+    ),
+    false,
+  );
+});
+
+test("scan advises when non-skill asset references a superseded local support asset", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
+  await mkdir(path.join(root, "skills", "demo", "references"), {
+    recursive: true,
+  });
+  await mkdir(path.join(root, "skills", "demo", "examples"), {
+    recursive: true,
+  });
+  await mkdir(path.join(root, "contexts", "tools", "demo"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "skills", "demo", "SKILL.md"),
+    `---
+id: demo
+description: Use this skill for demo setup workflows that keep examples separate from local support notes.
+---
+
+# Demo Skill
+
+Use this skill when preparing a demo workflow.
+Load examples/setup.md for a worked example.
+
+## Do Not Use For
+Unrelated tasks.
+
+## Preflight
+Collect the target workflow.
+
+## Examples
+Input: demo setup.
+Output: setup notes.
+
+## Verification
+Run the demo check.
+`,
+  );
+  await writeFile(
+    path.join(root, "skills", "demo", "examples", "setup.md"),
+    `---
+id: demo.example.setup
+owner: skills/demo
+status: stable
+---
+
+# Setup Example
+
+Follow references/setup.md for the old compatibility path.
+`,
+  );
+  await writeFile(
+    path.join(root, "skills", "demo", "references", "setup.md"),
+    `---
+id: demo.setup.local
+owner: skills/demo
+status: deprecated
+superseded_by: contexts/tools/demo/setup.md
+---
+
+# Setup
+
+Compatibility shim for old readers.
+`,
+  );
+  await writeFile(
+    path.join(root, "contexts", "tools", "demo", "setup.md"),
+    `---
+id: demo.setup
+owner: qa-platform
+status: stable
+---
+# Setup
+`,
+  );
+
+  const result = await scan(root);
+  const finding = result.findings.find(
+    (candidate) => candidate.id === "MAINT-ASSET-REFERENCES-SUPERSEDED-ASSET",
+  );
+
+  assert.equal(finding?.severity, "low");
+  assert.equal(finding?.confidence, "medium");
+  assert.equal(finding?.category, "maintenance");
+  assert.equal(finding?.evidence.path, "skills/demo/examples/setup.md");
+  assert.match(
+    finding?.evidence.snippet ?? "",
+    /skills\/demo\/references\/setup\.md/,
+  );
+  assert.match(
+    finding?.evidence.snippet ?? "",
+    /contexts\/tools\/demo\/setup\.md/,
+  );
+  assert.match(
+    JSON.stringify(finding?.constraints),
+    /Do not automatically move or rewrite files during scan/,
+  );
+  assert.match(JSON.stringify(finding?.verificationSteps), /Run renma catalog/);
+  assert.match(finding?.llmHint ?? "", /canonical shared context/);
+  assert.doesNotMatch(JSON.stringify(finding), /runtime[- ]resolver/i);
+});
+
+test("scan does not advise when non-skill asset references an active support asset", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
+  await mkdir(path.join(root, "skills", "demo", "references"), {
+    recursive: true,
+  });
+  await mkdir(path.join(root, "skills", "demo", "examples"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "skills", "demo", "SKILL.md"),
+    `---
+id: demo
+description: Use this skill for demo setup workflows that keep examples separate from local support notes.
+---
+
+# Demo Skill
+
+Use this skill when preparing a demo workflow.
+Load examples/setup.md for a worked example.
+
+## Do Not Use For
+Unrelated tasks.
+
+## Preflight
+Collect the target workflow.
+
+## Examples
+Input: demo setup.
+Output: setup notes.
+
+## Verification
+Run the demo check.
+`,
+  );
+  await writeFile(
+    path.join(root, "skills", "demo", "examples", "setup.md"),
+    `---
+id: demo.example.setup
+owner: skills/demo
+status: stable
+---
+
+# Setup Example
+
+Follow references/setup.md for local guidance.
+`,
+  );
+  await writeFile(
+    path.join(root, "skills", "demo", "references", "setup.md"),
+    `---
+id: demo.setup.local
+owner: skills/demo
+status: stable
+---
+
+# Setup
+
+Local setup notes.
+`,
+  );
+
+  const result = await scan(root);
+
+  assert.equal(
+    result.findings.some(
+      (candidate) => candidate.id === "MAINT-ASSET-REFERENCES-SUPERSEDED-ASSET",
+    ),
+    false,
+  );
+});
+
+test("scan does not advise when superseded support asset has no asset references", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
+  await mkdir(path.join(root, "skills", "demo", "references"), {
+    recursive: true,
+  });
+  await mkdir(path.join(root, "skills", "demo", "examples"), {
+    recursive: true,
+  });
+  await mkdir(path.join(root, "contexts", "tools", "demo"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "skills", "demo", "SKILL.md"),
+    `---
+id: demo
+description: Use this skill for demo setup workflows that point examples at shared context assets.
+requires_context: contexts/tools/demo/setup.md
+---
+
+# Demo Skill
+
+Use this skill when preparing a demo workflow.
+Load examples/setup.md for a worked example.
+
+## Do Not Use For
+Unrelated tasks.
+
+## Preflight
+Collect the target workflow.
+
+## Examples
+Input: demo setup.
+Output: setup notes.
+
+## Verification
+Run the demo check.
+`,
+  );
+  await writeFile(
+    path.join(root, "skills", "demo", "examples", "setup.md"),
+    `---
+id: demo.example.setup
+owner: skills/demo
+status: stable
+---
+
+# Setup Example
+
+Follow contexts/tools/demo/setup.md for canonical guidance.
+`,
+  );
+  await writeFile(
+    path.join(root, "skills", "demo", "references", "setup.md"),
+    `---
+id: demo.setup.local
+owner: skills/demo
+status: deprecated
+superseded_by: contexts/tools/demo/setup.md
+---
+
+# Setup
+
+Compatibility shim for old readers.
+`,
+  );
+  await writeFile(
+    path.join(root, "contexts", "tools", "demo", "setup.md"),
+    `---
+id: demo.setup
+owner: qa-platform
+status: stable
+---
+# Setup
+`,
+  );
+
+  const result = await scan(root);
+
+  assert.equal(
+    result.findings.some(
+      (candidate) => candidate.id === "MAINT-ASSET-REFERENCES-SUPERSEDED-ASSET",
     ),
     false,
   );
@@ -962,14 +1231,8 @@ Load these ordered parts:
 2. setup-02.md
 `,
   );
-  await writeFile(
-    path.join(referenceDir, "setup-01.md"),
-    "# Setup Part 1\n",
-  );
-  await writeFile(
-    path.join(referenceDir, "setup-02.md"),
-    "# Setup Part 2\n",
-  );
+  await writeFile(path.join(referenceDir, "setup-01.md"), "# Setup Part 1\n");
+  await writeFile(path.join(referenceDir, "setup-02.md"), "# Setup Part 2\n");
 
   const result = await scan(root);
   const unusedReferencePaths = result.findings

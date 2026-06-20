@@ -268,6 +268,11 @@ promotion. When reusable knowledge has moved from `skills/*/references/` into
 deprecated or superseded local support file instead of the canonical shared
 context asset.
 
+The same lifecycle governance should apply to non-skill assets that keep direct
+references to superseded support files. Those references should usually move to
+the canonical shared context, unless the superseded file is deliberately kept as
+a compatibility or migration shim.
+
 Validation should cover:
 
 - Duplicate IDs

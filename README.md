@@ -238,6 +238,7 @@ Current rules include:
 - Unreachable skill-local profiles, references, and examples
 - Profile overlays missing base skill declaration
 - Skills that still route through deprecated or superseded local support assets after reusable knowledge has moved to canonical shared context assets
+- Non-skill assets that still reference deprecated or superseded support files instead of canonical shared context assets
 - Advisory reusable-context candidates in `SKILL.md` files with enough size and diverse setup, troubleshooting, platform, testing, risk, or domain-rule signals
 - Advisory shared-context candidates in large `skills/*/references/**/*.md` support files with generic source-of-truth headings and reusable guidance phrases
 - Advisory shared-context assets under process-state folders such as `contexts/promoted/`, `contexts/generated/`, or `contexts/drafts/` that should become semantic final paths

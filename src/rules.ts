@@ -167,7 +167,9 @@ const RULES: Rule[] = [
   {
     id: "support-asset-shared-context-candidate",
     run: ({ documents }) =>
-      documents.flatMap((document) => supportSharedContextCandidateFindings(document)),
+      documents.flatMap((document) =>
+        supportSharedContextCandidateFindings(document),
+      ),
   },
   {
     id: "context-path-non-semantic",
@@ -184,6 +186,10 @@ const RULES: Rule[] = [
   {
     id: "skill-references-superseded-asset",
     run: ({ documents }) => skillReferencesSupersededAssetFindings(documents),
+  },
+  {
+    id: "asset-references-superseded-asset",
+    run: ({ documents }) => assetReferencesSupersededAssetFindings(documents),
   },
 ];
 
@@ -855,6 +861,128 @@ function skillReferenceLine(
   }
 
   return undefined;
+}
+
+function assetReferencesSupersededAssetFindings(
+  documents: ParsedDocument[],
+): Finding[] {
+  const supersededAssets = documents
+    .map((document) => ({
+      document,
+      canonicalTargets: sharedContextTargets(document),
+    }))
+    .filter(
+      ({ document, canonicalTargets }) =>
+        document.metadata.status === "deprecated" ||
+        document.metadata.status === "archived" ||
+        canonicalTargets.length > 0,
+    )
+    .filter(({ canonicalTargets }) => canonicalTargets.length > 0);
+
+  return documents.flatMap((referencingDocument) => {
+    if (referencingDocument.artifact.kind === "skill") return [];
+
+    return supersededAssets.flatMap(({ document, canonicalTargets }) => {
+      if (document.artifact.path === referencingDocument.artifact.path) {
+        return [];
+      }
+
+      const reference = assetReferenceLine(
+        referencingDocument,
+        document.artifact.path,
+      );
+      if (!reference) return [];
+
+      const canonicalTargetList = canonicalTargets
+        .map((target) => `- ${target}`)
+        .join("\n");
+      const snippet = [
+        `Referencing asset: ${referencingDocument.artifact.path}`,
+        `Referenced superseded asset: ${document.artifact.path}`,
+        "Superseded by:",
+        canonicalTargetList,
+        reference.text,
+      ].join("\n");
+
+      return [
+        {
+          id: "MAINT-ASSET-REFERENCES-SUPERSEDED-ASSET",
+          title: "Asset references a superseded support file",
+          category: "maintenance",
+          severity: "low",
+          confidence: "medium",
+          evidence: evidence(referencingDocument, reference.line, snippet),
+          whyItMatters:
+            "Deprecated or superseded support files may remain as compatibility shims, but assets that keep referencing them can hide the canonical shared context asset from humans and agents. Once reusable knowledge has been promoted to contexts/, repository assets should usually reference the canonical context directly.",
+          remediation:
+            "Update this asset to reference the canonical shared context asset directly, or keep the superseded reference only if it is intentionally needed as a compatibility shim. If the deprecated file still contains unique local guidance, preserve that local guidance and point reusable knowledge to the canonical context.",
+          constraints: [
+            "Do not introduce runtime context resolution.",
+            "Do not create prompt packages.",
+            "Do not make Renma call an LLM.",
+            "Do not automatically move or rewrite files during scan.",
+            "Preserve compatibility shims if they are intentionally needed.",
+            "Preserve unique local guidance not reusable shared context.",
+            "Update references through a reviewable human or calling-agent patch.",
+          ],
+          verificationSteps: [
+            "Run renma scan.",
+            "Run renma catalog.",
+            "Run project-specific validation checks that apply to this repository.",
+            "Confirm referencing asset now points to the canonical shared context asset, or documents why the superseded shim is still needed.",
+          ],
+          llmHint:
+            "Inspect the referenced deprecated asset and its superseded_by or canonical context metadata. If the canonical shared context is the intended source of truth, update this asset to reference that context directly. Keep the superseded file only when it serves a deliberate compatibility or migration role.",
+        },
+      ];
+    });
+  });
+}
+
+function assetReferenceLine(
+  referencingDocument: ParsedDocument,
+  targetPath: string,
+): { line: number; text: string } | undefined {
+  const referencingDir = path.posix.dirname(referencingDocument.artifact.path);
+  const relativePath = path.posix.relative(referencingDir, targetPath);
+  const referencedTokens = uniqueStrings([
+    targetPath,
+    relativePath,
+    skillRelativePath(referencingDocument.artifact.path, targetPath),
+  ]).filter(Boolean);
+
+  for (const index of markdownBodyLineIndexes(referencingDocument)) {
+    const line = referencingDocument.lines[index] ?? "";
+    if (referencedTokens.some((token) => line.includes(token))) {
+      return { line: index + 1, text: line.trim() };
+    }
+  }
+
+  return undefined;
+}
+
+function skillRelativePath(
+  referencingPath: string,
+  targetPath: string,
+): string | undefined {
+  const referencingSegments = referencingPath.split("/");
+  const targetSegments = targetPath.split("/");
+  if (
+    referencingSegments[0] !== "skills" ||
+    targetSegments[0] !== "skills" ||
+    referencingSegments[1] !== targetSegments[1]
+  ) {
+    return undefined;
+  }
+
+  return targetSegments.slice(2).join("/");
+}
+
+function uniqueStrings(values: Array<string | undefined>): string[] {
+  return values.filter(
+    (value, index): value is string =>
+      Boolean(value) && values.indexOf(value) === index,
+  );
 }
 
 function contextBudgetFindings(document: ParsedDocument): Finding[] {
