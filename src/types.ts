@@ -5,6 +5,7 @@ export type Severity = "low" | "medium" | "high" | "critical";
 export type ArtifactKind =
   | "skill"
   | "agent"
+  | "context"
   | "profile"
   | "reference"
   | "example"

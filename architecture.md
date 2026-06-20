@@ -133,7 +133,7 @@ Initial asset kinds:
 - `agent`
 - `config`
 
-The current implementation maps shared context Markdown onto the existing reference-like catalog model. The target model should introduce a dedicated `context` kind.
+Shared Markdown under `contexts/` or `context/` uses the dedicated `context` kind. Skill-local supporting material remains `reference`.
 
 ### Dependency
 

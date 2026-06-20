@@ -218,13 +218,17 @@ test("CLI prints catalog JSON and markdown", async () => {
   assert.equal(json.code, 0);
   const report = JSON.parse(json.stdout) as {
     catalog: {
-      assets: Array<{ id: string; contentHash: string }>;
+    assets: Array<{ id: string; kind: string; contentHash: string }>;
       dependencies: Array<{ from: string; to: string; kind: string }>;
     };
   };
   assert.deepEqual(
     report.catalog.assets.map((asset) => asset.id),
     ["demo", "testing.boundary-value-analysis", "demo.guide"],
+  );
+  assert.deepEqual(
+    report.catalog.assets.map((asset) => asset.kind),
+    ["skill", "context", "reference"],
   );
   assert.match(report.catalog.assets[0]?.contentHash ?? "", /^sha256:/);
   assert.deepEqual(report.catalog.dependencies, [

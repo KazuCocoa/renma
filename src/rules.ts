@@ -18,6 +18,7 @@ const USER_LOCAL_PATH_PATTERN =
 const SKILL_TOKEN_LIMIT = 500;
 const DESCRIPTION_MIN_CHARS = 150;
 const CONTEXT_TOKEN_LIMITS = {
+  context: 1200,
   profile: 500,
   reference: 800,
   example: 800,
@@ -291,6 +292,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
 
 function contextBudgetFindings(document: ParsedDocument): Finding[] {
   if (
+    document.artifact.kind !== "context" &&
     document.artifact.kind !== "profile" &&
     document.artifact.kind !== "reference" &&
     document.artifact.kind !== "example"

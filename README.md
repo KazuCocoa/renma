@@ -58,7 +58,7 @@ contexts/
       known-risk-patterns.md
 ```
 
-`contexts/` is preferred. `context/` is also scanned for compatibility.
+`contexts/` is preferred. `context/` is also scanned for compatibility. Files under either root are cataloged as first-class `context` assets, while skill-local `references/` remain `reference` assets.
 
 ## What Renma Does
 

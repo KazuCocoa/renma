@@ -38,6 +38,7 @@ export function buildCatalog(documents: ParsedDocument[]): {
       }
 
       if (
+        document.artifact.kind === "context" ||
         document.artifact.kind === "profile" ||
         document.artifact.kind === "reference" ||
         document.artifact.kind === "example"
@@ -117,9 +118,10 @@ function metadataEvidence(path: string): Evidence {
 /** Keep catalog output stable across filesystems and Node versions. */
 function kindOrder(kind: CatalogEntry["kind"]): number {
   if (kind === "skill") return 0;
-  if (kind === "profile") return 1;
-  if (kind === "reference") return 2;
-  return 3;
+  if (kind === "context") return 1;
+  if (kind === "profile") return 2;
+  if (kind === "reference") return 3;
+  return 4;
 }
 
 /** Keep dependency output stable while grouping the most important edges first. */

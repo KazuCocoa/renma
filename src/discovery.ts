@@ -93,7 +93,7 @@ function classify(relativePath: string): ArtifactKind {
   if (relativePath === "AGENTS.md" || relativePath.startsWith(".agents/"))
     return "agent";
   if (relativePath.startsWith("context/") || relativePath.startsWith("contexts/"))
-    return "reference";
+    return "context";
   if (relativePath.includes("/profiles/")) return "profile";
   if (relativePath.includes("/references/")) return "reference";
   if (relativePath.includes("/examples/")) return "example";

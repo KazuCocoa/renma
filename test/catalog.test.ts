@@ -68,6 +68,18 @@ test("buildCatalog creates deterministic entries for skills and context", () => 
   const documents = [
     parseDocument(
       artifact(
+        "contexts/testing/boundary-value-analysis.md",
+        "context",
+        `---
+id: testing.boundary-value-analysis
+owner: qa-platform
+---
+# Boundary Value Analysis
+`,
+      ),
+    ),
+    parseDocument(
+      artifact(
         "skills/demo/references/guide.md",
         "reference",
         `---
@@ -96,7 +108,11 @@ requires_context: demo.guide
 
   assert.deepEqual(
     result.catalog.entries.map((entry) => entry.id),
-    ["demo", "demo.guide"],
+    ["demo", "testing.boundary-value-analysis", "demo.guide"],
+  );
+  assert.deepEqual(
+    result.catalog.entries.map((entry) => entry.kind),
+    ["skill", "context", "reference"],
   );
   assert.equal(result.catalog.entries[0]?.sourcePath, "skills/demo/SKILL.md");
 });
