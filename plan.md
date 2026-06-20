@@ -326,11 +326,11 @@ Renma keeps those assets clean, owned, validated, deduplicated, and easy for age
 - Orphaned shared context asset detection
 - Superseded local support asset reference advisories
 - Ownership coverage reporting
+- Context graph snapshot reporting
 - LLM-actionable finding fields for safe external repair loops
 
 ### Near-Term Implementation
 
-- Context graph snapshot and reporting
 - Agent readiness report
 - Repeated context and duplicate knowledge discovery
 - Semantic diff for context changes
@@ -402,10 +402,11 @@ The graph should answer:
 - Which assets are affected by this change?
 - Which conflicts exist?
 
-Possible command:
+Current command:
 
 ```bash
 renma graph --format json
+renma graph --format markdown
 ```
 
 ### 5. Graph-Backed Validation
