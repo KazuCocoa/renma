@@ -64,7 +64,6 @@ export interface Dependency {
   evidence?: Evidence;
 }
 
-
 /** Deterministic catalog of normalized repository assets and their declared edges. */
 export interface Catalog {
   entries: CatalogEntry[];

@@ -214,9 +214,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
   }
 
   if (
-    !/use this skill|when to use|trigger|routing|context route|mixin/.test(
-      text,
-    )
+    !/use this skill|when to use|trigger|routing|context route|mixin/.test(text)
   ) {
     findings.push(
       documentFinding(

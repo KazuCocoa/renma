@@ -53,7 +53,10 @@ export async function runSuggestSemanticSplitCommand(
   target: string,
   options: SuggestSemanticSplitOptions = {},
 ): Promise<number> {
-  const semanticSplitReviewBundle = await buildSemanticSplitReviewBundle(target, options);
+  const semanticSplitReviewBundle = await buildSemanticSplitReviewBundle(
+    target,
+    options,
+  );
   const format = options.format ?? "prompt";
   process.stdout.write(
     format === "json"

@@ -19,7 +19,9 @@ export function buildCatalog(documents: ParsedDocument[]): {
     .map((document): CatalogEntry | undefined => {
       const result = parseAssetMetadata(document);
       diagnostics.push(...result.diagnostics);
-      diagnostics.push(...sharedContextMetadataDiagnostics(document, result.metadata));
+      diagnostics.push(
+        ...sharedContextMetadataDiagnostics(document, result.metadata),
+      );
 
       const base = {
         id: result.metadata.id ?? document.artifact.path,

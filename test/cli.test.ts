@@ -64,10 +64,14 @@ Demo input -> demo output.
   const result = await scan(root);
 
   assert.ok(
-    result.findings.some((finding) => finding.id === "SUPPORT-MISSING-REACHABILITY-GUIDANCE"),
+    result.findings.some(
+      (finding) => finding.id === "SUPPORT-MISSING-REACHABILITY-GUIDANCE",
+    ),
   );
   assert.ok(
-    result.findings.some((finding) => finding.id === "SUPPORT-UNREACHABLE-EXAMPLE"),
+    result.findings.some(
+      (finding) => finding.id === "SUPPORT-UNREACHABLE-EXAMPLE",
+    ),
   );
 });
 
@@ -111,7 +115,9 @@ Demo input -> demo output.
     ),
   );
   assert.ok(
-    !result.findings.some((finding) => finding.id === "SUPPORT-UNREACHABLE-EXAMPLE"),
+    !result.findings.some(
+      (finding) => finding.id === "SUPPORT-UNREACHABLE-EXAMPLE",
+    ),
   );
 });
 
@@ -218,7 +224,7 @@ test("CLI prints catalog JSON and markdown", async () => {
   assert.equal(json.code, 0);
   const report = JSON.parse(json.stdout) as {
     catalog: {
-    assets: Array<{ id: string; kind: string; contentHash: string }>;
+      assets: Array<{ id: string; kind: string; contentHash: string }>;
       dependencies: Array<{ from: string; to: string; kind: string }>;
     };
   };
@@ -338,7 +344,10 @@ test("CLI prints a Codex semantic split prompt", async () => {
   assert.equal(json.code, 0);
   assert.equal(semanticSplitReviewBundle.mode, "codex-semantic-split-prompt");
   assert.equal(semanticSplitReviewBundle.mutatesFiles, false);
-  assert.match(semanticSplitReviewBundle.helperCommands.outline, /renma inspect /);
+  assert.match(
+    semanticSplitReviewBundle.helperCommands.outline,
+    /renma inspect /,
+  );
   assert.equal(
     semanticSplitReviewBundle.source.outline.headings[0]?.text,
     "Android setup",

@@ -114,10 +114,14 @@ test("suggest-semantic-split builds a Codex prompt that asks for inferred catego
 
   assert.equal(semanticSplitReviewBundle.mutatesFiles, false);
   assert.match(
-    semanticSplitReviewBundle.source.outline.headings[0]?.preview.join("\n") ?? "",
+    semanticSplitReviewBundle.source.outline.headings[0]?.preview.join("\n") ??
+      "",
     /L0003: macOS\/Linux users/,
   );
-  assert.match(semanticSplitReviewBundle.context.skill.text, /Route environment setup/);
+  assert.match(
+    semanticSplitReviewBundle.context.skill.text,
+    /Route environment setup/,
+  );
   assert.ok(
     semanticSplitReviewBundle.context.siblingFiles.some((file) =>
       file.path.endsWith("references/index.md"),
