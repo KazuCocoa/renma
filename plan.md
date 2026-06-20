@@ -256,6 +256,18 @@ Supported status values:
 - `deprecated`
 - `archived`
 
+Keep lifecycle status separate from replacement or delegation relationships.
+Values such as `active` and `delegated` are not lifecycle statuses. If a local
+support file has been replaced by a shared context asset, prefer
+`status: deprecated` plus a separate future-compatible relationship such as
+`superseded_by: contexts/tools/example/setup.md`.
+
+Context promotion lifecycle governance should also cover the migration after
+promotion. When reusable knowledge has moved from `skills/*/references/` into
+`contexts/`, Renma can warn if the parent skill still routes readers through a
+deprecated or superseded local support file instead of the canonical shared
+context asset.
+
 Validation should cover:
 
 - Duplicate IDs

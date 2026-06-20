@@ -27,6 +27,7 @@ export interface AssetMetadata {
   requiresContext: string[];
   optionalContext: string[];
   conflicts: string[];
+  supersededBy: string[];
 }
 
 /** Repository object Renma can catalog, validate, reference, or report on. */

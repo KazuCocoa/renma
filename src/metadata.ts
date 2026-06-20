@@ -23,6 +23,7 @@ export function parseAssetMetadata(document: ParsedDocument): {
     requiresContext: listValue(document.metadata.requires_context),
     optionalContext: listValue(document.metadata.optional_context),
     conflicts: listValue(document.metadata.conflicts),
+    supersededBy: listValue(document.metadata.superseded_by),
   };
 
   if (rawStatus !== undefined && status === undefined) {

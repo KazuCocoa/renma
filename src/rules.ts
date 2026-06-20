@@ -174,6 +174,17 @@ const RULES: Rule[] = [
     run: ({ documents }) =>
       documents.flatMap((document) => contextPathNonSemanticFindings(document)),
   },
+  {
+    id: "skill-context-reference-not-declared",
+    run: ({ documents }) =>
+      documents.flatMap((document) =>
+        skillContextReferenceNotDeclaredFindings(document),
+      ),
+  },
+  {
+    id: "skill-references-superseded-asset",
+    run: ({ documents }) => skillReferencesSupersededAssetFindings(documents),
+  },
 ];
 
 /** Return whether a severity is at least as severe as a configured threshold. */
@@ -680,6 +691,172 @@ function contextPathNonSemanticFindings(document: ParsedDocument): Finding[] {
   ];
 }
 
+function skillContextReferenceNotDeclaredFindings(
+  document: ParsedDocument,
+): Finding[] {
+  if (document.artifact.kind !== "skill") return [];
+
+  const declaredContexts = new Set(
+    listMetadataValue(document.metadata.requires_context),
+  );
+  const bodyLineIndexes = markdownBodyLineIndexes(document);
+  const matches = new Map<string, { line: number; text: string }>();
+
+  for (const index of bodyLineIndexes) {
+    const line = document.lines[index] ?? "";
+    for (const match of line.matchAll(/\bcontexts?\/[^\s`)'"]+\.md\b/gu)) {
+      const referencedPath = match[0];
+      if (!matches.has(referencedPath)) {
+        matches.set(referencedPath, {
+          line: index + 1,
+          text: line.trim(),
+        });
+      }
+    }
+  }
+
+  return [...matches.entries()]
+    .filter(([referencedPath]) => !declaredContexts.has(referencedPath))
+    .map(([referencedPath, match]) => ({
+      id: "MAINT-SKILL-CONTEXT-REFERENCE-NOT-DECLARED",
+      title: "Skill references a shared context without declaring it",
+      category: "maintenance",
+      severity: "low",
+      confidence: "high",
+      evidence: evidence(document, match.line, match.text),
+      whyItMatters:
+        "Declared context references make skill/context relationships visible to catalog, graph, and validation reports. If a skill only mentions a context in prose, humans may see the dependency but repository tooling cannot validate it.",
+      remediation:
+        "Add the referenced shared context asset to the skill metadata using requires_context, or remove the prose reference if it is no longer needed.",
+      constraints: [
+        "Do not select runtime context.",
+        "Do not assemble prompt packages.",
+        "Do not make Renma decide which context a task should use.",
+        "Only declare repository relationships that the skill already references or intentionally depends on.",
+      ],
+      verificationSteps: [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Confirm the skill/context relationship appears in metadata and catalog output.",
+      ],
+      llmHint: `Find context paths mentioned in the skill body and add them to requires_context using the metadata syntax currently supported by Renma. Missing declaration: ${referencedPath}`,
+    }));
+}
+
+function skillReferencesSupersededAssetFindings(
+  documents: ParsedDocument[],
+): Finding[] {
+  const skillsByPath = new Map(
+    documents
+      .filter((document) => document.artifact.kind === "skill")
+      .map((document) => [document.artifact.path, document]),
+  );
+
+  return documents.flatMap((document) => {
+    if (!isSkillLocalReference(document)) return [];
+
+    const canonicalTargets = sharedContextTargets(document);
+    const supersededStatus =
+      document.metadata.status === "deprecated" ||
+      document.metadata.status === "archived";
+    if (!supersededStatus && canonicalTargets.length === 0) return [];
+    if (canonicalTargets.length === 0) return [];
+
+    const skillPath = parentSkillPath(document.artifact.path);
+    if (!skillPath) return [];
+
+    const skill = skillsByPath.get(skillPath);
+    if (!skill) return [];
+
+    const referencedFrom = skillReferenceLine(skill, document.artifact.path);
+    if (!referencedFrom) return [];
+
+    const canonicalTargetList = canonicalTargets
+      .map((target) => `- ${target}`)
+      .join("\n");
+    const snippet = [
+      `Deprecated local support file: ${document.artifact.path}`,
+      "Superseded by:",
+      canonicalTargetList,
+      `Referenced from: ${skill.artifact.path}`,
+      referencedFrom.text,
+    ].join("\n");
+
+    return [
+      {
+        id: "MAINT-SKILL-REFERENCES-SUPERSEDED-ASSET",
+        title: "Skill references a superseded local support asset",
+        category: "maintenance",
+        severity: "low",
+        confidence: "medium",
+        evidence: evidence(skill, referencedFrom.line, snippet),
+        whyItMatters:
+          "Deprecated or superseded local support files can be useful as compatibility shims, but keeping them in a primary reading path may hide the canonical shared context asset from humans and agents. Shared context assets should be the visible source of truth when reusable knowledge has been promoted to contexts/.",
+        remediation:
+          "Update the skill to reference the canonical shared context asset directly, or keep the deprecated local support file only as a clearly documented compatibility shim. If the local file still contains unique skill-specific guidance, reduce it to that local guidance and point to the shared context for reusable knowledge.",
+        constraints: [
+          "Do not introduce runtime context resolution.",
+          "Do not create prompt packages.",
+          "Do not make Renma call an LLM.",
+          "Do not automatically move or delete files during scan.",
+          "Preserve compatibility shims if they are still needed.",
+          "Preserve unique skill-local guidance if it is not reusable shared context.",
+          "Update declared context references when pointing the skill directly at shared contexts.",
+        ],
+        verificationSteps: [
+          "Run renma scan.",
+          "Run renma catalog.",
+          "Run project-specific validation checks that apply to this repository.",
+          "Confirm the skill points to canonical shared context assets directly, or any deprecated local support file is clearly only a compatibility shim.",
+        ],
+        llmHint:
+          "Inspect the deprecated local support file and its superseded_by or canonical_context metadata. If the shared context asset is now canonical, update skill guidance and metadata to reference the shared context directly. Keep the local reference only if it contains truly local notes or is intentionally preserved as a compatibility shim.",
+      },
+    ];
+  });
+}
+
+function isSkillLocalReference(document: ParsedDocument): boolean {
+  return (
+    document.artifact.kind === "reference" &&
+    /^skills\/[^/]+\/references\/.+\.md$/u.test(document.artifact.path)
+  );
+}
+
+function sharedContextTargets(document: ParsedDocument): string[] {
+  return [
+    ...listMetadataValue(document.metadata.superseded_by),
+    ...listMetadataValue(document.metadata.canonical_context),
+  ].filter(
+    (target, index, targets) =>
+      /^contexts?\//u.test(target) && targets.indexOf(target) === index,
+  );
+}
+
+function parentSkillPath(referencePath: string): string | undefined {
+  const segments = referencePath.split("/");
+  if (segments.length < 4 || segments[0] !== "skills") return undefined;
+  return `skills/${segments[1]}/SKILL.md`;
+}
+
+function skillReferenceLine(
+  skill: ParsedDocument,
+  referencePath: string,
+): { line: number; text: string } | undefined {
+  const skillDir = path.posix.dirname(skill.artifact.path);
+  const relativePath = path.posix.relative(skillDir, referencePath);
+  const referencedTokens = [referencePath, relativePath];
+
+  for (const index of markdownBodyLineIndexes(skill)) {
+    const line = skill.lines[index] ?? "";
+    if (referencedTokens.some((token) => line.includes(token))) {
+      return { line: index + 1, text: line.trim() };
+    }
+  }
+
+  return undefined;
+}
+
 function contextBudgetFindings(document: ParsedDocument): Finding[] {
   if (
     document.artifact.kind !== "context" &&
@@ -887,6 +1064,14 @@ function markdownBodyLineIndexes(document: ParsedDocument): number[] {
   return document.lines
     .map((_, index) => index)
     .filter((index) => index >= bodyStart);
+}
+
+function listMetadataValue(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function matchingLineFindings(

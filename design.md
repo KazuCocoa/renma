@@ -215,6 +215,21 @@ Initial status values:
 - `deprecated`
 - `archived`
 
+`status` describes lifecycle only. It should not be used for replacement,
+delegation, migration provenance, or canonical-source relationships. For
+example, a skill-local reference replaced by a shared context asset should use a
+valid lifecycle status such as `deprecated`, plus a separate relationship field
+such as `superseded_by: contexts/tools/example/setup.md` when the repository
+needs to preserve that link. Renma may catalog `superseded_by` as a static
+reference relationship, but it should not treat values such as `active` or
+`delegated` as valid lifecycle statuses.
+
+When reusable knowledge is promoted from a skill-local support file into
+`contexts/`, the original `skills/*/references/` file may remain temporarily as
+a compatibility shim. Renma can warn when a skill still routes readers through a
+deprecated or superseded local support asset instead of referencing the
+canonical shared context directly.
+
 Renma should start with deterministic validation for fields it actually uses:
 duplicate IDs, invalid statuses, missing owner or ID on published shared context,
 unknown dependencies, dependencies on deprecated or archived assets, and

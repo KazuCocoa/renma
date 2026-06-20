@@ -40,7 +40,32 @@ conflicts: android
     requiresContext: ["product.overview", "environment"],
     optionalContext: ["incidents"],
     conflicts: ["android"],
+    supersededBy: [],
   });
+  assert.deepEqual(result.diagnostics, []);
+});
+
+test("parseAssetMetadata captures superseded_by references", () => {
+  const document = parseDocument(
+    artifact(
+      "skills/demo/references/guide.md",
+      "reference",
+      `---
+id: demo.guide
+status: deprecated
+superseded_by: contexts/tools/demo/guide.md, contexts/tools/demo/checklist.md
+---
+# Guide
+`,
+    ),
+  );
+
+  const result = parseAssetMetadata(document);
+
+  assert.deepEqual(result.metadata.supersededBy, [
+    "contexts/tools/demo/guide.md",
+    "contexts/tools/demo/checklist.md",
+  ]);
   assert.deepEqual(result.diagnostics, []);
 });
 

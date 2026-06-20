@@ -117,6 +117,7 @@ function dependenciesForEntry(entry: CatalogEntry): Dependency[] {
     ...metadataDependencies(entry, "requires", entry.metadata.requiresContext),
     ...metadataDependencies(entry, "optional", entry.metadata.optionalContext),
     ...metadataDependencies(entry, "conflicts", entry.metadata.conflicts),
+    ...metadataDependencies(entry, "references", entry.metadata.supersededBy),
   ];
 }
 
