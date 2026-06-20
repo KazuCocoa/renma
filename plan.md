@@ -407,6 +407,7 @@ Current command:
 ```bash
 renma graph --format json
 renma graph --format markdown
+renma graph --format mermaid
 ```
 
 ### 5. Graph-Backed Validation

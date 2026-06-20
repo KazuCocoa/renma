@@ -9,7 +9,7 @@ import type {
 } from "../model.js";
 import type { Diagnostic } from "../types.js";
 
-export type GraphFormat = "json" | "markdown";
+export type GraphFormat = "json" | "markdown" | "mermaid";
 
 export interface GraphReport {
   root: string;
@@ -47,11 +47,7 @@ export async function runGraphCommand(
   options: { format: GraphFormat; overrides?: ConfigOverrides },
 ): Promise<number> {
   const report = await graph(targetPath, options.overrides ?? {});
-  process.stdout.write(
-    options.format === "json"
-      ? formatGraphJson(report)
-      : formatGraphMarkdown(report),
-  );
+  process.stdout.write(formatGraph(report, options.format));
   return report.diagnostics?.some(
     (diagnostic) => diagnostic.severity === "error",
   )
@@ -85,6 +81,61 @@ export async function graph(
 
 export function formatGraphJson(report: GraphReport): string {
   return `${JSON.stringify(report, null, 2)}\n`;
+}
+
+export function formatGraphMermaid(report: GraphReport): string {
+  const nodeIds = new Map<string, string>();
+  const missingIds = new Map<string, string>();
+  const lines = ["graph TD"];
+
+  report.nodes.forEach((node, index) => {
+    const id = `node_${index}`;
+    nodeIds.set(node.id, id);
+    lines.push(`  ${id}["${escapeMermaidLabel(nodeLabel(node))}"]`);
+  });
+
+  for (const edge of report.edges) {
+    if (edge.resolved) continue;
+    if (!missingIds.has(edge.to)) {
+      const id = `missing_${missingIds.size}`;
+      missingIds.set(edge.to, id);
+      lines.push(`  ${id}["${escapeMermaidLabel(`missing: ${edge.to}`)}"]`);
+    }
+  }
+
+  for (const edge of report.edges) {
+    const source = nodeIds.get(edge.from);
+    if (!source) continue;
+
+    if (edge.resolved && edge.targetId) {
+      const target = nodeIds.get(edge.targetId);
+      if (target) {
+        lines.push(
+          `  ${source} -->|${escapeMermaidLabel(edge.kind)}| ${target}`,
+        );
+      }
+      continue;
+    }
+
+    const missing = missingIds.get(edge.to);
+    if (missing) {
+      lines.push(
+        `  ${source} -.->|${escapeMermaidLabel(`${edge.kind} unresolved`)}| ${missing}`,
+      );
+    }
+  }
+
+  if (report.diagnostics && report.diagnostics.length > 0) {
+    lines.push("  %% Diagnostics:");
+    for (const diagnostic of report.diagnostics) {
+      const path = diagnostic.path ? `${diagnostic.path}: ` : "";
+      lines.push(
+        `  %% ${singleLine(`${diagnostic.severity}: ${path}${diagnostic.message}`)}`,
+      );
+    }
+  }
+
+  return `${lines.join("\n")}\n`;
 }
 
 export function formatGraphMarkdown(report: GraphReport): string {
@@ -140,6 +191,25 @@ export function formatGraphMarkdown(report: GraphReport): string {
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+function formatGraph(report: GraphReport, format: GraphFormat): string {
+  if (format === "json") return formatGraphJson(report);
+  if (format === "mermaid") return formatGraphMermaid(report);
+  return formatGraphMarkdown(report);
+}
+
+function nodeLabel(node: GraphNode): string {
+  const status = node.status ? ` (${node.status})` : "";
+  return `${node.kind}: ${node.id}${status}`;
+}
+
+function escapeMermaidLabel(label: string): string {
+  return singleLine(label).replace(/"/g, '\\"');
+}
+
+function singleLine(value: string): string {
+  return value.replace(/\r?\n/g, " ");
 }
 
 function toNode(asset: Asset): GraphNode {

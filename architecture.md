@@ -294,6 +294,7 @@ Current command:
 ```bash
 renma graph --format json
 renma graph --format markdown
+renma graph --format mermaid
 ```
 
 The graph is not a runtime selection engine. It is repository evidence.

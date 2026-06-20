@@ -139,7 +139,7 @@ Options:
 ```text
 -c, --config <path>      Read JSON config from path
     --fail-on <level>    Exit 1 when findings meet severity: low, medium, high, critical
-    --format <format>    scan: text or json; catalog/ownership/graph: json or markdown; suggest: prompt or json
+    --format <format>    scan: text or json; catalog/ownership: json or markdown; graph: json, markdown, or mermaid; suggest: prompt or json
     --include-owned      ownership: include owned asset details
     --json               Shortcut for --format json
     --lines <range>      inspect: exact line range, e.g. L10-L42
@@ -161,6 +161,7 @@ renma scan . --config ./renma.config.json
 renma catalog . --format markdown
 renma catalog . --json
 renma graph . --format markdown
+renma graph . --format mermaid
 renma graph . --json
 renma ownership . --format markdown
 renma ownership . --json
