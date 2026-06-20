@@ -175,9 +175,16 @@ function resolveDependencyTarget(
   dependency: Dependency,
   assets: Asset[],
 ): Asset | undefined {
+  const target = normalizeReference(dependency.to);
   return assets.find(
-    (asset) => asset.id === dependency.to || asset.sourcePath === dependency.to,
+    (asset) =>
+      asset.id === dependency.to ||
+      normalizeReference(asset.sourcePath) === target,
   );
+}
+
+function normalizeReference(reference: string): string {
+  return reference.replace(/\\/g, "/").replace(/^\.\//, "");
 }
 
 function edgeTarget(edge: GraphEdge): string {

@@ -80,7 +80,7 @@ test("graph resolves requires_context by asset id", async () => {
 test("graph resolves dependency edge by repository-relative path", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", {
-    requiresContext: ["contexts/testing/boundary.md"],
+    requiresContext: ["./contexts/testing/boundary.md"],
   });
   await writeContext(root, "testing", "boundary", {});
 
