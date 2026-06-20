@@ -99,6 +99,65 @@ test("readiness CLI supports --json", async () => {
   assert.equal(parsed.summary.totalAssets, 1);
 });
 
+test("readiness CLI exits 1 for needs_attention", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {});
+
+  const result = await withCapturedConsole(() =>
+    main(["readiness", root, "--json"]),
+  );
+  const parsed = JSON.parse(result.stdout);
+
+  assert.equal(result.code, 1);
+  assert.equal(result.stderr, "");
+  assert.equal(parsed.level, "needs_attention");
+  assert.equal(parsed.summary.unownedAssets, 1);
+});
+
+test("readiness CLI exits 1 for not_ready unresolved graph edges", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    requiresContext: ["missing.context"],
+  });
+
+  const result = await withCapturedConsole(() =>
+    main(["readiness", root, "--json"]),
+  );
+  const parsed = JSON.parse(result.stdout);
+
+  assert.equal(result.code, 1);
+  assert.equal(result.stderr, "");
+  assert.equal(parsed.level, "not_ready");
+  assert.equal(parsed.summary.unresolvedEdges, 1);
+});
+
+test("readiness CLI exits 1 for zero assets", async () => {
+  const root = await fixture();
+
+  const result = await withCapturedConsole(() =>
+    main(["readiness", root, "--json"]),
+  );
+  const parsed = JSON.parse(result.stdout);
+
+  assert.equal(result.code, 1);
+  assert.equal(result.stderr, "");
+  assert.equal(parsed.level, "not_ready");
+  assert.equal(parsed.summary.totalAssets, 0);
+});
+
+test("readiness CLI exits 2 for unsupported format", async () => {
+  const root = await fixture();
+
+  const result = await withCapturedConsole(() =>
+    main(["readiness", root, "--format", "text"]),
+  );
+
+  assert.equal(result.code, 2);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /--format must be either json or markdown/);
+});
+
 async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-"));
 }

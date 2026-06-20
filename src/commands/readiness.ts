@@ -52,7 +52,7 @@ export async function runReadinessCommand(
 ): Promise<number> {
   const report = await readiness(targetPath, options.overrides ?? {});
   process.stdout.write(formatReadiness(report, options.format));
-  return 0;
+  return report.level === "ready" ? 0 : 1;
 }
 
 export async function readiness(
