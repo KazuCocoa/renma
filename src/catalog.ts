@@ -34,7 +34,6 @@ export function buildCatalog(documents: ParsedDocument[]): {
         return {
           ...base,
           kind: "skill",
-          routes: result.metadata.requiresContext,
           requiredContext: result.metadata.requiresContext,
           optionalContext: result.metadata.optionalContext,
           conflicts: result.metadata.conflicts,

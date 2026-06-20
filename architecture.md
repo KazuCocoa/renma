@@ -147,6 +147,8 @@ Initial edge kinds:
 - `extends`
 - `routes_to`
 
+`routes_to` is a declared static relationship used for graph analysis and repository validation; it does not mean Renma chooses task context.
+
 Edges should carry source evidence: source path, line range, declaration form, and reason where available.
 
 ## Architecture
@@ -364,14 +366,26 @@ renma suggest-semantic-split <file>
 
 `renma inspect` inspects repository files and context assets by outline or line range. It does not choose task context or assemble prompts.
 
+Baseline now in place:
+
+- Dedicated `context` artifact kind.
+- Default discovery for top-level `contexts/**/*.md` and `context/**/*.md`.
+- Skill-local `references/` remain distinct from shared context assets.
+- `SupportAsset` names non-skill catalog assets.
+- `skill-local-support-reachability` validates static skill-local support files.
+- `renma inspect` provides repository file inspection by outline or line range.
+- Basic shared context metadata diagnostics.
+
 Near-term implementation work:
 
-- Add dedicated `context` asset kind.
-- Keep shared `contexts/**/*.md` and `context/**/*.md` in default discovery.
-- Expand catalog entries with owner, status, dependency, and dependent summaries.
-- Add graph output once the model is stable.
-- Add graph-backed validation rules.
-- Broaden repeated context discovery across shared contexts, skills, agents, references, profiles, and examples.
+- Duplicate asset ID detection.
+- Unknown dependency and reference detection.
+- Deprecated or archived dependency validation.
+- Orphaned context asset detection.
+- Ownership coverage reporting.
+- Context graph snapshot and reporting.
+- Agent readiness report.
+- Repeated context discovery across shared contexts, skills, agents, references, profiles, and examples.
 
 ## Principle
 

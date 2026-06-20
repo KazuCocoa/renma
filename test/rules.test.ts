@@ -81,7 +81,7 @@ description: This skill routes to references for detailed context and includes e
 ---
 # Demo Skill
 
-## Context Selection
+## Local Support Guidance
 For detailed reference material, load references/large.md.
 
 ## Do Not Use For
@@ -123,7 +123,7 @@ description: This skill uses an index reference to route ordered Android setup c
 ---
 # Setup Skill
 
-## Context Selection
+## Local Support Guidance
 For Android setup, load references/android.md.
 
 ## Do Not Use For

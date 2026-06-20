@@ -158,7 +158,7 @@ Dependencies are typed relationships between assets:
 - `optional`: useful context that is not always required
 - `conflicts`: assets that should not both be active without human review
 - `extends`: overlay or profile relationship
-- `routes_to`: skill routing relationship toward a context asset or local file
+- `routes_to`: declared static relationship from a skill or support asset toward a context asset or local file
 - `covered_by`: evaluation or evidence coverage relationship
 
 Edges should carry source evidence: path, range when available, declaration

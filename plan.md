@@ -169,6 +169,8 @@ A dependency is a typed relationship between assets. Initial relationship kinds:
 - `extends`
 - `routes_to`
 
+`routes_to` is static repository evidence for graph analysis and validation, not task context choice.
+
 Every dependency should preserve source evidence: path, line range, declaration form, and reason where available.
 
 ### Catalog Snapshot

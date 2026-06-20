@@ -88,7 +88,7 @@ description: "Use this skill for demo tasks when a short deterministic fixture n
 ---
 # Demo
 
-## Context Selection
+## Local Support Guidance
 - For the happy path, load examples/happy-path.md.
 
 ## Do Not Use For

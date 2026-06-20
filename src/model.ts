@@ -40,8 +40,6 @@ export interface Asset {
 
 export interface Skill extends Asset {
   kind: "skill";
-  /** Routing declarations extracted from skill metadata. */
-  routes: string[];
   requiredContext: string[];
   optionalContext: string[];
   conflicts: string[];
