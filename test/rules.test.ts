@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { formatText } from "../src/report.js";
 import { scan } from "../src/scanner.js";
 
 test("scan preserves local support reachability and profile findings", async () => {
@@ -50,6 +51,149 @@ Do not use for production credential changes.
   assert.ok(ids.includes("SUPPORT-UNREACHABLE-EXAMPLE"));
   assert.ok(ids.includes("PROF-MISSING-BASE"));
   assert.ok(ids.includes("SEC-LITERAL-SECRET"));
+
+  const reachabilityFinding = result.findings.find(
+    (finding) => finding.id === "SUPPORT-MISSING-REACHABILITY-GUIDANCE",
+  );
+  assert.match(
+    reachabilityFinding?.whyItMatters ?? "",
+    /statically discoverable/,
+  );
+  assert.ok(
+    reachabilityFinding?.constraints?.includes(
+      "Do not introduce runtime context resolution.",
+    ),
+  );
+  assert.ok(
+    reachabilityFinding?.verificationSteps?.includes("Run renma scan."),
+  );
+  assert.ok(
+    reachabilityFinding?.verificationSteps?.includes(
+      "Run any project-specific validation checks that apply to this repository.",
+    ),
+  );
+  assert.ok(!reachabilityFinding?.verificationSteps?.includes("Run npm test."));
+  assert.match(reachabilityFinding?.llmHint ?? "", /reachability guidance/);
+
+  const textReport = formatText(result);
+  assert.match(
+    textReport,
+    /constraints: Do not introduce runtime context resolution/,
+  );
+  assert.match(
+    textReport,
+    /verify: Run renma scan\.; Run any project-specific validation checks/,
+  );
+  assert.match(textReport, /llm: Add concise reachability guidance/);
+
+  const unreachableFinding = result.findings.find((finding) =>
+    finding.id.startsWith("SUPPORT-UNREACHABLE-"),
+  );
+  assert.match(
+    unreachableFinding?.whyItMatters ?? "",
+    /static repository evidence/,
+  );
+  assert.ok(
+    unreachableFinding?.constraints?.includes(
+      "Do not delete or summarize support content just to satisfy the check.",
+    ),
+  );
+});
+
+test("scan advises when a skill contains reusable context candidates", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
+  const skillDir = path.join(root, "skills", "mobile");
+  await mkdir(skillDir, { recursive: true });
+  await writeFile(
+    path.join(skillDir, "SKILL.md"),
+    `---
+name: mobile-review
+description: Use this skill for mobile review tasks when routing requires platform setup, troubleshooting, testing heuristics, examples, preflight checks, and verification guidance.
+---
+# Mobile Review
+
+Use this skill when reviewing mobile behavior.
+
+## Setup
+Install the project dependencies.
+Configure the simulator environment.
+Capture the device logs.
+Keep setup guidance current.
+
+## iOS
+iOS-specific behavior can differ after background resume.
+Known issue: push registration may retry slowly.
+Avoid assuming the first launch is representative.
+
+## Android Troubleshooting
+Android-specific networking can be flaky on emulators.
+Retry only after collecting logs.
+Platform-specific failures should keep their reproduction notes.
+
+## Testing Heuristics
+Best practice: include offline and resume cases.
+Edge case coverage should include low-storage behavior.
+Risk: login state may expire during backgrounding.
+Do not use for production incident response.
+
+## Examples
+Input: mobile checkout review.
+Output: review notes with risks.
+
+## Preflight
+Check device access and target app version.
+
+## Verification
+Run the mobile test command and confirm result.
+`,
+  );
+
+  const result = await scan(root, {});
+  const finding = result.findings.find(
+    (candidate) => candidate.id === "MAINT-SKILL-REUSABLE-CONTEXT-CANDIDATE",
+  );
+
+  assert.equal(finding?.severity, "low");
+  assert.equal(finding?.category, "maintenance");
+  assert.equal(finding?.confidence, "medium");
+  assert.match(finding?.evidence.snippet ?? "", /Detected reusable-knowledge/);
+  assert.match(finding?.evidence.snippet ?? "", /Setup/);
+  assert.match(finding?.evidence.snippet ?? "", /iOS/);
+  assert.match(finding?.evidence.snippet ?? "", /known issue/);
+  assert.ok(
+    finding?.constraints?.includes("Do not make Renma select runtime context."),
+  );
+  assert.match(finding?.llmHint ?? "", /without adding runtime context/);
+});
+
+test("scan does not advise reusable context extraction for tiny skills", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
+  const skillDir = path.join(root, "skills", "tiny");
+  await mkdir(skillDir, { recursive: true });
+  await writeFile(
+    path.join(skillDir, "SKILL.md"),
+    `---
+name: tiny
+description: Use this skill for tiny routing fixtures when examples, preflight checks, and verification guidance are enough.
+---
+# Tiny
+
+Use this skill when a fixture needs a known issue mention.
+Do not use for production work.
+Example input and output.
+Preflight check.
+Verification result.
+`,
+  );
+
+  const result = await scan(root, {});
+
+  assert.equal(
+    result.findings.some(
+      (finding) => finding.id === "MAINT-SKILL-REUSABLE-CONTEXT-CANDIDATE",
+    ),
+    false,
+  );
 });
 
 test("scan preserves security finding evidence paths", async () => {
@@ -109,6 +253,70 @@ Verify the result with a test.
     "skills/demo/references/large.md",
   );
   assert.match(contextBudgetFinding?.title ?? "", /Support asset exceeds/);
+  assert.match(contextBudgetFinding?.whyItMatters ?? "", /modular enough/);
+  assert.ok(
+    contextBudgetFinding?.constraints?.includes(
+      "Preserve concrete procedural steps losslessly.",
+    ),
+  );
+  assert.ok(
+    contextBudgetFinding?.verificationSteps?.includes("Run renma scan."),
+  );
+  assert.ok(
+    contextBudgetFinding?.verificationSteps?.includes(
+      "Run the repository-specific validation or test command, if one exists.",
+    ),
+  );
+  assert.ok(
+    !contextBudgetFinding?.verificationSteps?.includes("Run npm test."),
+  );
+  assert.match(contextBudgetFinding?.llmHint ?? "", /meaning-based ordered/);
+});
+
+test("scan emits actionable guidance for oversized skills", async () => {
+  const root = await fixture();
+  const skillDir = path.join(root, "skills", "large");
+  await mkdir(skillDir, { recursive: true });
+  await writeFile(
+    path.join(skillDir, "SKILL.md"),
+    `---
+name: Large Skill
+description: Use this skill for large-context governance checks that need static support references.
+---
+# Large Skill
+## Use When
+Use for repository governance review.
+## Do Not Use For
+Do not use for runtime context selection.
+## Preflight
+Collect the target repository path.
+## Procedure
+${repeatWords("procedure", 560)}
+## Verification
+Run npm test.
+`,
+  );
+
+  const result = await scan(root);
+  const skillBudgetFinding = result.findings.find(
+    (finding) => finding.id === "QUAL-SKILL-TOKEN-BUDGET",
+  );
+
+  assert.equal(skillBudgetFinding?.evidence.path, "skills/large/SKILL.md");
+  assert.match(skillBudgetFinding?.whyItMatters ?? "", /Large skills can mix/);
+  assert.ok(
+    skillBudgetFinding?.constraints?.includes(
+      "Do not make Renma responsible for selecting context.",
+    ),
+  );
+  assert.ok(skillBudgetFinding?.verificationSteps?.includes("Run renma scan."));
+  assert.ok(
+    skillBudgetFinding?.verificationSteps?.includes(
+      "Run any project-specific validation checks that apply to this repository.",
+    ),
+  );
+  assert.ok(!skillBudgetFinding?.verificationSteps?.includes("Run npm test."));
+  assert.match(skillBudgetFinding?.llmHint ?? "", /first-class context assets/);
 });
 
 test("scan treats support files referenced through an index reference as reachable", async () => {

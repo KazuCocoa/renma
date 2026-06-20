@@ -19,7 +19,7 @@ Skill = LLM-facing entrypoint / routing contract / usage guide
 Context = independently owned source-of-truth knowledge asset
 ```
 
-Skills tell an agent when and how to use a capability. They can route toward
+Skills tell an agent when and how to use a capability. They can reference
 context assets, ask preflight questions, describe safety gates, and define
 verification expectations.
 
@@ -93,8 +93,8 @@ Example diagnostic shape:
     "Each context asset should have id, owner, status, and short scope."
   ],
   "verificationSteps": [
-    "Run npm test.",
     "Run renma scan.",
+    "Run any project-specific validation checks that apply to this repository.",
     "Ensure the skill no longer mixes reusable domain knowledge with usage guidance."
   ],
   "llmHint": "Create shared context assets for reusable QA knowledge, update skill metadata, and preserve the skill as a concise usage guide."
@@ -218,7 +218,7 @@ Dependencies are typed relationships between assets:
 - `optional`: useful context that is not always required
 - `conflicts`: assets that should not both be active without human review
 - `extends`: overlay or profile relationship
-- `routes_to`: declared static relationship from a skill or support asset toward a context asset or local file
+- `references`: declared static relationship from a skill or support asset toward a context asset or local file
 - `covered_by`: evaluation or evidence coverage relationship
 
 Edges should carry source evidence: path, range when available, declaration
@@ -259,6 +259,7 @@ Early deterministic rules should focus on repository health:
 - Orphaned shared context asset
 - Broken Markdown links
 - Oversized skill entrypoint
+- Skill may contain reusable context worth extracting
 - Oversized context or skill-local support file
 - Missing skill routing guidance
 - Missing negative routing guidance
@@ -291,7 +292,7 @@ Good context assets in this domain include:
 - Team-specific test strategy
 - Known checkout or payment contract risks
 
-Skills can route to those assets for tasks such as test-case generation, spec
+Skills can reference those assets for tasks such as test-case generation, spec
 review, regression planning, or release readiness. The context assets remain
 the source of truth.
 

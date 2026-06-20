@@ -145,9 +145,9 @@ Initial edge kinds:
 - `optional`
 - `conflicts`
 - `extends`
-- `routes_to`
+- `references`
 
-`routes_to` is a declared static relationship used for graph analysis and repository validation; it does not mean Renma chooses task context.
+`references` is a declared static repository relationship used for graph analysis and repository validation; it does not mean Renma chooses task context.
 
 Edges should carry source evidence: source path, line range, declaration form, and reason where available.
 
@@ -269,6 +269,7 @@ Rule areas:
 - Missing preflight guidance
 - Missing verification guidance
 - Oversized skills or context assets
+- Reusable context candidates inside SKILL.md files
 - Missing shared context owner or ID
 - Invalid status values
 - Unknown dependencies

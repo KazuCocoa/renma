@@ -159,6 +159,6 @@ function dependencyKindOrder(kind: DependencyKind): number {
   if (kind === "optional") return 1;
   if (kind === "conflicts") return 2;
   if (kind === "extends") return 3;
-  if (kind === "routes_to") return 4;
+  if (kind === "references") return 4;
   return 5;
 }

@@ -286,7 +286,7 @@ test("CLI prints a Codex semantic split prompt", async () => {
       'name: "setup"\n',
       "---\n",
       "# Setup\n",
-      "Route environment setup requests to the relevant reference.\n",
+      "Reference environment setup guidance for relevant requests.\n",
     ].join(""),
   );
   await writeFile(
@@ -320,7 +320,16 @@ test("CLI prints a Codex semantic split prompt", async () => {
   assert.match(prompt.stdout, /renma inspect .* --lines L10-L42 --format text/);
   assert.match(prompt.stdout, /Name files by meaning, not by part number/);
   assert.match(prompt.stdout, /L0003: macOS\/Linux users/);
-  assert.match(prompt.stdout, /Route environment setup/);
+  assert.match(prompt.stdout, /Reference environment setup/);
+  assert.match(
+    prompt.stdout,
+    /"usageHint": "when SKILL\.md should reference this file"/,
+  );
+  assert.match(
+    prompt.stdout,
+    /"skillGuidanceUpdate": "brief SKILL\.md usage and reference guidance"/,
+  );
+  assert.doesNotMatch(prompt.stdout, /routingHint|routingUpdate/);
 
   const json = await withCapturedConsole(() =>
     main(["suggest-semantic-split", source, "--format", "json"]),

@@ -197,9 +197,9 @@ A dependency is a typed relationship between assets. Initial relationship kinds:
 - `optional`
 - `conflicts`
 - `extends`
-- `routes_to`
+- `references`
 
-`routes_to` is static repository evidence for graph analysis and validation, not task context choice.
+`references` is static repository evidence for graph analysis and validation, not task context choice.
 
 Every dependency should preserve source evidence: path, line range, declaration form, and reason where available.
 
@@ -317,6 +317,7 @@ Add rules for:
 - Oversized shared context assets
 - Context assets without clear usage guidance
 - Shared assets that duplicate large skill-local sections
+- SKILL.md files that may contain reusable setup, troubleshooting, platform, testing, risk, or domain-rule guidance worth extracting
 
 ### 3. Catalog Generation
 

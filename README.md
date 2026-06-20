@@ -236,6 +236,7 @@ Current rules include:
 - Oversized shared context assets or local support files in `contexts/`, `context/`, `profiles/`, `references/`, and `examples/`
 - Unreachable skill-local profiles, references, and examples
 - Profile overlays missing base skill declaration
+- Advisory reusable-context candidates in `SKILL.md` files with enough size and diverse setup, troubleshooting, platform, testing, risk, or domain-rule signals
 - Literal secret-like values
 - Private key material
 - Destructive commands without nearby confirmation or recovery context

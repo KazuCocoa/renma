@@ -12,7 +12,7 @@ export type DependencyKind =
   | "optional"
   | "conflicts"
   | "extends"
-  | "routes_to"
+  | "references"
   | "covered_by";
 
 /** Normalized shared metadata for cataloged assets. */
