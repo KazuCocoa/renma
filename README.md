@@ -2,7 +2,7 @@
 
 Renma helps teams keep LLM-ready context assets and skills healthy in Git.
 
-Renma is a Git-native governance and quality layer for shared context repositories. It prepares repositories so Codex, Claude, Cursor, and future agents can consume team-owned expertise correctly. Renma does not select, compose, inject, or execute runtime context; agents and runtimes decide how to use the assets for a task.
+Renma is a Git-native governance and quality layer for shared context repositories. It prepares repositories so Codex, Claude, Cursor, and future agents can consume team-owned expertise correctly. Renma does not choose task context, assemble prompts, inject context, or execute agent workflows; agents and runtimes decide how to use the assets for a task.
 
 ```text
 Skill = LLM-facing entrypoint / routing contract / usage guide
@@ -69,10 +69,10 @@ Current capabilities:
 - Bounded filesystem discovery
 - Stable POSIX-style repo-relative paths
 - Markdown parsing for headings, links, code fences, metadata, and evidence
-- Structural quality checks for skills and context files
+- Structural quality checks for skills, shared context assets, and local support files
 - Safety checks for risky instructions and literal secrets
 - Deterministic catalog output for assets and dependency metadata
-- Context outline and line-slice helper
+- Repository file outline and line-slice inspection helper
 - Semantic split prompt helper for oversized context files
 - CI-friendly exit behavior with `--fail-on`
 - Config loading from `renma.config.json` and `.renma.json`
@@ -120,9 +120,11 @@ renma scan .
 ```bash
 renma scan [path] [options]
 renma catalog [path] [options]
-renma context <file> [options]
+renma inspect <file> [options]
 renma suggest-semantic-split <file> [options]
 ```
+
+`renma inspect` is a repository inspection helper for outlines and exact line slices; it does not choose task context or assemble prompts.
 
 Options:
 
@@ -131,7 +133,7 @@ Options:
     --fail-on <level>    Exit 1 when findings meet severity: low, medium, high, critical
     --format <format>    scan: text or json; catalog: json or markdown; suggest: prompt or json
     --json               Shortcut for --format json
-    --lines <range>      context: exact line range, e.g. L10-L42
+    --lines <range>      inspect: exact line range, e.g. L10-L42
     --max-source-bytes <n>
                           suggest-semantic-split: source file byte budget
     --max-context-bytes <n>
@@ -149,8 +151,8 @@ renma scan . --fail-on medium
 renma scan . --config ./renma.config.json
 renma catalog . --format markdown
 renma catalog . --json
-renma context contexts/testing/boundary-value-analysis.md --format json
-renma context contexts/testing/boundary-value-analysis.md --lines L40-L90 --format text
+renma inspect contexts/testing/boundary-value-analysis.md --format json
+renma inspect contexts/testing/boundary-value-analysis.md --lines L40-L90 --format text
 renma suggest-semantic-split contexts/tools/appium/usage-guideline.md
 ```
 
@@ -224,8 +226,8 @@ Current rules include:
 - Missing skill description, examples, preflight, verification, negative routing, or explicit routing clarity
 - Short frontmatter descriptions
 - Oversized `SKILL.md` entrypoints
-- Oversized context files in `contexts/`, `context/`, `profiles/`, `references/`, and `examples/`
-- Unused or unreachable profiles, references, and examples
+- Oversized shared context assets or local support files in `contexts/`, `context/`, `profiles/`, `references/`, and `examples/`
+- Unreachable skill-local profiles, references, and examples
 - Profile overlays missing base skill declaration
 - Literal secret-like values
 - Private key material

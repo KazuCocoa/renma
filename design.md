@@ -42,15 +42,15 @@ Renma owns repository quality and governance:
 Renma does not own runtime behavior:
 
 - No skill selection for a user task
-- No prompt or context composition
+- No prompt construction or context bundling
 - No context injection into an agent
-- No runtime context resolver
+- No task-specific context choice service
 - No tool execution on behalf of an agent
-- No provider gateway or orchestration layer
+- No provider gateway or agent coordination layer
 - No telemetry collection responsibility
 
 Renma may become telemetry-aware by importing external signals from CI, IDE
-wrappers, Codex plugins, Claude extensions, or other runtime integrations. Those
+wrappers, Codex plugins, Claude extensions, or other agent integrations. Those
 signals are offline review evidence. Renma itself should not become
 telemetry-responsible.
 
@@ -128,20 +128,15 @@ id: testing.boundary-value-analysis
 version: 1.0.0
 owner: qa-platform
 status: stable
-tags:
-  - testing
-  - qa
-when_to_use:
-  - Designing tests around numeric, date, quantity, or limit boundaries
-when_not_to_use:
-  - Exploratory testing notes that do not depend on boundaries
-requires_context:
-  - testing.negative-testing
-optional_context:
-  - domain.payment.duplicate-charge
-conflicts:
-  - archived.testing.boundary-v0
+tags: testing, qa
+when_to_use: Designing tests around numeric, date, quantity, or limit boundaries
+when_not_to_use: Exploratory testing notes that do not depend on boundaries
+requires_context: testing.negative-testing
+optional_context: domain.payment.duplicate-charge
+conflicts: archived.testing.boundary-v0
 ```
+
+The current parser supports simple one-line values and comma-separated lists. Richer YAML block-list frontmatter can be added later without changing the product model.
 
 Initial status values:
 
@@ -169,7 +164,7 @@ Dependencies are typed relationships between assets:
 Edges should carry source evidence: path, range when available, declaration
 form, and enough snippet text for review.
 
-The graph is repository evidence. It must not become a runtime context selector.
+The graph is repository evidence. It must not become a task-specific context selector.
 
 ## Core Workflow
 
@@ -283,5 +278,5 @@ about any particular agent run.
   reasonable.
 - Preserve human ownership and review.
 - Treat existing documents as changeable product design, not sacred API.
-- Make shared context first-class before adding runtime-adjacent features.
+- Make shared context first-class before adding external signal features.
 - Design for gradual adoption in repositories that already have skill debt.

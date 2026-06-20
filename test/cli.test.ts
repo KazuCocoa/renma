@@ -32,7 +32,7 @@ test("scan discovers default artifacts and emits deterministic findings", async 
   assert.equal(result.findings.at(-1)?.evidence.path, "skills/demo/SKILL.md");
 });
 
-test("context examples are scanned and must be routed by the skill", async () => {
+test("local support examples are scanned and must be reachable from the skill", async () => {
   const root = await fixture();
   await mkdir(path.join(root, "skills", "demo", "examples"), {
     recursive: true,
@@ -64,14 +64,14 @@ Demo input -> demo output.
   const result = await scan(root);
 
   assert.ok(
-    result.findings.some((finding) => finding.id === "CTX-MISSING-ROUTING-MAP"),
+    result.findings.some((finding) => finding.id === "SUPPORT-MISSING-REACHABILITY-GUIDANCE"),
   );
   assert.ok(
-    result.findings.some((finding) => finding.id === "CTX-UNUSED-EXAMPLE"),
+    result.findings.some((finding) => finding.id === "SUPPORT-UNREACHABLE-EXAMPLE"),
   );
 });
 
-test("routed context examples do not report unused example findings", async () => {
+test("reachable local support examples do not report unreachable example findings", async () => {
   const root = await fixture();
   await mkdir(path.join(root, "skills", "demo", "examples"), {
     recursive: true,
@@ -107,11 +107,11 @@ Demo input -> demo output.
 
   assert.ok(
     !result.findings.some(
-      (finding) => finding.id === "CTX-MISSING-ROUTING-MAP",
+      (finding) => finding.id === "SUPPORT-MISSING-REACHABILITY-GUIDANCE",
     ),
   );
   assert.ok(
-    !result.findings.some((finding) => finding.id === "CTX-UNUSED-EXAMPLE"),
+    !result.findings.some((finding) => finding.id === "SUPPORT-UNREACHABLE-EXAMPLE"),
   );
 });
 
@@ -309,9 +309,9 @@ test("CLI prints a Codex semantic split prompt", async () => {
     prompt.stdout,
     /Infer the best split direction as a human maintainer/,
   );
-  assert.match(prompt.stdout, /Use deterministic context helpers/);
-  assert.match(prompt.stdout, /renma context .* --format json/);
-  assert.match(prompt.stdout, /renma context .* --lines L10-L42 --format text/);
+  assert.match(prompt.stdout, /Use deterministic inspection helpers/);
+  assert.match(prompt.stdout, /renma inspect .* --format json/);
+  assert.match(prompt.stdout, /renma inspect .* --lines L10-L42 --format text/);
   assert.match(prompt.stdout, /Name files by meaning, not by part number/);
   assert.match(prompt.stdout, /L0003: macOS\/Linux users/);
   assert.match(prompt.stdout, /Route environment setup/);
@@ -319,7 +319,7 @@ test("CLI prints a Codex semantic split prompt", async () => {
   const json = await withCapturedConsole(() =>
     main(["suggest-semantic-split", source, "--format", "json"]),
   );
-  const contextPackage = JSON.parse(json.stdout) as {
+  const semanticSplitReviewBundle = JSON.parse(json.stdout) as {
     context: {
       siblingFiles: Array<{ path: string }>;
     };
@@ -336,21 +336,21 @@ test("CLI prints a Codex semantic split prompt", async () => {
     };
   };
   assert.equal(json.code, 0);
-  assert.equal(contextPackage.mode, "codex-semantic-split-prompt");
-  assert.equal(contextPackage.mutatesFiles, false);
-  assert.match(contextPackage.helperCommands.outline, /renma context /);
+  assert.equal(semanticSplitReviewBundle.mode, "codex-semantic-split-prompt");
+  assert.equal(semanticSplitReviewBundle.mutatesFiles, false);
+  assert.match(semanticSplitReviewBundle.helperCommands.outline, /renma inspect /);
   assert.equal(
-    contextPackage.source.outline.headings[0]?.text,
+    semanticSplitReviewBundle.source.outline.headings[0]?.text,
     "Android setup",
   );
   assert.ok(
-    contextPackage.context.siblingFiles.some((file) =>
+    semanticSplitReviewBundle.context.siblingFiles.some((file) =>
       file.path.endsWith("references/index.md"),
     ),
   );
 });
 
-test("CLI context command prints compact outlines and exact slices", async () => {
+test("CLI inspect command prints compact outlines and exact slices", async () => {
   const root = await fixture();
   const source = path.join(root, "guide.md");
   await writeFile(
@@ -376,7 +376,7 @@ test("CLI context command prints compact outlines and exact slices", async () =>
   );
 
   const outlineResult = await withCapturedConsole(() =>
-    main(["context", source, "--format", "json"]),
+    main(["inspect", source, "--format", "json"]),
   );
   assert.equal(outlineResult.code, 0);
   const outline = JSON.parse(outlineResult.stdout) as {
@@ -392,7 +392,7 @@ test("CLI context command prints compact outlines and exact slices", async () =>
   assert.equal(outline.codeFences[0]?.range, "L11-L13");
 
   const sliceResult = await withCapturedConsole(() =>
-    main(["context", source, "--lines", "L8-L9", "--format", "text"]),
+    main(["inspect", source, "--lines", "L8-L9", "--format", "text"]),
   );
   assert.equal(sliceResult.code, 0);
   assert.match(sliceResult.stdout, /L0008: ## Windows/);
@@ -401,12 +401,12 @@ test("CLI context command prints compact outlines and exact slices", async () =>
 
 test("help and invalid commands have expected exit codes", async () => {
   const help = await withCapturedConsole(() => main(["--help"]));
-  const invalid = await withCapturedConsole(() => main(["inspect"]));
+  const invalid = await withCapturedConsole(() => main(["wat"]));
 
   assert.equal(help.code, 0);
   assert.match(help.stdout, /Usage: renma scan/);
   assert.equal(invalid.code, 2);
-  assert.match(invalid.stderr, /Unknown command "inspect"/);
+  assert.match(invalid.stderr, /Unknown command "wat"/);
 });
 
 async function fixture(): Promise<string> {

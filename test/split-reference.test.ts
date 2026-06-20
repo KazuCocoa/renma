@@ -75,7 +75,8 @@ test("suggest-semantic-split builds a Codex prompt that asks for inferred catego
   );
 
   const { stdout: prompt } = await execFileAsync(process.execPath, [
-    "scripts/suggest-semantic-split.mjs",
+    "dist-test/src/index.js",
+    "suggest-semantic-split",
     source,
   ]);
 
@@ -87,15 +88,18 @@ test("suggest-semantic-split builds a Codex prompt that asks for inferred catego
   assert.match(prompt, /Route environment setup/);
 
   const { stdout } = await execFileAsync(process.execPath, [
-    "scripts/suggest-semantic-split.mjs",
+    "dist-test/src/index.js",
+    "suggest-semantic-split",
     source,
     "--format",
     "json",
   ]);
-  const contextPackage = JSON.parse(stdout) as {
+  const semanticSplitReviewBundle = JSON.parse(stdout) as {
     mutatesFiles: boolean;
     source: {
-      numberedText: string;
+      outline: {
+        headings: Array<{ preview: string[] }>;
+      };
     };
     context: {
       skill: {
@@ -108,11 +112,14 @@ test("suggest-semantic-split builds a Codex prompt that asks for inferred catego
     };
   };
 
-  assert.equal(contextPackage.mutatesFiles, false);
-  assert.match(contextPackage.source.numberedText, /L0003: macOS\/Linux users/);
-  assert.match(contextPackage.context.skill.text, /Route environment setup/);
+  assert.equal(semanticSplitReviewBundle.mutatesFiles, false);
+  assert.match(
+    semanticSplitReviewBundle.source.outline.headings[0]?.preview.join("\n") ?? "",
+    /L0003: macOS\/Linux users/,
+  );
+  assert.match(semanticSplitReviewBundle.context.skill.text, /Route environment setup/);
   assert.ok(
-    contextPackage.context.siblingFiles.some((file) =>
+    semanticSplitReviewBundle.context.siblingFiles.some((file) =>
       file.path.endsWith("references/index.md"),
     ),
   );

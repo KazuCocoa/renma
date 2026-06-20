@@ -1,7 +1,7 @@
 import { parseArgs } from "node:util";
 import packageJson from "../package.json" with { type: "json" };
 import { runCatalogCommand, type CatalogFormat } from "./commands/catalog.js";
-import { runContextCommand, type ContextFormat } from "./commands/context.js";
+import { runInspectCommand, type InspectFormat } from "./commands/inspect.js";
 import { runScanCommand } from "./commands/scan.js";
 import {
   runSuggestSemanticSplitCommand,
@@ -50,7 +50,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     command !== "scan" &&
     command !== "catalog" &&
     command !== "suggest-semantic-split" &&
-    command !== "context"
+    command !== "inspect"
   ) {
     console.error(
       command ? `Unknown command "${command}".` : "Missing command.",
@@ -63,8 +63,8 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     return runSuggestSemanticSplit(parsed.values, target);
   }
 
-  if (command === "context") {
-    return runContext(parsed.values, target);
+  if (command === "inspect") {
+    return runInspect(parsed.values, target);
   }
 
   if (command === "catalog") {
@@ -168,7 +168,7 @@ function runSuggestSemanticSplit(
   });
 }
 
-function runContext(values: CliValues, target: string): Promise<number> {
+function runInspect(values: CliValues, target: string): Promise<number> {
   const format = values.json ? "json" : (stringValue(values.format) ?? "json");
   if (format !== "text" && format !== "json") {
     console.error("--format must be either text or json.");
@@ -176,8 +176,8 @@ function runContext(values: CliValues, target: string): Promise<number> {
   }
   const lines = stringValue(values.lines);
 
-  return runContextCommand(target, {
-    format: format as ContextFormat,
+  return runInspectCommand(target, {
+    format: format as InspectFormat,
     ...(lines ? { lines } : {}),
   });
 }
@@ -221,21 +221,23 @@ function helpText(): string {
     "Additional usage:",
     "  renma scan [path] [options]",
     "  renma catalog [path] [options]",
-    "  renma context <file> [options]",
+    "  renma inspect <file> [options]",
     "  renma suggest-semantic-split <file> [options]",
     "",
     "Commands:",
     "  scan                       Scan a repository or skill directory",
     "  catalog                    Print deterministic normalized asset catalog",
-    "  context                    Print compact outline or exact line slice",
+    "  inspect                    Inspect repository files/assets by outline or exact line slice",
     "  suggest-semantic-split     Print a Codex-ready semantic split prompt",
+    "",
+    "The inspect command is an inspection helper; it does not choose task context or assemble prompts.",
     "",
     "Options:",
     "  -c, --config <path>        scan: read JSON config from path",
     "      --fail-on <level>      scan: exit 1 when findings meet severity: low, medium, high, critical",
     "      --format <format>      scan: text or json; catalog: json or markdown; suggest-semantic-split: prompt or json",
     "      --json                 Shortcut for --format json",
-    "      --lines <range>        context: exact line range, e.g. L10-L42",
+    "      --lines <range>        inspect: exact line range, e.g. L10-L42",
     "      --max-source-bytes <n> suggest-semantic-split: source file byte budget",
     "      --max-context-bytes <n>",
     "                             suggest-semantic-split: nearby context byte budget",

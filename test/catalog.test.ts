@@ -64,6 +64,26 @@ status: permanent
   assert.match(result.diagnostics[0]?.message ?? "", /Invalid status/);
 });
 
+test("buildCatalog warns when shared context assets lack governance metadata", () => {
+  const result = buildCatalog([
+    parseDocument(
+      artifact(
+        "contexts/testing/boundary-value-analysis.md",
+        "context",
+        "# Boundary Value Analysis\n",
+      ),
+    ),
+  ]);
+
+  assert.deepEqual(
+    result.diagnostics.map((diagnostic) => diagnostic.message),
+    [
+      "Shared context asset is missing an id.",
+      "Shared context asset is missing an owner.",
+    ],
+  );
+});
+
 test("buildCatalog creates deterministic entries for skills and context", () => {
   const documents = [
     parseDocument(

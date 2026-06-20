@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type {
+  AssetMetadata,
   Catalog,
   CatalogEntry,
   Dependency,
@@ -18,6 +19,7 @@ export function buildCatalog(documents: ParsedDocument[]): {
     .map((document): CatalogEntry | undefined => {
       const result = parseAssetMetadata(document);
       diagnostics.push(...result.diagnostics);
+      diagnostics.push(...sharedContextMetadataDiagnostics(document, result.metadata));
 
       const base = {
         id: result.metadata.id ?? document.artifact.path,
@@ -80,6 +82,32 @@ export function buildCatalog(documents: ParsedDocument[]): {
 
 function contentHash(content: string): string {
   return `sha256:${createHash("sha256").update(content).digest("hex")}`;
+}
+
+function sharedContextMetadataDiagnostics(
+  document: ParsedDocument,
+  metadata: AssetMetadata,
+): Diagnostic[] {
+  if (document.artifact.kind !== "context") return [];
+
+  const diagnostics: Diagnostic[] = [];
+  if (!metadata.id) {
+    diagnostics.push({
+      severity: "warning",
+      path: document.artifact.path,
+      message: "Shared context asset is missing an id.",
+    });
+  }
+
+  if (!metadata.owner) {
+    diagnostics.push({
+      severity: "warning",
+      path: document.artifact.path,
+      message: "Shared context asset is missing an owner.",
+    });
+  }
+
+  return diagnostics;
 }
 
 /** Convert metadata relationship lists into graph edges for a catalog entry. */

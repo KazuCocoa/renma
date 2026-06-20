@@ -2,7 +2,7 @@
 
 Renma is a Git-native governance and quality layer for LLM-ready context assets and skills.
 
-Renma prepares shared repositories so Codex, Claude, Cursor, and future agents can consume team-owned expertise correctly. Renma does not select, compose, inject, or execute runtime context. Agents and agent runtimes decide how to use the repository assets at task time.
+Renma prepares shared repositories so Codex, Claude, Cursor, and future agents can consume team-owned expertise correctly. Renma does not choose task context, assemble prompts, inject context, or execute agent workflows. Agents and agent runtimes decide how to use the repository assets at task time.
 
 Conceptually:
 
@@ -100,10 +100,10 @@ Renma should:
 Renma should not:
 
 - Select a skill for a user task.
-- Decide which context an agent should use at runtime.
-- Compose a final prompt or runtime context package.
+- Decide which context an agent should use for a task.
+- Assemble prompts or task-specific context bundles.
 - Inject context into an agent.
-- Execute tools on behalf of an agent runtime.
+- Execute tools on behalf of an agent.
 - Own provider gateways, hosted dashboards, or package synchronization.
 - Replace human ownership review.
 
@@ -126,17 +126,7 @@ Use repository-governance terminology:
 - asset provenance manifest
 - agent readiness report
 
-Avoid runtime-oriented terminology unless explicitly describing out-of-scope behavior:
-
-- selected context
-- rejected context
-- execution manifest
-- resolved context package
-- task-specific context package
-- prompt assembly
-- runtime context resolution
-
-Prefer "LLM-facing entrypoint", "routing contract", "skill guidance", or "usage contract" over broad "orchestration" language.
+Prefer "LLM-facing entrypoint", "routing contract", "skill guidance", or "usage contract" over broad coordination language.
 
 Renma is telemetry-aware, but not telemetry-responsible. External signal producers may import usage evidence later, but Renma should not become a runtime observability system.
 
@@ -215,20 +205,15 @@ id: testing.boundary-value-analysis
 version: 1.0.0
 owner: qa-platform
 status: stable
-tags:
-  - testing
-  - qa
-when_to_use:
-  - Designing tests around numeric, date, quantity, or limit boundaries
-when_not_to_use:
-  - Exploratory testing notes that do not depend on boundaries
-requires_context:
-  - testing.negative-testing
-optional_context:
-  - domain.payment.duplicate-charge
-conflicts:
-  - archived.testing.boundary-v0
+tags: testing, qa
+when_to_use: Designing tests around numeric, date, quantity, or limit boundaries
+when_not_to_use: Exploratory testing notes that do not depend on boundaries
+requires_context: testing.negative-testing
+optional_context: domain.payment.duplicate-charge
+conflicts: archived.testing.boundary-v0
 ```
+
+The current parser supports simple one-line values and comma-separated lists. Richer YAML block-list frontmatter can be added later.
 
 Supported status values:
 
@@ -425,7 +410,7 @@ Potential producers:
 - Claude extension
 - Prompt wrapper
 - CI integration
-- Agent runtime integration
+- External agent signal import
 
 Renma may import those signals as repository evidence. Renma should not become the runtime, telemetry backend, provider gateway, or prompt wrapper.
 
@@ -433,8 +418,8 @@ Renma may import those signals as repository evidence. Renma should not become t
 
 Out of scope for this project direction:
 
-- Runtime skill selection
-- Runtime context selection
+- Task-specific skill choice
+- Task-specific context choice
 - Prompt assembly
 - Context injection
 - Agent execution
@@ -446,13 +431,7 @@ Out of scope for this project direction:
 
 Out-of-scope commands:
 
-```bash
-renma resolve
-renma run
-renma sync
-renma install
-renma update
-```
+Renma should avoid command shapes that imply task execution, agent prompt construction, package synchronization, or agent workflow behavior.
 
 ## Operating Principle
 

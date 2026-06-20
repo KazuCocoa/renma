@@ -30,10 +30,10 @@ External signal producers
   Codex plugin
   Claude extension
   prompt wrapper
-  CI/runtime integrations
+  CI and external signal integrations
 ```
 
-Renma does not select, compose, inject, or execute runtime context. Agents and runtimes perform skill selection and runtime context usage.
+Renma does not choose task context, assemble prompts, inject context, or execute agent workflows. Agents and runtimes decide how to use repository assets for a task.
 
 ## Goals
 
@@ -47,7 +47,7 @@ Renma does not select, compose, inject, or execute runtime context. Agents and r
 
 ## Non-Goals
 
-- Runtime context resolution
+- Task-specific context choice
 - Prompt assembly
 - Agent execution
 - Provider gateways
@@ -181,20 +181,15 @@ id: domain.payment.idempotency
 version: 1.0.0
 owner: payments
 status: stable
-tags:
-  - payment
-  - qa
-when_to_use:
-  - Testing payment retry or duplicate-submit behavior
-when_not_to_use:
-  - Non-payment checkout UI copy review
-requires_context:
-  - testing.negative-testing
-optional_context:
-  - testing.regression-risk
-conflicts:
-  - archived.payment.retry-v0
+tags: payment, qa
+when_to_use: Testing payment retry or duplicate-submit behavior
+when_not_to_use: Non-payment checkout UI copy review
+requires_context: testing.negative-testing
+optional_context: testing.regression-risk
+conflicts: archived.payment.retry-v0
 ```
+
+The current parser supports simple one-line values and comma-separated lists. Richer YAML block-list frontmatter is a future parser improvement.
 
 Status values:
 
@@ -328,7 +323,7 @@ It should include:
 - Risk findings
 - Affected skills and context assets
 
-It should not select runtime context for a task.
+It should not choose task context for an agent run.
 
 ## External Signals
 
@@ -354,7 +349,7 @@ Renma may import these as repository evidence. Ownership of telemetry collection
 8. Agent readiness reports
 9. Optional external signal import
 
-This sequence prioritizes shared context assets and repository health before any runtime integration.
+This sequence prioritizes shared context assets and repository health before external signal import.
 
 ## Implementation Notes
 
@@ -363,9 +358,11 @@ Current CLI commands:
 ```bash
 renma scan [path]
 renma catalog [path]
-renma context <file>
+renma inspect <file>
 renma suggest-semantic-split <file>
 ```
+
+`renma inspect` inspects repository files and context assets by outline or line range. It does not choose task context or assemble prompts.
 
 Near-term implementation work:
 
