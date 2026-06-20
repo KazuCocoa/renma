@@ -26,6 +26,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         config: { type: "string", short: "c" },
         "fail-on": { type: "string" },
         format: { type: "string" },
+        "include-owned": { type: "boolean" },
         json: { type: "boolean" },
         lines: { type: "string" },
         "max-context-bytes": { type: "string" },
@@ -160,6 +161,7 @@ async function runOwnership(
   try {
     return await runOwnershipCommand(target, {
       format: format as OwnershipFormat,
+      includeOwned: values["include-owned"] === true,
       overrides,
     });
   } catch (error) {
@@ -277,6 +279,7 @@ function helpText(): string {
     "  -c, --config <path>        scan: read JSON config from path",
     "      --fail-on <level>      scan: exit 1 when findings meet severity: low, medium, high, critical",
     "      --format <format>      scan: text or json; catalog/ownership: json or markdown; suggest-semantic-split: prompt or json",
+    "      --include-owned        ownership: include owned asset details",
     "      --json                 Shortcut for --format json",
     "      --lines <range>        inspect: exact line range, e.g. L10-L42",
     "      --max-source-bytes <n> suggest-semantic-split: source file byte budget",

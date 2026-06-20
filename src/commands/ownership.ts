@@ -1,6 +1,7 @@
 import { catalog } from "./catalog.js";
 import type { ConfigOverrides } from "../config.js";
 import type { Asset, AssetKind, AssetStatus } from "../model.js";
+import type { Diagnostic } from "../types.js";
 
 export type OwnershipFormat = "json" | "markdown";
 
@@ -20,6 +21,15 @@ export interface UnownedAsset {
   tags: string[];
 }
 
+export interface OwnedAsset {
+  id: string;
+  kind: AssetKind;
+  sourcePath: string;
+  owner: string;
+  status: AssetStatus | null;
+  tags: string[];
+}
+
 export interface OwnershipReport {
   root: string;
   configPath?: string;
@@ -30,32 +40,42 @@ export interface OwnershipReport {
   coveragePercent: number;
   byKind: OwnershipKindSummary[];
   unownedAssetList: UnownedAsset[];
+  ownedAssetList?: OwnedAsset[];
+  diagnostics?: Diagnostic[];
 }
 
 export async function runOwnershipCommand(
   targetPath: string,
-  options: { format: OwnershipFormat; overrides?: ConfigOverrides },
+  options: {
+    format: OwnershipFormat;
+    includeOwned?: boolean;
+    overrides?: ConfigOverrides;
+  },
 ): Promise<number> {
-  const report = await ownership(targetPath, options.overrides ?? {});
+  const report = await ownership(targetPath, options.overrides ?? {}, {
+    includeOwned: options.includeOwned ?? false,
+  });
   process.stdout.write(
     options.format === "json"
       ? formatOwnershipJson(report)
       : formatOwnershipMarkdown(report),
   );
-  return 0;
+  return report.diagnostics?.some((diagnostic) => diagnostic.severity === "error")
+    ? 1
+    : 0;
 }
 
 export async function ownership(
   targetPath: string,
   overrides: ConfigOverrides = {},
+  options: { includeOwned?: boolean } = {},
 ): Promise<OwnershipReport> {
   const result = await catalog(targetPath, overrides);
   const assets = stableAssets(result.catalog.assets);
   const totalAssets = assets.length;
   const ownedAssets = assets.filter(hasOwner).length;
-  const unownedAssetList = assets
-    .filter((asset) => !hasOwner(asset))
-    .map(toUnownedAsset);
+  const unownedAssetList = assets.filter((asset) => !hasOwner(asset)).map(toUnownedAsset);
+  const ownedAssetList = assets.filter(hasOwner).map(toOwnedAsset);
 
   return {
     root: result.root,
@@ -67,6 +87,8 @@ export async function ownership(
     coveragePercent: percent(ownedAssets, totalAssets),
     byKind: summarizeByKind(assets),
     unownedAssetList,
+    ...(options.includeOwned ? { ownedAssetList } : {}),
+    ...(result.diagnostics.length > 0 ? { diagnostics: result.diagnostics } : {}),
   };
 }
 
@@ -111,19 +133,36 @@ export function formatOwnershipMarkdown(report: OwnershipReport): string {
     }
   }
 
+  if (report.ownedAssetList) {
+    lines.push("", "## Owned Assets", "");
+    if (report.ownedAssetList.length === 0) {
+      lines.push("(none)");
+    } else {
+      lines.push("| ID | Kind | Source | Owner | Status | Tags |");
+      lines.push("| --- | --- | --- | --- | --- | --- |");
+      for (const asset of report.ownedAssetList) {
+        lines.push(
+          `| ${asset.id} | ${asset.kind} | ${asset.sourcePath} | ${asset.owner} | ${asset.status ?? ""} | ${asset.tags.join(", ")} |`,
+        );
+      }
+    }
+  }
+
+  if (report.diagnostics && report.diagnostics.length > 0) {
+    lines.push("", "## Diagnostics", "");
+    for (const diagnostic of report.diagnostics) {
+      const path = diagnostic.path ? `${diagnostic.path}: ` : "";
+      lines.push(`- ${diagnostic.severity}: ${path}${diagnostic.message}`);
+    }
+  }
+
   return `${lines.join("\n")}\n`;
 }
 
 function summarizeByKind(assets: Asset[]): OwnershipKindSummary[] {
-  const summaries = new Map<
-    AssetKind,
-    { totalAssets: number; ownedAssets: number }
-  >();
+  const summaries = new Map<AssetKind, { totalAssets: number; ownedAssets: number }>();
   for (const asset of assets) {
-    const summary = summaries.get(asset.kind) ?? {
-      totalAssets: 0,
-      ownedAssets: 0,
-    };
+    const summary = summaries.get(asset.kind) ?? { totalAssets: 0, ownedAssets: 0 };
     summary.totalAssets += 1;
     if (hasOwner(asset)) summary.ownedAssets += 1;
     summaries.set(asset.kind, summary);
@@ -160,10 +199,19 @@ function toUnownedAsset(asset: Asset): UnownedAsset {
   };
 }
 
+function toOwnedAsset(asset: Asset): OwnedAsset {
+  return {
+    id: asset.id,
+    kind: asset.kind,
+    sourcePath: asset.sourcePath,
+    owner: asset.metadata.owner?.trim() ?? "",
+    status: asset.metadata.status ?? null,
+    tags: asset.metadata.tags,
+  };
+}
+
 function hasOwner(asset: Asset): boolean {
-  return (
-    asset.metadata.owner !== undefined && asset.metadata.owner.trim().length > 0
-  );
+  return asset.metadata.owner !== undefined && asset.metadata.owner.trim().length > 0;
 }
 
 function percent(numerator: number, denominator: number): number {

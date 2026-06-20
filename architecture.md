@@ -403,16 +403,16 @@ Completed baseline:
 2. First-class context assets
 3. Catalog generation
 4. Graph-backed metadata governance for duplicate IDs, unknown references, deprecated or archived references, and orphaned context assets
+5. Ownership coverage reporting
 
 Near-term implementation:
 
-1. Ownership coverage reporting
-2. Context graph snapshot and reporting
-3. Agent readiness report
-4. Repeated context and duplicate knowledge discovery
-5. Semantic diff for context changes
-6. Optional LLM-assisted repository evaluation bundles
-7. Optional external signal import
+1. Context graph snapshot and reporting
+2. Agent readiness report
+3. Repeated context and duplicate knowledge discovery
+4. Semantic diff for context changes
+5. Optional LLM-assisted repository evaluation bundles
+6. Optional external signal import
 
 This sequence prioritizes shared context assets and repository health before external signal import.
 
@@ -423,6 +423,7 @@ Current CLI commands:
 ```bash
 renma scan [path]
 renma catalog [path]
+renma ownership [path]
 renma inspect <file>
 renma suggest-semantic-split <file>
 ```

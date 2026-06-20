@@ -139,6 +139,7 @@ Options:
 -c, --config <path>      Read JSON config from path
     --fail-on <level>    Exit 1 when findings meet severity: low, medium, high, critical
     --format <format>    scan: text or json; catalog/ownership: json or markdown; suggest: prompt or json
+    --include-owned      ownership: include owned asset details
     --json               Shortcut for --format json
     --lines <range>      inspect: exact line range, e.g. L10-L42
     --max-source-bytes <n>
@@ -160,6 +161,7 @@ renma catalog . --format markdown
 renma catalog . --json
 renma ownership . --format markdown
 renma ownership . --json
+renma ownership . --json --include-owned
 renma inspect contexts/testing/boundary-value-analysis.md --format json
 renma inspect contexts/testing/boundary-value-analysis.md --lines L40-L90 --format text
 renma suggest-semantic-split contexts/tools/appium/usage-guideline.md
