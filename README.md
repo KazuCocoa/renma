@@ -62,7 +62,7 @@ contexts/
 
 ## What Renma Does
 
-Today Renma is a minimal-dependency TypeScript CLI that scans AI-agent skills, repository instructions, shared context Markdown, profile overlays, references, and examples. It runs deterministic quality, structure, and safety rules, then emits text or JSON reports with file and line evidence. It also emits deterministic catalog and ownership coverage reports from the same local catalog model.
+Today Renma is a minimal-dependency TypeScript CLI that scans AI-agent skills, repository instructions, shared context Markdown, profile overlays, references, and examples. It runs deterministic quality, structure, and safety rules, then emits text or JSON reports with file and line evidence. It also emits deterministic catalog, ownership coverage, graph, and agent readiness reports from the same local catalog model.
 
 Renma findings are intended to be actionable repair prompts for humans and LLM
 tools such as Codex, Claude, and Cursor. Findings should explain what is wrong,
@@ -81,6 +81,7 @@ Completed baseline:
 - Deterministic catalog output for assets and dependency metadata
 - Deterministic ownership coverage reporting for cataloged assets
 - Context graph snapshot reporting
+- Deterministic agent readiness scoring for static repository health
 - Deterministic metadata governance for duplicate asset IDs, unknown declared references, references to deprecated or archived assets, and orphaned shared context assets
 - Repository file outline and line-slice inspection helper
 - Semantic split prompt helper for oversized context files
@@ -128,9 +129,12 @@ renma scan [path] [options]
 renma catalog [path] [options]
 renma graph [path] [options]
 renma ownership [path] [options]
+renma readiness [path] [options]
 renma inspect <file> [options]
 renma suggest-semantic-split <file> [options]
 ```
+
+`renma readiness` emits a static, deterministic agent-readiness report with a score, level, summary metrics, checks, and diagnostics. It exits 0 only when the level is `ready`; `needs_attention` and `not_ready` exit 1 for CI use. It does not call LLMs, choose runtime context, assemble prompts, or repair files.
 
 `renma inspect` is a repository inspection helper for outlines and exact line slices; it does not choose task context or assemble prompts.
 
@@ -166,6 +170,8 @@ renma graph . --json
 renma ownership . --format markdown
 renma ownership . --json
 renma ownership . --json --include-owned
+renma readiness . --format markdown
+renma readiness . --json
 renma inspect contexts/testing/boundary-value-analysis.md --format json
 renma inspect contexts/testing/boundary-value-analysis.md --lines L40-L90 --format text
 renma suggest-semantic-split contexts/tools/appium/usage-guideline.md

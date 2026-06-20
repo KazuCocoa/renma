@@ -7,6 +7,10 @@ import {
   runOwnershipCommand,
   type OwnershipFormat,
 } from "./commands/ownership.js";
+import {
+  runReadinessCommand,
+  type ReadinessFormat,
+} from "./commands/readiness.js";
 import { runScanCommand } from "./commands/scan.js";
 import {
   runSuggestSemanticSplitCommand,
@@ -57,6 +61,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     command !== "catalog" &&
     command !== "graph" &&
     command !== "ownership" &&
+    command !== "readiness" &&
     command !== "suggest-semantic-split" &&
     command !== "inspect"
   ) {
@@ -85,6 +90,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
   if (command === "ownership") {
     return runOwnership(parsed.values, target);
+  }
+
+  if (command === "readiness") {
+    return runReadiness(parsed.values, target);
   }
 
   return runScan(parsed.values, target);
@@ -207,6 +216,36 @@ async function runOwnership(
   }
 }
 
+async function runReadiness(
+  values: CliValues,
+  target: string,
+): Promise<number> {
+  const format = values.json ? "json" : (stringValue(values.format) ?? "json");
+  if (format !== "json" && format !== "markdown") {
+    console.error("--format must be either json or markdown.");
+    return 2;
+  }
+
+  const configPath = stringValue(values.config);
+  const overrides: ConfigOverrides = {
+    ...(configPath ? { configPath } : {}),
+  };
+
+  try {
+    return await runReadinessCommand(target, {
+      format: format as ReadinessFormat,
+      overrides,
+    });
+  } catch (error) {
+    console.error(
+      error instanceof ConfigError || error instanceof Error
+        ? error.message
+        : String(error),
+    );
+    return 2;
+  }
+}
+
 function runSuggestSemanticSplit(
   values: CliValues,
   target: string,
@@ -297,6 +336,7 @@ function helpText(): string {
     "  renma catalog [path] [options]",
     "  renma graph [path] [options]",
     "  renma ownership [path] [options]",
+    "  renma readiness [path] [options]",
     "  renma inspect <file> [options]",
     "  renma suggest-semantic-split <file> [options]",
     "",
@@ -305,6 +345,7 @@ function helpText(): string {
     "  catalog                    Print deterministic normalized asset catalog",
     "  graph                      Print deterministic repository graph snapshot",
     "  ownership                  Print deterministic ownership coverage report",
+    "  readiness                  Print deterministic agent readiness report",
     "  inspect                    Inspect repository files/assets by outline or exact line slice",
     "  suggest-semantic-split     Print a Codex-ready semantic split prompt",
     "",
@@ -313,7 +354,7 @@ function helpText(): string {
     "Options:",
     "  -c, --config <path>        scan: read JSON config from path",
     "      --fail-on <level>      scan: exit 1 when findings meet severity: low, medium, high, critical",
-    "      --format <format>      scan: text or json; catalog/ownership: json or markdown; graph: json, markdown, or mermaid; suggest-semantic-split: prompt or json",
+    "      --format <format>      scan: text or json; catalog/ownership/readiness: json or markdown; graph: json, markdown, or mermaid; suggest-semantic-split: prompt or json",
     "      --include-owned        ownership: include owned asset details",
     "      --json                 Shortcut for --format json",
     "      --lines <range>        inspect: exact line range, e.g. L10-L42",

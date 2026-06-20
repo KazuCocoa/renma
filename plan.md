@@ -408,6 +408,8 @@ Current command:
 renma graph --format json
 renma graph --format markdown
 renma graph --format mermaid
+renma readiness --format json
+renma readiness --format markdown
 ```
 
 ### 5. Graph-Backed Validation
@@ -466,6 +468,8 @@ renma diff --from main --to HEAD
 ### 8. Agent Readiness Reports
 
 Agent readiness reports should summarize whether the repository is healthy enough for agents to consume.
+
+Current command: `renma readiness [path] [--format json|markdown]`
 
 Report areas:
 
