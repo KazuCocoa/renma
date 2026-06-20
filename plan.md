@@ -97,6 +97,7 @@ Renma should:
 - Produce agent readiness reports that describe repository health.
 - Emit structured, LLM-actionable diagnostics that humans and agents can use to repair the repository safely.
 - Suggest improvements without requiring an LLM.
+- Advise when large skill-local support files have generic source-of-truth structure that a human or calling LLM should inspect for possible promotion into owned shared context assets under `contexts/`.
 
 Renma should not:
 

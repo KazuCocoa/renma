@@ -237,6 +237,7 @@ Current rules include:
 - Unreachable skill-local profiles, references, and examples
 - Profile overlays missing base skill declaration
 - Advisory reusable-context candidates in `SKILL.md` files with enough size and diverse setup, troubleshooting, platform, testing, risk, or domain-rule signals
+- Advisory shared-context candidates in large `skills/*/references/**/*.md` support files with generic source-of-truth headings and reusable guidance phrases
 - Literal secret-like values
 - Private key material
 - Destructive commands without nearby confirmation or recovery context

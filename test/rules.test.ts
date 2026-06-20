@@ -107,44 +107,44 @@ test("scan advises when a skill contains reusable context candidates", async () 
   await writeFile(
     path.join(skillDir, "SKILL.md"),
     `---
-name: mobile-review
-description: Use this skill for mobile review tasks when routing requires platform setup, troubleshooting, testing heuristics, examples, preflight checks, and verification guidance.
+name: workflow-review
+description: Use this skill for workflow review tasks when routing requires setup, troubleshooting, testing heuristics, examples, preflight checks, and verification guidance.
 ---
-# Mobile Review
+# Workflow Review
 
-Use this skill when reviewing mobile behavior.
+Use this skill when reviewing workflow behavior.
 
 ## Setup
 Install the project dependencies.
-Configure the simulator environment.
-Capture the device logs.
+Configure the local environment.
+Capture the workflow logs.
 Keep setup guidance current.
 
-## iOS
-iOS-specific behavior can differ after background resume.
-Known issue: push registration may retry slowly.
-Avoid assuming the first launch is representative.
+## Decision Logic
+Workflow behavior can differ after a resumed review.
+Known issue: state refresh may retry slowly.
+Avoid assuming the first run is representative.
 
-## Android Troubleshooting
-Android-specific networking can be flaky on emulators.
+## Troubleshooting
+Environment state can be flaky in local fixtures.
 Retry only after collecting logs.
-Platform-specific failures should keep their reproduction notes.
+Workflow-specific failures should keep their reproduction notes.
 
 ## Testing Heuristics
 Best practice: include offline and resume cases.
-Edge case coverage should include low-storage behavior.
-Risk: login state may expire during backgrounding.
+Edge case coverage should include missing-owner behavior.
+Risk: approval state may expire during review.
 Do not use for production incident response.
 
 ## Examples
-Input: mobile checkout review.
+Input: workflow readiness review.
 Output: review notes with risks.
 
 ## Preflight
-Check device access and target app version.
+Check fixture access and target workflow version.
 
 ## Verification
-Run the mobile test command and confirm result.
+Run the workflow test command and confirm result.
 `,
   );
 
@@ -158,7 +158,7 @@ Run the mobile test command and confirm result.
   assert.equal(finding?.confidence, "medium");
   assert.match(finding?.evidence.snippet ?? "", /Detected reusable-knowledge/);
   assert.match(finding?.evidence.snippet ?? "", /Setup/);
-  assert.match(finding?.evidence.snippet ?? "", /iOS/);
+  assert.match(finding?.evidence.snippet ?? "", /Troubleshooting/);
   assert.match(finding?.evidence.snippet ?? "", /known issue/);
   assert.ok(
     finding?.constraints?.includes("Do not make Renma select runtime context."),
@@ -319,6 +319,222 @@ Run npm test.
   assert.match(skillBudgetFinding?.llmHint ?? "", /first-class context assets/);
 });
 
+test("scan does not advise tiny skill-local references as shared context candidates", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
+  const skillDir = path.join(root, "skills", "demo");
+  await mkdir(path.join(skillDir, "references"), { recursive: true });
+  await writeFile(
+    path.join(skillDir, "SKILL.md"),
+    `# Demo Skill
+
+Use this skill when reviewing demo flows.
+
+## Local Support Guidance
+Load references/checklist.md when the user asks for the demo checklist.
+
+## Do Not Use For
+Unrelated setup work.
+
+## Preflight
+Confirm the target flow.
+
+## Verification
+Run the relevant check.
+`,
+  );
+  await writeFile(
+    path.join(skillDir, "references", "checklist.md"),
+    `# Demo Checklist
+
+- Check the local fixture.
+- Capture the expected output.
+`,
+  );
+
+  const result = await scan(root);
+
+  assert.ok(
+    !result.findings.some(
+      (finding) =>
+        finding.id === "MAINT-SUPPORT-ASSET-SHARED-CONTEXT-CANDIDATE",
+    ),
+  );
+});
+
+test("scan ignores frontmatter-only support asset signals", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
+  const skillDir = path.join(root, "skills", "setup");
+  await mkdir(path.join(skillDir, "references"), { recursive: true });
+  await writeFile(
+    path.join(skillDir, "SKILL.md"),
+    `# Setup Skill
+
+Use this skill when reviewing setup notes.
+
+## Local Support Guidance
+Load references/procedure-index.md for a local checklist.
+
+## Do Not Use For
+Unrelated troubleshooting.
+
+## Preflight
+Confirm the target workflow.
+
+## Verification
+Run the setup check.
+`,
+  );
+  await writeFile(
+    path.join(skillDir, "references", "procedure-index.md"),
+    `---
+name: decision-logic-validation-procedure
+status: delegated
+---
+
+# Local Checklist
+
+- Confirm the note still applies to this skill.
+- Keep this short local checklist beside the setup skill.
+- Do not promote metadata-only matches into shared contexts.
+- Record the local owner before editing this checklist.
+- Verify the related skill still references this file.
+`,
+  );
+
+  const result = await scan(root);
+
+  assert.ok(
+    !result.findings.some(
+      (finding) =>
+        finding.id === "MAINT-SUPPORT-ASSET-SHARED-CONTEXT-CANDIDATE",
+    ),
+  );
+});
+
+test("scan does not advise generic local one-off examples as shared context candidates", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
+  const skillDir = path.join(root, "skills", "review");
+  await mkdir(path.join(skillDir, "references"), { recursive: true });
+  await writeFile(
+    path.join(skillDir, "SKILL.md"),
+    `# Review Skill
+
+Use this skill when reviewing one local workflow.
+
+## Local Support Guidance
+Load references/example-response.md only when checking the sample response.
+
+## Do Not Use For
+General policy review.
+
+## Preflight
+Confirm the local workflow.
+
+## Verification
+Compare the response.
+`,
+  );
+  await writeFile(
+    path.join(skillDir, "references", "example-response.md"),
+    `# Example Response
+
+## Input
+A local review request for one workflow.
+
+## Output
+The response should mention the exact local fixture.
+
+## Notes
+Use this only as an example for the review skill.
+Prefer the wording from the skill when the example drifts.
+Do not treat this sample as team policy.
+Validate only against the local fixture named by the task.
+`,
+  );
+
+  const result = await scan(root);
+
+  assert.ok(
+    !result.findings.some(
+      (finding) =>
+        finding.id === "MAINT-SUPPORT-ASSET-SHARED-CONTEXT-CANDIDATE",
+    ),
+  );
+});
+
+test("scan advises generic source-of-truth support references as shared context candidates", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
+  const skillDir = path.join(root, "skills", "workflow");
+  await mkdir(path.join(skillDir, "references"), { recursive: true });
+  await writeFile(
+    path.join(skillDir, "SKILL.md"),
+    `# Workflow Skill
+
+Use this skill when validating operational workflows.
+
+## Local Support Guidance
+Load references/operating-procedure.md for decision and validation guidance.
+
+## Do Not Use For
+Production incident response.
+
+## Preflight
+Confirm the target workflow and owner.
+
+## Verification
+Run the workflow validation command.
+`,
+  );
+  await writeFile(
+    path.join(skillDir, "references", "operating-procedure.md"),
+    `# Operating Procedure
+
+## Decision Logic
+Choose the review path based on the workflow owner, risk level, and rollback needs.
+
+## Troubleshooting
+Known issue: stale local state can make a completed workflow appear incomplete.
+The reviewer should capture the first failing command before changing inputs.
+
+## Validation
+Validate the owner, expected output, and rollback note before marking the workflow ready.
+
+## Constraints
+Do not remove required approvals when promoting this guidance into shared context.
+Prefer stable procedure names over ad hoc local aliases.
+
+## Failure Modes
+A missing owner, missing rollback note, or stale fixture should block completion.
+Avoid mixing one skill's reading order with reusable procedure guidance.
+
+## Verification
+Verify the workflow after each fix and record the checked command.
+`,
+  );
+
+  const result = await scan(root);
+  const finding = result.findings.find(
+    (candidate) =>
+      candidate.id === "MAINT-SUPPORT-ASSET-SHARED-CONTEXT-CANDIDATE",
+  );
+
+  assert.equal(finding?.severity, "low");
+  assert.equal(finding?.confidence, "medium");
+  assert.equal(finding?.category, "maintenance");
+  assert.equal(
+    finding?.evidence.path,
+    "skills/workflow/references/operating-procedure.md",
+  );
+  assert.match(finding?.evidence.snippet ?? "", /Decision Logic/);
+  assert.match(finding?.evidence.snippet ?? "", /Validation/);
+  assert.ok(finding?.constraints?.length);
+  assert.ok(finding?.verificationSteps?.length);
+  assert.match(finding?.llmHint ?? "", /Search the repository/);
+  assert.match(finding?.llmHint ?? "", /overlapping guidance/);
+  assert.doesNotMatch(JSON.stringify(finding), /tool\/platform\/domain/i);
+  assert.doesNotMatch(JSON.stringify(finding), /runtime[- ]resolver/i);
+});
+
 test("scan treats support files referenced through an index reference as reachable", async () => {
   const root = await fixture();
   const skillDir = path.join(root, "skills", "setup");
@@ -327,15 +543,15 @@ test("scan treats support files referenced through an index reference as reachab
   await writeFile(
     path.join(skillDir, "SKILL.md"),
     `---
-description: This skill uses an index reference to route ordered Android setup context parts without listing every part in the skill.
+description: This skill uses an index reference to route ordered setup context parts without listing every part in the skill.
 ---
 # Setup Skill
 
 ## Local Support Guidance
-For Android setup, load references/android.md.
+For setup, load references/setup.md.
 
 ## Do Not Use For
-Do not use for iOS setup.
+Do not use for unrelated setup.
 
 ## Preflight
 Collect the target platform first.
@@ -345,22 +561,22 @@ Verify the setup with a test.
 `,
   );
   await writeFile(
-    path.join(referenceDir, "android.md"),
-    `# Android Index
+    path.join(referenceDir, "setup.md"),
+    `# Setup Index
 
 Load these ordered parts:
 
-1. android-01.md
-2. android-02.md
+1. setup-01.md
+2. setup-02.md
 `,
   );
   await writeFile(
-    path.join(referenceDir, "android-01.md"),
-    "# Android Part 1\n",
+    path.join(referenceDir, "setup-01.md"),
+    "# Setup Part 1\n",
   );
   await writeFile(
-    path.join(referenceDir, "android-02.md"),
-    "# Android Part 2\n",
+    path.join(referenceDir, "setup-02.md"),
+    "# Setup Part 2\n",
   );
 
   const result = await scan(root);

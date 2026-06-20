@@ -27,14 +27,16 @@ const DESCRIPTION_MIN_CHARS = 150;
 const REUSABLE_CONTEXT_MIN_LINES = 24;
 const REUSABLE_CONTEXT_MIN_TOKENS = 180;
 const REUSABLE_CONTEXT_MIN_SIGNALS = 3;
+const SUPPORT_SHARED_CONTEXT_MIN_LINES = 18;
+const SUPPORT_SHARED_CONTEXT_MIN_TOKENS = 140;
+const SUPPORT_SHARED_CONTEXT_MIN_HEADINGS = 2;
+const SUPPORT_SHARED_CONTEXT_MIN_PHRASES = 2;
 const REUSABLE_CONTEXT_HEADING_PATTERNS: Array<[RegExp, string]> = [
   [/\bsetup\b/i, "Setup"],
   [/\binstallation\b/i, "Installation"],
   [/\bconfiguration\b/i, "Configuration"],
   [/\benvironment\b/i, "Environment"],
   [/\bprerequisites?\b/i, "Prerequisites"],
-  [/\bios\b/i, "iOS"],
-  [/\bandroid\b/i, "Android"],
   [/\bplatform\b/i, "Platform"],
   [/\btroubleshooting\b/i, "Troubleshooting"],
   [/\bknown issues?\b/i, "Known Issues"],
@@ -58,8 +60,6 @@ const REUSABLE_CONTEXT_PHRASE_PATTERNS: Array<[RegExp, string]> = [
   [/\bflaky\b/i, "flaky"],
   [/\bretry\b/i, "retry"],
   [/\bplatform-specific\b/i, "platform-specific"],
-  [/\bios-specific\b/i, "iOS-specific"],
-  [/\bandroid-specific\b/i, "Android-specific"],
   [/\bedge case\b/i, "edge case"],
   [/\brisk\b/i, "risk"],
   [/\bheuristic\b/i, "heuristic"],
@@ -68,6 +68,41 @@ const REUSABLE_CONTEXT_PHRASE_PATTERNS: Array<[RegExp, string]> = [
   [/\bavoid\b/i, "avoid"],
   [/\balways\b/i, "always"],
   [/\bnever\b/i, "never"],
+];
+
+const SUPPORT_SHARED_CONTEXT_HEADING_PATTERNS: Array<[RegExp, string]> = [
+  ...REUSABLE_CONTEXT_HEADING_PATTERNS,
+  [/\bdecision logic\b/i, "Decision Logic"],
+  [/\bsafety notes?\b/i, "Safety Notes"],
+  [/\bvalidation\b/i, "Validation"],
+  [/\boperating model\b/i, "Operating Model"],
+  [/\bpolicy\b/i, "Policy"],
+  [/\bguidelines?\b/i, "Guidelines"],
+  [/\bprocedures?\b/i, "Procedure"],
+  [/\bchecklist\b/i, "Checklist"],
+  [/\bcompatibility\b/i, "Compatibility"],
+  [/\bconstraints?\b/i, "Constraints"],
+];
+
+const SUPPORT_SHARED_CONTEXT_PHRASE_PATTERNS: Array<[RegExp, string]> = [
+  [/\bmust\b/i, "must"],
+  [/\bshould\b/i, "should"],
+  [/\balways\b/i, "always"],
+  [/\bnever\b/i, "never"],
+  [/\bavoid\b/i, "avoid"],
+  [/\bprefer\b/i, "prefer"],
+  [/\bdo not\b/i, "do not"],
+  [/\brequired\b/i, "required"],
+  [/\brecommended\b/i, "recommended"],
+  [/\bknown issue\b/i, "known issue"],
+  [/\blimitation\b/i, "limitation"],
+  [/\bfailure mode\b/i, "failure mode"],
+  [/\btroubleshooting\b/i, "troubleshooting"],
+  [/\bedge case\b/i, "edge case"],
+  [/\brisk\b/i, "risk"],
+  [/\bbest practice\b/i, "best practice"],
+  [/\bvalidate\b/i, "validate"],
+  [/\bverify\b/i, "verify"],
 ];
 const CONTEXT_TOKEN_LIMITS = {
   context: 1200,
@@ -107,6 +142,11 @@ const RULES: Rule[] = [
   {
     id: "skill-local-support-reachability",
     run: ({ documents }) => skillLocalSupportReachabilityFindings(documents),
+  },
+  {
+    id: "support-asset-shared-context-candidate",
+    run: ({ documents }) =>
+      documents.flatMap((document) => supportSharedContextCandidateFindings(document)),
   },
 ];
 
@@ -450,6 +490,119 @@ function reusableContextCandidateFinding(
   };
 }
 
+function supportSharedContextCandidateFindings(
+  document: ParsedDocument,
+): Finding[] {
+  if (document.artifact.kind !== "reference") return [];
+  if (!/^skills\/[^/]+\/references\/.+\.md$/u.test(document.artifact.path)) {
+    return [];
+  }
+
+  const tokenCount = approximateTokenCount(document.artifact.content);
+  if (
+    document.lines.length < SUPPORT_SHARED_CONTEXT_MIN_LINES &&
+    tokenCount < SUPPORT_SHARED_CONTEXT_MIN_TOKENS
+  ) {
+    return [];
+  }
+
+  const contentLineIndexes = markdownBodyLineIndexes(document);
+  const headingMatches = SUPPORT_SHARED_CONTEXT_HEADING_PATTERNS.flatMap(
+    ([pattern, label]) => {
+      const lineIndex = contentLineIndexes.find((index) => {
+        const line = document.lines[index] ?? "";
+        const match = line.match(/^#{1,6}\s+(.+)$/u);
+        return match ? pattern.test(match[1] ?? "") : false;
+      });
+      if (lineIndex === undefined) return [];
+      return [
+        {
+          label,
+          line: lineIndex + 1,
+          text: document.lines[lineIndex]?.trim() ?? label,
+          type: "heading",
+        },
+      ];
+    },
+  );
+
+  const phraseMatches = SUPPORT_SHARED_CONTEXT_PHRASE_PATTERNS.flatMap(
+    ([pattern, label]) => {
+      const lineIndex = contentLineIndexes.find((index) =>
+        pattern.test(document.lines[index] ?? ""),
+      );
+      if (lineIndex === undefined) return [];
+      return [
+        {
+          label,
+          line: lineIndex + 1,
+          text: document.lines[lineIndex]?.trim() ?? label,
+          type: "phrase",
+        },
+      ];
+    },
+  );
+
+  const sourceSignals = [...headingMatches, ...phraseMatches];
+  if (
+    headingMatches.length < SUPPORT_SHARED_CONTEXT_MIN_HEADINGS ||
+    phraseMatches.length < SUPPORT_SHARED_CONTEXT_MIN_PHRASES
+  ) {
+    return [];
+  }
+
+  const evidenceMatches = sourceSignals
+    .slice(0, 12)
+    .sort((a, b) => a.line - b.line);
+  const evidenceLine = evidenceMatches[0]?.line ?? 1;
+  const evidenceSnippet = [
+    "Detected source-of-truth headings:",
+    ...headingMatches.slice(0, 8).map((match) => `- ${match.label}`),
+    "Detected reusable guidance phrases:",
+    ...phraseMatches.slice(0, 8).map((match) => `- ${match.label}`),
+    "Evidence lines:",
+    ...[...sourceSignals]
+      .sort((a, b) => a.line - b.line)
+      .slice(0, 8)
+      .map(
+        (match) =>
+          `- ${match.type}: ${match.label} (line ${match.line}) ${match.text}`,
+      ),
+  ].join("\n");
+
+  return [
+    {
+      id: "MAINT-SUPPORT-ASSET-SHARED-CONTEXT-CANDIDATE",
+      title: "Skill-local support file may be a shared context candidate",
+      category: "maintenance",
+      severity: "low",
+      confidence: "medium",
+      evidence: evidence(document, evidenceLine, evidenceSnippet),
+      whyItMatters:
+        "Skill-local references are useful for local support, but reusable source-of-truth knowledge is easier to own, review, and reuse when represented as a first-class shared context asset under contexts/. Large support files with setup, decision logic, troubleshooting, validation, constraints, or policy-like guidance may be useful beyond one skill.",
+      remediation:
+        "Review this support file and decide whether reusable knowledge should be promoted to a shared context asset under contexts/. Keep only skill-specific reading order, local notes, or one-off examples under skills/*/references/. Update declared context references after any promotion.",
+      constraints: [
+        "Do not introduce runtime context resolution.",
+        "Do not create prompt packages.",
+        "Do not make Renma call an LLM.",
+        "Do not move files automatically as part of scan.",
+        "Do not delete or summarize procedural details.",
+        "Preserve skill-local references when they are truly local to one skill.",
+        "Give promoted context assets stable metadata such as id, owner, and status.",
+      ],
+      verificationSteps: [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Run any project-specific validation checks that apply to this repository.",
+        "Confirm reusable source-of-truth knowledge lives in contexts/ and skill-local references only contain local support guidance.",
+      ],
+      llmHint:
+        "Search the repository for similar headings, filenames, repeated procedures, commands, constraints, or overlapping guidance. If this support file appears reusable, propose a first-class context asset under contexts/, move the reusable details without losing information, keep truly local notes in the skill directory, and update declared context references.",
+    },
+  ];
+}
+
 function contextBudgetFindings(document: ParsedDocument): Finding[] {
   if (
     document.artifact.kind !== "context" &&
@@ -643,6 +796,20 @@ function referencesDocument(
     source.artifact.content.includes(basename) ||
     new RegExp(`\\b${escapeRegExp(name)}\\b`, "i").test(source.artifact.content)
   );
+}
+
+function markdownBodyLineIndexes(document: ParsedDocument): number[] {
+  if (document.lines[0]?.trim() !== "---") {
+    return document.lines.map((_, index) => index);
+  }
+
+  const frontmatterEnd = document.lines.findIndex(
+    (line, index) => index > 0 && line.trim() === "---",
+  );
+  const bodyStart = frontmatterEnd >= 0 ? frontmatterEnd + 1 : 0;
+  return document.lines
+    .map((_, index) => index)
+    .filter((index) => index >= bodyStart);
 }
 
 function matchingLineFindings(

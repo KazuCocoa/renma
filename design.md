@@ -161,6 +161,8 @@ are useful for local routing variants, nearby examples, and skill-specific
 supporting text. When knowledge is reusable across skills, teams, tools, or
 agents, it should move into `contexts/` as an owned context asset.
 
+Renma can also flag large skill-local support files as shared-context candidates when they contain generic source-of-truth structure such as setup, decision logic, troubleshooting, validation, constraints, policy, or procedure guidance. This advisory does not decide semantic reuse itself. It surfaces structurally broad support files and asks the calling LLM or human to inspect the repository for similar concepts, overlapping guidance, and reuse opportunities before making a reviewable patch.
+
 ## Artifact Kinds
 
 Renma normalizes scanned files into asset kinds:
