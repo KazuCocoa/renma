@@ -4,7 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { main } from "../src/cli.js";
-import { formatGraphMarkdown, graph } from "../src/commands/graph.js";
+import {
+  formatGraphMarkdown,
+  formatGraphMermaid,
+  graph,
+} from "../src/commands/graph.js";
 
 test("graph JSON includes nodes and metadata dependency edges", async () => {
   const root = await fixture();
@@ -161,6 +165,110 @@ test("graph report uses deterministic ordering of nodes and edges", async () => 
   );
 });
 
+test("graph mermaid output includes nodes and resolved edges", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    status: "stable",
+    requiresContext: ["testing.boundary"],
+  });
+  await writeContext(root, "testing", "boundary", { owner: "qa" });
+
+  const mermaid = formatGraphMermaid(await graph(root));
+
+  assert.equal(
+    mermaid,
+    [
+      "graph TD",
+      '  node_0["context: testing.boundary"]',
+      '  node_1["skill: demo (stable)"]',
+      "  node_1 -->|requires| node_0",
+      "",
+    ].join("\n"),
+  );
+});
+
+test("graph mermaid output creates synthetic missing nodes for unresolved edges", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    requiresContext: ["missing.asset", "missing.other"],
+  });
+
+  const mermaid = formatGraphMermaid(await graph(root));
+
+  assert.match(mermaid, /missing_0\["missing: missing.asset"\]/);
+  assert.match(mermaid, /missing_1\["missing: missing.other"\]/);
+  assert.match(mermaid, /node_0 -\.->\|requires unresolved\| missing_0/);
+  assert.match(mermaid, /node_0 -\.->\|requires unresolved\| missing_1/);
+});
+
+test("graph mermaid output uses deterministic ids and ordering", async () => {
+  const root = await fixture();
+  await writeSkill(root, "zeta", {
+    owner: "platform",
+    requiresContext: ["testing.zeta"],
+  });
+  await writeSkill(root, "alpha", {
+    owner: "platform",
+    requiresContext: ["missing.alpha"],
+  });
+  await writeContext(root, "testing", "zeta", { owner: "qa" });
+
+  const mermaid = formatGraphMermaid(await graph(root));
+
+  assert.deepEqual(mermaid.trimEnd().split("\n"), [
+    "graph TD",
+    '  node_0["context: testing.zeta"]',
+    '  node_1["skill: alpha"]',
+    '  node_2["skill: zeta"]',
+    '  missing_0["missing: missing.alpha"]',
+    "  node_1 -.->|requires unresolved| missing_0",
+    "  node_2 -->|requires| node_0",
+  ]);
+});
+
+test("graph mermaid output escapes labels and keeps diagnostics as comments", () => {
+  const mermaid = formatGraphMermaid({
+    root: "/repo",
+    scannedFileCount: 1,
+    nodeCount: 1,
+    edgeCount: 0,
+    nodes: [
+      {
+        id: 'quote-"node"\nnext',
+        kind: "context",
+        sourcePath: "contexts/quote.md",
+        tags: [],
+      },
+    ],
+    edges: [],
+    diagnostics: [
+      {
+        severity: "warning",
+        message: "Line one\nLine two",
+        path: "contexts/quote.md",
+      },
+    ],
+  });
+
+  assert.match(mermaid, /node_0\["context: quote-\\"node\\" next"\]/);
+  assert.match(mermaid, /%% Diagnostics:/);
+  assert.match(mermaid, /%% warning: contexts\/quote\.md: Line one Line two/);
+});
+
+test("graph CLI supports mermaid format", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {});
+
+  const result = await withCapturedConsole(() =>
+    main(["graph", root, "--format", "mermaid"]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /^graph TD/);
+  assert.match(result.stdout, /node_0\["skill: demo"\]/);
+});
+
 test("graph CLI rejects unsupported format", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", {});
@@ -171,7 +279,10 @@ test("graph CLI rejects unsupported format", async () => {
 
   assert.equal(result.code, 2);
   assert.equal(result.stdout, "");
-  assert.match(result.stderr, /--format must be either json or markdown\./);
+  assert.match(
+    result.stderr,
+    /--format must be one of: json, markdown, mermaid\./,
+  );
 });
 
 async function fixture(): Promise<string> {

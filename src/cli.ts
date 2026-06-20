@@ -151,8 +151,8 @@ async function runCatalog(values: CliValues, target: string): Promise<number> {
 
 async function runGraph(values: CliValues, target: string): Promise<number> {
   const format = values.json ? "json" : (stringValue(values.format) ?? "json");
-  if (format !== "json" && format !== "markdown") {
-    console.error("--format must be either json or markdown.");
+  if (format !== "json" && format !== "markdown" && format !== "mermaid") {
+    console.error("--format must be one of: json, markdown, mermaid.");
     return 2;
   }
 
@@ -313,7 +313,7 @@ function helpText(): string {
     "Options:",
     "  -c, --config <path>        scan: read JSON config from path",
     "      --fail-on <level>      scan: exit 1 when findings meet severity: low, medium, high, critical",
-    "      --format <format>      scan: text or json; catalog/ownership/graph: json or markdown; suggest-semantic-split: prompt or json",
+    "      --format <format>      scan: text or json; catalog/ownership: json or markdown; graph: json, markdown, or mermaid; suggest-semantic-split: prompt or json",
     "      --include-owned        ownership: include owned asset details",
     "      --json                 Shortcut for --format json",
     "      --lines <range>        inspect: exact line range, e.g. L10-L42",
