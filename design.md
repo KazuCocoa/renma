@@ -19,7 +19,7 @@ Skill = LLM-facing entrypoint / routing contract / usage guide
 Context = independently owned source-of-truth knowledge asset
 ```
 
-Skills tell an agent when and how to use a capability. They can route toward
+Skills tell an agent when and how to use a capability. They can reference
 context assets, ask preflight questions, describe safety gates, and define
 verification expectations.
 
@@ -93,8 +93,8 @@ Example diagnostic shape:
     "Each context asset should have id, owner, status, and short scope."
   ],
   "verificationSteps": [
-    "Run npm test.",
     "Run renma scan.",
+    "Run any project-specific validation checks that apply to this repository.",
     "Ensure the skill no longer mixes reusable domain knowledge with usage guidance."
   ],
   "llmHint": "Create shared context assets for reusable QA knowledge, update skill metadata, and preserve the skill as a concise usage guide."
@@ -113,6 +113,12 @@ Central repair workflow:
 4. A human reviews the patch.
 5. Renma scans the repository again and confirms the skill/context separation is
    healthier.
+
+Optional LLM-assisted evaluation is advisory and outside core validation. See
+`architecture.md` section `Optional LLM Evaluation Boundary` for the rule:
+`scan`, catalog construction, and deterministic rule evaluation do not call an
+LLM; optional helpers may prepare review bundles or suggestions for a human or
+calling agent to apply.
 
 ## Repository Model
 
@@ -161,6 +167,10 @@ are useful for local routing variants, nearby examples, and skill-specific
 supporting text. When knowledge is reusable across skills, teams, tools, or
 agents, it should move into `contexts/` as an owned context asset.
 
+Renma can also flag large skill-local support files as shared-context candidates when they contain generic source-of-truth structure such as setup, decision logic, troubleshooting, validation, constraints, policy, or procedure guidance. This advisory does not decide semantic reuse itself. It surfaces structurally broad support files and asks the calling LLM or human to inspect the repository for similar concepts, overlapping guidance, and reuse opportunities before making a reviewable patch.
+
+Shared context assets should be organized by semantic scope, not migration state. Folders such as `contexts/promoted/` or `contexts/generated/` can be useful temporary staging concepts, but final context assets should live under meaning-oriented paths such as `contexts/tools/...`, `contexts/domain/...`, `contexts/testing/...`, `contexts/teams/...`, `contexts/policies/...`, or `contexts/platform/...`.
+
 ## Artifact Kinds
 
 Renma normalizes scanned files into asset kinds:
@@ -205,6 +215,26 @@ Initial status values:
 - `deprecated`
 - `archived`
 
+`status` describes lifecycle only. It should not be used for replacement,
+delegation, migration provenance, or canonical-source relationships. For
+example, a skill-local reference replaced by a shared context asset should use a
+valid lifecycle status such as `deprecated`, plus a separate relationship field
+such as `superseded_by: contexts/tools/example/setup.md` when the repository
+needs to preserve that link. Renma may catalog `superseded_by` as a static
+reference relationship, but it should not treat values such as `active` or
+`delegated` as valid lifecycle statuses.
+
+When reusable knowledge is promoted from a skill-local support file into
+`contexts/`, the original `skills/*/references/` file may remain temporarily as
+a compatibility shim. Renma can warn when a skill still routes readers through a
+deprecated or superseded local support asset instead of referencing the
+canonical shared context directly.
+
+Renma can also warn when other repository assets continue to reference a
+deprecated or superseded support file instead of the canonical shared context.
+This broader advisory helps remove hidden indirection after context promotion
+while preserving compatibility shims when they are intentionally needed.
+
 Renma should start with deterministic validation for fields it actually uses:
 duplicate IDs, invalid statuses, missing owner or ID on published shared context,
 unknown dependencies, dependencies on deprecated or archived assets, and
@@ -218,7 +248,7 @@ Dependencies are typed relationships between assets:
 - `optional`: useful context that is not always required
 - `conflicts`: assets that should not both be active without human review
 - `extends`: overlay or profile relationship
-- `routes_to`: declared static relationship from a skill or support asset toward a context asset or local file
+- `references`: declared static relationship from a skill or support asset toward a context asset or local file
 - `covered_by`: evaluation or evidence coverage relationship
 
 Edges should carry source evidence: path, range when available, declaration
@@ -259,6 +289,7 @@ Early deterministic rules should focus on repository health:
 - Orphaned shared context asset
 - Broken Markdown links
 - Oversized skill entrypoint
+- Skill may contain reusable context worth extracting
 - Oversized context or skill-local support file
 - Missing skill routing guidance
 - Missing negative routing guidance
@@ -291,7 +322,7 @@ Good context assets in this domain include:
 - Team-specific test strategy
 - Known checkout or payment contract risks
 
-Skills can route to those assets for tasks such as test-case generation, spec
+Skills can reference those assets for tasks such as test-case generation, spec
 review, regression planning, or release readiness. The context assets remain
 the source of truth.
 

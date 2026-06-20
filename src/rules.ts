@@ -2,6 +2,13 @@ import path from "node:path";
 import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import type { Evidence, Finding, ParsedDocument, Severity } from "./types.js";
 
+type FindingDetails = Partial<
+  Pick<
+    Finding,
+    "whyItMatters" | "constraints" | "verificationSteps" | "llmHint"
+  >
+>;
+
 const SECRET_PATTERN =
   /\b(?:password|passwd|token|api[_-]?key|secret|credential|private[_-]?key)\b\s*[:=]\s*["']?([A-Za-z0-9_./+=-]{8,})/i;
 const PRIVATE_KEY_PATTERN =
@@ -17,6 +24,107 @@ const USER_LOCAL_PATH_PATTERN =
 
 const SKILL_TOKEN_LIMIT = 500;
 const DESCRIPTION_MIN_CHARS = 150;
+const REUSABLE_CONTEXT_MIN_LINES = 24;
+const REUSABLE_CONTEXT_MIN_TOKENS = 180;
+const REUSABLE_CONTEXT_MIN_SIGNALS = 3;
+const SUPPORT_SHARED_CONTEXT_MIN_LINES = 18;
+const SUPPORT_SHARED_CONTEXT_MIN_TOKENS = 140;
+const SUPPORT_SHARED_CONTEXT_MIN_HEADINGS = 2;
+const SUPPORT_SHARED_CONTEXT_MIN_PHRASES = 2;
+const REUSABLE_CONTEXT_HEADING_PATTERNS: Array<[RegExp, string]> = [
+  [/\bsetup\b/i, "Setup"],
+  [/\binstallation\b/i, "Installation"],
+  [/\bconfiguration\b/i, "Configuration"],
+  [/\benvironment\b/i, "Environment"],
+  [/\bprerequisites?\b/i, "Prerequisites"],
+  [/\bplatform\b/i, "Platform"],
+  [/\btroubleshooting\b/i, "Troubleshooting"],
+  [/\bknown issues?\b/i, "Known Issues"],
+  [/\blimitations?\b/i, "Limitations"],
+  [/\bbest practices?\b/i, "Best Practices"],
+  [/\btesting heuristics?\b/i, "Testing Heuristics"],
+  [/\btest strategy\b/i, "Test Strategy"],
+  [/\bverification\b/i, "Verification"],
+  [/\bexamples?\b/i, "Examples"],
+  [/\bedge cases?\b/i, "Edge Cases"],
+  [/\brisks?\b/i, "Risks"],
+  [/\bdomain rules?\b/i, "Domain Rules"],
+  [/\bfailure modes?\b/i, "Failure Modes"],
+  [/\bflaky tests?\b/i, "Flaky Tests"],
+];
+const REUSABLE_CONTEXT_PHRASE_PATTERNS: Array<[RegExp, string]> = [
+  [/\buse this when\b/i, "use this when"],
+  [/\bknown issue\b/i, "known issue"],
+  [/\blimitation\b/i, "limitation"],
+  [/\btroubleshooting\b/i, "troubleshooting"],
+  [/\bflaky\b/i, "flaky"],
+  [/\bretry\b/i, "retry"],
+  [/\bplatform-specific\b/i, "platform-specific"],
+  [/\bedge case\b/i, "edge case"],
+  [/\brisk\b/i, "risk"],
+  [/\bheuristic\b/i, "heuristic"],
+  [/\bbest practice\b/i, "best practice"],
+  [/\bdo not\b/i, "do not"],
+  [/\bavoid\b/i, "avoid"],
+  [/\balways\b/i, "always"],
+  [/\bnever\b/i, "never"],
+];
+
+const SUPPORT_SHARED_CONTEXT_HEADING_PATTERNS: Array<[RegExp, string]> = [
+  ...REUSABLE_CONTEXT_HEADING_PATTERNS,
+  [/\bdecision logic\b/i, "Decision Logic"],
+  [/\bsafety notes?\b/i, "Safety Notes"],
+  [/\bvalidation\b/i, "Validation"],
+  [/\boperating model\b/i, "Operating Model"],
+  [/\bpolicy\b/i, "Policy"],
+  [/\bguidelines?\b/i, "Guidelines"],
+  [/\bprocedures?\b/i, "Procedure"],
+  [/\bchecklist\b/i, "Checklist"],
+  [/\bcompatibility\b/i, "Compatibility"],
+  [/\bconstraints?\b/i, "Constraints"],
+];
+
+const SUPPORT_SHARED_CONTEXT_PHRASE_PATTERNS: Array<[RegExp, string]> = [
+  [/\bmust\b/i, "must"],
+  [/\bshould\b/i, "should"],
+  [/\balways\b/i, "always"],
+  [/\bnever\b/i, "never"],
+  [/\bavoid\b/i, "avoid"],
+  [/\bprefer\b/i, "prefer"],
+  [/\bdo not\b/i, "do not"],
+  [/\brequired\b/i, "required"],
+  [/\brecommended\b/i, "recommended"],
+  [/\bknown issue\b/i, "known issue"],
+  [/\blimitation\b/i, "limitation"],
+  [/\bfailure mode\b/i, "failure mode"],
+  [/\btroubleshooting\b/i, "troubleshooting"],
+  [/\bedge case\b/i, "edge case"],
+  [/\brisk\b/i, "risk"],
+  [/\bbest practice\b/i, "best practice"],
+  [/\bvalidate\b/i, "validate"],
+  [/\bverify\b/i, "verify"],
+];
+const NON_SEMANTIC_CONTEXT_PATH_SEGMENTS = new Set([
+  "promoted",
+  "generated",
+  "split",
+  "migrated",
+  "migration",
+  "new",
+  "old",
+  "tmp",
+  "temp",
+  "draft",
+  "drafts",
+  "wip",
+  "misc",
+  "miscellaneous",
+  "todo",
+  "review",
+  "staging",
+  "candidate",
+  "candidates",
+]);
 const CONTEXT_TOKEN_LIMITS = {
   context: 1200,
   profile: 500,
@@ -55,6 +163,33 @@ const RULES: Rule[] = [
   {
     id: "skill-local-support-reachability",
     run: ({ documents }) => skillLocalSupportReachabilityFindings(documents),
+  },
+  {
+    id: "support-asset-shared-context-candidate",
+    run: ({ documents }) =>
+      documents.flatMap((document) =>
+        supportSharedContextCandidateFindings(document),
+      ),
+  },
+  {
+    id: "context-path-non-semantic",
+    run: ({ documents }) =>
+      documents.flatMap((document) => contextPathNonSemanticFindings(document)),
+  },
+  {
+    id: "skill-context-reference-not-declared",
+    run: ({ documents }) =>
+      documents.flatMap((document) =>
+        skillContextReferenceNotDeclaredFindings(document),
+      ),
+  },
+  {
+    id: "skill-references-superseded-asset",
+    run: ({ documents }) => skillReferencesSupersededAssetFindings(documents),
+  },
+  {
+    id: "asset-references-superseded-asset",
+    run: ({ documents }) => assetReferencesSupersededAssetFindings(documents),
   },
 ];
 
@@ -171,6 +306,12 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     );
   }
 
+  const reusableContextFinding = reusableContextCandidateFinding(
+    document,
+    tokenCount,
+  );
+  if (reusableContextFinding) findings.push(reusableContextFinding);
+
   if (document.artifact.kind === "skill" && tokenCount > SKILL_TOKEN_LIMIT) {
     findings.push(
       documentFinding(
@@ -179,7 +320,25 @@ function shapeFindings(document: ParsedDocument): Finding[] {
         "Skill entrypoint exceeds token budget",
         "quality",
         "medium",
-        `Keep SKILL.md under about ${SKILL_TOKEN_LIMIT} tokens as a compact router. Move detailed procedures into reference files, but preserve them losslessly in ordered parts when needed. Do not delete, summarize, or merge away procedural steps. SKILL.md should route to every required reference or index without embedding the full procedure.`,
+        `Keep SKILL.md under about ${SKILL_TOKEN_LIMIT} tokens as a compact usage guide. Move detailed procedures into reference files, but preserve them losslessly in ordered parts when needed. Do not delete, summarize, or merge away procedural steps. SKILL.md should reference every required support file or index without embedding the full procedure.`,
+        {
+          whyItMatters:
+            "Large skills can mix LLM-facing usage guidance with reusable domain knowledge. Skills should remain concise routing contracts and usage guides, while reusable QA heuristics, domain rules, and tool guidance live in independently owned shared context assets.",
+          constraints: [
+            "Do not introduce runtime context resolution.",
+            "Do not create prompt packages.",
+            "Do not make Renma responsible for selecting context.",
+            "Preserve the skill as an LLM-facing entrypoint / usage guide.",
+            "Give extracted context assets stable metadata such as id, owner, and status.",
+          ],
+          verificationSteps: [
+            "Run renma scan.",
+            "Run any project-specific validation checks that apply to this repository.",
+            "Confirm the skill is shorter and extracted knowledge is represented as shared context assets.",
+          ],
+          llmHint:
+            "If this skill mixes reusable knowledge with usage guidance, split reusable knowledge into first-class context assets under contexts/ and update the skill metadata or text to reference them.",
+        },
       ),
     );
   }
@@ -288,6 +447,544 @@ function shapeFindings(document: ParsedDocument): Finding[] {
   return findings;
 }
 
+function reusableContextCandidateFinding(
+  document: ParsedDocument,
+  tokenCount: number,
+): Finding | undefined {
+  if (document.artifact.kind !== "skill") return undefined;
+  if (
+    document.lines.length < REUSABLE_CONTEXT_MIN_LINES &&
+    tokenCount < REUSABLE_CONTEXT_MIN_TOKENS
+  )
+    return undefined;
+
+  const headingMatches = document.headings.flatMap((heading) =>
+    REUSABLE_CONTEXT_HEADING_PATTERNS.filter(([pattern]) =>
+      pattern.test(heading.text),
+    ).map(([, label]) => ({
+      label,
+      line: heading.line,
+      text: heading.text,
+    })),
+  );
+
+  const phraseMatches = REUSABLE_CONTEXT_PHRASE_PATTERNS.flatMap(
+    ([pattern, label]) => {
+      const lineIndex = document.lines.findIndex((line) => pattern.test(line));
+      if (lineIndex < 0) return [];
+      return [
+        {
+          label,
+          line: lineIndex + 1,
+          text: document.lines[lineIndex]?.trim() ?? label,
+        },
+      ];
+    },
+  );
+
+  const headingLabels = [
+    ...new Set(headingMatches.map((match) => match.label)),
+  ];
+  const phraseLabels = [...new Set(phraseMatches.map((match) => match.label))];
+  const signalCount = new Set([...headingLabels, ...phraseLabels]).size;
+  if (signalCount < REUSABLE_CONTEXT_MIN_SIGNALS) return undefined;
+
+  const evidenceLine =
+    headingMatches[0]?.line ??
+    phraseMatches[0]?.line ??
+    Math.max(1, document.lines.findIndex((line) => line.trim().length > 0) + 1);
+  const evidenceParts = [
+    headingLabels.length > 0
+      ? `Detected reusable-knowledge headings: ${headingLabels
+          .slice(0, 5)
+          .join(" - ")}`
+      : undefined,
+    phraseLabels.length > 0
+      ? `Detected reusable-knowledge phrases: ${phraseLabels
+          .slice(0, 5)
+          .join(" - ")}`
+      : undefined,
+  ].filter((part): part is string => Boolean(part));
+
+  return {
+    id: "MAINT-SKILL-REUSABLE-CONTEXT-CANDIDATE",
+    title: "Skill may contain reusable context worth extracting",
+    category: "maintenance",
+    severity: "low",
+    confidence: "medium",
+    evidence: evidence(document, evidenceLine, evidenceParts.join("; ")),
+    whyItMatters:
+      "Reusable setup notes, troubleshooting, platform guidance, testing heuristics, or domain rules are easier to own, review, and reuse when they live in shared context assets instead of only inside one skill.",
+    remediation:
+      "Review the matched headings and phrases. If they describe reusable knowledge, extract that knowledge into first-class shared context assets under contexts/ and keep SKILL.md as a concise LLM-facing usage guide.",
+    constraints: [
+      "Do not make Renma select runtime context.",
+      "Do not assemble prompt packages.",
+      "Do not automatically rewrite or split skills.",
+      "Preserve SKILL.md as the routing contract / usage guide.",
+      "Give extracted context assets stable metadata such as id, owner, and status.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm the advisory is resolved or intentionally accepted after reusable knowledge is represented as shared context assets.",
+    ],
+    llmHint:
+      "Look for reusable setup, troubleshooting, platform, testing, or domain guidance in this skill. If reusable, move it into owned contexts/ assets and update the skill to reference those assets without adding runtime context selection.",
+  };
+}
+
+function supportSharedContextCandidateFindings(
+  document: ParsedDocument,
+): Finding[] {
+  if (document.artifact.kind !== "reference") return [];
+  if (!/^skills\/[^/]+\/references\/.+\.md$/u.test(document.artifact.path)) {
+    return [];
+  }
+
+  const tokenCount = approximateTokenCount(document.artifact.content);
+  if (
+    document.lines.length < SUPPORT_SHARED_CONTEXT_MIN_LINES &&
+    tokenCount < SUPPORT_SHARED_CONTEXT_MIN_TOKENS
+  ) {
+    return [];
+  }
+
+  const contentLineIndexes = markdownBodyLineIndexes(document);
+  const headingMatches = SUPPORT_SHARED_CONTEXT_HEADING_PATTERNS.flatMap(
+    ([pattern, label]) => {
+      const lineIndex = contentLineIndexes.find((index) => {
+        const line = document.lines[index] ?? "";
+        const match = line.match(/^#{1,6}\s+(.+)$/u);
+        return match ? pattern.test(match[1] ?? "") : false;
+      });
+      if (lineIndex === undefined) return [];
+      return [
+        {
+          label,
+          line: lineIndex + 1,
+          text: document.lines[lineIndex]?.trim() ?? label,
+          type: "heading",
+        },
+      ];
+    },
+  );
+
+  const phraseMatches = SUPPORT_SHARED_CONTEXT_PHRASE_PATTERNS.flatMap(
+    ([pattern, label]) => {
+      const lineIndex = contentLineIndexes.find((index) =>
+        pattern.test(document.lines[index] ?? ""),
+      );
+      if (lineIndex === undefined) return [];
+      return [
+        {
+          label,
+          line: lineIndex + 1,
+          text: document.lines[lineIndex]?.trim() ?? label,
+          type: "phrase",
+        },
+      ];
+    },
+  );
+
+  const sourceSignals = [...headingMatches, ...phraseMatches];
+  if (
+    headingMatches.length < SUPPORT_SHARED_CONTEXT_MIN_HEADINGS ||
+    phraseMatches.length < SUPPORT_SHARED_CONTEXT_MIN_PHRASES
+  ) {
+    return [];
+  }
+
+  const evidenceMatches = sourceSignals
+    .slice(0, 12)
+    .sort((a, b) => a.line - b.line);
+  const evidenceLine = evidenceMatches[0]?.line ?? 1;
+  const evidenceSnippet = [
+    "Detected source-of-truth headings:",
+    ...headingMatches.slice(0, 8).map((match) => `- ${match.label}`),
+    "Detected reusable guidance phrases:",
+    ...phraseMatches.slice(0, 8).map((match) => `- ${match.label}`),
+    "Evidence lines:",
+    ...[...sourceSignals]
+      .sort((a, b) => a.line - b.line)
+      .slice(0, 8)
+      .map(
+        (match) =>
+          `- ${match.type}: ${match.label} (line ${match.line}) ${match.text}`,
+      ),
+  ].join("\n");
+
+  return [
+    {
+      id: "MAINT-SUPPORT-ASSET-SHARED-CONTEXT-CANDIDATE",
+      title: "Skill-local support file may be a shared context candidate",
+      category: "maintenance",
+      severity: "low",
+      confidence: "medium",
+      evidence: evidence(document, evidenceLine, evidenceSnippet),
+      whyItMatters:
+        "Skill-local references are useful for local support, but reusable source-of-truth knowledge is easier to own, review, and reuse when represented as a first-class shared context asset under contexts/. Large support files with setup, decision logic, troubleshooting, validation, constraints, or policy-like guidance may be useful beyond one skill.",
+      remediation:
+        "Review this support file and decide whether reusable knowledge should be promoted to a shared context asset under contexts/. Keep only skill-specific reading order, local notes, or one-off examples under skills/*/references/. Update declared context references after any promotion.",
+      constraints: [
+        "Do not introduce runtime context resolution.",
+        "Do not create prompt packages.",
+        "Do not make Renma call an LLM.",
+        "Do not move files automatically as part of scan.",
+        "Do not delete or summarize procedural details.",
+        "Preserve skill-local references when they are truly local to one skill.",
+        "Give promoted context assets stable metadata such as id, owner, and status.",
+      ],
+      verificationSteps: [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Run any project-specific validation checks that apply to this repository.",
+        "Confirm reusable source-of-truth knowledge lives in contexts/ and skill-local references only contain local support guidance.",
+      ],
+      llmHint:
+        "Search the repository for similar headings, filenames, repeated procedures, commands, constraints, or overlapping guidance. If this support file appears reusable, propose a first-class context asset under contexts/, move the reusable details without losing information, keep truly local notes in the skill directory, and update declared context references.",
+    },
+  ];
+}
+
+function contextPathNonSemanticFindings(document: ParsedDocument): Finding[] {
+  if (document.artifact.kind !== "context") return [];
+
+  const segments = document.artifact.path.split("/");
+  const root = segments[0];
+  if (root !== "context" && root !== "contexts") return [];
+
+  const suspiciousSegment = segments
+    .slice(1, -1)
+    .find((segment) =>
+      NON_SEMANTIC_CONTEXT_PATH_SEGMENTS.has(segment.toLowerCase()),
+    );
+  if (!suspiciousSegment) return [];
+
+  return [
+    {
+      id: "MAINT-CONTEXT-PATH-NON-SEMANTIC",
+      title: "Context asset path appears process-oriented rather than semantic",
+      category: "maintenance",
+      severity: "low",
+      confidence: "high",
+      evidence: evidence(
+        document,
+        1,
+        `Path segment "${suspiciousSegment}" appears process-oriented. Consider a semantic context path.`,
+      ),
+      whyItMatters:
+        "Shared context assets should be discoverable by their meaning, ownership, domain, tool, team, or policy scope. Process-state folders such as promoted, generated, or drafts describe how a file was created rather than what knowledge it owns, which makes the repository harder for humans and agents to navigate over time.",
+      remediation:
+        "Move this context asset to a semantic path that reflects its source-of-truth scope. Prefer paths such as contexts/tools/<tool>/..., contexts/domain/<domain>/..., contexts/testing/..., contexts/teams/<team>/..., or contexts/policies/.... Update any declared context references after moving the file.",
+      constraints: [
+        "Do not introduce runtime context resolution.",
+        "Do not create prompt packages.",
+        "Do not make Renma call an LLM.",
+        "Do not move files automatically as part of scan.",
+        "Preserve the context content and metadata.",
+        "Update references only through a reviewable human or calling-agent patch.",
+        "Temporary staging folders are acceptable outside final contexts/ paths, but final shared context assets should use semantic paths.",
+      ],
+      verificationSteps: [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Run project-specific validation checks that apply to this repository.",
+        "Confirm the context asset now lives under a semantic path and declared references still point to it correctly.",
+      ],
+      llmHint:
+        "Infer semantic scope from context title, headings, metadata, and references. Propose a path based on meaning, ownership, or reuse domain, such as contexts/tools/<tool>/..., contexts/domain/<domain>/..., contexts/testing/..., contexts/teams/<team>/..., or contexts/policies/.... Avoid final folders named after migration state such as promoted or generated.",
+    },
+  ];
+}
+
+function skillContextReferenceNotDeclaredFindings(
+  document: ParsedDocument,
+): Finding[] {
+  if (document.artifact.kind !== "skill") return [];
+
+  const declaredContexts = new Set(
+    listMetadataValue(document.metadata.requires_context),
+  );
+  const bodyLineIndexes = markdownBodyLineIndexes(document);
+  const matches = new Map<string, { line: number; text: string }>();
+
+  for (const index of bodyLineIndexes) {
+    const line = document.lines[index] ?? "";
+    for (const match of line.matchAll(/\bcontexts?\/[^\s`)'"]+\.md\b/gu)) {
+      const referencedPath = match[0];
+      if (!matches.has(referencedPath)) {
+        matches.set(referencedPath, {
+          line: index + 1,
+          text: line.trim(),
+        });
+      }
+    }
+  }
+
+  return [...matches.entries()]
+    .filter(([referencedPath]) => !declaredContexts.has(referencedPath))
+    .map(([referencedPath, match]) => ({
+      id: "MAINT-SKILL-CONTEXT-REFERENCE-NOT-DECLARED",
+      title: "Skill references a shared context without declaring it",
+      category: "maintenance",
+      severity: "low",
+      confidence: "high",
+      evidence: evidence(document, match.line, match.text),
+      whyItMatters:
+        "Declared context references make skill/context relationships visible to catalog, graph, and validation reports. If a skill only mentions a context in prose, humans may see the dependency but repository tooling cannot validate it.",
+      remediation:
+        "Add the referenced shared context asset to the skill metadata using requires_context, or remove the prose reference if it is no longer needed.",
+      constraints: [
+        "Do not select runtime context.",
+        "Do not assemble prompt packages.",
+        "Do not make Renma decide which context a task should use.",
+        "Only declare repository relationships that the skill already references or intentionally depends on.",
+      ],
+      verificationSteps: [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Confirm the skill/context relationship appears in metadata and catalog output.",
+      ],
+      llmHint: `Find context paths mentioned in the skill body and add them to requires_context using the metadata syntax currently supported by Renma. Missing declaration: ${referencedPath}`,
+    }));
+}
+
+function skillReferencesSupersededAssetFindings(
+  documents: ParsedDocument[],
+): Finding[] {
+  const skillsByPath = new Map(
+    documents
+      .filter((document) => document.artifact.kind === "skill")
+      .map((document) => [document.artifact.path, document]),
+  );
+
+  return documents.flatMap((document) => {
+    if (!isSkillLocalReference(document)) return [];
+
+    const canonicalTargets = sharedContextTargets(document);
+    const supersededStatus =
+      document.metadata.status === "deprecated" ||
+      document.metadata.status === "archived";
+    if (!supersededStatus && canonicalTargets.length === 0) return [];
+    if (canonicalTargets.length === 0) return [];
+
+    const skillPath = parentSkillPath(document.artifact.path);
+    if (!skillPath) return [];
+
+    const skill = skillsByPath.get(skillPath);
+    if (!skill) return [];
+
+    const referencedFrom = skillReferenceLine(skill, document.artifact.path);
+    if (!referencedFrom) return [];
+
+    const canonicalTargetList = canonicalTargets
+      .map((target) => `- ${target}`)
+      .join("\n");
+    const snippet = [
+      `Deprecated local support file: ${document.artifact.path}`,
+      "Superseded by:",
+      canonicalTargetList,
+      `Referenced from: ${skill.artifact.path}`,
+      referencedFrom.text,
+    ].join("\n");
+
+    return [
+      {
+        id: "MAINT-SKILL-REFERENCES-SUPERSEDED-ASSET",
+        title: "Skill references a superseded local support asset",
+        category: "maintenance",
+        severity: "low",
+        confidence: "medium",
+        evidence: evidence(skill, referencedFrom.line, snippet),
+        whyItMatters:
+          "Deprecated or superseded local support files can be useful as compatibility shims, but keeping them in a primary reading path may hide the canonical shared context asset from humans and agents. Shared context assets should be the visible source of truth when reusable knowledge has been promoted to contexts/.",
+        remediation:
+          "Update the skill to reference the canonical shared context asset directly, or keep the deprecated local support file only as a clearly documented compatibility shim. If the local file still contains unique skill-specific guidance, reduce it to that local guidance and point to the shared context for reusable knowledge.",
+        constraints: [
+          "Do not introduce runtime context resolution.",
+          "Do not create prompt packages.",
+          "Do not make Renma call an LLM.",
+          "Do not automatically move or delete files during scan.",
+          "Preserve compatibility shims if they are still needed.",
+          "Preserve unique skill-local guidance if it is not reusable shared context.",
+          "Update declared context references when pointing the skill directly at shared contexts.",
+        ],
+        verificationSteps: [
+          "Run renma scan.",
+          "Run renma catalog.",
+          "Run project-specific validation checks that apply to this repository.",
+          "Confirm the skill points to canonical shared context assets directly, or any deprecated local support file is clearly only a compatibility shim.",
+        ],
+        llmHint:
+          "Inspect the deprecated local support file and its superseded_by or canonical_context metadata. If the shared context asset is now canonical, update skill guidance and metadata to reference the shared context directly. Keep the local reference only if it contains truly local notes or is intentionally preserved as a compatibility shim.",
+      },
+    ];
+  });
+}
+
+function isSkillLocalReference(document: ParsedDocument): boolean {
+  return (
+    document.artifact.kind === "reference" &&
+    /^skills\/[^/]+\/references\/.+\.md$/u.test(document.artifact.path)
+  );
+}
+
+function sharedContextTargets(document: ParsedDocument): string[] {
+  return [
+    ...listMetadataValue(document.metadata.superseded_by),
+    ...listMetadataValue(document.metadata.canonical_context),
+  ].filter(
+    (target, index, targets) =>
+      /^contexts?\//u.test(target) && targets.indexOf(target) === index,
+  );
+}
+
+function parentSkillPath(referencePath: string): string | undefined {
+  const segments = referencePath.split("/");
+  if (segments.length < 4 || segments[0] !== "skills") return undefined;
+  return `skills/${segments[1]}/SKILL.md`;
+}
+
+function skillReferenceLine(
+  skill: ParsedDocument,
+  referencePath: string,
+): { line: number; text: string } | undefined {
+  const skillDir = path.posix.dirname(skill.artifact.path);
+  const relativePath = path.posix.relative(skillDir, referencePath);
+  const referencedTokens = [referencePath, relativePath];
+
+  for (const index of markdownBodyLineIndexes(skill)) {
+    const line = skill.lines[index] ?? "";
+    if (referencedTokens.some((token) => line.includes(token))) {
+      return { line: index + 1, text: line.trim() };
+    }
+  }
+
+  return undefined;
+}
+
+function assetReferencesSupersededAssetFindings(
+  documents: ParsedDocument[],
+): Finding[] {
+  const supersededAssets = documents
+    .map((document) => ({
+      document,
+      canonicalTargets: sharedContextTargets(document),
+    }))
+    .filter(
+      ({ document, canonicalTargets }) =>
+        document.metadata.status === "deprecated" ||
+        document.metadata.status === "archived" ||
+        canonicalTargets.length > 0,
+    )
+    .filter(({ canonicalTargets }) => canonicalTargets.length > 0);
+
+  return documents.flatMap((referencingDocument) => {
+    if (referencingDocument.artifact.kind === "skill") return [];
+
+    return supersededAssets.flatMap(({ document, canonicalTargets }) => {
+      if (document.artifact.path === referencingDocument.artifact.path) {
+        return [];
+      }
+
+      const reference = assetReferenceLine(
+        referencingDocument,
+        document.artifact.path,
+      );
+      if (!reference) return [];
+
+      const canonicalTargetList = canonicalTargets
+        .map((target) => `- ${target}`)
+        .join("\n");
+      const snippet = [
+        `Referencing asset: ${referencingDocument.artifact.path}`,
+        `Referenced superseded asset: ${document.artifact.path}`,
+        "Superseded by:",
+        canonicalTargetList,
+        reference.text,
+      ].join("\n");
+
+      return [
+        {
+          id: "MAINT-ASSET-REFERENCES-SUPERSEDED-ASSET",
+          title: "Asset references a superseded support file",
+          category: "maintenance",
+          severity: "low",
+          confidence: "medium",
+          evidence: evidence(referencingDocument, reference.line, snippet),
+          whyItMatters:
+            "Deprecated or superseded support files may remain as compatibility shims, but assets that keep referencing them can hide the canonical shared context asset from humans and agents. Once reusable knowledge has been promoted to contexts/, repository assets should usually reference the canonical context directly.",
+          remediation:
+            "Update this asset to reference the canonical shared context asset directly, or keep the superseded reference only if it is intentionally needed as a compatibility shim. If the deprecated file still contains unique local guidance, preserve that local guidance and point reusable knowledge to the canonical context.",
+          constraints: [
+            "Do not introduce runtime context resolution.",
+            "Do not create prompt packages.",
+            "Do not make Renma call an LLM.",
+            "Do not automatically move or rewrite files during scan.",
+            "Preserve compatibility shims if they are intentionally needed.",
+            "Preserve unique local guidance not reusable shared context.",
+            "Update references through a reviewable human or calling-agent patch.",
+          ],
+          verificationSteps: [
+            "Run renma scan.",
+            "Run renma catalog.",
+            "Run project-specific validation checks that apply to this repository.",
+            "Confirm referencing asset now points to the canonical shared context asset, or documents why the superseded shim is still needed.",
+          ],
+          llmHint:
+            "Inspect the referenced deprecated asset and its superseded_by or canonical context metadata. If the canonical shared context is the intended source of truth, update this asset to reference that context directly. Keep the superseded file only when it serves a deliberate compatibility or migration role.",
+        },
+      ];
+    });
+  });
+}
+
+function assetReferenceLine(
+  referencingDocument: ParsedDocument,
+  targetPath: string,
+): { line: number; text: string } | undefined {
+  const referencingDir = path.posix.dirname(referencingDocument.artifact.path);
+  const relativePath = path.posix.relative(referencingDir, targetPath);
+  const referencedTokens = uniqueStrings([
+    targetPath,
+    relativePath,
+    skillRelativePath(referencingDocument.artifact.path, targetPath),
+  ]).filter(Boolean);
+
+  for (const index of markdownBodyLineIndexes(referencingDocument)) {
+    const line = referencingDocument.lines[index] ?? "";
+    if (referencedTokens.some((token) => line.includes(token))) {
+      return { line: index + 1, text: line.trim() };
+    }
+  }
+
+  return undefined;
+}
+
+function skillRelativePath(
+  referencingPath: string,
+  targetPath: string,
+): string | undefined {
+  const referencingSegments = referencingPath.split("/");
+  const targetSegments = targetPath.split("/");
+  if (
+    referencingSegments[0] !== "skills" ||
+    targetSegments[0] !== "skills" ||
+    referencingSegments[1] !== targetSegments[1]
+  ) {
+    return undefined;
+  }
+
+  return targetSegments.slice(2).join("/");
+}
+
+function uniqueStrings(values: Array<string | undefined>): string[] {
+  return values.filter(
+    (value, index): value is string =>
+      Boolean(value) && values.indexOf(value) === index,
+  );
+}
+
 function contextBudgetFindings(document: ParsedDocument): Finding[] {
   if (
     document.artifact.kind !== "context" &&
@@ -310,6 +1007,23 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
       "quality",
       "low",
       `Keep ${document.artifact.kind} assets under about ${limit} tokens where practical. If a file is too large, run \`renma suggest-semantic-split ${document.artifact.path}\` to get a semantic split proposal, then split it losslessly into meaning-based ordered part files. Do not delete, summarize, or merge away procedural steps. The parent file or SKILL.md should reference every part in order, and the split should preserve the original procedure text exactly. Verify by reconstructing the parts and comparing them to the original content before accepting the fix.`,
+      {
+        whyItMatters:
+          "Oversized support assets are harder for humans and LLM coding agents to review safely. Shared context and local support files should stay modular enough that ownership, scope, and static references remain clear.",
+        constraints: [
+          "Do not introduce runtime context resolution.",
+          "Do not create prompt packages.",
+          "Preserve concrete procedural steps losslessly.",
+          "Keep static references from the parent file or SKILL.md to every split part.",
+        ],
+        verificationSteps: [
+          "Run renma scan.",
+          "Run the repository-specific validation or test command, if one exists.",
+          "Confirm the finding is resolved or reduced and every split part remains reachable.",
+        ],
+        llmHint:
+          "Split oversized support content into meaning-based ordered part files, keep the original procedure text intact, and update static references so Renma can validate reachability.",
+      },
     ),
   ];
 }
@@ -360,6 +1074,23 @@ function skillLocalSupportReachabilityFindings(
           "structure",
           "medium",
           "Add local support file reachability guidance so the top-level skill declares when profiles, references, examples, or scripts are reachable. If support content was split into ordered parts, reference the index or all parts in order. Preserve original concrete steps. Do not delete, summarize, or merge away procedural steps.",
+          {
+            whyItMatters:
+              "Local support files should be statically discoverable from the skill so humans and LLM coding agents can tell which repository evidence belongs to the skill without relying on runtime context selection.",
+            constraints: [
+              "Do not introduce runtime context resolution.",
+              "Do not make Renma responsible for selecting context.",
+              "Use static repository references from SKILL.md to local support files or their index.",
+              "Preserve original concrete steps and support content.",
+            ],
+            verificationSteps: [
+              "Run renma scan.",
+              "Run any project-specific validation checks that apply to this repository.",
+              "Confirm each local profile, reference, or example is reachable from SKILL.md or from a referenced parent support file.",
+            ],
+            llmHint:
+              "Add concise reachability guidance in SKILL.md that references local profiles, references, examples, or ordered support indexes without adding runtime routing behavior.",
+          },
         ),
       );
     }
@@ -378,6 +1109,23 @@ function skillLocalSupportReachabilityFindings(
             "structure",
             "low",
             "Reference this local support file from SKILL.md or from a referenced parent support file with clear reachability guidance. If this file is a split part, ensure the parent skill references the index or all ordered parts so preserved details remain reachable. Do not delete, summarize, or merge away procedural steps just to satisfy the check.",
+            {
+              whyItMatters:
+                "Unreachable local support files can drift outside review and be missed by humans or LLM coding agents. Reachability should be static repository evidence, not runtime context assembly.",
+              constraints: [
+                "Do not introduce runtime context resolution.",
+                "Do not delete or summarize support content just to satisfy the check.",
+                "Preserve ordered split parts and concrete procedural details.",
+                "Use SKILL.md or a referenced parent support file for static reachability.",
+              ],
+              verificationSteps: [
+                "Run renma scan.",
+                "Run any project-specific validation checks that apply to this repository.",
+                "Confirm this support file is no longer reported as unreachable.",
+              ],
+              llmHint:
+                "Update SKILL.md or a referenced support index to mention this file by path, basename, or clear title so the static reachability graph can find it.",
+            },
           ),
         );
       }
@@ -404,7 +1152,9 @@ function reachableLocalSupportDocuments(
           reachable.has(candidate.artifact.path),
         ),
       ];
-      if (possibleRouters.some((router) => routesTo(router, document))) {
+      if (
+        possibleRouters.some((router) => referencesDocument(router, document))
+      ) {
         reachable.add(document.artifact.path);
         changed = true;
       }
@@ -414,7 +1164,10 @@ function reachableLocalSupportDocuments(
   return reachable;
 }
 
-function routesTo(source: ParsedDocument, target: ParsedDocument): boolean {
+function referencesDocument(
+  source: ParsedDocument,
+  target: ParsedDocument,
+): boolean {
   const name = path.posix.basename(
     target.artifact.path,
     path.posix.extname(target.artifact.path),
@@ -425,6 +1178,28 @@ function routesTo(source: ParsedDocument, target: ParsedDocument): boolean {
     source.artifact.content.includes(basename) ||
     new RegExp(`\\b${escapeRegExp(name)}\\b`, "i").test(source.artifact.content)
   );
+}
+
+function markdownBodyLineIndexes(document: ParsedDocument): number[] {
+  if (document.lines[0]?.trim() !== "---") {
+    return document.lines.map((_, index) => index);
+  }
+
+  const frontmatterEnd = document.lines.findIndex(
+    (line, index) => index > 0 && line.trim() === "---",
+  );
+  const bodyStart = frontmatterEnd >= 0 ? frontmatterEnd + 1 : 0;
+  return document.lines
+    .map((_, index) => index)
+    .filter((index) => index >= bodyStart);
+}
+
+function listMetadataValue(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function matchingLineFindings(
@@ -451,6 +1226,7 @@ function finding(
   severity: Severity,
   document: ParsedDocument,
   remediation: string,
+  details: FindingDetails = {},
 ): Omit<Finding, "evidence" | "remediation"> & { remediation: string } {
   return {
     id,
@@ -459,8 +1235,14 @@ function finding(
     severity,
     confidence: "high",
     whyItMatters:
+      details.whyItMatters ??
       "Skills and repository instructions are loaded into agent context, so risky or unclear text can become risky behavior.",
     remediation,
+    ...(details.constraints ? { constraints: details.constraints } : {}),
+    ...(details.verificationSteps
+      ? { verificationSteps: details.verificationSteps }
+      : {}),
+    ...(details.llmHint ? { llmHint: details.llmHint } : {}),
   };
 }
 
@@ -471,6 +1253,7 @@ function documentFinding(
   category: Finding["category"],
   severity: Severity,
   remediation: string,
+  details: FindingDetails = {},
 ): Finding {
   const firstContentLine = document.lines.findIndex(
     (line) => line.trim().length > 0,
@@ -488,8 +1271,14 @@ function documentFinding(
       document.lines[firstContentLine] ?? "",
     ),
     whyItMatters:
+      details.whyItMatters ??
       "Clear skill structure helps agents choose the right workflow and report useful evidence.",
     remediation,
+    ...(details.constraints ? { constraints: details.constraints } : {}),
+    ...(details.verificationSteps
+      ? { verificationSteps: details.verificationSteps }
+      : {}),
+    ...(details.llmHint ? { llmHint: details.llmHint } : {}),
   };
 }
 

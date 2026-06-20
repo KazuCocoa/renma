@@ -117,6 +117,7 @@ function dependenciesForEntry(entry: CatalogEntry): Dependency[] {
     ...metadataDependencies(entry, "requires", entry.metadata.requiresContext),
     ...metadataDependencies(entry, "optional", entry.metadata.optionalContext),
     ...metadataDependencies(entry, "conflicts", entry.metadata.conflicts),
+    ...metadataDependencies(entry, "references", entry.metadata.supersededBy),
   ];
 }
 
@@ -159,6 +160,6 @@ function dependencyKindOrder(kind: DependencyKind): number {
   if (kind === "optional") return 1;
   if (kind === "conflicts") return 2;
   if (kind === "extends") return 3;
-  if (kind === "routes_to") return 4;
+  if (kind === "references") return 4;
   return 5;
 }

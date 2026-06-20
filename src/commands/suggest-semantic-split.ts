@@ -155,24 +155,24 @@ function renderCodexPrompt(
   "shouldSplit": true,
   "splitDirection": "one sentence describing the semantic boundary",
   "suggestedFiles": [
-    {
-      "path": "suggested repo-relative or source-neighbor path",
-      "category": "human-readable category",
-      "why": "why this category belongs together",
-      "sourceRanges": ["L10-L42", "L80-L120"],
-      "routingHint": "when SKILL.md should route here"
-    }
-  ],
-  "sharedContent": [
-    {
-      "sourceRanges": ["L1-L9"],
-      "recommendation": "keep in common file, duplicate intentionally, or route from SKILL.md"
-    }
-  ],
-  "routingUpdate": "brief SKILL.md routing guidance",
-  "risks": ["coverage or validation concerns"],
-  "confidence": 0.0
-}`),
+      {
+        "path": "suggested repo-relative or source-neighbor path",
+        "category": "human-readable category",
+        "why": "why this category belongs together",
+        "sourceRanges": ["L10-L42", "L80-L120"],
+        "usageHint": "when SKILL.md should reference this file"
+      }
+    ],
+    "sharedContent": [
+      {
+        "sourceRanges": ["L1-L9"],
+        "recommendation": "keep in a common file, duplicate intentionally, or reference from SKILL.md"
+      }
+    ],
+    "skillGuidanceUpdate": "brief SKILL.md usage and reference guidance",
+    "risks": ["coverage or validation concerns"],
+    "confidence": 0.0
+  }`),
     "",
     "Rules:",
     "- Use source line ranges from the outline and exact line slices.",

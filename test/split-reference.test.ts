@@ -54,7 +54,7 @@ test("suggest-semantic-split builds a Codex prompt that asks for inferred catego
       'name: "setup"\n',
       "---\n",
       "# Setup\n",
-      "Route environment setup requests to the relevant reference.\n",
+      "Reference environment setup guidance for relevant requests.\n",
     ].join(""),
   );
   await writeFile(
@@ -85,7 +85,16 @@ test("suggest-semantic-split builds a Codex prompt that asks for inferred catego
   assert.match(prompt, /Name files by meaning, not by part number/);
   assert.match(prompt, /Return JSON only/);
   assert.match(prompt, /L0003: macOS\/Linux users/);
-  assert.match(prompt, /Route environment setup/);
+  assert.match(prompt, /Reference environment setup/);
+  assert.match(
+    prompt,
+    /"usageHint": "when SKILL\.md should reference this file"/,
+  );
+  assert.match(
+    prompt,
+    /"skillGuidanceUpdate": "brief SKILL\.md usage and reference guidance"/,
+  );
+  assert.doesNotMatch(prompt, /routingHint|routingUpdate/);
 
   const { stdout } = await execFileAsync(process.execPath, [
     "dist-test/src/index.js",
@@ -120,7 +129,7 @@ test("suggest-semantic-split builds a Codex prompt that asks for inferred catego
   );
   assert.match(
     semanticSplitReviewBundle.context.skill.text,
-    /Route environment setup/,
+    /Reference environment setup/,
   );
   assert.ok(
     semanticSplitReviewBundle.context.siblingFiles.some((file) =>

@@ -233,9 +233,15 @@ Current rules include:
 - Missing skill description, examples, preflight, verification, negative routing, or explicit routing clarity
 - Short frontmatter descriptions
 - Oversized `SKILL.md` entrypoints
+- Metadata governance findings surfaced through `scan`, including invalid lifecycle status values and missing shared context `id` or `owner`
 - Oversized shared context assets or local support files in `contexts/`, `context/`, `profiles/`, `references/`, and `examples/`
 - Unreachable skill-local profiles, references, and examples
 - Profile overlays missing base skill declaration
+- Skills that still route through deprecated or superseded local support assets after reusable knowledge has moved to canonical shared context assets
+- Non-skill assets that still reference deprecated or superseded support files instead of canonical shared context assets
+- Advisory reusable-context candidates in `SKILL.md` files with enough size and diverse setup, troubleshooting, platform, testing, risk, or domain-rule signals
+- Advisory shared-context candidates in large `skills/*/references/**/*.md` support files with generic source-of-truth headings and reusable guidance phrases
+- Advisory shared-context assets under process-state folders such as `contexts/promoted/`, `contexts/generated/`, or `contexts/drafts/` that should become semantic final paths
 - Literal secret-like values
 - Private key material
 - Destructive commands without nearby confirmation or recovery context

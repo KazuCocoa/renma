@@ -97,6 +97,8 @@ Renma should:
 - Produce agent readiness reports that describe repository health.
 - Emit structured, LLM-actionable diagnostics that humans and agents can use to repair the repository safely.
 - Suggest improvements without requiring an LLM.
+- Advise when large skill-local support files have generic source-of-truth structure that a human or calling LLM should inspect for possible promotion into owned shared context assets under `contexts/`.
+- Advise when final shared context assets live under process-state folders such as `promoted`, `generated`, or `drafts` instead of semantic paths organized by meaning, ownership, team, domain, tool, policy, or platform.
 
 Renma should not:
 
@@ -197,9 +199,9 @@ A dependency is a typed relationship between assets. Initial relationship kinds:
 - `optional`
 - `conflicts`
 - `extends`
-- `routes_to`
+- `references`
 
-`routes_to` is static repository evidence for graph analysis and validation, not task context choice.
+`references` is static repository evidence for graph analysis and validation, not task context choice.
 
 Every dependency should preserve source evidence: path, line range, declaration form, and reason where available.
 
@@ -253,6 +255,23 @@ Supported status values:
 - `stable`
 - `deprecated`
 - `archived`
+
+Keep lifecycle status separate from replacement or delegation relationships.
+Values such as `active` and `delegated` are not lifecycle statuses. If a local
+support file has been replaced by a shared context asset, prefer
+`status: deprecated` plus a separate future-compatible relationship such as
+`superseded_by: contexts/tools/example/setup.md`.
+
+Context promotion lifecycle governance should also cover the migration after
+promotion. When reusable knowledge has moved from `skills/*/references/` into
+`contexts/`, Renma can warn if the parent skill still routes readers through a
+deprecated or superseded local support file instead of the canonical shared
+context asset.
+
+The same lifecycle governance should apply to non-skill assets that keep direct
+references to superseded support files. Those references should usually move to
+the canonical shared context, unless the superseded file is deliberately kept as
+a compatibility or migration shim.
 
 Validation should cover:
 
@@ -317,6 +336,7 @@ Add rules for:
 - Oversized shared context assets
 - Context assets without clear usage guidance
 - Shared assets that duplicate large skill-local sections
+- SKILL.md files that may contain reusable setup, troubleshooting, platform, testing, risk, or domain-rule guidance worth extracting
 
 ### 3. Catalog Generation
 

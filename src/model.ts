@@ -12,7 +12,7 @@ export type DependencyKind =
   | "optional"
   | "conflicts"
   | "extends"
-  | "routes_to"
+  | "references"
   | "covered_by";
 
 /** Normalized shared metadata for cataloged assets. */
@@ -27,6 +27,7 @@ export interface AssetMetadata {
   requiresContext: string[];
   optionalContext: string[];
   conflicts: string[];
+  supersededBy: string[];
 }
 
 /** Repository object Renma can catalog, validate, reference, or report on. */
