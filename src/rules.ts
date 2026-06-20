@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { Catalog, CatalogEntry, Dependency } from "./model.js";
 import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import type { Evidence, Finding, ParsedDocument, Severity } from "./types.js";
 
@@ -133,8 +134,11 @@ const CONTEXT_TOKEN_LIMITS = {
 } as const;
 
 /** Run all deterministic rules and return findings in stable source order. */
-export function runRules(documents: ParsedDocument[]): Finding[] {
-  const findings = runRuleRegistry(documents, RULES);
+export function runRules(
+  documents: ParsedDocument[],
+  catalog?: Catalog,
+): Finding[] {
+  const findings = runRuleRegistry(documents, RULES, catalog);
   return findings.sort((a, b) => {
     const byPath = a.evidence.path.localeCompare(b.evidence.path);
     if (byPath !== 0) return byPath;
@@ -191,7 +195,264 @@ const RULES: Rule[] = [
     id: "asset-references-superseded-asset",
     run: ({ documents }) => assetReferencesSupersededAssetFindings(documents),
   },
+  {
+    id: "catalog-declared-reference-governance",
+    run: ({ catalog }) => catalogDeclaredReferenceGovernanceFindings(catalog),
+  },
 ];
+
+function catalogDeclaredReferenceGovernanceFindings(
+  catalog: Catalog | undefined,
+): Finding[] {
+  if (!catalog) return [];
+
+  const resolver = createCatalogReferenceResolver(catalog.entries);
+  const findings: Finding[] = [
+    ...duplicateAssetIdFindings(catalog.entries),
+    ...unknownReferenceFindings(catalog.dependencies, resolver),
+    ...referenceDeprecatedAssetFindings(catalog.dependencies, resolver),
+    ...orphanedContextAssetFindings(
+      catalog.entries,
+      catalog.dependencies,
+      resolver,
+    ),
+  ];
+
+  return findings;
+}
+
+function duplicateAssetIdFindings(entries: CatalogEntry[]): Finding[] {
+  const entriesById = new Map<string, CatalogEntry[]>();
+
+  for (const entry of entries) {
+    entriesById.set(entry.id, [...(entriesById.get(entry.id) ?? []), entry]);
+  }
+
+  return [...entriesById.entries()].flatMap(([assetId, duplicates]) => {
+    if (duplicates.length < 2) return [];
+    const paths = duplicates.map((entry) => entry.sourcePath).sort();
+
+    return duplicates.map((entry) => ({
+      id: "META-DUPLICATE-ASSET-ID",
+      title: "Duplicate asset id",
+      category: "maintenance",
+      severity: "medium",
+      confidence: "high",
+      evidence: metadataFindingEvidence(
+        entry.sourcePath,
+        `Duplicate asset id: ${assetId}`,
+      ),
+      whyItMatters:
+        "Asset ids make skills, contexts, and support assets referenceable across the repository. Duplicate ids make dependency validation, ownership, and agent-readable cataloging ambiguous.",
+      remediation:
+        "Give each asset a unique stable id. If the assets represent the same source-of-truth knowledge, merge or deprecate one of them. If they are distinct, rename one id to reflect its actual scope.",
+      constraints: [
+        "Do not introduce runtime context resolution.",
+        "Do not create prompt packages.",
+        "Do not make Renma call an LLM.",
+        "Do not automatically rewrite ids during scan.",
+        "Update declared references through a reviewable patch after renaming an id.",
+      ],
+      verificationSteps: [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Run any project-specific validation checks that apply to this repository.",
+        "Confirm each asset id is unique and references still point to the intended asset.",
+      ],
+      llmHint: `Find all assets with id "${assetId}", compare their scope and metadata, and propose a merge/deprecation path or unique replacement ids. Duplicate paths: ${paths.join(", ")}`,
+    }));
+  });
+}
+
+function unknownReferenceFindings(
+  dependencies: Dependency[],
+  resolver: CatalogReferenceResolver,
+): Finding[] {
+  return dependencies.flatMap((dependency) => {
+    if (resolver.resolve(dependency.to)) return [];
+
+    return [
+      {
+        id: "META-UNKNOWN-REFERENCE",
+        title: "Declared reference does not resolve to a known asset",
+        category: "maintenance",
+        severity: "medium",
+        confidence: "high",
+        evidence:
+          dependency.evidence ??
+          metadataFindingEvidence(
+            dependency.sourcePath,
+            `Unresolved ${dependency.kind} reference: ${dependency.to}`,
+          ),
+        whyItMatters:
+          "Declared references make repository relationships visible to catalog, graph, and validation reports. Unknown references make skills and context assets harder for humans and agents to trust.",
+        remediation:
+          "Fix the reference so it points to an existing asset id or repository-relative path, or remove it if the relationship is no longer needed.",
+        constraints: [
+          "Do not select runtime context.",
+          "Do not assemble prompt packages.",
+          "Do not infer missing dependencies with an LLM during scan.",
+          "Only validate declared repository relationships.",
+        ],
+        verificationSteps: [
+          "Run renma scan.",
+          "Run renma catalog.",
+          "Confirm declared references resolve to known assets.",
+        ],
+        llmHint: `Search the repository for the intended asset by nearby filename, title, id, or path. Update or remove unresolved ${dependency.kind} reference "${dependency.to}" declared by "${dependency.from}".`,
+      },
+    ];
+  });
+}
+
+function referenceDeprecatedAssetFindings(
+  dependencies: Dependency[],
+  resolver: CatalogReferenceResolver,
+): Finding[] {
+  return dependencies.flatMap((dependency) => {
+    const target = resolver.resolve(dependency.to);
+    if (!target) return [];
+    if (
+      target.metadata.status !== "deprecated" &&
+      target.metadata.status !== "archived"
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        id: "MAINT-REFERENCE-DEPRECATED-ASSET",
+        title: "Declared reference targets a deprecated or archived asset",
+        category: "maintenance",
+        severity: "medium",
+        confidence: "high",
+        evidence:
+          dependency.evidence ??
+          metadataFindingEvidence(
+            dependency.sourcePath,
+            `Reference to ${target.metadata.status} asset: ${dependency.to}`,
+          ),
+        whyItMatters:
+          "Declared references to deprecated or archived assets can keep old knowledge in active repository paths. If a canonical replacement exists, assets should usually reference that replacement directly.",
+        remediation:
+          "Update the declared reference to point to the canonical replacement if one exists, or document why the deprecated or archived asset is still intentionally referenced.",
+        constraints: [
+          "Do not introduce runtime context resolution.",
+          "Do not create prompt packages.",
+          "Do not automatically rewrite references during scan.",
+          "Preserve compatibility shims when they are intentionally needed.",
+        ],
+        verificationSteps: [
+          "Run renma scan.",
+          "Run renma catalog.",
+          "Confirm active assets do not declare dependencies on deprecated or archived assets unless intentionally documented.",
+        ],
+        llmHint: `Inspect "${target.sourcePath}" for superseded_by or canonical context metadata. If a canonical replacement exists, update ${dependency.kind} reference "${dependency.to}" declared by "${dependency.from}". If not, decide whether the reference should remain and document why.`,
+      },
+    ];
+  });
+}
+
+function orphanedContextAssetFindings(
+  entries: CatalogEntry[],
+  dependencies: Dependency[],
+  resolver: CatalogReferenceResolver,
+): Finding[] {
+  const referencedPaths = new Set<string>();
+
+  for (const dependency of dependencies) {
+    const target = resolver.resolve(dependency.to);
+    const source = resolver.resolve(dependency.from);
+    if (!target) continue;
+    if (source?.sourcePath === target.sourcePath) continue;
+    referencedPaths.add(target.sourcePath);
+  }
+
+  return entries.flatMap((entry) => {
+    if (!isFirstClassSharedContext(entry)) return [];
+    if (
+      entry.metadata.status === "deprecated" ||
+      entry.metadata.status === "archived"
+    ) {
+      return [];
+    }
+    if (referencedPaths.has(entry.sourcePath)) return [];
+
+    return [
+      {
+        id: "MAINT-ORPHANED-CONTEXT-ASSET",
+        title: "Shared context asset is not referenced by other assets",
+        category: "maintenance",
+        severity: "low",
+        confidence: "medium",
+        evidence: metadataFindingEvidence(
+          entry.sourcePath,
+          "Shared context asset has no incoming declared references.",
+        ),
+        whyItMatters:
+          "Shared context assets are most valuable when discoverable and connected to skills, other contexts, or repository guidance. Orphaned context assets may be unused, newly created but not wired in, or missing declared references.",
+        remediation:
+          "If the context is intended to be used, reference it from the relevant skill or context metadata. If it is obsolete, deprecate or archive it. If it is intentionally standalone, document its intended discovery path.",
+        constraints: [
+          "Do not delete context assets automatically.",
+          "Do not require every context asset to be referenced immediately.",
+          "Do not make Renma decide runtime context selection.",
+          "Use this as a repository maintenance advisory.",
+        ],
+        verificationSteps: [
+          "Run renma scan.",
+          "Run renma catalog.",
+          "Confirm context is referenced, intentionally standalone, deprecated, or archived.",
+        ],
+        llmHint: `Search the repository for related skills, contexts, filenames, headings, or domain terms for "${entry.sourcePath}". If this context should be used, add a declared reference from the appropriate skill or context. If obsolete, propose a deprecation or archive patch.`,
+      },
+    ];
+  });
+}
+
+interface CatalogReferenceResolver {
+  resolve(reference: string): CatalogEntry | undefined;
+}
+
+function createCatalogReferenceResolver(
+  entries: CatalogEntry[],
+): CatalogReferenceResolver {
+  const byId = new Map<string, CatalogEntry>();
+  const byPath = new Map<string, CatalogEntry>();
+
+  for (const entry of entries) {
+    if (!byId.has(entry.id)) byId.set(entry.id, entry);
+    const normalizedPath = normalizeReference(entry.sourcePath);
+    if (!byPath.has(normalizedPath)) byPath.set(normalizedPath, entry);
+  }
+
+  return {
+    resolve(reference: string): CatalogEntry | undefined {
+      return byId.get(reference) ?? byPath.get(normalizeReference(reference));
+    },
+  };
+}
+
+function normalizeReference(reference: string): string {
+  return reference.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+function isFirstClassSharedContext(entry: CatalogEntry): boolean {
+  return (
+    entry.kind === "context" &&
+    (entry.sourcePath.startsWith("contexts/") ||
+      entry.sourcePath.startsWith("context/"))
+  );
+}
+
+function metadataFindingEvidence(path: string, snippet: string): Evidence {
+  return {
+    path,
+    startLine: 1,
+    endLine: 1,
+    snippet,
+  };
+}
 
 /** Return whether a severity is at least as severe as a configured threshold. */
 export function severityMeets(value: Severity, threshold: Severity): boolean {

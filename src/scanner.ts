@@ -17,7 +17,7 @@ export async function scan(
   const documents = artifacts.map(parseDocument);
   const catalogResult = buildCatalog(documents);
   const findings = [
-    ...runRules(documents),
+    ...runRules(documents, catalogResult.catalog),
     ...catalogDiagnosticFindings(catalogResult.diagnostics),
   ].sort((a, b) => {
     const byPath = a.evidence.path.localeCompare(b.evidence.path);

@@ -235,10 +235,13 @@ deprecated or superseded support file instead of the canonical shared context.
 This broader advisory helps remove hidden indirection after context promotion
 while preserving compatibility shims when they are intentionally needed.
 
-Renma should start with deterministic validation for fields it actually uses:
-duplicate IDs, invalid statuses, missing owner or ID on published shared context,
-unknown dependencies, dependencies on deprecated or archived assets, and
-conflicts that are declared but not visible in the catalog.
+Renma starts deterministic validation for fields it actually uses: duplicate IDs,
+invalid statuses, missing owner or ID on published shared context, unknown
+declared references, dependencies on deprecated or archived assets, and orphaned
+first-class shared context assets. Declared references resolve by exact asset ID
+or repository-relative path, with a leading `./` normalized away. Renma does not
+use fuzzy matching, semantic search, LLM inference, or runtime context selection
+for these checks.
 
 ## Dependency Model
 

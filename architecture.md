@@ -151,6 +151,8 @@ Initial edge kinds:
 
 Edges should carry source evidence: source path, line range, declaration form, and reason where available.
 
+Declared reference validation is deterministic. Renma resolves references by exact asset ID or repository-relative path, with only a leading `./` normalized away for path compatibility. Unknown declared references, duplicate asset IDs, references to deprecated or archived assets, and orphaned first-class shared context assets are reported as repository-governance findings. Renma does not use fuzzy matching, semantic search, LLM inference, or runtime context selection for these checks.
+
 ## Architecture
 
 ```text
