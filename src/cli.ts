@@ -2,6 +2,10 @@ import { parseArgs } from "node:util";
 import packageJson from "../package.json" with { type: "json" };
 import { runCatalogCommand, type CatalogFormat } from "./commands/catalog.js";
 import { runInspectCommand, type InspectFormat } from "./commands/inspect.js";
+import {
+  runOwnershipCommand,
+  type OwnershipFormat,
+} from "./commands/ownership.js";
 import { runScanCommand } from "./commands/scan.js";
 import {
   runSuggestSemanticSplitCommand,
@@ -49,6 +53,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   if (
     command !== "scan" &&
     command !== "catalog" &&
+    command !== "ownership" &&
     command !== "suggest-semantic-split" &&
     command !== "inspect"
   ) {
@@ -69,6 +74,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
   if (command === "catalog") {
     return runCatalog(parsed.values, target);
+  }
+
+  if (command === "ownership") {
+    return runOwnership(parsed.values, target);
   }
 
   return runScan(parsed.values, target);
@@ -121,6 +130,33 @@ async function runCatalog(values: CliValues, target: string): Promise<number> {
   try {
     return await runCatalogCommand(target, {
       format: format as CatalogFormat,
+      overrides,
+    });
+  } catch (error) {
+    console.error(
+      error instanceof ConfigError || error instanceof Error
+        ? error.message
+        : String(error),
+    );
+    return 2;
+  }
+}
+
+async function runOwnership(values: CliValues, target: string): Promise<number> {
+  const format = values.json ? "json" : (stringValue(values.format) ?? "json");
+  if (format !== "json" && format !== "markdown") {
+    console.error("--format must be either json or markdown.");
+    return 2;
+  }
+
+  const configPath = stringValue(values.config);
+  const overrides: ConfigOverrides = {
+    ...(configPath ? { configPath } : {}),
+  };
+
+  try {
+    return await runOwnershipCommand(target, {
+      format: format as OwnershipFormat,
       overrides,
     });
   } catch (error) {
@@ -221,12 +257,14 @@ function helpText(): string {
     "Additional usage:",
     "  renma scan [path] [options]",
     "  renma catalog [path] [options]",
+    "  renma ownership [path] [options]",
     "  renma inspect <file> [options]",
     "  renma suggest-semantic-split <file> [options]",
     "",
     "Commands:",
     "  scan                       Scan a repository or skill directory",
     "  catalog                    Print deterministic normalized asset catalog",
+    "  ownership                  Print deterministic ownership coverage report",
     "  inspect                    Inspect repository files/assets by outline or exact line slice",
     "  suggest-semantic-split     Print a Codex-ready semantic split prompt",
     "",
@@ -235,7 +273,7 @@ function helpText(): string {
     "Options:",
     "  -c, --config <path>        scan: read JSON config from path",
     "      --fail-on <level>      scan: exit 1 when findings meet severity: low, medium, high, critical",
-    "      --format <format>      scan: text or json; catalog: json or markdown; suggest-semantic-split: prompt or json",
+    "      --format <format>      scan: text or json; catalog/ownership: json or markdown; suggest-semantic-split: prompt or json",
     "      --json                 Shortcut for --format json",
     "      --lines <range>        inspect: exact line range, e.g. L10-L42",
     "      --max-source-bytes <n> suggest-semantic-split: source file byte budget",
