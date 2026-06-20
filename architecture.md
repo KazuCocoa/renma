@@ -427,9 +427,12 @@ renma scan [path]
 renma catalog [path]
 renma graph [path]
 renma ownership [path]
+renma readiness [path]
 renma inspect <file>
 renma suggest-semantic-split <file>
 ```
+
+`renma readiness` summarizes static repository health for human and external-agent review. It composes the graph/catalog model into deterministic score, level, metric, check, and diagnostic output; it does not call LLMs, select runtime context, assemble prompts, or repair files.
 
 `renma inspect` inspects repository files and context assets by outline or line range. It does not choose task context or assemble prompts.
 
@@ -446,10 +449,10 @@ Baseline now in place:
 - Unknown dependency and reference detection.
 - Deprecated or archived dependency validation.
 - Orphaned context asset detection.
+- Agent readiness report.
 
 Near-term implementation work:
 
-- Agent readiness report.
 - Repeated context discovery across shared contexts, skills, agents, references, profiles, and examples.
 - Optional LLM-assisted repository evaluation bundles.
 
