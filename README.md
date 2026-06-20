@@ -238,6 +238,7 @@ Current rules include:
 - Profile overlays missing base skill declaration
 - Advisory reusable-context candidates in `SKILL.md` files with enough size and diverse setup, troubleshooting, platform, testing, risk, or domain-rule signals
 - Advisory shared-context candidates in large `skills/*/references/**/*.md` support files with generic source-of-truth headings and reusable guidance phrases
+- Advisory shared-context assets under process-state folders such as `contexts/promoted/`, `contexts/generated/`, or `contexts/drafts/` that should become semantic final paths
 - Literal secret-like values
 - Private key material
 - Destructive commands without nearby confirmation or recovery context

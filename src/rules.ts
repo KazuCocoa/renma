@@ -104,6 +104,27 @@ const SUPPORT_SHARED_CONTEXT_PHRASE_PATTERNS: Array<[RegExp, string]> = [
   [/\bvalidate\b/i, "validate"],
   [/\bverify\b/i, "verify"],
 ];
+const NON_SEMANTIC_CONTEXT_PATH_SEGMENTS = new Set([
+  "promoted",
+  "generated",
+  "split",
+  "migrated",
+  "migration",
+  "new",
+  "old",
+  "tmp",
+  "temp",
+  "draft",
+  "drafts",
+  "wip",
+  "misc",
+  "miscellaneous",
+  "todo",
+  "review",
+  "staging",
+  "candidate",
+  "candidates",
+]);
 const CONTEXT_TOKEN_LIMITS = {
   context: 1200,
   profile: 500,
@@ -147,6 +168,11 @@ const RULES: Rule[] = [
     id: "support-asset-shared-context-candidate",
     run: ({ documents }) =>
       documents.flatMap((document) => supportSharedContextCandidateFindings(document)),
+  },
+  {
+    id: "context-path-non-semantic",
+    run: ({ documents }) =>
+      documents.flatMap((document) => contextPathNonSemanticFindings(document)),
   },
 ];
 
@@ -599,6 +625,57 @@ function supportSharedContextCandidateFindings(
       ],
       llmHint:
         "Search the repository for similar headings, filenames, repeated procedures, commands, constraints, or overlapping guidance. If this support file appears reusable, propose a first-class context asset under contexts/, move the reusable details without losing information, keep truly local notes in the skill directory, and update declared context references.",
+    },
+  ];
+}
+
+function contextPathNonSemanticFindings(document: ParsedDocument): Finding[] {
+  if (document.artifact.kind !== "context") return [];
+
+  const segments = document.artifact.path.split("/");
+  const root = segments[0];
+  if (root !== "context" && root !== "contexts") return [];
+
+  const suspiciousSegment = segments
+    .slice(1, -1)
+    .find((segment) =>
+      NON_SEMANTIC_CONTEXT_PATH_SEGMENTS.has(segment.toLowerCase()),
+    );
+  if (!suspiciousSegment) return [];
+
+  return [
+    {
+      id: "MAINT-CONTEXT-PATH-NON-SEMANTIC",
+      title: "Context asset path appears process-oriented rather than semantic",
+      category: "maintenance",
+      severity: "low",
+      confidence: "high",
+      evidence: evidence(
+        document,
+        1,
+        `Path segment "${suspiciousSegment}" appears process-oriented. Consider a semantic context path.`,
+      ),
+      whyItMatters:
+        "Shared context assets should be discoverable by their meaning, ownership, domain, tool, team, or policy scope. Process-state folders such as promoted, generated, or drafts describe how a file was created rather than what knowledge it owns, which makes the repository harder for humans and agents to navigate over time.",
+      remediation:
+        "Move this context asset to a semantic path that reflects its source-of-truth scope. Prefer paths such as contexts/tools/<tool>/..., contexts/domain/<domain>/..., contexts/testing/..., contexts/teams/<team>/..., or contexts/policies/.... Update any declared context references after moving the file.",
+      constraints: [
+        "Do not introduce runtime context resolution.",
+        "Do not create prompt packages.",
+        "Do not make Renma call an LLM.",
+        "Do not move files automatically as part of scan.",
+        "Preserve the context content and metadata.",
+        "Update references only through a reviewable human or calling-agent patch.",
+        "Temporary staging folders are acceptable outside final contexts/ paths, but final shared context assets should use semantic paths.",
+      ],
+      verificationSteps: [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Run project-specific validation checks that apply to this repository.",
+        "Confirm the context asset now lives under a semantic path and declared references still point to it correctly.",
+      ],
+      llmHint:
+        "Infer semantic scope from context title, headings, metadata, and references. Propose a path based on meaning, ownership, or reuse domain, such as contexts/tools/<tool>/..., contexts/domain/<domain>/..., contexts/testing/..., contexts/teams/<team>/..., or contexts/policies/.... Avoid final folders named after migration state such as promoted or generated.",
     },
   ];
 }

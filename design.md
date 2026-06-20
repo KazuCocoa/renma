@@ -114,6 +114,12 @@ Central repair workflow:
 5. Renma scans the repository again and confirms the skill/context separation is
    healthier.
 
+Optional LLM-assisted evaluation is advisory and outside core validation. See
+`architecture.md` section `Optional LLM Evaluation Boundary` for the rule:
+`scan`, catalog construction, and deterministic rule evaluation do not call an
+LLM; optional helpers may prepare review bundles or suggestions for a human or
+calling agent to apply.
+
 ## Repository Model
 
 The target repository shape gives shared context assets first-class space:
@@ -162,6 +168,8 @@ supporting text. When knowledge is reusable across skills, teams, tools, or
 agents, it should move into `contexts/` as an owned context asset.
 
 Renma can also flag large skill-local support files as shared-context candidates when they contain generic source-of-truth structure such as setup, decision logic, troubleshooting, validation, constraints, policy, or procedure guidance. This advisory does not decide semantic reuse itself. It surfaces structurally broad support files and asks the calling LLM or human to inspect the repository for similar concepts, overlapping guidance, and reuse opportunities before making a reviewable patch.
+
+Shared context assets should be organized by semantic scope, not migration state. Folders such as `contexts/promoted/` or `contexts/generated/` can be useful temporary staging concepts, but final context assets should live under meaning-oriented paths such as `contexts/tools/...`, `contexts/domain/...`, `contexts/testing/...`, `contexts/teams/...`, `contexts/policies/...`, or `contexts/platform/...`.
 
 ## Artifact Kinds
 

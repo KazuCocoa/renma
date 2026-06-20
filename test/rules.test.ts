@@ -535,6 +535,91 @@ Verify the workflow after each fix and record the checked command.
   assert.doesNotMatch(JSON.stringify(finding), /runtime[- ]resolver/i);
 });
 
+test("scan advises when shared context paths use process-state segments", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
+  await mkdir(path.join(root, "contexts", "promoted"), { recursive: true });
+  await writeFile(
+    path.join(root, "contexts", "promoted", "workflow-setup.md"),
+    `---
+id: workflow.setup
+owner: platform
+status: stable
+---
+
+# Workflow Setup
+
+Use this context when reviewing workflow setup ownership.
+`,
+  );
+
+  const result = await scan(root);
+  const finding = result.findings.find(
+    (candidate) => candidate.id === "MAINT-CONTEXT-PATH-NON-SEMANTIC",
+  );
+
+  assert.equal(finding?.severity, "low");
+  assert.equal(finding?.confidence, "high");
+  assert.equal(finding?.category, "maintenance");
+  assert.equal(finding?.evidence.path, "contexts/promoted/workflow-setup.md");
+  assert.match(finding?.evidence.snippet ?? "", /promoted/);
+  assert.match(finding?.remediation ?? "", /contexts\/tools\/<tool>/);
+  assert.ok(finding?.constraints?.length);
+  assert.ok(finding?.verificationSteps?.length);
+  assert.match(finding?.llmHint ?? "", /Infer semantic scope/);
+  assert.doesNotMatch(JSON.stringify(finding), /runtime[- ]resolver/i);
+});
+
+test("scan accepts semantic shared context path families", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
+  const paths = [
+    path.join(root, "contexts", "tools", "runner", "setup.md"),
+    path.join(root, "contexts", "domain", "payment", "idempotency.md"),
+    path.join(root, "contexts", "testing", "boundary-value-analysis.md"),
+  ];
+  for (const filePath of paths) {
+    await mkdir(path.dirname(filePath), { recursive: true });
+    await writeFile(
+      filePath,
+      `---
+id: ${path.basename(filePath, ".md")}
+owner: platform
+status: stable
+---
+
+# Context
+
+Reusable source-of-truth context.
+`,
+    );
+  }
+
+  const result = await scan(root);
+
+  assert.ok(
+    !result.findings.some(
+      (finding) => finding.id === "MAINT-CONTEXT-PATH-NON-SEMANTIC",
+    ),
+  );
+});
+
+test("scan does not inspect non-context staging folders as context path findings", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
+  await mkdir(path.join(root, ".migration", "promoted"), { recursive: true });
+  await writeFile(
+    path.join(root, ".migration", "promoted", "workflow-setup.md"),
+    "# Workflow Setup\n",
+  );
+
+  const result = await scan(root);
+
+  assert.equal(result.scannedFileCount, 0);
+  assert.ok(
+    !result.findings.some(
+      (finding) => finding.id === "MAINT-CONTEXT-PATH-NON-SEMANTIC",
+    ),
+  );
+});
+
 test("scan treats support files referenced through an index reference as reachable", async () => {
   const root = await fixture();
   const skillDir = path.join(root, "skills", "setup");

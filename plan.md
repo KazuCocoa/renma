@@ -98,6 +98,7 @@ Renma should:
 - Emit structured, LLM-actionable diagnostics that humans and agents can use to repair the repository safely.
 - Suggest improvements without requiring an LLM.
 - Advise when large skill-local support files have generic source-of-truth structure that a human or calling LLM should inspect for possible promotion into owned shared context assets under `contexts/`.
+- Advise when final shared context assets live under process-state folders such as `promoted`, `generated`, or `drafts` instead of semantic paths organized by meaning, ownership, team, domain, tool, policy, or platform.
 
 Renma should not:
 

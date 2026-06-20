@@ -189,6 +189,44 @@ Renma core remains deterministic: scan, catalog, validate, and emit structured
 findings. Optional helpers may produce LLM-friendly suggestions, but core
 validation does not call an LLM or apply semantic rewrites.
 
+## Optional LLM Evaluation Boundary
+
+Renma core is deterministic. LLM evaluation is optional and advisory.
+Repository repair remains outside Renma.
+
+Core commands such as `scan`, catalog construction, and rule evaluation should
+not require or call an LLM. Given the same repository, configuration, and Renma
+version, core validation should produce the same diagnostics. This keeps Renma
+suitable for CI, code review, reproducible governance checks, and trustable
+repository health reports.
+
+Some repository improvement tasks are semantic by nature: finding similar or
+overlapping knowledge across skills and contexts, deciding whether a
+skill-local reference should be promoted to `contexts/`, evaluating whether two
+context assets are duplicates, suggesting context asset names and boundaries, or
+reviewing a semantic split proposal. Renma may support optional LLM-assisted
+evaluation for these tasks, but those workflows should operate on explicit
+inputs such as scan findings, catalog snapshots, selected files, or generated
+review bundles. `suggest-semantic-split` is an example: it prepares a bounded
+review bundle or prompt, does not call a provider, and does not rewrite files.
+
+LLM-assisted workflows should produce suggestions, review bundles, or patch
+guidance. They must not silently rewrite the repository, select task context,
+assemble prompt packages, execute tools, orchestrate agents, or become required
+for validation. Diagnostics such as
+`MAINT-SKILL-REUSABLE-CONTEXT-CANDIDATE` and
+`MAINT-SUPPORT-ASSET-SHARED-CONTEXT-CANDIDATE` can guide a calling LLM or human
+toward semantic review, but Renma itself remains the deterministic evaluator.
+
+The repair loop stays reviewable:
+
+```text
+renma scan/catalog -> deterministic diagnostics or review bundle
+human or calling agent -> proposes a repository patch
+human review -> accepts or edits the patch
+renma scan/catalog -> validates the result deterministically
+```
+
 ## Metadata
 
 Renma should validate a small stable subset first:
