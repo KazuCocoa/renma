@@ -53,7 +53,9 @@ export async function ownership(
   const assets = stableAssets(result.catalog.assets);
   const totalAssets = assets.length;
   const ownedAssets = assets.filter(hasOwner).length;
-  const unownedAssetList = assets.filter((asset) => !hasOwner(asset)).map(toUnownedAsset);
+  const unownedAssetList = assets
+    .filter((asset) => !hasOwner(asset))
+    .map(toUnownedAsset);
 
   return {
     root: result.root,
@@ -113,9 +115,15 @@ export function formatOwnershipMarkdown(report: OwnershipReport): string {
 }
 
 function summarizeByKind(assets: Asset[]): OwnershipKindSummary[] {
-  const summaries = new Map<AssetKind, { totalAssets: number; ownedAssets: number }>();
+  const summaries = new Map<
+    AssetKind,
+    { totalAssets: number; ownedAssets: number }
+  >();
   for (const asset of assets) {
-    const summary = summaries.get(asset.kind) ?? { totalAssets: 0, ownedAssets: 0 };
+    const summary = summaries.get(asset.kind) ?? {
+      totalAssets: 0,
+      ownedAssets: 0,
+    };
     summary.totalAssets += 1;
     if (hasOwner(asset)) summary.ownedAssets += 1;
     summaries.set(asset.kind, summary);
@@ -153,7 +161,9 @@ function toUnownedAsset(asset: Asset): UnownedAsset {
 }
 
 function hasOwner(asset: Asset): boolean {
-  return asset.metadata.owner !== undefined && asset.metadata.owner.trim().length > 0;
+  return (
+    asset.metadata.owner !== undefined && asset.metadata.owner.trim().length > 0
+  );
 }
 
 function percent(numerator: number, denominator: number): number {

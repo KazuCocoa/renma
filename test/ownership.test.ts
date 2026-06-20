@@ -4,7 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { main } from "../src/cli.js";
-import { formatOwnershipMarkdown, ownership } from "../src/commands/ownership.js";
+import {
+  formatOwnershipMarkdown,
+  ownership,
+} from "../src/commands/ownership.js";
 
 test("ownership report counts all assets owned", async () => {
   const root = await fixture();

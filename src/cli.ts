@@ -142,7 +142,10 @@ async function runCatalog(values: CliValues, target: string): Promise<number> {
   }
 }
 
-async function runOwnership(values: CliValues, target: string): Promise<number> {
+async function runOwnership(
+  values: CliValues,
+  target: string,
+): Promise<number> {
   const format = values.json ? "json" : (stringValue(values.format) ?? "json");
   if (format !== "json" && format !== "markdown") {
     console.error("--format must be either json or markdown.");
