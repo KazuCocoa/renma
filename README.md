@@ -62,7 +62,7 @@ contexts/
 
 ## What Renma Does
 
-Today Renma is a minimal-dependency TypeScript CLI that scans AI-agent skills, repository instructions, shared context Markdown, profile overlays, references, and examples. It runs deterministic quality, structure, and safety rules, then emits text or JSON reports with file and line evidence.
+Today Renma is a minimal-dependency TypeScript CLI that scans AI-agent skills, repository instructions, shared context Markdown, profile overlays, references, and examples. It runs deterministic quality, structure, and safety rules, then emits text or JSON reports with file and line evidence. It also emits deterministic catalog and ownership coverage reports from the same local catalog model.
 
 Renma findings are intended to be actionable repair prompts for humans and LLM
 tools such as Codex, Claude, and Cursor. Findings should explain what is wrong,
@@ -79,6 +79,7 @@ Completed baseline:
 - Structural quality checks for skills, shared context assets, and local support files
 - Safety checks for risky instructions and literal secrets
 - Deterministic catalog output for assets and dependency metadata
+- Deterministic ownership coverage reporting for cataloged assets
 - Deterministic metadata governance for duplicate asset IDs, unknown declared references, references to deprecated or archived assets, and orphaned shared context assets
 - Repository file outline and line-slice inspection helper
 - Semantic split prompt helper for oversized context files
@@ -87,7 +88,6 @@ Completed baseline:
 
 Near-term direction:
 
-- Ownership coverage reporting
 - Context graph snapshot and reporting
 - Agent readiness report
 - Repeated context and duplicate knowledge discovery
@@ -126,6 +126,7 @@ renma scan .
 ```bash
 renma scan [path] [options]
 renma catalog [path] [options]
+renma ownership [path] [options]
 renma inspect <file> [options]
 renma suggest-semantic-split <file> [options]
 ```
@@ -137,7 +138,8 @@ Options:
 ```text
 -c, --config <path>      Read JSON config from path
     --fail-on <level>    Exit 1 when findings meet severity: low, medium, high, critical
-    --format <format>    scan: text or json; catalog: json or markdown; suggest: prompt or json
+    --format <format>    scan: text or json; catalog/ownership: json or markdown; suggest: prompt or json
+    --include-owned      ownership: include owned asset details
     --json               Shortcut for --format json
     --lines <range>      inspect: exact line range, e.g. L10-L42
     --max-source-bytes <n>
@@ -157,6 +159,9 @@ renma scan . --fail-on medium
 renma scan . --config ./renma.config.json
 renma catalog . --format markdown
 renma catalog . --json
+renma ownership . --format markdown
+renma ownership . --json
+renma ownership . --json --include-owned
 renma inspect contexts/testing/boundary-value-analysis.md --format json
 renma inspect contexts/testing/boundary-value-analysis.md --lines L40-L90 --format text
 renma suggest-semantic-split contexts/tools/appium/usage-guideline.md

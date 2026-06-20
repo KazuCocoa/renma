@@ -325,11 +325,11 @@ Renma keeps those assets clean, owned, validated, deduplicated, and easy for age
 - Deprecated or archived declared reference validation
 - Orphaned shared context asset detection
 - Superseded local support asset reference advisories
+- Ownership coverage reporting
 - LLM-actionable finding fields for safe external repair loops
 
 ### Near-Term Implementation
 
-- Ownership coverage reporting
 - Context graph snapshot and reporting
 - Agent readiness report
 - Repeated context and duplicate knowledge discovery
