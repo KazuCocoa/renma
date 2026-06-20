@@ -235,10 +235,13 @@ deprecated or superseded support file instead of the canonical shared context.
 This broader advisory helps remove hidden indirection after context promotion
 while preserving compatibility shims when they are intentionally needed.
 
-Renma should start with deterministic validation for fields it actually uses:
-duplicate IDs, invalid statuses, missing owner or ID on published shared context,
-unknown dependencies, dependencies on deprecated or archived assets, and
-conflicts that are declared but not visible in the catalog.
+Renma starts deterministic validation for fields it actually uses: duplicate IDs,
+invalid statuses, missing owner or ID on published shared context, unknown
+declared references, dependencies on deprecated or archived assets, and orphaned
+first-class shared context assets. Declared references resolve by exact asset ID
+or repository-relative path, with a leading `./` normalized away. Renma does not
+use fuzzy matching, semantic search, LLM inference, or runtime context selection
+for these checks.
 
 ## Dependency Model
 
@@ -277,17 +280,16 @@ the authority.
 
 ## Rules
 
-Early deterministic rules should focus on repository health:
+Implemented deterministic rules focus on repository health:
 
 - Missing context asset ID
 - Missing owner on shared context assets
 - Invalid lifecycle status
 - Duplicate asset IDs
-- Missing required dependency
-- Dependency on deprecated or archived context
-- Declared conflict not present in the catalog
+- Unknown declared references
+- Declared dependency on deprecated or archived context
 - Orphaned shared context asset
-- Broken Markdown links
+- Superseded local support asset reference advisories
 - Oversized skill entrypoint
 - Skill may contain reusable context worth extracting
 - Oversized context or skill-local support file
@@ -300,6 +302,9 @@ Early deterministic rules should focus on repository health:
 - Risky remote defaults
 - Broad environment copying into subprocesses
 - Hardcoded user-local paths in reusable guidance
+
+Near-term reporting should cover ownership coverage, context graph snapshots,
+agent readiness, repeated context discovery, and semantic diffs.
 
 Passing Renma checks does not prove a workflow is safe. It means the repository
 met the deterministic governance checks that were enabled.

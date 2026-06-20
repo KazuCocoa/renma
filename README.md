@@ -71,7 +71,7 @@ how to verify the fix. Renma does not apply large semantic rewrites itself; it
 emits structured diagnostics so a human or agent can propose a reviewable patch
 and run Renma again.
 
-Current capabilities:
+Completed baseline:
 
 - Bounded filesystem discovery
 - Stable POSIX-style repo-relative paths
@@ -79,21 +79,20 @@ Current capabilities:
 - Structural quality checks for skills, shared context assets, and local support files
 - Safety checks for risky instructions and literal secrets
 - Deterministic catalog output for assets and dependency metadata
+- Deterministic metadata governance for duplicate asset IDs, unknown declared references, references to deprecated or archived assets, and orphaned shared context assets
 - Repository file outline and line-slice inspection helper
 - Semantic split prompt helper for oversized context files
 - CI-friendly exit behavior with `--fail-on`
 - Config loading from `renma.config.json` and `.renma.json`
 
-Planned direction:
+Near-term direction:
 
-- First-class shared context asset validation
-- Catalog snapshots
-- Dependency and reference graph snapshots
-- Graph-backed validation
-- Orphaned, deprecated, missing, invalid, and conflicting context detection
+- Ownership coverage reporting
+- Context graph snapshot and reporting
+- Agent readiness report
 - Repeated context and duplicate knowledge discovery
 - Semantic diff for context changes
-- Agent readiness reports
+- Optional LLM-assisted repository evaluation bundles
 - Optional external signal import
 
 See [architecture.md](./architecture.md) and [plan.md](./plan.md) for the current design direction.
@@ -233,7 +232,7 @@ Current rules include:
 - Missing skill description, examples, preflight, verification, negative routing, or explicit routing clarity
 - Short frontmatter descriptions
 - Oversized `SKILL.md` entrypoints
-- Metadata governance findings surfaced through `scan`, including invalid lifecycle status values and missing shared context `id` or `owner`
+- Metadata governance findings surfaced through `scan`, including invalid lifecycle status values, missing shared context `id` or `owner`, duplicate asset IDs, unknown declared references, declared references to deprecated or archived assets, and orphaned shared context assets
 - Oversized shared context assets or local support files in `contexts/`, `context/`, `profiles/`, `references/`, and `examples/`
 - Unreachable skill-local profiles, references, and examples
 - Profile overlays missing base skill declaration
@@ -248,6 +247,8 @@ Current rules include:
 - Risky remote defaults
 - Broad environment copying into subprocesses
 - Hardcoded user-local paths
+
+Declared reference validation resolves exact asset IDs and repository-relative paths, including paths with a leading `./` normalized away. It does not perform fuzzy matching, semantic lookup, runtime context selection, or prompt assembly.
 
 Static checks are evidence. Passing a scan does not prove a repository or agent workflow is safe.
 

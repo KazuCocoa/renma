@@ -1296,6 +1296,215 @@ Verify the result with a command.
   assert.ok(!ids.includes("QUAL-USER-LOCAL-PATHS"));
 });
 
+test("scan detects duplicate asset ids", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "contexts", "alpha"), { recursive: true });
+  await mkdir(path.join(root, "contexts", "beta"), { recursive: true });
+
+  await writeFile(
+    path.join(root, "contexts", "alpha", "overview.md"),
+    `---
+id: shared.duplicate
+owner: platform
+status: stable
+---
+
+# Alpha
+`,
+  );
+  await writeFile(
+    path.join(root, "contexts", "beta", "overview.md"),
+    `---
+id: shared.duplicate
+owner: platform
+status: stable
+---
+
+# Beta
+`,
+  );
+
+  const result = await scan(root);
+  const duplicateFindings = result.findings.filter(
+    (finding) => finding.id === "META-DUPLICATE-ASSET-ID",
+  );
+
+  assert.equal(duplicateFindings.length, 2);
+  assert.deepEqual(
+    duplicateFindings.map((finding) => finding.evidence.path).sort(),
+    ["contexts/alpha/overview.md", "contexts/beta/overview.md"],
+  );
+  assert.ok(duplicateFindings.every((finding) => finding.llmHint));
+});
+
+test("scan detects unknown declared references", async () => {
+  const root = await fixture();
+  const skillDir = path.join(root, "skills", "demo");
+  await mkdir(skillDir, { recursive: true });
+
+  await writeFile(
+    path.join(skillDir, "SKILL.md"),
+    `---
+id: demo
+description: Demo skill with declared context relationships.
+requires_context: missing.context
+---
+
+# Demo
+
+## Preflight
+Review declared context before acting.
+
+## Verification
+Verify the result.
+`,
+  );
+
+  const result = await scan(root);
+  const finding = result.findings.find(
+    (candidate) => candidate.id === "META-UNKNOWN-REFERENCE",
+  );
+
+  assert.equal(finding?.evidence.path, "skills/demo/SKILL.md");
+  assert.equal(finding?.severity, "medium");
+  assert.match(finding?.llmHint ?? "", /missing\.context/);
+});
+
+test("scan detects declared references to deprecated or archived assets", async () => {
+  const root = await fixture();
+  const skillDir = path.join(root, "skills", "demo");
+  await mkdir(skillDir, { recursive: true });
+  await mkdir(path.join(root, "contexts", "legacy"), { recursive: true });
+
+  await writeFile(
+    path.join(skillDir, "SKILL.md"),
+    `---
+id: demo
+description: Demo skill with declared context relationships.
+requires_context: legacy.context
+---
+
+# Demo
+
+## Preflight
+Review declared context before acting.
+
+## Verification
+Verify the result.
+`,
+  );
+  await writeFile(
+    path.join(root, "contexts", "legacy", "context.md"),
+    `---
+id: legacy.context
+owner: platform
+status: deprecated
+---
+
+# Legacy Context
+`,
+  );
+
+  const result = await scan(root);
+  const ids = result.findings.map((finding) => finding.id);
+  const finding = result.findings.find(
+    (candidate) => candidate.id === "MAINT-REFERENCE-DEPRECATED-ASSET",
+  );
+
+  assert.ok(finding);
+  assert.equal(finding?.evidence.path, "skills/demo/SKILL.md");
+  assert.ok(!ids.includes("META-UNKNOWN-REFERENCE"));
+});
+
+test("scan detects orphaned first-class context assets", async () => {
+  const root = await fixture();
+  const skillDir = path.join(root, "skills", "demo");
+  await mkdir(skillDir, { recursive: true });
+  await mkdir(path.join(root, "contexts", "shared"), { recursive: true });
+
+  await writeFile(
+    path.join(skillDir, "SKILL.md"),
+    `---
+id: demo
+description: Demo skill with declared context relationships.
+requires_context: contexts/shared/referenced.md
+---
+
+# Demo
+
+## Preflight
+Review declared context before acting.
+
+## Verification
+Verify the result.
+`,
+  );
+  await writeFile(
+    path.join(root, "contexts", "shared", "referenced.md"),
+    `---
+id: shared.referenced
+owner: platform
+status: stable
+---
+
+# Referenced Context
+`,
+  );
+  await writeFile(
+    path.join(root, "contexts", "shared", "orphan.md"),
+    `---
+id: shared.orphan
+owner: platform
+status: stable
+---
+
+# Orphan Context
+`,
+  );
+
+  const result = await scan(root);
+  const orphanPaths = result.findings
+    .filter((finding) => finding.id === "MAINT-ORPHANED-CONTEXT-ASSET")
+    .map((finding) => finding.evidence.path);
+
+  assert.deepEqual(orphanPaths, ["contexts/shared/orphan.md"]);
+});
+
+test("scan does not report archived or deprecated contexts as orphaned", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "contexts", "archive"), { recursive: true });
+
+  await writeFile(
+    path.join(root, "contexts", "archive", "old.md"),
+    `---
+id: archive.old
+owner: platform
+status: archived
+---
+
+# Old Context
+`,
+  );
+  await writeFile(
+    path.join(root, "contexts", "archive", "deprecated.md"),
+    `---
+id: archive.deprecated
+owner: platform
+status: deprecated
+---
+
+# Deprecated Context
+`,
+  );
+
+  const result = await scan(root);
+  const orphanPaths = result.findings
+    .filter((finding) => finding.id === "MAINT-ORPHANED-CONTEXT-ASSET")
+    .map((finding) => finding.evidence.path);
+
+  assert.deepEqual(orphanPaths, []);
+});
+
 async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
 }
