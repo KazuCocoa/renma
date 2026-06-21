@@ -146,6 +146,7 @@ Options:
     --format <format>    scan: text or json; catalog/ownership: json or markdown; graph: json, markdown, or mermaid; suggest: prompt or json
     --include-owned      ownership: include owned asset details
     --json               Shortcut for --format json
+    --view <view>        graph: summary, workflow, or full
     --lines <range>      inspect: exact line range, e.g. L10-L42
     --max-source-bytes <n>
                           suggest-semantic-split: source file byte budget
