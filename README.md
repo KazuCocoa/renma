@@ -185,11 +185,14 @@ By default, Renma looks for:
 skills/**/SKILL.md
 .agents/**/*.md
 AGENTS.md
+README.md
 context/**/*.md
 contexts/**/*.md
 skills/**/profiles/**/*.md
 skills/**/references/**/*.md
 skills/**/examples/**/*.md
+skills/**/scripts/**/*
+tools/**/*
 ```
 
 It skips `node_modules`, `dist`, and `.git`, ignores symbolic links, enforces a maximum file size, and reports paths in stable POSIX-style form.
@@ -234,6 +237,9 @@ Supported fields:
 - `max_file_size_bytes`: positive integer
 - `max_depth`: positive integer
 - `concurrency`: positive integer
+- `layout`: optional strict layout policy configuration
+  - `tool_namespace`: optional namespace for suggested `contexts/tools/<namespace>/...` and `tools/<namespace>/...` paths
+  - `workflow_aliases`: map of skill directory names to canonical workflow directory names
 
 Invalid config fields exit with code `2`.
 
