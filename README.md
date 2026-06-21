@@ -175,7 +175,7 @@ renma readiness . --format markdown
 renma readiness . --json
 renma inspect contexts/testing/boundary-value-analysis.md --format json
 renma inspect contexts/testing/boundary-value-analysis.md --lines L40-L90 --format text
-renma suggest-semantic-split contexts/tools/appium/usage-guideline.md
+renma suggest-semantic-split contexts/testing/boundary-value-analysis.md
 ```
 
 ## What Gets Scanned

@@ -47,7 +47,11 @@ export interface GraphEdge {
 
 export async function runGraphCommand(
   targetPath: string,
-  options: { format: GraphFormat; view?: GraphView; overrides?: ConfigOverrides },
+  options: {
+    format: GraphFormat;
+    view?: GraphView;
+    overrides?: ConfigOverrides;
+  },
 ): Promise<number> {
   const report = await graph(targetPath, options.overrides ?? {});
   const view = options.view ?? defaultGraphView(options.format);
@@ -347,7 +351,8 @@ function keepWorkflowNode(sourcePath: string): boolean {
   return (
     name === "routing.md" ||
     name === "triage.md" ||
-    name === "procedure-part1.md" ||
+    name === "index.md" ||
+    name === "README.md" ||
     /-environment\.md$/.test(name) ||
     /-readiness\.md$/.test(name) ||
     directWorkflowContext(path, name)
