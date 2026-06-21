@@ -218,7 +218,10 @@ Example:
   "exclude": ["node_modules", "dist", ".git"],
   "max_file_size_bytes": 524288,
   "max_depth": 16,
-  "concurrency": 16
+  "concurrency": 16,
+  "layout": {
+    "workflow_aliases": {}
+  }
 }
 ```
 
@@ -233,6 +236,15 @@ Supported fields:
 - `concurrency`: positive integer
 
 Invalid config fields exit with code `2`.
+
+## Layout Policy
+
+Strict layout diagnostics are generic by default. Renma suggests context assets under `contexts/<workflow>/...` and helper assets under `tools/<workflow>/...` unless a repository config adds a tool namespace.
+
+- `layout.tool_namespace` is optional. When set, it controls the namespace used in suggested `contexts/tools/<namespace>/...` and `tools/<namespace>/...` paths. When omitted, Renma suggests `contexts/<workflow>/...` and `tools/<workflow>/...` paths.
+- `layout.workflow_aliases` maps skill directory names to canonical workflow directory names, such as mapping `appium-troubleshooting` to `troubleshooting`.
+
+Appium Skills is an example validation repository, not Renma's default domain. Appium repositories can set `layout.tool_namespace` to `appium` and provide workflow aliases in `renma.config.json`.
 
 ## Exit Codes
 

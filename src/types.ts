@@ -44,7 +44,7 @@ export interface Diagnostic {
 
 /** Repository layout mapping used by strict three-root policy diagnostics. */
 export interface LayoutPolicyConfig {
-  toolNamespace: string;
+  toolNamespace?: string;
   workflowAliases: Record<string, string>;
 }
 

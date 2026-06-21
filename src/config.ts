@@ -27,11 +27,7 @@ export const DEFAULT_CONFIG: ScanConfig = {
   maxDepth: 16,
   concurrency: 16,
   layout: {
-    toolNamespace: "appium",
-    workflowAliases: {
-      "appium-troubleshooting": "troubleshooting",
-      "xcuitest-real-device-config": "real-device",
-    },
+    workflowAliases: {},
   },
 };
 
@@ -203,7 +199,7 @@ function layoutPolicy(value: unknown): ScanConfig["layout"] {
 
   const toolNamespace =
     layout.tool_namespace === undefined
-      ? DEFAULT_CONFIG.layout.toolNamespace
+      ? undefined
       : stringValue("layout.tool_namespace", layout.tool_namespace);
   const workflowAliases =
     layout.workflow_aliases === undefined
@@ -211,7 +207,7 @@ function layoutPolicy(value: unknown): ScanConfig["layout"] {
       : stringRecord("layout.workflow_aliases", layout.workflow_aliases);
 
   return {
-    toolNamespace,
+    ...(toolNamespace === undefined ? {} : { toolNamespace }),
     workflowAliases: {
       ...DEFAULT_CONFIG.layout.workflowAliases,
       ...workflowAliases,

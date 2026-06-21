@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { formatReadiness, readiness } from "../src/commands/readiness.js";
 import { scan } from "../src/scanner.js";
 
-test("strict layout findings explain old appium skill-local support moves", async () => {
+test("strict layout findings explain generic skill-local support moves", async () => {
   const root = await fixture();
   await writeMarkdown(
     root,
@@ -72,15 +72,13 @@ test("strict layout findings explain old appium skill-local support moves", asyn
   assert(
     result.findings.some((finding) =>
       finding.remediation.includes(
-        "contexts/tools/appium/setup/references/node/node-decision-logic.md",
+        "contexts/setup/references/node/node-decision-logic.md",
       ),
     ),
   );
   assert(
     result.findings.some((finding) =>
-      finding.remediation.includes(
-        "tools/appium/setup/scripts/check-node-env.mjs",
-      ),
+      finding.remediation.includes("tools/setup/scripts/check-node-env.mjs"),
     ),
   );
 
@@ -100,6 +98,18 @@ test("strict layout findings explain old appium skill-local support moves", asyn
 
 test("strict layout passes refactored appium three-root layout", async () => {
   const root = await fixture();
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({
+      layout: {
+        tool_namespace: "appium",
+        workflow_aliases: {
+          "appium-troubleshooting": "troubleshooting",
+          "xcuitest-real-device-config": "real-device",
+        },
+      },
+    }),
+  );
   await writeMarkdown(
     root,
     "skills/setup/SKILL.md",
@@ -134,22 +144,22 @@ test("strict layout passes refactored appium three-root layout", async () => {
       owner: "appium",
       id: "appium.setup.routing",
       optional_context:
-        "contexts/tools/appium/setup/references/node/node-decision-logic.md, contexts/tools/appium/setup/examples/uiautomator2.md",
+        "contexts/setup/references/node/node-decision-logic.md, contexts/tools/appium/setup/examples/uiautomator2.md",
     }) +
       [
         "# Setup Routing",
         "",
-        "Use `contexts/tools/appium/setup/references/node/node-decision-logic.md`.",
+        "Use `contexts/setup/references/node/node-decision-logic.md`.",
         "",
         "```bash",
-        "node tools/appium/setup/scripts/check-node-env.mjs",
+        "node tools/setup/scripts/check-node-env.mjs",
         "```",
         "",
       ].join("\n"),
   );
   await writeMarkdown(
     root,
-    "contexts/tools/appium/setup/references/node/node-decision-logic.md",
+    "contexts/setup/references/node/node-decision-logic.md",
     context(
       "appium.setup.references.node.node-decision-logic",
       "Node reference.",
@@ -162,7 +172,7 @@ test("strict layout passes refactored appium three-root layout", async () => {
   );
   await writeFileInRepo(
     root,
-    "tools/appium/setup/scripts/check-node-env.mjs",
+    "tools/setup/scripts/check-node-env.mjs",
     "console.log('ok');\n",
   );
   await writeMarkdown(
@@ -283,6 +293,50 @@ test("strict layout suggestions use configured namespace and workflow aliases", 
   );
 });
 
+test("strict layout suggestions use appium config for appium workflow aliases", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-layout-appium-"));
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({
+      layout: {
+        tool_namespace: "appium",
+        workflow_aliases: {
+          "appium-troubleshooting": "troubleshooting",
+          "xcuitest-real-device-config": "real-device",
+        },
+      },
+    }),
+  );
+  await writeMarkdown(
+    root,
+    "skills/appium-troubleshooting/references/session-startup.md",
+    context("old.appium.troubleshooting", "Troubleshooting reference."),
+  );
+  await writeMarkdown(
+    root,
+    "skills/xcuitest-real-device-config/scripts/check-real-device.mjs",
+    "#!/usr/bin/env node\n",
+  );
+
+  const result = await scan(root);
+  const remediations = result.findings.map((finding) => finding.remediation);
+
+  assert(
+    remediations.some((remediation) =>
+      remediation.includes(
+        "contexts/tools/appium/troubleshooting/references/session-startup.md",
+      ),
+    ),
+  );
+  assert(
+    remediations.some((remediation) =>
+      remediation.includes(
+        "tools/appium/real-device/scripts/check-real-device.mjs",
+      ),
+    ),
+  );
+});
+
 test("readiness markdown includes layout findings as a repair brief", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-layout-markdown-"));
   await writeMarkdown(
@@ -319,13 +373,13 @@ test("readiness markdown includes layout findings as a repair brief", async () =
   );
   assert.match(
     markdown,
-    /contexts\/tools\/appium\/setup\/references\/node\/node-decision-logic\.md/,
+    /contexts\/setup\/references\/node\/node-decision-logic\.md/,
   );
   assert.match(
     markdown,
     /PATH-HELPER-COMMAND-SKILL-SCRIPTS: skills\/setup\/SKILL\.md/,
   );
-  assert.match(markdown, /tools\/appium\/setup\/scripts\/check-node-env\.mjs/);
+  assert.match(markdown, /tools\/setup\/scripts\/check-node-env\.mjs/);
 });
 
 function isStrictLayoutFinding(id: string): boolean {

@@ -1561,10 +1561,9 @@ function canonicalSkillAssetTarget(
   rest: string,
 ): string {
   const workflow = canonicalWorkflowName(config, skillName);
-  const namespace = config.layout.toolNamespace;
   if (assetRoot === "scripts")
-    return `tools/${namespace}/${workflow}/scripts/${rest}`;
-  return `contexts/tools/${namespace}/${workflow}/${assetRoot}/${rest}`;
+    return helperAssetPath(config, workflow, `scripts/${rest}`);
+  return contextAssetPath(config, workflow, `${assetRoot}/${rest}`);
 }
 
 function canonicalWorkflowName(config: ScanConfig, skillName: string): string {
@@ -1896,7 +1895,27 @@ function canonicalHelperTarget(config: ScanConfig, scriptPath: string): string {
   const skillName = parts[1] ?? "unknown";
   const rest = parts.slice(3).join("/");
   const workflow = canonicalWorkflowName(config, skillName);
-  return `tools/${config.layout.toolNamespace}/${workflow}/scripts/${rest}`;
+  return helperAssetPath(config, workflow, `scripts/${rest}`);
+}
+
+function contextAssetPath(
+  config: ScanConfig,
+  workflow: string,
+  rest: string,
+): string {
+  const namespace = config.layout.toolNamespace;
+  if (namespace) return `contexts/tools/${namespace}/${workflow}/${rest}`;
+  return `contexts/${workflow}/${rest}`;
+}
+
+function helperAssetPath(
+  config: ScanConfig,
+  workflow: string,
+  rest: string,
+): string {
+  const namespace = config.layout.toolNamespace;
+  if (namespace) return `tools/${namespace}/${workflow}/${rest}`;
+  return `tools/${workflow}/${rest}`;
 }
 
 function isCanonicalSkillEntrypoint(pathValue: string): boolean {
