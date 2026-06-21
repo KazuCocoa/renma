@@ -42,6 +42,12 @@ export interface Diagnostic {
   path?: string;
 }
 
+/** Repository layout mapping used by strict three-root policy diagnostics. */
+export interface LayoutPolicyConfig {
+  toolNamespace?: string;
+  workflowAliases: Record<string, string>;
+}
+
 /** Effective scan configuration after defaults, config files, and CLI overrides. */
 export interface ScanConfig {
   failOn: Severity;
@@ -51,6 +57,7 @@ export interface ScanConfig {
   maxFileSizeBytes: number;
   maxDepth: number;
   concurrency: number;
+  layout: LayoutPolicyConfig;
 }
 
 /** Loaded configuration plus the path it came from, when applicable. */

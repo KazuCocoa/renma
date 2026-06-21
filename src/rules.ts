@@ -1,7 +1,14 @@
+import { existsSync } from "node:fs";
 import path from "node:path";
 import type { Catalog, CatalogEntry, Dependency } from "./model.js";
 import { runRuleRegistry, type Rule } from "./rule-engine.js";
-import type { Evidence, Finding, ParsedDocument, Severity } from "./types.js";
+import type {
+  Evidence,
+  Finding,
+  ParsedDocument,
+  ScanConfig,
+  Severity,
+} from "./types.js";
 
 type FindingDetails = Partial<
   Pick<
@@ -136,9 +143,10 @@ const CONTEXT_TOKEN_LIMITS = {
 /** Run all deterministic rules and return findings in stable source order. */
 export function runRules(
   documents: ParsedDocument[],
+  config: ScanConfig,
   catalog?: Catalog,
 ): Finding[] {
-  const findings = runRuleRegistry(documents, RULES, catalog);
+  const findings = runRuleRegistry(documents, RULES, catalog, config);
   return findings.sort((a, b) => {
     const byPath = a.evidence.path.localeCompare(b.evidence.path);
     if (byPath !== 0) return byPath;
@@ -147,6 +155,15 @@ export function runRules(
 }
 
 const RULES: Rule[] = [
+  {
+    id: "strict-layout-policy",
+    run: (context) =>
+      strictLayoutPolicyFindings(
+        context.documents,
+        context.config,
+        context.catalog,
+      ),
+  },
   {
     id: "security",
     run: ({ documents }) =>
@@ -1478,6 +1495,474 @@ function matchingLineFindings(
       },
     ];
   });
+}
+
+function strictLayoutPolicyFindings(
+  documents: ParsedDocument[],
+  config: ScanConfig,
+  catalog?: Catalog,
+): Finding[] {
+  const findings: Finding[] = [];
+  const root = repositoryRoot(documents);
+  const paths = new Set(documents.map((document) => document.artifact.path));
+
+  for (const document of documents) {
+    findings.push(...disallowedSkillAssetFindings(document, config));
+    findings.push(...thinSkillLayoutFindings(document));
+    findings.push(...helperCommandFindings(document, root, paths, config));
+    findings.push(...layoutConsistencyFindings(document));
+    findings.push(...contextRootFindings(document));
+    findings.push(...helperRootFindings(document));
+  }
+
+  if (catalog) {
+    findings.push(...declaredDependencyLayoutFindings(catalog, paths, root));
+  }
+
+  return findings;
+}
+
+function disallowedSkillAssetFindings(
+  document: ParsedDocument,
+  config: ScanConfig,
+): Finding[] {
+  const match = document.artifact.path.match(
+    /^skills\/([^/]+)\/(references|profiles|examples|scripts)\/(.+)$/,
+  );
+  if (!match) return [];
+
+  const [, skillName = "", assetRoot = "", rest = ""] = match;
+  const target = canonicalSkillAssetTarget(config, skillName, assetRoot, rest);
+  return [
+    documentFinding(
+      document,
+      "LAYOUT-DISALLOWED-SKILL-ASSET",
+      `Disallowed skill-local ${assetRoot} asset`,
+      "structure",
+      assetRoot === "scripts" ? "medium" : "low",
+      `Move this file to \`${target}\` and update every repo-local reference to the new canonical path.`,
+      {
+        whyItMatters:
+          "Strict layout keeps skills as thin entrypoints, shared context under contexts/, and executable helpers under tools/ so agents can migrate repositories deterministically.",
+        verificationSteps: [
+          `Move ${document.artifact.path} to ${target}.`,
+          "Run renma scan and renma readiness again.",
+        ],
+        llmHint: `Move ${document.artifact.path} to ${target}, then rewrite references from the old path to the new path. Do not leave a compatibility shim unless another Renma finding requires it.`,
+      },
+    ),
+  ];
+}
+
+function canonicalSkillAssetTarget(
+  config: ScanConfig,
+  skillName: string,
+  assetRoot: string,
+  rest: string,
+): string {
+  const workflow = canonicalWorkflowName(config, skillName);
+  if (assetRoot === "scripts")
+    return helperAssetPath(config, workflow, `scripts/${rest}`);
+  return contextAssetPath(config, workflow, `${assetRoot}/${rest}`);
+}
+
+function canonicalWorkflowName(config: ScanConfig, skillName: string): string {
+  return config.layout.workflowAliases[skillName] ?? skillName;
+}
+
+function thinSkillLayoutFindings(document: ParsedDocument): Finding[] {
+  if (!isCanonicalSkillEntrypoint(document.artifact.path)) return [];
+
+  const findings: Finding[] = [];
+  const wordCount = words(document.artifact.content).length;
+  const procedureSignals = [
+    /^#{2,}\s+(procedure|steps?|install|configure|troubleshoot|diagnose|setup)\b/im,
+    /\b(step\s+\d+|first,|next,|finally)\b/i,
+  ];
+
+  if (
+    wordCount > 450 ||
+    procedureSignals.some((pattern) => pattern.test(document.artifact.content))
+  ) {
+    findings.push(
+      documentFinding(
+        document,
+        "LAYOUT-SKILL-NOT-THIN",
+        "Skill entrypoint contains procedure content",
+        "structure",
+        wordCount > 700 ? "medium" : "low",
+        "Move reusable procedure content into contexts/** and keep SKILL.md as a concise router that points to the required context assets.",
+        {
+          whyItMatters:
+            "Strict layout expects skills/*/SKILL.md to route agents, not own canonical references, profiles, examples, scripts, or detailed procedures.",
+          verificationSteps: [
+            "Confirm SKILL.md contains routing guidance and required context references only.",
+            "Run renma readiness and check layout.skills_thin.",
+          ],
+          llmHint:
+            "Extract long procedure sections into contexts/**, add requires_context or optional_context references, and keep SKILL.md focused on when to use or not use the skill.",
+        },
+      ),
+    );
+  }
+
+  const command = firstExecutableCommand(document);
+  if (command) {
+    findings.push(
+      findingAt(
+        document,
+        "LAYOUT-SKILL-EXECUTABLE-COMMAND",
+        "Skill entrypoint contains executable command",
+        "structure",
+        "low",
+        command.line,
+        command.command,
+        "Move executable setup commands into contexts/** procedures or tools/** helper documentation, and keep SKILL.md as a router.",
+        {
+          whyItMatters:
+            "Executable setup commands in SKILL.md make the entrypoint procedural and harder to migrate to the strict three-root layout.",
+          verificationSteps: [
+            "Move the command guidance to a context/reference/procedure.",
+            "If the command invokes a helper script, ensure it points under tools/**.",
+          ],
+        },
+      ),
+    );
+  }
+
+  return findings;
+}
+
+function helperCommandFindings(
+  document: ParsedDocument,
+  root: string | undefined,
+  paths: Set<string>,
+  config: ScanConfig,
+): Finding[] {
+  const findings: Finding[] = [];
+
+  for (const command of executableCommands(document)) {
+    const scriptPath = helperScriptPath(command.command);
+    if (!scriptPath) continue;
+
+    if (/^skills\/[^/]+\/scripts\//.test(scriptPath)) {
+      findings.push(
+        findingAt(
+          document,
+          "PATH-HELPER-COMMAND-SKILL-SCRIPTS",
+          "Helper command points to skill-local scripts",
+          "structure",
+          "medium",
+          command.line,
+          command.command,
+          `Move the helper script to \`${canonicalHelperTarget(config, scriptPath)}\` and update this command to use the tools/** path.`,
+          {
+            whyItMatters:
+              "Strict layout keeps executable helper assets under tools/**, not under skills/**.",
+            verificationSteps: [
+              `Confirm ${canonicalHelperTarget(config, scriptPath)} exists.`,
+              "Run renma scan and renma readiness again.",
+            ],
+          },
+        ),
+      );
+      continue;
+    }
+
+    if (scriptPath.includes("/scripts/") && !scriptPath.startsWith("tools/")) {
+      findings.push(
+        findingAt(
+          document,
+          "PATH-HELPER-COMMAND-NON_TOOLS",
+          "Helper command does not use tools root",
+          "structure",
+          "low",
+          command.line,
+          command.command,
+          "Update helper script commands to reference scripts under tools/**.",
+          {
+            whyItMatters:
+              "Helper commands should resolve to non-context helper assets in tools/** so contexts remain LLM-readable guidance.",
+          },
+        ),
+      );
+      continue;
+    }
+
+    if (
+      scriptPath.startsWith("tools/") &&
+      !paths.has(scriptPath) &&
+      !(root && existsSync(path.join(root, scriptPath)))
+    ) {
+      findings.push(
+        findingAt(
+          document,
+          "PATH-HELPER-COMMAND-UNRESOLVED",
+          "Helper command target does not resolve",
+          "structure",
+          "medium",
+          command.line,
+          command.command,
+          `Create \`${scriptPath}\` or update this command to the correct tools/** helper path.`,
+          {
+            whyItMatters:
+              "Agents need helper commands in markdown procedures to resolve deterministically before running them.",
+          },
+        ),
+      );
+    }
+  }
+
+  return findings;
+}
+
+function layoutConsistencyFindings(document: ParsedDocument): Finding[] {
+  if (
+    document.artifact.path !== "README.md" &&
+    document.artifact.path !== "AGENTS.md"
+  )
+    return [];
+
+  const text = document.artifact.content;
+  const findings: Finding[] = [];
+  const stalePatterns = [
+    {
+      pattern: /copy-paste prompt templates/i,
+      message:
+        "Replace copy-paste prompt template wording with execution rules, routing guidance, workflow sections, or actual template assets.",
+    },
+    {
+      pattern: /Each skill includes a self-improvement prompt/i,
+      message:
+        "Describe self-improvement prompts as loaded context/reference/procedure workflow prompts instead of SKILL.md-only content.",
+    },
+    {
+      pattern: /skills\/[^/\s`]+\/(?:references|profiles|examples|scripts)\//,
+      message:
+        "Update docs to point to canonical contexts/** assets or tools/** helper scripts instead of skill-local support directories.",
+    },
+    {
+      pattern: /\]\(contexts\/tools\//,
+      message:
+        "Use backtick repo-root paths for contexts/tools/... references instead of file-relative Markdown links.",
+    },
+  ];
+
+  for (const stale of stalePatterns) {
+    const match = text.match(stale.pattern);
+    if (!match) continue;
+    const line = lineForOffset(text, match.index ?? 0);
+    findings.push(
+      findingAt(
+        document,
+        "DOCS-LAYOUT-INCONSISTENT",
+        "Repository docs describe a non-canonical layout",
+        "maintenance",
+        "low",
+        line,
+        lineText(document, line),
+        stale.message,
+        {
+          whyItMatters:
+            "README.md and AGENTS.md should teach agents the same strict three-root layout that Renma enforces.",
+          verificationSteps: [
+            "Update README.md and AGENTS.md to mention skills/, contexts/, and tools/ canonical roots.",
+            "Run renma scan again.",
+          ],
+        },
+      ),
+    );
+  }
+
+  return findings;
+}
+
+function contextRootFindings(document: ParsedDocument): Finding[] {
+  if (document.artifact.path.startsWith("context/")) {
+    return [
+      documentFinding(
+        document,
+        "LAYOUT-CONTEXT-LEGACY-ROOT",
+        "Context asset uses legacy context/ root",
+        "structure",
+        "low",
+        "Move canonical LLM-readable context assets under contexts/**.",
+        {
+          whyItMatters:
+            "The strict repository layout uses contexts/**/*.md as canonical LLM-readable context assets.",
+        },
+      ),
+    ];
+  }
+  return [];
+}
+
+function helperRootFindings(document: ParsedDocument): Finding[] {
+  if (
+    document.artifact.path.includes("/scripts/") &&
+    !document.artifact.path.startsWith("tools/")
+  ) {
+    return [
+      documentFinding(
+        document,
+        "LAYOUT-HELPER-NON_TOOLS",
+        "Helper script is outside tools root",
+        "structure",
+        "medium",
+        "Move non-context helper assets under tools/** and update command references.",
+        {
+          whyItMatters:
+            "The strict repository layout reserves tools/** for executable and non-context helper assets.",
+        },
+      ),
+    ];
+  }
+  return [];
+}
+
+function declaredDependencyLayoutFindings(
+  catalog: Catalog,
+  paths: Set<string>,
+  root: string | undefined,
+): Finding[] {
+  const findings: Finding[] = [];
+
+  for (const dependency of catalog.dependencies) {
+    const target = dependency.to;
+    if (!isRepoPathLike(target)) continue;
+    if (!paths.has(target) && !(root && existsSync(path.join(root, target)))) {
+      continue;
+    }
+    if (
+      target.startsWith("contexts/") ||
+      target.startsWith("skills/") ||
+      target.startsWith("tools/")
+    ) {
+      continue;
+    }
+    const source = catalog.assets.find((asset) => asset.id === dependency.from);
+    if (!source) continue;
+    findings.push({
+      id: "LAYOUT-CONTEXT-REFERENCE-NON_CANONICAL",
+      title: "Declared context path is not under canonical roots",
+      category: "structure",
+      severity: "low",
+      confidence: "medium",
+      evidence: metadataFindingEvidence(source.sourcePath, target),
+      whyItMatters:
+        "Declared context references should resolve through canonical contexts/**, skills/**, or tools/** repo paths.",
+      remediation:
+        "Rewrite declared requires_context or optional_context values to canonical repo-root paths.",
+      verificationSteps: ["Run renma graph and confirm all edges resolve."],
+    });
+  }
+
+  return findings;
+}
+
+function executableCommands(document: ParsedDocument): Array<{
+  command: string;
+  line: number;
+}> {
+  return document.codeFences.flatMap((fence) =>
+    fence.content
+      .split(/\r?\n/)
+      .map((line, index) => ({
+        command: line.trim(),
+        line: fence.startLine + index + 1,
+      }))
+      .filter(({ command }) =>
+        /^(node|bash|sh|python|python3)\s+/.test(command),
+      ),
+  );
+}
+
+function firstExecutableCommand(
+  document: ParsedDocument,
+): { command: string; line: number } | undefined {
+  return executableCommands(document)[0];
+}
+
+function helperScriptPath(command: string): string | undefined {
+  const parts = command.split(/\s+/).slice(1);
+  return parts.find((part) =>
+    /(?:^|\/)scripts\/.+\.(?:mjs|js|cjs|sh|bash|py)$/.test(part),
+  );
+}
+
+function canonicalHelperTarget(config: ScanConfig, scriptPath: string): string {
+  const parts = scriptPath.split("/");
+  const skillName = parts[1] ?? "unknown";
+  const rest = parts.slice(3).join("/");
+  const workflow = canonicalWorkflowName(config, skillName);
+  return helperAssetPath(config, workflow, `scripts/${rest}`);
+}
+
+function contextAssetPath(
+  config: ScanConfig,
+  workflow: string,
+  rest: string,
+): string {
+  const namespace = config.layout.toolNamespace;
+  if (namespace) return `contexts/tools/${namespace}/${workflow}/${rest}`;
+  return `contexts/${workflow}/${rest}`;
+}
+
+function helperAssetPath(
+  config: ScanConfig,
+  workflow: string,
+  rest: string,
+): string {
+  const namespace = config.layout.toolNamespace;
+  if (namespace) return `tools/${namespace}/${workflow}/${rest}`;
+  return `tools/${workflow}/${rest}`;
+}
+
+function isCanonicalSkillEntrypoint(pathValue: string): boolean {
+  return /^skills\/[^/]+\/SKILL\.md$/.test(pathValue);
+}
+
+function repositoryRoot(documents: ParsedDocument[]): string | undefined {
+  const document = documents[0];
+  if (!document) return undefined;
+  return document.artifact.absolutePath.slice(
+    0,
+    document.artifact.absolutePath.length - document.artifact.path.length,
+  );
+}
+
+function findingAt(
+  document: ParsedDocument,
+  id: string,
+  title: string,
+  category: Finding["category"],
+  severity: Severity,
+  line: number,
+  snippet: string,
+  remediation: string,
+  details: FindingDetails = {},
+): Finding {
+  return {
+    ...finding(id, title, category, severity, document, remediation, details),
+    evidence: evidence(document, line, snippet),
+    remediation,
+  };
+}
+
+function lineForOffset(text: string, offset: number): number {
+  return text.slice(0, offset).split(/\r?\n/).length;
+}
+
+function lineText(document: ParsedDocument, line: number): string {
+  return document.lines[line - 1] ?? "";
+}
+
+function isRepoPathLike(value: string): boolean {
+  return /^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+$/.test(value);
+}
+
+function words(text: string): string[] {
+  return text.match(/[A-Za-z0-9_./+=-]+|[^\sA-Za-z0-9_./+=-]/g) ?? [];
 }
 
 function finding(

@@ -1,6 +1,7 @@
 import { graph, type GraphEdge, type GraphReport } from "./graph.js";
+import { scan } from "../scanner.js";
 import type { ConfigOverrides } from "../config.js";
-import type { Diagnostic } from "../types.js";
+import type { Diagnostic, Finding } from "../types.js";
 
 export type ReadinessFormat = "json" | "markdown";
 export type ReadinessLevel = "ready" | "needs_attention" | "not_ready";
@@ -31,6 +32,7 @@ export interface ReadinessReport {
   };
   checks: ReadinessCheck[];
   diagnostics?: Diagnostic[];
+  findings?: Finding[];
 }
 
 export interface ReadinessCheck {
@@ -59,14 +61,22 @@ export async function readiness(
   targetPath: string,
   overrides: ConfigOverrides = {},
 ): Promise<ReadinessReport> {
-  const graphReport = await graph(targetPath, overrides);
-  return buildReadinessReport(graphReport);
+  const [graphReport, scanResult] = await Promise.all([
+    graph(targetPath, overrides),
+    scan(targetPath, overrides),
+  ]);
+  return buildReadinessReport(
+    graphReport,
+    scanResult.findings,
+    scanResult.diagnostics,
+  );
 }
 
 export function buildReadinessReport(
   graphReport: GraphReport,
+  findings: Finding[] = [],
+  diagnostics: Diagnostic[] = graphReport.diagnostics ?? [],
 ): ReadinessReport {
-  const diagnostics = graphReport.diagnostics ?? [];
   const diagnosticCounts = countDiagnostics(diagnostics);
   const totalAssets = graphReport.nodes.length;
   const ownedAssets = graphReport.nodes.filter((node) =>
@@ -90,10 +100,63 @@ export function buildReadinessReport(
     graphEdgesCheck(unresolvedEdges),
     lifecycleCheck(lifecycleAssets),
     minimumInventoryCheck(totalAssets),
+    findingCheck(
+      "layout.skills_thin",
+      "Thin skill entrypoints",
+      findings,
+      ["LAYOUT-SKILL-NOT-THIN", "LAYOUT-SKILL-EXECUTABLE-COMMAND"],
+      "warn",
+      "All skill entrypoints are thin routers.",
+    ),
+    findingCheck(
+      "layout.disallowed_skill_assets",
+      "Disallowed skill-local assets",
+      findings,
+      ["LAYOUT-DISALLOWED-SKILL-ASSET"],
+      "fail",
+      "No canonical references, profiles, examples, or scripts live under skills/**.",
+    ),
+    findingCheck(
+      "layout.context_root",
+      "Canonical context root",
+      findings,
+      ["LAYOUT-CONTEXT-LEGACY-ROOT", "LAYOUT-CONTEXT-REFERENCE-NON_CANONICAL"],
+      "warn",
+      "Context assets and declared context paths use canonical roots.",
+    ),
+    findingCheck(
+      "layout.helper_root",
+      "Canonical helper root",
+      findings,
+      ["LAYOUT-HELPER-NON_TOOLS"],
+      "fail",
+      "Helper assets live under tools/**.",
+    ),
+    findingCheck(
+      "paths.helper_commands",
+      "Helper command paths",
+      findings,
+      [
+        "PATH-HELPER-COMMAND-SKILL-SCRIPTS",
+        "PATH-HELPER-COMMAND-NON_TOOLS",
+        "PATH-HELPER-COMMAND-UNRESOLVED",
+      ],
+      "fail",
+      "Markdown helper commands resolve to tools/**.",
+    ),
+    findingCheck(
+      "docs.layout_consistency",
+      "Layout documentation consistency",
+      findings,
+      ["DOCS-LAYOUT-INCONSISTENT"],
+      "warn",
+      "Repository docs describe the strict three-root layout.",
+    ),
   ];
 
   const ownershipPenalty =
     totalAssets === 0 ? 0 : Math.round((unownedAssets / totalAssets) * 20);
+  const layoutPenalty = layoutReadinessPenalty(checks);
   const score = Math.max(
     0,
     100 -
@@ -101,7 +164,8 @@ export function buildReadinessReport(
       (unresolvedEdges.length > 0 ? 30 : 0) -
       ownershipPenalty -
       (totalAssets === 0 ? 10 : 0) -
-      (lifecycleAssets.length > 0 ? 5 : 0),
+      (lifecycleAssets.length > 0 ? 5 : 0) -
+      layoutPenalty,
   );
   const hasFailingCheck = checks.some((check) => check.status === "fail");
   const level = readinessLevel(score, hasFailingCheck);
@@ -126,6 +190,7 @@ export function buildReadinessReport(
     },
     checks,
     ...(diagnostics.length > 0 ? { diagnostics } : {}),
+    ...(findings.length > 0 ? { findings } : {}),
   };
 }
 
@@ -175,6 +240,15 @@ export function formatReadinessMarkdown(report: ReadinessReport): string {
         return `- ${diagnostic.severity}: ${path}${diagnostic.message}`;
       }),
     );
+  }
+
+  if (report.findings?.length) {
+    lines.push("", "## Findings", "");
+    for (const finding of report.findings) {
+      lines.push(`- ${finding.id}: ${finding.evidence.path}`);
+      lines.push(`  - Remediation: ${finding.remediation}`);
+      if (finding.llmHint) lines.push(`  - LLM hint: ${finding.llmHint}`);
+    }
   }
 
   return `${lines.join("\n")}\n`;
@@ -324,6 +398,51 @@ function minimumInventoryCheck(totalAssets: number): ReadinessCheck {
     severity: "error",
     summary: "No cataloged assets were found.",
   };
+}
+
+function findingCheck(
+  id: string,
+  title: string,
+  findings: Finding[],
+  findingIds: string[],
+  failingStatus: "warn" | "fail",
+  passSummary: string,
+): ReadinessCheck {
+  const matched = findings.filter((finding) => findingIds.includes(finding.id));
+  if (matched.length === 0) {
+    return {
+      id,
+      title,
+      status: "pass",
+      severity: "info",
+      summary: passSummary,
+    };
+  }
+
+  return {
+    id,
+    title,
+    status: failingStatus,
+    severity: failingStatus === "fail" ? "error" : "warning",
+    summary: `${matched.length} strict layout finding${
+      matched.length === 1 ? "" : "s"
+    } matched this check.`,
+    evidence: matched.map((finding) => ({
+      id: finding.id,
+      path: finding.evidence.path,
+      message: finding.remediation,
+    })),
+  };
+}
+
+function layoutReadinessPenalty(checks: ReadinessCheck[]): number {
+  return checks.reduce((penalty, check) => {
+    if (!check.id.startsWith("layout.") && check.id !== "paths.helper_commands")
+      return penalty;
+    if (check.status === "fail") return penalty + 15;
+    if (check.status === "warn") return penalty + 5;
+    return penalty;
+  }, 0);
 }
 
 function countDiagnostics(diagnostics: Diagnostic[]): {
