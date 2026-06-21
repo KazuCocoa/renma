@@ -46,7 +46,9 @@ test("layout config validation errors exit with usage code", async () => {
   ];
 
   for (const item of cases) {
-    const root = await fixture(`renma-config-${item.name.replaceAll(" ", "-")}-`);
+    const root = await fixture(
+      `renma-config-${item.name.replaceAll(" ", "-")}-`,
+    );
     await writeFile(
       path.join(root, "renma.config.json"),
       JSON.stringify(item.config),
@@ -92,9 +94,18 @@ test("configured layout namespace and workflow aliases shape suggestions", async
   const report = await scan(root);
   const remediation = layoutRemediation(report.findings);
 
-  assert.match(remediation, /contexts\/tools\/mobile\/real-device\/references\/foo\.md/);
-  assert.match(remediation, /contexts\/tools\/mobile\/real-device\/profiles\/foo\.md/);
-  assert.match(remediation, /contexts\/tools\/mobile\/real-device\/examples\/foo\.md/);
+  assert.match(
+    remediation,
+    /contexts\/tools\/mobile\/real-device\/references\/foo\.md/,
+  );
+  assert.match(
+    remediation,
+    /contexts\/tools\/mobile\/real-device\/profiles\/foo\.md/,
+  );
+  assert.match(
+    remediation,
+    /contexts\/tools\/mobile\/real-device\/examples\/foo\.md/,
+  );
   assert.match(remediation, /tools\/mobile\/real-device\/scripts\/foo\.mjs/);
 });
 
