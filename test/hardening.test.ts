@@ -120,8 +120,8 @@ test("readiness markdown limits findings while JSON stays complete", () => {
     markdown,
     /- TEST-001 \[medium\/quality\] skills\/demo\/SKILL\.md:1-2/,
   );
-  assert.match(markdown, /  - Remediation: Fix finding 1\./);
-  assert.match(markdown, /  - LLM hint: Prefer a small deterministic patch\./);
+  assert.match(markdown, / {2}- Remediation: Fix finding 1\./);
+  assert.match(markdown, / {2}- LLM hint: Prefer a small deterministic patch\./);
   assert.match(
     markdown,
     /\.\.\. 5 more findings omitted from markdown output\. Use --json for the full report\./,

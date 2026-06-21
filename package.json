@@ -22,6 +22,7 @@
     "format": "prettier --write \"**/*.{ts,js,json}\"",
     "format:check": "prettier --check \"**/*.{ts,js,json}\"",
     "lint": "eslint \"{src,test}/**/*.ts\" \"scripts/**/*.mjs\" \"eslint.config.js\"",
+    "lint:fix": "eslint --fix \"{src,test}/**/*.ts\" \"scripts/**/*.mjs\" \"eslint.config.js\"",
     "split-reference": "node scripts/split-reference.mjs",
     "suggest-semantic-split": "node dist/index.js suggest-semantic-split"
   },
