@@ -1,7 +1,11 @@
 import { parseArgs } from "node:util";
 import packageJson from "../package.json" with { type: "json" };
 import { runCatalogCommand, type CatalogFormat } from "./commands/catalog.js";
-import { runGraphCommand, type GraphFormat } from "./commands/graph.js";
+import {
+  runGraphCommand,
+  type GraphFormat,
+  type GraphView,
+} from "./commands/graph.js";
 import { runInspectCommand, type InspectFormat } from "./commands/inspect.js";
 import {
   runOwnershipCommand,
@@ -34,6 +38,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         "include-owned": { type: "boolean" },
         json: { type: "boolean" },
         lines: { type: "string" },
+        view: { type: "string" },
         "max-context-bytes": { type: "string" },
         "max-source-bytes": { type: "string" },
         help: { type: "boolean", short: "h" },
@@ -164,6 +169,12 @@ async function runGraph(values: CliValues, target: string): Promise<number> {
     console.error("--format must be one of: json, markdown, mermaid.");
     return 2;
   }
+  const view =
+    stringValue(values.view) ?? (format === "json" ? "full" : "summary");
+  if (view !== "summary" && view !== "workflow" && view !== "full") {
+    console.error("--view must be one of: summary, workflow, full.");
+    return 2;
+  }
 
   const configPath = stringValue(values.config);
   const overrides: ConfigOverrides = {
@@ -173,6 +184,7 @@ async function runGraph(values: CliValues, target: string): Promise<number> {
   try {
     return await runGraphCommand(target, {
       format: format as GraphFormat,
+      view: view as GraphView,
       overrides,
     });
   } catch (error) {
@@ -357,6 +369,7 @@ function helpText(): string {
     "      --format <format>      scan: text or json; catalog/ownership/readiness: json or markdown; graph: json, markdown, or mermaid; suggest-semantic-split: prompt or json",
     "      --include-owned        ownership: include owned asset details",
     "      --json                 Shortcut for --format json",
+    "      --view <view>          graph: summary, workflow, or full",
     "      --lines <range>        inspect: exact line range, e.g. L10-L42",
     "      --max-source-bytes <n> suggest-semantic-split: source file byte budget",
     "      --max-context-bytes <n>",

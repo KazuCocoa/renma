@@ -49,9 +49,9 @@ contexts/
       offline-behavior.md
       background-resume.md
   tools/
-    appium/
-      usage-guideline.md
-      limitations.md
+    mobile/
+      device-setup.md
+      helper-guidelines.md
   teams/
     checkout/
       payment-api-contracts.md
@@ -146,6 +146,7 @@ Options:
     --format <format>    scan: text or json; catalog/ownership: json or markdown; graph: json, markdown, or mermaid; suggest: prompt or json
     --include-owned      ownership: include owned asset details
     --json               Shortcut for --format json
+    --view <view>        graph: summary, workflow, or full
     --lines <range>      inspect: exact line range, e.g. L10-L42
     --max-source-bytes <n>
                           suggest-semantic-split: source file byte budget
@@ -166,6 +167,7 @@ renma catalog . --format markdown
 renma catalog . --json
 renma graph . --format markdown
 renma graph . --format mermaid
+renma graph . --format mermaid --view workflow
 renma graph . --json
 renma ownership . --format markdown
 renma ownership . --json
@@ -174,7 +176,7 @@ renma readiness . --format markdown
 renma readiness . --json
 renma inspect contexts/testing/boundary-value-analysis.md --format json
 renma inspect contexts/testing/boundary-value-analysis.md --lines L40-L90 --format text
-renma suggest-semantic-split contexts/tools/appium/usage-guideline.md
+renma suggest-semantic-split contexts/testing/boundary-value-analysis.md
 ```
 
 ## What Gets Scanned
