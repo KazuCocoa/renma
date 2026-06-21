@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { readiness } from "../src/commands/readiness.js";
+import { formatReadiness, readiness } from "../src/commands/readiness.js";
 import { scan } from "../src/scanner.js";
 
 test("strict layout findings explain old appium skill-local support moves", async () => {
@@ -241,6 +241,92 @@ function frontmatter(values: Record<string, string>): string {
 function context(id: string, body: string): string {
   return `${frontmatter({ owner: "appium", id })}# ${id}\n\n${body}\n`;
 }
+
+test("strict layout suggestions use configured namespace and workflow aliases", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-layout-config-"));
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({
+      layout: {
+        tool_namespace: "mobile",
+        workflow_aliases: {
+          "device-setup": "real-device",
+        },
+      },
+    }),
+  );
+  await writeMarkdown(
+    root,
+    "skills/device-setup/references/setup.md",
+    context("old.device.setup", "Device setup reference."),
+  );
+  await writeMarkdown(
+    root,
+    "skills/device-setup/scripts/check-device.mjs",
+    "#!/usr/bin/env node\n",
+  );
+
+  const result = await scan(root);
+  const remediations = result.findings.map((finding) => finding.remediation);
+
+  assert(
+    remediations.some((remediation) =>
+      remediation.includes(
+        "contexts/tools/mobile/real-device/references/setup.md",
+      ),
+    ),
+  );
+  assert(
+    remediations.some((remediation) =>
+      remediation.includes("tools/mobile/real-device/scripts/check-device.mjs"),
+    ),
+  );
+});
+
+test("readiness markdown includes layout findings as a repair brief", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-layout-markdown-"));
+  await writeMarkdown(
+    root,
+    "skills/setup/SKILL.md",
+    [
+      "# Appium Setup",
+      "",
+      "Run the environment check:",
+      "",
+      "```bash",
+      "node skills/setup/scripts/check-node-env.mjs",
+      "```",
+    ].join("\n"),
+  );
+  await writeMarkdown(
+    root,
+    "skills/setup/references/node/node-decision-logic.md",
+    context("old.node.reference", "Node decision logic."),
+  );
+  await writeMarkdown(
+    root,
+    "skills/setup/scripts/check-node-env.mjs",
+    "#!/usr/bin/env node\n",
+  );
+
+  const report = await readiness(root);
+  const markdown = formatReadiness(report, "markdown");
+
+  assert.match(markdown, /## Findings/);
+  assert.match(
+    markdown,
+    /LAYOUT-DISALLOWED-SKILL-ASSET: skills\/setup\/references\/node\/node-decision-logic\.md/,
+  );
+  assert.match(
+    markdown,
+    /contexts\/tools\/appium\/setup\/references\/node\/node-decision-logic\.md/,
+  );
+  assert.match(
+    markdown,
+    /PATH-HELPER-COMMAND-SKILL-SCRIPTS: skills\/setup\/SKILL\.md/,
+  );
+  assert.match(markdown, /tools\/appium\/setup\/scripts\/check-node-env\.mjs/);
+});
 
 function isStrictLayoutFinding(id: string): boolean {
   return (

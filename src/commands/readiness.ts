@@ -242,6 +242,15 @@ export function formatReadinessMarkdown(report: ReadinessReport): string {
     );
   }
 
+  if (report.findings?.length) {
+    lines.push("", "## Findings", "");
+    for (const finding of report.findings) {
+      lines.push(`- ${finding.id}: ${finding.evidence.path}`);
+      lines.push(`  - Remediation: ${finding.remediation}`);
+      if (finding.llmHint) lines.push(`  - LLM hint: ${finding.llmHint}`);
+    }
+  }
+
   return `${lines.join("\n")}\n`;
 }
 

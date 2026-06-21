@@ -2,7 +2,13 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import type { Catalog, CatalogEntry, Dependency } from "./model.js";
 import { runRuleRegistry, type Rule } from "./rule-engine.js";
-import type { Evidence, Finding, ParsedDocument, Severity } from "./types.js";
+import type {
+  Evidence,
+  Finding,
+  ParsedDocument,
+  ScanConfig,
+  Severity,
+} from "./types.js";
 
 type FindingDetails = Partial<
   Pick<
@@ -137,9 +143,10 @@ const CONTEXT_TOKEN_LIMITS = {
 /** Run all deterministic rules and return findings in stable source order. */
 export function runRules(
   documents: ParsedDocument[],
+  config: ScanConfig,
   catalog?: Catalog,
 ): Finding[] {
-  const findings = runRuleRegistry(documents, RULES, catalog);
+  const findings = runRuleRegistry(documents, RULES, catalog, config);
   return findings.sort((a, b) => {
     const byPath = a.evidence.path.localeCompare(b.evidence.path);
     if (byPath !== 0) return byPath;
@@ -151,7 +158,11 @@ const RULES: Rule[] = [
   {
     id: "strict-layout-policy",
     run: (context) =>
-      strictLayoutPolicyFindings(context.documents, context.catalog),
+      strictLayoutPolicyFindings(
+        context.documents,
+        context.config,
+        context.catalog,
+      ),
   },
   {
     id: "security",
@@ -1488,6 +1499,7 @@ function matchingLineFindings(
 
 function strictLayoutPolicyFindings(
   documents: ParsedDocument[],
+  config: ScanConfig,
   catalog?: Catalog,
 ): Finding[] {
   const findings: Finding[] = [];
@@ -1495,9 +1507,9 @@ function strictLayoutPolicyFindings(
   const paths = new Set(documents.map((document) => document.artifact.path));
 
   for (const document of documents) {
-    findings.push(...disallowedSkillAssetFindings(document));
+    findings.push(...disallowedSkillAssetFindings(document, config));
     findings.push(...thinSkillLayoutFindings(document));
-    findings.push(...helperCommandFindings(document, root, paths));
+    findings.push(...helperCommandFindings(document, root, paths, config));
     findings.push(...layoutConsistencyFindings(document));
     findings.push(...contextRootFindings(document));
     findings.push(...helperRootFindings(document));
@@ -1510,14 +1522,17 @@ function strictLayoutPolicyFindings(
   return findings;
 }
 
-function disallowedSkillAssetFindings(document: ParsedDocument): Finding[] {
+function disallowedSkillAssetFindings(
+  document: ParsedDocument,
+  config: ScanConfig,
+): Finding[] {
   const match = document.artifact.path.match(
     /^skills\/([^/]+)\/(references|profiles|examples|scripts)\/(.+)$/,
   );
   if (!match) return [];
 
   const [, skillName = "", assetRoot = "", rest = ""] = match;
-  const target = canonicalSkillAssetTarget(skillName, assetRoot, rest);
+  const target = canonicalSkillAssetTarget(config, skillName, assetRoot, rest);
   return [
     documentFinding(
       document,
@@ -1540,19 +1555,20 @@ function disallowedSkillAssetFindings(document: ParsedDocument): Finding[] {
 }
 
 function canonicalSkillAssetTarget(
+  config: ScanConfig,
   skillName: string,
   assetRoot: string,
   rest: string,
 ): string {
-  const workflow =
-    skillName === "appium-troubleshooting"
-      ? "troubleshooting"
-      : skillName === "xcuitest-real-device-config"
-        ? "real-device"
-        : skillName;
+  const workflow = canonicalWorkflowName(config, skillName);
+  const namespace = config.layout.toolNamespace;
   if (assetRoot === "scripts")
-    return `tools/appium/${workflow}/scripts/${rest}`;
-  return `contexts/tools/appium/${workflow}/${assetRoot}/${rest}`;
+    return `tools/${namespace}/${workflow}/scripts/${rest}`;
+  return `contexts/tools/${namespace}/${workflow}/${assetRoot}/${rest}`;
+}
+
+function canonicalWorkflowName(config: ScanConfig, skillName: string): string {
+  return config.layout.workflowAliases[skillName] ?? skillName;
 }
 
 function thinSkillLayoutFindings(document: ParsedDocument): Finding[] {
@@ -1622,6 +1638,7 @@ function helperCommandFindings(
   document: ParsedDocument,
   root: string | undefined,
   paths: Set<string>,
+  config: ScanConfig,
 ): Finding[] {
   const findings: Finding[] = [];
 
@@ -1639,12 +1656,12 @@ function helperCommandFindings(
           "medium",
           command.line,
           command.command,
-          `Move the helper script to \`${canonicalHelperTarget(scriptPath)}\` and update this command to use the tools/** path.`,
+          `Move the helper script to \`${canonicalHelperTarget(config, scriptPath)}\` and update this command to use the tools/** path.`,
           {
             whyItMatters:
               "Strict layout keeps executable helper assets under tools/**, not under skills/**.",
             verificationSteps: [
-              `Confirm ${canonicalHelperTarget(scriptPath)} exists.`,
+              `Confirm ${canonicalHelperTarget(config, scriptPath)} exists.`,
               "Run renma scan and renma readiness again.",
             ],
           },
@@ -1874,17 +1891,12 @@ function helperScriptPath(command: string): string | undefined {
   );
 }
 
-function canonicalHelperTarget(scriptPath: string): string {
-  const match = scriptPath.match(/^skills\/([^/]+)\/scripts\/(.+)$/);
-  if (!match) return scriptPath;
-  const [, skillName = "", rest = ""] = match;
-  const workflow =
-    skillName === "appium-troubleshooting"
-      ? "troubleshooting"
-      : skillName === "xcuitest-real-device-config"
-        ? "real-device"
-        : skillName;
-  return `tools/appium/${workflow}/scripts/${rest}`;
+function canonicalHelperTarget(config: ScanConfig, scriptPath: string): string {
+  const parts = scriptPath.split("/");
+  const skillName = parts[1] ?? "unknown";
+  const rest = parts.slice(3).join("/");
+  const workflow = canonicalWorkflowName(config, skillName);
+  return `tools/${config.layout.toolNamespace}/${workflow}/scripts/${rest}`;
 }
 
 function isCanonicalSkillEntrypoint(pathValue: string): boolean {

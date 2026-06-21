@@ -26,6 +26,13 @@ export const DEFAULT_CONFIG: ScanConfig = {
   maxFileSizeBytes: 512 * 1024,
   maxDepth: 16,
   concurrency: 16,
+  layout: {
+    toolNamespace: "appium",
+    workflowAliases: {
+      "appium-troubleshooting": "troubleshooting",
+      "xcuitest-real-device-config": "real-device",
+    },
+  },
 };
 
 /** Error raised for invalid Renma configuration or CLI configuration input. */
@@ -110,6 +117,7 @@ function normalizeConfig(
     "max_file_size_bytes",
     "max_depth",
     "concurrency",
+    "layout",
   ]);
   for (const key of Object.keys(value)) {
     if (!allowed.has(key)) {
@@ -139,6 +147,7 @@ function normalizeConfig(
   if (value.concurrency !== undefined)
     config.concurrency = positiveInteger("concurrency", value.concurrency);
 
+  if (value.layout !== undefined) config.layout = layoutPolicy(value.layout);
   return config;
 }
 
@@ -177,4 +186,52 @@ function errorMessage(error: unknown): string {
 
 function toPosix(value: string): string {
   return value.split(path.sep).join(path.posix.sep);
+}
+function layoutPolicy(value: unknown): ScanConfig["layout"] {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new Error("layout must be an object.");
+  const layout = value as Record<string, unknown>;
+  const allowed = new Set(["tool_namespace", "workflow_aliases"]);
+  for (const key of Object.keys(layout)) {
+    if (!allowed.has(key))
+      throw new Error(
+        `Unknown layout config key "${key}". Allowed keys: ${[...allowed].join(
+          ", ",
+        )}.`,
+      );
+  }
+
+  const toolNamespace =
+    layout.tool_namespace === undefined
+      ? DEFAULT_CONFIG.layout.toolNamespace
+      : stringValue("layout.tool_namespace", layout.tool_namespace);
+  const workflowAliases =
+    layout.workflow_aliases === undefined
+      ? DEFAULT_CONFIG.layout.workflowAliases
+      : stringRecord("layout.workflow_aliases", layout.workflow_aliases);
+
+  return {
+    toolNamespace,
+    workflowAliases: {
+      ...DEFAULT_CONFIG.layout.workflowAliases,
+      ...workflowAliases,
+    },
+  };
+}
+
+function stringRecord(name: string, value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new Error(`${name} must be an object of string values.`);
+  const record = value as Record<string, unknown>;
+  for (const [key, item] of Object.entries(record)) {
+    if (typeof item !== "string")
+      throw new Error(`${name}.${key} must be a string.`);
+  }
+  return record as Record<string, string>;
+}
+
+function stringValue(name: string, value: unknown): string {
+  if (typeof value !== "string" || value.trim() === "")
+    throw new Error(`${name} must be a non-empty string.`);
+  return value;
 }
