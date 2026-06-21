@@ -7,6 +7,8 @@ import { main } from "../src/cli.js";
 import {
   formatReadinessMarkdown,
   readiness,
+  type ReadinessReport,
+  type ReadinessCheckStatus,
 } from "../src/commands/readiness.js";
 
 test("readiness report marks fully owned resolved inventory ready", async () => {
@@ -33,16 +35,16 @@ test("readiness report marks fully owned resolved inventory ready", async () => 
   assert.equal(report.summary.resolvedEdges, 1);
   assert.equal(report.summary.unresolvedEdges, 0);
   assert.equal(report.summary.graphResolutionPercent, 100);
-  assert.deepEqual(
-    report.checks.map((check) => [check.id, check.status]),
-    [
-      ["diagnostics.errors", "pass"],
-      ["ownership.coverage", "pass"],
-      ["graph.unresolved_edges", "pass"],
-      ["assets.lifecycle", "pass"],
-      ["assets.minimum_inventory", "pass"],
-    ],
-  );
+  assertCheckStatuses(report, {
+    "diagnostics.errors": "pass",
+    "ownership.coverage": "pass",
+    "graph.unresolved_edges": "pass",
+    "assets.lifecycle": "pass",
+    "assets.minimum_inventory": "pass",
+    "layout.skills_thin": "pass",
+    "layout.disallowed_skill_assets": "pass",
+    "paths.helper_commands": "pass",
+  });
 });
 
 test("readiness report scores unresolved and unowned assets deterministically", async () => {
@@ -61,16 +63,16 @@ test("readiness report scores unresolved and unowned assets deterministically", 
   assert.equal(report.summary.unownedAssets, 1);
   assert.equal(report.summary.unresolvedEdges, 1);
   assert.equal(report.summary.diagnosticCounts.error, 0);
-  assert.deepEqual(
-    report.checks.map((check) => [check.id, check.status]),
-    [
-      ["diagnostics.errors", "pass"],
-      ["ownership.coverage", "warn"],
-      ["graph.unresolved_edges", "fail"],
-      ["assets.lifecycle", "warn"],
-      ["assets.minimum_inventory", "pass"],
-    ],
-  );
+  assertCheckStatuses(report, {
+    "diagnostics.errors": "pass",
+    "ownership.coverage": "warn",
+    "graph.unresolved_edges": "fail",
+    "assets.lifecycle": "warn",
+    "assets.minimum_inventory": "pass",
+    "layout.skills_thin": "pass",
+    "layout.disallowed_skill_assets": "pass",
+    "paths.helper_commands": "pass",
+  });
 });
 
 test("readiness markdown prints a compact reviewable report", async () => {
@@ -222,6 +224,18 @@ function markdown(metadata: {
     "Use for readiness report tests.",
     "",
   ].join("\n");
+}
+
+function assertCheckStatuses(
+  report: ReadinessReport,
+  expected: Record<string, ReadinessCheckStatus>,
+): void {
+  const statuses = new Map(
+    report.checks.map((check) => [check.id, check.status]),
+  );
+  for (const [id, status] of Object.entries(expected)) {
+    assert.equal(statuses.get(id), status, id);
+  }
 }
 
 async function withCapturedConsole(
