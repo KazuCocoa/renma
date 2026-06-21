@@ -118,7 +118,7 @@ test("graph markdown output includes node and edge tables", async () => {
   });
   await writeContext(root, "testing", "boundary", { owner: "qa" });
 
-  const markdown = formatGraphMarkdown(await graph(root));
+  const markdown = formatGraphMarkdown(await graph(root), "full");
 
   assert.match(markdown, /^# Renma Graph/);
   assert.match(markdown, /## Nodes/);
@@ -174,7 +174,7 @@ test("graph mermaid output includes nodes and resolved edges", async () => {
   });
   await writeContext(root, "testing", "boundary", { owner: "qa" });
 
-  const mermaid = formatGraphMermaid(await graph(root));
+  const mermaid = formatGraphMermaid(await graph(root), "full");
 
   assert.equal(
     mermaid,
@@ -194,7 +194,7 @@ test("graph mermaid output creates synthetic missing nodes for unresolved edges"
     requiresContext: ["missing.asset", "missing.other"],
   });
 
-  const mermaid = formatGraphMermaid(await graph(root));
+  const mermaid = formatGraphMermaid(await graph(root), "full");
 
   assert.match(mermaid, /missing_0\["missing: missing.asset"\]/);
   assert.match(mermaid, /missing_1\["missing: missing.other"\]/);
@@ -214,7 +214,7 @@ test("graph mermaid output uses deterministic ids and ordering", async () => {
   });
   await writeContext(root, "testing", "zeta", { owner: "qa" });
 
-  const mermaid = formatGraphMermaid(await graph(root));
+  const mermaid = formatGraphMermaid(await graph(root), "full");
 
   assert.deepEqual(mermaid.trimEnd().split("\n"), [
     "graph TD",
@@ -231,6 +231,7 @@ test("graph mermaid output escapes labels and keeps diagnostics as comments", ()
   const mermaid = formatGraphMermaid({
     root: "/repo",
     scannedFileCount: 1,
+    view: "full",
     nodeCount: 1,
     edgeCount: 0,
     nodes: [
@@ -249,11 +250,55 @@ test("graph mermaid output escapes labels and keeps diagnostics as comments", ()
         path: "contexts/quote.md",
       },
     ],
-  });
+  }, "full");
 
   assert.match(mermaid, /node_0\["context: quote-\\"node\\" next"\]/);
   assert.match(mermaid, /%% Diagnostics:/);
   assert.match(mermaid, /%% warning: contexts\/quote\.md: Line one Line two/);
+});
+
+test("graph full view preserves individual node and edge detail", async () => {
+  const root = await graphViewFixture();
+  const markdown = formatGraphMarkdown(await graph(root), "full");
+
+  assert.match(markdown, /contexts\/tools\/appium\/setup\/references\/node\/node-npm-health\.md/);
+  assert.match(markdown, /contexts\/tools\/appium\/setup\/references\/node\/node-cache-health\.md/);
+  assert.match(markdown, /contexts\/tools\/appium\/setup\/examples\/uiautomator2\.md/);
+  assert.match(markdown, /\| setup \| requires \| tools\/appium\/setup\/scripts\/check-node-env\.mjs \| no \|  \|/);
+  assert.match(markdown, /requires/);
+});
+
+test("graph summary view collapses leaf paths", async () => {
+  const root = await graphViewFixture();
+  const mermaid = formatGraphMermaid(await graph(root), "summary");
+
+  assert.match(mermaid, /contexts\/tools\/appium\/setup\/references\/\* \(2\)/);
+  assert.match(mermaid, /contexts\/tools\/appium\/setup\/examples\/\* \(1\)/);
+  assert.match(mermaid, /tools\/appium\/setup\/scripts\/\* \(1\)/);
+  assert.doesNotMatch(mermaid, /node-npm-health\.md/);
+  assert.doesNotMatch(mermaid, /node-cache-health\.md/);
+  assert.doesNotMatch(mermaid, /uiautomator2\.md/);
+  assert.doesNotMatch(mermaid, /check-node-env\.mjs/);
+});
+
+test("graph summary view deduplicates repeated group edges", async () => {
+  const root = await graphViewFixture();
+  const markdown = formatGraphMarkdown(await graph(root), "summary");
+  const referenceGroupEdges = markdown.match(
+    /\| setup \| requires \| contexts\/tools\/appium\/setup\/references\/\* \| yes \|/g,
+  );
+
+  assert.equal(referenceGroupEdges?.length, 1);
+});
+
+test("graph workflow view keeps router files and collapses deep support assets", async () => {
+  const root = await graphViewFixture();
+  const mermaid = formatGraphMermaid(await graph(root), "workflow");
+
+  assert.match(mermaid, /contexts\.tools\.appium\.setup\.routing/);
+  assert.match(mermaid, /contexts\.tools\.appium\.setup\.node-environment/);
+  assert.match(mermaid, /contexts\/tools\/appium\/setup\/references\/\* \(2\)/);
+  assert.doesNotMatch(mermaid, /node-npm-health\.md/);
 });
 
 test("graph CLI supports mermaid format", async () => {
@@ -267,6 +312,18 @@ test("graph CLI supports mermaid format", async () => {
   assert.equal(result.code, 0);
   assert.match(result.stdout, /^graph TD/);
   assert.match(result.stdout, /node_0\["skill: demo"\]/);
+});
+
+test("graph CLI supports summary view", async () => {
+  const root = await graphViewFixture();
+
+  const result = await withCapturedConsole(() =>
+    main(["graph", root, "--format", "mermaid", "--view", "summary"]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /contexts\/tools\/appium\/setup\/references\/\* \(2\)/);
+  assert.doesNotMatch(result.stdout, /node-npm-health\.md/);
 });
 
 test("graph CLI rejects unsupported format", async () => {
@@ -284,6 +341,71 @@ test("graph CLI rejects unsupported format", async () => {
     /--format must be one of: json, markdown, mermaid\./,
   );
 });
+
+async function graphViewFixture(): Promise<string> {
+  const root = await fixture();
+  await writeSkill(root, "setup", {
+    owner: "platform",
+    requiresContext: [
+      "contexts/tools/appium/setup/routing.md",
+      "contexts/tools/appium/setup/node-environment.md",
+      "contexts/tools/appium/setup/references/node/node-npm-health.md",
+      "contexts/tools/appium/setup/references/node/node-cache-health.md",
+      "contexts/tools/appium/setup/examples/uiautomator2.md",
+      "tools/appium/setup/scripts/check-node-env.mjs",
+    ],
+  });
+  await writeMarkdownAsset(
+    root,
+    "contexts/tools/appium/setup/routing.md",
+    "contexts.tools.appium.setup.routing",
+  );
+  await writeMarkdownAsset(
+    root,
+    "contexts/tools/appium/setup/node-environment.md",
+    "contexts.tools.appium.setup.node-environment",
+  );
+  await writeMarkdownAsset(
+    root,
+    "contexts/tools/appium/setup/references/node/node-npm-health.md",
+    "contexts.tools.appium.setup.references.node.npm-health",
+  );
+  await writeMarkdownAsset(
+    root,
+    "contexts/tools/appium/setup/references/node/node-cache-health.md",
+    "contexts.tools.appium.setup.references.node.cache-health",
+  );
+  await writeMarkdownAsset(
+    root,
+    "contexts/tools/appium/setup/examples/uiautomator2.md",
+    "contexts.tools.appium.setup.examples.uiautomator2",
+  );
+  await mkdir(path.join(root, "tools", "appium", "setup", "scripts"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "tools", "appium", "setup", "scripts", "check-node-env.mjs"),
+    "console.log('ok');\n",
+  );
+  return root;
+}
+
+async function writeMarkdownAsset(
+  root: string,
+  relativePath: string,
+  id: string,
+): Promise<void> {
+  const filePath = path.join(root, relativePath);
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(
+    filePath,
+    markdown({
+      id,
+      owner: "platform",
+      title: `# ${id}`,
+    }),
+  );
+}
 
 async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-graph-"));

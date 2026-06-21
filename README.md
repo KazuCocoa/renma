@@ -166,6 +166,7 @@ renma catalog . --format markdown
 renma catalog . --json
 renma graph . --format markdown
 renma graph . --format mermaid
+renma graph . --format mermaid --view workflow
 renma graph . --json
 renma ownership . --format markdown
 renma ownership . --json

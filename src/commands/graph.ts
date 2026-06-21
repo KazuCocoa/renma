@@ -10,11 +10,13 @@ import type {
 import type { Diagnostic } from "../types.js";
 
 export type GraphFormat = "json" | "markdown" | "mermaid";
+export type GraphView = "summary" | "workflow" | "full";
 
 export interface GraphReport {
   root: string;
   configPath?: string;
   scannedFileCount: number;
+  view: GraphView;
   nodeCount: number;
   edgeCount: number;
   nodes: GraphNode[];
@@ -29,6 +31,7 @@ export interface GraphNode {
   owner?: string;
   status?: AssetStatus;
   tags: string[];
+  groupedCount?: number;
 }
 
 export interface GraphEdge {
@@ -44,10 +47,11 @@ export interface GraphEdge {
 
 export async function runGraphCommand(
   targetPath: string,
-  options: { format: GraphFormat; overrides?: ConfigOverrides },
+  options: { format: GraphFormat; view?: GraphView; overrides?: ConfigOverrides },
 ): Promise<number> {
   const report = await graph(targetPath, options.overrides ?? {});
-  process.stdout.write(formatGraph(report, options.format));
+  const view = options.view ?? defaultGraphView(options.format);
+  process.stdout.write(formatGraph(report, options.format, view));
   return report.diagnostics?.some(
     (diagnostic) => diagnostic.severity === "error",
   )
@@ -69,6 +73,7 @@ export async function graph(
     root: result.root,
     ...(result.configPath ? { configPath: result.configPath } : {}),
     scannedFileCount: result.scannedFileCount,
+    view: "full",
     nodeCount: nodes.length,
     edgeCount: edges.length,
     nodes,
@@ -83,7 +88,11 @@ export function formatGraphJson(report: GraphReport): string {
   return `${JSON.stringify(report, null, 2)}\n`;
 }
 
-export function formatGraphMermaid(report: GraphReport): string {
+export function formatGraphMermaid(
+  report: GraphReport,
+  view: GraphView = "summary",
+): string {
+  report = graphViewReport(report, view);
   const nodeIds = new Map<string, string>();
   const missingIds = new Map<string, string>();
   const lines = ["graph TD"];
@@ -138,12 +147,17 @@ export function formatGraphMermaid(report: GraphReport): string {
   return `${lines.join("\n")}\n`;
 }
 
-export function formatGraphMarkdown(report: GraphReport): string {
+export function formatGraphMarkdown(
+  report: GraphReport,
+  view: GraphView = "summary",
+): string {
+  report = graphViewReport(report, view);
   const lines = [
     "# Renma Graph",
     "",
     `- Root: ${report.root}`,
     ...(report.configPath ? [`- Config: ${report.configPath}`] : []),
+    `- View: ${report.view}`,
     `- Scanned files: ${report.scannedFileCount}`,
     `- Nodes: ${report.nodeCount}`,
     `- Edges: ${report.edgeCount}`,
@@ -193,15 +207,173 @@ export function formatGraphMarkdown(report: GraphReport): string {
   return `${lines.join("\n")}\n`;
 }
 
-function formatGraph(report: GraphReport, format: GraphFormat): string {
-  if (format === "json") return formatGraphJson(report);
-  if (format === "mermaid") return formatGraphMermaid(report);
-  return formatGraphMarkdown(report);
+function formatGraph(
+  report: GraphReport,
+  format: GraphFormat,
+  view: GraphView = defaultGraphView(format),
+): string {
+  if (format === "json") return formatGraphJson(graphViewReport(report, view));
+  if (format === "mermaid") return formatGraphMermaid(report, view);
+  return formatGraphMarkdown(report, view);
 }
 
 function nodeLabel(node: GraphNode): string {
+  if (node.groupedCount !== undefined) {
+    return `${node.id} (${node.groupedCount})`;
+  }
   const status = node.status ? ` (${node.status})` : "";
   return `${node.kind}: ${node.id}${status}`;
+}
+
+function defaultGraphView(format: GraphFormat): GraphView {
+  return format === "json" ? "full" : "summary";
+}
+
+function graphViewReport(report: GraphReport, view: GraphView): GraphReport {
+  if (report.view === view) return report;
+  if (view === "full") return { ...report, view };
+
+  const nodeMap = new Map<string, GraphNode>();
+  const groupMembers = new Map<string, Set<string>>();
+  const nodeProjection = new Map<string, string>();
+
+  for (const node of report.nodes) {
+    const projection = projectedNode(node, view);
+    nodeProjection.set(node.id, projection.id);
+    nodeProjection.set(node.sourcePath, projection.id);
+    if (!nodeMap.has(projection.id)) {
+      nodeMap.set(projection.id, projection);
+      if (projection.groupedCount !== undefined) {
+        groupMembers.set(projection.id, new Set());
+      }
+    }
+    if (projection.groupedCount !== undefined) {
+      groupMembers.get(projection.id)?.add(node.id);
+    }
+  }
+
+  for (const [id, members] of groupMembers) {
+    const node = nodeMap.get(id);
+    if (node) node.groupedCount = members.size;
+  }
+
+  const edgeMap = new Map<string, GraphEdge>();
+  for (const edge of report.edges) {
+    const from = nodeProjection.get(edge.from) ?? edge.from;
+    const targetId = edge.targetId
+      ? (nodeProjection.get(edge.targetId) ?? edge.targetId)
+      : undefined;
+    const targetPath = edge.targetPath
+      ? (nodeProjection.get(edge.targetPath) ?? edge.targetPath)
+      : undefined;
+    const to = edge.resolved
+      ? (targetId ?? edge.to)
+      : unresolvedGroupId(edge.to, view);
+
+    if (!edge.resolved && !nodeMap.has(to)) {
+      nodeMap.set(to, {
+        id: to,
+        kind: "context",
+        sourcePath: to,
+        tags: [],
+        groupedCount: 1,
+      });
+    }
+
+    if (from === to) continue;
+    const key = `${from}\0${edge.kind}\0${to}\0${edge.resolved ? "1" : "0"}`;
+    if (!edgeMap.has(key)) {
+      edgeMap.set(key, {
+        from,
+        to,
+        kind: edge.kind,
+        sourcePath: edge.sourcePath,
+        resolved: edge.resolved,
+        ...(targetId ? { targetId } : {}),
+        ...(edge.targetKind ? { targetKind: edge.targetKind } : {}),
+        ...(targetPath ? { targetPath } : {}),
+      });
+    }
+  }
+
+  const nodes = [...nodeMap.values()].sort(compareGraphNodes);
+  const edges = [...edgeMap.values()].sort(compareGraphEdges);
+  return {
+    ...report,
+    view,
+    nodeCount: nodes.length,
+    edgeCount: edges.length,
+    nodes,
+    edges,
+  };
+}
+
+function projectedNode(node: GraphNode, view: GraphView): GraphNode {
+  if (view === "workflow" && keepWorkflowNode(node.sourcePath)) return node;
+  const groupId = groupPath(node.sourcePath, view);
+  if (!groupId) return node;
+  return {
+    id: groupId,
+    kind: node.kind,
+    sourcePath: groupId,
+    tags: [],
+    groupedCount: 0,
+  };
+}
+
+function groupPath(sourcePath: string, view: GraphView): string | undefined {
+  const path = normalizeReference(sourcePath);
+  const parts = path.split("/");
+  const supportIndex = parts.findIndex((part) =>
+    ["references", "profiles", "examples", "scripts"].includes(part),
+  );
+  if (supportIndex >= 0) {
+    return `${parts.slice(0, supportIndex + 1).join("/")}/*`;
+  }
+  if (view === "summary" && parts[0] === "contexts" && parts.length > 2) {
+    return `${parts.slice(0, -1).join("/")}/*`;
+  }
+  if (view === "summary" && parts[0] === "tools" && parts.length > 2) {
+    return `${parts.slice(0, -1).join("/")}/*`;
+  }
+  return undefined;
+}
+
+function keepWorkflowNode(sourcePath: string): boolean {
+  const path = normalizeReference(sourcePath);
+  if (/^skills\/[^/]+\/SKILL\.md$/.test(path)) return true;
+  if (!path.startsWith("contexts/")) return false;
+  const name = path.split("/").at(-1) ?? "";
+  return (
+    name === "routing.md" ||
+    name === "triage.md" ||
+    name === "procedure-part1.md" ||
+    /-environment\.md$/.test(name) ||
+    /-readiness\.md$/.test(name) ||
+    directWorkflowContext(path, name)
+  );
+}
+
+function directWorkflowContext(path: string, fileName: string): boolean {
+  if (!fileName.endsWith(".md")) return false;
+  const stem = fileName.slice(0, -3);
+  return path.split("/").slice(1, -1).includes(stem);
+}
+
+function unresolvedGroupId(reference: string, view: GraphView): string {
+  return groupPath(reference, view) ?? `unresolved/${reference}`;
+}
+
+function compareGraphNodes(a: GraphNode, b: GraphNode): number {
+  return a.sourcePath.localeCompare(b.sourcePath) || a.id.localeCompare(b.id);
+}
+
+function compareGraphEdges(a: GraphEdge, b: GraphEdge): number {
+  return (
+    a.from.localeCompare(b.from) ||
+    a.kind.localeCompare(b.kind) ||
+    a.to.localeCompare(b.to)
+  );
 }
 
 function escapeMermaidLabel(label: string): string {
