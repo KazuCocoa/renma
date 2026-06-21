@@ -264,14 +264,8 @@ test("graph full view preserves individual node and edge detail", async () => {
   const root = await graphViewFixture();
   const markdown = formatGraphMarkdown(await graph(root), "full");
 
-  assert.match(
-    markdown,
-    /contexts\/setup\/references\/node\/http-health\.md/,
-  );
-  assert.match(
-    markdown,
-    /contexts\/setup\/references\/node\/cache-health\.md/,
-  );
+  assert.match(markdown, /contexts\/setup\/references\/node\/http-health\.md/);
+  assert.match(markdown, /contexts\/setup\/references\/node\/cache-health\.md/);
   assert.match(markdown, /contexts\/setup\/examples\/basic\.md/);
   assert.match(
     markdown,
@@ -307,8 +301,8 @@ test("graph workflow view keeps router files and collapses deep support assets",
   const root = await graphViewFixture();
   const mermaid = formatGraphMermaid(await graph(root), "workflow");
 
-  assert.match(mermaid, /contexts\.tools\.appium\.setup\.routing/);
-  assert.match(mermaid, /contexts\.tools\.appium\.setup\.node-environment/);
+  assert.match(mermaid, /contexts\.setup\.routing/);
+  assert.match(mermaid, /contexts\.setup\.node-environment/);
   assert.match(mermaid, /contexts\/setup\/references\/\* \(2\)/);
   assert.doesNotMatch(mermaid, /http-health\.md/);
 });
@@ -334,10 +328,7 @@ test("graph CLI supports summary view", async () => {
   );
 
   assert.equal(result.code, 0);
-  assert.match(
-    result.stdout,
-    /contexts\/setup\/references\/\* \(2\)/,
-  );
+  assert.match(result.stdout, /contexts\/setup\/references\/\* \(2\)/);
   assert.doesNotMatch(result.stdout, /http-health\.md/);
 });
 

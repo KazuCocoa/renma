@@ -49,9 +49,9 @@ contexts/
       offline-behavior.md
       background-resume.md
   tools/
-    appium/
-      usage-guideline.md
-      limitations.md
+    mobile/
+      device-setup.md
+      helper-guidelines.md
   teams/
     checkout/
       payment-api-contracts.md
