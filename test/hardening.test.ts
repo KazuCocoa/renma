@@ -61,7 +61,7 @@ test("layout config validation errors exit with usage code", async () => {
 
 test("generic layout suggestions stay namespace-free by default", async () => {
   const root = await fixture("renma-layout-generic-");
-  await writeSkillSupport(root, "setup");
+  await writeSkillSupport(root, "setup", "Demo");
 
   const report = await scan(root);
   const remediation = layoutRemediation(report.findings);
@@ -123,7 +123,11 @@ async function fixture(prefix: string): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), prefix));
 }
 
-async function writeSkillSupport(root: string, workflow: string): Promise<void> {
+async function writeSkillSupport(
+  root: string,
+  workflow: string,
+  title = workflow,
+): Promise<void> {
   await mkdir(path.join(root, "skills", workflow, "references"), {
     recursive: true,
   });
@@ -138,7 +142,7 @@ async function writeSkillSupport(root: string, workflow: string): Promise<void> 
   });
   await writeFile(
     path.join(root, "skills", workflow, "SKILL.md"),
-    `---\nid: ${workflow}\nowner: platform\nstatus: stable\n---\n# ${workflow}\nUse when setting up tooling.\n`,
+    `---\nid: ${workflow}\nowner: platform\nstatus: stable\n---\n# ${title}\nUse when setting up tooling.\n`,
   );
   await writeFile(
     path.join(root, "skills", workflow, "references", "foo.md"),
