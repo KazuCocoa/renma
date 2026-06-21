@@ -188,10 +188,6 @@ AGENTS.md
 README.md
 context/**/*.md
 contexts/**/*.md
-skills/**/profiles/**/*.md
-skills/**/references/**/*.md
-skills/**/examples/**/*.md
-skills/**/scripts/**/*
 tools/**/*
 ```
 
@@ -247,10 +243,21 @@ Invalid config fields exit with code `2`.
 
 Strict layout diagnostics are generic by default. Renma suggests context assets under `contexts/<workflow>/...` and helper assets under `tools/<workflow>/...` unless a repository config adds a tool namespace.
 
-- `layout.tool_namespace` is optional. When set, it controls the namespace used in suggested `contexts/tools/<namespace>/...` and `tools/<namespace>/...` paths. When omitted, Renma suggests `contexts/<workflow>/...` and `tools/<workflow>/...` paths.
-- `layout.workflow_aliases` maps skill directory names to canonical workflow directory names, such as mapping `appium-troubleshooting` to `troubleshooting`.
+- `layout.tool_namespace` is optional. When set, it controls the namespace used in suggested `contexts/tools/<namespace>/<workflow>/...` and `tools/<namespace>/<workflow>/...` paths. When omitted, Renma suggests `contexts/<workflow>/...` and `tools/<workflow>/...` paths.
+- `layout.workflow_aliases` maps skill directory names to canonical workflow directory names.
 
-Appium Skills is an example validation repository, not Renma's default domain. Appium repositories can set `layout.tool_namespace` to `appium` and provide workflow aliases in `renma.config.json`.
+Example:
+
+```json
+{
+  "layout": {
+    "tool_namespace": "mobile",
+    "workflow_aliases": {
+      "device-setup": "real-device"
+    }
+  }
+}
+```
 
 ## Exit Codes
 
@@ -272,7 +279,7 @@ Current rules include:
 - Skills that still route through deprecated or superseded local support assets after reusable knowledge has moved to canonical shared context assets
 - Non-skill assets that still reference deprecated or superseded support files instead of canonical shared context assets
 - Advisory reusable-context candidates in `SKILL.md` files with enough size and diverse setup, troubleshooting, platform, testing, risk, or domain-rule signals
-- Advisory shared-context candidates in large `skills/*/references/**/*.md` support files with generic source-of-truth headings and reusable guidance phrases
+- Advisory shared-context candidates in large `contexts/**/*.md` assets with generic source-of-truth headings and reusable guidance phrases
 - Advisory shared-context assets under process-state folders such as `contexts/promoted/`, `contexts/generated/`, or `contexts/drafts/` that should become semantic final paths
 - Literal secret-like values
 - Private key material

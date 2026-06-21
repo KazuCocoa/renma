@@ -4,6 +4,8 @@ import type { ConfigOverrides } from "../config.js";
 import type { Diagnostic, Finding } from "../types.js";
 
 export type ReadinessFormat = "json" | "markdown";
+
+const MARKDOWN_FINDINGS_LIMIT = 50;
 export type ReadinessLevel = "ready" | "needs_attention" | "not_ready";
 export type ReadinessCheckStatus = "pass" | "warn" | "fail";
 export type ReadinessCheckSeverity = "info" | "warning" | "error";
@@ -244,10 +246,17 @@ export function formatReadinessMarkdown(report: ReadinessReport): string {
 
   if (report.findings?.length) {
     lines.push("", "## Findings", "");
-    for (const finding of report.findings) {
-      lines.push(`- ${finding.id}: ${finding.evidence.path}`);
+    const displayedFindings = report.findings.slice(0, MARKDOWN_FINDINGS_LIMIT);
+    for (const finding of displayedFindings) {
+      lines.push(`- ${formatMarkdownFinding(finding)}`);
       lines.push(`  - Remediation: ${finding.remediation}`);
       if (finding.llmHint) lines.push(`  - LLM hint: ${finding.llmHint}`);
+    }
+    const omittedCount = report.findings.length - displayedFindings.length;
+    if (omittedCount > 0) {
+      lines.push(
+        `... ${omittedCount} more findings omitted from markdown output. Use --json for the full report.`,
+      );
     }
   }
 
@@ -261,6 +270,15 @@ export function formatReadiness(
   return format === "json"
     ? formatReadinessJson(report)
     : formatReadinessMarkdown(report);
+}
+
+function formatMarkdownFinding(finding: Finding): string {
+  const { path, startLine, endLine } = finding.evidence;
+  const location =
+    startLine === endLine
+      ? `${path}:${startLine}`
+      : `${path}:${startLine}-${endLine}`;
+  return `${finding.id} [${finding.severity}/${finding.category}] ${location}`;
 }
 
 function diagnosticsCheck(

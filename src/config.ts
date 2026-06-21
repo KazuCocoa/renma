@@ -185,12 +185,12 @@ function toPosix(value: string): string {
 }
 function layoutPolicy(value: unknown): ScanConfig["layout"] {
   if (!value || typeof value !== "object" || Array.isArray(value))
-    throw new Error("layout must be an object.");
+    throw new ConfigError("layout must be an object.");
   const layout = value as Record<string, unknown>;
   const allowed = new Set(["tool_namespace", "workflow_aliases"]);
   for (const key of Object.keys(layout)) {
     if (!allowed.has(key))
-      throw new Error(
+      throw new ConfigError(
         `Unknown layout config key "${key}". Allowed keys: ${[...allowed].join(
           ", ",
         )}.`,
@@ -217,17 +217,17 @@ function layoutPolicy(value: unknown): ScanConfig["layout"] {
 
 function stringRecord(name: string, value: unknown): Record<string, string> {
   if (!value || typeof value !== "object" || Array.isArray(value))
-    throw new Error(`${name} must be an object of string values.`);
+    throw new ConfigError(`${name} must be an object of string values.`);
   const record = value as Record<string, unknown>;
   for (const [key, item] of Object.entries(record)) {
     if (typeof item !== "string")
-      throw new Error(`${name}.${key} must be a string.`);
+      throw new ConfigError(`${name}.${key} must be a string.`);
   }
   return record as Record<string, string>;
 }
 
 function stringValue(name: string, value: unknown): string {
   if (typeof value !== "string" || value.trim() === "")
-    throw new Error(`${name} must be a non-empty string.`);
+    throw new ConfigError(`${name} must be a non-empty string.`);
   return value;
 }

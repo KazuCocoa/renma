@@ -369,7 +369,7 @@ test("readiness markdown includes layout findings as a repair brief", async () =
   assert.match(markdown, /## Findings/);
   assert.match(
     markdown,
-    /LAYOUT-DISALLOWED-SKILL-ASSET: skills\/setup\/references\/node\/node-decision-logic\.md/,
+    /LAYOUT-DISALLOWED-SKILL-ASSET.*skills\/setup\/references\/node\/node-decision-logic\.md:1/,
   );
   assert.match(
     markdown,
@@ -377,7 +377,7 @@ test("readiness markdown includes layout findings as a repair brief", async () =
   );
   assert.match(
     markdown,
-    /PATH-HELPER-COMMAND-SKILL-SCRIPTS: skills\/setup\/SKILL\.md/,
+    /PATH-HELPER-COMMAND-SKILL-SCRIPTS.*skills\/setup\/SKILL\.md/,
   );
   assert.match(markdown, /tools\/setup\/scripts\/check-node-env\.mjs/);
 });
