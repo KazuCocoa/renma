@@ -78,7 +78,9 @@ test("strict layout findings explain old appium skill-local support moves", asyn
   );
   assert(
     result.findings.some((finding) =>
-      finding.remediation.includes("tools/appium/setup/scripts/check-node-env.mjs"),
+      finding.remediation.includes(
+        "tools/appium/setup/scripts/check-node-env.mjs",
+      ),
     ),
   );
 
@@ -148,7 +150,10 @@ test("strict layout passes refactored appium three-root layout", async () => {
   await writeMarkdown(
     root,
     "contexts/tools/appium/setup/references/node/node-decision-logic.md",
-    context("appium.setup.references.node.node-decision-logic", "Node reference."),
+    context(
+      "appium.setup.references.node.node-decision-logic",
+      "Node reference.",
+    ),
   );
   await writeMarkdown(
     root,

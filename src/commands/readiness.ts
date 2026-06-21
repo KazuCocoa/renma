@@ -120,10 +120,7 @@ export function buildReadinessReport(
       "layout.context_root",
       "Canonical context root",
       findings,
-      [
-        "LAYOUT-CONTEXT-LEGACY-ROOT",
-        "LAYOUT-CONTEXT-REFERENCE-NON_CANONICAL",
-      ],
+      ["LAYOUT-CONTEXT-LEGACY-ROOT", "LAYOUT-CONTEXT-REFERENCE-NON_CANONICAL"],
       "warn",
       "Context assets and declared context paths use canonical roots.",
     ),

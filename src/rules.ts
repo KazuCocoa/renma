@@ -1550,7 +1550,8 @@ function canonicalSkillAssetTarget(
       : skillName === "xcuitest-real-device-config"
         ? "real-device"
         : skillName;
-  if (assetRoot === "scripts") return `tools/appium/${workflow}/scripts/${rest}`;
+  if (assetRoot === "scripts")
+    return `tools/appium/${workflow}/scripts/${rest}`;
   return `contexts/tools/appium/${workflow}/${assetRoot}/${rest}`;
 }
 
@@ -1700,7 +1701,10 @@ function helperCommandFindings(
 }
 
 function layoutConsistencyFindings(document: ParsedDocument): Finding[] {
-  if (document.artifact.path !== "README.md" && document.artifact.path !== "AGENTS.md")
+  if (
+    document.artifact.path !== "README.md" &&
+    document.artifact.path !== "AGENTS.md"
+  )
     return [];
 
   const text = document.artifact.content;
@@ -1851,7 +1855,9 @@ function executableCommands(document: ParsedDocument): Array<{
         command: line.trim(),
         line: fence.startLine + index + 1,
       }))
-      .filter(({ command }) => /^(node|bash|sh|python|python3)\s+/.test(command)),
+      .filter(({ command }) =>
+        /^(node|bash|sh|python|python3)\s+/.test(command),
+      ),
   );
 }
 
