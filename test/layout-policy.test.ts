@@ -135,6 +135,8 @@ test("strict layout passes refactored appium three-root layout", async () => {
         "Required inputs: setup request, repository root, and permission to read static contexts.",
         "## Example",
         "Input: setup request. Output: route to canonical context and helper scripts.",
+        "## Completion criteria",
+        "The workflow is complete when the setup request is routed to canonical context and helper script paths.",
         "## Verification",
         "Verify by running readiness and scan reports against the fixture.",
         "",
