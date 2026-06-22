@@ -23,7 +23,7 @@ Renma treats context as a software asset:
 - Validated
 - Easy to inspect in CI and code review
 
-The first strong product focus is QA/testing: boundary value analysis, negative testing, regression risk, payment idempotency, duplicate charge prevention, refund edge cases, mobile offline behavior, Appium usage, internal test strategy, and known team-specific risks can live as shared context assets instead of being buried inside individual skills.
+The first strong product focus is QA/testing: boundary value analysis, negative testing, regression risk, payment idempotency, duplicate charge prevention, refund edge cases, mobile offline behavior, mobile automation usage, internal test strategy, and known team-specific risks can live as shared context assets instead of being buried inside individual skills.
 
 ## Repository Shape
 

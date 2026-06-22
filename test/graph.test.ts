@@ -348,6 +348,22 @@ test("graph CLI rejects unsupported format", async () => {
   );
 });
 
+test("graph CLI rejects unsupported view", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {});
+
+  const result = await withCapturedConsole(() =>
+    main(["graph", root, "--format", "mermaid", "--view", "invalid"]),
+  );
+
+  assert.equal(result.code, 2);
+  assert.equal(result.stdout, "");
+  assert.match(
+    result.stderr,
+    /--view must be one of: summary, workflow, full\./,
+  );
+});
+
 async function graphViewFixture(): Promise<string> {
   const root = await fixture();
   await writeSkill(root, "setup", {
