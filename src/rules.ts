@@ -36,6 +36,8 @@ const REUSABLE_CONTEXT_MIN_LINES = 24;
 const REUSABLE_CONTEXT_MIN_TOKENS = 180;
 const REQUIRED_INPUTS_PATTERN =
   /\b(?:required inputs?|inputs|input requirements?|required information|prerequisites?|required context|required files|required permissions?|permission requirements?|environment requirements?|before running,\s*provide|before you begin,\s*provide|the user must provide|needs the following|target files|permissions required|environment required)\b|\brequires:/;
+const COMPLETION_CRITERIA_PATTERN =
+  /\b(?:completion criteria|completion checklist|success criteria|success requirements|done criteria|done when|definition of done|acceptance criteria|deliverables?|final response|final answer|expected outcomes?|expected results?|expected output|required output|output requirements?|report should include|patch should include|when complete|workflow is complete|the workflow is complete after|task is complete|counts as complete|completion requirements?|stop when|do not finish until)\b/;
 const REUSABLE_CONTEXT_MIN_SIGNALS = 3;
 const SUPPORT_SHARED_CONTEXT_MIN_LINES = 18;
 const SUPPORT_SHARED_CONTEXT_MIN_TOKENS = 140;
@@ -724,6 +726,40 @@ function shapeFindings(document: ParsedDocument): Finding[] {
           ],
           llmHint:
             "Add a concise Required inputs or Prerequisites section to this SKILL.md. State user-provided inputs, target files, repository state, permissions, credentials, and environment assumptions needed before the workflow starts. Do not add runtime context selection or prompt assembly behavior.",
+        },
+      ),
+    );
+  }
+
+  if (
+    document.artifact.kind === "skill" &&
+    !COMPLETION_CRITERIA_PATTERN.test(text)
+  ) {
+    findings.push(
+      documentFinding(
+        document,
+        "QUAL-MISSING-COMPLETION-CRITERIA",
+        "Skill does not state completion criteria",
+        "quality",
+        "medium",
+        "Add a Completion criteria, Success requirements, Deliverables, or Final response section that states the observable outputs or conditions that mean the workflow is complete.",
+        {
+          whyItMatters:
+            "Agents need explicit completion criteria before finishing a workflow. Missing completion criteria can cause incomplete delivery, unnecessary follow-up work, or inconsistent final responses.",
+          constraints: [
+            "Do not infer runtime context.",
+            "Do not assemble prompt packages.",
+            "Do not require optional context selection.",
+            "Do not make Renma decide task-specific success at runtime.",
+            "Keep the skill as a static workflow entrypoint.",
+          ],
+          verificationSteps: [
+            "Run renma scan.",
+            "Run renma readiness.",
+            "Confirm each skill workflow entrypoint documents completion criteria.",
+          ],
+          llmHint:
+            "Add a concise Completion criteria, Success requirements, Deliverables, or Final response section to this SKILL.md. State the observable outputs, checks, or final-response conditions that mean the workflow is complete. Do not add runtime context selection or prompt assembly behavior.",
         },
       ),
     );

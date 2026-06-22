@@ -26,11 +26,16 @@ test("scan discovers default artifacts and emits deterministic findings", async 
       "QUAL-MISSING-EXAMPLES",
       "QUAL-MISSING-PREFLIGHT",
       "QUAL-MISSING-REQUIRED-INPUTS",
+      "QUAL-MISSING-COMPLETION-CRITERIA",
       "QUAL-MISSING-VERIFICATION",
       "SEC-DESTRUCTIVE-COMMAND",
     ],
   );
-  assert.equal(result.findings.at(-1)?.evidence.path, "skills/demo/SKILL.md");
+  assert.equal(
+    result.findings.find((finding) => finding.id === "SEC-DESTRUCTIVE-COMMAND")
+      ?.evidence.path,
+    "skills/demo/SKILL.md",
+  );
 });
 
 test("local support examples are scanned and must be reachable from the skill", async () => {

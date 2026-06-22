@@ -142,6 +142,8 @@ Workflow clarity warns when skill entrypoints lack deterministic routing, prefli
 
 Workflow required-input checks warn when skill entrypoints do not document the inputs, prerequisites, or permissions agents need before starting.
 
+Workflow completion-criteria checks warn when skill entrypoints do not state the final output, evidence, report contents, patch expectations, or stop condition needed to complete the workflow.
+
 `renma inspect` is a repository inspection helper for outlines and exact line slices; it does not choose task context or assemble prompts.
 
 Options:

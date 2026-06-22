@@ -1526,6 +1526,7 @@ async function writeSkill(
 
 function skillMarkdown(options: {
   requiredInputs?: boolean;
+  completionCriteria?: boolean;
   signal?: string;
 }): string {
   const inputSection =
@@ -1533,6 +1534,10 @@ function skillMarkdown(options: {
     (options.requiredInputs === false
       ? ""
       : "## Required inputs\nRepository root and target command.");
+  const completionSection =
+    options.completionCriteria === false
+      ? ""
+      : "## Completion criteria\nThe workflow is complete when the scan output is deterministic and the final response summarizes the evidence.";
   return [
     "---",
     "id: demo",
@@ -1549,6 +1554,7 @@ function skillMarkdown(options: {
     inputSection,
     "## Example",
     "Example request produces deterministic finding evidence.",
+    completionSection,
     "## Verification",
     "Verify by running renma scan and renma readiness.",
     "",
@@ -1604,6 +1610,70 @@ test("required input finding accepts deterministic input signals", async () => {
     assert.equal(
       result.findings.some(
         (finding) => finding.id === "QUAL-MISSING-REQUIRED-INPUTS",
+      ),
+      false,
+      signal,
+    );
+  }
+});
+
+test("missing completion criteria finding includes rich static guidance", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", skillMarkdown({ completionCriteria: false }));
+
+  const result = await scan(root);
+  const finding = result.findings.find(
+    (candidate) => candidate.id === "QUAL-MISSING-COMPLETION-CRITERIA",
+  );
+
+  assert.equal(finding?.title, "Skill does not state completion criteria");
+  assert.equal(finding?.category, "quality");
+  assert.equal(finding?.severity, "medium");
+  assert.match(finding?.whyItMatters ?? "", /completion criteria/);
+  assert.ok(finding?.constraints?.includes("Do not infer runtime context."));
+  assert.ok(finding?.constraints?.includes("Do not assemble prompt packages."));
+  assert.ok(finding?.verificationSteps?.includes("Run renma readiness."));
+  assert.match(finding?.llmHint ?? "", /Completion criteria/);
+});
+
+test("completion criteria finding accepts deterministic completion signals", async () => {
+  const signals = [
+    "## Completion criteria\nReturn deterministic scan evidence.",
+    "## Success criteria\nThe output includes a readiness summary.",
+    "## Success requirements\nThe final response summarizes all findings.",
+    "## Deliverables\nProvide the patched files and test results.",
+    "## Final response\nSummarize the completed workflow and verification.",
+    "Definition of done: readiness reports deterministic evidence.",
+    "Acceptance criteria: the report includes check status and evidence.",
+    "The workflow is complete when the scan output is deterministic.",
+    "Done when the readiness report includes deterministic evidence.",
+    "## Completion checklist\nConfirm scan output, readiness output, and final summary.",
+    "Expected output: a readiness report with check status and evidence.",
+    "Required output: patch summary and verification results.",
+    "Output requirements: include final status and diagnostics.",
+    "Report should include score, level, and workflow evidence.",
+    "Patch should include tests for the new readiness check.",
+    "The workflow is complete after build, typecheck, and tests pass.",
+    "Stop when readiness returns deterministic JSON evidence.",
+    "Do not finish until the final response includes verification results.",
+  ];
+
+  for (const [index, signal] of signals.entries()) {
+    const root = await fixture();
+    await writeSkill(
+      root,
+      `demo-${index}`,
+      skillMarkdown({ completionCriteria: true }).replace(
+        "## Completion criteria\nThe workflow is complete when the scan output is deterministic and the final response summarizes the evidence.",
+        signal,
+      ),
+    );
+
+    const result = await scan(root);
+
+    assert.equal(
+      result.findings.some(
+        (finding) => finding.id === "QUAL-MISSING-COMPLETION-CRITERIA",
       ),
       false,
       signal,

@@ -19,6 +19,9 @@ const WORKFLOW_CLARITY_FINDING_IDS = new Set([
 const WORKFLOW_REQUIRED_INPUTS_FINDING_IDS = new Set([
   "QUAL-MISSING-REQUIRED-INPUTS",
 ]);
+const WORKFLOW_COMPLETION_CRITERIA_FINDING_IDS = new Set([
+  "QUAL-MISSING-COMPLETION-CRITERIA",
+]);
 export type ReadinessLevel = "ready" | "needs_attention" | "not_ready";
 export type ReadinessCheckStatus = "pass" | "warn" | "fail";
 export type ReadinessCheckSeverity = "info" | "warning" | "error";
@@ -116,6 +119,7 @@ export function buildReadinessReport(
     workflowContextClosureCheck(graphReport),
     workflowClarityCheck(findings),
     workflowRequiredInputsCheck(findings),
+    workflowCompletionCriteriaCheck(findings),
     lifecycleCheck(lifecycleAssets),
     minimumInventoryCheck(totalAssets),
     findingCheck(
@@ -182,9 +186,16 @@ export function buildReadinessReport(
     (check) =>
       check.id === "workflow.required_inputs" && check.status === "warn",
   );
+  const hasWorkflowCompletionCriteriaWarning = checks.some(
+    (check) =>
+      check.id === "workflow.completion_criteria" && check.status === "warn",
+  );
   const workflowClarityPenalty = hasWorkflowClarityWarning ? 15 : 0;
   const workflowRequiredInputsPenalty = hasWorkflowRequiredInputsWarning
     ? 10
+    : 0;
+  const workflowCompletionCriteriaPenalty = hasWorkflowCompletionCriteriaWarning
+    ? 15
     : 0;
   const score = Math.max(
     0,
@@ -196,7 +207,8 @@ export function buildReadinessReport(
       (lifecycleAssets.length > 0 ? 5 : 0) -
       layoutPenalty -
       workflowClarityPenalty -
-      workflowRequiredInputsPenalty,
+      workflowRequiredInputsPenalty -
+      workflowCompletionCriteriaPenalty,
   );
   const hasFailingCheck = checks.some((check) => check.status === "fail");
   const level = readinessLevel(score, hasFailingCheck);
@@ -542,6 +554,38 @@ function workflowRequiredInputsCheck(findings: Finding[]): ReadinessCheck {
     status: "warn",
     severity: "warning",
     summary: `${matched.length} workflow required-input finding${
+      matched.length === 1 ? "" : "s"
+    } matched skill entrypoints.`,
+    evidence: matched.map((finding) => ({
+      id: finding.id,
+      path: finding.evidence.path,
+      message: finding.remediation,
+    })),
+  };
+}
+
+function workflowCompletionCriteriaCheck(findings: Finding[]): ReadinessCheck {
+  const matched = findings.filter(
+    (finding) =>
+      WORKFLOW_COMPLETION_CRITERIA_FINDING_IDS.has(finding.id) &&
+      isSkillEntrypointPath(finding.evidence.path),
+  );
+  if (matched.length === 0) {
+    return {
+      id: "workflow.completion_criteria",
+      title: "Workflow completion criteria",
+      status: "pass",
+      severity: "info",
+      summary: "All skill workflow entrypoints document completion criteria.",
+    };
+  }
+
+  return {
+    id: "workflow.completion_criteria",
+    title: "Workflow completion criteria",
+    status: "warn",
+    severity: "warning",
+    summary: `${matched.length} workflow completion-criteria finding${
       matched.length === 1 ? "" : "s"
     } matched skill entrypoints.`,
     evidence: matched.map((finding) => ({

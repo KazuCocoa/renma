@@ -42,6 +42,7 @@ test("readiness report marks fully owned resolved inventory ready", async () => 
     "workflow.context_closure": "pass",
     "workflow.clarity": "pass",
     "workflow.required_inputs": "pass",
+    "workflow.completion_criteria": "pass",
     "assets.lifecycle": "pass",
     "assets.minimum_inventory": "pass",
     "layout.skills_thin": "pass",
@@ -73,6 +74,7 @@ test("readiness report scores unresolved and unowned assets deterministically", 
     "workflow.context_closure": "fail",
     "workflow.clarity": "pass",
     "workflow.required_inputs": "pass",
+    "workflow.completion_criteria": "pass",
     "assets.lifecycle": "warn",
     "assets.minimum_inventory": "pass",
     "layout.skills_thin": "pass",
@@ -164,7 +166,7 @@ test("readiness warns for unclear skill workflow entrypoint", async () => {
     owner: "platform",
     status: "stable",
     description: "Too short.",
-    body: "# demo\nUse for readiness report tests.\n",
+    body: "# demo\nUse for readiness report tests.\n\n## Completion criteria\nThe workflow is complete when readiness output is deterministic.\n",
   });
 
   const report = await readiness(root);
@@ -201,6 +203,27 @@ test("readiness warns and applies penalty for missing workflow required inputs",
   assert.equal(check?.evidence?.[0]?.path, "skills/demo/SKILL.md");
 });
 
+test("readiness warns and applies penalty for missing workflow completion criteria", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    status: "stable",
+    body: workflowReadySkillBodyWithoutCompletionCriteria("demo"),
+  });
+
+  const report = await readiness(root);
+  const check = report.checks.find(
+    (candidate) => candidate.id === "workflow.completion_criteria",
+  );
+
+  assert.equal(report.score, 85);
+  assert.equal(report.level, "needs_attention");
+  assert.equal(check?.status, "warn");
+  assert.equal(check?.severity, "warning");
+  assert.equal(check?.evidence?.[0]?.id, "QUAL-MISSING-COMPLETION-CRITERIA");
+  assert.equal(check?.evidence?.[0]?.path, "skills/demo/SKILL.md");
+});
+
 test("readiness markdown prints a compact reviewable report", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", { owner: "platform" });
@@ -212,6 +235,7 @@ test("readiness markdown prints a compact reviewable report", async () => {
   assert.match(markdown, /\| ownership\.coverage \| pass \| info \|/);
   assert.match(markdown, /\| workflow\.clarity \| pass \| info \|/);
   assert.match(markdown, /\| workflow\.required_inputs \| pass \| info \|/);
+  assert.match(markdown, /\| workflow\.completion_criteria \| pass \| info \|/);
 });
 
 test("readiness CLI supports --json", async () => {
@@ -238,6 +262,13 @@ test("readiness CLI supports --json", async () => {
     parsed.checks.find(
       (check: { id: string; status: string }) =>
         check.id === "workflow.required_inputs",
+    )?.status,
+    "pass",
+  );
+  assert.equal(
+    parsed.checks.find(
+      (check: { id: string; status: string }) =>
+        check.id === "workflow.completion_criteria",
     )?.status,
     "pass",
   );
@@ -396,6 +427,9 @@ function workflowReadySkillBody(id: string): string {
     "## Example",
     "Input: readiness report fixture. Output: deterministic check evidence.",
     "",
+    "## Completion criteria",
+    "The workflow is complete when the readiness command reports deterministic JSON or Markdown evidence and the final response summarizes the result.",
+    "",
     "## Verification",
     "Verify by running the readiness command and checking the JSON or Markdown output.",
   ].join("\n");
@@ -413,6 +447,33 @@ function workflowReadySkillBodyWithoutRequiredInputs(id: string): string {
     "",
     "## Preflight",
     "Before you begin, confirm the repository fixture exists and static context paths are readable.",
+    "",
+    "## Example",
+    "Input: readiness report fixture. Output: deterministic check evidence.",
+    "",
+    "## Completion criteria",
+    "The workflow is complete when the readiness command reports deterministic JSON or Markdown evidence and the final response summarizes the result.",
+    "",
+    "## Verification",
+    "Verify by running the readiness command and checking the JSON or Markdown output.",
+  ].join("\n");
+}
+
+function workflowReadySkillBodyWithoutCompletionCriteria(id: string): string {
+  return [
+    `# ${id}`,
+    "",
+    "## When to use",
+    "Use this workflow for deterministic readiness report tests.",
+    "",
+    "## Required inputs",
+    "Required inputs: repository root, target report format, and permission to read local fixture files.",
+    "",
+    "## DO NOT USE FOR",
+    "Do not use this workflow for runtime task context selection or prompt assembly.",
+    "",
+    "## Preflight",
+    "Before you begin, confirm the repository fixture exists and inputs are static.",
     "",
     "## Example",
     "Input: readiness report fixture. Output: deterministic check evidence.",
