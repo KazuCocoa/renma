@@ -16,6 +16,9 @@ const WORKFLOW_CLARITY_FINDING_IDS = new Set([
   "QUAL-MISSING-VERIFICATION",
   "QUAL-LOW-HEADING-DENSITY",
 ]);
+const WORKFLOW_REQUIRED_INPUTS_FINDING_IDS = new Set([
+  "QUAL-MISSING-REQUIRED-INPUTS",
+]);
 export type ReadinessLevel = "ready" | "needs_attention" | "not_ready";
 export type ReadinessCheckStatus = "pass" | "warn" | "fail";
 export type ReadinessCheckSeverity = "info" | "warning" | "error";
@@ -112,6 +115,7 @@ export function buildReadinessReport(
     graphEdgesCheck(unresolvedEdges),
     workflowContextClosureCheck(graphReport),
     workflowClarityCheck(findings),
+    workflowRequiredInputsCheck(findings),
     lifecycleCheck(lifecycleAssets),
     minimumInventoryCheck(totalAssets),
     findingCheck(
@@ -174,7 +178,14 @@ export function buildReadinessReport(
   const hasWorkflowClarityWarning = checks.some(
     (check) => check.id === "workflow.clarity" && check.status === "warn",
   );
+  const hasWorkflowRequiredInputsWarning = checks.some(
+    (check) =>
+      check.id === "workflow.required_inputs" && check.status === "warn",
+  );
   const workflowClarityPenalty = hasWorkflowClarityWarning ? 15 : 0;
+  const workflowRequiredInputsPenalty = hasWorkflowRequiredInputsWarning
+    ? 10
+    : 0;
   const score = Math.max(
     0,
     100 -
@@ -184,7 +195,8 @@ export function buildReadinessReport(
       (totalAssets === 0 ? 10 : 0) -
       (lifecycleAssets.length > 0 ? 5 : 0) -
       layoutPenalty -
-      workflowClarityPenalty,
+      workflowClarityPenalty -
+      workflowRequiredInputsPenalty,
   );
   const hasFailingCheck = checks.some((check) => check.status === "fail");
   const level = readinessLevel(score, hasFailingCheck);
@@ -497,6 +509,39 @@ function workflowClarityCheck(findings: Finding[]): ReadinessCheck {
     status: "warn",
     severity: "warning",
     summary: `${matched.length} workflow clarity finding${
+      matched.length === 1 ? "" : "s"
+    } matched skill entrypoints.`,
+    evidence: matched.map((finding) => ({
+      id: finding.id,
+      path: finding.evidence.path,
+      message: finding.remediation,
+    })),
+  };
+}
+
+function workflowRequiredInputsCheck(findings: Finding[]): ReadinessCheck {
+  const matched = findings.filter(
+    (finding) =>
+      WORKFLOW_REQUIRED_INPUTS_FINDING_IDS.has(finding.id) &&
+      isSkillEntrypointPath(finding.evidence.path),
+  );
+  if (matched.length === 0) {
+    return {
+      id: "workflow.required_inputs",
+      title: "Workflow required inputs",
+      status: "pass",
+      severity: "info",
+      summary:
+        "All skill workflow entrypoints document required inputs or prerequisites.",
+    };
+  }
+
+  return {
+    id: "workflow.required_inputs",
+    title: "Workflow required inputs",
+    status: "warn",
+    severity: "warning",
+    summary: `${matched.length} workflow required-input finding${
       matched.length === 1 ? "" : "s"
     } matched skill entrypoints.`,
     evidence: matched.map((finding) => ({

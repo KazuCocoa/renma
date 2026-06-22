@@ -131,6 +131,8 @@ test("strict layout passes refactored appium three-root layout", async () => {
         "Do not use this skill for runtime context selection or prompt assembly.",
         "## Preflight",
         "Before you begin, confirm the repository fixture and static context paths exist.",
+        "## Required inputs",
+        "Required inputs: setup request, repository root, and permission to read static contexts.",
         "## Example",
         "Input: setup request. Output: route to canonical context and helper scripts.",
         "## Verification",

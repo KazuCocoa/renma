@@ -12,9 +12,14 @@ export function formatText(result: ScanResult): string {
     `Root: ${result.root}`,
     `Config: ${result.configPath ?? "(defaults)"}`,
     `Files scanned: ${result.scannedFileCount}`,
+    `Diagnostics: ${result.diagnostics.length}`,
     `Exit threshold: ${result.exitThreshold}`,
     `Findings: ${result.findings.length}`,
   ];
+
+  if (result.findings.length === 0) {
+    lines.push("No findings.");
+  }
 
   for (const diagnostic of result.diagnostics) {
     lines.push(

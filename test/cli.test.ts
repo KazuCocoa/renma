@@ -25,6 +25,7 @@ test("scan discovers default artifacts and emits deterministic findings", async 
       "QUAL-MISSING-ROUTING-CLARITY",
       "QUAL-MISSING-EXAMPLES",
       "QUAL-MISSING-PREFLIGHT",
+      "QUAL-MISSING-REQUIRED-INPUTS",
       "QUAL-MISSING-VERIFICATION",
       "SEC-DESTRUCTIVE-COMMAND",
     ],

@@ -34,6 +34,8 @@ const SKILL_TOKEN_LIMIT = 500;
 const DESCRIPTION_MIN_CHARS = 150;
 const REUSABLE_CONTEXT_MIN_LINES = 24;
 const REUSABLE_CONTEXT_MIN_TOKENS = 180;
+const REQUIRED_INPUTS_PATTERN =
+  /\b(?:required inputs?|inputs|input requirements?|required information|prerequisites?|required context|required files|required permissions?|permission requirements?|environment requirements?|before running,\s*provide|before you begin,\s*provide|the user must provide|needs the following|target files|permissions required|environment required)\b|\brequires:/;
 const REUSABLE_CONTEXT_MIN_SIGNALS = 3;
 const SUPPORT_SHARED_CONTEXT_MIN_LINES = 18;
 const SUPPORT_SHARED_CONTEXT_MIN_TOKENS = 140;
@@ -689,6 +691,40 @@ function shapeFindings(document: ParsedDocument): Finding[] {
         "quality",
         "medium",
         "Add a preflight section that captures environment, permissions, target files, and assumptions before acting.",
+      ),
+    );
+  }
+
+  if (
+    document.artifact.kind === "skill" &&
+    !REQUIRED_INPUTS_PATTERN.test(text)
+  ) {
+    findings.push(
+      documentFinding(
+        document,
+        "QUAL-MISSING-REQUIRED-INPUTS",
+        "Skill does not state required inputs",
+        "quality",
+        "medium",
+        "Add a Required inputs or Prerequisites section that states the user-provided inputs, target files, repository state, permissions, credentials, or environment assumptions needed before the workflow can start.",
+        {
+          whyItMatters:
+            "Agents need explicit input requirements before starting a workflow. Missing required inputs can cause the agent to guess targets, assume permissions, or start without enough repository context.",
+          constraints: [
+            "Do not infer runtime context.",
+            "Do not assemble prompt packages.",
+            "Do not require optional context selection.",
+            "Do not make Renma decide whether the workflow can run for the current task.",
+            "Keep the skill as a static workflow entrypoint.",
+          ],
+          verificationSteps: [
+            "Run renma scan.",
+            "Run renma readiness.",
+            "Confirm each skill entrypoint either documents required inputs or explicitly states that no special inputs are required.",
+          ],
+          llmHint:
+            "Add a concise Required inputs or Prerequisites section to this SKILL.md. State user-provided inputs, target files, repository state, permissions, credentials, and environment assumptions needed before the workflow starts. Do not add runtime context selection or prompt assembly behavior.",
+        },
       ),
     );
   }
