@@ -117,7 +117,7 @@ test("strict layout passes refactored appium three-root layout", async () => {
       owner: "appium",
       name: "setup",
       description:
-        "Route setup work to canonical contexts and helper scripts without owning procedure content.",
+        "Route setup work to canonical contexts and helper scripts without owning procedure content while preserving deterministic usage guidance, non-goals, preflight checks, examples, and verification expectations.",
       requires_context: "contexts/tools/appium/setup/routing.md",
     }) +
       [
@@ -125,7 +125,16 @@ test("strict layout passes refactored appium three-root layout", async () => {
         "",
         "## Route",
         "",
+        "## When to use",
         "Use this skill for setup routing.",
+        "## DO NOT USE FOR",
+        "Do not use this skill for runtime context selection or prompt assembly.",
+        "## Preflight",
+        "Before you begin, confirm the repository fixture and static context paths exist.",
+        "## Example",
+        "Input: setup request. Output: route to canonical context and helper scripts.",
+        "## Verification",
+        "Verify by running readiness and scan reports against the fixture.",
         "",
         "## When Not To Use",
         "",
