@@ -20,7 +20,7 @@
     "codex",
     "skills"
   ],
-"type": "module",
+  "type": "module",
   "bin": {
     "renma": "./dist/index.js"
   },
