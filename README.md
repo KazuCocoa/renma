@@ -14,6 +14,14 @@ Renma is especially useful when a repository contains agent-facing material such
 
 Renma is not a Markdown linter and not a prompt-management system. Markdown is the storage format today; the product is the catalog, dependency graph, ownership model, and readiness checks around LLM-era repository knowledge.
 
+Use Renma when you need to answer repository-level questions such as:
+
+- What LLM-facing knowledge exists in this repo?
+- Which skills, context assets, examples, and tool notes are reusable?
+- Which assets are unowned, stale, orphaned, incomplete, deprecated, or broken?
+- Which product decisions, bug history, testing strategy, or platform guidance should be promoted from one-off prompt text into shared context?
+- What changed in the agent-facing knowledge catalog during this pull request?
+
 ## The Layer Model
 
 ```text
@@ -119,6 +127,8 @@ Try Renma against the current repository:
 ```bash
 npx renma scan .
 ```
+
+This first command does not require you to design a knowledge architecture up front. It scans the repository, builds a local catalog, and reports obvious health issues such as broken links, unclear ownership, risky instructions, weak structure, and context that may be hard for agents to trust.
 
 If you are working from a clone of this repository:
 
