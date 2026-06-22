@@ -138,6 +138,20 @@ Readiness output also includes a compact workflow readiness summary that groups 
 
 `renma readiness` emits a static, deterministic agent-readiness report with a score, level, summary metrics, checks, and diagnostics. It exits 0 only when the level is `ready`; `needs_attention` and `not_ready` exit 1 for CI use. It does not call LLMs, choose runtime context, assemble prompts, or repair files.
 
+### Agent readiness v1
+
+Agent readiness v1 is a deterministic static report for checking whether skill workflow entrypoints are safe and understandable enough for human or agent consumption. It does not decide runtime context selection, assemble prompts, call an LLM, or repair files.
+
+The v1 workflow checks cover:
+
+- required context closure
+- optional context health
+- routing and usage clarity
+- required inputs / prerequisites
+- completion criteria / definition of done
+
+The report also includes a workflow readiness summary that counts workflow pass/warn/fail states and reports a deterministic workflow readiness percentage.
+
 Workflow context closure checks that each skill entrypoint's declared required context references resolve to usable, non-deprecated, non-archived assets.
 
 Workflow optional-context checks warn when declared optional context references are unresolved, deprecated, or archived, without deciding whether optional context should be loaded at runtime.
