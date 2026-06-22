@@ -256,10 +256,9 @@ test("readiness markdown prints a compact reviewable report", async () => {
 
   assert.match(markdown, /^# Agent Readiness/m);
   assert.match(markdown, /\| Total assets \| 1 \|/);
-  assert.match(
-    markdown,
-    /\| Workflow readiness \| skill entrypoints: 1 \/ 4 pass \/ 0 warn \/ 0 fail \/ 4 checks \(100%\) \|/,
-  );
+  assert.match(markdown, /^## Workflow Readiness$/m);
+  assert.match(markdown, /\| Skill entrypoints \| 1 \|/);
+  assert.match(markdown, /\| Workflow readiness \| 100% \|/);
   assert.match(markdown, /\| ownership\.coverage \| pass \| info \|/);
   assert.match(markdown, /\| workflow\.clarity \| pass \| info \|/);
   assert.match(markdown, /\| workflow\.required_inputs \| pass \| info \|/);
@@ -278,6 +277,14 @@ test("readiness CLI supports --json", async () => {
   assert.equal(result.code, 0);
   assert.equal(result.stderr, "");
   assert.equal(parsed.level, "ready");
+  assert.deepEqual(parsed.summary.workflow, {
+    skillEntrypoints: 1,
+    checks: 4,
+    pass: 4,
+    warn: 0,
+    fail: 0,
+    readinessPercent: 100,
+  });
   assert.equal(parsed.summary.totalAssets, 1);
   assert.equal(
     parsed.checks.find(

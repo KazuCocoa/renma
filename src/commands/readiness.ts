@@ -254,13 +254,6 @@ export function formatReadinessJson(report: ReadinessReport): string {
 }
 
 export function formatReadinessMarkdown(report: ReadinessReport): string {
-  const workflowReadiness =
-    `skill entrypoints: ${report.summary.workflow.skillEntrypoints} / ` +
-    `${report.summary.workflow.pass} pass / ` +
-    `${report.summary.workflow.warn} warn / ` +
-    `${report.summary.workflow.fail} fail / ` +
-    `${report.summary.workflow.checks} checks ` +
-    `(${report.summary.workflow.readinessPercent}%)`;
   const lines = [
     "# Agent Readiness",
     "",
@@ -280,10 +273,20 @@ export function formatReadinessMarkdown(report: ReadinessReport): string {
     `| Resolved edges | ${report.summary.resolvedEdges} |`,
     `| Unresolved edges | ${report.summary.unresolvedEdges} |`,
     `| Graph resolution | ${report.summary.graphResolutionPercent}% |`,
-    `| Workflow readiness | ${workflowReadiness} |`,
     `| Diagnostic errors | ${report.summary.diagnosticCounts.error} |`,
     `| Diagnostic warnings | ${report.summary.diagnosticCounts.warning} |`,
     `| Diagnostic info | ${report.summary.diagnosticCounts.info} |`,
+    "",
+    "## Workflow Readiness",
+    "",
+    "| Metric | Value |",
+    "| --- | ---: |",
+    `| Skill entrypoints | ${report.summary.workflow.skillEntrypoints} |`,
+    `| Workflow checks | ${report.summary.workflow.checks} |`,
+    `| Passed workflow checks | ${report.summary.workflow.pass} |`,
+    `| Warning workflow checks | ${report.summary.workflow.warn} |`,
+    `| Failing workflow checks | ${report.summary.workflow.fail} |`,
+    `| Workflow readiness | ${report.summary.workflow.readinessPercent}% |`,
     "",
     "| Check | Status | Severity | Summary |",
     "| --- | --- | --- | --- |",
