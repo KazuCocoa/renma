@@ -518,7 +518,9 @@ function workflowContextClosureCheck(graphReport: GraphReport): ReadinessCheck {
   };
 }
 
-function workflowOptionalContextCheck(graphReport: GraphReport): ReadinessCheck {
+function workflowOptionalContextCheck(
+  graphReport: GraphReport,
+): ReadinessCheck {
   const nodesById = new Map(graphReport.nodes.map((node) => [node.id, node]));
   const optionalEdges = graphReport.edges.filter(
     (edge) =>
@@ -572,8 +574,7 @@ function workflowOptionalContextCheck(graphReport: GraphReport): ReadinessCheck 
       title: "Workflow optional context",
       status: "pass",
       severity: "info",
-      summary:
-        "All declared optional workflow context references are usable.",
+      summary: "All declared optional workflow context references are usable.",
     };
   }
 
