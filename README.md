@@ -140,6 +140,8 @@ Readiness output also includes a compact workflow readiness summary that groups 
 
 Workflow context closure checks that each skill entrypoint's declared required context references resolve to usable, non-deprecated, non-archived assets.
 
+Workflow optional-context checks warn when declared optional context references are unresolved, deprecated, or archived, without deciding whether optional context should be loaded at runtime.
+
 Workflow clarity warns when skill entrypoints lack deterministic routing, preflight, examples, verification, or other static guidance needed for responsible agent use.
 
 Workflow required-input checks warn when skill entrypoints do not document the inputs, prerequisites, or permissions agents need before starting.

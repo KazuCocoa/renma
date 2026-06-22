@@ -280,6 +280,7 @@ test("readiness warns for deprecated workflow optional context", async () => {
     (candidate) => candidate.id === "workflow.optional_context",
   );
 
+  // Optional-context and lifecycle warnings each apply a 5-point penalty.
   assert.equal(report.score, 90);
   assert.equal(report.level, "ready");
   assert.equal(check?.status, "warn");
@@ -308,6 +309,7 @@ test("readiness warns for archived workflow optional context", async () => {
     (candidate) => candidate.id === "workflow.optional_context",
   );
 
+  // Optional-context and lifecycle warnings each apply a 5-point penalty.
   assert.equal(report.score, 90);
   assert.equal(report.level, "ready");
   assert.equal(check?.status, "warn");
