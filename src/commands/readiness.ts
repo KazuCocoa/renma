@@ -26,6 +26,15 @@ export type ReadinessLevel = "ready" | "needs_attention" | "not_ready";
 export type ReadinessCheckStatus = "pass" | "warn" | "fail";
 export type ReadinessCheckSeverity = "info" | "warning" | "error";
 
+export interface WorkflowReadinessSummary {
+  skillEntrypoints: number;
+  checks: number;
+  pass: number;
+  warn: number;
+  fail: number;
+  readinessPercent: number;
+}
+
 export interface ReadinessReport {
   root: string;
   configPath?: string;
@@ -47,6 +56,7 @@ export interface ReadinessReport {
       warning: number;
       info: number;
     };
+    workflow: WorkflowReadinessSummary;
   };
   checks: ReadinessCheck[];
   diagnostics?: Diagnostic[];
@@ -212,6 +222,7 @@ export function buildReadinessReport(
   );
   const hasFailingCheck = checks.some((check) => check.status === "fail");
   const level = readinessLevel(score, hasFailingCheck);
+  const workflow = workflowSummary(graphReport, checks);
 
   return {
     root: graphReport.root,
@@ -230,6 +241,7 @@ export function buildReadinessReport(
       unresolvedEdges: unresolvedEdges.length,
       graphResolutionPercent,
       diagnosticCounts,
+      workflow,
     },
     checks,
     ...(diagnostics.length > 0 ? { diagnostics } : {}),
@@ -242,6 +254,13 @@ export function formatReadinessJson(report: ReadinessReport): string {
 }
 
 export function formatReadinessMarkdown(report: ReadinessReport): string {
+  const workflowReadiness =
+    `skill entrypoints: ${report.summary.workflow.skillEntrypoints} / ` +
+    `${report.summary.workflow.pass} pass / ` +
+    `${report.summary.workflow.warn} warn / ` +
+    `${report.summary.workflow.fail} fail / ` +
+    `${report.summary.workflow.checks} checks ` +
+    `(${report.summary.workflow.readinessPercent}%)`;
   const lines = [
     "# Agent Readiness",
     "",
@@ -261,6 +280,7 @@ export function formatReadinessMarkdown(report: ReadinessReport): string {
     `| Resolved edges | ${report.summary.resolvedEdges} |`,
     `| Unresolved edges | ${report.summary.unresolvedEdges} |`,
     `| Graph resolution | ${report.summary.graphResolutionPercent}% |`,
+    `| Workflow readiness | ${workflowReadiness} |`,
     `| Diagnostic errors | ${report.summary.diagnosticCounts.error} |`,
     `| Diagnostic warnings | ${report.summary.diagnosticCounts.warning} |`,
     `| Diagnostic info | ${report.summary.diagnosticCounts.info} |`,
@@ -686,6 +706,28 @@ function layoutReadinessPenalty(checks: ReadinessCheck[]): number {
     if (check.status === "warn") return penalty + 5;
     return penalty;
   }, 0);
+}
+
+function workflowSummary(
+  graphReport: GraphReport,
+  checks: ReadinessCheck[],
+): WorkflowReadinessSummary {
+  const workflowChecks = checks.filter((check) =>
+    check.id.startsWith("workflow."),
+  );
+  const pass = workflowChecks.filter((check) => check.status === "pass").length;
+  const warn = workflowChecks.filter((check) => check.status === "warn").length;
+  const fail = workflowChecks.filter((check) => check.status === "fail").length;
+
+  return {
+    skillEntrypoints: graphReport.nodes.filter((node) => node.kind === "skill")
+      .length,
+    checks: workflowChecks.length,
+    pass,
+    warn,
+    fail,
+    readinessPercent: percentage(pass, workflowChecks.length),
+  };
 }
 
 function countDiagnostics(diagnostics: Diagnostic[]): {
