@@ -2,7 +2,25 @@
   "name": "renma",
   "version": "0.1.0",
   "description": "Git-native governance and quality CLI for LLM-ready skills and shared context assets.",
-  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KazuCocoa/renma.git"
+  },
+  "bugs": {
+    "url": "https://github.com/KazuCocoa/renma/issues"
+  },
+  "homepage": "https://github.com/KazuCocoa/renma#readme",
+  "keywords": [
+    "llm",
+    "agents",
+    "context",
+    "governance",
+    "cli",
+    "codex",
+    "skills"
+  ],
+"type": "module",
   "bin": {
     "renma": "./dist/index.js"
   },
