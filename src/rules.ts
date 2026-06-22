@@ -693,6 +693,24 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     );
   }
 
+  if (
+    document.artifact.kind === "skill" &&
+    !/\b(required inputs?|input requirements?|required information|prerequisites?|required permissions?|permission requirements?)\b/.test(
+      text,
+    )
+  ) {
+    findings.push(
+      documentFinding(
+        document,
+        "QUAL-MISSING-REQUIRED-INPUTS",
+        "Skill does not state required inputs",
+        "quality",
+        "medium",
+        "Add an Inputs, Input requirements, Required information, prerequisites, or required permissions section so agents know what information they need before starting the workflow.",
+      ),
+    );
+  }
+
   if (!/verify|validation|test|confirm result|expected output/.test(text)) {
     findings.push(
       documentFinding(

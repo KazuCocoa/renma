@@ -140,6 +140,8 @@ Workflow context closure checks that each skill entrypoint's declared required c
 
 Workflow clarity warns when skill entrypoints lack deterministic routing, preflight, examples, verification, or other static guidance needed for responsible agent use.
 
+Workflow required-input checks warn when skill entrypoints do not document the inputs, prerequisites, or permissions agents need before starting.
+
 `renma inspect` is a repository inspection helper for outlines and exact line slices; it does not choose task context or assemble prompts.
 
 Options:

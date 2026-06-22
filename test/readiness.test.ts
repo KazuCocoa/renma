@@ -41,6 +41,7 @@ test("readiness report marks fully owned resolved inventory ready", async () => 
     "graph.unresolved_edges": "pass",
     "workflow.context_closure": "pass",
     "workflow.clarity": "pass",
+    "workflow.required_inputs": "pass",
     "assets.lifecycle": "pass",
     "assets.minimum_inventory": "pass",
     "layout.skills_thin": "pass",
@@ -71,6 +72,7 @@ test("readiness report scores unresolved and unowned assets deterministically", 
     "graph.unresolved_edges": "fail",
     "workflow.context_closure": "fail",
     "workflow.clarity": "pass",
+    "workflow.required_inputs": "pass",
     "assets.lifecycle": "warn",
     "assets.minimum_inventory": "pass",
     "layout.skills_thin": "pass",
@@ -170,12 +172,33 @@ test("readiness warns for unclear skill workflow entrypoint", async () => {
     (candidate) => candidate.id === "workflow.clarity",
   );
 
-  assert.equal(report.score, 85);
+  assert.equal(report.score, 75);
   assert.equal(report.level, "needs_attention");
   assert.equal(check?.status, "warn");
   assert.equal(check?.severity, "warning");
   assert.equal(check?.evidence?.[0]?.path, "skills/demo/SKILL.md");
   assert.match(check?.summary ?? "", /workflow clarity finding/);
+});
+
+test("readiness warns and applies penalty for missing workflow required inputs", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    status: "stable",
+    body: workflowReadySkillBodyWithoutRequiredInputs("demo"),
+  });
+
+  const report = await readiness(root);
+  const check = report.checks.find(
+    (candidate) => candidate.id === "workflow.required_inputs",
+  );
+
+  assert.equal(report.score, 90);
+  assert.equal(report.level, "ready");
+  assert.equal(check?.status, "warn");
+  assert.equal(check?.severity, "warning");
+  assert.equal(check?.evidence?.[0]?.id, "QUAL-MISSING-REQUIRED-INPUTS");
+  assert.equal(check?.evidence?.[0]?.path, "skills/demo/SKILL.md");
 });
 
 test("readiness markdown prints a compact reviewable report", async () => {
@@ -188,6 +211,7 @@ test("readiness markdown prints a compact reviewable report", async () => {
   assert.match(markdown, /\| Total assets \| 1 \|/);
   assert.match(markdown, /\| ownership\.coverage \| pass \| info \|/);
   assert.match(markdown, /\| workflow\.clarity \| pass \| info \|/);
+  assert.match(markdown, /\| workflow\.required_inputs \| pass \| info \|/);
 });
 
 test("readiness CLI supports --json", async () => {
@@ -207,6 +231,13 @@ test("readiness CLI supports --json", async () => {
     parsed.checks.find(
       (check: { id: string; status: string }) =>
         check.id === "workflow.clarity",
+    )?.status,
+    "pass",
+  );
+  assert.equal(
+    parsed.checks.find(
+      (check: { id: string; status: string }) =>
+        check.id === "workflow.required_inputs",
     )?.status,
     "pass",
   );
@@ -353,11 +384,35 @@ function workflowReadySkillBody(id: string): string {
     "## When to use",
     "Use this workflow for deterministic readiness report tests.",
     "",
+    "## Required inputs",
+    "Required inputs: repository root, target report format, and permission to read local fixture files.",
+    "",
     "## DO NOT USE FOR",
     "Do not use this workflow for runtime task context selection or prompt assembly.",
     "",
     "## Preflight",
     "Before you begin, confirm the repository fixture exists and inputs are static.",
+    "",
+    "## Example",
+    "Input: readiness report fixture. Output: deterministic check evidence.",
+    "",
+    "## Verification",
+    "Verify by running the readiness command and checking the JSON or Markdown output.",
+  ].join("\n");
+}
+
+function workflowReadySkillBodyWithoutRequiredInputs(id: string): string {
+  return [
+    `# ${id}`,
+    "",
+    "## When to use",
+    "Use this workflow for deterministic readiness report tests.",
+    "",
+    "## DO NOT USE FOR",
+    "Do not use this workflow for runtime task context selection or prompt assembly.",
+    "",
+    "## Preflight",
+    "Before you begin, confirm the repository fixture exists and static context paths are readable.",
     "",
     "## Example",
     "Input: readiness report fixture. Output: deterministic check evidence.",
