@@ -442,6 +442,15 @@ test("readiness markdown prints a compact reviewable report", async () => {
   assert.match(markdown, /^## Workflow Readiness$/m);
   assert.match(markdown, /\| Skill entrypoints \| 1 \|/);
   assert.match(markdown, /\| Workflow readiness \| 100% \|/);
+  assert.ok(
+    markdown.includes(
+      "- Workflow readiness: 100% (5/5 workflow checks passing)",
+    ),
+  );
+  assert.ok(markdown.includes("- Graph resolution: 100% (0/0 edges resolved)"));
+  assert.ok(
+    markdown.includes("- Ownership coverage: 100% (1/1 assets owned)"),
+  );
   assert.match(markdown, /\| ownership\.coverage \| pass \| info \|/);
   assert.match(markdown, /\| workflow\.optional_context \| pass \| info \|/);
   assert.match(markdown, /\| workflow\.clarity \| pass \| info \|/);
