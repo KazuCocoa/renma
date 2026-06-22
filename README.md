@@ -1,33 +1,59 @@
-# Renma - 練磨
+# Renma
 
-Renma helps teams keep LLM-ready context assets and skills healthy in Git.
+Renma is a catalog and health layer for LLM-consumable repository knowledge.
 
-Renma is a Git-native governance and quality layer for shared context repositories. It prepares repositories so Codex, Claude, Cursor, and future agents can consume team-owned expertise correctly. Renma does not choose task context, assemble prompts, inject context, or execute agent workflows; agents and runtimes decide how to use the assets for a task.
+It helps teams keep the skills, instructions, shared context, examples, tool notes, and ownership metadata that agents rely on discoverable, reviewable, and safe to reuse. Instead of letting critical knowledge get copied into many prompts or buried in one-off Markdown files, Renma treats that knowledge as a software asset: named, owned, versioned, linked, and checked in CI.
+
+Renma is especially useful when a repository contains agent-facing material such as:
+
+- Codex, Claude, Cursor, or other agent skills
+- `AGENTS.md` and repository instructions
+- Shared product, domain, QA, platform, or tool guidance
+- Team-owned context assets that should outlive a single prompt
+- References and examples that agents should be able to cite or inspect
+
+Renma is not a Markdown linter and not a prompt-management system. Markdown is the storage format today; the product is the catalog, dependency graph, ownership model, and readiness checks around LLM-era repository knowledge.
+
+## The Layer Model
 
 ```text
-Skill = LLM-facing entrypoint / routing contract / usage guide
-Context = independently owned source-of-truth knowledge asset
+Tools
+  Codex, Claude, Cursor, CI, editors, internal CLIs
+
+Skills
+  LLM-facing entrypoints that route an agent toward a task
+
+Context Assets
+  Shared domain, product, testing, platform, and tool knowledge
+
+Catalog
+  Deterministic IDs, ownership, lifecycle state, dependencies, evidence
+
+Repository
+  Git-reviewed source of truth for agent-consumable knowledge
 ```
+
+Tools decide what to do at runtime. Skills tell an agent when and how to use a capability. Context assets hold reusable knowledge. Renma catalogs and validates the layer underneath so tools and agents are not guessing from stale, orphaned, duplicated, or unowned files.
 
 ## Why Renma?
 
-As AI-agent repositories grow, expertise often gets copied into many skills. Testing heuristics, domain risks, tool usage notes, and team-specific contracts drift apart. Ownership becomes unclear, references break, deprecated guidance remains reachable, and new engineers or agents cannot tell which knowledge is authoritative.
+As AI-agent repositories grow, expertise often gets duplicated across skills and prompts. Testing heuristics, domain risks, tool usage notes, product decisions, and team-specific contracts drift apart. Ownership becomes unclear. References break. Deprecated guidance remains reachable. New engineers and agents cannot tell which knowledge is authoritative.
 
-Renma treats context as a software asset:
+Renma gives that material the same operational posture teams expect from source code:
 
-- Reusable
-- Owned
-- Reviewable
-- Versioned
-- Composable
-- Validated
-- Easy to inspect in CI and code review
+- Reusable across skills and agents
+- Owned by a team or maintainer
+- Reviewable in pull requests
+- Versioned in Git
+- Composable through explicit references and dependencies
+- Validated with deterministic checks
+- Easy to inspect locally and in CI
 
-The first strong product focus is QA/testing: boundary value analysis, negative testing, regression risk, payment idempotency, duplicate charge prevention, refund edge cases, mobile offline behavior, mobile automation usage, internal test strategy, and known team-specific risks can live as shared context assets instead of being buried inside individual skills.
+For example, a testing organization can keep boundary value analysis, negative testing, regression risk, payment idempotency, duplicate charge prevention, refund edge cases, mobile offline behavior, mobile automation notes, and known team-specific risks as shared context assets instead of burying them inside individual skills.
 
 ## Repository Shape
 
-Renma supports skill-local references, profiles, and examples, but the target repository model gives shared context assets first-class space:
+Renma supports existing skill-local references, profiles, and examples. The preferred model is to give reusable knowledge first-class space under `contexts/`:
 
 ```text
 skills/
@@ -35,6 +61,7 @@ skills/
     test-case-generation.skill.md
     spec-review.skill.md
     regression-planning.skill.md
+
 contexts/
   testing/
     boundary-value-analysis.md
@@ -45,171 +72,106 @@ contexts/
       idempotency.md
       duplicate-charge.md
       refund-risk.md
-    mobile/
-      offline-behavior.md
-      background-resume.md
+  mobile/
+    offline-behavior.md
+    background-resume.md
   tools/
-    mobile/
-      device-setup.md
-      helper-guidelines.md
+    appium/
+      usage-guideline.md
+      limitations.md
   teams/
     checkout/
       payment-api-contracts.md
       known-risk-patterns.md
 ```
 
-`contexts/` is preferred. `context/` is also scanned for compatibility. Files under either root are cataloged as first-class `context` assets, while skill-local `references/` remain `reference` assets.
+`contexts/` is preferred. `context/` is also scanned for compatibility. Files under either root are cataloged as first-class `context` assets, while skill-local `references/` remain supported as `reference` assets.
 
-## What Renma Does
+## What Renma Does Today
 
-Today Renma is a minimal-dependency TypeScript CLI that scans AI-agent skills, repository instructions, shared context Markdown, profile overlays, references, and examples. It runs deterministic quality, structure, and safety rules, then emits text or JSON reports with file and line evidence. It also emits deterministic catalog, ownership coverage, graph, and agent readiness reports from the same local catalog model.
+Renma is a minimal-dependency TypeScript CLI that scans local repositories and builds a deterministic catalog of agent-consumable assets.
 
-Renma findings are intended to be actionable repair prompts for humans and LLM
-tools such as Codex, Claude, and Cursor. Findings should explain what is wrong,
-why it matters, where the evidence is, what a safe repair should preserve, and
-how to verify the fix. Renma does not apply large semantic rewrites itself; it
-emits structured diagnostics so a human or agent can propose a reviewable patch
-and run Renma again.
+It currently scans:
 
-Completed baseline:
+- AI-agent skills
+- Repository instructions such as `AGENTS.md`
+- Shared context Markdown under `context/` and `contexts/`
+- Skill profiles, references, and examples
+- Tool guidance and support files
+- README-level repository documentation
 
-- Bounded filesystem discovery
-- Stable POSIX-style repo-relative paths
-- Markdown parsing for headings, links, code fences, metadata, and evidence
-- Structural quality checks for skills, shared context assets, and local support files
-- Safety checks for risky instructions and literal secrets
-- Deterministic catalog output for assets and dependency metadata
-- Deterministic ownership coverage reporting for cataloged assets
-- Context graph snapshot reporting
-- Deterministic agent readiness scoring for static repository health
-- Deterministic metadata governance for duplicate asset IDs, unknown declared references, references to deprecated or archived assets, and orphaned shared context assets
-- Repository file outline and line-slice inspection helper
-- Deterministic agent readiness v1 reporting with workflow checks, score/level, JSON/Markdown output, workflow summary, and compact PR-review recap
-- Semantic split prompt helper for oversized context files
-- CI-friendly exit behavior with `--fail-on`
-- Config loading from `renma.config.json` and `.renma.json`
+It produces:
 
-Near-term direction:
+- File and line-level diagnostics
+- Catalog reports with deterministic asset IDs
+- Ownership coverage reports
+- Dependency graph reports
+- Agent readiness reports
+- JSON output for CI and downstream tooling
+- Text output designed to become actionable repair prompts for humans or agents
 
-- Repeated context and duplicate knowledge discovery
-- Semantic diff for context changes
-- CI integration examples and sample readiness reports
-- Optional LLM-assisted repository evaluation bundles
+Findings are meant to explain what is wrong, why it matters, where the evidence is, what to preserve while fixing it, and how to verify the repair. Renma does not apply large semantic rewrites itself; it emits structured diagnostics so a human or coding agent can propose a reviewable patch and run Renma again.
 
-See [architecture.md](./architecture.md) and [plan.md](./plan.md) for the current design direction.
+## First-Time Use
 
-## Requirements
+Try Renma against the current repository:
 
-- Node.js 22.17 or newer
-- npm
+```bash
+npx renma scan .
+```
 
-Install:
+If you are working from a clone of this repository:
 
 ```bash
 npm install
 npm run build
-```
-
-After building, run the CLI directly:
-
-```bash
 node dist/index.js scan .
 ```
 
-When installed as a package, the binary name is:
+Then inspect the catalog and graph:
+
+```bash
+node dist/index.js catalog . --format json
+node dist/index.js graph . --format mermaid
+node dist/index.js readiness .
+```
+
+A practical first pass is:
+
+1. Run `scan` to find broken links, weak structure, risky instructions, missing lifecycle metadata, and other repairable issues.
+2. Run `catalog` to see which skills, context assets, references, examples, and support files Renma discovered.
+3. Run `ownership` to find assets without clear ownership.
+4. Run `graph` to inspect dependencies and discover orphaned or overly coupled knowledge.
+5. Run `readiness` to summarize whether the repository is healthy enough for agent use.
+
+Renma does not require an LLM for this loop. Its core analysis is deterministic so the same repository state produces stable evidence in local development, CI, and code review.
+
+## CLI Commands
+
+```bash
+renma scan <path>
+renma catalog <path>
+renma ownership <path>
+renma graph <path>
+renma readiness <path>
+renma inspect <path> <asset-or-file>
+renma suggest-semantic-split <file>
+```
+
+Common examples:
 
 ```bash
 renma scan .
-```
-
-## Usage
-
-```bash
-renma scan [path] [options]
-renma catalog [path] [options]
-renma graph [path] [options]
-renma ownership [path] [options]
-renma readiness [path] [options]
-renma inspect <file> [options]
-renma suggest-semantic-split <file> [options]
-```
-
-Readiness output also includes a compact workflow readiness summary that groups workflow-level checks, counts pass/warn/fail states, and reports a deterministic workflow readiness percentage.
-
-`renma readiness` emits a static, deterministic agent-readiness report with a score, level, summary metrics, checks, and diagnostics. It exits 0 only when the level is `ready`; `needs_attention` and `not_ready` exit 1 for CI use. It does not call LLMs, choose runtime context, assemble prompts, or repair files.
-
-### Agent readiness v1
-
-Agent readiness v1 is a deterministic static report for checking whether skill workflow entrypoints are safe and understandable enough for human or agent consumption. It does not decide runtime context selection, assemble prompts, call an LLM, or repair files.
-
-The v1 workflow checks cover:
-
-- required context closure
-- optional context health
-- routing and usage clarity
-- required inputs / prerequisites
-- completion criteria / definition of done
-
-The report also includes a workflow readiness summary that counts workflow pass/warn/fail states and reports a deterministic workflow readiness percentage.
-
-A ready report is intentionally compact enough to paste into a PR description, for example: level, score, workflow readiness, graph resolution, ownership coverage, diagnostics, and layout status.
-
-Dogfooding against the `appium/skills` branch `refine2` produced a ready v1 report with all workflow checks passing, all graph edges resolved, all assets owned, no diagnostics, and passing layout checks. The example confirmed that the Markdown recap is useful for PR reviews without changing Renma's deterministic static boundaries.
-
-The JSON and Markdown reports expose `summary.workflow` counts, graph resolution, ownership coverage, diagnostics, and layout status. They do not perform runtime context selection, assemble prompt packages, call an LLM, auto-repair files, score repairability, or plan per-skill patches.
-
-Workflow context closure checks that each skill entrypoint's declared required context references resolve to usable, non-deprecated, non-archived assets.
-
-Workflow optional-context checks warn when declared optional context references are unresolved, deprecated, or archived, without deciding whether optional context should be loaded at runtime.
-
-Workflow clarity warns when skill entrypoints lack deterministic routing, preflight, examples, verification, or other static guidance needed for responsible agent use.
-
-Workflow required-input checks warn when skill entrypoints do not document the inputs, prerequisites, or permissions agents need before starting.
-
-Workflow completion-criteria checks warn when skill entrypoints do not state the final output, evidence, report contents, patch expectations, or stop condition needed to complete the workflow.
-
-`renma inspect` is a repository inspection helper for outlines and exact line slices; it does not choose task context or assemble prompts.
-
-Options:
-
-```text
--c, --config <path>      Read JSON config from path
-    --fail-on <level>    Exit 1 when findings meet severity: low, medium, high, critical
-    --format <format>    scan: text or json; catalog/ownership: json or markdown; graph: json, markdown, or mermaid; suggest: prompt or json
-    --include-owned      ownership: include owned asset details
-    --json               Shortcut for --format json
-    --view <view>        graph: summary, workflow, or full
-    --lines <range>      inspect: exact line range, e.g. L10-L42
-    --max-source-bytes <n>
-                          suggest-semantic-split: source file byte budget
-    --max-context-bytes <n>
-                          suggest-semantic-split: nearby context byte budget
--h, --help               Show help
--v, --version            Show version
-```
-
-Examples:
-
-```bash
-renma scan .
-renma scan ./my-repo --json
-renma scan . --fail-on medium
-renma scan . --config ./renma.config.json
-renma catalog . --format markdown
-renma catalog . --json
-renma graph . --format markdown
+renma scan . --format json
+renma scan . --fail-on high
+renma catalog . --format json
+renma ownership . --include-owned
 renma graph . --format mermaid
-renma graph . --format mermaid --view workflow
-renma graph . --json
-renma ownership . --format markdown
-renma ownership . --json
-renma ownership . --json --include-owned
-renma readiness . --format markdown
-renma readiness . --json
-renma inspect contexts/testing/boundary-value-analysis.md --format json
-renma inspect contexts/testing/boundary-value-analysis.md --lines L40-L90 --format text
-renma suggest-semantic-split contexts/testing/boundary-value-analysis.md
+renma readiness .
+renma inspect . contexts/testing/boundary-value-analysis.md
 ```
+
+Use JSON output when Renma is part of CI or another tool. Use text output when a person or coding agent needs a concise repair list.
 
 ## What Gets Scanned
 
@@ -225,19 +187,11 @@ contexts/**/*.md
 tools/**/*
 ```
 
-It skips `node_modules`, `dist`, and `.git`, ignores symbolic links, enforces a maximum file size, and reports paths in stable POSIX-style form.
+Renma also understands skill-local support directories such as `profiles/`, `references/`, and `examples/`. Shared knowledge that is reused across skills should usually move into `contexts/` so it can have its own owner, lifecycle, dependencies, and review history.
 
 ## Configuration
 
-Renma automatically looks for `renma.config.json`, then `.renma.json`.
-
-Configuration is applied in this order:
-
-1. Defaults
-2. Config file
-3. CLI flags
-
-Example:
+Add `renma.config.json` at the repository root to tune discovery and CI behavior:
 
 ```json
 {
@@ -248,7 +202,11 @@ Example:
     "AGENTS.md",
     "contexts/**/*.md"
   ],
-  "exclude": ["node_modules", "dist", ".git"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".git"
+  ],
   "max_file_size_bytes": 524288,
   "max_depth": 16,
   "concurrency": 16,
@@ -258,93 +216,93 @@ Example:
 }
 ```
 
-Supported fields:
+## Asset Metadata
 
-- `fail_on`: `low`, `medium`, `high`, or `critical`
-- `format`: `text` or `json`
-- `globs`: array of glob patterns
-- `exclude`: array of path segment names to skip
-- `max_file_size_bytes`: positive integer
-- `max_depth`: positive integer
-- `concurrency`: positive integer
-- `layout`: optional strict layout policy configuration
-  - `tool_namespace`: optional namespace for suggested `contexts/tools/<namespace>/...` and `tools/<namespace>/...` paths
-  - `workflow_aliases`: map of skill directory names to canonical workflow directory names
+Renma works best when reusable assets declare lightweight metadata in front matter:
 
-Invalid config fields exit with code `2`.
+```markdown
+---
+id: context.testing.boundary-value-analysis
+kind: context
+owner: qa-platform
+status: active
+depends_on:
+  - context.testing.negative-testing
+---
 
-## Layout Policy
-
-Strict layout diagnostics are generic by default. Renma suggests context assets under `contexts/<workflow>/...` and helper assets under `tools/<workflow>/...` unless a repository config adds a tool namespace.
-
-- `layout.tool_namespace` is optional. When set, it controls the namespace used in suggested `contexts/tools/<namespace>/<workflow>/...` and `tools/<namespace>/<workflow>/...` paths. When omitted, Renma suggests `contexts/<workflow>/...` and `tools/<workflow>/...` paths.
-- `layout.workflow_aliases` maps skill directory names to canonical workflow directory names.
-
-Example:
-
-```json
-{
-  "layout": {
-    "tool_namespace": "mobile",
-    "workflow_aliases": {
-      "device-setup": "real-device"
-    }
-  }
-}
+# Boundary Value Analysis
 ```
 
-## Exit Codes
+Useful metadata includes:
 
-- `0`: Scan completed and no findings met the failure threshold
-- `1`: Scan completed and at least one finding met `fail_on`
-- `2`: CLI usage error, invalid config, or unreadable required input
+- `id`: Stable catalog ID
+- `kind`: `skill`, `context`, `reference`, `example`, `profile`, or support type
+- `owner`: Team, person, or group responsible for the asset
+- `status`: Lifecycle state such as `active`, `draft`, `deprecated`, or `archived`
+- `depends_on`: Other catalog IDs this asset relies on
 
-## Checks
+Renma can infer some information from paths and headings, but explicit metadata makes ownership and dependency reports much more valuable.
 
-Current rules include:
+## CI Example
 
-- Missing skill description, examples, preflight, verification, negative routing, or explicit routing clarity
-- Short frontmatter descriptions
-- Oversized `SKILL.md` entrypoints
-- Metadata governance findings surfaced through `scan`, including invalid lifecycle status values, missing shared context `id` or `owner`, duplicate asset IDs, unknown declared references, declared references to deprecated or archived assets, and orphaned shared context assets
-- Oversized shared context assets or local support files in `contexts/`, `context/`, `profiles/`, `references/`, and `examples/`
-- Unreachable skill-local profiles, references, and examples
-- Profile overlays missing base skill declaration
-- Skills that still route through deprecated or superseded local support assets after reusable knowledge has moved to canonical shared context assets
-- Non-skill assets that still reference deprecated or superseded support files instead of canonical shared context assets
-- Advisory reusable-context candidates in `SKILL.md` files with enough size and diverse setup, troubleshooting, platform, testing, risk, or domain-rule signals
-- Advisory shared-context candidates in large `contexts/**/*.md` assets with generic source-of-truth headings and reusable guidance phrases
-- Advisory shared-context assets under process-state folders such as `contexts/promoted/`, `contexts/generated/`, or `contexts/drafts/` that should become semantic final paths
-- Literal secret-like values
-- Private key material
-- Destructive commands without nearby confirmation or recovery context
-- Risky remote defaults
-- Broad environment copying into subprocesses
-- Hardcoded user-local paths
+```yaml
+name: renma
 
-Declared reference validation resolves exact asset IDs and repository-relative paths, including paths with a leading `./` normalized away. It does not perform fuzzy matching, semantic lookup, runtime context selection, or prompt assembly.
+on:
+  pull_request:
+  push:
+    branches:
+      - main
 
-Static checks are evidence. Passing a scan does not prove a repository or agent workflow is safe.
+jobs:
+  renma:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx renma scan . --fail-on high --format json
+```
+
+## Design Boundaries
+
+Renma intentionally stays below the agent runtime layer.
+
+Renma does:
+
+- Catalog LLM-consumable repository assets
+- Validate links, structure, lifecycle state, safety signals, and ownership
+- Emit deterministic reports with file and line evidence
+- Help humans and agents repair knowledge repositories through reviewable patches
+
+Renma does not:
+
+- Choose task-specific context for a live agent session
+- Assemble prompts
+- Inject context into model calls
+- Execute agent workflows
+- Act as a provider gateway
+- Replace product, QA, platform, or documentation ownership
+
+This boundary keeps Renma useful as repository infrastructure. Agent tools can consume its reports, but the catalog remains grounded in Git, code review, and deterministic checks.
 
 ## Development
 
 ```bash
+npm install
 npm run build
-npm run typecheck
 npm test
 ```
 
-The package build emits the CLI to `dist/index.js`. Tests compile to `dist-test/`.
+Run the local CLI after building:
 
-## Inspirations
+```bash
+node dist/index.js scan .
+```
 
-Renma is inspired by:
+## Related Docs
 
-- [Waza](https://github.com/microsoft/waza), especially skill eval coverage, task-based regression checks, and readiness-oriented validation.
-- [SkillSpector](https://github.com/NVIDIA/skillspector), especially deterministic security scanning, risk-oriented findings, SARIF/reporting direction, and analyzer-style rule organization.
-
-Renma is an independent implementation focused on lightweight deterministic governance checks for AI-agent skill and context repositories.
-
-## License
-
-MIT. See [LICENSE](./LICENSE).
+- [architecture.md](architecture.md) for the deeper system model
+- [design.md](design.md) for product and rule-design notes
+- [plan.md](plan.md) for current implementation direction
