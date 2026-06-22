@@ -1,6 +1,6 @@
 # Renma
 
-Renma is a catalog and health layer for LLM-consumable repository knowledge.
+Renma is a Context Asset Repository and health layer for LLM-consumable repository knowledge.
 
 It helps teams keep the skills, instructions, shared context, examples, tool notes, and ownership metadata that agents rely on discoverable, reviewable, and safe to reuse. Instead of letting critical knowledge get copied into many prompts or buried in one-off Markdown files, Renma treats that knowledge as a software asset: named, owned, versioned, linked, and checked in CI.
 
@@ -126,6 +126,9 @@ Try Renma against the current repository:
 
 ```bash
 npx renma scan .
+npx renma catalog . --format json
+npx renma graph . --format mermaid
+npx renma readiness .
 ```
 
 This first command does not require you to design a knowledge architecture up front. It scans the repository, builds a local catalog, and reports obvious health issues such as broken links, unclear ownership, risky instructions, weak structure, and context that may be hard for agents to trust.
