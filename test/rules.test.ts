@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { formatText } from "../src/report.js";
 import { scan } from "../src/scanner.js";
+import type { ScanResult } from "../src/types.js";
 
 test("scan preserves local support reachability and profile findings", async () => {
   const root = await fixture();
@@ -1512,3 +1513,117 @@ async function fixture(): Promise<string> {
 function repeatWords(word: string, count: number): string {
   return Array.from({ length: count }, () => word).join(" ");
 }
+
+async function writeSkill(
+  root: string,
+  name: string,
+  content: string,
+): Promise<void> {
+  const skillDir = path.join(root, "skills", name);
+  await mkdir(skillDir, { recursive: true });
+  await writeFile(path.join(skillDir, "SKILL.md"), content);
+}
+
+function skillMarkdown(options: {
+  requiredInputs?: boolean;
+  signal?: string;
+}): string {
+  const inputSection =
+    options.signal ??
+    (options.requiredInputs === false
+      ? ""
+      : "## Required inputs\nRepository root and target command.");
+  return [
+    "---",
+    "id: demo",
+    "owner: platform",
+    "description: Clear workflow routing for readiness report tests with deterministic usage guidance, non-goals, preflight checks, examples, and verification expectations for agent consumers.",
+    "---",
+    "# Demo",
+    "## When to use",
+    "Use this skill for deterministic scanner tests.",
+    "## DO NOT USE FOR",
+    "Do not use this skill for runtime context selection or prompt assembly.",
+    "## Preflight",
+    "Before you begin, confirm the repository fixture exists.",
+    inputSection,
+    "## Example",
+    "Example request produces deterministic finding evidence.",
+    "## Verification",
+    "Verify by running renma scan and renma readiness.",
+    "",
+  ].join("\n");
+}
+test("missing required inputs finding includes rich static guidance", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", skillMarkdown({ requiredInputs: false }));
+
+  const result = await scan(root);
+  const finding = result.findings.find(
+    (candidate) => candidate.id === "QUAL-MISSING-REQUIRED-INPUTS",
+  );
+
+  assert.equal(finding?.title, "Skill does not state required inputs");
+  assert.equal(finding?.category, "quality");
+  assert.equal(finding?.severity, "medium");
+  assert.match(finding?.whyItMatters ?? "", /Agents need explicit input/);
+  assert.ok(finding?.constraints?.includes("Do not infer runtime context."));
+  assert.ok(finding?.constraints?.includes("Do not assemble prompt packages."));
+  assert.ok(finding?.verificationSteps?.includes("Run renma readiness."));
+  assert.match(finding?.llmHint ?? "", /Required inputs or Prerequisites/);
+});
+
+test("required input finding accepts deterministic input signals", async () => {
+  const signals = [
+    "## Required inputs\nRepository root and target command.",
+    "## Inputs\nRepository root and target command.",
+    "## Input requirements\nRepository root and target command.",
+    "## Required information\nRepository root and target command.",
+    "## Prerequisites\nRepository root and target command.",
+    "## Required context\nRepository root and target command.",
+    "## Required files\nRepository root and target command.",
+    "## Required permissions\nRepository root and target command.",
+    "## Permission requirements\nRepository root and target command.",
+    "## Environment requirements\nRepository root and target command.",
+    "requires: repository root and target command.",
+    "Before running, provide the repository root and target command.",
+    "Before you begin, provide the repository root and target command.",
+    "The user must provide the repository root and target command.",
+    "Needs the following: repository root and target command.",
+    "Target files: repository root and target command.",
+    "Permissions required: repository read access.",
+    "Environment required: local repository checkout.",
+  ];
+
+  for (const [index, signal] of signals.entries()) {
+    const root = await fixture();
+    await writeSkill(root, `demo-${index}`, skillMarkdown({ signal }));
+
+    const result = await scan(root);
+
+    assert.equal(
+      result.findings.some(
+        (finding) => finding.id === "QUAL-MISSING-REQUIRED-INPUTS",
+      ),
+      false,
+      signal,
+    );
+  }
+});
+
+test("text report calls out clean scans", () => {
+  const result: ScanResult = {
+    root: "/repo",
+    scannedFileCount: 1,
+    format: "text",
+    findings: [],
+    diagnostics: [],
+    exitThreshold: "high",
+  };
+
+  const textReport = formatText(result);
+
+  assert.match(textReport, /Diagnostics: 0/);
+  assert.match(textReport, /Findings: 0/);
+  assert.match(textReport, /No findings\./);
+});
