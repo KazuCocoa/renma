@@ -43,6 +43,16 @@ test("readiness report marks fully owned resolved inventory ready", async () => 
     fail: 0,
     readinessPercent: 100,
   });
+  const workflowCheckIds = report.checks
+    .filter((check) => check.id.startsWith("workflow."))
+    .map((check) => check.id);
+  assert.deepEqual(workflowCheckIds, [
+    "workflow.context_closure",
+    "workflow.optional_context",
+    "workflow.clarity",
+    "workflow.required_inputs",
+    "workflow.completion_criteria",
+  ]);
   assertCheckStatuses(report, {
     "diagnostics.errors": "pass",
     "ownership.coverage": "pass",
@@ -391,6 +401,34 @@ test("readiness warns and applies penalty for missing workflow completion criter
   assert.equal(check?.severity, "warning");
   assert.equal(check?.evidence?.[0]?.id, "QUAL-MISSING-COMPLETION-CRITERIA");
   assert.equal(check?.evidence?.[0]?.path, "skills/demo/SKILL.md");
+});
+
+test("readiness applies stable score contract for workflow warnings", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    status: "stable",
+    optionalContext: ["missing.context"],
+    body: workflowReadySkillBodyWithoutCompletionCriteria("demo"),
+  });
+
+  const report = await readiness(root);
+
+  assert.deepEqual(report.summary.workflow, {
+    skillEntrypoints: 1,
+    checks: 5,
+    pass: 3,
+    warn: 2,
+    fail: 0,
+    readinessPercent: 60,
+  });
+  assertCheckStatuses(report, {
+    "graph.unresolved_edges": "pass",
+    "workflow.optional_context": "warn",
+    "workflow.completion_criteria": "warn",
+  });
+  assert.equal(report.score, 80);
+  assert.equal(report.level, "needs_attention");
 });
 
 test("readiness markdown prints a compact reviewable report", async () => {

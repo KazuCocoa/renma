@@ -125,6 +125,11 @@ export function buildReadinessReport(
     (node) => node.status === "deprecated" || node.status === "archived",
   );
 
+  /**
+   * Workflow checks are static entrypoint-readiness checks.
+   * Keep required context strict, optional context advisory, and avoid runtime
+   * context selection or prompt/package assembly in this report.
+   */
   const checks: ReadinessCheck[] = [
     diagnosticsCheck(diagnosticCounts.error, diagnostics),
     ownershipCheck(unownedAssets, totalAssets, graphReport.nodes),
