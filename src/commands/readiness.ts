@@ -183,7 +183,9 @@ export function buildReadinessReport(
       check.id === "workflow.required_inputs" && check.status === "warn",
   );
   const workflowClarityPenalty = hasWorkflowClarityWarning ? 15 : 0;
-  const workflowRequiredInputsPenalty = hasWorkflowRequiredInputsWarning ? 10 : 0;
+  const workflowRequiredInputsPenalty = hasWorkflowRequiredInputsWarning
+    ? 10
+    : 0;
   const score = Math.max(
     0,
     100 -
