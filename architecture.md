@@ -42,7 +42,7 @@ Renma does not choose task context, assemble prompts, inject context, or execute
 - Validate references, metadata, lifecycle, and dependency graph health.
 - Detect orphaned, deprecated, conflicting, missing, and repeated context.
 - Provide deterministic catalog and graph snapshots for Git review and CI.
-- Produce repository-level agent readiness reports.
+- Produce repository-level deterministic readiness reports.
 - Allow optional LLM assistance for suggestions and semantic review without making LLMs required for core analysis.
 
 ## Non-Goals
@@ -171,7 +171,7 @@ Catalog snapshot + context graph snapshot
 Validation, repeated-context discovery, semantic diff
   |
   v
-Reports, repository manifests, agent readiness output
+Reports, repository manifests, readiness output
  |
  v
 Humans and LLM coding agents review diagnostics, propose patches, and rerun Renma
@@ -367,9 +367,9 @@ Possible command:
 renma diff --from main --to HEAD
 ```
 
-## Agent Readiness Reports
+## Repository Health Reports
 
-Agent readiness v1 is a deterministic static report that describes whether a repository is healthy enough for agents to consume.
+Readiness v1 is a deterministic static report that describes whether a repository is healthy enough for agents to consume.
 
 Current v1 command:
 
@@ -420,13 +420,12 @@ Completed baseline:
 
 Near-term implementation:
 
-1. Agent readiness report
-2. Repeated context and duplicate knowledge discovery
-3. Semantic diff for context changes
+1. Repeated context and duplicate knowledge discovery
+2. Semantic diff for context changes
+3. CI integration examples and sample readiness reports
 4. Optional LLM-assisted repository evaluation bundles
-5. Optional external signal import
 
-This sequence prioritizes shared context assets and repository health before external signal import.
+This sequence prioritizes shared context assets, CI review examples, and repository health before later external signal import work.
 
 ## Implementation Notes
 
@@ -459,11 +458,12 @@ Baseline now in place:
 - Unknown dependency and reference detection.
 - Deprecated or archived dependency validation.
 - Orphaned context asset detection.
-- Agent readiness report.
+- Readiness v1 repository-health report.
 
 Near-term implementation work:
 
 - Repeated context discovery across shared contexts, skills, agents, references, profiles, and examples.
+- CI integration examples and sample readiness reports.
 - Optional LLM-assisted repository evaluation bundles.
 
 ## Principle
