@@ -37,7 +37,7 @@ const REUSABLE_CONTEXT_MIN_TOKENS = 180;
 const REQUIRED_INPUTS_PATTERN =
   /\b(?:required inputs?|inputs|input requirements?|required information|prerequisites?|required context|required files|required permissions?|permission requirements?|environment requirements?|before running,\s*provide|before you begin,\s*provide|the user must provide|needs the following|target files|permissions required|environment required)\b|\brequires:/;
 const COMPLETION_CRITERIA_PATTERN =
-  /\b(?:completion criteria|success criteria|success requirements|done criteria|definition of done|acceptance criteria|deliverables?|final response|final answer|expected outcomes?|expected results?|when complete|workflow is complete|task is complete|counts as complete|completion requirements?)\b/;
+  /\b(?:completion criteria|completion checklist|success criteria|success requirements|done criteria|done when|definition of done|acceptance criteria|deliverables?|final response|final answer|expected outcomes?|expected results?|expected output|required output|output requirements?|report should include|patch should include|when complete|workflow is complete|the workflow is complete after|task is complete|counts as complete|completion requirements?|stop when|do not finish until)\b/;
 const REUSABLE_CONTEXT_MIN_SIGNALS = 3;
 const SUPPORT_SHARED_CONTEXT_MIN_LINES = 18;
 const SUPPORT_SHARED_CONTEXT_MIN_TOKENS = 140;

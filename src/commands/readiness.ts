@@ -188,15 +188,15 @@ export function buildReadinessReport(
   );
   const hasWorkflowCompletionCriteriaWarning = checks.some(
     (check) =>
-      check.id === "workflow.completion_criteria" &&
-      check.status === "warn",
+      check.id === "workflow.completion_criteria" && check.status === "warn",
   );
   const workflowClarityPenalty = hasWorkflowClarityWarning ? 15 : 0;
   const workflowRequiredInputsPenalty = hasWorkflowRequiredInputsWarning
     ? 10
     : 0;
-  const workflowCompletionCriteriaPenalty =
-    hasWorkflowCompletionCriteriaWarning ? 15 : 0;
+  const workflowCompletionCriteriaPenalty = hasWorkflowCompletionCriteriaWarning
+    ? 15
+    : 0;
   const score = Math.max(
     0,
     100 -
@@ -576,8 +576,7 @@ function workflowCompletionCriteriaCheck(findings: Finding[]): ReadinessCheck {
       title: "Workflow completion criteria",
       status: "pass",
       severity: "info",
-      summary:
-        "All skill workflow entrypoints document completion criteria.",
+      summary: "All skill workflow entrypoints document completion criteria.",
     };
   }
 

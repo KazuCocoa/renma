@@ -220,10 +220,7 @@ test("readiness warns and applies penalty for missing workflow completion criter
   assert.equal(report.level, "needs_attention");
   assert.equal(check?.status, "warn");
   assert.equal(check?.severity, "warning");
-  assert.equal(
-    check?.evidence?.[0]?.id,
-    "QUAL-MISSING-COMPLETION-CRITERIA",
-  );
+  assert.equal(check?.evidence?.[0]?.id, "QUAL-MISSING-COMPLETION-CRITERIA");
   assert.equal(check?.evidence?.[0]?.path, "skills/demo/SKILL.md");
 });
 
@@ -265,6 +262,13 @@ test("readiness CLI supports --json", async () => {
     parsed.checks.find(
       (check: { id: string; status: string }) =>
         check.id === "workflow.required_inputs",
+    )?.status,
+    "pass",
+  );
+  assert.equal(
+    parsed.checks.find(
+      (check: { id: string; status: string }) =>
+        check.id === "workflow.completion_criteria",
     )?.status,
     "pass",
   );

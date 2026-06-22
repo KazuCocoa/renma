@@ -1619,11 +1619,7 @@ test("required input finding accepts deterministic input signals", async () => {
 
 test("missing completion criteria finding includes rich static guidance", async () => {
   const root = await fixture();
-  await writeSkill(
-    root,
-    "demo",
-    skillMarkdown({ completionCriteria: false }),
-  );
+  await writeSkill(root, "demo", skillMarkdown({ completionCriteria: false }));
 
   const result = await scan(root);
   const finding = result.findings.find(
@@ -1635,9 +1631,7 @@ test("missing completion criteria finding includes rich static guidance", async 
   assert.equal(finding?.severity, "medium");
   assert.match(finding?.whyItMatters ?? "", /completion criteria/);
   assert.ok(finding?.constraints?.includes("Do not infer runtime context."));
-  assert.ok(
-    finding?.constraints?.includes("Do not assemble prompt packages."),
-  );
+  assert.ok(finding?.constraints?.includes("Do not assemble prompt packages."));
   assert.ok(finding?.verificationSteps?.includes("Run renma readiness."));
   assert.match(finding?.llmHint ?? "", /Completion criteria/);
 });
@@ -1652,6 +1646,16 @@ test("completion criteria finding accepts deterministic completion signals", asy
     "Definition of done: readiness reports deterministic evidence.",
     "Acceptance criteria: the report includes check status and evidence.",
     "The workflow is complete when the scan output is deterministic.",
+    "Done when the readiness report includes deterministic evidence.",
+    "## Completion checklist\nConfirm scan output, readiness output, and final summary.",
+    "Expected output: a readiness report with check status and evidence.",
+    "Required output: patch summary and verification results.",
+    "Output requirements: include final status and diagnostics.",
+    "Report should include score, level, and workflow evidence.",
+    "Patch should include tests for the new readiness check.",
+    "The workflow is complete after build, typecheck, and tests pass.",
+    "Stop when readiness returns deterministic JSON evidence.",
+    "Do not finish until the final response includes verification results.",
   ];
 
   for (const [index, signal] of signals.entries()) {
