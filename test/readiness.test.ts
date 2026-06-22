@@ -35,6 +35,14 @@ test("readiness report marks fully owned resolved inventory ready", async () => 
   assert.equal(report.summary.resolvedEdges, 1);
   assert.equal(report.summary.unresolvedEdges, 0);
   assert.equal(report.summary.graphResolutionPercent, 100);
+  assert.deepEqual(report.summary.workflow, {
+    skillEntrypoints: 1,
+    checks: 4,
+    pass: 4,
+    warn: 0,
+    fail: 0,
+    readinessPercent: 100,
+  });
   assertCheckStatuses(report, {
     "diagnostics.errors": "pass",
     "ownership.coverage": "pass",
@@ -67,6 +75,14 @@ test("readiness report scores unresolved and unowned assets deterministically", 
   assert.equal(report.summary.unownedAssets, 1);
   assert.equal(report.summary.unresolvedEdges, 1);
   assert.equal(report.summary.diagnosticCounts.error, 0);
+  assert.deepEqual(report.summary.workflow, {
+    skillEntrypoints: 1,
+    checks: 4,
+    pass: 3,
+    warn: 0,
+    fail: 1,
+    readinessPercent: 75,
+  });
   assertCheckStatuses(report, {
     "diagnostics.errors": "pass",
     "ownership.coverage": "warn",
@@ -217,6 +233,14 @@ test("readiness warns and applies penalty for missing workflow completion criter
   );
 
   assert.equal(report.score, 85);
+  assert.deepEqual(report.summary.workflow, {
+    skillEntrypoints: 1,
+    checks: 4,
+    pass: 3,
+    warn: 1,
+    fail: 0,
+    readinessPercent: 75,
+  });
   assert.equal(report.level, "needs_attention");
   assert.equal(check?.status, "warn");
   assert.equal(check?.severity, "warning");
@@ -232,6 +256,9 @@ test("readiness markdown prints a compact reviewable report", async () => {
 
   assert.match(markdown, /^# Agent Readiness/m);
   assert.match(markdown, /\| Total assets \| 1 \|/);
+  assert.match(markdown, /^## Workflow Readiness$/m);
+  assert.match(markdown, /\| Skill entrypoints \| 1 \|/);
+  assert.match(markdown, /\| Workflow readiness \| 100% \|/);
   assert.match(markdown, /\| ownership\.coverage \| pass \| info \|/);
   assert.match(markdown, /\| workflow\.clarity \| pass \| info \|/);
   assert.match(markdown, /\| workflow\.required_inputs \| pass \| info \|/);
@@ -250,6 +277,14 @@ test("readiness CLI supports --json", async () => {
   assert.equal(result.code, 0);
   assert.equal(result.stderr, "");
   assert.equal(parsed.level, "ready");
+  assert.deepEqual(parsed.summary.workflow, {
+    skillEntrypoints: 1,
+    checks: 4,
+    pass: 4,
+    warn: 0,
+    fail: 0,
+    readinessPercent: 100,
+  });
   assert.equal(parsed.summary.totalAssets, 1);
   assert.equal(
     parsed.checks.find(

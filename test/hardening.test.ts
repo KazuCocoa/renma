@@ -204,6 +204,14 @@ function readinessReportWithFindings(count: number): ReadinessReport {
         warning: 0,
         info: 0,
       },
+      workflow: {
+        skillEntrypoints: 0,
+        checks: 0,
+        pass: 0,
+        warn: 0,
+        fail: 0,
+        readinessPercent: 100,
+      },
     },
     checks: [
       {

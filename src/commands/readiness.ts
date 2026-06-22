@@ -26,6 +26,15 @@ export type ReadinessLevel = "ready" | "needs_attention" | "not_ready";
 export type ReadinessCheckStatus = "pass" | "warn" | "fail";
 export type ReadinessCheckSeverity = "info" | "warning" | "error";
 
+export interface WorkflowReadinessSummary {
+  skillEntrypoints: number;
+  checks: number;
+  pass: number;
+  warn: number;
+  fail: number;
+  readinessPercent: number;
+}
+
 export interface ReadinessReport {
   root: string;
   configPath?: string;
@@ -47,6 +56,7 @@ export interface ReadinessReport {
       warning: number;
       info: number;
     };
+    workflow: WorkflowReadinessSummary;
   };
   checks: ReadinessCheck[];
   diagnostics?: Diagnostic[];
@@ -212,6 +222,7 @@ export function buildReadinessReport(
   );
   const hasFailingCheck = checks.some((check) => check.status === "fail");
   const level = readinessLevel(score, hasFailingCheck);
+  const workflow = workflowSummary(graphReport, checks);
 
   return {
     root: graphReport.root,
@@ -230,6 +241,7 @@ export function buildReadinessReport(
       unresolvedEdges: unresolvedEdges.length,
       graphResolutionPercent,
       diagnosticCounts,
+      workflow,
     },
     checks,
     ...(diagnostics.length > 0 ? { diagnostics } : {}),
@@ -264,6 +276,17 @@ export function formatReadinessMarkdown(report: ReadinessReport): string {
     `| Diagnostic errors | ${report.summary.diagnosticCounts.error} |`,
     `| Diagnostic warnings | ${report.summary.diagnosticCounts.warning} |`,
     `| Diagnostic info | ${report.summary.diagnosticCounts.info} |`,
+    "",
+    "## Workflow Readiness",
+    "",
+    "| Metric | Value |",
+    "| --- | ---: |",
+    `| Skill entrypoints | ${report.summary.workflow.skillEntrypoints} |`,
+    `| Workflow checks | ${report.summary.workflow.checks} |`,
+    `| Passed workflow checks | ${report.summary.workflow.pass} |`,
+    `| Warning workflow checks | ${report.summary.workflow.warn} |`,
+    `| Failing workflow checks | ${report.summary.workflow.fail} |`,
+    `| Workflow readiness | ${report.summary.workflow.readinessPercent}% |`,
     "",
     "| Check | Status | Severity | Summary |",
     "| --- | --- | --- | --- |",
@@ -686,6 +709,28 @@ function layoutReadinessPenalty(checks: ReadinessCheck[]): number {
     if (check.status === "warn") return penalty + 5;
     return penalty;
   }, 0);
+}
+
+function workflowSummary(
+  graphReport: GraphReport,
+  checks: ReadinessCheck[],
+): WorkflowReadinessSummary {
+  const workflowChecks = checks.filter((check) =>
+    check.id.startsWith("workflow."),
+  );
+  const pass = workflowChecks.filter((check) => check.status === "pass").length;
+  const warn = workflowChecks.filter((check) => check.status === "warn").length;
+  const fail = workflowChecks.filter((check) => check.status === "fail").length;
+
+  return {
+    skillEntrypoints: graphReport.nodes.filter((node) => node.kind === "skill")
+      .length,
+    checks: workflowChecks.length,
+    pass,
+    warn,
+    fail,
+    readinessPercent: percentage(pass, workflowChecks.length),
+  };
 }
 
 function countDiagnostics(diagnostics: Diagnostic[]): {
