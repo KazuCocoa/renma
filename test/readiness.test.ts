@@ -170,7 +170,7 @@ test("readiness warns for unclear skill workflow entrypoint", async () => {
     (candidate) => candidate.id === "workflow.clarity",
   );
 
-  assert.equal(report.score, 100);
+  assert.equal(report.score, 85);
   assert.equal(report.level, "needs_attention");
   assert.equal(check?.status, "warn");
   assert.equal(check?.severity, "warning");

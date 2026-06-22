@@ -171,6 +171,10 @@ export function buildReadinessReport(
   const ownershipPenalty =
     totalAssets === 0 ? 0 : Math.round((unownedAssets / totalAssets) * 20);
   const layoutPenalty = layoutReadinessPenalty(checks);
+  const hasWorkflowClarityWarning = checks.some(
+    (check) => check.id === "workflow.clarity" && check.status === "warn",
+  );
+  const workflowClarityPenalty = hasWorkflowClarityWarning ? 15 : 0;
   const score = Math.max(
     0,
     100 -
@@ -179,17 +183,11 @@ export function buildReadinessReport(
       ownershipPenalty -
       (totalAssets === 0 ? 10 : 0) -
       (lifecycleAssets.length > 0 ? 5 : 0) -
-      layoutPenalty,
+      layoutPenalty -
+      workflowClarityPenalty,
   );
   const hasFailingCheck = checks.some((check) => check.status === "fail");
-  const hasWorkflowClarityWarning = checks.some(
-    (check) => check.id === "workflow.clarity" && check.status === "warn",
-  );
-  const level = readinessLevel(
-    score,
-    hasFailingCheck,
-    hasWorkflowClarityWarning,
-  );
+  const level = readinessLevel(score, hasFailingCheck);
 
   return {
     root: graphReport.root,
@@ -618,10 +616,8 @@ function countDiagnostics(diagnostics: Diagnostic[]): {
 function readinessLevel(
   score: number,
   hasFailingCheck: boolean,
-  hasWorkflowClarityWarning = false,
 ): ReadinessLevel {
-  if (score >= 90 && !hasFailingCheck && !hasWorkflowClarityWarning)
-    return "ready";
+  if (score >= 90 && !hasFailingCheck) return "ready";
   if (score < 60 || hasFailingCheck) return "not_ready";
   return "needs_attention";
 }
