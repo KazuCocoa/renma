@@ -367,11 +367,19 @@ Possible command:
 renma diff --from main --to HEAD
 ```
 
-## Agent Readiness Report
+## Agent Readiness Reports
 
-An agent readiness report should describe whether a repository is healthy enough for agents to consume.
+Agent readiness v1 is a deterministic static report that describes whether a repository is healthy enough for agents to consume.
 
-It should include:
+Current v1 command:
+
+```bash
+renma readiness [path] [--format json|markdown]
+```
+
+The report summarizes level, score, workflow readiness, graph resolution, ownership coverage, diagnostics, and layout status. Markdown output is intentionally compact for PR descriptions, while JSON output keeps the same deterministic data available for CI.
+
+The v1 report includes:
 
 - Broken references
 - Missing owners
@@ -384,6 +392,8 @@ It should include:
 - Affected skills and context assets
 
 It should not choose task context for an agent run.
+
+It does not call an LLM, select runtime context, assemble prompts, auto-repair files, perform cross-document semantic consistency analysis, score repairability, or plan per-skill patches.
 
 ## External Signals
 

@@ -154,6 +154,10 @@ The report also includes a workflow readiness summary that counts workflow pass/
 
 A ready report is intentionally compact enough to paste into a PR description, for example: level, score, workflow readiness, graph resolution, ownership coverage, diagnostics, and layout status.
 
+Dogfooding against the `appium/skills` branch `refine2` produced a ready v1 report with all workflow checks passing, all graph edges resolved, all assets owned, no diagnostics, and passing layout checks. The example confirmed that the Markdown recap is useful for PR reviews without changing Renma's deterministic static boundaries.
+
+The JSON and Markdown reports expose `summary.workflow` counts, graph resolution, ownership coverage, diagnostics, and layout status. They do not perform runtime context selection, assemble prompt packages, call an LLM, auto-repair files, score repairability, or plan per-skill patches.
+
 Workflow context closure checks that each skill entrypoint's declared required context references resolve to usable, non-deprecated, non-archived assets.
 
 Workflow optional-context checks warn when declared optional context references are unresolved, deprecated, or archived, without deciding whether optional context should be loaded at runtime.
