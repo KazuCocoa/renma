@@ -156,7 +156,7 @@ Use repository-governance terminology:
 - catalog snapshot
 - context graph snapshot
 - asset provenance manifest
-- agent readiness report
+- optional LLM-assisted integration reports
 
 Prefer "LLM-facing entrypoint", "routing contract", "skill guidance", or "usage contract" over broad coordination language.
 
@@ -228,7 +228,7 @@ A context graph snapshot is the dependency graph of skills, context assets, agen
 
 ### Agent Readiness Report
 
-An agent readiness report summarizes repository health for agent consumption. It should not say which context to use for a live task. It should say whether the repository has enough ownership, structure, references, metadata, and validation for agents to consume assets responsibly.
+Agent readiness v1 summarizes repository health for agent consumption. It does not say which context to use for a live task. It reports whether the repository has enough ownership, structure, references, metadata, workflow guidance, diagnostics, and layout health for agents to consume assets responsibly.
 
 ## Metadata Direction
 
@@ -465,23 +465,27 @@ Possible command:
 renma diff --from main --to HEAD
 ```
 
+Semantic diff should compare Renma's deterministic repository model across Git revisions, not use an LLM to interpret arbitrary prose.
+
+It should explain changes in catalog, ownership, lifecycle status, declared dependencies, graph resolution, readiness score/level, check statuses, and findings. The goal is to show whether a change improves or regresses repository governance and agent readiness.
+
+Semantic diff must not choose task context, assemble prompts, judge runtime agent behavior, call an LLM, or automatically repair files.
+
 ### 8. Agent Readiness Reports
 
-Agent readiness reports should summarize whether the repository is healthy enough for agents to consume.
+Current v1 command:
 
-Current command: `renma readiness [path] [--format json|markdown]`
+```bash
+renma readiness [path] [--format json|markdown]
+```
 
-Report areas:
+Agent readiness v1 is a deterministic static report for repository health. It answers whether skill workflow entrypoints, graph references, ownership metadata, diagnostics, and layout checks are healthy enough for responsible agent consumption.
 
-- Missing owners
-- Missing usage guidance
-- Broken references
-- Deprecated or archived reachable context
-- Orphaned shared context
-- Oversized assets
-- Duplicate knowledge
-- Safety risks
-- Affected skills and assets
+The Markdown report is compact enough to paste into a PR description: level, score, workflow readiness, graph resolution, ownership coverage, diagnostics, and layout status. The JSON report keeps the same fields available for CI and tooling.
+
+In v1, readiness does not choose runtime context, assemble prompt packages, call an LLM, auto-repair files, compare cross-document semantic consistency, score repairability, or plan per-skill patches.
+
+Future work may add optional LLM-assisted integration reports or semantic-diff review bundles, but those are separate from the deterministic readiness report.
 
 ### 9. Optional External Signal Import
 

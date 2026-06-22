@@ -351,7 +351,13 @@ are useful in pull requests.
 
 ## Agent Readiness
 
-An agent readiness report should answer repository-level questions:
+Agent readiness v1 is a deterministic static report for repository maintainers:
+
+```bash
+renma readiness [path] [--format json|markdown]
+```
+
+It answers repository-level questions:
 
 - Are shared context assets identifiable and owned?
 - Are lifecycle states explicit?
@@ -364,6 +370,10 @@ An agent readiness report should answer repository-level questions:
 
 Readiness is about preparing the repository for agents. It is not a guarantee
 about any particular agent run.
+
+The Markdown report is intentionally compact for PR review: level, score, workflow readiness, graph resolution, ownership coverage, diagnostics, and layout status. The JSON report exposes the same deterministic facts for CI.
+
+Readiness does not call an LLM, select runtime context, assemble prompts, auto-repair files, perform cross-document semantic consistency analysis, score repairability, or plan per-skill patches.
 
 ## Implementation Principles
 
