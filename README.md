@@ -84,17 +84,17 @@ Completed baseline:
 - Deterministic agent readiness scoring for static repository health
 - Deterministic metadata governance for duplicate asset IDs, unknown declared references, references to deprecated or archived assets, and orphaned shared context assets
 - Repository file outline and line-slice inspection helper
+- Deterministic agent readiness v1 reporting with workflow checks, score/level, JSON/Markdown output, workflow summary, and compact PR-review recap
 - Semantic split prompt helper for oversized context files
 - CI-friendly exit behavior with `--fail-on`
 - Config loading from `renma.config.json` and `.renma.json`
 
 Near-term direction:
 
-- Agent readiness report
 - Repeated context and duplicate knowledge discovery
 - Semantic diff for context changes
+- CI integration examples and sample readiness reports
 - Optional LLM-assisted repository evaluation bundles
-- Optional external signal import
 
 See [architecture.md](./architecture.md) and [plan.md](./plan.md) for the current design direction.
 

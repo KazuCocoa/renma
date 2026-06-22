@@ -37,7 +37,7 @@ Renma owns repository quality and governance:
 - Catalog and graph snapshots
 - Orphaned, deprecated, archived, conflicting, and missing asset diagnostics
 - Deterministic evidence for repeated or duplicated knowledge
-- Agent readiness reports for repository maintainers
+- Deterministic readiness reports for repository maintainers
 
 Renma does not own runtime behavior:
 
@@ -303,8 +303,9 @@ Implemented deterministic rules focus on repository health:
 - Broad environment copying into subprocesses
 - Hardcoded user-local paths in reusable guidance
 
-Near-term reporting should cover ownership coverage, context graph snapshots,
-agent readiness, repeated context discovery, and semantic diffs.
+Near-term reporting should extend ownership coverage, context graph snapshots,
+repeated context discovery, semantic diffs, CI examples, and optional LLM-assisted
+evaluation bundles.
 
 Passing Renma checks does not prove a workflow is safe. It means the repository
 met the deterministic governance checks that were enabled.
@@ -349,9 +350,9 @@ the source of truth.
 Catalog output should be stable across filesystems and Node versions so diffs
 are useful in pull requests.
 
-## Agent Readiness
+## Repository Health Readiness
 
-Agent readiness v1 is a deterministic static report for repository maintainers:
+Readiness v1 is a deterministic static repository-health report for maintainers:
 
 ```bash
 renma readiness [path] [--format json|markdown]
