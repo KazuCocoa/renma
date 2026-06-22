@@ -270,6 +270,19 @@ export function formatReadinessJson(report: ReadinessReport): string {
   return `${JSON.stringify(report, null, 2)}\n`;
 }
 
+function workflowReadinessSummaryLine(report: ReadinessReport): string {
+  const workflow = report.summary.workflow;
+  return `- Workflow readiness: ${workflow.readinessPercent}% (${workflow.pass}/${workflow.checks} workflow checks passing)`;
+}
+
+function graphResolutionSummaryLine(report: ReadinessReport): string {
+  return `- Graph resolution: ${report.summary.graphResolutionPercent}% (${report.summary.resolvedEdges}/${report.summary.edgeCount} edges resolved)`;
+}
+
+function ownershipSummaryLine(report: ReadinessReport): string {
+  return `- Ownership coverage: ${report.summary.ownershipCoveragePercent}% (${report.summary.ownedAssets}/${report.summary.totalAssets} assets owned)`;
+}
+
 export function formatReadinessMarkdown(report: ReadinessReport): string {
   const lines = [
     "# Agent Readiness",
@@ -278,6 +291,9 @@ export function formatReadinessMarkdown(report: ReadinessReport): string {
     ...(report.configPath ? [`- Config: ${report.configPath}`] : []),
     `- Level: ${report.level}`,
     `- Score: ${report.score}`,
+    workflowReadinessSummaryLine(report),
+    graphResolutionSummaryLine(report),
+    ownershipSummaryLine(report),
     "",
     "| Metric | Value |",
     "| --- | ---: |",

@@ -152,6 +152,8 @@ The v1 workflow checks cover:
 
 The report also includes a workflow readiness summary that counts workflow pass/warn/fail states and reports a deterministic workflow readiness percentage.
 
+A ready report is intentionally compact enough to paste into a PR description, for example: level, score, workflow readiness, graph resolution, ownership coverage, diagnostics, and layout status.
+
 Workflow context closure checks that each skill entrypoint's declared required context references resolve to usable, non-deprecated, non-archived assets.
 
 Workflow optional-context checks warn when declared optional context references are unresolved, deprecated, or archived, without deciding whether optional context should be loaded at runtime.
