@@ -100,6 +100,7 @@ export function buildReadinessReport(
     diagnosticsCheck(diagnosticCounts.error, diagnostics),
     ownershipCheck(unownedAssets, totalAssets, graphReport.nodes),
     graphEdgesCheck(unresolvedEdges),
+    workflowContextClosureCheck(graphReport),
     lifecycleCheck(lifecycleAssets),
     minimumInventoryCheck(totalAssets),
     findingCheck(
@@ -371,6 +372,93 @@ function graphEdgesCheck(unresolvedEdges: GraphEdge[]): ReadinessCheck {
   };
 }
 
+function workflowContextClosureCheck(graphReport: GraphReport): ReadinessCheck {
+  const skills = graphReport.nodes.filter((node) => node.kind === "skill");
+  if (skills.length === 0) {
+    return {
+      id: "workflow.context_closure",
+      title: "Workflow context closure",
+      status: "pass",
+      severity: "info",
+      summary: "No skill workflow entrypoints were cataloged.",
+    };
+  }
+
+  const nodesById = new Map(graphReport.nodes.map((node) => [node.id, node]));
+  const nodesByPath = new Map(
+    graphReport.nodes.map((node) => [
+      normalizeGraphPath(node.sourcePath),
+      node,
+    ]),
+  );
+  const requiredEdges = graphReport.edges.filter(
+    (edge) =>
+      edge.kind === "requires" && nodesById.get(edge.from)?.kind === "skill",
+  );
+  const problems = requiredEdges.flatMap((edge) => {
+    const target = edge.resolved
+      ? resolveRequiredContextTarget(edge, nodesById, nodesByPath)
+      : undefined;
+    if (target === undefined) {
+      return [
+        {
+          id: edge.from,
+          path: edge.sourcePath,
+          message: `Required context reference "${edge.to}" does not resolve.`,
+        },
+      ];
+    }
+    if (target.status === "deprecated" || target.status === "archived") {
+      return [
+        {
+          id: edge.from,
+          path: edge.sourcePath,
+          message: `Required context "${edge.to}" resolves to ${target.status} asset ${target.sourcePath}.`,
+        },
+      ];
+    }
+    return [];
+  });
+
+  if (problems.length === 0) {
+    return {
+      id: "workflow.context_closure",
+      title: "Workflow context closure",
+      status: "pass",
+      severity: "info",
+      summary:
+        "All skill required context references resolve to usable assets.",
+    };
+  }
+
+  return {
+    id: "workflow.context_closure",
+    title: "Workflow context closure",
+    status: "fail",
+    severity: "error",
+    summary: `${problems.length} required workflow context reference${
+      problems.length === 1 ? "" : "s"
+    } did not close.`,
+    evidence: problems,
+  };
+}
+
+function resolveRequiredContextTarget(
+  edge: GraphEdge,
+  nodesById: Map<string, GraphReport["nodes"][number]>,
+  nodesByPath: Map<string, GraphReport["nodes"][number]>,
+): GraphReport["nodes"][number] | undefined {
+  if (edge.targetId !== undefined) {
+    const byTargetId = nodesById.get(edge.targetId);
+    if (byTargetId !== undefined) return byTargetId;
+  }
+  if (edge.targetPath !== undefined) {
+    const byTargetPath = nodesByPath.get(normalizeGraphPath(edge.targetPath));
+    if (byTargetPath !== undefined) return byTargetPath;
+  }
+  return nodesById.get(edge.to) ?? nodesByPath.get(normalizeGraphPath(edge.to));
+}
+
 function lifecycleCheck(nodes: GraphReport["nodes"]): ReadinessCheck {
   if (nodes.length === 0) {
     return {
@@ -493,6 +581,10 @@ function percentage(numerator: number, denominator: number): number {
 
 function hasOwner(owner: string | undefined): boolean {
   return owner !== undefined && owner.trim().length > 0;
+}
+
+function normalizeGraphPath(path: string): string {
+  return path.replace(/\\/g, "/").replace(/^\.\//, "");
 }
 
 function escapeTableCell(value: string): string {

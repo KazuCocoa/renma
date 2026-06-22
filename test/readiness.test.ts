@@ -39,6 +39,7 @@ test("readiness report marks fully owned resolved inventory ready", async () => 
     "diagnostics.errors": "pass",
     "ownership.coverage": "pass",
     "graph.unresolved_edges": "pass",
+    "workflow.context_closure": "pass",
     "assets.lifecycle": "pass",
     "assets.minimum_inventory": "pass",
     "layout.skills_thin": "pass",
@@ -67,12 +68,90 @@ test("readiness report scores unresolved and unowned assets deterministically", 
     "diagnostics.errors": "pass",
     "ownership.coverage": "warn",
     "graph.unresolved_edges": "fail",
+    "workflow.context_closure": "fail",
     "assets.lifecycle": "warn",
     "assets.minimum_inventory": "pass",
     "layout.skills_thin": "pass",
     "layout.disallowed_skill_assets": "pass",
     "paths.helper_commands": "pass",
   });
+});
+
+test("readiness fails workflow context closure for missing required context", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    status: "stable",
+    requiresContext: ["missing.context"],
+  });
+
+  const report = await readiness(root);
+  const check = report.checks.find(
+    (candidate) => candidate.id === "workflow.context_closure",
+  );
+
+  assert.equal(report.level, "not_ready");
+  assert.equal(check?.status, "fail");
+  assert.match(check?.evidence?.[0]?.message ?? "", /missing\.context/);
+});
+
+test("readiness fails workflow context closure for deprecated required context", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    status: "stable",
+    requiresContext: ["testing.boundary"],
+  });
+  await writeContext(root, "testing", "boundary", {
+    owner: "docs",
+    status: "deprecated",
+  });
+
+  const report = await readiness(root);
+  const check = report.checks.find(
+    (candidate) => candidate.id === "workflow.context_closure",
+  );
+
+  assert.equal(report.level, "not_ready");
+  assert.equal(check?.status, "fail");
+  assert.match(check?.evidence?.[0]?.message ?? "", /deprecated/);
+});
+
+test("readiness fails workflow context closure for archived required context", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    status: "stable",
+    requiresContext: ["testing.legacy"],
+  });
+  await writeContext(root, "testing", "legacy", {
+    owner: "docs",
+    status: "archived",
+  });
+
+  const report = await readiness(root);
+  const check = report.checks.find(
+    (candidate) => candidate.id === "workflow.context_closure",
+  );
+
+  assert.equal(report.level, "not_ready");
+  assert.equal(check?.status, "fail");
+  assert.match(check?.evidence?.[0]?.message ?? "", /archived/);
+});
+
+test("readiness passes workflow context closure for skill without requires edges", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    status: "stable",
+  });
+
+  const report = await readiness(root);
+  const check = report.checks.find(
+    (candidate) => candidate.id === "workflow.context_closure",
+  );
+
+  assert.equal(check?.status, "pass");
 });
 
 test("readiness markdown prints a compact reviewable report", async () => {

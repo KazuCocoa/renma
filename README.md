@@ -136,6 +136,8 @@ renma suggest-semantic-split <file> [options]
 
 `renma readiness` emits a static, deterministic agent-readiness report with a score, level, summary metrics, checks, and diagnostics. It exits 0 only when the level is `ready`; `needs_attention` and `not_ready` exit 1 for CI use. It does not call LLMs, choose runtime context, assemble prompts, or repair files.
 
+Workflow context closure checks that each skill entrypoint's declared required context references resolve to usable, non-deprecated, non-archived assets.
+
 `renma inspect` is a repository inspection helper for outlines and exact line slices; it does not choose task context or assemble prompts.
 
 Options:
