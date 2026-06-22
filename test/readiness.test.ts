@@ -40,6 +40,7 @@ test("readiness report marks fully owned resolved inventory ready", async () => 
     "ownership.coverage": "pass",
     "graph.unresolved_edges": "pass",
     "workflow.context_closure": "pass",
+    "workflow.clarity": "pass",
     "assets.lifecycle": "pass",
     "assets.minimum_inventory": "pass",
     "layout.skills_thin": "pass",
@@ -69,6 +70,7 @@ test("readiness report scores unresolved and unowned assets deterministically", 
     "ownership.coverage": "warn",
     "graph.unresolved_edges": "fail",
     "workflow.context_closure": "fail",
+    "workflow.clarity": "pass",
     "assets.lifecycle": "warn",
     "assets.minimum_inventory": "pass",
     "layout.skills_thin": "pass",
@@ -154,6 +156,28 @@ test("readiness passes workflow context closure for skill without requires edges
   assert.equal(check?.status, "pass");
 });
 
+test("readiness warns for unclear skill workflow entrypoint", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    status: "stable",
+    description: "Too short.",
+    body: "# demo\nUse for readiness report tests.\n",
+  });
+
+  const report = await readiness(root);
+  const check = report.checks.find(
+    (candidate) => candidate.id === "workflow.clarity",
+  );
+
+  assert.equal(report.score, 85);
+  assert.equal(report.level, "needs_attention");
+  assert.equal(check?.status, "warn");
+  assert.equal(check?.severity, "warning");
+  assert.equal(check?.evidence?.[0]?.path, "skills/demo/SKILL.md");
+  assert.match(check?.summary ?? "", /workflow clarity finding/);
+});
+
 test("readiness markdown prints a compact reviewable report", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", { owner: "platform" });
@@ -163,6 +187,7 @@ test("readiness markdown prints a compact reviewable report", async () => {
   assert.match(markdown, /^# Agent Readiness/m);
   assert.match(markdown, /\| Total assets \| 1 \|/);
   assert.match(markdown, /\| ownership\.coverage \| pass \| info \|/);
+  assert.match(markdown, /\| workflow\.clarity \| pass \| info \|/);
 });
 
 test("readiness CLI supports --json", async () => {
@@ -178,6 +203,13 @@ test("readiness CLI supports --json", async () => {
   assert.equal(result.stderr, "");
   assert.equal(parsed.level, "ready");
   assert.equal(parsed.summary.totalAssets, 1);
+  assert.equal(
+    parsed.checks.find(
+      (check: { id: string; status: string }) =>
+        check.id === "workflow.clarity",
+    )?.status,
+    "pass",
+  );
 });
 
 test("readiness CLI exits 1 for needs_attention", async () => {
@@ -248,9 +280,11 @@ async function writeSkill(
   id: string,
   metadata: {
     owner?: string;
+    description?: string;
     status?: string;
     tags?: string[];
     requiresContext?: string[];
+    body?: string;
   },
 ): Promise<void> {
   await mkdir(path.join(root, "skills", id), { recursive: true });
@@ -260,6 +294,7 @@ async function writeSkill(
       id,
       ...metadata,
       title: `# ${id}`,
+      body: metadata.body ?? workflowReadySkillBody(id),
     }),
   );
 }
@@ -284,14 +319,20 @@ async function writeContext(
 function markdown(metadata: {
   id: string;
   owner?: string;
+  description?: string;
   status?: string;
   tags?: string[];
   requiresContext?: string[];
   title: string;
+  body?: string;
 }): string {
   return [
     "---",
     `id: ${metadata.id}`,
+    `description: ${
+      metadata.description ??
+      "Clear workflow routing for readiness report tests with deterministic usage guidance, non-goals, preflight checks, examples, and verification expectations for agent consumers."
+    }`,
     ...(metadata.owner ? [`owner: ${metadata.owner}`] : []),
     ...(metadata.status ? [`status: ${metadata.status}`] : []),
     ...(metadata.tags ? [`tags: ${metadata.tags.join(", ")}`] : []),
@@ -299,9 +340,30 @@ function markdown(metadata: {
       ? [`requires_context: ${metadata.requiresContext.join(", ")}`]
       : []),
     "---",
-    metadata.title,
-    "Use for readiness report tests.",
+    metadata.body ??
+      [metadata.title, "Use for readiness report tests."].join("\n"),
     "",
+  ].join("\n");
+}
+
+function workflowReadySkillBody(id: string): string {
+  return [
+    `# ${id}`,
+    "",
+    "## When to use",
+    "Use this workflow for deterministic readiness report tests.",
+    "",
+    "## DO NOT USE FOR",
+    "Do not use this workflow for runtime task context selection or prompt assembly.",
+    "",
+    "## Preflight",
+    "Before you begin, confirm the repository fixture exists and inputs are static.",
+    "",
+    "## Example",
+    "Input: readiness report fixture. Output: deterministic check evidence.",
+    "",
+    "## Verification",
+    "Verify by running the readiness command and checking the JSON or Markdown output.",
   ].join("\n");
 }
 

@@ -6,6 +6,16 @@ import type { Diagnostic, Finding } from "../types.js";
 export type ReadinessFormat = "json" | "markdown";
 
 const MARKDOWN_FINDINGS_LIMIT = 50;
+const WORKFLOW_CLARITY_FINDING_IDS = new Set([
+  "QUAL-MISSING-DESCRIPTION",
+  "QUAL-SHORT-DESCRIPTION",
+  "QUAL-MISSING-NEGATIVE-ROUTING",
+  "QUAL-MISSING-ROUTING-CLARITY",
+  "QUAL-MISSING-EXAMPLES",
+  "QUAL-MISSING-PREFLIGHT",
+  "QUAL-MISSING-VERIFICATION",
+  "QUAL-LOW-HEADING-DENSITY",
+]);
 export type ReadinessLevel = "ready" | "needs_attention" | "not_ready";
 export type ReadinessCheckStatus = "pass" | "warn" | "fail";
 export type ReadinessCheckSeverity = "info" | "warning" | "error";
@@ -101,6 +111,7 @@ export function buildReadinessReport(
     ownershipCheck(unownedAssets, totalAssets, graphReport.nodes),
     graphEdgesCheck(unresolvedEdges),
     workflowContextClosureCheck(graphReport),
+    workflowClarityCheck(findings),
     lifecycleCheck(lifecycleAssets),
     minimumInventoryCheck(totalAssets),
     findingCheck(
@@ -160,6 +171,10 @@ export function buildReadinessReport(
   const ownershipPenalty =
     totalAssets === 0 ? 0 : Math.round((unownedAssets / totalAssets) * 20);
   const layoutPenalty = layoutReadinessPenalty(checks);
+  const hasWorkflowClarityWarning = checks.some(
+    (check) => check.id === "workflow.clarity" && check.status === "warn",
+  );
+  const workflowClarityPenalty = hasWorkflowClarityWarning ? 15 : 0;
   const score = Math.max(
     0,
     100 -
@@ -168,7 +183,8 @@ export function buildReadinessReport(
       ownershipPenalty -
       (totalAssets === 0 ? 10 : 0) -
       (lifecycleAssets.length > 0 ? 5 : 0) -
-      layoutPenalty,
+      layoutPenalty -
+      workflowClarityPenalty,
   );
   const hasFailingCheck = checks.some((check) => check.status === "fail");
   const level = readinessLevel(score, hasFailingCheck);
@@ -459,6 +475,38 @@ function resolveRequiredContextTarget(
   return nodesById.get(edge.to) ?? nodesByPath.get(normalizeGraphPath(edge.to));
 }
 
+function workflowClarityCheck(findings: Finding[]): ReadinessCheck {
+  const matched = findings.filter(
+    (finding) =>
+      WORKFLOW_CLARITY_FINDING_IDS.has(finding.id) &&
+      isSkillEntrypointPath(finding.evidence.path),
+  );
+  if (matched.length === 0) {
+    return {
+      id: "workflow.clarity",
+      title: "Workflow clarity",
+      status: "pass",
+      severity: "info",
+      summary: "All skill workflow entrypoints include static routing clarity.",
+    };
+  }
+
+  return {
+    id: "workflow.clarity",
+    title: "Workflow clarity",
+    status: "warn",
+    severity: "warning",
+    summary: `${matched.length} workflow clarity finding${
+      matched.length === 1 ? "" : "s"
+    } matched skill entrypoints.`,
+    evidence: matched.map((finding) => ({
+      id: finding.id,
+      path: finding.evidence.path,
+      message: finding.remediation,
+    })),
+  };
+}
+
 function lifecycleCheck(nodes: GraphReport["nodes"]): ReadinessCheck {
   if (nodes.length === 0) {
     return {
@@ -581,6 +629,10 @@ function percentage(numerator: number, denominator: number): number {
 
 function hasOwner(owner: string | undefined): boolean {
   return owner !== undefined && owner.trim().length > 0;
+}
+
+function isSkillEntrypointPath(path: string): boolean {
+  return /^skills\/[^/]+\/SKILL\.md$/.test(normalizeGraphPath(path));
 }
 
 function normalizeGraphPath(path: string): string {

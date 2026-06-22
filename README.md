@@ -138,6 +138,8 @@ renma suggest-semantic-split <file> [options]
 
 Workflow context closure checks that each skill entrypoint's declared required context references resolve to usable, non-deprecated, non-archived assets.
 
+Workflow clarity warns when skill entrypoints lack deterministic routing, preflight, examples, verification, or other static guidance needed for responsible agent use.
+
 `renma inspect` is a repository inspection helper for outlines and exact line slices; it does not choose task context or assemble prompts.
 
 Options:
