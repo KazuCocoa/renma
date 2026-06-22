@@ -113,6 +113,9 @@ export function buildReadinessReport(
   const unownedAssets = totalAssets - ownedAssets;
   const ownershipCoveragePercent = percentage(ownedAssets, totalAssets);
   const unresolvedEdges = graphReport.edges.filter((edge) => !edge.resolved);
+  const unresolvedBlockingEdges = unresolvedEdges.filter(
+    (edge) => edge.kind !== "optional",
+  );
   const resolvedEdges = graphReport.edges.length - unresolvedEdges.length;
   const graphResolutionPercent = percentage(
     resolvedEdges,
@@ -125,8 +128,9 @@ export function buildReadinessReport(
   const checks: ReadinessCheck[] = [
     diagnosticsCheck(diagnosticCounts.error, diagnostics),
     ownershipCheck(unownedAssets, totalAssets, graphReport.nodes),
-    graphEdgesCheck(unresolvedEdges),
+    graphEdgesCheck(unresolvedBlockingEdges),
     workflowContextClosureCheck(graphReport),
+    workflowOptionalContextCheck(graphReport),
     workflowClarityCheck(findings),
     workflowRequiredInputsCheck(findings),
     workflowCompletionCriteriaCheck(findings),
@@ -192,6 +196,10 @@ export function buildReadinessReport(
   const hasWorkflowClarityWarning = checks.some(
     (check) => check.id === "workflow.clarity" && check.status === "warn",
   );
+  const hasWorkflowOptionalContextWarning = checks.some(
+    (check) =>
+      check.id === "workflow.optional_context" && check.status === "warn",
+  );
   const hasWorkflowRequiredInputsWarning = checks.some(
     (check) =>
       check.id === "workflow.required_inputs" && check.status === "warn",
@@ -201,6 +209,9 @@ export function buildReadinessReport(
       check.id === "workflow.completion_criteria" && check.status === "warn",
   );
   const workflowClarityPenalty = hasWorkflowClarityWarning ? 15 : 0;
+  const workflowOptionalContextPenalty = hasWorkflowOptionalContextWarning
+    ? 5
+    : 0;
   const workflowRequiredInputsPenalty = hasWorkflowRequiredInputsWarning
     ? 10
     : 0;
@@ -211,12 +222,13 @@ export function buildReadinessReport(
     0,
     100 -
       (diagnosticCounts.error > 0 ? 40 : 0) -
-      (unresolvedEdges.length > 0 ? 30 : 0) -
+      (unresolvedBlockingEdges.length > 0 ? 30 : 0) -
       ownershipPenalty -
       (totalAssets === 0 ? 10 : 0) -
       (lifecycleAssets.length > 0 ? 5 : 0) -
       layoutPenalty -
       workflowClarityPenalty -
+      workflowOptionalContextPenalty -
       workflowRequiredInputsPenalty -
       workflowCompletionCriteriaPenalty,
   );
@@ -460,7 +472,7 @@ function workflowContextClosureCheck(graphReport: GraphReport): ReadinessCheck {
   );
   const problems = requiredEdges.flatMap((edge) => {
     const target = edge.resolved
-      ? resolveRequiredContextTarget(edge, nodesById, nodesByPath)
+      ? resolveWorkflowContextTarget(edge, nodesById, nodesByPath)
       : undefined;
     if (target === undefined) {
       return [
@@ -506,7 +518,77 @@ function workflowContextClosureCheck(graphReport: GraphReport): ReadinessCheck {
   };
 }
 
-function resolveRequiredContextTarget(
+function workflowOptionalContextCheck(
+  graphReport: GraphReport,
+): ReadinessCheck {
+  const nodesById = new Map(graphReport.nodes.map((node) => [node.id, node]));
+  const optionalEdges = graphReport.edges.filter(
+    (edge) =>
+      edge.kind === "optional" && nodesById.get(edge.from)?.kind === "skill",
+  );
+
+  if (optionalEdges.length === 0) {
+    return {
+      id: "workflow.optional_context",
+      title: "Workflow optional context",
+      status: "pass",
+      severity: "info",
+      summary: "No optional workflow context references were declared.",
+    };
+  }
+
+  const nodesByPath = new Map(
+    graphReport.nodes.map((node) => [
+      normalizeGraphPath(node.sourcePath),
+      node,
+    ]),
+  );
+  const problems = optionalEdges.flatMap((edge) => {
+    const target = edge.resolved
+      ? resolveWorkflowContextTarget(edge, nodesById, nodesByPath)
+      : undefined;
+    if (target === undefined) {
+      return [
+        {
+          id: edge.from,
+          path: edge.sourcePath,
+          message: `Optional context reference "${edge.to}" does not resolve.`,
+        },
+      ];
+    }
+    if (target.status === "deprecated" || target.status === "archived") {
+      return [
+        {
+          id: edge.from,
+          path: edge.sourcePath,
+          message: `Optional context "${edge.to}" resolves to ${target.status} asset ${target.sourcePath}.`,
+        },
+      ];
+    }
+    return [];
+  });
+
+  if (problems.length === 0) {
+    return {
+      id: "workflow.optional_context",
+      title: "Workflow optional context",
+      status: "pass",
+      severity: "info",
+      summary: "All declared optional workflow context references are usable.",
+    };
+  }
+
+  return {
+    id: "workflow.optional_context",
+    title: "Workflow optional context",
+    status: "warn",
+    severity: "warning",
+    summary: `${problems.length} optional workflow context reference(s) need attention.`,
+    evidence: problems,
+  };
+}
+
+function resolveWorkflowContextTarget(
   edge: GraphEdge,
   nodesById: Map<string, GraphReport["nodes"][number]>,
   nodesByPath: Map<string, GraphReport["nodes"][number]>,

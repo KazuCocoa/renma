@@ -37,8 +37,8 @@ test("readiness report marks fully owned resolved inventory ready", async () => 
   assert.equal(report.summary.graphResolutionPercent, 100);
   assert.deepEqual(report.summary.workflow, {
     skillEntrypoints: 1,
-    checks: 4,
-    pass: 4,
+    checks: 5,
+    pass: 5,
     warn: 0,
     fail: 0,
     readinessPercent: 100,
@@ -48,6 +48,7 @@ test("readiness report marks fully owned resolved inventory ready", async () => 
     "ownership.coverage": "pass",
     "graph.unresolved_edges": "pass",
     "workflow.context_closure": "pass",
+    "workflow.optional_context": "pass",
     "workflow.clarity": "pass",
     "workflow.required_inputs": "pass",
     "workflow.completion_criteria": "pass",
@@ -77,17 +78,18 @@ test("readiness report scores unresolved and unowned assets deterministically", 
   assert.equal(report.summary.diagnosticCounts.error, 0);
   assert.deepEqual(report.summary.workflow, {
     skillEntrypoints: 1,
-    checks: 4,
-    pass: 3,
+    checks: 5,
+    pass: 4,
     warn: 0,
     fail: 1,
-    readinessPercent: 75,
+    readinessPercent: 80,
   });
   assertCheckStatuses(report, {
     "diagnostics.errors": "pass",
     "ownership.coverage": "warn",
     "graph.unresolved_edges": "fail",
     "workflow.context_closure": "fail",
+    "workflow.optional_context": "pass",
     "workflow.clarity": "pass",
     "workflow.required_inputs": "pass",
     "workflow.completion_criteria": "pass",
@@ -176,6 +178,149 @@ test("readiness passes workflow context closure for skill without requires edges
   assert.equal(check?.status, "pass");
 });
 
+test("readiness passes workflow optional context when none is declared", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    status: "stable",
+  });
+
+  const report = await readiness(root);
+  const check = report.checks.find(
+    (candidate) => candidate.id === "workflow.optional_context",
+  );
+
+  assert.equal(report.score, 100);
+  assert.equal(report.level, "ready");
+  assert.deepEqual(report.summary.workflow, {
+    skillEntrypoints: 1,
+    checks: 5,
+    pass: 5,
+    warn: 0,
+    fail: 0,
+    readinessPercent: 100,
+  });
+  assert.equal(check?.status, "pass");
+  assert.equal(
+    check?.summary,
+    "No optional workflow context references were declared.",
+  );
+});
+
+test("readiness passes workflow optional context for usable optional assets", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    status: "stable",
+    optionalContext: ["testing.boundary"],
+  });
+  await writeContext(root, "testing", "boundary", {
+    owner: "docs",
+    status: "stable",
+  });
+
+  const report = await readiness(root);
+  const check = report.checks.find(
+    (candidate) => candidate.id === "workflow.optional_context",
+  );
+
+  assert.equal(report.score, 100);
+  assert.equal(report.level, "ready");
+  assert.equal(check?.status, "pass");
+  assert.equal(
+    check?.summary,
+    "All declared optional workflow context references are usable.",
+  );
+});
+
+test("readiness warns for missing workflow optional context", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    status: "stable",
+    optionalContext: ["missing.context"],
+  });
+
+  const report = await readiness(root);
+  const optionalCheck = report.checks.find(
+    (candidate) => candidate.id === "workflow.optional_context",
+  );
+  const graphCheck = report.checks.find(
+    (candidate) => candidate.id === "graph.unresolved_edges",
+  );
+
+  assert.equal(report.score, 95);
+  assert.equal(report.level, "ready");
+  assert.equal(optionalCheck?.status, "warn");
+  assert.equal(optionalCheck?.severity, "warning");
+  assert.equal(
+    optionalCheck?.summary,
+    "1 optional workflow context reference(s) need attention.",
+  );
+  assert.equal(optionalCheck?.evidence?.[0]?.id, "demo");
+  assert.equal(optionalCheck?.evidence?.[0]?.path, "skills/demo/SKILL.md");
+  assert.match(optionalCheck?.evidence?.[0]?.message ?? "", /missing\.context/);
+  assert.equal(graphCheck?.status, "pass");
+});
+
+test("readiness warns for deprecated workflow optional context", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    status: "stable",
+    optionalContext: ["testing.boundary"],
+  });
+  await writeContext(root, "testing", "boundary", {
+    owner: "docs",
+    status: "deprecated",
+  });
+
+  const report = await readiness(root);
+  const check = report.checks.find(
+    (candidate) => candidate.id === "workflow.optional_context",
+  );
+
+  // Optional-context and lifecycle warnings each apply a 5-point penalty.
+  assert.equal(report.score, 90);
+  assert.equal(report.level, "ready");
+  assert.equal(check?.status, "warn");
+  assert.equal(check?.severity, "warning");
+  assert.match(check?.evidence?.[0]?.message ?? "", /deprecated/);
+  assert.match(
+    check?.evidence?.[0]?.message ?? "",
+    /contexts\/testing\/boundary\.md/,
+  );
+});
+
+test("readiness warns for archived workflow optional context", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    status: "stable",
+    optionalContext: ["testing.legacy"],
+  });
+  await writeContext(root, "testing", "legacy", {
+    owner: "docs",
+    status: "archived",
+  });
+
+  const report = await readiness(root);
+  const check = report.checks.find(
+    (candidate) => candidate.id === "workflow.optional_context",
+  );
+
+  // Optional-context and lifecycle warnings each apply a 5-point penalty.
+  assert.equal(report.score, 90);
+  assert.equal(report.level, "ready");
+  assert.equal(check?.status, "warn");
+  assert.equal(check?.severity, "warning");
+  assert.match(check?.evidence?.[0]?.message ?? "", /archived/);
+  assert.match(
+    check?.evidence?.[0]?.message ?? "",
+    /contexts\/testing\/legacy\.md/,
+  );
+});
+
 test("readiness warns for unclear skill workflow entrypoint", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", {
@@ -235,11 +380,11 @@ test("readiness warns and applies penalty for missing workflow completion criter
   assert.equal(report.score, 85);
   assert.deepEqual(report.summary.workflow, {
     skillEntrypoints: 1,
-    checks: 4,
-    pass: 3,
+    checks: 5,
+    pass: 4,
     warn: 1,
     fail: 0,
-    readinessPercent: 75,
+    readinessPercent: 80,
   });
   assert.equal(report.level, "needs_attention");
   assert.equal(check?.status, "warn");
@@ -260,6 +405,7 @@ test("readiness markdown prints a compact reviewable report", async () => {
   assert.match(markdown, /\| Skill entrypoints \| 1 \|/);
   assert.match(markdown, /\| Workflow readiness \| 100% \|/);
   assert.match(markdown, /\| ownership\.coverage \| pass \| info \|/);
+  assert.match(markdown, /\| workflow\.optional_context \| pass \| info \|/);
   assert.match(markdown, /\| workflow\.clarity \| pass \| info \|/);
   assert.match(markdown, /\| workflow\.required_inputs \| pass \| info \|/);
   assert.match(markdown, /\| workflow\.completion_criteria \| pass \| info \|/);
@@ -279,13 +425,20 @@ test("readiness CLI supports --json", async () => {
   assert.equal(parsed.level, "ready");
   assert.deepEqual(parsed.summary.workflow, {
     skillEntrypoints: 1,
-    checks: 4,
-    pass: 4,
+    checks: 5,
+    pass: 5,
     warn: 0,
     fail: 0,
     readinessPercent: 100,
   });
   assert.equal(parsed.summary.totalAssets, 1);
+  assert.equal(
+    parsed.checks.find(
+      (check: { id: string; status: string }) =>
+        check.id === "workflow.optional_context",
+    )?.status,
+    "pass",
+  );
   assert.equal(
     parsed.checks.find(
       (check: { id: string; status: string }) =>
@@ -381,6 +534,7 @@ async function writeSkill(
     status?: string;
     tags?: string[];
     requiresContext?: string[];
+    optionalContext?: string[];
     body?: string;
   },
 ): Promise<void> {
@@ -420,6 +574,7 @@ function markdown(metadata: {
   status?: string;
   tags?: string[];
   requiresContext?: string[];
+  optionalContext?: string[];
   title: string;
   body?: string;
 }): string {
@@ -435,6 +590,9 @@ function markdown(metadata: {
     ...(metadata.tags ? [`tags: ${metadata.tags.join(", ")}`] : []),
     ...(metadata.requiresContext
       ? [`requires_context: ${metadata.requiresContext.join(", ")}`]
+      : []),
+    ...(metadata.optionalContext
+      ? [`optional_context: ${metadata.optionalContext.join(", ")}`]
       : []),
     "---",
     metadata.body ??
