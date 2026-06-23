@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import path from "node:path";
 
 import type { Finding, ParsedDocument } from "./types.js";
 
@@ -118,6 +119,7 @@ function collectRepeatedSections(documents: ParsedDocument[]): RepeatGroup[] {
     for (let index = 0; index < document.headings.length; index += 1) {
       const heading = document.headings[index];
       if (!heading) continue;
+
       const endLine = findSectionEndLine(document, index);
       const lines = document.lines.slice(heading.line - 1, endLine);
       const normalized = normalizeWhitespace(lines.join("\n"));
@@ -206,8 +208,11 @@ function collectRepeatedLinks(documents: ParsedDocument[]): RepeatGroup[] {
 
   for (const document of documents) {
     for (const link of document.links) {
-      const target = normalizeLinkTarget(link.target);
-      if (!isContextReferenceTarget(target)) continue;
+      const target = normalizeLocalMarkdownLinkTarget(
+        link.target,
+        document.artifact.path,
+      );
+      if (!target) continue;
 
       addOccurrence(groups, {
         kind: "link_target",
@@ -278,6 +283,7 @@ function groupsToFindings(
       const first = occurrences[0];
       if (!first) return [];
       const others = occurrences.slice(1, 5);
+      const alsoAppears = formatOtherOccurrences(others);
 
       return [
         {
@@ -286,8 +292,7 @@ function groupsToFindings(
           category: "maintenance",
           severity:
             kind === "heading" || kind === "link_target" ? "low" : "medium",
-          confidence: "high",
-          message: `${title} detected for ${group.label}. ${formatOtherOccurrences(others)}`,
+          confidence: confidenceForKind(kind),
           evidence: {
             path: first.path,
             startLine: first.startLine,
@@ -297,6 +302,7 @@ function groupsToFindings(
           remediation,
           whyItMatters:
             "Repeated agent context can drift across skills, agents, references, and examples. Renma reports deterministic evidence so an LLM or maintainer can propose consolidation and a human can approve it.",
+          llmHint: `${title} detected for ${group.label}. ${alsoAppears} Use these locations as evidence for a consolidation proposal, but do not treat them as an automatic source-of-truth decision.`,
           constraints: [
             "Do not delete or rewrite content solely because this finding exists.",
             "Preserve procedural details and ownership boundaries while consolidating.",
@@ -350,6 +356,7 @@ function findSectionEndLine(
 ): number {
   const heading = document.headings[headingIndex];
   if (!heading) return document.lines.length;
+
   const nextPeer = document.headings
     .slice(headingIndex + 1)
     .find((candidate) => candidate.depth <= heading.depth);
@@ -393,24 +400,48 @@ function isUsefulShingle(words: string[]): boolean {
   return words.join(" ").length >= 140;
 }
 
-function isContextReferenceTarget(target: string): boolean {
+function normalizeLocalMarkdownLinkTarget(
+  value: string,
+  sourcePath: string,
+): string | undefined {
+  const target = normalizeWhitespace(value);
   if (
+    !target ||
     target.startsWith("#") ||
-    target.startsWith("http://") ||
-    target.startsWith("https://") ||
-    target.startsWith("mailto:")
+    /^[a-z][a-z0-9+.-]*:/i.test(target)
   ) {
-    return false;
+    return undefined;
   }
 
-  return (
-    target.includes("/") ||
-    target.endsWith(".md") ||
-    target.endsWith(".mdx") ||
-    target.startsWith("agents/") ||
-    target.startsWith("contexts/") ||
-    target.startsWith("skills/")
-  );
+  const withoutFragment = target.replace(/#.*/, "").replace(/\?.*/, "");
+  if (!withoutFragment) return undefined;
+
+  const normalizedTarget = withoutFragment.replace(/\\/g, "/");
+  const normalizedSource = sourcePath.replace(/\\/g, "/");
+  const sourceDirectory = path.posix.dirname(normalizedSource);
+  const resolved = normalizedTarget.startsWith("/")
+    ? path.posix.normalize(normalizedTarget.slice(1))
+    : path.posix.normalize(
+        path.posix.join(
+          sourceDirectory === "." ? "" : sourceDirectory,
+          normalizedTarget,
+        ),
+      );
+
+  if (!resolved || resolved === "." || resolved.startsWith("../")) {
+    return undefined;
+  }
+
+  const repositoryRelative = resolved.replace(/^\.\//, "");
+  if (
+    !repositoryRelative.includes("/") &&
+    !repositoryRelative.endsWith(".md") &&
+    !repositoryRelative.endsWith(".mdx")
+  ) {
+    return undefined;
+  }
+
+  return repositoryRelative;
 }
 
 function normalizeHeading(value: string): string {
@@ -418,10 +449,6 @@ function normalizeHeading(value: string): string {
     .replace(/^#+\s*/, "")
     .replace(/\s+#+$/, "")
     .toLowerCase();
-}
-
-function normalizeLinkTarget(value: string): string {
-  return normalizeWhitespace(value).replace(/^\.\//, "");
 }
 
 function normalizeWhitespace(value: string): string {
@@ -467,6 +494,19 @@ function compareFindings(left: Finding, right: Finding): number {
     left.evidence.path.localeCompare(right.evidence.path) ||
     left.evidence.startLine - right.evidence.startLine
   );
+}
+
+function confidenceForKind(kind: RepeatKind): Finding["confidence"] {
+  switch (kind) {
+    case "section_hash":
+    case "code_block":
+      return "high";
+    case "token_shingle":
+      return "medium";
+    case "heading":
+    case "link_target":
+      return "low";
+  }
 }
 
 function formatOtherOccurrences(occurrences: Occurrence[]): string {
