@@ -207,6 +207,7 @@ renma ownership <path>
 renma graph <path>
 renma readiness <path>
 renma diff <path> --from <ref> --to <ref>
+renma ci-report <path> --from <ref> --to <ref>
 renma inspect <path> <asset-or-file>
 renma suggest-semantic-split <file>
 ```
@@ -222,10 +223,17 @@ renma ownership . --include-owned
 renma graph . --format mermaid
 renma readiness .
 renma diff . --from main --to HEAD --format markdown
+renma ci-report . --from main --to HEAD --format markdown
 renma inspect . contexts/testing/boundary-value-analysis.md
 ```
 
-Use JSON output when Renma is part of CI or another tool. Use text output when a person or coding agent needs a concise repair list.
+Use JSON output when Renma is part of CI or another tool. Use markdown output for PR-review artifacts. Use text output when a person or coding agent needs a concise repair list.
+
+`ci-report` exit behavior:
+
+- PASS/WARN: exit 0
+- FAIL: exit 1
+- command, runtime, or config error: exit 2
 
 ## What Gets Scanned
 
@@ -298,6 +306,8 @@ Useful metadata includes:
 Renma can infer some information from paths and headings, but explicit metadata makes ownership and dependency reports much more valuable.
 
 ## CI Example
+
+For PR review artifacts, see [`examples/github-actions/renma-ci-report.yml`](examples/github-actions/renma-ci-report.yml).
 
 ```yaml
 name: renma
