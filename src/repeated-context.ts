@@ -105,7 +105,7 @@ export function detectRepeatedContextPatterns(
       "Repeated context pattern",
       "token_shingle",
       collectRepeatedTokenShingles(documents),
-      "Use the repeated token sequence as evidence for a consolidation proposal, then have a human approve any semantic rewrite.",
+      "Use the repeated token sequence as evidence for a consolidation proposal, then have a human approve any reviewable patch.",
     ),
   ];
 
