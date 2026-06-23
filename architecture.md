@@ -417,13 +417,16 @@ Completed baseline:
 4. Graph-backed metadata governance for duplicate IDs, unknown references, deprecated or archived references, and orphaned context assets
 5. Ownership coverage reporting
 6. Context graph snapshot reporting
+7. Readiness v1 repository-health report
+8. 0.1.0 release baseline
 
 Near-term implementation:
 
 1. Repeated context and duplicate knowledge discovery
 2. Semantic diff for context changes
-3. CI integration examples and sample readiness reports
-4. Optional LLM-assisted repository evaluation bundles
+3. Stronger security and supply-chain safety diagnostics for agent-facing repository content
+4. CI integration examples and sample readiness reports
+5. Optional LLM-assisted repository evaluation bundles
 
 This sequence prioritizes shared context assets, CI review examples, and repository health before later external signal import work.
 
@@ -459,10 +462,12 @@ Baseline now in place:
 - Deprecated or archived dependency validation.
 - Orphaned context asset detection.
 - Readiness v1 repository-health report.
+- 0.1.0 release baseline.
 
 Near-term implementation work:
 
 - Repeated context discovery across shared contexts, skills, agents, references, profiles, and examples.
+- Stronger security and supply-chain safety diagnostics for agent-facing repository content.
 - CI integration examples and sample readiness reports.
 - Optional LLM-assisted repository evaluation bundles.
 

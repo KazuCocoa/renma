@@ -303,9 +303,11 @@ Implemented deterministic rules focus on repository health:
 - Broad environment copying into subprocesses
 - Hardcoded user-local paths in reusable guidance
 
-Near-term reporting should extend ownership coverage, context graph snapshots,
-repeated context discovery, semantic diffs, CI examples, and optional LLM-assisted
-evaluation bundles.
+Current reporting includes deterministic readiness output, ownership coverage,
+context graph snapshots, and static safety findings for agent-facing repository
+content. Near-term reporting should extend repeated context discovery, semantic
+diffs, stronger security and supply-chain safety diagnostics, CI examples, and
+optional LLM-assisted evaluation bundles.
 
 Passing Renma checks does not prove a workflow is safe. It means the repository
 met the deterministic governance checks that were enabled.
