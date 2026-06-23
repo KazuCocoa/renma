@@ -535,3 +535,48 @@ LLM proposes. Renma verifies. Human approves.
 ```
 
 No-LLM workflows must remain first-class.
+
+## Security and supply-chain safety
+
+Renma should treat agent-facing repository content as part of the software supply chain. Skills, context assets, examples, setup guides, and troubleshooting instructions may be read by agents and turned into commands, patches, or operational recommendations.
+
+Renma checks whether LLM-facing skills, context assets, and repository guidance contain risky instructions or patterns that agents may read, copy, execute, or recommend.
+
+Renma is not a replacement for SAST, dependency auditing, vulnerability scanning, or dedicated secret scanning. Its role is to provide deterministic safety signals for LLM-facing repository content.
+
+Renma should warn when reusable guidance contains patterns that increase supply-chain or local-environment risk, such as:
+
+- literal secret-like values or private key material
+- remote script execution patterns such as `curl | sh` or `wget | sh`
+- unpinned dependency installation guidance when reproducibility matters
+- package manager script assumptions such as unsafe `postinstall` behavior
+- destructive commands without nearby confirmation, dry-run, backup, or recovery guidance
+- broad environment forwarding into subprocesses, containers, CI jobs, or scripts
+- hardcoded user-local paths or machine-specific assumptions in reusable guidance
+- commands that require `sudo`, recursive ownership changes, or broad permissions without explaining scope and rollback
+- CI examples that risk exposing secrets or tokens
+- instructions that tell agents or users to bypass verification, ignore warnings, or disable safety checks
+
+These checks should remain deterministic and evidence-based. Renma should not execute commands, fetch remote scripts for inspection by default, call an LLM to judge intent, or automatically rewrite files.
+
+The goal is not to ban all risky commands. The goal is to require reviewable context: confirmation, scope, preconditions, safer alternatives, verification, and recovery guidance.
+
+Current:
+
+- static safety checks for secret-like literals, private key material, destructive commands, risky remote defaults, broad environment propagation, and hardcoded local paths
+
+Near-term / future:
+
+- stronger agent-facing supply-chain safety rules
+- better diagnostics for remote install guidance and package-manager risk
+- CI and setup-script safety examples
+- clearer repair guidance for risky command/context patterns
+
+Important boundaries:
+
+- Do not turn Renma into a vulnerability scanner.
+- Do not execute package manager commands.
+- Do not fetch or evaluate remote scripts by default.
+- Do not use LLM judgment for core security checks.
+- Do not auto-repair security issues.
+- Emit deterministic evidence and review guidance only.
