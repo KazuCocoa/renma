@@ -89,6 +89,30 @@ test("ci report policy does not warn on total asset decrease alone", () => {
   assert.equal(determineCiReportStatus(report), "pass");
 });
 
+test("ci report policy passes readiness check changes when visible signals improve", () => {
+  const report = policyDiffReport({
+    summary: {
+      readinessScoreDelta: 91,
+      ownershipCoverageDelta: 82,
+      findingsDelta: -158,
+      highOrCriticalFindingsDelta: 0,
+    },
+    checkChanges: [
+      {
+        id: "workflow.required_context",
+        title: "Required context",
+        fromStatus: "fail",
+        toStatus: "pass",
+        fromSeverity: "error",
+        toSeverity: "info",
+        summaryChanged: true,
+      },
+    ],
+  });
+
+  assert.equal(determineCiReportStatus(report), "pass");
+});
+
 test("ci report policy warns on ownership coverage decrease", () => {
   const report = policyDiffReport({
     summary: {

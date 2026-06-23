@@ -80,8 +80,7 @@ export function determineCiReportStatus(report: DiffReport): CiReportStatus {
     report.summary.readinessScoreDelta < 0 ||
     report.summary.ownershipCoverageDelta < 0 ||
     report.summary.graphResolutionDelta < 0 ||
-    report.summary.findingsDelta > 0 ||
-    report.readiness.checkChanges.length > 0
+    report.summary.findingsDelta > 0
   ) {
     return "warn";
   }
