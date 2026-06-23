@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -53,6 +53,7 @@ export interface DiffReport {
 interface DiffEndpoint {
   ref: string;
   scannedFileCount: number;
+  totalAssets: number;
   readinessScore: number;
   readinessLevel: string;
 }
@@ -94,7 +95,7 @@ interface ReadinessCheckChange {
 interface FindingDelta {
   id: string;
   severity: string;
-  message: string;
+  title: string;
   evidence?: EvidenceDelta | undefined;
 }
 
@@ -134,19 +135,31 @@ export async function diff(
     overrides?: ConfigOverrides;
   },
 ): Promise<DiffReport> {
-  const workingDirectory = process.cwd();
-  const repoRoot = await gitOutput(workingDirectory, [
-    "rev-parse",
-    "--show-toplevel",
-  ]);
-  const absoluteTarget = resolve(workingDirectory, targetPath);
+  const absoluteTarget = await realpath(resolve(process.cwd(), targetPath));
+  const repoRoot = await realpath(
+    await gitOutput(absoluteTarget, ["rev-parse", "--show-toplevel"]),
+  );
   const relativeTarget = pathWithinRepo(repoRoot, absoluteTarget);
   const tempRoot = await mkdtemp(join(tmpdir(), "renma-diff-"));
 
   try {
     const [fromSnapshot, toSnapshot] = await Promise.all([
-      snapshot(repoRoot, relativeTarget, options.fromRef, tempRoot, "from", options.overrides),
-      snapshot(repoRoot, relativeTarget, options.toRef, tempRoot, "to", options.overrides),
+      snapshot(
+        repoRoot,
+        relativeTarget,
+        options.fromRef,
+        tempRoot,
+        "from",
+        options.overrides,
+      ),
+      snapshot(
+        repoRoot,
+        relativeTarget,
+        options.toRef,
+        tempRoot,
+        "to",
+        options.overrides,
+      ),
     ]);
     return buildDiffReport(repoRoot, fromSnapshot, toSnapshot);
   } finally {
@@ -210,7 +223,10 @@ export function buildDiffReport(
         .filter(([key]) => !toEdges.has(key))
         .map(([, edge]) => edge),
       newUnresolvedEdges: [...toEdges]
-        .filter(([key, edge]) => !edge.resolved && !fromEdges.has(key))
+        .filter(([key, edge]) => {
+          const previous = fromEdges.get(key);
+          return !edge.resolved && (!previous || previous.resolved);
+        })
         .map(([, edge]) => edge),
       resolvedEdges: [...toEdges]
         .filter(([key, edge]) => {
@@ -229,7 +245,10 @@ export function buildDiffReport(
       removed: [...fromFindings]
         .filter(([key]) => !toFindings.has(key))
         .map(([, finding]) => finding),
-      countById: countById(fromReadiness.findings ?? [], toReadiness.findings ?? []),
+      countById: countById(
+        fromReadiness.findings ?? [],
+        toReadiness.findings ?? [],
+      ),
     },
   };
 }
@@ -252,7 +271,8 @@ function formatDiffMarkdown(report: DiffReport): string {
     "",
     `- Readiness score: ${report.to.readinessScore} (${signed(report.summary.readinessScoreDelta)})`,
     `- Readiness level changed: ${report.summary.readinessLevelChanged ? "yes" : "no"}`,
-    `- Assets: ${report.to.scannedFileCount} (${signed(report.summary.totalAssetsDelta)})`,
+    `- Scanned files: ${report.to.scannedFileCount} (${signed(report.to.scannedFileCount - report.from.scannedFileCount)})`,
+    `- Total assets: ${report.to.totalAssets} (${signed(report.summary.totalAssetsDelta)})`,
     `- Ownership coverage: ${signed(report.summary.ownershipCoverageDelta)}`,
     `- Graph resolution: ${signed(report.summary.graphResolutionDelta)}`,
     `- Findings: ${signed(report.summary.findingsDelta)}`,
@@ -345,6 +365,7 @@ function endpoint(snapshot: Snapshot): DiffEndpoint {
   return {
     ref: snapshot.ref,
     scannedFileCount: snapshot.readiness.scannedFileCount,
+    totalAssets: snapshot.readiness.summary.totalAssets,
     readinessScore: snapshot.readiness.score,
     readinessLevel: snapshot.readiness.level,
   };
@@ -365,12 +386,23 @@ function changedAssets(
       );
       return changedFields.length === 0
         ? []
-        : [{ id: toAsset.id, path: toAsset.path, changedFields, from: fromAsset, to: toAsset }];
+        : [
+            {
+              id: toAsset.id,
+              path: toAsset.path,
+              changedFields,
+              from: fromAsset,
+              to: toAsset,
+            },
+          ];
     })
     .sort(compareBy((change) => change.id));
 }
 
-function checkChanges(fromChecks: unknown[], toChecks: unknown[]): ReadinessCheckChange[] {
+function checkChanges(
+  fromChecks: unknown[],
+  toChecks: unknown[],
+): ReadinessCheckChange[] {
   const fromById = new Map(
     fromChecks.map((check) => [stringField(check, "id"), check] as const),
   );
@@ -423,7 +455,10 @@ function edgeMap(edges: unknown[]): Map<string, EdgeDelta> {
         resolved: booleanField(edge, "resolved"),
         evidence: evidenceDelta(objectField(edge, "evidence")),
       };
-      return [`${normalized.source}\0${normalized.kind}\0${normalized.target}`, normalized] as const;
+      return [
+        `${normalized.source}\0${normalized.kind}\0${normalized.target}`,
+        normalized,
+      ] as const;
     }),
   );
 }
@@ -435,7 +470,7 @@ function findingMap(findings: unknown[]): Map<string, FindingDelta> {
       const deltaFinding = {
         id: stringField(finding, "id"),
         severity: stringField(finding, "severity"),
-        message: stringField(finding, "message"),
+        title: stringField(finding, "title"),
         evidence,
       };
       return [
@@ -453,8 +488,12 @@ function findingMap(findings: unknown[]): Map<string, FindingDelta> {
 }
 
 function countById(fromFindings: unknown[], toFindings: unknown[]) {
-  const fromCounts = counts(fromFindings.map((finding) => stringField(finding, "id")));
-  const toCounts = counts(toFindings.map((finding) => stringField(finding, "id")));
+  const fromCounts = counts(
+    fromFindings.map((finding) => stringField(finding, "id")),
+  );
+  const toCounts = counts(
+    toFindings.map((finding) => stringField(finding, "id")),
+  );
   return [...new Set([...fromCounts.keys(), ...toCounts.keys()])]
     .map((id) => ({
       id,
@@ -492,7 +531,9 @@ function pathWithinRepo(repoRoot: string, absoluteTarget: string): string {
   ) {
     return relativeTarget === "" ? "." : relativeTarget;
   }
-  throw new Error(`Diff target must be inside the git repository: ${absoluteTarget}`);
+  throw new Error(
+    `Diff target must be inside the git repository: ${absoluteTarget}`,
+  );
 }
 
 function snapshotOverrides(
@@ -523,10 +564,25 @@ async function gitOutput(cwd: string, args: string[]): Promise<string> {
     return stdout.trim();
   } catch (error) {
     if (error instanceof Error) {
-      throw new Error(`git ${args.join(" ")} failed: ${error.message}`);
+      const output = [
+        error.message,
+        stringErrorField(error, "stderr"),
+        stringErrorField(error, "stdout"),
+      ]
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .join("\n");
+      throw new Error(`git ${args.join(" ")} failed: ${output}`, {
+        cause: error,
+      });
     }
     throw error;
   }
+}
+
+function stringErrorField(error: Error, field: "stdout" | "stderr"): string {
+  const value = (error as Error & Record<typeof field, unknown>)[field];
+  return typeof value === "string" ? value : "";
 }
 
 function stableMap<T>(entries: Array<readonly [string, T]>): Map<string, T> {
@@ -550,10 +606,14 @@ function signed(value: number): string {
 }
 
 function markdownList<T>(items: T[], render: (item: T) => string): string[] {
-  return items.length === 0 ? ["- (none)"] : items.map((item) => `- ${render(item)}`);
+  return items.length === 0
+    ? ["- (none)"]
+    : items.map((item) => `- ${render(item)}`);
 }
 
-function compareBy<T>(selector: (item: T) => string): (left: T, right: T) => number {
+function compareBy<T>(
+  selector: (item: T) => string,
+): (left: T, right: T) => number {
   return (left, right) => selector(left).localeCompare(selector(right));
 }
 
@@ -561,7 +621,10 @@ function firstString(value: unknown, fields: string[]): string {
   return firstOptionalString(value, fields) ?? "";
 }
 
-function firstOptionalString(value: unknown, fields: string[]): string | undefined {
+function firstOptionalString(
+  value: unknown,
+  fields: string[],
+): string | undefined {
   for (const field of fields) {
     const candidate = optionalStringField(value, field);
     if (candidate !== undefined) return candidate;
@@ -573,12 +636,18 @@ function stringField(value: unknown, field: string): string {
   return optionalStringField(value, field) ?? "";
 }
 
-function optionalStringField(value: unknown, field: string): string | undefined {
+function optionalStringField(
+  value: unknown,
+  field: string,
+): string | undefined {
   const candidate = objectField(value, field);
   return typeof candidate === "string" ? candidate : undefined;
 }
 
-function optionalNumberField(value: unknown, field: string): number | undefined {
+function optionalNumberField(
+  value: unknown,
+  field: string,
+): number | undefined {
   const candidate = objectField(value, field);
   return typeof candidate === "number" ? candidate : undefined;
 }
