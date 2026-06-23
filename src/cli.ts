@@ -1,6 +1,10 @@
 import { parseArgs } from "node:util";
 import packageJson from "../package.json" with { type: "json" };
 import { runCatalogCommand, type CatalogFormat } from "./commands/catalog.js";
+import {
+  runCiReportCommand,
+  type CiReportFormat,
+} from "./commands/ci-report.js";
 import { runDiffCommand, type DiffFormat } from "./commands/diff.js";
 import {
   runGraphCommand,
@@ -68,6 +72,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     command !== "scan" &&
     command !== "catalog" &&
     command !== "diff" &&
+    command !== "ci-report" &&
     command !== "graph" &&
     command !== "ownership" &&
     command !== "readiness" &&
@@ -95,6 +100,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
   if (command === "diff") {
     return runDiff(parsed.values, target);
+  }
+
+  if (command === "ci-report") {
+    return runCiReport(parsed.values, target);
   }
 
   if (command === "graph") {
@@ -195,6 +204,42 @@ async function runDiff(values: CliValues, target: string): Promise<number> {
       fromRef,
       toRef,
       format: format as DiffFormat,
+      overrides,
+    });
+  } catch (error) {
+    console.error(
+      error instanceof ConfigError || error instanceof Error
+        ? error.message
+        : String(error),
+    );
+    return 2;
+  }
+}
+
+async function runCiReport(values: CliValues, target: string): Promise<number> {
+  const fromRef = stringValue(values.from);
+  const toRef = stringValue(values.to);
+  if (!fromRef || !toRef) {
+    console.error("ci-report requires --from <ref> and --to <ref>.");
+    return 2;
+  }
+
+  const format = values.json ? "json" : (stringValue(values.format) ?? "markdown");
+  if (format !== "json" && format !== "markdown") {
+    console.error("--format must be either json or markdown.");
+    return 2;
+  }
+
+  const configPath = stringValue(values.config);
+  const overrides: ConfigOverrides = {
+    ...(configPath ? { configPath } : {}),
+  };
+
+  try {
+    return await runCiReportCommand(target, {
+      fromRef,
+      toRef,
+      format: format as CiReportFormat,
       overrides,
     });
   } catch (error) {
@@ -391,6 +436,7 @@ function helpText(): string {
     "  renma scan [path] [options]",
     "  renma catalog [path] [options]",
     "  renma diff [path] --from <ref> --to <ref> [options]",
+    "  renma ci-report [path] --from <ref> --to <ref> [options]",
     "  renma graph [path] [options]",
     "  renma ownership [path] [options]",
     "  renma readiness [path] [options]",
@@ -401,6 +447,7 @@ function helpText(): string {
     "  scan                       Scan a repository or skill directory",
     "  catalog                    Print deterministic normalized asset catalog",
     "  diff                       Compare deterministic readiness snapshots",
+    "  ci-report                  Print deterministic CI / PR review report",
     "  graph                      Print deterministic repository graph snapshot",
     "  ownership                  Print deterministic ownership coverage report",
     "  readiness                  Print deterministic agent readiness report",
@@ -412,7 +459,7 @@ function helpText(): string {
     "Options:",
     "  -c, --config <path>        scan: read JSON config from path",
     "      --fail-on <level>      scan: exit 1 when findings meet severity: low, medium, high, critical",
-    "      --format <format>      scan: text or json; catalog/ownership/readiness: json or markdown; graph: json, markdown, or mermaid; suggest-semantic-split: prompt or json",
+    "      --format <format>      scan: text or json; catalog/ownership/readiness/ci-report: json or markdown; graph: json, markdown, or mermaid; suggest-semantic-split: prompt or json",
     "      --include-owned        ownership: include owned asset details",
     "      --json                 Shortcut for --format json",
     "      --view <view>          graph: summary, workflow, or full",

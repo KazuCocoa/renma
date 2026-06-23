@@ -1,0 +1,36 @@
+name: Renma CI Report
+
+on:
+  pull_request:
+
+jobs:
+  renma-ci-report:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Generate Renma CI report
+        run: |
+          node dist/index.js ci-report . \
+            --from origin/${{ github.base_ref }} \
+            --to HEAD \
+            --format markdown > renma-ci-report.md
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: renma-ci-report
+          path: renma-ci-report.md
