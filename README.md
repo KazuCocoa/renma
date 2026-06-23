@@ -229,6 +229,12 @@ renma inspect . contexts/testing/boundary-value-analysis.md
 
 Use JSON output when Renma is part of CI or another tool. Use markdown output for PR-review artifacts. Use text output when a person or coding agent needs a concise repair list.
 
+`ci-report` exit behavior:
+
+- PASS/WARN: exit 0
+- FAIL: exit 1
+- command, runtime, or config error: exit 2
+
 ## What Gets Scanned
 
 By default, Renma looks for:

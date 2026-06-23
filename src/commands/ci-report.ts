@@ -26,10 +26,12 @@ interface ReportFinding {
   id: string;
   severity: string;
   title: string;
-  evidence?: {
-    path?: string | undefined;
-    startLine?: number | undefined;
-  } | undefined;
+  evidence?:
+    | {
+        path?: string | undefined;
+        startLine?: number | undefined;
+      }
+    | undefined;
 }
 
 export async function runCiReportCommand(
@@ -46,7 +48,7 @@ export async function ciReport(
   options: CiReportOptions,
 ): Promise<CiReport> {
   const report = await diff(targetPath, options);
-  const status = determineStatus(report);
+  const status = determineCiReportStatus(report);
   return {
     root: report.root,
     from: report.from,
@@ -66,18 +68,19 @@ export function formatCiReport(
   return formatCiReportMarkdown(report);
 }
 
-function determineStatus(report: DiffReport): CiReportStatus {
+export function determineCiReportStatus(report: DiffReport): CiReportStatus {
   if (
-    report.summary.highOrCriticalFindingsDelta > 0 ||
-    report.graph.newUnresolvedEdges.length > 0
+    hasNewHighOrCriticalFinding(report) ||
+    hasNewUnresolvedRequiredEdge(report)
   ) {
     return "fail";
   }
 
   if (
     report.summary.readinessScoreDelta < 0 ||
+    report.summary.ownershipCoverageDelta < 0 ||
+    report.summary.graphResolutionDelta < 0 ||
     report.summary.findingsDelta > 0 ||
-    report.summary.totalAssetsDelta < 0 ||
     report.readiness.checkChanges.length > 0
   ) {
     return "warn";
@@ -86,13 +89,31 @@ function determineStatus(report: DiffReport): CiReportStatus {
   return "pass";
 }
 
+function hasNewHighOrCriticalFinding(report: DiffReport): boolean {
+  return report.findings.added.some(
+    (finding) => finding.severity === "high" || finding.severity === "critical",
+  );
+}
+
+function hasNewUnresolvedRequiredEdge(report: DiffReport): boolean {
+  return report.graph.newUnresolvedEdges.some(isRequiredEdge);
+}
+
+function newUnresolvedRequiredEdgeCount(report: DiffReport): number {
+  return report.graph.newUnresolvedEdges.filter(isRequiredEdge).length;
+}
+
+function isRequiredEdge(edge: { kind: string }): boolean {
+  return edge.kind === "required" || edge.kind === "requires";
+}
+
 function reviewNotes(report: DiffReport, status: CiReportStatus): string[] {
   const notes: string[] = [];
 
-  if (report.graph.newUnresolvedEdges.length > 0) {
+  if (hasNewUnresolvedRequiredEdge(report)) {
     notes.push("Review new unresolved required edges before merge.");
   }
-  if (report.summary.highOrCriticalFindingsDelta > 0) {
+  if (hasNewHighOrCriticalFinding(report)) {
     notes.push("Review new high or critical findings before merge.");
   }
   if (report.summary.readinessScoreDelta < 0) {
@@ -141,7 +162,7 @@ function formatCiReportMarkdown(report: CiReport): string {
     `- Added assets: ${report.diff.catalog.addedAssets.length}`,
     `- Removed assets: ${report.diff.catalog.removedAssets.length}`,
     `- Changed assets: ${report.diff.catalog.changedAssets.length}`,
-    `- New unresolved required edges: ${report.diff.graph.newUnresolvedEdges.length}`,
+    `- New unresolved required edges: ${newUnresolvedRequiredEdgeCount(report.diff)}`,
     `- Resolved edges: ${report.diff.graph.resolvedEdges.length}`,
     `- Added findings: ${report.diff.findings.added.length}`,
     `- Resolved findings: ${report.diff.findings.removed.length}`,
@@ -170,7 +191,10 @@ function formatDelta(value: number): string {
   return "+0";
 }
 
-function formatFindingSection(label: string, findings: ReportFinding[]): string[] {
+function formatFindingSection(
+  label: string,
+  findings: ReportFinding[],
+): string[] {
   if (findings.length === 0) return [`### ${label}`, "", "- None"];
 
   return [

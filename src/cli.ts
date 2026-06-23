@@ -224,7 +224,9 @@ async function runCiReport(values: CliValues, target: string): Promise<number> {
     return 2;
   }
 
-  const format = values.json ? "json" : (stringValue(values.format) ?? "markdown");
+  const format = values.json
+    ? "json"
+    : (stringValue(values.format) ?? "markdown");
   if (format !== "json" && format !== "markdown") {
     console.error("--format must be either json or markdown.");
     return 2;

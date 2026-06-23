@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatCiReport, type CiReport } from "../src/commands/ci-report.js";
+import {
+  determineCiReportStatus,
+  formatCiReport,
+  type CiReport,
+} from "../src/commands/ci-report.js";
 
 test("formatCiReport renders deterministic markdown review artifact", () => {
   const report = sampleReport();
@@ -11,7 +15,10 @@ test("formatCiReport renders deterministic markdown review artifact", () => {
   assert.match(markdown, /- Status: FAIL/);
   assert.match(markdown, /- Range: `main` -> `HEAD`/);
   assert.match(markdown, /- New unresolved required edges: 1/);
-  assert.match(markdown, /- HIGH MAINT-REPEATED-CODE-BLOCK docs\/guide.md:12 - Repeated code block/);
+  assert.match(
+    markdown,
+    /- HIGH MAINT-REPEATED-CODE-BLOCK docs\/guide.md:12 - Repeated code block/,
+  );
   assert.match(markdown, /Review new unresolved required edges before merge\./);
 });
 
@@ -22,6 +29,104 @@ test("formatCiReport renders structured JSON", () => {
   assert.equal(parsed.status, "fail");
   assert.equal(parsed.summary.highOrCriticalFindingsDelta, 1);
   assert.equal(parsed.diff.findings.added[0]?.id, "MAINT-REPEATED-CODE-BLOCK");
+});
+
+test("ci report policy fails new high finding even when high/critical net delta is zero", () => {
+  const report = policyDiffReport({
+    addedFindings: [finding("MAINT-NEW-HIGH", "high")],
+    summary: {
+      findingsDelta: 0,
+      highOrCriticalFindingsDelta: 0,
+    },
+  });
+
+  assert.equal(determineCiReportStatus(report), "fail");
+});
+
+test("ci report policy fails new critical finding", () => {
+  const report = policyDiffReport({
+    addedFindings: [finding("SEC-NEW-CRITICAL", "critical")],
+  });
+
+  assert.equal(determineCiReportStatus(report), "fail");
+});
+
+test("ci report policy fails new unresolved required edge", () => {
+  const report = policyDiffReport({
+    newUnresolvedEdges: [
+      {
+        source: "skills/demo/SKILL.md",
+        target: "docs/required.md",
+        kind: "requires",
+      },
+    ],
+  });
+
+  assert.equal(determineCiReportStatus(report), "fail");
+});
+
+test("ci report policy does not fail unresolved optional edge", () => {
+  const report = policyDiffReport({
+    newUnresolvedEdges: [
+      {
+        source: "skills/demo/SKILL.md",
+        target: "docs/optional.md",
+        kind: "optional",
+      },
+    ],
+  });
+
+  assert.equal(determineCiReportStatus(report), "pass");
+});
+
+test("ci report policy does not warn on total asset decrease alone", () => {
+  const report = policyDiffReport({
+    summary: {
+      totalAssetsDelta: -3,
+    },
+  });
+
+  assert.equal(determineCiReportStatus(report), "pass");
+});
+
+test("ci report policy warns on ownership coverage decrease", () => {
+  const report = policyDiffReport({
+    summary: {
+      ownershipCoverageDelta: -1,
+    },
+  });
+
+  assert.equal(determineCiReportStatus(report), "warn");
+});
+
+test("ci report policy warns on graph resolution decrease", () => {
+  const report = policyDiffReport({
+    summary: {
+      graphResolutionDelta: -1,
+    },
+  });
+
+  assert.equal(determineCiReportStatus(report), "warn");
+});
+
+test("ci report policy warns on finding increase", () => {
+  const report = policyDiffReport({
+    summary: {
+      findingsDelta: 1,
+    },
+  });
+
+  assert.equal(determineCiReportStatus(report), "warn");
+});
+
+test("ci report policy warns on readiness score decrease", () => {
+  const report = policyDiffReport({
+    summary: {
+      readinessScoreDelta: -1,
+    },
+  });
+
+  assert.equal(determineCiReportStatus(report), "warn");
 });
 
 function sampleReport(): CiReport {
@@ -87,9 +192,9 @@ function sampleReport(): CiReport {
         removedEdges: [],
         newUnresolvedEdges: [
           {
-            from: "skills/demo/SKILL.md",
-            to: "docs/guide.md",
-            relationship: "requires",
+            source: "skills/demo/SKILL.md",
+            target: "docs/guide.md",
+            kind: "requires",
           },
         ],
         resolvedEdges: [],
@@ -120,5 +225,71 @@ function sampleReport(): CiReport {
         ],
       },
     } as unknown as CiReport["diff"],
+  };
+}
+
+function policyDiffReport(options: {
+  addedFindings?: unknown[];
+  newUnresolvedEdges?: unknown[];
+  summary?: Partial<CiReport["summary"]>;
+  checkChanges?: unknown[];
+}): CiReport["diff"] {
+  return {
+    root: "/repo",
+    from: {
+      ref: "main",
+      scannedFileCount: 8,
+      totalAssets: 10,
+      readinessScore: 80,
+      readinessLevel: "needs_attention",
+    },
+    to: {
+      ref: "HEAD",
+      scannedFileCount: 8,
+      totalAssets: 10,
+      readinessScore: 80,
+      readinessLevel: "needs_attention",
+    },
+    summary: {
+      readinessScoreDelta: 0,
+      readinessLevelChanged: false,
+      totalAssetsDelta: 0,
+      ownershipCoverageDelta: 0,
+      graphResolutionDelta: 0,
+      findingsDelta: 0,
+      highOrCriticalFindingsDelta: 0,
+      ...options.summary,
+    },
+    catalog: {
+      addedAssets: [],
+      removedAssets: [],
+      changedAssets: [],
+    },
+    graph: {
+      addedEdges: [],
+      removedEdges: [],
+      newUnresolvedEdges: options.newUnresolvedEdges ?? [],
+      resolvedEdges: [],
+    },
+    readiness: {
+      checkChanges: options.checkChanges ?? [],
+    },
+    findings: {
+      added: options.addedFindings ?? [],
+      removed: [],
+      countById: [],
+    },
+  } as unknown as CiReport["diff"];
+}
+
+function finding(id: string, severity: string) {
+  return {
+    id,
+    severity,
+    title: "Policy finding",
+    evidence: {
+      path: "docs/policy.md",
+      startLine: 1,
+    },
   };
 }
