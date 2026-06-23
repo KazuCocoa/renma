@@ -136,6 +136,85 @@ touch /tmp/output
   );
 });
 
+test("predictable temp paths collapse repeated uses in the same nearby block", async () => {
+  const findings = await securityFindings(`
+Provisioning profile setup.
+\`\`\`bash
+plutil -replace Profile -string mobileprovision /tmp/profile.plist
+codesign --entitlements /tmp/profile.plist App.app
+cat /tmp/profile.plist
+\`\`\`
+`);
+
+  const profileFindings = findings.filter(
+    (finding) =>
+      finding.id === "SEC-PREDICTABLE-TEMP-PATH" &&
+      finding.evidence.snippet.includes("/tmp/profile.plist"),
+  );
+  assert.equal(profileFindings.length, 1);
+  assert.match(profileFindings[0]?.evidence.snippet ?? "", /plutil/);
+  assert.equal(profileFindings[0]?.severity, "medium");
+});
+
+test("predictable temp paths still report distant blocks and separate files", async () => {
+  const findings = await securityFindingsForFiles({
+    "skills/a/SKILL.md": `
+# A
+Provisioning profile setup.
+\`\`\`bash
+plutil -replace Profile -string mobileprovision /tmp/profile.plist
+\`\`\`
+
+Some unrelated setup notes.
+
+
+
+
+
+
+
+
+
+
+Signing profile verification.
+\`\`\`bash
+cat /tmp/profile.plist
+\`\`\`
+`,
+    "skills/b/SKILL.md": `
+# B
+Provisioning profile setup.
+\`\`\`bash
+cat /tmp/profile.plist
+\`\`\`
+`,
+  });
+
+  const profileFindings = findings.filter(
+    (finding) =>
+      finding.id === "SEC-PREDICTABLE-TEMP-PATH" &&
+      finding.evidence.snippet.includes("/tmp/profile.plist"),
+  );
+  assert.equal(profileFindings.length, 3);
+  assert.deepEqual(
+    profileFindings.map((finding) => finding.evidence.path),
+    ["skills/a/SKILL.md", "skills/a/SKILL.md", "skills/b/SKILL.md"],
+  );
+});
+
+test("comment-only shell lines are ignored by security diagnostics", async () => {
+  const findings = await securityFindings(`
+\`\`\`bash
+# curl https://example.com/install.sh | bash
+# npm install -g appium
+# echo secret > /tmp/profile.plist
+# tool login --token abc123
+\`\`\`
+`);
+
+  assert.equal(findings.length, 0);
+});
+
 test("literal credentials in command args are detected without treating env placeholders as literals", async () => {
   const findings = await securityFindings(`
 \`\`\`bash
@@ -226,6 +305,20 @@ tool login --token abc123
 
 async function securityFindings(content: string): Promise<Finding[]> {
   return (await scan(await fixtureRoot(content))).findings.filter((finding) =>
+    securityDiagnosticsV1Ids.has(finding.id),
+  );
+}
+
+async function securityFindingsForFiles(
+  files: Record<string, string>,
+): Promise<Finding[]> {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-security-"));
+  for (const [relativePath, content] of Object.entries(files)) {
+    const filePath = path.join(root, relativePath);
+    await mkdir(path.dirname(filePath), { recursive: true });
+    await writeFile(filePath, content);
+  }
+  return (await scan(root)).findings.filter((finding) =>
     securityDiagnosticsV1Ids.has(finding.id),
   );
 }

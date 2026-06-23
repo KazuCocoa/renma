@@ -146,6 +146,8 @@ function securityFindingsForArtifact(artifact: Artifact): Finding[] {
       continue;
     }
 
+    if (isCommentOnlyShellLine(trimmed)) continue;
+
     const context = nearbyContext(lines, index);
     const operational = inFence || looksOperational(trimmed);
     const detections = [
@@ -163,7 +165,7 @@ function securityFindingsForArtifact(artifact: Artifact): Finding[] {
     }
   }
 
-  return findings;
+  return collapsePredictableTempPathFindings(findings);
 }
 
 function detectRemoteScript(line: string, operational: boolean): Detection[] {
@@ -417,6 +419,46 @@ function looksOperational(line: string): boolean {
   return commandStarters.some((command) =>
     new RegExp(`^(?:[-*]\\s+)?${command}\\b`, "i").test(line),
   );
+}
+
+function isCommentOnlyShellLine(line: string): boolean {
+  return line.startsWith("#");
+}
+
+function collapsePredictableTempPathFindings(findings: Finding[]): Finding[] {
+  const collapsed: Finding[] = [];
+  const lastByPath = new Map<string, Finding>();
+
+  for (const finding of findings) {
+    if (finding.id !== "SEC-PREDICTABLE-TEMP-PATH") {
+      collapsed.push(finding);
+      continue;
+    }
+
+    const tempPath = extractTempPath(finding.evidence.snippet);
+    if (!tempPath) {
+      collapsed.push(finding);
+      continue;
+    }
+
+    const key = `${finding.evidence.path}:${tempPath}`;
+    const previous = lastByPath.get(key);
+    if (
+      previous &&
+      finding.evidence.startLine - previous.evidence.startLine <= 10
+    ) {
+      continue;
+    }
+
+    lastByPath.set(key, finding);
+    collapsed.push(finding);
+  }
+
+  return collapsed;
+}
+
+function extractTempPath(value: string): string | undefined {
+  return value.match(/\/tmp\/[A-Za-z0-9._/-]+/)?.[0];
 }
 
 function splitCommandArgs(value: string): string[] {
