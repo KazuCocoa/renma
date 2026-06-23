@@ -328,15 +328,17 @@ Renma keeps those assets clean, owned, validated, deduplicated, and easy for age
 - Ownership coverage reporting
 - Context graph snapshot reporting
 - LLM-actionable finding fields for safe external repair loops
-- Readiness v1 repository-health report
+- Readiness repository health report
+- Repeated-context discovery
+- Semantic diff across Git refs
+- CI / PR review report artifact
+- Security diagnostics v1 for agent-facing operational instructions
 - 0.1.0 release baseline
 - Dogfood result captured against the Renma repository
 
 ### Near-Term Implementation
 
-- Repeated context and duplicate knowledge discovery
-- Semantic diff for context changes
-- Stronger security and supply-chain safety diagnostics for agent-facing repository content
+- Security diagnostics follow-ups for policy tuning and additional conservative rule batches
 - CI integration examples and sample readiness reports
 - Optional LLM-assisted repository evaluation bundles
 

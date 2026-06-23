@@ -1,7 +1,9 @@
 # Renma Product Design
 
-Renma is a Git-native governance and quality CLI for repositories that hold
+Renma is a Git-native deterministic governance and quality CLI for repositories that hold
 LLM-ready context assets and skills.
+
+Current product surface includes `scan`, `catalog`, `ownership`, `graph`, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, and security diagnostics v1 for agent-facing operational instructions.
 
 ```text
 Renma prepares the environment.
@@ -55,6 +57,8 @@ signals are offline review evidence. Renma itself should not become
 telemetry-responsible.
 
 ## LLM-Actionable Diagnostics
+
+Security diagnostics are deterministic review guardrails for LLM-facing operational instructions. They flag patterns such as unpinned remote shell execution, unpinned dependency installs, privileged commands without nearby guardrails, predictable temporary paths, and credential-like command arguments; they do not replace SAST, secret scanning, dependency scanning, or human security review.
 
 Renma findings should be useful not only to humans, but also to LLM coding
 agents. A good Renma diagnostic should explain what is wrong, why it matters for
