@@ -305,6 +305,14 @@ Validation should combine local file checks and graph-backed checks.
 
 Rule areas:
 
+- Repeated context maintenance:
+  - `MAINT-REPEATED-SECTION` detects exact repeated sections after whitespace normalization.
+  - `MAINT-REPEATED-HEADING` detects repeated non-generic headings across files.
+  - `MAINT-REPEATED-CODE-BLOCK` detects substantial repeated fenced code blocks.
+  - `MAINT-REPEATED-LINK` detects repeated repository context link targets.
+  - `MAINT-REPEATED-CONTEXT-PATTERN` detects repeated token shingles as deterministic consolidation evidence.
+  - These findings do not decide semantic source of truth. They provide stable evidence so an LLM or maintainer can propose a consolidation and a human can approve it.
+
 - Missing or weak skill description
 - Missing negative routing
 - Missing usage guidance

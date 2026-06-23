@@ -120,6 +120,24 @@ It produces:
 
 Findings are meant to explain what is wrong, why it matters, where the evidence is, what to preserve while fixing it, and how to verify the repair. Renma does not apply large semantic rewrites itself; it emits structured diagnostics so a human or coding agent can propose a reviewable patch and run Renma again.
 
+### Repeated context diagnostics
+
+`renma scan` reports deterministic repeated-context candidates across discovered skills, agents, profiles, references, examples, and shared context assets. These findings are evidence for consolidation, not automatic source-of-truth decisions:
+
+```text
+LLM proposes. Renma verifies. Human approves.
+```
+
+The MVP rule IDs are:
+
+- `MAINT-REPEATED-SECTION` for repeated normalized section hashes.
+- `MAINT-REPEATED-HEADING` for repeated non-generic headings.
+- `MAINT-REPEATED-CODE-BLOCK` for repeated substantial code fences.
+- `MAINT-REPEATED-LINK` for repeated repository context link targets.
+- `MAINT-REPEATED-CONTEXT-PATTERN` for repeated token shingles.
+
+Renma normalizes whitespace and only reports cross-file candidates with stable parser evidence. Remediation text asks maintainers to preserve ownership boundaries, procedural detail, and human approval while consolidating owned knowledge.
+
 ## How Renma differs from adjacent tools
 
 Prompt-management and eval tools focus on prompts, traces, and model outputs.
