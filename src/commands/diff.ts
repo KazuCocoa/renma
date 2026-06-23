@@ -1,0 +1,593 @@
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { isAbsolute, join, relative, resolve } from "node:path";
+import { promisify } from "node:util";
+import { execFile as execFileCallback } from "node:child_process";
+import { graph, type GraphReport } from "./graph.js";
+import { readiness, type ReadinessReport } from "./readiness.js";
+import type { ConfigOverrides } from "../config.js";
+
+const execFile = promisify(execFileCallback);
+
+export type DiffFormat = "json" | "markdown";
+
+export interface DiffReport {
+  root: string;
+  from: DiffEndpoint;
+  to: DiffEndpoint;
+  summary: {
+    readinessScoreDelta: number;
+    readinessLevelChanged: boolean;
+    totalAssetsDelta: number;
+    ownershipCoverageDelta: number;
+    graphResolutionDelta: number;
+    findingsDelta: number;
+    highOrCriticalFindingsDelta: number;
+  };
+  catalog: {
+    addedAssets: AssetDelta[];
+    removedAssets: AssetDelta[];
+    changedAssets: AssetChange[];
+  };
+  graph: {
+    addedEdges: EdgeDelta[];
+    removedEdges: EdgeDelta[];
+    newUnresolvedEdges: EdgeDelta[];
+    resolvedEdges: EdgeDelta[];
+  };
+  readiness: {
+    checkChanges: ReadinessCheckChange[];
+  };
+  findings: {
+    added: FindingDelta[];
+    removed: FindingDelta[];
+    countById: Array<{
+      id: string;
+      from: number;
+      to: number;
+      delta: number;
+    }>;
+  };
+}
+
+interface DiffEndpoint {
+  ref: string;
+  scannedFileCount: number;
+  readinessScore: number;
+  readinessLevel: string;
+}
+
+interface AssetDelta {
+  id: string;
+  path?: string | undefined;
+  kind?: string | undefined;
+  owner?: string | undefined;
+  status?: string | undefined;
+}
+
+interface AssetChange {
+  id: string;
+  path?: string | undefined;
+  changedFields: string[];
+  from: AssetDelta;
+  to: AssetDelta;
+}
+
+interface EdgeDelta {
+  source: string;
+  target: string;
+  kind: string;
+  resolved: boolean;
+  evidence?: EvidenceDelta | undefined;
+}
+
+interface ReadinessCheckChange {
+  id: string;
+  title: string;
+  fromStatus: string;
+  toStatus: string;
+  fromSeverity: string;
+  toSeverity: string;
+  summaryChanged: boolean;
+}
+
+interface FindingDelta {
+  id: string;
+  severity: string;
+  message: string;
+  evidence?: EvidenceDelta | undefined;
+}
+
+interface EvidenceDelta {
+  path?: string | undefined;
+  startLine?: number | undefined;
+  endLine?: number | undefined;
+  snippet?: string | undefined;
+}
+
+interface Snapshot {
+  ref: string;
+  root: string;
+  readiness: ReadinessReport;
+  graph: GraphReport;
+}
+
+export async function runDiffCommand(
+  targetPath: string,
+  options: {
+    fromRef: string;
+    toRef: string;
+    format: DiffFormat;
+    overrides?: ConfigOverrides;
+  },
+): Promise<number> {
+  const report = await diff(targetPath, options);
+  process.stdout.write(formatDiff(report, options.format));
+  return 0;
+}
+
+export async function diff(
+  targetPath: string,
+  options: {
+    fromRef: string;
+    toRef: string;
+    overrides?: ConfigOverrides;
+  },
+): Promise<DiffReport> {
+  const workingDirectory = process.cwd();
+  const repoRoot = await gitOutput(workingDirectory, [
+    "rev-parse",
+    "--show-toplevel",
+  ]);
+  const absoluteTarget = resolve(workingDirectory, targetPath);
+  const relativeTarget = pathWithinRepo(repoRoot, absoluteTarget);
+  const tempRoot = await mkdtemp(join(tmpdir(), "renma-diff-"));
+
+  try {
+    const [fromSnapshot, toSnapshot] = await Promise.all([
+      snapshot(repoRoot, relativeTarget, options.fromRef, tempRoot, "from", options.overrides),
+      snapshot(repoRoot, relativeTarget, options.toRef, tempRoot, "to", options.overrides),
+    ]);
+    return buildDiffReport(repoRoot, fromSnapshot, toSnapshot);
+  } finally {
+    await rm(tempRoot, { force: true, recursive: true });
+  }
+}
+
+export function buildDiffReport(
+  root: string,
+  fromSnapshot: Snapshot,
+  toSnapshot: Snapshot,
+): DiffReport {
+  const fromReadiness = fromSnapshot.readiness;
+  const toReadiness = toSnapshot.readiness;
+  const fromFindings = findingMap(fromReadiness.findings ?? []);
+  const toFindings = findingMap(toReadiness.findings ?? []);
+  const fromAssets = assetMap(fromSnapshot.graph.nodes);
+  const toAssets = assetMap(toSnapshot.graph.nodes);
+  const fromEdges = edgeMap(fromSnapshot.graph.edges);
+  const toEdges = edgeMap(toSnapshot.graph.edges);
+
+  return {
+    root,
+    from: endpoint(fromSnapshot),
+    to: endpoint(toSnapshot),
+    summary: {
+      readinessScoreDelta: delta(toReadiness.score, fromReadiness.score),
+      readinessLevelChanged: fromReadiness.level !== toReadiness.level,
+      totalAssetsDelta: delta(
+        toReadiness.summary.totalAssets,
+        fromReadiness.summary.totalAssets,
+      ),
+      ownershipCoverageDelta: delta(
+        toReadiness.summary.ownershipCoveragePercent,
+        fromReadiness.summary.ownershipCoveragePercent,
+      ),
+      graphResolutionDelta: delta(
+        toReadiness.summary.graphResolutionPercent,
+        fromReadiness.summary.graphResolutionPercent,
+      ),
+      findingsDelta: delta(toFindings.size, fromFindings.size),
+      highOrCriticalFindingsDelta: delta(
+        highOrCriticalCount([...toFindings.values()]),
+        highOrCriticalCount([...fromFindings.values()]),
+      ),
+    },
+    catalog: {
+      addedAssets: [...toAssets]
+        .filter(([key]) => !fromAssets.has(key))
+        .map(([, asset]) => asset),
+      removedAssets: [...fromAssets]
+        .filter(([key]) => !toAssets.has(key))
+        .map(([, asset]) => asset),
+      changedAssets: changedAssets(fromAssets, toAssets),
+    },
+    graph: {
+      addedEdges: [...toEdges]
+        .filter(([key]) => !fromEdges.has(key))
+        .map(([, edge]) => edge),
+      removedEdges: [...fromEdges]
+        .filter(([key]) => !toEdges.has(key))
+        .map(([, edge]) => edge),
+      newUnresolvedEdges: [...toEdges]
+        .filter(([key, edge]) => !edge.resolved && !fromEdges.has(key))
+        .map(([, edge]) => edge),
+      resolvedEdges: [...toEdges]
+        .filter(([key, edge]) => {
+          const previous = fromEdges.get(key);
+          return previous ? !previous.resolved && edge.resolved : false;
+        })
+        .map(([, edge]) => edge),
+    },
+    readiness: {
+      checkChanges: checkChanges(fromReadiness.checks, toReadiness.checks),
+    },
+    findings: {
+      added: [...toFindings]
+        .filter(([key]) => !fromFindings.has(key))
+        .map(([, finding]) => finding),
+      removed: [...fromFindings]
+        .filter(([key]) => !toFindings.has(key))
+        .map(([, finding]) => finding),
+      countById: countById(fromReadiness.findings ?? [], toReadiness.findings ?? []),
+    },
+  };
+}
+
+export function formatDiff(report: DiffReport, format: DiffFormat): string {
+  if (format === "json") {
+    return `${JSON.stringify(report, null, 2)}\n`;
+  }
+  return formatDiffMarkdown(report);
+}
+
+function formatDiffMarkdown(report: DiffReport): string {
+  const lines = [
+    `# Renma semantic diff`,
+    "",
+    `Root: \`${report.root}\``,
+    `Refs: \`${report.from.ref}\` -> \`${report.to.ref}\``,
+    "",
+    "## Summary",
+    "",
+    `- Readiness score: ${report.to.readinessScore} (${signed(report.summary.readinessScoreDelta)})`,
+    `- Readiness level changed: ${report.summary.readinessLevelChanged ? "yes" : "no"}`,
+    `- Assets: ${report.to.scannedFileCount} (${signed(report.summary.totalAssetsDelta)})`,
+    `- Ownership coverage: ${signed(report.summary.ownershipCoverageDelta)}`,
+    `- Graph resolution: ${signed(report.summary.graphResolutionDelta)}`,
+    `- Findings: ${signed(report.summary.findingsDelta)}`,
+    `- High/critical findings: ${signed(report.summary.highOrCriticalFindingsDelta)}`,
+    "",
+    "## Catalog",
+    "",
+    `- Added assets: ${report.catalog.addedAssets.length}`,
+    `- Removed assets: ${report.catalog.removedAssets.length}`,
+    `- Changed assets: ${report.catalog.changedAssets.length}`,
+    "",
+    "## Graph",
+    "",
+    `- Added edges: ${report.graph.addedEdges.length}`,
+    `- Removed edges: ${report.graph.removedEdges.length}`,
+    `- New unresolved edges: ${report.graph.newUnresolvedEdges.length}`,
+    `- Resolved edges: ${report.graph.resolvedEdges.length}`,
+    "",
+    "## Readiness checks",
+    "",
+    ...markdownList(
+      report.readiness.checkChanges,
+      (check) =>
+        `${check.id}: ${check.fromStatus}/${check.fromSeverity} -> ${check.toStatus}/${check.toSeverity}`,
+    ),
+    "",
+    "## Findings",
+    "",
+    `- Added findings: ${report.findings.added.length}`,
+    `- Removed findings: ${report.findings.removed.length}`,
+  ];
+
+  if (report.graph.newUnresolvedEdges.length > 0) {
+    lines.push("", "### New unresolved edges", "");
+    lines.push(
+      ...markdownList(
+        report.graph.newUnresolvedEdges,
+        (edge) => `${edge.source} --${edge.kind}--> ${edge.target}`,
+      ),
+    );
+  }
+
+  if (report.findings.added.length > 0) {
+    lines.push("", "### Added findings", "");
+    lines.push(
+      ...markdownList(
+        report.findings.added,
+        (finding) =>
+          `${finding.id} (${finding.severity})${finding.evidence?.path ? ` at ${finding.evidence.path}` : ""}`,
+      ),
+    );
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+async function snapshot(
+  repoRoot: string,
+  relativeTarget: string,
+  ref: string,
+  tempRoot: string,
+  label: string,
+  overrides: ConfigOverrides = {},
+): Promise<Snapshot> {
+  const root = join(tempRoot, label);
+  const archivePath = join(tempRoot, `${label}.tar`);
+  await mkdir(root, { recursive: true });
+  await gitOutput(repoRoot, [
+    "archive",
+    "--format=tar",
+    "--output",
+    archivePath,
+    ref,
+  ]);
+  await execFile("tar", ["-xf", archivePath, "-C", root]);
+  const target = relativeTarget === "." ? root : join(root, relativeTarget);
+  const [readinessReport, graphReport] = await Promise.all([
+    readiness(target, snapshotOverrides(repoRoot, root, overrides)),
+    graph(target, snapshotOverrides(repoRoot, root, overrides)),
+  ]);
+  return {
+    ref,
+    root: target,
+    readiness: readinessReport,
+    graph: graphReport,
+  };
+}
+
+function endpoint(snapshot: Snapshot): DiffEndpoint {
+  return {
+    ref: snapshot.ref,
+    scannedFileCount: snapshot.readiness.scannedFileCount,
+    readinessScore: snapshot.readiness.score,
+    readinessLevel: snapshot.readiness.level,
+  };
+}
+
+function changedAssets(
+  fromAssets: Map<string, AssetDelta>,
+  toAssets: Map<string, AssetDelta>,
+): AssetChange[] {
+  return [...toAssets]
+    .flatMap(([key, toAsset]) => {
+      const fromAsset = fromAssets.get(key);
+      if (!fromAsset) return [];
+      const changedFields = ["path", "kind", "owner", "status"].filter(
+        (field) =>
+          fromAsset[field as keyof AssetDelta] !==
+          toAsset[field as keyof AssetDelta],
+      );
+      return changedFields.length === 0
+        ? []
+        : [{ id: toAsset.id, path: toAsset.path, changedFields, from: fromAsset, to: toAsset }];
+    })
+    .sort(compareBy((change) => change.id));
+}
+
+function checkChanges(fromChecks: unknown[], toChecks: unknown[]): ReadinessCheckChange[] {
+  const fromById = new Map(
+    fromChecks.map((check) => [stringField(check, "id"), check] as const),
+  );
+  return toChecks
+    .flatMap((check) => {
+      const id = stringField(check, "id");
+      const previous = fromById.get(id);
+      if (!previous) return [];
+      const change = {
+        id,
+        title: stringField(check, "title"),
+        fromStatus: stringField(previous, "status"),
+        toStatus: stringField(check, "status"),
+        fromSeverity: stringField(previous, "severity"),
+        toSeverity: stringField(check, "severity"),
+        summaryChanged:
+          stringField(previous, "summary") !== stringField(check, "summary"),
+      };
+      return change.fromStatus === change.toStatus &&
+        change.fromSeverity === change.toSeverity &&
+        !change.summaryChanged
+        ? []
+        : [change];
+    })
+    .sort(compareBy((change) => change.id));
+}
+
+function assetMap(nodes: unknown[]): Map<string, AssetDelta> {
+  return stableMap(
+    nodes.map((node) => {
+      const asset = {
+        id: firstString(node, ["id", "path", "sourcePath"]),
+        path: firstOptionalString(node, ["sourcePath", "path"]),
+        kind: firstOptionalString(node, ["kind"]),
+        owner: firstOptionalString(node, ["owner"]),
+        status: firstOptionalString(node, ["status"]),
+      };
+      return [asset.id, asset] as const;
+    }),
+  );
+}
+
+function edgeMap(edges: unknown[]): Map<string, EdgeDelta> {
+  return stableMap(
+    edges.map((edge) => {
+      const normalized = {
+        source: firstString(edge, ["source", "sourceId", "sourcePath", "from"]),
+        target: firstString(edge, ["target", "targetId", "targetPath", "to"]),
+        kind: firstString(edge, ["kind", "type"]),
+        resolved: booleanField(edge, "resolved"),
+        evidence: evidenceDelta(objectField(edge, "evidence")),
+      };
+      return [`${normalized.source}\0${normalized.kind}\0${normalized.target}`, normalized] as const;
+    }),
+  );
+}
+
+function findingMap(findings: unknown[]): Map<string, FindingDelta> {
+  return stableMap(
+    findings.map((finding) => {
+      const evidence = evidenceDelta(objectField(finding, "evidence"));
+      const deltaFinding = {
+        id: stringField(finding, "id"),
+        severity: stringField(finding, "severity"),
+        message: stringField(finding, "message"),
+        evidence,
+      };
+      return [
+        [
+          deltaFinding.id,
+          evidence?.path ?? "",
+          evidence?.startLine ?? "",
+          evidence?.endLine ?? "",
+          evidence?.snippet ?? "",
+        ].join("\0"),
+        deltaFinding,
+      ] as const;
+    }),
+  );
+}
+
+function countById(fromFindings: unknown[], toFindings: unknown[]) {
+  const fromCounts = counts(fromFindings.map((finding) => stringField(finding, "id")));
+  const toCounts = counts(toFindings.map((finding) => stringField(finding, "id")));
+  return [...new Set([...fromCounts.keys(), ...toCounts.keys()])]
+    .map((id) => ({
+      id,
+      from: fromCounts.get(id) ?? 0,
+      to: toCounts.get(id) ?? 0,
+      delta: delta(toCounts.get(id) ?? 0, fromCounts.get(id) ?? 0),
+    }))
+    .filter((item) => item.delta !== 0)
+    .sort(compareBy((item) => item.id));
+}
+
+function evidenceDelta(evidence: unknown): EvidenceDelta | undefined {
+  if (!evidence || typeof evidence !== "object") return undefined;
+  const record = evidence as Record<string, unknown>;
+  return {
+    path: optionalStringField(record, "path"),
+    startLine: optionalNumberField(record, "startLine"),
+    endLine: optionalNumberField(record, "endLine"),
+    snippet: optionalStringField(record, "snippet"),
+  };
+}
+
+function highOrCriticalCount(findings: FindingDelta[]): number {
+  return findings.filter(
+    (finding) => finding.severity === "high" || finding.severity === "critical",
+  ).length;
+}
+
+function pathWithinRepo(repoRoot: string, absoluteTarget: string): string {
+  const relativeTarget = relative(repoRoot, absoluteTarget);
+  if (
+    relativeTarget === "" ||
+    relativeTarget === "." ||
+    (!relativeTarget.startsWith("..") && !isAbsolute(relativeTarget))
+  ) {
+    return relativeTarget === "" ? "." : relativeTarget;
+  }
+  throw new Error(`Diff target must be inside the git repository: ${absoluteTarget}`);
+}
+
+function snapshotOverrides(
+  repoRoot: string,
+  snapshotRoot: string,
+  overrides: ConfigOverrides,
+): ConfigOverrides {
+  if (!overrides.configPath) return overrides;
+  try {
+    const configPath = pathWithinRepo(
+      repoRoot,
+      resolve(process.cwd(), overrides.configPath),
+    );
+    return {
+      ...overrides,
+      configPath: join(snapshotRoot, configPath),
+    };
+  } catch {
+    return overrides;
+  }
+}
+
+async function gitOutput(cwd: string, args: string[]): Promise<string> {
+  try {
+    const { stdout } = await execFile("git", ["-C", cwd, ...args], {
+      maxBuffer: 1024 * 1024 * 20,
+    });
+    return stdout.trim();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`git ${args.join(" ")} failed: ${error.message}`);
+    }
+    throw error;
+  }
+}
+
+function stableMap<T>(entries: Array<readonly [string, T]>): Map<string, T> {
+  return new Map(entries.sort(([left], [right]) => left.localeCompare(right)));
+}
+
+function counts(values: string[]): Map<string, number> {
+  const result = new Map<string, number>();
+  for (const value of values) {
+    result.set(value, (result.get(value) ?? 0) + 1);
+  }
+  return result;
+}
+
+function delta(to: number, from: number): number {
+  return Number((to - from).toFixed(2));
+}
+
+function signed(value: number): string {
+  return value > 0 ? `+${value}` : String(value);
+}
+
+function markdownList<T>(items: T[], render: (item: T) => string): string[] {
+  return items.length === 0 ? ["- (none)"] : items.map((item) => `- ${render(item)}`);
+}
+
+function compareBy<T>(selector: (item: T) => string): (left: T, right: T) => number {
+  return (left, right) => selector(left).localeCompare(selector(right));
+}
+
+function firstString(value: unknown, fields: string[]): string {
+  return firstOptionalString(value, fields) ?? "";
+}
+
+function firstOptionalString(value: unknown, fields: string[]): string | undefined {
+  for (const field of fields) {
+    const candidate = optionalStringField(value, field);
+    if (candidate !== undefined) return candidate;
+  }
+  return undefined;
+}
+
+function stringField(value: unknown, field: string): string {
+  return optionalStringField(value, field) ?? "";
+}
+
+function optionalStringField(value: unknown, field: string): string | undefined {
+  const candidate = objectField(value, field);
+  return typeof candidate === "string" ? candidate : undefined;
+}
+
+function optionalNumberField(value: unknown, field: string): number | undefined {
+  const candidate = objectField(value, field);
+  return typeof candidate === "number" ? candidate : undefined;
+}
+
+function booleanField(value: unknown, field: string): boolean {
+  return objectField(value, field) === true;
+}
+
+function objectField(value: unknown, field: string): unknown {
+  if (!value || typeof value !== "object") return undefined;
+  return (value as Record<string, unknown>)[field];
+}

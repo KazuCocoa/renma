@@ -1,6 +1,7 @@
 import { parseArgs } from "node:util";
 import packageJson from "../package.json" with { type: "json" };
 import { runCatalogCommand, type CatalogFormat } from "./commands/catalog.js";
+import { runDiffCommand, type DiffFormat } from "./commands/diff.js";
 import {
   runGraphCommand,
   type GraphFormat,
@@ -35,9 +36,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         config: { type: "string", short: "c" },
         "fail-on": { type: "string" },
         format: { type: "string" },
+        from: { type: "string" },
         "include-owned": { type: "boolean" },
         json: { type: "boolean" },
         lines: { type: "string" },
+        to: { type: "string" },
         view: { type: "string" },
         "max-context-bytes": { type: "string" },
         "max-source-bytes": { type: "string" },
@@ -64,6 +67,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   if (
     command !== "scan" &&
     command !== "catalog" &&
+    command !== "diff" &&
     command !== "graph" &&
     command !== "ownership" &&
     command !== "readiness" &&
@@ -87,6 +91,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
   if (command === "catalog") {
     return runCatalog(parsed.values, target);
+  }
+
+  if (command === "diff") {
+    return runDiff(parsed.values, target);
   }
 
   if (command === "graph") {
@@ -151,6 +159,42 @@ async function runCatalog(values: CliValues, target: string): Promise<number> {
   try {
     return await runCatalogCommand(target, {
       format: format as CatalogFormat,
+      overrides,
+    });
+  } catch (error) {
+    console.error(
+      error instanceof ConfigError || error instanceof Error
+        ? error.message
+        : String(error),
+    );
+    return 2;
+  }
+}
+
+async function runDiff(values: CliValues, target: string): Promise<number> {
+  const fromRef = stringValue(values.from);
+  const toRef = stringValue(values.to);
+  if (!fromRef || !toRef) {
+    console.error("diff requires --from <ref> and --to <ref>.");
+    return 2;
+  }
+
+  const format = values.json ? "json" : (stringValue(values.format) ?? "json");
+  if (format !== "json" && format !== "markdown") {
+    console.error("--format must be either json or markdown.");
+    return 2;
+  }
+
+  const configPath = stringValue(values.config);
+  const overrides: ConfigOverrides = {
+    ...(configPath ? { configPath } : {}),
+  };
+
+  try {
+    return await runDiffCommand(target, {
+      fromRef,
+      toRef,
+      format: format as DiffFormat,
       overrides,
     });
   } catch (error) {
@@ -346,6 +390,7 @@ function helpText(): string {
     "Additional usage:",
     "  renma scan [path] [options]",
     "  renma catalog [path] [options]",
+    "  renma diff [path] --from <ref> --to <ref> [options]",
     "  renma graph [path] [options]",
     "  renma ownership [path] [options]",
     "  renma readiness [path] [options]",
@@ -355,6 +400,7 @@ function helpText(): string {
     "Commands:",
     "  scan                       Scan a repository or skill directory",
     "  catalog                    Print deterministic normalized asset catalog",
+    "  diff                       Compare deterministic readiness snapshots",
     "  graph                      Print deterministic repository graph snapshot",
     "  ownership                  Print deterministic ownership coverage report",
     "  readiness                  Print deterministic agent readiness report",
