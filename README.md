@@ -120,6 +120,20 @@ It produces:
 
 Findings are meant to explain what is wrong, why it matters, where the evidence is, what to preserve while fixing it, and how to verify the repair. Renma does not apply large semantic rewrites itself; it emits structured diagnostics so a human or coding agent can propose a reviewable patch and run Renma again.
 
+## How Renma differs from adjacent tools
+
+Prompt-management and eval tools focus on prompts, traces, and model outputs.
+
+Renma focuses one layer lower: the reusable context assets and skills that prompts, agents, and tools depend on.
+
+Knowledge-management tools help humans organize notes and documents.
+
+Renma focuses on machine-consumable repository knowledge that can be owned, referenced, validated, and reused in AI workflows.
+
+Software catalogs track services, libraries, ownership, and lifecycle.
+
+Renma applies a similar catalog model to context assets.
+
 ## First-Time Use
 
 Try Renma against the current repository:
@@ -133,7 +147,7 @@ npx renma readiness .
 
 This first command does not require you to design a knowledge architecture up front. It scans the repository, builds a local catalog, and reports obvious health issues such as broken links, unclear ownership, risky instructions, weak structure, and context that may be hard for agents to trust.
 
-If you are working from a clone of this repository:
+If you are developing Renma from source:
 
 ```bash
 npm install
