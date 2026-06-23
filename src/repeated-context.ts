@@ -10,6 +10,13 @@ type RepeatKind =
   | "link_target"
   | "token_shingle";
 
+type RepeatedContextFindingId =
+  | "MAINT-REPEATED-SECTION"
+  | "MAINT-REPEATED-HEADING"
+  | "MAINT-REPEATED-CODE-BLOCK"
+  | "MAINT-REPEATED-LINK"
+  | "MAINT-REPEATED-CONTEXT-PATTERN";
+
 interface Occurrence {
   path: string;
   startLine: number;
@@ -24,8 +31,21 @@ interface RepeatGroup {
   occurrences: Occurrence[];
 }
 
-const MAX_FINDINGS_PER_RULE = 20;
+const FINDING_CAPS: Record<RepeatedContextFindingId, number> = {
+  "MAINT-REPEATED-SECTION": 10,
+  "MAINT-REPEATED-HEADING": 10,
+  "MAINT-REPEATED-CODE-BLOCK": 10,
+  "MAINT-REPEATED-LINK": 10,
+  "MAINT-REPEATED-CONTEXT-PATTERN": 10,
+};
 const SHINGLE_SIZE = 24;
+const TOKEN_SHINGLE_NEARBY_LINE_WINDOW = 8;
+
+export function repeatedContextFindingCap(
+  id: RepeatedContextFindingId,
+): number {
+  return FINDING_CAPS[id];
+}
 
 const GENERIC_HEADINGS = new Set([
   "overview",
@@ -264,11 +284,11 @@ function collectRepeatedTokenShingles(
     }
   }
 
-  return repeatedCrossFileGroups(groups, 2);
+  return collapseNearDuplicateTokenShingles(repeatedCrossFileGroups(groups, 2));
 }
 
 function groupsToFindings(
-  id: string,
+  id: RepeatedContextFindingId,
   title: string,
   kind: RepeatKind,
   groups: RepeatGroup[],
@@ -277,7 +297,7 @@ function groupsToFindings(
   return groups
     .filter((group) => group.kind === kind)
     .sort(compareGroups)
-    .slice(0, MAX_FINDINGS_PER_RULE)
+    .slice(0, repeatedContextFindingCap(id))
     .flatMap((group) => {
       const occurrences = sortOccurrences(group.occurrences);
       const first = occurrences[0];
@@ -348,6 +368,74 @@ function repeatedCrossFileGroups(
   return [...groups.values()].filter(
     (group) => distinctPaths(group.occurrences).size >= minimumPaths,
   );
+}
+
+function collapseNearDuplicateTokenShingles(
+  groups: RepeatGroup[],
+): RepeatGroup[] {
+  const selected: RepeatGroup[] = [];
+
+  for (const group of [...groups].sort(compareTokenShingleRepresentatives)) {
+    if (
+      selected.some((representative) =>
+        isNearDuplicateTokenShingleGroup(group, representative),
+      )
+    ) {
+      continue;
+    }
+
+    selected.push(group);
+  }
+
+  return selected;
+}
+
+function isNearDuplicateTokenShingleGroup(
+  candidate: RepeatGroup,
+  representative: RepeatGroup,
+): boolean {
+  const candidatePrimary = sortOccurrences(candidate.occurrences)[0];
+  const representativePrimary = sortOccurrences(representative.occurrences)[0];
+  if (!candidatePrimary || !representativePrimary) return false;
+
+  if (
+    candidatePrimary.path === representativePrimary.path &&
+    Math.abs(candidatePrimary.startLine - representativePrimary.startLine) <=
+      TOKEN_SHINGLE_NEARBY_LINE_WINDOW
+  ) {
+    return true;
+  }
+
+  return (
+    alsoAppearsSignature(candidate.occurrences) ===
+    alsoAppearsSignature(representative.occurrences)
+  );
+}
+
+function compareTokenShingleRepresentatives(
+  left: RepeatGroup,
+  right: RepeatGroup,
+): number {
+  const leftPrimary = sortOccurrences(left.occurrences)[0];
+  const rightPrimary = sortOccurrences(right.occurrences)[0];
+
+  return (
+    (leftPrimary?.path ?? "").localeCompare(rightPrimary?.path ?? "") ||
+    (leftPrimary?.startLine ?? 0) - (rightPrimary?.startLine ?? 0) ||
+    (leftPrimary?.endLine ?? 0) - (rightPrimary?.endLine ?? 0) ||
+    left.key.localeCompare(right.key)
+  );
+}
+
+function alsoAppearsSignature(occurrences: Occurrence[]): string {
+  const sorted = sortOccurrences(occurrences);
+  const primary = sorted[0];
+
+  return sorted
+    .filter((occurrence) => occurrence !== primary)
+    .map((occurrence) => `${occurrence.path}:L${occurrence.startLine}`)
+    .sort()
+    .join("|");
 }
 
 function findSectionEndLine(
