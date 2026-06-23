@@ -190,7 +190,9 @@ function collectRepeatedCodeBlocks(documents: ParsedDocument[]): RepeatGroup[] {
           path: document.artifact.path,
           startLine: fence.startLine,
           endLine: fence.endLine,
-          snippet: snippet(document.lines.slice(fence.startLine - 1, fence.endLine)),
+          snippet: snippet(
+            document.lines.slice(fence.startLine - 1, fence.endLine),
+          ),
         },
       });
     }
@@ -224,7 +226,9 @@ function collectRepeatedLinks(documents: ParsedDocument[]): RepeatGroup[] {
   return repeatedCrossFileGroups(groups, 3);
 }
 
-function collectRepeatedTokenShingles(documents: ParsedDocument[]): RepeatGroup[] {
+function collectRepeatedTokenShingles(
+  documents: ParsedDocument[],
+): RepeatGroup[] {
   const groups = new Map<string, RepeatGroup>();
 
   for (const document of documents) {
@@ -275,32 +279,35 @@ function groupsToFindings(
       if (!first) return [];
       const others = occurrences.slice(1, 5);
 
-      return [{
-        id,
-        title,
-        category: "maintenance",
-        severity: kind === "heading" || kind === "link_target" ? "low" : "medium",
-        confidence: "high",
-        message: `${title} detected for ${group.label}. ${formatOtherOccurrences(others)}`,
-        evidence: {
-          path: first.path,
-          startLine: first.startLine,
-          endLine: first.endLine,
-          snippet: first.snippet,
+      return [
+        {
+          id,
+          title,
+          category: "maintenance",
+          severity:
+            kind === "heading" || kind === "link_target" ? "low" : "medium",
+          confidence: "high",
+          message: `${title} detected for ${group.label}. ${formatOtherOccurrences(others)}`,
+          evidence: {
+            path: first.path,
+            startLine: first.startLine,
+            endLine: first.endLine,
+            snippet: first.snippet,
+          },
+          remediation,
+          whyItMatters:
+            "Repeated agent context can drift across skills, agents, references, and examples. Renma reports deterministic evidence so an LLM or maintainer can propose consolidation and a human can approve it.",
+          constraints: [
+            "Do not delete or rewrite content solely because this finding exists.",
+            "Preserve procedural details and ownership boundaries while consolidating.",
+            "Treat this as deterministic evidence, not a semantic source-of-truth decision.",
+          ],
+          verificationSteps: [
+            "Review all reported occurrences and choose an owned source of truth.",
+            "Run renma scan after any consolidation patch.",
+          ],
         },
-        remediation,
-        whyItMatters:
-          "Repeated agent context can drift across skills, agents, references, and examples. Renma reports deterministic evidence so an LLM or maintainer can propose consolidation and a human can approve it.",
-        constraints: [
-          "Do not delete or rewrite content solely because this finding exists.",
-          "Preserve procedural details and ownership boundaries while consolidating.",
-          "Treat this as deterministic evidence, not a semantic source-of-truth decision.",
-        ],
-        verificationSteps: [
-          "Review all reported occurrences and choose an owned source of truth.",
-          "Run renma scan after any consolidation patch.",
-        ],
-      }];
+      ];
     });
 }
 
@@ -337,7 +344,10 @@ function repeatedCrossFileGroups(
   );
 }
 
-function findSectionEndLine(document: ParsedDocument, headingIndex: number): number {
+function findSectionEndLine(
+  document: ParsedDocument,
+  headingIndex: number,
+): number {
   const heading = document.headings[headingIndex];
   if (!heading) return document.lines.length;
   const nextPeer = document.headings
@@ -346,7 +356,9 @@ function findSectionEndLine(document: ParsedDocument, headingIndex: number): num
   return nextPeer ? nextPeer.line - 1 : document.lines.length;
 }
 
-function tokenizeDocument(document: ParsedDocument): Array<{ value: string; line: number }> {
+function tokenizeDocument(
+  document: ParsedDocument,
+): Array<{ value: string; line: number }> {
   const codeLines = new Set<number>();
   for (const fence of document.codeFences) {
     for (let line = fence.startLine; line <= fence.endLine; line += 1) {
@@ -441,7 +453,8 @@ function distinctPaths(occurrences: Occurrence[]): Set<string> {
 
 function compareGroups(left: RepeatGroup, right: RepeatGroup): number {
   return (
-    distinctPaths(right.occurrences).size - distinctPaths(left.occurrences).size ||
+    distinctPaths(right.occurrences).size -
+      distinctPaths(left.occurrences).size ||
     right.occurrences.length - left.occurrences.length ||
     left.label.localeCompare(right.label) ||
     left.key.localeCompare(right.key)
