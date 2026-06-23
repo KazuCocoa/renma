@@ -343,7 +343,7 @@ export function formatReadinessMarkdown(report: ReadinessReport): string {
 
   if (report.findings?.length) {
     lines.push("", "## Findings", "");
-    const displayedFindings = report.findings.slice(0, MARKDOWN_FINDINGS_LIMIT);
+    const displayedFindings = selectMarkdownFindings(report.findings);
     for (const finding of displayedFindings) {
       lines.push(`- ${formatMarkdownFinding(finding)}`);
       lines.push(`  - Remediation: ${finding.remediation}`);
@@ -367,6 +367,51 @@ export function formatReadiness(
   return format === "json"
     ? formatReadinessJson(report)
     : formatReadinessMarkdown(report);
+}
+
+function selectMarkdownFindings(findings: Finding[]): Finding[] {
+  if (findings.length <= MARKDOWN_FINDINGS_LIMIT) return findings;
+
+  const selected: Finding[] = [];
+  const selectedKeys = new Set<string>();
+  const repeatedBuckets = new Map<string, Finding[]>();
+
+  for (const finding of findings) {
+    if (!finding.id.startsWith("MAINT-REPEATED-")) continue;
+    const bucket = repeatedBuckets.get(finding.id) ?? [];
+    bucket.push(finding);
+    repeatedBuckets.set(finding.id, bucket);
+  }
+
+  while (
+    selected.length < MARKDOWN_FINDINGS_LIMIT &&
+    [...repeatedBuckets.values()].some((bucket) => bucket.length > 0)
+  ) {
+    for (const id of [...repeatedBuckets.keys()].sort()) {
+      const bucket = repeatedBuckets.get(id);
+      const finding = bucket?.shift();
+      if (!finding) continue;
+
+      selected.push(finding);
+      selectedKeys.add(findingKey(finding));
+      if (selected.length >= MARKDOWN_FINDINGS_LIMIT) break;
+    }
+  }
+
+  for (const finding of findings) {
+    if (selected.length >= MARKDOWN_FINDINGS_LIMIT) break;
+    const key = findingKey(finding);
+    if (selectedKeys.has(key)) continue;
+
+    selected.push(finding);
+    selectedKeys.add(key);
+  }
+
+  return selected;
+}
+
+function findingKey(finding: Finding): string {
+  return `${finding.id}:${finding.evidence.path}:${finding.evidence.startLine}:${finding.evidence.endLine}`;
 }
 
 function formatMarkdownFinding(finding: Finding): string {

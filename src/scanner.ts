@@ -3,6 +3,7 @@ import { buildCatalog } from "./catalog.js";
 import { loadConfig, type ConfigOverrides } from "./config.js";
 import { discoverArtifacts } from "./discovery.js";
 import { parseDocument } from "./markdown.js";
+import { detectRepeatedContextPatterns } from "./repeated-context.js";
 import { runRules } from "./rules.js";
 import type { Diagnostic, Finding, ScanResult } from "./types.js";
 
@@ -18,6 +19,7 @@ export async function scan(
   const catalogResult = buildCatalog(documents);
   const findings = [
     ...runRules(documents, config, catalogResult.catalog),
+    ...detectRepeatedContextPatterns(documents),
     ...catalogDiagnosticFindings(catalogResult.diagnostics),
   ].sort((a, b) => {
     const byPath = a.evidence.path.localeCompare(b.evidence.path);
