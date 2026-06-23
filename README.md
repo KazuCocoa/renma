@@ -161,6 +161,7 @@ npx renma scan .
 npx renma catalog . --format json
 npx renma graph . --format mermaid
 npx renma readiness .
+npx renma diff . --from main --to HEAD --format markdown
 ```
 
 The first command does not require you to design a knowledge architecture up front. It scans the repository, builds a local catalog, and reports obvious health issues such as broken links, unclear ownership, risky instructions, weak structure, and context that may be hard for agents to trust.
@@ -179,7 +180,13 @@ Then inspect the catalog and graph:
 node dist/index.js catalog . --format json
 node dist/index.js graph . --format mermaid
 node dist/index.js readiness .
+node dist/index.js diff . --from main --to HEAD --format markdown
 ```
+
+Semantic diff compares deterministic catalog, graph, readiness, and finding
+snapshots across Git refs. It does not interpret arbitrary prose semantics,
+assemble prompts, choose context, call an LLM, repair files, or check out or
+mutate the working tree.
 
 A practical first pass is:
 
@@ -199,6 +206,7 @@ renma catalog <path>
 renma ownership <path>
 renma graph <path>
 renma readiness <path>
+renma diff <path> --from <ref> --to <ref>
 renma inspect <path> <asset-or-file>
 renma suggest-semantic-split <file>
 ```
@@ -213,6 +221,7 @@ renma catalog . --format json
 renma ownership . --include-owned
 renma graph . --format mermaid
 renma readiness .
+renma diff . --from main --to HEAD --format markdown
 renma inspect . contexts/testing/boundary-value-analysis.md
 ```
 
