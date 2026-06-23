@@ -145,7 +145,7 @@ npx renma graph . --format mermaid
 npx renma readiness .
 ```
 
-This first command does not require you to design a knowledge architecture up front. It scans the repository, builds a local catalog, and reports obvious health issues such as broken links, unclear ownership, risky instructions, weak structure, and context that may be hard for agents to trust.
+The first command does not require you to design a knowledge architecture up front. It scans the repository, builds a local catalog, and reports obvious health issues such as broken links, unclear ownership, risky instructions, weak structure, and context that may be hard for agents to trust.
 
 If you are developing Renma from source:
 
@@ -291,6 +291,14 @@ jobs:
           node-version: 22
       - run: npx renma scan . --fail-on high --format json
 ```
+
+## Design Philosophy
+
+Renma has an opinionated design.
+
+It is built around the idea that reusable LLM context should be treated like a software asset: owned, versioned, referenced, reviewed, and checked for readiness.
+
+This means Renma favors structured, Git-friendly context repositories over ad hoc prompt snippets or untracked notes.
 
 ## Design Boundaries
 
