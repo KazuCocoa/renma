@@ -33,6 +33,7 @@ export const DEFAULT_CONFIG: ScanConfig = {
     approvedDomains: [],
     approvedUploadDomains: [],
     disallowedCommands: [],
+    profiles: {},
   },
 };
 
@@ -232,6 +233,7 @@ function securityPolicy(value: unknown): ScanConfig["security"] {
     "approvedDomains",
     "approvedUploadDomains",
     "disallowedCommands",
+    "profiles",
   ]);
   for (const key of Object.keys(security)) {
     if (!allowed.has(key)) {
@@ -262,7 +264,127 @@ function securityPolicy(value: unknown): ScanConfig["security"] {
             "security.disallowedCommands",
             security.disallowedCommands,
           ),
+    profiles:
+      security.profiles === undefined
+        ? DEFAULT_CONFIG.security.profiles
+        : securityProfiles(security.profiles),
   };
+}
+
+function securityProfiles(
+  value: unknown,
+): NonNullable<ScanConfig["security"]["profiles"]> {
+  const profiles = objectRecord("security.profiles", value);
+  const normalized: NonNullable<ScanConfig["security"]["profiles"]> = {};
+  for (const [name, profile] of Object.entries(profiles)) {
+    if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
+      throw new ConfigError(`security.profiles.${name} must be an object.`);
+    }
+    const source = profile as Record<string, unknown>;
+    const allowed = new Set([
+      "allowedDataClass",
+      "allowed_data_class",
+      "networkAllowed",
+      "network_allowed",
+      "externalUploadAllowed",
+      "external_upload_allowed",
+      "secretsAllowed",
+      "secrets_allowed",
+      "humanApprovalRequired",
+      "human_approval_required",
+      "requiresHumanApproval",
+      "requires_human_approval",
+      "securityProfile",
+      "security_profile",
+      "allowedData",
+      "allowed_data",
+      "forbiddenInputs",
+      "forbidden_inputs",
+      "approvedDomains",
+      "approvedUploadDomains",
+      "disallowedCommands",
+    ]);
+    for (const key of Object.keys(source)) {
+      if (!allowed.has(key)) {
+        throw new ConfigError(
+          `Unknown security profile key "${key}" in security.profiles.${name}.`,
+        );
+      }
+    }
+    normalized[name] = {
+      allowedDataClass: optionalString(
+        `security.profiles.${name}.allowedDataClass`,
+        source.allowedDataClass ?? source.allowed_data_class,
+      ),
+      networkAllowed: optionalBoolean(
+        `security.profiles.${name}.networkAllowed`,
+        source.networkAllowed ?? source.network_allowed,
+      ),
+      externalUploadAllowed: optionalBoolean(
+        `security.profiles.${name}.externalUploadAllowed`,
+        source.externalUploadAllowed ?? source.external_upload_allowed,
+      ),
+      secretsAllowed: optionalBoolean(
+        `security.profiles.${name}.secretsAllowed`,
+        source.secretsAllowed ?? source.secrets_allowed,
+      ),
+      humanApprovalRequired: optionalBoolean(
+        `security.profiles.${name}.humanApprovalRequired`,
+        source.humanApprovalRequired ??
+          source.human_approval_required ??
+          source.requiresHumanApproval ??
+          source.requires_human_approval,
+      ),
+      securityProfile: optionalString(
+        `security.profiles.${name}.securityProfile`,
+        source.securityProfile ?? source.security_profile,
+      ),
+      allowedData: stringArray(
+        `security.profiles.${name}.allowedData`,
+        source.allowedData ?? source.allowed_data ?? [],
+      ),
+      forbiddenInputs: stringArray(
+        `security.profiles.${name}.forbiddenInputs`,
+        source.forbiddenInputs ?? source.forbidden_inputs ?? [],
+      ),
+      approvedDomains: stringArray(
+        `security.profiles.${name}.approvedDomains`,
+        source.approvedDomains ?? [],
+      ),
+      approvedUploadDomains: stringArray(
+        `security.profiles.${name}.approvedUploadDomains`,
+        source.approvedUploadDomains ?? [],
+      ),
+      disallowedCommands: stringArray(
+        `security.profiles.${name}.disallowedCommands`,
+        source.disallowedCommands ?? [],
+      ),
+    };
+  }
+  return normalized;
+}
+
+function optionalString(name: string, value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") {
+    throw new ConfigError(`${name} must be a string.`);
+  }
+  return value;
+}
+
+function optionalBoolean(name: string, value: unknown): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "boolean") {
+    throw new ConfigError(`${name} must be a boolean.`);
+  }
+  return value;
+}
+
+function objectRecord(name: string, value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ConfigError(`${name} must be an object.`);
+  }
+  return value as Record<string, unknown>;
 }
 
 function stringRecord(name: string, value: unknown): Record<string, string> {

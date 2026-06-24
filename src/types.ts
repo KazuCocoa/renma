@@ -48,10 +48,25 @@ export interface LayoutPolicyConfig {
   workflowAliases: Record<string, string>;
 }
 
+export interface SecurityProfileConfig {
+  allowedDataClass?: string | undefined;
+  networkAllowed?: boolean | undefined;
+  externalUploadAllowed?: boolean | undefined;
+  secretsAllowed?: boolean | undefined;
+  humanApprovalRequired?: boolean | undefined;
+  securityProfile?: string | undefined;
+  allowedData: string[];
+  forbiddenInputs: string[];
+  approvedDomains: string[];
+  approvedUploadDomains: string[];
+  disallowedCommands: string[];
+}
+
 export interface SecurityConfig {
   approvedDomains: string[];
   approvedUploadDomains: string[];
   disallowedCommands: string[];
+  profiles?: Record<string, SecurityProfileConfig> | undefined;
 }
 
 /** Effective scan configuration after defaults, config files, and CLI overrides. */

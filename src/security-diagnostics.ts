@@ -28,6 +28,7 @@ type SecurityPolicy = {
   externalUploadAllowed?: boolean;
   secretsAllowed?: boolean;
   humanApprovalRequired?: boolean;
+  securityProfile?: string;
   allowedData?: string;
   approvedNetworkDestinations: string[];
   approvedUploadDestinations: string[];
@@ -83,6 +84,86 @@ const RULES = {
     ],
     llmHint:
       "Resolve the policy by choosing the stricter allowed behavior or by separating instructions into different assets with explicit metadata.",
+    confidence: "high",
+  },
+  policyProfileNotFound: {
+    id: "SEC-POLICY-PROFILE-NOT-FOUND",
+    category: "safety",
+    title: "Referenced security profile is not configured",
+    whyItMatters:
+      "A missing security profile makes artifact policy resolution ambiguous and can hide intended network, upload, and secret-handling constraints.",
+    remediation:
+      "Add the named profile under security.profiles or update the artifact to reference an existing profile.",
+    constraints: [
+      "Do not silently ignore profile references.",
+      "Keep profile names deterministic and repo-local.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm the referenced security profile exists in configuration.",
+    ],
+    llmHint:
+      "Use a configured security_profile value, or add the missing profile under security.profiles with explicit policy fields.",
+    confidence: "high",
+  },
+  policyProfileCycle: {
+    id: "SEC-POLICY-PROFILE-CYCLE",
+    category: "safety",
+    title: "Security profile inheritance cycle detected",
+    whyItMatters:
+      "Cyclic profile inheritance prevents deterministic policy resolution and can make agents miss stricter inherited restrictions.",
+    remediation:
+      "Break the profile inheritance cycle so each profile resolves through an acyclic chain.",
+    constraints: [
+      "Do not resolve cycles by choosing the least restrictive profile.",
+      "Keep inherited policy chains short and explicit.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm profile inheritance resolves without revisiting the same profile.",
+    ],
+    llmHint:
+      "Remove or rewrite the cyclic profile reference so the selected security profile has a deterministic parent chain.",
+    confidence: "high",
+  },
+  policyOverrideContradiction: {
+    id: "SEC-POLICY-OVERRIDE-CONTRADICTION",
+    category: "safety",
+    title: "Security profile conflicts with stricter artifact policy",
+    whyItMatters:
+      "Profile or repository allowances cannot override artifact-local explicit denials without making the policy contract ambiguous.",
+    remediation:
+      "Keep the artifact-local denial and remove conflicting inherited allowances, or split the artifact into separately governed instructions.",
+    constraints: [
+      "Artifact-local explicit denials remain strict.",
+      "Do not weaken local restrictions through profile inheritance.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm inherited policy does not contradict explicit artifact denials.",
+    ],
+    llmHint:
+      "Treat explicit false policy fields in the artifact as authoritative and adjust the referenced profile or repo-level security config.",
+    confidence: "high",
+  },
+  forbiddenInputInstruction: {
+    id: "SEC-FORBIDDEN-INPUT-INSTRUCTION",
+    category: "safety",
+    title: "Instruction requests data forbidden by security profile",
+    whyItMatters:
+      "Profile-level forbidden inputs define data classes that must not be collected, copied, uploaded, or summarized by LLM-facing instructions.",
+    remediation:
+      "Remove the forbidden input request or choose a profile whose allowed data contract covers the instruction.",
+    constraints: [
+      "Do not reinterpret forbidden inputs as allowed data.",
+      "Keep profile data-class restrictions explicit.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm the artifact no longer instructs agents to handle forbidden inputs.",
+    ],
+    llmHint:
+      "Rewrite the instruction so it avoids profile-forbidden inputs such as secrets, credentials, private keys, or customer data.",
     confidence: "high",
   },
   instructionViolatesPolicy: {
@@ -455,6 +536,12 @@ const UPLOAD_DESTINATION_POLICY_FIELDS = new Set([
 ]);
 
 const ALLOWED_DATA_POLICY_FIELDS = new Set(["allowed_data", "allowedData"]);
+const SECURITY_PROFILE_POLICY_FIELDS = new Set([
+  "security_profile",
+  "securityProfile",
+]);
+const FORBIDDEN_INPUT_ACTION_PATTERN =
+  /\b(copy|print|cat|echo|paste|upload|send|share|attach|include|dump|export|log|summari[sz]e|read|collect|provide|load|use)\b/i;
 
 const NETWORK_ACTION_RE =
   /\b(curl|wget|http|https|api|webhook|post|get|upload|download|fetch|send|sync|push)\b|https?:\/\//i;
@@ -531,11 +618,14 @@ function securityFindingsForArtifact(
   artifact: Artifact,
   securityConfig?: SecurityConfig,
 ): Finding[] {
-  const policy = applySecurityConfig(
-    parseSecurityPolicy(artifact.content),
+  const parsedPolicy = parseSecurityPolicy(artifact.content);
+  const policy = applySecurityConfig(parsedPolicy, securityConfig);
+  const detections: Detection[] = securityPolicyResolutionDetections(
+    parsedPolicy,
+    policy,
     securityConfig,
+    artifact.content,
   );
-  const detections: Detection[] = [];
   const lines = artifact.content.split(/\r?\n/);
   let inFence = false;
   let recentApprovalLine = 0;
@@ -1011,6 +1101,13 @@ function parseSecurityPolicy(content: string): SecurityPolicy {
       policy.allowedData = value;
       policy.declared.add("allowedData");
       policy.lineByField.set("allowedData", index + 1);
+      continue;
+    }
+
+    if (SECURITY_PROFILE_POLICY_FIELDS.has(key)) {
+      policy.securityProfile = value;
+      policy.declared.add("securityProfile");
+      policy.lineByField.set("securityProfile", index + 1);
     }
   }
 
@@ -1024,29 +1121,237 @@ function applySecurityConfig(
   if (config === undefined) return policy;
 
   const declared = new Set(policy.declared);
-  if (config.approvedDomains.length > 0) {
-    declared.add("approvedNetworkDestinations");
-  }
-  if (config.approvedUploadDomains.length > 0) {
-    declared.add("approvedUploadDestinations");
+  const lineByField = new Map(policy.lineByField);
+  const resolved: SecurityPolicy = {
+    ...policy,
+    approvedNetworkDestinations: [...policy.approvedNetworkDestinations],
+    approvedUploadDestinations: [...policy.approvedUploadDestinations],
+    disallowedCommands: [...policy.disallowedCommands],
+    declared,
+    lineByField,
+  };
+
+  const chain = securityProfileChain(policy.securityProfile, config);
+  for (const item of chain.profiles) {
+    const profile = item.profile;
+    if (
+      !declared.has("networkAllowed") &&
+      profile.networkAllowed !== undefined
+    ) {
+      resolved.networkAllowed = profile.networkAllowed;
+    }
+    if (
+      !declared.has("externalUploadAllowed") &&
+      profile.externalUploadAllowed !== undefined
+    ) {
+      resolved.externalUploadAllowed = profile.externalUploadAllowed;
+    }
+    if (
+      !declared.has("secretsAllowed") &&
+      profile.secretsAllowed !== undefined
+    ) {
+      resolved.secretsAllowed = profile.secretsAllowed;
+    }
+    if (
+      !declared.has("humanApprovalRequired") &&
+      profile.humanApprovalRequired !== undefined
+    ) {
+      resolved.humanApprovalRequired = profile.humanApprovalRequired;
+    }
+    if (
+      !declared.has("allowedData") &&
+      profile.allowedDataClass !== undefined
+    ) {
+      resolved.allowedData = profile.allowedDataClass;
+    }
+    resolved.approvedNetworkDestinations.push(...profile.approvedDomains);
+    resolved.approvedUploadDestinations.push(...profile.approvedUploadDomains);
+    resolved.disallowedCommands.push(...profile.disallowedCommands);
   }
 
-  return {
-    ...policy,
-    approvedNetworkDestinations: [
-      ...config.approvedDomains,
-      ...policy.approvedNetworkDestinations,
-    ],
-    approvedUploadDestinations: [
-      ...config.approvedUploadDomains,
-      ...policy.approvedUploadDestinations,
-    ],
-    disallowedCommands: [
-      ...config.disallowedCommands,
-      ...policy.disallowedCommands,
-    ],
-    declared,
-  };
+  resolved.approvedNetworkDestinations.push(...config.approvedDomains);
+  resolved.approvedUploadDestinations.push(...config.approvedUploadDomains);
+  resolved.disallowedCommands.push(...config.disallowedCommands);
+  resolved.approvedNetworkDestinations = uniqueStrings(
+    resolved.approvedNetworkDestinations,
+  );
+  resolved.approvedUploadDestinations = uniqueStrings(
+    resolved.approvedUploadDestinations,
+  );
+  resolved.disallowedCommands = uniqueStrings(resolved.disallowedCommands);
+
+  return resolved;
+}
+
+type SecurityProfileChainItem = {
+  name: string;
+  profile: NonNullable<SecurityConfig["profiles"]>[string];
+};
+
+type SecurityProfileChain = {
+  profiles: SecurityProfileChainItem[];
+  missingProfile?: string;
+  cycle?: string[];
+};
+
+function securityProfileChain(
+  name: string | undefined,
+  config: SecurityConfig | undefined,
+): SecurityProfileChain {
+  if (name === undefined) return { profiles: [] };
+  if (config === undefined) return { profiles: [], missingProfile: name };
+
+  const profiles: SecurityProfileChainItem[] = [];
+  const seen = new Set<string>();
+  const path: string[] = [];
+  let current: string | undefined = name;
+
+  while (current !== undefined) {
+    if (seen.has(current)) {
+      return {
+        profiles: [],
+        cycle: [...path.slice(path.indexOf(current)), current],
+      };
+    }
+    seen.add(current);
+    path.push(current);
+
+    const profile: NonNullable<SecurityConfig["profiles"]>[string] | undefined =
+      config.profiles?.[current];
+    if (profile === undefined) {
+      return { profiles: [], missingProfile: current };
+    }
+    profiles.push({ name: current, profile });
+    current = profile.securityProfile;
+  }
+
+  return { profiles: profiles.reverse() };
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
+function securityPolicyResolutionDetections(
+  parsedPolicy: SecurityPolicy,
+  resolvedPolicy: SecurityPolicy,
+  config: SecurityConfig | undefined,
+  content: string,
+): Detection[] {
+  if (parsedPolicy.securityProfile === undefined) return [];
+
+  const detections: Detection[] = [];
+  const chain = securityProfileChain(parsedPolicy.securityProfile, config);
+  const profileLine = parsedPolicy.lineByField.get("securityProfile") ?? 1;
+  const profileSnippet =
+    lineSnippet(content, profileLine) ??
+    `security_profile: ${parsedPolicy.securityProfile}`;
+
+  if (chain.missingProfile !== undefined) {
+    detections.push({
+      metadata: RULES.policyProfileNotFound,
+      severity: "high",
+      startLine: profileLine,
+      snippet: profileSnippet,
+      dedupeKey: `profile-not-found:${chain.missingProfile}`,
+    });
+    return detections;
+  }
+
+  if (chain.cycle !== undefined) {
+    detections.push({
+      metadata: RULES.policyProfileCycle,
+      severity: "high",
+      startLine: profileLine,
+      snippet: profileSnippet,
+      dedupeKey: `profile-cycle:${chain.cycle.join(">")}`,
+    });
+    return detections;
+  }
+
+  const inheritedNetworkAllowed = chain.profiles.some(
+    (item) => item.profile.networkAllowed === true,
+  );
+  const inheritedUploadAllowed = chain.profiles.some(
+    (item) => item.profile.externalUploadAllowed === true,
+  );
+
+  if (
+    parsedPolicy.declared.has("networkAllowed") &&
+    parsedPolicy.networkAllowed === false &&
+    (inheritedNetworkAllowed ||
+      resolvedPolicy.approvedNetworkDestinations.length >
+        parsedPolicy.approvedNetworkDestinations.length)
+  ) {
+    detections.push({
+      metadata: RULES.policyOverrideContradiction,
+      severity: "high",
+      startLine: parsedPolicy.lineByField.get("networkAllowed") ?? profileLine,
+      snippet:
+        lineSnippet(
+          content,
+          parsedPolicy.lineByField.get("networkAllowed") ?? profileLine,
+        ) ?? "network_allowed: false",
+      dedupeKey: "override-contradiction:network",
+    });
+  }
+
+  if (
+    parsedPolicy.declared.has("externalUploadAllowed") &&
+    parsedPolicy.externalUploadAllowed === false &&
+    (inheritedUploadAllowed ||
+      resolvedPolicy.approvedUploadDestinations.length >
+        parsedPolicy.approvedUploadDestinations.length)
+  ) {
+    detections.push({
+      metadata: RULES.policyOverrideContradiction,
+      severity: "high",
+      startLine:
+        parsedPolicy.lineByField.get("externalUploadAllowed") ?? profileLine,
+      snippet:
+        lineSnippet(
+          content,
+          parsedPolicy.lineByField.get("externalUploadAllowed") ?? profileLine,
+        ) ?? "external_upload_allowed: false",
+      dedupeKey: "override-contradiction:upload",
+    });
+  }
+
+  for (const forbiddenInput of uniqueStrings(
+    chain.profiles.flatMap((item) => item.profile.forbiddenInputs),
+  )) {
+    const detection = forbiddenInputDetection(content, forbiddenInput);
+    if (detection !== undefined) detections.push(detection);
+  }
+
+  return detections;
+}
+
+function forbiddenInputDetection(
+  content: string,
+  forbiddenInput: string,
+): Detection | undefined {
+  const needle = forbiddenInput.trim();
+  if (needle.length === 0) return undefined;
+
+  const pattern = new RegExp(`\\b${escapeRegExp(needle)}\\b`, "i");
+  const lines = content.split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
+    if (!pattern.test(line)) continue;
+    if (!FORBIDDEN_INPUT_ACTION_PATTERN.test(line)) continue;
+    return {
+      metadata: RULES.forbiddenInputInstruction,
+      severity: "high",
+      startLine: index + 1,
+      snippet: line.trim(),
+      dedupeKey: `forbidden-input:${needle.toLowerCase()}`,
+    };
+  }
+  return undefined;
+}
+
+function lineSnippet(content: string, line: number): string | undefined {
+  return content.split(/\r?\n/)[line - 1]?.trim();
 }
 
 function parseBoolean(value: string): boolean | undefined {
