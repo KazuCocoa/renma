@@ -28,6 +28,7 @@ test("scan discovers default artifacts and emits deterministic findings", async 
       "QUAL-MISSING-REQUIRED-INPUTS",
       "QUAL-MISSING-COMPLETION-CRITERIA",
       "QUAL-MISSING-VERIFICATION",
+      "SEC-MISSING-POLICY-METADATA",
       "SEC-DESTRUCTIVE-COMMAND",
     ],
   );
