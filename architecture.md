@@ -1,6 +1,8 @@
 # Renma Architecture Direction
 
-Renma is a Git-native governance and quality layer for LLM-ready context assets and skills. It keeps shared repositories healthy so agents can consume team-owned expertise correctly.
+Renma is a Git-native deterministic governance and health layer for LLM-ready context assets and skills. It keeps shared repositories healthy so agents can consume team-owned expertise correctly.
+
+The current CLI surface covers `scan`, `catalog`, `ownership`, `graph`, `readiness`, repeated-context diagnostics, semantic diff, and `ci-report`. Security diagnostics v1 adds deterministic safety findings for agent-facing operational instructions without executing commands or calling external services.
 
 Renma sits at the repository governance layer, not the runtime layer.
 
@@ -425,16 +427,18 @@ Completed baseline:
 4. Graph-backed metadata governance for duplicate IDs, unknown references, deprecated or archived references, and orphaned context assets
 5. Ownership coverage reporting
 6. Context graph snapshot reporting
-7. Readiness v1 repository-health report
-8. 0.1.0 release baseline
+7. Readiness repository health report
+8. Repeated-context discovery
+9. Semantic diff across Git refs
+10. CI / PR review report artifact
+11. Security diagnostics v1
+12. 0.1.0 release baseline
 
 Near-term implementation:
 
-1. Repeated context and duplicate knowledge discovery
-2. Semantic diff for context changes
-3. Stronger security and supply-chain safety diagnostics for agent-facing repository content
-4. CI integration examples and sample readiness reports
-5. Optional LLM-assisted repository evaluation bundles
+1. Security diagnostics follow-up rule batches and policy tuning
+2. CI integration examples and sample readiness reports
+3. Optional LLM-assisted repository evaluation bundles
 
 This sequence prioritizes shared context assets, CI review examples, and repository health before later external signal import work.
 

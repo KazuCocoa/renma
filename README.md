@@ -1,8 +1,10 @@
 # Renma
 
-Renma is a Context Asset Repository and health layer for LLM-consumable repository knowledge.
+Renma is a deterministic governance and health layer for LLM-facing repository knowledge.
 
-It helps teams keep the skills, instructions, shared context, examples, tool notes, and ownership metadata that agents rely on discoverable, reviewable, and safe to reuse. Instead of letting critical knowledge get copied into many prompts or buried in one-off Markdown files, Renma treats that knowledge as a software asset: named, owned, versioned, linked, and checked in CI.
+It helps teams keep the skills, instructions, shared context, examples, tool notes, and ownership metadata that agents rely on discoverable, reviewable, and safe to reuse. Instead of letting critical knowledge get copied into many prompts or buried in one-off Markdown files, Renma treats that knowledge as a software asset: named, owned, versioned, linked, checked in CI, and reviewed with deterministic safety diagnostics.
+
+Renma now supports `scan`, `catalog`, `ownership`, `graph`, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, and security diagnostics v1.
 
 Renma is especially useful when a repository contains agent-facing material such as:
 
@@ -358,6 +360,12 @@ Renma does not:
 - Replace product, QA, platform, or documentation ownership
 
 This boundary keeps Renma useful as repository infrastructure. Agent tools can consume its reports, but the catalog remains grounded in Git, code review, and deterministic checks.
+
+## Security Diagnostics
+
+Renma reports deterministic safety findings for agent-facing operational instructions, such as unpinned remote scripts, unsafe privileged commands, predictable temporary paths, and credential-like command arguments.
+
+These findings are guardrails for review. They do not replace secret scanning, SAST, dependency scanning, or human security review.
 
 ## Development
 

@@ -5,6 +5,7 @@ import { discoverArtifacts } from "./discovery.js";
 import { parseDocument } from "./markdown.js";
 import { detectRepeatedContextPatterns } from "./repeated-context.js";
 import { runRules } from "./rules.js";
+import { securityDiagnosticFindings } from "./security-diagnostics.js";
 import type { Diagnostic, Finding, ScanResult } from "./types.js";
 
 /** Run the complete deterministic scan pipeline for a target path. */
@@ -21,6 +22,7 @@ export async function scan(
     ...runRules(documents, config, catalogResult.catalog),
     ...detectRepeatedContextPatterns(documents),
     ...catalogDiagnosticFindings(catalogResult.diagnostics),
+    ...securityDiagnosticFindings(artifacts),
   ].sort((a, b) => {
     const byPath = a.evidence.path.localeCompare(b.evidence.path);
     if (byPath !== 0) return byPath;
