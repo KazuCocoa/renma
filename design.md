@@ -58,6 +58,8 @@ telemetry-responsible.
 
 ## LLM-Actionable Diagnostics
 
+Security diagnostics v1 focuses on conservative operational-instruction risks. It does not yet implement disclosed-area policy metadata, approved destination validation, or runtime enforcement.
+
 Security diagnostics are deterministic review guardrails for LLM-facing operational instructions. They flag patterns such as unpinned remote shell execution, unpinned dependency installs, privileged commands without nearby guardrails, predictable temporary paths, and credential-like command arguments; they do not replace SAST, secret scanning, dependency scanning, or human security review.
 
 Renma findings should be useful not only to humans, but also to LLM coding
