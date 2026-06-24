@@ -29,7 +29,9 @@ type SecurityPolicy = {
   secretsAllowed?: boolean;
   humanApprovalRequired?: boolean;
   securityProfile?: string;
-  allowedData?: string;
+  allowedDataClass?: string;
+  allowedData: string[];
+  forbiddenInputs: string[];
   approvedNetworkDestinations: string[];
   approvedUploadDestinations: string[];
   disallowedCommands: string[];
@@ -84,6 +86,26 @@ const RULES = {
     ],
     llmHint:
       "Resolve the policy by choosing the stricter allowed behavior or by separating instructions into different assets with explicit metadata.",
+    confidence: "high",
+  },
+  bodyPolicyContradiction: {
+    id: "SEC-BODY-POLICY-CONTRADICTION",
+    category: "safety",
+    title: "Security policy metadata contradicts the instruction body",
+    whyItMatters:
+      "Conflicting body text and policy metadata make deterministic review ambiguous and can cause an agent to follow the less restrictive instruction.",
+    remediation:
+      "Make the body instructions and security metadata agree, or split them into separate artifacts with explicit policy fields.",
+    constraints: [
+      "deterministic",
+      "compares policy metadata with simple body denials",
+      "does not classify intent",
+    ],
+    verificationSteps: [
+      "Run renma scan and confirm policy fields match the body instructions.",
+    ],
+    llmHint:
+      "Resolve body and metadata conflicts by choosing the stricter behavior or separating conflicting instructions into different assets.",
     confidence: "high",
   },
   policyProfileNotFound: {
@@ -536,14 +558,30 @@ const UPLOAD_DESTINATION_POLICY_FIELDS = new Set([
 ]);
 
 const ALLOWED_DATA_POLICY_FIELDS = new Set(["allowed_data", "allowedData"]);
+const FORBIDDEN_INPUT_POLICY_FIELDS = new Set([
+  "forbidden_inputs",
+  "forbiddenInputs",
+]);
 const SECURITY_PROFILE_POLICY_FIELDS = new Set([
   "security_profile",
   "securityProfile",
+]);
+const FUTURE_BLOCK_LIST_POLICY_FIELDS = new Set([
+  "allowed_tools",
+  "allowedTools",
+  "allowed_clients",
+  "allowedClients",
 ]);
 const FORBIDDEN_INPUT_ACTION_PATTERN =
   /\b(copy|print|cat|echo|paste|upload|send|share|attach|include|dump|export|log|summari[sz]e|read|collect|provide|load|use)\b/i;
 const SAFE_FORBIDDEN_INPUT_PATTERN =
   /\b(do\s+not|don't|never|avoid|exclude|without|redact|remove|omit|strip|skip)\b.{0,80}\b(secret|secrets|credential|credentials|token|password|private key|private keys|\.env|env files?|customer data)\b/i;
+const BODY_NETWORK_DISALLOWED_RE =
+  /\b(no|without|avoid|exclude|disallow|forbid|forbidden|block|do\s+not|don't|never)\b.{0,80}\b(network|internet|external|remote|http|https|api|webhook|download|fetch|curl|wget)\b/i;
+const BODY_UPLOAD_DISALLOWED_RE =
+  /\b(no|without|avoid|exclude|disallow|forbid|forbidden|block|do\s+not|don't|never)\b.{0,80}\b(upload|send|post|share|attach|submit|sync|push|publish|external upload|third-party)\b/i;
+const BODY_SECRET_DISALLOWED_RE =
+  /\b(no|without|avoid|exclude|disallow|forbid|forbidden|block|do\s+not|don't|never)\b.{0,80}\b(secret|secrets|credential|credentials|token|password|private key|private keys|\.env|env files?|customer data)\b/i;
 
 const NETWORK_ACTION_RE =
   /\b(curl|wget|http|https|api|webhook|post|get|upload|download|fetch|send|sync|push)\b|https?:\/\//i;
@@ -629,12 +667,18 @@ function securityFindingsForArtifact(
     artifact.content,
   );
   const lines = artifact.content.split(/\r?\n/);
+  const frontmatterEnd =
+    lines[0]?.trim() === "---"
+      ? lines.findIndex((line, index) => index > 0 && line.trim() === "---")
+      : -1;
+  const scanStart = frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
   let inFence = false;
   let recentApprovalLine = 0;
 
   if (
     (artifact.kind === "skill" || artifact.kind === "context") &&
-    policy.allowedData === undefined
+    effectiveAllowedDataClass(policy) === undefined &&
+    effectiveAllowedDataList(policy).length === 0
   ) {
     detections.push({
       metadata: RULES.missingPolicyMetadata,
@@ -644,7 +688,11 @@ function securityFindingsForArtifact(
     });
   }
 
-  for (let index = 0; index < lines.length; index += 1) {
+  detections.push(
+    ...bodyPolicyContradictionDetections(artifact.content, policy),
+  );
+
+  for (let index = scanStart; index < lines.length; index += 1) {
     const lineNumber = index + 1;
     const line = lines[index] ?? "";
     if (/^\s*```/.test(line)) {
@@ -724,6 +772,61 @@ function disallowedCommandDetections(
   ];
 }
 
+function bodyPolicyContradictionDetections(
+  content: string,
+  policy: SecurityPolicy,
+): Detection[] {
+  const detections: Detection[] = [];
+  const lines = content.split(/\r?\n/);
+  const frontmatterEnd =
+    lines[0]?.trim() === "---"
+      ? lines.findIndex((line, index) => index > 0 && line.trim() === "---")
+      : -1;
+  const scanStart = frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
+  const emitted = new Set<string>();
+  let inFence = false;
+
+  for (let index = scanStart; index < lines.length; index += 1) {
+    const line = lines[index] ?? "";
+    if (/^\s*```/.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence || isPolicyLine(line)) continue;
+
+    const lineNumber = index + 1;
+    const candidates: Array<[string, boolean]> = [
+      [
+        "network",
+        policy.networkAllowed === true && BODY_NETWORK_DISALLOWED_RE.test(line),
+      ],
+      [
+        "upload",
+        policy.externalUploadAllowed === true &&
+          BODY_UPLOAD_DISALLOWED_RE.test(line),
+      ],
+      [
+        "secrets",
+        policy.secretsAllowed === true && BODY_SECRET_DISALLOWED_RE.test(line),
+      ],
+    ];
+
+    for (const [kind, matched] of candidates) {
+      if (!matched || emitted.has(kind)) continue;
+      emitted.add(kind);
+      detections.push({
+        metadata: RULES.bodyPolicyContradiction,
+        severity: "high",
+        startLine: lineNumber,
+        snippet: line.trim(),
+        dedupeKey: `body-policy-contradiction:${kind}`,
+      });
+    }
+  }
+
+  return detections;
+}
+
 function policyDetections(
   line: string,
   lineNumber: number,
@@ -798,7 +901,7 @@ function policyDetections(
   }
 
   if (
-    policy.allowedData?.toLowerCase() === "disclosed" &&
+    effectiveAllowedDataClass(policy)?.toLowerCase() === "disclosed" &&
     UNDISCLOSED_DATA_RE.test(line)
   ) {
     detections.push({
@@ -1043,8 +1146,47 @@ function predictableTempDetections(
   ];
 }
 
+type ParsedBlockList = {
+  values: string[];
+  nextIndex: number;
+};
+
+function parseBlockList(
+  lines: string[],
+  startIndex: number,
+  scanEnd: number,
+): ParsedBlockList {
+  const values: string[] = [];
+  let index = startIndex + 1;
+  for (; index < scanEnd; index += 1) {
+    const line = lines[index] ?? "";
+    if (line.trim().length === 0) break;
+
+    const match = line.match(/^\s*-\s*(.*?)\s*$/);
+    if (!match) break;
+
+    values.push(...parseList(match[1] ?? ""));
+  }
+
+  return { values, nextIndex: index };
+}
+
+function policyListValues(value: string, blockList: ParsedBlockList): string[] {
+  return value.length > 0 ? parseList(value) : blockList.values;
+}
+
+function consumesBlockList(value: string, blockList: ParsedBlockList): boolean {
+  return value.length === 0 && blockList.values.length > 0;
+}
+
+function isInlineListValue(value: string): boolean {
+  return value.startsWith("[") || value.includes(",");
+}
+
 function parseSecurityPolicy(content: string): SecurityPolicy {
   const policy: SecurityPolicy = {
+    allowedData: [],
+    forbiddenInputs: [],
     approvedNetworkDestinations: [],
     approvedUploadDestinations: [],
     disallowedCommands: [],
@@ -1071,6 +1213,10 @@ function parseSecurityPolicy(content: string): SecurityPolicy {
     const rawValue = match[2] ?? "";
     const key = rawKey.trim();
     const value = rawValue.trim();
+    const blockList =
+      value.length === 0
+        ? parseBlockList(lines, index, scanEnd)
+        : { values: [], nextIndex: index + 1 };
 
     const booleanField = BOOLEAN_POLICY_FIELDS.get(key);
     if (booleanField !== undefined) {
@@ -1084,25 +1230,46 @@ function parseSecurityPolicy(content: string): SecurityPolicy {
     }
 
     if (DESTINATION_POLICY_FIELDS.has(key)) {
-      const destinations = parseList(value);
+      const destinations = policyListValues(value, blockList);
       policy.approvedNetworkDestinations.push(...destinations);
       policy.declared.add("approvedNetworkDestinations");
       policy.lineByField.set("approvedNetworkDestinations", index + 1);
+      if (consumesBlockList(value, blockList)) index = blockList.nextIndex - 1;
       continue;
     }
 
     if (UPLOAD_DESTINATION_POLICY_FIELDS.has(key)) {
-      const destinations = parseList(value);
+      const destinations = policyListValues(value, blockList);
       policy.approvedUploadDestinations.push(...destinations);
       policy.declared.add("approvedUploadDestinations");
       policy.lineByField.set("approvedUploadDestinations", index + 1);
+      if (consumesBlockList(value, blockList)) index = blockList.nextIndex - 1;
       continue;
     }
 
     if (ALLOWED_DATA_POLICY_FIELDS.has(key)) {
-      policy.allowedData = value;
+      const values = policyListValues(value, blockList);
+      if (value.length > 0 && !isInlineListValue(value)) {
+        policy.allowedDataClass = value;
+      } else {
+        policy.allowedData.push(...values);
+      }
       policy.declared.add("allowedData");
       policy.lineByField.set("allowedData", index + 1);
+      if (consumesBlockList(value, blockList)) index = blockList.nextIndex - 1;
+      continue;
+    }
+
+    if (FORBIDDEN_INPUT_POLICY_FIELDS.has(key)) {
+      policy.forbiddenInputs.push(...policyListValues(value, blockList));
+      policy.declared.add("forbiddenInputs");
+      policy.lineByField.set("forbiddenInputs", index + 1);
+      if (consumesBlockList(value, blockList)) index = blockList.nextIndex - 1;
+      continue;
+    }
+
+    if (FUTURE_BLOCK_LIST_POLICY_FIELDS.has(key)) {
+      if (consumesBlockList(value, blockList)) index = blockList.nextIndex - 1;
       continue;
     }
 
@@ -1126,6 +1293,8 @@ function applySecurityConfig(
   const lineByField = new Map(policy.lineByField);
   const resolved: SecurityPolicy = {
     ...policy,
+    allowedData: [...policy.allowedData],
+    forbiddenInputs: [...policy.forbiddenInputs],
     approvedNetworkDestinations: [...policy.approvedNetworkDestinations],
     approvedUploadDestinations: [...policy.approvedUploadDestinations],
     disallowedCommands: [...policy.disallowedCommands],
@@ -1164,7 +1333,13 @@ function applySecurityConfig(
       !declared.has("allowedData") &&
       profile.allowedDataClass !== undefined
     ) {
-      resolved.allowedData = profile.allowedDataClass;
+      resolved.allowedDataClass = profile.allowedDataClass;
+    }
+    if (!declared.has("allowedData")) {
+      resolved.allowedData.push(...profile.allowedData);
+    }
+    if (!declared.has("forbiddenInputs")) {
+      resolved.forbiddenInputs.push(...profile.forbiddenInputs);
     }
     resolved.approvedNetworkDestinations.push(...profile.approvedDomains);
     resolved.approvedUploadDestinations.push(...profile.approvedUploadDomains);
@@ -1174,6 +1349,8 @@ function applySecurityConfig(
   resolved.approvedNetworkDestinations.push(...config.approvedDomains);
   resolved.approvedUploadDestinations.push(...config.approvedUploadDomains);
   resolved.disallowedCommands.push(...config.disallowedCommands);
+  resolved.allowedData = uniqueStrings(resolved.allowedData);
+  resolved.forbiddenInputs = uniqueStrings(resolved.forbiddenInputs);
   resolved.approvedNetworkDestinations = uniqueStrings(
     resolved.approvedNetworkDestinations,
   );
@@ -1234,15 +1411,26 @@ function uniqueStrings(values: string[]): string[] {
   return [...new Set(values)];
 }
 
+function effectiveAllowedDataClass(policy: SecurityPolicy): string | undefined {
+  return policy.allowedDataClass;
+}
+
+function effectiveAllowedDataList(policy: SecurityPolicy): string[] {
+  return policy.allowedData;
+}
+
 function securityPolicyResolutionDetections(
   parsedPolicy: SecurityPolicy,
   resolvedPolicy: SecurityPolicy,
   config: SecurityConfig | undefined,
   content: string,
 ): Detection[] {
-  if (parsedPolicy.securityProfile === undefined) return [];
-
   const detections: Detection[] = [];
+  if (parsedPolicy.securityProfile === undefined) {
+    addForbiddenInputDetections(detections, resolvedPolicy, content);
+    return detections;
+  }
+
   const chain = securityProfileChain(parsedPolicy.securityProfile, config);
   const profileLine = parsedPolicy.lineByField.get("securityProfile") ?? 1;
   const profileSnippet =
@@ -1352,14 +1540,20 @@ function securityPolicyResolutionDetections(
     });
   }
 
-  for (const forbiddenInput of uniqueStrings(
-    chain.profiles.flatMap((item) => item.profile.forbiddenInputs),
-  )) {
+  addForbiddenInputDetections(detections, resolvedPolicy, content);
+
+  return detections;
+}
+
+function addForbiddenInputDetections(
+  detections: Detection[],
+  policy: SecurityPolicy,
+  content: string,
+): void {
+  for (const forbiddenInput of policy.forbiddenInputs) {
     const detection = forbiddenInputDetection(content, forbiddenInput);
     if (detection !== undefined) detections.push(detection);
   }
-
-  return detections;
 }
 
 function inheritedBoolean(
@@ -1423,7 +1617,13 @@ function forbiddenInputDetection(
 
   const pattern = new RegExp(`\\b${escapeRegExp(needle)}\\b`, "i");
   const lines = content.split(/\r?\n/);
-  for (const [index, line] of lines.entries()) {
+  const frontmatterEnd =
+    lines[0]?.trim() === "---"
+      ? lines.findIndex((line, index) => index > 0 && line.trim() === "---")
+      : -1;
+  const scanStart = frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
+  for (let index = scanStart; index < lines.length; index += 1) {
+    const line = lines[index] ?? "";
     if (!pattern.test(line)) continue;
     if (SAFE_FORBIDDEN_INPUT_PATTERN.test(line)) continue;
     if (!FORBIDDEN_INPUT_ACTION_PATTERN.test(line)) continue;
@@ -1590,7 +1790,10 @@ function isPolicyLine(line: string): boolean {
     (BOOLEAN_POLICY_FIELDS.has(key) ||
       DESTINATION_POLICY_FIELDS.has(key) ||
       UPLOAD_DESTINATION_POLICY_FIELDS.has(key) ||
-      ALLOWED_DATA_POLICY_FIELDS.has(key))
+      ALLOWED_DATA_POLICY_FIELDS.has(key) ||
+      FORBIDDEN_INPUT_POLICY_FIELDS.has(key) ||
+      SECURITY_PROFILE_POLICY_FIELDS.has(key) ||
+      FUTURE_BLOCK_LIST_POLICY_FIELDS.has(key))
   );
 }
 
