@@ -1,265 +1,600 @@
-import type { Artifact, Finding, Severity } from "./types.js";
+import type { Artifact, Finding } from "./types.js";
 
-interface RuleMetadata {
+type SecurityCategory = "safety";
+
+type RuleMetadata = {
   id: string;
+  category: SecurityCategory;
   title: string;
   whyItMatters: string;
   remediation: string;
+  constraints: string[];
+  verificationSteps: string[];
   llmHint: string;
-}
-
-interface Detection {
-  metadata: RuleMetadata;
-  severity: Severity;
   confidence: Finding["confidence"];
-  line: number;
+};
+
+type Detection = {
+  metadata: RuleMetadata;
+  severity: Finding["severity"];
+  startLine: number;
+  endLine?: number;
   snippet: string;
-}
-
-const constraints = [
-  "Do not remove legitimate setup steps solely because this finding exists.",
-  "Preserve required platform-specific setup instructions.",
-  "Prefer pinning, scoping, confirmation, and recovery guidance over deleting operational detail.",
-];
-
-const verificationSteps = [
-  "Review the reported command or instruction.",
-  "Add version pinning, checksum verification, confirmation, scoping, or recovery steps as appropriate.",
-  "Run `renma scan` again.",
-];
-
-const remoteScriptMetadata: RuleMetadata = {
-  id: "SEC-UNPINNED-REMOTE-SCRIPT",
-  title: "Remote script execution without pinning or inspection",
-  whyItMatters:
-    "Agent-facing instructions that pipe remote code directly into a shell can cause unreviewed code execution.",
-  remediation:
-    "Download the script first, inspect it, pin the source/version/checksum, and run it only after human approval.",
-  llmHint:
-    "Replace one-line remote shell execution with download, checksum/version pinning, inspection, and explicit human approval steps.",
+  dedupeKey?: string;
 };
 
-const unpinnedDependencyMetadata: RuleMetadata = {
-  id: "SEC-UNPINNED-DEPENDENCY-INSTALL",
-  title: "Dependency install without a version pin",
-  whyItMatters:
-    "Agent-facing install instructions that resolve the latest package can change behavior between runs and pull unreviewed code.",
-  remediation:
-    "Pin package versions or document why the latest version is intentionally required.",
-  llmHint:
-    "Prefer explicit package versions, image tags, or a written reason why latest is required.",
+type SecurityPolicy = {
+  networkAllowed?: boolean;
+  externalUploadAllowed?: boolean;
+  secretsAllowed?: boolean;
+  humanApprovalRequired?: boolean;
+  approvedNetworkDestinations: string[];
+  declared: Set<string>;
+  lineByField: Map<string, number>;
 };
 
-const privilegedCommandMetadata: RuleMetadata = {
-  id: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
-  title: "Privileged command without nearby guardrails",
-  whyItMatters:
-    "Privileged commands in reusable instructions can alter system state broadly when copied by an agent without confirmation or rollback guidance.",
-  remediation:
-    "Add explicit scope, confirmation, and rollback/verification instructions before privileged commands.",
-  llmHint:
-    "Keep the setup step if it is required, but add confirmation, path scope, backup or rollback, and verification language nearby.",
-};
+const RULES = {
+  missingPolicyMetadata: {
+    id: "SEC-MISSING-POLICY-METADATA",
+    category: "safety",
+    title: "Security-sensitive instructions are missing policy metadata",
+    whyItMatters:
+      "LLM-facing security policy metadata gives humans and agents a deterministic contract for network, upload, and secret-handling instructions.",
+    remediation:
+      "Add explicit security policy metadata such as network_allowed, external_upload_allowed, secrets_allowed, and any approved network destinations.",
+    constraints: [
+      "Keep the policy deterministic and local to the artifact.",
+      "Do not infer approval from prose alone.",
+      "Preserve existing repository governance metadata.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm the artifact declares the relevant policy fields.",
+      "Review the security-sensitive instruction against the declared policy.",
+    ],
+    llmHint:
+      "Add small frontmatter policy fields that describe whether network access, external uploads, and secret material are allowed for this artifact.",
+    confidence: "medium",
+  },
+  policyContradiction: {
+    id: "SEC-POLICY-CONTRADICTION",
+    category: "safety",
+    title: "Security policy fields contradict each other",
+    whyItMatters:
+      "Contradictory policy metadata makes deterministic review ambiguous and can cause an agent to follow the less restrictive interpretation.",
+    remediation:
+      "Make the policy internally consistent, or split the artifact so each instruction set has one clear policy.",
+    constraints: [
+      "Do not weaken restrictions without human review.",
+      "Keep network and upload allowances explicit.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm contradictory policy fields no longer appear together.",
+    ],
+    llmHint:
+      "Resolve the policy by choosing the stricter allowed behavior or by separating instructions into different assets with explicit metadata.",
+    confidence: "high",
+  },
+  instructionViolatesPolicy: {
+    id: "SEC-INSTRUCTION-VIOLATES-POLICY",
+    category: "safety",
+    title: "Instruction appears to violate declared security policy",
+    whyItMatters:
+      "A deterministic policy denial should override LLM-facing operational instructions that ask for network, upload, or secret handling.",
+    remediation:
+      "Remove or rewrite the violating instruction, or update the policy only after an explicit human security review.",
+    constraints: [
+      "Do not silently relax network, upload, or secret restrictions.",
+      "Preserve the artifact's intended workflow where it can be made policy-compliant.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm no instruction conflicts with the declared policy.",
+    ],
+    llmHint:
+      "Find the instruction that asks for denied behavior and rewrite it to stay within the artifact's declared security policy.",
+    confidence: "high",
+  },
+  missingHumanApprovalGuard: {
+    id: "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+    category: "safety",
+    title: "Sensitive external action lacks a human approval guard",
+    whyItMatters:
+      "Instructions that send data externally should clearly require human confirmation before an agent performs the action.",
+    remediation:
+      "Add an explicit approval, confirmation, or review guard before external network or upload actions.",
+    constraints: [
+      "Do not replace approval with vague cautionary language.",
+      "Keep the guard close to the sensitive instruction.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm the sensitive action is guarded by nearby approval language.",
+    ],
+    llmHint:
+      "Insert an explicit human approval requirement next to upload, POST, cloud sync, or external sharing instructions.",
+    confidence: "medium",
+  },
+  sensitiveFileReference: {
+    id: "SEC-SENSITIVE-FILE-REFERENCE",
+    category: "safety",
+    title: "Instruction references sensitive file material",
+    whyItMatters:
+      "Private keys, signing material, credential stores, and environment files need deliberate handling before they are read, copied, or attached to agent context.",
+    remediation:
+      "Remove unnecessary sensitive file references or add explicit handling rules that prevent disclosure.",
+    constraints: [
+      "Do not expose file contents in diagnostics.",
+      "Keep allowlisted sample paths separate from real secret material.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm sensitive file references are removed, mocked, or protected by policy.",
+    ],
+    llmHint:
+      "Inspect this reference and either replace it with a safe placeholder or add explicit no-disclosure handling instructions.",
+    confidence: "high",
+  },
+  secretMaterialInstruction: {
+    id: "SEC-SECRET-MATERIAL-INSTRUCTION",
+    category: "safety",
+    title: "Instruction may expose secret material",
+    whyItMatters:
+      "LLM-facing instructions that copy, print, paste, upload, or summarize secrets can leak credentials even when no literal secret value appears in the repository.",
+    remediation:
+      "Rewrite the instruction to avoid exposing secret material and require redaction or human review when sensitive files are involved.",
+    constraints: [
+      "Do not include secret values in the repair.",
+      "Prefer safe placeholders and redaction guidance.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm secret material is not requested for printing, copying, uploading, or context inclusion.",
+    ],
+    llmHint:
+      "Rewrite this instruction so secret-bearing files are never copied into prompts, logs, uploads, or diagnostics.",
+    confidence: "high",
+  },
+  externalUploadInstruction: {
+    id: "SEC-EXTERNAL-UPLOAD-INSTRUCTION",
+    category: "safety",
+    title: "Instruction sends repository data to an external destination",
+    whyItMatters:
+      "External uploads can disclose proprietary code, logs, credentials, customer data, or unreleased operational details.",
+    remediation:
+      "Require explicit approval and destination review before uploading or sharing repository data externally.",
+    constraints: [
+      "Do not assume cloud or pastebin destinations are safe.",
+      "Keep approved destinations explicit in policy metadata.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm uploads are either removed or guarded by explicit policy and approval.",
+    ],
+    llmHint:
+      "Add a human approval gate and approved destination metadata, or replace the upload with a local-only workflow.",
+    confidence: "high",
+  },
+  unapprovedNetworkDestination: {
+    id: "SEC-UNAPPROVED-NETWORK-DESTINATION",
+    category: "safety",
+    title: "Instruction references an unapproved network destination",
+    whyItMatters:
+      "Agents need deterministic destination allowlists when instructions mention external hosts, APIs, or storage services.",
+    remediation:
+      "Add the destination to approved_network_destinations after review, or remove the external network instruction.",
+    constraints: [
+      "Do not use fuzzy destination matching.",
+      "Keep hostnames or URL prefixes explicit.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm every external destination is approved or removed.",
+    ],
+    llmHint:
+      "Compare the referenced URL or host to approved_network_destinations and either approve it explicitly or remove the instruction.",
+    confidence: "high",
+  },
+  bulkDataSharingInstruction: {
+    id: "SEC-BULK-DATA-SHARING-INSTRUCTION",
+    category: "safety",
+    title: "Instruction asks to share broad repository or context data",
+    whyItMatters:
+      "Bulk sharing instructions can leak more information than the task needs and are risky when followed by an LLM agent.",
+    remediation:
+      "Narrow the instruction to the minimum files, snippets, or sanitized summary needed for review.",
+    constraints: [
+      "Do not ask an agent to paste entire repositories, logs, or context bundles.",
+      "Prefer scoped evidence snippets over bulk data transfer.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm sharing instructions name a bounded, minimal data set.",
+    ],
+    llmHint:
+      "Replace broad sharing language with scoped file paths, limited snippets, and redaction requirements.",
+    confidence: "medium",
+  },
+  cloudUploadInstruction: {
+    id: "SEC-CLOUD-UPLOAD-INSTRUCTION",
+    category: "safety",
+    title: "Instruction uploads data to cloud storage or cloud services",
+    whyItMatters:
+      "Cloud upload instructions often move repository data outside local review boundaries and should be explicitly approved.",
+    remediation:
+      "Replace cloud upload with a local artifact, or require explicit approval and approved destination metadata.",
+    constraints: [
+      "Do not treat generic cloud storage as approved by default.",
+      "Keep external upload policy explicit.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm cloud uploads are removed, approved, or guarded.",
+    ],
+    llmHint:
+      "Turn the cloud upload into a local-only output, or add policy metadata and a human approval guard.",
+    confidence: "medium",
+  },
+  overbroadContextInstruction: {
+    id: "SEC-OVERBROAD-CONTEXT-INSTRUCTION",
+    category: "safety",
+    title: "Instruction requests overbroad context collection",
+    whyItMatters:
+      "Overbroad context collection encourages agents to ingest unnecessary files, logs, or private data before a task requires it.",
+    remediation:
+      "Scope the instruction to relevant files, folders, or evidence snippets and exclude secret-bearing material.",
+    constraints: [
+      "Do not introduce runtime context selection.",
+      "Keep guidance deterministic and repository-local.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm context instructions are scoped and exclude sensitive material.",
+    ],
+    llmHint:
+      "Replace broad context collection with bounded paths, task-relevant snippets, and explicit exclusions for secrets.",
+    confidence: "medium",
+  },
+  noRedactionInstruction: {
+    id: "SEC-NO-REDACTION-INSTRUCTION",
+    category: "safety",
+    title: "Instruction discourages redaction of sensitive data",
+    whyItMatters:
+      "Telling agents not to redact data can cause credentials, customer data, or internal details to appear in prompts, logs, or uploads.",
+    remediation:
+      "Remove the no-redaction instruction and require redaction for secrets, credentials, tokens, personal data, and proprietary values.",
+    constraints: [
+      "Do not weaken redaction requirements.",
+      "Keep examples synthetic where possible.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm instructions require redaction where sensitive data may appear.",
+    ],
+    llmHint:
+      "Replace no-redaction wording with explicit redaction requirements for secrets and sensitive data.",
+    confidence: "high",
+  },
+  unpinnedRemoteScript: {
+    id: "SEC-UNPINNED-REMOTE-SCRIPT",
+    category: "safety",
+    title: "Remote install script is not pinned",
+    whyItMatters:
+      "Piping a mutable remote script into a shell gives the destination server control over code executed by the agent or developer.",
+    remediation:
+      "Replace the pipe-to-shell command with a pinned release artifact, checksum verification, or manually reviewed local script.",
+    constraints: [
+      "Do not execute the remote script during remediation.",
+      "Keep install guidance reproducible.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm remote script execution is removed or pinned with verification.",
+    ],
+    llmHint:
+      "Rewrite the install instruction to download a pinned artifact and verify it before execution.",
+    confidence: "high",
+  },
+  unpinnedDependencyInstall: {
+    id: "SEC-UNPINNED-DEPENDENCY-INSTALL",
+    category: "safety",
+    title: "Dependency install is not pinned",
+    whyItMatters:
+      "Unpinned dependencies make agent setup non-reproducible and can unexpectedly pull compromised or breaking packages.",
+    remediation:
+      "Pin package, image, and formula versions or refer to the repository lockfile.",
+    constraints: [
+      "Do not pick arbitrary versions without checking the repository's intended support matrix.",
+      "Preserve existing package manager conventions.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm dependency install instructions are pinned or lockfile-based.",
+    ],
+    llmHint:
+      "Pin packages, images, or formulas in setup instructions, or route through the repository's lockfile command.",
+    confidence: "medium",
+  },
+  privilegedCommandWithoutGuard: {
+    id: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+    category: "safety",
+    title: "Privileged command lacks a review guard",
+    whyItMatters:
+      "Privileged commands can modify the host, containers, system package state, or file ownership outside the repository.",
+    remediation:
+      "Add a human approval or review guard before privileged commands, or replace them with least-privilege alternatives.",
+    constraints: [
+      "Do not normalize privileged commands as routine setup.",
+      "Keep the guard close to the command.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm privileged commands require approval or have been removed.",
+    ],
+    llmHint:
+      "Add an explicit approval requirement before sudo, chmod/chown, docker privileged operations, or system writes.",
+    confidence: "medium",
+  },
+  credentialInCommandArg: {
+    id: "SEC-CREDENTIAL-IN-COMMAND-ARG",
+    category: "safety",
+    title: "Command includes credential material in arguments",
+    whyItMatters:
+      "Credentials in command arguments can leak through shell history, process lists, logs, diagnostics, or copied instructions.",
+    remediation:
+      "Move credentials to approved secret storage, environment injection, or an interactive prompt that is not logged.",
+    constraints: [
+      "Do not preserve literal credential examples.",
+      "Use placeholders only when examples are necessary.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm command examples do not include token, password, key, or certificate values.",
+    ],
+    llmHint:
+      "Replace literal credential command arguments with safe placeholders and approved secret handling guidance.",
+    confidence: "high",
+  },
+  predictableTempPath: {
+    id: "SEC-PREDICTABLE-TEMP-PATH",
+    category: "safety",
+    title: "Instruction uses predictable temporary path for sensitive material",
+    whyItMatters:
+      "Predictable temporary file paths can expose credentials, profiles, logs, or certificates to accidental reuse or disclosure.",
+    remediation:
+      "Use a securely created temporary directory or repository-local ignored path with explicit cleanup.",
+    constraints: [
+      "Do not put sensitive material in shared /tmp paths.",
+      "Keep cleanup instructions explicit.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm sensitive temporary paths are randomized, scoped, and cleaned up.",
+    ],
+    llmHint:
+      "Replace predictable /tmp paths for profiles, credentials, certs, logs, or tokens with secure temporary directory handling.",
+    confidence: "medium",
+  },
+} satisfies Record<string, RuleMetadata>;
 
-const predictableTempMetadata: RuleMetadata = {
-  id: "SEC-PREDICTABLE-TEMP-PATH",
-  title: "Predictable temporary path in operational instructions",
-  whyItMatters:
-    "Predictable temporary paths can expose sensitive files or collide with existing files when reused by agents or scripts.",
-  remediation:
-    "Use `mktemp` or a workspace-scoped temporary directory, and avoid predictable paths for sensitive data.",
-  llmHint:
-    "Use mktemp or a repository-scoped temporary path, especially for tokens, credentials, signing material, or auth files.",
-};
+const BOOLEAN_POLICY_FIELDS = new Map<string, keyof SecurityPolicy>([
+  ["network_allowed", "networkAllowed"],
+  ["networkAllowed", "networkAllowed"],
+  ["external_upload_allowed", "externalUploadAllowed"],
+  ["externalUploadAllowed", "externalUploadAllowed"],
+  ["secrets_allowed", "secretsAllowed"],
+  ["secretsAllowed", "secretsAllowed"],
+  ["human_approval_required", "humanApprovalRequired"],
+  ["humanApprovalRequired", "humanApprovalRequired"],
+  ["requires_human_approval", "humanApprovalRequired"],
+  ["requiresHumanApproval", "humanApprovalRequired"],
+]);
 
-const credentialArgMetadata: RuleMetadata = {
-  id: "SEC-CREDENTIAL-IN-COMMAND-ARG",
-  title: "Credential-like value embedded in a command argument",
-  whyItMatters:
-    "Credentials in command arguments or reusable headers can leak through shell history, process listings, logs, or copied instructions.",
-  remediation:
-    "Use environment variables, secret managers, or interactive prompts. Avoid putting credentials directly in command arguments or reusable instructions.",
-  llmHint:
-    "Move literal secrets out of command arguments and into environment variables, secret managers, or interactive prompts.",
-};
+const DESTINATION_POLICY_FIELDS = new Set([
+  "approved_network_destinations",
+  "approvedNetworkDestinations",
+  "allowed_network_destinations",
+  "allowedNetworkDestinations",
+]);
 
-const guardWords = [
-  "confirm",
-  "ask the user",
-  "approval",
-  "dry run",
-  "backup",
-  "restore",
-  "rollback",
-  "revert",
-  "scope",
-  "only this path",
-  "verify",
+const NETWORK_ACTION_RE =
+  /\b(curl|wget|http|https|api|webhook|post|get|upload|download|fetch|send|sync|push)\b|https?:\/\//i;
+const EXTERNAL_UPLOAD_RE =
+  /\b(upload|send|post|share|attach|submit|sync|push|publish)\b.*\b(external|remote|third[- ]party|pastebin|gist|slack|discord|s3|gcs|cloud|storage|bucket|drive|dropbox|notion|jira|github)\b|\b(post|put)\b.*https?:\/\//i;
+const CLOUD_UPLOAD_RE =
+  /\b(upload|sync|copy|send|push|publish)\b.*\b(s3|gcs|cloud storage|bucket|drive|dropbox|box|onedrive|blob storage|azure storage|storage)\b/i;
+const BULK_DATA_RE =
+  /\b(entire|whole|all|full|complete|raw)\b.*\b(repo|repository|workspace|codebase|project|context|logs?|files?|history|dataset)\b|\b(paste|upload|send|share|attach)\b.*\b(everything|all files|full logs|full context|entire repo|whole repository)\b/i;
+const OVERBROAD_CONTEXT_RE =
+  /\b(load|read|include|attach|paste|ingest|collect|provide|send)\b.*\b(entire|whole|all|full|complete|raw)\b.*\b(repo|repository|workspace|codebase|context|logs?|files?)\b/i;
+const NO_REDACTION_RE =
+  /\b(do not|don't|without|no|never)\b.{0,30}\b(redact|redaction|sanitize|mask|obfuscate)\b|\b(redact|sanitize|mask|obfuscate)\b.{0,30}\b(disabled|false|off)\b/i;
+const APPROVAL_RE =
+  /\b(human|user|owner|maintainer|reviewer|security)\b.{0,40}\b(approve|approval|confirm|confirmation|review|consent|authorize|authorization)\b|\b(ask|require|obtain|wait for)\b.{0,40}\b(approval|confirmation|consent|authorization)\b/i;
+const SECRET_WORD_RE =
+  /\b(secret|secrets|credential|credentials|token|password|passwd|api key|apikey|private key|ssh key|signing key|certificate|cert|auth)\b/i;
+const SECRET_ACTION_RE =
+  /\b(copy|print|cat|echo|paste|upload|send|share|attach|include|dump|export|log|summari[sz]e|read)\b/i;
+const SAFE_NEGATION_RE =
+  /\b(not|never|avoid|exclude|without|redact|mock|fake|sample|placeholder|dummy)\b.{0,40}\b(secret|secrets|credential|credentials|token|password|private key)\b|\b(secret|secrets|credential|credentials|token|password|private key)\b.{0,40}\b(not|never|avoid|exclude|redact|mock|fake|sample|placeholder|dummy)\b/i;
+const REMOTE_SCRIPT_RE =
+  /\b(curl|wget)\b[^\n]*?(https?:\/\/[^\s|`'")]+)[^\n]*(\|\s*(sh|bash|zsh)|\b(sh|bash|zsh)\b)/i;
+const PRIVILEGED_COMMAND_RE =
+  /\b(sudo|chmod\s+(777|666|\+w|a\+w)|chown\b|docker\s+run\b[^\n]*(--privileged|-v\s+\/|--pid=host)|mount\b|launchctl\b|systemctl\b)\b/i;
+const DESTRUCTIVE_COMMAND_RE =
+  /\b(rm\s+-[^\n]*[rf][^\n]*|git\s+reset\s+--hard|git\s+clean\s+-[^\n]*[xdf][^\n]*|docker\s+(?:rm|rmi|system\s+prune|volume\s+rm)\b|kubectl\s+delete\b|drop\s+database|truncate\s+table)\b/i;
+const CREDENTIAL_ARG_RE =
+  /--?(token|password|passwd|secret|credential|api[-_]?key|key|cert|certificate|signing[-_]?key|auth)(=|\s+)(?!<|\$|\{|\[|REDACTED|redacted|xxx|XXX|placeholder|example)[^\s"'`]+/i;
+const CREDENTIAL_ARG_ANY_RE =
+  /--?(token|password|passwd|secret|credential|api[-_]?key|key|cert|certificate|signing[-_]?key|auth)(=|\s+)[^\s"'`]+/i;
+const CREDENTIAL_HEADER_RE =
+  /\bAuthorization:\s*Bearer\s+(?!<|\$|\{|\[|REDACTED|redacted|xxx|XXX|placeholder|example)[^\s"'`]+/i;
+const PREDICTABLE_TEMP_RE = /\/tmp\/[A-Za-z0-9._/-]+/g;
+
+const SENSITIVE_FILE_PATTERNS = [
+  /\.env(?:\b|\.|$)/i,
+  /(^|[/\s])id_(rsa|dsa|ecdsa|ed25519)(?:\b|$)/i,
+  /(^|[/\s])\.?ssh\/(?:config|id_[A-Za-z0-9_-]+)/i,
+  /\.(p12|pfx|pem|key|p8|mobileprovision)(?:\b|$)/i,
+  /(^|[/\s])kubeconfig(?:\b|$)/i,
+  /(^|[/\s])\.kube\/config(?:\b|$)/i,
+  /(^|[/\s])\.aws\/credentials(?:\b|$)/i,
+  /(^|[/\s])credentials\.json(?:\b|$)/i,
+  /(^|[/\s])service-account(?:\b|\.json|$)/i,
+  /(^|[/\s])secrets?\.(json|ya?ml|toml|env)(?:\b|$)/i,
 ];
 
-const sensitiveTempWords = [
-  "token",
-  "secret",
-  "password",
-  "credential",
-  "key",
-  "cert",
-  "certificate",
-  "profile",
-  "provisioning",
-  "signing",
-  "auth",
-];
-
-const commandStarters = [
-  "bash",
-  "brew",
-  "chmod",
-  "chown",
-  "curl",
-  "docker",
-  "npm",
-  "pip",
-  "pip3",
-  "sh",
-  "sudo",
-  "wget",
-];
+const CLOUD_DESTINATION_RE =
+  /\b(s3:\/\/|gs:\/\/|az:\/\/|https?:\/\/(?:[^/\s]+\.)?(?:s3|storage|blob|drive|dropbox|box|onedrive|pastebin|gist|slack|discord)[^/\s]*\S*)/i;
+const URL_RE = /\bhttps?:\/\/[^\s)<>"'`]+/gi;
+const HOST_RE =
+  /\b(?:api|storage|upload|webhook|hooks)\.[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/gi;
 
 export function securityDiagnosticFindings(artifacts: Artifact[]): Finding[] {
-  return artifacts
-    .flatMap((artifact) => securityFindingsForArtifact(artifact))
-    .sort(compareDiagnostics);
+  return artifacts.flatMap((artifact) => securityFindingsForArtifact(artifact));
 }
 
 function securityFindingsForArtifact(artifact: Artifact): Finding[] {
+  const policy = parseSecurityPolicy(artifact.content);
+  const detections: Detection[] = [];
   const lines = artifact.content.split(/\r?\n/);
-  const findings: Finding[] = [];
   let inFence = false;
+  let recentApprovalLine = 0;
 
   for (let index = 0; index < lines.length; index += 1) {
+    const lineNumber = index + 1;
     const line = lines[index] ?? "";
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith("```")) {
+    if (/^\s*```/.test(line)) {
       inFence = !inFence;
+    }
+
+    const strippedComment = line.replace(/^\s*(#|\/\/)\s*/, "");
+    const shellComment =
+      /^\s*(#|\/\/)/.test(line) &&
+      (inFence ||
+        isCommandLike(strippedComment) ||
+        CREDENTIAL_ARG_ANY_RE.test(strippedComment) ||
+        REMOTE_SCRIPT_RE.test(strippedComment) ||
+        PREDICTABLE_TEMP_RE.test(strippedComment));
+    if (shellComment) {
       continue;
     }
-
-    if (isCommentOnlyShellLine(trimmed)) continue;
-
-    const context = nearbyContext(lines, index);
-    const operational = inFence || looksOperational(trimmed);
-    const detections = [
-      ...detectRemoteScript(trimmed, operational),
-      ...detectUnpinnedDependency(trimmed, operational),
-      ...detectPrivilegedCommand(trimmed, context, operational),
-      ...detectPredictableTempPath(trimmed, context, operational),
-      ...detectCredentialArgument(trimmed, operational),
-    ];
-
-    for (const detection of detections) {
-      findings.push(
-        toFinding(artifact.path, { ...detection, line: index + 1 }),
-      );
+    if (isPolicyLine(line)) {
+      continue;
     }
-  }
+    const hasApprovalGuard =
+      hasNearbyApprovalLanguage(line) ||
+      (recentApprovalLine > 0 && lineNumber - recentApprovalLine <= 2);
+    const commandLine =
+      !shellComment &&
+      (inFence ||
+        isCommandLike(line) ||
+        CREDENTIAL_ARG_ANY_RE.test(line) ||
+        CREDENTIAL_HEADER_RE.test(line));
 
-  return collapsePredictableTempPathFindings(findings);
-}
-
-function detectRemoteScript(line: string, operational: boolean): Detection[] {
-  if (!operational) return [];
-
-  const directPipe =
-    /\b(curl|wget)\b[^\n|]*(https?:\/\/\S+)[^\n|]*\|\s*(sudo\s+)?(ba)?sh\b/i.test(
-      line,
+    detections.push(
+      ...policyDetections(
+        line,
+        lineNumber,
+        policy,
+        commandLine,
+        hasApprovalGuard,
+      ),
     );
-  const processSubstitution =
-    /\b(ba)?sh\s*<\(\s*(curl|wget)\b[^\n)]*https?:\/\/\S+/i.test(line);
+    if (!commandLine || referencesSensitiveFile(line)) {
+      detections.push(...sensitiveDataDetections(line, lineNumber, policy));
+    }
+    if (!commandLine || policy.declared.size > 0) {
+      detections.push(...networkAndUploadDetections(line, lineNumber, policy));
+    }
+    detections.push(...contextScopeDetections(line, lineNumber));
+    detections.push(...predictableTempDetections(line, lineNumber));
 
-  if (!directPipe && !processSubstitution) return [];
+    if (commandLine) {
+      detections.push(...commandDetections(line, lineNumber, hasApprovalGuard));
+    }
 
-  return [
-    {
-      metadata: remoteScriptMetadata,
-      severity: directPipe ? "high" : "medium",
-      confidence: "high",
-      line: 0,
-      snippet: line,
-    },
-  ];
+    if (hasNearbyApprovalLanguage(line)) {
+      recentApprovalLine = lineNumber;
+    }
+  }
+
+  detections.push(...policyContradictions(policy));
+  return dedupeDetections(detections).map((detection) =>
+    findingFromDetection(artifact, detection),
+  );
 }
 
-function detectUnpinnedDependency(
+function policyDetections(
   line: string,
-  operational: boolean,
+  lineNumber: number,
+  policy: SecurityPolicy,
+  commandLine: boolean,
+  hasApprovalGuard: boolean,
 ): Detection[] {
-  if (!operational) return [];
-
   const detections: Detection[] = [];
-  const npm = line.match(/\bnpm\s+(?:install|i)\s+([^\n#]+)/i);
-  if (npm) {
-    const args = splitCommandArgs(npm[1] ?? "");
-    const globalInstall = args.includes("-g") || args.includes("--global");
-    const packages = args.filter((arg) => isPackageToken(arg) && arg !== "-g");
-    const unpinned = packages.find((arg) => !isPinnedNpmPackage(arg));
-    if (unpinned) {
-      detections.push({
-        metadata: unpinnedDependencyMetadata,
-        severity: globalInstall ? "medium" : "low",
-        confidence: "medium",
-        line: 0,
-        snippet: line,
-      });
-    }
-  }
+  const hasSensitiveInstruction =
+    NETWORK_ACTION_RE.test(line) ||
+    EXTERNAL_UPLOAD_RE.test(line) ||
+    SECRET_WORD_RE.test(line);
 
-  const pip = line.match(/\bpip3?\s+install\s+([^\n#]+)/i);
-  if (pip) {
-    const packages = splitCommandArgs(pip[1] ?? "").filter(isPackageToken);
-    const unpinned = packages.find((arg) => !/[<>=~!]=/.test(arg));
-    if (unpinned) {
-      detections.push({
-        metadata: unpinnedDependencyMetadata,
-        severity: "low",
-        confidence: "medium",
-        line: 0,
-        snippet: line,
-      });
-    }
-  }
-
-  const brew = line.match(/\bbrew\s+install\s+([^\n#]+)/i);
-  if (brew) {
-    const packages = splitCommandArgs(brew[1] ?? "").filter(isPackageToken);
-    if (packages.length > 0) {
-      detections.push({
-        metadata: unpinnedDependencyMetadata,
-        severity: "low",
-        confidence: "medium",
-        line: 0,
-        snippet: line,
-      });
-    }
-  }
-
-  if (/\bdocker\s+(pull|run)\b[^\n#]*\S+:latest\b/i.test(line)) {
+  if (
+    hasSensitiveInstruction &&
+    policy.declared.size === 0 &&
+    !commandLine &&
+    !isPolicyLine(line) &&
+    !SAFE_NEGATION_RE.test(line) &&
+    !PREDICTABLE_TEMP_RE.test(line)
+  ) {
     detections.push({
-      metadata: unpinnedDependencyMetadata,
-      severity: "medium",
-      confidence: "high",
-      line: 0,
+      metadata: RULES.missingPolicyMetadata,
+      severity: "low",
+      startLine: lineNumber,
       snippet: line,
     });
   }
 
-  if (/\bcurl\b[^\n#]*https?:\/\/\S*\/latest(?:\/|\b|\S*)/i.test(line)) {
+  if (policy.networkAllowed === false && NETWORK_ACTION_RE.test(line)) {
     detections.push({
-      metadata: unpinnedDependencyMetadata,
-      severity: "low",
-      confidence: "medium",
-      line: 0,
+      metadata: RULES.instructionViolatesPolicy,
+      severity: "high",
+      startLine: lineNumber,
+      snippet: line,
+    });
+  }
+
+  if (policy.externalUploadAllowed === false && EXTERNAL_UPLOAD_RE.test(line)) {
+    detections.push({
+      metadata: RULES.instructionViolatesPolicy,
+      severity: "high",
+      startLine: lineNumber,
+      snippet: line,
+    });
+  }
+
+  if (
+    policy.secretsAllowed === false &&
+    SECRET_WORD_RE.test(line) &&
+    !SAFE_NEGATION_RE.test(line)
+  ) {
+    detections.push({
+      metadata: RULES.instructionViolatesPolicy,
+      severity: "high",
+      startLine: lineNumber,
+      snippet: line,
+    });
+  }
+
+  const needsApproval =
+    (EXTERNAL_UPLOAD_RE.test(line) || CLOUD_UPLOAD_RE.test(line)) &&
+    policy.humanApprovalRequired !== true &&
+    !hasApprovalGuard;
+  if (needsApproval) {
+    detections.push({
+      metadata: RULES.missingHumanApprovalGuard,
+      severity: "medium",
+      startLine: lineNumber,
       snippet: line,
     });
   }
@@ -267,254 +602,518 @@ function detectUnpinnedDependency(
   return detections;
 }
 
-function detectPrivilegedCommand(
-  line: string,
-  context: string,
-  operational: boolean,
-): Detection[] {
-  if (!operational) return [];
-
-  const hasPrivilegedCommand =
-    /\bsudo\s+(npm|rm|chmod|chown|sh|bash|curl|wget)\b/i.test(line) ||
-    /\bchmod\s+-R\s+777\b/i.test(line) ||
-    /\bchown\s+-R\b/i.test(line);
-
-  if (!hasPrivilegedCommand || hasGuardrail(context)) return [];
-
-  return [
-    {
-      metadata: privilegedCommandMetadata,
-      severity: "medium",
-      confidence: "medium",
-      line: 0,
-      snippet: line,
-    },
-  ];
-}
-
-function detectPredictableTempPath(
-  line: string,
-  context: string,
-  operational: boolean,
-): Detection[] {
-  if (!operational || !/\/tmp\/[A-Za-z0-9._/-]+/.test(line)) return [];
-
-  const sensitive = sensitiveTempWords.some((word) =>
-    new RegExp(`\\b${word}\\b`, "i").test(context),
-  );
-
-  return [
-    {
-      metadata: predictableTempMetadata,
-      severity: sensitive ? "medium" : "low",
-      confidence: sensitive ? "high" : "medium",
-      line: 0,
-      snippet: line,
-    },
-  ];
-}
-
-function detectCredentialArgument(
-  line: string,
-  operational: boolean,
-): Detection[] {
-  if (!operational) return [];
-
+function policyContradictions(policy: SecurityPolicy): Detection[] {
   const detections: Detection[] = [];
-  const optionMatch = line.match(
-    /\B--(?:password|token)\s+(?:"([^"]+)"|'([^']+)'|(\S+))/i,
-  );
-  const optionValue = optionMatch?.[1] ?? optionMatch?.[2] ?? optionMatch?.[3];
-  if (optionValue && !isSafePlaceholder(optionValue)) {
-    detections.push({
-      metadata: credentialArgMetadata,
-      severity: "high",
-      confidence: "high",
-      line: 0,
-      snippet: line,
-    });
-  } else if (optionValue) {
-    detections.push({
-      metadata: credentialArgMetadata,
-      severity: "medium",
-      confidence: "medium",
-      line: 0,
-      snippet: line,
-    });
-  }
 
-  const basicAuthMatch = line.match(
-    /\s-u\s+(?:"([^"]+)"|'([^']+)'|(\S+:\S+))/i,
-  );
-  const basicAuthValue =
-    basicAuthMatch?.[1] ?? basicAuthMatch?.[2] ?? basicAuthMatch?.[3];
-  if (basicAuthValue && basicAuthValue.includes(":")) {
-    detections.push({
-      metadata: credentialArgMetadata,
-      severity: isSafePlaceholder(basicAuthValue) ? "medium" : "high",
-      confidence: isSafePlaceholder(basicAuthValue) ? "medium" : "high",
-      line: 0,
-      snippet: line,
-    });
-  }
-
-  const bearerMatch = line.match(
-    /Authorization:\s*Bearer\s+(?:"([^"]+)"|'([^']+)'|(\S+))/i,
-  );
-  const bearerValue = bearerMatch?.[1] ?? bearerMatch?.[2] ?? bearerMatch?.[3];
-  if (bearerValue && !isSafePlaceholder(bearerValue)) {
-    detections.push({
-      metadata: credentialArgMetadata,
-      severity: bearerValue === "..." ? "medium" : "high",
-      confidence: bearerValue === "..." ? "medium" : "high",
-      line: 0,
-      snippet: line,
-    });
-  } else if (bearerValue) {
-    detections.push({
-      metadata: credentialArgMetadata,
-      severity: "medium",
-      confidence: "medium",
-      line: 0,
-      snippet: line,
-    });
-  }
-
-  return dedupeDetections(detections);
-}
-
-function toFinding(path: string, detection: Detection): Finding {
-  return {
-    ...detection.metadata,
-    category: "safety",
-    severity: detection.severity,
-    confidence: detection.confidence,
-    evidence: {
-      path,
-      startLine: detection.line,
-      endLine: detection.line,
-      snippet: detection.snippet,
-    },
-    constraints,
-    verificationSteps,
-    llmHint: detection.metadata.llmHint,
-  };
-}
-
-function nearbyContext(lines: string[], index: number): string {
-  const start = Math.max(0, index - 3);
-  const end = Math.min(lines.length, index + 4);
-  return lines.slice(start, end).join("\n").toLowerCase();
-}
-
-function looksOperational(line: string): boolean {
-  if (line.length === 0) return false;
-  if (line.startsWith("$ ")) return true;
   if (
-    /[|<>]/.test(line) &&
-    /\b(curl|wget|bash|sh|tmp|Authorization)\b/i.test(line)
+    policy.networkAllowed === false &&
+    policy.externalUploadAllowed === true
   ) {
+    detections.push({
+      metadata: RULES.policyContradiction,
+      severity: "high",
+      startLine: policy.lineByField.get("externalUploadAllowed") ?? 1,
+      snippet: "external_upload_allowed is true while network_allowed is false",
+    });
+  }
+
+  if (
+    policy.externalUploadAllowed === true &&
+    policy.approvedNetworkDestinations.length === 0
+  ) {
+    detections.push({
+      metadata: RULES.policyContradiction,
+      severity: "medium",
+      startLine: policy.lineByField.get("externalUploadAllowed") ?? 1,
+      snippet:
+        "external_upload_allowed is true without approved_network_destinations",
+    });
+  }
+
+  if (policy.secretsAllowed === true && policy.externalUploadAllowed === true) {
+    detections.push({
+      metadata: RULES.policyContradiction,
+      severity: "high",
+      startLine: policy.lineByField.get("secretsAllowed") ?? 1,
+      snippet: "secrets_allowed and external_upload_allowed are both true",
+    });
+  }
+
+  return detections;
+}
+
+function sensitiveDataDetections(
+  line: string,
+  lineNumber: number,
+  policy: SecurityPolicy,
+): Detection[] {
+  const detections: Detection[] = [];
+  const sensitiveFile = referencesSensitiveFile(line);
+
+  if (sensitiveFile && !SAFE_NEGATION_RE.test(line)) {
+    detections.push({
+      metadata: RULES.sensitiveFileReference,
+      severity: "high",
+      startLine: lineNumber,
+      snippet: line,
+    });
+  }
+
+  const exposesSecret =
+    SECRET_ACTION_RE.test(line) &&
+    (SECRET_WORD_RE.test(line) || sensitiveFile) &&
+    !SAFE_NEGATION_RE.test(line);
+
+  if (exposesSecret) {
+    detections.push({
+      metadata: RULES.secretMaterialInstruction,
+      severity:
+        policy.secretsAllowed === false || policy.externalUploadAllowed === true
+          ? "critical"
+          : "high",
+      startLine: lineNumber,
+      snippet: line,
+    });
+  }
+
+  return detections;
+}
+
+function referencesSensitiveFile(line: string): boolean {
+  return SENSITIVE_FILE_PATTERNS.some((pattern) => pattern.test(line));
+}
+
+function networkAndUploadDetections(
+  line: string,
+  lineNumber: number,
+  policy: SecurityPolicy,
+): Detection[] {
+  const detections: Detection[] = [];
+
+  if (EXTERNAL_UPLOAD_RE.test(line)) {
+    detections.push({
+      metadata: RULES.externalUploadInstruction,
+      severity: policy.externalUploadAllowed === false ? "high" : "medium",
+      startLine: lineNumber,
+      snippet: line,
+    });
+  }
+
+  if (BULK_DATA_RE.test(line)) {
+    detections.push({
+      metadata: RULES.bulkDataSharingInstruction,
+      severity: "medium",
+      startLine: lineNumber,
+      snippet: line,
+    });
+  }
+
+  if (CLOUD_UPLOAD_RE.test(line) || CLOUD_DESTINATION_RE.test(line)) {
+    detections.push({
+      metadata: RULES.cloudUploadInstruction,
+      severity: "medium",
+      startLine: lineNumber,
+      snippet: line,
+    });
+  }
+
+  const destinations = extractDestinations(line);
+  for (const destination of destinations) {
+    if (
+      policy.approvedNetworkDestinations.length > 0 &&
+      !isApprovedDestination(destination, policy.approvedNetworkDestinations)
+    ) {
+      detections.push({
+        metadata: RULES.unapprovedNetworkDestination,
+        severity: "high",
+        startLine: lineNumber,
+        snippet: line,
+      });
+      break;
+    }
+  }
+
+  return detections;
+}
+
+function contextScopeDetections(line: string, lineNumber: number): Detection[] {
+  const detections: Detection[] = [];
+
+  if (OVERBROAD_CONTEXT_RE.test(line)) {
+    detections.push({
+      metadata: RULES.overbroadContextInstruction,
+      severity: "medium",
+      startLine: lineNumber,
+      snippet: line,
+    });
+  }
+
+  if (NO_REDACTION_RE.test(line)) {
+    detections.push({
+      metadata: RULES.noRedactionInstruction,
+      severity: "high",
+      startLine: lineNumber,
+      snippet: line,
+    });
+  }
+
+  return detections;
+}
+
+function commandDetections(
+  line: string,
+  lineNumber: number,
+  hasApprovalGuard: boolean,
+): Detection[] {
+  const detections: Detection[] = [];
+
+  const remoteScript = line.match(REMOTE_SCRIPT_RE);
+  if (remoteScript && !hasPinnedRemoteScript(line)) {
+    const remoteUrl = (remoteScript[2] ?? line).replace(/[.,;:]+$/, "");
+    const shell = remoteScript[4] ?? remoteScript[5] ?? "sh";
+    detections.push({
+      metadata: RULES.unpinnedRemoteScript,
+      severity: "high",
+      startLine: lineNumber,
+      snippet: `curl ${remoteUrl} | ${shell}`,
+      dedupeKey: `${RULES.unpinnedRemoteScript.id}:${remoteUrl}`,
+    });
+  }
+
+  const unpinnedInstall = unpinnedDependencyInstall(line);
+  if (unpinnedInstall) {
+    detections.push({
+      metadata: RULES.unpinnedDependencyInstall,
+      severity: "medium",
+      startLine: lineNumber,
+      snippet: line,
+    });
+  }
+
+  if (PRIVILEGED_COMMAND_RE.test(line) && !hasApprovalGuard) {
+    detections.push({
+      metadata: RULES.privilegedCommandWithoutGuard,
+      severity: "medium",
+      startLine: lineNumber,
+      snippet: line,
+    });
+  }
+
+  if (CREDENTIAL_ARG_RE.test(line) || CREDENTIAL_HEADER_RE.test(line)) {
+    detections.push({
+      metadata: RULES.credentialInCommandArg,
+      severity: "high",
+      startLine: lineNumber,
+      snippet: line,
+    });
+  }
+
+  return detections;
+}
+
+function predictableTempDetections(
+  line: string,
+  lineNumber: number,
+): Detection[] {
+  const tempMatches = line.match(PREDICTABLE_TEMP_RE) ?? [];
+  if (
+    tempMatches.length === 0 ||
+    DESTRUCTIVE_COMMAND_RE.test(line) ||
+    /mktemp|tempfile|random|unique/i.test(line)
+  ) {
+    return [];
+  }
+
+  return [
+    {
+      metadata: RULES.predictableTempPath,
+      severity: sensitiveTempWords(line) ? "medium" : "low",
+      startLine: lineNumber,
+      snippet: line,
+      dedupeKey: `${RULES.predictableTempPath.id}:${tempMatches[0]}:${Math.floor(
+        (lineNumber - 1) / 10,
+      )}`,
+    },
+  ];
+}
+
+function parseSecurityPolicy(content: string): SecurityPolicy {
+  const policy: SecurityPolicy = {
+    approvedNetworkDestinations: [],
+    declared: new Set(),
+    lineByField: new Map(),
+  };
+
+  const lines = content.split(/\r?\n/);
+  const frontmatterEnd =
+    lines[0]?.trim() === "---"
+      ? lines.findIndex((line, index) => index > 0 && line.trim() === "---")
+      : -1;
+  const scanEnd =
+    frontmatterEnd > 0 ? frontmatterEnd : Math.min(lines.length, 80);
+
+  for (let index = 0; index < scanEnd; index += 1) {
+    const line = lines[index] ?? "";
+    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*):\s*(.*?)\s*$/);
+    if (!match) {
+      continue;
+    }
+
+    const rawKey = match[1] ?? "";
+    const rawValue = match[2] ?? "";
+    const key = rawKey.trim();
+    const value = rawValue.trim();
+
+    const booleanField = BOOLEAN_POLICY_FIELDS.get(key);
+    if (booleanField !== undefined) {
+      const parsed = parseBoolean(value);
+      if (parsed !== undefined) {
+        (policy[booleanField] as boolean | undefined) = parsed;
+        policy.declared.add(booleanField);
+        policy.lineByField.set(booleanField, index + 1);
+      }
+      continue;
+    }
+
+    if (DESTINATION_POLICY_FIELDS.has(key)) {
+      const destinations = parseList(value);
+      policy.approvedNetworkDestinations.push(...destinations);
+      policy.declared.add("approvedNetworkDestinations");
+      policy.lineByField.set("approvedNetworkDestinations", index + 1);
+    }
+  }
+
+  return policy;
+}
+
+function parseBoolean(value: string): boolean | undefined {
+  const normalized = value.toLowerCase();
+  if (["true", "yes", "allowed", "allow", "1"].includes(normalized)) {
     return true;
   }
-  return commandStarters.some((command) =>
-    new RegExp(`^(?:[-*]\\s+)?${command}\\b`, "i").test(line),
+  if (["false", "no", "denied", "deny", "0"].includes(normalized)) {
+    return false;
+  }
+  return undefined;
+}
+
+function parseList(value: string): string[] {
+  return value
+    .replace(/^\[/, "")
+    .replace(/\]$/, "")
+    .split(",")
+    .map((item) => item.trim().replace(/^["']|["']$/g, ""))
+    .filter((item) => item.length > 0);
+}
+
+function isPolicyLine(line: string): boolean {
+  const key = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*):/)?.[1];
+  return (
+    key !== undefined &&
+    (BOOLEAN_POLICY_FIELDS.has(key) || DESTINATION_POLICY_FIELDS.has(key))
   );
 }
 
-function isCommentOnlyShellLine(line: string): boolean {
-  return line.startsWith("#");
+function isCommandLike(line: string): boolean {
+  return /\b(npm|pnpm|yarn|pip3?|brew|docker|curl|wget|sudo|chmod|chown|git|gh|aws|gcloud|az|kubectl|echo|cat|cp|mv|rm|touch|mkdir)\b/i.test(
+    line,
+  );
 }
 
-function collapsePredictableTempPathFindings(findings: Finding[]): Finding[] {
-  const collapsed: Finding[] = [];
-  const lastByPath = new Map<string, Finding>();
+function hasNearbyApprovalLanguage(line: string): boolean {
+  return (
+    APPROVAL_RE.test(line) ||
+    /\b(approved|approval|confirm|confirmed|ask|asking|asked|review|reviewed|authorize|authorized|permission|consent|guardrail|guard)\b/i.test(
+      line,
+    )
+  );
+}
 
-  for (const finding of findings) {
-    if (finding.id !== "SEC-PREDICTABLE-TEMP-PATH") {
-      collapsed.push(finding);
-      continue;
-    }
+function hasPinnedRemoteScript(line: string): boolean {
+  return /\b(sha256|sha512|checksum|gpg|cosign|sigstore|version|v\d+\.\d+\.\d+|@[a-f0-9]{7,40})\b/i.test(
+    line,
+  );
+}
 
-    const tempPath = extractTempPath(finding.evidence.snippet);
-    if (!tempPath) {
-      collapsed.push(finding);
-      continue;
-    }
-
-    const key = `${finding.evidence.path}:${tempPath}`;
-    const previous = lastByPath.get(key);
-    if (
-      previous &&
-      finding.evidence.startLine - previous.evidence.startLine <= 10
-    ) {
-      continue;
-    }
-
-    lastByPath.set(key, finding);
-    collapsed.push(finding);
+function unpinnedDependencyInstall(line: string): boolean {
+  const npm = line.match(/\bnpm\s+(?:install|i|add)\s+([^\n#]+)/i);
+  if (npm && splitCommandArgs(npm[1] ?? "").some(isUnpinnedNpmPackage)) {
+    return true;
   }
 
-  return collapsed;
-}
+  const pnpm = line.match(/\bpnpm\s+(?:add|install)\s+([^\n#]+)/i);
+  if (pnpm && splitCommandArgs(pnpm[1] ?? "").some(isUnpinnedNpmPackage)) {
+    return true;
+  }
 
-function extractTempPath(value: string): string | undefined {
-  return value.match(/\/tmp\/[A-Za-z0-9._/-]+/)?.[0];
+  const yarn = line.match(/\byarn\s+add\s+([^\n#]+)/i);
+  if (yarn && splitCommandArgs(yarn[1] ?? "").some(isUnpinnedNpmPackage)) {
+    return true;
+  }
+
+  const pip = line.match(/\bpip3?\s+install\s+([^\n#]+)/i);
+  if (pip && splitCommandArgs(pip[1] ?? "").some(isUnpinnedPythonPackage)) {
+    return true;
+  }
+
+  const brew = line.match(/\bbrew\s+install\s+([^\n#]+)/i);
+  if (brew && splitCommandArgs(brew[1] ?? "").some(isUnpinnedBrewFormula)) {
+    return true;
+  }
+
+  const docker = line.match(/\bdocker\s+(?:pull|run)\s+([^\s#]+)/i);
+  if (docker && isUnpinnedContainerImage(docker[1] ?? "")) {
+    return true;
+  }
+
+  return false;
 }
 
 function splitCommandArgs(value: string): string[] {
   return value
     .split(/\s+/)
-    .map((arg) => arg.replace(/^["']|["']$/g, ""))
-    .filter(Boolean);
+    .map((arg) => arg.trim())
+    .filter(
+      (arg) =>
+        arg.length > 0 &&
+        !arg.startsWith("-") &&
+        !arg.includes("=") &&
+        !/[|;&]/.test(arg),
+    );
 }
 
-function isPackageToken(arg: string): boolean {
-  return (
-    !arg.startsWith("-") && !arg.includes("/") && arg !== "." && arg !== ".."
-  );
-}
-
-function isPinnedNpmPackage(arg: string): boolean {
-  if (arg.startsWith("@")) {
-    const lastAt = arg.lastIndexOf("@");
-    return lastAt > 0 && lastAt < arg.length - 1;
+function isUnpinnedNpmPackage(arg: string): boolean {
+  if (isPlaceholder(arg) || arg.startsWith("$") || arg.startsWith(".")) {
+    return false;
   }
-  return /@\d/.test(arg);
+  const packageName = arg.startsWith("@")
+    ? arg.split("@").slice(0, 2).join("@")
+    : arg.split("@")[0];
+  return packageName === arg;
 }
 
-function hasGuardrail(context: string): boolean {
-  return guardWords.some((word) => context.includes(word));
+function isUnpinnedPythonPackage(arg: string): boolean {
+  if (isPlaceholder(arg) || arg.startsWith("-") || arg.startsWith(".")) {
+    return false;
+  }
+  return !/[=<>~!]=|===/.test(arg);
 }
 
-function isSafePlaceholder(value: string): boolean {
-  const normalized = value.trim().replace(/[",]$/g, "");
-  return (
-    normalized.startsWith("$") ||
-    /^<[^>]+>$/.test(normalized) ||
-    /^YOUR_[A-Z0-9_]+$/.test(normalized) ||
-    /^REDACTED$/i.test(normalized) ||
-    /^\*+$/.test(normalized)
+function isUnpinnedBrewFormula(arg: string): boolean {
+  if (isPlaceholder(arg) || arg.includes("/")) {
+    return false;
+  }
+  return !arg.includes("@");
+}
+
+function isUnpinnedContainerImage(image: string): boolean {
+  if (isPlaceholder(image)) {
+    return false;
+  }
+  const tag = image.includes(":") ? image.split(":").pop() : undefined;
+  return tag === undefined || tag === "" || tag === "latest";
+}
+
+function isPlaceholder(value: string): boolean {
+  return /^<.*>$|^\[.*\]$|^(example|placeholder|package|image)$/i.test(value);
+}
+
+function sensitiveTempWords(line: string): boolean {
+  return /\b(profile|credential|credentials|secret|token|password|cert|certificate|key|signing|auth|cookie|session|log|dump)\b|\/tmp\/(?:token|secret)\b|\/tmp\/[^/\s]+\.plist\b/i.test(
+    line,
   );
+}
+
+function highRiskTempWords(line: string): boolean {
+  return /\b(credential|credentials|secret|token|password|cert|certificate|key|signing|auth|cookie|session|dump)\b|\/tmp\/(?:token|secret)\b/i.test(
+    line,
+  );
+}
+
+function extractDestinations(line: string): string[] {
+  return [
+    ...(line.match(URL_RE) ?? []),
+    ...(line.match(HOST_RE) ?? []),
+    ...(line.match(CLOUD_DESTINATION_RE) ?? []),
+  ].map((destination) => destination.replace(/[.,;:]$/, ""));
+}
+
+function isApprovedDestination(
+  destination: string,
+  approvedDestinations: string[],
+): boolean {
+  return approvedDestinations.some((approved) => {
+    if (destination === approved || destination.startsWith(approved)) {
+      return true;
+    }
+    const approvedHost = hostFromUrl(approved);
+    if (
+      approvedHost !== undefined &&
+      (destination === approvedHost || destination.endsWith(`.${approvedHost}`))
+    ) {
+      return true;
+    }
+    try {
+      const destinationHost = new URL(destination).host;
+      return (
+        destinationHost === approved ||
+        destinationHost.endsWith(`.${approved}`) ||
+        destinationHost === approvedHost ||
+        (approvedHost !== undefined &&
+          destinationHost.endsWith(`.${approvedHost}`))
+      );
+    } catch {
+      return destination === approved || destination.endsWith(`.${approved}`);
+    }
+  });
+}
+
+function hostFromUrl(value: string): string | undefined {
+  try {
+    return new URL(value).host;
+  } catch {
+    return undefined;
+  }
 }
 
 function dedupeDetections(detections: Detection[]): Detection[] {
   const seen = new Set<string>();
-  return detections.filter((detection) => {
-    const key = `${detection.metadata.id}:${detection.snippet}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  const unique: Detection[] = [];
+  for (const detection of detections) {
+    const key =
+      detection.dedupeKey ?? `${detection.metadata.id}:${detection.snippet}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(detection);
+    }
+  }
+  return unique;
 }
 
-function compareDiagnostics(a: Finding, b: Finding): number {
-  const aPath = a.evidence.path;
-  const bPath = b.evidence.path;
-  if (aPath !== bPath) return aPath.localeCompare(bPath);
+function findingFromDetection(
+  artifact: Artifact,
+  detection: Detection,
+): Finding {
+  return {
+    id: detection.metadata.id,
+    severity: detection.severity,
+    category: detection.metadata.category,
+    title: detection.metadata.title,
+    evidence: {
+      path: artifact.path,
+      startLine: detection.startLine,
+      endLine: detection.endLine ?? detection.startLine,
+      snippet: snippet(detection.snippet),
+    },
+    whyItMatters: detection.metadata.whyItMatters,
+    remediation: detection.metadata.remediation,
+    constraints: detection.metadata.constraints,
+    verificationSteps: detection.metadata.verificationSteps,
+    llmHint: detection.metadata.llmHint,
+    confidence: detection.metadata.confidence,
+  };
+}
 
-  const aLine = a.evidence.startLine;
-  const bLine = b.evidence.startLine;
-  if (aLine !== bLine) return aLine - bLine;
-
-  return a.id.localeCompare(b.id);
+function snippet(value: string): string {
+  return value.trim().replace(/\s+/g, " ").slice(0, 240);
 }
