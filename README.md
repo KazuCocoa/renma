@@ -391,6 +391,29 @@ Global `approvedDomains` combine with artifact-local
 `approved_network_destinations`. Upload destinations must be approved separately
 with `approvedUploadDomains`.
 
+Security profiles can be defined under `security.profiles` and selected by artifacts with `security_profile` or `securityProfile`. Artifact-local explicit denials such as `network_allowed: false` and `external_upload_allowed: false` remain stricter than inherited profile or repository allowances.
+
+```json
+{
+  "security": {
+    "profiles": {
+      "appium-disclosed-local": {
+        "allowedDataClass": "disclosed",
+        "networkAllowed": true,
+        "externalUploadAllowed": false,
+        "secretsAllowed": false,
+        "humanApprovalRequired": true,
+        "allowedData": ["sanitized diagnostics"],
+        "forbiddenInputs": ["secrets", "credentials"],
+        "approvedDomains": ["github.com"],
+        "approvedUploadDomains": [],
+        "disallowedCommands": ["gh gist create"]
+      }
+    }
+  }
+}
+```
+
 Renma reports deterministic safety findings for agent-facing operational instructions, such as unpinned remote scripts, unsafe privileged commands, predictable temporary paths, and credential-like command arguments.
 
 These findings are guardrails for review. They do not replace secret scanning, SAST, dependency scanning, or human security review.
