@@ -365,11 +365,14 @@ This boundary keeps Renma useful as repository infrastructure. Agent tools can c
 
 Security diagnostics v2 extends the deterministic v1 command checks with
 LLM-facing policy and data-handling diagnostics. Renma recognizes small policy
-metadata such as `network_allowed`, `external_upload_allowed`, `secrets_allowed`,
-and `approved_network_destinations`; reports contradictory or violated policy;
-flags sensitive file and secret-material instructions; and detects external
-uploads, unapproved destinations, bulk sharing, cloud upload, overbroad context
+metadata such as `allowed_data`, `network_allowed`, `external_upload_allowed`,
+`secrets_allowed`, and `requires_human_approval`; reports contradictory or
+violated policy; flags sensitive file and secret-material instructions; and
+detects external uploads, bulk sharing, cloud upload, overbroad context
 collection, and no-redaction instructions.
+
+Approved destination allowlists such as `approved_network_destinations` are
+deferred to a v3 security diagnostics pass.
 
 Renma reports deterministic safety findings for agent-facing operational instructions, such as unpinned remote scripts, unsafe privileged commands, predictable temporary paths, and credential-like command arguments.
 

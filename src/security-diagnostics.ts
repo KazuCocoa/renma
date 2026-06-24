@@ -28,6 +28,7 @@ type SecurityPolicy = {
   externalUploadAllowed?: boolean;
   secretsAllowed?: boolean;
   humanApprovalRequired?: boolean;
+  allowedData?: string;
   approvedNetworkDestinations: string[];
   declared: Set<string>;
   lineByField: Map<string, number>;
@@ -398,6 +399,8 @@ const DESTINATION_POLICY_FIELDS = new Set([
   "allowedNetworkDestinations",
 ]);
 
+const ALLOWED_DATA_POLICY_FIELDS = new Set(["allowed_data", "allowedData"]);
+
 const NETWORK_ACTION_RE =
   /\b(curl|wget|http|https|api|webhook|post|get|upload|download|fetch|send|sync|push)\b|https?:\/\//i;
 const EXTERNAL_UPLOAD_RE =
@@ -406,6 +409,8 @@ const CLOUD_UPLOAD_RE =
   /\b(upload|sync|copy|send|push|publish)\b.*\b(s3|gcs|cloud storage|bucket|drive|dropbox|box|onedrive|blob storage|azure storage|storage)\b/i;
 const BULK_DATA_RE =
   /\b(entire|whole|all|full|complete|raw)\b.*\b(repo|repository|workspace|codebase|project|context|logs?|files?|history|dataset)\b|\b(paste|upload|send|share|attach)\b.*\b(everything|all files|full logs|full context|entire repo|whole repository)\b/i;
+const UNDISCLOSED_DATA_RE =
+  /\b(include|attach|paste|upload|send|share|dump|export|print|collect|provide)\b.*\b(all|entire|full|complete|raw)\b.*\b(environment variables|env vars|env|process\.env|secrets?|credentials?|tokens?)\b/i;
 const OVERBROAD_CONTEXT_RE =
   /\b(load|read|include|attach|paste|ingest|collect|provide|send)\b.*\b(entire|whole|all|full|complete|raw)\b.*\b(repo|repository|workspace|codebase|context|logs?|files?)\b/i;
 const NO_REDACTION_RE =
@@ -430,7 +435,8 @@ const CREDENTIAL_ARG_ANY_RE =
   /--?(token|password|passwd|secret|credential|api[-_]?key|key|cert|certificate|signing[-_]?key|auth)(=|\s+)[^\s"'`]+/i;
 const CREDENTIAL_HEADER_RE =
   /\bAuthorization:\s*Bearer\s+(?!<|\$|\{|\[|REDACTED|redacted|xxx|XXX|placeholder|example)[^\s"'`]+/i;
-const PREDICTABLE_TEMP_RE = /\/tmp\/[A-Za-z0-9._/-]+/g;
+const PREDICTABLE_TEMP_RE = /\/tmp\/[A-Za-z0-9._/-]+/;
+const PREDICTABLE_TEMP_GLOBAL_RE = /\/tmp\/[A-Za-z0-9._/-]+/g;
 
 const SENSITIVE_FILE_PATTERNS = [
   /\.env(?:\b|\.|$)/i,
@@ -447,9 +453,6 @@ const SENSITIVE_FILE_PATTERNS = [
 
 const CLOUD_DESTINATION_RE =
   /\b(s3:\/\/|gs:\/\/|az:\/\/|https?:\/\/(?:[^/\s]+\.)?(?:s3|storage|blob|drive|dropbox|box|onedrive|pastebin|gist|slack|discord)[^/\s]*\S*)/i;
-const URL_RE = /\bhttps?:\/\/[^\s)<>"'`]+/gi;
-const HOST_RE =
-  /\b(?:api|storage|upload|webhook|hooks)\.[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/gi;
 
 export function securityDiagnosticFindings(artifacts: Artifact[]): Finding[] {
   return artifacts.flatMap((artifact) => securityFindingsForArtifact(artifact));
@@ -461,6 +464,18 @@ function securityFindingsForArtifact(artifact: Artifact): Finding[] {
   const lines = artifact.content.split(/\r?\n/);
   let inFence = false;
   let recentApprovalLine = 0;
+
+  if (
+    (artifact.kind === "skill" || artifact.kind === "context") &&
+    policy.allowedData === undefined
+  ) {
+    detections.push({
+      metadata: RULES.missingPolicyMetadata,
+      severity: "medium",
+      startLine: 1,
+      snippet: "missing allowed_data policy metadata",
+    });
+  }
 
   for (let index = 0; index < lines.length; index += 1) {
     const lineNumber = index + 1;
@@ -494,13 +509,7 @@ function securityFindingsForArtifact(artifact: Artifact): Finding[] {
         CREDENTIAL_HEADER_RE.test(line));
 
     detections.push(
-      ...policyDetections(
-        line,
-        lineNumber,
-        policy,
-        commandLine,
-        hasApprovalGuard,
-      ),
+      ...policyDetections(line, lineNumber, policy, hasApprovalGuard),
     );
     if (!commandLine || referencesSensitiveFile(line)) {
       detections.push(...sensitiveDataDetections(line, lineNumber, policy));
@@ -530,30 +539,9 @@ function policyDetections(
   line: string,
   lineNumber: number,
   policy: SecurityPolicy,
-  commandLine: boolean,
   hasApprovalGuard: boolean,
 ): Detection[] {
   const detections: Detection[] = [];
-  const hasSensitiveInstruction =
-    NETWORK_ACTION_RE.test(line) ||
-    EXTERNAL_UPLOAD_RE.test(line) ||
-    SECRET_WORD_RE.test(line);
-
-  if (
-    hasSensitiveInstruction &&
-    policy.declared.size === 0 &&
-    !commandLine &&
-    !isPolicyLine(line) &&
-    !SAFE_NEGATION_RE.test(line) &&
-    !PREDICTABLE_TEMP_RE.test(line)
-  ) {
-    detections.push({
-      metadata: RULES.missingPolicyMetadata,
-      severity: "low",
-      startLine: lineNumber,
-      snippet: line,
-    });
-  }
 
   if (policy.networkAllowed === false && NETWORK_ACTION_RE.test(line)) {
     detections.push({
@@ -586,9 +574,21 @@ function policyDetections(
     });
   }
 
+  if (
+    policy.allowedData?.toLowerCase() === "disclosed" &&
+    UNDISCLOSED_DATA_RE.test(line)
+  ) {
+    detections.push({
+      metadata: RULES.instructionViolatesPolicy,
+      severity: "high",
+      startLine: lineNumber,
+      snippet: line,
+    });
+  }
+
   const needsApproval =
     (EXTERNAL_UPLOAD_RE.test(line) || CLOUD_UPLOAD_RE.test(line)) &&
-    policy.humanApprovalRequired !== true &&
+    policy.humanApprovalRequired === true &&
     !hasApprovalGuard;
   if (needsApproval) {
     detections.push({
@@ -617,19 +617,6 @@ function policyContradictions(policy: SecurityPolicy): Detection[] {
     });
   }
 
-  if (
-    policy.externalUploadAllowed === true &&
-    policy.approvedNetworkDestinations.length === 0
-  ) {
-    detections.push({
-      metadata: RULES.policyContradiction,
-      severity: "medium",
-      startLine: policy.lineByField.get("externalUploadAllowed") ?? 1,
-      snippet:
-        "external_upload_allowed is true without approved_network_destinations",
-    });
-  }
-
   if (policy.secretsAllowed === true && policy.externalUploadAllowed === true) {
     detections.push({
       metadata: RULES.policyContradiction,
@@ -650,7 +637,7 @@ function sensitiveDataDetections(
   const detections: Detection[] = [];
   const sensitiveFile = referencesSensitiveFile(line);
 
-  if (sensitiveFile && !SAFE_NEGATION_RE.test(line)) {
+  if (sensitiveFile && !isSafeSensitiveHandlingInstruction(line)) {
     detections.push({
       metadata: RULES.sensitiveFileReference,
       severity: "high",
@@ -662,7 +649,7 @@ function sensitiveDataDetections(
   const exposesSecret =
     SECRET_ACTION_RE.test(line) &&
     (SECRET_WORD_RE.test(line) || sensitiveFile) &&
-    !SAFE_NEGATION_RE.test(line);
+    !isSafeSensitiveHandlingInstruction(line);
 
   if (exposesSecret) {
     detections.push({
@@ -681,6 +668,18 @@ function sensitiveDataDetections(
 
 function referencesSensitiveFile(line: string): boolean {
   return SENSITIVE_FILE_PATTERNS.some((pattern) => pattern.test(line));
+}
+
+function isSafeSensitiveHandlingInstruction(line: string): boolean {
+  return (
+    SAFE_NEGATION_RE.test(line) ||
+    /\b(never|do not|don't|avoid|exclude|skip)\b.{0,50}\b(upload|send|share|attach|copy|paste|include|print|cat|echo|log|dump)\b/i.test(
+      line,
+    ) ||
+    /\b(upload|send|share|attach|copy|paste|include|print|cat|echo|log|dump)\b.{0,50}\b(never|do not|don't|avoid|exclude|skip)\b/i.test(
+      line,
+    )
+  );
 }
 
 function networkAndUploadDetections(
@@ -715,22 +714,6 @@ function networkAndUploadDetections(
       startLine: lineNumber,
       snippet: line,
     });
-  }
-
-  const destinations = extractDestinations(line);
-  for (const destination of destinations) {
-    if (
-      policy.approvedNetworkDestinations.length > 0 &&
-      !isApprovedDestination(destination, policy.approvedNetworkDestinations)
-    ) {
-      detections.push({
-        metadata: RULES.unapprovedNetworkDestination,
-        severity: "high",
-        startLine: lineNumber,
-        snippet: line,
-      });
-      break;
-    }
   }
 
   return detections;
@@ -815,7 +798,7 @@ function predictableTempDetections(
   line: string,
   lineNumber: number,
 ): Detection[] {
-  const tempMatches = line.match(PREDICTABLE_TEMP_RE) ?? [];
+  const tempMatches = line.match(PREDICTABLE_TEMP_GLOBAL_RE) ?? [];
   if (
     tempMatches.length === 0 ||
     DESTRUCTIVE_COMMAND_RE.test(line) ||
@@ -880,6 +863,13 @@ function parseSecurityPolicy(content: string): SecurityPolicy {
       policy.approvedNetworkDestinations.push(...destinations);
       policy.declared.add("approvedNetworkDestinations");
       policy.lineByField.set("approvedNetworkDestinations", index + 1);
+      continue;
+    }
+
+    if (ALLOWED_DATA_POLICY_FIELDS.has(key)) {
+      policy.allowedData = value;
+      policy.declared.add("allowedData");
+      policy.lineByField.set("allowedData", index + 1);
     }
   }
 
@@ -910,7 +900,9 @@ function isPolicyLine(line: string): boolean {
   const key = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*):/)?.[1];
   return (
     key !== undefined &&
-    (BOOLEAN_POLICY_FIELDS.has(key) || DESTINATION_POLICY_FIELDS.has(key))
+    (BOOLEAN_POLICY_FIELDS.has(key) ||
+      DESTINATION_POLICY_FIELDS.has(key) ||
+      ALLOWED_DATA_POLICY_FIELDS.has(key))
   );
 }
 
@@ -1022,58 +1014,6 @@ function sensitiveTempWords(line: string): boolean {
   return /\b(profile|credential|credentials|secret|token|password|cert|certificate|key|signing|auth|cookie|session|log|dump)\b|\/tmp\/(?:token|secret)\b|\/tmp\/[^/\s]+\.plist\b/i.test(
     line,
   );
-}
-
-function highRiskTempWords(line: string): boolean {
-  return /\b(credential|credentials|secret|token|password|cert|certificate|key|signing|auth|cookie|session|dump)\b|\/tmp\/(?:token|secret)\b/i.test(
-    line,
-  );
-}
-
-function extractDestinations(line: string): string[] {
-  return [
-    ...(line.match(URL_RE) ?? []),
-    ...(line.match(HOST_RE) ?? []),
-    ...(line.match(CLOUD_DESTINATION_RE) ?? []),
-  ].map((destination) => destination.replace(/[.,;:]$/, ""));
-}
-
-function isApprovedDestination(
-  destination: string,
-  approvedDestinations: string[],
-): boolean {
-  return approvedDestinations.some((approved) => {
-    if (destination === approved || destination.startsWith(approved)) {
-      return true;
-    }
-    const approvedHost = hostFromUrl(approved);
-    if (
-      approvedHost !== undefined &&
-      (destination === approvedHost || destination.endsWith(`.${approvedHost}`))
-    ) {
-      return true;
-    }
-    try {
-      const destinationHost = new URL(destination).host;
-      return (
-        destinationHost === approved ||
-        destinationHost.endsWith(`.${approved}`) ||
-        destinationHost === approvedHost ||
-        (approvedHost !== undefined &&
-          destinationHost.endsWith(`.${approvedHost}`))
-      );
-    } catch {
-      return destination === approved || destination.endsWith(`.${approved}`);
-    }
-  });
-}
-
-function hostFromUrl(value: string): string | undefined {
-  try {
-    return new URL(value).host;
-  } catch {
-    return undefined;
-  }
 }
 
 function dedupeDetections(detections: Detection[]): Detection[] {
