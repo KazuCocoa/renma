@@ -688,7 +688,9 @@ function securityFindingsForArtifact(
     });
   }
 
-  detections.push(...bodyPolicyContradictionDetections(artifact.content, policy));
+  detections.push(
+    ...bodyPolicyContradictionDetections(artifact.content, policy),
+  );
 
   for (let index = scanStart; index < lines.length; index += 1) {
     const lineNumber = index + 1;
