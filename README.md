@@ -374,6 +374,23 @@ collection, and no-redaction instructions.
 Security diagnostics v3 also enforces approved destination allowlists such as
 `approved_network_destinations` for URL and domain-like network instructions.
 
+Security diagnostics v4 can also read repository-wide security policy from
+`renma.config.json`:
+
+```json
+{
+  "security": {
+    "approvedDomains": ["github.com", "registry.npmjs.org"],
+    "approvedUploadDomains": ["internal-artifacts.example.com"],
+    "disallowedCommands": ["gh gist create", "pastebin", "webhook.site", "nc"]
+  }
+}
+```
+
+Global `approvedDomains` combine with artifact-local
+`approved_network_destinations`. Upload destinations must be approved separately
+with `approvedUploadDomains`.
+
 Renma reports deterministic safety findings for agent-facing operational instructions, such as unpinned remote scripts, unsafe privileged commands, predictable temporary paths, and credential-like command arguments.
 
 These findings are guardrails for review. They do not replace secret scanning, SAST, dependency scanning, or human security review.
