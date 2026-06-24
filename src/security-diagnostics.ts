@@ -1,4 +1,4 @@
-import type { Artifact, Finding } from "./types.js";
+import type { Artifact, Finding, SecurityConfig } from "./types.js";
 
 type SecurityCategory = "safety";
 
@@ -30,6 +30,8 @@ type SecurityPolicy = {
   humanApprovalRequired?: boolean;
   allowedData?: string;
   approvedNetworkDestinations: string[];
+  approvedUploadDestinations: string[];
+  disallowedCommands: string[];
   declared: Set<string>;
   lineByField: Map<string, number>;
 };
@@ -203,6 +205,26 @@ const RULES = {
       "Compare the referenced URL or host to approved_network_destinations and either approve it explicitly or remove the instruction.",
     confidence: "high",
   },
+  unapprovedUploadDestination: {
+    id: "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+    category: "safety",
+    title: "Instruction references an unapproved upload destination",
+    whyItMatters:
+      "Upload destinations need a stricter allowlist because they can receive repository data, logs, credentials, or private context.",
+    remediation:
+      "Add the destination to security.approvedUploadDomains after review, or remove the upload instruction.",
+    constraints: [
+      "Do not treat general network approval as upload approval.",
+      "Keep upload destinations explicit and deterministic.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm every upload destination is approved or removed.",
+    ],
+    llmHint:
+      "Compare the referenced upload URL or host to security.approvedUploadDomains and either approve it explicitly or remove the instruction.",
+    confidence: "high",
+  },
   bulkDataSharingInstruction: {
     id: "SEC-BULK-DATA-SHARING-INSTRUCTION",
     category: "safety",
@@ -343,6 +365,26 @@ const RULES = {
       "Add an explicit approval requirement before sudo, chmod/chown, docker privileged operations, or system writes.",
     confidence: "medium",
   },
+  dangerousToolInstruction: {
+    id: "SEC-DANGEROUS-TOOL-INSTRUCTION",
+    category: "safety",
+    title: "Instruction uses a disallowed tool or command",
+    whyItMatters:
+      "Repository policy can ban tools that exfiltrate data, open raw sockets, or publish content outside reviewed workflows.",
+    remediation:
+      "Remove the disallowed command or replace it with an approved, auditable workflow.",
+    constraints: [
+      "Do not bypass the configured disallowed command list.",
+      "Keep any replacement workflow deterministic and reviewable.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm disallowed command instructions have been removed or rewritten.",
+    ],
+    llmHint:
+      "Check security.disallowedCommands and remove instructions that invoke those commands or services.",
+    confidence: "high",
+  },
   credentialInCommandArg: {
     id: "SEC-CREDENTIAL-IN-COMMAND-ARG",
     category: "safety",
@@ -405,6 +447,13 @@ const DESTINATION_POLICY_FIELDS = new Set([
   "allowedNetworkDestinations",
 ]);
 
+const UPLOAD_DESTINATION_POLICY_FIELDS = new Set([
+  "approved_upload_destinations",
+  "approvedUploadDestinations",
+  "approved_upload_domains",
+  "approvedUploadDomains",
+]);
+
 const ALLOWED_DATA_POLICY_FIELDS = new Set(["allowed_data", "allowedData"]);
 
 const NETWORK_ACTION_RE =
@@ -416,6 +465,8 @@ const EXTERNAL_UPLOAD_RE =
   /\b(upload|send|post|share|attach|submit|sync|push|publish)\b.*\b(external|remote|third[- ]party|pastebin|gist|slack|discord|s3|gcs|cloud|storage|bucket|drive|dropbox|notion|jira|github)\b|\b(post|put)\b.*https?:\/\//i;
 const CLOUD_UPLOAD_RE =
   /\b(upload|sync|copy|send|push|publish)\b.*\b(s3|gcs|cloud storage|bucket|drive|dropbox|box|onedrive|blob storage|azure storage|storage)\b/i;
+const UPLOAD_DESTINATION_ACTION_RE =
+  /\b(upload|send|post|put|share|attach|submit|sync|push|publish|copy)\b|--data(?:-binary)?\b|-X\s*(?:POST|PUT)\b/i;
 const BULK_DATA_RE =
   /\b(entire|whole|all|full|complete|raw)\b.*\b(repo|repository|workspace|codebase|project|context|logs?|files?|history|dataset)\b|\b(paste|upload|send|share|attach)\b.*\b(everything|all files|full logs|full context|entire repo|whole repository)\b/i;
 const UNDISCLOSED_DATA_RE =
@@ -463,12 +514,27 @@ const SENSITIVE_FILE_PATTERNS = [
 const CLOUD_DESTINATION_RE =
   /\b(s3:\/\/|gs:\/\/|az:\/\/|https?:\/\/(?:[^/\s]+\.)?(?:s3|storage|blob|drive|dropbox|box|onedrive|pastebin|gist|slack|discord)[^/\s]*\S*)/i;
 
-export function securityDiagnosticFindings(artifacts: Artifact[]): Finding[] {
-  return artifacts.flatMap((artifact) => securityFindingsForArtifact(artifact));
+type SecurityDiagnosticsConfig = {
+  security?: SecurityConfig;
+};
+
+export function securityDiagnosticFindings(
+  artifacts: Artifact[],
+  config: SecurityDiagnosticsConfig = {},
+): Finding[] {
+  return artifacts.flatMap((artifact) =>
+    securityFindingsForArtifact(artifact, config.security),
+  );
 }
 
-function securityFindingsForArtifact(artifact: Artifact): Finding[] {
-  const policy = parseSecurityPolicy(artifact.content);
+function securityFindingsForArtifact(
+  artifact: Artifact,
+  securityConfig?: SecurityConfig,
+): Finding[] {
+  const policy = applySecurityConfig(
+    parseSecurityPolicy(artifact.content),
+    securityConfig,
+  );
   const detections: Detection[] = [];
   const lines = artifact.content.split(/\r?\n/);
   let inFence = false;
@@ -520,6 +586,7 @@ function securityFindingsForArtifact(artifact: Artifact): Finding[] {
     detections.push(
       ...policyDetections(line, lineNumber, policy, hasApprovalGuard),
     );
+    detections.push(...disallowedCommandDetections(line, lineNumber, policy));
     if (!commandLine || referencesSensitiveFile(line)) {
       detections.push(...sensitiveDataDetections(line, lineNumber, policy));
     }
@@ -542,6 +609,27 @@ function securityFindingsForArtifact(artifact: Artifact): Finding[] {
   return dedupeDetections(detections).map((detection) =>
     findingFromDetection(artifact, detection),
   );
+}
+
+function disallowedCommandDetections(
+  line: string,
+  lineNumber: number,
+  policy: SecurityPolicy,
+): Detection[] {
+  const matched = policy.disallowedCommands.find((command) =>
+    matchesDisallowedCommand(line, command),
+  );
+  if (matched === undefined) return [];
+
+  return [
+    {
+      metadata: RULES.dangerousToolInstruction,
+      severity: "high",
+      startLine: lineNumber,
+      snippet: line,
+      dedupeKey: `${RULES.dangerousToolInstruction.id}:${matched.toLowerCase()}:${lineNumber}`,
+    },
+  ];
 }
 
 function policyDetections(
@@ -576,13 +664,32 @@ function policyDetections(
     }
   }
 
-  if (policy.externalUploadAllowed === false && EXTERNAL_UPLOAD_RE.test(line)) {
+  if (policy.externalUploadAllowed === false && isUploadInstruction(line)) {
     detections.push({
       metadata: RULES.instructionViolatesPolicy,
       severity: "high",
       startLine: lineNumber,
       snippet: line,
     });
+  }
+
+  if (
+    policy.externalUploadAllowed !== false &&
+    policy.approvedUploadDestinations.length > 0 &&
+    isUploadInstruction(line)
+  ) {
+    for (const destination of unapprovedDestinations(
+      line,
+      policy.approvedUploadDestinations,
+    )) {
+      detections.push({
+        metadata: RULES.unapprovedUploadDestination,
+        severity: "high",
+        startLine: lineNumber,
+        snippet: line,
+        dedupeKey: destination.host + destination.path,
+      });
+    }
   }
 
   if (
@@ -847,6 +954,8 @@ function predictableTempDetections(
 function parseSecurityPolicy(content: string): SecurityPolicy {
   const policy: SecurityPolicy = {
     approvedNetworkDestinations: [],
+    approvedUploadDestinations: [],
+    disallowedCommands: [],
     declared: new Set(),
     lineByField: new Map(),
   };
@@ -890,6 +999,14 @@ function parseSecurityPolicy(content: string): SecurityPolicy {
       continue;
     }
 
+    if (UPLOAD_DESTINATION_POLICY_FIELDS.has(key)) {
+      const destinations = parseList(value);
+      policy.approvedUploadDestinations.push(...destinations);
+      policy.declared.add("approvedUploadDestinations");
+      policy.lineByField.set("approvedUploadDestinations", index + 1);
+      continue;
+    }
+
     if (ALLOWED_DATA_POLICY_FIELDS.has(key)) {
       policy.allowedData = value;
       policy.declared.add("allowedData");
@@ -898,6 +1015,38 @@ function parseSecurityPolicy(content: string): SecurityPolicy {
   }
 
   return policy;
+}
+
+function applySecurityConfig(
+  policy: SecurityPolicy,
+  config?: SecurityConfig,
+): SecurityPolicy {
+  if (config === undefined) return policy;
+
+  const declared = new Set(policy.declared);
+  if (config.approvedDomains.length > 0) {
+    declared.add("approvedNetworkDestinations");
+  }
+  if (config.approvedUploadDomains.length > 0) {
+    declared.add("approvedUploadDestinations");
+  }
+
+  return {
+    ...policy,
+    approvedNetworkDestinations: [
+      ...config.approvedDomains,
+      ...policy.approvedNetworkDestinations,
+    ],
+    approvedUploadDestinations: [
+      ...config.approvedUploadDomains,
+      ...policy.approvedUploadDestinations,
+    ],
+    disallowedCommands: [
+      ...config.disallowedCommands,
+      ...policy.disallowedCommands,
+    ],
+    declared,
+  };
 }
 
 function parseBoolean(value: string): boolean | undefined {
@@ -924,7 +1073,14 @@ function unapprovedNetworkDestinations(
   line: string,
   policy: SecurityPolicy,
 ): NetworkDestination[] {
-  const approved = policy.approvedNetworkDestinations
+  return unapprovedDestinations(line, policy.approvedNetworkDestinations);
+}
+
+function unapprovedDestinations(
+  line: string,
+  approvedDestinations: string[],
+): NetworkDestination[] {
+  const approved = approvedDestinations
     .map((destination) => normalizeNetworkDestination(destination))
     .filter(
       (destination): destination is NetworkDestination =>
@@ -939,6 +1095,15 @@ function unapprovedNetworkDestinations(
       !approved.some((approvedDestination) =>
         networkDestinationMatches(destination, approvedDestination),
       ),
+  );
+}
+
+function isUploadInstruction(line: string): boolean {
+  return (
+    EXTERNAL_UPLOAD_RE.test(line) ||
+    CLOUD_UPLOAD_RE.test(line) ||
+    (UPLOAD_DESTINATION_ACTION_RE.test(line) &&
+      extractNetworkDestinations(line).length > 0)
   );
 }
 
@@ -1006,12 +1171,32 @@ function networkDestinationMatches(
   );
 }
 
+function matchesDisallowedCommand(line: string, command: string): boolean {
+  const normalizedLine = line.toLowerCase().replace(/\s+/g, " ");
+  const normalizedCommand = command.trim().toLowerCase().replace(/\s+/g, " ");
+  if (normalizedCommand.length === 0) return false;
+
+  if (/^[a-z0-9_-]+$/.test(normalizedCommand)) {
+    const escaped = escapeRegExp(normalizedCommand);
+    return new RegExp(`(^|[^a-z0-9_-])${escaped}($|[^a-z0-9_-])`).test(
+      normalizedLine,
+    );
+  }
+
+  return normalizedLine.includes(normalizedCommand);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function isPolicyLine(line: string): boolean {
   const key = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*):/)?.[1];
   return (
     key !== undefined &&
     (BOOLEAN_POLICY_FIELDS.has(key) ||
       DESTINATION_POLICY_FIELDS.has(key) ||
+      UPLOAD_DESTINATION_POLICY_FIELDS.has(key) ||
       ALLOWED_DATA_POLICY_FIELDS.has(key))
   );
 }

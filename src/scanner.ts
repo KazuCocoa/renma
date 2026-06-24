@@ -22,7 +22,7 @@ export async function scan(
     ...runRules(documents, config, catalogResult.catalog),
     ...detectRepeatedContextPatterns(documents),
     ...catalogDiagnosticFindings(catalogResult.diagnostics),
-    ...securityDiagnosticFindings(artifacts),
+    ...securityDiagnosticFindings(artifacts, config),
   ].sort((a, b) => {
     const byPath = a.evidence.path.localeCompare(b.evidence.path);
     if (byPath !== 0) return byPath;

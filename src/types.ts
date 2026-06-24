@@ -48,6 +48,12 @@ export interface LayoutPolicyConfig {
   workflowAliases: Record<string, string>;
 }
 
+export interface SecurityConfig {
+  approvedDomains: string[];
+  approvedUploadDomains: string[];
+  disallowedCommands: string[];
+}
+
 /** Effective scan configuration after defaults, config files, and CLI overrides. */
 export interface ScanConfig {
   failOn: Severity;
@@ -58,6 +64,7 @@ export interface ScanConfig {
   maxDepth: number;
   concurrency: number;
   layout: LayoutPolicyConfig;
+  security: SecurityConfig;
 }
 
 /** Loaded configuration plus the path it came from, when applicable. */

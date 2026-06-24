@@ -29,6 +29,11 @@ export const DEFAULT_CONFIG: ScanConfig = {
   layout: {
     workflowAliases: {},
   },
+  security: {
+    approvedDomains: [],
+    approvedUploadDomains: [],
+    disallowedCommands: [],
+  },
 };
 
 /** Error raised for invalid Renma configuration or CLI configuration input. */
@@ -114,6 +119,7 @@ function normalizeConfig(
     "max_depth",
     "concurrency",
     "layout",
+    "security",
   ]);
   for (const key of Object.keys(value)) {
     if (!allowed.has(key)) {
@@ -144,6 +150,8 @@ function normalizeConfig(
     config.concurrency = positiveInteger("concurrency", value.concurrency);
 
   if (value.layout !== undefined) config.layout = layoutPolicy(value.layout);
+  if (value.security !== undefined)
+    config.security = securityPolicy(value.security);
   return config;
 }
 
@@ -212,6 +220,48 @@ function layoutPolicy(value: unknown): ScanConfig["layout"] {
       ...DEFAULT_CONFIG.layout.workflowAliases,
       ...workflowAliases,
     },
+  };
+}
+
+function securityPolicy(value: unknown): ScanConfig["security"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ConfigError("security must be an object.");
+  }
+  const security = value as Record<string, unknown>;
+  const allowed = new Set([
+    "approvedDomains",
+    "approvedUploadDomains",
+    "disallowedCommands",
+  ]);
+  for (const key of Object.keys(security)) {
+    if (!allowed.has(key)) {
+      throw new ConfigError(
+        `Unknown security config key "${key}". Allowed keys: ${[
+          ...allowed,
+        ].join(", ")}.`,
+      );
+    }
+  }
+
+  return {
+    approvedDomains:
+      security.approvedDomains === undefined
+        ? DEFAULT_CONFIG.security.approvedDomains
+        : stringArray("security.approvedDomains", security.approvedDomains),
+    approvedUploadDomains:
+      security.approvedUploadDomains === undefined
+        ? DEFAULT_CONFIG.security.approvedUploadDomains
+        : stringArray(
+            "security.approvedUploadDomains",
+            security.approvedUploadDomains,
+          ),
+    disallowedCommands:
+      security.disallowedCommands === undefined
+        ? DEFAULT_CONFIG.security.disallowedCommands
+        : stringArray(
+            "security.disallowedCommands",
+            security.disallowedCommands,
+          ),
   };
 }
 
