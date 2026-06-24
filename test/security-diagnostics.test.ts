@@ -652,6 +652,7 @@ allowed_data: endpoint reachability only
 ---
 
 nc -vz example.com 443
+nc -vz internal.example.com 443
 gh gist create logs.txt
 `);
   const findings = securityDiagnosticFindings([artifact], {
@@ -665,7 +666,7 @@ gh gist create logs.txt
     (finding) => finding.id === "SEC-DANGEROUS-TOOL-INSTRUCTION",
   );
 
-  assert.equal(dangerousFindings.length, 2);
+  assert.equal(dangerousFindings.length, 3);
 });
 
 test("scan applies security config from renma config", async () => {

@@ -627,7 +627,7 @@ function disallowedCommandDetections(
       severity: "high",
       startLine: lineNumber,
       snippet: line,
-      dedupeKey: matched.toLowerCase(),
+      dedupeKey: `${RULES.dangerousToolInstruction.id}:${matched.toLowerCase()}:${lineNumber}`,
     },
   ];
 }
