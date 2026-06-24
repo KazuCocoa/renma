@@ -314,33 +314,20 @@ Renma keeps those assets clean, owned, validated, deduplicated, and easy for age
 
 ### Completed Baseline
 
-- First-class `context` assets under `contexts/**/*.md` and `context/**/*.md`
-- Context discovery distinct from skill-local `references/`, `profiles/`, and `examples/`
-- Deterministic scan and catalog metadata consistency
-- Invalid lifecycle status detection
-- Missing shared context `id` and `owner` diagnostics
-- Semantic context path advisory for process-state folders
-- Duplicate asset ID detection
-- Unknown declared reference detection
-- Deprecated or archived declared reference validation
-- Orphaned shared context asset detection
-- Superseded local support asset reference advisories
-- Ownership coverage reporting
-- Context graph snapshot reporting
-- LLM-actionable finding fields for safe external repair loops
-- Readiness repository health report
-- Repeated-context discovery
-- Semantic diff across Git refs
-- CI / PR review report artifact
-- Security diagnostics v1 for agent-facing operational instructions
-- 0.1.0 release baseline
-- Dogfood result captured against the Renma repository
+Renma's shipped baseline is now grouped around:
+
+- Repository discovery for `contexts/**/*.md`, `context/**/*.md`, and skill-adjacent `references/`, `profiles/`, and `examples/`.
+- Deterministic scan and catalog diagnostics for metadata IDs, owners, tags, paths, references, dependencies, manifest shape, layout policy, duplicate context, repeated context, and security policy issues.
+- CLI-first views for `scan`, `catalog`, `ownership`, `graph`, `readiness`, `repeated-context`, `diff`, `ci-report`, `inspect`, and `suggest-semantic-split`.
+- LLM-actionable output without an LLM runtime dependency: Markdown and JSON diagnostics provide stable IDs, severity, evidence, and repair guidance.
+- Security diagnostics v1 for agent-facing network, upload, and secret-material policy; approved network destinations; approved upload domains; command-risk patterns; profile inheritance and cycles; and policy contradictions.
+- Historical `0.1.0` manifests remain supported as legacy input. Current planning should describe the merged implementation, not a separate `0.2.0` security command.
 
 ### Near-Term Implementation
 
-- Security diagnostics follow-ups for policy tuning and additional conservative rule batches
-- CI integration examples and sample readiness reports
-- Optional LLM-assisted repository evaluation bundles
+- Security refinement in upload, network, secret-material, and diagnostics coverage.
+- Deterministic dependency and CI artifact diagnostics for agent-facing repository artifacts.
+- Optional LLM-assisted repository evaluation bundles remain external and advisory, not diff or CI truth.
 
 ### Later / External Evidence
 
@@ -351,7 +338,7 @@ Renma keeps those assets clean, owned, validated, deduplicated, and easy for age
 
 ### 1. Scanner And Metadata Stabilization
 
-Current Renma lives here. Continue strengthening deterministic scanning, config loading, path normalization, Markdown parsing, and metadata parsing.
+Current Renma lives here. Continue strengthening deterministic scanning, config loading, path normalization, Markdown parsing, and metadata parsing, while treating diagnostics v1 as merged across scan/catalog/readiness/diff/CI/inspect/suggest-semantic-split instead of as a separate history or design track.
 
 Immediate priorities:
 
@@ -544,45 +531,27 @@ No-LLM workflows must remain first-class.
 
 ## Security and supply-chain safety
 
-Renma should treat agent-facing repository content as part of the software supply chain. Skills, context assets, examples, setup guides, and troubleshooting instructions may be read by agents and turned into commands, patches, or operational recommendations.
+Renma does not execute skills, install dependencies, or call an LLM to judge content. Its safety model is deterministic, Git-native, and artifact-facing: make agent instructions reviewable before they are reused in prompts, CI jobs, or local automation.
 
-Renma checks whether LLM-facing skills, context assets, and repository guidance contain risky instructions or patterns that agents may read, copy, execute, or recommend.
+The merged security diagnostics are narrower than a generic command block-list. They understand LLM-facing policy metadata and instruction text for:
 
-Renma is not a replacement for SAST, dependency auditing, vulnerability scanning, or dedicated secret scanning. Its role is to provide deterministic safety signals for LLM-facing repository content.
+- `network_allowed` and approved network destinations, including `approved_network_destinations` and `security.approvedDomains`.
+- `external_upload_allowed` and approved upload domains, including `approved_upload_domains` and `security.approvedUploadDomains`.
+- Secret-material and credential handling, including commands that pass credentials in arguments.
+- Security profile inheritance, missing profiles, cycles, contradictions, and artifact-local policy overrides.
+- Risky command/context patterns such as predictable temp paths, broad chmod or sudo usage, ignored recovery paths, and upload/network instructions that violate declared policy.
 
-Renma should warn when reusable guidance contains patterns that increase supply-chain or local-environment risk, such as:
+Core security contract:
 
-- literal secret-like values or private key material
-- remote script execution patterns such as `curl | sh` or `wget | sh`
-- unpinned dependency installation guidance when reproducibility matters
-- package manager script assumptions such as unsafe `postinstall` behavior
-- destructive commands without nearby confirmation, dry-run, backup, or recovery guidance
-- broad environment forwarding into subprocesses, containers, CI jobs, or scripts
-- hardcoded user-local paths or machine-specific assumptions in reusable guidance
-- commands that require `sudo`, recursive ownership changes, or broad permissions without explaining scope and rollback
-- CI examples that risk exposing secrets or tokens
-- instructions that tell agents or users to bypass verification, ignore warnings, or disable safety checks
+```text
+LLM proposes. Renma verifies. Human approves.
+```
 
-These checks should remain deterministic and evidence-based. Renma should not execute commands, fetch remote scripts for inspection by default, call an LLM to judge intent, or automatically rewrite files.
-
-The goal is not to ban all risky commands. The goal is to require reviewable context: confirmation, scope, preconditions, safer alternatives, verification, and recovery guidance.
-
-Current:
-
-- static safety checks for secret-like literals, private key material, destructive commands, risky remote defaults, broad environment propagation, and hardcoded local paths
+Agent-facing allowed network access, upload, and secret-material rules live in checked-in metadata/config. Diagnostics are deterministic and LLM-actionable: they report stable rule IDs, severity, evidence, and remediation text for humans, agents, CI, and PR review. Renma should continue to explain why something is risky; it should not auto-repair security issues or become a runtime sandbox.
 
 Near-term / future:
 
-- stronger agent-facing supply-chain safety rules
-- better diagnostics for remote install guidance and package-manager risk
-- CI and setup-script safety examples
-- clearer repair guidance for risky command/context patterns
-
-Important boundaries:
-
-- Do not turn Renma into a vulnerability scanner.
-- Do not execute package manager commands.
-- Do not fetch or evaluate remote scripts by default.
-- Do not use LLM judgment for core security checks.
-- Do not auto-repair security issues.
-- Emit deterministic evidence and review guidance only.
+- Harden rule coverage for dependency and supply-chain artifacts that agents commonly touch, including package manager scripts, CI workflow commands, generated artifacts, and task-time tooling notes.
+- Keep output useful for CI/PR review by improving JSON and Markdown diagnostics rather than adding a standalone `security-diagnostics-v6` command.
+- Add focused tests before broadening heuristics, especially for upload/network allow-lists, security profile inheritance, command-risk findings, and false-positive suppression.
+- Keep LLM assistance optional and outside the trusted decision path; Renma remains deterministic, non-runtime, and non-LLM.
