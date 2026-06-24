@@ -798,14 +798,11 @@ function bodyPolicyContradictionDetections(
     const candidates: Array<[string, boolean]> = [
       [
         "network",
-        (policy.networkAllowed === true ||
-          policy.approvedNetworkDestinations.length > 0) &&
-          BODY_NETWORK_DISALLOWED_RE.test(line),
+        policy.networkAllowed === true && BODY_NETWORK_DISALLOWED_RE.test(line),
       ],
       [
         "upload",
-        (policy.externalUploadAllowed === true ||
-          policy.approvedUploadDestinations.length > 0) &&
+        policy.externalUploadAllowed === true &&
           BODY_UPLOAD_DISALLOWED_RE.test(line),
       ],
       [
@@ -1620,7 +1617,13 @@ function forbiddenInputDetection(
 
   const pattern = new RegExp(`\\b${escapeRegExp(needle)}\\b`, "i");
   const lines = content.split(/\r?\n/);
-  for (const [index, line] of lines.entries()) {
+  const frontmatterEnd =
+    lines[0]?.trim() === "---"
+      ? lines.findIndex((line, index) => index > 0 && line.trim() === "---")
+      : -1;
+  const scanStart = frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
+  for (let index = scanStart; index < lines.length; index += 1) {
+    const line = lines[index] ?? "";
     if (!pattern.test(line)) continue;
     if (SAFE_FORBIDDEN_INPUT_PATTERN.test(line)) continue;
     if (!FORBIDDEN_INPUT_ACTION_PATTERN.test(line)) continue;

@@ -739,6 +739,50 @@ Do not use network access for this workflow.
   assert.match(finding.evidence.snippet, /Do not use network access/);
 });
 
+test("repo-level approved domains do not imply body network permission", () => {
+  const artifact = v2SecurityArtifact(`---
+allowed_data: disclosed
+---
+
+Do not use network access for this workflow.
+`);
+
+  const findings = securityDiagnosticFindings([artifact], {
+    security: {
+      approvedDomains: ["github.com"],
+      approvedUploadDomains: [],
+      disallowedCommands: [],
+    },
+  });
+
+  assert.equal(
+    findings.some((finding) => finding.id === "SEC-BODY-POLICY-CONTRADICTION"),
+    false,
+  );
+});
+
+test("repo-level approved upload domains do not imply body upload permission", () => {
+  const artifact = v2SecurityArtifact(`---
+allowed_data: disclosed
+---
+
+Do not upload artifacts for this workflow.
+`);
+
+  const findings = securityDiagnosticFindings([artifact], {
+    security: {
+      approvedDomains: [],
+      approvedUploadDomains: ["internal-artifacts.example.com"],
+      disallowedCommands: [],
+    },
+  });
+
+  assert.equal(
+    findings.some((finding) => finding.id === "SEC-BODY-POLICY-CONTRADICTION"),
+    false,
+  );
+});
+
 function v2SecurityArtifact(
   content: string,
   kind: "skill" | "context" = "skill",
