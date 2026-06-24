@@ -542,6 +542,8 @@ const SECURITY_PROFILE_POLICY_FIELDS = new Set([
 ]);
 const FORBIDDEN_INPUT_ACTION_PATTERN =
   /\b(copy|print|cat|echo|paste|upload|send|share|attach|include|dump|export|log|summari[sz]e|read|collect|provide|load|use)\b/i;
+const SAFE_FORBIDDEN_INPUT_PATTERN =
+  /\b(do\s+not|don't|never|avoid|exclude|without|redact|remove|omit|strip|skip)\b.{0,80}\b(secret|secrets|credential|credentials|token|password|private key|private keys|\.env|env files?|customer data)\b/i;
 
 const NETWORK_ACTION_RE =
   /\b(curl|wget|http|https|api|webhook|post|get|upload|download|fetch|send|sync|push)\b|https?:\/\//i;
@@ -1269,17 +1271,46 @@ function securityPolicyResolutionDetections(
     return detections;
   }
 
-  const inheritedNetworkAllowed = chain.profiles.some(
-    (item) => item.profile.networkAllowed === true,
+  const inheritedNetworkAllowed = inheritedBoolean(chain, "networkAllowed");
+  const inheritedUploadAllowed = inheritedBoolean(chain, "externalUploadAllowed");
+  const inheritedSecretsAllowed = inheritedBoolean(chain, "secretsAllowed");
+  const inheritedNetworkDestinations = chain.profiles.some(
+    (item) => item.profile.approvedDomains.length > 0,
   );
-  const inheritedUploadAllowed = chain.profiles.some(
-    (item) => item.profile.externalUploadAllowed === true,
+  const inheritedUploadDestinations = chain.profiles.some(
+    (item) => item.profile.approvedUploadDomains.length > 0,
+  );
+
+  addScalarOverrideContradiction(
+    detections,
+    parsedPolicy,
+    content,
+    "networkAllowed",
+    inheritedNetworkAllowed,
+    profileLine,
+  );
+  addScalarOverrideContradiction(
+    detections,
+    parsedPolicy,
+    content,
+    "externalUploadAllowed",
+    inheritedUploadAllowed,
+    profileLine,
+  );
+  addScalarOverrideContradiction(
+    detections,
+    parsedPolicy,
+    content,
+    "secretsAllowed",
+    inheritedSecretsAllowed,
+    profileLine,
   );
 
   if (
     parsedPolicy.declared.has("networkAllowed") &&
     parsedPolicy.networkAllowed === false &&
     (inheritedNetworkAllowed ||
+      inheritedNetworkDestinations ||
       resolvedPolicy.approvedNetworkDestinations.length >
         parsedPolicy.approvedNetworkDestinations.length)
   ) {
@@ -1300,6 +1331,7 @@ function securityPolicyResolutionDetections(
     parsedPolicy.declared.has("externalUploadAllowed") &&
     parsedPolicy.externalUploadAllowed === false &&
     (inheritedUploadAllowed ||
+      inheritedUploadDestinations ||
       resolvedPolicy.approvedUploadDestinations.length >
         parsedPolicy.approvedUploadDestinations.length)
   ) {
@@ -1327,6 +1359,52 @@ function securityPolicyResolutionDetections(
   return detections;
 }
 
+function inheritedBoolean(
+  chain: SecurityProfileChain,
+  field: "networkAllowed" | "externalUploadAllowed" | "secretsAllowed",
+): boolean | undefined {
+  for (let index = chain.profiles.length - 1; index >= 0; index -= 1) {
+    const value = chain.profiles[index]?.profile[field];
+    if (value !== undefined) return value;
+  }
+  return undefined;
+}
+
+function addScalarOverrideContradiction(
+  detections: Detection[],
+  parsedPolicy: SecurityPolicy,
+  content: string,
+  field: "networkAllowed" | "externalUploadAllowed" | "secretsAllowed",
+  inheritedValue: boolean | undefined,
+  fallbackLine: number,
+): void {
+  const artifactValue = parsedPolicy[field];
+  if (
+    inheritedValue === false &&
+    artifactValue === true &&
+    parsedPolicy.declared.has(field)
+  ) {
+    pushOverrideContradiction(detections, parsedPolicy, content, field, fallbackLine);
+  }
+}
+
+function pushOverrideContradiction(
+  detections: Detection[],
+  parsedPolicy: SecurityPolicy,
+  content: string,
+  field: "networkAllowed" | "externalUploadAllowed" | "secretsAllowed",
+  fallbackLine: number,
+): void {
+  const line = parsedPolicy.lineByField.get(field) ?? fallbackLine;
+  detections.push({
+    metadata: RULES.policyOverrideContradiction,
+    severity: "high",
+    startLine: line,
+    snippet: lineSnippet(content, line) ?? field,
+    dedupeKey: `override-contradiction:${field}`,
+  });
+}
+
 function forbiddenInputDetection(
   content: string,
   forbiddenInput: string,
@@ -1338,6 +1416,7 @@ function forbiddenInputDetection(
   const lines = content.split(/\r?\n/);
   for (const [index, line] of lines.entries()) {
     if (!pattern.test(line)) continue;
+    if (SAFE_FORBIDDEN_INPUT_PATTERN.test(line)) continue;
     if (!FORBIDDEN_INPUT_ACTION_PATTERN.test(line)) continue;
     return {
       metadata: RULES.forbiddenInputInstruction,

@@ -191,6 +191,111 @@ Fetch https://github.com/appium/appium.`),
   );
 });
 
+test("security diagnostics report artifact upload override that weakens profile policy", () => {
+  const findings = securityDiagnosticFindings(
+    [artifact(`---
+security_profile: strict-local
+external_upload_allowed: true
+---
+
+Upload sanitized diagnostics to https://github.com/example/repo.`)],
+    {
+      security: {
+        ...baseSecurityConfig,
+        profiles: {
+          "strict-local": {
+            externalUploadAllowed: false,
+            allowedData: [],
+            forbiddenInputs: [],
+            approvedDomains: [],
+            approvedUploadDomains: [],
+            disallowedCommands: [],
+          },
+        },
+      },
+    },
+  );
+
+  assert.ok(
+    findings.some(
+      (finding) => finding.id === "SEC-POLICY-OVERRIDE-CONTRADICTION",
+    ),
+  );
+});
+
+test("security diagnostics report artifact secrets override that weakens profile policy", () => {
+  const findings = securityDiagnosticFindings(
+    [artifact(`---
+security_profile: strict-local
+secrets_allowed: true
+---
+
+Use credentials from the local environment.`)],
+    {
+      security: {
+        ...baseSecurityConfig,
+        profiles: {
+          "strict-local": {
+            secretsAllowed: false,
+            allowedData: [],
+            forbiddenInputs: [],
+            approvedDomains: [],
+            approvedUploadDomains: [],
+            disallowedCommands: [],
+          },
+        },
+      },
+    },
+  );
+
+  assert.ok(
+    findings.some(
+      (finding) => finding.id === "SEC-POLICY-OVERRIDE-CONTRADICTION",
+    ),
+  );
+});
+
+test("security diagnostics do not report forbidden inputs for safe negative wording", () => {
+  const findings = securityDiagnosticFindings(
+    [artifact(`---
+security_profile: strict-local
+---
+
+Do not include credentials.
+Never upload .env files.
+Redact private keys before sharing diagnostics.
+Exclude secrets from the report.`)],
+    {
+      security: {
+        ...baseSecurityConfig,
+        profiles: {
+          "strict-local": {
+            allowedData: [],
+            forbiddenInputs: [
+              "credentials",
+              ".env files",
+              "private keys",
+              "secrets",
+            ],
+            approvedDomains: [],
+            approvedUploadDomains: [],
+            disallowedCommands: [],
+          },
+        },
+      },
+    },
+  );
+
+  assert.equal(
+    findings.some(
+      (finding) =>
+        finding.id === "SEC-FORBIDDEN-INPUT-INSTRUCTION" &&
+        finding.severity === "high",
+    ),
+    false,
+  );
+});
+
 function artifact(content: string): Artifact {
   return {
     path: "skills/appium/SKILL.md",
