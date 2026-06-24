@@ -193,12 +193,14 @@ Fetch https://github.com/appium/appium.`),
 
 test("security diagnostics report artifact upload override that weakens profile policy", () => {
   const findings = securityDiagnosticFindings(
-    [artifact(`---
+    [
+      artifact(`---
 security_profile: strict-local
 external_upload_allowed: true
 ---
 
-Upload sanitized diagnostics to https://github.com/example/repo.`)],
+Upload sanitized diagnostics to https://github.com/example/repo.`),
+    ],
     {
       security: {
         ...baseSecurityConfig,
@@ -225,12 +227,14 @@ Upload sanitized diagnostics to https://github.com/example/repo.`)],
 
 test("security diagnostics report artifact secrets override that weakens profile policy", () => {
   const findings = securityDiagnosticFindings(
-    [artifact(`---
+    [
+      artifact(`---
 security_profile: strict-local
 secrets_allowed: true
 ---
 
-Use credentials from the local environment.`)],
+Use credentials from the local environment.`),
+    ],
     {
       security: {
         ...baseSecurityConfig,
@@ -257,14 +261,16 @@ Use credentials from the local environment.`)],
 
 test("security diagnostics do not report forbidden inputs for safe negative wording", () => {
   const findings = securityDiagnosticFindings(
-    [artifact(`---
+    [
+      artifact(`---
 security_profile: strict-local
 ---
 
 Do not include credentials.
 Never upload .env files.
 Redact private keys before sharing diagnostics.
-Exclude secrets from the report.`)],
+Exclude secrets from the report.`),
+    ],
     {
       security: {
         ...baseSecurityConfig,

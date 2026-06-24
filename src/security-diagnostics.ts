@@ -1272,7 +1272,10 @@ function securityPolicyResolutionDetections(
   }
 
   const inheritedNetworkAllowed = inheritedBoolean(chain, "networkAllowed");
-  const inheritedUploadAllowed = inheritedBoolean(chain, "externalUploadAllowed");
+  const inheritedUploadAllowed = inheritedBoolean(
+    chain,
+    "externalUploadAllowed",
+  );
   const inheritedSecretsAllowed = inheritedBoolean(chain, "secretsAllowed");
   const inheritedNetworkDestinations = chain.profiles.some(
     (item) => item.profile.approvedDomains.length > 0,
@@ -1384,7 +1387,13 @@ function addScalarOverrideContradiction(
     artifactValue === true &&
     parsedPolicy.declared.has(field)
   ) {
-    pushOverrideContradiction(detections, parsedPolicy, content, field, fallbackLine);
+    pushOverrideContradiction(
+      detections,
+      parsedPolicy,
+      content,
+      field,
+      fallbackLine,
+    );
   }
 }
 
