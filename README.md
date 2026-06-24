@@ -371,8 +371,8 @@ violated policy; flags sensitive file and secret-material instructions; and
 detects external uploads, bulk sharing, cloud upload, overbroad context
 collection, and no-redaction instructions.
 
-Approved destination allowlists such as `approved_network_destinations` are
-deferred to a v3 security diagnostics pass.
+Security diagnostics v3 also enforces approved destination allowlists such as
+`approved_network_destinations` for URL and domain-like network instructions.
 
 Renma reports deterministic safety findings for agent-facing operational instructions, such as unpinned remote scripts, unsafe privileged commands, predictable temporary paths, and credential-like command arguments.
 

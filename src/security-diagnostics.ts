@@ -34,6 +34,12 @@ type SecurityPolicy = {
   lineByField: Map<string, number>;
 };
 
+type NetworkDestination = {
+  raw: string;
+  host: string;
+  path: string;
+};
+
 const RULES = {
   missingPolicyMetadata: {
     id: "SEC-MISSING-POLICY-METADATA",
@@ -403,6 +409,9 @@ const ALLOWED_DATA_POLICY_FIELDS = new Set(["allowed_data", "allowedData"]);
 
 const NETWORK_ACTION_RE =
   /\b(curl|wget|http|https|api|webhook|post|get|upload|download|fetch|send|sync|push)\b|https?:\/\//i;
+const NETWORK_DESTINATION_RE =
+  /\b(?:https?:\/\/)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}(?::\d+)?(?:\/[^\s"'`<>{}[\]]*)?/gi;
+const TRAILING_DESTINATION_PUNCTUATION_RE = /[),.;:!?]+$/;
 const EXTERNAL_UPLOAD_RE =
   /\b(upload|send|post|share|attach|submit|sync|push|publish)\b.*\b(external|remote|third[- ]party|pastebin|gist|slack|discord|s3|gcs|cloud|storage|bucket|drive|dropbox|notion|jira|github)\b|\b(post|put)\b.*https?:\/\//i;
 const CLOUD_UPLOAD_RE =
@@ -550,6 +559,21 @@ function policyDetections(
       startLine: lineNumber,
       snippet: line,
     });
+  }
+
+  if (
+    policy.networkAllowed !== false &&
+    policy.approvedNetworkDestinations.length > 0
+  ) {
+    for (const destination of unapprovedNetworkDestinations(line, policy)) {
+      detections.push({
+        metadata: RULES.unapprovedNetworkDestination,
+        severity: "high",
+        startLine: lineNumber,
+        snippet: line,
+        dedupeKey: destination.host + destination.path,
+      });
+    }
   }
 
   if (policy.externalUploadAllowed === false && EXTERNAL_UPLOAD_RE.test(line)) {
@@ -894,6 +918,92 @@ function parseList(value: string): string[] {
     .split(",")
     .map((item) => item.trim().replace(/^["']|["']$/g, ""))
     .filter((item) => item.length > 0);
+}
+
+function unapprovedNetworkDestinations(
+  line: string,
+  policy: SecurityPolicy,
+): NetworkDestination[] {
+  const approved = policy.approvedNetworkDestinations
+    .map((destination) => normalizeNetworkDestination(destination))
+    .filter(
+      (destination): destination is NetworkDestination =>
+        destination !== undefined,
+    );
+  if (approved.length === 0) {
+    return [];
+  }
+
+  return extractNetworkDestinations(line).filter(
+    (destination) =>
+      !approved.some((approvedDestination) =>
+        networkDestinationMatches(destination, approvedDestination),
+      ),
+  );
+}
+
+function extractNetworkDestinations(line: string): NetworkDestination[] {
+  const seen = new Set<string>();
+  const destinations: NetworkDestination[] = [];
+  for (const match of line.matchAll(NETWORK_DESTINATION_RE)) {
+    const destination = normalizeNetworkDestination(match[0] ?? "");
+    if (destination === undefined) {
+      continue;
+    }
+    const key = destination.host + destination.path;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    destinations.push(destination);
+  }
+  return destinations;
+}
+
+function normalizeNetworkDestination(
+  candidate: string,
+): NetworkDestination | undefined {
+  const raw = candidate.trim().replace(TRAILING_DESTINATION_PUNCTUATION_RE, "");
+  if (raw.length === 0) {
+    return undefined;
+  }
+
+  const parseable = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw)
+    ? raw
+    : `https://${raw}`;
+  try {
+    const url = new URL(parseable);
+    const host = url.hostname.toLowerCase();
+    if (!host.includes(".")) {
+      return undefined;
+    }
+    const path = url.pathname.replace(/\/+$/, "");
+    return {
+      raw,
+      host,
+      path: path === "/" ? "" : path,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function networkDestinationMatches(
+  candidate: NetworkDestination,
+  approved: NetworkDestination,
+): boolean {
+  if (approved.path.length > 0) {
+    return (
+      candidate.host === approved.host &&
+      (candidate.path === approved.path ||
+        candidate.path.startsWith(`${approved.path}/`))
+    );
+  }
+
+  return (
+    candidate.host === approved.host ||
+    candidate.host.endsWith(`.${approved.host}`)
+  );
 }
 
 function isPolicyLine(line: string): boolean {

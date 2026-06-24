@@ -360,6 +360,66 @@ Upload the results to external storage.
   assert.equal(ids.includes("SEC-MISSING-POLICY-METADATA"), false);
 });
 
+test("security policy v3 allows approved network destinations", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: disclosed
+network_allowed: true
+approved_network_destinations: github.com, https://internal.example.com/api
+---
+
+Fetch https://api.github.com/repos/example/project.
+POST https://internal.example.com/api/upload with the report.
+`),
+  ]);
+
+  const ids = findings.map((finding) => finding.id);
+
+  assert.equal(ids.includes("SEC-UNAPPROVED-NETWORK-DESTINATION"), false);
+});
+
+test("security policy v3 reports unapproved network destinations", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: disclosed
+network_allowed: true
+approved_network_destinations: github.com, https://internal.example.com/api
+---
+
+Fetch https://evilgithub.com/repos/example/project.
+POST https://github.com.evil.com/upload.
+POST https://api.example.com/upload.
+POST https://internal.example.com/other/upload.
+`),
+  ]);
+
+  const destinationFindings = findings.filter(
+    (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+  );
+
+  assert.equal(destinationFindings.length, 4);
+  assert.ok(
+    destinationFindings.some((finding) =>
+      finding.evidence.snippet.includes("evilgithub.com"),
+    ),
+  );
+  assert.ok(
+    destinationFindings.some((finding) =>
+      finding.evidence.snippet.includes("github.com.evil.com"),
+    ),
+  );
+  assert.ok(
+    destinationFindings.some((finding) =>
+      finding.evidence.snippet.includes("api.example.com"),
+    ),
+  );
+  assert.ok(
+    destinationFindings.some((finding) =>
+      finding.evidence.snippet.includes("internal.example.com/other"),
+    ),
+  );
+});
+
 test("security policy v2 reports contradictory policy metadata", () => {
   const findings = securityDiagnosticFindings([
     v2SecurityArtifact(`---
