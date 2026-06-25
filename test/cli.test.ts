@@ -252,9 +252,10 @@ test("CLI prints catalog JSON and markdown", async () => {
       sourcePath: "skills/demo/SKILL.md",
       evidence: {
         path: "skills/demo/SKILL.md",
-        startLine: 1,
-        endLine: 1,
-        snippet: "frontmatter dependency metadata",
+        startLine: 6,
+        endLine: 6,
+        snippet:
+          "requires_context: demo.guide, testing.boundary-value-analysis",
       },
     },
     {
@@ -264,9 +265,10 @@ test("CLI prints catalog JSON and markdown", async () => {
       sourcePath: "skills/demo/SKILL.md",
       evidence: {
         path: "skills/demo/SKILL.md",
-        startLine: 1,
-        endLine: 1,
-        snippet: "frontmatter dependency metadata",
+        startLine: 6,
+        endLine: 6,
+        snippet:
+          "requires_context: demo.guide, testing.boundary-value-analysis",
       },
     },
   ]);

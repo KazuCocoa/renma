@@ -28,6 +28,8 @@ export function buildCatalog(documents: ParsedDocument[]): {
         sourcePath: document.artifact.path,
         contentHash: contentHash(document.artifact.content),
         metadata: result.metadata,
+        metadataFields: document.metadataFields,
+        metadataListItems: document.metadataListItems,
       };
 
       if (document.artifact.kind === "skill") {
@@ -70,6 +72,7 @@ export function buildCatalog(documents: ParsedDocument[]): {
       if (byKind !== 0) return byKind;
       return a.to.localeCompare(b.to);
     });
+  diagnostics.push(...dependencyDiagnostics(entries, dependencies));
 
   return {
     catalog: {
@@ -79,6 +82,45 @@ export function buildCatalog(documents: ParsedDocument[]): {
     },
     diagnostics,
   };
+}
+
+function dependencyDiagnostics(
+  entries: CatalogEntry[],
+  dependencies: Dependency[],
+): Diagnostic[] {
+  const entriesById = new Map(entries.map((entry) => [entry.id, entry]));
+  const diagnostics: Diagnostic[] = [];
+
+  for (const dependency of dependencies) {
+    if (dependency.to.includes("*")) continue;
+    if (!dependency.to.startsWith("context.")) continue;
+
+    const target = entriesById.get(dependency.to);
+    if (!target) {
+      diagnostics.push({
+        severity: "warning",
+        path: dependency.sourcePath,
+        message: `Metadata dependency "${dependency.to}" from "${dependency.from}" does not match a catalog entry.`,
+        ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
+      });
+      continue;
+    }
+
+    if (
+      dependency.kind === "optional" &&
+      (target.metadata.status === "deprecated" ||
+        target.metadata.status === "archived")
+    ) {
+      diagnostics.push({
+        severity: "warning",
+        path: dependency.sourcePath,
+        message: `Metadata dependency "${dependency.to}" from "${dependency.from}" targets a ${target.metadata.status} asset.`,
+        ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
+      });
+    }
+  }
+
+  return diagnostics;
 }
 
 function contentHash(content: string): string {
@@ -114,10 +156,30 @@ function sharedContextMetadataDiagnostics(
 /** Convert metadata relationship lists into graph edges for a catalog entry. */
 function dependenciesForEntry(entry: CatalogEntry): Dependency[] {
   return [
-    ...metadataDependencies(entry, "requires", entry.metadata.requiresContext),
-    ...metadataDependencies(entry, "optional", entry.metadata.optionalContext),
-    ...metadataDependencies(entry, "conflicts", entry.metadata.conflicts),
-    ...metadataDependencies(entry, "references", entry.metadata.supersededBy),
+    ...metadataDependencies(
+      entry,
+      "requires",
+      entry.metadata.requiresContext,
+      "requires_context",
+    ),
+    ...metadataDependencies(
+      entry,
+      "optional",
+      entry.metadata.optionalContext,
+      "optional_context",
+    ),
+    ...metadataDependencies(
+      entry,
+      "conflicts",
+      entry.metadata.conflicts,
+      "conflicts",
+    ),
+    ...metadataDependencies(
+      entry,
+      "references",
+      entry.metadata.supersededBy,
+      "superseded_by",
+    ),
   ];
 }
 
@@ -125,18 +187,35 @@ function metadataDependencies(
   entry: CatalogEntry,
   kind: DependencyKind,
   targets: string[],
+  fieldKey: string,
 ): Dependency[] {
-  return targets.map((target) => ({
-    from: entry.id,
-    to: target,
-    kind,
-    sourcePath: entry.sourcePath,
-    evidence: metadataEvidence(entry.sourcePath),
-  }));
+  return targets.map((target, index) => {
+    const field =
+      entry.metadataListItems[fieldKey]?.[index] ??
+      entry.metadataFields[fieldKey];
+    return {
+      from: entry.id,
+      to: target,
+      kind,
+      sourcePath: entry.sourcePath,
+      evidence: metadataEvidence(entry.sourcePath, field),
+    };
+  });
 }
 
-/** Evidence points at frontmatter until metadata parsing preserves field line ranges. */
-function metadataEvidence(path: string): Evidence {
+function metadataEvidence(
+  path: string,
+  field: CatalogEntry["metadataFields"][string] | undefined,
+): Evidence {
+  if (field) {
+    return {
+      path: field.path,
+      startLine: field.startLine,
+      endLine: field.endLine,
+      snippet: field.raw,
+    };
+  }
+
   return {
     path,
     startLine: 1,

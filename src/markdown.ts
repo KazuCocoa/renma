@@ -3,7 +3,9 @@ import type {
   CodeFence,
   Heading,
   Link,
+  MetadataFieldEvidence,
   MetadataValue,
+  ParsedMetadata,
   ParsedDocument,
 } from "./types.js";
 
@@ -13,7 +15,7 @@ export function parseDocument(artifact: Artifact): ParsedDocument {
   const headings: Heading[] = [];
   const links: Link[] = [];
   const codeFences: CodeFence[] = [];
-  const metadata = parseFrontmatter(lines);
+  const metadata = parseFrontmatter(artifact.path, lines);
   let fenceStart: number | undefined;
   let fenceLanguage = "";
   let fenceLines: string[] = [];
@@ -72,7 +74,16 @@ export function parseDocument(artifact: Artifact): ParsedDocument {
     });
   }
 
-  return { artifact, lines, headings, codeFences, links, metadata };
+  return {
+    artifact,
+    lines,
+    headings,
+    codeFences,
+    links,
+    metadata: metadata.values,
+    metadataFields: metadata.fields,
+    metadataListItems: metadata.listItems,
+  };
 }
 
 const LIST_METADATA_KEYS = new Set([
@@ -85,33 +96,69 @@ const LIST_METADATA_KEYS = new Set([
   "superseded_by",
 ]);
 
-function parseFrontmatter(lines: string[]): Record<string, MetadataValue> {
-  if (lines[0] !== "---") return {};
-  const metadata: Record<string, MetadataValue> = {};
+function parseFrontmatter(path: string, lines: string[]): ParsedMetadata {
+  const values: Record<string, MetadataValue> = {};
+  const fields: Record<string, MetadataFieldEvidence> = {};
+  const listItems: Record<string, MetadataFieldEvidence[]> = {};
+  if (lines[0] !== "---") return { values, fields, listItems };
+
   let activeListKey: string | undefined;
+  let activeListStartLine: number | undefined;
   for (let index = 1; index < lines.length; index += 1) {
     const line = lines[index];
     if (line === "---") break;
     const listItem = line?.match(/^\s+-\s+(.+)$/);
     if (activeListKey && listItem) {
-      const current = metadata[activeListKey];
+      const current = values[activeListKey];
       if (Array.isArray(current)) current.push(listItem[1]?.trim() ?? "");
+      const activeListItems = (listItems[activeListKey] ??= []);
+      activeListItems.push(
+        frontmatterFieldEvidence(path, activeListKey, lines, index, index),
+      );
+      fields[activeListKey] = frontmatterFieldEvidence(
+        path,
+        activeListKey,
+        lines,
+        activeListStartLine ?? index,
+        index,
+      );
       continue;
     }
 
     activeListKey = undefined;
+    activeListStartLine = undefined;
     const match = line?.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
     if (!match) continue;
 
     const key = match[1] as string;
     const value = match[2]?.trim() ?? "";
     if (LIST_METADATA_KEYS.has(key) && value.length === 0) {
-      metadata[key] = [];
+      values[key] = [];
+      listItems[key] = [];
+      fields[key] = frontmatterFieldEvidence(path, key, lines, index, index);
       activeListKey = key;
+      activeListStartLine = index;
       continue;
     }
 
-    metadata[key] = value;
+    values[key] = value;
+    fields[key] = frontmatterFieldEvidence(path, key, lines, index, index);
   }
-  return metadata;
+  return { values, fields, listItems };
+}
+
+function frontmatterFieldEvidence(
+  path: string,
+  key: string,
+  lines: string[],
+  startIndex: number,
+  endIndex: number,
+): MetadataFieldEvidence {
+  return {
+    path,
+    key,
+    startLine: startIndex + 1,
+    endLine: endIndex + 1,
+    raw: lines.slice(startIndex, endIndex + 1).join("\n"),
+  };
 }

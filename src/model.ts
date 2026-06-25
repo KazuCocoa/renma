@@ -1,4 +1,4 @@
-import type { ArtifactKind, Evidence } from "./types.js";
+import type { ArtifactKind, Evidence, MetadataFieldEvidence } from "./types.js";
 
 /** Lifecycle state for a skill or context asset. */
 export type AssetStatus = "experimental" | "stable" | "deprecated" | "archived";
@@ -37,6 +37,8 @@ export interface Asset {
   sourcePath: string;
   contentHash: string;
   metadata: AssetMetadata;
+  metadataFields: Record<string, MetadataFieldEvidence>;
+  metadataListItems: Record<string, MetadataFieldEvidence[]>;
 }
 
 export interface Skill extends Asset {

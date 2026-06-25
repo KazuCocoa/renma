@@ -260,8 +260,9 @@ function duplicateAssetIdFindings(entries: CatalogEntry[]): Finding[] {
       category: "maintenance",
       severity: "medium",
       confidence: "high",
-      evidence: metadataFindingEvidence(
-        entry.sourcePath,
+      evidence: metadataFieldFindingEvidence(
+        entry,
+        "id",
         `Duplicate asset id: ${assetId}`,
       ),
       whyItMatters:
@@ -474,6 +475,24 @@ function metadataFindingEvidence(path: string, snippet: string): Evidence {
     endLine: 1,
     snippet,
   };
+}
+
+function metadataFieldFindingEvidence(
+  entry: CatalogEntry,
+  fieldKey: string,
+  fallbackSnippet: string,
+): Evidence {
+  const field = entry.metadataFields[fieldKey];
+  if (field) {
+    return {
+      path: field.path,
+      startLine: field.startLine,
+      endLine: field.endLine,
+      snippet: field.raw,
+    };
+  }
+
+  return metadataFindingEvidence(entry.sourcePath, fallbackSnippet);
 }
 
 /** Return whether a severity is at least as severe as a configured threshold. */

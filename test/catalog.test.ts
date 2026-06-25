@@ -100,6 +100,7 @@ tags:
   - testing
   - spec-review
   - qa
+status: stable
 requires_context:
   - context.testing.boundary-value-analysis
   - context.testing.negative-testing
@@ -249,7 +250,6 @@ conflicts: android
       to: dependency.to,
       kind: dependency.kind,
       sourcePath: dependency.sourcePath,
-      evidence: dependency.evidence,
     })),
     [
       {
@@ -257,48 +257,24 @@ conflicts: android
         to: "environment",
         kind: "requires",
         sourcePath: "skills/demo/SKILL.md",
-        evidence: {
-          path: "skills/demo/SKILL.md",
-          startLine: 1,
-          endLine: 1,
-          snippet: "frontmatter dependency metadata",
-        },
       },
       {
         from: "demo",
         to: "product.overview",
         kind: "requires",
         sourcePath: "skills/demo/SKILL.md",
-        evidence: {
-          path: "skills/demo/SKILL.md",
-          startLine: 1,
-          endLine: 1,
-          snippet: "frontmatter dependency metadata",
-        },
       },
       {
         from: "demo",
         to: "incidents",
         kind: "optional",
         sourcePath: "skills/demo/SKILL.md",
-        evidence: {
-          path: "skills/demo/SKILL.md",
-          startLine: 1,
-          endLine: 1,
-          snippet: "frontmatter dependency metadata",
-        },
       },
       {
         from: "demo",
         to: "android",
         kind: "conflicts",
         sourcePath: "skills/demo/SKILL.md",
-        evidence: {
-          path: "skills/demo/SKILL.md",
-          startLine: 1,
-          endLine: 1,
-          snippet: "frontmatter dependency metadata",
-        },
       },
     ],
   );
@@ -344,6 +320,119 @@ conflicts:
     "optional",
   );
   assert.equal(dependencies.get("archived.testing.old-review"), "conflicts");
+});
+
+test("parseDocument records frontmatter field evidence", () => {
+  const document = parseDocument(
+    artifact(
+      "skills/demo/SKILL.md",
+      "skill",
+      `---
+id: skill.demo
+requires_context:
+  - context.demo.required
+---
+# Demo
+`,
+    ),
+  );
+
+  assert.deepEqual(document.metadata.requires_context, [
+    "context.demo.required",
+  ]);
+  assert.equal(document.metadataFields.requires_context?.startLine, 3);
+  assert.equal(document.metadataFields.requires_context?.endLine, 4);
+  assert.equal(
+    document.metadataFields.requires_context?.raw,
+    "requires_context:\n  - context.demo.required",
+  );
+  assert.equal(document.metadataListItems.requires_context?.[0]?.startLine, 4);
+  assert.equal(
+    document.metadataListItems.requires_context?.[0]?.raw,
+    "  - context.demo.required",
+  );
+});
+
+test("buildCatalog uses metadata field evidence on dependency edges", () => {
+  const { catalog } = buildCatalog([
+    parseDocument(
+      artifact(
+        "skills/demo/SKILL.md",
+        "skill",
+        `---
+id: skill.demo
+requires_context:
+  - context.demo.required
+---
+# Demo
+`,
+      ),
+    ),
+    parseDocument(
+      artifact(
+        "context/demo/required.md",
+        "context",
+        `---
+id: context.demo.required
+owner: qa-platform
+status: stable
+---
+# Required
+`,
+      ),
+    ),
+  ]);
+
+  assert.equal(catalog.dependencies[0]?.evidence?.startLine, 4);
+  assert.equal(catalog.dependencies[0]?.evidence?.endLine, 4);
+  assert.equal(
+    catalog.dependencies[0]?.evidence?.snippet,
+    "  - context.demo.required",
+  );
+});
+
+test("buildCatalog validates dependency targets", () => {
+  const { diagnostics } = buildCatalog([
+    parseDocument(
+      artifact(
+        "skills/demo/SKILL.md",
+        "skill",
+        `---
+id: skill.demo
+optional_context:
+  - context.demo.missing
+  - context.demo.old
+---
+# Demo
+`,
+      ),
+    ),
+    parseDocument(
+      artifact(
+        "context/demo/old.md",
+        "context",
+        `---
+id: context.demo.old
+owner: qa-platform
+status: deprecated
+---
+# Old
+`,
+      ),
+    ),
+  ]);
+
+  const unknown = diagnostics.find((diagnostic) =>
+    diagnostic.message.includes("does not match a catalog entry"),
+  );
+  assert.equal(unknown?.evidence?.startLine, 4);
+  assert.equal(unknown?.evidence?.endLine, 4);
+
+  const inactive = diagnostics.find((diagnostic) =>
+    diagnostic.message.includes("targets a deprecated asset"),
+  );
+  assert.equal(inactive?.evidence?.startLine, 5);
+  assert.equal(inactive?.evidence?.endLine, 5);
 });
 
 function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
