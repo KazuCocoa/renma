@@ -20,6 +20,12 @@ import {
   runReadinessCommand,
   type ReadinessFormat,
 } from "./commands/readiness.js";
+import {
+  runScaffoldCommand,
+  type ScaffoldFormat,
+  type ScaffoldKind,
+  type ScaffoldOptions,
+} from "./commands/scaffold.js";
 import { runScanCommand } from "./commands/scan.js";
 import {
   runSuggestSemanticSplitCommand,
@@ -39,11 +45,15 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       options: {
         config: { type: "string", short: "c" },
         "fail-on": { type: "string" },
+        focus: { type: "string" },
         format: { type: "string" },
         from: { type: "string" },
         "include-owned": { type: "boolean" },
+        id: { type: "string" },
         json: { type: "boolean" },
         lines: { type: "string" },
+        owner: { type: "string" },
+        title: { type: "string" },
         to: { type: "string" },
         view: { type: "string" },
         "max-context-bytes": { type: "string" },
@@ -76,6 +86,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     command !== "graph" &&
     command !== "ownership" &&
     command !== "readiness" &&
+    command !== "scaffold" &&
     command !== "suggest-semantic-split" &&
     command !== "inspect"
   ) {
@@ -88,6 +99,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
   if (command === "suggest-semantic-split") {
     return runSuggestSemanticSplit(parsed.values, target);
+  }
+
+  if (command === "scaffold") {
+    return runScaffold(parsed.values, target, parsed.positionals[2]);
   }
 
   if (command === "inspect") {
@@ -119,6 +134,46 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   }
 
   return runScan(parsed.values, target);
+}
+
+async function runScaffold(
+  values: CliValues,
+  kindValue: string,
+  targetPath?: string,
+): Promise<number> {
+  if (kindValue !== "skill" && kindValue !== "context") {
+    console.error("scaffold requires kind skill or context.");
+    return 2;
+  }
+
+  if (!targetPath) {
+    console.error("scaffold requires a target path.");
+    return 2;
+  }
+
+  const format = stringValue(values.format) ?? "file";
+  if (format !== "file" && format !== "prompt" && format !== "json") {
+    console.error("--format must be one of file, prompt, or json.");
+    return 2;
+  }
+
+  try {
+    const scaffoldOptions: ScaffoldOptions = {
+      kind: kindValue as ScaffoldKind,
+      targetPath,
+      format: format as ScaffoldFormat,
+    };
+    const id = stringValue(values.id);
+    const title = stringValue(values.title);
+    const owner = stringValue(values.owner);
+    if (id) scaffoldOptions.id = id;
+    if (title) scaffoldOptions.title = title;
+    if (owner) scaffoldOptions.owner = owner;
+    return await runScaffoldCommand(scaffoldOptions);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    return 2;
+  }
 }
 
 async function runScan(values: CliValues, target: string): Promise<number> {
@@ -273,11 +328,21 @@ async function runGraph(values: CliValues, target: string): Promise<number> {
   };
 
   try {
-    return await runGraphCommand(target, {
+    const graphOptions: {
+      format: GraphFormat;
+      view: GraphView;
+      focus?: string;
+      overrides: ConfigOverrides;
+    } = {
       format: format as GraphFormat,
       view: view as GraphView,
       overrides,
-    });
+    };
+    const focus = stringValue(values.focus);
+    if (focus) {
+      graphOptions.focus = focus;
+    }
+    return await runGraphCommand(target, graphOptions);
   } catch (error) {
     console.error(
       error instanceof ConfigError || error instanceof Error

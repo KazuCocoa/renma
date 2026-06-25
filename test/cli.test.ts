@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -432,6 +432,101 @@ test("help and invalid commands have expected exit codes", async () => {
   assert.match(help.stdout, /Usage: renma scan/);
   assert.equal(invalid.code, 2);
   assert.match(invalid.stderr, /Unknown command "wat"/);
+});
+
+test("scaffold skill writes deterministic file output", async () => {
+  const root = await fixture();
+  const target = path.join(
+    root,
+    "skills",
+    "testing",
+    "spec-review",
+    "SKILL.md",
+  );
+
+  const result = await withCapturedConsole(() =>
+    main([
+      "scaffold",
+      "skill",
+      target,
+      "--owner",
+      "qa-platform",
+      "--title",
+      "Spec Review",
+    ]),
+  );
+
+  assert.equal(result.code, 0);
+  const content = await readFile(target, "utf8");
+  assert.match(content, /^id: testing.spec-review$/m);
+  assert.match(content, /^title: Spec Review$/m);
+  assert.match(content, /^owner: qa-platform$/m);
+  assert.match(content, /^status: experimental$/m);
+  assert.match(content, /^requires_context:$/m);
+});
+
+test("scaffold refuses to overwrite an existing file", async () => {
+  const root = await fixture();
+  const target = path.join(root, "contexts", "testing", "boundary.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(target, "already here");
+
+  const result = await withCapturedConsole(() =>
+    main(["scaffold", "context", target]),
+  );
+
+  assert.equal(result.code, 2);
+  assert.match(result.stderr, /EEXIST/);
+});
+
+test("scaffold context can emit json", async () => {
+  const result = await withCapturedConsole(() =>
+    main([
+      "scaffold",
+      "context",
+      "contexts/testing/boundary-value-analysis.md",
+      "--format",
+      "json",
+      "--owner",
+      "qa-platform",
+    ]),
+  );
+
+  assert.equal(result.code, 0);
+  const bundle = JSON.parse(result.stdout) as {
+    kind: string;
+    id: string;
+    title: string;
+    owner: string;
+    content: string;
+  };
+  assert.equal(bundle.kind, "context");
+  assert.equal(bundle.id, "context.testing.boundary-value-analysis");
+  assert.equal(bundle.title, "Boundary Value Analysis");
+  assert.equal(bundle.owner, "qa-platform");
+  assert.match(
+    bundle.content,
+    /^id: context\.testing\.boundary-value-analysis$/m,
+  );
+});
+
+test("scaffold prompt emits Codex-ready authoring instructions", async () => {
+  const result = await withCapturedConsole(() =>
+    main([
+      "scaffold",
+      "skill",
+      "skills/testing/spec-review/SKILL.md",
+      "--format",
+      "prompt",
+      "--owner",
+      "qa-platform",
+    ]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /Create a Renma skill asset/);
+  assert.match(result.stdout, /id: `testing.spec-review`/);
+  assert.match(result.stdout, /Do not invent owners/);
 });
 
 async function fixture(): Promise<string> {
