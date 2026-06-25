@@ -304,6 +304,48 @@ conflicts: android
   );
 });
 
+test("buildCatalog creates dependency edges from block-list metadata", () => {
+  const skillContent = `---
+id: skill.testing.spec-review
+owner: qa-platform
+status: experimental
+tags:
+  - testing
+  - spec-review
+requires_context:
+  - context.testing.boundary-value-analysis
+optional_context:
+  - context.testing.negative-testing
+conflicts:
+  - archived.testing.old-review
+---
+# Spec Review
+`;
+  const { catalog } = buildCatalog([
+    parseDocument(
+      artifact("skills/testing/spec-review/SKILL.md", "skill", skillContent),
+    ),
+  ]);
+
+  assert.deepEqual(catalog.entries[0]?.metadata.tags, [
+    "testing",
+    "spec-review",
+  ]);
+
+  const dependencies = new Map(
+    catalog.dependencies.map((dependency) => [dependency.to, dependency.kind]),
+  );
+  assert.equal(
+    dependencies.get("context.testing.boundary-value-analysis"),
+    "requires",
+  );
+  assert.equal(
+    dependencies.get("context.testing.negative-testing"),
+    "optional",
+  );
+  assert.equal(dependencies.get("archived.testing.old-review"), "conflicts");
+});
+
 function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
   return {
     path,

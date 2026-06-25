@@ -538,6 +538,7 @@ function helpText(): string {
     "  diff                       Compare deterministic readiness snapshots",
     "  ci-report                  Print deterministic CI / PR review report",
     "  graph                      Print deterministic repository graph snapshot",
+    "  scaffold                   Create deterministic authoring scaffolds and prompts",
     "  ownership                  Print deterministic ownership coverage report",
     "  readiness                  Print deterministic agent readiness report",
     "  inspect                    Inspect repository files/assets by outline or exact line slice",

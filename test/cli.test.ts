@@ -430,6 +430,10 @@ test("help and invalid commands have expected exit codes", async () => {
 
   assert.equal(help.code, 0);
   assert.match(help.stdout, /Usage: renma scan/);
+  assert.match(
+    help.stdout,
+    /scaffold\s+Create deterministic authoring scaffolds and prompts/,
+  );
   assert.equal(invalid.code, 2);
   assert.match(invalid.stderr, /Unknown command "wat"/);
 });
@@ -579,6 +583,7 @@ test("scaffold prompt emits Codex-ready authoring instructions", async () => {
     result.stdout,
     /renma graph \. --focus testing\.spec-review --format mermaid/,
   );
+  assert.doesNotMatch(result.stdout, /does\.not\.exist/);
   assert.match(result.stdout, /Do not invent owners/);
   await assert.rejects(readFile(target, "utf8"));
 });

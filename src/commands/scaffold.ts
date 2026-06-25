@@ -197,7 +197,7 @@ Constraints:
 - Do not assemble prompts for live model calls.
 - Do not call external services.
 - Keep the asset LLM-facing and Renma-verifiable.
-- After creating files, run \`renma scan\`, \`renma catalog\`, \`renma graph . --focus ${input.id}\`, \`renma graph . --focus ${input.id} --format mermaid\`, and \`renma graph . --focus does.not.exist\`.
+- After creating files, run \`renma scan .\`, \`renma catalog . --format json\`, and \`renma graph . --focus ${input.id} --format mermaid\`.
 `;
 }
 
