@@ -1,13 +1,13 @@
 # Renma Plan
 
-Renma is a Git-native governance and quality layer for Codex/Claude-ready context assets and skills.
+Renma is a Git-native governance and quality layer for agent-consumable context assets and skills.
 
 Renma prepares shared repositories so Codex, Claude, Cursor, and future agents can consume team-owned expertise correctly. Renma does not choose task context, assemble prompts, inject context, or execute agent workflows. Agents and agent runtimes decide how to use the repository assets at task time.
 
 Conceptually:
 
 ```text
-Skill = Codex/Claude-ready entrypoint / routing contract / usage guide
+Skill = agent-facing entrypoint / routing contract / usage guide
 Context = independently owned source-of-truth knowledge asset
 ```
 
@@ -158,7 +158,7 @@ Use repository-governance terminology:
 - asset provenance manifest
 - optional external-LLM integration reports
 
-Prefer "Codex/Claude-ready entrypoint", "routing contract", "skill guidance", or "usage contract" over broad coordination language.
+Prefer "agent-facing entrypoint", "routing contract", "skill guidance", or "usage contract" over broad coordination language.
 
 Renma is telemetry-aware, but not telemetry-responsible. External signal producers may import usage evidence later, but Renma should not become a runtime observability system.
 
@@ -166,7 +166,7 @@ Renma is telemetry-aware, but not telemetry-responsible. External signal produce
 
 ### Skill
 
-A skill is a Codex/Claude-ready entrypoint. It defines when a capability should be used, when it should not be used, required preflight questions, workflow guidance, safety gates, verification expectations, and which context assets it declares or references.
+A skill is an agent-facing entrypoint. It defines when a capability should be used, when it should not be used, required preflight questions, workflow guidance, safety gates, verification expectations, and which context assets it declares or references.
 
 A good skill stays concise. It routes agents toward the right owned context assets instead of embedding every piece of expert knowledge.
 
@@ -236,7 +236,7 @@ Start with a small stable metadata subset and expand only when a command uses th
 
 ```yaml
 ---
-id: context.testing.boundary-value-analysis
+id: context.testing.boundary-value-analysis-v2
 title: Boundary Value Analysis
 kind: context
 owner: qa-platform
@@ -254,11 +254,11 @@ requires_context:
 optional_context:
   - domain.payment.duplicate-charge
 conflicts:
-  - archived.testing.boundary-v0
+  - context.testing.boundary-value-analysis-v1
 ---
 ```
 
-The current parser supports full YAML frontmatter for these deterministic metadata fields. Supported block-list fields include `when_not_to_use`, `requires_context`, `optional_context`, `depends_on`, `related`, `relates_to`, `replaces`, and `supersedes`.
+The current parser supports YAML-style block lists for selected deterministic metadata fields. Supported block-list fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `conflicts`, and `superseded_by`; arbitrary nested maps are not metadata.
 
 Supported status values:
 

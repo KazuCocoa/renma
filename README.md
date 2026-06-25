@@ -1,6 +1,6 @@
 # Renma
 
-Renma is a deterministic governance and health layer for Codex/Claude-ready repository knowledge.
+Renma is a deterministic governance and health layer for agent-consumable repository knowledge.
 
 It helps teams keep skills and shared context assets discoverable, reviewable, and safe for agent runtimes to reuse. Instead of letting critical knowledge get copied into many prompts or buried in one-off Markdown files, Renma treats that knowledge as a software asset: named, owned, versioned, linked, checked in CI, and reviewed with deterministic safety diagnostics.
 
@@ -14,11 +14,11 @@ Renma is especially useful when a repository contains agent-facing material such
 - Team-owned context assets that should outlive a single prompt
 - References and examples that agents should be able to cite or inspect
 
-Renma is not a Markdown linter, not a prompt-management system, and not an agent runtime. Markdown is the storage format today; the product is the catalog, dependency graph, ownership model, and readiness checks around Codex/Claude-ready repository knowledge.
+Renma is not a Markdown linter, not a prompt-management system, and not an agent runtime. Markdown is the storage format today; the product is the catalog, dependency graph, ownership model, and readiness checks around agent-consumable repository knowledge.
 
 Use Renma when you need to answer repository-level questions such as:
 
-- What Codex/Claude-ready knowledge exists in this repo?
+- What agent-consumable knowledge exists in this repo?
 - Which skills, context assets, examples, and tool notes are reusable?
 - Which assets are unowned, stale, orphaned, incomplete, deprecated, or broken?
 - Which product decisions, bug history, testing strategy, or platform guidance should be promoted from one-off prompt text into shared context?
@@ -199,7 +199,7 @@ npx renma graph . --focus skill.testing.spec-review --format mermaid
 npx renma inspect skills/testing/spec-review/SKILL.md
 ```
 
-`scaffold --format prompt` and `scaffold --format json` produce Codex/Claude-ready authoring output for `<asset-id-or-path>` without writing files.
+`scaffold --format prompt` emits a Codex/Claude-ready authoring prompt for `<asset-id-or-path>` without writing files. `scaffold --format json` emits structured scaffold data.
 
 Semantic diff compares deterministic catalog, graph, readiness, and finding
 snapshots across Git refs. It does not interpret arbitrary prose semantics,
@@ -305,8 +305,8 @@ Renma works best when reusable assets declare lightweight metadata in front matt
 id: context.testing.boundary-value-analysis
 kind: context
 owner: qa-platform
-status: active
-depends_on:
+status: stable
+requires_context:
   - context.testing.negative-testing
 ---
 
@@ -318,35 +318,38 @@ Useful metadata includes:
 - `id`: Stable catalog ID
 - `kind`: `skill`, `context`, `reference`, `example`, `profile`, or support type
 - `owner`: Team, person, or group responsible for the asset
-- `status`: Lifecycle state such as `active`, `draft`, `deprecated`, or `archived`
-- `depends_on`: Other catalog IDs this asset relies on
+- `status`: Lifecycle state such as `experimental`, `stable`, `deprecated`, or `archived`
+- `requires_context`: Other catalog IDs this asset relies on
 
 Renma can infer some information from paths and headings, but explicit metadata makes ownership and dependency reports much more valuable.
 
-Renma reads deterministic frontmatter from skills and context assets. Prefer full YAML frontmatter for authored files so block-list fields remain explicit and reviewable:
+Renma reads deterministic frontmatter from skills and context assets. YAML-style block lists are supported for selected metadata fields, which keeps authored metadata explicit and reviewable:
 
 ```yaml
 ---
-id: context.testing.negative-testing
-title: Negative Testing Notes
+id: context.testing.boundary-value-analysis-v2
+title: Boundary Value Analysis
 kind: context
 owner: qa-platform
-status: active
+status: stable
+version: 1.0.0
 tags:
   - testing
   - spec-review
-depends_on:
-  - context.testing.boundary-value-analysis
-relates_to:
-  - skill.testing.spec-review
+when_to_use:
+  - Designing tests around numeric, date, quantity, or limit boundaries
 when_not_to_use:
   - For exploratory testing notes that do not depend on boundaries
 requires_context:
-  - testing.negative-testing
+  - context.testing.negative-testing
+optional_context:
+  - domain.payment.duplicate-charge
+conflicts:
+  - context.testing.boundary-value-analysis-v1
 ---
 ```
 
-Supported block-list fields include `when_not_to_use`, `requires_context`, `optional_context`, `depends_on`, `related`, `relates_to`, `replaces`, and `supersedes`. Renma treats these as full maps/lists when present; it does not infer missing dependencies with an LLM during `scan`.
+Supported YAML-style block-list fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `conflicts`, and `superseded_by`. Renma supports lists for those metadata fields, not arbitrary nested maps; it does not infer missing dependencies with an LLM during `scan`.
 
 ## CI Example
 

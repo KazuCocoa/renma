@@ -1,7 +1,7 @@
 # Renma Product Design
 
 Renma is a Git-native deterministic governance and quality CLI for repositories that hold
-Codex/Claude-ready context assets and skills.
+agent-consumable context assets and skills.
 
 Current product surface includes `scan`, `catalog`, `ownership`, `graph`, focused graph views, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-semantic-split`, and security diagnostics v1 for agent-facing operational instructions.
 
@@ -17,7 +17,7 @@ what context an agent should load at task time.
 ## Core Distinction
 
 ```text
-Skill = Codex/Claude-ready entrypoint / routing contract / usage guide
+Skill = agent-facing entrypoint / routing contract / usage guide
 Context = independently owned source-of-truth knowledge asset
 ```
 
@@ -201,7 +201,7 @@ Context assets should use small, reviewable metadata blocks:
 
 ```yaml
 ---
-id: context.testing.boundary-value-analysis
+id: context.testing.boundary-value-analysis-v2
 title: Boundary Value Analysis
 kind: context
 owner: qa-platform
@@ -219,11 +219,11 @@ requires_context:
 optional_context:
   - domain.payment.duplicate-charge
 conflicts:
-  - archived.testing.boundary-v0
+  - context.testing.boundary-value-analysis-v1
 ---
 ```
 
-The current parser supports full YAML frontmatter for these deterministic metadata fields. Supported block-list fields include `when_not_to_use`, `requires_context`, `optional_context`, `depends_on`, `related`, `relates_to`, `replaces`, and `supersedes`.
+The current parser supports YAML-style block lists for selected deterministic metadata fields. Supported block-list fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `conflicts`, and `superseded_by`; arbitrary nested maps are not metadata.
 
 Initial status values:
 
