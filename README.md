@@ -488,6 +488,11 @@ Run the local CLI after building:
 node dist/index.js scan .
 ```
 
+## Documentation
+
+- [User Manual](docs/user-manual.md)
+- [Diagnostics Reference](docs/diagnostics.md)
+
 ## Related Docs
 
 - [architecture.md](architecture.md) for the deeper system model
