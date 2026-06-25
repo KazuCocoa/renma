@@ -1,13 +1,13 @@
 # Renma Plan
 
-Renma is a Git-native governance and quality layer for LLM-ready context assets and skills.
+Renma is a Git-native governance and quality layer for agent-consumable context assets and skills.
 
 Renma prepares shared repositories so Codex, Claude, Cursor, and future agents can consume team-owned expertise correctly. Renma does not choose task context, assemble prompts, inject context, or execute agent workflows. Agents and agent runtimes decide how to use the repository assets at task time.
 
 Conceptually:
 
 ```text
-Skill = LLM-facing entrypoint / routing contract / usage guide
+Skill = agent-facing entrypoint / routing contract / usage guide
 Context = independently owned source-of-truth knowledge asset
 ```
 
@@ -36,7 +36,7 @@ Renma should help teams answer:
 - What changed between two Git revisions?
 - Is the repository ready for agents to consume?
 
-Renma remains deterministic by default, CLI-first, Git-native, minimal-dependency, and independent of LLMs for core analysis. Optional LLM assistance may support suggestions, semantic duplicate labeling, or review summaries, but deterministic evidence remains the authority.
+Renma remains deterministic by default, CLI-first, Git-native, minimal-dependency, and independent of LLMs for core analysis. Optional external-LLM assistance may support suggestions, semantic duplicate labeling, or review summaries, but deterministic evidence remains the authority: LLM proposes. Renma verifies. Human approves.
 
 ## Repository Model
 
@@ -156,9 +156,9 @@ Use repository-governance terminology:
 - catalog snapshot
 - context graph snapshot
 - asset provenance manifest
-- optional LLM-assisted integration reports
+- optional external-LLM integration reports
 
-Prefer "LLM-facing entrypoint", "routing contract", "skill guidance", or "usage contract" over broad coordination language.
+Prefer "agent-facing entrypoint", "routing contract", "skill guidance", or "usage contract" over broad coordination language.
 
 Renma is telemetry-aware, but not telemetry-responsible. External signal producers may import usage evidence later, but Renma should not become a runtime observability system.
 
@@ -166,7 +166,7 @@ Renma is telemetry-aware, but not telemetry-responsible. External signal produce
 
 ### Skill
 
-A skill is an LLM-facing entrypoint. It defines when a capability should be used, when it should not be used, required preflight questions, workflow guidance, safety gates, verification expectations, and which context assets it declares or references.
+A skill is an agent-facing entrypoint. It defines when a capability should be used, when it should not be used, required preflight questions, workflow guidance, safety gates, verification expectations, and which context assets it declares or references.
 
 A good skill stays concise. It routes agents toward the right owned context assets instead of embedding every piece of expert knowledge.
 
@@ -235,19 +235,31 @@ Agent readiness v1 summarizes repository health for agent consumption. It does n
 Start with a small stable metadata subset and expand only when a command uses the field.
 
 ```yaml
-id: testing.boundary-value-analysis
-version: 1.0.0
+---
+id: context.testing.boundary-value-analysis-v2
+title: Boundary Value Analysis
 owner: qa-platform
 status: stable
-tags: testing, qa
-when_to_use: Designing tests around numeric, date, quantity, or limit boundaries
-when_not_to_use: Exploratory testing notes that do not depend on boundaries
-requires_context: testing.negative-testing
-optional_context: domain.payment.duplicate-charge
-conflicts: archived.testing.boundary-v0
+version: 1.0.0
+tags:
+  - testing
+  - qa
+when_to_use:
+  - Designing tests around numeric, date, quantity, or limit boundaries
+when_not_to_use:
+  - Exploratory testing notes that do not depend on boundaries
+requires_context:
+  - testing.negative-testing
+optional_context:
+  - context.domain.payment.duplicate-charge
+conflicts:
+  - context.testing.boundary-value-analysis-v1
+superseded_by:
+  - context.testing.boundary-value-analysis-v3
+---
 ```
 
-The current parser supports simple one-line values and comma-separated lists. Richer YAML block-list frontmatter can be added later.
+The current parser supports YAML-style block lists for selected deterministic metadata fields. Supported block-list fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `conflicts`, and `superseded_by`; arbitrary nested maps are not metadata.
 
 Supported status values:
 
@@ -318,16 +330,16 @@ Renma's shipped baseline is now grouped around:
 
 - Repository discovery for `contexts/**/*.md`, `context/**/*.md`, and skill-adjacent `references/`, `profiles/`, and `examples/`.
 - Deterministic scan and catalog diagnostics for metadata IDs, owners, tags, paths, references, dependencies, manifest shape, layout policy, duplicate context, repeated context, and security policy issues.
-- CLI-first views for `scan`, `catalog`, `ownership`, `graph`, `readiness`, `repeated-context`, `diff`, `ci-report`, `inspect`, and `suggest-semantic-split`.
+- CLI-first views for `scan`, `catalog`, `ownership`, `graph`, focused graph views, `readiness`, `repeated-context`, `diff`, `ci-report`, `inspect`, `scaffold`, and `suggest-semantic-split`.
 - LLM-actionable output without an LLM runtime dependency: Markdown and JSON diagnostics provide stable IDs, severity, evidence, and repair guidance.
 - Security diagnostics v1 for agent-facing network, upload, and secret-material policy; approved network destinations; approved upload domains; command-risk patterns; profile inheritance and cycles; and policy contradictions.
 - Historical `0.1.0` manifests remain supported as legacy input. Current planning should describe the merged implementation, not a separate `0.2.0` security command.
 
 ### Near-Term Implementation
 
-- Security refinement in upload, network, secret-material, and diagnostics coverage.
+- Deterministic network/upload/secret-material policy refinement and diagnostics coverage.
 - Deterministic dependency and CI artifact diagnostics for agent-facing repository artifacts.
-- Optional LLM-assisted repository evaluation bundles remain external and advisory, not diff or CI truth.
+- Optional external-LLM repository evaluation bundles remain external and advisory, not scan/catalog/graph/readiness/diff/CI truth.
 
 ### Later / External Evidence
 
@@ -401,9 +413,12 @@ Current command:
 renma graph --format json
 renma graph --format markdown
 renma graph --format mermaid
+renma graph --focus skill.testing.spec-review --format mermaid
 renma readiness --format json
 renma readiness --format markdown
 ```
+
+Focused graph views are inspection tools; they do not choose, inject, or load runtime context for an agent.
 
 ### 5. Graph-Backed Validation
 

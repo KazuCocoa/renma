@@ -1,7 +1,7 @@
 {
   "name": "renma",
   "version": "0.4.0",
-  "description": "Git-native governance and quality CLI for LLM-ready skills and shared context assets.",
+  "description": "Git-native governance and quality CLI for agent-consumable skills and shared context assets.",
   "license": "MIT",
   "repository": {
     "type": "git",

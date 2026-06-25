@@ -1,9 +1,11 @@
 # Renma Product Design
 
 Renma is a Git-native deterministic governance and quality CLI for repositories that hold
-LLM-ready context assets and skills.
+agent-consumable context assets and skills.
 
-Current product surface includes `scan`, `catalog`, `ownership`, `graph`, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, and security diagnostics v1 for agent-facing operational instructions.
+Current product surface includes `scan`, `catalog`, `ownership`, `graph`, focused graph views, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-semantic-split`, and security diagnostics v1 for agent-facing operational instructions.
+
+Focused graph views are inspection tools; they do not choose, inject, or load runtime context for an agent.
 
 ```text
 Renma prepares the environment.
@@ -17,7 +19,7 @@ what context an agent should load at task time.
 ## Core Distinction
 
 ```text
-Skill = LLM-facing entrypoint / routing contract / usage guide
+Skill = agent-facing entrypoint / routing contract / usage guide
 Context = independently owned source-of-truth knowledge asset
 ```
 
@@ -200,19 +202,31 @@ skill-local reference material.
 Context assets should use small, reviewable metadata blocks:
 
 ```yaml
-id: testing.boundary-value-analysis
-version: 1.0.0
+---
+id: context.testing.boundary-value-analysis-v2
+title: Boundary Value Analysis
 owner: qa-platform
 status: stable
-tags: testing, qa
-when_to_use: Designing tests around numeric, date, quantity, or limit boundaries
-when_not_to_use: Exploratory testing notes that do not depend on boundaries
-requires_context: testing.negative-testing
-optional_context: domain.payment.duplicate-charge
-conflicts: archived.testing.boundary-v0
+version: 1.0.0
+tags:
+  - testing
+  - qa
+when_to_use:
+  - Designing tests around numeric, date, quantity, or limit boundaries
+when_not_to_use:
+  - Exploratory testing notes that do not depend on boundaries
+requires_context:
+  - testing.negative-testing
+optional_context:
+  - context.domain.payment.duplicate-charge
+conflicts:
+  - context.testing.boundary-value-analysis-v1
+superseded_by:
+  - context.testing.boundary-value-analysis-v3
+---
 ```
 
-The current parser supports simple one-line values and comma-separated lists. Richer YAML block-list frontmatter can be added later without changing the product model.
+The current parser supports YAML-style block lists for selected deterministic metadata fields. Supported block-list fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `conflicts`, and `superseded_by`; arbitrary nested maps are not metadata.
 
 Initial status values:
 
@@ -313,7 +327,7 @@ Current reporting includes deterministic readiness output, ownership coverage,
 context graph snapshots, and static safety findings for agent-facing repository
 content. Near-term reporting should extend repeated context discovery, semantic
 diffs, stronger security and supply-chain safety diagnostics, CI examples, and
-optional LLM-assisted evaluation bundles.
+optional external-LLM advisory evaluation bundles.
 
 Passing Renma checks does not prove a workflow is safe. It means the repository
 met the deterministic governance checks that were enabled.
