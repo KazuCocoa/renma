@@ -244,6 +244,6 @@ function formatStatus(status: CiReportStatus): string {
     case "warn":
       return "WARN — review recommended before merge";
     case "fail":
-      return "FAIL — blocking CI review issue detected";
+      return "FAIL — blocking repository-governance regression detected";
   }
 }

@@ -37,7 +37,7 @@ test("formatCiReport renders deterministic markdown review artifact", () => {
   const markdown = formatCiReport(report, "markdown");
 
   assert.match(markdown, /# Renma CI Report/);
-  assert.match(markdown, /- Status: FAIL — blocking CI review issue detected/);
+  assert.match(markdown, /- Status: FAIL — blocking repository-governance regression detected/);
   assert.match(markdown, /- Range: `main` -> `HEAD`/);
   assert.match(markdown, /- New unresolved required edges: 1/);
   assert.match(
