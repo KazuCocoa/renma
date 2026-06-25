@@ -69,7 +69,9 @@ The identifiers below are part of the current scan output. The current implement
 | --- | --- | --- | --- |
 | `DOCS-LAYOUT-INCONSISTENT` | Documentation points at non-canonical layout. | Docs mention stale roots or skill-local support paths. | Update docs to reference canonical `skills/`, `contexts/`, and `tools/` layout. |
 | `LAYOUT-CONTEXT-LEGACY-ROOT` | Context lives under a legacy root. | Shared context is stored outside the configured context root. | Move the asset to the canonical context root or update layout config. |
+| `LAYOUT-CONTEXT-REFERENCE-NON_CANONICAL` | Reference uses non-canonical path layout. | A declared dependency points outside canonical `contexts/`, `skills/`, or `tools/` paths. | Rewrite the dependency to the canonical asset path or ID. |
 | `LAYOUT-DISALLOWED-SKILL-ASSET` | Skill-local asset should live elsewhere. | A skill contains support content that policy routes to shared roots. | Move reusable assets to the canonical shared location and update references. |
+| `LAYOUT-HELPER-NON_TOOLS` | Helper file is outside the tools root. | A helper script lives under a non-canonical scripts directory. | Move helper code under the configured `tools/**` root. |
 | `LAYOUT-SKILL-EXECUTABLE-COMMAND` | `SKILL.md` includes executable command detail. | A skill entrypoint contains shell commands instead of delegating to helpers. | Move commands to approved helpers and keep `SKILL.md` as routing guidance. |
 | `LAYOUT-SKILL-NOT-THIN` | Skill entrypoint is too large or procedural. | `SKILL.md` contains long procedures, setup, or troubleshooting content. | Split detailed material into references, profiles, examples, or tools. |
 | `MAINT-ASSET-REFERENCES-SUPERSEDED-ASSET` | Asset references superseded context. | Metadata or content points at an asset marked superseded. | Retarget the reference to the active replacement. |
@@ -87,6 +89,7 @@ The identifiers below are part of the current scan output. The current implement
 | `MAINT-SUPPORT-ASSET-SHARED-CONTEXT-CANDIDATE` | Support asset looks reusable. | A reference, profile, or example contains content useful beyond one skill. | Promote it to shared context when reuse is intended. |
 | `META-DUPLICATE-ASSET-ID` | Asset ID is not unique. | Two catalog entries declare the same ID. | Give each asset a unique ID and update references. |
 | `META-UNKNOWN-REFERENCE` | Metadata reference does not resolve. | A dependency points to a missing asset ID or path. | Fix the reference, add the missing asset, or remove the dependency. |
+| `PATH-HELPER-COMMAND-NON_TOOLS` | Helper command points outside tools. | A command references a scripts path that is not under `tools/**`. | Move the helper to `tools/**` and update the command. |
 | `PATH-HELPER-COMMAND-SKILL-SCRIPTS` | Helper command is skill-local. | A command points into `skills/*/scripts`. | Move helper code to the configured `tools/**` location. |
 | `PATH-HELPER-COMMAND-UNRESOLVED` | Helper command path is missing. | A referenced helper under `tools/**` does not exist. | Add the helper or correct the command path. |
 | `PROF-MISSING-BASE` | Profile lacks base guidance. | A profile does not clearly relate to base skill behavior. | Add base-profile context or inheritance guidance. |
