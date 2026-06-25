@@ -99,20 +99,33 @@ conflicts:
 
 # ${metadata.title}
 
-## When To Use
+## Purpose
 
-- Describe the recurring task, decision, or workflow this skill should guide.
+Describe the recurring task, decision, or workflow this skill should guide.
+
+## Required Inputs
+
+- List the inputs, evidence, or repository artifacts the agent should inspect before acting.
 
 ## Instructions
 
-1. State the inputs the agent should inspect before acting.
-2. Describe the deterministic checks or steps Renma can verify.
+1. State the inputs, evidence, or repository artifacts the agent should inspect.
+2. Describe the review steps, checks, or decision points that should remain explicit and reviewable.
 3. Identify the expected output, artifact, or handoff.
 
-## Guardrails
+## Context References
 
-- Keep recommendations grounded in repository evidence.
-- Do not invent domain facts, policies, owners, or dependencies.
+Use \`requires_context\` and \`optional_context\` in frontmatter to reference durable context assets.
+
+Move reusable domain, testing, platform, product, or tool knowledge into separately owned context assets under \`contexts/\`.
+
+## Constraints
+
+- Keep recommendations grounded in provided inputs and repository evidence.
+- Do not invent domain facts, policies, owners, dependencies, or product behavior.
+- Do not choose runtime task context beyond this skill's declared scope.
+- Do not assemble prompts for live model calls.
+- Do not call external services unless the surrounding workflow explicitly allows it.
 
 ## Validation
 

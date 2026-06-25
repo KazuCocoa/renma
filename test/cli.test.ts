@@ -470,6 +470,13 @@ test("scaffold skill writes deterministic file output", async () => {
   assert.match(content, /^status: experimental$/m);
   assert.match(content, /^tags:\n {2}- testing\n {2}- spec-review\n {2}- qa$/m);
   assert.match(content, /^requires_context:$/m);
+  assert.match(content, /^## Purpose$/m);
+  assert.match(content, /^## Required Inputs$/m);
+  assert.match(content, /^## Context References$/m);
+  assert.match(content, /^## Constraints$/m);
+  assert.match(content, /Do not choose runtime task context/);
+  assert.match(content, /Do not assemble prompts for live model calls/);
+  assert.doesNotMatch(content, /Renma can verify/);
 
   const catalogResult = await withCapturedConsole(() =>
     main(["catalog", root, "--format", "json"]),
