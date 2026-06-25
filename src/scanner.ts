@@ -51,7 +51,7 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
         category: "maintenance",
         severity: "medium",
         confidence: "high",
-        evidence: {
+        evidence: diagnostic.evidence ?? {
           path,
           startLine: 1,
           endLine: 1,
@@ -79,21 +79,35 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
 
     const missingId = /missing an id/i.test(diagnostic.message);
     const missingOwner = /missing an owner/i.test(diagnostic.message);
+    const unknownDependency = /does not match a catalog entry/i.test(
+      diagnostic.message,
+    );
+    const inactiveDependency = /targets a (deprecated|archived) asset/i.test(
+      diagnostic.message,
+    );
     return {
       id: missingId
         ? "META-MISSING-ID"
         : missingOwner
           ? "META-MISSING-OWNER"
-          : "META-CATALOG-DIAGNOSTIC",
+          : unknownDependency
+            ? "META-UNKNOWN-DEPENDENCY"
+            : inactiveDependency
+              ? "META-INACTIVE-DEPENDENCY"
+              : "META-CATALOG-DIAGNOSTIC",
       title: missingId
         ? "Shared context asset is missing an id"
         : missingOwner
           ? "Shared context asset is missing an owner"
-          : "Catalog metadata diagnostic",
+          : unknownDependency
+            ? "Metadata dependency target is unknown"
+            : inactiveDependency
+              ? "Metadata dependency targets an inactive asset"
+              : "Catalog metadata diagnostic",
       category: "maintenance",
       severity: "medium",
       confidence: "high",
-      evidence: {
+      evidence: diagnostic.evidence ?? {
         path,
         startLine: 1,
         endLine: 1,

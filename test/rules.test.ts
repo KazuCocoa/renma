@@ -238,7 +238,7 @@ status: active
   assert.equal(finding?.severity, "medium");
   assert.equal(finding?.confidence, "high");
   assert.equal(finding?.evidence.path, "contexts/testing/workflow.md");
-  assert.match(finding?.evidence.snippet ?? "", /Invalid status "active"/);
+  assert.match(finding?.evidence.snippet ?? "", /status: active/);
   assert.match(
     finding?.remediation ?? "",
     /experimental, stable, deprecated, archived/,

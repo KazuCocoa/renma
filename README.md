@@ -358,6 +358,11 @@ superseded_by:
 
 Supported YAML-style block-list fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `conflicts`, and `superseded_by`. Renma supports lists for those metadata fields, not arbitrary nested maps; it does not infer missing dependencies with an LLM during `scan`.
 
+Catalog and scan diagnostics preserve field-level evidence for metadata. For
+block-list dependency fields such as `requires_context` and `optional_context`,
+findings point to the specific list item line that produced the edge or
+diagnostic.
+
 ## CI Example
 
 For PR review artifacts, see [`examples/github-actions/renma-ci-report.yml`](examples/github-actions/renma-ci-report.yml).

@@ -27,10 +27,12 @@ export function parseAssetMetadata(document: ParsedDocument): {
   };
 
   if (rawStatus !== undefined && status === undefined) {
+    const evidence = metadataFieldEvidence(document, "status");
     diagnostics.push({
       severity: "warning",
       path: document.artifact.path,
       message: `Invalid status "${rawStatus}". Expected one of: ${STATUSES.join(", ")}.`,
+      ...(evidence ? { evidence } : {}),
     });
   }
 
@@ -82,6 +84,17 @@ function listValue(value: MetadataValue | undefined): string[] {
 
 function metadataText(value: MetadataValue | undefined): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function metadataFieldEvidence(document: ParsedDocument, key: string) {
+  const field = document.metadataFields[key];
+  if (!field) return undefined;
+  return {
+    path: field.path,
+    startLine: field.startLine,
+    endLine: field.endLine,
+    snippet: field.raw,
+  };
 }
 
 function assignOptional<K extends keyof AssetMetadata>(
