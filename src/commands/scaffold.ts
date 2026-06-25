@@ -171,6 +171,7 @@ This context does not apply when:
 
 ## Constraints
 
+- Do not put task-specific prompt instructions in this context asset.
 - Keep this asset focused on reusable knowledge that can be referenced by skills.
 - Do not duplicate large source material when a reference is enough.
 - Do not invent domain facts, policies, owners, dependencies, or product behavior.
