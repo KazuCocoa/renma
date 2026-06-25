@@ -1,10 +1,10 @@
 # Renma
 
-Renma is a deterministic governance and health layer for LLM-facing repository knowledge.
+Renma is a deterministic governance and health layer for Codex/Claude-ready repository knowledge.
 
-It helps teams keep the skills, instructions, shared context, examples, tool notes, and ownership metadata that agents rely on discoverable, reviewable, and safe to reuse. Instead of letting critical knowledge get copied into many prompts or buried in one-off Markdown files, Renma treats that knowledge as a software asset: named, owned, versioned, linked, checked in CI, and reviewed with deterministic safety diagnostics.
+It helps teams keep skills and shared context assets discoverable, reviewable, and safe for agent runtimes to reuse. Instead of letting critical knowledge get copied into many prompts or buried in one-off Markdown files, Renma treats that knowledge as a software asset: named, owned, versioned, linked, checked in CI, and reviewed with deterministic safety diagnostics.
 
-Renma now supports `scan`, `catalog`, `ownership`, `graph`, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, and security diagnostics v1.
+Renma now supports `scan`, `catalog`, `ownership`, `graph`, focused graph views, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-semantic-split`, and security diagnostics v1.
 
 Renma is especially useful when a repository contains agent-facing material such as:
 
@@ -14,11 +14,11 @@ Renma is especially useful when a repository contains agent-facing material such
 - Team-owned context assets that should outlive a single prompt
 - References and examples that agents should be able to cite or inspect
 
-Renma is not a Markdown linter and not a prompt-management system. Markdown is the storage format today; the product is the catalog, dependency graph, ownership model, and readiness checks around LLM-era repository knowledge.
+Renma is not a Markdown linter, not a prompt-management system, and not an agent runtime. Markdown is the storage format today; the product is the catalog, dependency graph, ownership model, and readiness checks around Codex/Claude-ready repository knowledge.
 
 Use Renma when you need to answer repository-level questions such as:
 
-- What LLM-facing knowledge exists in this repo?
+- What Codex/Claude-ready knowledge exists in this repo?
 - Which skills, context assets, examples, and tool notes are reusable?
 - Which assets are unowned, stale, orphaned, incomplete, deprecated, or broken?
 - Which product decisions, bug history, testing strategy, or platform guidance should be promoted from one-off prompt text into shared context?
@@ -31,7 +31,7 @@ Tools
   Codex, Claude, Cursor, CI, editors, internal CLIs
 
 Skills
-  LLM-facing entrypoints that route an agent toward a task
+  agent-facing entrypoints that route an agent toward a task
 
 Context Assets
   Shared domain, product, testing, platform, and tool knowledge
@@ -185,6 +185,22 @@ node dist/index.js readiness .
 node dist/index.js diff . --from main --to HEAD --format markdown
 ```
 
+Author a skill or context asset with `scaffold`:
+
+```bash
+npx renma scaffold skill skills/testing/spec-review/SKILL.md --id skill.testing.spec-review --title "Spec Review" --owner qa-platform --tags testing,spec-review
+npx renma scaffold context contexts/testing/boundary-value-analysis.md --id context.testing.boundary-value-analysis --title "Boundary Value Analysis" --owner qa-platform --tags testing
+```
+
+Inspect a focused graph for the new skill:
+
+```bash
+npx renma graph . --focus skill.testing.spec-review --format mermaid
+npx renma inspect skills/testing/spec-review/SKILL.md
+```
+
+`scaffold --format prompt` and `scaffold --format json` produce Codex/Claude-ready authoring output for `<asset-id-or-path>` without writing files.
+
 Semantic diff compares deterministic catalog, graph, readiness, and finding
 snapshots across Git refs. It does not interpret arbitrary prose semantics,
 assemble prompts, choose context, call an LLM, repair files, or check out or
@@ -306,6 +322,31 @@ Useful metadata includes:
 - `depends_on`: Other catalog IDs this asset relies on
 
 Renma can infer some information from paths and headings, but explicit metadata makes ownership and dependency reports much more valuable.
+
+Renma reads deterministic frontmatter from skills and context assets. Prefer full YAML frontmatter for authored files so block-list fields remain explicit and reviewable:
+
+```yaml
+---
+id: context.testing.negative-testing
+title: Negative Testing Notes
+kind: context
+owner: qa-platform
+status: active
+tags:
+  - testing
+  - spec-review
+depends_on:
+  - context.testing.boundary-value-analysis
+relates_to:
+  - skill.testing.spec-review
+when_not_to_use:
+  - For exploratory testing notes that do not depend on boundaries
+requires_context:
+  - testing.negative-testing
+---
+```
+
+Supported block-list fields include `when_not_to_use`, `requires_context`, `optional_context`, `depends_on`, `related`, `relates_to`, `replaces`, and `supersedes`. Renma treats these as full maps/lists when present; it does not infer missing dependencies with an LLM during `scan`.
 
 ## CI Example
 
