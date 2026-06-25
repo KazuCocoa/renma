@@ -1681,6 +1681,37 @@ test("completion criteria finding accepts deterministic completion signals", asy
   }
 });
 
+test("duplicate asset id findings point to the id field line", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-duplicate-id-"));
+  await mkdir(path.join(root, "contexts", "alpha"), { recursive: true });
+  await mkdir(path.join(root, "contexts", "beta"), { recursive: true });
+  const duplicateContext = `---
+id: duplicated.asset
+owner: qa-platform
+status: stable
+---
+# Duplicate
+`;
+
+  await writeFile(
+    path.join(root, "contexts", "alpha", "overview.md"),
+    duplicateContext,
+  );
+  await writeFile(
+    path.join(root, "contexts", "beta", "overview.md"),
+    duplicateContext,
+  );
+
+  const result = await scan(root, {});
+  const finding = result.findings.find(
+    (candidate) => candidate.id === "META-DUPLICATE-ASSET-ID",
+  );
+
+  assert.equal(finding?.evidence.startLine, 2);
+  assert.equal(finding?.evidence.endLine, 2);
+  assert.equal(finding?.evidence.snippet, "id: duplicated.asset");
+});
+
 test("text report calls out clean scans", () => {
   const result: ScanResult = {
     root: "/repo",
