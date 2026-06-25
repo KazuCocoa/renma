@@ -238,7 +238,6 @@ Start with a small stable metadata subset and expand only when a command uses th
 ---
 id: context.testing.boundary-value-analysis-v2
 title: Boundary Value Analysis
-kind: context
 owner: qa-platform
 status: stable
 version: 1.0.0
@@ -252,9 +251,11 @@ when_not_to_use:
 requires_context:
   - testing.negative-testing
 optional_context:
-  - domain.payment.duplicate-charge
+  - context.domain.payment.duplicate-charge
 conflicts:
   - context.testing.boundary-value-analysis-v1
+superseded_by:
+  - context.testing.boundary-value-analysis-v3
 ---
 ```
 

@@ -305,7 +305,6 @@ Renma works best when reusable assets declare lightweight metadata in front matt
 ```markdown
 ---
 id: context.testing.boundary-value-analysis
-kind: context
 owner: qa-platform
 status: stable
 requires_context:
@@ -318,10 +317,15 @@ requires_context:
 Useful metadata includes:
 
 - `id`: Stable catalog ID
-- `kind`: `skill`, `context`, `reference`, `example`, `profile`, or support type
+- `title`: Human-readable asset title
 - `owner`: Team, person, or group responsible for the asset
 - `status`: Lifecycle state such as `experimental`, `stable`, `deprecated`, or `archived`
-- `requires_context`: Other catalog IDs this asset relies on
+- `version`: Asset version when the repository uses explicit versioning
+- `tags`: Search and grouping labels
+- `requires_context`: Context assets this asset normally depends on
+- `optional_context`: Context assets useful only in some cases
+- `conflicts`: Context assets that should not be applied together
+- `superseded_by`: Replacement asset when this asset is deprecated
 
 Renma can infer some information from paths and headings, but explicit metadata makes ownership and dependency reports much more valuable.
 
@@ -331,7 +335,6 @@ Renma reads deterministic frontmatter from skills and context assets. YAML-style
 ---
 id: context.testing.boundary-value-analysis-v2
 title: Boundary Value Analysis
-kind: context
 owner: qa-platform
 status: stable
 version: 1.0.0
@@ -345,9 +348,11 @@ when_not_to_use:
 requires_context:
   - context.testing.negative-testing
 optional_context:
-  - domain.payment.duplicate-charge
+  - context.domain.payment.duplicate-charge
 conflicts:
   - context.testing.boundary-value-analysis-v1
+superseded_by:
+  - context.testing.boundary-value-analysis-v3
 ---
 ```
 
