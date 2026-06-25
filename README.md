@@ -199,6 +199,8 @@ npx renma graph . --focus skill.testing.spec-review --format mermaid
 npx renma inspect skills/testing/spec-review/SKILL.md
 ```
 
+Focused graph views are inspection tools; they do not choose, inject, or load runtime context for an agent.
+
 `scaffold --format prompt` emits a Codex/Claude-ready authoring prompt for `<asset-id-or-path>` without writing files. `scaffold --format json` emits structured scaffold data.
 
 Semantic diff compares deterministic catalog, graph, readiness, and finding

@@ -5,6 +5,8 @@ agent-consumable context assets and skills.
 
 Current product surface includes `scan`, `catalog`, `ownership`, `graph`, focused graph views, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-semantic-split`, and security diagnostics v1 for agent-facing operational instructions.
 
+Focused graph views are inspection tools; they do not choose, inject, or load runtime context for an agent.
+
 ```text
 Renma prepares the environment.
 Agents operate within that environment.

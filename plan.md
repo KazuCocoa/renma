@@ -417,6 +417,8 @@ renma readiness --format json
 renma readiness --format markdown
 ```
 
+Focused graph views are inspection tools; they do not choose, inject, or load runtime context for an agent.
+
 ### 5. Graph-Backed Validation
 
 Use the graph to validate repository health.
