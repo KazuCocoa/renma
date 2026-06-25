@@ -3,6 +3,7 @@ import type {
   CodeFence,
   Heading,
   Link,
+  MetadataValue,
   ParsedDocument,
 } from "./types.js";
 
@@ -74,14 +75,43 @@ export function parseDocument(artifact: Artifact): ParsedDocument {
   return { artifact, lines, headings, codeFences, links, metadata };
 }
 
-function parseFrontmatter(lines: string[]): Record<string, string> {
+const LIST_METADATA_KEYS = new Set([
+  "tags",
+  "when_to_use",
+  "when_not_to_use",
+  "requires_context",
+  "optional_context",
+  "conflicts",
+  "superseded_by",
+]);
+
+function parseFrontmatter(lines: string[]): Record<string, MetadataValue> {
   if (lines[0] !== "---") return {};
-  const metadata: Record<string, string> = {};
+  const metadata: Record<string, MetadataValue> = {};
+  let activeListKey: string | undefined;
   for (let index = 1; index < lines.length; index += 1) {
     const line = lines[index];
     if (line === "---") break;
-    const match = line?.match(/^([A-Za-z0-9_-]+):\s*(.+)$/);
-    if (match) metadata[match[1] as string] = match[2]?.trim() ?? "";
+    const listItem = line?.match(/^\s+-\s+(.+)$/);
+    if (activeListKey && listItem) {
+      const current = metadata[activeListKey];
+      if (Array.isArray(current)) current.push(listItem[1]?.trim() ?? "");
+      continue;
+    }
+
+    activeListKey = undefined;
+    const match = line?.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+    if (!match) continue;
+
+    const key = match[1] as string;
+    const value = match[2]?.trim() ?? "";
+    if (LIST_METADATA_KEYS.has(key) && value.length === 0) {
+      metadata[key] = [];
+      activeListKey = key;
+      continue;
+    }
+
+    metadata[key] = value;
   }
   return metadata;
 }

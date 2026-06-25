@@ -89,6 +89,69 @@ status: permanent
   assert.match(result.diagnostics[0]?.message ?? "", /Invalid status/);
 });
 
+test("parseAssetMetadata supports simple block-list frontmatter", () => {
+  const document = parseDocument(
+    artifact(
+      "skills/testing/spec-review/SKILL.md",
+      "skill",
+      `---
+id: skill.testing.spec-review
+tags:
+  - testing
+  - spec-review
+  - qa
+requires_context:
+  - context.testing.boundary-value-analysis
+  - context.testing.negative-testing
+optional_context:
+  - context.domain.payment.idempotency
+conflicts:
+  - archived.testing.old-review
+---
+
+# Spec Review
+`,
+    ),
+  );
+
+  const result = parseAssetMetadata(document);
+
+  assert.deepEqual(result.metadata.tags, ["testing", "spec-review", "qa"]);
+  assert.deepEqual(result.metadata.requiresContext, [
+    "context.testing.boundary-value-analysis",
+    "context.testing.negative-testing",
+  ]);
+  assert.deepEqual(result.metadata.optionalContext, [
+    "context.domain.payment.idempotency",
+  ]);
+  assert.deepEqual(result.metadata.conflicts, ["archived.testing.old-review"]);
+});
+
+test("parseAssetMetadata keeps comma-separated list metadata working", () => {
+  const document = parseDocument(
+    artifact(
+      "skills/testing/spec-review/SKILL.md",
+      "skill",
+      `---
+id: skill.testing.spec-review
+tags: testing, spec-review, qa
+requires_context: context.testing.boundary-value-analysis, context.testing.negative-testing
+---
+
+# Spec Review
+`,
+    ),
+  );
+
+  const result = parseAssetMetadata(document);
+
+  assert.deepEqual(result.metadata.tags, ["testing", "spec-review", "qa"]);
+  assert.deepEqual(result.metadata.requiresContext, [
+    "context.testing.boundary-value-analysis",
+    "context.testing.negative-testing",
+  ]);
+});
+
 test("buildCatalog warns when shared context assets lack governance metadata", () => {
   const result = buildCatalog([
     parseDocument(
@@ -239,6 +302,48 @@ conflicts: android
       },
     ],
   );
+});
+
+test("buildCatalog creates dependency edges from block-list metadata", () => {
+  const skillContent = `---
+id: skill.testing.spec-review
+owner: qa-platform
+status: experimental
+tags:
+  - testing
+  - spec-review
+requires_context:
+  - context.testing.boundary-value-analysis
+optional_context:
+  - context.testing.negative-testing
+conflicts:
+  - archived.testing.old-review
+---
+# Spec Review
+`;
+  const { catalog } = buildCatalog([
+    parseDocument(
+      artifact("skills/testing/spec-review/SKILL.md", "skill", skillContent),
+    ),
+  ]);
+
+  assert.deepEqual(catalog.entries[0]?.metadata.tags, [
+    "testing",
+    "spec-review",
+  ]);
+
+  const dependencies = new Map(
+    catalog.dependencies.map((dependency) => [dependency.to, dependency.kind]),
+  );
+  assert.equal(
+    dependencies.get("context.testing.boundary-value-analysis"),
+    "requires",
+  );
+  assert.equal(
+    dependencies.get("context.testing.negative-testing"),
+    "optional",
+  );
+  assert.equal(dependencies.get("archived.testing.old-review"), "conflicts");
 });
 
 function artifact(path: string, kind: ArtifactKind, content: string): Artifact {

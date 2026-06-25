@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { catalog } from "./catalog.js";
 import type { ConfigOverrides } from "../config.js";
 import type {
@@ -50,10 +52,14 @@ export async function runGraphCommand(
   options: {
     format: GraphFormat;
     view?: GraphView;
+    focus?: string;
     overrides?: ConfigOverrides;
   },
 ): Promise<number> {
-  const report = await graph(targetPath, options.overrides ?? {});
+  const report = focusGraph(
+    await graph(targetPath, options.overrides ?? {}),
+    options.focus,
+  );
   const view = options.view ?? defaultGraphView(options.format);
   process.stdout.write(formatGraph(report, options.format, view));
   return report.diagnostics?.some(
@@ -90,6 +96,53 @@ export async function graph(
 
 export function formatGraphJson(report: GraphReport): string {
   return `${JSON.stringify(report, null, 2)}\n`;
+}
+
+function focusGraph(report: GraphReport, focus?: string): GraphReport {
+  if (!focus) {
+    return report;
+  }
+
+  const node = report.nodes.find((candidate) =>
+    matchesFocus(candidate, report.root, focus),
+  );
+  if (!node) {
+    throw new Error(
+      `graph --focus did not match any asset id or source path: ${focus}`,
+    );
+  }
+
+  const edges = report.edges.filter(
+    (edge) =>
+      edge.from === node.id || edge.to === node.id || edge.targetId === node.id,
+  );
+  const nodeIds = new Set<string>([node.id]);
+  for (const edge of edges) {
+    nodeIds.add(edge.from);
+    nodeIds.add(edge.targetId ?? edge.to);
+  }
+  const nodes = report.nodes.filter((candidate) => nodeIds.has(candidate.id));
+
+  return {
+    ...report,
+    nodeCount: nodes.length,
+    edgeCount: edges.length,
+    nodes,
+    edges,
+  };
+}
+
+function matchesFocus(node: GraphNode, root: string, focus: string): boolean {
+  const normalizedFocus = normalizePath(focus);
+  return (
+    node.id === focus ||
+    normalizePath(node.sourcePath) === normalizedFocus ||
+    normalizePath(path.resolve(root, node.sourcePath)) === normalizedFocus
+  );
+}
+
+function normalizePath(value: string): string {
+  return value.split(path.sep).join("/");
 }
 
 export function formatGraphMermaid(

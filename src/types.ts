@@ -120,13 +120,15 @@ export interface Link {
 }
 
 /** Parsed representation of an artifact used by rules and catalog builders. */
+export type MetadataValue = string | string[];
+
 export interface ParsedDocument {
   artifact: Artifact;
   lines: string[];
   headings: Heading[];
   codeFences: CodeFence[];
   links: Link[];
-  metadata: Record<string, string>;
+  metadata: Record<string, MetadataValue>;
 }
 
 /** Complete result returned by a scan operation. */

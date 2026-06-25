@@ -429,6 +429,64 @@ async function writeMarkdownAsset(
   );
 }
 
+test("graph CLI can focus on a node id", async () => {
+  const root = await fixture();
+  await writeContext(root, "testing", "checklist", {
+    owner: "qa",
+    status: "stable",
+    tags: ["qa"],
+  });
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    status: "experimental",
+    requiresContext: ["contexts/testing/checklist.md"],
+  });
+  await writeSkill(root, "unrelated", {
+    owner: "platform",
+    status: "experimental",
+  });
+
+  const result = await withCapturedConsole(() =>
+    main(["graph", root, "--focus", "demo"]),
+  );
+
+  assert.equal(result.code, 0);
+  const report = JSON.parse(result.stdout) as {
+    nodeCount: number;
+    edgeCount: number;
+    nodes: Array<{ id: string }>;
+    edges: Array<{ from: string; to: string }>;
+  };
+  assert.equal(report.nodeCount, 2);
+  assert.equal(report.edgeCount, 1);
+  assert.deepEqual(report.nodes.map((node) => node.id).sort(), [
+    "demo",
+    "testing.checklist",
+  ]);
+  assert.deepEqual(
+    report.edges.map((edge) => [edge.from, edge.to]),
+    [["demo", "contexts/testing/checklist.md"]],
+  );
+});
+
+test("graph CLI fails clearly when focus does not match", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    status: "experimental",
+  });
+
+  const result = await withCapturedConsole(() =>
+    main(["graph", root, "--focus", "does.not.exist"]),
+  );
+
+  assert.equal(result.code, 2);
+  assert.match(
+    result.stderr,
+    /graph --focus did not match any asset id or source path: does\.not\.exist/,
+  );
+});
+
 async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-graph-"));
 }
