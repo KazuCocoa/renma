@@ -53,55 +53,65 @@ These diagnostics are emitted after files are parsed into catalog entries.
 
 ## Scan Finding Identifiers
 
-`renma scan` emits finding IDs from the rule engine. The current identifiers are:
+`renma scan` emits finding IDs from the rule engine. A scan finding identifier is a machine-readable label for the kind of issue found during a scan.
 
-| ID | Area |
-| --- | --- |
-| `DOCS-LAYOUT-INCONSISTENT` | Documentation layout |
-| `LAYOUT-CONTEXT-LEGACY-ROOT` | Repository layout |
-| `LAYOUT-DISALLOWED-SKILL-ASSET` | Repository layout |
-| `LAYOUT-SKILL-EXECUTABLE-COMMAND` | Repository layout and command policy |
-| `LAYOUT-SKILL-NOT-THIN` | Skill layout |
-| `MAINT-ASSET-REFERENCES-SUPERSEDED-ASSET` | Maintenance |
-| `MAINT-CONTEXT-PATH-NON-SEMANTIC` | Maintenance |
-| `MAINT-ORPHANED-CONTEXT-ASSET` | Maintenance |
-| `MAINT-REFERENCE-DEPRECATED-ASSET` | Maintenance |
-| `MAINT-REPEATED-CODE-BLOCK` | Maintenance |
-| `MAINT-REPEATED-CONTEXT-PATTERN` | Maintenance |
-| `MAINT-REPEATED-HEADING` | Maintenance |
-| `MAINT-REPEATED-LINK` | Maintenance |
-| `MAINT-REPEATED-SECTION` | Maintenance |
-| `MAINT-SKILL-CONTEXT-REFERENCE-NOT-DECLARED` | Maintenance |
-| `MAINT-SKILL-REFERENCES-SUPERSEDED-ASSET` | Maintenance |
-| `MAINT-SKILL-REUSABLE-CONTEXT-CANDIDATE` | Maintenance |
-| `MAINT-SUPPORT-ASSET-SHARED-CONTEXT-CANDIDATE` | Maintenance |
-| `META-DUPLICATE-ASSET-ID` | Metadata |
-| `META-UNKNOWN-REFERENCE` | Metadata |
-| `PATH-HELPER-COMMAND-SKILL-SCRIPTS` | Path and helper command policy |
-| `PATH-HELPER-COMMAND-UNRESOLVED` | Path and helper command policy |
-| `PROF-MISSING-BASE` | Profile coverage |
-| `QUAL-LOW-HEADING-DENSITY` | Quality |
-| `QUAL-MISSING-COMPLETION-CRITERIA` | Quality |
-| `QUAL-MISSING-DESCRIPTION` | Quality |
-| `QUAL-MISSING-EXAMPLES` | Quality |
-| `QUAL-MISSING-NEGATIVE-ROUTING` | Quality |
-| `QUAL-MISSING-PREFLIGHT` | Quality |
-| `QUAL-MISSING-REQUIRED-INPUTS` | Quality |
-| `QUAL-MISSING-ROUTING-CLARITY` | Quality |
-| `QUAL-MISSING-VERIFICATION` | Quality |
-| `QUAL-SHORT-DESCRIPTION` | Quality |
-| `QUAL-SKILL-TOKEN-BUDGET` | Quality |
-| `QUAL-SUPPORT-ASSET-TOKEN-BUDGET` | Quality |
-| `QUAL-USER-LOCAL-PATHS` | Quality |
-| `SEC-DESTRUCTIVE-COMMAND` | Security |
-| `SEC-ENV-COPY` | Security |
-| `SEC-LITERAL-SECRET` | Security |
-| `SEC-PRIVATE-KEY` | Security |
-| `SEC-REMOTE-DEFAULT` | Security |
-| `SUPPORT-MISSING-REACHABILITY-GUIDANCE` | Supportability |
-| `SUPPORT-UNREACHABLE-EXAMPLE` | Supportability |
-| `SUPPORT-UNREACHABLE-PROFILE` | Supportability |
-| `SUPPORT-UNREACHABLE-REFERENCE` | Supportability |
+It is different from:
+
+- an asset ID, which identifies a context asset or other catalog entry
+- a file path, which identifies where the issue was found
+- a diagnostic message, which is written for humans and may contain contextual details
+
+Finding identifiers are useful when you want to group, filter, document, or automate responses to scan results. CI systems, editor integrations, docs, and LLM-assisted repair workflows can use the identifier to understand the category of problem without relying on the exact wording of the human-readable message.
+
+The identifiers below are part of the current scan output. The current implementation does not declare them as a permanent public API, so integrations should avoid assuming stronger stability than the project documents. If renma adopts long-term stability guarantees later, identifier changes should come with documented migrations.
+
+| Identifier | Meaning | Typical cause | How to fix |
+| --- | --- | --- | --- |
+| `DOCS-LAYOUT-INCONSISTENT` | Documentation points at non-canonical layout. | Docs mention stale roots or skill-local support paths. | Update docs to reference canonical `skills/`, `contexts/`, and `tools/` layout. |
+| `LAYOUT-CONTEXT-LEGACY-ROOT` | Context lives under a legacy root. | Shared context is stored outside the configured context root. | Move the asset to the canonical context root or update layout config. |
+| `LAYOUT-DISALLOWED-SKILL-ASSET` | Skill-local asset should live elsewhere. | A skill contains support content that policy routes to shared roots. | Move reusable assets to the canonical shared location and update references. |
+| `LAYOUT-SKILL-EXECUTABLE-COMMAND` | `SKILL.md` includes executable command detail. | A skill entrypoint contains shell commands instead of delegating to helpers. | Move commands to approved helpers and keep `SKILL.md` as routing guidance. |
+| `LAYOUT-SKILL-NOT-THIN` | Skill entrypoint is too large or procedural. | `SKILL.md` contains long procedures, setup, or troubleshooting content. | Split detailed material into references, profiles, examples, or tools. |
+| `MAINT-ASSET-REFERENCES-SUPERSEDED-ASSET` | Asset references superseded context. | Metadata or content points at an asset marked superseded. | Retarget the reference to the active replacement. |
+| `MAINT-CONTEXT-PATH-NON-SEMANTIC` | Context path is not semantically grouped. | Context is stored under vague folders such as misc or general. | Move it under a meaningful path such as `contexts/tools/`, `contexts/domain/`, or `contexts/testing/`. |
+| `MAINT-ORPHANED-CONTEXT-ASSET` | Shared context has no incoming references. | A first-class context asset is not used by skills or other assets. | Link it from consumers, archive it, or remove it after review. |
+| `MAINT-REFERENCE-DEPRECATED-ASSET` | Reference targets deprecated context. | Metadata dependency resolves to a deprecated asset. | Point dependents at an active asset or finish the migration. |
+| `MAINT-REPEATED-CODE-BLOCK` | Duplicate code block appears across assets. | Copy-pasted examples or procedures repeat in multiple files. | Extract shared guidance or consolidate the repeated block. |
+| `MAINT-REPEATED-CONTEXT-PATTERN` | Repeated context-like wording appears. | Multiple assets duplicate the same reusable context pattern. | Promote the shared pattern into a context asset and reference it. |
+| `MAINT-REPEATED-HEADING` | Same heading repeats across assets. | Similar sections are copied through several files. | Consolidate or reference a shared source of truth. |
+| `MAINT-REPEATED-LINK` | Same link repeats across assets. | Repeated references suggest duplicated guidance. | Centralize the reference or keep only necessary local links. |
+| `MAINT-REPEATED-SECTION` | Similar section text repeats. | A section has been copied into multiple assets. | Extract common material or reduce duplication. |
+| `MAINT-SKILL-CONTEXT-REFERENCE-NOT-DECLARED` | Skill mentions context without metadata. | Body text references `contexts/...` but `requires_context` omits it. | Add the context to `requires_context` or remove the stale mention. |
+| `MAINT-SKILL-REFERENCES-SUPERSEDED-ASSET` | Skill refers to superseded context. | Skill content names a superseded context asset. | Update the skill to the active context asset. |
+| `MAINT-SKILL-REUSABLE-CONTEXT-CANDIDATE` | Skill contains reusable context. | `SKILL.md` includes broadly reusable setup, troubleshooting, or risk guidance. | Move reusable content to shared context and reference it. |
+| `MAINT-SUPPORT-ASSET-SHARED-CONTEXT-CANDIDATE` | Support asset looks reusable. | A reference, profile, or example contains content useful beyond one skill. | Promote it to shared context when reuse is intended. |
+| `META-DUPLICATE-ASSET-ID` | Asset ID is not unique. | Two catalog entries declare the same ID. | Give each asset a unique ID and update references. |
+| `META-UNKNOWN-REFERENCE` | Metadata reference does not resolve. | A dependency points to a missing asset ID or path. | Fix the reference, add the missing asset, or remove the dependency. |
+| `PATH-HELPER-COMMAND-SKILL-SCRIPTS` | Helper command is skill-local. | A command points into `skills/*/scripts`. | Move helper code to the configured `tools/**` location. |
+| `PATH-HELPER-COMMAND-UNRESOLVED` | Helper command path is missing. | A referenced helper under `tools/**` does not exist. | Add the helper or correct the command path. |
+| `PROF-MISSING-BASE` | Profile lacks base guidance. | A profile does not clearly relate to base skill behavior. | Add base-profile context or inheritance guidance. |
+| `QUAL-LOW-HEADING-DENSITY` | Asset has too little structure. | Long content has few headings. | Add meaningful headings or split the asset. |
+| `QUAL-MISSING-COMPLETION-CRITERIA` | Completion criteria are missing. | The asset does not say when work is done. | Add explicit completion or acceptance criteria. |
+| `QUAL-MISSING-DESCRIPTION` | Description is missing. | Metadata or introductory purpose is absent. | Add a concise description. |
+| `QUAL-MISSING-EXAMPLES` | Examples are missing. | Instructional content has no concrete example. | Add representative positive examples. |
+| `QUAL-MISSING-NEGATIVE-ROUTING` | Negative routing is missing. | Skill guidance omits when not to use it. | Add exclusions or handoff guidance. |
+| `QUAL-MISSING-PREFLIGHT` | Preflight guidance is missing. | The asset omits checks to run before acting. | Add required inputs, checks, or setup steps. |
+| `QUAL-MISSING-REQUIRED-INPUTS` | Required inputs are unclear. | The asset does not state what information is needed. | Add an explicit required-inputs section. |
+| `QUAL-MISSING-ROUTING-CLARITY` | Routing guidance is unclear. | A skill does not clearly say when to use it. | Clarify triggers, audience, and handoffs. |
+| `QUAL-MISSING-VERIFICATION` | Verification guidance is missing. | The asset lacks checks for validating the result. | Add verification steps or expected evidence. |
+| `QUAL-SHORT-DESCRIPTION` | Description is too short. | Metadata description is present but not informative. | Expand it enough to explain purpose and scope. |
+| `QUAL-SKILL-TOKEN-BUDGET` | Skill content is too large. | A skill exceeds the configured token budget. | Split support content out of the skill entrypoint. |
+| `QUAL-SUPPORT-ASSET-TOKEN-BUDGET` | Support asset is too large. | A reference, profile, or example exceeds its token budget. | Split the asset or shorten nonessential material. |
+| `QUAL-USER-LOCAL-PATHS` | User-local path appears in content. | Guidance includes machine-specific paths such as home directories. | Replace local paths with repository-relative or configurable paths. |
+| `SEC-DESTRUCTIVE-COMMAND` | Destructive command appears. | Content includes risky commands such as forced deletion or reset. | Remove it, gate it with explicit safety guidance, or use a safer command. |
+| `SEC-ENV-COPY` | Environment copying is suggested. | Content copies broad environment or secret-bearing files. | Narrow the copied data and document secret handling. |
+| `SEC-LITERAL-SECRET` | Literal secret-like value appears. | Content includes token, password, key, or credential patterns. | Remove the secret and replace it with a placeholder. |
+| `SEC-PRIVATE-KEY` | Private key material appears. | Content includes a private key block. | Remove the key and rotate it if it was real. |
+| `SEC-REMOTE-DEFAULT` | Remote command default is unsafe. | Guidance defaults to network commands, prod hosts, or insecure flags. | Use safe examples and require explicit approval for risky remotes. |
+| `SUPPORT-MISSING-REACHABILITY-GUIDANCE` | Support docs are not discoverable. | A skill has local profiles, references, or examples without routing guidance. | Add guidance that explains when to load each support asset. |
+| `SUPPORT-UNREACHABLE-EXAMPLE` | Example is unreachable. | A skill-local example is not referenced by the skill. | Link it from the skill or move/remove it. |
+| `SUPPORT-UNREACHABLE-PROFILE` | Profile is unreachable. | A skill-local profile is not referenced by the skill. | Link it from the skill or move/remove it. |
+| `SUPPORT-UNREACHABLE-REFERENCE` | Reference is unreachable. | A skill-local reference is not referenced by the skill. | Link it from the skill or move/remove it. |
 
 ## How To Fix Results
 

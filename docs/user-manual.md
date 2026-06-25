@@ -203,7 +203,7 @@ renma readiness . --format json > renma-readiness.json
 renma reports three related but different kinds of output:
 
 - Diagnostics: problems reading files, parsing metadata, or resolving catalog data. See [Diagnostics Reference](diagnostics.md).
-- Findings: rule results from `scan`, such as layout, security, maintenance, quality, profile, and support issues.
+- Scan findings: rule results from `scan`, such as layout, security, maintenance, quality, profile, and support issues. Each scan finding has a finding identifier, such as `SEC-LITERAL-SECRET`, that labels the kind of issue independently from the file path, asset ID, or human-readable message.
 - Readiness checks: workflow-level pass, warning, or error states derived from catalog, graph, ownership, and finding data.
 
 Treat errors as blockers for deterministic automation. Treat warnings as review items that can become blockers when they affect agent reliability.

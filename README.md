@@ -2,7 +2,7 @@
 
 Renma is a deterministic governance and health layer for agent-consumable repository knowledge.
 
-It helps teams keep skills and shared context assets discoverable, reviewable, and safe for agent runtimes to reuse. Instead of letting critical knowledge get copied into many prompts or buried in one-off Markdown files, Renma treats that knowledge as a software asset: named, owned, versioned, linked, checked in CI, and reviewed with deterministic safety diagnostics.
+It helps teams keep skills and shared context assets discoverable, reviewable, and safe for agent runtimes to reuse. Instead of letting critical knowledge get copied into many prompts or buried in one-off Markdown files, Renma treats that knowledge as a software asset: named, owned, versioned, linked, checked in CI, and reviewed with deterministic diagnostics and scan findings.
 
 Renma now supports `scan`, `catalog`, `ownership`, `graph`, focused graph views, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-semantic-split`, and security diagnostics v1.
 
