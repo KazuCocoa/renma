@@ -553,6 +553,15 @@ test("scaffold context can emit json", async () => {
     bundle.content,
     /^id: context\.testing\.boundary-value-analysis$/m,
   );
+  assert.match(bundle.content, /^## Summary$/m);
+  assert.match(bundle.content, /^## Scope$/m);
+  assert.match(bundle.content, /^## Guidance$/m);
+  assert.match(bundle.content, /^## Constraints$/m);
+  assert.match(
+    bundle.content,
+    /Do not duplicate large source material when a reference is enough/,
+  );
+  assert.doesNotMatch(bundle.content, /^## Applies To$/m);
 });
 
 test("scaffold prompt emits Codex-ready authoring instructions", async () => {

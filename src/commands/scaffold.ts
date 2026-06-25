@@ -154,14 +154,26 @@ ${renderTagBlock(metadata.tags)}
 
 Describe the durable context, rule, constraint, or domain fact this asset records.
 
-## Applies To
+## Scope
 
-- List the systems, workflows, or skills that should consider this context.
+This context applies when:
+
+- Describe the systems, workflows, or skills that should consider this context.
+
+This context does not apply when:
+
+- Describe nearby cases that should use a different context asset.
 
 ## Guidance
 
 - Keep this context specific, reviewable, and source-backed.
 - Prefer stable facts over transient implementation notes.
+
+## Constraints
+
+- Keep this asset focused on reusable knowledge that can be referenced by skills.
+- Do not duplicate large source material when a reference is enough.
+- Do not invent domain facts, policies, owners, dependencies, or product behavior.
 
 ## Validation
 
