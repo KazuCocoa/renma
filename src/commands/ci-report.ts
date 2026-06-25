@@ -137,7 +137,7 @@ function formatCiReportMarkdown(report: CiReport): string {
     "",
     "## Summary",
     "",
-    `- Status: ${report.status.toUpperCase()}`,
+    `- Status: ${formatStatus(report.status)}`,
     `- Range: \`${report.from.ref}\` -> \`${report.to.ref}\``,
     `- Readiness: ${report.from.readinessLevel} ${report.from.readinessScore} -> ${report.to.readinessLevel} ${report.to.readinessScore} (${formatDelta(report.summary.readinessScoreDelta)})`,
     `- Total assets: ${report.from.totalAssets} -> ${report.to.totalAssets} (${formatDelta(report.summary.totalAssetsDelta)})`,
@@ -148,7 +148,7 @@ function formatCiReportMarkdown(report: CiReport): string {
     "",
     "## Status",
     "",
-    report.status.toUpperCase(),
+    formatStatus(report.status),
     "",
     "## Readiness",
     "",
@@ -205,10 +205,14 @@ function formatFindingSection(
 }
 
 function formatFinding(finding: ReportFinding): string {
-  const location = finding.evidence?.path
-    ? `${finding.evidence.path}:${finding.evidence.startLine ?? "?"}`
-    : "unknown";
-  return `- ${finding.severity.toUpperCase()} ${finding.id} ${location} - ${finding.title}`;
+  const location = formatFindingLocation(finding);
+  return `- ${finding.severity.toUpperCase()} \`${finding.id}\` \`${location}\` — ${finding.title}`;
+}
+
+function formatFindingLocation(finding: ReportFinding): string {
+  if (!finding.evidence?.path) return "unknown";
+  if (finding.evidence.startLine === undefined) return finding.evidence.path;
+  return `${finding.evidence.path}:L${finding.evidence.startLine}`;
 }
 
 function formatCountChanges(
@@ -228,5 +232,18 @@ function formatCountChanges(
 
 function formatOverflow(length: number): string[] {
   if (length <= MAX_LIST_ITEMS) return [];
-  return [`- ${length - MAX_LIST_ITEMS} more not shown`];
+  return [
+    `- ${length - MAX_LIST_ITEMS} more not shown; see JSON for the full list.`,
+  ];
+}
+
+function formatStatus(status: CiReportStatus): string {
+  switch (status) {
+    case "pass":
+      return "PASS — no blocking CI review issues detected";
+    case "warn":
+      return "WARN — review recommended before merge";
+    case "fail":
+      return "FAIL — blocking CI review issue detected";
+  }
 }

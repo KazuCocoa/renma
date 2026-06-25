@@ -8,17 +8,51 @@ import {
 
 test("formatCiReport renders deterministic markdown review artifact", () => {
   const report = sampleReport();
+  report.diff.findings.added.push(
+    {
+      id: "DOC-NO-LINE",
+      severity: "medium",
+      title: "Finding without line",
+      evidence: {
+        path: "docs/no-line.md",
+      },
+    },
+    {
+      id: "DOC-NO-PATH",
+      severity: "medium",
+      title: "Finding without path",
+      evidence: {},
+    },
+    ...Array.from({ length: 9 }, (_, index) => ({
+      id: `DOC-EXTRA-${index + 1}`,
+      severity: "low",
+      title: `Overflow finding ${index + 1}`,
+      evidence: {
+        path: `docs/extra-${index + 1}.md`,
+        startLine: index + 1,
+      },
+    })),
+  );
 
   const markdown = formatCiReport(report, "markdown");
 
   assert.match(markdown, /# Renma CI Report/);
-  assert.match(markdown, /- Status: FAIL/);
+  assert.match(markdown, /- Status: FAIL — blocking CI review issue detected/);
   assert.match(markdown, /- Range: `main` -> `HEAD`/);
   assert.match(markdown, /- New unresolved required edges: 1/);
   assert.match(
     markdown,
-    /- HIGH MAINT-REPEATED-CODE-BLOCK docs\/guide.md:12 - Repeated code block/,
+    /- HIGH `MAINT-REPEATED-CODE-BLOCK` `docs\/guide.md:L12` — Repeated code block/,
   );
+  assert.match(
+    markdown,
+    /- MEDIUM `DOC-NO-LINE` `docs\/no-line.md` — Finding without line/,
+  );
+  assert.match(
+    markdown,
+    /- MEDIUM `DOC-NO-PATH` `unknown` — Finding without path/,
+  );
+  assert.match(markdown, /- 2 more not shown; see JSON for the full list\./);
   assert.match(markdown, /Review new unresolved required edges before merge\./);
 });
 
