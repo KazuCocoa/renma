@@ -89,6 +89,69 @@ status: permanent
   assert.match(result.diagnostics[0]?.message ?? "", /Invalid status/);
 });
 
+test("parseAssetMetadata supports simple block-list frontmatter", () => {
+  const document = parseDocument(
+    artifact(
+      "skills/testing/spec-review/SKILL.md",
+      "skill",
+      `---
+id: skill.testing.spec-review
+tags:
+  - testing
+  - spec-review
+  - qa
+requires_context:
+  - context.testing.boundary-value-analysis
+  - context.testing.negative-testing
+optional_context:
+  - context.domain.payment.idempotency
+conflicts:
+  - archived.testing.old-review
+---
+
+# Spec Review
+`,
+    ),
+  );
+
+  const result = parseAssetMetadata(document);
+
+  assert.deepEqual(result.metadata.tags, ["testing", "spec-review", "qa"]);
+  assert.deepEqual(result.metadata.requiresContext, [
+    "context.testing.boundary-value-analysis",
+    "context.testing.negative-testing",
+  ]);
+  assert.deepEqual(result.metadata.optionalContext, [
+    "context.domain.payment.idempotency",
+  ]);
+  assert.deepEqual(result.metadata.conflicts, ["archived.testing.old-review"]);
+});
+
+test("parseAssetMetadata keeps comma-separated list metadata working", () => {
+  const document = parseDocument(
+    artifact(
+      "skills/testing/spec-review/SKILL.md",
+      "skill",
+      `---
+id: skill.testing.spec-review
+tags: testing, spec-review, qa
+requires_context: context.testing.boundary-value-analysis, context.testing.negative-testing
+---
+
+# Spec Review
+`,
+    ),
+  );
+
+  const result = parseAssetMetadata(document);
+
+  assert.deepEqual(result.metadata.tags, ["testing", "spec-review", "qa"]);
+  assert.deepEqual(result.metadata.requiresContext, [
+    "context.testing.boundary-value-analysis",
+    "context.testing.negative-testing",
+  ]);
+});
+
 test("buildCatalog warns when shared context assets lack governance metadata", () => {
   const result = buildCatalog([
     parseDocument(

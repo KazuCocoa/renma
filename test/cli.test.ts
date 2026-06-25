@@ -453,6 +453,8 @@ test("scaffold skill writes deterministic file output", async () => {
       "qa-platform",
       "--title",
       "Spec Review",
+      "--tags",
+      "testing,spec-review,qa",
     ]),
   );
 
@@ -462,7 +464,21 @@ test("scaffold skill writes deterministic file output", async () => {
   assert.match(content, /^title: Spec Review$/m);
   assert.match(content, /^owner: qa-platform$/m);
   assert.match(content, /^status: experimental$/m);
+  assert.match(content, /^tags:\n {2}- testing\n {2}- spec-review\n {2}- qa$/m);
   assert.match(content, /^requires_context:$/m);
+
+  const catalogResult = await withCapturedConsole(() =>
+    main(["catalog", root, "--format", "json"]),
+  );
+  assert.equal(catalogResult.code, 0);
+  const catalog = JSON.parse(catalogResult.stdout) as {
+    catalog: { entries: Array<{ id: string; metadata: { tags: string[] } }> };
+  };
+  assert.deepEqual(catalog.catalog.entries[0]?.metadata.tags, [
+    "testing",
+    "spec-review",
+    "qa",
+  ]);
 });
 
 test("scaffold refuses to overwrite an existing file", async () => {
@@ -472,11 +488,29 @@ test("scaffold refuses to overwrite an existing file", async () => {
   await writeFile(target, "already here");
 
   const result = await withCapturedConsole(() =>
-    main(["scaffold", "context", target]),
+    main(["scaffold", "context", target, "--owner", "qa-platform"]),
   );
 
   assert.equal(result.code, 2);
   assert.match(result.stderr, /EEXIST/);
+});
+
+test("scaffold file mode requires owner", async () => {
+  const root = await fixture();
+  const target = path.join(
+    root,
+    "skills",
+    "testing",
+    "missing-owner",
+    "SKILL.md",
+  );
+
+  const result = await withCapturedConsole(() =>
+    main(["scaffold", "skill", target]),
+  );
+
+  assert.equal(result.code, 2);
+  assert.match(result.stderr, /requires --owner/);
 });
 
 test("scaffold context can emit json", async () => {
@@ -511,11 +545,19 @@ test("scaffold context can emit json", async () => {
 });
 
 test("scaffold prompt emits Codex-ready authoring instructions", async () => {
+  const root = await fixture();
+  const target = path.join(
+    root,
+    "skills",
+    "testing",
+    "spec-review",
+    "SKILL.md",
+  );
   const result = await withCapturedConsole(() =>
     main([
       "scaffold",
       "skill",
-      "skills/testing/spec-review/SKILL.md",
+      target,
       "--format",
       "prompt",
       "--owner",
@@ -526,7 +568,19 @@ test("scaffold prompt emits Codex-ready authoring instructions", async () => {
   assert.equal(result.code, 0);
   assert.match(result.stdout, /Create a Renma skill asset/);
   assert.match(result.stdout, /id: `testing.spec-review`/);
+  assert.match(
+    result.stdout,
+    /Move durable domain, testing, platform, product, or tool knowledge/,
+  );
+  assert.match(result.stdout, /Do not choose runtime task context/);
+  assert.match(result.stdout, /Do not assemble prompts for live model calls/);
+  assert.match(result.stdout, /Do not call external services/);
+  assert.match(
+    result.stdout,
+    /renma graph \. --focus testing\.spec-review --format mermaid/,
+  );
   assert.match(result.stdout, /Do not invent owners/);
+  await assert.rejects(readFile(target, "utf8"));
 });
 
 async function fixture(): Promise<string> {

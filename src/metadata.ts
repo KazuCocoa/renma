@@ -1,5 +1,5 @@
 import type { AssetMetadata, AssetStatus } from "./model.js";
-import type { Diagnostic, ParsedDocument } from "./types.js";
+import type { Diagnostic, MetadataValue, ParsedDocument } from "./types.js";
 
 const STATUSES: AssetStatus[] = [
   "experimental",
@@ -14,7 +14,7 @@ export function parseAssetMetadata(document: ParsedDocument): {
   diagnostics: Diagnostic[];
 } {
   const diagnostics: Diagnostic[] = [];
-  const rawStatus = document.metadata.status;
+  const rawStatus = metadataText(document.metadata.status);
   const status = parseStatus(rawStatus);
   const metadata: AssetMetadata = {
     tags: listValue(document.metadata.tags),
@@ -34,9 +34,21 @@ export function parseAssetMetadata(document: ParsedDocument): {
     });
   }
 
-  assignOptional(metadata, "id", optionalText(document.metadata.id));
-  assignOptional(metadata, "version", optionalText(document.metadata.version));
-  assignOptional(metadata, "owner", optionalText(document.metadata.owner));
+  assignOptional(
+    metadata,
+    "id",
+    optionalText(metadataText(document.metadata.id)),
+  );
+  assignOptional(
+    metadata,
+    "version",
+    optionalText(metadataText(document.metadata.version)),
+  );
+  assignOptional(
+    metadata,
+    "owner",
+    optionalText(metadataText(document.metadata.owner)),
+  );
   assignOptional(metadata, "status", status);
 
   return {
@@ -57,12 +69,19 @@ function optionalText(value: string | undefined): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-function listValue(value: string | undefined): string[] {
+function listValue(value: MetadataValue | undefined): string[] {
   if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.map((item) => item.trim()).filter(Boolean);
+  }
   return value
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function metadataText(value: MetadataValue | undefined): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }
 
 function assignOptional<K extends keyof AssetMetadata>(

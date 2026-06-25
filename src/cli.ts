@@ -53,6 +53,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         json: { type: "boolean" },
         lines: { type: "string" },
         owner: { type: "string" },
+        tags: { type: "string", multiple: true },
         title: { type: "string" },
         to: { type: "string" },
         view: { type: "string" },
@@ -157,6 +158,12 @@ async function runScaffold(
     return 2;
   }
 
+  const owner = stringValue(values.owner);
+  if (format === "file" && !owner) {
+    console.error("scaffold --format file requires --owner <owner>.");
+    return 2;
+  }
+
   try {
     const scaffoldOptions: ScaffoldOptions = {
       kind: kindValue as ScaffoldKind,
@@ -165,10 +172,11 @@ async function runScaffold(
     };
     const id = stringValue(values.id);
     const title = stringValue(values.title);
-    const owner = stringValue(values.owner);
+    const tags = stringListValue(values.tags);
     if (id) scaffoldOptions.id = id;
     if (title) scaffoldOptions.title = title;
     if (owner) scaffoldOptions.owner = owner;
+    if (tags.length > 0) scaffoldOptions.tags = tags;
     return await runScaffoldCommand(scaffoldOptions);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
@@ -467,6 +475,18 @@ function stringValue(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function stringListValue(value: unknown): string[] {
+  const values = Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : typeof value === "string"
+      ? [value]
+      : [];
+  return values
+    .flatMap((item) => item.split(","))
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function parseSeverity(value: string | undefined): Severity | undefined {
   if (
     value === "low" ||
@@ -505,6 +525,8 @@ function helpText(): string {
     "  renma diff [path] --from <ref> --to <ref> [options]",
     "  renma ci-report [path] --from <ref> --to <ref> [options]",
     "  renma graph [path] [options]",
+    "  renma scaffold skill <path> [options]",
+    "  renma scaffold context <path> [options]",
     "  renma ownership [path] [options]",
     "  renma readiness [path] [options]",
     "  renma inspect <file> [options]",
@@ -530,6 +552,10 @@ function helpText(): string {
     "      --include-owned        ownership: include owned asset details",
     "      --json                 Shortcut for --format json",
     "      --view <view>          graph: summary, workflow, or full",
+    "      --focus <asset-id-or-path>",
+    "      --owner <owner>",
+    "      --title <title>",
+    "      --tags <tags>",
     "      --lines <range>        inspect: exact line range, e.g. L10-L42",
     "      --max-source-bytes <n> suggest-semantic-split: source file byte budget",
     "      --max-context-bytes <n>",

@@ -469,6 +469,24 @@ test("graph CLI can focus on a node id", async () => {
   );
 });
 
+test("graph CLI fails clearly when focus does not match", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    owner: "platform",
+    status: "experimental",
+  });
+
+  const result = await withCapturedConsole(() =>
+    main(["graph", root, "--focus", "does.not.exist"]),
+  );
+
+  assert.equal(result.code, 2);
+  assert.match(
+    result.stderr,
+    /graph --focus did not match any asset id or source path: does\.not\.exist/,
+  );
+});
+
 async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-graph-"));
 }

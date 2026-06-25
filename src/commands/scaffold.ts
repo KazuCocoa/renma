@@ -11,6 +11,7 @@ export interface ScaffoldOptions {
   id?: string;
   title?: string;
   owner?: string;
+  tags?: string[];
 }
 
 export interface ScaffoldBundle {
@@ -19,6 +20,7 @@ export interface ScaffoldBundle {
   id: string;
   title: string;
   owner: string;
+  tags: string[];
   format: ScaffoldFormat;
   content: string;
   prompt: string;
@@ -49,10 +51,12 @@ export function buildScaffoldBundle(options: ScaffoldOptions): ScaffoldBundle {
   const id = options.id ?? inferId(options.kind, options.targetPath);
   const title = options.title ?? titleFromId(id);
   const owner = options.owner ?? "unowned";
+  const tags =
+    options.tags && options.tags.length > 0 ? options.tags : ["authoring"];
   const content =
     options.kind === "skill"
-      ? renderSkillScaffold({ id, title, owner })
-      : renderContextScaffold({ id, title, owner });
+      ? renderSkillScaffold({ id, title, owner, tags })
+      : renderContextScaffold({ id, title, owner, tags });
 
   return {
     kind: options.kind,
@@ -60,6 +64,7 @@ export function buildScaffoldBundle(options: ScaffoldOptions): ScaffoldBundle {
     id,
     title,
     owner,
+    tags,
     format: options.format,
     content,
     prompt: renderPrompt({
@@ -68,6 +73,7 @@ export function buildScaffoldBundle(options: ScaffoldOptions): ScaffoldBundle {
       id,
       title,
       owner,
+      tags,
       content,
     }),
   };
@@ -77,6 +83,7 @@ function renderSkillScaffold(metadata: {
   id: string;
   title: string;
   owner: string;
+  tags: string[];
 }): string {
   return `---
 id: ${metadata.id}
@@ -84,8 +91,7 @@ title: ${metadata.title}
 version: 0.1.0
 owner: ${metadata.owner}
 status: experimental
-tags:
-  - authoring
+${renderTagBlock(metadata.tags)}
 requires_context:
 optional_context:
 conflicts:
@@ -118,6 +124,7 @@ function renderContextScaffold(metadata: {
   id: string;
   title: string;
   owner: string;
+  tags: string[];
 }): string {
   return `---
 id: ${metadata.id}
@@ -125,8 +132,7 @@ title: ${metadata.title}
 version: 0.1.0
 owner: ${metadata.owner}
 status: experimental
-tags:
-  - authoring
+${renderTagBlock(metadata.tags)}
 ---
 
 # ${metadata.title}
@@ -156,6 +162,7 @@ function renderPrompt(input: {
   id: string;
   title: string;
   owner: string;
+  tags: string[];
   content: string;
 }): string {
   return `Create a Renma ${input.kind} asset at \`${input.targetPath}\`.
@@ -165,6 +172,7 @@ Use this metadata exactly:
 - id: \`${input.id}\`
 - title: \`${input.title}\`
 - owner: \`${input.owner}\`
+- tags: \`${input.tags.join(",")}\`
 - version: \`0.1.0\`
 - status: \`experimental\`
 
@@ -177,9 +185,25 @@ Constraints:
 
 - Preserve the YAML frontmatter shape unless the repository already requires a stricter local convention.
 - Use only supported statuses: experimental, stable, deprecated, archived.
+- Move durable domain, testing, platform, product, or tool knowledge into separately owned context assets under \`contexts/\`.
+- Use \`requires_context\` for context the skill normally depends on.
+- Use \`optional_context\` for context useful only in some cases.
+- Use simple supported metadata shapes only.
+- For context assets, keep content durable, reviewable, and source-backed.
+- Do not put task-specific prompt instructions in context assets.
+- Add explicit metadata and references where appropriate.
 - Do not invent owners, dependencies, policies, or domain facts.
+- Do not choose runtime task context.
+- Do not assemble prompts for live model calls.
+- Do not call external services.
 - Keep the asset LLM-facing and Renma-verifiable.
+- After creating files, run \`renma scan\`, \`renma catalog\`, \`renma graph . --focus ${input.id}\`, \`renma graph . --focus ${input.id} --format mermaid\`, and \`renma graph . --focus does.not.exist\`.
 `;
+}
+
+function renderTagBlock(tags: string[]): string {
+  return `tags:
+${tags.map((tag) => `  - ${tag}`).join("\n")}`;
 }
 
 function inferId(kind: ScaffoldKind, targetPath: string): string {

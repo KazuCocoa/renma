@@ -107,13 +107,9 @@ function focusGraph(report: GraphReport, focus?: string): GraphReport {
     matchesFocus(candidate, report.root, focus),
   );
   if (!node) {
-    return {
-      ...report,
-      nodeCount: 0,
-      edgeCount: 0,
-      nodes: [],
-      edges: [],
-    };
+    throw new Error(
+      `graph --focus did not match any asset id or source path: ${focus}`,
+    );
   }
 
   const edges = report.edges.filter(

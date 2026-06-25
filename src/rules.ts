@@ -5,6 +5,7 @@ import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import type {
   Evidence,
   Finding,
+  MetadataValue,
   ParsedDocument,
   ScanConfig,
   Severity,
@@ -1113,8 +1114,8 @@ function skillReferencesSupersededAssetFindings(
 
     const canonicalTargets = sharedContextTargets(document);
     const supersededStatus =
-      document.metadata.status === "deprecated" ||
-      document.metadata.status === "archived";
+      metadataText(document.metadata.status) === "deprecated" ||
+      metadataText(document.metadata.status) === "archived";
     if (!supersededStatus && canonicalTargets.length === 0) return [];
     if (canonicalTargets.length === 0) return [];
 
@@ -1223,8 +1224,8 @@ function assetReferencesSupersededAssetFindings(
     }))
     .filter(
       ({ document, canonicalTargets }) =>
-        document.metadata.status === "deprecated" ||
-        document.metadata.status === "archived" ||
+        metadataText(document.metadata.status) === "deprecated" ||
+        metadataText(document.metadata.status) === "archived" ||
         canonicalTargets.length > 0,
     )
     .filter(({ canonicalTargets }) => canonicalTargets.length > 0);
@@ -1544,12 +1545,18 @@ function markdownBodyLineIndexes(document: ParsedDocument): number[] {
     .filter((index) => index >= bodyStart);
 }
 
-function listMetadataValue(value: string | undefined): string[] {
+function listMetadataValue(value: MetadataValue | undefined): string[] {
   if (!value) return [];
+  if (Array.isArray(value))
+    return value.map((item) => item.trim()).filter(Boolean);
   return value
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function metadataText(value: MetadataValue | undefined): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }
 
 function matchingLineFindings(
