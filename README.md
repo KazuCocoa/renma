@@ -2,7 +2,7 @@
 
 Renma is a deterministic governance and health layer for agent-consumable repository knowledge.
 
-It helps teams keep skills and shared context assets discoverable, reviewable, and safe for agent runtimes to reuse. Instead of letting critical knowledge get copied into many prompts or buried in one-off Markdown files, Renma treats that knowledge as a software asset: named, owned, versioned, linked, checked in CI, and reviewed with deterministic safety diagnostics.
+It helps teams keep skills and shared context assets discoverable, reviewable, and safe for agent runtimes to reuse. Instead of letting critical knowledge get copied into many prompts or buried in one-off Markdown files, Renma treats that knowledge as a software asset: named, owned, versioned, linked, checked in CI, and reviewed with deterministic diagnostics and scan findings.
 
 Renma now supports `scan`, `catalog`, `ownership`, `graph`, focused graph views, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-semantic-split`, and security diagnostics v1.
 
@@ -228,7 +228,8 @@ renma graph <path>
 renma readiness <path>
 renma diff <path> --from <ref> --to <ref>
 renma ci-report <path> --from <ref> --to <ref>
-renma inspect <path> <asset-or-file>
+renma inspect <file>
+renma inspect <file> --lines L10-L42
 renma suggest-semantic-split <file>
 ```
 
@@ -241,10 +242,11 @@ renma scan . --fail-on high
 renma catalog . --format json
 renma ownership . --include-owned
 renma graph . --format mermaid
+renma graph . --focus skill.testing.spec-review --view full
 renma readiness .
 renma diff . --from main --to HEAD --format markdown
 renma ci-report . --from main --to HEAD --format markdown
-renma inspect . contexts/testing/boundary-value-analysis.md
+renma inspect contexts/testing/boundary-value-analysis.md
 ```
 
 Use JSON output when Renma is part of CI or another tool. Use markdown output for PR-review artifacts. Use text output when a person or coding agent needs a concise repair list.
@@ -266,6 +268,10 @@ AGENTS.md
 README.md
 context/**/*.md
 contexts/**/*.md
+skills/**/profiles/**/*.md
+skills/**/references/**/*.md
+skills/**/examples/**/*.md
+skills/**/scripts/**/*
 tools/**/*
 ```
 
@@ -487,6 +493,11 @@ Run the local CLI after building:
 ```bash
 node dist/index.js scan .
 ```
+
+## Documentation
+
+- [User Manual](docs/user-manual.md)
+- [Diagnostics Reference](docs/diagnostics.md)
 
 ## Related Docs
 
