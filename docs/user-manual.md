@@ -95,9 +95,9 @@ The list-style metadata fields are `tags`, `when_to_use`, `when_not_to_use`, `re
 
 renma commands fall into a few groups:
 
-- Inventory and ownership: `catalog`, `ownership`, and `graph`.
-- Local inspection and authoring: `inspect`, `scaffold`, and `suggest-semantic-split`.
-- Review and CI: `scan`, `readiness`, `diff`, and `ci-report`.
+- Inventory and ownership: `catalog` lists discovered assets and references, `ownership` summarizes owned and unowned assets, and `graph` shows relationships between catalog nodes.
+- Local inspection and authoring: `inspect` reads one file as an outline or exact line slice, `scaffold` creates starter assets or authoring prompts, and `suggest-semantic-split` prepares a prompt or JSON bundle for splitting mixed-purpose Markdown.
+- Review and CI: `scan` emits deterministic findings, `readiness` turns repository state into checks and a score, `diff` compares two refs, and `ci-report` formats the comparison for pull-request review.
 
 ### `scan`
 
@@ -111,6 +111,8 @@ renma scan . --fail-on high
 
 Use `--fail-on` in CI when findings at or above a severity should fail the job. The JSON output includes findings, evidence, diagnostics, and summary data that other tools can consume.
 
+Output includes scan findings, discovery or catalog diagnostics, the effective exit threshold, and evidence paths or snippets for each finding.
+
 ### `catalog`
 
 Builds a deterministic catalog of discovered assets.
@@ -121,6 +123,8 @@ renma catalog . --format markdown
 ```
 
 Use the catalog to review asset IDs, owners, status, dependencies, and metadata-derived references.
+
+Output includes catalog assets, dependency edges, owners, lifecycle status, tags, and diagnostics.
 
 ### `graph`
 
@@ -164,9 +168,11 @@ When `--focus` is provided, renma keeps the matched asset, its directly connecte
 
 Note: this graph `focus` argument is a CLI option. It is not a metadata field on an asset.
 
+Output includes graph nodes, relationship edges, unresolved targets, and diagnostics. Mermaid output renders the same graph as a diagram definition.
+
 ### `inspect`
 
-Inspects one asset and its local graph slice.
+Inspects one file as an outline or exact line slice.
 
 ```bash
 renma inspect skills/testing/spec-review/SKILL.md
@@ -174,7 +180,7 @@ renma inspect contexts/testing/boundary-value-analysis.md --format json
 renma inspect skills/testing/spec-review/SKILL.md --lines L10-L42
 ```
 
-Use this when editing one skill or context file and you want to see nearby dependencies without reading the whole repository catalog. Use `--lines <range>` for an exact source slice; ranges can look like `L10-L42` or `10-42`.
+Use this when editing one skill or context file and you want a deterministic outline without reading the whole repository catalog. Without `--lines`, output includes file size, line count, frontmatter range, headings, code fences, and links. Use `--lines <range>` for an exact source slice; ranges can look like `L10-L42` or `10-42`.
 
 ### `readiness`
 
@@ -188,6 +194,8 @@ renma readiness . --format json
 
 Readiness combines catalog diagnostics, ownership metadata, graph resolution, required and optional context references, asset status, and selected scan findings into an agent-readiness score.
 
+Output includes a readiness score and level, workflow checks, diagnostics, scan findings that affect readiness, and graph or ownership summary data.
+
 ### `diff`
 
 Compares deterministic readiness reports for two git refs.
@@ -198,6 +206,8 @@ renma diff . --from main --to HEAD --format markdown
 ```
 
 Use this to review what changed between branches or commits. The command builds readiness data for both refs and reports asset, graph, check, and finding deltas.
+
+Output includes readiness deltas, changed assets, graph edge changes, check changes, and added or removed findings.
 
 ### `ci-report`
 
@@ -210,6 +220,8 @@ renma ci-report . --from main --to HEAD --format json
 
 The report summarizes readiness deltas, graph-resolution changes, added and removed findings, and policy-relevant status. It is CI-oriented: it exits `1` when the comparison has a blocking review status and `2` for usage, command, or configuration errors.
 
+Output includes a CI status (`PASS`, `WARN`, or `FAIL`), a summary, readiness changes, graph changes, and review-focused finding changes.
+
 ### `ownership`
 
 Reports asset ownership.
@@ -221,6 +233,8 @@ renma ownership . --format json
 ```
 
 Use this to find unowned assets and to review what each owner is responsible for.
+
+Output includes total asset count, owned asset count, ownership coverage, unowned assets, and optionally owned asset details when `--include-owned` is provided.
 
 ### `scaffold`
 
@@ -241,13 +255,31 @@ Suggests a semantic split for large or mixed-purpose assets.
 ```bash
 renma suggest-semantic-split docs/large-runbook.md
 renma suggest-semantic-split docs/large-runbook.md --format json
+renma suggest-semantic-split docs/large-runbook.md --max-context-bytes 32768
 ```
 
 Use this as an editing aid when an asset has grown beyond one clear responsibility.
 
+Output is a prompt by default. With `--format json`, output includes source context, sibling-file context, helper commands, and a structured review bundle for a human or coding agent to propose a semantic split.
+
 ## Output Formats
 
-Common formats are `text`, `json`, and `markdown`. `graph` also supports `mermaid`. Prefer JSON in automation and markdown for human review in pull requests.
+Use `--format <format>` to select output and `--json` as a shortcut where the command supports JSON.
+
+| Command | Formats |
+| --- | --- |
+| `scan` | `text`, `json` |
+| `catalog` | `json`, `markdown` |
+| `ownership` | `json`, `markdown` |
+| `readiness` | `json`, `markdown` |
+| `diff` | `json`, `markdown` |
+| `ci-report` | `json`, `markdown` |
+| `graph` | `json`, `markdown`, `mermaid` |
+| `inspect` | `text`, `json` |
+| `scaffold` | `file`, `prompt`, `json` |
+| `suggest-semantic-split` | `prompt`, `json` |
+
+Prefer JSON in automation and markdown for human review in pull requests. Use Mermaid when you want to render a graph diagram.
 
 ## CI Workflow
 
