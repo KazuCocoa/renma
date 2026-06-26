@@ -218,6 +218,10 @@ A practical first pass is:
 
 Renma does not require an LLM for this loop. Its core analysis is deterministic so the same repository state produces stable evidence in local development, CI, and code review.
 
+## Example repository
+
+See [`examples/context-repo`](examples/context-repo) for a small skill and shared-context repository you can scan with renma.
+
 ## CLI Commands
 
 ```bash
