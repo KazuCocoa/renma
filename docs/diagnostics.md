@@ -17,7 +17,7 @@ These diagnostics are emitted while renma discovers files.
 
 | Severity | Message | Meaning | Fix |
 | --- | --- | --- | --- |
-| `error` | `Could not evaluate glob "<pattern>": <error>` | An include pattern could not be evaluated. | Fix or remove the glob pattern in config or CLI input. |
+| `error` | `Could not evaluate glob "<pattern>": <error>` | A configured discovery glob could not be evaluated. | Fix or remove the glob pattern in config or CLI input. |
 | `warning` | `Skipping symbolic link.` | renma found a symlink and skipped it. | Point config at the real file or directory if the target should be scanned. |
 | `warning` | `Skipping file larger than max_file_size_bytes (<bytes>).` | A file exceeded the configured size limit. | Raise `max_file_size_bytes`, exclude the file, or split the asset. |
 | `error` | `Could not read file: <error>` | The file matched discovery but could not be read. | Fix permissions, remove the bad path, or exclude the file. |
@@ -28,9 +28,9 @@ These diagnostics are emitted after files are parsed into catalog entries.
 
 | Severity | Message | Meaning | Fix |
 | --- | --- | --- | --- |
-| `warning` | `Invalid status "<status>". Expected one of: draft, active, deprecated, superseded.` | An asset status does not match the accepted status values. | Replace the status with a supported value. |
+| `warning` | `Invalid status "<status>". Expected one of: experimental, stable, deprecated, archived.` | An asset status does not match the accepted status values. | Replace the status with a supported value. |
 | `warning` | `Metadata dependency "<to>" from "<from>" does not match a catalog entry.` | A metadata dependency points at an asset renma did not discover. | Correct the reference, add the missing asset, or update include/exclude config. |
-| `warning` | `Metadata dependency "<to>" from "<from>" targets a <status> asset.` | A dependency points at an inactive catalog target such as a deprecated or superseded asset. | Retarget the dependency to an active asset or document the migration. |
+| `warning` | `Metadata dependency "<to>" from "<from>" targets a <status> asset.` | A dependency points at a deprecated or archived catalog target. | Retarget the dependency to a stable replacement or document the migration. |
 | `warning` | `Shared context asset is missing an id.` | A shared context asset has no stable ID. | Add an `id` metadata field. |
 | `warning` | `Shared context asset is missing an owner.` | A shared context asset has no owner metadata. | Add an `owner` metadata field. |
 
@@ -45,10 +45,10 @@ These diagnostics are emitted after files are parsed into catalog entries.
 | `error` | `Missing owner metadata.` | A catalog asset lacks owner metadata. | Add `owner` metadata to the asset. |
 | `error` | `<kind> reference "<target>" does not resolve.` | A graph edge points to a missing target. | Correct the reference or add the target asset. |
 | `error` | `Required context reference "<target>" does not resolve.` | A required context reference is missing. | Add the context asset or correct `requires_context`. |
-| `error` | `Required context "<target>" resolves to <status> asset <path>.` | Required context exists but is not active. | Move the dependency to an active context asset. |
+| `error` | `Required context "<target>" resolves to <status> asset <path>.` | Required context exists but is deprecated or archived. | Move the dependency to a stable context asset. |
 | `warning` | `Optional context reference "<target>" does not resolve.` | An optional context reference is missing. | Correct it or remove it if it is no longer useful. |
-| `warning` | `Optional context "<target>" resolves to <status> asset <path>.` | Optional context exists but is not active. | Retarget or remove the optional dependency. |
-| `warning` | `Asset status is <status>.` | A catalog asset is deprecated, superseded, or otherwise not active. | Migrate dependents or update the asset status. |
+| `warning` | `Optional context "<target>" resolves to <status> asset <path>.` | Optional context exists but is deprecated or archived. | Retarget or remove the optional dependency. |
+| `warning` | `Asset status is <status>.` | A catalog asset is deprecated or archived. | Migrate dependents or update the asset status. |
 | `error` or `warning` | scan finding remediation text | A scan finding is severe enough to affect readiness. | Fix the finding listed in the readiness detail. |
 
 ## Scan Finding Identifiers
@@ -74,17 +74,17 @@ The identifiers below are part of the current scan output. The current implement
 | `LAYOUT-HELPER-NON_TOOLS` | Helper file is outside the tools root. | A helper script lives under a non-canonical scripts directory. | Move helper code under the configured `tools/**` root. |
 | `LAYOUT-SKILL-EXECUTABLE-COMMAND` | `SKILL.md` includes executable command detail. | A skill entrypoint contains shell commands instead of delegating to helpers. | Move commands to approved helpers and keep `SKILL.md` as routing guidance. |
 | `LAYOUT-SKILL-NOT-THIN` | Skill entrypoint is too large or procedural. | `SKILL.md` contains long procedures, setup, or troubleshooting content. | Split detailed material into references, profiles, examples, or tools. |
-| `MAINT-ASSET-REFERENCES-SUPERSEDED-ASSET` | Asset references superseded context. | Metadata or content points at an asset marked superseded. | Retarget the reference to the active replacement. |
+| `MAINT-ASSET-REFERENCES-SUPERSEDED-ASSET` | Asset references superseded context. | Metadata or content points at an asset marked superseded. | Retarget the reference to the stable replacement. |
 | `MAINT-CONTEXT-PATH-NON-SEMANTIC` | Context path is not semantically grouped. | Context is stored under vague folders such as misc or general. | Move it under a meaningful path such as `contexts/tools/`, `contexts/domain/`, or `contexts/testing/`. |
 | `MAINT-ORPHANED-CONTEXT-ASSET` | Shared context has no incoming references. | A first-class context asset is not used by skills or other assets. | Link it from consumers, archive it, or remove it after review. |
-| `MAINT-REFERENCE-DEPRECATED-ASSET` | Reference targets deprecated context. | Metadata dependency resolves to a deprecated asset. | Point dependents at an active asset or finish the migration. |
+| `MAINT-REFERENCE-DEPRECATED-ASSET` | Reference targets deprecated context. | Metadata dependency resolves to a deprecated asset. | Point dependents at a stable asset or finish the migration. |
 | `MAINT-REPEATED-CODE-BLOCK` | Duplicate code block appears across assets. | Copy-pasted examples or procedures repeat in multiple files. | Extract shared guidance or consolidate the repeated block. |
 | `MAINT-REPEATED-CONTEXT-PATTERN` | Repeated context-like wording appears. | Multiple assets duplicate the same reusable context pattern. | Promote the shared pattern into a context asset and reference it. |
 | `MAINT-REPEATED-HEADING` | Same heading repeats across assets. | Similar sections are copied through several files. | Consolidate or reference a shared source of truth. |
 | `MAINT-REPEATED-LINK` | Same link repeats across assets. | Repeated references suggest duplicated guidance. | Centralize the reference or keep only necessary local links. |
 | `MAINT-REPEATED-SECTION` | Similar section text repeats. | A section has been copied into multiple assets. | Extract common material or reduce duplication. |
 | `MAINT-SKILL-CONTEXT-REFERENCE-NOT-DECLARED` | Skill mentions context without metadata. | Body text references `contexts/...` but `requires_context` omits it. | Add the context to `requires_context` or remove the stale mention. |
-| `MAINT-SKILL-REFERENCES-SUPERSEDED-ASSET` | Skill refers to superseded context. | Skill content names a superseded context asset. | Update the skill to the active context asset. |
+| `MAINT-SKILL-REFERENCES-SUPERSEDED-ASSET` | Skill refers to superseded context. | Skill content names a superseded context asset. | Update the skill to the stable replacement context asset. |
 | `MAINT-SKILL-REUSABLE-CONTEXT-CANDIDATE` | Skill contains reusable context. | `SKILL.md` includes broadly reusable setup, troubleshooting, or risk guidance. | Move reusable content to shared context and reference it. |
 | `MAINT-SUPPORT-ASSET-SHARED-CONTEXT-CANDIDATE` | Support asset looks reusable. | A reference, profile, or example contains content useful beyond one skill. | Promote it to shared context when reuse is intended. |
 | `META-DUPLICATE-ASSET-ID` | Asset ID is not unique. | Two catalog entries declare the same ID. | Give each asset a unique ID and update references. |

@@ -40,12 +40,12 @@ Assets can declare metadata such as `id`, `owner`, `status`, `requires_context`,
 Use `--config <path>` with commands that scan the repository:
 
 ```bash
-renma scan . --config renma.json
+renma scan . --config renma.config.json
 ```
 
 The JSON configuration supports the same names used by the implementation, including:
 
-- `include`: glob patterns to scan.
+- `globs`: glob patterns to scan.
 - `exclude`: paths or path prefixes to skip.
 - `max_file_size_bytes`: largest file renma will read.
 - `max_depth`: maximum discovery depth.
@@ -57,7 +57,47 @@ The JSON configuration supports the same names used by the implementation, inclu
 
 CLI flags override config values when both are provided.
 
+If `--config` is not provided, renma looks for repository config files such as `renma.config.json` or `.renma.json` while resolving the scan target.
+
+By default, renma discovers these glob families:
+
+- `prompts/**`
+- `docs/**`
+- `skills/**/SKILL.md`
+- `.agents/**/*.md`
+- `AGENTS.md`
+- `README.md`
+- `context/**/*.md`
+- `contexts/**/*.md`
+- `skills/**/profiles/**/*.md`
+- `skills/**/references/**/*.md`
+- `skills/**/examples/**/*.md`
+- `skills/**/scripts/**/*`
+
+## Metadata
+
+Assets can use simple YAML-style metadata at the top of Markdown files. Common fields are:
+
+- `id`: stable catalog asset ID. If omitted, renma falls back to the repository-relative source path.
+- `title`: human-readable title.
+- `owner`: owning team or maintainer.
+- `status`: lifecycle state: `experimental`, `stable`, `deprecated`, or `archived`.
+- `version`: optional asset version.
+- `tags`: list of searchable labels.
+- `when_to_use` and `when_not_to_use`: routing guidance.
+- `requires_context` and `optional_context`: dependencies on context assets.
+- `conflicts`: assets that should not be used together.
+- `superseded_by`: replacement assets for deprecated or archived content.
+
+The list-style metadata fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `conflicts`, and `superseded_by`.
+
 ## Commands
+
+renma commands fall into a few groups:
+
+- Inventory and ownership: `catalog`, `ownership`, and `graph`.
+- Local inspection and authoring: `inspect`, `scaffold`, and `suggest-semantic-split`.
+- Review and CI: `scan`, `readiness`, `diff`, and `ci-report`.
 
 ### `scan`
 
@@ -131,9 +171,10 @@ Inspects one asset and its local graph slice.
 ```bash
 renma inspect skills/testing/spec-review/SKILL.md
 renma inspect contexts/testing/boundary-value-analysis.md --format json
+renma inspect skills/testing/spec-review/SKILL.md --lines L10-L42
 ```
 
-Use this when editing one skill or context file and you want to see nearby dependencies without reading the whole repository catalog.
+Use this when editing one skill or context file and you want to see nearby dependencies without reading the whole repository catalog. Use `--lines <range>` for an exact source slice; ranges can look like `L10-L42` or `10-42`.
 
 ### `readiness`
 
@@ -149,24 +190,25 @@ Readiness combines catalog diagnostics, ownership metadata, graph resolution, re
 
 ### `diff`
 
-Compares two deterministic readiness snapshots.
+Compares deterministic readiness reports for two git refs.
 
 ```bash
-renma diff before.json after.json
+renma diff . --from main --to HEAD
+renma diff . --from main --to HEAD --format markdown
 ```
 
-Use this to review what changed between branches, commits, or generated artifacts.
+Use this to review what changed between branches or commits. The command builds readiness data for both refs and reports asset, graph, check, and finding deltas.
 
 ### `ci-report`
 
 Formats a diff result for CI or pull-request review.
 
 ```bash
-renma ci-report before.json after.json --format markdown
-renma ci-report before.json after.json --format json
+renma ci-report . --from main --to HEAD --format markdown
+renma ci-report . --from main --to HEAD --format json
 ```
 
-The report summarizes readiness deltas, graph-resolution changes, added and removed findings, and policy-relevant status.
+The report summarizes readiness deltas, graph-resolution changes, added and removed findings, and policy-relevant status. It is CI-oriented: it exits `1` when the comparison has a blocking review status and `2` for usage, command, or configuration errors.
 
 ### `ownership`
 
@@ -185,11 +227,12 @@ Use this to find unowned assets and to review what each owner is responsible for
 Creates a starter skill or context asset.
 
 ```bash
-renma scaffold skills/testing/spec-review/SKILL.md
-renma scaffold contexts/testing/boundary-value-analysis.md
+renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
+renma scaffold context contexts/testing/boundary-value-analysis.md --owner qa-platform
+renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform --format prompt
 ```
 
-The generated files are intentionally minimal. Fill in metadata, dependencies, and verification steps before depending on them in automation.
+`scaffold --format file` writes a starter file, `--format prompt` emits an authoring prompt, and `--format json` emits structured scaffold data. The generated content is intentionally minimal; fill in metadata, dependencies, and verification steps before depending on it in automation.
 
 ### `suggest-semantic-split`
 
@@ -213,7 +256,7 @@ A typical CI flow is:
 1. Build renma.
 2. Run `renma scan . --fail-on high`.
 3. Run `renma readiness . --format json` and store the result as an artifact.
-4. Compare snapshots with `renma diff`.
+4. Compare refs with `renma diff . --from main --to HEAD`.
 5. Publish `renma ci-report` in the pull-request summary.
 
 Example:
