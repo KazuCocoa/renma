@@ -93,6 +93,8 @@ The list-style metadata fields are `tags`, `when_to_use`, `when_not_to_use`, `re
 
 ## Commands
 
+For a runnable mini-repository with a skill, shared context assets, ownership metadata, and graph relationships, see [`examples/context-repo`](../examples/context-repo).
+
 renma commands fall into a few groups:
 
 - Inventory and ownership: `catalog` lists discovered assets and references, `ownership` summarizes owned and unowned assets, and `graph` shows relationships between catalog nodes.
