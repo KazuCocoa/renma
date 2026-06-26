@@ -34,6 +34,8 @@ test("all implemented scan finding identifiers are documented", async () => {
 
   const documented = new Set(documentedIds);
   const missing = implementedIds.filter((id) => !documented.has(id));
+  const implemented = new Set(implementedIds);
+  const stale = documentedIds.filter((id) => !implemented.has(id));
 
   if (missing.length > 0) {
     assert.fail(
@@ -41,6 +43,16 @@ test("all implemented scan finding identifiers are documented", async () => {
         "docs/diagnostics.md is missing implemented scan finding identifier(s)",
         "from the Scan Finding Identifiers table:",
         ...missing.map((id) => `- ${id}`),
+      ].join("\n"),
+    );
+  }
+
+  if (stale.length > 0) {
+    assert.fail(
+      [
+        "docs/diagnostics.md documents scan finding identifier(s) that are not",
+        "emitted by the current implementation:",
+        ...stale.map((id) => `- ${id}`),
       ].join("\n"),
     );
   }
