@@ -268,6 +268,10 @@ AGENTS.md
 README.md
 context/**/*.md
 contexts/**/*.md
+skills/**/profiles/**/*.md
+skills/**/references/**/*.md
+skills/**/examples/**/*.md
+skills/**/scripts/**/*
 tools/**/*
 ```
 

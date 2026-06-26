@@ -29,8 +29,7 @@ renma is most useful when agent knowledge is stored in predictable places:
 
 - `skills/**/SKILL.md` for skill instructions.
 - `contexts/**` for shared context assets.
-- `prompts/**` for reusable prompts.
-- `docs/**` for documentation that agents or humans depend on.
+- configurable prompt or documentation paths for reusable prompts and broader docs.
 - `*.renma.json` for structured metadata assets.
 
 Tool helper implementations usually belong under `tools/**`. They can be referenced from skills and commands, but they are not the same thing as user-facing documentation under `docs/**`.
@@ -63,8 +62,6 @@ If `--config` is not provided, renma looks for repository config files such as `
 
 By default, renma scans these glob families when building its catalog and findings:
 
-- `prompts/**`
-- `docs/**`
 - `skills/**/SKILL.md`
 - `.agents/**/*.md`
 - `AGENTS.md`
@@ -75,6 +72,7 @@ By default, renma scans these glob families when building its catalog and findin
 - `skills/**/references/**/*.md`
 - `skills/**/examples/**/*.md`
 - `skills/**/scripts/**/*`
+- `tools/**/*`
 
 ## Metadata
 
