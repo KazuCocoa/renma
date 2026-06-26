@@ -38,6 +38,8 @@ test("example context repository scans and builds catalog/graph reports", async 
     ),
   );
   assert.ok(
-    graphEdges.includes("skill.testing.spec-review->context.testing.negative-testing"),
+    graphEdges.includes(
+      "skill.testing.spec-review->context.testing.negative-testing",
+    ),
   );
 });
