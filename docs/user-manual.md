@@ -33,6 +33,8 @@ renma is most useful when agent knowledge is stored in predictable places:
 - `docs/**` for documentation that agents or humans depend on.
 - `*.renma.json` for structured metadata assets.
 
+Tool helper implementations usually belong under `tools/**`. They can be referenced from skills and commands, but they are not the same thing as user-facing documentation under `docs/**`.
+
 Assets can declare metadata such as `id`, `owner`, `status`, `requires_context`, `optional_context`, and dependency references. The catalog and graph commands use that metadata to resolve links, identify weak references, and produce reports that can be checked in CI.
 
 ## Configuration
@@ -59,7 +61,7 @@ CLI flags override config values when both are provided.
 
 If `--config` is not provided, renma looks for repository config files such as `renma.config.json` or `.renma.json` while resolving the scan target.
 
-By default, renma discovers these glob families:
+By default, renma scans these glob families when building its catalog and findings:
 
 - `prompts/**`
 - `docs/**`
@@ -96,7 +98,7 @@ The list-style metadata fields are `tags`, `when_to_use`, `when_not_to_use`, `re
 renma commands fall into a few groups:
 
 - Inventory and ownership: `catalog` lists discovered assets and references, `ownership` summarizes owned and unowned assets, and `graph` shows relationships between catalog nodes.
-- Local inspection and authoring: `inspect` reads one file as an outline or exact line slice, `scaffold` creates starter assets or authoring prompts, and `suggest-semantic-split` prepares a prompt or JSON bundle for splitting mixed-purpose Markdown.
+- Local inspection and authoring: `inspect` reads one file as an outline or exact line slice, `scaffold` creates starter assets or authoring prompts, and `suggest-semantic-split` packages source context and helper commands so a human or coding agent can draft a split for mixed-purpose Markdown.
 - Review and CI: `scan` emits deterministic findings, `readiness` turns repository state into checks and a score, `diff` compares two refs, and `ci-report` formats the comparison for pull-request review.
 
 ### `scan`
@@ -218,7 +220,7 @@ renma ci-report . --from main --to HEAD --format markdown
 renma ci-report . --from main --to HEAD --format json
 ```
 
-The report summarizes readiness deltas, graph-resolution changes, added and removed findings, and policy-relevant status. It is CI-oriented: it exits `1` when the comparison has a blocking review status and `2` for usage, command, or configuration errors.
+The report summarizes readiness deltas, graph-resolution changes, added and removed findings, and policy-relevant status. It is CI-oriented: `PASS` and `WARN` exit `0`, `FAIL` exits `1`, and usage, command, or configuration errors exit `2`.
 
 Output includes a CI status (`PASS`, `WARN`, or `FAIL`), a summary, readiness changes, graph changes, and review-focused finding changes.
 
@@ -260,7 +262,7 @@ renma suggest-semantic-split docs/large-runbook.md --max-context-bytes 32768
 
 Use this as an editing aid when an asset has grown beyond one clear responsibility.
 
-Output is a prompt by default. With `--format json`, output includes source context, sibling-file context, helper commands, and a structured review bundle for a human or coding agent to propose a semantic split.
+Output is a prompt by default. With `--format json`, output includes source context, sibling-file context, helper commands, and a structured review bundle. The command does not apply a split itself; it gives a human or coding agent enough context to draft a proposal.
 
 ## Output Formats
 

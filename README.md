@@ -228,7 +228,8 @@ renma graph <path>
 renma readiness <path>
 renma diff <path> --from <ref> --to <ref>
 renma ci-report <path> --from <ref> --to <ref>
-renma inspect <path> <asset-or-file>
+renma inspect <file>
+renma inspect <file> --lines L10-L42
 renma suggest-semantic-split <file>
 ```
 
@@ -245,7 +246,7 @@ renma graph . --focus skill.testing.spec-review --view full
 renma readiness .
 renma diff . --from main --to HEAD --format markdown
 renma ci-report . --from main --to HEAD --format markdown
-renma inspect . contexts/testing/boundary-value-analysis.md
+renma inspect contexts/testing/boundary-value-analysis.md
 ```
 
 Use JSON output when Renma is part of CI or another tool. Use markdown output for PR-review artifacts. Use text output when a person or coding agent needs a concise repair list.
