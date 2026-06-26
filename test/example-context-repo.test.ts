@@ -4,6 +4,7 @@ import test from "node:test";
 
 import { catalog } from "../src/commands/catalog.js";
 import { graph } from "../src/commands/graph.js";
+import { readiness } from "../src/commands/readiness.js";
 import { scan } from "../src/scanner.js";
 
 const EXAMPLE_ROOT = path.join(process.cwd(), "examples/context-repo");
@@ -42,4 +43,38 @@ test("example context repository scans and builds catalog/graph reports", async 
       "skill.testing.spec-review->context.testing.negative-testing",
     ),
   );
+});
+
+test("example context repository produces a stable readiness report shape", async () => {
+  const [catalogResult, readinessReport] = await Promise.all([
+    catalog(EXAMPLE_ROOT),
+    readiness(EXAMPLE_ROOT),
+  ]);
+  const assetIds = catalogResult.catalog.assets.map((asset) => asset.id);
+  const checkIds = readinessReport.checks.map((check) => check.id);
+
+  assert.ok(["ready", "partial", "not_ready"].includes(readinessReport.level));
+  assert.ok(assetIds.includes("skill.testing.spec-review"));
+  assert.ok(assetIds.includes("context.testing.boundary-value-analysis"));
+  assert.ok(assetIds.includes("context.testing.negative-testing"));
+
+  assert.equal(readinessReport.summary.totalAssets, assetIds.length);
+  assert.equal(
+    readinessReport.summary.ownedAssets,
+    readinessReport.summary.totalAssets,
+  );
+  assert.equal(readinessReport.summary.unownedAssets, 0);
+  assert.equal(readinessReport.summary.nodeCount, assetIds.length);
+  assert.ok(readinessReport.summary.edgeCount >= 3);
+  assert.equal(
+    readinessReport.summary.resolvedEdges,
+    readinessReport.summary.edgeCount,
+  );
+  assert.equal(readinessReport.summary.unresolvedEdges, 0);
+  assert.equal(readinessReport.summary.workflow.skillEntrypoints, 1);
+  assert.equal(readinessReport.summary.workflow.readinessPercent, 100);
+
+  assert.ok(checkIds.includes("ownership.coverage"));
+  assert.ok(checkIds.includes("graph.unresolved_edges"));
+  assert.ok(checkIds.includes("workflow.context_closure"));
 });
