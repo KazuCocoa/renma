@@ -98,6 +98,32 @@ Views are:
 - `workflow`: workflow-oriented relationships.
 - `full`: all known graph edges.
 
+#### Focusing The Graph
+
+The graph command can be focused on one asset with `--focus <asset-id-or-path>`.
+
+Use this when you want to inspect the local neighborhood around one context asset, skill, or other catalog entry instead of reading the entire repository graph. A focused graph is useful for answering questions such as:
+
+- What does this asset depend on?
+- What other assets reference this asset?
+- Is this asset connected to the expected parts of the context repository?
+- Is this asset isolated or unexpectedly central?
+
+Examples:
+
+```bash
+renma graph . --focus context.testing.boundary-value-analysis
+renma graph . --focus contexts/testing/boundary-value-analysis.md --view full
+```
+
+`--focus` accepts one value. The value must match either a catalog asset ID, a repository-relative source path such as `contexts/testing/boundary-value-analysis.md`, or an absolute source path. It does not match projected `summary` view node IDs such as `contexts/testing/*`.
+
+When `--focus` is provided, renma keeps the matched asset, its directly connected incoming and outgoing graph edges, and the assets at the other ends of those edges. In other words, it filters graph contents to the focused asset's one-hop neighborhood; it does not only highlight or rearrange the full graph. If the focus value does not match an asset ID or source path, the command exits with usage code `2` and reports that `graph --focus did not match any asset id or source path`.
+
+`--focus` runs before `--view` projection. For example, `--view summary --focus <asset>` first selects the focused neighborhood and then groups that smaller graph into the summary view. There is no separate depth option in the current graph command, and repeated `--focus` flags are not a multi-focus API.
+
+Note: this graph `focus` argument is a CLI option. It is not a metadata field on an asset.
+
 ### `inspect`
 
 Inspects one asset and its local graph slice.

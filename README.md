@@ -241,6 +241,7 @@ renma scan . --fail-on high
 renma catalog . --format json
 renma ownership . --include-owned
 renma graph . --format mermaid
+renma graph . --focus skill.testing.spec-review --view full
 renma readiness .
 renma diff . --from main --to HEAD --format markdown
 renma ci-report . --from main --to HEAD --format markdown
