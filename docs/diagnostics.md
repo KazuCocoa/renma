@@ -115,6 +115,36 @@ The identifiers below are part of the current scan output. The current implement
 | `SUPPORT-UNREACHABLE-EXAMPLE` | Example is unreachable. | A skill-local example is not referenced by the skill. | Link it from the skill or move/remove it. |
 | `SUPPORT-UNREACHABLE-PROFILE` | Profile is unreachable. | A skill-local profile is not referenced by the skill. | Link it from the skill or move/remove it. |
 | `SUPPORT-UNREACHABLE-REFERENCE` | Reference is unreachable. | A skill-local reference is not referenced by the skill. | Link it from the skill or move/remove it. |
+| `META-CATALOG-DIAGNOSTIC` | Catalog diagnostic was promoted to a scan finding. | Catalog validation emitted a lower-level diagnostic. | Fix the original catalog diagnostic shown in the finding evidence. |
+| `META-INACTIVE-DEPENDENCY` | Metadata points to an inactive asset. | A dependency targets a deprecated or archived asset. | Retarget the dependency to a stable asset or update asset status intentionally. |
+| `META-INVALID-STATUS` | Metadata status is invalid. | An asset declares an unsupported status value. | Replace it with a supported lifecycle status. |
+| `META-MISSING-ID` | Metadata is missing an asset ID. | A shared context asset has no stable `id`. | Add an `id` metadata field. |
+| `META-MISSING-OWNER` | Metadata is missing an owner. | An asset has no owner metadata. | Add an `owner` metadata field. |
+| `META-UNKNOWN-DEPENDENCY` | Metadata dependency is unresolved. | A dependency points at an asset renma did not discover. | Correct the dependency, add the missing asset, or update discovery config. |
+| `SEC-BODY-POLICY-CONTRADICTION` | Body text contradicts a security policy. | Asset instructions override or weaken policy expectations. | Align the asset content with the active policy profile. |
+| `SEC-BULK-DATA-SHARING-INSTRUCTION` | Instructions allow broad data sharing. | Content tells an agent to share large or sensitive data without bounds. | Narrow the sharing scope and add approval or redaction guidance. |
+| `SEC-CLOUD-UPLOAD-INSTRUCTION` | Instructions allow cloud upload. | Content sends files or data to cloud storage without policy controls. | Add approved destinations, limits, and approval requirements. |
+| `SEC-CREDENTIAL-IN-COMMAND-ARG` | Command embeds a credential-like value. | Example commands include secrets in arguments. | Move credentials to secure environment or secret-management guidance. |
+| `SEC-DANGEROUS-TOOL-INSTRUCTION` | Instructions permit dangerous tool use. | Content allows destructive or high-risk commands without guardrails. | Require review, dry runs, or explicit user approval before execution. |
+| `SEC-EXTERNAL-UPLOAD-INSTRUCTION` | Instructions allow external upload. | Content sends artifacts to external services without controls. | Restrict uploads to approved destinations and document review steps. |
+| `SEC-FORBIDDEN-INPUT-INSTRUCTION` | Instructions request forbidden input. | Content asks for secrets or other disallowed sensitive values. | Remove the request or replace it with safe placeholder guidance. |
+| `SEC-INSTRUCTION-VIOLATES-POLICY` | Instruction conflicts with active policy. | Asset content violates a configured security profile. | Update the instruction or policy metadata so they agree. |
+| `SEC-MISSING-HUMAN-APPROVAL-GUARD` | High-risk operation lacks approval guidance. | Content describes sensitive actions without human confirmation. | Add explicit approval requirements before the action. |
+| `SEC-MISSING-POLICY-METADATA` | Security policy metadata is missing. | Asset content needs a policy profile but does not declare one. | Add the appropriate security policy metadata. |
+| `SEC-NO-REDACTION-INSTRUCTION` | Sensitive data flow lacks redaction guidance. | Content shares logs, files, or context without redaction steps. | Add instructions to redact or minimize sensitive data before sharing. |
+| `SEC-OVERBROAD-CONTEXT-INSTRUCTION` | Instructions request excessive context. | Content tells an agent to include broad repository or user data. | Scope context collection to the minimum required files and fields. |
+| `SEC-POLICY-CONTRADICTION` | Security policy settings contradict each other. | Profile rules define incompatible requirements. | Resolve the conflicting policy fields. |
+| `SEC-POLICY-OVERRIDE-CONTRADICTION` | Policy override contradicts inherited policy. | An override weakens or conflicts with the base profile. | Adjust the override or split the profile intentionally. |
+| `SEC-POLICY-PROFILE-CYCLE` | Policy profiles form a cycle. | Profile inheritance refers back to itself. | Break the cycle in policy profile inheritance. |
+| `SEC-POLICY-PROFILE-NOT-FOUND` | Referenced policy profile is missing. | Metadata names a profile renma cannot resolve. | Add the profile or correct the reference. |
+| `SEC-PREDICTABLE-TEMP-PATH` | Command uses a predictable temp path. | Examples write to fixed `/tmp` paths or similar locations. | Use a unique temporary directory or safe temp-file helper. |
+| `SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD` | Privileged command lacks guardrails. | Content runs `sudo` or equivalent privileged actions without checks. | Add prerequisites, confirmation, and rollback guidance. |
+| `SEC-SECRET-MATERIAL-INSTRUCTION` | Instructions expose or request secret material. | Content includes or asks for private keys, tokens, or credentials. | Remove secret material and describe secure handling instead. |
+| `SEC-SENSITIVE-FILE-REFERENCE` | Instructions reference sensitive files. | Content points at credentials, keys, or local secret paths. | Replace with safe examples or redacted placeholders. |
+| `SEC-UNAPPROVED-NETWORK-DESTINATION` | Network destination is not approved. | Instructions contact a host outside the allowed list. | Use an approved destination or update policy intentionally. |
+| `SEC-UNAPPROVED-UPLOAD-DESTINATION` | Upload destination is not approved. | Instructions upload data to an unapproved service or host. | Use an approved destination or update policy intentionally. |
+| `SEC-UNPINNED-DEPENDENCY-INSTALL` | Dependency install is not pinned. | Examples install packages without exact versions or digests. | Pin package versions or use a reproducible install source. |
+| `SEC-UNPINNED-REMOTE-SCRIPT` | Remote script execution is unpinned. | Commands pipe or execute remote scripts without an immutable reference. | Pin the script source and verify it before execution. |
 
 ## How To Fix Results
 
