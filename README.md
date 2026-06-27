@@ -1,10 +1,12 @@
 # Renma
 
-Renma is a deterministic governance and health layer for agent-consumable repository knowledge.
+Renma is an opinionated Context Repository toolkit for LLM-era software teams.
 
-It helps teams keep skills and shared context assets discoverable, reviewable, and safe for agent runtimes to reuse. Instead of letting critical knowledge get copied into many prompts or buried in one-off Markdown files, Renma treats that knowledge as a software asset: named, owned, versioned, linked, checked in CI, and reviewed with deterministic diagnostics and scan findings.
+It helps teams manage reusable, human-curated context assets in Git so agents, coding tools, and future AI runtimes can consume team knowledge more safely and consistently.
 
-Renma now supports `scan`, `catalog`, `ownership`, `graph`, focused graph views, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-semantic-split`, and security diagnostics v1.
+Renma is the deterministic governance and health layer around that repository knowledge. Instead of letting critical knowledge get copied into many prompts or buried in one-off Markdown files, Renma treats it as a software asset: named, owned, versioned, linked, checked in CI, and reviewed with deterministic diagnostics and scan findings.
+
+Renma now supports `scan`, `catalog`, `ownership`, `graph`, focused graph views, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-semantic-split`, and security diagnostics.
 
 Renma is especially useful when a repository contains agent-facing material such as:
 
@@ -14,7 +16,7 @@ Renma is especially useful when a repository contains agent-facing material such
 - Team-owned context assets that should outlive a single prompt
 - References and examples that agents should be able to cite or inspect
 
-Renma is not a Markdown linter, not a prompt-management system, and not an agent runtime. Markdown is the storage format today; the product is the catalog, dependency graph, ownership model, and readiness checks around agent-consumable repository knowledge.
+Renma is not an agent runtime, not a prompt library, not a vector database, and not a general Markdown linter. Markdown is the storage format today; the product is the catalog, dependency graph, ownership model, and readiness checks around agent-consumable repository knowledge.
 
 Use Renma when you need to answer repository-level questions such as:
 
@@ -23,6 +25,14 @@ Use Renma when you need to answer repository-level questions such as:
 - Which assets are unowned, stale, orphaned, incomplete, deprecated, or broken?
 - Which product decisions, bug history, testing strategy, or platform guidance should be promoted from one-off prompt text into shared context?
 - What changed in the agent-facing knowledge catalog during this pull request?
+
+## What Is a Context Repository?
+
+A Context Repository is a Git-reviewed source of truth for reusable knowledge that LLMs and agents can consume.
+
+It is not a prompt library. It is not a vector database. It is not an agent memory.
+
+It is a place where teams maintain context assets with ownership, lifecycle state, dependencies, references, and review history.
 
 ## The Layer Model
 
@@ -44,6 +54,18 @@ Repository
 ```
 
 Tools decide what to do at runtime. Skills tell an agent when and how to use a capability. Context assets hold reusable knowledge. Renma catalogs and validates the layer underneath so tools and agents are not guessing from stale, orphaned, duplicated, or unowned files.
+
+## How Renma Relates to RAG and Agent Memory
+
+Renma does not replace RAG, vector databases, or agent memory.
+
+RAG helps systems retrieve relevant information. Renma helps teams organize reusable knowledge before it is retrieved. Agent memory grows from an agent's experience. A Context Repository grows from human-curated knowledge.
+
+These layers can work together:
+
+```text
+People create knowledge -> Renma organizes it -> RAG retrieves it -> agents consume it -> agent memory records experience
+```
 
 ## Why Renma?
 
@@ -483,6 +505,15 @@ Security profiles can be defined under `security.profiles` and selected by artif
 Renma reports deterministic safety findings for agent-facing operational instructions, such as unpinned remote scripts, unsafe privileged commands, predictable temporary paths, and credential-like command arguments.
 
 These findings are guardrails for review. They do not replace secret scanning, SAST, dependency scanning, or human security review.
+
+## Design Notes
+
+Renma is part of a broader idea: treating reusable LLM context as software-managed knowledge.
+
+- [Beyond Prompt Engineering: Why We Need Context Repositories](https://kazucocoa.blog/2026/06/26/beyond-prompt-engineering-why-we-need-context-repositories/)
+- Introducing Renma: An Opinionated Context Repository for LLMs (planned)
+- Where Does a Context Repository Fit in the AI Stack? (planned)
+- Context Engineering Is Software Engineering (planned)
 
 ## Development
 
