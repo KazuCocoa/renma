@@ -193,6 +193,70 @@ test("config suppressions mark findings without skipping scanned files", async (
   assert.equal(secretFinding?.suppression?.expires, "2999-12-31");
 });
 
+test("config suppressions require both matching id and path", async () => {
+  const cases = [
+    {
+      name: "same id non-matching path",
+      suppression: {
+        id: "SEC-LITERAL-SECRET",
+        paths: ["skills/other/**"],
+        reason: "Does not apply to demo.",
+      },
+      expectedCode: 1,
+      suppressed: false,
+    },
+    {
+      name: "matching path different id",
+      suppression: {
+        id: "SEC-DESTRUCTIVE-COMMAND",
+        paths: ["skills/demo/**"],
+        reason: "Does not apply to literal secrets.",
+      },
+      expectedCode: 1,
+      suppressed: false,
+    },
+    {
+      name: "matching id and path",
+      suppression: {
+        id: "SEC-LITERAL-SECRET",
+        paths: ["skills/demo/**"],
+        reason: "Fixture intentionally includes a fake secret.",
+      },
+      expectedCode: 0,
+      suppressed: true,
+    },
+  ];
+
+  for (const item of cases) {
+    const root = await fixture();
+    await mkdir(path.join(root, "skills", "demo"), { recursive: true });
+    await writeFile(
+      path.join(root, "renma.config.json"),
+      JSON.stringify({
+        fail_on: "high",
+        format: "json",
+        suppressions: [item.suppression],
+      }),
+    );
+    await writeFile(
+      path.join(root, "skills", "demo", "SKILL.md"),
+      '# Demo\n\napi_key = "abcd1234abcd1234"\n',
+    );
+
+    const exitCode = await withCapturedConsole(() => main(["scan", root]));
+    const report = JSON.parse(exitCode.stdout) as {
+      findings: Array<{ id: string; suppression?: unknown }>;
+    };
+    const secretFinding = report.findings.find(
+      (finding) => finding.id === "SEC-LITERAL-SECRET",
+    );
+
+    assert.equal(exitCode.code, item.expectedCode, item.name);
+    assert.ok(secretFinding, item.name);
+    assert.equal(secretFinding?.suppression !== undefined, item.suppressed);
+  }
+});
+
 test("expired config suppressions do not suppress findings", async () => {
   const root = await fixture();
   await mkdir(path.join(root, "skills", "demo"), { recursive: true });
@@ -238,6 +302,47 @@ test("expired config suppressions do not suppress findings", async () => {
   );
 });
 
+test('config suppressions with expires "never" do not expire', async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "skills", "demo"), { recursive: true });
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({
+      fail_on: "high",
+      format: "json",
+      suppressions: [
+        {
+          id: "SEC-LITERAL-SECRET",
+          paths: ["skills/demo/**"],
+          reason: "Permanent fixture exception.",
+          expires: "never",
+        },
+      ],
+    }),
+  );
+  await writeFile(
+    path.join(root, "skills", "demo", "SKILL.md"),
+    '# Demo\n\napi_key = "abcd1234abcd1234"\n',
+  );
+
+  const exitCode = await withCapturedConsole(() => main(["scan", root]));
+  const report = JSON.parse(exitCode.stdout) as {
+    diagnostics: Array<{ message: string }>;
+    findings: Array<{ id: string; suppression?: { expires?: string } }>;
+  };
+  const secretFinding = report.findings.find(
+    (finding) => finding.id === "SEC-LITERAL-SECRET",
+  );
+
+  assert.equal(exitCode.code, 0);
+  assert.equal(secretFinding?.suppression?.expires, "never");
+  assert.ok(
+    !report.diagnostics.some((diagnostic) =>
+      /Suppression for SEC-LITERAL-SECRET expired/.test(diagnostic.message),
+    ),
+  );
+});
+
 test("config suppressions require an audit reason", async () => {
   const root = await fixture();
   await writeFile(
@@ -251,6 +356,172 @@ test("config suppressions require an audit reason", async () => {
 
   assert.equal(exitCode.code, 2);
   assert.match(exitCode.stderr, /suppressions\[0\]\.reason/);
+});
+
+test("invalid suppression configs are rejected", async () => {
+  const cases = [
+    {
+      name: "empty paths",
+      suppression: {
+        id: "SEC-LITERAL-SECRET",
+        paths: [],
+        reason: "Needs a scoped path.",
+      },
+      pattern: /suppressions\[0\]\.paths/,
+    },
+    {
+      name: "missing paths",
+      suppression: { id: "SEC-LITERAL-SECRET", reason: "Needs paths." },
+      pattern: /suppressions\[0\]\.paths/,
+    },
+    {
+      name: "missing id",
+      suppression: { paths: ["skills/demo/**"], reason: "Needs id." },
+      pattern: /suppressions\[0\]\.id/,
+    },
+    {
+      name: "empty reason",
+      suppression: {
+        id: "SEC-LITERAL-SECRET",
+        paths: ["skills/demo/**"],
+        reason: "",
+      },
+      pattern: /suppressions\[0\]\.reason/,
+    },
+    {
+      name: "unknown key",
+      suppression: {
+        id: "SEC-LITERAL-SECRET",
+        paths: ["skills/demo/**"],
+        reason: "No extra keys.",
+        ticket: "SEC-123",
+      },
+      pattern: /Unknown suppression config key "ticket"/,
+    },
+    {
+      name: "invalid expires",
+      suppression: {
+        id: "SEC-LITERAL-SECRET",
+        paths: ["skills/demo/**"],
+        reason: "Bad expires.",
+        expires: "forever",
+      },
+      pattern: /suppressions\[0\]\.expires/,
+    },
+    {
+      name: "none expires",
+      suppression: {
+        id: "SEC-LITERAL-SECRET",
+        paths: ["skills/demo/**"],
+        reason: "Bad expires.",
+        expires: "none",
+      },
+      pattern: /suppressions\[0\]\.expires/,
+    },
+    {
+      name: "empty expires",
+      suppression: {
+        id: "SEC-LITERAL-SECRET",
+        paths: ["skills/demo/**"],
+        reason: "Bad expires.",
+        expires: "",
+      },
+      pattern: /suppressions\[0\]\.expires/,
+    },
+    {
+      name: "null expires",
+      suppression: {
+        id: "SEC-LITERAL-SECRET",
+        paths: ["skills/demo/**"],
+        reason: "Bad expires.",
+        expires: null,
+      },
+      pattern: /suppressions\[0\]\.expires/,
+    },
+    {
+      name: "non-string expires",
+      suppression: {
+        id: "SEC-LITERAL-SECRET",
+        paths: ["skills/demo/**"],
+        reason: "Bad expires.",
+        expires: 20260930,
+      },
+      pattern: /suppressions\[0\]\.expires/,
+    },
+    {
+      name: "invalid calendar date",
+      suppression: {
+        id: "SEC-LITERAL-SECRET",
+        paths: ["skills/demo/**"],
+        reason: "Bad date.",
+        expires: "2026-02-30",
+      },
+      pattern: /suppressions\[0\]\.expires must be a valid date/,
+    },
+  ];
+
+  for (const item of cases) {
+    const root = await fixture();
+    await writeFile(
+      path.join(root, "renma.config.json"),
+      JSON.stringify({ suppressions: [item.suppression] }),
+    );
+
+    const exitCode = await withCapturedConsole(() => main(["scan", root]));
+
+    assert.equal(exitCode.code, 2, item.name);
+    assert.match(exitCode.stderr, item.pattern, item.name);
+  }
+});
+
+test("scan output includes suppression audit metadata", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "skills", "demo"), { recursive: true });
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({
+      fail_on: "high",
+      suppressions: [
+        {
+          id: "SEC-LITERAL-SECRET",
+          paths: ["skills/demo/**"],
+          reason: "Fixture intentionally includes a fake secret.",
+          expires: "2026-09-30",
+        },
+      ],
+    }),
+  );
+  await writeFile(
+    path.join(root, "skills", "demo", "SKILL.md"),
+    '# Demo\n\napi_key = "abcd1234abcd1234"\n',
+  );
+
+  const json = await withCapturedConsole(() => main(["scan", root, "--json"]));
+  const report = JSON.parse(json.stdout) as {
+    findings: Array<{
+      id: string;
+      suppression?: { reason?: string; expires?: string };
+    }>;
+  };
+  const secretFinding = report.findings.find(
+    (finding) => finding.id === "SEC-LITERAL-SECRET",
+  );
+
+  assert.equal(json.code, 0);
+  assert.equal(
+    secretFinding?.suppression?.reason,
+    "Fixture intentionally includes a fake secret.",
+  );
+  assert.equal(secretFinding?.suppression?.expires, "2026-09-30");
+
+  const text = await withCapturedConsole(() => main(["scan", root]));
+
+  assert.equal(text.code, 0);
+  assert.match(
+    text.stdout,
+    /suppressed: Fixture intentionally includes a fake secret\./,
+  );
+  assert.match(text.stdout, /suppression expires: 2026-09-30/);
 });
 
 test("CLI honors format from config", async () => {

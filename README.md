@@ -327,6 +327,12 @@ Add `renma.config.json` at the repository root to tune discovery and CI behavior
       "paths": ["skills/testing/**"],
       "reason": "This skill intentionally documents env passthrough test cases.",
       "expires": "2026-09-30"
+    },
+    {
+      "id": "LAYOUT-SKILL-NOT-THIN",
+      "paths": ["skills/legacy/**"],
+      "reason": "Legacy skill kept for compatibility with existing workflows.",
+      "expires": "never"
     }
   ],
   "max_file_size_bytes": 524288,
@@ -338,7 +344,9 @@ Add `renma.config.json` at the repository root to tune discovery and CI behavior
 }
 ```
 
-Use `exclude` only for paths Renma should not scan. Use `suppressions` when Renma should still scan a file and report a matching finding, but the finding should be marked suppressed and ignored for failure thresholds. Each suppression requires a rule `id`, one or more path patterns, and an audit `reason`; `expires` is optional and uses `YYYY-MM-DD`.
+Use `exclude` only for paths Renma should not scan. Use `suppressions` when Renma should still scan a file, detect and report a matching finding, mark it as suppressed, and ignore it for failure thresholds. Suppressions apply only when both the finding `id` and at least one `paths` entry match, so keep path patterns narrow.
+
+Each suppression requires a rule `id`, one or more path patterns, and an audit `reason`. `expires` is optional, but audited suppressions should usually include either a date in `YYYY-MM-DD` for temporary workarounds or `"never"` for an intentionally permanent exception. Date-based expirations reactivate matching findings after the date passes. Suppression paths use repository-relative POSIX-style paths, exact matches, directory-prefix matches for non-glob patterns, and a small glob subset: `*` within a path segment and `**` across directories.
 
 ## Asset Metadata
 

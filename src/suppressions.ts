@@ -67,10 +67,18 @@ function expiredSuppressionDiagnostics(
 }
 
 function isExpired(suppression: SuppressionConfig, todayKey: string): boolean {
-  return suppression.expires !== undefined && suppression.expires < todayKey;
+  return (
+    suppression.expires !== undefined &&
+    suppression.expires !== "never" &&
+    suppression.expires < todayKey
+  );
 }
 
-function pathPatternMatches(pattern: string, relativePath: string): boolean {
+/** Match suppression path patterns against normalized repository paths. */
+export function pathPatternMatches(
+  pattern: string,
+  relativePath: string,
+): boolean {
   const normalizedPattern = normalizePath(pattern);
   const normalizedPath = normalizePath(relativePath);
   if (normalizedPattern === normalizedPath) return true;

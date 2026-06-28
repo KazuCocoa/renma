@@ -5,6 +5,7 @@ import type {
   ScanConfig,
   Severity,
   SuppressionConfig,
+  SuppressionExpiration,
 } from "./types.js";
 
 const SEVERITIES = ["low", "medium", "high", "critical"] as const;
@@ -442,7 +443,7 @@ function suppressionArray(value: unknown): SuppressionConfig[] {
     const expires =
       source.expires === undefined
         ? undefined
-        : isoDateValue(`${name}.expires`, source.expires);
+        : suppressionExpiration(`${name}.expires`, source.expires);
 
     return {
       id,
@@ -453,9 +454,15 @@ function suppressionArray(value: unknown): SuppressionConfig[] {
   });
 }
 
-function isoDateValue(name: string, value: unknown): string {
+function suppressionExpiration(
+  name: string,
+  value: unknown,
+): SuppressionExpiration {
+  if (value === "never") return value;
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    throw new ConfigError(`${name} must be a date in YYYY-MM-DD format.`);
+    throw new ConfigError(
+      `${name} must be a date in YYYY-MM-DD format or "never".`,
+    );
   }
   const timestamp = Date.parse(`${value}T00:00:00.000Z`);
   if (Number.isNaN(timestamp)) {
@@ -465,5 +472,5 @@ function isoDateValue(name: string, value: unknown): string {
   if (normalized !== value) {
     throw new ConfigError(`${name} must be a valid date.`);
   }
-  return value;
+  return value as SuppressionExpiration;
 }
