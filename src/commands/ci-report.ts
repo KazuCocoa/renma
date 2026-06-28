@@ -26,11 +26,6 @@ interface ReportFinding {
   id: string;
   severity: string;
   title: string;
-  suppression?: {
-    reason: string;
-    paths?: string[];
-    expires?: string;
-  };
   evidence?:
     | {
         path?: string | undefined;
@@ -95,9 +90,7 @@ export function determineCiReportStatus(report: DiffReport): CiReportStatus {
 
 function hasNewHighOrCriticalFinding(report: DiffReport): boolean {
   return report.findings.added.some(
-    (finding) =>
-      finding.suppression === undefined &&
-      (finding.severity === "high" || finding.severity === "critical"),
+    (finding) => finding.severity === "high" || finding.severity === "critical",
   );
 }
 
@@ -213,26 +206,13 @@ function formatFindingSection(
 
 function formatFinding(finding: ReportFinding): string {
   const location = formatFindingLocation(finding);
-  const line = `- ${finding.severity.toUpperCase()}${formatSuppressionStatus(finding)} \`${finding.id}\` \`${location}\` — ${finding.title}`;
-  if (!finding.suppression) return line;
-  return `${line}\n  reason: ${finding.suppression.reason}`;
+  return `- ${finding.severity.toUpperCase()} \`${finding.id}\` \`${location}\` — ${finding.title}`;
 }
 
 function formatFindingLocation(finding: ReportFinding): string {
   if (!finding.evidence?.path) return "unknown";
   if (finding.evidence.startLine === undefined) return finding.evidence.path;
   return `${finding.evidence.path}:L${finding.evidence.startLine}`;
-}
-
-function formatSuppressionStatus(finding: ReportFinding): string {
-  if (!finding.suppression) return "";
-  if (finding.suppression.expires === "never") {
-    return " (suppressed, never expires)";
-  }
-  if (finding.suppression.expires) {
-    return ` (suppressed until ${finding.suppression.expires})`;
-  }
-  return " (suppressed)";
 }
 
 function formatCountChanges(

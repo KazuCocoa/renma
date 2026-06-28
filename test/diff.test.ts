@@ -166,33 +166,6 @@ test("formatDiff renders markdown summaries", () => {
   assert.match(markdown, /Added assets: 1/);
 });
 
-test("diff preserves suppression metadata on finding deltas", () => {
-  const report = buildDiffReport(
-    "/repo",
-    snapshot("base", {}),
-    snapshot("head", {
-      findings: [
-        finding("SEC-ENV-COPY", "high", "skills/testing/SKILL.md", 12, {
-          reason:
-            "This skill intentionally documents env passthrough test cases.",
-          paths: ["skills/testing/**"],
-          expires: "2026-09-30",
-        }),
-      ],
-    }),
-  );
-  const markdown = formatDiff(report, "markdown");
-
-  assert.equal(report.summary.findingsDelta, 1);
-  assert.equal(report.summary.highOrCriticalFindingsDelta, 0);
-  assert.deepEqual(report.findings.added[0]?.suppression, {
-    reason: "This skill intentionally documents env passthrough test cases.",
-    paths: ["skills/testing/**"],
-    expires: "2026-09-30",
-  });
-  assert.match(markdown, /SEC-ENV-COPY \(high, suppressed\)/);
-});
-
 test("diff resolves the git repository from an absolute target path", async () => {
   const repo = await createGitRepo();
   const outside = await mkdtemp(join(tmpdir(), "renma-diff-outside-"));
@@ -345,18 +318,11 @@ function check(id: string, status: string, severity: string, summary: string) {
   };
 }
 
-function finding(
-  id: string,
-  severity: string,
-  path: string,
-  line: number,
-  suppression?: { reason: string; paths?: string[]; expires?: string },
-) {
+function finding(id: string, severity: string, path: string, line: number) {
   return {
     id,
     severity,
     title: id,
-    ...(suppression === undefined ? {} : { suppression }),
     evidence: { path, startLine: line, endLine: line, snippet: id },
   };
 }

@@ -1,7 +1,6 @@
 import { graph, type GraphEdge, type GraphReport } from "./graph.js";
 import { scan } from "../scanner.js";
 import type { ConfigOverrides } from "../config.js";
-import { isActiveFinding } from "../suppressions.js";
 import type { Diagnostic, Finding } from "../types.js";
 
 export type ReadinessFormat = "json" | "markdown";
@@ -107,7 +106,6 @@ export function buildReadinessReport(
   diagnostics: Diagnostic[] = graphReport.diagnostics ?? [],
 ): ReadinessReport {
   const diagnosticCounts = countDiagnostics(diagnostics);
-  const activeFindings = findings.filter(isActiveFinding);
   const totalAssets = graphReport.nodes.length;
   const ownedAssets = graphReport.nodes.filter((node) =>
     hasOwner(node.owner),
@@ -138,15 +136,15 @@ export function buildReadinessReport(
     graphEdgesCheck(unresolvedBlockingEdges),
     workflowContextClosureCheck(graphReport),
     workflowOptionalContextCheck(graphReport),
-    workflowClarityCheck(activeFindings),
-    workflowRequiredInputsCheck(activeFindings),
-    workflowCompletionCriteriaCheck(activeFindings),
+    workflowClarityCheck(findings),
+    workflowRequiredInputsCheck(findings),
+    workflowCompletionCriteriaCheck(findings),
     lifecycleCheck(lifecycleAssets),
     minimumInventoryCheck(totalAssets),
     findingCheck(
       "layout.skills_thin",
       "Thin skill entrypoints",
-      activeFindings,
+      findings,
       ["LAYOUT-SKILL-NOT-THIN", "LAYOUT-SKILL-EXECUTABLE-COMMAND"],
       "warn",
       "All skill entrypoints are thin routers.",
@@ -154,7 +152,7 @@ export function buildReadinessReport(
     findingCheck(
       "layout.disallowed_skill_assets",
       "Disallowed skill-local assets",
-      activeFindings,
+      findings,
       ["LAYOUT-DISALLOWED-SKILL-ASSET"],
       "fail",
       "No canonical references, profiles, examples, or scripts live under skills/**.",
@@ -162,7 +160,7 @@ export function buildReadinessReport(
     findingCheck(
       "layout.context_root",
       "Canonical context root",
-      activeFindings,
+      findings,
       ["LAYOUT-CONTEXT-LEGACY-ROOT", "LAYOUT-CONTEXT-REFERENCE-NON_CANONICAL"],
       "warn",
       "Context assets and declared context paths use canonical roots.",
@@ -170,7 +168,7 @@ export function buildReadinessReport(
     findingCheck(
       "layout.helper_root",
       "Canonical helper root",
-      activeFindings,
+      findings,
       ["LAYOUT-HELPER-NON_TOOLS"],
       "fail",
       "Helper assets live under tools/**.",
@@ -178,7 +176,7 @@ export function buildReadinessReport(
     findingCheck(
       "paths.helper_commands",
       "Helper command paths",
-      activeFindings,
+      findings,
       [
         "PATH-HELPER-COMMAND-SKILL-SCRIPTS",
         "PATH-HELPER-COMMAND-NON_TOOLS",
@@ -190,7 +188,7 @@ export function buildReadinessReport(
     findingCheck(
       "docs.layout_consistency",
       "Layout documentation consistency",
-      activeFindings,
+      findings,
       ["DOCS-LAYOUT-INCONSISTENT"],
       "warn",
       "Repository docs describe the strict three-root layout.",

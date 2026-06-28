@@ -33,7 +33,6 @@ export interface Finding {
   constraints?: string[];
   verificationSteps?: string[];
   llmHint?: string;
-  suppression?: AppliedSuppression;
 }
 
 /** Configured finding suppression scoped to rule id and repository paths. */
@@ -41,13 +40,6 @@ export interface SuppressionConfig {
   id: string;
   paths: string[];
   reason: string;
-  expires?: SuppressionExpiration;
-}
-
-/** Suppression metadata attached to an emitted finding for auditability. */
-export interface AppliedSuppression {
-  reason: string;
-  paths: string[];
   expires?: SuppressionExpiration;
 }
 
