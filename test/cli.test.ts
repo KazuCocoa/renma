@@ -149,6 +149,110 @@ test("config loads fail_on and CLI override takes precedence", async () => {
   assert.equal(fromConfig.configPath, "renma.config.json");
 });
 
+test("config suppressions mark findings without skipping scanned files", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "skills", "demo"), { recursive: true });
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({
+      fail_on: "high",
+      format: "json",
+      suppressions: [
+        {
+          id: "SEC-LITERAL-SECRET",
+          paths: ["skills/demo/**"],
+          reason: "Fixture intentionally includes a fake secret.",
+          expires: "2999-12-31",
+        },
+      ],
+    }),
+  );
+  await writeFile(
+    path.join(root, "skills", "demo", "SKILL.md"),
+    '# Demo\n\napi_key = "abcd1234abcd1234"\n',
+  );
+
+  const exitCode = await withCapturedConsole(() => main(["scan", root]));
+  const report = JSON.parse(exitCode.stdout) as {
+    scannedFileCount: number;
+    findings: Array<{
+      id: string;
+      suppression?: { reason: string; expires?: string };
+    }>;
+  };
+  const secretFinding = report.findings.find(
+    (finding) => finding.id === "SEC-LITERAL-SECRET",
+  );
+
+  assert.equal(exitCode.code, 0);
+  assert.equal(report.scannedFileCount, 1);
+  assert.equal(
+    secretFinding?.suppression?.reason,
+    "Fixture intentionally includes a fake secret.",
+  );
+  assert.equal(secretFinding?.suppression?.expires, "2999-12-31");
+});
+
+test("expired config suppressions do not suppress findings", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "skills", "demo"), { recursive: true });
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({
+      fail_on: "high",
+      format: "json",
+      suppressions: [
+        {
+          id: "SEC-LITERAL-SECRET",
+          paths: ["skills/demo/**"],
+          reason: "Fixture intentionally includes a fake secret.",
+          expires: "2000-01-01",
+        },
+      ],
+    }),
+  );
+  await writeFile(
+    path.join(root, "skills", "demo", "SKILL.md"),
+    '# Demo\n\napi_key = "abcd1234abcd1234"\n',
+  );
+
+  const exitCode = await withCapturedConsole(() => main(["scan", root]));
+  const report = JSON.parse(exitCode.stdout) as {
+    diagnostics: Array<{ severity: string; message: string }>;
+    findings: Array<{ id: string; suppression?: unknown }>;
+  };
+  const secretFinding = report.findings.find(
+    (finding) => finding.id === "SEC-LITERAL-SECRET",
+  );
+
+  assert.equal(exitCode.code, 1);
+  assert.equal(secretFinding?.suppression, undefined);
+  assert.ok(
+    report.diagnostics.some(
+      (diagnostic) =>
+        diagnostic.severity === "warning" &&
+        /Suppression for SEC-LITERAL-SECRET expired on 2000-01-01/.test(
+          diagnostic.message,
+        ),
+    ),
+  );
+});
+
+test("config suppressions require an audit reason", async () => {
+  const root = await fixture();
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({
+      suppressions: [{ id: "SEC-LITERAL-SECRET", paths: ["skills/demo/**"] }],
+    }),
+  );
+
+  const exitCode = await withCapturedConsole(() => main(["scan", root]));
+
+  assert.equal(exitCode.code, 2);
+  assert.match(exitCode.stderr, /suppressions\[0\]\.reason/);
+});
+
 test("CLI honors format from config", async () => {
   const root = await fixture();
   await writeFile(

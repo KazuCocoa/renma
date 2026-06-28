@@ -33,6 +33,22 @@ export interface Finding {
   constraints?: string[];
   verificationSteps?: string[];
   llmHint?: string;
+  suppression?: AppliedSuppression;
+}
+
+/** Configured finding suppression scoped to rule id and repository paths. */
+export interface SuppressionConfig {
+  id: string;
+  paths: string[];
+  reason: string;
+  expires?: string;
+}
+
+/** Suppression metadata attached to an emitted finding for auditability. */
+export interface AppliedSuppression {
+  reason: string;
+  paths: string[];
+  expires?: string;
 }
 
 /** Non-finding diagnostic produced while loading, discovering, or parsing input. */
@@ -79,6 +95,7 @@ export interface ScanConfig {
   maxFileSizeBytes: number;
   maxDepth: number;
   concurrency: number;
+  suppressions: SuppressionConfig[];
   layout: LayoutPolicyConfig;
   security: SecurityConfig;
 }

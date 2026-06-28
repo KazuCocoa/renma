@@ -26,6 +26,7 @@ interface ReportFinding {
   id: string;
   severity: string;
   title: string;
+  suppressed?: boolean;
   evidence?:
     | {
         path?: string | undefined;
@@ -90,7 +91,9 @@ export function determineCiReportStatus(report: DiffReport): CiReportStatus {
 
 function hasNewHighOrCriticalFinding(report: DiffReport): boolean {
   return report.findings.added.some(
-    (finding) => finding.severity === "high" || finding.severity === "critical",
+    (finding) =>
+      !finding.suppressed &&
+      (finding.severity === "high" || finding.severity === "critical"),
   );
 }
 
@@ -206,7 +209,8 @@ function formatFindingSection(
 
 function formatFinding(finding: ReportFinding): string {
   const location = formatFindingLocation(finding);
-  return `- ${finding.severity.toUpperCase()} \`${finding.id}\` \`${location}\` — ${finding.title}`;
+  const status = finding.suppressed ? " (suppressed)" : "";
+  return `- ${finding.severity.toUpperCase()}${status} \`${finding.id}\` \`${location}\` — ${finding.title}`;
 }
 
 function formatFindingLocation(finding: ReportFinding): string {

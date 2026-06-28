@@ -321,6 +321,14 @@ Add `renma.config.json` at the repository root to tune discovery and CI behavior
     "dist",
     ".git"
   ],
+  "suppressions": [
+    {
+      "id": "SEC-ENV-COPY",
+      "paths": ["skills/testing/**"],
+      "reason": "This skill intentionally documents env passthrough test cases.",
+      "expires": "2026-09-30"
+    }
+  ],
   "max_file_size_bytes": 524288,
   "max_depth": 16,
   "concurrency": 16,
@@ -329,6 +337,8 @@ Add `renma.config.json` at the repository root to tune discovery and CI behavior
   }
 }
 ```
+
+Use `exclude` only for paths Renma should not scan. Use `suppressions` when Renma should still scan a file and report a matching finding, but the finding should be marked suppressed and ignored for failure thresholds. Each suppression requires a rule `id`, one or more path patterns, and an audit `reason`; `expires` is optional and uses `YYYY-MM-DD`.
 
 ## Asset Metadata
 

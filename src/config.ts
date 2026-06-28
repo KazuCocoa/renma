@@ -1,6 +1,11 @@
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
-import type { LoadedConfig, ScanConfig, Severity } from "./types.js";
+import type {
+  LoadedConfig,
+  ScanConfig,
+  Severity,
+  SuppressionConfig,
+} from "./types.js";
 
 const SEVERITIES = ["low", "medium", "high", "critical"] as const;
 const FORMATS = ["text", "json"] as const;
@@ -26,6 +31,7 @@ export const DEFAULT_CONFIG: ScanConfig = {
   maxFileSizeBytes: 512 * 1024,
   maxDepth: 16,
   concurrency: 16,
+  suppressions: [],
   layout: {
     workflowAliases: {},
   },
@@ -119,6 +125,7 @@ function normalizeConfig(
     "max_file_size_bytes",
     "max_depth",
     "concurrency",
+    "suppressions",
     "layout",
     "security",
   ]);
@@ -149,6 +156,8 @@ function normalizeConfig(
     config.maxDepth = positiveInteger("max_depth", value.max_depth);
   if (value.concurrency !== undefined)
     config.concurrency = positiveInteger("concurrency", value.concurrency);
+  if (value.suppressions !== undefined)
+    config.suppressions = suppressionArray(value.suppressions);
 
   if (value.layout !== undefined) config.layout = layoutPolicy(value.layout);
   if (value.security !== undefined)
@@ -401,5 +410,60 @@ function stringRecord(name: string, value: unknown): Record<string, string> {
 function stringValue(name: string, value: unknown): string {
   if (typeof value !== "string" || value.trim() === "")
     throw new ConfigError(`${name} must be a non-empty string.`);
+  return value;
+}
+
+function suppressionArray(value: unknown): SuppressionConfig[] {
+  if (!Array.isArray(value)) {
+    throw new ConfigError("suppressions must be an array.");
+  }
+
+  return value.map((item, index) => {
+    const name = `suppressions[${index}]`;
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new ConfigError(`${name} must be an object.`);
+    }
+    const source = item as Record<string, unknown>;
+    const allowed = new Set(["id", "paths", "reason", "expires"]);
+    for (const key of Object.keys(source)) {
+      if (!allowed.has(key)) {
+        throw new ConfigError(
+          `Unknown suppression config key "${key}" in ${name}.`,
+        );
+      }
+    }
+
+    const id = stringValue(`${name}.id`, source.id);
+    const paths = stringArray(`${name}.paths`, source.paths);
+    if (paths.length === 0) {
+      throw new ConfigError(`${name}.paths must include at least one path.`);
+    }
+    const reason = stringValue(`${name}.reason`, source.reason);
+    const expires =
+      source.expires === undefined
+        ? undefined
+        : isoDateValue(`${name}.expires`, source.expires);
+
+    return {
+      id,
+      paths,
+      reason,
+      ...(expires === undefined ? {} : { expires }),
+    };
+  });
+}
+
+function isoDateValue(name: string, value: unknown): string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new ConfigError(`${name} must be a date in YYYY-MM-DD format.`);
+  }
+  const timestamp = Date.parse(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(timestamp)) {
+    throw new ConfigError(`${name} must be a valid date.`);
+  }
+  const normalized = new Date(timestamp).toISOString().slice(0, 10);
+  if (normalized !== value) {
+    throw new ConfigError(`${name} must be a valid date.`);
+  }
   return value;
 }

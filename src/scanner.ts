@@ -6,6 +6,7 @@ import { parseDocument } from "./markdown.js";
 import { detectRepeatedContextPatterns } from "./repeated-context.js";
 import { runRules } from "./rules.js";
 import { securityDiagnosticFindings } from "./security-diagnostics.js";
+import { applySuppressions } from "./suppressions.js";
 import type { Diagnostic, Finding, ScanResult } from "./types.js";
 
 /** Run the complete deterministic scan pipeline for a target path. */
@@ -18,7 +19,7 @@ export async function scan(
   const { artifacts, diagnostics } = await discoverArtifacts(root, config);
   const documents = artifacts.map(parseDocument);
   const catalogResult = buildCatalog(documents);
-  const findings = [
+  const rawFindings = [
     ...runRules(documents, config, catalogResult.catalog),
     ...detectRepeatedContextPatterns(documents),
     ...catalogDiagnosticFindings(catalogResult.diagnostics),
@@ -28,14 +29,15 @@ export async function scan(
     if (byPath !== 0) return byPath;
     return a.evidence.startLine - b.evidence.startLine;
   });
+  const suppressed = applySuppressions(rawFindings, config.suppressions);
 
   return {
     root,
     ...(configPath ? { configPath } : {}),
     scannedFileCount: artifacts.length,
     format: config.format,
-    findings,
-    diagnostics,
+    findings: suppressed.findings,
+    diagnostics: [...diagnostics, ...suppressed.diagnostics],
     exitThreshold: config.failOn,
   };
 }

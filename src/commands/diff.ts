@@ -96,6 +96,7 @@ interface FindingDelta {
   id: string;
   severity: string;
   title: string;
+  suppressed?: boolean;
   evidence?: EvidenceDelta | undefined;
 }
 
@@ -321,7 +322,7 @@ function formatDiffMarkdown(report: DiffReport): string {
       ...markdownList(
         report.findings.added,
         (finding) =>
-          `${finding.id} (${finding.severity})${finding.evidence?.path ? ` at ${finding.evidence.path}` : ""}`,
+          `${finding.id} (${finding.severity}${finding.suppressed ? ", suppressed" : ""})${finding.evidence?.path ? ` at ${finding.evidence.path}` : ""}`,
       ),
     );
   }
@@ -471,6 +472,7 @@ function findingMap(findings: unknown[]): Map<string, FindingDelta> {
         id: stringField(finding, "id"),
         severity: stringField(finding, "severity"),
         title: stringField(finding, "title"),
+        suppressed: objectField(finding, "suppression") !== undefined,
         evidence,
       };
       return [
@@ -518,7 +520,9 @@ function evidenceDelta(evidence: unknown): EvidenceDelta | undefined {
 
 function highOrCriticalCount(findings: FindingDelta[]): number {
   return findings.filter(
-    (finding) => finding.severity === "high" || finding.severity === "critical",
+    (finding) =>
+      !finding.suppressed &&
+      (finding.severity === "high" || finding.severity === "critical"),
   ).length;
 }
 
