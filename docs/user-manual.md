@@ -48,6 +48,7 @@ The JSON configuration supports the same names used by the implementation, inclu
 
 - `globs`: glob patterns to scan.
 - `exclude`: paths or path prefixes to skip.
+- `suppressions`: rule suppressions that keep findings visible but ignore matching findings for failure thresholds.
 - `max_file_size_bytes`: largest file renma will read.
 - `max_depth`: maximum discovery depth.
 - `concurrency`: scan concurrency.
@@ -57,6 +58,10 @@ The JSON configuration supports the same names used by the implementation, inclu
 - `security`: command, network, upload, and profile policy.
 
 CLI flags override config values when both are provided.
+
+Use `exclude` for files Renma should not scan. Use `suppressions` for audited exceptions where Renma should scan the file, emit the finding, attach the suppression reason, and avoid failing on that finding. A suppression applies only when both `id` and `paths` match. Each suppression includes `id`, `paths`, required `reason`, and optional `expires`.
+
+Use a date in `YYYY-MM-DD` for temporary workarounds, or `"never"` when the exception is intentionally permanent. Permanent suppressions should still use narrow path patterns and a clear reason. Suppression path patterns are repository-relative and support exact paths, directory-prefix matches for non-glob patterns, `*` within one path segment, and `**` across directories.
 
 If `--config` is not provided, renma looks for repository config files such as `renma.config.json` or `.renma.json` while resolving the scan target.
 

@@ -68,6 +68,70 @@ test("formatCiReport renders structured JSON", () => {
   assert.equal(parsed.diff.findings.added[0]?.id, "MAINT-REPEATED-CODE-BLOCK");
 });
 
+test("formatCiReport preserves suppression metadata in JSON and markdown", () => {
+  const report = sampleReport();
+  report.diff.findings.added[0] = {
+    id: "SEC-ENV-COPY",
+    severity: "high",
+    title: "Environment passthrough",
+    suppression: {
+      reason: "This skill intentionally documents env passthrough test cases.",
+      paths: ["skills/testing/**"],
+      expires: "2026-09-30",
+    },
+    evidence: {
+      path: "skills/testing/SKILL.md",
+      startLine: 12,
+    },
+  };
+
+  const json = JSON.parse(formatCiReport(report, "json")) as CiReport;
+  const markdown = formatCiReport(report, "markdown");
+
+  assert.deepEqual(json.diff.findings.added[0]?.suppression, {
+    reason: "This skill intentionally documents env passthrough test cases.",
+    paths: ["skills/testing/**"],
+    expires: "2026-09-30",
+  });
+  assert.match(
+    markdown,
+    /- HIGH \(suppressed until 2026-09-30\) `SEC-ENV-COPY` `skills\/testing\/SKILL\.md:L12` — Environment passthrough/,
+  );
+  assert.match(
+    markdown,
+    /reason: This skill intentionally documents env passthrough test cases\./,
+  );
+});
+
+test("formatCiReport describes suppressions that never expire", () => {
+  const report = sampleReport();
+  report.diff.findings.added[0] = {
+    id: "LAYOUT-SKILL-NOT-THIN",
+    severity: "high",
+    title: "Legacy skill layout",
+    suppression: {
+      reason: "Legacy skill kept for compatibility with existing workflows.",
+      paths: ["skills/legacy/**"],
+      expires: "never",
+    },
+    evidence: {
+      path: "skills/legacy/SKILL.md",
+      startLine: 1,
+    },
+  };
+
+  const markdown = formatCiReport(report, "markdown");
+
+  assert.match(
+    markdown,
+    /- HIGH \(suppressed, never expires\) `LAYOUT-SKILL-NOT-THIN` `skills\/legacy\/SKILL\.md:L1` — Legacy skill layout/,
+  );
+  assert.match(
+    markdown,
+    /reason: Legacy skill kept for compatibility with existing workflows\./,
+  );
+});
+
 test("ci report policy fails new high finding even when high/critical net delta is zero", () => {
   const report = policyDiffReport({
     addedFindings: [finding("MAINT-NEW-HIGH", "high")],
@@ -78,6 +142,23 @@ test("ci report policy fails new high finding even when high/critical net delta 
   });
 
   assert.equal(determineCiReportStatus(report), "fail");
+});
+
+test("ci report policy does not fail suppressed high findings", () => {
+  const report = policyDiffReport({
+    addedFindings: [
+      {
+        ...finding("SEC-SUPPRESSED-HIGH", "high"),
+        suppression: {
+          reason: "Audited exception.",
+          paths: ["docs/policy.md"],
+          expires: "never",
+        },
+      },
+    ],
+  });
+
+  assert.equal(determineCiReportStatus(report), "pass");
 });
 
 test("ci report policy fails new critical finding", () => {
