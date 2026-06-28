@@ -1,6 +1,6 @@
 import type { Diagnostic, Finding, SuppressionConfig } from "./types.js";
 
-/** Apply active config suppressions to findings without removing them. */
+/** Apply active config suppressions by removing matching findings from reports. */
 export function applySuppressions(
   findings: Finding[],
   suppressions: SuppressionConfig[],
@@ -17,29 +17,14 @@ export function applySuppressions(
   );
 
   return {
-    findings: findings.map((finding) => {
-      const suppression = activeSuppressions.find((candidate) =>
-        matchesSuppression(finding, candidate),
-      );
-      if (!suppression) return finding;
-      return {
-        ...finding,
-        suppression: {
-          reason: suppression.reason,
-          paths: suppression.paths,
-          ...(suppression.expires === undefined
-            ? {}
-            : { expires: suppression.expires }),
-        },
-      };
-    }),
+    findings: findings.filter(
+      (finding) =>
+        !activeSuppressions.some((suppression) =>
+          matchesSuppression(finding, suppression),
+        ),
+    ),
     diagnostics,
   };
-}
-
-/** Return true when a finding is active for CI/status decisions. */
-export function isActiveFinding(finding: Finding): boolean {
-  return finding.suppression === undefined;
 }
 
 function matchesSuppression(

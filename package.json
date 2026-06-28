@@ -1,7 +1,7 @@
 {
   "name": "renma",
   "version": "0.5.1",
-  "description": "An opinionated Context Repository toolkit for LLM-era software teams.",
+  "description": "Manage human-curated context assets for LLMs and agents in Git.",
   "license": "MIT",
   "repository": {
     "type": "git",

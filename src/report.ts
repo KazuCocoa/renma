@@ -35,11 +35,6 @@ export function formatText(result: ScanResult): string {
     lines.push(`  ${finding.evidence.path}:${finding.evidence.startLine}`);
     if (finding.evidence.snippet)
       lines.push(`  evidence: ${finding.evidence.snippet}`);
-    if (finding.suppression) {
-      lines.push(`  suppressed: ${finding.suppression.reason}`);
-      if (finding.suppression.expires)
-        lines.push(`  suppression expires: ${finding.suppression.expires}`);
-    }
     lines.push(`  why: ${finding.whyItMatters}`);
     lines.push(`  fix: ${finding.remediation}`);
     if (finding.constraints && finding.constraints.length > 0)

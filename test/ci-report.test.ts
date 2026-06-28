@@ -1,10 +1,19 @@
 import assert from "node:assert/strict";
+import { execFile as execFileCallback } from "node:child_process";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 import {
+  ciReport,
   determineCiReportStatus,
   formatCiReport,
   type CiReport,
 } from "../src/commands/ci-report.js";
+import { scan } from "../src/scanner.js";
+
+const execFile = promisify(execFileCallback);
 
 test("formatCiReport renders deterministic markdown review artifact", () => {
   const report = sampleReport();
@@ -68,70 +77,6 @@ test("formatCiReport renders structured JSON", () => {
   assert.equal(parsed.diff.findings.added[0]?.id, "MAINT-REPEATED-CODE-BLOCK");
 });
 
-test("formatCiReport preserves suppression metadata in JSON and markdown", () => {
-  const report = sampleReport();
-  report.diff.findings.added[0] = {
-    id: "SEC-ENV-COPY",
-    severity: "high",
-    title: "Environment passthrough",
-    suppression: {
-      reason: "This skill intentionally documents env passthrough test cases.",
-      paths: ["skills/testing/**"],
-      expires: "2026-09-30",
-    },
-    evidence: {
-      path: "skills/testing/SKILL.md",
-      startLine: 12,
-    },
-  };
-
-  const json = JSON.parse(formatCiReport(report, "json")) as CiReport;
-  const markdown = formatCiReport(report, "markdown");
-
-  assert.deepEqual(json.diff.findings.added[0]?.suppression, {
-    reason: "This skill intentionally documents env passthrough test cases.",
-    paths: ["skills/testing/**"],
-    expires: "2026-09-30",
-  });
-  assert.match(
-    markdown,
-    /- HIGH \(suppressed until 2026-09-30\) `SEC-ENV-COPY` `skills\/testing\/SKILL\.md:L12` — Environment passthrough/,
-  );
-  assert.match(
-    markdown,
-    /reason: This skill intentionally documents env passthrough test cases\./,
-  );
-});
-
-test("formatCiReport describes suppressions that never expire", () => {
-  const report = sampleReport();
-  report.diff.findings.added[0] = {
-    id: "LAYOUT-SKILL-NOT-THIN",
-    severity: "high",
-    title: "Legacy skill layout",
-    suppression: {
-      reason: "Legacy skill kept for compatibility with existing workflows.",
-      paths: ["skills/legacy/**"],
-      expires: "never",
-    },
-    evidence: {
-      path: "skills/legacy/SKILL.md",
-      startLine: 1,
-    },
-  };
-
-  const markdown = formatCiReport(report, "markdown");
-
-  assert.match(
-    markdown,
-    /- HIGH \(suppressed, never expires\) `LAYOUT-SKILL-NOT-THIN` `skills\/legacy\/SKILL\.md:L1` — Legacy skill layout/,
-  );
-  assert.match(
-    markdown,
-    /reason: Legacy skill kept for compatibility with existing workflows\./,
-  );
-});
-
 test("ci report policy fails new high finding even when high/critical net delta is zero", () => {
   const report = policyDiffReport({
     addedFindings: [finding("MAINT-NEW-HIGH", "high")],
@@ -142,23 +87,6 @@ test("ci report policy fails new high finding even when high/critical net delta 
   });
 
   assert.equal(determineCiReportStatus(report), "fail");
-});
-
-test("ci report policy does not fail suppressed high findings", () => {
-  const report = policyDiffReport({
-    addedFindings: [
-      {
-        ...finding("SEC-SUPPRESSED-HIGH", "high"),
-        suppression: {
-          reason: "Audited exception.",
-          paths: ["docs/policy.md"],
-          expires: "never",
-        },
-      },
-    ],
-  });
-
-  assert.equal(determineCiReportStatus(report), "pass");
 });
 
 test("ci report policy fails new critical finding", () => {
@@ -269,6 +197,33 @@ test("ci report policy warns on readiness score decrease", () => {
   });
 
   assert.equal(determineCiReportStatus(report), "warn");
+});
+
+test("ci report omits suppressed high findings introduced between git refs", async () => {
+  const repo = await createSuppressedFindingRepo();
+  try {
+    const headScan = await scan(repo, { format: "json" });
+    const report = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+    const markdown = formatCiReport(report, "markdown");
+    const json = formatCiReport(report, "json");
+
+    assert.equal(headScan.scannedFileCount, 1);
+    assert.ok(
+      !headScan.findings.some((finding) => finding.id === "SEC-LITERAL-SECRET"),
+    );
+    assert.ok(
+      !report.diff.findings.added.some(
+        (finding) => finding.id === "SEC-LITERAL-SECRET",
+      ),
+    );
+    assert.equal(report.summary.findingsDelta, 0);
+    assert.equal(report.summary.highOrCriticalFindingsDelta, 0);
+    assert.notEqual(report.status, "fail");
+    assert.doesNotMatch(markdown, /SEC-LITERAL-SECRET/);
+    assert.doesNotMatch(json, /SEC-LITERAL-SECRET/);
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
 });
 
 function sampleReport(): CiReport {
@@ -434,4 +389,85 @@ function finding(id: string, severity: string) {
       startLine: 1,
     },
   };
+}
+
+async function createSuppressedFindingRepo(): Promise<string> {
+  const repo = await mkdtemp(join(tmpdir(), "renma-ci-suppression-"));
+  await git(repo, ["init", "-b", "main"]);
+  await git(repo, ["config", "user.email", "renma@example.test"]);
+  await git(repo, ["config", "user.name", "Renma Test"]);
+  await writeFile(
+    join(repo, "renma.config.json"),
+    JSON.stringify({
+      suppressions: [
+        {
+          id: "SEC-LITERAL-SECRET",
+          paths: ["skills/demo/**"],
+          reason: "Fixture intentionally introduces a fake secret.",
+          expires: "never",
+        },
+      ],
+    }),
+  );
+  await writeSkill(repo, "");
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "base"]);
+  await git(repo, ["tag", "base"]);
+
+  await writeSkill(repo, '\napi_key = "abcd1234abcd1234"\n');
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "head"]);
+  return repo;
+}
+
+async function writeSkill(repo: string, extraBody: string): Promise<void> {
+  const directory = join(repo, "skills", "demo");
+  await mkdir(directory, { recursive: true });
+  await writeFile(
+    join(directory, "SKILL.md"),
+    [
+      "---",
+      "id: demo",
+      "name: demo",
+      "owner: qa-platform",
+      "status: stable",
+      "description: Use this skill for demo requests when routing clarity, examples, preflight checks, required inputs, completion criteria, and verification are needed.",
+      "allowed_data: public",
+      "network_allowed: false",
+      "external_upload_allowed: false",
+      "secrets_allowed: false",
+      "---",
+      "# Demo",
+      "Use this skill when a demo request needs a deterministic workflow.",
+      "",
+      "## Do Not Use For",
+      "Do not use for production incidents.",
+      "",
+      "## Instructions",
+      "1. Collect task context.",
+      "2. Verify the result.",
+      "",
+      "## Required Inputs",
+      "- A demo request.",
+      "",
+      "## Completion Criteria",
+      "- The result is verified.",
+      "",
+      "## Examples",
+      "Input: demo request.",
+      "Output: demo result.",
+      "",
+      "## Preflight",
+      "Check the target path.",
+      "",
+      "## Verification",
+      "Run renma scan.",
+      extraBody,
+    ].join("\n"),
+  );
+}
+
+async function git(cwd: string, args: string[]): Promise<string> {
+  const { stdout } = await execFile("git", ["-C", cwd, ...args]);
+  return stdout.trim();
 }

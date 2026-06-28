@@ -96,11 +96,6 @@ interface FindingDelta {
   id: string;
   severity: string;
   title: string;
-  suppression?: {
-    reason: string;
-    paths?: string[];
-    expires?: string;
-  };
   evidence?: EvidenceDelta | undefined;
 }
 
@@ -326,7 +321,7 @@ function formatDiffMarkdown(report: DiffReport): string {
       ...markdownList(
         report.findings.added,
         (finding) =>
-          `${finding.id} (${finding.severity}${finding.suppression ? ", suppressed" : ""})${finding.evidence?.path ? ` at ${finding.evidence.path}` : ""}`,
+          `${finding.id} (${finding.severity})${finding.evidence?.path ? ` at ${finding.evidence.path}` : ""}`,
       ),
     );
   }
@@ -476,10 +471,6 @@ function findingMap(findings: unknown[]): Map<string, FindingDelta> {
         id: stringField(finding, "id"),
         severity: stringField(finding, "severity"),
         title: stringField(finding, "title"),
-        ...optionalField(
-          "suppression",
-          suppressionDelta(objectField(finding, "suppression")),
-        ),
         evidence,
       };
       return [
@@ -525,24 +516,9 @@ function evidenceDelta(evidence: unknown): EvidenceDelta | undefined {
   };
 }
 
-function suppressionDelta(suppression: unknown): FindingDelta["suppression"] {
-  if (!suppression || typeof suppression !== "object") return undefined;
-  const reason = optionalStringField(suppression, "reason");
-  if (reason === undefined) return undefined;
-  const paths = optionalStringArrayField(suppression, "paths");
-  const expires = optionalStringField(suppression, "expires");
-  return {
-    reason,
-    ...(paths === undefined ? {} : { paths }),
-    ...(expires === undefined ? {} : { expires }),
-  };
-}
-
 function highOrCriticalCount(findings: FindingDelta[]): number {
   return findings.filter(
-    (finding) =>
-      finding.suppression === undefined &&
-      (finding.severity === "high" || finding.severity === "critical"),
+    (finding) => finding.severity === "high" || finding.severity === "critical",
   ).length;
 }
 
@@ -668,30 +644,12 @@ function optionalStringField(
   return typeof candidate === "string" ? candidate : undefined;
 }
 
-function optionalField<T, K extends string>(
-  field: K,
-  value: T | undefined,
-): { [P in K]?: T } {
-  return value === undefined ? {} : ({ [field]: value } as { [P in K]?: T });
-}
-
 function optionalNumberField(
   value: unknown,
   field: string,
 ): number | undefined {
   const candidate = objectField(value, field);
   return typeof candidate === "number" ? candidate : undefined;
-}
-
-function optionalStringArrayField(
-  value: unknown,
-  field: string,
-): string[] | undefined {
-  const candidate = objectField(value, field);
-  return Array.isArray(candidate) &&
-    candidate.every((item) => typeof item === "string")
-    ? candidate
-    : undefined;
 }
 
 function booleanField(value: unknown, field: string): boolean {
