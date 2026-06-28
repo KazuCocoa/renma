@@ -37,3 +37,12 @@ renma inspect examples/context-repo/skills/testing/spec-review/SKILL.md --lines 
 ```
 
 The scan command checks the example assets for findings. Catalog lists the assets and metadata. Ownership groups assets by owner. Graph shows required and optional context relationships; the focused graph centers the skill and its connected context assets. Readiness turns the catalog and graph into workflow checks. Inspect shows a focused outline or line slice for one asset.
+
+```mermaid
+graph TD
+  node_0["contexts/domain/payment/* (1)"]
+  node_1["contexts/testing/* (2)"]
+  node_2["skill: skill.testing.spec-review (experimental)"]
+  node_2 -->|optional| node_0
+  node_2 -->|requires| node_1
+```
