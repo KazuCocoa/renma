@@ -64,12 +64,19 @@ This context does not apply when:
    - Package version, changelog version, tag name, and release note title agree.
    - New or changed diagnostics are documented in `docs/diagnostics.md`.
    - Changed commands or output formats are documented in `docs/user-manual.md`.
-5. Hand off with changed artifacts, exact commands run, blockers, residual risks, and the proposed tag name.
+5. Finalize locally when the user requests npm-version-style behavior:
+   - Ensure the working tree contains only intended release files.
+   - Stage the exact release files.
+   - Create a local release commit named after the version, such as `0.6.0`.
+   - Create a local annotated tag named `v<version>` with the same version text.
+   - If the release commit already exists, tag that commit instead of rewriting it.
+6. Hand off with changed artifacts, exact commands run, blockers, residual risks, commit hash, and tag name.
 
 ## Constraints
 
 - Do not invent domain facts, policies, owners, dependencies, or product behavior.
-- Distribution work and remote repository changes are outside this workflow unless the user separately requests them.
+- Remote repository changes, package publication, and public release creation are outside this workflow unless the user separately requests them.
+- Local version commits and local annotated tags are allowed when the user asks for release finalization.
 - Do not rewrite unrelated release history while preparing the current release.
 - Treat Renma findings at or above the requested failure threshold as release blockers unless the user explicitly accepts a documented suppression.
 - Redact secrets, credentials, tokens, personal data, and proprietary values from release artifacts and shared logs.

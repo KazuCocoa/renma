@@ -48,7 +48,8 @@ Use this skill to prepare a Renma release from a local checkout. It routes the a
 2. Inspect the requested release scope and latest release tag.
 3. Dogfood Renma before and after release artifact edits.
 4. Prepare only the release-ready files needed for the requested version.
-5. Report changed artifacts, exact validation commands, blockers, and the proposed tag name.
+5. When the user asks for release finalization, create the local version commit and tag.
+6. Report changed artifacts, exact validation commands, blockers, commit, and tag name.
 
 ## Constraints
 
@@ -60,7 +61,7 @@ Use this skill to prepare a Renma release from a local checkout. It routes the a
 
 - Release metadata, changelog, docs, and release notes are consistent for the target version.
 - Required Renma reports have been run or any skipped report is explained.
-- The final handoff names blockers, residual risks, and the proposed tag.
+- The final handoff names blockers, residual risks, and the local commit/tag state.
 
 ## Validation
 
