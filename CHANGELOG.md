@@ -6,15 +6,21 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-29
+
 ### Added
 
 - Added freshness diagnostics for context assets.
 - Added suppressions for managing accepted diagnostics.
+- Added the project changelog to document release history.
+- Added a release-prep skill and context asset that dogfood Renma reports during release preparation.
 
 ### Changed
 
 - Centralized diagnostic IDs in one module.
 - Simplified the example spec and improved example README documentation.
+- Updated package metadata so published packages include the changelog, license, and README.
+- Clarified README layout and redaction wording so Renma's own scan reports stay clean.
 
 ## [0.5.1] - 2026-06-27
 
@@ -97,7 +103,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/KazuCocoa/renma/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/KazuCocoa/renma/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/KazuCocoa/renma/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/KazuCocoa/renma/compare/v0.3.0...v0.4.0
