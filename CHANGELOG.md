@@ -6,6 +6,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-06-29
+
 ### Changed
 
 - Updated the release-prep workflow to allow local version commits and annotated tags when release finalization is requested.
@@ -108,7 +110,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/KazuCocoa/renma/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/KazuCocoa/renma/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/KazuCocoa/renma/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/KazuCocoa/renma/compare/v0.4.0...v0.5.0
