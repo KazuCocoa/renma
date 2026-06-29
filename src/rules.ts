@@ -7,6 +7,7 @@ import {
   parseDayDuration,
   todayIsoDate,
 } from "./freshness.js";
+import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import type {
   Evidence,
@@ -268,7 +269,7 @@ function expiredAssetFindings(entry: CatalogEntry, today: string): Finding[] {
 
   return [
     {
-      id: "MAINT-ASSET-EXPIRED",
+      id: DIAGNOSTIC_IDS.MAINT_ASSET_EXPIRED,
       title: "Asset freshness metadata is expired",
       category: "maintenance",
       severity: "medium",
@@ -313,7 +314,7 @@ function reviewOverdueAssetFindings(
 
   return [
     {
-      id: "MAINT-ASSET-REVIEW-OVERDUE",
+      id: DIAGNOSTIC_IDS.MAINT_ASSET_REVIEW_OVERDUE,
       title: "Asset freshness review is overdue",
       category: "maintenance",
       severity: "medium",
@@ -354,7 +355,7 @@ function duplicateAssetIdFindings(entries: CatalogEntry[]): Finding[] {
     const paths = duplicates.map((entry) => entry.sourcePath).sort();
 
     return duplicates.map((entry) => ({
-      id: "META-DUPLICATE-ASSET-ID",
+      id: DIAGNOSTIC_IDS.META_DUPLICATE_ASSET_ID,
       title: "Duplicate asset id",
       category: "maintenance",
       severity: "medium",
@@ -395,7 +396,7 @@ function unknownReferenceFindings(
 
     return [
       {
-        id: "META-UNKNOWN-REFERENCE",
+        id: DIAGNOSTIC_IDS.META_UNKNOWN_REFERENCE,
         title: "Declared reference does not resolve to a known asset",
         category: "maintenance",
         severity: "medium",
@@ -443,7 +444,7 @@ function referenceDeprecatedAssetFindings(
 
     return [
       {
-        id: "MAINT-REFERENCE-DEPRECATED-ASSET",
+        id: DIAGNOSTIC_IDS.MAINT_REFERENCE_DEPRECATED_ASSET,
         title: "Declared reference targets a deprecated or archived asset",
         category: "maintenance",
         severity: "medium",
@@ -502,7 +503,7 @@ function orphanedContextAssetFindings(
 
     return [
       {
-        id: "MAINT-ORPHANED-CONTEXT-ASSET",
+        id: DIAGNOSTIC_IDS.MAINT_ORPHANED_CONTEXT_ASSET,
         title: "Shared context asset is not referenced by other assets",
         category: "maintenance",
         severity: "low",
@@ -609,7 +610,7 @@ function secretFindings(document: ParsedDocument): Finding[] {
   return matchingLineFindings(document, (line) => {
     if (PRIVATE_KEY_PATTERN.test(line)) {
       return finding(
-        "SEC-PRIVATE-KEY",
+        DIAGNOSTIC_IDS.SEC_PRIVATE_KEY,
         "Private key material appears in repository text",
         "safety",
         "critical",
@@ -619,7 +620,7 @@ function secretFindings(document: ParsedDocument): Finding[] {
     }
     if (SECRET_PATTERN.test(line) && !isPlaceholder(line)) {
       return finding(
-        "SEC-LITERAL-SECRET",
+        DIAGNOSTIC_IDS.SEC_LITERAL_SECRET,
         "Literal credential-like value appears in repository text",
         "safety",
         "high",
@@ -639,7 +640,7 @@ function commandFindings(document: ParsedDocument): Finding[] {
       !hasNearbyConfirmation(document.lines, line)
     ) {
       return finding(
-        "SEC-DESTRUCTIVE-COMMAND",
+        DIAGNOSTIC_IDS.SEC_DESTRUCTIVE_COMMAND,
         "Dangerous command lacks explicit confirmation or recovery guard",
         "safety",
         "high",
@@ -649,7 +650,7 @@ function commandFindings(document: ParsedDocument): Finding[] {
     }
     if (REMOTE_PATTERN.test(line)) {
       return finding(
-        "SEC-REMOTE-DEFAULT",
+        DIAGNOSTIC_IDS.SEC_REMOTE_DEFAULT,
         "Remote command example uses unsafe default",
         "safety",
         "medium",
@@ -659,7 +660,7 @@ function commandFindings(document: ParsedDocument): Finding[] {
     }
     if (ENV_COPY_PATTERN.test(line)) {
       return finding(
-        "SEC-ENV-COPY",
+        DIAGNOSTIC_IDS.SEC_ENV_COPY,
         "Command may pass broad environment into subprocess execution",
         "safety",
         "medium",
@@ -684,7 +685,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     findings.push(
       documentFinding(
         document,
-        "QUAL-MISSING-DESCRIPTION",
+        DIAGNOSTIC_IDS.QUAL_MISSING_DESCRIPTION,
         "Skill is missing an explicit description",
         "quality",
         "medium",
@@ -698,7 +699,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     findings.push(
       documentFinding(
         document,
-        "QUAL-SHORT-DESCRIPTION",
+        DIAGNOSTIC_IDS.QUAL_SHORT_DESCRIPTION,
         "Skill description is too short for routing clarity",
         "quality",
         "low",
@@ -717,7 +718,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     findings.push(
       documentFinding(
         document,
-        "QUAL-SKILL-TOKEN-BUDGET",
+        DIAGNOSTIC_IDS.QUAL_SKILL_TOKEN_BUDGET,
         "Skill entrypoint exceeds token budget",
         "quality",
         "medium",
@@ -751,7 +752,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     findings.push(
       documentFinding(
         document,
-        "QUAL-USER-LOCAL-PATHS",
+        DIAGNOSTIC_IDS.QUAL_USER_LOCAL_PATHS,
         "Skill uses hardcoded user home paths in instructions",
         "quality",
         "medium",
@@ -764,7 +765,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     findings.push(
       documentFinding(
         document,
-        "QUAL-MISSING-NEGATIVE-ROUTING",
+        DIAGNOSTIC_IDS.QUAL_MISSING_NEGATIVE_ROUTING,
         "Skill lacks negative routing guidance",
         "structure",
         "medium",
@@ -779,7 +780,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     findings.push(
       documentFinding(
         document,
-        "QUAL-MISSING-ROUTING-CLARITY",
+        DIAGNOSTIC_IDS.QUAL_MISSING_ROUTING_CLARITY,
         "Skill lacks routing clarity",
         "quality",
         "low",
@@ -792,7 +793,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     findings.push(
       documentFinding(
         document,
-        "QUAL-MISSING-EXAMPLES",
+        DIAGNOSTIC_IDS.QUAL_MISSING_EXAMPLES,
         "Skill lacks examples",
         "quality",
         "low",
@@ -807,7 +808,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     findings.push(
       documentFinding(
         document,
-        "QUAL-MISSING-PREFLIGHT",
+        DIAGNOSTIC_IDS.QUAL_MISSING_PREFLIGHT,
         "Skill lacks a preflight step",
         "quality",
         "medium",
@@ -823,7 +824,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     findings.push(
       documentFinding(
         document,
-        "QUAL-MISSING-REQUIRED-INPUTS",
+        DIAGNOSTIC_IDS.QUAL_MISSING_REQUIRED_INPUTS,
         "Skill does not state required inputs",
         "quality",
         "medium",
@@ -857,7 +858,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     findings.push(
       documentFinding(
         document,
-        "QUAL-MISSING-COMPLETION-CRITERIA",
+        DIAGNOSTIC_IDS.QUAL_MISSING_COMPLETION_CRITERIA,
         "Skill does not state completion criteria",
         "quality",
         "medium",
@@ -888,7 +889,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     findings.push(
       documentFinding(
         document,
-        "QUAL-MISSING-VERIFICATION",
+        DIAGNOSTIC_IDS.QUAL_MISSING_VERIFICATION,
         "Skill lacks verification guidance",
         "quality",
         "medium",
@@ -904,7 +905,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     findings.push(
       documentFinding(
         document,
-        "QUAL-LOW-HEADING-DENSITY",
+        DIAGNOSTIC_IDS.QUAL_LOW_HEADING_DENSITY,
         "Long instruction file has few headings",
         "structure",
         "low",
@@ -976,7 +977,7 @@ function reusableContextCandidateFinding(
   ].filter((part): part is string => Boolean(part));
 
   return {
-    id: "MAINT-SKILL-REUSABLE-CONTEXT-CANDIDATE",
+    id: DIAGNOSTIC_IDS.MAINT_SKILL_REUSABLE_CONTEXT_CANDIDATE,
     title: "Skill may contain reusable context worth extracting",
     category: "maintenance",
     severity: "low",
@@ -1084,7 +1085,7 @@ function supportSharedContextCandidateFindings(
 
   return [
     {
-      id: "MAINT-SUPPORT-ASSET-SHARED-CONTEXT-CANDIDATE",
+      id: DIAGNOSTIC_IDS.MAINT_SUPPORT_ASSET_SHARED_CONTEXT_CANDIDATE,
       title: "Skill-local support file may be a shared context candidate",
       category: "maintenance",
       severity: "low",
@@ -1131,7 +1132,7 @@ function contextPathNonSemanticFindings(document: ParsedDocument): Finding[] {
 
   return [
     {
-      id: "MAINT-CONTEXT-PATH-NON-SEMANTIC",
+      id: DIAGNOSTIC_IDS.MAINT_CONTEXT_PATH_NON_SEMANTIC,
       title: "Context asset path appears process-oriented rather than semantic",
       category: "maintenance",
       severity: "low",
@@ -1193,7 +1194,7 @@ function skillContextReferenceNotDeclaredFindings(
   return [...matches.entries()]
     .filter(([referencedPath]) => !declaredContexts.has(referencedPath))
     .map(([referencedPath, match]) => ({
-      id: "MAINT-SKILL-CONTEXT-REFERENCE-NOT-DECLARED",
+      id: DIAGNOSTIC_IDS.MAINT_SKILL_CONTEXT_REFERENCE_NOT_DECLARED,
       title: "Skill references a shared context without declaring it",
       category: "maintenance",
       severity: "low",
@@ -1259,7 +1260,7 @@ function skillReferencesSupersededAssetFindings(
 
     return [
       {
-        id: "MAINT-SKILL-REFERENCES-SUPERSEDED-ASSET",
+        id: DIAGNOSTIC_IDS.MAINT_SKILL_REFERENCES_SUPERSEDED_ASSET,
         title: "Skill references a superseded local support asset",
         category: "maintenance",
         severity: "low",
@@ -1375,7 +1376,7 @@ function assetReferencesSupersededAssetFindings(
 
       return [
         {
-          id: "MAINT-ASSET-REFERENCES-SUPERSEDED-ASSET",
+          id: DIAGNOSTIC_IDS.MAINT_ASSET_REFERENCES_SUPERSEDED_ASSET,
           title: "Asset references a superseded support file",
           category: "maintenance",
           severity: "low",
@@ -1471,7 +1472,7 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
   return [
     documentFinding(
       document,
-      "QUAL-SUPPORT-ASSET-TOKEN-BUDGET",
+      DIAGNOSTIC_IDS.QUAL_SUPPORT_ASSET_TOKEN_BUDGET,
       "Support asset exceeds token guidance",
       "quality",
       "low",
@@ -1504,7 +1505,7 @@ function profileFindings(document: ParsedDocument): Finding[] {
   return [
     documentFinding(
       document,
-      "PROF-MISSING-BASE",
+      DIAGNOSTIC_IDS.PROF_MISSING_BASE,
       "Profile overlay does not declare its base skill",
       "structure",
       "medium",
@@ -1538,7 +1539,7 @@ function skillLocalSupportReachabilityFindings(
       findings.push(
         documentFinding(
           skill,
-          "SUPPORT-MISSING-REACHABILITY-GUIDANCE",
+          DIAGNOSTIC_IDS.SUPPORT_MISSING_REACHABILITY_GUIDANCE,
           "Skill has local support files but no reachability guidance",
           "structure",
           "medium",
@@ -1733,7 +1734,7 @@ function disallowedSkillAssetFindings(
   return [
     documentFinding(
       document,
-      "LAYOUT-DISALLOWED-SKILL-ASSET",
+      DIAGNOSTIC_IDS.LAYOUT_DISALLOWED_SKILL_ASSET,
       `Disallowed skill-local ${assetRoot} asset`,
       "structure",
       assetRoot === "scripts" ? "medium" : "low",
@@ -1784,7 +1785,7 @@ function thinSkillLayoutFindings(document: ParsedDocument): Finding[] {
     findings.push(
       documentFinding(
         document,
-        "LAYOUT-SKILL-NOT-THIN",
+        DIAGNOSTIC_IDS.LAYOUT_SKILL_NOT_THIN,
         "Skill entrypoint contains procedure content",
         "structure",
         wordCount > 700 ? "medium" : "low",
@@ -1808,7 +1809,7 @@ function thinSkillLayoutFindings(document: ParsedDocument): Finding[] {
     findings.push(
       findingAt(
         document,
-        "LAYOUT-SKILL-EXECUTABLE-COMMAND",
+        DIAGNOSTIC_IDS.LAYOUT_SKILL_EXECUTABLE_COMMAND,
         "Skill entrypoint contains executable command",
         "structure",
         "low",
@@ -1846,7 +1847,7 @@ function helperCommandFindings(
       findings.push(
         findingAt(
           document,
-          "PATH-HELPER-COMMAND-SKILL-SCRIPTS",
+          DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_SKILL_SCRIPTS,
           "Helper command points to skill-local scripts",
           "structure",
           "medium",
@@ -1870,7 +1871,7 @@ function helperCommandFindings(
       findings.push(
         findingAt(
           document,
-          "PATH-HELPER-COMMAND-NON_TOOLS",
+          DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_NON_TOOLS,
           "Helper command does not use tools root",
           "structure",
           "low",
@@ -1894,7 +1895,7 @@ function helperCommandFindings(
       findings.push(
         findingAt(
           document,
-          "PATH-HELPER-COMMAND-UNRESOLVED",
+          DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_UNRESOLVED,
           "Helper command target does not resolve",
           "structure",
           "medium",
@@ -1952,7 +1953,7 @@ function layoutConsistencyFindings(document: ParsedDocument): Finding[] {
     findings.push(
       findingAt(
         document,
-        "DOCS-LAYOUT-INCONSISTENT",
+        DIAGNOSTIC_IDS.DOCS_LAYOUT_INCONSISTENT,
         "Repository docs describe a non-canonical layout",
         "maintenance",
         "low",
@@ -1979,7 +1980,7 @@ function contextRootFindings(document: ParsedDocument): Finding[] {
     return [
       documentFinding(
         document,
-        "LAYOUT-CONTEXT-LEGACY-ROOT",
+        DIAGNOSTIC_IDS.LAYOUT_CONTEXT_LEGACY_ROOT,
         "Context asset uses legacy context/ root",
         "structure",
         "low",
@@ -2002,7 +2003,7 @@ function helperRootFindings(document: ParsedDocument): Finding[] {
     return [
       documentFinding(
         document,
-        "LAYOUT-HELPER-NON_TOOLS",
+        DIAGNOSTIC_IDS.LAYOUT_HELPER_NON_TOOLS,
         "Helper script is outside tools root",
         "structure",
         "medium",
@@ -2040,7 +2041,7 @@ function declaredDependencyLayoutFindings(
     const source = catalog.assets.find((asset) => asset.id === dependency.from);
     if (!source) continue;
     findings.push({
-      id: "LAYOUT-CONTEXT-REFERENCE-NON_CANONICAL",
+      id: DIAGNOSTIC_IDS.LAYOUT_CONTEXT_REFERENCE_NON_CANONICAL,
       title: "Declared context path is not under canonical roots",
       category: "structure",
       severity: "low",
@@ -2241,9 +2242,9 @@ function evidence(
 function localSupportUnreachableRuleId(
   kind: ParsedDocument["artifact"]["kind"],
 ): string {
-  if (kind === "profile") return "SUPPORT-UNREACHABLE-PROFILE";
-  if (kind === "example") return "SUPPORT-UNREACHABLE-EXAMPLE";
-  return "SUPPORT-UNREACHABLE-REFERENCE";
+  if (kind === "profile") return DIAGNOSTIC_IDS.SUPPORT_UNREACHABLE_PROFILE;
+  if (kind === "example") return DIAGNOSTIC_IDS.SUPPORT_UNREACHABLE_EXAMPLE;
+  return DIAGNOSTIC_IDS.SUPPORT_UNREACHABLE_REFERENCE;
 }
 
 function escapeRegExp(value: string): string {

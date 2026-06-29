@@ -1,6 +1,7 @@
 import path from "node:path";
 import { buildCatalog } from "./catalog.js";
 import { loadConfig, type ConfigOverrides } from "./config.js";
+import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import { discoverArtifacts } from "./discovery.js";
 import { parseDocument } from "./markdown.js";
 import { detectRepeatedContextPatterns } from "./repeated-context.js";
@@ -48,7 +49,7 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
     const invalidStatus = diagnostic.message.match(/Invalid status "([^"]+)"/);
     if (invalidStatus) {
       return {
-        id: "META-INVALID-STATUS",
+        id: DIAGNOSTIC_IDS.META_INVALID_STATUS,
         title: "Asset metadata uses an invalid lifecycle status",
         category: "maintenance",
         severity: "medium",
@@ -87,10 +88,10 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
     if (invalidLastReviewedAt || invalidExpiresAt || invalidReviewCycle) {
       return {
         id: invalidLastReviewedAt
-          ? "META-INVALID-LAST-REVIEWED-AT"
+          ? DIAGNOSTIC_IDS.META_INVALID_LAST_REVIEWED_AT
           : invalidExpiresAt
-            ? "META-INVALID-EXPIRES-AT"
-            : "META-INVALID-REVIEW-CYCLE",
+            ? DIAGNOSTIC_IDS.META_INVALID_EXPIRES_AT
+            : DIAGNOSTIC_IDS.META_INVALID_REVIEW_CYCLE,
         title: invalidLastReviewedAt
           ? "Freshness metadata uses an invalid last review date"
           : invalidExpiresAt
@@ -135,14 +136,14 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
     );
     return {
       id: missingId
-        ? "META-MISSING-ID"
+        ? DIAGNOSTIC_IDS.META_MISSING_ID
         : missingOwner
-          ? "META-MISSING-OWNER"
+          ? DIAGNOSTIC_IDS.META_MISSING_OWNER
           : unknownDependency
-            ? "META-UNKNOWN-DEPENDENCY"
+            ? DIAGNOSTIC_IDS.META_UNKNOWN_DEPENDENCY
             : inactiveDependency
-              ? "META-INACTIVE-DEPENDENCY"
-              : "META-CATALOG-DIAGNOSTIC",
+              ? DIAGNOSTIC_IDS.META_INACTIVE_DEPENDENCY
+              : DIAGNOSTIC_IDS.META_CATALOG_DIAGNOSTIC,
       title: missingId
         ? "Shared context asset is missing an id"
         : missingOwner

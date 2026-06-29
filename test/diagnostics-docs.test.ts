@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 const SCAN_FINDING_IMPLEMENTATION_FILES = [
+  "src/diagnostic-ids.ts",
   "src/rules.ts",
   "src/repeated-context.ts",
   "src/security-diagnostics.ts",
