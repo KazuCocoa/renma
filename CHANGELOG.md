@@ -6,6 +6,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Changed
+
+- Updated the release-prep workflow to allow local version commits and annotated tags when release finalization is requested.
+
 ## [0.6.0] - 2026-06-29
 
 ### Added
