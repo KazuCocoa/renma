@@ -538,6 +538,8 @@ Renma is part of a broader idea: treating reusable LLM context as software-manag
 - Where Does a Context Repository Fit in the AI Stack? (planned)
 - Context Engineering Is Software Engineering (planned)
 
+([Context Repository Series](https://kazucocoa.blog/context-repository/))
+
 ## Development
 
 ```bash
