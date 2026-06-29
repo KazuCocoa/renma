@@ -5,7 +5,7 @@ id: skill.release-prep
 title: Release Prep
 version: 0.1.0
 owner: maintainers
-status: experimental
+status: stable
 tags:
   - release
   - maintenance
@@ -14,7 +14,7 @@ requires_context:
   - context.release.prep
 optional_context:
 conflicts:
-allowed_data: disclosed
+allowed_data: public
 network_allowed: true
 external_upload_allowed: false
 secrets_allowed: false
@@ -29,7 +29,7 @@ forbidden_inputs:
 
 ## Purpose
 
-Use this skill to prepare a Renma release from a local checkout. It routes the agent to the release-prep workflow and requires Renma's own reports as release evidence.
+Use this skill to prepare a Renma release from a local checkout. It routes to `context.release.prep` and the deterministic `tools/release-prep.mjs` helper.
 
 ## Do Not Use For
 
@@ -45,11 +45,11 @@ Use this skill to prepare a Renma release from a local checkout. It routes the a
 ## Instructions
 
 1. Read `context.release.prep`.
-2. Inspect the requested release scope and latest release tag.
-3. Dogfood Renma before and after release artifact edits.
-4. Prepare only the release-ready files needed for the requested version.
-5. When the user asks for release finalization, create the local version commit and tag.
-6. Report changed artifacts, exact validation commands, blockers, commit, and tag name.
+2. Run `node tools/release-prep.mjs --check-only` before editing release files.
+3. Prepare only the release-ready files needed for the requested version.
+4. Run `node tools/release-prep.mjs` for validation evidence.
+5. If finalization is requested, run `node tools/release-prep.mjs --finalize`.
+6. Report changed artifacts, blockers, validation status, commit, and tag.
 
 ## Constraints
 

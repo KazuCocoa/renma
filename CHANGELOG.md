@@ -9,6 +9,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 ### Changed
 
 - Updated the release-prep workflow to allow local version commits and annotated tags when release finalization is requested.
+- Moved release-prep validation mechanics into a deterministic tool script to reduce skill/context token usage.
 
 ## [0.6.0] - 2026-06-29
 

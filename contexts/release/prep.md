@@ -3,12 +3,12 @@ id: context.release.prep
 title: Release Prep Workflow
 version: 0.1.0
 owner: maintainers
-status: experimental
+status: stable
 tags:
   - release
   - maintenance
   - dogfooding
-allowed_data: disclosed
+allowed_data: public
 network_allowed: true
 external_upload_allowed: false
 secrets_allowed: false
@@ -23,7 +23,7 @@ forbidden_inputs:
 
 ## Summary
 
-Renma release preparation should be grounded in local repository evidence: git history, package metadata, changelog entries, draft notes, documentation updates, tests, and Renma's own reports. The patch should make the target version reviewable before any separate distribution step.
+Renma release preparation is local-first and evidence-based. Use `tools/release-prep.mjs` for deterministic metadata checks, Renma dogfooding reports, validation commands, and optional npm-version-style local commit/tag finalization.
 
 ## Scope
 
@@ -41,36 +41,12 @@ This context does not apply when:
 
 ## Workflow
 
-1. Inspect the release state:
-   - Read `package.json`, `package-lock.json`, `CHANGELOG.md`, README release-facing sections, `docs/user-manual.md`, and `docs/diagnostics.md`.
-   - Identify the latest `v*` tag and compare `git log <latest-tag>..HEAD` with the changelog's `Unreleased` section.
-   - Check the public release page only when network access is available or the user explicitly allows it.
-2. Dogfood Renma before editing release artifacts:
-   - Build the local CLI with `npm run build` if `dist/index.js` is stale or missing.
-   - Run `node dist/index.js scan . --fail-on high`.
-   - Run `node dist/index.js catalog . --format markdown`.
-   - Run `node dist/index.js readiness . --format markdown`.
-   - Run `node dist/index.js graph . --focus skill.release-prep --format mermaid`.
-   - Run `node dist/index.js diff . --from <latest-tag> --to HEAD --format markdown` when the base tag is available.
-   - Run `node dist/index.js ci-report . --from <latest-tag> --to HEAD --format markdown` for PR-ready release evidence.
-3. Prepare release artifacts:
-   - Move relevant `Unreleased` entries into a new version section with the release date.
-   - Keep an empty `Unreleased` section for future changes.
-   - Update `package.json` and `package-lock.json` version fields when the release requires a version bump.
-   - Draft or update release notes from the changelog, Renma diff, and CI report evidence.
-   - Update README, User Manual, diagnostics docs, or examples when commands, outputs, diagnostics, or user workflows changed.
-4. Verify consistency:
-   - Changelog entries describe user-facing changes, not only raw commit subjects.
-   - Package version, changelog version, tag name, and release note title agree.
-   - New or changed diagnostics are documented in `docs/diagnostics.md`.
-   - Changed commands or output formats are documented in `docs/user-manual.md`.
-5. Finalize locally when the user requests npm-version-style behavior:
-   - Ensure the working tree contains only intended release files.
-   - Stage the exact release files.
-   - Create a local release commit named after the version, such as `0.6.0`.
-   - Create a local annotated tag named `v<version>` with the same version text.
-   - If the release commit already exists, tag that commit instead of rewriting it.
-6. Hand off with changed artifacts, exact commands run, blockers, residual risks, commit hash, and tag name.
+1. Inspect `package.json`, `package-lock.json`, `CHANGELOG.md`, and release-relevant docs.
+2. Run `node tools/release-prep.mjs --check-only` to check version, changelog, and base-tag consistency.
+3. Edit release artifacts: version fields, changelog section/links, release notes, and docs affected by changed commands or diagnostics.
+4. Run `node tools/release-prep.mjs` to execute tests, build, Renma scan/catalog/readiness/graph, diff, and CI report.
+5. When requested, run `node tools/release-prep.mjs --finalize` to stage only intended release files and create the local version commit and annotated tag.
+6. Hand off changed artifacts, validation results, blockers, residual risks, commit hash, and tag name.
 
 ## Constraints
 
@@ -84,11 +60,4 @@ This context does not apply when:
 
 ## Validation
 
-- `npm test`
-- `npm run build`
-- `node dist/index.js scan . --fail-on high`
-- `node dist/index.js catalog . --format markdown`
-- `node dist/index.js readiness . --format markdown`
-- `node dist/index.js graph . --focus skill.release-prep --format mermaid`
-- `node dist/index.js diff . --from <latest-tag> --to HEAD --format markdown`
-- `node dist/index.js ci-report . --from <latest-tag> --to HEAD --format markdown`
+Run `node tools/release-prep.mjs`; use `--check-only` for metadata checks only and `--finalize` for local commit/tag creation after validation.

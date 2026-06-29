@@ -1181,10 +1181,6 @@ function consumesBlockList(value: string, blockList: ParsedBlockList): boolean {
   return value.length === 0 && blockList.values.length > 0;
 }
 
-function isInlineListValue(value: string): boolean {
-  return value.startsWith("[") || value.includes(",");
-}
-
 function parseSecurityPolicy(content: string): SecurityPolicy {
   const policy: SecurityPolicy = {
     allowedData: [],
@@ -1251,11 +1247,7 @@ function parseSecurityPolicy(content: string): SecurityPolicy {
 
     if (ALLOWED_DATA_POLICY_FIELDS.has(key)) {
       const values = policyListValues(value, blockList);
-      if (value.length > 0 && !isInlineListValue(value)) {
-        policy.allowedDataClass = value;
-      } else {
-        policy.allowedData.push(...values);
-      }
+      policy.allowedData.push(...values);
       policy.declared.add("allowedData");
       policy.lineByField.set("allowedData", index + 1);
       if (consumesBlockList(value, blockList)) index = blockList.nextIndex - 1;
@@ -1414,7 +1406,7 @@ function uniqueStrings(values: string[]): string[] {
 }
 
 function effectiveAllowedDataClass(policy: SecurityPolicy): string | undefined {
-  return policy.allowedDataClass;
+  return policy.allowedDataClass ?? policy.allowedData[0];
 }
 
 function effectiveAllowedDataList(policy: SecurityPolicy): string[] {
