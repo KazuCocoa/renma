@@ -140,6 +140,7 @@ export function buildReadinessReport(
     workflowRequiredInputsCheck(findings),
     workflowCompletionCriteriaCheck(findings),
     lifecycleCheck(lifecycleAssets),
+    freshnessCheck(findings),
     minimumInventoryCheck(totalAssets),
     findingCheck(
       "layout.skills_thin",
@@ -790,6 +791,43 @@ function lifecycleCheck(nodes: GraphReport["nodes"]): ReadinessCheck {
       id: node.id,
       path: node.sourcePath,
       message: `Asset status is ${node.status}.`,
+    })),
+  };
+}
+
+function freshnessCheck(findings: Finding[]): ReadinessCheck {
+  const matched = findings.filter((finding) =>
+    [
+      "MAINT-CONTEXT-EXPIRED",
+      "MAINT-CONTEXT-REVIEW-OVERDUE",
+      "META-INVALID-LAST-REVIEWED-AT",
+      "META-INVALID-EXPIRES-AT",
+      "META-INVALID-REVIEW-CYCLE",
+    ].includes(finding.id),
+  );
+
+  if (matched.length === 0) {
+    return {
+      id: "assets.freshness",
+      title: "Asset freshness",
+      status: "pass",
+      severity: "info",
+      summary: "No expired, overdue, or invalid freshness metadata was found.",
+    };
+  }
+
+  return {
+    id: "assets.freshness",
+    title: "Asset freshness",
+    status: "warn",
+    severity: "warning",
+    summary: `${matched.length} freshness finding${
+      matched.length === 1 ? "" : "s"
+    } matched cataloged assets.`,
+    evidence: matched.map((finding) => ({
+      id: finding.id,
+      path: finding.evidence.path,
+      message: finding.remediation,
     })),
   };
 }

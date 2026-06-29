@@ -29,6 +29,9 @@ These diagnostics are emitted after files are parsed into catalog entries.
 | Severity | Message | Meaning | Fix |
 | --- | --- | --- | --- |
 | `warning` | `Invalid status "<status>". Expected one of: experimental, stable, deprecated, archived.` | An asset status does not match the accepted status values. | Replace the status with a supported value. |
+| `warning` | `Invalid last_reviewed_at "<date>". Expected ISO date YYYY-MM-DD.` | Freshness metadata has an invalid human review date. | Replace it with a real ISO date such as `2026-06-28`. |
+| `warning` | `Invalid expires_at "<date>". Expected ISO date YYYY-MM-DD.` | Freshness metadata has an invalid expiration date. | Replace it with a real ISO date such as `2026-12-31`. |
+| `warning` | `Invalid review_cycle "<duration>". Expected supported ISO 8601 day duration such as P90D.` | Freshness metadata uses a review cycle renma cannot evaluate. | Use a day-based duration such as `P90D` or `P180D`. |
 | `warning` | `Metadata dependency "<to>" from "<from>" does not match a catalog entry.` | A metadata dependency points at an asset renma did not discover. | Correct the reference, add the missing asset, or update include/exclude config. |
 | `warning` | `Metadata dependency "<to>" from "<from>" targets a <status> asset.` | A dependency points at a deprecated or archived catalog target. | Retarget the dependency to a stable replacement or document the migration. |
 | `warning` | `Shared context asset is missing an id.` | A shared context asset has no stable ID. | Add an `id` metadata field. |
@@ -75,7 +78,9 @@ The identifiers below are part of the current scan output. The current implement
 | `LAYOUT-SKILL-EXECUTABLE-COMMAND` | `SKILL.md` includes executable command detail. | A skill entrypoint contains shell commands instead of delegating to helpers. | Move commands to approved helpers and keep `SKILL.md` as routing guidance. |
 | `LAYOUT-SKILL-NOT-THIN` | Skill entrypoint is too large or procedural. | `SKILL.md` contains long procedures, setup, or troubleshooting content. | Split detailed material into references, profiles, examples, or tools. |
 | `MAINT-ASSET-REFERENCES-SUPERSEDED-ASSET` | Asset references superseded context. | Metadata or content points at an asset marked superseded. | Retarget the reference to the stable replacement. |
+| `MAINT-CONTEXT-EXPIRED` | Context freshness metadata is expired. | `expires_at` is before today's date. | Review the asset with its owner, then update freshness metadata, status, or references. |
 | `MAINT-CONTEXT-PATH-NON-SEMANTIC` | Context path is not semantically grouped. | Context is stored under vague folders such as misc or general. | Move it under a meaningful path such as `contexts/tools/`, `contexts/domain/`, or `contexts/testing/`. |
+| `MAINT-CONTEXT-REVIEW-OVERDUE` | Context freshness review is overdue. | `last_reviewed_at + review_cycle` is before today's date. | Revalidate the asset with a human owner, then update `last_reviewed_at` or review cadence. |
 | `MAINT-ORPHANED-CONTEXT-ASSET` | Shared context has no incoming references. | A first-class context asset is not used by skills or other assets. | Link it from consumers, archive it, or remove it after review. |
 | `MAINT-REFERENCE-DEPRECATED-ASSET` | Reference targets deprecated context. | Metadata dependency resolves to a deprecated asset. | Point dependents at a stable asset or finish the migration. |
 | `MAINT-REPEATED-CODE-BLOCK` | Duplicate code block appears across assets. | Copy-pasted examples or procedures repeat in multiple files. | Extract shared guidance or consolidate the repeated block. |
@@ -117,6 +122,9 @@ The identifiers below are part of the current scan output. The current implement
 | `SUPPORT-UNREACHABLE-REFERENCE` | Reference is unreachable. | A skill-local reference is not referenced by the skill. | Link it from the skill or move/remove it. |
 | `META-CATALOG-DIAGNOSTIC` | Catalog diagnostic was promoted to a scan finding. | Catalog validation emitted a lower-level diagnostic. | Fix the original catalog diagnostic shown in the finding evidence. |
 | `META-INACTIVE-DEPENDENCY` | Metadata points to an inactive asset. | A dependency targets a deprecated or archived asset. | Retarget the dependency to a stable asset or update asset status intentionally. |
+| `META-INVALID-EXPIRES-AT` | Freshness expiration date is invalid. | `expires_at` is present but is not a real `YYYY-MM-DD` date. | Replace it with a valid ISO date or remove the field until reviewed. |
+| `META-INVALID-LAST-REVIEWED-AT` | Freshness review date is invalid. | `last_reviewed_at` is present but is not a real `YYYY-MM-DD` date. | Replace it with a valid ISO date or remove the field until reviewed. |
+| `META-INVALID-REVIEW-CYCLE` | Freshness review cycle is unsupported. | `review_cycle` is present but is not a supported day duration. | Use a duration such as `P90D` or `P180D`. |
 | `META-INVALID-STATUS` | Metadata status is invalid. | An asset declares an unsupported status value. | Replace it with a supported lifecycle status. |
 | `META-MISSING-ID` | Metadata is missing an asset ID. | A shared context asset has no stable `id`. | Add an `id` metadata field. |
 | `META-MISSING-OWNER` | Metadata is missing an owner. | An asset has no owner metadata. | Add an `owner` metadata field. |

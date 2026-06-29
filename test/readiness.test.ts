@@ -188,6 +188,35 @@ test("readiness passes workflow context closure for skill without requires edges
   assert.equal(check?.status, "pass");
 });
 
+test("readiness warns on freshness findings without failing readiness", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "contexts", "testing"), { recursive: true });
+  await writeFile(
+    path.join(root, "contexts", "testing", "workflow.md"),
+    `---
+id: testing.workflow
+owner: docs
+expires_at: 2000-01-01
+---
+
+# Workflow Context
+`,
+  );
+
+  const report = await readiness(root);
+  const check = report.checks.find(
+    (candidate) => candidate.id === "assets.freshness",
+  );
+
+  assert.equal(check?.status, "warn");
+  assert.match(check?.summary ?? "", /freshness finding/);
+  assert.equal(
+    report.findings?.some((finding) => finding.id === "MAINT-CONTEXT-EXPIRED"),
+    true,
+  );
+  assert.notEqual(report.level, "not_ready");
+});
+
 test("readiness passes workflow optional context when none is declared", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", {

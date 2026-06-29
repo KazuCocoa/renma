@@ -1,6 +1,12 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import type { Catalog, CatalogEntry, Dependency } from "./model.js";
+import {
+  addDaysIsoDate,
+  isIsoDate,
+  parseDayDuration,
+  todayIsoDate,
+} from "./freshness.js";
 import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import type {
   Evidence,
@@ -238,9 +244,102 @@ function catalogDeclaredReferenceGovernanceFindings(
       catalog.dependencies,
       resolver,
     ),
+    ...freshnessGovernanceFindings(catalog.entries),
   ];
 
   return findings;
+}
+
+function freshnessGovernanceFindings(
+  entries: CatalogEntry[],
+  today = todayIsoDate(),
+): Finding[] {
+  return entries
+    .filter((entry) => entry.kind === "context" || entry.kind === "skill")
+    .flatMap((entry) => [
+      ...expiredAssetFindings(entry, today),
+      ...reviewOverdueAssetFindings(entry, today),
+    ]);
+}
+
+function expiredAssetFindings(entry: CatalogEntry, today: string): Finding[] {
+  const expiresAt = entry.metadata.expiresAt;
+  if (!expiresAt || !isIsoDate(expiresAt) || expiresAt >= today) return [];
+
+  return [
+    {
+      id: "MAINT-CONTEXT-EXPIRED",
+      title: "Context freshness metadata is expired",
+      category: "maintenance",
+      severity: "medium",
+      confidence: "high",
+      evidence: metadataFieldFindingEvidence(
+        entry,
+        "expires_at",
+        `expires_at: ${expiresAt}`,
+      ),
+      whyItMatters:
+        "Freshness metadata is a human review contract. Expired assets may contain guidance that has not been intentionally revalidated for current use.",
+      remediation:
+        "Review the asset with a human owner, then update expires_at, last_reviewed_at, review_cycle, status, or dependent references as appropriate.",
+      constraints: [
+        "Do not infer freshness from file modification time.",
+        "Do not introduce runtime context selection.",
+        "Do not create prompt packages.",
+      ],
+      verificationSteps: [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Confirm the freshness metadata reflects human review.",
+      ],
+      llmHint: `Review ${entry.sourcePath} for stale assumptions, then update explicit freshness metadata only after human review.`,
+    },
+  ];
+}
+
+function reviewOverdueAssetFindings(
+  entry: CatalogEntry,
+  today: string,
+): Finding[] {
+  const lastReviewedAt = entry.metadata.lastReviewedAt;
+  const reviewCycle = entry.metadata.reviewCycle;
+  if (!lastReviewedAt || !reviewCycle) return [];
+  if (!isIsoDate(lastReviewedAt)) return [];
+  const cycleDays = parseDayDuration(reviewCycle);
+  if (cycleDays === undefined) return [];
+
+  const dueAt = addDaysIsoDate(lastReviewedAt, cycleDays);
+  if (dueAt >= today) return [];
+
+  return [
+    {
+      id: "MAINT-CONTEXT-REVIEW-OVERDUE",
+      title: "Context freshness review is overdue",
+      category: "maintenance",
+      severity: "medium",
+      confidence: "high",
+      evidence: metadataFieldFindingEvidence(
+        entry,
+        "last_reviewed_at",
+        `last_reviewed_at: ${lastReviewedAt}; review_cycle: ${reviewCycle}`,
+      ),
+      whyItMatters:
+        "Review cycles make human freshness expectations explicit. Overdue assets may no longer match current product, policy, or workflow behavior.",
+      remediation:
+        "Review the asset with a human owner, then update last_reviewed_at or review_cycle if the guidance is still current.",
+      constraints: [
+        "Do not infer freshness from Git history or file modification time.",
+        "Do not introduce runtime context selection.",
+        "Do not create prompt packages.",
+      ],
+      verificationSteps: [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Confirm the next review date is not overdue.",
+      ],
+      llmHint: `The next review date for ${entry.sourcePath} was ${dueAt}. Revalidate the asset before updating freshness metadata.`,
+    },
+  ];
 }
 
 function duplicateAssetIdFindings(entries: CatalogEntry[]): Finding[] {
