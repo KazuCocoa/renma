@@ -294,14 +294,10 @@ AGENTS.md
 README.md
 context/**/*.md
 contexts/**/*.md
-skills/**/profiles/**/*.md
-skills/**/references/**/*.md
-skills/**/examples/**/*.md
-skills/**/scripts/**/*
 tools/**/*
 ```
 
-Renma also understands skill-local support directories such as `profiles/`, `references/`, and `examples/`. Shared knowledge that is reused across skills should usually move into `contexts/` so it can have its own owner, lifecycle, dependencies, and review history.
+Renma can still discover legacy skill-local support files for compatibility, but canonical reusable knowledge belongs in `contexts/` and helper implementations belong in `tools/`. Shared knowledge that is reused across skills should usually move into `contexts/` so it can have its own owner, lifecycle, dependencies, and review history.
 
 ## Configuration
 
@@ -484,7 +480,7 @@ metadata such as `allowed_data`, `network_allowed`, `external_upload_allowed`,
 `secrets_allowed`, and `requires_human_approval`; reports contradictory or
 violated policy; flags sensitive file and secret-material instructions; and
 detects external uploads, bulk sharing, cloud upload, overbroad context
-collection, and no-redaction instructions.
+collection, and instructions that disable or discourage redaction.
 
 Security diagnostics v3 also enforces approved destination allowlists such as
 `approved_network_destinations` for URL and domain-like network instructions.
