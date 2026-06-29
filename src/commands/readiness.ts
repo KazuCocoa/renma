@@ -1,4 +1,5 @@
 import { graph, type GraphEdge, type GraphReport } from "./graph.js";
+import { DIAGNOSTIC_IDS } from "../diagnostic-ids.js";
 import { scan } from "../scanner.js";
 import type { ConfigOverrides } from "../config.js";
 import type { Diagnostic, Finding } from "../types.js";
@@ -6,21 +7,21 @@ import type { Diagnostic, Finding } from "../types.js";
 export type ReadinessFormat = "json" | "markdown";
 
 const MARKDOWN_FINDINGS_LIMIT = 50;
-const WORKFLOW_CLARITY_FINDING_IDS = new Set([
-  "QUAL-MISSING-DESCRIPTION",
-  "QUAL-SHORT-DESCRIPTION",
-  "QUAL-MISSING-NEGATIVE-ROUTING",
-  "QUAL-MISSING-ROUTING-CLARITY",
-  "QUAL-MISSING-EXAMPLES",
-  "QUAL-MISSING-PREFLIGHT",
-  "QUAL-MISSING-VERIFICATION",
-  "QUAL-LOW-HEADING-DENSITY",
+const WORKFLOW_CLARITY_FINDING_IDS = new Set<string>([
+  DIAGNOSTIC_IDS.QUAL_MISSING_DESCRIPTION,
+  DIAGNOSTIC_IDS.QUAL_SHORT_DESCRIPTION,
+  DIAGNOSTIC_IDS.QUAL_MISSING_NEGATIVE_ROUTING,
+  DIAGNOSTIC_IDS.QUAL_MISSING_ROUTING_CLARITY,
+  DIAGNOSTIC_IDS.QUAL_MISSING_EXAMPLES,
+  DIAGNOSTIC_IDS.QUAL_MISSING_PREFLIGHT,
+  DIAGNOSTIC_IDS.QUAL_MISSING_VERIFICATION,
+  DIAGNOSTIC_IDS.QUAL_LOW_HEADING_DENSITY,
 ]);
-const WORKFLOW_REQUIRED_INPUTS_FINDING_IDS = new Set([
-  "QUAL-MISSING-REQUIRED-INPUTS",
+const WORKFLOW_REQUIRED_INPUTS_FINDING_IDS = new Set<string>([
+  DIAGNOSTIC_IDS.QUAL_MISSING_REQUIRED_INPUTS,
 ]);
-const WORKFLOW_COMPLETION_CRITERIA_FINDING_IDS = new Set([
-  "QUAL-MISSING-COMPLETION-CRITERIA",
+const WORKFLOW_COMPLETION_CRITERIA_FINDING_IDS = new Set<string>([
+  DIAGNOSTIC_IDS.QUAL_MISSING_COMPLETION_CRITERIA,
 ]);
 export type ReadinessLevel = "ready" | "needs_attention" | "not_ready";
 export type ReadinessCheckStatus = "pass" | "warn" | "fail";
@@ -146,7 +147,10 @@ export function buildReadinessReport(
       "layout.skills_thin",
       "Thin skill entrypoints",
       findings,
-      ["LAYOUT-SKILL-NOT-THIN", "LAYOUT-SKILL-EXECUTABLE-COMMAND"],
+      [
+        DIAGNOSTIC_IDS.LAYOUT_SKILL_NOT_THIN,
+        DIAGNOSTIC_IDS.LAYOUT_SKILL_EXECUTABLE_COMMAND,
+      ],
       "warn",
       "All skill entrypoints are thin routers.",
     ),
@@ -154,7 +158,7 @@ export function buildReadinessReport(
       "layout.disallowed_skill_assets",
       "Disallowed skill-local assets",
       findings,
-      ["LAYOUT-DISALLOWED-SKILL-ASSET"],
+      [DIAGNOSTIC_IDS.LAYOUT_DISALLOWED_SKILL_ASSET],
       "fail",
       "No canonical references, profiles, examples, or scripts live under skills/**.",
     ),
@@ -162,7 +166,10 @@ export function buildReadinessReport(
       "layout.context_root",
       "Canonical context root",
       findings,
-      ["LAYOUT-CONTEXT-LEGACY-ROOT", "LAYOUT-CONTEXT-REFERENCE-NON_CANONICAL"],
+      [
+        DIAGNOSTIC_IDS.LAYOUT_CONTEXT_LEGACY_ROOT,
+        DIAGNOSTIC_IDS.LAYOUT_CONTEXT_REFERENCE_NON_CANONICAL,
+      ],
       "warn",
       "Context assets and declared context paths use canonical roots.",
     ),
@@ -170,7 +177,7 @@ export function buildReadinessReport(
       "layout.helper_root",
       "Canonical helper root",
       findings,
-      ["LAYOUT-HELPER-NON_TOOLS"],
+      [DIAGNOSTIC_IDS.LAYOUT_HELPER_NON_TOOLS],
       "fail",
       "Helper assets live under tools/**.",
     ),
@@ -179,9 +186,9 @@ export function buildReadinessReport(
       "Helper command paths",
       findings,
       [
-        "PATH-HELPER-COMMAND-SKILL-SCRIPTS",
-        "PATH-HELPER-COMMAND-NON_TOOLS",
-        "PATH-HELPER-COMMAND-UNRESOLVED",
+        DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_SKILL_SCRIPTS,
+        DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_NON_TOOLS,
+        DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_UNRESOLVED,
       ],
       "fail",
       "Markdown helper commands resolve to tools/**.",
@@ -190,7 +197,7 @@ export function buildReadinessReport(
       "docs.layout_consistency",
       "Layout documentation consistency",
       findings,
-      ["DOCS-LAYOUT-INCONSISTENT"],
+      [DIAGNOSTIC_IDS.DOCS_LAYOUT_INCONSISTENT],
       "warn",
       "Repository docs describe the strict three-root layout.",
     ),
@@ -796,14 +803,15 @@ function lifecycleCheck(nodes: GraphReport["nodes"]): ReadinessCheck {
 }
 
 function freshnessCheck(findings: Finding[]): ReadinessCheck {
+  const freshnessFindingIds: string[] = [
+    DIAGNOSTIC_IDS.MAINT_ASSET_EXPIRED,
+    DIAGNOSTIC_IDS.MAINT_ASSET_REVIEW_OVERDUE,
+    DIAGNOSTIC_IDS.META_INVALID_LAST_REVIEWED_AT,
+    DIAGNOSTIC_IDS.META_INVALID_EXPIRES_AT,
+    DIAGNOSTIC_IDS.META_INVALID_REVIEW_CYCLE,
+  ];
   const matched = findings.filter((finding) =>
-    [
-      "MAINT-ASSET-EXPIRED",
-      "MAINT-ASSET-REVIEW-OVERDUE",
-      "META-INVALID-LAST-REVIEWED-AT",
-      "META-INVALID-EXPIRES-AT",
-      "META-INVALID-REVIEW-CYCLE",
-    ].includes(finding.id),
+    freshnessFindingIds.includes(finding.id),
   );
 
   if (matched.length === 0) {

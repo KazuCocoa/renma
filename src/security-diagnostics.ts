@@ -1,9 +1,11 @@
+import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
+import type { DiagnosticId } from "./diagnostic-ids.js";
 import type { Artifact, Finding, SecurityConfig } from "./types.js";
 
 type SecurityCategory = "safety";
 
 type RuleMetadata = {
-  id: string;
+  id: DiagnosticId;
   category: SecurityCategory;
   title: string;
   whyItMatters: string;
@@ -47,7 +49,7 @@ type NetworkDestination = {
 
 const RULES = {
   missingPolicyMetadata: {
-    id: "SEC-MISSING-POLICY-METADATA",
+    id: DIAGNOSTIC_IDS.SEC_MISSING_POLICY_METADATA,
     category: "safety",
     title: "Security-sensitive instructions are missing policy metadata",
     whyItMatters:
@@ -69,7 +71,7 @@ const RULES = {
     confidence: "medium",
   },
   policyContradiction: {
-    id: "SEC-POLICY-CONTRADICTION",
+    id: DIAGNOSTIC_IDS.SEC_POLICY_CONTRADICTION,
     category: "safety",
     title: "Security policy fields contradict each other",
     whyItMatters:
@@ -89,7 +91,7 @@ const RULES = {
     confidence: "high",
   },
   bodyPolicyContradiction: {
-    id: "SEC-BODY-POLICY-CONTRADICTION",
+    id: DIAGNOSTIC_IDS.SEC_BODY_POLICY_CONTRADICTION,
     category: "safety",
     title: "Security policy metadata contradicts the instruction body",
     whyItMatters:
@@ -109,7 +111,7 @@ const RULES = {
     confidence: "high",
   },
   policyProfileNotFound: {
-    id: "SEC-POLICY-PROFILE-NOT-FOUND",
+    id: DIAGNOSTIC_IDS.SEC_POLICY_PROFILE_NOT_FOUND,
     category: "safety",
     title: "Referenced security profile is not configured",
     whyItMatters:
@@ -129,7 +131,7 @@ const RULES = {
     confidence: "high",
   },
   policyProfileCycle: {
-    id: "SEC-POLICY-PROFILE-CYCLE",
+    id: DIAGNOSTIC_IDS.SEC_POLICY_PROFILE_CYCLE,
     category: "safety",
     title: "Security profile inheritance cycle detected",
     whyItMatters:
@@ -149,7 +151,7 @@ const RULES = {
     confidence: "high",
   },
   policyOverrideContradiction: {
-    id: "SEC-POLICY-OVERRIDE-CONTRADICTION",
+    id: DIAGNOSTIC_IDS.SEC_POLICY_OVERRIDE_CONTRADICTION,
     category: "safety",
     title: "Security profile conflicts with stricter artifact policy",
     whyItMatters:
@@ -169,7 +171,7 @@ const RULES = {
     confidence: "high",
   },
   forbiddenInputInstruction: {
-    id: "SEC-FORBIDDEN-INPUT-INSTRUCTION",
+    id: DIAGNOSTIC_IDS.SEC_FORBIDDEN_INPUT_INSTRUCTION,
     category: "safety",
     title: "Instruction requests data forbidden by security profile",
     whyItMatters:
@@ -189,7 +191,7 @@ const RULES = {
     confidence: "high",
   },
   instructionViolatesPolicy: {
-    id: "SEC-INSTRUCTION-VIOLATES-POLICY",
+    id: DIAGNOSTIC_IDS.SEC_INSTRUCTION_VIOLATES_POLICY,
     category: "safety",
     title: "Instruction appears to violate declared security policy",
     whyItMatters:
@@ -209,7 +211,7 @@ const RULES = {
     confidence: "high",
   },
   missingHumanApprovalGuard: {
-    id: "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+    id: DIAGNOSTIC_IDS.SEC_MISSING_HUMAN_APPROVAL_GUARD,
     category: "safety",
     title: "Sensitive external action lacks a human approval guard",
     whyItMatters:
@@ -229,7 +231,7 @@ const RULES = {
     confidence: "medium",
   },
   sensitiveFileReference: {
-    id: "SEC-SENSITIVE-FILE-REFERENCE",
+    id: DIAGNOSTIC_IDS.SEC_SENSITIVE_FILE_REFERENCE,
     category: "safety",
     title: "Instruction references sensitive file material",
     whyItMatters:
@@ -249,7 +251,7 @@ const RULES = {
     confidence: "high",
   },
   secretMaterialInstruction: {
-    id: "SEC-SECRET-MATERIAL-INSTRUCTION",
+    id: DIAGNOSTIC_IDS.SEC_SECRET_MATERIAL_INSTRUCTION,
     category: "safety",
     title: "Instruction may expose secret material",
     whyItMatters:
@@ -269,7 +271,7 @@ const RULES = {
     confidence: "high",
   },
   externalUploadInstruction: {
-    id: "SEC-EXTERNAL-UPLOAD-INSTRUCTION",
+    id: DIAGNOSTIC_IDS.SEC_EXTERNAL_UPLOAD_INSTRUCTION,
     category: "safety",
     title: "Instruction sends repository data to an external destination",
     whyItMatters:
@@ -289,7 +291,7 @@ const RULES = {
     confidence: "high",
   },
   unapprovedNetworkDestination: {
-    id: "SEC-UNAPPROVED-NETWORK-DESTINATION",
+    id: DIAGNOSTIC_IDS.SEC_UNAPPROVED_NETWORK_DESTINATION,
     category: "safety",
     title: "Instruction references an unapproved network destination",
     whyItMatters:
@@ -309,7 +311,7 @@ const RULES = {
     confidence: "high",
   },
   unapprovedUploadDestination: {
-    id: "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+    id: DIAGNOSTIC_IDS.SEC_UNAPPROVED_UPLOAD_DESTINATION,
     category: "safety",
     title: "Instruction references an unapproved upload destination",
     whyItMatters:
@@ -329,7 +331,7 @@ const RULES = {
     confidence: "high",
   },
   bulkDataSharingInstruction: {
-    id: "SEC-BULK-DATA-SHARING-INSTRUCTION",
+    id: DIAGNOSTIC_IDS.SEC_BULK_DATA_SHARING_INSTRUCTION,
     category: "safety",
     title: "Instruction asks to share broad repository or context data",
     whyItMatters:
@@ -349,7 +351,7 @@ const RULES = {
     confidence: "medium",
   },
   cloudUploadInstruction: {
-    id: "SEC-CLOUD-UPLOAD-INSTRUCTION",
+    id: DIAGNOSTIC_IDS.SEC_CLOUD_UPLOAD_INSTRUCTION,
     category: "safety",
     title: "Instruction uploads data to cloud storage or cloud services",
     whyItMatters:
@@ -369,7 +371,7 @@ const RULES = {
     confidence: "medium",
   },
   overbroadContextInstruction: {
-    id: "SEC-OVERBROAD-CONTEXT-INSTRUCTION",
+    id: DIAGNOSTIC_IDS.SEC_OVERBROAD_CONTEXT_INSTRUCTION,
     category: "safety",
     title: "Instruction requests overbroad context collection",
     whyItMatters:
@@ -389,7 +391,7 @@ const RULES = {
     confidence: "medium",
   },
   noRedactionInstruction: {
-    id: "SEC-NO-REDACTION-INSTRUCTION",
+    id: DIAGNOSTIC_IDS.SEC_NO_REDACTION_INSTRUCTION,
     category: "safety",
     title: "Instruction discourages redaction of sensitive data",
     whyItMatters:
@@ -409,7 +411,7 @@ const RULES = {
     confidence: "high",
   },
   unpinnedRemoteScript: {
-    id: "SEC-UNPINNED-REMOTE-SCRIPT",
+    id: DIAGNOSTIC_IDS.SEC_UNPINNED_REMOTE_SCRIPT,
     category: "safety",
     title: "Remote install script is not pinned",
     whyItMatters:
@@ -429,7 +431,7 @@ const RULES = {
     confidence: "high",
   },
   unpinnedDependencyInstall: {
-    id: "SEC-UNPINNED-DEPENDENCY-INSTALL",
+    id: DIAGNOSTIC_IDS.SEC_UNPINNED_DEPENDENCY_INSTALL,
     category: "safety",
     title: "Dependency install is not pinned",
     whyItMatters:
@@ -449,7 +451,7 @@ const RULES = {
     confidence: "medium",
   },
   privilegedCommandWithoutGuard: {
-    id: "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+    id: DIAGNOSTIC_IDS.SEC_PRIVILEGED_COMMAND_WITHOUT_GUARD,
     category: "safety",
     title: "Privileged command lacks a review guard",
     whyItMatters:
@@ -469,7 +471,7 @@ const RULES = {
     confidence: "medium",
   },
   dangerousToolInstruction: {
-    id: "SEC-DANGEROUS-TOOL-INSTRUCTION",
+    id: DIAGNOSTIC_IDS.SEC_DANGEROUS_TOOL_INSTRUCTION,
     category: "safety",
     title: "Instruction uses a disallowed tool or command",
     whyItMatters:
@@ -489,7 +491,7 @@ const RULES = {
     confidence: "high",
   },
   credentialInCommandArg: {
-    id: "SEC-CREDENTIAL-IN-COMMAND-ARG",
+    id: DIAGNOSTIC_IDS.SEC_CREDENTIAL_IN_COMMAND_ARG,
     category: "safety",
     title: "Command includes credential material in arguments",
     whyItMatters:
@@ -509,7 +511,7 @@ const RULES = {
     confidence: "high",
   },
   predictableTempPath: {
-    id: "SEC-PREDICTABLE-TEMP-PATH",
+    id: DIAGNOSTIC_IDS.SEC_PREDICTABLE_TEMP_PATH,
     category: "safety",
     title: "Instruction uses predictable temporary path for sensitive material",
     whyItMatters:

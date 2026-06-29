@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 
+import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import type { Finding, ParsedDocument } from "./types.js";
 
 type RepeatKind =
@@ -11,11 +12,11 @@ type RepeatKind =
   | "token_shingle";
 
 type RepeatedContextFindingId =
-  | "MAINT-REPEATED-SECTION"
-  | "MAINT-REPEATED-HEADING"
-  | "MAINT-REPEATED-CODE-BLOCK"
-  | "MAINT-REPEATED-LINK"
-  | "MAINT-REPEATED-CONTEXT-PATTERN";
+  | typeof DIAGNOSTIC_IDS.MAINT_REPEATED_SECTION
+  | typeof DIAGNOSTIC_IDS.MAINT_REPEATED_HEADING
+  | typeof DIAGNOSTIC_IDS.MAINT_REPEATED_CODE_BLOCK
+  | typeof DIAGNOSTIC_IDS.MAINT_REPEATED_LINK
+  | typeof DIAGNOSTIC_IDS.MAINT_REPEATED_CONTEXT_PATTERN;
 
 interface Occurrence {
   path: string;
@@ -32,11 +33,11 @@ interface RepeatGroup {
 }
 
 const FINDING_CAPS: Record<RepeatedContextFindingId, number> = {
-  "MAINT-REPEATED-SECTION": 10,
-  "MAINT-REPEATED-HEADING": 10,
-  "MAINT-REPEATED-CODE-BLOCK": 10,
-  "MAINT-REPEATED-LINK": 10,
-  "MAINT-REPEATED-CONTEXT-PATTERN": 10,
+  [DIAGNOSTIC_IDS.MAINT_REPEATED_SECTION]: 10,
+  [DIAGNOSTIC_IDS.MAINT_REPEATED_HEADING]: 10,
+  [DIAGNOSTIC_IDS.MAINT_REPEATED_CODE_BLOCK]: 10,
+  [DIAGNOSTIC_IDS.MAINT_REPEATED_LINK]: 10,
+  [DIAGNOSTIC_IDS.MAINT_REPEATED_CONTEXT_PATTERN]: 10,
 };
 const SHINGLE_SIZE = 24;
 const TOKEN_SHINGLE_NEARBY_LINE_WINDOW = 8;
@@ -93,35 +94,35 @@ export function detectRepeatedContextPatterns(
 ): Finding[] {
   const findings = [
     ...groupsToFindings(
-      "MAINT-REPEATED-SECTION",
+      DIAGNOSTIC_IDS.MAINT_REPEATED_SECTION,
       "Repeated section",
       "section_hash",
       collectRepeatedSections(documents),
       "Move the repeated section into an owned source-of-truth context or reference, then replace copies with explicit references where appropriate.",
     ),
     ...groupsToFindings(
-      "MAINT-REPEATED-HEADING",
+      DIAGNOSTIC_IDS.MAINT_REPEATED_HEADING,
       "Repeated heading",
       "heading",
       collectRepeatedHeadings(documents),
       "Review whether these similarly named sections are intentional navigation or a sign that knowledge should be consolidated under one owned context.",
     ),
     ...groupsToFindings(
-      "MAINT-REPEATED-CODE-BLOCK",
+      DIAGNOSTIC_IDS.MAINT_REPEATED_CODE_BLOCK,
       "Repeated code block",
       "code_block",
       collectRepeatedCodeBlocks(documents),
       "Move the repeated command or code sample into one maintained reference, then link to it from dependent skills or docs.",
     ),
     ...groupsToFindings(
-      "MAINT-REPEATED-LINK",
+      DIAGNOSTIC_IDS.MAINT_REPEATED_LINK,
       "Repeated link target",
       "link_target",
       collectRepeatedLinks(documents),
       "Check whether the repeated link target should be declared as a shared reference or source-of-truth dependency.",
     ),
     ...groupsToFindings(
-      "MAINT-REPEATED-CONTEXT-PATTERN",
+      DIAGNOSTIC_IDS.MAINT_REPEATED_CONTEXT_PATTERN,
       "Repeated context pattern",
       "token_shingle",
       collectRepeatedTokenShingles(documents),
