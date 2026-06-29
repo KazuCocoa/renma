@@ -89,6 +89,13 @@ export function formatCatalogMarkdown(result: CatalogResult): string {
     lines.push(`- Hash: ${entry.contentHash}`);
     lines.push(`- Owner: ${entry.metadata.owner ?? "(none)"}`);
     lines.push(`- Status: ${entry.metadata.status ?? "(unspecified)"}`);
+    lines.push(
+      `- Last reviewed: ${entry.metadata.lastReviewedAt ?? "(unspecified)"}`,
+    );
+    lines.push(
+      `- Review cycle: ${entry.metadata.reviewCycle ?? "(unspecified)"}`,
+    );
+    lines.push(`- Expires: ${entry.metadata.expiresAt ?? "(unspecified)"}`);
     lines.push(`- Tags: ${list(entry.metadata.tags)}`);
     lines.push(
       `- Dependencies: ${dependencySummary(entry, result.catalog.dependencies)}`,

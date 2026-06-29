@@ -357,6 +357,9 @@ Renma works best when reusable assets declare lightweight metadata in front matt
 id: context.testing.boundary-value-analysis
 owner: qa-platform
 status: stable
+last_reviewed_at: 2026-06-28
+review_cycle: P90D
+expires_at: 2026-12-31
 requires_context:
   - context.testing.negative-testing
 ---
@@ -371,6 +374,9 @@ Useful metadata includes:
 - `owner`: Team, person, or group responsible for the asset
 - `status`: Lifecycle state such as `experimental`, `stable`, `deprecated`, or `archived`
 - `version`: Asset version when the repository uses explicit versioning
+- `last_reviewed_at`: ISO date for the last human review, such as `2026-06-28`
+- `review_cycle`: ISO 8601 day duration for expected review cadence, such as `P90D`
+- `expires_at`: ISO date when the asset should be treated as expired
 - `tags`: Search and grouping labels
 - `requires_context`: Context assets this asset normally depends on
 - `optional_context`: Context assets useful only in some cases
@@ -388,6 +394,9 @@ title: Boundary Value Analysis
 owner: qa-platform
 status: stable
 version: 1.0.0
+last_reviewed_at: 2026-06-28
+review_cycle: P180D
+expires_at: 2026-12-31
 tags:
   - testing
   - spec-review

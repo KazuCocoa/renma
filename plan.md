@@ -241,6 +241,9 @@ title: Boundary Value Analysis
 owner: qa-platform
 status: stable
 version: 1.0.0
+last_reviewed_at: 2026-06-28
+review_cycle: P180D
+expires_at: 2026-12-31
 tags:
   - testing
   - qa
@@ -259,7 +262,7 @@ superseded_by:
 ---
 ```
 
-The current parser supports YAML-style block lists for selected deterministic metadata fields. Supported block-list fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `conflicts`, and `superseded_by`; arbitrary nested maps are not metadata.
+The current parser supports YAML-style block lists for selected deterministic metadata fields. Supported block-list fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `conflicts`, and `superseded_by`; arbitrary nested maps are not metadata. Freshness metadata is scalar and explicit: `last_reviewed_at` and `expires_at` use ISO dates, and `review_cycle` currently supports day-based ISO 8601 durations such as `P90D` and `P180D`.
 
 Supported status values:
 
@@ -294,7 +297,7 @@ Validation should cover:
 - Unknown dependencies
 - Dependencies on deprecated or archived context
 - Conflicts declared but not visible in the graph
-- Stale or expired context when freshness fields are introduced
+- Stale or expired context from explicit freshness metadata
 
 ## QA And Testing Focus
 
@@ -329,7 +332,7 @@ Renma keeps those assets clean, owned, validated, deduplicated, and easy for age
 Renma's shipped baseline is now grouped around:
 
 - Repository discovery for `contexts/**/*.md`, `context/**/*.md`, and skill-adjacent `references/`, `profiles/`, and `examples/`.
-- Deterministic scan and catalog diagnostics for metadata IDs, owners, tags, paths, references, dependencies, manifest shape, layout policy, duplicate context, repeated context, and security policy issues.
+- Deterministic scan and catalog diagnostics for metadata IDs, owners, tags, freshness, paths, references, dependencies, manifest shape, layout policy, duplicate context, repeated context, and security policy issues.
 - CLI-first views for `scan`, `catalog`, `ownership`, `graph`, focused graph views, `readiness`, `repeated-context`, `diff`, `ci-report`, `inspect`, `scaffold`, and `suggest-semantic-split`.
 - LLM-actionable output without an LLM runtime dependency: Markdown and JSON diagnostics provide stable IDs, severity, evidence, and repair guidance.
 - Security diagnostics v1 for agent-facing network, upload, and secret-material policy; approved network destinations; approved upload domains; command-risk patterns; profile inheritance and cycles; and policy contradictions.

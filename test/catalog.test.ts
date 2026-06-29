@@ -45,6 +45,85 @@ conflicts: android
   assert.deepEqual(result.diagnostics, []);
 });
 
+test("parseAssetMetadata parses freshness metadata", () => {
+  const document = parseDocument(
+    artifact(
+      "contexts/testing/boundary-value-analysis.md",
+      "context",
+      `---
+id: context.testing.boundary-value-analysis
+owner: qa-platform
+last_reviewed_at: 2026-06-28
+review_cycle: P90D
+expires_at: 2026-12-31
+---
+# Boundary Value Analysis
+`,
+    ),
+  );
+
+  const result = parseAssetMetadata(document);
+
+  assert.equal(result.metadata.lastReviewedAt, "2026-06-28");
+  assert.equal(result.metadata.reviewCycle, "P90D");
+  assert.equal(result.metadata.expiresAt, "2026-12-31");
+  assert.deepEqual(result.diagnostics, []);
+});
+
+test("parseAssetMetadata reports invalid freshness date evidence", () => {
+  const document = parseDocument(
+    artifact(
+      "contexts/testing/boundary-value-analysis.md",
+      "context",
+      `---
+id: context.testing.boundary-value-analysis
+owner: qa-platform
+last_reviewed_at: 2026-02-31
+expires_at: tomorrow
+---
+# Boundary Value Analysis
+`,
+    ),
+  );
+
+  const result = parseAssetMetadata(document);
+
+  assert.equal(result.diagnostics.length, 2);
+  const lastReviewedAt = result.diagnostics.find((diagnostic) =>
+    diagnostic.message.includes("last_reviewed_at"),
+  );
+  assert.equal(lastReviewedAt?.evidence?.startLine, 4);
+  assert.match(lastReviewedAt?.evidence?.snippet ?? "", /2026-02-31/);
+  const expiresAt = result.diagnostics.find((diagnostic) =>
+    diagnostic.message.includes("expires_at"),
+  );
+  assert.equal(expiresAt?.evidence?.startLine, 5);
+  assert.match(expiresAt?.evidence?.snippet ?? "", /tomorrow/);
+});
+
+test("parseAssetMetadata reports invalid review_cycle evidence", () => {
+  const document = parseDocument(
+    artifact(
+      "contexts/testing/boundary-value-analysis.md",
+      "context",
+      `---
+id: context.testing.boundary-value-analysis
+owner: qa-platform
+review_cycle: P3M
+---
+# Boundary Value Analysis
+`,
+    ),
+  );
+
+  const result = parseAssetMetadata(document);
+
+  assert.equal(result.diagnostics.length, 1);
+  assert.match(result.diagnostics[0]?.message ?? "", /review_cycle/);
+  assert.equal(result.diagnostics[0]?.evidence?.startLine, 4);
+  assert.match(result.diagnostics[0]?.evidence?.snippet ?? "", /P3M/);
+});
+
 test("parseAssetMetadata captures superseded_by references", () => {
   const document = parseDocument(
     artifact(

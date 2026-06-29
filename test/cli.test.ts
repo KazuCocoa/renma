@@ -570,6 +570,9 @@ test("CLI prints catalog JSON and markdown", async () => {
       "id: demo",
       "owner: qa-platform",
       "status: stable",
+      "last_reviewed_at: 2026-06-28",
+      "review_cycle: P90D",
+      "expires_at: 2026-12-31",
       "tags: appium, android",
       "requires_context: demo.guide, testing.boundary-value-analysis",
       "---",
@@ -591,7 +594,16 @@ test("CLI prints catalog JSON and markdown", async () => {
   assert.equal(json.code, 0);
   const report = JSON.parse(json.stdout) as {
     catalog: {
-      assets: Array<{ id: string; kind: string; contentHash: string }>;
+      assets: Array<{
+        id: string;
+        kind: string;
+        contentHash: string;
+        metadata: {
+          lastReviewedAt?: string;
+          reviewCycle?: string;
+          expiresAt?: string;
+        };
+      }>;
       dependencies: Array<{ from: string; to: string; kind: string }>;
     };
   };
@@ -604,6 +616,21 @@ test("CLI prints catalog JSON and markdown", async () => {
     ["skill", "context", "reference"],
   );
   assert.match(report.catalog.assets[0]?.contentHash ?? "", /^sha256:/);
+  assert.deepEqual(report.catalog.assets[0]?.metadata, {
+    id: "demo",
+    owner: "qa-platform",
+    status: "stable",
+    lastReviewedAt: "2026-06-28",
+    reviewCycle: "P90D",
+    expiresAt: "2026-12-31",
+    tags: ["appium", "android"],
+    whenToUse: [],
+    whenNotToUse: [],
+    requiresContext: ["demo.guide", "testing.boundary-value-analysis"],
+    optionalContext: [],
+    conflicts: [],
+    supersededBy: [],
+  });
   assert.deepEqual(report.catalog.dependencies, [
     {
       from: "demo",
@@ -612,8 +639,8 @@ test("CLI prints catalog JSON and markdown", async () => {
       sourcePath: "skills/demo/SKILL.md",
       evidence: {
         path: "skills/demo/SKILL.md",
-        startLine: 6,
-        endLine: 6,
+        startLine: 9,
+        endLine: 9,
         snippet:
           "requires_context: demo.guide, testing.boundary-value-analysis",
       },
@@ -625,8 +652,8 @@ test("CLI prints catalog JSON and markdown", async () => {
       sourcePath: "skills/demo/SKILL.md",
       evidence: {
         path: "skills/demo/SKILL.md",
-        startLine: 6,
-        endLine: 6,
+        startLine: 9,
+        endLine: 9,
         snippet:
           "requires_context: demo.guide, testing.boundary-value-analysis",
       },
@@ -639,6 +666,9 @@ test("CLI prints catalog JSON and markdown", async () => {
   assert.equal(markdown.code, 0);
   assert.match(markdown.stdout, /# Renma Catalog/);
   assert.match(markdown.stdout, /### demo/);
+  assert.match(markdown.stdout, /Last reviewed: 2026-06-28/);
+  assert.match(markdown.stdout, /Review cycle: P90D/);
+  assert.match(markdown.stdout, /Expires: 2026-12-31/);
   assert.match(markdown.stdout, /Dependencies: requires:demo\.guide/);
   assert.match(markdown.stdout, /Dependents: requires:demo/);
 });

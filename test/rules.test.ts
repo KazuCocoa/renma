@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { todayIsoDate } from "../src/freshness.js";
 import { formatText } from "../src/report.js";
 import { scan } from "../src/scanner.js";
 import type { ScanResult } from "../src/types.js";
@@ -244,6 +245,83 @@ status: active
     /experimental, stable, deprecated, archived/,
   );
   assert.match(finding?.llmHint ?? "", /superseded_by/);
+});
+
+test("scan reports expired freshness metadata", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
+  await mkdir(path.join(root, "contexts", "testing"), { recursive: true });
+  await writeFile(
+    path.join(root, "contexts", "testing", "workflow.md"),
+    `---
+id: testing.workflow
+owner: qa-platform
+expires_at: 2000-01-01
+---
+
+# Workflow Context
+`,
+  );
+
+  const result = await scan(root);
+  const finding = result.findings.find(
+    (candidate) => candidate.id === "MAINT-ASSET-EXPIRED",
+  );
+
+  assert.equal(finding?.severity, "medium");
+  assert.equal(finding?.evidence.path, "contexts/testing/workflow.md");
+  assert.match(finding?.evidence.snippet ?? "", /expires_at: 2000-01-01/);
+  assert.match(finding?.remediation ?? "", /Review the asset/);
+});
+
+test("scan reports overdue freshness review cycles", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
+  await mkdir(path.join(root, "contexts", "testing"), { recursive: true });
+  await writeFile(
+    path.join(root, "contexts", "testing", "workflow.md"),
+    `---
+id: testing.workflow
+owner: qa-platform
+last_reviewed_at: 2000-01-01
+review_cycle: P90D
+---
+
+# Workflow Context
+`,
+  );
+
+  const result = await scan(root);
+  const finding = result.findings.find(
+    (candidate) => candidate.id === "MAINT-ASSET-REVIEW-OVERDUE",
+  );
+
+  assert.equal(finding?.severity, "medium");
+  assert.equal(finding?.evidence.path, "contexts/testing/workflow.md");
+  assert.match(finding?.evidence.snippet ?? "", /last_reviewed_at/);
+  assert.match(finding?.llmHint ?? "", /2000-03-31/);
+});
+
+test("scan does not report future expiration or in-cycle review metadata", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-rules-"));
+  await mkdir(path.join(root, "contexts", "testing"), { recursive: true });
+  await writeFile(
+    path.join(root, "contexts", "testing", "workflow.md"),
+    `---
+id: testing.workflow
+owner: qa-platform
+last_reviewed_at: ${todayIsoDate()}
+review_cycle: P90D
+expires_at: 2999-12-31
+---
+
+# Workflow Context
+`,
+  );
+
+  const result = await scan(root);
+  const ids = result.findings.map((finding) => finding.id);
+
+  assert.equal(ids.includes("MAINT-ASSET-EXPIRED"), false);
+  assert.equal(ids.includes("MAINT-ASSET-REVIEW-OVERDUE"), false);
 });
 
 test("scan advises when skill body context references are not declared", async () => {

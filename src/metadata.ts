@@ -1,5 +1,6 @@
 import type { AssetMetadata, AssetStatus } from "./model.js";
 import type { Diagnostic, MetadataValue, ParsedDocument } from "./types.js";
+import { isIsoDate, parseDayDuration } from "./freshness.js";
 
 const STATUSES: AssetStatus[] = [
   "experimental",
@@ -16,6 +17,13 @@ export function parseAssetMetadata(document: ParsedDocument): {
   const diagnostics: Diagnostic[] = [];
   const rawStatus = metadataText(document.metadata.status);
   const status = parseStatus(rawStatus);
+  const lastReviewedAt = optionalText(
+    metadataText(document.metadata.last_reviewed_at),
+  );
+  const reviewCycle = optionalText(
+    metadataText(document.metadata.review_cycle),
+  );
+  const expiresAt = optionalText(metadataText(document.metadata.expires_at));
   const metadata: AssetMetadata = {
     tags: listValue(document.metadata.tags),
     whenToUse: listValue(document.metadata.when_to_use),
@@ -52,10 +60,60 @@ export function parseAssetMetadata(document: ParsedDocument): {
     optionalText(metadataText(document.metadata.owner)),
   );
   assignOptional(metadata, "status", status);
+  assignOptional(metadata, "lastReviewedAt", lastReviewedAt);
+  assignOptional(metadata, "reviewCycle", reviewCycle);
+  assignOptional(metadata, "expiresAt", expiresAt);
+
+  if (lastReviewedAt !== undefined && !isIsoDate(lastReviewedAt)) {
+    diagnostics.push(
+      invalidMetadataDiagnostic(
+        document,
+        "last_reviewed_at",
+        `Invalid last_reviewed_at "${lastReviewedAt}". Expected ISO date YYYY-MM-DD.`,
+      ),
+    );
+  }
+
+  if (expiresAt !== undefined && !isIsoDate(expiresAt)) {
+    diagnostics.push(
+      invalidMetadataDiagnostic(
+        document,
+        "expires_at",
+        `Invalid expires_at "${expiresAt}". Expected ISO date YYYY-MM-DD.`,
+      ),
+    );
+  }
+
+  if (
+    reviewCycle !== undefined &&
+    parseDayDuration(reviewCycle) === undefined
+  ) {
+    diagnostics.push(
+      invalidMetadataDiagnostic(
+        document,
+        "review_cycle",
+        `Invalid review_cycle "${reviewCycle}". Expected supported ISO 8601 day duration such as P90D.`,
+      ),
+    );
+  }
 
   return {
     metadata,
     diagnostics,
+  };
+}
+
+function invalidMetadataDiagnostic(
+  document: ParsedDocument,
+  field: string,
+  message: string,
+): Diagnostic {
+  const evidence = metadataFieldEvidence(document, field);
+  return {
+    severity: "warning",
+    path: document.artifact.path,
+    message,
+    ...(evidence ? { evidence } : {}),
   };
 }
 

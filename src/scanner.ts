@@ -79,6 +79,52 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
       };
     }
 
+    const invalidLastReviewedAt = /Invalid last_reviewed_at/i.test(
+      diagnostic.message,
+    );
+    const invalidExpiresAt = /Invalid expires_at/i.test(diagnostic.message);
+    const invalidReviewCycle = /Invalid review_cycle/i.test(diagnostic.message);
+    if (invalidLastReviewedAt || invalidExpiresAt || invalidReviewCycle) {
+      return {
+        id: invalidLastReviewedAt
+          ? "META-INVALID-LAST-REVIEWED-AT"
+          : invalidExpiresAt
+            ? "META-INVALID-EXPIRES-AT"
+            : "META-INVALID-REVIEW-CYCLE",
+        title: invalidLastReviewedAt
+          ? "Freshness metadata uses an invalid last review date"
+          : invalidExpiresAt
+            ? "Freshness metadata uses an invalid expiration date"
+            : "Freshness metadata uses an unsupported review cycle",
+        category: "maintenance",
+        severity: "medium",
+        confidence: "high",
+        evidence: diagnostic.evidence ?? {
+          path,
+          startLine: 1,
+          endLine: 1,
+          snippet: diagnostic.message,
+        },
+        whyItMatters:
+          "Freshness metadata is a human review contract. Invalid dates or unsupported review cycles make deterministic freshness checks unreliable.",
+        remediation:
+          "Use ISO date values such as 2026-06-28 for last_reviewed_at and expires_at, and day-based ISO 8601 durations such as P90D for review_cycle.",
+        constraints: [
+          "Do not infer freshness from file modification time.",
+          "Do not introduce runtime context resolution.",
+          "Do not create prompt packages.",
+          "Do not silently rewrite metadata during scan.",
+        ],
+        verificationSteps: [
+          "Run renma scan.",
+          "Run renma catalog.",
+          "Confirm freshness metadata reflects human review.",
+        ],
+        llmHint:
+          "Repair only the explicit freshness metadata fields. Do not add modified_at or infer review freshness from Git history.",
+      };
+    }
+
     const missingId = /missing an id/i.test(diagnostic.message);
     const missingOwner = /missing an owner/i.test(diagnostic.message);
     const unknownDependency = /does not match a catalog entry/i.test(

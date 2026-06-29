@@ -21,6 +21,9 @@ export interface AssetMetadata {
   version?: string;
   owner?: string;
   status?: AssetStatus;
+  lastReviewedAt?: string;
+  reviewCycle?: string;
+  expiresAt?: string;
   tags: string[];
   whenToUse: string[];
   whenNotToUse: string[];
