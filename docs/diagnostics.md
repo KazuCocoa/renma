@@ -68,6 +68,26 @@ Finding identifiers are useful when you want to group, filter, document, or auto
 
 The identifiers below are part of the current scan output. The current implementation does not declare them as a permanent public API, so integrations should avoid assuming stronger stability than the project documents. If renma adopts long-term stability guarantees later, identifier changes should come with documented migrations.
 
+### Security Policy Metadata
+
+Security policy diagnostics read small metadata fields from skill and context frontmatter. If a skill or context omits both `allowed_data` and inherited policy data, Renma can emit `SEC-MISSING-POLICY-METADATA` with evidence such as `missing allowed_data policy metadata`.
+
+Supported policy metadata includes:
+
+| Field | Meaning | Related findings |
+| --- | --- | --- |
+| `allowed_data` | Declares the asset's data class or allowed data list. Inline scalar values such as `disclosed` act as the data class; list values act as explicit allowed data entries. | `SEC-MISSING-POLICY-METADATA`, `SEC-FORBIDDEN-INPUT-INSTRUCTION`, `SEC-INSTRUCTION-VIOLATES-POLICY` |
+| `network_allowed` | Declares whether the asset may perform network actions such as fetching URLs or contacting APIs. Explicit `false` blocks network instructions even when repository config has approved domains. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-BODY-POLICY-CONTRADICTION`, `SEC-UNAPPROVED-NETWORK-DESTINATION` |
+| `external_upload_allowed` | Declares whether the asset may upload, publish, submit, sync, push, or otherwise send repository data externally. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-EXTERNAL-UPLOAD-INSTRUCTION`, `SEC-UNAPPROVED-UPLOAD-DESTINATION` |
+| `secrets_allowed` | Declares whether secret material is allowed as input or content for the asset. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-SECRET-MATERIAL-INSTRUCTION`, `SEC-SENSITIVE-FILE-REFERENCE` |
+| `requires_human_approval` | Requires a nearby human approval guard before sensitive network, upload, secret-handling, or high-risk actions. `human_approval_required` is also accepted. | `SEC-MISSING-HUMAN-APPROVAL-GUARD` |
+| `approved_network_destinations` | Lists approved network destinations for URL or domain-like network instructions. `allowed_network_destinations` is also accepted. | `SEC-UNAPPROVED-NETWORK-DESTINATION` |
+| `approved_upload_destinations` | Lists approved upload destinations. `approved_upload_domains` is also accepted. Upload approvals are checked separately from general network approvals. | `SEC-UNAPPROVED-UPLOAD-DESTINATION` |
+| `forbidden_inputs` | Lists inputs the asset must not request or process, such as `secrets`, `credentials`, or `tokens`. | `SEC-FORBIDDEN-INPUT-INSTRUCTION` |
+| `security_profile` | Selects a repository security profile from `renma.config.json`. Artifact-local explicit denials remain stricter than inherited profile or repository allowances. | `SEC-POLICY-PROFILE-NOT-FOUND`, `SEC-POLICY-PROFILE-CYCLE`, `SEC-POLICY-OVERRIDE-CONTRADICTION` |
+
+The camelCase aliases used by config and some assets are also accepted, such as `allowedData`, `networkAllowed`, `externalUploadAllowed`, `secretsAllowed`, `requiresHumanApproval`, `approvedNetworkDestinations`, `approvedUploadDestinations`, `forbiddenInputs`, and `securityProfile`.
+
 | Identifier | Meaning | Typical cause | How to fix |
 | --- | --- | --- | --- |
 | `DOCS-LAYOUT-INCONSISTENT` | Documentation points at non-canonical layout. | Docs mention stale roots or skill-local support paths. | Update docs to reference canonical `skills/`, `contexts/`, and `tools/` layout. |
