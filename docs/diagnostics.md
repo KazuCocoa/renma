@@ -76,7 +76,7 @@ Supported policy metadata includes:
 
 | Field | Accepted aliases | Meaning | Related findings |
 | --- | --- | --- | --- |
-| `allowed_data` | `allowedData` | Declares the asset's allowed data entries. Scalar values such as `disclosed` are treated like a one-item list, so `allowed_data: disclosed` and `allowed_data: [disclosed]` are equivalent for asset frontmatter. | `SEC-MISSING-POLICY-METADATA`, `SEC-FORBIDDEN-INPUT-INSTRUCTION`, `SEC-INSTRUCTION-VIOLATES-POLICY` |
+| `allowed_data` | `allowedData` | Declares the asset's allowed data entries. It accepts scalar, inline list, and block list forms; `allowed_data: disclosed`, `allowed_data: [disclosed]`, and a one-item block list are equivalent. | `SEC-MISSING-POLICY-METADATA`, `SEC-FORBIDDEN-INPUT-INSTRUCTION`, `SEC-INSTRUCTION-VIOLATES-POLICY` |
 | `network_allowed` | `networkAllowed` | Declares whether the asset may perform network actions such as fetching URLs or contacting APIs. Explicit `false` blocks network instructions even when repository config has approved domains. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-BODY-POLICY-CONTRADICTION`, `SEC-UNAPPROVED-NETWORK-DESTINATION` |
 | `external_upload_allowed` | `externalUploadAllowed` | Declares whether the asset may upload, publish, submit, sync, push, or otherwise send repository data externally. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-EXTERNAL-UPLOAD-INSTRUCTION`, `SEC-UNAPPROVED-UPLOAD-DESTINATION` |
 | `secrets_allowed` | `secretsAllowed` | Declares whether secret material is allowed as input or content for the asset. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-SECRET-MATERIAL-INSTRUCTION`, `SEC-SENSITIVE-FILE-REFERENCE` |
@@ -102,7 +102,7 @@ forbidden_inputs:
   - tokens
 ```
 
-`security_profile` inherits policy values from `renma.config.json`. Security profile `allowedData` and `allowed_data` values also accept either a string or an array of strings. Profiles may still use `allowedDataClass` or `allowed_data_class` for a broad data class, but `allowedData` / `allowed_data` is the simpler shape for new config. Artifact-local explicit denials, such as `network_allowed: false` or `external_upload_allowed: false`, remain stricter than inherited profile or repository allowances. Network destination approvals and upload destination approvals are separate; approving a host for network access does not approve uploads to that host.
+`security_profile` inherits policy values from `renma.config.json`. Security profile list fields such as `allowedData` / `allowed_data`, `forbiddenInputs` / `forbidden_inputs`, `approvedDomains`, `approvedUploadDomains`, and `disallowedCommands` accept either a string or an array of strings. Profiles may still use `allowedDataClass` or `allowed_data_class` for a broad data class, but `allowedData` / `allowed_data` is the simpler shape for new config. Artifact-local explicit denials, such as `network_allowed: false` or `external_upload_allowed: false`, remain stricter than inherited profile or repository allowances. Network destination approvals and upload destination approvals are separate; approving a host for network access does not approve uploads to that host.
 
 | Identifier | Meaning | Typical cause | How to fix |
 | --- | --- | --- | --- |

@@ -358,19 +358,19 @@ function securityProfiles(
         `security.profiles.${name}.allowedData`,
         source.allowedData ?? source.allowed_data ?? [],
       ),
-      forbiddenInputs: stringArray(
+      forbiddenInputs: stringList(
         `security.profiles.${name}.forbiddenInputs`,
         source.forbiddenInputs ?? source.forbidden_inputs ?? [],
       ),
-      approvedDomains: stringArray(
+      approvedDomains: stringList(
         `security.profiles.${name}.approvedDomains`,
         source.approvedDomains ?? [],
       ),
-      approvedUploadDomains: stringArray(
+      approvedUploadDomains: stringList(
         `security.profiles.${name}.approvedUploadDomains`,
         source.approvedUploadDomains ?? [],
       ),
-      disallowedCommands: stringArray(
+      disallowedCommands: stringList(
         `security.profiles.${name}.disallowedCommands`,
         source.disallowedCommands ?? [],
       ),
