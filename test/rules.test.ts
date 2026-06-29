@@ -264,7 +264,7 @@ expires_at: 2000-01-01
 
   const result = await scan(root);
   const finding = result.findings.find(
-    (candidate) => candidate.id === "MAINT-CONTEXT-EXPIRED",
+    (candidate) => candidate.id === "MAINT-ASSET-EXPIRED",
   );
 
   assert.equal(finding?.severity, "medium");
@@ -291,7 +291,7 @@ review_cycle: P90D
 
   const result = await scan(root);
   const finding = result.findings.find(
-    (candidate) => candidate.id === "MAINT-CONTEXT-REVIEW-OVERDUE",
+    (candidate) => candidate.id === "MAINT-ASSET-REVIEW-OVERDUE",
   );
 
   assert.equal(finding?.severity, "medium");
@@ -320,8 +320,8 @@ expires_at: 2999-12-31
   const result = await scan(root);
   const ids = result.findings.map((finding) => finding.id);
 
-  assert.equal(ids.includes("MAINT-CONTEXT-EXPIRED"), false);
-  assert.equal(ids.includes("MAINT-CONTEXT-REVIEW-OVERDUE"), false);
+  assert.equal(ids.includes("MAINT-ASSET-EXPIRED"), false);
+  assert.equal(ids.includes("MAINT-ASSET-REVIEW-OVERDUE"), false);
 });
 
 test("scan advises when skill body context references are not declared", async () => {

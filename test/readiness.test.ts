@@ -211,7 +211,7 @@ expires_at: 2000-01-01
   assert.equal(check?.status, "warn");
   assert.match(check?.summary ?? "", /freshness finding/);
   assert.equal(
-    report.findings?.some((finding) => finding.id === "MAINT-CONTEXT-EXPIRED"),
+    report.findings?.some((finding) => finding.id === "MAINT-ASSET-EXPIRED"),
     true,
   );
   assert.notEqual(report.level, "not_ready");

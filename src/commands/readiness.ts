@@ -798,8 +798,8 @@ function lifecycleCheck(nodes: GraphReport["nodes"]): ReadinessCheck {
 function freshnessCheck(findings: Finding[]): ReadinessCheck {
   const matched = findings.filter((finding) =>
     [
-      "MAINT-CONTEXT-EXPIRED",
-      "MAINT-CONTEXT-REVIEW-OVERDUE",
+      "MAINT-ASSET-EXPIRED",
+      "MAINT-ASSET-REVIEW-OVERDUE",
       "META-INVALID-LAST-REVIEWED-AT",
       "META-INVALID-EXPIRES-AT",
       "META-INVALID-REVIEW-CYCLE",

@@ -268,8 +268,8 @@ function expiredAssetFindings(entry: CatalogEntry, today: string): Finding[] {
 
   return [
     {
-      id: "MAINT-CONTEXT-EXPIRED",
-      title: "Context freshness metadata is expired",
+      id: "MAINT-ASSET-EXPIRED",
+      title: "Asset freshness metadata is expired",
       category: "maintenance",
       severity: "medium",
       confidence: "high",
@@ -313,8 +313,8 @@ function reviewOverdueAssetFindings(
 
   return [
     {
-      id: "MAINT-CONTEXT-REVIEW-OVERDUE",
-      title: "Context freshness review is overdue",
+      id: "MAINT-ASSET-REVIEW-OVERDUE",
+      title: "Asset freshness review is overdue",
       category: "maintenance",
       severity: "medium",
       confidence: "high",
