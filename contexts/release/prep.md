@@ -23,7 +23,7 @@ forbidden_inputs:
 
 ## Summary
 
-Renma release preparation is local-first and evidence-based. Use `tools/release-prep.mjs` for deterministic metadata checks, Renma dogfooding reports, validation commands, and optional npm-version-style local commit/tag finalization.
+Renma release preparation is local-first and evidence-based. Use `tools/release-prep.mjs` for deterministic metadata checks, GitHub-ready release notes, Renma dogfooding reports, validation commands, and optional npm-version-style local commit/tag finalization.
 
 ## Scope
 
@@ -44,9 +44,10 @@ This context does not apply when:
 1. Inspect `package.json`, `package-lock.json`, `CHANGELOG.md`, and release-relevant docs.
 2. Run `node tools/release-prep.mjs --check-only` to check version, changelog, and base-tag consistency.
 3. Edit release artifacts: version fields, changelog section/links, release notes, and docs affected by changed commands or diagnostics.
-4. Run `node tools/release-prep.mjs` to execute tests, build, Renma scan/catalog/readiness/graph, diff, and CI report.
-5. When requested, run `node tools/release-prep.mjs --finalize` to stage only intended release files and create the local version commit and annotated tag.
-6. Hand off changed artifacts, validation results, blockers, residual risks, commit hash, and tag name.
+4. Run `node tools/release-prep.mjs --release-notes --version <version>` to generate the GitHub Release body from `CHANGELOG.md`. Add `--from <tag>` or `--to <ref>` when generating notes for an older tag or a non-default comparison range.
+5. Run `node tools/release-prep.mjs` to execute tests, build, Renma scan/catalog/readiness/graph, diff, and CI report.
+6. When requested, run `node tools/release-prep.mjs --finalize` to stage only intended release files and create the local version commit and annotated tag.
+7. Hand off changed artifacts, generated release notes, validation results, blockers, residual risks, commit hash, and tag name.
 
 ## Constraints
 
@@ -60,4 +61,4 @@ This context does not apply when:
 
 ## Validation
 
-Run `node tools/release-prep.mjs`; use `--check-only` for metadata checks only and `--finalize` for local commit/tag creation after validation.
+Run `node tools/release-prep.mjs`; use `--check-only` for metadata checks only, `--release-notes` for GitHub Release body generation, and `--finalize` for local commit/tag creation after validation.

@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 const RELEASE_FILES = ["package.json", "package-lock.json", "CHANGELOG.md"];
+const REPOSITORY_URL = "https://github.com/KazuCocoa/renma";
 
 const args = process.argv.slice(2);
 if (!existsSync("package.json")) {
@@ -17,10 +18,16 @@ if (options.help) {
 }
 
 const version = options.version ?? readPackageVersion();
-const base = options.from ?? latestVersionTag(version);
+const base =
+  options.from ?? changelogBaseTag(version) ?? latestVersionTag(version);
 const target = options.to ?? "HEAD";
 const tag = `v${version}`;
 const finalize = options.finalize === true;
+
+if (options.releaseNotes) {
+  console.log(buildReleaseNotes({ version, base, target }));
+  process.exit(0);
+}
 
 const checks = [];
 
@@ -118,6 +125,7 @@ function parseArgs(input) {
     checkOnly: false,
     finalize: false,
     help: false,
+    releaseNotes: false,
     version: undefined,
     from: undefined,
     to: undefined,
@@ -128,6 +136,7 @@ function parseArgs(input) {
     if (arg === "--help" || arg === "-h") parsed.help = true;
     else if (arg === "--check-only") parsed.checkOnly = true;
     else if (arg === "--finalize") parsed.finalize = true;
+    else if (arg === "--release-notes") parsed.releaseNotes = true;
     else if (arg === "--version")
       parsed.version = requiredValue(input, ++index, arg);
     else if (arg === "--from") parsed.from = requiredValue(input, ++index, arg);
@@ -160,10 +169,43 @@ function changelogHasVersion(releaseVersion) {
   );
 }
 
+function changelogSection(releaseVersion) {
+  const changelog = readFileSync("CHANGELOG.md", "utf8");
+  const heading = new RegExp(
+    `^## \\[${escapeRegExp(releaseVersion)}\\](?: - .*)?$`,
+    "m",
+  );
+  const match = changelog.match(heading);
+  if (!match || match.index === undefined) {
+    throw new Error(
+      `CHANGELOG.md does not contain a ${releaseVersion} section.`,
+    );
+  }
+
+  const start = match.index + match[0].length;
+  const nextHeading = changelog.slice(start).search(/\n## \[/);
+  return nextHeading === -1
+    ? changelog.slice(start).trim()
+    : changelog.slice(start, start + nextHeading).trim();
+}
+
+function changelogBaseTag(releaseVersion) {
+  const changelog = readFileSync("CHANGELOG.md", "utf8");
+  const pattern = new RegExp(
+    `^\\[${escapeRegExp(releaseVersion)}\\]: ${escapeRegExp(
+      REPOSITORY_URL,
+    )}/compare/(v\\d+\\.\\d+\\.\\d+(?:[-+][^\\.\\s]+)?)\\.\\.\\.v${escapeRegExp(
+      releaseVersion,
+    )}$`,
+    "m",
+  );
+  return changelog.match(pattern)?.[1];
+}
+
 function changelogHasCompareLink(releaseVersion, baseTag) {
   if (!baseTag) return true;
   return readFileSync("CHANGELOG.md", "utf8").includes(
-    `[${releaseVersion}]: https://github.com/KazuCocoa/renma/compare/${baseTag}...v${releaseVersion}`,
+    `[${releaseVersion}]: ${REPOSITORY_URL}/compare/${baseTag}...v${releaseVersion}`,
   );
 }
 
@@ -257,6 +299,120 @@ function check(label, ok) {
   return { label, ok };
 }
 
+function buildReleaseNotes({ version: releaseVersion, base: baseTag, target }) {
+  const sections = parseChangelogSection(changelogSection(releaseVersion));
+  const summary = releaseSummary(sections);
+  const validationCommands = releaseValidationCommands(baseTag, target);
+  const compareLine = baseTag
+    ? `This release covers changes from \`${baseTag}\` to \`v${releaseVersion}\`.`
+    : `This release covers changes through \`v${releaseVersion}\`.`;
+
+  const lines = [
+    `Renma v${releaseVersion} includes ${summary}.`,
+    "",
+    compareLine,
+    "",
+    "## Highlights",
+    "",
+  ];
+
+  for (const [heading, items] of sections) {
+    lines.push(`### ${heading}`, "");
+    lines.push(...items, "");
+  }
+
+  lines.push(
+    "## Upgrade",
+    "",
+    "```bash",
+    "npm install",
+    "npm run build",
+    "npm test",
+    "```",
+    "",
+    "If using the published package:",
+    "",
+    "```bash",
+    "npm install -g renma",
+    "```",
+    "",
+    "## Validation",
+    "",
+    "Validated with:",
+    "",
+    "```bash",
+    ...validationCommands,
+    "```",
+    "",
+    "## Summary",
+    "",
+    `v${releaseVersion} includes ${summary}.`,
+  );
+
+  return lines.join("\n");
+}
+
+function parseChangelogSection(section) {
+  const parsed = [];
+  let currentHeading;
+  let currentItems = [];
+
+  for (const line of section.split(/\r?\n/)) {
+    const heading = line.match(/^### (.+)$/);
+    if (heading) {
+      if (currentHeading) parsed.push([currentHeading, currentItems]);
+      currentHeading = heading[1] ?? "";
+      currentItems = [];
+      continue;
+    }
+
+    if (line.startsWith("- ")) {
+      currentItems.push(line);
+    }
+  }
+
+  if (currentHeading) parsed.push([currentHeading, currentItems]);
+  if (parsed.length === 0) {
+    throw new Error("CHANGELOG section does not contain release note entries.");
+  }
+
+  return parsed;
+}
+
+function releaseSummary(sections) {
+  const entryCount = sections.reduce(
+    (count, [, entries]) => count + entries.length,
+    0,
+  );
+  const sectionNames = sections.map(([heading]) => heading.toLowerCase());
+  const sectionText = formatList(sectionNames);
+
+  return `${entryCount} changelog ${
+    entryCount === 1 ? "entry" : "entries"
+  } across ${sectionText}`;
+}
+
+function releaseValidationCommands(baseTag, target) {
+  const commands = ["npm test", "npm run build"];
+  commands.push("node dist/index.js scan . --fail-on high");
+  commands.push("node dist/index.js catalog . --format markdown");
+  commands.push("node dist/index.js readiness . --format markdown");
+  commands.push(
+    "node dist/index.js graph . --focus skill.release-prep --format mermaid",
+  );
+
+  if (baseTag) {
+    commands.push(
+      `node dist/index.js diff . --from ${baseTag} --to ${target} --format markdown`,
+    );
+    commands.push(
+      `node dist/index.js ci-report . --from ${baseTag} --to ${target} --format markdown`,
+    );
+  }
+
+  return commands;
+}
+
 function run(command, commandArgs) {
   const rendered = [command, ...commandArgs].join(" ");
   console.log(`\n$ ${rendered}`);
@@ -291,7 +447,18 @@ Options:
   --from <tag>         Base tag. Defaults to latest v* tag.
   --to <ref>           Target ref for Renma diff reports. Defaults to HEAD.
   --check-only         Check metadata consistency without running commands.
+  --release-notes      Print GitHub-ready release notes from CHANGELOG.md.
   --finalize           After validation, stage release files and create local version commit/tag.
   --help               Show this help.
 `);
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function formatList(values) {
+  if (values.length <= 1) return values[0] ?? "";
+  if (values.length === 2) return `${values[0]} and ${values[1]}`;
+  return `${values.slice(0, -1).join(", ")}, and ${values.at(-1)}`;
 }
