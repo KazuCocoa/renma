@@ -534,7 +534,7 @@ These findings are guardrails for review. They do not replace secret scanning, S
 Renma is part of a broader idea: treating reusable LLM context as software-managed knowledge.
 
 - [Beyond Prompt Engineering: Why We Need Context Repositories](https://kazucocoa.blog/2026/06/26/beyond-prompt-engineering-why-we-need-context-repositories/)
-- Introducing Renma: An Opinionated Context Repository for LLMs (planned)
+- [Introducing Renma: An Opinionated Context Repository for LLMs](https://kazucocoa.blog/2026/06/29/introducing-renma-an-opinionated-context-repository-for-llms/)
 - Where Does a Context Repository Fit in the AI Stack? (planned)
 - Context Engineering Is Software Engineering (planned)
 
