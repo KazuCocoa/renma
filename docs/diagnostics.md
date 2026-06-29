@@ -74,19 +74,35 @@ Security policy diagnostics read small metadata fields from skill and context fr
 
 Supported policy metadata includes:
 
-| Field | Meaning | Related findings |
-| --- | --- | --- |
-| `allowed_data` | Declares the asset's data class or allowed data list. Inline scalar values such as `disclosed` act as the data class; list values act as explicit allowed data entries. | `SEC-MISSING-POLICY-METADATA`, `SEC-FORBIDDEN-INPUT-INSTRUCTION`, `SEC-INSTRUCTION-VIOLATES-POLICY` |
-| `network_allowed` | Declares whether the asset may perform network actions such as fetching URLs or contacting APIs. Explicit `false` blocks network instructions even when repository config has approved domains. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-BODY-POLICY-CONTRADICTION`, `SEC-UNAPPROVED-NETWORK-DESTINATION` |
-| `external_upload_allowed` | Declares whether the asset may upload, publish, submit, sync, push, or otherwise send repository data externally. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-EXTERNAL-UPLOAD-INSTRUCTION`, `SEC-UNAPPROVED-UPLOAD-DESTINATION` |
-| `secrets_allowed` | Declares whether secret material is allowed as input or content for the asset. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-SECRET-MATERIAL-INSTRUCTION`, `SEC-SENSITIVE-FILE-REFERENCE` |
-| `requires_human_approval` | Requires a nearby human approval guard before sensitive network, upload, secret-handling, or high-risk actions. `human_approval_required` is also accepted. | `SEC-MISSING-HUMAN-APPROVAL-GUARD` |
-| `approved_network_destinations` | Lists approved network destinations for URL or domain-like network instructions. `allowed_network_destinations` is also accepted. | `SEC-UNAPPROVED-NETWORK-DESTINATION` |
-| `approved_upload_destinations` | Lists approved upload destinations. `approved_upload_domains` is also accepted. Upload approvals are checked separately from general network approvals. | `SEC-UNAPPROVED-UPLOAD-DESTINATION` |
-| `forbidden_inputs` | Lists inputs the asset must not request or process, such as `secrets`, `credentials`, or `tokens`. | `SEC-FORBIDDEN-INPUT-INSTRUCTION` |
-| `security_profile` | Selects a repository security profile from `renma.config.json`. Artifact-local explicit denials remain stricter than inherited profile or repository allowances. | `SEC-POLICY-PROFILE-NOT-FOUND`, `SEC-POLICY-PROFILE-CYCLE`, `SEC-POLICY-OVERRIDE-CONTRADICTION` |
+| Field | Accepted aliases | Meaning | Related findings |
+| --- | --- | --- | --- |
+| `allowed_data` | `allowedData` | Declares the asset's allowed data entries. Scalar values such as `disclosed` are treated like a one-item list, so `allowed_data: disclosed` and `allowed_data: [disclosed]` are equivalent for asset frontmatter. | `SEC-MISSING-POLICY-METADATA`, `SEC-FORBIDDEN-INPUT-INSTRUCTION`, `SEC-INSTRUCTION-VIOLATES-POLICY` |
+| `network_allowed` | `networkAllowed` | Declares whether the asset may perform network actions such as fetching URLs or contacting APIs. Explicit `false` blocks network instructions even when repository config has approved domains. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-BODY-POLICY-CONTRADICTION`, `SEC-UNAPPROVED-NETWORK-DESTINATION` |
+| `external_upload_allowed` | `externalUploadAllowed` | Declares whether the asset may upload, publish, submit, sync, push, or otherwise send repository data externally. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-EXTERNAL-UPLOAD-INSTRUCTION`, `SEC-UNAPPROVED-UPLOAD-DESTINATION` |
+| `secrets_allowed` | `secretsAllowed` | Declares whether secret material is allowed as input or content for the asset. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-SECRET-MATERIAL-INSTRUCTION`, `SEC-SENSITIVE-FILE-REFERENCE` |
+| `requires_human_approval` | `human_approval_required`, `requiresHumanApproval`, `humanApprovalRequired` | Requires a nearby human approval guard before sensitive network, upload, secret-handling, or high-risk actions. | `SEC-MISSING-HUMAN-APPROVAL-GUARD` |
+| `approved_network_destinations` | `approvedNetworkDestinations`, `allowed_network_destinations`, `allowedNetworkDestinations` | Lists approved network destinations for URL or domain-like network instructions. | `SEC-UNAPPROVED-NETWORK-DESTINATION` |
+| `approved_upload_destinations` | `approvedUploadDestinations`, `approved_upload_domains`, `approvedUploadDomains` | Lists approved upload destinations. Upload approvals are checked separately from general network approvals. | `SEC-UNAPPROVED-UPLOAD-DESTINATION` |
+| `forbidden_inputs` | `forbiddenInputs` | Lists inputs the asset must not request or process, such as `secrets`, `credentials`, or `tokens`. | `SEC-FORBIDDEN-INPUT-INSTRUCTION` |
+| `security_profile` | `securityProfile` | Selects a repository security profile from `renma.config.json`. Artifact-local explicit denials remain stricter than inherited profile or repository allowances. | `SEC-POLICY-PROFILE-NOT-FOUND`, `SEC-POLICY-PROFILE-CYCLE`, `SEC-POLICY-OVERRIDE-CONTRADICTION` |
 
-The camelCase aliases used by config and some assets are also accepted, such as `allowedData`, `networkAllowed`, `externalUploadAllowed`, `secretsAllowed`, `requiresHumanApproval`, `approvedNetworkDestinations`, `approvedUploadDestinations`, `forbiddenInputs`, and `securityProfile`.
+Boolean policy fields accept values such as `true`, `false`, `yes`, `no`, `allowed`, `denied`, `allow`, and `deny`. List-valued fields accept comma-separated inline values, bracket-style inline lists, or simple block lists.
+
+Example:
+
+```yaml
+allowed_data: public
+network_allowed: true
+external_upload_allowed: false
+secrets_allowed: false
+requires_human_approval: true
+forbidden_inputs:
+  - secrets
+  - credentials
+  - tokens
+```
+
+`security_profile` inherits policy values from `renma.config.json`. Security profiles may also use `allowedDataClass` or `allowed_data_class` for a broad data class. Artifact-local explicit denials, such as `network_allowed: false` or `external_upload_allowed: false`, remain stricter than inherited profile or repository allowances. Network destination approvals and upload destination approvals are separate; approving a host for network access does not approve uploads to that host.
 
 | Identifier | Meaning | Typical cause | How to fix |
 | --- | --- | --- | --- |
