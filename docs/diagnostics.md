@@ -102,7 +102,7 @@ forbidden_inputs:
   - tokens
 ```
 
-`security_profile` inherits policy values from `renma.config.json`. Security profiles may also use `allowedDataClass` or `allowed_data_class` for a broad data class. Artifact-local explicit denials, such as `network_allowed: false` or `external_upload_allowed: false`, remain stricter than inherited profile or repository allowances. Network destination approvals and upload destination approvals are separate; approving a host for network access does not approve uploads to that host.
+`security_profile` inherits policy values from `renma.config.json`. Security profile `allowedData` and `allowed_data` values also accept either a string or an array of strings. Profiles may still use `allowedDataClass` or `allowed_data_class` for a broad data class, but `allowedData` / `allowed_data` is the simpler shape for new config. Artifact-local explicit denials, such as `network_allowed: false` or `external_upload_allowed: false`, remain stricter than inherited profile or repository allowances. Network destination approvals and upload destination approvals are separate; approving a host for network access does not approve uploads to that host.
 
 | Identifier | Meaning | Typical cause | How to fix |
 | --- | --- | --- | --- |

@@ -181,6 +181,11 @@ function stringArray(field: string, value: unknown): string[] {
   throw new ConfigError(`${field} must be an array of strings.`);
 }
 
+function stringList(field: string, value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  return stringArray(field, value);
+}
+
 function positiveInteger(field: string, value: unknown): number {
   if (Number.isInteger(value) && typeof value === "number" && value > 0)
     return value;
@@ -349,7 +354,7 @@ function securityProfiles(
         `security.profiles.${name}.securityProfile`,
         source.securityProfile ?? source.security_profile,
       ),
-      allowedData: stringArray(
+      allowedData: stringList(
         `security.profiles.${name}.allowedData`,
         source.allowedData ?? source.allowed_data ?? [],
       ),
