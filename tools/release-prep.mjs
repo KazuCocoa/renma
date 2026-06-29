@@ -2,6 +2,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
+const RELEASE_FILES = ["package.json", "package-lock.json", "CHANGELOG.md"];
+
 const args = process.argv.slice(2);
 if (!existsSync("package.json")) {
   throw new Error("Run this script from the repository root.");
@@ -34,8 +36,7 @@ if (base) {
 }
 
 if (finalize) {
-  checks.push(check("tag is absent", !gitOk(["rev-parse", "--verify", tag])));
-  checks.push(check("working tree is clean", workingTreeClean()));
+  checks.push(...releaseFinalizationChecks(RELEASE_FILES, tag));
 }
 
 const commands = [
@@ -106,7 +107,8 @@ for (const [command, commandArgs] of commands) {
 }
 
 if (finalize) {
-  run("git", ["add", "package.json", "package-lock.json", "CHANGELOG.md"]);
+  ensureReleaseFinalizationReady(RELEASE_FILES, tag);
+  run("git", ["add", ...RELEASE_FILES]);
   run("git", ["commit", "-m", version]);
   run("git", ["tag", "-a", tag, "-m", version]);
 }
@@ -177,9 +179,74 @@ function latestVersionTag(releaseVersion) {
     .find((line) => /^v\d+\.\d+\.\d+/.test(line) && line !== currentTag);
 }
 
-function workingTreeClean() {
-  const result = spawnSync("git", ["status", "--short"], { encoding: "utf8" });
-  return result.status === 0 && result.stdout.trim().length === 0;
+function releaseFinalizationChecks(allowedFiles, releaseTag) {
+  return [
+    check("tag is absent", !gitOk(["rev-parse", "--verify", releaseTag])),
+    check(
+      "only release files changed",
+      workingTreeContainsOnlyAllowedChanges(allowedFiles),
+    ),
+    check("release files have changes", releaseFilesHaveChanges(allowedFiles)),
+  ];
+}
+
+function ensureReleaseFinalizationReady(allowedFiles, releaseTag) {
+  const failed = releaseFinalizationChecks(allowedFiles, releaseTag).filter(
+    (item) => !item.ok,
+  );
+
+  if (failed.length === 0) return;
+
+  console.error("\nRelease finalization stopped before staging files.");
+  for (const item of failed) {
+    console.error(`- FAIL ${item.label}`);
+  }
+  process.exit(1);
+}
+
+function workingTreeContainsOnlyAllowedChanges(allowedFiles) {
+  const allowed = new Set(allowedFiles);
+  const status = gitStatusPaths();
+  return status.ok && status.paths.every((item) => allowed.has(item));
+}
+
+function releaseFilesHaveChanges(allowedFiles) {
+  const allowed = new Set(allowedFiles);
+  const status = gitStatusPaths();
+  return status.ok && status.paths.some((item) => allowed.has(item));
+}
+
+function gitStatusPaths() {
+  const result = spawnSync(
+    "git",
+    ["status", "--porcelain=v1", "--untracked-files=all"],
+    { encoding: "utf8" },
+  );
+
+  if (result.status !== 0) return { ok: false, paths: [] };
+
+  return {
+    ok: true,
+    paths: result.stdout
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .flatMap((line) => parseStatusPaths(line)),
+  };
+}
+
+function parseStatusPaths(line) {
+  const pathPart = line.slice(3).trim();
+  if (!pathPart.includes(" -> ")) return [unquoteStatusPath(pathPart)];
+  return pathPart.split(" -> ").map((item) => unquoteStatusPath(item));
+}
+
+function unquoteStatusPath(pathName) {
+  if (!pathName.startsWith('"') || !pathName.endsWith('"')) return pathName;
+  try {
+    return JSON.parse(pathName);
+  } catch {
+    return pathName;
+  }
 }
 
 function gitOk(commandArgs) {
@@ -224,7 +291,7 @@ Options:
   --from <tag>         Base tag. Defaults to latest v* tag.
   --to <ref>           Target ref for Renma diff reports. Defaults to HEAD.
   --check-only         Check metadata consistency without running commands.
-  --finalize           After validation, create local version commit and tag.
+  --finalize           After validation, stage release files and create local version commit/tag.
   --help               Show this help.
 `);
 }

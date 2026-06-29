@@ -45,7 +45,7 @@ This context does not apply when:
 2. Run `node tools/release-prep.mjs --check-only` to check version, changelog, and base-tag consistency.
 3. Edit release artifacts: version fields, changelog section/links, release notes, and docs affected by changed commands or diagnostics.
 4. Run `node tools/release-prep.mjs` to execute tests, build, Renma scan/catalog/readiness/graph, diff, and CI report.
-5. When requested, run `node tools/release-prep.mjs --finalize` to create the local version commit and annotated tag.
+5. When requested, run `node tools/release-prep.mjs --finalize` to stage only intended release files and create the local version commit and annotated tag.
 6. Hand off changed artifacts, validation results, blockers, residual risks, commit hash, and tag name.
 
 ## Constraints
