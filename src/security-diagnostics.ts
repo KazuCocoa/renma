@@ -470,6 +470,28 @@ const RULES = {
       "Add an explicit approval requirement before sudo, chmod/chown, docker privileged operations, or system writes.",
     confidence: "medium",
   },
+  destructiveCommand: {
+    id: DIAGNOSTIC_IDS.SEC_DESTRUCTIVE_COMMAND,
+    category: "safety",
+    title: "Destructive command lacks a review guard",
+    whyItMatters:
+      "Destructive commands in agent-facing guidance can erase files, reset Git state, remove containers, or delete infrastructure when copied or followed by an agent.",
+    remediation:
+      "Remove the destructive command, replace it with a safer scoped command, or add explicit human approval, dry-run, backup, and rollback guidance.",
+    constraints: [
+      "Do not normalize destructive commands as routine setup.",
+      "Keep any required destructive action narrowly scoped.",
+      "Keep approval and recovery guidance close to the command.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm destructive commands are removed or guarded.",
+      "Review any remaining command for scope, backup, and rollback guidance.",
+    ],
+    llmHint:
+      "Replace forced deletion, hard reset, clean, prune, or delete commands with safer alternatives, or add explicit approval plus verification and rollback steps.",
+    confidence: "high",
+  },
   dangerousToolInstruction: {
     id: DIAGNOSTIC_IDS.SEC_DANGEROUS_TOOL_INSTRUCTION,
     category: "safety",
@@ -613,7 +635,7 @@ const SECRET_ACTION_RE =
 const SAFE_NEGATION_RE =
   /\b(not|never|avoid|exclude|without|redact|mock|fake|sample|placeholder|dummy)\b.{0,40}\b(secret|secrets|credential|credentials|token|password|private key)\b|\b(secret|secrets|credential|credentials|token|password|private key)\b.{0,40}\b(not|never|avoid|exclude|redact|mock|fake|sample|placeholder|dummy)\b/i;
 const REMOTE_SCRIPT_RE =
-  /\b(curl|wget)\b[^\n]*?(https?:\/\/[^\s|`'")]+)[^\n]*(\|\s*(sh|bash|zsh)|\b(sh|bash|zsh)\b)/i;
+  /\b(curl|wget)\b[^\n]*?(https?:\/\/[^\s|`'")]+)[^\n]*\|\s*(sh|bash|zsh)\b/i;
 const PRIVILEGED_COMMAND_RE =
   /\b(sudo|chmod\s+(777|666|\+w|a\+w)|chown\b|docker\s+run\b[^\n]*(--privileged|-v\s+\/|--pid=host)|mount\b|launchctl\b|systemctl\b)\b/i;
 const DESTRUCTIVE_COMMAND_RE =
@@ -732,7 +754,7 @@ function securityFindingsForArtifact(
     if (!commandLine || referencesSensitiveFile(line)) {
       detections.push(...sensitiveDataDetections(line, lineNumber, policy));
     }
-    if (!commandLine || policy.declared.size > 0) {
+    if (!commandLine || policy.declared.size > 0 || isUploadInstruction(line)) {
       detections.push(...networkAndUploadDetections(line, lineNumber, policy));
     }
     detections.push(...contextScopeDetections(line, lineNumber));
@@ -1080,13 +1102,14 @@ function commandDetections(
 
   const remoteScript = line.match(REMOTE_SCRIPT_RE);
   if (remoteScript && !hasPinnedRemoteScript(line)) {
+    const fetchCommand = remoteScript[1] ?? "curl";
     const remoteUrl = (remoteScript[2] ?? line).replace(/[.,;:]+$/, "");
-    const shell = remoteScript[4] ?? remoteScript[5] ?? "sh";
+    const shell = remoteScript[3] ?? "sh";
     detections.push({
       metadata: RULES.unpinnedRemoteScript,
       severity: "high",
       startLine: lineNumber,
-      snippet: `curl ${remoteUrl} | ${shell}`,
+      snippet: `${fetchCommand} ${remoteUrl} | ${shell}`,
       dedupeKey: `${RULES.unpinnedRemoteScript.id}:${remoteUrl}`,
     });
   }
@@ -1105,6 +1128,15 @@ function commandDetections(
     detections.push({
       metadata: RULES.privilegedCommandWithoutGuard,
       severity: "medium",
+      startLine: lineNumber,
+      snippet: line,
+    });
+  }
+
+  if (DESTRUCTIVE_COMMAND_RE.test(line) && !hasApprovalGuard) {
+    detections.push({
+      metadata: RULES.destructiveCommand,
+      severity: "high",
       startLine: lineNumber,
       snippet: line,
     });
@@ -1823,7 +1855,7 @@ function unpinnedDependencyInstall(line: string): boolean {
     return true;
   }
 
-  const yarn = line.match(/\byarn\s+add\s+([^\n#]+)/i);
+  const yarn = line.match(/\byarn\s+(?:global\s+)?add\s+([^\n#]+)/i);
   if (yarn && splitCommandArgs(yarn[1] ?? "").some(isUnpinnedNpmPackage)) {
     return true;
   }

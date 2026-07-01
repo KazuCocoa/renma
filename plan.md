@@ -38,6 +38,8 @@ Renma should help teams answer:
 
 Renma remains deterministic by default, CLI-first, Git-native, minimal-dependency, and independent of LLMs for core analysis. Optional external-LLM assistance may support suggestions, semantic duplicate labeling, or review summaries, but deterministic evidence remains the authority: LLM proposes. Renma verifies. Human approves.
 
+The 0.7.0 security direction refines deterministic diagnostics for agent-facing context assets. Renma should catch risky instructions inside discovered skills, contexts, agent files, references, profiles, examples, and tool guidance without becoming a broad package, CI, Docker, or supply-chain scanner.
+
 ## Repository Model
 
 Renma should support shared repositories shaped like this:

@@ -6,6 +6,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Changed
+
+- Refined deterministic security diagnostics for agent-facing context assets without adding package or CI workflow scanning.
+
 ## [0.6.1] - 2026-06-29
 
 ### Changed
