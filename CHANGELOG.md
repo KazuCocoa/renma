@@ -9,6 +9,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 ### Changed
 
 - Refined deterministic security diagnostics for agent-facing context assets without adding package or CI workflow scanning.
+- Reduced false positives for guarded or defensive security guidance around destructive commands, privileged commands, remote script execution, unpinned installs, and external uploads.
 
 ## [0.6.1] - 2026-06-29
 
