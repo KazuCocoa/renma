@@ -68,6 +68,8 @@ Finding identifiers are useful when you want to group, filter, document, or auto
 
 The identifiers below are part of the current scan output. The current implementation does not declare them as a permanent public API, so integrations should avoid assuming stronger stability than the project documents. If renma adopts long-term stability guarantees later, identifier changes should come with documented migrations.
 
+Security diagnostics focus on agent-facing or context-bearing artifacts Renma already discovers, such as skills, contexts, `AGENTS.md`, references, profiles, examples, and tool guidance. Renma does not scan `package.json`, GitHub Actions workflows, Dockerfiles, or repository-wide supply-chain metadata by default.
+
 ### Security Policy Metadata
 
 Security policy diagnostics read small metadata fields from skill and context frontmatter. If a skill or context omits both `allowed_data` and inherited policy data, Renma can emit `SEC-MISSING-POLICY-METADATA` with evidence such as `missing allowed_data policy metadata`.

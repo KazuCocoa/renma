@@ -29,8 +29,6 @@ const SECRET_PATTERN =
   /\b(?:password|passwd|token|api[_-]?key|secret|credential|private[_-]?key)\b\s*[:=]\s*["']?([A-Za-z0-9_./+=-]{8,})/i;
 const PRIVATE_KEY_PATTERN =
   /-----BEGIN (?:RSA |OPENSSH |EC |DSA )?PRIVATE KEY-----/;
-const DESTRUCTIVE_PATTERN =
-  /\b(?:rm\s+-rf|mkfs|dd\s+if=|chmod\s+-R\s+777|chown\s+-R|sudo\s+(?:rm|dd|mkfs|chmod|chown)|git\s+clean\s+-fdx|docker\s+system\s+prune)\b/i;
 const REMOTE_PATTERN =
   /\b(?:curl|wget)\b.*(?:\|\s*(?:sh|bash)|\b(?:example\.com|prod|production|--insecure|-k)\b)|\b(?:ssh|scp)\b.*\b(?:example\.com|prod|production|root@|--insecure|-k|StrictHostKeyChecking=no|UserKnownHostsFile=\/dev\/null)\b/i;
 const ENV_COPY_PATTERN =
@@ -635,19 +633,6 @@ function secretFindings(document: ParsedDocument): Finding[] {
 function commandFindings(document: ParsedDocument): Finding[] {
   return matchingLineFindings(document, (line) => {
     if (isSuppressed(line)) return undefined;
-    if (
-      DESTRUCTIVE_PATTERN.test(line) &&
-      !hasNearbyConfirmation(document.lines, line)
-    ) {
-      return finding(
-        DIAGNOSTIC_IDS.SEC_DESTRUCTIVE_COMMAND,
-        "Dangerous command lacks explicit confirmation or recovery guard",
-        "safety",
-        "high",
-        document,
-        "Require explicit user confirmation, add dry-run/backup guidance, and describe rollback or verification.",
-      );
-    }
     if (REMOTE_PATTERN.test(line)) {
       return finding(
         DIAGNOSTIC_IDS.SEC_REMOTE_DEFAULT,
@@ -2262,15 +2247,4 @@ function isPlaceholder(line: string): boolean {
 
 function isSuppressed(line: string): boolean {
   return /tool-ignore\s+[A-Z0-9-]+/.test(line);
-}
-
-function hasNearbyConfirmation(lines: string[], matchedLine: string): boolean {
-  const index = lines.indexOf(matchedLine);
-  const window = lines
-    .slice(Math.max(0, index - 3), Math.min(lines.length, index + 4))
-    .join("\n")
-    .toLowerCase();
-  return /confirm|confirmation|backup|rollback|dry-run|explicit (?:approval|request|requested|permission)|explicitly request(?:s|ed)?/.test(
-    window,
-  );
 }
