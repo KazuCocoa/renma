@@ -162,6 +162,8 @@ The MVP rule IDs are:
 
 Renma normalizes whitespace and only reports cross-file candidates with stable parser evidence. Remediation text asks maintainers to preserve ownership boundaries, procedural detail, and human approval while consolidating owned knowledge.
 
+LLM-authored skills and context assets often converge on similar wording, structure, and safety boilerplate. That uniformity can make deterministic checks more useful, not less: Renma can catch repeated sections, duplicated guidance, stale ownership, risky commands, and policy drift without needing to call an LLM. The findings are evidence for review, not automatic rewrite decisions.
+
 ## How Renma differs from adjacent tools
 
 Prompt-management and eval tools focus on prompts, traces, and model outputs.
