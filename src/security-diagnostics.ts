@@ -1893,7 +1893,7 @@ function isDefensiveActionInstruction(line: string): boolean {
   ) {
     return false;
   }
-  return DEFENSIVE_ACTION_RE.test(line) || GUARDED_ACTION_RE.test(line);
+  return DEFENSIVE_ACTION_RE.test(line);
 }
 
 function hasPinnedRemoteScript(line: string): boolean {

@@ -766,6 +766,21 @@ Upload the results to external storage.
   assert.ok(ids.includes("SEC-MISSING-HUMAN-APPROVAL-GUARD"));
 });
 
+test("requires_human_approval true rejects guarded upload without explicit approval", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: redacted logs
+requires_human_approval: true
+---
+
+Use --dry-run first, then upload the results to external storage.
+`),
+  ]);
+  const ids = findings.map((finding) => finding.id);
+
+  assert.ok(ids.includes("SEC-MISSING-HUMAN-APPROVAL-GUARD"));
+});
+
 test("requires_human_approval true rejects generic weak approval wording", () => {
   const findings = securityDiagnosticFindings([
     v2SecurityArtifact(`---
