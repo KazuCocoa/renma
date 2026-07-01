@@ -177,6 +177,20 @@ rm -rf /tmp/renma-output
   );
 });
 
+test("destructive commands accept nearby local risk mitigation guards", async () => {
+  const findings = await securityFindings(`
+Use --dry-run first and create a backup before running this.
+\`\`\`bash
+rm -rf /tmp/renma-output
+\`\`\`
+`);
+
+  assert.equal(
+    findings.some((finding) => finding.id === "SEC-DESTRUCTIVE-COMMAND"),
+    false,
+  );
+});
+
 test("unguarded destructive command remains a finding", async () => {
   const findings = await securityFindings(`
 \`\`\`bash
@@ -734,6 +748,22 @@ Upload the results to external storage.
   const ids = findings.map((finding) => finding.id);
 
   assert.equal(ids.includes("SEC-MISSING-HUMAN-APPROVAL-GUARD"), false);
+});
+
+test("requires_human_approval true rejects dry-run without explicit approval", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: redacted logs
+requires_human_approval: true
+---
+
+Use --dry-run first.
+Upload the results to external storage.
+`),
+  ]);
+  const ids = findings.map((finding) => finding.id);
+
+  assert.ok(ids.includes("SEC-MISSING-HUMAN-APPROVAL-GUARD"));
 });
 
 test("requires_human_approval true rejects generic weak approval wording", () => {

@@ -705,7 +705,8 @@ function securityFindingsForArtifact(
       : -1;
   const scanStart = frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
   let inFence = false;
-  let recentApprovalLine = 0;
+  let recentHumanApprovalLine = 0;
+  let recentRiskMitigationLine = 0;
 
   if (
     (artifact.kind === "skill" || artifact.kind === "context") &&
@@ -745,9 +746,15 @@ function securityFindingsForArtifact(
     if (isPolicyLine(line)) {
       continue;
     }
-    const hasApprovalGuard =
-      hasExplicitRiskGuard(line) ||
-      (recentApprovalLine > 0 && lineNumber - recentApprovalLine <= 2);
+    const hasHumanApprovalGuard =
+      hasExplicitHumanApprovalGuard(line) ||
+      (recentHumanApprovalLine > 0 &&
+        lineNumber - recentHumanApprovalLine <= 2);
+    const hasCommandRiskGuard =
+      hasHumanApprovalGuard ||
+      hasLocalRiskMitigationGuard(line) ||
+      (recentRiskMitigationLine > 0 &&
+        lineNumber - recentRiskMitigationLine <= 2);
     const commandLine =
       !shellComment &&
       (inFence ||
@@ -756,7 +763,7 @@ function securityFindingsForArtifact(
         CREDENTIAL_HEADER_RE.test(line));
 
     detections.push(
-      ...policyDetections(line, lineNumber, policy, hasApprovalGuard),
+      ...policyDetections(line, lineNumber, policy, hasHumanApprovalGuard),
     );
     detections.push(...disallowedCommandDetections(line, lineNumber, policy));
     if (!commandLine || referencesSensitiveFile(line)) {
@@ -769,11 +776,16 @@ function securityFindingsForArtifact(
     detections.push(...predictableTempDetections(line, lineNumber));
 
     if (commandLine) {
-      detections.push(...commandDetections(line, lineNumber, hasApprovalGuard));
+      detections.push(
+        ...commandDetections(line, lineNumber, hasCommandRiskGuard),
+      );
     }
 
-    if (hasExplicitRiskGuard(line)) {
-      recentApprovalLine = lineNumber;
+    if (hasExplicitHumanApprovalGuard(line)) {
+      recentHumanApprovalLine = lineNumber;
+    }
+    if (hasLocalRiskMitigationGuard(line)) {
+      recentRiskMitigationLine = lineNumber;
     }
   }
 
@@ -863,10 +875,11 @@ function policyDetections(
   line: string,
   lineNumber: number,
   policy: SecurityPolicy,
-  hasApprovalGuard: boolean,
+  hasHumanApprovalGuard: boolean,
 ): Detection[] {
   const detections: Detection[] = [];
-  const safeOrGuarded = isDefensiveActionInstruction(line);
+  const defensiveAction = isDefensiveActionInstruction(line);
+  const safeOrGuarded = isDefensiveOrGuardedActionInstruction(line);
 
   if (
     policy.networkAllowed === false &&
@@ -956,8 +969,8 @@ function policyDetections(
   const needsApproval =
     (EXTERNAL_UPLOAD_RE.test(line) || CLOUD_UPLOAD_RE.test(line)) &&
     policy.humanApprovalRequired === true &&
-    !hasApprovalGuard &&
-    !safeOrGuarded;
+    !hasHumanApprovalGuard &&
+    !defensiveAction;
   if (needsApproval) {
     detections.push({
       metadata: RULES.missingHumanApprovalGuard,
@@ -1056,7 +1069,7 @@ function networkAndUploadDetections(
   policy: SecurityPolicy,
 ): Detection[] {
   const detections: Detection[] = [];
-  if (isDefensiveActionInstruction(line)) {
+  if (isDefensiveOrGuardedActionInstruction(line)) {
     return detections;
   }
 
@@ -1117,10 +1130,10 @@ function contextScopeDetections(line: string, lineNumber: number): Detection[] {
 function commandDetections(
   line: string,
   lineNumber: number,
-  hasApprovalGuard: boolean,
+  hasCommandRiskGuard: boolean,
 ): Detection[] {
   const detections: Detection[] = [];
-  const defensiveAction = isDefensiveActionInstruction(line);
+  const defensiveAction = isDefensiveOrGuardedActionInstruction(line);
 
   const remoteScript = line.match(REMOTE_SCRIPT_RE);
   if (remoteScript && !hasPinnedRemoteScript(line) && !defensiveAction) {
@@ -1148,7 +1161,7 @@ function commandDetections(
 
   if (
     PRIVILEGED_COMMAND_RE.test(line) &&
-    !hasApprovalGuard &&
+    !hasCommandRiskGuard &&
     !defensiveAction
   ) {
     detections.push({
@@ -1161,7 +1174,7 @@ function commandDetections(
 
   if (
     DESTRUCTIVE_COMMAND_RE.test(line) &&
-    !hasApprovalGuard &&
+    !hasCommandRiskGuard &&
     !defensiveAction
   ) {
     detections.push({
@@ -1859,11 +1872,19 @@ function isCommandLike(line: string): boolean {
   );
 }
 
-function hasExplicitRiskGuard(line: string): boolean {
+function hasExplicitHumanApprovalGuard(line: string): boolean {
   if (WEAK_OR_NEGATED_APPROVAL_RE.test(line)) {
     return false;
   }
-  return APPROVAL_RE.test(line) || RECOVERY_GUARD_RE.test(line);
+  return APPROVAL_RE.test(line);
+}
+
+function hasLocalRiskMitigationGuard(line: string): boolean {
+  return RECOVERY_GUARD_RE.test(line);
+}
+
+function isDefensiveOrGuardedActionInstruction(line: string): boolean {
+  return isDefensiveActionInstruction(line) || GUARDED_ACTION_RE.test(line);
 }
 
 function isDefensiveActionInstruction(line: string): boolean {
