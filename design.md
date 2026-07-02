@@ -64,6 +64,12 @@ Security diagnostics v1 focuses on conservative operational-instruction risks. I
 
 Security diagnostics are deterministic review guardrails for LLM-facing operational instructions. They flag patterns such as unpinned remote shell execution, unpinned dependency installs, privileged commands without nearby guardrails, predictable temporary paths, and credential-like command arguments; they do not replace SAST, secret scanning, dependency scanning, or human security review.
 
+The next product layer should turn these diagnostics into security posture summaries in readiness and CI reports. Security posture should summarize effective policy, security profile resolution, allowed data, forbidden inputs, approved network and upload destinations, human approval requirements, and high-risk findings without enforcing runtime behavior.
+
+Trust Graph should initially be a deterministic interpretation of existing catalog, graph, readiness, and security evidence. It may expose signals such as owner presence, lifecycle status, resolved dependencies, policy contradictions, unapproved destinations, missing metadata, and high-severity findings, but it should not introduce subjective trust scores or a separate runtime system.
+
+Repository Context BOM should begin as a declared repository manifest: assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence. It should not claim actual LLM runtime usage. Actual consumed-context evidence may be imported later from external agents or wrappers and validated against Renma's repository model.
+
 Renma findings should be useful not only to humans, but also to LLM coding
 agents. A good Renma diagnostic should explain what is wrong, why it matters for
 repository governance, where the evidence is, what direction a safe fix should
@@ -326,8 +332,8 @@ Implemented deterministic rules focus on repository health:
 Current reporting includes deterministic readiness output, ownership coverage,
 context graph snapshots, and static safety findings for agent-facing repository
 content. Near-term reporting should extend repeated context discovery, semantic
-diffs, stronger security and supply-chain safety diagnostics, CI examples, and
-optional external-LLM advisory evaluation bundles.
+diffs, security diagnostics stabilization, security posture summaries, CI
+examples, and optional external-LLM advisory evaluation bundles.
 
 Passing Renma checks does not prove a workflow is safe. It means the repository
 met the deterministic governance checks that were enabled.

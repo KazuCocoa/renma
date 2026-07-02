@@ -470,6 +470,7 @@ Renma does not:
 - Inject context into model calls
 - Execute agent workflows
 - Act as a provider gateway
+- Own runtime telemetry collection
 - Replace product, QA, platform, or documentation ownership
 
 This boundary keeps Renma useful as repository infrastructure. Agent tools can consume its reports, but the catalog remains grounded in Git, code review, and deterministic checks.
@@ -530,6 +531,12 @@ Security profiles can be defined under `security.profiles` and selected by artif
 Renma reports deterministic safety findings for agent-facing operational instructions, such as unpinned remote scripts, unsafe privileged commands, predictable temporary paths, and credential-like command arguments.
 
 These findings are guardrails for review. They do not replace secret scanning, SAST, dependency scanning, or human security review.
+
+Near-term security work is focused on stabilizing these diagnostics for the 0.7.0 line. After that, Renma should summarize security posture in readiness and CI reports, including effective policy, security profile resolution, approved destinations, forbidden inputs, human approval requirements, and high-risk findings.
+
+Future Trust Graph work should interpret existing catalog, graph, readiness, and security evidence as deterministic trust and risk signals. It should not become a separate runtime system or a subjective trust score.
+
+Repository Context BOM work should start as a declared repository manifest of assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence. It should not claim what an LLM actually used at runtime. Later external consumed-context evidence may be imported and validated against Renma's repository model, while telemetry collection remains outside Renma.
 
 ## Design Notes
 

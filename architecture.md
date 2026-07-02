@@ -4,6 +4,8 @@ Renma is a Git-native deterministic governance and health layer for LLM-ready co
 
 The current CLI surface covers `scan`, `catalog`, `ownership`, `graph`, `readiness`, repeated-context diagnostics, semantic diff, and `ci-report`. Security diagnostics v1 adds deterministic safety findings for agent-facing operational instructions without executing commands or calling external services.
 
+The 0.7.0 direction is to stabilize and document security diagnostics. Follow-on releases should add security posture summaries to readiness and CI output, expose Trust Graph evidence as deterministic graph/catalog/readiness signals, and then produce a Repository Context BOM as a declared repository manifest.
+
 Renma sits at the repository governance layer, not the runtime layer.
 
 ```text
@@ -36,6 +38,8 @@ External signal producers
 ```
 
 Renma does not choose task context, assemble prompts, inject context, or execute agent workflows. Agents and runtimes decide how to use repository assets for a task.
+
+Near-term provenance features should stay repository-level. A Repository Context BOM is a manifest of declared assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence; it is not a report of actual LLM runtime usage.
 
 ## Goals
 
@@ -417,6 +421,8 @@ External tools may later emit signals into Renma:
 
 Renma may import these as repository evidence. Ownership of telemetry collection, storage, runtime tracing, and dashboards remains outside Renma.
 
+Consumed-context evidence from external agents, editor integrations, prompt wrappers, or CI tools may be useful later, but Renma should validate that evidence against the catalog, graph, readiness, and security model instead of becoming the telemetry producer.
+
 ## Roadmap Layers
 
 Completed baseline:
@@ -436,9 +442,11 @@ Completed baseline:
 
 Near-term implementation:
 
-1. Security diagnostics follow-up rule batches and policy tuning
-2. CI integration examples and sample readiness reports
-3. Optional LLM-assisted repository evaluation bundles
+1. Security diagnostics stabilization and policy tuning for 0.7.0
+2. Security posture summaries in readiness and CI reports for 0.8.x
+3. Trust Graph evidence derived from catalog, graph, readiness, and security signals for 0.9.x
+4. Repository Context BOM as a declared repository manifest for 1.0
+5. Optional consumed-context evidence import from external tools after the repository model is stable
 
 This sequence prioritizes shared context assets, CI review examples, and repository health before later external signal import work.
 
@@ -479,7 +487,7 @@ Baseline now in place:
 Near-term implementation work:
 
 - Repeated context discovery across shared contexts, skills, agents, references, profiles, and examples.
-- Stronger security and supply-chain safety diagnostics for agent-facing repository content.
+- Security diagnostics stabilization and security posture summaries for agent-facing repository content.
 - CI integration examples and sample readiness reports.
 - Optional LLM-assisted repository evaluation bundles.
 

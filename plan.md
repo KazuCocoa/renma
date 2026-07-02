@@ -38,7 +38,7 @@ Renma should help teams answer:
 
 Renma remains deterministic by default, CLI-first, Git-native, minimal-dependency, and independent of LLMs for core analysis. Optional external-LLM assistance may support suggestions, semantic duplicate labeling, or review summaries, but deterministic evidence remains the authority: LLM proposes. Renma verifies. Human approves.
 
-The 0.7.0 security direction refines deterministic diagnostics for agent-facing context assets. Renma should catch risky instructions inside discovered skills, contexts, agent files, references, profiles, examples, and tool guidance without becoming a broad package, CI, Docker, or supply-chain scanner.
+The 0.7.0 security direction stabilizes deterministic diagnostics for agent-facing context assets. Renma should catch risky instructions inside discovered skills, contexts, agent files, references, profiles, examples, and tool guidance without becoming a broad package, CI, Docker, GitHub Actions, or supply-chain scanner.
 
 ## Repository Model
 
@@ -342,9 +342,21 @@ Renma's shipped baseline is now grouped around:
 
 ### Near-Term Implementation
 
-- Deterministic network/upload/secret-material policy refinement and diagnostics coverage.
-- Deterministic dependency and CI artifact diagnostics for agent-facing repository artifacts.
+- Deterministic network/upload/secret-material policy refinement and diagnostics coverage for agent-facing repository artifacts.
+- Security posture summaries for readiness and CI reports, derived from existing scan, catalog, graph, and policy evidence.
 - Optional external-LLM repository evaluation bundles remain external and advisory, not scan/catalog/graph/readiness/diff/CI truth.
+
+### Security posture, Trust Graph, and Repository Context BOM
+
+Renma should extend security diagnostics into repository-level security posture reporting before adding heavier provenance features.
+
+Near-term work should keep improving deterministic security diagnostics for agent-facing artifacts. The next layer should summarize effective policy, profile resolution, approved destinations, human approval requirements, forbidden inputs, and high-risk findings in readiness and CI reports.
+
+Trust Graph should initially be an interpretation of existing catalog and graph evidence, not a new runtime system. Nodes may expose deterministic trust and risk signals such as owner presence, lifecycle status, resolved dependencies, security profile resolution, policy contradictions, unapproved destinations, missing policy metadata, and high-severity safety findings.
+
+Repository Context BOM should begin as a repository-level manifest of declared assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence. It should not claim actual LLM runtime usage.
+
+Actual consumed-context evidence may be imported later from external agents, editor integrations, prompt wrappers, or CI tools and validated against the repository model. Renma should remain telemetry-aware but not telemetry-responsible.
 
 ### Later / External Evidence
 
@@ -500,9 +512,11 @@ In v1, readiness does not choose runtime context, assemble prompt packages, call
 
 Future work may add optional LLM-assisted integration reports, CI examples, sample readiness reports, or semantic-diff review bundles, but those are separate from deterministic readiness output.
 
+Security posture should be the next readiness layer after diagnostics stabilization. It should summarize effective security policy, profile resolution, allowed data, forbidden inputs, approved network and upload destinations, human approval requirements, and high-risk findings without selecting runtime context or enforcing agent behavior.
+
 ### 9. Optional External Signal Import
 
-External signal producers may later provide evidence such as:
+External signal producers may later provide consumed-context evidence such as:
 
 - Which context assets agents actually loaded
 - Which references were ignored
@@ -519,6 +533,8 @@ Potential producers:
 - External agent signal import
 
 Renma may import those signals as repository evidence. Renma should not become the runtime, telemetry backend, provider gateway, or prompt wrapper.
+
+Imported consumed-context evidence should be validated against the catalog, graph, readiness, and security posture model. It should not redefine the near-term Repository Context BOM, which remains a declared repository manifest rather than an actual runtime usage report.
 
 ## Out Of Scope
 
@@ -549,7 +565,7 @@ LLM proposes. Renma verifies. Human approves.
 
 No-LLM workflows must remain first-class.
 
-## Security and supply-chain safety
+## Security diagnostics safety
 
 Renma does not execute skills, install dependencies, or call an LLM to judge content. Its safety model is deterministic, Git-native, and artifact-facing: make agent instructions reviewable before they are reused in prompts, CI jobs, or local automation.
 
@@ -571,7 +587,8 @@ Agent-facing allowed network access, upload, and secret-material rules live in c
 
 Near-term / future:
 
-- Harden rule coverage for dependency and supply-chain artifacts that agents commonly touch, including package manager scripts, CI workflow commands, generated artifacts, and task-time tooling notes.
+- Stabilize security diagnostics for agent-facing context assets and keep broad package, Docker, GitHub Actions, and supply-chain scanner behavior outside Renma's core scope.
+- Add security posture summaries to readiness and CI reports using the existing policy, profile, destination, approval, and finding evidence.
 - Keep output useful for CI/PR review by improving JSON and Markdown diagnostics rather than adding a standalone `security-diagnostics-v6` command.
 - Add focused tests before broadening heuristics, especially for upload/network allow-lists, security profile inheritance, command-risk findings, and false-positive suppression.
 - Keep LLM assistance optional and outside the trusted decision path; Renma remains deterministic, non-runtime, and non-LLM.
