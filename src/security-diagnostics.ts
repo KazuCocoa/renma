@@ -1897,7 +1897,9 @@ function requiresHumanApprovalGuard(line: string): boolean {
 }
 
 function referencesConcreteNetworkDestination(line: string): boolean {
-  return NETWORK_ACTION_RE.test(line) && extractNetworkDestinations(line).length > 0;
+  return (
+    NETWORK_ACTION_RE.test(line) && extractNetworkDestinations(line).length > 0
+  );
 }
 
 function isDefensiveOrGuardedActionInstruction(line: string): boolean {
