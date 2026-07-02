@@ -627,13 +627,21 @@ const OVERBROAD_CONTEXT_RE =
 const NO_REDACTION_RE =
   /\b(do not|don't|without|no|never)\b.{0,30}\b(redact|redaction|sanitize|mask|obfuscate)\b|\b(redact|sanitize|mask|obfuscate)\b.{0,30}\b(disabled|false|off)\b/i;
 const APPROVAL_RE =
-  /\b(human|user|owner|maintainer|reviewer|security)\b.{0,40}\b(approve|approval|confirm|confirmation|review|consent|authorize|authorization)\b|\b(ask|require|obtain|wait for)\b.{0,40}\b(approval|confirmation|consent|authorization)\b/i;
+  /\b(ask|prompt|require|obtain|wait for)\b.{0,50}\b(human|user|owner|maintainer|reviewer|security)?\s*(approval|confirmation|consent|authorization|review)\b|\b(human|user|owner|maintainer|reviewer|security)\b.{0,50}\b(approve|approval|confirm|confirmation|review|consent|authorize|authorization)\b|\bonly\b.{0,20}\b(after|with)\b.{0,40}\b(explicit\s+)?(human|user|owner|maintainer|reviewer|security)?\s*(approval|confirmation|review|authorization)\b|\bdo\s+not\s+run\s+automatically\b.{0,60}\b(human|user|maintainer|review|approval|confirmation)\b/i;
+const WEAK_OR_NEGATED_APPROVAL_RE =
+  /\b(no approval|approval is not|approval isn't|approved by default|approval by default|without approval|automatically approved|safe|run carefully|make sure it works)\b/i;
+const RECOVERY_GUARD_RE =
+  /\b(create|make|take|keep|verify|confirm|document|check|use|run)\b.{0,40}\b(backup|rollback|roll back|restore|dry[- ]run|revert)\b|\b(backup|rollback|roll back|restore|dry[- ]run|revert)\b.{0,40}\b(first|before|steps?|plan|guidance|confirm|verify|check)\b/i;
 const SECRET_WORD_RE =
   /\b(secret|secrets|credential|credentials|token|password|passwd|api key|apikey|private key|ssh key|signing key|certificate|cert|auth)\b/i;
 const SECRET_ACTION_RE =
   /\b(copy|print|cat|echo|paste|upload|send|share|attach|include|dump|export|log|summari[sz]e|read)\b/i;
 const SAFE_NEGATION_RE =
   /\b(not|never|avoid|exclude|without|redact|mock|fake|sample|placeholder|dummy)\b.{0,40}\b(secret|secrets|credential|credentials|token|password|private key)\b|\b(secret|secrets|credential|credentials|token|password|private key)\b.{0,40}\b(not|never|avoid|exclude|redact|mock|fake|sample|placeholder|dummy)\b/i;
+const DEFENSIVE_ACTION_RE =
+  /\b(do\s+not|don't|never|avoid|exclude|skip|omit|forbid|forbidden|disallow|block)\b.{0,80}\b(upload|send|post|put|share|attach|submit|sync|push|publish|copy|paste|include|print|cat|echo|log|dump|curl|wget|pipe|bash|sh|sudo|chmod|chown|rm\s+-|git\s+reset|git\s+clean|delete|install|add)\b/i;
+const GUARDED_ACTION_RE =
+  /\b(only|unless|after|with|before)\b.{0,80}\b(approval|approved|confirmation|confirm|human review|maintainer review|redact|redacted|redaction|dry[- ]run|backup|rollback)\b|\b(redact|redacted|redaction|approval|approved|confirmation|confirm|human review|maintainer review|dry[- ]run|backup|rollback)\b.{0,80}\b(before|after|upload|send|post|put|share|sudo|rm\s+-|git\s+reset|git\s+clean|delete|install|add)\b/i;
 const REMOTE_SCRIPT_RE =
   /\b(curl|wget)\b[^\n]*?(https?:\/\/[^\s|`'")]+)[^\n]*\|\s*(sh|bash|zsh)\b/i;
 const PRIVILEGED_COMMAND_RE =
@@ -697,7 +705,8 @@ function securityFindingsForArtifact(
       : -1;
   const scanStart = frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
   let inFence = false;
-  let recentApprovalLine = 0;
+  let recentHumanApprovalLine = 0;
+  let recentRiskMitigationLine = 0;
 
   if (
     (artifact.kind === "skill" || artifact.kind === "context") &&
@@ -737,9 +746,15 @@ function securityFindingsForArtifact(
     if (isPolicyLine(line)) {
       continue;
     }
-    const hasApprovalGuard =
-      hasNearbyApprovalLanguage(line) ||
-      (recentApprovalLine > 0 && lineNumber - recentApprovalLine <= 2);
+    const hasHumanApprovalGuard =
+      hasExplicitHumanApprovalGuard(line) ||
+      (recentHumanApprovalLine > 0 &&
+        lineNumber - recentHumanApprovalLine <= 2);
+    const hasCommandRiskGuard =
+      hasHumanApprovalGuard ||
+      hasLocalRiskMitigationGuard(line) ||
+      (recentRiskMitigationLine > 0 &&
+        lineNumber - recentRiskMitigationLine <= 2);
     const commandLine =
       !shellComment &&
       (inFence ||
@@ -748,7 +763,7 @@ function securityFindingsForArtifact(
         CREDENTIAL_HEADER_RE.test(line));
 
     detections.push(
-      ...policyDetections(line, lineNumber, policy, hasApprovalGuard),
+      ...policyDetections(line, lineNumber, policy, hasHumanApprovalGuard),
     );
     detections.push(...disallowedCommandDetections(line, lineNumber, policy));
     if (!commandLine || referencesSensitiveFile(line)) {
@@ -761,11 +776,16 @@ function securityFindingsForArtifact(
     detections.push(...predictableTempDetections(line, lineNumber));
 
     if (commandLine) {
-      detections.push(...commandDetections(line, lineNumber, hasApprovalGuard));
+      detections.push(
+        ...commandDetections(line, lineNumber, hasCommandRiskGuard),
+      );
     }
 
-    if (hasNearbyApprovalLanguage(line)) {
-      recentApprovalLine = lineNumber;
+    if (hasExplicitHumanApprovalGuard(line)) {
+      recentHumanApprovalLine = lineNumber;
+    }
+    if (hasLocalRiskMitigationGuard(line)) {
+      recentRiskMitigationLine = lineNumber;
     }
   }
 
@@ -855,11 +875,17 @@ function policyDetections(
   line: string,
   lineNumber: number,
   policy: SecurityPolicy,
-  hasApprovalGuard: boolean,
+  hasHumanApprovalGuard: boolean,
 ): Detection[] {
   const detections: Detection[] = [];
+  const defensiveAction = isDefensiveActionInstruction(line);
+  const safeOrGuarded = isDefensiveOrGuardedActionInstruction(line);
 
-  if (policy.networkAllowed === false && NETWORK_ACTION_RE.test(line)) {
+  if (
+    policy.networkAllowed === false &&
+    NETWORK_ACTION_RE.test(line) &&
+    !safeOrGuarded
+  ) {
     detections.push({
       metadata: RULES.instructionViolatesPolicy,
       severity: "high",
@@ -883,7 +909,11 @@ function policyDetections(
     }
   }
 
-  if (policy.externalUploadAllowed === false && isUploadInstruction(line)) {
+  if (
+    policy.externalUploadAllowed === false &&
+    isUploadInstruction(line) &&
+    !safeOrGuarded
+  ) {
     detections.push({
       metadata: RULES.instructionViolatesPolicy,
       severity: "high",
@@ -939,7 +969,8 @@ function policyDetections(
   const needsApproval =
     (EXTERNAL_UPLOAD_RE.test(line) || CLOUD_UPLOAD_RE.test(line)) &&
     policy.humanApprovalRequired === true &&
-    !hasApprovalGuard;
+    !hasHumanApprovalGuard &&
+    !defensiveAction;
   if (needsApproval) {
     detections.push({
       metadata: RULES.missingHumanApprovalGuard,
@@ -1038,6 +1069,9 @@ function networkAndUploadDetections(
   policy: SecurityPolicy,
 ): Detection[] {
   const detections: Detection[] = [];
+  if (isDefensiveOrGuardedActionInstruction(line)) {
+    return detections;
+  }
 
   if (EXTERNAL_UPLOAD_RE.test(line)) {
     detections.push({
@@ -1096,12 +1130,13 @@ function contextScopeDetections(line: string, lineNumber: number): Detection[] {
 function commandDetections(
   line: string,
   lineNumber: number,
-  hasApprovalGuard: boolean,
+  hasCommandRiskGuard: boolean,
 ): Detection[] {
   const detections: Detection[] = [];
+  const defensiveAction = isDefensiveOrGuardedActionInstruction(line);
 
   const remoteScript = line.match(REMOTE_SCRIPT_RE);
-  if (remoteScript && !hasPinnedRemoteScript(line)) {
+  if (remoteScript && !hasPinnedRemoteScript(line) && !defensiveAction) {
     const fetchCommand = remoteScript[1] ?? "curl";
     const remoteUrl = (remoteScript[2] ?? line).replace(/[.,;:]+$/, "");
     const shell = remoteScript[3] ?? "sh";
@@ -1115,7 +1150,7 @@ function commandDetections(
   }
 
   const unpinnedInstall = unpinnedDependencyInstall(line);
-  if (unpinnedInstall) {
+  if (unpinnedInstall && !defensiveAction) {
     detections.push({
       metadata: RULES.unpinnedDependencyInstall,
       severity: "medium",
@@ -1124,7 +1159,11 @@ function commandDetections(
     });
   }
 
-  if (PRIVILEGED_COMMAND_RE.test(line) && !hasApprovalGuard) {
+  if (
+    PRIVILEGED_COMMAND_RE.test(line) &&
+    !hasCommandRiskGuard &&
+    !defensiveAction
+  ) {
     detections.push({
       metadata: RULES.privilegedCommandWithoutGuard,
       severity: "medium",
@@ -1133,7 +1172,11 @@ function commandDetections(
     });
   }
 
-  if (DESTRUCTIVE_COMMAND_RE.test(line) && !hasApprovalGuard) {
+  if (
+    DESTRUCTIVE_COMMAND_RE.test(line) &&
+    !hasCommandRiskGuard &&
+    !defensiveAction
+  ) {
     detections.push({
       metadata: RULES.destructiveCommand,
       severity: "high",
@@ -1829,13 +1872,28 @@ function isCommandLike(line: string): boolean {
   );
 }
 
-function hasNearbyApprovalLanguage(line: string): boolean {
-  return (
-    APPROVAL_RE.test(line) ||
-    /\b(approved|approval|confirm|confirmed|ask|asking|asked|review|reviewed|authorize|authorized|permission|consent|guardrail|guard)\b/i.test(
-      line,
-    )
-  );
+function hasExplicitHumanApprovalGuard(line: string): boolean {
+  if (WEAK_OR_NEGATED_APPROVAL_RE.test(line)) {
+    return false;
+  }
+  return APPROVAL_RE.test(line);
+}
+
+function hasLocalRiskMitigationGuard(line: string): boolean {
+  return RECOVERY_GUARD_RE.test(line);
+}
+
+function isDefensiveOrGuardedActionInstruction(line: string): boolean {
+  return isDefensiveActionInstruction(line) || GUARDED_ACTION_RE.test(line);
+}
+
+function isDefensiveActionInstruction(line: string): boolean {
+  if (
+    /\b(no approval is needed|approved by default|safe to run)\b/i.test(line)
+  ) {
+    return false;
+  }
+  return DEFENSIVE_ACTION_RE.test(line);
 }
 
 function hasPinnedRemoteScript(line: string): boolean {
