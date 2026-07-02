@@ -1887,13 +1887,17 @@ function requiresHumanApprovalGuard(line: string): boolean {
   return (
     EXTERNAL_UPLOAD_RE.test(line) ||
     CLOUD_UPLOAD_RE.test(line) ||
-    NETWORK_ACTION_RE.test(line) ||
+    referencesConcreteNetworkDestination(line) ||
     (SECRET_ACTION_RE.test(line) && SECRET_WORD_RE.test(line)) ||
     (referencesSensitiveFile(line) &&
       !isSafeSensitiveHandlingInstruction(line)) ||
     PRIVILEGED_COMMAND_RE.test(line) ||
     DESTRUCTIVE_COMMAND_RE.test(line)
   );
+}
+
+function referencesConcreteNetworkDestination(line: string): boolean {
+  return NETWORK_ACTION_RE.test(line) && extractNetworkDestinations(line).length > 0;
 }
 
 function isDefensiveOrGuardedActionInstruction(line: string): boolean {
