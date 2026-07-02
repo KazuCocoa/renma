@@ -1,5 +1,9 @@
 # Renma
 
+[![NPM version](http://img.shields.io/npm/v/renma.svg)](https://npmjs.org/package/renma)
+[![Downloads](http://img.shields.io/npm/dm/renma.svg)](https://npmjs.org/package/renma)
+
+
 Renma is an opinionated Context Repository toolkit for LLM-era software teams.
 
 It helps teams manage reusable, human-curated context assets in Git so agents, coding tools, and future AI runtimes can consume team knowledge more safely and consistently.
