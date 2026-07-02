@@ -6,6 +6,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-02
+
 ### Changed
 
 - Refined deterministic security diagnostics for agent-facing context assets without adding package or CI workflow scanning.
@@ -121,7 +123,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/KazuCocoa/renma/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/KazuCocoa/renma/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/KazuCocoa/renma/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/KazuCocoa/renma/compare/v0.5.0...v0.5.1
