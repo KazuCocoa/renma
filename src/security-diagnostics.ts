@@ -967,8 +967,8 @@ function policyDetections(
   }
 
   const needsApproval =
-    (EXTERNAL_UPLOAD_RE.test(line) || CLOUD_UPLOAD_RE.test(line)) &&
     policy.humanApprovalRequired === true &&
+    requiresHumanApprovalGuard(line) &&
     !hasHumanApprovalGuard &&
     !defensiveAction;
   if (needsApproval) {
@@ -1881,6 +1881,19 @@ function hasExplicitHumanApprovalGuard(line: string): boolean {
 
 function hasLocalRiskMitigationGuard(line: string): boolean {
   return RECOVERY_GUARD_RE.test(line);
+}
+
+function requiresHumanApprovalGuard(line: string): boolean {
+  return (
+    EXTERNAL_UPLOAD_RE.test(line) ||
+    CLOUD_UPLOAD_RE.test(line) ||
+    NETWORK_ACTION_RE.test(line) ||
+    (SECRET_ACTION_RE.test(line) && SECRET_WORD_RE.test(line)) ||
+    (referencesSensitiveFile(line) &&
+      !isSafeSensitiveHandlingInstruction(line)) ||
+    PRIVILEGED_COMMAND_RE.test(line) ||
+    DESTRUCTIVE_COMMAND_RE.test(line)
+  );
 }
 
 function isDefensiveOrGuardedActionInstruction(line: string): boolean {
