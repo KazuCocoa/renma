@@ -15,6 +15,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Expanded the user manual with metadata authoring guidance, security policy examples, reusable security profile guidance, and common security diagnostic fixes for the 0.7.0 line.
 - Added a first-skill authoring walkthrough that shows how to use scaffold, inspect, scan, graph, readiness, and LLM-assisted repair loops to create and refine skills.
 - Added guidance for deriving related router skills from existing skills, including an Appium setup example.
+- Split the expanded user manual into focused authoring and security policy guides while keeping the user manual as the CLI entrypoint.
 
 ## [0.6.1] - 2026-06-29
 

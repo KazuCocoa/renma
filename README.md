@@ -566,6 +566,8 @@ node dist/index.js scan .
 ## Documentation
 
 - [User Manual](docs/user-manual.md)
+- [Authoring Guide](docs/authoring-guide.md)
+- [Security Policy Guide](docs/security-policy.md)
 - [Diagnostics Reference](docs/diagnostics.md)
 
 ## Related Docs
