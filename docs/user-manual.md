@@ -203,6 +203,8 @@ Readiness combines catalog diagnostics, ownership metadata, graph resolution, re
 
 Output includes a readiness score and level, workflow checks, diagnostics, scan findings that affect readiness, and graph or ownership summary data.
 
+Planned security posture summaries should remain static repository evidence in this report: effective policy, security profile resolution, allowed data, forbidden inputs, approved destinations, human approval requirements, and high-risk findings. Readiness does not choose runtime context or describe what an LLM actually used.
+
 ### `diff`
 
 Compares deterministic readiness reports for two git refs.
@@ -228,6 +230,8 @@ renma ci-report . --from main --to HEAD --format json
 The report summarizes readiness deltas, graph-resolution changes, added and removed findings, and policy-relevant status. It is CI-oriented: `PASS` and `WARN` exit `0`, `FAIL` exits `1`, and usage, command, or configuration errors exit `2`.
 
 Output includes a CI status (`PASS`, `WARN`, or `FAIL`), a summary, readiness changes, graph changes, and review-focused finding changes.
+
+Future CI output may include security posture changes and declared Repository Context BOM evidence. Those artifacts should describe repository state, not prompt assembly, context injection, agent execution, or runtime telemetry.
 
 ### `ownership`
 
