@@ -766,6 +766,72 @@ Upload the results to external storage.
   assert.ok(ids.includes("SEC-MISSING-HUMAN-APPROVAL-GUARD"));
 });
 
+test("requires_human_approval true rejects concrete network URL without explicit approval", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public package metadata
+requires_human_approval: true
+---
+
+Fetch https://api.github.com/repos/KazuCocoa/renma before release prep.
+`),
+  ]);
+  const ids = findings.map((finding) => finding.id);
+
+  assert.ok(ids.includes("SEC-MISSING-HUMAN-APPROVAL-GUARD"));
+});
+
+test("requires_human_approval true does not reject ordinary local get wording", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: local logs
+requires_human_approval: true
+---
+
+Get local logs from the repository build output.
+`),
+  ]);
+  const ids = findings.map((finding) => finding.id);
+
+  assert.equal(ids.includes("SEC-MISSING-HUMAN-APPROVAL-GUARD"), false);
+});
+
+test("requires_human_approval true rejects destructive dry-run without explicit approval", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: local build artifacts
+requires_human_approval: true
+---
+
+Use --dry-run first and create a backup before running this.
+\`\`\`bash
+rm -rf /tmp/renma-output
+\`\`\`
+`),
+  ]);
+  const ids = findings.map((finding) => finding.id);
+
+  assert.ok(ids.includes("SEC-MISSING-HUMAN-APPROVAL-GUARD"));
+});
+
+test("requires_human_approval true accepts high-risk command with explicit approval", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: local build artifacts
+requires_human_approval: true
+---
+
+Use --dry-run first, create a backup, and ask the user for approval before running this.
+\`\`\`bash
+rm -rf /tmp/renma-output
+\`\`\`
+`),
+  ]);
+  const ids = findings.map((finding) => finding.id);
+
+  assert.equal(ids.includes("SEC-MISSING-HUMAN-APPROVAL-GUARD"), false);
+});
+
 test("requires_human_approval true rejects guarded upload without explicit approval", () => {
   const findings = securityDiagnosticFindings([
     v2SecurityArtifact(`---

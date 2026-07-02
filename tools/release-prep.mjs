@@ -333,7 +333,7 @@ function buildReleaseNotes({ version: releaseVersion, base: baseTag, target }) {
     "If using the published package:",
     "",
     "```bash",
-    "npm install -g renma",
+    `npm install -g renma@${releaseVersion}`,
     "```",
     "",
     "## Validation",
