@@ -544,7 +544,7 @@ Renma is part of a broader idea: treating reusable LLM context as software-manag
 
 - [Beyond Prompt Engineering: Why We Need Context Repositories](https://kazucocoa.blog/2026/06/26/beyond-prompt-engineering-why-we-need-context-repositories/)
 - [Introducing Renma: An Opinionated Context Repository for LLMs](https://kazucocoa.blog/2026/06/29/introducing-renma-an-opinionated-context-repository-for-llms/)
-- Where Does a Context Repository Fit in the AI Stack? (planned)
+- [Where Does a Context Repository Fit in the AI Stack?](https://kazucocoa.blog/2026/07/01/where-does-a-context-repository-fit-in-the-ai-stack/)
 - Context Engineering Is Software Engineering (planned)
 
 ([Context Repository Series](https://kazucocoa.blog/context-repository/))

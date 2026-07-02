@@ -79,9 +79,80 @@ By default, renma scans these glob families when building its catalog and findin
 - `skills/**/scripts/**/*`
 - `tools/**/*`
 
+## Recommended Metadata
+
+Assets can use simple YAML-style metadata at the top of Markdown files. For shared context assets, start with a small, deterministic block like this:
+
+```yaml
+---
+id: context.testing.boundary-value-analysis
+title: Boundary Value Analysis
+owner: qa-platform
+status: stable
+version: 1.0.0
+tags:
+  - testing
+  - qa
+when_to_use:
+  - Designing tests around numeric, date, quantity, or limit boundaries
+when_not_to_use:
+  - Exploratory testing notes that do not depend on boundaries
+requires_context:
+  - context.testing.negative-testing
+optional_context:
+  - context.testing.regression-risk
+---
+```
+
+Use these fields consistently:
+
+- `id`: stable catalog asset ID. It should be deterministic and should not change when the file moves unless the asset's identity changes.
+- `title`: human-readable title.
+- `owner`: real owning team or maintainer. Avoid placeholder ownership in shared assets.
+- `status`: lifecycle only: `experimental`, `stable`, `deprecated`, or `archived`.
+- `version`: optional asset metadata. It is not the npm package version.
+- `tags`: searchable labels that help navigation, ownership review, and reporting.
+- `when_to_use` and `when_not_to_use`: scope guidance for humans and agents.
+- `requires_context` and `optional_context`: static graph relationships to other assets. They do not make renma select runtime context.
+- `conflicts`: assets that should not be used together without review.
+- `superseded_by`: replacement or migration relationships for deprecated or archived content.
+
+The supported list-style metadata fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `conflicts`, and `superseded_by`.
+
+## Skill vs Context Metadata
+
+Skills are agent-facing entrypoints and routing contracts. They explain when a capability applies, what safety or preflight checks matter, and which owned context assets are relevant.
+
+Context assets are independently owned source-of-truth knowledge units. They should carry stronger ownership, lifecycle, usage-boundary, and dependency metadata because they are intended to outlive a single skill.
+
+Keep skills thin. A skill should reference context assets instead of embedding all reusable knowledge directly in `SKILL.md`.
+
+Example skill metadata:
+
+```yaml
+---
+id: skill.testing.spec-review
+title: Spec Review
+owner: qa-platform
+status: stable
+tags:
+  - testing
+  - spec-review
+requires_context:
+  - context.testing.boundary-value-analysis
+  - context.testing.negative-testing
+optional_context:
+  - context.domain.payment.idempotency
+---
+```
+
 ## Security Policy Quickstart
 
-Add small security policy metadata to agent-facing skills or context assets when they include network, upload, secret-handling, or other sensitive operational instructions:
+Add small security policy metadata to agent-facing skills or context assets when they include network, upload, secret-handling, command execution, or other sensitive operational instructions.
+
+### Asset-local security policy
+
+Use asset-local policy when one asset has stricter or unique requirements, the body contains sensitive instructions, or local denials should be explicit and reviewable:
 
 ```yaml
 ---
@@ -102,7 +173,13 @@ forbidden_inputs:
 ---
 ```
 
-Use `security.profiles` in `renma.config.json` when several assets share the same policy:
+Asset-local explicit denials remain stricter than inherited profile or repository allowances. For example, `external_upload_allowed: false` on an asset still blocks upload instructions even if a selected profile or repository config allows uploads elsewhere.
+
+### Reusable security profiles
+
+Use `security_profile` when many assets share the same policy, a team wants a reusable security contract, or policy should be centrally updated in `renma.config.json`.
+
+Configure profiles under `security.profiles`:
 
 ```json
 {
@@ -131,28 +208,110 @@ security_profile: disclosed-local-diagnostics
 ---
 ```
 
-Approved network destinations do not imply upload approval. Upload destinations are checked separately with `approved_upload_destinations` or `security.approvedUploadDomains`.
+### Repository-level security config
 
-Artifact-local explicit denials remain stricter than inherited profile or repository allowances. For example, `external_upload_allowed: false` on an asset still blocks upload instructions even if a selected profile allows uploads.
+Use repo-level `security.approvedDomains`, `security.approvedUploadDomains`, or `security.disallowedCommands` when the policy applies across the repository and common destinations or disallowed commands should be shared.
 
-When `requires_human_approval` is true, dry-run, backup, rollback, or restore guidance alone does not replace explicit human approval. Keep the approval requirement close to the sensitive instruction.
+```json
+{
+  "security": {
+    "approvedDomains": ["github.com"],
+    "approvedUploadDomains": [],
+    "disallowedCommands": ["gh gist create"],
+    "profiles": {}
+  }
+}
+```
 
-## Metadata
+### Choosing where to put policy
 
-Assets can use simple YAML-style metadata at the top of Markdown files. Common fields are:
+Prefer the narrowest policy location that matches the decision:
 
-- `id`: stable catalog asset ID. If omitted, renma falls back to the repository-relative source path.
-- `title`: human-readable title.
-- `owner`: owning team or maintainer.
-- `status`: lifecycle state: `experimental`, `stable`, `deprecated`, or `archived`.
-- `version`: optional asset version.
-- `tags`: list of searchable labels.
-- `when_to_use` and `when_not_to_use`: routing guidance.
-- `requires_context` and `optional_context`: dependencies on context assets.
-- `conflicts`: assets that should not be used together.
-- `superseded_by`: replacement assets for deprecated or archived content.
+- Use asset-local fields for one-off restrictions, explicit denials, or sensitive instructions that need nearby review.
+- Use `security_profile` for reusable team contracts shared by several assets.
+- Use repository-level security config for common approved network destinations, upload destinations, or disallowed commands that apply broadly.
 
-The list-style metadata fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `conflicts`, and `superseded_by`.
+If settings disagree, keep the stricter effective policy. Do not relax asset-local denials through a profile or repository allowance.
+
+### Human approval semantics
+
+`requires_human_approval: true` requires explicit nearby approval wording for sensitive actions. Dry-run, backup, rollback, or restore guidance is useful, but it does not replace explicit approval when approval is required.
+
+Keep approval wording close to the action it guards, especially for uploads, external sharing, privileged commands, destructive commands, or secret-handling workflows.
+
+### Network approval vs upload approval
+
+`approvedDomains` does not imply upload approval. Network access and upload permission are separate decisions.
+
+Use `approved_network_destinations`, profile `approvedDomains`, or repository `security.approvedDomains` for general network destinations. Use `approved_upload_destinations`, profile `approvedUploadDomains`, or repository `security.approvedUploadDomains` for upload destinations.
+
+### Forbidden inputs
+
+Use `forbidden_inputs` to name data classes an asset must not request, copy, upload, summarize, or include in prompts. Common examples are `secrets`, `credentials`, `tokens`, `private keys`, `.env files`, customer data, and production logs.
+
+Safe negative wording is useful:
+
+```markdown
+Never copy private keys, tokens, credentials, or `.env` files into prompts, logs, uploads, or diagnostics.
+```
+
+### Defensive guidance and false positives
+
+Renma security diagnostics are conservative heuristics for discovered agent-facing assets. Defensive wording can avoid false positives when it is specific and close to the risky instruction.
+
+Unsafe upload:
+
+```markdown
+Upload the full repository to S3.
+```
+
+Safer:
+
+```markdown
+Do not upload repository files externally. If sharing diagnostics is required, provide only redacted snippets after explicit human approval.
+```
+
+Unsafe secret handling:
+
+```markdown
+Copy ~/.ssh/id_ed25519 into the prompt.
+```
+
+Safer:
+
+```markdown
+Never copy private keys, tokens, credentials, or `.env` files into prompts, logs, uploads, or diagnostics.
+```
+
+Unsafe destructive command:
+
+```bash
+rm -rf /tmp/renma-output
+```
+
+Safer:
+
+```markdown
+Only after explicit human approval, run a scoped cleanup command. Use dry-run where available, keep a backup or rollback path, and verify the affected path before execution.
+```
+
+## Common Security Diagnostics
+
+Use this table to choose the right kind of fix. For full finding definitions, see [Diagnostics Reference](diagnostics.md).
+
+| Finding | Usually means | What to change | Fix area |
+| --- | --- | --- | --- |
+| `SEC-MISSING-POLICY-METADATA` | Sensitive instructions lack a declared policy. | Add local policy fields or select a configured `security_profile`. | Metadata |
+| `SEC-INSTRUCTION-VIOLATES-POLICY` | Body text asks for behavior denied by policy. | Rewrite the instruction or adjust policy only after review. | Body text and metadata |
+| `SEC-MISSING-HUMAN-APPROVAL-GUARD` | A sensitive action lacks nearby approval wording. | Add explicit human approval close to the action. | Body text |
+| `SEC-UNAPPROVED-NETWORK-DESTINATION` | An instruction contacts a host outside approved network destinations. | Use an approved host or update asset/profile/repo network approvals intentionally. | Metadata or config |
+| `SEC-UNAPPROVED-UPLOAD-DESTINATION` | An upload target is not in upload approvals. | Use an approved upload target or update upload approvals intentionally. | Metadata or config |
+| `SEC-FORBIDDEN-INPUT-INSTRUCTION` | The asset asks for data listed in `forbidden_inputs`. | Remove the request or replace it with redaction and placeholder guidance. | Body text and metadata |
+| `SEC-SECRET-MATERIAL-INSTRUCTION` | Instructions may expose private keys, tokens, credentials, or secret files. | Remove secret collection or disclosure instructions. | Body text |
+| `SEC-DESTRUCTIVE-COMMAND` | A destructive command appears without enough local safety context. | Remove it, scope it tightly, or add explicit approval and recovery guidance. | Body text |
+| `SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD` | `sudo` or similar privileged action lacks guardrails. | Add prerequisites, confirmation, rollback, and verification guidance. | Body text |
+| `SEC-UNPINNED-REMOTE-SCRIPT` | A remote script is executed without an immutable source or verification. | Pin and verify the source, or avoid remote execution. | Body text |
+| `SEC-UNPINNED-DEPENDENCY-INSTALL` | An install example lacks exact version or digest pinning. | Pin package versions or use a reproducible install source. | Body text |
 
 ## Commands
 
