@@ -11,6 +11,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Refined deterministic security diagnostics for agent-facing context assets without adding package or CI workflow scanning.
 - Reduced false positives for guarded or defensive security guidance around destructive commands, privileged commands, remote script execution, unpinned installs, and external uploads.
 - Clarified the 0.7.0-and-later roadmap: security diagnostics stabilization first, security posture summaries next, Trust Graph as deterministic repository evidence, and Repository Context BOM as a declared manifest rather than runtime usage telemetry.
+- Added a user-manual quickstart for security policy metadata and reusable security profiles.
 
 ## [0.6.1] - 2026-06-29
 

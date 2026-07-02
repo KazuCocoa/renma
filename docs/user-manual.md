@@ -79,6 +79,64 @@ By default, renma scans these glob families when building its catalog and findin
 - `skills/**/scripts/**/*`
 - `tools/**/*`
 
+## Security Policy Quickstart
+
+Add small security policy metadata to agent-facing skills or context assets when they include network, upload, secret-handling, or other sensitive operational instructions:
+
+```yaml
+---
+id: skill.diagnostics.local-triage
+owner: qa-platform
+status: stable
+allowed_data:
+  - public
+  - sanitized diagnostics
+network_allowed: true
+external_upload_allowed: false
+secrets_allowed: false
+requires_human_approval: true
+forbidden_inputs:
+  - secrets
+  - credentials
+  - tokens
+---
+```
+
+Use `security.profiles` in `renma.config.json` when several assets share the same policy:
+
+```json
+{
+  "security": {
+    "profiles": {
+      "disclosed-local-diagnostics": {
+        "allowedData": ["public", "sanitized diagnostics"],
+        "networkAllowed": true,
+        "externalUploadAllowed": false,
+        "secretsAllowed": false,
+        "humanApprovalRequired": true,
+        "forbiddenInputs": ["secrets", "credentials", "tokens"],
+        "approvedDomains": ["github.com"],
+        "approvedUploadDomains": []
+      }
+    }
+  }
+}
+```
+
+Then select the profile from an asset:
+
+```yaml
+---
+security_profile: disclosed-local-diagnostics
+---
+```
+
+Approved network destinations do not imply upload approval. Upload destinations are checked separately with `approved_upload_destinations` or `security.approvedUploadDomains`.
+
+Artifact-local explicit denials remain stricter than inherited profile or repository allowances. For example, `external_upload_allowed: false` on an asset still blocks upload instructions even if a selected profile allows uploads.
+
+When `requires_human_approval` is true, dry-run, backup, rollback, or restore guidance alone does not replace explicit human approval. Keep the approval requirement close to the sensitive instruction.
+
 ## Metadata
 
 Assets can use simple YAML-style metadata at the top of Markdown files. Common fields are:
