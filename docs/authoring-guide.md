@@ -104,6 +104,19 @@ renma scaffold skill skills/testing/spec-review/SKILL.md \
   --tags testing,spec-review
 ```
 
+If you want to hand the scaffold and authoring constraints to an external or local LLM before creating the file, emit a prompt instead:
+
+```bash
+renma scaffold skill skills/testing/spec-review/SKILL.md \
+  --id skill.testing.spec-review \
+  --title "Spec Review" \
+  --owner qa-platform \
+  --tags testing,spec-review \
+  --format prompt > spec-review-authoring-prompt.md
+```
+
+Review the prompt, add any repository-specific evidence or constraints, then give it to your LLM tool. The LLM should propose a repository patch; Renma still verifies the result after you apply and review it.
+
 The generated file is intentionally small. Treat it as a starting point for review, not as a complete skill. Fill in these sections before depending on it:
 
 - Purpose: the recurring task, decision, or workflow the skill guides.
@@ -125,7 +138,7 @@ renma readiness . --format markdown
 
 Renma does not call an LLM, choose runtime task context, assemble live prompts, inject context into agents, execute agent workflows, or own runtime telemetry. It emits deterministic repository evidence. You can give that evidence to your own local or external LLM tool:
 
-1. Give the scaffolded skill to the LLM.
+1. Give the scaffolded skill or scaffold prompt to the LLM.
 2. Give relevant `renma inspect`, `scan`, `catalog`, `graph`, or `readiness` output.
 3. Ask the LLM to propose a patch.
 4. Review the patch as a human owner.
