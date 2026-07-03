@@ -6,6 +6,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added a GitHub Actions workflow that publishes the npm package from version tags via npm trusted publishing.
+
 ## [0.8.0] - 2026-07-03
 
 ### Added
