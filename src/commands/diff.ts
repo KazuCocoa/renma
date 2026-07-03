@@ -369,8 +369,15 @@ function formatDiffMarkdown(report: DiffReport): string {
   return `${lines.join("\n")}\n`;
 }
 
-function formatSecurityChanges(security: SecurityDiffSummary): string[] {
-  const { posture, policyInventory } = security;
+function formatSecurityChanges(
+  security: SecurityDiffSummary | undefined,
+): string[] {
+  const { posture, policyInventory } =
+    security ??
+    buildSecurityDiffSummary({
+      addedFindings: [],
+      removedFindings: [],
+    });
   return [
     `- Added security findings: ${posture.added.totalSecurityFindings}`,
     `- Resolved security findings: ${posture.resolved.totalSecurityFindings}`,

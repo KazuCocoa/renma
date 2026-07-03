@@ -31,6 +31,8 @@ Renma scan findings always include `severity` and `confidence`. Security finding
 
 Readiness and CI reports may include two security summaries: security posture from static findings, and security policy inventory from effective asset metadata, security profiles, and repository security config. The inventory is reporting-only and does not change scan `fail_on`, readiness scoring, or CI status.
 
+Semantic diff and CI reports may include security deltas, including added/resolved security findings grouped by `riskClass` and effective policy inventory count changes. These summaries are reporting-only and do not change scan `fail_on`, readiness scoring, or CI status.
+
 ## Discovery Diagnostics
 
 These diagnostics are emitted while renma discovers files.

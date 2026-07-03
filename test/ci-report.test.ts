@@ -183,6 +183,17 @@ test("formatCiReport includes security changes from the semantic diff", () => {
   assert.match(markdown, /- Missing security profiles: \+1/);
 });
 
+test("formatCiReport tolerates legacy fixtures without security diff", () => {
+  const report = sampleReport();
+  delete (report.diff as Partial<CiReport["diff"]>).security;
+
+  const markdown = formatCiReport(report, "markdown");
+
+  assert.match(markdown, /^## Security Changes$/m);
+  assert.match(markdown, /- Added security findings: 0/);
+  assert.match(markdown, /- Policy assets: \+0/);
+});
+
 test("formatCiReport renders finding risk classes when present", () => {
   const report = sampleReport();
   report.diff.findings.added[0] = {
@@ -525,11 +536,12 @@ function policyInventory(
 }
 
 function policyDiffReport(options: {
-  addedFindings?: unknown[];
+  addedFindings?: Array<ReturnType<typeof finding>>;
   newUnresolvedEdges?: unknown[];
   summary?: Partial<CiReport["summary"]>;
   checkChanges?: unknown[];
 }): CiReport["diff"] {
+  const addedFindings = options.addedFindings ?? [];
   return {
     root: "/repo",
     from: {
@@ -571,10 +583,14 @@ function policyDiffReport(options: {
       checkChanges: options.checkChanges ?? [],
     },
     findings: {
-      added: options.addedFindings ?? [],
+      added: addedFindings,
       removed: [],
       countById: [],
     },
+    security: buildSecurityDiffSummary({
+      addedFindings,
+      removedFindings: [],
+    }),
   } as unknown as CiReport["diff"];
 }
 

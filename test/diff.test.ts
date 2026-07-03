@@ -267,6 +267,21 @@ test("formatDiff renders markdown summaries", () => {
   assert.equal(parsed.security.policyInventory.totalPolicyAssets, 2);
 });
 
+test("formatDiff tolerates legacy reports without security diff", () => {
+  const report = buildDiffReport(
+    "/repo",
+    snapshot("base", {}),
+    snapshot("head", {}),
+  );
+  delete (report as Partial<typeof report>).security;
+
+  const markdown = formatDiff(report, "markdown");
+
+  assert.match(markdown, /^## Security Changes$/m);
+  assert.match(markdown, /- Added security findings: 0/);
+  assert.match(markdown, /- Policy assets: \+0/);
+});
+
 test("diff resolves the git repository from an absolute target path", async () => {
   const repo = await createGitRepo();
   const outside = await mkdtemp(join(tmpdir(), "renma-diff-outside-"));

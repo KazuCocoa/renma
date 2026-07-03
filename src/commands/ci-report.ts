@@ -4,6 +4,10 @@ import {
   type SecurityPostureSummary,
 } from "../security-posture.js";
 import {
+  buildSecurityDiffSummary,
+  type SecurityDiffSummary,
+} from "../security-diff.js";
+import {
   zeroSecurityPolicyInventorySummary,
   type SecurityPolicyInventorySummary,
 } from "../security-policy-inventory.js";
@@ -225,9 +229,9 @@ function formatCiReportMarkdown(report: CiReport): string {
 }
 
 function formatSecurityChangesSection(
-  security: CiReport["diff"]["security"],
+  security: CiReport["diff"]["security"] | undefined,
 ): string[] {
-  const { posture, policyInventory } = security;
+  const { posture, policyInventory } = security ?? emptySecurityDiff();
   return [
     `- Added security findings: ${posture.added.totalSecurityFindings}`,
     `- Resolved security findings: ${posture.resolved.totalSecurityFindings}`,
@@ -239,6 +243,13 @@ function formatSecurityChangesSection(
     `- Assets missing policy metadata: ${formatDelta(policyInventory.assetsMissingPolicyMetadata)}`,
     `- Missing security profiles: ${formatDelta(policyInventory.securityProfiles.missing)}`,
   ];
+}
+
+function emptySecurityDiff(): SecurityDiffSummary {
+  return buildSecurityDiffSummary({
+    addedFindings: [],
+    removedFindings: [],
+  });
 }
 
 function formatSecurityPostureSection(report: CiReport["securityPosture"]) {
