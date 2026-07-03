@@ -152,6 +152,16 @@ test("formatDiff renders markdown summaries", () => {
       nodes: [
         node("skill", "skills/demo/SKILL.md", "skill", "platform", "stable"),
       ],
+      findings: [
+        finding("MAINT-REPEATED-CODE-BLOCK", "high", "docs/guide.md", 12),
+        finding(
+          "SEC-LITERAL-SECRET",
+          "high",
+          "skills/demo/SKILL.md",
+          4,
+          "violation",
+        ),
+      ],
     }),
   );
 
@@ -164,6 +174,14 @@ test("formatDiff renders markdown summaries", () => {
   assert.match(markdown, /Total assets: 1 \(\+1\)/);
   assert.doesNotMatch(markdown, /- Assets:/);
   assert.match(markdown, /Added assets: 1/);
+  assert.match(
+    markdown,
+    /- MAINT-REPEATED-CODE-BLOCK \(high\) at docs\/guide\.md/,
+  );
+  assert.match(
+    markdown,
+    /- HIGH \[violation\] SEC-LITERAL-SECRET at skills\/demo\/SKILL\.md/,
+  );
 });
 
 test("diff resolves the git repository from an absolute target path", async () => {
@@ -318,10 +336,17 @@ function check(id: string, status: string, severity: string, summary: string) {
   };
 }
 
-function finding(id: string, severity: string, path: string, line: number) {
+function finding(
+  id: string,
+  severity: string,
+  path: string,
+  line: number,
+  riskClass?: string,
+) {
   return {
     id,
     severity,
+    ...(riskClass ? { riskClass } : {}),
     title: id,
     evidence: { path, startLine: line, endLine: line, snippet: id },
   };

@@ -21,7 +21,11 @@ import type {
 type FindingDetails = Partial<
   Pick<
     Finding,
-    "whyItMatters" | "constraints" | "verificationSteps" | "llmHint"
+    | "whyItMatters"
+    | "constraints"
+    | "verificationSteps"
+    | "llmHint"
+    | "riskClass"
   >
 >;
 
@@ -614,6 +618,7 @@ function secretFindings(document: ParsedDocument): Finding[] {
         "critical",
         document,
         "Remove the key, rotate it if real, and keep only setup instructions or placeholders.",
+        { riskClass: "violation" },
       );
     }
     if (SECRET_PATTERN.test(line) && !isPlaceholder(line)) {
@@ -624,6 +629,7 @@ function secretFindings(document: ParsedDocument): Finding[] {
         "high",
         document,
         "Move secrets to user-approved inputs or a secret manager, and keep only placeholders in repository files.",
+        { riskClass: "violation" },
       );
     }
     return undefined;
@@ -641,6 +647,7 @@ function commandFindings(document: ParsedDocument): Finding[] {
         "medium",
         document,
         "Avoid production placeholders, insecure transport flags, and pipe-to-shell patterns unless paired with verification and confirmation.",
+        { riskClass: "suspicious" },
       );
     }
     if (ENV_COPY_PATTERN.test(line)) {
@@ -651,6 +658,7 @@ function commandFindings(document: ParsedDocument): Finding[] {
         "medium",
         document,
         "Pass only required environment variables to subprocesses and avoid forwarding secrets by default.",
+        { riskClass: "suspicious" },
       );
     }
     return undefined;
@@ -2172,6 +2180,7 @@ function finding(
       ? { verificationSteps: details.verificationSteps }
       : {}),
     ...(details.llmHint ? { llmHint: details.llmHint } : {}),
+    ...(details.riskClass ? { riskClass: details.riskClass } : {}),
   };
 }
 
@@ -2208,6 +2217,7 @@ function documentFinding(
       ? { verificationSteps: details.verificationSteps }
       : {}),
     ...(details.llmHint ? { llmHint: details.llmHint } : {}),
+    ...(details.riskClass ? { riskClass: details.riskClass } : {}),
   };
 }
 

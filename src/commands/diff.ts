@@ -95,6 +95,7 @@ interface ReadinessCheckChange {
 interface FindingDelta {
   id: string;
   severity: string;
+  riskClass?: string | undefined;
   title: string;
   evidence?: EvidenceDelta | undefined;
 }
@@ -141,9 +142,11 @@ export async function diff(
   );
   const relativeTarget = pathWithinRepo(repoRoot, absoluteTarget);
   const tempRoot = await mkdtemp(join(tmpdir(), "renma-diff-"));
+  let report: DiffReport | undefined;
+  let primaryError: unknown;
 
   try {
-    const [fromSnapshot, toSnapshot] = await Promise.all([
+    const [fromResult, toResult] = await Promise.allSettled([
       snapshot(
         repoRoot,
         relativeTarget,
@@ -161,10 +164,33 @@ export async function diff(
         options.overrides,
       ),
     ]);
-    return buildDiffReport(repoRoot, fromSnapshot, toSnapshot);
-  } finally {
-    await rm(tempRoot, { force: true, recursive: true });
+
+    if (fromResult.status === "rejected") throw fromResult.reason;
+    if (toResult.status === "rejected") throw toResult.reason;
+
+    const fromSnapshot = fromResult.value;
+    const toSnapshot = toResult.value;
+    report = buildDiffReport(repoRoot, fromSnapshot, toSnapshot);
+  } catch (error) {
+    primaryError = error;
   }
+
+  let cleanupError: unknown;
+  try {
+    await rm(tempRoot, {
+      force: true,
+      maxRetries: 3,
+      recursive: true,
+      retryDelay: 50,
+    });
+  } catch (error) {
+    cleanupError = error;
+  }
+
+  if (primaryError !== undefined) throw primaryError;
+  if (cleanupError !== undefined) throw cleanupError;
+  if (report === undefined) throw new Error("Diff report was not generated.");
+  return report;
 }
 
 export function buildDiffReport(
@@ -317,16 +343,20 @@ function formatDiffMarkdown(report: DiffReport): string {
 
   if (report.findings.added.length > 0) {
     lines.push("", "### Added findings", "");
-    lines.push(
-      ...markdownList(
-        report.findings.added,
-        (finding) =>
-          `${finding.id} (${finding.severity})${finding.evidence?.path ? ` at ${finding.evidence.path}` : ""}`,
-      ),
-    );
+    lines.push(...markdownList(report.findings.added, formatFindingDelta));
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+function formatFindingDelta(finding: FindingDelta): string {
+  const location = finding.evidence?.path ? ` at ${finding.evidence.path}` : "";
+
+  if (!finding.riskClass) {
+    return `${finding.id} (${finding.severity})${location}`;
+  }
+
+  return `${finding.severity.toUpperCase()} [${finding.riskClass}] ${finding.id}${location}`;
 }
 
 async function snapshot(
@@ -470,6 +500,7 @@ function findingMap(findings: unknown[]): Map<string, FindingDelta> {
       const deltaFinding = {
         id: stringField(finding, "id"),
         severity: stringField(finding, "severity"),
+        riskClass: optionalStringField(finding, "riskClass"),
         title: stringField(finding, "title"),
         evidence,
       };

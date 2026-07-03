@@ -29,8 +29,9 @@ export function formatText(result: ScanResult): string {
 
   for (const finding of result.findings) {
     lines.push("");
+    const risk = finding.riskClass ? ` [${finding.riskClass}]` : "";
     lines.push(
-      `${finding.severity.toUpperCase()} ${finding.id}: ${finding.title}`,
+      `${finding.severity.toUpperCase()}${risk} ${finding.id}: ${finding.title}`,
     );
     lines.push(`  ${finding.evidence.path}:${finding.evidence.startLine}`);
     if (finding.evidence.snippet)

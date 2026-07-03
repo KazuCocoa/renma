@@ -77,6 +77,27 @@ test("formatCiReport renders structured JSON", () => {
   assert.equal(parsed.diff.findings.added[0]?.id, "MAINT-REPEATED-CODE-BLOCK");
 });
 
+test("formatCiReport renders finding risk classes when present", () => {
+  const report = sampleReport();
+  report.diff.findings.added[0] = {
+    id: "SEC-LITERAL-SECRET",
+    severity: "high",
+    riskClass: "violation",
+    title: "Literal credential-like value appears in repository text",
+    evidence: {
+      path: "skills/demo/SKILL.md",
+      startLine: 4,
+    },
+  };
+
+  const markdown = formatCiReport(report, "markdown");
+
+  assert.match(
+    markdown,
+    /- HIGH \[violation\] `SEC-LITERAL-SECRET` `skills\/demo\/SKILL\.md:L4`/,
+  );
+});
+
 test("ci report policy fails new high finding even when high/critical net delta is zero", () => {
   const report = policyDiffReport({
     addedFindings: [finding("MAINT-NEW-HIGH", "high")],

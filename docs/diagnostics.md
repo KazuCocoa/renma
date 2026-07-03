@@ -11,6 +11,22 @@ renma uses two severity systems:
 
 In JSON output, diagnostics usually appear as structured objects with a `severity`, a `message`, and, when available, a `path`.
 
+## Scan Review Signals
+
+Renma scan findings always include `severity` and `confidence`. Security findings may also include `riskClass`, a human security-review interpretation.
+
+- `severity`: CI gating, urgency, and impact. Values are `low`, `medium`, `high`, and `critical`.
+- `confidence`: detector certainty. Values are `low`, `medium`, and `high`.
+- `riskClass`: human security-review interpretation for security findings. Values are `violation`, `suspicious`, and `advisory`.
+
+`violation` means a rule or safety contract is broken. Examples include unapproved network or upload destinations, policy contradictions, forbidden inputs, literal secrets, private keys, secret exposure, and dangerous commands.
+
+`suspicious` means a risky or ambiguous instruction should be reviewed but is not necessarily a direct policy violation. Examples include external upload instructions, cloud upload instructions, broad data sharing, overbroad context collection, unpinned remote scripts, unpinned dependency installs, privileged commands without guardrails, and risky temporary paths.
+
+`advisory` means a governance or hardening recommendation. For example, `SEC-MISSING-POLICY-METADATA` advises adding explicit policy metadata.
+
+`riskClass` does not replace `severity` and does not change `fail_on` behavior. Severity remains the CI threshold signal.
+
 ## Discovery Diagnostics
 
 These diagnostics are emitted while renma discovers files.

@@ -428,7 +428,8 @@ function formatMarkdownFinding(finding: Finding): string {
     startLine === endLine
       ? `${path}:${startLine}`
       : `${path}:${startLine}-${endLine}`;
-  return `${finding.id} [${finding.severity}/${finding.category}] ${location}`;
+  const risk = finding.riskClass ? ` [${finding.riskClass}]` : "";
+  return `${finding.id} [${finding.severity}/${finding.category}]${risk} ${location}`;
 }
 
 function diagnosticsCheck(
