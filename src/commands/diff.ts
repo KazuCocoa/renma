@@ -343,15 +343,20 @@ function formatDiffMarkdown(report: DiffReport): string {
 
   if (report.findings.added.length > 0) {
     lines.push("", "### Added findings", "");
-    lines.push(
-      ...markdownList(report.findings.added, (finding) => {
-        const risk = finding.riskClass ? ` [${finding.riskClass}]` : "";
-        return `${finding.severity.toUpperCase()}${risk} ${finding.id}${finding.evidence?.path ? ` at ${finding.evidence.path}` : ""}`;
-      }),
-    );
+    lines.push(...markdownList(report.findings.added, formatFindingDelta));
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+function formatFindingDelta(finding: FindingDelta): string {
+  const location = finding.evidence?.path ? ` at ${finding.evidence.path}` : "";
+
+  if (!finding.riskClass) {
+    return `${finding.id} (${finding.severity})${location}`;
+  }
+
+  return `${finding.severity.toUpperCase()} [${finding.riskClass}] ${finding.id}${location}`;
 }
 
 async function snapshot(
