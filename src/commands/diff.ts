@@ -142,9 +142,11 @@ export async function diff(
   );
   const relativeTarget = pathWithinRepo(repoRoot, absoluteTarget);
   const tempRoot = await mkdtemp(join(tmpdir(), "renma-diff-"));
+  let report: DiffReport | undefined;
+  let primaryError: unknown;
 
   try {
-    const [fromSnapshot, toSnapshot] = await Promise.all([
+    const [fromResult, toResult] = await Promise.allSettled([
       snapshot(
         repoRoot,
         relativeTarget,
@@ -162,10 +164,33 @@ export async function diff(
         options.overrides,
       ),
     ]);
-    return buildDiffReport(repoRoot, fromSnapshot, toSnapshot);
-  } finally {
-    await rm(tempRoot, { force: true, recursive: true });
+
+    if (fromResult.status === "rejected") throw fromResult.reason;
+    if (toResult.status === "rejected") throw toResult.reason;
+
+    const fromSnapshot = fromResult.value;
+    const toSnapshot = toResult.value;
+    report = buildDiffReport(repoRoot, fromSnapshot, toSnapshot);
+  } catch (error) {
+    primaryError = error;
   }
+
+  let cleanupError: unknown;
+  try {
+    await rm(tempRoot, {
+      force: true,
+      maxRetries: 3,
+      recursive: true,
+      retryDelay: 50,
+    });
+  } catch (error) {
+    cleanupError = error;
+  }
+
+  if (primaryError !== undefined) throw primaryError;
+  if (cleanupError !== undefined) throw cleanupError;
+  if (report === undefined) throw new Error("Diff report was not generated.");
+  return report;
 }
 
 export function buildDiffReport(
