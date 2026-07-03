@@ -4,6 +4,10 @@ import {
   type SecurityPostureSummary,
 } from "../security-posture.js";
 import {
+  buildSecurityDiffSummary,
+  type SecurityDiffSummary,
+} from "../security-diff.js";
+import {
   zeroSecurityPolicyInventorySummary,
   type SecurityPolicyInventorySummary,
 } from "../security-policy-inventory.js";
@@ -198,6 +202,10 @@ function formatCiReportMarkdown(report: CiReport): string {
     "",
     ...formatSecurityPostureSection(report.securityPosture),
     "",
+    "## Security Changes",
+    "",
+    ...formatSecurityChangesSection(report.diff.security),
+    "",
     "## Security Policy Inventory",
     "",
     ...formatSecurityPolicyInventorySection(report.to.securityPolicyInventory),
@@ -218,6 +226,30 @@ function formatCiReportMarkdown(report: CiReport): string {
   ];
 
   return `${lines.join("\n")}\n`;
+}
+
+function formatSecurityChangesSection(
+  security: CiReport["diff"]["security"] | undefined,
+): string[] {
+  const { posture, policyInventory } = security ?? emptySecurityDiff();
+  return [
+    `- Added security findings: ${posture.added.totalSecurityFindings}`,
+    `- Resolved security findings: ${posture.resolved.totalSecurityFindings}`,
+    `- Added violations: ${posture.added.riskClasses.violation}`,
+    `- Added suspicious: ${posture.added.riskClasses.suspicious}`,
+    `- Added advisory: ${posture.added.riskClasses.advisory}`,
+    `- Policy assets: ${formatDelta(policyInventory.totalPolicyAssets)}`,
+    `- Assets with policy metadata: ${formatDelta(policyInventory.assetsWithPolicyMetadata)}`,
+    `- Assets missing policy metadata: ${formatDelta(policyInventory.assetsMissingPolicyMetadata)}`,
+    `- Missing security profiles: ${formatDelta(policyInventory.securityProfiles.missing)}`,
+  ];
+}
+
+function emptySecurityDiff(): SecurityDiffSummary {
+  return buildSecurityDiffSummary({
+    addedFindings: [],
+    removedFindings: [],
+  });
 }
 
 function formatSecurityPostureSection(report: CiReport["securityPosture"]) {

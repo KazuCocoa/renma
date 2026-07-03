@@ -16,6 +16,7 @@ import {
   summarizeSecurityPosture,
   zeroSecurityPostureSummary,
 } from "../src/security-posture.js";
+import { buildSecurityDiffSummary } from "../src/security-diff.js";
 import {
   zeroSecurityPolicyInventorySummary,
   type SecurityPolicyInventorySummary,
@@ -83,6 +84,8 @@ test("formatCiReport renders structured JSON", () => {
   assert.equal(parsed.status, "fail");
   assert.equal(parsed.summary.highOrCriticalFindingsDelta, 1);
   assert.equal(parsed.diff.findings.added[0]?.id, "MAINT-REPEATED-CODE-BLOCK");
+  assert.equal(parsed.diff.security.posture.added.totalSecurityFindings, 0);
+  assert.equal(parsed.diff.security.policyInventory.totalPolicyAssets, 5);
   assert.equal(parsed.securityPosture.added.totalSecurityFindings, 0);
   assert.equal(parsed.to.securityPolicyInventory?.assetsWithPolicyMetadata, 3);
 });
@@ -133,6 +136,62 @@ test("formatCiReport includes target security policy inventory", () => {
   assert.match(markdown, /- Target missing security profiles: 1/);
   assert.match(markdown, /- Target approved network destinations: 4/);
   assert.match(markdown, /- Target approved upload destinations: 2/);
+});
+
+test("formatCiReport includes security changes from the semantic diff", () => {
+  const report = sampleReport();
+  const fromInventory = policyInventory({
+    totalPolicyAssets: 3,
+    assetsWithPolicyMetadata: 2,
+    assetsMissingPolicyMetadata: 2,
+    missingSecurityProfiles: 0,
+  });
+  const toInventory = policyInventory({
+    totalPolicyAssets: 5,
+    assetsWithPolicyMetadata: 4,
+    assetsMissingPolicyMetadata: 1,
+    missingSecurityProfiles: 1,
+  });
+  report.diff.findings.added = [
+    finding("SEC-LITERAL-SECRET", "high", "violation"),
+  ];
+  report.diff.findings.removed = [
+    finding("SEC-MISSING-POLICY-METADATA", "medium", "advisory"),
+  ];
+  report.diff.from.securityPolicyInventory = fromInventory;
+  report.diff.to.securityPolicyInventory = toInventory;
+  report.diff.security = buildSecurityDiffSummary({
+    addedFindings: report.diff.findings.added,
+    removedFindings: report.diff.findings.removed,
+    fromPolicyInventory: fromInventory,
+    toPolicyInventory: toInventory,
+  });
+
+  const parsed = JSON.parse(formatCiReport(report, "json")) as CiReport;
+  const markdown = formatCiReport(report, "markdown");
+
+  assert.equal(parsed.diff.security.posture.added.totalSecurityFindings, 1);
+  assert.equal(parsed.diff.security.posture.resolved.totalSecurityFindings, 1);
+  assert.equal(parsed.diff.security.policyInventory.totalPolicyAssets, 2);
+  assert.match(markdown, /^## Security Changes$/m);
+  assert.match(markdown, /- Added security findings: 1/);
+  assert.match(markdown, /- Resolved security findings: 1/);
+  assert.match(markdown, /- Added violations: 1/);
+  assert.match(markdown, /- Policy assets: \+2/);
+  assert.match(markdown, /- Assets with policy metadata: \+2/);
+  assert.match(markdown, /- Assets missing policy metadata: -1/);
+  assert.match(markdown, /- Missing security profiles: \+1/);
+});
+
+test("formatCiReport tolerates legacy fixtures without security diff", () => {
+  const report = sampleReport();
+  delete (report.diff as Partial<CiReport["diff"]>).security;
+
+  const markdown = formatCiReport(report, "markdown");
+
+  assert.match(markdown, /^## Security Changes$/m);
+  assert.match(markdown, /- Added security findings: 0/);
+  assert.match(markdown, /- Policy assets: \+0/);
 });
 
 test("formatCiReport renders finding risk classes when present", () => {
@@ -280,7 +339,16 @@ test("ci report policy warns on readiness score decrease", () => {
 
 test("ci report policy inventory counts do not change CI status", () => {
   const report = policyDiffReport({});
-  report.to.securityPolicyInventory = targetSecurityPolicyInventory();
+  const fromInventory = policyInventory({ totalPolicyAssets: 1 });
+  const toInventory = targetSecurityPolicyInventory();
+  report.from.securityPolicyInventory = fromInventory;
+  report.to.securityPolicyInventory = toInventory;
+  report.security = buildSecurityDiffSummary({
+    addedFindings: [],
+    removedFindings: [],
+    fromPolicyInventory: fromInventory,
+    toPolicyInventory: toInventory,
+  });
 
   assert.equal(determineCiReportStatus(report), "pass");
 });
@@ -313,6 +381,7 @@ test("ci report omits suppressed high findings introduced between git refs", asy
 });
 
 function sampleReport(): CiReport {
+  const targetInventory = targetSecurityPolicyInventory();
   return {
     root: "/repo",
     from: {
@@ -328,7 +397,7 @@ function sampleReport(): CiReport {
       totalAssets: 12,
       readinessScore: 80,
       readinessLevel: "needs_attention",
-      securityPolicyInventory: targetSecurityPolicyInventory(),
+      securityPolicyInventory: targetInventory,
     },
     status: "fail",
     summary: {
@@ -360,7 +429,7 @@ function sampleReport(): CiReport {
         totalAssets: 12,
         readinessScore: 80,
         readinessLevel: "needs_attention",
-        securityPolicyInventory: targetSecurityPolicyInventory(),
+        securityPolicyInventory: targetInventory,
       },
       summary: {
         readinessScoreDelta: 8,
@@ -413,28 +482,66 @@ function sampleReport(): CiReport {
           },
         ],
       },
+      security: buildSecurityDiffSummary({
+        addedFindings: [
+          {
+            id: "MAINT-REPEATED-CODE-BLOCK",
+            severity: "high",
+          },
+        ],
+        removedFindings: [],
+        toPolicyInventory: targetInventory,
+      }),
     } as unknown as CiReport["diff"],
   };
 }
 
 function targetSecurityPolicyInventory(): SecurityPolicyInventorySummary {
+  return policyInventory({
+    totalPolicyAssets: 5,
+    assetsWithPolicyMetadata: 3,
+    assetsMissingPolicyMetadata: 1,
+    approvedNetworkDestinationCount: 4,
+    approvedUploadDestinationCount: 2,
+    referencedSecurityProfiles: 2,
+    missingSecurityProfiles: 1,
+  });
+}
+
+interface PolicyInventoryInput {
+  totalPolicyAssets?: number | undefined;
+  assetsWithPolicyMetadata?: number | undefined;
+  assetsMissingPolicyMetadata?: number | undefined;
+  approvedNetworkDestinationCount?: number | undefined;
+  approvedUploadDestinationCount?: number | undefined;
+  referencedSecurityProfiles?: number | undefined;
+  missingSecurityProfiles?: number | undefined;
+}
+
+function policyInventory(
+  input: PolicyInventoryInput,
+): SecurityPolicyInventorySummary {
   const inventory = zeroSecurityPolicyInventorySummary();
-  inventory.totalPolicyAssets = 5;
-  inventory.assetsWithPolicyMetadata = 3;
-  inventory.assetsMissingPolicyMetadata = 1;
-  inventory.approvedNetworkDestinationCount = 4;
-  inventory.approvedUploadDestinationCount = 2;
-  inventory.securityProfiles.referenced = 2;
-  inventory.securityProfiles.missing = 1;
+  inventory.totalPolicyAssets = input.totalPolicyAssets ?? 0;
+  inventory.assetsWithPolicyMetadata = input.assetsWithPolicyMetadata ?? 0;
+  inventory.assetsMissingPolicyMetadata =
+    input.assetsMissingPolicyMetadata ?? 0;
+  inventory.approvedNetworkDestinationCount =
+    input.approvedNetworkDestinationCount ?? 0;
+  inventory.approvedUploadDestinationCount =
+    input.approvedUploadDestinationCount ?? 0;
+  inventory.securityProfiles.referenced = input.referencedSecurityProfiles ?? 0;
+  inventory.securityProfiles.missing = input.missingSecurityProfiles ?? 0;
   return inventory;
 }
 
 function policyDiffReport(options: {
-  addedFindings?: unknown[];
+  addedFindings?: Array<ReturnType<typeof finding>>;
   newUnresolvedEdges?: unknown[];
   summary?: Partial<CiReport["summary"]>;
   checkChanges?: unknown[];
 }): CiReport["diff"] {
+  const addedFindings = options.addedFindings ?? [];
   return {
     root: "/repo",
     from: {
@@ -476,10 +583,14 @@ function policyDiffReport(options: {
       checkChanges: options.checkChanges ?? [],
     },
     findings: {
-      added: options.addedFindings ?? [],
+      added: addedFindings,
       removed: [],
       countById: [],
     },
+    security: buildSecurityDiffSummary({
+      addedFindings,
+      removedFindings: [],
+    }),
   } as unknown as CiReport["diff"];
 }
 
