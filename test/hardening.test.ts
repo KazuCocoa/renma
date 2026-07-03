@@ -10,6 +10,7 @@ import {
   type ReadinessReport,
 } from "../src/commands/readiness.js";
 import { scan } from "../src/scanner.js";
+import { zeroSecurityPostureSummary } from "../src/security-posture.js";
 import type { Finding } from "../src/types.js";
 
 test("layout config validation errors exit with usage code", async () => {
@@ -212,6 +213,7 @@ function readinessReportWithFindings(count: number): ReadinessReport {
         fail: 0,
         readinessPercent: 100,
       },
+      securityPosture: zeroSecurityPostureSummary(),
     },
     checks: [
       {

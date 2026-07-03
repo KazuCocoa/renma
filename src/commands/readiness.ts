@@ -1,6 +1,10 @@
 import { graph, type GraphEdge, type GraphReport } from "./graph.js";
 import { DIAGNOSTIC_IDS } from "../diagnostic-ids.js";
 import { scan } from "../scanner.js";
+import {
+  summarizeSecurityPosture,
+  type SecurityPostureSummary,
+} from "../security-posture.js";
 import type { ConfigOverrides } from "../config.js";
 import type { Diagnostic, Finding } from "../types.js";
 
@@ -58,6 +62,7 @@ export interface ReadinessReport {
       info: number;
     };
     workflow: WorkflowReadinessSummary;
+    securityPosture: SecurityPostureSummary;
   };
   checks: ReadinessCheck[];
   diagnostics?: Diagnostic[];
@@ -248,6 +253,7 @@ export function buildReadinessReport(
   const hasFailingCheck = checks.some((check) => check.status === "fail");
   const level = readinessLevel(score, hasFailingCheck);
   const workflow = workflowSummary(graphReport, checks);
+  const securityPosture = summarizeSecurityPosture(findings);
 
   return {
     root: graphReport.root,
@@ -267,6 +273,7 @@ export function buildReadinessReport(
       graphResolutionPercent,
       diagnosticCounts,
       workflow,
+      securityPosture,
     },
     checks,
     ...(diagnostics.length > 0 ? { diagnostics } : {}),
@@ -318,6 +325,10 @@ export function formatReadinessMarkdown(report: ReadinessReport): string {
     `| Diagnostic warnings | ${report.summary.diagnosticCounts.warning} |`,
     `| Diagnostic info | ${report.summary.diagnosticCounts.info} |`,
     "",
+    "## Security Posture",
+    "",
+    ...formatSecurityPostureMarkdown(report.summary.securityPosture),
+    "",
     "## Workflow Readiness",
     "",
     "| Metric | Value |",
@@ -366,6 +377,35 @@ export function formatReadinessMarkdown(report: ReadinessReport): string {
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+function formatSecurityPostureMarkdown(
+  securityPosture: SecurityPostureSummary,
+): string[] {
+  const lines = [
+    "| Metric | Value |",
+    "| --- | ---: |",
+    `| Security findings | ${securityPosture.totalSecurityFindings} |`,
+    `| Violations | ${securityPosture.riskClasses.violation} |`,
+    `| Suspicious | ${securityPosture.riskClasses.suspicious} |`,
+    `| Advisory | ${securityPosture.riskClasses.advisory} |`,
+    `| Unclassified security findings | ${securityPosture.riskClasses.unclassified} |`,
+    `| High/critical security findings | ${securityPosture.highOrCritical} |`,
+  ];
+
+  if (securityPosture.topFindingIds.length > 0) {
+    lines.push(
+      "",
+      "### Top security findings",
+      "",
+      ...securityPosture.topFindingIds.map(
+        (finding) =>
+          `- ${finding.id}: ${finding.count} [${finding.riskClass ?? "unclassified"}, ${finding.maxSeverity}]`,
+      ),
+    );
+  }
+
+  return lines;
 }
 
 export function formatReadiness(

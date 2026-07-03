@@ -1,4 +1,8 @@
 import { diff, type DiffReport, type DiffFormat } from "./diff.js";
+import {
+  summarizeSecurityPosture,
+  type SecurityPostureSummary,
+} from "../security-posture.js";
 import type { ConfigOverrides } from "../config.js";
 
 export type CiReportFormat = DiffFormat;
@@ -10,6 +14,10 @@ export interface CiReport {
   to: DiffReport["to"];
   status: CiReportStatus;
   summary: DiffReport["summary"];
+  securityPosture: {
+    added: SecurityPostureSummary;
+    resolved: SecurityPostureSummary;
+  };
   notes: string[];
   diff: DiffReport;
 }
@@ -50,13 +58,18 @@ export async function ciReport(
 ): Promise<CiReport> {
   const report = await diff(targetPath, options);
   const status = determineCiReportStatus(report);
+  const securityPosture = {
+    added: summarizeSecurityPosture(report.findings.added),
+    resolved: summarizeSecurityPosture(report.findings.removed),
+  };
   return {
     root: report.root,
     from: report.from,
     to: report.to,
     status,
     summary: report.summary,
-    notes: reviewNotes(report, status),
+    securityPosture,
+    notes: reviewNotes(report, status, securityPosture.added),
     diff: report,
   };
 }
@@ -107,7 +120,11 @@ function isRequiredEdge(edge: { kind: string }): boolean {
   return edge.kind === "required" || edge.kind === "requires";
 }
 
-function reviewNotes(report: DiffReport, status: CiReportStatus): string[] {
+function reviewNotes(
+  report: DiffReport,
+  status: CiReportStatus,
+  addedSecurityPosture: SecurityPostureSummary,
+): string[] {
   const notes: string[] = [];
 
   if (hasNewUnresolvedRequiredEdge(report)) {
@@ -115,6 +132,12 @@ function reviewNotes(report: DiffReport, status: CiReportStatus): string[] {
   }
   if (hasNewHighOrCriticalFinding(report)) {
     notes.push("Review new high or critical findings before merge.");
+  }
+  if (addedSecurityPosture.riskClasses.violation > 0) {
+    notes.push("Review new security violations before merge.");
+  }
+  if (addedSecurityPosture.riskClasses.suspicious > 0) {
+    notes.push("Review new suspicious security findings before merge.");
   }
   if (report.summary.readinessScoreDelta < 0) {
     notes.push("Readiness score decreased.");
@@ -167,6 +190,10 @@ function formatCiReportMarkdown(report: CiReport): string {
     `- Added findings: ${report.diff.findings.added.length}`,
     `- Resolved findings: ${report.diff.findings.removed.length}`,
     "",
+    "## Security Posture",
+    "",
+    ...formatSecurityPostureSection(report.securityPosture),
+    "",
     "## Scan Findings",
     "",
     ...formatFindingSection("Added", report.diff.findings.added),
@@ -183,6 +210,28 @@ function formatCiReportMarkdown(report: CiReport): string {
   ];
 
   return `${lines.join("\n")}\n`;
+}
+
+function formatSecurityPostureSection(report: CiReport["securityPosture"]) {
+  const { added, resolved } = report;
+  if (
+    added.totalSecurityFindings === 0 &&
+    resolved.totalSecurityFindings === 0
+  ) {
+    return ["- No added or resolved security findings."];
+  }
+
+  return [
+    `- Added security findings: ${added.totalSecurityFindings}`,
+    `- Added violations: ${added.riskClasses.violation}`,
+    `- Added suspicious: ${added.riskClasses.suspicious}`,
+    `- Added advisory: ${added.riskClasses.advisory}`,
+    `- Added high/critical security findings: ${added.highOrCritical}`,
+    `- Resolved security findings: ${resolved.totalSecurityFindings}`,
+    `- Resolved violations: ${resolved.riskClasses.violation}`,
+    `- Resolved suspicious: ${resolved.riskClasses.suspicious}`,
+    `- Resolved advisory: ${resolved.riskClasses.advisory}`,
+  ];
 }
 
 function formatDelta(value: number): string {
