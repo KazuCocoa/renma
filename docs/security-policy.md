@@ -185,6 +185,12 @@ Renma can also summarize the effective static policy surface across discovered a
 
 The inventory reports policy coverage, network/upload/secrets booleans, human approval requirements, approved destinations, forbidden inputs, disallowed commands, and profile resolution counts. It is reporting-only in v1 and does not enforce runtime behavior.
 
+### Security-aware semantic diff
+
+`renma diff` and `renma ci-report` can summarize how security posture and effective security policy inventory changed between two revisions.
+
+The diff uses existing static findings and existing policy metadata/config summaries. It does not add new detectors, change runtime behavior, change scan `fail_on`, change readiness scoring, or change CI pass/warn/fail status in v1.
+
 ## Common Security Diagnostics
 
 Use this table to choose the right kind of fix. For full finding definitions, see [Diagnostics Reference](diagnostics.md).

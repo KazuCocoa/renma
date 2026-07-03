@@ -5,6 +5,10 @@ import { promisify } from "node:util";
 import { execFile as execFileCallback } from "node:child_process";
 import { graph, type GraphReport } from "./graph.js";
 import { readiness, type ReadinessReport } from "./readiness.js";
+import {
+  buildSecurityDiffSummary,
+  type SecurityDiffSummary,
+} from "../security-diff.js";
 import type { SecurityPolicyInventorySummary } from "../security-policy-inventory.js";
 import type { ConfigOverrides } from "../config.js";
 
@@ -39,6 +43,7 @@ export interface DiffReport {
   readiness: {
     checkChanges: ReadinessCheckChange[];
   };
+  security: SecurityDiffSummary;
   findings: {
     added: FindingDelta[];
     removed: FindingDelta[];
@@ -208,11 +213,19 @@ export function buildDiffReport(
   const toAssets = assetMap(toSnapshot.graph.nodes);
   const fromEdges = edgeMap(fromSnapshot.graph.edges);
   const toEdges = edgeMap(toSnapshot.graph.edges);
+  const fromEndpoint = endpoint(fromSnapshot);
+  const toEndpoint = endpoint(toSnapshot);
+  const addedFindings = [...toFindings]
+    .filter(([key]) => !fromFindings.has(key))
+    .map(([, finding]) => finding);
+  const removedFindings = [...fromFindings]
+    .filter(([key]) => !toFindings.has(key))
+    .map(([, finding]) => finding);
 
   return {
     root,
-    from: endpoint(fromSnapshot),
-    to: endpoint(toSnapshot),
+    from: fromEndpoint,
+    to: toEndpoint,
     summary: {
       readinessScoreDelta: delta(toReadiness.score, fromReadiness.score),
       readinessLevelChanged: fromReadiness.level !== toReadiness.level,
@@ -266,13 +279,15 @@ export function buildDiffReport(
     readiness: {
       checkChanges: checkChanges(fromReadiness.checks, toReadiness.checks),
     },
+    security: buildSecurityDiffSummary({
+      addedFindings,
+      removedFindings,
+      fromPolicyInventory: fromEndpoint.securityPolicyInventory,
+      toPolicyInventory: toEndpoint.securityPolicyInventory,
+    }),
     findings: {
-      added: [...toFindings]
-        .filter(([key]) => !fromFindings.has(key))
-        .map(([, finding]) => finding),
-      removed: [...fromFindings]
-        .filter(([key]) => !toFindings.has(key))
-        .map(([, finding]) => finding),
+      added: addedFindings,
+      removed: removedFindings,
       countById: countById(
         fromReadiness.findings ?? [],
         toReadiness.findings ?? [],
@@ -348,7 +363,39 @@ function formatDiffMarkdown(report: DiffReport): string {
     lines.push(...markdownList(report.findings.added, formatFindingDelta));
   }
 
+  lines.push("", "## Security Changes", "");
+  lines.push(...formatSecurityChanges(report.security));
+
   return `${lines.join("\n")}\n`;
+}
+
+function formatSecurityChanges(security: SecurityDiffSummary): string[] {
+  const { posture, policyInventory } = security;
+  return [
+    `- Added security findings: ${posture.added.totalSecurityFindings}`,
+    `- Resolved security findings: ${posture.resolved.totalSecurityFindings}`,
+    `- Added violations: ${posture.added.riskClasses.violation}`,
+    `- Added suspicious: ${posture.added.riskClasses.suspicious}`,
+    `- Added advisory: ${posture.added.riskClasses.advisory}`,
+    `- Resolved violations: ${posture.resolved.riskClasses.violation}`,
+    `- Resolved suspicious: ${posture.resolved.riskClasses.suspicious}`,
+    `- Resolved advisory: ${posture.resolved.riskClasses.advisory}`,
+    `- Policy assets: ${formatSignedNumber(policyInventory.totalPolicyAssets)}`,
+    `- Assets with policy metadata: ${formatSignedNumber(policyInventory.assetsWithPolicyMetadata)}`,
+    `- Assets missing policy metadata: ${formatSignedNumber(policyInventory.assetsMissingPolicyMetadata)}`,
+    `- Network allowed: ${formatSignedNumber(policyInventory.networkAllowed.true)}`,
+    `- Network denied: ${formatSignedNumber(policyInventory.networkAllowed.false)}`,
+    `- Upload allowed: ${formatSignedNumber(policyInventory.externalUploadAllowed.true)}`,
+    `- Upload denied: ${formatSignedNumber(policyInventory.externalUploadAllowed.false)}`,
+    `- Secrets allowed: ${formatSignedNumber(policyInventory.secretsAllowed.true)}`,
+    `- Secrets denied: ${formatSignedNumber(policyInventory.secretsAllowed.false)}`,
+    `- Human approval required: ${formatSignedNumber(policyInventory.humanApprovalRequired.true)}`,
+    `- Approved network destinations: ${formatSignedNumber(policyInventory.approvedNetworkDestinationCount)}`,
+    `- Approved upload destinations: ${formatSignedNumber(policyInventory.approvedUploadDestinationCount)}`,
+    `- Forbidden inputs: ${formatSignedNumber(policyInventory.forbiddenInputCount)}`,
+    `- Missing security profiles: ${formatSignedNumber(policyInventory.securityProfiles.missing)}`,
+    `- Cyclic security profiles: ${formatSignedNumber(policyInventory.securityProfiles.cyclic)}`,
+  ];
 }
 
 function formatFindingDelta(finding: FindingDelta): string {
@@ -637,6 +684,10 @@ function delta(to: number, from: number): number {
 
 function signed(value: number): string {
   return value > 0 ? `+${value}` : String(value);
+}
+
+function formatSignedNumber(value: number): string {
+  return value >= 0 ? `+${value}` : String(value);
 }
 
 function markdownList<T>(items: T[], render: (item: T) => string): string[] {

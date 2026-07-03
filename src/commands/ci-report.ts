@@ -198,6 +198,10 @@ function formatCiReportMarkdown(report: CiReport): string {
     "",
     ...formatSecurityPostureSection(report.securityPosture),
     "",
+    "## Security Changes",
+    "",
+    ...formatSecurityChangesSection(report.diff.security),
+    "",
     "## Security Policy Inventory",
     "",
     ...formatSecurityPolicyInventorySection(report.to.securityPolicyInventory),
@@ -218,6 +222,23 @@ function formatCiReportMarkdown(report: CiReport): string {
   ];
 
   return `${lines.join("\n")}\n`;
+}
+
+function formatSecurityChangesSection(
+  security: CiReport["diff"]["security"],
+): string[] {
+  const { posture, policyInventory } = security;
+  return [
+    `- Added security findings: ${posture.added.totalSecurityFindings}`,
+    `- Resolved security findings: ${posture.resolved.totalSecurityFindings}`,
+    `- Added violations: ${posture.added.riskClasses.violation}`,
+    `- Added suspicious: ${posture.added.riskClasses.suspicious}`,
+    `- Added advisory: ${posture.added.riskClasses.advisory}`,
+    `- Policy assets: ${formatDelta(policyInventory.totalPolicyAssets)}`,
+    `- Assets with policy metadata: ${formatDelta(policyInventory.assetsWithPolicyMetadata)}`,
+    `- Assets missing policy metadata: ${formatDelta(policyInventory.assetsMissingPolicyMetadata)}`,
+    `- Missing security profiles: ${formatDelta(policyInventory.securityProfiles.missing)}`,
+  ];
 }
 
 function formatSecurityPostureSection(report: CiReport["securityPosture"]) {
