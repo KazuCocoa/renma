@@ -6,6 +6,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-03
+
 ### Added
 
 - Added a GitHub Actions workflow that publishes the npm package from version tags via npm trusted publishing.
@@ -143,7 +145,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/KazuCocoa/renma/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/KazuCocoa/renma/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/KazuCocoa/renma/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/KazuCocoa/renma/compare/v0.6.0...v0.6.1
