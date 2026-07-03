@@ -1,6 +1,6 @@
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import type { DiagnosticId } from "./diagnostic-ids.js";
-import type { Artifact, Finding, SecurityConfig } from "./types.js";
+import type { Artifact, Finding, RiskClass, SecurityConfig } from "./types.js";
 
 type SecurityCategory = "safety";
 
@@ -14,6 +14,7 @@ type RuleMetadata = {
   verificationSteps: string[];
   llmHint: string;
   confidence: Finding["confidence"];
+  riskClass: RiskClass;
 };
 
 type Detection = {
@@ -69,6 +70,7 @@ const RULES = {
     llmHint:
       "Add small frontmatter policy fields that describe whether network access, external uploads, and secret material are allowed for this artifact.",
     confidence: "medium",
+    riskClass: "advisory",
   },
   policyContradiction: {
     id: DIAGNOSTIC_IDS.SEC_POLICY_CONTRADICTION,
@@ -89,6 +91,7 @@ const RULES = {
     llmHint:
       "Resolve the policy by choosing the stricter allowed behavior or by separating instructions into different assets with explicit metadata.",
     confidence: "high",
+    riskClass: "violation",
   },
   bodyPolicyContradiction: {
     id: DIAGNOSTIC_IDS.SEC_BODY_POLICY_CONTRADICTION,
@@ -109,6 +112,7 @@ const RULES = {
     llmHint:
       "Resolve body and metadata conflicts by choosing the stricter behavior or separating conflicting instructions into different assets.",
     confidence: "high",
+    riskClass: "violation",
   },
   policyProfileNotFound: {
     id: DIAGNOSTIC_IDS.SEC_POLICY_PROFILE_NOT_FOUND,
@@ -129,6 +133,7 @@ const RULES = {
     llmHint:
       "Use a configured security_profile value, or add the missing profile under security.profiles with explicit policy fields.",
     confidence: "high",
+    riskClass: "violation",
   },
   policyProfileCycle: {
     id: DIAGNOSTIC_IDS.SEC_POLICY_PROFILE_CYCLE,
@@ -149,6 +154,7 @@ const RULES = {
     llmHint:
       "Remove or rewrite the cyclic profile reference so the selected security profile has a deterministic parent chain.",
     confidence: "high",
+    riskClass: "violation",
   },
   policyOverrideContradiction: {
     id: DIAGNOSTIC_IDS.SEC_POLICY_OVERRIDE_CONTRADICTION,
@@ -169,6 +175,7 @@ const RULES = {
     llmHint:
       "Treat explicit false policy fields in the artifact as authoritative and adjust the referenced profile or repo-level security config.",
     confidence: "high",
+    riskClass: "violation",
   },
   forbiddenInputInstruction: {
     id: DIAGNOSTIC_IDS.SEC_FORBIDDEN_INPUT_INSTRUCTION,
@@ -189,6 +196,7 @@ const RULES = {
     llmHint:
       "Rewrite the instruction so it avoids profile-forbidden inputs such as secrets, credentials, private keys, or customer data.",
     confidence: "high",
+    riskClass: "violation",
   },
   instructionViolatesPolicy: {
     id: DIAGNOSTIC_IDS.SEC_INSTRUCTION_VIOLATES_POLICY,
@@ -209,6 +217,7 @@ const RULES = {
     llmHint:
       "Find the instruction that asks for denied behavior and rewrite it to stay within the artifact's declared security policy.",
     confidence: "high",
+    riskClass: "violation",
   },
   missingHumanApprovalGuard: {
     id: DIAGNOSTIC_IDS.SEC_MISSING_HUMAN_APPROVAL_GUARD,
@@ -229,6 +238,7 @@ const RULES = {
     llmHint:
       "Insert an explicit human approval requirement next to upload, POST, cloud sync, or external sharing instructions.",
     confidence: "medium",
+    riskClass: "violation",
   },
   sensitiveFileReference: {
     id: DIAGNOSTIC_IDS.SEC_SENSITIVE_FILE_REFERENCE,
@@ -249,6 +259,7 @@ const RULES = {
     llmHint:
       "Inspect this reference and either replace it with a safe placeholder or add explicit no-disclosure handling instructions.",
     confidence: "high",
+    riskClass: "violation",
   },
   secretMaterialInstruction: {
     id: DIAGNOSTIC_IDS.SEC_SECRET_MATERIAL_INSTRUCTION,
@@ -269,6 +280,7 @@ const RULES = {
     llmHint:
       "Rewrite this instruction so secret-bearing files are never copied into prompts, logs, uploads, or diagnostics.",
     confidence: "high",
+    riskClass: "violation",
   },
   externalUploadInstruction: {
     id: DIAGNOSTIC_IDS.SEC_EXTERNAL_UPLOAD_INSTRUCTION,
@@ -289,6 +301,7 @@ const RULES = {
     llmHint:
       "Add a human approval gate and approved destination metadata, or replace the upload with a local-only workflow.",
     confidence: "high",
+    riskClass: "suspicious",
   },
   unapprovedNetworkDestination: {
     id: DIAGNOSTIC_IDS.SEC_UNAPPROVED_NETWORK_DESTINATION,
@@ -309,6 +322,7 @@ const RULES = {
     llmHint:
       "Compare the referenced URL or host to approved_network_destinations and either approve it explicitly or remove the instruction.",
     confidence: "high",
+    riskClass: "violation",
   },
   unapprovedUploadDestination: {
     id: DIAGNOSTIC_IDS.SEC_UNAPPROVED_UPLOAD_DESTINATION,
@@ -329,6 +343,7 @@ const RULES = {
     llmHint:
       "Compare the referenced upload URL or host to security.approvedUploadDomains and either approve it explicitly or remove the instruction.",
     confidence: "high",
+    riskClass: "violation",
   },
   bulkDataSharingInstruction: {
     id: DIAGNOSTIC_IDS.SEC_BULK_DATA_SHARING_INSTRUCTION,
@@ -349,6 +364,7 @@ const RULES = {
     llmHint:
       "Replace broad sharing language with scoped file paths, limited snippets, and redaction requirements.",
     confidence: "medium",
+    riskClass: "suspicious",
   },
   cloudUploadInstruction: {
     id: DIAGNOSTIC_IDS.SEC_CLOUD_UPLOAD_INSTRUCTION,
@@ -369,6 +385,7 @@ const RULES = {
     llmHint:
       "Turn the cloud upload into a local-only output, or add policy metadata and a human approval guard.",
     confidence: "medium",
+    riskClass: "suspicious",
   },
   overbroadContextInstruction: {
     id: DIAGNOSTIC_IDS.SEC_OVERBROAD_CONTEXT_INSTRUCTION,
@@ -389,6 +406,7 @@ const RULES = {
     llmHint:
       "Replace broad context collection with bounded paths, task-relevant snippets, and explicit exclusions for secrets.",
     confidence: "medium",
+    riskClass: "suspicious",
   },
   noRedactionInstruction: {
     id: DIAGNOSTIC_IDS.SEC_NO_REDACTION_INSTRUCTION,
@@ -409,6 +427,7 @@ const RULES = {
     llmHint:
       "Replace no-redaction wording with explicit redaction requirements for secrets and sensitive data.",
     confidence: "high",
+    riskClass: "violation",
   },
   unpinnedRemoteScript: {
     id: DIAGNOSTIC_IDS.SEC_UNPINNED_REMOTE_SCRIPT,
@@ -429,6 +448,7 @@ const RULES = {
     llmHint:
       "Rewrite the install instruction to download a pinned artifact and verify it before execution.",
     confidence: "high",
+    riskClass: "suspicious",
   },
   unpinnedDependencyInstall: {
     id: DIAGNOSTIC_IDS.SEC_UNPINNED_DEPENDENCY_INSTALL,
@@ -449,6 +469,7 @@ const RULES = {
     llmHint:
       "Pin packages, images, or formulas in setup instructions, or route through the repository's lockfile command.",
     confidence: "medium",
+    riskClass: "suspicious",
   },
   privilegedCommandWithoutGuard: {
     id: DIAGNOSTIC_IDS.SEC_PRIVILEGED_COMMAND_WITHOUT_GUARD,
@@ -469,6 +490,7 @@ const RULES = {
     llmHint:
       "Add an explicit approval requirement before sudo, chmod/chown, docker privileged operations, or system writes.",
     confidence: "medium",
+    riskClass: "suspicious",
   },
   destructiveCommand: {
     id: DIAGNOSTIC_IDS.SEC_DESTRUCTIVE_COMMAND,
@@ -491,6 +513,7 @@ const RULES = {
     llmHint:
       "Replace forced deletion, hard reset, clean, prune, or delete commands with safer alternatives, or add explicit approval plus verification and rollback steps.",
     confidence: "high",
+    riskClass: "violation",
   },
   dangerousToolInstruction: {
     id: DIAGNOSTIC_IDS.SEC_DANGEROUS_TOOL_INSTRUCTION,
@@ -511,6 +534,7 @@ const RULES = {
     llmHint:
       "Check security.disallowedCommands and remove instructions that invoke those commands or services.",
     confidence: "high",
+    riskClass: "violation",
   },
   credentialInCommandArg: {
     id: DIAGNOSTIC_IDS.SEC_CREDENTIAL_IN_COMMAND_ARG,
@@ -531,6 +555,7 @@ const RULES = {
     llmHint:
       "Replace literal credential command arguments with safe placeholders and approved secret handling guidance.",
     confidence: "high",
+    riskClass: "violation",
   },
   predictableTempPath: {
     id: DIAGNOSTIC_IDS.SEC_PREDICTABLE_TEMP_PATH,
@@ -551,6 +576,7 @@ const RULES = {
     llmHint:
       "Replace predictable /tmp paths for profiles, credentials, certs, logs, or tokens with secure temporary directory handling.",
     confidence: "medium",
+    riskClass: "suspicious",
   },
 } satisfies Record<string, RuleMetadata>;
 
@@ -2045,6 +2071,7 @@ function findingFromDetection(
     verificationSteps: detection.metadata.verificationSteps,
     llmHint: detection.metadata.llmHint,
     confidence: detection.metadata.confidence,
+    riskClass: detection.metadata.riskClass,
   };
 }
 

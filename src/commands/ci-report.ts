@@ -25,6 +25,7 @@ const MAX_LIST_ITEMS = 10;
 interface ReportFinding {
   id: string;
   severity: string;
+  riskClass?: string | undefined;
   title: string;
   evidence?:
     | {
@@ -206,7 +207,8 @@ function formatFindingSection(
 
 function formatFinding(finding: ReportFinding): string {
   const location = formatFindingLocation(finding);
-  return `- ${finding.severity.toUpperCase()} \`${finding.id}\` \`${location}\` — ${finding.title}`;
+  const risk = finding.riskClass ? ` [${finding.riskClass}]` : "";
+  return `- ${finding.severity.toUpperCase()}${risk} \`${finding.id}\` \`${location}\` — ${finding.title}`;
 }
 
 function formatFindingLocation(finding: ReportFinding): string {

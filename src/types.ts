@@ -1,6 +1,9 @@
 /** Finding severity used for scan reports and failure thresholds. */
 export type Severity = "low" | "medium" | "high" | "critical";
 
+/** Security review taxonomy for static scan findings. */
+export type RiskClass = "violation" | "suspicious" | "advisory";
+
 /** Classified artifact kind discovered from repository paths. */
 export type ArtifactKind =
   | "skill"
@@ -27,6 +30,7 @@ export interface Finding {
   category: "quality" | "safety" | "structure" | "maintenance";
   severity: Severity;
   confidence: "low" | "medium" | "high";
+  riskClass?: RiskClass;
   evidence: Evidence;
   whyItMatters: string;
   remediation: string;

@@ -95,6 +95,7 @@ interface ReadinessCheckChange {
 interface FindingDelta {
   id: string;
   severity: string;
+  riskClass?: string | undefined;
   title: string;
   evidence?: EvidenceDelta | undefined;
 }
@@ -318,11 +319,10 @@ function formatDiffMarkdown(report: DiffReport): string {
   if (report.findings.added.length > 0) {
     lines.push("", "### Added findings", "");
     lines.push(
-      ...markdownList(
-        report.findings.added,
-        (finding) =>
-          `${finding.id} (${finding.severity})${finding.evidence?.path ? ` at ${finding.evidence.path}` : ""}`,
-      ),
+      ...markdownList(report.findings.added, (finding) => {
+        const risk = finding.riskClass ? ` [${finding.riskClass}]` : "";
+        return `${finding.severity.toUpperCase()}${risk} ${finding.id}${finding.evidence?.path ? ` at ${finding.evidence.path}` : ""}`;
+      }),
     );
   }
 
@@ -470,6 +470,7 @@ function findingMap(findings: unknown[]): Map<string, FindingDelta> {
       const deltaFinding = {
         id: stringField(finding, "id"),
         severity: stringField(finding, "severity"),
+        riskClass: optionalStringField(finding, "riskClass"),
         title: stringField(finding, "title"),
         evidence,
       };

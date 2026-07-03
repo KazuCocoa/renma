@@ -153,6 +153,18 @@ Safer:
 Only after explicit human approval, run a scoped cleanup command. Use dry-run where available, keep a backup or rollback path, and verify the affected path before execution.
 ```
 
+## Security Review Taxonomy
+
+Renma remains a static, compile-time-style scanner. It reads repository text and metadata, emits deterministic findings, and does not become a runtime network blocker, sandbox, or policy enforcement layer.
+
+Security findings may include `riskClass` so reviewers can distinguish clear violations from suspicious patterns and advisory hardening:
+
+- `violation`: a rule or safety contract is broken.
+- `suspicious`: risky or ambiguous guidance needs review but is not necessarily a direct violation.
+- `advisory`: governance or hardening guidance, such as missing policy metadata.
+
+`riskClass` helps humans triage security review. Runtime network enforcement remains the responsibility of the sandbox, execution environment, MCP server, network policy, or other controls around the agent.
+
 ## Common Security Diagnostics
 
 Use this table to choose the right kind of fix. For full finding definitions, see [Diagnostics Reference](diagnostics.md).
