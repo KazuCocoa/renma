@@ -6,6 +6,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added security posture summaries to readiness and CI reports, derived from existing security findings and `riskClass` metadata.
+
+### Changed
+
+- Kept security posture reporting non-gating in v1; readiness score, readiness level, scan `fail_on`, and CI status semantics remain unchanged.
+
 ## [0.8.1] - 2026-07-03
 
 ### Added

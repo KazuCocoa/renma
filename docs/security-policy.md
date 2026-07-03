@@ -165,6 +165,20 @@ Security findings may include `riskClass` so reviewers can distinguish clear vio
 
 `riskClass` helps humans triage security review. Runtime network enforcement remains the responsibility of the sandbox, execution environment, MCP server, network policy, or other controls around the agent.
 
+## Security Posture Summaries
+
+Renma can summarize security posture from existing static security findings. The summary groups findings by `riskClass` (`violation`, `suspicious`, `advisory`, and `unclassified`) and by severity, and reports high/critical security finding counts.
+
+This is reporting-only in v1:
+
+- it does not add new detectors
+- it does not change scan `fail_on`
+- it does not change readiness score or readiness level
+- it does not change CI pass/warn/fail status
+- it does not enforce runtime network, upload, sandbox, or tool behavior
+
+Runtime enforcement remains outside Renma.
+
 ## Common Security Diagnostics
 
 Use this table to choose the right kind of fix. For full finding definitions, see [Diagnostics Reference](diagnostics.md).

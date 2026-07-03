@@ -4,12 +4,16 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { main } from "../src/cli.js";
+import type { GraphReport } from "../src/commands/graph.js";
 import {
+  buildReadinessReport,
+  formatReadinessJson,
   formatReadinessMarkdown,
   readiness,
   type ReadinessReport,
   type ReadinessCheckStatus,
 } from "../src/commands/readiness.js";
+import type { Finding } from "../src/types.js";
 
 test("readiness report marks fully owned resolved inventory ready", async () => {
   const root = await fixture();
@@ -460,6 +464,44 @@ test("readiness applies stable score contract for workflow warnings", async () =
   assert.equal(report.level, "needs_attention");
 });
 
+test("readiness JSON includes security posture summary", () => {
+  const parsed = JSON.parse(
+    formatReadinessJson(securityPostureReadinessReport()),
+  ) as ReadinessReport;
+
+  assert.deepEqual(parsed.summary.securityPosture.riskClasses, {
+    violation: 1,
+    suspicious: 1,
+    advisory: 1,
+    unclassified: 0,
+  });
+  assert.equal(parsed.summary.securityPosture.totalSecurityFindings, 3);
+  assert.equal(parsed.summary.securityPosture.highOrCritical, 1);
+  assert.deepEqual(
+    parsed.summary.securityPosture.topFindingIds.map((finding) => finding.id),
+    [
+      "SEC-UNAPPROVED-NETWORK-DESTINATION",
+      "SEC-EXTERNAL-UPLOAD-INSTRUCTION",
+      "SEC-MISSING-POLICY-METADATA",
+    ],
+  );
+});
+
+test("readiness markdown includes security posture counts", () => {
+  const markdown = formatReadinessMarkdown(securityPostureReadinessReport());
+
+  assert.match(markdown, /^## Security Posture$/m);
+  assert.match(markdown, /\| Security findings \| 3 \|/);
+  assert.match(markdown, /\| Violations \| 1 \|/);
+  assert.match(markdown, /\| Suspicious \| 1 \|/);
+  assert.match(markdown, /\| Advisory \| 1 \|/);
+  assert.match(markdown, /\| High\/critical security findings \| 1 \|/);
+  assert.match(
+    markdown,
+    /- SEC-UNAPPROVED-NETWORK-DESTINATION: 1 \[violation, high\]/,
+  );
+});
+
 test("readiness markdown prints a compact reviewable report", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", { owner: "platform" });
@@ -760,6 +802,58 @@ function assertCheckStatuses(
   for (const [id, status] of Object.entries(expected)) {
     assert.equal(statuses.get(id), status, id);
   }
+}
+
+function securityPostureReadinessReport(): ReadinessReport {
+  return buildReadinessReport(securityGraphReport(), [
+    readinessFinding("SEC-MISSING-POLICY-METADATA", "medium", "advisory"),
+    readinessFinding("SEC-UNAPPROVED-NETWORK-DESTINATION", "high", "violation"),
+    readinessFinding("SEC-EXTERNAL-UPLOAD-INSTRUCTION", "medium", "suspicious"),
+  ]);
+}
+
+function securityGraphReport(): GraphReport {
+  return {
+    root: "/repo",
+    scannedFileCount: 1,
+    view: "full",
+    nodeCount: 1,
+    edgeCount: 0,
+    nodes: [
+      {
+        id: "security",
+        kind: "skill",
+        sourcePath: "skills/security/SKILL.md",
+        owner: "platform",
+        status: "stable",
+        tags: [],
+      },
+    ],
+    edges: [],
+  };
+}
+
+function readinessFinding(
+  id: string,
+  severity: Finding["severity"],
+  riskClass?: Finding["riskClass"],
+): Finding {
+  return {
+    id,
+    title: id,
+    category: "safety",
+    severity,
+    confidence: "high",
+    ...(riskClass ? { riskClass } : {}),
+    evidence: {
+      path: "skills/security/SKILL.md",
+      startLine: 1,
+      endLine: 1,
+      snippet: id,
+    },
+    whyItMatters: "Security posture test fixture.",
+    remediation: "Review the fixture finding.",
+  };
 }
 
 async function withCapturedConsole(

@@ -12,6 +12,10 @@ import {
   type CiReport,
 } from "../src/commands/ci-report.js";
 import { scan } from "../src/scanner.js";
+import {
+  summarizeSecurityPosture,
+  zeroSecurityPostureSummary,
+} from "../src/security-posture.js";
 
 const execFile = promisify(execFileCallback);
 
@@ -75,6 +79,36 @@ test("formatCiReport renders structured JSON", () => {
   assert.equal(parsed.status, "fail");
   assert.equal(parsed.summary.highOrCriticalFindingsDelta, 1);
   assert.equal(parsed.diff.findings.added[0]?.id, "MAINT-REPEATED-CODE-BLOCK");
+  assert.equal(parsed.securityPosture.added.totalSecurityFindings, 0);
+});
+
+test("formatCiReport includes security posture summaries", () => {
+  const report = sampleReport();
+  report.diff.findings.added = [
+    finding("SEC-LITERAL-SECRET", "high", "violation"),
+    finding("QUAL-MISSING-EXAMPLES", "high"),
+  ];
+  report.diff.findings.removed = [
+    finding("SEC-MISSING-POLICY-METADATA", "medium", "advisory"),
+  ];
+  report.securityPosture = {
+    added: summarizeSecurityPosture(report.diff.findings.added),
+    resolved: summarizeSecurityPosture(report.diff.findings.removed),
+  };
+
+  const parsed = JSON.parse(formatCiReport(report, "json")) as CiReport;
+  const markdown = formatCiReport(report, "markdown");
+
+  assert.equal(parsed.securityPosture.added.totalSecurityFindings, 1);
+  assert.equal(parsed.securityPosture.added.riskClasses.violation, 1);
+  assert.equal(parsed.securityPosture.added.highOrCritical, 1);
+  assert.equal(parsed.securityPosture.resolved.totalSecurityFindings, 1);
+  assert.equal(parsed.securityPosture.resolved.riskClasses.advisory, 1);
+  assert.match(markdown, /^## Security Posture$/m);
+  assert.match(markdown, /- Added security findings: 1/);
+  assert.match(markdown, /- Added violations: 1/);
+  assert.match(markdown, /- Resolved security findings: 1/);
+  assert.match(markdown, /- Resolved advisory: 1/);
 });
 
 test("formatCiReport renders finding risk classes when present", () => {
@@ -274,6 +308,10 @@ function sampleReport(): CiReport {
       findingsDelta: 1,
       highOrCriticalFindingsDelta: 1,
     },
+    securityPosture: {
+      added: zeroSecurityPostureSummary(),
+      resolved: zeroSecurityPostureSummary(),
+    },
     notes: ["Review new unresolved required edges before merge."],
     diff: {
       root: "/repo",
@@ -400,10 +438,11 @@ function policyDiffReport(options: {
   } as unknown as CiReport["diff"];
 }
 
-function finding(id: string, severity: string) {
+function finding(id: string, severity: string, riskClass?: string) {
   return {
     id,
     severity,
+    ...(riskClass ? { riskClass } : {}),
     title: "Policy finding",
     evidence: {
       path: "docs/policy.md",
