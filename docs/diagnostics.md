@@ -13,7 +13,7 @@ In JSON output, diagnostics usually appear as structured objects with a `severit
 
 ## Scan Review Signals
 
-Renma scan findings have three independent review signals:
+Renma scan findings always include `severity` and `confidence`. Security findings may also include `riskClass`, a human security-review interpretation.
 
 - `severity`: CI gating, urgency, and impact. Values are `low`, `medium`, `high`, and `critical`.
 - `confidence`: detector certainty. Values are `low`, `medium`, and `high`.
