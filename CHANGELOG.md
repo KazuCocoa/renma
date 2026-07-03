@@ -6,6 +6,22 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-03
+
+### Added
+
+- Added `riskClass` to security scan findings so reviewers can distinguish `violation`, `suspicious`, and `advisory` results without changing severity thresholds.
+- Added scan review signal docs and security policy taxonomy guidance for `severity`, `confidence`, and `riskClass`.
+
+### Changed
+
+- Surfaced risk classes in text scan output, readiness reports, semantic diffs, and CI reports.
+- Added npm version and download badges to the README.
+
+### Fixed
+
+- Made semantic diff cleanup preserve primary snapshot errors while retrying temporary directory removal.
+
 ## [0.7.0] - 2026-07-02
 
 ### Changed
@@ -123,7 +139,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/KazuCocoa/renma/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/KazuCocoa/renma/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/KazuCocoa/renma/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/KazuCocoa/renma/compare/v0.5.1...v0.6.0
