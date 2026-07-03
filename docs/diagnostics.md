@@ -25,6 +25,8 @@ Renma scan findings always include `severity` and `confidence`. Security finding
 
 `advisory` means a governance or hardening recommendation. For example, `SEC-MISSING-POLICY-METADATA` advises adding explicit policy metadata.
 
+`riskClass` also powers aggregate security posture summaries in readiness and CI reports.
+
 `riskClass` does not replace `severity` and does not change `fail_on` behavior. Severity remains the CI threshold signal.
 
 ## Discovery Diagnostics
