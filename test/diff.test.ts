@@ -255,6 +255,10 @@ test("formatDiff renders markdown summaries", () => {
   assert.match(markdown, /- Assets missing policy metadata: -1/);
   assert.match(markdown, /- Network allowed: \+1/);
   assert.match(markdown, /- Missing security profiles: \+1/);
+  assert.ok(
+    markdown.indexOf("## Security Changes") <
+      markdown.indexOf("### Added findings"),
+  );
   assert.match(
     markdown,
     /- MAINT-REPEATED-CODE-BLOCK \(high\) at docs\/guide\.md/,

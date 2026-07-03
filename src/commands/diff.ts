@@ -358,13 +358,13 @@ function formatDiffMarkdown(report: DiffReport): string {
     );
   }
 
+  lines.push("", "## Security Changes", "");
+  lines.push(...formatSecurityChanges(report.security));
+
   if (report.findings.added.length > 0) {
     lines.push("", "### Added findings", "");
     lines.push(...markdownList(report.findings.added, formatFindingDelta));
   }
-
-  lines.push("", "## Security Changes", "");
-  lines.push(...formatSecurityChanges(report.security));
 
   return `${lines.join("\n")}\n`;
 }
