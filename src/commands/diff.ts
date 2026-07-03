@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import { execFile as execFileCallback } from "node:child_process";
 import { graph, type GraphReport } from "./graph.js";
 import { readiness, type ReadinessReport } from "./readiness.js";
+import type { SecurityPolicyInventorySummary } from "../security-policy-inventory.js";
 import type { ConfigOverrides } from "../config.js";
 
 const execFile = promisify(execFileCallback);
@@ -56,6 +57,7 @@ interface DiffEndpoint {
   totalAssets: number;
   readinessScore: number;
   readinessLevel: string;
+  securityPolicyInventory?: SecurityPolicyInventorySummary;
 }
 
 interface AssetDelta {
@@ -398,6 +400,7 @@ function endpoint(snapshot: Snapshot): DiffEndpoint {
     totalAssets: snapshot.readiness.summary.totalAssets,
     readinessScore: snapshot.readiness.score,
     readinessLevel: snapshot.readiness.level,
+    securityPolicyInventory: snapshot.readiness.summary.securityPolicyInventory,
   };
 }
 

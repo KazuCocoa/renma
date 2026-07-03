@@ -37,6 +37,9 @@ test("scan discovers default artifacts and emits deterministic findings", async 
       ?.evidence.path,
     "skills/demo/SKILL.md",
   );
+  assert.equal(result.securityPolicyInventory?.totalPolicyAssets, 1);
+  assert.equal(result.securityPolicyInventory?.assetsWithPolicyMetadata, 0);
+  assert.equal(result.securityPolicyInventory?.assetsMissingPolicyMetadata, 1);
 });
 
 test("local support examples are scanned and must be reachable from the skill", async () => {

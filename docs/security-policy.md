@@ -179,6 +179,12 @@ This is reporting-only in v1:
 
 Runtime enforcement remains outside Renma.
 
+### Effective policy inventory
+
+Renma can also summarize the effective static policy surface across discovered assets. The inventory is derived from asset-local policy metadata, selected `security_profile` chains, and repository-level `security` config.
+
+The inventory reports policy coverage, network/upload/secrets booleans, human approval requirements, approved destinations, forbidden inputs, disallowed commands, and profile resolution counts. It is reporting-only in v1 and does not enforce runtime behavior.
+
 ## Common Security Diagnostics
 
 Use this table to choose the right kind of fix. For full finding definitions, see [Diagnostics Reference](diagnostics.md).

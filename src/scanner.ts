@@ -7,6 +7,7 @@ import { parseDocument } from "./markdown.js";
 import { detectRepeatedContextPatterns } from "./repeated-context.js";
 import { runRules } from "./rules.js";
 import { securityDiagnosticFindings } from "./security-diagnostics.js";
+import { summarizeSecurityPolicyInventory } from "./security-policy-inventory.js";
 import { applySuppressions } from "./suppressions.js";
 import type { Diagnostic, Finding, ScanResult } from "./types.js";
 
@@ -18,6 +19,10 @@ export async function scan(
   const root = path.resolve(targetPath);
   const { config, configPath } = await loadConfig(root, overrides);
   const { artifacts, diagnostics } = await discoverArtifacts(root, config);
+  const securityPolicyInventory = summarizeSecurityPolicyInventory(
+    artifacts,
+    config.security,
+  );
   const documents = artifacts.map(parseDocument);
   const catalogResult = buildCatalog(documents);
   const rawFindings = [
@@ -37,6 +42,7 @@ export async function scan(
     ...(configPath ? { configPath } : {}),
     scannedFileCount: artifacts.length,
     format: config.format,
+    securityPolicyInventory,
     findings: suppressed.findings,
     diagnostics: [...diagnostics, ...suppressed.diagnostics],
     exitThreshold: config.failOn,
