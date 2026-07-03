@@ -502,6 +502,63 @@ test("readiness markdown includes security posture counts", () => {
   );
 });
 
+test("readiness JSON includes security policy inventory summary", async () => {
+  const root = await fixture();
+  await writePolicySkill(root);
+  await writeContext(root, "testing", "boundary", {
+    owner: "docs",
+    status: "stable",
+  });
+
+  const report = await readiness(root);
+  const inventory = report.summary.securityPolicyInventory;
+
+  assert.equal(inventory.totalPolicyAssets, 2);
+  assert.equal(inventory.assetsWithPolicyMetadata, 1);
+  assert.equal(inventory.assetsMissingPolicyMetadata, 1);
+  assert.deepEqual(inventory.networkAllowed, {
+    true: 1,
+    false: 0,
+    unspecified: 1,
+  });
+  assert.equal(inventory.approvedNetworkDestinationCount, 1);
+  assert.equal(inventory.forbiddenInputCount, 1);
+  assert.deepEqual(inventory.topApprovedNetworkDestinations, [
+    { destination: "api.example.com", count: 1 },
+  ]);
+  assert.deepEqual(inventory.topForbiddenInputs, [
+    { input: "credentials", count: 1 },
+  ]);
+
+  const parsed = JSON.parse(formatReadinessJson(report)) as ReadinessReport;
+  assert.equal(
+    parsed.summary.securityPolicyInventory.assetsMissingPolicyMetadata,
+    1,
+  );
+});
+
+test("readiness markdown includes security policy inventory", async () => {
+  const root = await fixture();
+  await writePolicySkill(root);
+  await writeContext(root, "testing", "boundary", {
+    owner: "docs",
+    status: "stable",
+  });
+
+  const markdown = formatReadinessMarkdown(await readiness(root));
+
+  assert.match(markdown, /^## Security Policy Inventory$/m);
+  assert.match(markdown, /\| Policy assets \| 2 \|/);
+  assert.match(markdown, /\| Assets with policy metadata \| 1 \|/);
+  assert.match(markdown, /\| Assets missing policy metadata \| 1 \|/);
+  assert.match(markdown, /\| Network allowed \| 1 \|/);
+  assert.match(markdown, /\| Forbidden inputs \| 1 \|/);
+  assert.match(markdown, /^### Top approved network destinations$/m);
+  assert.match(markdown, /- api\.example\.com: 1/);
+  assert.match(markdown, /^### Top forbidden inputs$/m);
+  assert.match(markdown, /- credentials: 1/);
+});
+
 test("readiness markdown prints a compact reviewable report", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", { owner: "platform" });
@@ -680,6 +737,25 @@ async function writeContext(
       ...metadata,
       title: `# ${id}`,
     }),
+  );
+}
+
+async function writePolicySkill(root: string): Promise<void> {
+  await mkdir(path.join(root, "skills", "policy"), { recursive: true });
+  await writeFile(
+    path.join(root, "skills", "policy", "SKILL.md"),
+    [
+      "---",
+      "id: policy",
+      "owner: platform",
+      "status: stable",
+      "description: Clear workflow routing for readiness report tests with deterministic security policy metadata and verification expectations.",
+      "network_allowed: true",
+      "approved_network_destinations: api.example.com",
+      "forbidden_inputs: credentials",
+      "---",
+      workflowReadySkillBody("policy"),
+    ].join("\n"),
   );
 }
 

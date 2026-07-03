@@ -16,6 +16,10 @@ import {
   summarizeSecurityPosture,
   zeroSecurityPostureSummary,
 } from "../src/security-posture.js";
+import {
+  zeroSecurityPolicyInventorySummary,
+  type SecurityPolicyInventorySummary,
+} from "../src/security-policy-inventory.js";
 
 const execFile = promisify(execFileCallback);
 
@@ -80,6 +84,7 @@ test("formatCiReport renders structured JSON", () => {
   assert.equal(parsed.summary.highOrCriticalFindingsDelta, 1);
   assert.equal(parsed.diff.findings.added[0]?.id, "MAINT-REPEATED-CODE-BLOCK");
   assert.equal(parsed.securityPosture.added.totalSecurityFindings, 0);
+  assert.equal(parsed.to.securityPolicyInventory?.assetsWithPolicyMetadata, 3);
 });
 
 test("formatCiReport includes security posture summaries", () => {
@@ -109,6 +114,25 @@ test("formatCiReport includes security posture summaries", () => {
   assert.match(markdown, /- Added violations: 1/);
   assert.match(markdown, /- Resolved security findings: 1/);
   assert.match(markdown, /- Resolved advisory: 1/);
+});
+
+test("formatCiReport includes target security policy inventory", () => {
+  const report = sampleReport();
+  const parsed = JSON.parse(formatCiReport(report, "json")) as CiReport;
+  const markdown = formatCiReport(report, "markdown");
+
+  assert.equal(parsed.to.securityPolicyInventory?.assetsWithPolicyMetadata, 3);
+  assert.equal(
+    parsed.to.securityPolicyInventory?.assetsMissingPolicyMetadata,
+    1,
+  );
+  assert.match(markdown, /^## Security Policy Inventory$/m);
+  assert.match(markdown, /- Target assets with policy metadata: 3/);
+  assert.match(markdown, /- Target assets missing policy metadata: 1/);
+  assert.match(markdown, /- Target referenced security profiles: 2/);
+  assert.match(markdown, /- Target missing security profiles: 1/);
+  assert.match(markdown, /- Target approved network destinations: 4/);
+  assert.match(markdown, /- Target approved upload destinations: 2/);
 });
 
 test("formatCiReport renders finding risk classes when present", () => {
@@ -254,6 +278,13 @@ test("ci report policy warns on readiness score decrease", () => {
   assert.equal(determineCiReportStatus(report), "warn");
 });
 
+test("ci report policy inventory counts do not change CI status", () => {
+  const report = policyDiffReport({});
+  report.to.securityPolicyInventory = targetSecurityPolicyInventory();
+
+  assert.equal(determineCiReportStatus(report), "pass");
+});
+
 test("ci report omits suppressed high findings introduced between git refs", async () => {
   const repo = await createSuppressedFindingRepo();
   try {
@@ -297,6 +328,7 @@ function sampleReport(): CiReport {
       totalAssets: 12,
       readinessScore: 80,
       readinessLevel: "needs_attention",
+      securityPolicyInventory: targetSecurityPolicyInventory(),
     },
     status: "fail",
     summary: {
@@ -328,6 +360,7 @@ function sampleReport(): CiReport {
         totalAssets: 12,
         readinessScore: 80,
         readinessLevel: "needs_attention",
+        securityPolicyInventory: targetSecurityPolicyInventory(),
       },
       summary: {
         readinessScoreDelta: 8,
@@ -382,6 +415,18 @@ function sampleReport(): CiReport {
       },
     } as unknown as CiReport["diff"],
   };
+}
+
+function targetSecurityPolicyInventory(): SecurityPolicyInventorySummary {
+  const inventory = zeroSecurityPolicyInventorySummary();
+  inventory.totalPolicyAssets = 5;
+  inventory.assetsWithPolicyMetadata = 3;
+  inventory.assetsMissingPolicyMetadata = 1;
+  inventory.approvedNetworkDestinationCount = 4;
+  inventory.approvedUploadDestinationCount = 2;
+  inventory.securityProfiles.referenced = 2;
+  inventory.securityProfiles.missing = 1;
+  return inventory;
 }
 
 function policyDiffReport(options: {

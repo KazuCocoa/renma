@@ -10,6 +10,7 @@ import {
   type ReadinessReport,
 } from "../src/commands/readiness.js";
 import { scan } from "../src/scanner.js";
+import { zeroSecurityPolicyInventorySummary } from "../src/security-policy-inventory.js";
 import { zeroSecurityPostureSummary } from "../src/security-posture.js";
 import type { Finding } from "../src/types.js";
 
@@ -214,6 +215,7 @@ function readinessReportWithFindings(count: number): ReadinessReport {
         readinessPercent: 100,
       },
       securityPosture: zeroSecurityPostureSummary(),
+      securityPolicyInventory: zeroSecurityPolicyInventorySummary(),
     },
     checks: [
       {

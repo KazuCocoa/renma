@@ -9,10 +9,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 ### Added
 
 - Added security posture summaries to readiness and CI reports, derived from existing security findings and `riskClass` metadata.
+- Added effective security policy inventory summaries for readiness and CI reporting, derived from asset policy metadata, security profiles, and repository security config.
 
 ### Changed
 
 - Kept security posture reporting non-gating in v1; readiness score, readiness level, scan `fail_on`, and CI status semantics remain unchanged.
+- Kept policy inventory reporting non-gating in v1; scan `fail_on`, readiness score/level, and CI status semantics remain unchanged.
 
 ## [0.8.1] - 2026-07-03
 

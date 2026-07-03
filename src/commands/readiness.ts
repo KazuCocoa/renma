@@ -5,6 +5,10 @@ import {
   summarizeSecurityPosture,
   type SecurityPostureSummary,
 } from "../security-posture.js";
+import {
+  zeroSecurityPolicyInventorySummary,
+  type SecurityPolicyInventorySummary,
+} from "../security-policy-inventory.js";
 import type { ConfigOverrides } from "../config.js";
 import type { Diagnostic, Finding } from "../types.js";
 
@@ -63,6 +67,7 @@ export interface ReadinessReport {
     };
     workflow: WorkflowReadinessSummary;
     securityPosture: SecurityPostureSummary;
+    securityPolicyInventory: SecurityPolicyInventorySummary;
   };
   checks: ReadinessCheck[];
   diagnostics?: Diagnostic[];
@@ -103,6 +108,7 @@ export async function readiness(
     graphReport,
     scanResult.findings,
     scanResult.diagnostics,
+    scanResult.securityPolicyInventory,
   );
 }
 
@@ -110,6 +116,7 @@ export function buildReadinessReport(
   graphReport: GraphReport,
   findings: Finding[] = [],
   diagnostics: Diagnostic[] = graphReport.diagnostics ?? [],
+  securityPolicyInventory: SecurityPolicyInventorySummary = zeroSecurityPolicyInventorySummary(),
 ): ReadinessReport {
   const diagnosticCounts = countDiagnostics(diagnostics);
   const totalAssets = graphReport.nodes.length;
@@ -274,6 +281,7 @@ export function buildReadinessReport(
       diagnosticCounts,
       workflow,
       securityPosture,
+      securityPolicyInventory,
     },
     checks,
     ...(diagnostics.length > 0 ? { diagnostics } : {}),
@@ -328,6 +336,12 @@ export function formatReadinessMarkdown(report: ReadinessReport): string {
     "## Security Posture",
     "",
     ...formatSecurityPostureMarkdown(report.summary.securityPosture),
+    "",
+    "## Security Policy Inventory",
+    "",
+    ...formatSecurityPolicyInventoryMarkdown(
+      report.summary.securityPolicyInventory,
+    ),
     "",
     "## Workflow Readiness",
     "",
@@ -401,6 +415,69 @@ function formatSecurityPostureMarkdown(
       ...securityPosture.topFindingIds.map(
         (finding) =>
           `- ${finding.id}: ${finding.count} [${finding.riskClass ?? "unclassified"}, ${finding.maxSeverity}]`,
+      ),
+    );
+  }
+
+  return lines;
+}
+
+function formatSecurityPolicyInventoryMarkdown(
+  inventory: SecurityPolicyInventorySummary,
+): string[] {
+  const lines = [
+    "| Metric | Value |",
+    "| --- | ---: |",
+    `| Policy assets | ${inventory.totalPolicyAssets} |`,
+    `| Assets with policy metadata | ${inventory.assetsWithPolicyMetadata} |`,
+    `| Assets missing policy metadata | ${inventory.assetsMissingPolicyMetadata} |`,
+    `| Network allowed | ${inventory.networkAllowed.true} |`,
+    `| Network denied | ${inventory.networkAllowed.false} |`,
+    `| Network unspecified | ${inventory.networkAllowed.unspecified} |`,
+    `| Upload allowed | ${inventory.externalUploadAllowed.true} |`,
+    `| Upload denied | ${inventory.externalUploadAllowed.false} |`,
+    `| Upload unspecified | ${inventory.externalUploadAllowed.unspecified} |`,
+    `| Secrets allowed | ${inventory.secretsAllowed.true} |`,
+    `| Secrets denied | ${inventory.secretsAllowed.false} |`,
+    `| Secrets unspecified | ${inventory.secretsAllowed.unspecified} |`,
+    `| Human approval required | ${inventory.humanApprovalRequired.true} |`,
+    `| Approved network destinations | ${inventory.approvedNetworkDestinationCount} |`,
+    `| Approved upload destinations | ${inventory.approvedUploadDestinationCount} |`,
+    `| Forbidden inputs | ${inventory.forbiddenInputCount} |`,
+    `| Referenced security profiles | ${inventory.securityProfiles.referenced} |`,
+    `| Missing security profiles | ${inventory.securityProfiles.missing} |`,
+    `| Cyclic security profiles | ${inventory.securityProfiles.cyclic} |`,
+  ];
+
+  if (inventory.topApprovedNetworkDestinations.length > 0) {
+    lines.push(
+      "",
+      "### Top approved network destinations",
+      "",
+      ...inventory.topApprovedNetworkDestinations.map(
+        (item) => `- ${item.destination}: ${item.count}`,
+      ),
+    );
+  }
+
+  if (inventory.topApprovedUploadDestinations.length > 0) {
+    lines.push(
+      "",
+      "### Top approved upload destinations",
+      "",
+      ...inventory.topApprovedUploadDestinations.map(
+        (item) => `- ${item.destination}: ${item.count}`,
+      ),
+    );
+  }
+
+  if (inventory.topForbiddenInputs.length > 0) {
+    lines.push(
+      "",
+      "### Top forbidden inputs",
+      "",
+      ...inventory.topForbiddenInputs.map(
+        (item) => `- ${item.input}: ${item.count}`,
       ),
     );
   }

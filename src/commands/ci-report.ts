@@ -3,6 +3,10 @@ import {
   summarizeSecurityPosture,
   type SecurityPostureSummary,
 } from "../security-posture.js";
+import {
+  zeroSecurityPolicyInventorySummary,
+  type SecurityPolicyInventorySummary,
+} from "../security-policy-inventory.js";
 import type { ConfigOverrides } from "../config.js";
 
 export type CiReportFormat = DiffFormat;
@@ -194,6 +198,10 @@ function formatCiReportMarkdown(report: CiReport): string {
     "",
     ...formatSecurityPostureSection(report.securityPosture),
     "",
+    "## Security Policy Inventory",
+    "",
+    ...formatSecurityPolicyInventorySection(report.to.securityPolicyInventory),
+    "",
     "## Scan Findings",
     "",
     ...formatFindingSection("Added", report.diff.findings.added),
@@ -231,6 +239,20 @@ function formatSecurityPostureSection(report: CiReport["securityPosture"]) {
     `- Resolved violations: ${resolved.riskClasses.violation}`,
     `- Resolved suspicious: ${resolved.riskClasses.suspicious}`,
     `- Resolved advisory: ${resolved.riskClasses.advisory}`,
+  ];
+}
+
+function formatSecurityPolicyInventorySection(
+  inventory: SecurityPolicyInventorySummary | undefined,
+): string[] {
+  const target = inventory ?? zeroSecurityPolicyInventorySummary();
+  return [
+    `- Target assets with policy metadata: ${target.assetsWithPolicyMetadata}`,
+    `- Target assets missing policy metadata: ${target.assetsMissingPolicyMetadata}`,
+    `- Target referenced security profiles: ${target.securityProfiles.referenced}`,
+    `- Target missing security profiles: ${target.securityProfiles.missing}`,
+    `- Target approved network destinations: ${target.approvedNetworkDestinationCount}`,
+    `- Target approved upload destinations: ${target.approvedUploadDestinationCount}`,
   ];
 }
 

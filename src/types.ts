@@ -1,3 +1,5 @@
+import type { SecurityPolicyInventorySummary } from "./security-policy-inventory.js";
+
 /** Finding severity used for scan reports and failure thresholds. */
 export type Severity = "low" | "medium" | "high" | "critical";
 
@@ -172,6 +174,7 @@ export interface ScanResult {
   configPath?: string;
   scannedFileCount: number;
   format: "text" | "json";
+  securityPolicyInventory?: SecurityPolicyInventorySummary;
   findings: Finding[];
   diagnostics: Diagnostic[];
   exitThreshold: Severity;

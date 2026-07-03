@@ -29,6 +29,8 @@ Renma scan findings always include `severity` and `confidence`. Security finding
 
 `riskClass` does not replace `severity` and does not change `fail_on` behavior. Severity remains the CI threshold signal.
 
+Readiness and CI reports may include two security summaries: security posture from static findings, and security policy inventory from effective asset metadata, security profiles, and repository security config. The inventory is reporting-only and does not change scan `fail_on`, readiness scoring, or CI status.
+
 ## Discovery Diagnostics
 
 These diagnostics are emitted while renma discovers files.
