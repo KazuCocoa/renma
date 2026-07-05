@@ -7,6 +7,10 @@ status: stable
 tags:
   - payment
   - reliability
+when_to_use:
+  - Reviewing payment write retry behavior or duplicate request handling
+when_not_to_use:
+  - Reviewing non-payment retries or read-only request behavior
 ---
 
 # Payment Idempotency
