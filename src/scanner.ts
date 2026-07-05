@@ -132,6 +132,49 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
       };
     }
 
+    const frontmatterTooLarge = /Frontmatter metadata is too large/i.test(
+      diagnostic.message,
+    );
+    const metadataListItemTooLong = /Metadata list item is too long/i.test(
+      diagnostic.message,
+    );
+    if (frontmatterTooLarge || metadataListItemTooLong) {
+      return {
+        id: frontmatterTooLarge
+          ? DIAGNOSTIC_IDS.META_FRONTMATTER_TOO_LARGE
+          : DIAGNOSTIC_IDS.META_LIST_ITEM_TOO_LONG,
+        title: frontmatterTooLarge
+          ? "Frontmatter metadata is too large"
+          : "Metadata list item is too long",
+        category: "maintenance",
+        severity: "low",
+        confidence: "high",
+        evidence: diagnostic.evidence ?? {
+          path,
+          startLine: 1,
+          endLine: 1,
+          snippet: diagnostic.message,
+        },
+        whyItMatters:
+          "Frontmatter metadata is part of the LLM-facing catalog surface. Overgrown metadata increases token use and catalog noise, and often means detailed guidance belongs in the markdown body or a referenced context asset instead.",
+        remediation:
+          "Keep frontmatter as a compact deterministic index. Move long explanations, routing prose, examples, procedures, and detailed policy text into the markdown body or referenced context assets.",
+        constraints: [
+          "Do not add new metadata fields to hide long prose.",
+          "Do not delete substantive guidance just to satisfy the check.",
+          "Preserve detailed knowledge in the asset body or referenced context assets.",
+          "Keep metadata useful for deterministic cataloging, graph checks, readiness checks, and security diagnostics.",
+        ],
+        verificationSteps: [
+          "Run renma scan.",
+          "Run renma catalog.",
+          "Confirm the frontmatter is shorter and detailed guidance remains preserved outside metadata.",
+        ],
+        llmHint:
+          "Shorten metadata without losing knowledge: keep concise routing/index fields in frontmatter, move long prose into body sections or referenced context assets, and preserve existing references.",
+      };
+    }
+
     const missingId = /missing an id/i.test(diagnostic.message);
     const missingOwner = /missing an owner/i.test(diagnostic.message);
     const unknownDependency = /does not match a catalog entry/i.test(

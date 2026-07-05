@@ -9,6 +9,10 @@ import type {
 import { parseAssetMetadata } from "./metadata.js";
 import type { Diagnostic, Evidence, ParsedDocument } from "./types.js";
 
+const FRONTMATTER_MAX_LINES = 24;
+const FRONTMATTER_MAX_CHARS = 1200;
+const METADATA_LIST_ITEM_MAX_CHARS = 140;
+
 /** Build a deterministic catalog of skill and context entries from parsed documents. */
 export function buildCatalog(documents: ParsedDocument[]): {
   catalog: Catalog;
@@ -18,6 +22,7 @@ export function buildCatalog(documents: ParsedDocument[]): {
   const entries = documents
     .map((document): CatalogEntry | undefined => {
       const result = parseAssetMetadata(document);
+      diagnostics.push(...metadataBudgetDiagnostics(document));
       diagnostics.push(...result.diagnostics);
       diagnostics.push(
         ...sharedContextMetadataDiagnostics(document, result.metadata),
@@ -82,6 +87,68 @@ export function buildCatalog(documents: ParsedDocument[]): {
     },
     diagnostics,
   };
+}
+
+function metadataBudgetDiagnostics(document: ParsedDocument): Diagnostic[] {
+  const frontmatter = frontmatterRange(document);
+  if (!frontmatter) return [];
+
+  const diagnostics: Diagnostic[] = [];
+  const frontmatterLines = document.lines.slice(
+    frontmatter.startLine - 1,
+    frontmatter.endLine,
+  );
+  const lineCount = frontmatterLines.length;
+  const charCount = frontmatterLines.join("\n").length;
+  if (lineCount > FRONTMATTER_MAX_LINES || charCount > FRONTMATTER_MAX_CHARS) {
+    diagnostics.push({
+      severity: "warning",
+      path: document.artifact.path,
+      message: `Frontmatter metadata is too large. Frontmatter has ${lineCount} lines and ${charCount} characters; keep metadata as a compact index and move detailed guidance into the markdown body or referenced context assets.`,
+      evidence: {
+        path: document.artifact.path,
+        startLine: frontmatter.startLine,
+        endLine: frontmatter.endLine,
+        snippet: `frontmatter: ${lineCount} lines, ${charCount} characters`,
+      },
+    });
+  }
+
+  for (const [key, items] of Object.entries(document.metadataListItems)) {
+    for (const item of items) {
+      const itemText = metadataListItemText(item.raw);
+      if (itemText.length <= METADATA_LIST_ITEM_MAX_CHARS) continue;
+
+      diagnostics.push({
+        severity: "warning",
+        path: document.artifact.path,
+        message: `Metadata list item is too long in ${key}. Item has ${itemText.length} characters; keep list items short and move routing prose into the markdown body or referenced context assets.`,
+        evidence: {
+          path: item.path,
+          startLine: item.startLine,
+          endLine: item.endLine,
+          snippet: item.raw,
+        },
+      });
+    }
+  }
+
+  return diagnostics;
+}
+
+function frontmatterRange(
+  document: ParsedDocument,
+): { startLine: number; endLine: number } | undefined {
+  if (document.lines[0]?.trim() !== "---") return undefined;
+  const endIndex = document.lines.findIndex(
+    (line, index) => index > 0 && line.trim() === "---",
+  );
+  if (endIndex < 0) return undefined;
+  return { startLine: 1, endLine: endIndex + 1 };
+}
+
+function metadataListItemText(raw: string): string {
+  return raw.replace(/^\s*-\s*/, "").trim();
 }
 
 function dependencyDiagnostics(

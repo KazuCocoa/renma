@@ -94,21 +94,23 @@ Security diagnostics focus on high-signal heuristics for agent-facing or context
 
 ### Security Policy Metadata
 
-Security policy diagnostics read small metadata fields from skill and context frontmatter. If a skill or context omits both `allowed_data` and inherited policy data, Renma can emit `SEC-MISSING-POLICY-METADATA` with evidence such as `missing allowed_data policy metadata`.
+Security policy diagnostics read small canonical metadata fields from skill and context frontmatter. If a skill or context omits both `allowed_data` and inherited policy data, Renma can emit `SEC-MISSING-POLICY-METADATA` with evidence such as `missing allowed_data policy metadata`.
+
+Renma intentionally keeps asset-local frontmatter metadata small. Use the canonical snake_case frontmatter field names below; alias spellings are not supported for asset-local policy metadata.
 
 Supported policy metadata includes:
 
-| Field | Accepted aliases | Meaning | Related findings |
-| --- | --- | --- | --- |
-| `allowed_data` | `allowedData` | Declares the asset's allowed data entries. It accepts scalar, inline list, and block list forms; `allowed_data: disclosed`, `allowed_data: [disclosed]`, and a one-item block list are equivalent. | `SEC-MISSING-POLICY-METADATA`, `SEC-FORBIDDEN-INPUT-INSTRUCTION`, `SEC-INSTRUCTION-VIOLATES-POLICY` |
-| `network_allowed` | `networkAllowed` | Declares whether the asset may perform network actions such as fetching URLs or contacting APIs. Explicit `false` blocks network instructions even when repository config has approved domains. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-BODY-POLICY-CONTRADICTION`, `SEC-UNAPPROVED-NETWORK-DESTINATION` |
-| `external_upload_allowed` | `externalUploadAllowed` | Declares whether the asset may upload, publish, submit, sync, push, or otherwise send repository data externally. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-EXTERNAL-UPLOAD-INSTRUCTION`, `SEC-UNAPPROVED-UPLOAD-DESTINATION` |
-| `secrets_allowed` | `secretsAllowed` | Declares whether secret material is allowed as input or content for the asset. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-SECRET-MATERIAL-INSTRUCTION`, `SEC-SENSITIVE-FILE-REFERENCE` |
-| `requires_human_approval` | `human_approval_required`, `requiresHumanApproval`, `humanApprovalRequired` | Requires a nearby human approval guard before sensitive network, upload, secret-handling, or high-risk actions. | `SEC-MISSING-HUMAN-APPROVAL-GUARD` |
-| `approved_network_destinations` | `approvedNetworkDestinations`, `allowed_network_destinations`, `allowedNetworkDestinations` | Lists approved network destinations for URL or domain-like network instructions. | `SEC-UNAPPROVED-NETWORK-DESTINATION` |
-| `approved_upload_destinations` | `approvedUploadDestinations`, `approved_upload_domains`, `approvedUploadDomains` | Lists approved upload destinations. Upload approvals are checked separately from general network approvals. | `SEC-UNAPPROVED-UPLOAD-DESTINATION` |
-| `forbidden_inputs` | `forbiddenInputs` | Lists inputs the asset must not request or process, such as `secrets`, `credentials`, or `tokens`. | `SEC-FORBIDDEN-INPUT-INSTRUCTION` |
-| `security_profile` | `securityProfile` | Selects a repository security profile from `renma.config.json`. Artifact-local explicit denials remain stricter than inherited profile or repository allowances. | `SEC-POLICY-PROFILE-NOT-FOUND`, `SEC-POLICY-PROFILE-CYCLE`, `SEC-POLICY-OVERRIDE-CONTRADICTION` |
+| Field | Meaning | Related findings |
+| --- | --- | --- |
+| `allowed_data` | Declares the asset's allowed data entries. It accepts scalar, inline list, and block list forms; `allowed_data: disclosed`, `allowed_data: [disclosed]`, and a one-item block list are equivalent. | `SEC-MISSING-POLICY-METADATA`, `SEC-FORBIDDEN-INPUT-INSTRUCTION`, `SEC-INSTRUCTION-VIOLATES-POLICY` |
+| `network_allowed` | Declares whether the asset may perform network actions such as fetching URLs or contacting APIs. Explicit `false` blocks network instructions even when repository config has approved domains. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-BODY-POLICY-CONTRADICTION`, `SEC-UNAPPROVED-NETWORK-DESTINATION` |
+| `external_upload_allowed` | Declares whether the asset may upload, publish, submit, sync, push, or otherwise send repository data externally. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-EXTERNAL-UPLOAD-INSTRUCTION`, `SEC-UNAPPROVED-UPLOAD-DESTINATION` |
+| `secrets_allowed` | Declares whether secret material is allowed as input or content for the asset. | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-SECRET-MATERIAL-INSTRUCTION`, `SEC-SENSITIVE-FILE-REFERENCE` |
+| `requires_human_approval` | Requires a nearby human approval guard before sensitive network, upload, secret-handling, or high-risk actions. | `SEC-MISSING-HUMAN-APPROVAL-GUARD` |
+| `approved_network_destinations` | Lists approved network destinations for URL or domain-like network instructions. | `SEC-UNAPPROVED-NETWORK-DESTINATION` |
+| `approved_upload_destinations` | Lists approved upload destinations. Upload approvals are checked separately from general network approvals. | `SEC-UNAPPROVED-UPLOAD-DESTINATION` |
+| `forbidden_inputs` | Lists inputs the asset must not request or process, such as `secrets`, `credentials`, or `tokens`. | `SEC-FORBIDDEN-INPUT-INSTRUCTION` |
+| `security_profile` | Selects a repository security profile from `renma.config.json`. Artifact-local explicit denials remain stricter than inherited profile or repository allowances. | `SEC-POLICY-PROFILE-NOT-FOUND`, `SEC-POLICY-PROFILE-CYCLE`, `SEC-POLICY-OVERRIDE-CONTRADICTION` |
 
 Boolean policy fields accept values such as `true`, `false`, `yes`, `no`, `allowed`, `denied`, `allow`, and `deny`. List-valued fields accept comma-separated inline values, bracket-style inline lists, or simple block lists.
 
@@ -126,7 +128,7 @@ forbidden_inputs:
   - tokens
 ```
 
-`security_profile` inherits policy values from `renma.config.json`. Security profile list fields such as `allowedData` / `allowed_data`, `forbiddenInputs` / `forbidden_inputs`, `approvedDomains`, `approvedUploadDomains`, and `disallowedCommands` accept either a string or an array of strings. Profiles may still use `allowedDataClass` or `allowed_data_class` for a broad data class, but `allowedData` / `allowed_data` is the simpler shape for new config. Artifact-local explicit denials, such as `network_allowed: false` or `external_upload_allowed: false`, remain stricter than inherited profile or repository allowances. Network destination approvals and upload destination approvals are separate; approving a host for network access does not approve uploads to that host.
+`security_profile` inherits policy values from `renma.config.json`. Frontmatter uses canonical snake_case metadata fields; repository security profile config uses the existing JSON config schema. Security profile list fields such as `allowedData`, `forbiddenInputs`, `approvedDomains`, `approvedUploadDomains`, and `disallowedCommands` accept either a string or an array of strings. Artifact-local explicit denials, such as `network_allowed: false` or `external_upload_allowed: false`, remain stricter than inherited profile or repository allowances. Network destination approvals and upload destination approvals are separate; approving a host for network access does not approve uploads to that host.
 
 | Identifier | Meaning | Typical cause | How to fix |
 | --- | --- | --- | --- |
@@ -153,6 +155,7 @@ forbidden_inputs:
 | `MAINT-SKILL-REUSABLE-CONTEXT-CANDIDATE` | Skill contains reusable context. | `SKILL.md` includes broadly reusable setup, troubleshooting, or risk guidance. | Move reusable content to shared context and reference it. |
 | `MAINT-SUPPORT-ASSET-SHARED-CONTEXT-CANDIDATE` | Support asset looks reusable. | A reference, profile, or example contains content useful beyond one skill. | Promote it to shared context when reuse is intended. |
 | `META-DUPLICATE-ASSET-ID` | Asset ID is not unique. | Two catalog entries declare the same ID. | Give each asset a unique ID and update references. |
+| `META-FRONTMATTER-TOO-LARGE` | Frontmatter metadata is too large. | Frontmatter has too many lines or characters to stay a compact index. | Move long prose, examples, procedures, or rationale into the body or referenced context assets. |
 | `META-UNKNOWN-REFERENCE` | Metadata reference does not resolve. | A dependency points to a missing asset ID or path. | Fix the reference, add the missing asset, or remove the dependency. |
 | `PATH-HELPER-COMMAND-NON_TOOLS` | Helper command points outside tools. | A command references a scripts path that is not under `tools/**`. | Move the helper to `tools/**` and update the command. |
 | `PATH-HELPER-COMMAND-SKILL-SCRIPTS` | Helper command is skill-local. | A command points into `skills/*/scripts`. | Move helper code to the configured `tools/**` location. |
@@ -186,6 +189,7 @@ forbidden_inputs:
 | `META-INVALID-LAST-REVIEWED-AT` | Freshness review date is invalid. | `last_reviewed_at` is present but is not a real `YYYY-MM-DD` date. | Replace it with a valid ISO date or remove the field until reviewed. |
 | `META-INVALID-REVIEW-CYCLE` | Freshness review cycle is unsupported. | `review_cycle` is present but is not a supported day duration. | Use a duration such as `P90D` or `P180D`. |
 | `META-INVALID-STATUS` | Metadata status is invalid. | An asset declares an unsupported status value. | Replace it with a supported lifecycle status. |
+| `META-LIST-ITEM-TOO-LONG` | Metadata list item is too long. | A block-list metadata item contains routing prose or detailed conditions. | Keep the item short and move detailed guidance into body sections or referenced context assets. |
 | `META-MISSING-ID` | Metadata is missing an asset ID. | A shared context asset has no stable `id`. | Add an `id` metadata field. |
 | `META-MISSING-OWNER` | Metadata is missing an owner. | An asset has no owner metadata. | Add an `owner` metadata field. |
 | `META-UNKNOWN-DEPENDENCY` | Metadata dependency is unresolved. | A dependency points at an asset renma did not discover. | Correct the dependency, add the missing asset, or update discovery config. |

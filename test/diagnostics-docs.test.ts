@@ -11,18 +11,17 @@ const SCAN_FINDING_IMPLEMENTATION_FILES = [
   "src/scanner.ts",
 ] as const;
 
+const SCAN_FINDING_DOCUMENTATION_FILES = [
+  "docs/diagnostics.md",
+  "docs/metadata-budget.md",
+] as const;
+
 const FINDING_ID_PATTERN = /["'`]([A-Z][A-Z0-9]+-[A-Z0-9_-]+)["'`]/g;
 const DOCUMENTED_ID_PATTERN = /^`([A-Z][A-Z0-9]+-[A-Z0-9_-]+)`$/;
 
 test("all implemented scan finding identifiers are documented", async () => {
   const implementedIds = await collectImplementedFindingIds();
-  const diagnostics = await readFile(
-    path.join(process.cwd(), "docs", "diagnostics.md"),
-    "utf8",
-  );
-  const documentedIds = collectDocumentedFindingIds(
-    scanFindingIdentifiersSection(diagnostics),
-  );
+  const documentedIds = await collectAllDocumentedFindingIds();
 
   assert.ok(
     implementedIds.length > 0,
@@ -30,7 +29,7 @@ test("all implemented scan finding identifiers are documented", async () => {
   );
   assert.ok(
     documentedIds.length > 0,
-    "expected docs/diagnostics.md to contain a Scan Finding Identifiers table",
+    "expected documentation to contain scan finding identifier tables",
   );
 
   const documented = new Set(documentedIds);
@@ -41,8 +40,7 @@ test("all implemented scan finding identifiers are documented", async () => {
   if (missing.length > 0) {
     assert.fail(
       [
-        "docs/diagnostics.md is missing implemented scan finding identifier(s)",
-        "from the Scan Finding Identifiers table:",
+        "scan finding documentation is missing implemented identifier(s):",
         ...missing.map((id) => `- ${id}`),
       ].join("\n"),
     );
@@ -51,7 +49,7 @@ test("all implemented scan finding identifiers are documented", async () => {
   if (stale.length > 0) {
     assert.fail(
       [
-        "docs/diagnostics.md documents scan finding identifier(s) that are not",
+        "scan finding documentation includes identifier(s) that are not",
         "emitted by the current implementation:",
         ...stale.map((id) => `- ${id}`),
       ].join("\n"),
@@ -73,9 +71,29 @@ async function collectImplementedFindingIds(): Promise<string[]> {
   return [...ids].sort();
 }
 
-function scanFindingIdentifiersSection(diagnostics: string): string {
+async function collectAllDocumentedFindingIds(): Promise<string[]> {
+  const ids = new Set<string>();
+
+  for (const file of SCAN_FINDING_DOCUMENTATION_FILES) {
+    const documentation = await readFile(
+      path.join(process.cwd(), file),
+      "utf8",
+    );
+    for (const id of collectDocumentedFindingIds(
+      documentedSection(file, documentation),
+    )) {
+      ids.add(id);
+    }
+  }
+
+  return [...ids].sort();
+}
+
+function documentedSection(file: string, documentation: string): string {
+  if (file !== "docs/diagnostics.md") return documentation;
+
   const heading = "## Scan Finding Identifiers";
-  const start = diagnostics.indexOf(heading);
+  const start = documentation.indexOf(heading);
 
   assert.notEqual(
     start,
@@ -84,11 +102,11 @@ function scanFindingIdentifiersSection(diagnostics: string): string {
   );
 
   const bodyStart = start + heading.length;
-  const nextHeading = diagnostics.slice(bodyStart).search(/\n## /);
+  const nextHeading = documentation.slice(bodyStart).search(/\n## /);
 
   return nextHeading === -1
-    ? diagnostics.slice(bodyStart)
-    : diagnostics.slice(bodyStart, bodyStart + nextHeading);
+    ? documentation.slice(bodyStart)
+    : documentation.slice(bodyStart, bodyStart + nextHeading);
 }
 
 function collectDocumentedFindingIds(section: string): string[] {
@@ -100,7 +118,7 @@ function collectDocumentedFindingIds(section: string): string[] {
 
   assert.ok(
     tableLines.length >= 3,
-    "Scan Finding Identifiers section must contain a markdown table",
+    "scan finding documentation must contain a markdown table",
   );
 
   for (const line of tableLines.slice(2)) {
