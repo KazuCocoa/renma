@@ -3,23 +3,20 @@ import test from "node:test";
 import { conflictDiagnostics } from "../src/catalog-conflicts.js";
 import type { CatalogEntry } from "../src/model.js";
 
-test(
-  "conflictDiagnostics warns when conflicts metadata references itself",
-  () => {
-    const diagnostics = conflictDiagnostics([
-      contextEntry({
-        id: "context.testing.boundary-analysis",
-        conflicts: ["context.testing.boundary-analysis"],
-      }),
-    ]);
+test("conflictDiagnostics warns when conflicts metadata references itself", () => {
+  const diagnostics = conflictDiagnostics([
+    contextEntry({
+      id: "context.testing.boundary-analysis",
+      conflicts: ["context.testing.boundary-analysis"],
+    }),
+  ]);
 
-    assert.ok(
-      diagnostics.some((diagnostic) =>
-        diagnostic.message.includes("conflicts metadata references itself"),
-      ),
-    );
-  },
-);
+  assert.ok(
+    diagnostics.some((diagnostic) =>
+      diagnostic.message.includes("conflicts metadata references itself"),
+    ),
+  );
+});
 
 test("conflictDiagnostics warns when conflicts target is missing", () => {
   const diagnostics = conflictDiagnostics([
@@ -31,35 +28,30 @@ test("conflictDiagnostics warns when conflicts target is missing", () => {
 
   assert.ok(
     diagnostics.some((diagnostic) =>
-      diagnostic.message.includes(
-        "conflicts target \"context.testing.missing\"",
-      ),
+      diagnostic.message.includes('conflicts target "context.testing.missing"'),
     ),
   );
 });
 
-test(
-  "conflictDiagnostics warns when a skill requires conflicting contexts",
-  () => {
-    const diagnostics = conflictDiagnostics([
-      contextEntry({
-        id: "context.testing.boundary-analysis",
-        conflicts: ["context.testing.fuzz-testing"],
-      }),
-      contextEntry({ id: "context.testing.fuzz-testing" }),
-      skillEntry([
-        "context.testing.boundary-analysis",
-        "context.testing.fuzz-testing",
-      ]),
-    ]);
+test("conflictDiagnostics warns when a skill requires conflicting contexts", () => {
+  const diagnostics = conflictDiagnostics([
+    contextEntry({
+      id: "context.testing.boundary-analysis",
+      conflicts: ["context.testing.fuzz-testing"],
+    }),
+    contextEntry({ id: "context.testing.fuzz-testing" }),
+    skillEntry([
+      "context.testing.boundary-analysis",
+      "context.testing.fuzz-testing",
+    ]),
+  ]);
 
-    assert.ok(
-      diagnostics.some((diagnostic) =>
-        diagnostic.message.includes("requires conflicting context assets"),
-      ),
-    );
-  },
-);
+  assert.ok(
+    diagnostics.some((diagnostic) =>
+      diagnostic.message.includes("requires conflicting context assets"),
+    ),
+  );
+});
 
 function contextEntry(options: {
   id: string;
