@@ -13,7 +13,7 @@ const FRONTMATTER_MAX_LINES = 24;
 const FRONTMATTER_MAX_CHARS = 1200;
 const METADATA_LIST_ITEM_MAX_CHARS = 140;
 const PLACEHOLDER_USAGE_BOUNDARY_PATTERN =
-  /^(?:todo|tbd|tba|unknown|n\/?a|none|placeholder|to be defined|未定|あとで|確認中)(?:[\s:：-].*)?$/i;
+  /^(?:todo|tbd|tba|unknown|n\/?a|none|placeholder|to be defined)(?:[\s:-].*)?$/i;
 
 /** Build a deterministic catalog of skill and context entries from parsed documents. */
 export function buildCatalog(documents: ParsedDocument[]): {
