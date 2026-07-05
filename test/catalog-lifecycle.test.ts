@@ -119,10 +119,11 @@ function contextAsset(options: {
   status: "experimental" | "stable" | "deprecated" | "archived";
   supersededBy?: string[];
 }): string {
-  const supersededBy = options.supersededBy?.length
-    ? `superseded_by:\n${options.supersededBy
-        .map((id) => `  - ${id}`)
-        .join("\n")}\n`
+  const supersededByLines = options.supersededBy
+    ?.map((id) => `  - ${id}`)
+    .join("\n");
+  const supersededBy = supersededByLines
+    ? `superseded_by:\n${supersededByLines}\n`
     : "";
 
   return `---
