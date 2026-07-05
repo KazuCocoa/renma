@@ -58,6 +58,9 @@ These diagnostics are emitted after files are parsed into catalog entries.
 | `warning` | `Metadata dependency "<to>" from "<from>" targets a <status> asset.` | A dependency points at a deprecated or archived catalog target. | Retarget the dependency to a stable replacement or document the migration. |
 | `warning` | `Shared context asset is missing an id.` | A shared context asset has no stable ID. | Add an `id` metadata field. |
 | `warning` | `Shared context asset is missing an owner.` | A shared context asset has no owner metadata. | Add an `owner` metadata field. |
+| `warning` | `Shared context asset is missing when_to_use metadata.` | An active, owned shared context asset has no positive usage boundary. | Add compact `when_to_use` metadata that states when humans or agents should apply the context. |
+| `warning` | `Shared context asset is missing when_not_to_use metadata.` | An active, owned shared context asset has no negative usage boundary. | Add compact `when_not_to_use` metadata so agents do not over-apply the context. |
+| `warning` | `Shared context asset usage-boundary metadata contains placeholder values in <field>.` | Usage-boundary metadata is present but still says TODO, TBD, unknown, none, or similar. | Replace placeholders with reviewed scope boundaries, or remove the field until it can be completed. |
 
 ## Readiness Diagnostics
 
@@ -154,6 +157,10 @@ forbidden_inputs:
 | `MAINT-SKILL-REFERENCES-SUPERSEDED-ASSET` | Skill refers to superseded context. | Skill content names a superseded context asset. | Update the skill to the stable replacement context asset. |
 | `MAINT-SKILL-REUSABLE-CONTEXT-CANDIDATE` | Skill contains reusable context. | `SKILL.md` includes broadly reusable setup, troubleshooting, or risk guidance. | Move reusable content to shared context and reference it. |
 | `MAINT-SUPPORT-ASSET-SHARED-CONTEXT-CANDIDATE` | Support asset looks reusable. | A reference, profile, or example contains content useful beyond one skill. | Promote it to shared context when reuse is intended. |
+| `META-CATALOG-DIAGNOSTIC` | Catalog diagnostic was promoted to a scan finding. | Catalog validation emitted a lower-level diagnostic. | Fix the original catalog diagnostic shown in the finding evidence. |
+| `META-CONTEXT-MISSING-WHEN-TO-USE` | Shared context usage boundary is missing. | An active, owned shared context asset lacks `when_to_use`. | Add compact positive scope guidance. |
+| `META-CONTEXT-MISSING-WHEN-NOT-TO-USE` | Shared context negative boundary is missing. | An active, owned shared context asset lacks `when_not_to_use`. | Add compact exclusions so agents do not over-apply the context. |
+| `META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY` | Shared context usage boundary contains placeholders. | `when_to_use` or `when_not_to_use` contains TODO, TBD, unknown, none, or similar placeholder text. | Replace placeholders with reviewed boundaries. |
 | `META-DUPLICATE-ASSET-ID` | Asset ID is not unique. | Two catalog entries declare the same ID. | Give each asset a unique ID and update references. |
 | `META-FRONTMATTER-TOO-LARGE` | Frontmatter metadata is too large. | Frontmatter has too many lines or characters to stay a compact index. | Move long prose, examples, procedures, or rationale into the body or referenced context assets. |
 | `META-UNKNOWN-REFERENCE` | Metadata reference does not resolve. | A dependency points to a missing asset ID or path. | Fix the reference, add the missing asset, or remove the dependency. |
