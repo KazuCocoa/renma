@@ -66,11 +66,7 @@ function requiredConflictDiagnostics(
           severity: "warning",
           path: entry.sourcePath,
           message: `Skill requires conflicting context assets "${left}" and "${right}".`,
-          evidence: metadataListEvidence(
-            entry,
-            "requires_context",
-            rightIndex,
-          ),
+          evidence: metadataListEvidence(entry, "requires_context", rightIndex),
         });
       }
     }
