@@ -48,7 +48,10 @@ export function contextBodyLanguageDiagnostics(
   document: ContextDocument,
 ): ContextDiagnostic[] {
   const diagnostics: ContextDiagnostic[] = [];
-  const vagueMatch = firstBodyLinePatternMatch(document, VAGUE_WORDING_PATTERNS);
+  const vagueMatch = firstBodyLinePatternMatch(
+    document,
+    VAGUE_WORDING_PATTERNS,
+  );
   if (vagueMatch) {
     diagnostics.push({
       severity: "warning",
@@ -68,7 +71,11 @@ export function contextBodyLanguageDiagnostics(
       severity: "warning",
       path: document.artifact.path,
       message: `Shared context asset contains currentness wording "${currentnessMatch.label}" without an explicit date or version.`,
-      evidence: evidence(document, currentnessMatch.line, currentnessMatch.text),
+      evidence: evidence(
+        document,
+        currentnessMatch.line,
+        currentnessMatch.text,
+      ),
     });
   }
 
