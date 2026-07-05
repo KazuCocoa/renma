@@ -32,8 +32,14 @@ status: stable
       "Shared context asset is missing when_not_to_use metadata.",
     ],
   );
-  assert.equal(result.diagnostics[0]?.evidence?.snippet, "frontmatter missing when_to_use");
-  assert.equal(result.diagnostics[1]?.evidence?.snippet, "frontmatter missing when_not_to_use");
+  assert.equal(
+    result.diagnostics[0]?.evidence?.snippet,
+    "frontmatter missing when_to_use",
+  );
+  assert.equal(
+    result.diagnostics[1]?.evidence?.snippet,
+    "frontmatter missing when_not_to_use",
+  );
 });
 
 test("buildCatalog detects placeholder usage-boundary metadata", () => {
