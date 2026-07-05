@@ -130,7 +130,11 @@ async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-context-usage-boundary-"));
 }
 
-function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
+function artifact(
+  path: string,
+  kind: ArtifactKind,
+  content: string,
+): Artifact {
   return {
     path,
     absolutePath: `/tmp/${path}`,
