@@ -131,7 +131,10 @@ function missingTargetMessage(targetId: string): string {
   return `Shared context asset superseded_by target "${targetId}" does not match a catalog entry.`;
 }
 
-function inactiveTargetMessage(targetId: string, status: AssetStatus): string {
+function inactiveTargetMessage(
+  targetId: string,
+  status: AssetStatus | undefined,
+): string {
   return `Shared context asset superseded_by target "${targetId}" resolves to a ${status} asset.`;
 }
 
