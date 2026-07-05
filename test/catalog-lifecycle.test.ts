@@ -3,25 +3,22 @@ import test from "node:test";
 import { lifecycleDiagnostics } from "../src/catalog-lifecycle.js";
 import type { CatalogEntry } from "../src/model.js";
 
-test(
-  "lifecycleDiagnostics warns when deprecated governed context lacks superseded_by",
-  () => {
-    const diagnostics = lifecycleDiagnostics([
-      contextEntry({
-        id: "context.testing.old-boundary-analysis",
-        status: "deprecated",
-      }),
-    ]);
+test("lifecycleDiagnostics warns when deprecated governed context lacks superseded_by", () => {
+  const diagnostics = lifecycleDiagnostics([
+    contextEntry({
+      id: "context.testing.old-boundary-analysis",
+      status: "deprecated",
+    }),
+  ]);
 
-    assert.ok(
-      diagnostics.some(
-        (diagnostic) =>
-          diagnostic.message ===
-          "Deprecated shared context asset is missing superseded_by metadata.",
-      ),
-    );
-  },
-);
+  assert.ok(
+    diagnostics.some(
+      (diagnostic) =>
+        diagnostic.message ===
+        "Deprecated shared context asset is missing superseded_by metadata.",
+    ),
+  );
+});
 
 test("lifecycleDiagnostics warns when superseded_by points to itself", () => {
   const diagnostics = lifecycleDiagnostics([
