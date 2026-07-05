@@ -73,7 +73,7 @@ function requiredConflictDiagnostics(
 }
 
 function pairKey(left: string, right: string): string {
-  return [left, right].sort().join("\0");
+  return [left, right].sort().join("\u0000");
 }
 
 function metadataListEvidence(
