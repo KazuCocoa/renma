@@ -51,12 +51,15 @@ function requiredConflictDiagnostics(
       leftIndex += 1
     ) {
       const left = entry.requiredContext[leftIndex];
+      if (left === undefined) continue;
+
       for (
         let rightIndex = leftIndex + 1;
         rightIndex < entry.requiredContext.length;
         rightIndex += 1
       ) {
         const right = entry.requiredContext[rightIndex];
+        if (right === undefined) continue;
         if (!conflictPairs.has(pairKey(left, right))) continue;
 
         diagnostics.push({
