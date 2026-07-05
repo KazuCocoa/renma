@@ -2,7 +2,7 @@
 
 Renma checks canonical active shared context assets for small English-only wording patterns that can make reusable context harder for humans and agents to apply safely.
 
-These diagnostics are deterministic catalog diagnostics. They do not call an LLM, infer a replacement threshold, infer a date or version, or rewrite context content.
+These diagnostics are deterministic catalog diagnostics. They do not call an LLM, infer a replacement threshold, infer a date or version, create scan finding IDs, or rewrite context content.
 
 ## Scope
 
