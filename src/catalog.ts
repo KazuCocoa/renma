@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { contextBodyLanguageDiagnostics } from "./context-language-diagnostics.js";
 import type {
   AssetMetadata,
   Catalog,
@@ -220,7 +221,10 @@ function sharedContextMetadataDiagnostics(
   }
 
   if (isCanonicalSharedContext(metadata) && isActiveContext(metadata)) {
-    diagnostics.push(...usageBoundaryDiagnostics(document, metadata));
+    diagnostics.push(
+      ...usageBoundaryDiagnostics(document, metadata),
+      ...contextBodyLanguageDiagnostics(document),
+    );
   }
 
   return diagnostics;

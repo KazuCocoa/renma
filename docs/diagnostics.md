@@ -46,7 +46,7 @@ These diagnostics are emitted while renma discovers files.
 
 ## Metadata And Catalog Diagnostics
 
-These diagnostics are emitted after files are parsed into catalog entries.
+These diagnostics are emitted after files are parsed into catalog entries. For shared-context wording details, see [Context Language Diagnostics](context-language-diagnostics.md).
 
 | Severity | Message | Meaning | Fix |
 | --- | --- | --- | --- |
@@ -61,6 +61,8 @@ These diagnostics are emitted after files are parsed into catalog entries.
 | `warning` | `Shared context asset is missing when_to_use metadata.` | An active, owned shared context asset has no positive usage boundary. | Add compact `when_to_use` metadata that states when humans or agents should apply the context. |
 | `warning` | `Shared context asset is missing when_not_to_use metadata.` | An active, owned shared context asset has no negative usage boundary. | Add compact `when_not_to_use` metadata so agents do not over-apply the context. |
 | `warning` | `Shared context asset usage-boundary metadata contains placeholder values in <field>.` | Usage-boundary metadata is present but still says TODO, TBD, unknown, none, or similar. | Replace placeholders with reviewed scope boundaries, or remove the field until it can be completed. |
+| `warning` | `Shared context asset contains vague wording "<term>".` | A canonical active shared context uses broad English wording such as usually, often, quickly, soon, as needed, or major. | Replace it with concrete applicability conditions, evidence, thresholds, or explicit uncertainty handling. |
+| `warning` | `Shared context asset contains currentness wording "<term>" without an explicit date or version.` | A canonical active shared context uses relative English currentness wording such as recently, latest, currently, or as of now. | Add an explicit date, version, freshness metadata, or stable wording. |
 
 ## Readiness Diagnostics
 

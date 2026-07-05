@@ -1,6 +1,6 @@
 # Renma Authoring Guide
 
-Use this guide when creating or refining Renma skills and context assets. For CLI command syntax, see the [User Manual](user-manual.md). For security-sensitive skills or context assets, read the [Security Policy Guide](security-policy.md). For finding details, use the [Diagnostics Reference](diagnostics.md).
+Use this guide when creating or refining Renma skills and context assets. For CLI command syntax, see the [User Manual](user-manual.md). For security-sensitive skills or context assets, read the [Security Policy Guide](security-policy.md). For finding details, use the [Diagnostics Reference](diagnostics.md). For shared-context wording guidance, see [Context Language Diagnostics](context-language-diagnostics.md).
 
 Renma is a tool-assisted authoring and verification layer. It emits deterministic repository evidence that humans and external LLM tools can use, but Renma does not call an LLM, choose runtime context, assemble prompts, inject context into agents, execute agent workflows, or own runtime telemetry.
 
@@ -64,6 +64,10 @@ Use these fields consistently:
 - `superseded_by`: replacement or migration relationships for deprecated or archived content.
 
 The supported list-style metadata fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `conflicts`, and `superseded_by`.
+
+Keep `when_to_use` and `when_not_to_use` compact. They are routing boundaries for catalog and graph review, not full procedures. Put detailed explanation, examples, caveats, and rationale in the Markdown body or referenced context assets.
+
+For shared context bodies, avoid leaving English vague wording such as `usually`, `often`, `quickly`, or `as needed` without a concrete condition, threshold, required evidence, or explicit uncertainty-handling rule. Avoid relative currentness wording such as `recently`, `latest`, `currently`, or `as of now` unless the same line includes a stable date or version.
 
 ## Skill vs Context Metadata
 
