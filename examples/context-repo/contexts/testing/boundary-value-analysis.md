@@ -6,6 +6,10 @@ owner: qa-platform
 status: stable
 tags:
   - testing
+when_to_use:
+  - Designing test cases around numeric, date, count, length, or pagination limits
+when_not_to_use:
+  - Testing invalid inputs that are not tied to explicit boundary values
 ---
 
 # Boundary Value Analysis
