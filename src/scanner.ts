@@ -175,6 +175,62 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
       };
     }
 
+    const missingContextWhenToUse = /missing when_to_use metadata/i.test(
+      diagnostic.message,
+    );
+    const missingContextWhenNotToUse = /missing when_not_to_use metadata/i.test(
+      diagnostic.message,
+    );
+    const placeholderUsageBoundary =
+      /usage-boundary metadata contains placeholder values/i.test(
+        diagnostic.message,
+      );
+    if (
+      missingContextWhenToUse ||
+      missingContextWhenNotToUse ||
+      placeholderUsageBoundary
+    ) {
+      return {
+        id: missingContextWhenToUse
+          ? DIAGNOSTIC_IDS.META_CONTEXT_MISSING_WHEN_TO_USE
+          : missingContextWhenNotToUse
+            ? DIAGNOSTIC_IDS.META_CONTEXT_MISSING_WHEN_NOT_TO_USE
+            : DIAGNOSTIC_IDS.META_CONTEXT_PLACEHOLDER_USAGE_BOUNDARY,
+        title: missingContextWhenToUse
+          ? "Shared context asset is missing when_to_use metadata"
+          : missingContextWhenNotToUse
+            ? "Shared context asset is missing when_not_to_use metadata"
+            : "Shared context usage-boundary metadata contains placeholders",
+        category: "maintenance",
+        severity: "low",
+        confidence: "high",
+        evidence: diagnostic.evidence ?? {
+          path,
+          startLine: 1,
+          endLine: 1,
+          snippet: diagnostic.message,
+        },
+        whyItMatters:
+          "Usage boundaries are part of the deterministic catalog surface for shared context assets. Missing or placeholder boundaries force humans and agents to infer when reusable knowledge applies, which increases over-application risk.",
+        remediation:
+          "Add compact, reviewed when_to_use and when_not_to_use entries. Keep detailed routing explanations, examples, procedures, and rationale in the markdown body or referenced context assets.",
+        constraints: [
+          "Do not infer missing boundaries from broad body prose.",
+          "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders.",
+          "Do not introduce runtime context resolution.",
+          "Do not create prompt packages.",
+          "Keep metadata compact and preserve detailed guidance outside frontmatter.",
+        ],
+        verificationSteps: [
+          "Run renma scan.",
+          "Run renma catalog.",
+          "Confirm shared context assets declare compact positive and negative usage boundaries.",
+        ],
+        llmHint:
+          "Ask the asset owner for concise positive and negative usage boundaries. Do not invent domain exclusions, owners, policies, or runtime routing behavior.",
+      };
+    }
+
     const missingId = /missing an id/i.test(diagnostic.message);
     const missingOwner = /missing an owner/i.test(diagnostic.message);
     const unknownDependency = /does not match a catalog entry/i.test(
