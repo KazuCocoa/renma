@@ -75,7 +75,10 @@ async function collectAllDocumentedFindingIds(): Promise<string[]> {
   const ids = new Set<string>();
 
   for (const file of SCAN_FINDING_DOCUMENTATION_FILES) {
-    const documentation = await readFile(path.join(process.cwd(), file), "utf8");
+    const documentation = await readFile(
+      path.join(process.cwd(), file),
+      "utf8",
+    );
     for (const id of collectDocumentedFindingIds(
       documentedSection(file, documentation),
     )) {
