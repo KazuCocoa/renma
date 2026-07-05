@@ -5,6 +5,7 @@ import {
   summarizeSecurityPolicyInventory,
   zeroSecurityPolicyInventorySummary,
 } from "../src/security-policy-inventory.js";
+import { parseSecurityPolicy } from "../src/security-policy.js";
 import type { Artifact, ArtifactKind, SecurityConfig } from "../src/types.js";
 
 test("empty policy inventory returns a zero summary", () => {
@@ -122,6 +123,39 @@ test("destinations and forbidden inputs are deduped per asset", () => {
   ]);
 });
 
+test("security policy parser only recognizes canonical frontmatter keys", () => {
+  const parsed = parseSecurityPolicy(
+    [
+      "---",
+      "allowedData: public",
+      "networkAllowed: true",
+      "externalUploadAllowed: true",
+      "secretsAllowed: true",
+      "human_approval_required: true",
+      "requiresHumanApproval: true",
+      "approvedNetworkDestinations: api.example.com",
+      "allowedNetworkDestinations: cdn.example.com",
+      "approvedUploadDestinations: uploads.example.com",
+      "approved_upload_domains: artifacts.example.com",
+      "forbiddenInputs: secrets",
+      "securityProfile: strict-local",
+      "---",
+      "# Demo",
+    ].join("\n"),
+  );
+
+  assert.equal(parsed.declared.size, 0);
+  assert.equal(parsed.networkAllowed, undefined);
+  assert.equal(parsed.externalUploadAllowed, undefined);
+  assert.equal(parsed.secretsAllowed, undefined);
+  assert.equal(parsed.humanApprovalRequired, undefined);
+  assert.equal(parsed.securityProfile, undefined);
+  assert.deepEqual(parsed.allowedData, []);
+  assert.deepEqual(parsed.approvedNetworkDestinations, []);
+  assert.deepEqual(parsed.approvedUploadDestinations, []);
+  assert.deepEqual(parsed.forbiddenInputs, []);
+});
+
 test("repo-level security config is reflected in effective policy lists", () => {
   const summary = summarizeSecurityPolicyInventory(
     [
@@ -163,12 +197,11 @@ test("resolved security profiles count as referenced and contribute policy", () 
       ...baseSecurityConfig(),
       profiles: {
         "strict-local": {
-          allowedDataClass: "disclosed",
           networkAllowed: false,
           externalUploadAllowed: false,
           secretsAllowed: false,
           humanApprovalRequired: true,
-          allowedData: ["sanitized diagnostics"],
+          allowedData: ["disclosed", "sanitized diagnostics"],
           forbiddenInputs: ["credentials"],
           approvedDomains: ["docs.example.com"],
           approvedUploadDomains: ["uploads.example.com"],
@@ -350,7 +383,7 @@ function policy(options: {
       : [`secrets_allowed: ${options.secretsAllowed}`]),
     ...(options.humanApprovalRequired === undefined
       ? []
-      : [`human_approval_required: ${options.humanApprovalRequired}`]),
+      : [`requires_human_approval: ${options.humanApprovalRequired}`]),
     ...(options.securityProfile
       ? [`security_profile: ${options.securityProfile}`]
       : []),

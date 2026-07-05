@@ -29,46 +29,19 @@ export interface SecurityProfileChain {
 
 const BOOLEAN_POLICY_FIELDS = new Map<string, keyof SecurityPolicy>([
   ["network_allowed", "networkAllowed"],
-  ["networkAllowed", "networkAllowed"],
   ["external_upload_allowed", "externalUploadAllowed"],
-  ["externalUploadAllowed", "externalUploadAllowed"],
   ["secrets_allowed", "secretsAllowed"],
-  ["secretsAllowed", "secretsAllowed"],
-  ["human_approval_required", "humanApprovalRequired"],
-  ["humanApprovalRequired", "humanApprovalRequired"],
   ["requires_human_approval", "humanApprovalRequired"],
-  ["requiresHumanApproval", "humanApprovalRequired"],
 ]);
 
-const DESTINATION_POLICY_FIELDS = new Set([
-  "approved_network_destinations",
-  "approvedNetworkDestinations",
-  "allowed_network_destinations",
-  "allowedNetworkDestinations",
-]);
-
+const DESTINATION_POLICY_FIELDS = new Set(["approved_network_destinations"]);
 const UPLOAD_DESTINATION_POLICY_FIELDS = new Set([
   "approved_upload_destinations",
-  "approvedUploadDestinations",
-  "approved_upload_domains",
-  "approvedUploadDomains",
 ]);
 
-const ALLOWED_DATA_POLICY_FIELDS = new Set(["allowed_data", "allowedData"]);
-const FORBIDDEN_INPUT_POLICY_FIELDS = new Set([
-  "forbidden_inputs",
-  "forbiddenInputs",
-]);
-const SECURITY_PROFILE_POLICY_FIELDS = new Set([
-  "security_profile",
-  "securityProfile",
-]);
-const FUTURE_BLOCK_LIST_POLICY_FIELDS = new Set([
-  "allowed_tools",
-  "allowedTools",
-  "allowed_clients",
-  "allowedClients",
-]);
+const ALLOWED_DATA_POLICY_FIELDS = new Set(["allowed_data"]);
+const FORBIDDEN_INPUT_POLICY_FIELDS = new Set(["forbidden_inputs"]);
+const SECURITY_PROFILE_POLICY_FIELDS = new Set(["security_profile"]);
 
 type ParsedBlockList = {
   values: string[];
@@ -152,11 +125,6 @@ export function parseSecurityPolicy(content: string): SecurityPolicy {
       policy.forbiddenInputs.push(...policyListValues(value, blockList));
       policy.declared.add("forbiddenInputs");
       policy.lineByField.set("forbiddenInputs", index + 1);
-      if (consumesBlockList(value, blockList)) index = blockList.nextIndex - 1;
-      continue;
-    }
-
-    if (FUTURE_BLOCK_LIST_POLICY_FIELDS.has(key)) {
       if (consumesBlockList(value, blockList)) index = blockList.nextIndex - 1;
       continue;
     }
@@ -303,8 +271,7 @@ export function isSecurityPolicyLine(line: string): boolean {
       UPLOAD_DESTINATION_POLICY_FIELDS.has(key) ||
       ALLOWED_DATA_POLICY_FIELDS.has(key) ||
       FORBIDDEN_INPUT_POLICY_FIELDS.has(key) ||
-      SECURITY_PROFILE_POLICY_FIELDS.has(key) ||
-      FUTURE_BLOCK_LIST_POLICY_FIELDS.has(key))
+      SECURITY_PROFILE_POLICY_FIELDS.has(key))
   );
 }
 
