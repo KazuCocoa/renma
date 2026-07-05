@@ -68,6 +68,30 @@ Versioned wording is also acceptable when it makes the claim stable:
 The latest Appium 2.8 behavior is covered here.
 ```
 
+## Prompt or runtime-selection wording
+
+Renma warns when a shared context body looks like a prompt artifact or runtime context-selection rule instead of reusable base knowledge. Examples include:
+
+- role-prompt wording such as `You are an ... assistant`
+- runtime selection wording such as `always load this context`
+- priority wording such as `use this context first`
+- direct runtime wording such as `select this context at runtime`
+- prompt-artifact wording such as `system prompt`
+
+Example warning message:
+
+```text
+Shared context asset contains prompt or runtime-selection wording "role prompt".
+```
+
+Prefer keeping the context as reusable knowledge:
+
+```md
+This context describes Appium setup terminology and constraints for maintainers.
+```
+
+Put prompt assembly, runtime context selection, and assistant role instructions outside shared context assets. Renma does not choose runtime context, assemble prompts, inject context into agents, or execute agent workflows.
+
 ## Relationship to metadata diagnostics
 
 These body-language diagnostics complement usage-boundary metadata diagnostics such as missing `when_to_use`, missing `when_not_to_use`, and placeholder usage-boundary metadata.

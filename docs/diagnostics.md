@@ -63,6 +63,7 @@ These diagnostics are emitted after files are parsed into catalog entries. For s
 | `warning` | `Shared context asset usage-boundary metadata contains placeholder values in <field>.` | Usage-boundary metadata is present but still says TODO, TBD, unknown, none, or similar. | Replace placeholders with reviewed scope boundaries, or remove the field until it can be completed. |
 | `warning` | `Shared context asset contains vague wording "<term>".` | A canonical active shared context uses broad English wording such as usually, often, quickly, soon, as needed, or major. | Replace it with concrete applicability conditions, evidence, thresholds, or explicit uncertainty handling. |
 | `warning` | `Shared context asset contains currentness wording "<term>" without an explicit date or version.` | A canonical active shared context uses relative English currentness wording such as recently, latest, currently, or as of now. | Add an explicit date, version, freshness metadata, or stable wording. |
+| `warning` | `Shared context asset contains prompt or runtime-selection wording "<term>".` | A canonical active shared context looks like a prompt artifact or runtime context-selection rule. | Move prompt assembly, assistant role instructions, and runtime context selection outside shared context assets. |
 
 ## Readiness Diagnostics
 

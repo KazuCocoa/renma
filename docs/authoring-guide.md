@@ -69,6 +69,8 @@ Keep `when_to_use` and `when_not_to_use` compact. They are routing boundaries fo
 
 For shared context bodies, avoid leaving English vague wording such as `usually`, `often`, `quickly`, or `as needed` without a concrete condition, threshold, required evidence, or explicit uncertainty-handling rule. Avoid relative currentness wording such as `recently`, `latest`, `currently`, or `as of now` unless the same line includes a stable date or version.
 
+Shared context assets should hold reusable knowledge, not prompt artifacts or runtime routing rules. Keep assistant role instructions, prompt assembly, context priority, and runtime context-selection behavior outside shared context assets.
+
 ## Skill vs Context Metadata
 
 Skills are agent-facing entrypoints and routing contracts. They explain when a capability applies, what safety or preflight checks matter, and which owned context assets are relevant.
