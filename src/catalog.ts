@@ -12,6 +12,8 @@ import type { Diagnostic, Evidence, ParsedDocument } from "./types.js";
 const FRONTMATTER_MAX_LINES = 24;
 const FRONTMATTER_MAX_CHARS = 1200;
 const METADATA_LIST_ITEM_MAX_CHARS = 140;
+const PLACEHOLDER_USAGE_BOUNDARY_PATTERN =
+  /^(?:todo|tbd|tba|unknown|n\/?a|none|placeholder|to be defined|未定|あとで|確認中)(?:[\s:：-].*)?$/i;
 
 /** Build a deterministic catalog of skill and context entries from parsed documents. */
 export function buildCatalog(documents: ParsedDocument[]): {
@@ -217,7 +219,125 @@ function sharedContextMetadataDiagnostics(
     });
   }
 
+  if (metadata.id && metadata.owner && isActiveContext(metadata)) {
+    diagnostics.push(...usageBoundaryDiagnostics(document, metadata));
+  }
+
   return diagnostics;
+}
+
+function isActiveContext(metadata: AssetMetadata): boolean {
+  return metadata.status !== "deprecated" && metadata.status !== "archived";
+}
+
+function usageBoundaryDiagnostics(
+  document: ParsedDocument,
+  metadata: AssetMetadata,
+): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  if (metadata.whenToUse.length === 0) {
+    diagnostics.push({
+      severity: "warning",
+      path: document.artifact.path,
+      message: "Shared context asset is missing when_to_use metadata.",
+      evidence: missingMetadataEvidence(document, "when_to_use"),
+    });
+  }
+
+  if (metadata.whenNotToUse.length === 0) {
+    diagnostics.push({
+      severity: "warning",
+      path: document.artifact.path,
+      message: "Shared context asset is missing when_not_to_use metadata.",
+      evidence: missingMetadataEvidence(document, "when_not_to_use"),
+    });
+  }
+
+  diagnostics.push(
+    ...placeholderUsageBoundaryDiagnostics(
+      document,
+      "when_to_use",
+      metadata.whenToUse,
+    ),
+    ...placeholderUsageBoundaryDiagnostics(
+      document,
+      "when_not_to_use",
+      metadata.whenNotToUse,
+    ),
+  );
+
+  return diagnostics;
+}
+
+function placeholderUsageBoundaryDiagnostics(
+  document: ParsedDocument,
+  fieldKey: "when_to_use" | "when_not_to_use",
+  values: string[],
+): Diagnostic[] {
+  return values
+    .map((value, index): Diagnostic | undefined => {
+      if (!PLACEHOLDER_USAGE_BOUNDARY_PATTERN.test(value.trim())) {
+        return undefined;
+      }
+
+      return {
+        severity: "warning",
+        path: document.artifact.path,
+        message: `Shared context asset usage-boundary metadata contains placeholder values in ${fieldKey}.`,
+        evidence: metadataValueEvidence(document, fieldKey, index),
+      };
+    })
+    .filter((diagnostic): diagnostic is Diagnostic => diagnostic !== undefined);
+}
+
+function metadataValueEvidence(
+  document: ParsedDocument,
+  fieldKey: string,
+  index: number,
+): Evidence {
+  const item = document.metadataListItems[fieldKey]?.[index];
+  if (item) {
+    return {
+      path: item.path,
+      startLine: item.startLine,
+      endLine: item.endLine,
+      snippet: item.raw,
+    };
+  }
+
+  const field = document.metadataFields[fieldKey];
+  if (field) {
+    return {
+      path: field.path,
+      startLine: field.startLine,
+      endLine: field.endLine,
+      snippet: field.raw,
+    };
+  }
+
+  return missingMetadataEvidence(document, fieldKey);
+}
+
+function missingMetadataEvidence(
+  document: ParsedDocument,
+  fieldKey: string,
+): Evidence {
+  const frontmatter = frontmatterRange(document);
+  if (frontmatter) {
+    return {
+      path: document.artifact.path,
+      startLine: frontmatter.startLine,
+      endLine: frontmatter.endLine,
+      snippet: `frontmatter missing ${fieldKey}`,
+    };
+  }
+
+  return {
+    path: document.artifact.path,
+    startLine: 1,
+    endLine: 1,
+    snippet: `missing ${fieldKey} metadata`,
+  };
 }
 
 /** Convert metadata relationship lists into graph edges for a catalog entry. */
