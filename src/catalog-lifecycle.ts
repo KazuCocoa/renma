@@ -21,7 +21,10 @@ export function lifecycleDiagnostics(entries: CatalogEntry[]): Diagnostic[] {
         severity: "warning",
         path: entry.sourcePath,
         message: MISSING_SUPERSEDED_BY_MESSAGE,
-        evidence: defaultMetadataEvidence(entry, "missing superseded_by metadata"),
+        evidence: defaultMetadataEvidence(
+          entry,
+          "missing superseded_by metadata",
+        ),
       });
     }
 
