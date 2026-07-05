@@ -1,8 +1,8 @@
-import type { CatalogEntry } from "./model.js";
+import type { AssetStatus, CatalogEntry } from "./model.js";
 import type { Diagnostic, Evidence } from "./types.js";
 
-const ACTIVE_STATUSES = new Set(["experimental", "stable"]);
-const INACTIVE_STATUSES = new Set(["deprecated", "archived"]);
+const ACTIVE_STATUSES = new Set<AssetStatus>(["experimental", "stable"]);
+const INACTIVE_STATUSES = new Set<AssetStatus>(["deprecated", "archived"]);
 
 export function lifecycleDiagnostics(entries: CatalogEntry[]): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -45,7 +45,7 @@ export function lifecycleDiagnostics(entries: CatalogEntry[]): Diagnostic[] {
         continue;
       }
 
-      if (INACTIVE_STATUSES.has(target.metadata.status)) {
+      if (isInactiveStatus(target.metadata.status)) {
         diagnostics.push({
           severity: "warning",
           path: entry.sourcePath,
@@ -103,7 +103,7 @@ function firstCycleEntry(
   for (const targetId of entry.metadata.supersededBy) {
     const target = entriesById.get(targetId);
     if (!target || target.kind !== "context") continue;
-    if (ACTIVE_STATUSES.has(target.metadata.status)) continue;
+    if (isActiveStatus(target.metadata.status)) continue;
 
     const cycleEntry = firstCycleEntry(target, entriesById, path);
     if (cycleEntry) return cycleEntry;
@@ -111,6 +111,14 @@ function firstCycleEntry(
 
   path.pop();
   return undefined;
+}
+
+function isActiveStatus(status: AssetStatus | undefined): boolean {
+  return status !== undefined && ACTIVE_STATUSES.has(status);
+}
+
+function isInactiveStatus(status: AssetStatus | undefined): boolean {
+  return status !== undefined && INACTIVE_STATUSES.has(status);
 }
 
 function metadataListEvidence(
