@@ -3,6 +3,8 @@ import type { Diagnostic, Evidence } from "./types.js";
 
 const ACTIVE_STATUSES = new Set<AssetStatus>(["experimental", "stable"]);
 const INACTIVE_STATUSES = new Set<AssetStatus>(["deprecated", "archived"]);
+const MISSING_SUPERSEDED_BY_MESSAGE =
+  "Deprecated shared context asset is missing superseded_by metadata.";
 
 export function lifecycleDiagnostics(entries: CatalogEntry[]): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -18,8 +20,7 @@ export function lifecycleDiagnostics(entries: CatalogEntry[]): Diagnostic[] {
       diagnostics.push({
         severity: "warning",
         path: entry.sourcePath,
-        message:
-          "Deprecated shared context asset is missing superseded_by metadata.",
+        message: MISSING_SUPERSEDED_BY_MESSAGE,
         evidence: defaultMetadataEvidence(entry, "missing superseded_by metadata"),
       });
     }
@@ -29,7 +30,7 @@ export function lifecycleDiagnostics(entries: CatalogEntry[]): Diagnostic[] {
         diagnostics.push({
           severity: "warning",
           path: entry.sourcePath,
-          message: `Shared context asset superseded_by references itself: "${targetId}".`,
+          message: selfReferenceMessage(targetId),
           evidence: metadataListEvidence(entry, "superseded_by", index),
         });
         continue;
@@ -40,7 +41,7 @@ export function lifecycleDiagnostics(entries: CatalogEntry[]): Diagnostic[] {
         diagnostics.push({
           severity: "warning",
           path: entry.sourcePath,
-          message: `Shared context asset superseded_by target "${targetId}" does not match a catalog entry.`,
+          message: missingTargetMessage(targetId),
           evidence: metadataListEvidence(entry, "superseded_by", index),
         });
         continue;
@@ -50,7 +51,7 @@ export function lifecycleDiagnostics(entries: CatalogEntry[]): Diagnostic[] {
         diagnostics.push({
           severity: "warning",
           path: entry.sourcePath,
-          message: `Shared context asset superseded_by target "${targetId}" resolves to a ${target.metadata.status} asset.`,
+          message: inactiveTargetMessage(targetId, target.metadata.status),
           evidence: metadataListEvidence(entry, "superseded_by", index),
         });
       }
@@ -85,7 +86,7 @@ function supersessionCycleDiagnostics(
     diagnostics.push({
       severity: "warning",
       path: entry.sourcePath,
-      message: `Shared context asset superseded_by chain forms a cycle involving "${cycleEntry.id}".`,
+      message: cycleMessage(cycleEntry.id),
       evidence: metadataListEvidence(entry, "superseded_by", 0),
     });
   }
@@ -120,6 +121,22 @@ function isActiveStatus(status: AssetStatus | undefined): boolean {
 
 function isInactiveStatus(status: AssetStatus | undefined): boolean {
   return status !== undefined && INACTIVE_STATUSES.has(status);
+}
+
+function selfReferenceMessage(targetId: string): string {
+  return `Shared context asset superseded_by references itself: "${targetId}".`;
+}
+
+function missingTargetMessage(targetId: string): string {
+  return `Shared context asset superseded_by target "${targetId}" does not match a catalog entry.`;
+}
+
+function inactiveTargetMessage(targetId: string, status: AssetStatus): string {
+  return `Shared context asset superseded_by target "${targetId}" resolves to a ${status} asset.`;
+}
+
+function cycleMessage(entryId: string): string {
+  return `Shared context asset superseded_by chain forms a cycle involving "${entryId}".`;
 }
 
 function metadataListEvidence(
