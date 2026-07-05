@@ -8,6 +8,10 @@ tags:
   - release
   - maintenance
   - dogfooding
+when_to_use:
+  - Preparing a Renma release from a local checkout
+when_not_to_use:
+  - Publishing packages or creating public releases remotely
 allowed_data: public
 network_allowed: true
 external_upload_allowed: false
