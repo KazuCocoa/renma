@@ -219,11 +219,15 @@ function sharedContextMetadataDiagnostics(
     });
   }
 
-  if (metadata.id && metadata.owner && isActiveContext(metadata)) {
+  if (isCanonicalSharedContext(metadata) && isActiveContext(metadata)) {
     diagnostics.push(...usageBoundaryDiagnostics(document, metadata));
   }
 
   return diagnostics;
+}
+
+function isCanonicalSharedContext(metadata: AssetMetadata): boolean {
+  return Boolean(metadata.id?.startsWith("context.") && metadata.owner);
 }
 
 function isActiveContext(metadata: AssetMetadata): boolean {
