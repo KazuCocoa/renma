@@ -6,6 +6,10 @@ owner: qa-platform
 status: stable
 tags:
   - testing
+when_to_use:
+  - Designing validation, unsupported-state, or error-handling test cases
+when_not_to_use:
+  - Designing accepted boundary-value cases for valid limits
 ---
 
 # Negative Testing
