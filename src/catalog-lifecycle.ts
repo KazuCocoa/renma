@@ -11,7 +11,7 @@ export function lifecycleDiagnostics(entries: CatalogEntry[]): Diagnostic[] {
   const entriesById = new Map(entries.map((entry) => [entry.id, entry]));
 
   for (const entry of entries) {
-    if (entry.kind !== "context") continue;
+    if (!isGovernedContext(entry)) continue;
 
     if (
       entry.metadata.status === "deprecated" &&
@@ -73,7 +73,7 @@ function supersessionCycleDiagnostics(
   const reported = new Set<string>();
 
   for (const entry of entries) {
-    if (entry.kind !== "context") continue;
+    if (!isGovernedContext(entry)) continue;
     if (entry.metadata.supersededBy.length === 0) continue;
 
     const path: string[] = [];
@@ -107,7 +107,7 @@ function firstCycleEntry(
 
   for (const targetId of entry.metadata.supersededBy) {
     const target = entriesById.get(targetId);
-    if (!target || target.kind !== "context") continue;
+    if (!target || !isGovernedContext(target)) continue;
     if (isActiveStatus(target.metadata.status)) continue;
 
     const cycleEntry = firstCycleEntry(target, entriesById, path);
@@ -116,6 +116,16 @@ function firstCycleEntry(
 
   path.pop();
   return undefined;
+}
+
+function isGovernedContext(entry: CatalogEntry): boolean {
+  return (
+    entry.kind === "context" &&
+    entry.id.startsWith("context.") &&
+    Boolean(entry.metadata.owner) &&
+    entry.metadata.whenToUse.length > 0 &&
+    entry.metadata.whenNotToUse.length > 0
+  );
 }
 
 function isActiveStatus(status: AssetStatus | undefined): boolean {
