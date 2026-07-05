@@ -15,6 +15,28 @@ const CURRENTNESS_PATTERNS: LinePattern[] = [
   { pattern: /\bcurrently\b/i, label: "currently" },
   { pattern: /\bas of now\b/i, label: "as of now" },
 ];
+const PROMPT_CONTAMINATION_PATTERNS: LinePattern[] = [
+  {
+    pattern: /\byou are an? [^.\n]{0,80}\bassistant\b/i,
+    label: "role prompt",
+  },
+  {
+    pattern: /\balways load (?:this|the) context\b/i,
+    label: "runtime context selection",
+  },
+  {
+    pattern: /\buse this context first\b/i,
+    label: "runtime context priority",
+  },
+  {
+    pattern: /\bselect (?:this|the) context at runtime\b/i,
+    label: "runtime context selection",
+  },
+  {
+    pattern: /\bsystem prompt\b/i,
+    label: "prompt artifact wording",
+  },
+];
 
 type LinePattern = {
   pattern: RegExp;
@@ -76,6 +98,19 @@ export function contextBodyLanguageDiagnostics(
         currentnessMatch.line,
         currentnessMatch.text,
       ),
+    });
+  }
+
+  const promptMatch = firstBodyLinePatternMatch(
+    document,
+    PROMPT_CONTAMINATION_PATTERNS,
+  );
+  if (promptMatch) {
+    diagnostics.push({
+      severity: "warning",
+      path: document.artifact.path,
+      message: `Shared context asset contains prompt or runtime-selection wording "${promptMatch.label}".`,
+      evidence: evidence(document, promptMatch.line, promptMatch.text),
     });
   }
 
