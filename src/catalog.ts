@@ -34,9 +34,18 @@ const CONTEXT_CURRENTNESS_PATTERNS: ContextLinePattern[] = [
   { pattern: /\bas of now\b/i, label: "as of now" },
   { pattern: /\btoday\b/i, label: "today" },
   { pattern: /\btomorrow\b/i, label: "tomorrow" },
-  { pattern: /\bthis (?:week|month|quarter|year)\b/i, label: "this period" },
-  { pattern: /\blast (?:week|month|quarter|year)\b/i, label: "last period" },
-  { pattern: /\bnext (?:week|month|quarter|year)\b/i, label: "next period" },
+  {
+    pattern: /\bthis (?:week|month|quarter|year)\b/i,
+    label: "this period",
+  },
+  {
+    pattern: /\blast (?:week|month|quarter|year)\b/i,
+    label: "last period",
+  },
+  {
+    pattern: /\bnext (?:week|month|quarter|year)\b/i,
+    label: "next period",
+  },
 ];
 
 type ContextLinePattern = {
@@ -374,7 +383,6 @@ function firstBodyLinePatternMatch(
   for (const index of markdownBodyLineIndexes(document)) {
     const line = document.lines[index] ?? "";
     if (!line.trim()) continue;
-    if (/tool-ignore\s+[A-Z0-9-]+/.test(line)) continue;
     if (!shouldInspectLine(line)) continue;
 
     for (const { pattern, label } of patterns) {
@@ -391,14 +399,7 @@ function markdownBodyLineIndexes(document: ParsedDocument): number[] {
   const bodyStart = frontmatter ? frontmatter.endLine : 0;
   return document.lines
     .map((_, index) => index)
-    .filter((index) => index >= bodyStart)
-    .filter((index) => !isCodeFenceLine(document, index + 1));
-}
-
-function isCodeFenceLine(document: ParsedDocument, lineNumber: number): boolean {
-  return document.codeFences.some(
-    (fence) => lineNumber >= fence.startLine && lineNumber <= fence.endLine,
-  );
+    .filter((index) => index >= bodyStart);
 }
 
 function metadataValueEvidence(
