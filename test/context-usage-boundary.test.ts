@@ -8,39 +8,42 @@ import { parseDocument } from "../src/markdown.js";
 import { scan } from "../src/scanner.js";
 import type { Artifact, ArtifactKind } from "../src/types.js";
 
-test("buildCatalog warns when active shared context lacks usage-boundary metadata", () => {
-  const result = buildCatalog([
-    parseDocument(
-      artifact(
-        "contexts/testing/boundary-value-analysis.md",
-        "context",
-        `---
+test(
+  "buildCatalog warns when active shared context lacks usage-boundary metadata",
+  () => {
+    const result = buildCatalog([
+      parseDocument(
+        artifact(
+          "contexts/testing/boundary-value-analysis.md",
+          "context",
+          `---
 id: context.testing.boundary-value-analysis
 owner: qa-platform
 status: stable
 ---
 # Boundary Value Analysis
 `,
+        ),
       ),
-    ),
-  ]);
+    ]);
 
-  assert.deepEqual(
-    result.diagnostics.map((diagnostic) => diagnostic.message),
-    [
-      "Shared context asset is missing when_to_use metadata.",
-      "Shared context asset is missing when_not_to_use metadata.",
-    ],
-  );
-  assert.equal(
-    result.diagnostics[0]?.evidence?.snippet,
-    "frontmatter missing when_to_use",
-  );
-  assert.equal(
-    result.diagnostics[1]?.evidence?.snippet,
-    "frontmatter missing when_not_to_use",
-  );
-});
+    assert.deepEqual(
+      result.diagnostics.map((diagnostic) => diagnostic.message),
+      [
+        "Shared context asset is missing when_to_use metadata.",
+        "Shared context asset is missing when_not_to_use metadata.",
+      ],
+    );
+    assert.equal(
+      result.diagnostics[0]?.evidence?.snippet,
+      "frontmatter missing when_to_use",
+    );
+    assert.equal(
+      result.diagnostics[1]?.evidence?.snippet,
+      "frontmatter missing when_not_to_use",
+    );
+  },
+);
 
 test("buildCatalog detects placeholder usage-boundary metadata", () => {
   const result = buildCatalog([
@@ -75,25 +78,28 @@ when_not_to_use: TBD
   assert.match(result.diagnostics[1]?.evidence?.snippet ?? "", /TBD/);
 });
 
-test("buildCatalog does not require usage boundaries for inactive shared context", () => {
-  const result = buildCatalog([
-    parseDocument(
-      artifact(
-        "contexts/testing/old-boundary-value-analysis.md",
-        "context",
-        `---
+test(
+  "buildCatalog does not require usage boundaries for inactive shared context",
+  () => {
+    const result = buildCatalog([
+      parseDocument(
+        artifact(
+          "contexts/testing/old-boundary-value-analysis.md",
+          "context",
+          `---
 id: context.testing.old-boundary-value-analysis
 owner: qa-platform
 status: deprecated
 ---
 # Old Boundary Value Analysis
 `,
+        ),
       ),
-    ),
-  ]);
+    ]);
 
-  assert.deepEqual(result.diagnostics, []);
-});
+    assert.deepEqual(result.diagnostics, []);
+  },
+);
 
 test("scan emits stable usage-boundary finding ids", async () => {
   const root = await fixture();
