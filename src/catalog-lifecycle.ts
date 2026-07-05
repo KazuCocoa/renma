@@ -18,7 +18,8 @@ export function lifecycleDiagnostics(entries: CatalogEntry[]): Diagnostic[] {
       diagnostics.push({
         severity: "warning",
         path: entry.sourcePath,
-        message: "Deprecated shared context asset is missing superseded_by metadata.",
+        message:
+          "Deprecated shared context asset is missing superseded_by metadata.",
         evidence: defaultMetadataEvidence(entry, "missing superseded_by metadata"),
       });
     }
@@ -149,7 +150,10 @@ function metadataListEvidence(
   return defaultMetadataEvidence(entry, `missing ${fieldKey} metadata`);
 }
 
-function defaultMetadataEvidence(entry: CatalogEntry, snippet: string): Evidence {
+function defaultMetadataEvidence(
+  entry: CatalogEntry,
+  snippet: string,
+): Evidence {
   return {
     path: entry.sourcePath,
     startLine: 1,
