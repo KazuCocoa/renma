@@ -120,7 +120,9 @@ function contextAsset(options: {
   supersededBy?: string[];
 }): string {
   const supersededBy = options.supersededBy?.length
-    ? `superseded_by:\n${options.supersededBy.map((id) => `  - ${id}`).join("\n")}\n`
+    ? `superseded_by:\n${options.supersededBy
+        .map((id) => `  - ${id}`)
+        .join("\n")}\n`
     : "";
 
   return `---
