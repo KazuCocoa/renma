@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { conflictDiagnostics } from "./catalog-conflicts.js";
 import { lifecycleDiagnostics } from "./catalog-lifecycle.js";
 import { contextBodyLanguageDiagnostics } from "./context-language-diagnostics.js";
 import type {
@@ -83,6 +84,7 @@ export function buildCatalog(documents: ParsedDocument[]): {
     });
   diagnostics.push(...dependencyDiagnostics(entries, dependencies));
   diagnostics.push(...lifecycleDiagnostics(entries));
+  diagnostics.push(...conflictDiagnostics(entries));
 
   return {
     catalog: {
