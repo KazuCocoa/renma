@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { lifecycleDiagnostics } from "./catalog-lifecycle.js";
 import { contextBodyLanguageDiagnostics } from "./context-language-diagnostics.js";
 import type {
   AssetMetadata,
@@ -81,6 +82,7 @@ export function buildCatalog(documents: ParsedDocument[]): {
       return a.to.localeCompare(b.to);
     });
   diagnostics.push(...dependencyDiagnostics(entries, dependencies));
+  diagnostics.push(...lifecycleDiagnostics(entries));
 
   return {
     catalog: {
