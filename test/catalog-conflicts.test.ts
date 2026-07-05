@@ -31,7 +31,9 @@ test("conflictDiagnostics warns when conflicts target is missing", () => {
 
   assert.ok(
     diagnostics.some((diagnostic) =>
-      diagnostic.message.includes("conflicts target \"context.testing.missing\""),
+      diagnostic.message.includes(
+        "conflicts target \"context.testing.missing\"",
+      ),
     ),
   );
 });
