@@ -53,33 +53,30 @@ test(
   },
 );
 
-test(
-  "buildCatalog accepts dated or versioned currentness wording",
-  () => {
-    const result = buildCatalog([
-      parseDocument(
-        artifact(
-          "contexts/tools/appium/drivers.md",
-          "context",
-          contextAsset("Recently, as of 2026-07-01, driver guidance changed."),
-        ),
+test("buildCatalog accepts dated or versioned currentness wording", () => {
+  const result = buildCatalog([
+    parseDocument(
+      artifact(
+        "contexts/tools/appium/drivers.md",
+        "context",
+        contextAsset("Recently, as of 2026-07-01, driver guidance changed."),
       ),
-      parseDocument(
-        artifact(
-          "contexts/tools/appium/server.md",
-          "context",
-          contextAsset("The latest Appium 2.8 behavior is covered here."),
-        ),
+    ),
+    parseDocument(
+      artifact(
+        "contexts/tools/appium/server.md",
+        "context",
+        contextAsset("The latest Appium 2.8 behavior is covered here."),
       ),
-    ]);
+    ),
+  ]);
 
-    assert.ok(
-      !result.diagnostics.some((diagnostic) =>
-        diagnostic.message.includes("contains currentness wording"),
-      ),
-    );
-  },
-);
+  assert.ok(
+    !result.diagnostics.some((diagnostic) =>
+      diagnostic.message.includes("contains currentness wording"),
+    ),
+  );
+});
 
 function contextAsset(body: string): string {
   return `---
@@ -97,7 +94,11 @@ ${body}
 `;
 }
 
-function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
+function artifact(
+  path: string,
+  kind: ArtifactKind,
+  content: string,
+): Artifact {
   return {
     path,
     absolutePath: `/tmp/${path}`,
