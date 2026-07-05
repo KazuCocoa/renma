@@ -11,7 +11,10 @@ export function lifecycleDiagnostics(entries: CatalogEntry[]): Diagnostic[] {
   for (const entry of entries) {
     if (entry.kind !== "context") continue;
 
-    if (entry.metadata.status === "deprecated" && entry.metadata.supersededBy.length === 0) {
+    if (
+      entry.metadata.status === "deprecated" &&
+      entry.metadata.supersededBy.length === 0
+    ) {
       diagnostics.push({
         severity: "warning",
         path: entry.sourcePath,
@@ -72,7 +75,9 @@ function supersessionCycleDiagnostics(
     const cycleEntry = firstCycleEntry(entry, entriesById, path);
     if (!cycleEntry) continue;
 
-    const cycleKey = [...new Set(path.slice(path.indexOf(cycleEntry.id)))].sort().join(" -> ");
+    const cycleKey = [...new Set(path.slice(path.indexOf(cycleEntry.id)))]
+      .sort()
+      .join(" -> ");
     if (reported.has(cycleKey)) continue;
     reported.add(cycleKey);
 
