@@ -13,14 +13,17 @@ export type DependencyKind =
   | "conflicts"
   | "extends"
   | "references"
+  | "applies_to"
   | "covered_by";
 
 /** Normalized shared metadata for cataloged assets. */
 export interface AssetMetadata {
   id?: string;
+  type?: string;
   version?: string;
   owner?: string;
   status?: AssetStatus;
+  purpose?: string;
   lastReviewedAt?: string;
   reviewCycle?: string;
   expiresAt?: string;
@@ -31,6 +34,11 @@ export interface AssetMetadata {
   optionalContext: string[];
   conflicts: string[];
   supersededBy: string[];
+  appliesTo?: string[];
+  focus?: string[];
+  expectedOutputs?: string[];
+  requiresLens?: string[];
+  optionalLens?: string[];
 }
 
 /** Repository object Renma can catalog, validate, reference, or report on. */
@@ -48,6 +56,8 @@ export interface Skill extends Asset {
   kind: "skill";
   requiredContext: string[];
   optionalContext: string[];
+  requiredLens: string[];
+  optionalLens: string[];
   conflicts: string[];
 }
 
