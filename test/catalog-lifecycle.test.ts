@@ -51,7 +51,9 @@ test("lifecycleDiagnostics warns when superseded_by target is inactive", () => {
 
   assert.ok(
     diagnostics.some((diagnostic) =>
-      diagnostic.message.includes("resolves to a archived asset"),
+      diagnostic.message.includes(
+        'resolves to an inactive asset with status "archived"',
+      ),
     ),
   );
 });
