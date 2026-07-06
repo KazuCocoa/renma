@@ -246,6 +246,7 @@ Creates a starter skill or context asset.
 ```bash
 renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
 renma scaffold context contexts/testing/boundary-value-analysis.md --owner qa-platform
+renma scaffold context_lens lenses/testing/spec-review-boundary-values.md --owner qa-platform
 renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform --format prompt
 ```
 

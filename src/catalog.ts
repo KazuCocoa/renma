@@ -255,7 +255,7 @@ function sharedContextMetadataDiagnostics(
     diagnostics.push({
       severity: "warning",
       path: document.artifact.path,
-      message: "Shared context asset is missing an id.",
+      message: "Asset is missing an id.",
     });
   }
 
@@ -263,7 +263,7 @@ function sharedContextMetadataDiagnostics(
     diagnostics.push({
       severity: "warning",
       path: document.artifact.path,
-      message: "Shared context asset is missing an owner.",
+      message: "Asset is missing an owner.",
     });
   }
 
@@ -286,7 +286,7 @@ function contextLensMetadataDiagnostics(
     diagnostics.push({
       severity: "warning",
       path: document.artifact.path,
-      message: "Context lens asset is missing an id.",
+      message: "Asset is missing an id.",
     });
   }
 
@@ -294,7 +294,7 @@ function contextLensMetadataDiagnostics(
     diagnostics.push({
       severity: "warning",
       path: document.artifact.path,
-      message: "Context lens asset is missing an owner.",
+      message: "Asset is missing an owner.",
     });
   }
 

@@ -8,7 +8,7 @@ A practical authoring loop is:
 
 ```text
 scaffold
--> edit skill/context
+-> edit skill/context/lens
 -> inspect
 -> scan
 -> catalog
@@ -129,7 +129,19 @@ renma scaffold skill skills/testing/spec-review/SKILL.md \
 
 Review the prompt, add any repository-specific evidence or constraints, then give it to your LLM tool. The LLM should propose a repository patch; Renma still verifies the result after you apply and review it.
 
-The generated file is intentionally small. Treat it as a starting point for review, not as a complete skill. Fill in these sections before depending on it:
+For an experimental context lens starter, use:
+
+```bash
+renma scaffold context_lens lenses/testing/spec-review-boundary-values.md \
+  --id lens.testing.spec-review.boundary-values \
+  --title "Spec Review Boundary Values Lens" \
+  --owner qa-platform \
+  --tags testing,spec-review
+```
+
+Inspecting a lens shows its purpose metadata, inbound skill references, outbound `applies_to` dependencies, and the declared `skill -> lens -> context` relationship chain.
+
+For generated skills, the file is intentionally small. Treat it as a starting point for review, not as a complete skill. Fill in these sections before depending on it:
 
 - Purpose: the recurring task, decision, or workflow the skill guides.
 - Required Inputs: the evidence, files, issue links, specs, diffs, or user answers needed before work begins.

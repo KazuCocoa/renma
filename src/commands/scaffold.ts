@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-export type ScaffoldKind = "skill" | "context";
+export type ScaffoldKind = "skill" | "context" | "context_lens";
 export type ScaffoldFormat = "file" | "prompt" | "json";
 
 export interface ScaffoldOptions {
@@ -56,7 +56,9 @@ export function buildScaffoldBundle(options: ScaffoldOptions): ScaffoldBundle {
   const content =
     options.kind === "skill"
       ? renderSkillScaffold({ id, title, owner, tags })
-      : renderContextScaffold({ id, title, owner, tags });
+      : options.kind === "context_lens"
+        ? renderContextLensScaffold({ id, title, owner, tags })
+        : renderContextScaffold({ id, title, owner, tags });
 
   return {
     kind: options.kind,
@@ -182,6 +184,48 @@ This context does not apply when:
 `;
 }
 
+function renderContextLensScaffold(metadata: {
+  id: string;
+  title: string;
+  owner: string;
+  tags: string[];
+}): string {
+  return `---
+id: ${metadata.id}
+type: context_lens
+title: ${metadata.title}
+owner: ${metadata.owner}
+status: experimental
+${renderTagBlock(metadata.tags)}
+purpose: spec_review
+applies_to:
+  - context.example.replace-me
+focus:
+  - ambiguity
+  - missing boundary
+expected_outputs:
+  - unresolved questions
+  - risk notes
+---
+
+# ${metadata.title}
+
+## Purpose
+
+This context lens is a purpose-oriented interpretation layer for the context assets listed in \`applies_to\`.
+
+## Boundary
+
+- Detailed domain knowledge belongs in context assets, not in this lens.
+- This file must not become a prompt template, runtime selector, or context injection rule.
+- Keep focus terms and expected outputs compact, deterministic, and reviewable.
+
+## Interpretation Notes
+
+- Replace this placeholder with review focus guidance grounded in the applied context assets.
+`;
+}
+
 function renderPrompt(input: {
   kind: ScaffoldKind;
   targetPath: string;
@@ -212,11 +256,14 @@ Constraints:
 - Preserve the YAML frontmatter shape unless the repository already requires a stricter local convention.
 - Use only supported statuses: experimental, stable, deprecated, archived.
 - Move durable domain, testing, platform, product, or tool knowledge into separately owned context assets under \`contexts/\`.
-- Use \`requires_context\` for context the skill normally depends on.
-- Use \`optional_context\` for context useful only in some cases.
+- For skill assets, use \`requires_context\` for context the skill normally depends on.
+- For skill assets, use \`optional_context\` for context useful only in some cases.
+- For skill assets, use \`requires_lens\` or \`optional_lens\` for static lens relationships.
+- For context lens assets, use \`applies_to\` for context assets the lens interprets.
 - Use simple supported metadata shapes only.
 - For context assets, keep content durable, reviewable, and source-backed.
 - Do not put task-specific prompt instructions in context assets.
+- Do not turn context lens assets into prompt templates, runtime selectors, or context injection rules.
 - Add explicit metadata and references where appropriate.
 - Do not invent owners, dependencies, policies, or domain facts.
 - Do not choose runtime task context.
@@ -244,6 +291,12 @@ function inferId(kind: ScaffoldKind, targetPath: string): string {
   if (kind === "skill") {
     const skillRoot = normalized.indexOf("skills");
     return normalized.slice(skillRoot >= 0 ? skillRoot + 1 : 0).join(".");
+  }
+
+  if (kind === "context_lens") {
+    const lensRoot = normalized.indexOf("lenses");
+    const parts = normalized.slice(lensRoot >= 0 ? lensRoot + 1 : 0);
+    return parts[0] === "lens" ? parts.join(".") : ["lens", ...parts].join(".");
   }
 
   const contextRoot = normalized.findIndex(

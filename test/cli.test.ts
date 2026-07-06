@@ -819,6 +819,168 @@ test("CLI inspect command prints compact outlines and exact slices", async () =>
   assert.match(sliceResult.stdout, /L0009: Use PowerShell\./);
 });
 
+test("CLI inspect command prints context lens metadata and relationships", async () => {
+  const root = await fixture();
+  const lens = path.join(
+    root,
+    "lenses",
+    "testing",
+    "spec-review-boundary-values.md",
+  );
+  await mkdir(path.join(root, "contexts", "testing"), { recursive: true });
+  await mkdir(path.dirname(lens), { recursive: true });
+  await mkdir(path.join(root, "skills", "testing", "spec-review"), {
+    recursive: true,
+  });
+  await mkdir(path.join(root, "skills", "testing", "exploratory"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "contexts", "testing", "boundary-value-analysis.md"),
+    `---
+id: context.testing.boundary-value-analysis
+owner: qa-platform
+status: stable
+when_to_use:
+  - Designing tests around numeric, date, quantity, or limit boundaries
+when_not_to_use:
+  - Exploratory notes unrelated to limits
+---
+# Boundary Value Analysis
+`,
+  );
+  await writeFile(
+    lens,
+    `---
+id: lens.testing.spec-review.boundary-values
+type: context_lens
+title: Spec Review Boundary Values Lens
+owner: qa-platform
+status: experimental
+tags:
+  - testing
+  - spec-review
+purpose: spec_review
+applies_to:
+  - contexts/testing/boundary-value-analysis.md
+focus:
+  - ambiguity
+  - missing boundary
+expected_outputs:
+  - unresolved questions
+  - risk notes
+---
+# Spec Review Boundary Values Lens
+`,
+  );
+  await writeFile(
+    path.join(root, "skills", "testing", "spec-review", "SKILL.md"),
+    `---
+id: skill.testing.spec-review
+owner: qa-platform
+status: experimental
+requires_lens:
+  - lenses/testing/spec-review-boundary-values.md
+---
+# Spec Review
+`,
+  );
+  await writeFile(
+    path.join(root, "skills", "testing", "exploratory", "SKILL.md"),
+    `---
+id: skill.testing.exploratory
+owner: qa-platform
+status: experimental
+optional_lens:
+  - lens.testing.spec-review.boundary-values
+---
+# Exploratory Review
+`,
+  );
+
+  const result = await withCapturedConsole(() =>
+    main(["inspect", lens, "--format", "text"]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /Kind: context_lens/);
+  assert.match(result.stdout, /Purpose: spec_review/);
+  assert.match(
+    result.stdout,
+    /Applies to: contexts\/testing\/boundary-value-analysis\.md/,
+  );
+  assert.match(result.stdout, /Focus: ambiguity, missing boundary/);
+  assert.match(
+    result.stdout,
+    /Expected outputs: unresolved questions, risk notes/,
+  );
+  assert.match(
+    result.stdout,
+    /skill\.testing\.spec-review requires_lens -> lenses\/testing\/spec-review-boundary-values\.md/,
+  );
+  assert.match(
+    result.stdout,
+    /skill\.testing\.exploratory optional_lens -> lens\.testing\.spec-review\.boundary-values/,
+  );
+  assert.match(
+    result.stdout,
+    /lens\.testing\.spec-review\.boundary-values applies_to -> contexts\/testing\/boundary-value-analysis\.md/,
+  );
+  assert.match(
+    result.stdout,
+    /skill\.testing\.spec-review -> lens\.testing\.spec-review\.boundary-values -> context\.testing\.boundary-value-analysis/,
+  );
+
+  const jsonResult = await withCapturedConsole(() =>
+    main(["inspect", lens, "--format", "json"]),
+  );
+  assert.equal(jsonResult.code, 0);
+  const outline = JSON.parse(jsonResult.stdout) as {
+    asset: {
+      inboundDependents: Array<{
+        from: string;
+        kind: string;
+        resolved: boolean;
+        sourcePath: string;
+        targetId?: string;
+        targetKind?: string;
+        targetPath?: string;
+        to: string;
+      }>;
+    } | null;
+  };
+  const pathBasedLensReference = outline.asset?.inboundDependents.find(
+    (relationship) => relationship.from === "skill.testing.spec-review",
+  );
+
+  assert.deepEqual(pathBasedLensReference, {
+    from: "skill.testing.spec-review",
+    kind: "requires_lens",
+    resolved: true,
+    sourcePath: "skills/testing/spec-review/SKILL.md",
+    targetId: "lens.testing.spec-review.boundary-values",
+    targetKind: "context_lens",
+    targetPath: "lenses/testing/spec-review-boundary-values.md",
+    to: "lenses/testing/spec-review-boundary-values.md",
+  });
+
+  const skillResult = await withCapturedConsole(() =>
+    main([
+      "inspect",
+      path.join(root, "skills", "testing", "spec-review", "SKILL.md"),
+      "--format",
+      "text",
+    ]),
+  );
+
+  assert.equal(skillResult.code, 0);
+  assert.match(skillResult.stdout, /Kind: skill/);
+  assert.match(skillResult.stdout, /Relationships:/);
+  assert.doesNotMatch(skillResult.stdout, /Applies to:/);
+  assert.doesNotMatch(skillResult.stdout, /Focus:/);
+  assert.doesNotMatch(skillResult.stdout, /Expected outputs:/);
+});
+
 test("help and invalid commands have expected exit codes", async () => {
   const help = await withCapturedConsole(() => main(["--help"]));
   const invalid = await withCapturedConsole(() => main(["wat"]));
@@ -885,6 +1047,65 @@ test("scaffold skill writes deterministic file output", async () => {
     "spec-review",
     "qa",
   ]);
+});
+
+test("scaffold context_lens writes deterministic file output", async () => {
+  const root = await fixture();
+  const target = path.join(
+    root,
+    "lenses",
+    "testing",
+    "spec-review-boundary-values.md",
+  );
+
+  const result = await withCapturedConsole(() =>
+    main([
+      "scaffold",
+      "context_lens",
+      target,
+      "--id",
+      "lens.testing.spec-review.boundary-values",
+      "--title",
+      "Spec Review Boundary Values Lens",
+      "--owner",
+      "qa-platform",
+      "--tags",
+      "testing,spec-review",
+    ]),
+  );
+
+  assert.equal(result.code, 0);
+  const content = await readFile(target, "utf8");
+  assert.match(content, /^id: lens\.testing\.spec-review\.boundary-values$/m);
+  assert.match(content, /^type: context_lens$/m);
+  assert.match(content, /^title: Spec Review Boundary Values Lens$/m);
+  assert.match(content, /^owner: qa-platform$/m);
+  assert.match(content, /^status: experimental$/m);
+  assert.match(content, /^tags:\n {2}- testing\n {2}- spec-review$/m);
+  assert.match(content, /^purpose: spec_review$/m);
+  assert.match(content, /^applies_to:\n {2}- context\.example\.replace-me$/m);
+  assert.match(content, /^focus:\n {2}- ambiguity\n {2}- missing boundary$/m);
+  assert.match(
+    content,
+    /^expected_outputs:\n {2}- unresolved questions\n {2}- risk notes$/m,
+  );
+  assert.match(content, /purpose-oriented interpretation layer/);
+  assert.match(content, /Detailed domain knowledge belongs in context assets/);
+  assert.match(content, /must not become a prompt template/);
+  assert.doesNotMatch(content, /^version:/m);
+
+  const catalogResult = await withCapturedConsole(() =>
+    main(["catalog", root, "--format", "json"]),
+  );
+  assert.equal(catalogResult.code, 0);
+  const catalog = JSON.parse(catalogResult.stdout) as {
+    catalog: { entries: Array<{ id: string; kind: string }> };
+  };
+  assert.equal(
+    catalog.catalog.entries[0]?.id,
+    "lens.testing.spec-review.boundary-values",
+  );
+  assert.equal(catalog.catalog.entries[0]?.kind, "context_lens");
 });
 
 test("scaffold refuses to overwrite an existing file", async () => {
@@ -957,6 +1178,35 @@ test("scaffold context can emit json", async () => {
     /Do not duplicate large source material when a reference is enough/,
   );
   assert.doesNotMatch(bundle.content, /^## Applies To$/m);
+});
+
+test("scaffold context_lens can emit json", async () => {
+  const result = await withCapturedConsole(() =>
+    main([
+      "scaffold",
+      "context_lens",
+      "lenses/testing/spec-review-boundary-values.md",
+      "--format",
+      "json",
+      "--owner",
+      "qa-platform",
+    ]),
+  );
+
+  assert.equal(result.code, 0);
+  const bundle = JSON.parse(result.stdout) as {
+    kind: string;
+    id: string;
+    content: string;
+    prompt: string;
+  };
+  assert.equal(bundle.kind, "context_lens");
+  assert.equal(bundle.id, "lens.testing.spec-review-boundary-values");
+  assert.match(bundle.content, /^type: context_lens$/m);
+  assert.match(bundle.content, /^purpose: spec_review$/m);
+  assert.match(bundle.prompt, /Create a Renma context_lens asset/);
+  assert.match(bundle.prompt, /use `applies_to`/);
+  assert.match(bundle.prompt, /runtime selectors/);
 });
 
 test("scaffold prompt emits Codex-ready authoring instructions", async () => {

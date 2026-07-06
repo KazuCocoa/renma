@@ -90,6 +90,20 @@ requires_lens:
 
 `requires_lens` and `optional_lens` are graph metadata. They do not make Renma select runtime context or inject the lens into an agent.
 
+## Authoring helpers
+
+Use `scaffold` to create a compact starter lens:
+
+```bash
+renma scaffold context_lens lenses/testing/spec-review-boundary-values.md \
+  --id lens.testing.spec-review.boundary-values \
+  --title "Spec Review Boundary Values Lens" \
+  --owner qa-platform \
+  --tags testing,spec-review
+```
+
+Use `inspect` on a lens to review its purpose metadata and declared graph neighborhood. Lens inspection shows inbound skill references, outbound `applies_to` context targets, and the static `skill -> lens -> context` chain.
+
 ## Good lens boundaries
 
 A lens should answer:
@@ -117,5 +131,8 @@ Initial support is intentionally small:
 - `applies_to`, `requires_lens`, and `optional_lens` create graph edges.
 - missing lens `purpose` or `applies_to` metadata is reported for active canonical lenses.
 - missing referenced lens or context IDs are reported through deterministic dependency diagnostics.
+- `inspect` summarizes lens metadata and declared inbound/outbound relationships.
+- `scaffold context_lens` creates a small reviewable starter file.
+- active lenses with no skill references, or active lenses applying to inactive context, are reported as low-severity maintenance advisories.
 
-Future work may improve `inspect`, `scaffold`, authoring workflows, readiness summaries, and optional profile-specific rules without changing the runtime boundary.
+Future work may improve authoring workflows, readiness summaries, and optional profile-specific rules without changing the runtime boundary.

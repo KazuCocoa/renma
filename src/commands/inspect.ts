@@ -1,7 +1,14 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { parseDocument } from "../markdown.js";
+import type {
+  AssetKind,
+  AssetStatus,
+  CatalogEntry,
+  Dependency,
+} from "../model.js";
 import type { Artifact } from "../types.js";
+import { catalog } from "./catalog.js";
 
 const DEFAULT_SECTION_PREVIEW_LINES = 3;
 
@@ -17,6 +24,7 @@ export interface InspectOutline {
   bytes: number;
   lineCount: number;
   frontmatterRange: null | string;
+  asset: InspectAssetSummary | null;
   headings: Array<{
     depth: number;
     line: number;
@@ -34,6 +42,38 @@ export interface InspectOutline {
     line: number;
     target: string;
   }>;
+}
+
+export interface InspectAssetSummary {
+  id: string;
+  kind: AssetKind;
+  owner?: string;
+  status?: AssetStatus;
+  tags: string[];
+  purpose?: string;
+  appliesTo: string[];
+  focus: string[];
+  expectedOutputs: string[];
+  inboundDependents: InspectRelationship[];
+  outboundDependencies: InspectRelationship[];
+  relationshipChains: InspectRelationshipChain[];
+}
+
+export interface InspectRelationship {
+  from: string;
+  to: string;
+  kind: string;
+  sourcePath: string;
+  resolved: boolean;
+  targetId?: string;
+  targetKind?: AssetKind;
+  targetPath?: string;
+}
+
+export interface InspectRelationshipChain {
+  skill: string;
+  lens: string;
+  context: string;
 }
 
 export interface InspectSlice {
@@ -82,6 +122,7 @@ export async function buildInspectOutline(
 
   return {
     bytes: artifact.sizeBytes,
+    asset: await inspectAssetForTarget(absolutePath),
     codeFences: document.codeFences.map((fence) => ({
       endLine: fence.endLine,
       language: fence.language,
@@ -109,6 +150,204 @@ export async function buildInspectOutline(
     })),
     path: absolutePath,
   };
+}
+
+async function inspectAssetForTarget(
+  absolutePath: string,
+): Promise<InspectAssetSummary | null> {
+  try {
+    const root = inferCatalogRoot(absolutePath);
+    const result = await catalog(root);
+    const entry = result.catalog.entries.find(
+      (candidate) => path.resolve(root, candidate.sourcePath) === absolutePath,
+    );
+    if (!entry) return null;
+
+    const resolver = createInspectRelationshipResolver(result.catalog.entries);
+    const inboundDependents = result.catalog.dependencies
+      .filter((dependency) => resolver.matches(dependency.to, entry))
+      .map((dependency) => inspectRelationship(dependency, resolver))
+      .sort(compareInspectRelationships);
+    const outboundDependencies = result.catalog.dependencies
+      .filter((dependency) => resolver.matches(dependency.from, entry))
+      .map((dependency) => inspectRelationship(dependency, resolver))
+      .sort(compareInspectRelationships);
+
+    return {
+      id: entry.id,
+      kind: entry.kind,
+      ...(entry.metadata.owner ? { owner: entry.metadata.owner } : {}),
+      ...(entry.metadata.status ? { status: entry.metadata.status } : {}),
+      ...(entry.metadata.purpose ? { purpose: entry.metadata.purpose } : {}),
+      appliesTo: entry.metadata.appliesTo ?? [],
+      focus: entry.metadata.focus ?? [],
+      expectedOutputs: entry.metadata.expectedOutputs ?? [],
+      inboundDependents,
+      outboundDependencies,
+      relationshipChains: relationshipChains(
+        entry,
+        inboundDependents,
+        outboundDependencies,
+      ),
+      tags: entry.metadata.tags,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function inspectRelationship(
+  dependency: Dependency,
+  resolver: InspectRelationshipResolver,
+): InspectRelationship {
+  const source = resolver.resolve(dependency.from);
+  const target = resolver.resolve(dependency.to);
+
+  return {
+    from: dependency.from,
+    kind: inspectRelationshipKind(dependency, source, target),
+    resolved: target !== undefined,
+    sourcePath: dependency.sourcePath,
+    to: dependency.to,
+    ...(target ? { targetId: target.id } : {}),
+    ...(target ? { targetKind: target.kind } : {}),
+    ...(target ? { targetPath: target.sourcePath } : {}),
+  };
+}
+
+function inspectRelationshipKind(
+  dependency: Dependency,
+  source: CatalogEntry | undefined,
+  target: CatalogEntry | undefined,
+): string {
+  if (
+    source?.kind === "skill" &&
+    (target?.kind === "context_lens" || dependency.to.startsWith("lens."))
+  ) {
+    if (dependency.kind === "requires") return "requires_lens";
+    if (dependency.kind === "optional") return "optional_lens";
+  }
+
+  if (
+    source?.kind === "skill" &&
+    (target?.kind === "context" || dependency.to.startsWith("context."))
+  ) {
+    if (dependency.kind === "requires") return "requires_context";
+    if (dependency.kind === "optional") return "optional_context";
+  }
+
+  return dependency.kind;
+}
+
+interface InspectRelationshipResolver {
+  matches(reference: string, entry: CatalogEntry): boolean;
+  resolve(reference: string): CatalogEntry | undefined;
+}
+
+function createInspectRelationshipResolver(
+  entries: CatalogEntry[],
+): InspectRelationshipResolver {
+  const byId = new Map<string, CatalogEntry>();
+  const byPath = new Map<string, CatalogEntry>();
+
+  for (const entry of entries) {
+    if (!byId.has(entry.id)) byId.set(entry.id, entry);
+    for (const reference of [
+      entry.sourcePath,
+      normalizeReference(entry.sourcePath),
+      `./${entry.sourcePath}`,
+    ]) {
+      const normalized = normalizeReference(reference);
+      if (!byPath.has(normalized)) byPath.set(normalized, entry);
+    }
+  }
+
+  const resolve = (reference: string): CatalogEntry | undefined =>
+    byId.get(reference) ?? byPath.get(normalizeReference(reference));
+
+  return {
+    matches(reference: string, entry: CatalogEntry): boolean {
+      const resolved = resolve(reference);
+      if (!resolved) return false;
+      return sameCatalogEntry(resolved, entry);
+    },
+    resolve,
+  };
+}
+
+function sameCatalogEntry(left: CatalogEntry, right: CatalogEntry): boolean {
+  return (
+    left.id === right.id ||
+    normalizeReference(left.sourcePath) === normalizeReference(right.sourcePath)
+  );
+}
+
+function normalizeReference(reference: string): string {
+  return reference.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+function relationshipChains(
+  entry: CatalogEntry,
+  inboundDependents: InspectRelationship[],
+  outboundDependencies: InspectRelationship[],
+): InspectRelationshipChain[] {
+  if (entry.kind !== "context_lens") return [];
+
+  const skillDependents = inboundDependents.filter(
+    (relationship) =>
+      relationship.kind === "requires_lens" ||
+      relationship.kind === "optional_lens",
+  );
+  const appliedContexts = outboundDependencies.filter(
+    (relationship) => relationship.kind === "applies_to",
+  );
+
+  return skillDependents.flatMap((dependent) =>
+    appliedContexts.map((dependency) => ({
+      context: dependency.targetId ?? dependency.to,
+      lens: entry.id,
+      skill: dependent.from,
+    })),
+  );
+}
+
+function compareInspectRelationships(
+  left: InspectRelationship,
+  right: InspectRelationship,
+): number {
+  const byFrom = left.from.localeCompare(right.from);
+  if (byFrom !== 0) return byFrom;
+  const byKind = left.kind.localeCompare(right.kind);
+  if (byKind !== 0) return byKind;
+  return left.to.localeCompare(right.to);
+}
+
+function inferCatalogRoot(absolutePath: string): string {
+  const segments = absolutePath.split(path.sep);
+  for (let index = segments.length - 2; index >= 0; index -= 1) {
+    if (
+      segments[index] === "skills" ||
+      segments[index] === "context" ||
+      segments[index] === "contexts" ||
+      segments[index] === "lenses" ||
+      segments[index] === ".agents"
+    ) {
+      return (
+        segments.slice(0, index).join(path.sep) || path.parse(absolutePath).root
+      );
+    }
+  }
+
+  const cwd = path.resolve(process.cwd());
+  const relativeToCwd = path.relative(cwd, absolutePath);
+  if (
+    relativeToCwd &&
+    !relativeToCwd.startsWith("..") &&
+    !path.isAbsolute(relativeToCwd)
+  ) {
+    return cwd;
+  }
+  return path.dirname(absolutePath);
 }
 
 async function buildInspectSlice(
@@ -194,6 +433,9 @@ function renderTextOutline(outline: InspectOutline): string {
     `Lines: ${outline.lineCount}`,
     `Bytes: ${outline.bytes}`,
     `Frontmatter: ${outline.frontmatterRange ?? "none"}`,
+    ...(outline.asset
+      ? ["", "Asset:", ...renderAssetSummary(outline.asset)]
+      : []),
     "",
     "Headings:",
     ...outline.headings.flatMap((heading) => [
@@ -212,6 +454,51 @@ function renderTextOutline(outline: InspectOutline): string {
   ];
 
   return `${lines.join("\n")}\n`;
+}
+
+function renderAssetSummary(asset: InspectAssetSummary): string[] {
+  return [
+    `- ID: ${asset.id}`,
+    `- Kind: ${asset.kind}`,
+    ...(asset.owner ? [`- Owner: ${asset.owner}`] : []),
+    ...(asset.status ? [`- Status: ${asset.status}`] : []),
+    `- Tags: ${list(asset.tags)}`,
+    ...(asset.kind === "context_lens"
+      ? [
+          ...(asset.purpose ? [`- Purpose: ${asset.purpose}`] : []),
+          `- Applies to: ${list(asset.appliesTo)}`,
+          `- Focus: ${list(asset.focus)}`,
+          `- Expected outputs: ${list(asset.expectedOutputs)}`,
+        ]
+      : []),
+    "",
+    "Relationships:",
+    "- Inbound dependents:",
+    ...relationshipLines(asset.inboundDependents),
+    "- Outbound dependencies:",
+    ...relationshipLines(asset.outboundDependencies),
+    ...(asset.relationshipChains.length > 0
+      ? [
+          "- Relationship chains:",
+          ...asset.relationshipChains.map(
+            (chain) =>
+              `  - ${chain.skill} -> ${chain.lens} -> ${chain.context}`,
+          ),
+        ]
+      : []),
+  ];
+}
+
+function relationshipLines(relationships: InspectRelationship[]): string[] {
+  if (relationships.length === 0) return ["  - (none)"];
+  return relationships.map(
+    (relationship) =>
+      `  - ${relationship.from} ${relationship.kind} -> ${relationship.to}`,
+  );
+}
+
+function list(values: string[]): string {
+  return values.length > 0 ? values.join(", ") : "(none)";
 }
 
 function formatRange(start: number, end: number): string {

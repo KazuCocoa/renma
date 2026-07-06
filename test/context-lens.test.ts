@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { buildCatalog } from "../src/catalog.js";
 import { parseDocument } from "../src/markdown.js";
 import { parseAssetMetadata } from "../src/metadata.js";
+import { scan } from "../src/scanner.js";
 import type { Artifact, ArtifactKind } from "../src/types.js";
 
 test("parseAssetMetadata captures context lens metadata", () => {
@@ -262,6 +266,150 @@ applies_to:
     ),
   );
 });
+
+test("scan uses generic missing id and owner finding titles for contexts and lenses", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "contexts", "testing"), { recursive: true });
+  await mkdir(path.join(root, "lenses", "testing"), { recursive: true });
+  await writeFile(
+    path.join(root, "contexts", "testing", "missing.md"),
+    "# Missing Context Metadata\n",
+  );
+  await writeFile(
+    path.join(root, "lenses", "testing", "missing.md"),
+    "# Missing Lens Metadata\n",
+  );
+
+  const result = await scan(root);
+  const missingFindings = result.findings
+    .filter(
+      (finding) =>
+        finding.id === "META-MISSING-ID" || finding.id === "META-MISSING-OWNER",
+    )
+    .map((finding) => ({
+      path: finding.evidence.path,
+      title: finding.title,
+    }));
+
+  assert.deepEqual(missingFindings, [
+    {
+      path: "contexts/testing/missing.md",
+      title: "Asset is missing an id",
+    },
+    {
+      path: "contexts/testing/missing.md",
+      title: "Asset is missing an owner",
+    },
+    {
+      path: "lenses/testing/missing.md",
+      title: "Asset is missing an id",
+    },
+    {
+      path: "lenses/testing/missing.md",
+      title: "Asset is missing an owner",
+    },
+  ]);
+});
+
+test("scan reports active context lenses that are not referenced by skills", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "contexts", "testing"), { recursive: true });
+  await mkdir(path.join(root, "lenses", "testing"), { recursive: true });
+  await writeFile(
+    path.join(root, "contexts", "testing", "boundary-value-analysis.md"),
+    `---
+id: context.testing.boundary-value-analysis
+owner: qa-platform
+status: stable
+when_to_use:
+  - Designing tests around numeric, date, quantity, or limit boundaries
+when_not_to_use:
+  - Exploratory notes unrelated to limits
+---
+# Boundary Value Analysis
+`,
+  );
+  await writeFile(
+    path.join(root, "lenses", "testing", "spec-review.md"),
+    `---
+id: lens.testing.spec-review
+owner: qa-platform
+status: experimental
+purpose: spec_review
+applies_to:
+  - context.testing.boundary-value-analysis
+---
+# Spec Review Lens
+`,
+  );
+
+  const result = await scan(root);
+  const finding = result.findings.find(
+    (candidate) => candidate.id === "MAINT-ORPHANED-CONTEXT-LENS",
+  );
+
+  assert.equal(finding?.severity, "low");
+  assert.equal(finding?.evidence.path, "lenses/testing/spec-review.md");
+});
+
+test("scan reports active lenses that apply to inactive context assets", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "contexts", "testing"), { recursive: true });
+  await mkdir(path.join(root, "lenses", "testing"), { recursive: true });
+  await mkdir(path.join(root, "skills", "testing", "spec-review"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "contexts", "testing", "old-boundary-value-analysis.md"),
+    `---
+id: context.testing.old-boundary-value-analysis
+owner: qa-platform
+status: archived
+---
+# Old Boundary Value Analysis
+`,
+  );
+  await writeFile(
+    path.join(root, "lenses", "testing", "spec-review.md"),
+    `---
+id: lens.testing.spec-review
+owner: qa-platform
+status: experimental
+purpose: spec_review
+applies_to:
+  - context.testing.old-boundary-value-analysis
+---
+# Spec Review Lens
+`,
+  );
+  await writeFile(
+    path.join(root, "skills", "testing", "spec-review", "SKILL.md"),
+    `---
+id: skill.testing.spec-review
+owner: qa-platform
+status: experimental
+requires_lens:
+  - lens.testing.spec-review
+---
+# Spec Review
+`,
+  );
+
+  const result = await scan(root);
+  const finding = result.findings.find(
+    (candidate) =>
+      candidate.id === "MAINT-CONTEXT-LENS-APPLIES-TO-INACTIVE-CONTEXT",
+  );
+  const ids = result.findings.map((candidate) => candidate.id);
+
+  assert.equal(finding?.severity, "low");
+  assert.equal(finding?.evidence.path, "lenses/testing/spec-review.md");
+  assert.ok(!ids.includes("MAINT-REFERENCE-DEPRECATED-ASSET"));
+});
+
+async function fixture(): Promise<string> {
+  return mkdtemp(path.join(os.tmpdir(), "renma-context-lens-"));
+}
 
 function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
   return {

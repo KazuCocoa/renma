@@ -245,10 +245,7 @@ test("buildCatalog warns when shared context assets lack governance metadata", (
 
   assert.deepEqual(
     result.diagnostics.map((diagnostic) => diagnostic.message),
-    [
-      "Shared context asset is missing an id.",
-      "Shared context asset is missing an owner.",
-    ],
+    ["Asset is missing an id.", "Asset is missing an owner."],
   );
 });
 
