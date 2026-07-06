@@ -327,10 +327,13 @@ async function runGraph(values: CliValues, target: string): Promise<number> {
     console.error("--format must be one of: json, markdown, mermaid.");
     return 2;
   }
-  const view =
+  const viewValue =
     stringValue(values.view) ?? (format === "json" ? "full" : "summary");
-  if (view !== "summary" && view !== "workflow" && view !== "full") {
-    console.error("--view must be one of: summary, workflow, full.");
+  const view = normalizeGraphView(viewValue);
+  if (!view) {
+    console.error(
+      "--view must be one of: summary, workflow, full, layered, lens.",
+    );
     return 2;
   }
 
@@ -363,6 +366,19 @@ async function runGraph(values: CliValues, target: string): Promise<number> {
     );
     return 2;
   }
+}
+
+function normalizeGraphView(value: string): GraphView | undefined {
+  if (value === "lens") return "layered";
+  if (
+    value === "summary" ||
+    value === "workflow" ||
+    value === "full" ||
+    value === "layered"
+  ) {
+    return value;
+  }
+  return undefined;
 }
 
 async function runOwnership(
@@ -557,7 +573,7 @@ function helpText(): string {
     "      --format <format>      scan: text or json; catalog/ownership/readiness/ci-report: json or markdown; graph: json, markdown, or mermaid; suggest-semantic-split: prompt or json",
     "      --include-owned        ownership: include owned asset details",
     "      --json                 Shortcut for --format json",
-    "      --view <view>          graph: summary, workflow, or full",
+    "      --view <view>          graph: summary, workflow, full, layered, or lens",
     "      --focus <asset-id-or-path>",
     "      --owner <owner>",
     "      --title <title>",
