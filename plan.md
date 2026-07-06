@@ -437,6 +437,65 @@ renma readiness --format markdown
 
 Focused graph views are inspection tools; they do not choose, inject, or load runtime context for an agent.
 
+Follow-up issue / PR plan: improve graph readability for context lenses.
+
+Problem:
+
+When skills use `context_lens` assets, the current graph is technically correct
+but visually noisy because skills, lenses, contexts, and support assets share the
+same graph plane. The intended review path should be easy to see:
+
+```text
+skill -> lens -> context
+```
+
+Real repositories may also keep direct `requires_context` edges while adopting
+lenses, so focused graph output can mix these relationship shapes:
+
+```text
+skill -> context
+skill -> lens -> context
+context -> optional_context
+```
+
+Goal:
+
+Add a visualization-only graph view that makes the lens-mediated path readable
+without changing catalog semantics or adding runtime behavior. Candidate CLI
+interfaces:
+
+```bash
+renma graph . --view layered
+renma graph . --view lens
+```
+
+Recommended behavior:
+
+- Group or rank nodes by asset kind: skills, context lenses, contexts, and then
+  references / examples / profiles / tools.
+- Render `requires_lens` and `optional_lens` edges from skills to lenses.
+- Render `applies_to` edges from lenses to contexts.
+- Keep direct `requires_context` and `optional_context` edges visible, but
+  visually separate from lens-mediated paths so they do not obscure the lens
+  layer.
+- Preserve existing graph output unless the new view is requested.
+
+Non-goals:
+
+- Do not change catalog semantics.
+- Do not add runtime lens selection.
+- Do not rank, retrieve, inject, or assemble context.
+- Do not make graph views a prompt assembly or agent execution feature.
+
+Acceptance criteria:
+
+- A focused graph for an Appium setup lens clearly shows
+  `skill -> lens -> context`.
+- Context and lens nodes are visually distinguishable.
+- Direct skill-to-context edges remain visible but do not obscure the lens layer.
+- Existing graph output remains backward compatible unless `--view layered`,
+  `--view lens`, or an equivalent explicit view is requested.
+
 ### 5. Graph-Backed Validation
 
 Use the graph to validate repository health.
