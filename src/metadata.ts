@@ -51,6 +51,11 @@ export function parseAssetMetadata(document: ParsedDocument): {
   );
   assignOptional(
     metadata,
+    "type",
+    optionalText(metadataText(document.metadata.type)),
+  );
+  assignOptional(
+    metadata,
     "version",
     optionalText(metadataText(document.metadata.version)),
   );
@@ -60,9 +65,31 @@ export function parseAssetMetadata(document: ParsedDocument): {
     optionalText(metadataText(document.metadata.owner)),
   );
   assignOptional(metadata, "status", status);
+  assignOptional(
+    metadata,
+    "purpose",
+    optionalText(metadataText(document.metadata.purpose)),
+  );
   assignOptional(metadata, "lastReviewedAt", lastReviewedAt);
   assignOptional(metadata, "reviewCycle", reviewCycle);
   assignOptional(metadata, "expiresAt", expiresAt);
+  assignOptionalList(metadata, "appliesTo", listValue(document.metadata.applies_to));
+  assignOptionalList(metadata, "focus", listValue(document.metadata.focus));
+  assignOptionalList(
+    metadata,
+    "expectedOutputs",
+    listValue(document.metadata.expected_outputs),
+  );
+  assignOptionalList(
+    metadata,
+    "requiresLens",
+    listValue(document.metadata.requires_lens),
+  );
+  assignOptionalList(
+    metadata,
+    "optionalLens",
+    listValue(document.metadata.optional_lens),
+  );
 
   if (lastReviewedAt !== undefined && !isIsoDate(lastReviewedAt)) {
     diagnostics.push(
@@ -162,5 +189,15 @@ function assignOptional<K extends keyof AssetMetadata>(
 ): void {
   if (value !== undefined) {
     metadata[key] = value;
+  }
+}
+
+function assignOptionalList<K extends keyof AssetMetadata>(
+  metadata: AssetMetadata,
+  key: K,
+  value: string[],
+): void {
+  if (value.length > 0) {
+    metadata[key] = value as AssetMetadata[K];
   }
 }
