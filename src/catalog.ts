@@ -171,6 +171,8 @@ function dependencyDiagnostics(
 
     const target = entriesById.get(dependency.to);
     if (!target) {
+      if (dependency.kind === "conflicts") continue;
+
       diagnostics.push({
         severity: "warning",
         path: dependency.sourcePath,

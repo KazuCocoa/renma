@@ -514,6 +514,65 @@ status: deprecated
   assert.equal(inactive?.evidence?.endLine, 5);
 });
 
+test("buildCatalog suppresses generic missing-target diagnostics for conflicts", () => {
+  const { catalog, diagnostics } = buildCatalog([
+    parseDocument(
+      artifact(
+        "skills/demo/SKILL.md",
+        "skill",
+        `---
+id: skill.demo
+requires_context:
+  - context.demo.required-missing
+optional_context:
+  - context.demo.optional-missing
+conflicts:
+  - context.demo.conflict-missing
+---
+# Demo
+`,
+      ),
+    ),
+  ]);
+
+  assert.ok(
+    catalog.dependencies.some(
+      (dependency) =>
+        dependency.kind === "conflicts" &&
+        dependency.to === "context.demo.conflict-missing",
+    ),
+  );
+
+  assert.ok(
+    diagnostics.some(
+      (diagnostic) =>
+        diagnostic.message ===
+        'Asset conflicts target "context.demo.conflict-missing" does not match a catalog entry.',
+    ),
+  );
+  assert.ok(
+    !diagnostics.some(
+      (diagnostic) =>
+        diagnostic.message ===
+        'Metadata dependency "context.demo.conflict-missing" from "skill.demo" does not match a catalog entry.',
+    ),
+  );
+  assert.ok(
+    diagnostics.some(
+      (diagnostic) =>
+        diagnostic.message ===
+        'Metadata dependency "context.demo.required-missing" from "skill.demo" does not match a catalog entry.',
+    ),
+  );
+  assert.ok(
+    diagnostics.some(
+      (diagnostic) =>
+        diagnostic.message ===
+        'Metadata dependency "context.demo.optional-missing" from "skill.demo" does not match a catalog entry.',
+    ),
+  );
+});
+
 function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
   return {
     path,

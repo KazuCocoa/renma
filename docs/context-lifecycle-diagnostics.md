@@ -4,6 +4,10 @@ Renma checks shared context lifecycle metadata so deprecated context assets rema
 
 These diagnostics are deterministic catalog diagnostics. They do not choose replacement context at runtime, infer migration intent, create scan finding IDs, or rewrite metadata.
 
+## Scope
+
+These diagnostics apply to governed shared context assets: context assets with a `context.*` id, owner metadata, and usage-boundary metadata (`when_to_use` and `when_not_to_use`). Lightweight fixtures or unmanaged context-like files are ignored.
+
 ## Deprecated context without replacement
 
 Renma warns when a deprecated shared context asset has no `superseded_by` metadata:
@@ -31,7 +35,7 @@ Example messages:
 ```text
 Shared context asset superseded_by references itself: "context.testing.old-boundary-analysis".
 Shared context asset superseded_by target "context.testing.missing" does not match a catalog entry.
-Shared context asset superseded_by target "context.testing.old-target" resolves to a deprecated asset.
+Shared context asset superseded_by target "context.testing.old-target" resolves to an inactive asset with status "deprecated".
 ```
 
 `superseded_by` should point at a stable or experimental catalog asset that can serve as the reviewed replacement.

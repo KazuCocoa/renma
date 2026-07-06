@@ -148,7 +148,7 @@ function inactiveTargetMessage(
   targetId: string,
   status: AssetStatus | undefined,
 ): string {
-  return `Shared context asset superseded_by target "${targetId}" resolves to a ${status} asset.`;
+  return `Shared context asset superseded_by target "${targetId}" resolves to an inactive asset with status "${status}".`;
 }
 
 function cycleMessage(entryId: string): string {
