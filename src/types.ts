@@ -11,6 +11,7 @@ export type ArtifactKind =
   | "skill"
   | "agent"
   | "context"
+  | "context_lens"
   | "profile"
   | "reference"
   | "example"

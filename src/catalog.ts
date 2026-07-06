@@ -18,6 +18,8 @@ const METADATA_LIST_ITEM_MAX_CHARS = 140;
 const PLACEHOLDER_USAGE_BOUNDARY_PATTERN =
   /^(?:todo|tbd|tba|unknown|n\/?a|none|placeholder|to be defined)(?:[\s:-].*)?$/i;
 
+type CatalogedKind = CatalogEntry["kind"];
+
 /** Build a deterministic catalog of skill and context entries from parsed documents. */
 export function buildCatalog(documents: ParsedDocument[]): {
   catalog: Catalog;
@@ -27,11 +29,16 @@ export function buildCatalog(documents: ParsedDocument[]): {
   const entries = documents
     .map((document): CatalogEntry | undefined => {
       const result = parseAssetMetadata(document);
+      const kind = catalogedKind(document, result.metadata);
       diagnostics.push(...metadataBudgetDiagnostics(document));
       diagnostics.push(...result.diagnostics);
-      diagnostics.push(
-        ...sharedContextMetadataDiagnostics(document, result.metadata),
-      );
+      if (kind) {
+        diagnostics.push(
+          ...assetMetadataDiagnostics(document, result.metadata, kind),
+        );
+      }
+
+      if (!kind) return undefined;
 
       const base = {
         id: result.metadata.id ?? document.artifact.path,
@@ -42,29 +49,22 @@ export function buildCatalog(documents: ParsedDocument[]): {
         metadataListItems: document.metadataListItems,
       };
 
-      if (document.artifact.kind === "skill") {
+      if (kind === "skill") {
         return {
           ...base,
           kind: "skill",
           requiredContext: result.metadata.requiresContext,
           optionalContext: result.metadata.optionalContext,
+          requiredLens: result.metadata.requiresLens ?? [],
+          optionalLens: result.metadata.optionalLens ?? [],
           conflicts: result.metadata.conflicts,
         };
       }
 
-      if (
-        document.artifact.kind === "context" ||
-        document.artifact.kind === "profile" ||
-        document.artifact.kind === "reference" ||
-        document.artifact.kind === "example"
-      ) {
-        return {
-          ...base,
-          kind: document.artifact.kind,
-        };
-      }
-
-      return undefined;
+      return {
+        ...base,
+        kind,
+      };
     })
     .filter((entry): entry is CatalogEntry => entry !== undefined)
     .sort((a, b) => {
@@ -94,6 +94,29 @@ export function buildCatalog(documents: ParsedDocument[]): {
     },
     diagnostics,
   };
+}
+
+function catalogedKind(
+  document: ParsedDocument,
+  metadata: AssetMetadata,
+): CatalogedKind | undefined {
+  if (document.artifact.kind === "skill") return "skill";
+  if (document.artifact.kind === "context_lens") return "context_lens";
+  if (
+    document.artifact.kind === "context" &&
+    metadata.type === "context_lens"
+  ) {
+    return "context_lens";
+  }
+  if (
+    document.artifact.kind === "context" ||
+    document.artifact.kind === "profile" ||
+    document.artifact.kind === "reference" ||
+    document.artifact.kind === "example"
+  ) {
+    return document.artifact.kind;
+  }
+  return undefined;
 }
 
 function metadataBudgetDiagnostics(document: ParsedDocument): Diagnostic[] {
@@ -167,7 +190,7 @@ function dependencyDiagnostics(
 
   for (const dependency of dependencies) {
     if (dependency.to.includes("*")) continue;
-    if (!dependency.to.startsWith("context.")) continue;
+    if (!shouldValidateDependencyTarget(dependency)) continue;
 
     const target = entriesById.get(dependency.to);
     if (!target) {
@@ -199,16 +222,34 @@ function dependencyDiagnostics(
   return diagnostics;
 }
 
+function shouldValidateDependencyTarget(dependency: Dependency): boolean {
+  return (
+    dependency.to.startsWith("context.") || dependency.to.startsWith("lens.")
+  );
+}
+
 function contentHash(content: string): string {
   return `sha256:${createHash("sha256").update(content).digest("hex")}`;
+}
+
+function assetMetadataDiagnostics(
+  document: ParsedDocument,
+  metadata: AssetMetadata,
+  kind: CatalogedKind,
+): Diagnostic[] {
+  if (kind === "context") {
+    return sharedContextMetadataDiagnostics(document, metadata);
+  }
+  if (kind === "context_lens") {
+    return contextLensMetadataDiagnostics(document, metadata);
+  }
+  return [];
 }
 
 function sharedContextMetadataDiagnostics(
   document: ParsedDocument,
   metadata: AssetMetadata,
 ): Diagnostic[] {
-  if (document.artifact.kind !== "context") return [];
-
   const diagnostics: Diagnostic[] = [];
   if (!metadata.id) {
     diagnostics.push({
@@ -226,7 +267,7 @@ function sharedContextMetadataDiagnostics(
     });
   }
 
-  if (isCanonicalSharedContext(metadata) && isActiveContext(metadata)) {
+  if (isCanonicalSharedContext(metadata) && isActiveAsset(metadata)) {
     diagnostics.push(
       ...usageBoundaryDiagnostics(document, metadata),
       ...contextBodyLanguageDiagnostics(document),
@@ -236,11 +277,61 @@ function sharedContextMetadataDiagnostics(
   return diagnostics;
 }
 
+function contextLensMetadataDiagnostics(
+  document: ParsedDocument,
+  metadata: AssetMetadata,
+): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  if (!metadata.id) {
+    diagnostics.push({
+      severity: "warning",
+      path: document.artifact.path,
+      message: "Context lens asset is missing an id.",
+    });
+  }
+
+  if (!metadata.owner) {
+    diagnostics.push({
+      severity: "warning",
+      path: document.artifact.path,
+      message: "Context lens asset is missing an owner.",
+    });
+  }
+
+  if (!isCanonicalContextLens(metadata) || !isActiveAsset(metadata)) {
+    return diagnostics;
+  }
+
+  if (!metadata.purpose) {
+    diagnostics.push({
+      severity: "warning",
+      path: document.artifact.path,
+      message: "Context lens asset is missing purpose metadata.",
+      evidence: missingMetadataEvidence(document, "purpose"),
+    });
+  }
+
+  if ((metadata.appliesTo ?? []).length === 0) {
+    diagnostics.push({
+      severity: "warning",
+      path: document.artifact.path,
+      message: "Context lens asset is missing applies_to metadata.",
+      evidence: missingMetadataEvidence(document, "applies_to"),
+    });
+  }
+
+  return diagnostics;
+}
+
 function isCanonicalSharedContext(metadata: AssetMetadata): boolean {
   return Boolean(metadata.id?.startsWith("context.") && metadata.owner);
 }
 
-function isActiveContext(metadata: AssetMetadata): boolean {
+function isCanonicalContextLens(metadata: AssetMetadata): boolean {
+  return Boolean(metadata.id?.startsWith("lens.") && metadata.owner);
+}
+
+function isActiveAsset(metadata: AssetMetadata): boolean {
   return metadata.status !== "deprecated" && metadata.status !== "archived";
 }
 
@@ -365,9 +456,27 @@ function dependenciesForEntry(entry: CatalogEntry): Dependency[] {
     ),
     ...metadataDependencies(
       entry,
+      "requires",
+      entry.metadata.requiresLens ?? [],
+      "requires_lens",
+    ),
+    ...metadataDependencies(
+      entry,
       "optional",
       entry.metadata.optionalContext,
       "optional_context",
+    ),
+    ...metadataDependencies(
+      entry,
+      "optional",
+      entry.metadata.optionalLens ?? [],
+      "optional_lens",
+    ),
+    ...metadataDependencies(
+      entry,
+      "applies_to",
+      entry.metadata.appliesTo ?? [],
+      "applies_to",
     ),
     ...metadataDependencies(
       entry,
@@ -429,17 +538,19 @@ function metadataEvidence(
 function kindOrder(kind: CatalogEntry["kind"]): number {
   if (kind === "skill") return 0;
   if (kind === "context") return 1;
-  if (kind === "profile") return 2;
-  if (kind === "reference") return 3;
-  return 4;
+  if (kind === "context_lens") return 2;
+  if (kind === "profile") return 3;
+  if (kind === "reference") return 4;
+  return 5;
 }
 
 /** Keep dependency output stable while grouping the most important edges first. */
 function dependencyKindOrder(kind: DependencyKind): number {
   if (kind === "requires") return 0;
   if (kind === "optional") return 1;
-  if (kind === "conflicts") return 2;
-  if (kind === "extends") return 3;
-  if (kind === "references") return 4;
-  return 5;
+  if (kind === "applies_to") return 2;
+  if (kind === "conflicts") return 3;
+  if (kind === "extends") return 4;
+  if (kind === "references") return 5;
+  return 6;
 }

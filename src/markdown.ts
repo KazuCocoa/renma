@@ -92,6 +92,11 @@ const LIST_METADATA_KEYS = new Set([
   "when_not_to_use",
   "requires_context",
   "optional_context",
+  "requires_lens",
+  "optional_lens",
+  "applies_to",
+  "focus",
+  "expected_outputs",
   "conflicts",
   "superseded_by",
 ]);

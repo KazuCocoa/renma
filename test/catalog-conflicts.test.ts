@@ -101,6 +101,8 @@ function skillEntry(requiredContext: string[]): CatalogEntry {
     metadataListItems: {},
     requiredContext,
     optionalContext: [],
+    requiredLens: [],
+    optionalLens: [],
     conflicts: [],
   };
 }

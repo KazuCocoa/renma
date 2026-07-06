@@ -92,6 +92,7 @@ function classify(relativePath: string): ArtifactKind {
   if (relativePath.endsWith("/SKILL.md")) return "skill";
   if (relativePath === "AGENTS.md" || relativePath.startsWith(".agents/"))
     return "agent";
+  if (relativePath.startsWith("lenses/")) return "context_lens";
   if (
     relativePath.startsWith("context/") ||
     relativePath.startsWith("contexts/")

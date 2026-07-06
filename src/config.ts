@@ -22,6 +22,7 @@ export const DEFAULT_CONFIG: ScanConfig = {
     "README.md",
     "context/**/*.md",
     "contexts/**/*.md",
+    "lenses/**/*.md",
     "skills/**/profiles/**/*.md",
     "skills/**/references/**/*.md",
     "skills/**/examples/**/*.md",
