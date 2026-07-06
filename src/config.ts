@@ -226,9 +226,9 @@ function layoutPolicy(value: unknown): ScanConfig["layout"] {
   for (const key of Object.keys(value)) {
     if (!allowed.has(key)) {
       throw new ConfigError(
-        `Unknown layout config key "${key}". Allowed keys: ${[
-          ...allowed,
-        ].join(", ")}.`,
+        `Unknown layout config key "${key}". Allowed keys: ${[...allowed].join(
+          ", ",
+        )}.`,
       );
     }
   }

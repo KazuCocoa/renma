@@ -73,7 +73,11 @@ export function parseAssetMetadata(document: ParsedDocument): {
   assignOptional(metadata, "lastReviewedAt", lastReviewedAt);
   assignOptional(metadata, "reviewCycle", reviewCycle);
   assignOptional(metadata, "expiresAt", expiresAt);
-  assignOptionalList(metadata, "appliesTo", listValue(document.metadata.applies_to));
+  assignOptionalList(
+    metadata,
+    "appliesTo",
+    listValue(document.metadata.applies_to),
+  );
   assignOptionalList(metadata, "focus", listValue(document.metadata.focus));
   assignOptionalList(
     metadata,

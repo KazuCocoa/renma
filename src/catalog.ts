@@ -33,7 +33,9 @@ export function buildCatalog(documents: ParsedDocument[]): {
       diagnostics.push(...metadataBudgetDiagnostics(document));
       diagnostics.push(...result.diagnostics);
       if (kind) {
-        diagnostics.push(...assetMetadataDiagnostics(document, result.metadata, kind));
+        diagnostics.push(
+          ...assetMetadataDiagnostics(document, result.metadata, kind),
+        );
       }
 
       if (!kind) return undefined;
