@@ -250,9 +250,9 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
               ? DIAGNOSTIC_IDS.META_INACTIVE_DEPENDENCY
               : DIAGNOSTIC_IDS.META_CATALOG_DIAGNOSTIC,
       title: missingId
-        ? "Shared context asset is missing an id"
+        ? "Asset is missing an id"
         : missingOwner
-          ? "Shared context asset is missing an owner"
+          ? "Asset is missing an owner"
           : unknownDependency
             ? "Metadata dependency target is unknown"
             : inactiveDependency
@@ -268,7 +268,7 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
         snippet: diagnostic.message,
       },
       whyItMatters:
-        "Catalog metadata is part of the repository governance contract. Missing or malformed metadata makes shared context ownership, lifecycle, and relationships harder to review and validate.",
+        "Catalog metadata is part of the repository governance contract. Missing or malformed metadata makes asset ownership, lifecycle, and relationships harder to review and validate.",
       remediation:
         "Update the asset metadata so catalog construction can identify the asset and its owner.",
       constraints: [
@@ -282,7 +282,7 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
         "Run any project-specific validation checks that apply to this repository.",
       ],
       llmHint:
-        "Add missing governance metadata using the repository's existing frontmatter style, then rerun scan and catalog.",
+        "Add missing asset governance metadata using the repository's existing frontmatter style, then rerun scan and catalog.",
     };
   });
 }

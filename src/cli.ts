@@ -142,8 +142,12 @@ async function runScaffold(
   kindValue: string,
   targetPath?: string,
 ): Promise<number> {
-  if (kindValue !== "skill" && kindValue !== "context") {
-    console.error("scaffold requires kind skill or context.");
+  if (
+    kindValue !== "skill" &&
+    kindValue !== "context" &&
+    kindValue !== "context_lens"
+  ) {
+    console.error("scaffold requires kind skill, context, or context_lens.");
     return 2;
   }
 
@@ -527,6 +531,7 @@ function helpText(): string {
     "  renma graph [path] [options]",
     "  renma scaffold skill <path> [options]",
     "  renma scaffold context <path> [options]",
+    "  renma scaffold context_lens <path> [options]",
     "  renma ownership [path] [options]",
     "  renma readiness [path] [options]",
     "  renma inspect <file> [options]",

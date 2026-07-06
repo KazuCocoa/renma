@@ -56,8 +56,8 @@ These diagnostics are emitted after files are parsed into catalog entries. For s
 | `warning` | `Invalid review_cycle "<duration>". Expected supported ISO 8601 day duration such as P90D.` | Freshness metadata uses a review cycle renma cannot evaluate. | Use a day-based duration such as `P90D` or `P180D`. |
 | `warning` | `Metadata dependency "<to>" from "<from>" does not match a catalog entry.` | A metadata dependency points at an asset renma did not discover. | Correct the reference, add the missing asset, or update include/exclude config. |
 | `warning` | `Metadata dependency "<to>" from "<from>" targets a <status> asset.` | A dependency points at a deprecated or archived catalog target. | Retarget the dependency to a stable replacement or document the migration. |
-| `warning` | `Shared context asset is missing an id.` | A shared context asset has no stable ID. | Add an `id` metadata field. |
-| `warning` | `Shared context asset is missing an owner.` | A shared context asset has no owner metadata. | Add an `owner` metadata field. |
+| `warning` | `Asset is missing an id.` | A cataloged asset has no stable ID. | Add an `id` metadata field. |
+| `warning` | `Asset is missing an owner.` | A cataloged asset has no owner metadata. | Add an `owner` metadata field. |
 | `warning` | `Shared context asset is missing when_to_use metadata.` | An active, owned shared context asset has no positive usage boundary. | Add compact `when_to_use` metadata that states when humans or agents should apply the context. |
 | `warning` | `Shared context asset is missing when_not_to_use metadata.` | An active, owned shared context asset has no negative usage boundary. | Add compact `when_not_to_use` metadata so agents do not over-apply the context. |
 | `warning` | `Shared context asset usage-boundary metadata contains placeholder values in <field>.` | Usage-boundary metadata is present but still says TODO, TBD, unknown, none, or similar. | Replace placeholders with reviewed scope boundaries, or remove the field until it can be completed. |
@@ -147,9 +147,11 @@ forbidden_inputs:
 | `LAYOUT-SKILL-NOT-THIN` | Skill entrypoint is too large or procedural. | `SKILL.md` contains long procedures, setup, or troubleshooting content. | Split detailed material into references, profiles, examples, or tools. |
 | `MAINT-ASSET-REFERENCES-SUPERSEDED-ASSET` | Asset references superseded context. | Metadata or content points at an asset marked superseded. | Retarget the reference to the stable replacement. |
 | `MAINT-ASSET-EXPIRED` | Asset freshness metadata is expired. | `expires_at` is before today's date. | Review the asset with its owner, then update freshness metadata, status, or references. |
+| `MAINT-CONTEXT-LENS-APPLIES-TO-INACTIVE-CONTEXT` | Context lens applies to inactive context. | An active context lens applies to a deprecated or archived context asset. | Point `applies_to` at an active replacement, or update the lens lifecycle after review. |
 | `MAINT-CONTEXT-PATH-NON-SEMANTIC` | Context path is not semantically grouped. | Context is stored under vague folders such as misc or general. | Move it under a meaningful path such as `contexts/tools/`, `contexts/domain/`, or `contexts/testing/`. |
 | `MAINT-ASSET-REVIEW-OVERDUE` | Asset freshness review is overdue. | `last_reviewed_at + review_cycle` is before today's date. | Revalidate the asset with a human owner, then update `last_reviewed_at` or review cadence. |
 | `MAINT-ORPHANED-CONTEXT-ASSET` | Shared context has no incoming references. | A first-class context asset is not used by skills or other assets. | Link it from consumers, archive it, or remove it after review. |
+| `MAINT-ORPHANED-CONTEXT-LENS` | Context lens has no skill references. | An active context lens is not referenced by any skill through `requires_lens` or `optional_lens`. | Link it from a skill, archive it, or leave it staged with reviewed lifecycle metadata. |
 | `MAINT-REFERENCE-DEPRECATED-ASSET` | Reference targets deprecated context. | Metadata dependency resolves to a deprecated asset. | Point dependents at a stable asset or finish the migration. |
 | `MAINT-REPEATED-CODE-BLOCK` | Duplicate code block appears across assets. | Copy-pasted examples or procedures repeat in multiple files. | Extract shared guidance or consolidate the repeated block. |
 | `MAINT-REPEATED-CONTEXT-PATTERN` | Repeated context-like wording appears. | Multiple assets duplicate the same reusable context pattern. | Promote the shared pattern into a context asset and reference it. |
@@ -200,7 +202,7 @@ forbidden_inputs:
 | `META-INVALID-REVIEW-CYCLE` | Freshness review cycle is unsupported. | `review_cycle` is present but is not a supported day duration. | Use a duration such as `P90D` or `P180D`. |
 | `META-INVALID-STATUS` | Metadata status is invalid. | An asset declares an unsupported status value. | Replace it with a supported lifecycle status. |
 | `META-LIST-ITEM-TOO-LONG` | Metadata list item is too long. | A block-list metadata item contains routing prose or detailed conditions. | Keep the item short and move detailed guidance into body sections or referenced context assets. |
-| `META-MISSING-ID` | Metadata is missing an asset ID. | A shared context asset has no stable `id`. | Add an `id` metadata field. |
+| `META-MISSING-ID` | Metadata is missing an asset ID. | A cataloged asset has no stable `id`. | Add an `id` metadata field. |
 | `META-MISSING-OWNER` | Metadata is missing an owner. | An asset has no owner metadata. | Add an `owner` metadata field. |
 | `META-UNKNOWN-DEPENDENCY` | Metadata dependency is unresolved. | A dependency points at an asset renma did not discover. | Correct the dependency, add the missing asset, or update discovery config. |
 | `SEC-BODY-POLICY-CONTRADICTION` | Body text contradicts a security policy. | Asset instructions override or weaken policy expectations. | Align the asset content with the active policy profile. |

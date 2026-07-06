@@ -247,6 +247,11 @@ function catalogDeclaredReferenceGovernanceFindings(
       catalog.dependencies,
       resolver,
     ),
+    ...orphanedContextLensFindings(catalog.entries, resolver),
+    ...contextLensAppliesToInactiveContextFindings(
+      catalog.dependencies,
+      resolver,
+    ),
     ...freshnessGovernanceFindings(catalog.entries),
   ];
 
@@ -437,6 +442,14 @@ function referenceDeprecatedAssetFindings(
   return dependencies.flatMap((dependency) => {
     const target = resolver.resolve(dependency.to);
     if (!target) return [];
+    const source = resolver.resolve(dependency.from);
+    if (
+      dependency.kind === "applies_to" &&
+      source?.kind === "context_lens" &&
+      target.kind === "context"
+    ) {
+      return [];
+    }
     if (
       target.metadata.status !== "deprecated" &&
       target.metadata.status !== "archived"
@@ -473,6 +486,107 @@ function referenceDeprecatedAssetFindings(
           "Confirm active assets do not declare dependencies on deprecated or archived assets unless intentionally documented.",
         ],
         llmHint: `Inspect "${target.sourcePath}" for superseded_by or canonical context metadata. If a canonical replacement exists, update ${dependency.kind} reference "${dependency.to}" declared by "${dependency.from}". If not, decide whether the reference should remain and document why.`,
+      },
+    ];
+  });
+}
+
+function orphanedContextLensFindings(
+  entries: CatalogEntry[],
+  resolver: CatalogReferenceResolver,
+): Finding[] {
+  const referencedLensPaths = new Set<string>();
+
+  for (const entry of entries) {
+    if (entry.kind !== "skill") continue;
+    for (const reference of [...entry.requiredLens, ...entry.optionalLens]) {
+      const target = resolver.resolve(reference);
+      if (target?.kind === "context_lens") {
+        referencedLensPaths.add(target.sourcePath);
+      }
+    }
+  }
+
+  return entries.flatMap((entry) => {
+    if (entry.kind !== "context_lens") return [];
+    if (!isActiveAsset(entry)) return [];
+    if (referencedLensPaths.has(entry.sourcePath)) return [];
+
+    return [
+      {
+        id: DIAGNOSTIC_IDS.MAINT_ORPHANED_CONTEXT_LENS,
+        title: "Context lens is not referenced by any skill",
+        category: "maintenance",
+        severity: "low",
+        confidence: "medium",
+        evidence: metadataFindingEvidence(
+          entry.sourcePath,
+          "Active context lens has no incoming requires_lens or optional_lens references from skills.",
+        ),
+        whyItMatters:
+          "Context lenses are easier to review when a skill declares how the purpose-oriented interpretation is used. An unreferenced active lens may be newly created, intentionally staged, or stale.",
+        remediation:
+          "If the lens should be used, reference it from a skill with requires_lens or optional_lens. If it is not ready or no longer needed, update its lifecycle status after review.",
+        constraints: [
+          "Do not make Renma select runtime lenses.",
+          "Do not rank or retrieve lenses semantically.",
+          "Do not assemble prompts or inject context.",
+          "Treat this as repository governance only.",
+        ],
+        verificationSteps: [
+          "Run renma scan.",
+          "Run renma catalog.",
+          "Run renma graph focused on the lens or owning skill.",
+        ],
+        llmHint: `Search for skills that should declare "${entry.id}" in requires_lens or optional_lens. Do not add runtime selection logic or prompt assembly.`,
+      },
+    ];
+  });
+}
+
+function contextLensAppliesToInactiveContextFindings(
+  dependencies: Dependency[],
+  resolver: CatalogReferenceResolver,
+): Finding[] {
+  return dependencies.flatMap((dependency) => {
+    if (dependency.kind !== "applies_to") return [];
+
+    const source = resolver.resolve(dependency.from);
+    const target = resolver.resolve(dependency.to);
+    if (source?.kind !== "context_lens" || target?.kind !== "context") {
+      return [];
+    }
+    if (!isActiveAsset(source) || isActiveAsset(target)) return [];
+
+    return [
+      {
+        id: DIAGNOSTIC_IDS.MAINT_CONTEXT_LENS_APPLIES_TO_INACTIVE_CONTEXT,
+        title: "Context lens applies to an inactive context asset",
+        category: "maintenance",
+        severity: "low",
+        confidence: "high",
+        evidence:
+          dependency.evidence ??
+          metadataFindingEvidence(
+            dependency.sourcePath,
+            `Context lens applies_to inactive context: ${dependency.to}`,
+          ),
+        whyItMatters:
+          "A lens that interprets deprecated or archived context may keep stale knowledge connected to active skills. The relationship can still be intentional, but it should be easy to review.",
+        remediation:
+          "Point applies_to at the active replacement context when one exists, or mark the lens lifecycle appropriately if it only applies to archived knowledge.",
+        constraints: [
+          "Do not infer a replacement context with an LLM.",
+          "Do not make Renma select runtime lenses.",
+          "Do not assemble prompts or inject context.",
+          "Keep the check deterministic and relationship-based.",
+        ],
+        verificationSteps: [
+          "Run renma scan.",
+          "Run renma catalog.",
+          "Inspect the lens and applied context lifecycle metadata.",
+        ],
+        llmHint: `Inspect "${target.sourcePath}" for superseded_by or replacement guidance. Update the applies_to reference in "${source.sourcePath}" only if a reviewed replacement exists.`,
       },
     ];
   });
@@ -533,6 +647,13 @@ function orphanedContextAssetFindings(
       },
     ];
   });
+}
+
+function isActiveAsset(entry: CatalogEntry): boolean {
+  return (
+    entry.metadata.status !== "deprecated" &&
+    entry.metadata.status !== "archived"
+  );
 }
 
 interface CatalogReferenceResolver {

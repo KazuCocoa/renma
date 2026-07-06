@@ -220,11 +220,12 @@ node dist/index.js readiness .
 node dist/index.js diff . --from main --to HEAD --format markdown
 ```
 
-Author a skill or context asset with `scaffold`:
+Author a skill, context asset, or context lens with `scaffold`:
 
 ```bash
 npx renma scaffold skill skills/testing/spec-review/SKILL.md --id skill.testing.spec-review --title "Spec Review" --owner qa-platform --tags testing,spec-review
 npx renma scaffold context contexts/testing/boundary-value-analysis.md --id context.testing.boundary-value-analysis --title "Boundary Value Analysis" --owner qa-platform --tags testing
+npx renma scaffold context_lens lenses/testing/spec-review-boundary-values.md --id lens.testing.spec-review.boundary-values --title "Spec Review Boundary Values Lens" --owner qa-platform --tags testing,spec-review
 ```
 
 Inspect a focused graph for the new skill:
