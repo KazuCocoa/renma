@@ -6,6 +6,21 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-05
+
+### Added
+
+- Added metadata budget diagnostics for oversized frontmatter and long metadata list items.
+- Added shared context usage-boundary diagnostics for missing or placeholder `when_to_use` and `when_not_to_use` metadata.
+- Added shared context language diagnostics for vague wording, relative currentness wording, and prompt/runtime-selection wording.
+- Added shared context lifecycle diagnostics for deprecated assets, invalid `superseded_by` targets, and supersession cycles.
+- Added context conflict graph diagnostics for invalid `conflicts` metadata and skills that require conflicting contexts.
+
+### Changed
+
+- Simplified security policy frontmatter handling around canonical snake_case metadata keys.
+- Expanded diagnostics documentation for metadata budgets and shared context governance checks.
+
 ## [0.9.0] - 2026-07-03
 
 ### Added
@@ -159,7 +174,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/KazuCocoa/renma/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/KazuCocoa/renma/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/KazuCocoa/renma/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/KazuCocoa/renma/compare/v0.7.0...v0.8.0
