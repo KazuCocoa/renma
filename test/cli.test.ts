@@ -880,7 +880,7 @@ id: skill.testing.spec-review
 owner: qa-platform
 status: experimental
 requires_lens:
-  - lens.testing.spec-review.boundary-values
+  - lenses/testing/spec-review-boundary-values.md
 ---
 # Spec Review
 `,
@@ -916,7 +916,7 @@ optional_lens:
   );
   assert.match(
     result.stdout,
-    /skill\.testing\.spec-review requires_lens -> lens\.testing\.spec-review\.boundary-values/,
+    /skill\.testing\.spec-review requires_lens -> lenses\/testing\/spec-review-boundary-values\.md/,
   );
   assert.match(
     result.stdout,
@@ -930,6 +930,39 @@ optional_lens:
     result.stdout,
     /skill\.testing\.spec-review -> lens\.testing\.spec-review\.boundary-values -> context\.testing\.boundary-value-analysis/,
   );
+
+  const jsonResult = await withCapturedConsole(() =>
+    main(["inspect", lens, "--format", "json"]),
+  );
+  assert.equal(jsonResult.code, 0);
+  const outline = JSON.parse(jsonResult.stdout) as {
+    asset: {
+      inboundDependents: Array<{
+        from: string;
+        kind: string;
+        resolved: boolean;
+        sourcePath: string;
+        targetId?: string;
+        targetKind?: string;
+        targetPath?: string;
+        to: string;
+      }>;
+    } | null;
+  };
+  const pathBasedLensReference = outline.asset?.inboundDependents.find(
+    (relationship) => relationship.from === "skill.testing.spec-review",
+  );
+
+  assert.deepEqual(pathBasedLensReference, {
+    from: "skill.testing.spec-review",
+    kind: "requires_lens",
+    resolved: true,
+    sourcePath: "skills/testing/spec-review/SKILL.md",
+    targetId: "lens.testing.spec-review.boundary-values",
+    targetKind: "context_lens",
+    targetPath: "lenses/testing/spec-review-boundary-values.md",
+    to: "lenses/testing/spec-review-boundary-values.md",
+  });
 });
 
 test("help and invalid commands have expected exit codes", async () => {

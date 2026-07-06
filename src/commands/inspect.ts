@@ -163,16 +163,14 @@ async function inspectAssetForTarget(
     );
     if (!entry) return null;
 
-    const entriesById = new Map(
-      result.catalog.entries.map((candidate) => [candidate.id, candidate]),
-    );
+    const resolver = createInspectRelationshipResolver(result.catalog.entries);
     const inboundDependents = result.catalog.dependencies
-      .filter((dependency) => dependency.to === entry.id)
-      .map((dependency) => inspectRelationship(dependency, entriesById))
+      .filter((dependency) => resolver.matches(dependency.to, entry))
+      .map((dependency) => inspectRelationship(dependency, resolver))
       .sort(compareInspectRelationships);
     const outboundDependencies = result.catalog.dependencies
-      .filter((dependency) => dependency.from === entry.id)
-      .map((dependency) => inspectRelationship(dependency, entriesById))
+      .filter((dependency) => resolver.matches(dependency.from, entry))
+      .map((dependency) => inspectRelationship(dependency, resolver))
       .sort(compareInspectRelationships);
 
     return {
@@ -200,10 +198,10 @@ async function inspectAssetForTarget(
 
 function inspectRelationship(
   dependency: Dependency,
-  entriesById: Map<string, CatalogEntry>,
+  resolver: InspectRelationshipResolver,
 ): InspectRelationship {
-  const source = entriesById.get(dependency.from);
-  const target = entriesById.get(dependency.to);
+  const source = resolver.resolve(dependency.from);
+  const target = resolver.resolve(dependency.to);
 
   return {
     from: dependency.from,
@@ -239,6 +237,53 @@ function inspectRelationshipKind(
   }
 
   return dependency.kind;
+}
+
+interface InspectRelationshipResolver {
+  matches(reference: string, entry: CatalogEntry): boolean;
+  resolve(reference: string): CatalogEntry | undefined;
+}
+
+function createInspectRelationshipResolver(
+  entries: CatalogEntry[],
+): InspectRelationshipResolver {
+  const byId = new Map<string, CatalogEntry>();
+  const byPath = new Map<string, CatalogEntry>();
+
+  for (const entry of entries) {
+    if (!byId.has(entry.id)) byId.set(entry.id, entry);
+    for (const reference of [
+      entry.sourcePath,
+      normalizeReference(entry.sourcePath),
+      `./${entry.sourcePath}`,
+    ]) {
+      const normalized = normalizeReference(reference);
+      if (!byPath.has(normalized)) byPath.set(normalized, entry);
+    }
+  }
+
+  const resolve = (reference: string): CatalogEntry | undefined =>
+    byId.get(reference) ?? byPath.get(normalizeReference(reference));
+
+  return {
+    matches(reference: string, entry: CatalogEntry): boolean {
+      const resolved = resolve(reference);
+      if (!resolved) return false;
+      return sameCatalogEntry(resolved, entry);
+    },
+    resolve,
+  };
+}
+
+function sameCatalogEntry(left: CatalogEntry, right: CatalogEntry): boolean {
+  return (
+    left.id === right.id ||
+    normalizeReference(left.sourcePath) === normalizeReference(right.sourcePath)
+  );
+}
+
+function normalizeReference(reference: string): string {
+  return reference.replace(/\\/g, "/").replace(/^\.\//, "");
 }
 
 function relationshipChains(
