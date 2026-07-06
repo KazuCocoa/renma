@@ -6,6 +6,19 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-05
+
+### Added
+
+- Added experimental `context_lens` assets, including default `lenses/**/*.md` discovery, cataloging, graph edges, and authoring docs.
+- Added `requires_lens`, `optional_lens`, and `applies_to` metadata relationships for static skill-to-lens-to-context graphs.
+- Added `inspect` and `scaffold context_lens` support for lens metadata, relationships, and deterministic starter files.
+- Added context lens diagnostics for missing purpose or `applies_to` metadata, orphaned active lenses, and active lenses that apply to inactive contexts.
+
+### Changed
+
+- Updated docs and examples for the context lens model, including clearer boundaries around runtime selection, prompt assembly, and context injection.
+
 ## [0.10.0] - 2026-07-05
 
 ### Added
@@ -174,7 +187,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/KazuCocoa/renma/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/KazuCocoa/renma/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/KazuCocoa/renma/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/KazuCocoa/renma/compare/v0.8.0...v0.8.1
