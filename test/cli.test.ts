@@ -862,7 +862,7 @@ tags:
   - spec-review
 purpose: spec_review
 applies_to:
-  - context.testing.boundary-value-analysis
+  - contexts/testing/boundary-value-analysis.md
 focus:
   - ambiguity
   - missing boundary
@@ -907,7 +907,7 @@ optional_lens:
   assert.match(result.stdout, /Purpose: spec_review/);
   assert.match(
     result.stdout,
-    /Applies to: context\.testing\.boundary-value-analysis/,
+    /Applies to: contexts\/testing\/boundary-value-analysis\.md/,
   );
   assert.match(result.stdout, /Focus: ambiguity, missing boundary/);
   assert.match(
@@ -924,7 +924,7 @@ optional_lens:
   );
   assert.match(
     result.stdout,
-    /lens\.testing\.spec-review\.boundary-values applies_to -> context\.testing\.boundary-value-analysis/,
+    /lens\.testing\.spec-review\.boundary-values applies_to -> contexts\/testing\/boundary-value-analysis\.md/,
   );
   assert.match(
     result.stdout,
@@ -963,6 +963,22 @@ optional_lens:
     targetPath: "lenses/testing/spec-review-boundary-values.md",
     to: "lenses/testing/spec-review-boundary-values.md",
   });
+
+  const skillResult = await withCapturedConsole(() =>
+    main([
+      "inspect",
+      path.join(root, "skills", "testing", "spec-review", "SKILL.md"),
+      "--format",
+      "text",
+    ]),
+  );
+
+  assert.equal(skillResult.code, 0);
+  assert.match(skillResult.stdout, /Kind: skill/);
+  assert.match(skillResult.stdout, /Relationships:/);
+  assert.doesNotMatch(skillResult.stdout, /Applies to:/);
+  assert.doesNotMatch(skillResult.stdout, /Focus:/);
+  assert.doesNotMatch(skillResult.stdout, /Expected outputs:/);
 });
 
 test("help and invalid commands have expected exit codes", async () => {

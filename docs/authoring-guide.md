@@ -141,7 +141,7 @@ renma scaffold context_lens lenses/testing/spec-review-boundary-values.md \
 
 Inspecting a lens shows its purpose metadata, inbound skill references, outbound `applies_to` dependencies, and the declared `skill -> lens -> context` relationship chain.
 
-The generated skill file is intentionally small. Treat it as a starting point for review, not as a complete skill. Fill in these sections before depending on it:
+For generated skills, the file is intentionally small. Treat it as a starting point for review, not as a complete skill. Fill in these sections before depending on it:
 
 - Purpose: the recurring task, decision, or workflow the skill guides.
 - Required Inputs: the evidence, files, issue links, specs, diffs, or user answers needed before work begins.

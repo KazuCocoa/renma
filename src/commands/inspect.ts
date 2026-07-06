@@ -304,7 +304,7 @@ function relationshipChains(
 
   return skillDependents.flatMap((dependent) =>
     appliedContexts.map((dependency) => ({
-      context: dependency.to,
+      context: dependency.targetId ?? dependency.to,
       lens: entry.id,
       skill: dependent.from,
     })),
@@ -463,10 +463,14 @@ function renderAssetSummary(asset: InspectAssetSummary): string[] {
     ...(asset.owner ? [`- Owner: ${asset.owner}`] : []),
     ...(asset.status ? [`- Status: ${asset.status}`] : []),
     `- Tags: ${list(asset.tags)}`,
-    ...(asset.purpose ? [`- Purpose: ${asset.purpose}`] : []),
-    `- Applies to: ${list(asset.appliesTo)}`,
-    `- Focus: ${list(asset.focus)}`,
-    `- Expected outputs: ${list(asset.expectedOutputs)}`,
+    ...(asset.kind === "context_lens"
+      ? [
+          ...(asset.purpose ? [`- Purpose: ${asset.purpose}`] : []),
+          `- Applies to: ${list(asset.appliesTo)}`,
+          `- Focus: ${list(asset.focus)}`,
+          `- Expected outputs: ${list(asset.expectedOutputs)}`,
+        ]
+      : []),
     "",
     "Relationships:",
     "- Inbound dependents:",
