@@ -70,6 +70,8 @@ Supported experimental lens fields:
 - `focus`: compact review focus terms.
 - `expected_outputs`: compact output expectations.
 
+`context_lens` is the only supported `type` value today. Other `type` strings may parse as raw metadata, but Renma does not assign them catalog meaning.
+
 ## Skill metadata
 
 A skill can declare static lens relationships:

@@ -57,6 +57,7 @@ Use these fields consistently:
 - `owner`: real owning team or maintainer. Avoid placeholder ownership in shared assets.
 - `status`: lifecycle only: `experimental`, `stable`, `deprecated`, or `archived`.
 - `version`: optional asset metadata. It is not the npm package version.
+- `type`: optional discriminator. Currently only `context_lens` has defined catalog meaning, and only for context files.
 - `tags`: searchable labels that help navigation, ownership review, and reporting.
 - `when_to_use` and `when_not_to_use`: scope guidance for humans and agents.
 - `requires_context` and `optional_context`: static graph relationships to other assets. They do not make renma select runtime context.
