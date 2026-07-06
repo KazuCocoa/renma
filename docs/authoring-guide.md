@@ -1,6 +1,6 @@
 # Renma Authoring Guide
 
-Use this guide when creating or refining Renma skills and context assets. For CLI command syntax, see the [User Manual](user-manual.md). For security-sensitive skills or context assets, read the [Security Policy Guide](security-policy.md). For finding details, use the [Diagnostics Reference](diagnostics.md). For shared-context wording guidance, see [Context Language Diagnostics](context-language-diagnostics.md).
+Use this guide when creating or refining Renma skills and context assets. For CLI command syntax, see the [User Manual](user-manual.md). For experimental context lens assets, see [Context Lens Assets](context-lens.md). For security-sensitive skills or context assets, read the [Security Policy Guide](security-policy.md). For finding details, use the [Diagnostics Reference](diagnostics.md). For shared-context wording guidance, see [Context Language Diagnostics](context-language-diagnostics.md).
 
 Renma is a tool-assisted authoring and verification layer. It emits deterministic repository evidence that humans and external LLM tools can use, but Renma does not call an LLM, choose runtime context, assemble prompts, inject context into agents, execute agent workflows, or own runtime telemetry.
 
@@ -60,10 +60,15 @@ Use these fields consistently:
 - `tags`: searchable labels that help navigation, ownership review, and reporting.
 - `when_to_use` and `when_not_to_use`: scope guidance for humans and agents.
 - `requires_context` and `optional_context`: static graph relationships to other assets. They do not make renma select runtime context.
+- `requires_lens` and `optional_lens`: experimental static graph relationships from a skill to context lens assets.
+- `applies_to`: experimental static graph relationship from a context lens to the context assets it interprets.
+- `focus` and `expected_outputs`: compact experimental lens metadata for catalog review.
 - `conflicts`: assets that should not be used together without review.
 - `superseded_by`: replacement or migration relationships for deprecated or archived content.
 
-The supported list-style metadata fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `conflicts`, and `superseded_by`.
+The supported list-style metadata fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `requires_lens`, `optional_lens`, `applies_to`, `focus`, `expected_outputs`, `conflicts`, and `superseded_by`.
+
+Lens fields are graph and catalog metadata. They do not make Renma select runtime lenses, rank context, assemble prompts, or inject context into agents.
 
 Keep `when_to_use` and `when_not_to_use` compact. They are routing boundaries for catalog and graph review, not full procedures. Put detailed explanation, examples, caveats, and rationale in the Markdown body or referenced context assets.
 

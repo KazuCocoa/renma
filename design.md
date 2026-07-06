@@ -20,6 +20,7 @@ what context an agent should load at task time.
 
 ```text
 Skill = agent-facing entrypoint / routing contract / usage guide
+Context Lens = purpose-oriented interpretation layer over context assets
 Context = independently owned source-of-truth knowledge asset
 ```
 
@@ -30,6 +31,10 @@ verification expectations.
 Context assets hold reusable expertise. They should be maintainable outside a
 single skill, owned by the right team, versioned, reviewed, and reused across
 skills, agents, tools, and future agent runtimes.
+
+Context lenses describe how one or more context assets should be interpreted for
+a purpose. They are repository governance metadata, not runtime lens selection
+or prompt assembly.
 
 ## Product Boundary
 
@@ -167,6 +172,10 @@ contexts/
       payment-api-contracts.md
       known-risk-patterns.md
 
+lenses/
+  testing/
+    spec-review-boundary-values.md
+
 metadata/
 graph/
 catalog/
@@ -174,7 +183,8 @@ catalog/
 
 `contexts/` is preferred for shared context assets. `context/` remains supported
 as a compatibility alias. Files under either root are classified as the
-`context` artifact kind, not as `reference`.
+`context` artifact kind, not as `reference`. Experimental `context_lens` assets
+can live under `lenses/`, or context files can opt in with `type: context_lens`.
 
 Skill-local `profiles/`, `references/`, and `examples/` remain supported. They
 are useful for local routing variants, nearby examples, and skill-specific
@@ -192,6 +202,7 @@ Renma normalizes scanned files into asset kinds:
 - `skill`: LLM-facing entrypoint, routing contract, and usage guide
 - `context`: shared source-of-truth knowledge asset under `contexts/` or
   `context/`
+- `context_lens`: purpose-oriented interpretation layer over context assets
 - `profile`: skill-local overlay or variant
 - `reference`: skill-local supporting material
 - `example`: skill-local example or fixture text
@@ -275,6 +286,7 @@ Dependencies are typed relationships between assets:
 
 - `requires`: the target asset is needed for the source asset to be complete
 - `optional`: useful context that is not always required
+- `applies_to`: context asset interpreted by a context lens
 - `conflicts`: assets that should not both be active without human review
 - `extends`: overlay or profile relationship
 - `references`: declared static relationship from a skill or support asset toward a context asset or local file

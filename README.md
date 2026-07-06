@@ -47,6 +47,9 @@ Tools
 Skills
   agent-facing entrypoints that route an agent toward a task
 
+Context Lenses
+  purpose-oriented interpretation layers over context assets
+
 Context Assets
   Shared domain, product, testing, platform, and tool knowledge
 
@@ -57,7 +60,7 @@ Repository
   Git-reviewed source of truth for agent-consumable knowledge
 ```
 
-Tools decide what to do at runtime. Skills tell an agent when and how to use a capability. Context assets hold reusable knowledge. Renma catalogs and validates the layer underneath so tools and agents are not guessing from stale, orphaned, duplicated, or unowned files.
+Tools decide what to do at runtime. Skills tell an agent when and how to use a capability. Context lenses describe purpose-oriented interpretation over reusable knowledge. Context assets hold that reusable knowledge. Renma catalogs and validates the layer underneath so tools and agents are not guessing from stale, orphaned, duplicated, or unowned files.
 
 ## How Renma Relates to RAG and Agent Memory
 
@@ -119,9 +122,13 @@ contexts/
     checkout/
       payment-api-contracts.md
       known-risk-patterns.md
+
+lenses/
+  testing/
+    spec-review-boundary-values.md
 ```
 
-`contexts/` is preferred. `context/` is also scanned for compatibility. Files under either root are cataloged as first-class `context` assets, while skill-local `references/` remain supported as `reference` assets.
+`contexts/` is preferred. `context/` is also scanned for compatibility. Files under either root are cataloged as first-class `context` assets, while experimental `context_lens` assets live under `lenses/` or opt in from context files with `type: context_lens`. Skill-local `references/` remain supported as `reference` assets.
 
 ## What Renma Does Today
 
@@ -300,10 +307,11 @@ AGENTS.md
 README.md
 context/**/*.md
 contexts/**/*.md
+lenses/**/*.md
 tools/**/*
 ```
 
-Renma can still discover legacy skill-local support files for compatibility, but canonical reusable knowledge belongs in `contexts/` and helper implementations belong in `tools/`. Shared knowledge that is reused across skills should usually move into `contexts/` so it can have its own owner, lifecycle, dependencies, and review history.
+Renma can still discover legacy skill-local support files for compatibility, but canonical reusable knowledge belongs in `contexts/`, experimental interpretation layers belong in `lenses/`, and helper implementations belong in `tools/`. Shared knowledge that is reused across skills should usually move into `contexts/` so it can have its own owner, lifecycle, dependencies, and review history.
 
 ## Configuration
 

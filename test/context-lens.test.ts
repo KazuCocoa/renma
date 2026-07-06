@@ -125,6 +125,30 @@ applies_to:
   assert.equal(catalog.entries[0]?.id, "lens.testing.spec-review");
 });
 
+test("buildCatalog keeps skill files as skills when type is context_lens", () => {
+  const { catalog } = buildCatalog([
+    parseDocument(
+      artifact(
+        "skills/testing/spec-review/SKILL.md",
+        "skill",
+        `---
+id: skill.testing.spec-review
+type: context_lens
+owner: qa-platform
+status: experimental
+requires_lens:
+  - lens.testing.spec-review
+---
+# Spec Review
+`,
+      ),
+    ),
+  ]);
+
+  assert.equal(catalog.entries[0]?.kind, "skill");
+  assert.equal(catalog.entries[0]?.id, "skill.testing.spec-review");
+});
+
 test("buildCatalog creates skill to lens dependency edges", () => {
   const { catalog } = buildCatalog([
     parseDocument(

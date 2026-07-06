@@ -100,9 +100,11 @@ function catalogedKind(
   document: ParsedDocument,
   metadata: AssetMetadata,
 ): CatalogedKind | undefined {
-  if (metadata.type === "context_lens") return "context_lens";
   if (document.artifact.kind === "skill") return "skill";
   if (document.artifact.kind === "context_lens") return "context_lens";
+  if (document.artifact.kind === "context" && metadata.type === "context_lens") {
+    return "context_lens";
+  }
   if (
     document.artifact.kind === "context" ||
     document.artifact.kind === "profile" ||

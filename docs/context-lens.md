@@ -64,7 +64,7 @@ expected_outputs:
 
 Supported experimental lens fields:
 
-- `type: context_lens`: identifies a lens when the file is not under `lenses/`.
+- `type: context_lens`: identifies a lens for files under `context/` or `contexts/`.
 - `purpose`: short purpose label such as `spec_review`, `test_design`, or `failure_analysis`.
 - `applies_to`: context asset IDs this lens interprets.
 - `focus`: compact review focus terms.
@@ -111,7 +111,7 @@ Initial support is intentionally small:
 
 - `context_lens` assets are cataloged.
 - `lenses/**/*.md` is scanned by default.
-- `type: context_lens` can classify a Markdown asset as a lens.
+- `type: context_lens` can classify a context asset as a lens.
 - `applies_to`, `requires_lens`, and `optional_lens` create graph edges.
 - missing lens `purpose` or `applies_to` metadata is reported for active canonical lenses.
 - missing referenced lens or context IDs are reported through deterministic dependency diagnostics.
