@@ -437,7 +437,7 @@ renma readiness --format markdown
 
 Focused graph views are inspection tools; they do not choose, inject, or load runtime context for an agent.
 
-Follow-up issue / PR plan: improve graph readability for context lenses.
+Implemented in 0.11.1: graph readability for context lenses.
 
 Problem:
 
@@ -458,18 +458,17 @@ skill -> lens -> context
 context -> optional_context
 ```
 
-Goal:
+Implemented behavior:
 
-Add a visualization-only graph view that makes the lens-mediated path readable
-without changing catalog semantics or adding runtime behavior. Candidate CLI
-interfaces:
+Renma includes a visualization-only graph view that makes the lens-mediated path
+readable without changing catalog semantics or adding runtime behavior.
 
 ```bash
 renma graph . --view layered
 renma graph . --view lens
 ```
 
-Recommended behavior:
+Behavior:
 
 - Group or rank nodes by asset kind: skills, context lenses, contexts, and then
   references / examples / profiles / tools.

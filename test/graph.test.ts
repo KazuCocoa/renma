@@ -188,6 +188,28 @@ test("graph mermaid output includes nodes and resolved edges", async () => {
   );
 });
 
+test("graph mermaid default view remains unlayered", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    requiresContext: ["testing.boundary"],
+  });
+  await writeContext(root, "testing", "boundary", { owner: "qa" });
+
+  const mermaid = formatGraphMermaid(await graph(root));
+
+  assert.equal(
+    mermaid,
+    [
+      "graph TD",
+      '  node_0["contexts/testing/* (1)"]',
+      '  node_1["skill: demo"]',
+      "  node_1 -->|requires| node_0",
+      "",
+    ].join("\n"),
+  );
+  assert.doesNotMatch(mermaid, /subgraph/);
+});
+
 test("graph mermaid output creates synthetic missing nodes for unresolved edges", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", {
@@ -258,6 +280,28 @@ test("graph mermaid output escapes labels and keeps diagnostics as comments", ()
   assert.match(mermaid, /node_0\["context: quote-\\"node\\" next"\]/);
   assert.match(mermaid, /%% Diagnostics:/);
   assert.match(mermaid, /%% warning: contexts\/quote\.md: Line one Line two/);
+});
+
+test("graph layered mermaid groups nodes by asset kind", async () => {
+  const root = await fixture();
+  await writeSkill(root, "setup", {
+    requiresContext: ["contexts/setup/routing.md"],
+    requiresLens: ["lens.setup.diagnosis"],
+  });
+  await writeContextLens(root, "setup", "diagnosis", {
+    id: "lens.setup.diagnosis",
+    appliesTo: ["contexts/setup/routing.md"],
+  });
+  await writeMarkdownAsset(root, "contexts/setup/routing.md", "setup.routing");
+
+  const mermaid = formatGraphMermaid(await graph(root), "layered");
+
+  assert.match(mermaid, /subgraph Skills\["Skills"\]/);
+  assert.match(mermaid, /subgraph Context_Lenses\["Context Lenses"\]/);
+  assert.match(mermaid, /subgraph Contexts\["Contexts"\]/);
+  assert.match(mermaid, /skill: setup/);
+  assert.match(mermaid, /lens: lens\.setup\.diagnosis/);
+  assert.match(mermaid, /context: setup\.routing/);
 });
 
 test("graph full view preserves individual node and edge detail", async () => {
@@ -332,6 +376,17 @@ test("graph CLI supports summary view", async () => {
   assert.doesNotMatch(result.stdout, /http-health\.md/);
 });
 
+test("graph CLI supports layered lens view alias", async () => {
+  const root = await graphViewFixture();
+
+  const result = await withCapturedConsole(() =>
+    main(["graph", root, "--format", "mermaid", "--view", "lens"]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /subgraph Skills\["Skills"\]/);
+});
+
 test("graph CLI rejects unsupported format", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", {});
@@ -360,7 +415,69 @@ test("graph CLI rejects unsupported view", async () => {
   assert.equal(result.stdout, "");
   assert.match(
     result.stderr,
-    /--view must be one of: summary, workflow, full\./,
+    /--view must be one of: summary, workflow, full, layered, lens\./,
+  );
+});
+
+test("graph layered mermaid shows skill lens context paths", async () => {
+  const root = await appiumLensFixture();
+
+  const mermaid = formatGraphMermaid(await graph(root), "layered");
+  const skill = mermaidNodeId(mermaid, "skill: skill.tools.appium.setup");
+  const lens = mermaidNodeId(
+    mermaid,
+    "lens: lens.tools.appium.setup-diagnosis",
+  );
+  const context = mermaidNodeId(
+    mermaid,
+    "context: context.tools.appium.setup.routing",
+  );
+
+  assert.match(mermaid, /subgraph Skills\["Skills"\]/);
+  assert.match(mermaid, /subgraph Context_Lenses\["Context Lenses"\]/);
+  assert.match(mermaid, /subgraph Contexts\["Contexts"\]/);
+  assert.match(mermaid, new RegExp(`${skill} -->\\|requires_lens\\| ${lens}`));
+  assert.match(mermaid, new RegExp(`${lens} -->\\|applies_to\\| ${context}`));
+  assert.match(
+    mermaid,
+    new RegExp(`${skill} -->\\|requires_context\\| ${context}`),
+  );
+});
+
+test("focused layered lens graph includes inbound skills and applied contexts", async () => {
+  const root = await appiumLensFixture();
+
+  const result = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--focus",
+      "lens.tools.appium.setup-diagnosis",
+      "--view",
+      "layered",
+      "--format",
+      "mermaid",
+    ]),
+  );
+
+  assert.equal(result.code, 0);
+  const skill = mermaidNodeId(result.stdout, "skill: skill.tools.appium.setup");
+  const lens = mermaidNodeId(
+    result.stdout,
+    "lens: lens.tools.appium.setup-diagnosis",
+  );
+  const context = mermaidNodeId(
+    result.stdout,
+    "context: context.tools.appium.setup.routing",
+  );
+
+  assert.match(
+    result.stdout,
+    new RegExp(`${skill} -->\\|requires_lens\\| ${lens}`),
+  );
+  assert.match(
+    result.stdout,
+    new RegExp(`${lens} -->\\|applies_to\\| ${context}`),
   );
 });
 
@@ -409,6 +526,27 @@ async function graphViewFixture(): Promise<string> {
     path.join(root, "tools", "setup", "scripts", "check-node-env.mjs"),
     "console.log('ok');\n",
   );
+  return root;
+}
+
+async function appiumLensFixture(): Promise<string> {
+  const root = await fixture();
+  await writeSkill(root, "setup", {
+    id: "skill.tools.appium.setup",
+    owner: "platform",
+    requiresContext: ["contexts/tools/appium/setup/routing.md"],
+    requiresLens: ["lens.tools.appium.setup-diagnosis"],
+    optionalLens: ["lens.tools.appium.driver-selection"],
+  });
+  await writeMarkdownAsset(
+    root,
+    "contexts/tools/appium/setup/routing.md",
+    "context.tools.appium.setup.routing",
+  );
+  await writeContextLens(root, "tools/appium", "setup-diagnosis", {
+    id: "lens.tools.appium.setup-diagnosis",
+    appliesTo: ["contexts/tools/appium/setup/routing.md"],
+  });
   return root;
 }
 
@@ -495,10 +633,13 @@ async function writeSkill(
   root: string,
   id: string,
   metadata: {
+    id?: string;
     owner?: string;
     status?: string;
     tags?: string[];
     requiresContext?: string[];
+    requiresLens?: string[];
+    optionalLens?: string[];
   },
 ): Promise<void> {
   await mkdir(path.join(root, "skills", id), { recursive: true });
@@ -529,28 +670,80 @@ async function writeContext(
   );
 }
 
+async function writeContextLens(
+  root: string,
+  group: string,
+  name: string,
+  metadata: {
+    id: string;
+    owner?: string;
+    status?: string;
+    tags?: string[];
+    appliesTo: string[];
+  },
+): Promise<void> {
+  await mkdir(path.join(root, "lenses", group), { recursive: true });
+  await writeFile(
+    path.join(root, "lenses", group, `${name}.md`),
+    markdown({
+      ...metadata,
+      type: "context_lens",
+      purpose: "Make setup context easier to review.",
+      title: `# ${metadata.id}`,
+    }),
+  );
+}
+
 function markdown(metadata: {
   id: string;
+  type?: string;
   owner?: string;
   status?: string;
+  purpose?: string;
   tags?: string[];
   requiresContext?: string[];
+  requiresLens?: string[];
+  optionalLens?: string[];
+  appliesTo?: string[];
   title: string;
 }): string {
   return [
     "---",
     `id: ${metadata.id}`,
+    ...(metadata.type ? [`type: ${metadata.type}`] : []),
     ...(metadata.owner ? [`owner: ${metadata.owner}`] : []),
     ...(metadata.status ? [`status: ${metadata.status}`] : []),
+    ...(metadata.purpose ? [`purpose: ${metadata.purpose}`] : []),
     ...(metadata.tags ? [`tags: ${metadata.tags.join(", ")}`] : []),
     ...(metadata.requiresContext
       ? [`requires_context: ${metadata.requiresContext.join(", ")}`]
+      : []),
+    ...(metadata.requiresLens
+      ? [`requires_lens: ${metadata.requiresLens.join(", ")}`]
+      : []),
+    ...(metadata.optionalLens
+      ? [`optional_lens: ${metadata.optionalLens.join(", ")}`]
+      : []),
+    ...(metadata.appliesTo
+      ? [`applies_to: ${metadata.appliesTo.join(", ")}`]
       : []),
     "---",
     metadata.title,
     "Use for graph report tests.",
     "",
   ].join("\n");
+}
+
+function mermaidNodeId(mermaid: string, label: string): string {
+  const match = mermaid.match(
+    new RegExp(`(node_\\d+)\\["${escapeRegExp(label)}"\\]`),
+  );
+  assert.ok(match, `Expected Mermaid node with label ${label}`);
+  return match[1] as string;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function withCapturedConsole(

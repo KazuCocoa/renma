@@ -6,6 +6,17 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-07-06
+
+### Added
+
+- Added `renma graph --view layered` for Mermaid graph output that groups skills, context lenses, contexts, support assets, and unresolved targets into readable layers.
+- Added `renma graph --view lens` as an alias for the layered context-lens graph view.
+
+### Changed
+
+- Focused graph output for context lenses now clearly preserves inbound skill lens references and outbound `applies_to` context edges in the layered view.
+
 ## [0.11.0] - 2026-07-05
 
 ### Added

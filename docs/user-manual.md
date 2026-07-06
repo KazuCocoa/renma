@@ -133,6 +133,7 @@ Prints the relationship graph between assets.
 renma graph . --view summary
 renma graph . --view workflow --format markdown
 renma graph . --view full --format mermaid
+renma graph . --view layered --format mermaid
 ```
 
 Views are:
@@ -140,6 +141,9 @@ Views are:
 - `summary`: compact graph overview.
 - `workflow`: workflow-oriented relationships.
 - `full`: all known graph edges.
+- `layered`: Mermaid-focused graph grouped by asset kind so skill-to-lens-to-context paths are easier to read. `lens` is accepted as an alias.
+
+Layered Mermaid output groups skills, context lenses, contexts, support assets, and unresolved targets into separate subgraphs. JSON and Markdown keep the same node and edge detail while reporting the selected view.
 
 #### Focusing The Graph
 

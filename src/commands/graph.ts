@@ -12,7 +12,7 @@ import type {
 import type { Diagnostic } from "../types.js";
 
 export type GraphFormat = "json" | "markdown" | "mermaid";
-export type GraphView = "summary" | "workflow" | "full";
+export type GraphView = "summary" | "workflow" | "full" | "layered";
 
 export interface GraphReport {
   root: string;
@@ -150,6 +150,8 @@ export function formatGraphMermaid(
   view: GraphView = "summary",
 ): string {
   report = graphViewReport(report, view);
+  if (view === "layered") return formatLayeredGraphMermaid(report);
+
   const nodeIds = new Map<string, string>();
   const missingIds = new Map<string, string>();
   const lines = ["graph TD"];
@@ -187,6 +189,75 @@ export function formatGraphMermaid(
     if (missing) {
       lines.push(
         `  ${source} -.->|${escapeMermaidLabel(`${edge.kind} unresolved`)}| ${missing}`,
+      );
+    }
+  }
+
+  if (report.diagnostics && report.diagnostics.length > 0) {
+    lines.push("  %% Diagnostics:");
+    for (const diagnostic of report.diagnostics) {
+      const path = diagnostic.path ? `${diagnostic.path}: ` : "";
+      lines.push(
+        `  %% ${singleLine(`${diagnostic.severity}: ${path}${diagnostic.message}`)}`,
+      );
+    }
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+function formatLayeredGraphMermaid(report: GraphReport): string {
+  const nodeIds = new Map<string, string>();
+  const missingIds = new Map<string, string>();
+  const nodesById = new Map(report.nodes.map((node) => [node.id, node]));
+  const lines = ["graph TD"];
+
+  report.nodes.forEach((node, index) => {
+    nodeIds.set(node.id, `node_${index}`);
+  });
+
+  for (const edge of report.edges) {
+    if (edge.resolved) continue;
+    if (!missingIds.has(edge.to)) {
+      missingIds.set(edge.to, `missing_${missingIds.size}`);
+    }
+  }
+
+  for (const layer of graphLayers) {
+    const nodes = report.nodes.filter((node) => nodeLayerId(node) === layer.id);
+    const missing = layer.id === "Unresolved" ? [...missingIds.entries()] : [];
+    if (nodes.length === 0 && missing.length === 0) continue;
+
+    lines.push(`  subgraph ${layer.id}["${layer.label}"]`);
+    for (const node of nodes) {
+      lines.push(
+        `    ${nodeIds.get(node.id)}["${escapeMermaidLabel(layeredNodeLabel(node))}"]`,
+      );
+    }
+    for (const [target, id] of missing) {
+      lines.push(`    ${id}["${escapeMermaidLabel(`missing: ${target}`)}"]`);
+    }
+    lines.push("  end");
+  }
+
+  for (const edge of report.edges) {
+    const source = nodeIds.get(edge.from);
+    if (!source) continue;
+
+    if (edge.resolved && edge.targetId) {
+      const target = nodeIds.get(edge.targetId);
+      if (target) {
+        lines.push(
+          `  ${source} -->|${escapeMermaidLabel(layeredEdgeLabel(edge, nodesById))}| ${target}`,
+        );
+      }
+      continue;
+    }
+
+    const missing = missingIds.get(edge.to);
+    if (missing) {
+      lines.push(
+        `  ${source} -.->|${escapeMermaidLabel(`${layeredEdgeLabel(edge, nodesById)} unresolved`)}| ${missing}`,
       );
     }
   }
@@ -288,7 +359,7 @@ function defaultGraphView(format: GraphFormat): GraphView {
 
 function graphViewReport(report: GraphReport, view: GraphView): GraphReport {
   if (report.view === view) return report;
-  if (view === "full") return { ...report, view };
+  if (view === "full" || view === "layered") return { ...report, view };
 
   const nodeMap = new Map<string, GraphNode>();
   const groupMembers = new Map<string, Set<string>>();
@@ -376,6 +447,82 @@ function projectedNode(node: GraphNode, view: GraphView): GraphNode {
     tags: [],
     groupedCount: 0,
   };
+}
+
+const graphLayers = [
+  { id: "Skills", label: "Skills" },
+  { id: "Context_Lenses", label: "Context Lenses" },
+  { id: "Contexts", label: "Contexts" },
+  { id: "Support_Assets", label: "Support Assets" },
+  { id: "Unresolved", label: "Unresolved" },
+] as const;
+
+type GraphLayerId = (typeof graphLayers)[number]["id"];
+
+function nodeLayerId(node: GraphNode): GraphLayerId {
+  if (node.kind === "skill") return "Skills";
+  if (node.kind === "context_lens") return "Context_Lenses";
+  if (node.kind === "context") return "Contexts";
+  return "Support_Assets";
+}
+
+function layeredNodeLabel(node: GraphNode): string {
+  const kind =
+    node.kind === "context_lens"
+      ? "lens"
+      : node.kind === "context"
+        ? "context"
+        : node.kind;
+  const status = node.status ? ` (${node.status})` : "";
+  return `${kind}: ${node.id}${status}`;
+}
+
+function layeredEdgeLabel(
+  edge: GraphEdge,
+  nodesById: Map<string, GraphNode>,
+): string {
+  const sourceKind = nodesById.get(edge.from)?.kind;
+  if (sourceKind !== "skill") return edge.kind;
+
+  if (edge.kind === "requires") {
+    if (edgeTargetsKind(edge, nodesById, "context_lens")) {
+      return "requires_lens";
+    }
+    if (edgeTargetsKind(edge, nodesById, "context")) {
+      return "requires_context";
+    }
+  }
+
+  if (edge.kind === "optional") {
+    if (edgeTargetsKind(edge, nodesById, "context_lens")) {
+      return "optional_lens";
+    }
+    if (edgeTargetsKind(edge, nodesById, "context")) {
+      return "optional_context";
+    }
+  }
+
+  return edge.kind;
+}
+
+function edgeTargetsKind(
+  edge: GraphEdge,
+  nodesById: Map<string, GraphNode>,
+  kind: AssetKind,
+): boolean {
+  const targetKind =
+    edge.targetKind ??
+    (edge.targetId ? nodesById.get(edge.targetId)?.kind : undefined);
+  if (targetKind === kind) return true;
+
+  const target = normalizeReference(edge.to);
+  if (kind === "context_lens") {
+    return target.startsWith("lens.") || target.startsWith("lenses/");
+  }
+  if (kind === "context") {
+    return target.startsWith("context/") || target.startsWith("contexts/");
+  }
+  return false;
 }
 
 function groupPath(sourcePath: string, view: GraphView): string | undefined {
