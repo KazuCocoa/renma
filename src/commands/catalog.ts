@@ -58,7 +58,11 @@ export async function catalog(
     scannedFileCount: artifacts.length,
     catalog: built.catalog,
     contextLens: contextLens.summary,
-    diagnostics: [...diagnostics, ...built.diagnostics],
+    diagnostics: [
+      ...diagnostics,
+      ...built.diagnostics,
+      ...contextLens.diagnostics,
+    ],
   };
 }
 

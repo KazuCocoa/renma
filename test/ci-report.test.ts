@@ -9,8 +9,10 @@ import {
   ciReport,
   determineCiReportStatus,
   formatCiReport,
+  runCiReportCommand,
   type CiReport,
 } from "../src/commands/ci-report.js";
+import { zeroContextLensSummary } from "../src/context-lens.js";
 import { scan } from "../src/scanner.js";
 import {
   summarizeSecurityPosture,
@@ -353,6 +355,23 @@ test("ci report policy inventory counts do not change CI status", () => {
   assert.equal(determineCiReportStatus(report), "pass");
 });
 
+test("ci report policy fails blocking Context Lens diagnostics", () => {
+  const report = policyDiffReport({});
+  report.to.contextLens = {
+    ...zeroContextLensSummary(),
+    detected: true,
+    totalLensCount: 1,
+    invalidLensCount: 1,
+    diagnosticCounts: {
+      error: 1,
+      warning: 0,
+      info: 0,
+    },
+  };
+
+  assert.equal(determineCiReportStatus(report), "fail");
+});
+
 test("ci report omits suppressed high findings introduced between git refs", async () => {
   const repo = await createSuppressedFindingRepo();
   try {
@@ -375,6 +394,35 @@ test("ci report omits suppressed high findings introduced between git refs", asy
     assert.notEqual(report.status, "fail");
     assert.doesNotMatch(markdown, /SEC-LITERAL-SECRET/);
     assert.doesNotMatch(json, /SEC-LITERAL-SECRET/);
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
+test("ci report fails when target ref has blocking Context Lens diagnostics", async () => {
+  const repo = await createContextLensDiagnosticRepo();
+  try {
+    const report = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+    const json = JSON.parse(formatCiReport(report, "json")) as CiReport;
+    const command = await withCapturedStdout(() =>
+      runCiReportCommand(repo, {
+        fromRef: "base",
+        toRef: "HEAD",
+        format: "json",
+      }),
+    );
+    const commandJson = JSON.parse(command.stdout) as CiReport;
+
+    assert.equal(report.status, "fail");
+    assert.equal(command.code, 1);
+    assert.equal(json.to.contextLens?.invalidLensCount, 1);
+    assert.equal(json.to.contextLens?.diagnosticCounts.error, 1);
+    assert.equal(commandJson.to.contextLens?.diagnosticCounts.error, 1);
+    assert.ok(
+      report.notes.includes(
+        "Review blocking Context Lens diagnostics before merge.",
+      ),
+    );
   } finally {
     await rm(repo, { force: true, recursive: true });
   }
@@ -636,6 +684,22 @@ async function createSuppressedFindingRepo(): Promise<string> {
   return repo;
 }
 
+async function createContextLensDiagnosticRepo(): Promise<string> {
+  const repo = await mkdtemp(join(tmpdir(), "renma-ci-context-lens-"));
+  await git(repo, ["init", "-b", "main"]);
+  await git(repo, ["config", "user.email", "renma@example.test"]);
+  await git(repo, ["config", "user.name", "Renma Test"]);
+  await writeContext(repo);
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "base"]);
+  await git(repo, ["tag", "base"]);
+
+  await writeInvalidContextLens(repo);
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "head"]);
+  return repo;
+}
+
 async function writeSkill(repo: string, extraBody: string): Promise<void> {
   const directory = join(repo, "skills", "demo");
   await mkdir(directory, { recursive: true });
@@ -683,7 +747,74 @@ async function writeSkill(repo: string, extraBody: string): Promise<void> {
   );
 }
 
+async function writeContext(repo: string): Promise<void> {
+  const directory = join(repo, "contexts", "testing");
+  await mkdir(directory, { recursive: true });
+  await writeFile(
+    join(directory, "boundary-value-analysis.md"),
+    [
+      "---",
+      "id: context.testing.boundary-value-analysis",
+      "owner: qa-platform",
+      "status: stable",
+      "allowed_data: public",
+      "network_allowed: false",
+      "external_upload_allowed: false",
+      "secrets_allowed: false",
+      "when_to_use:",
+      "  - Designing tests around numeric, date, quantity, or limit boundaries",
+      "when_not_to_use:",
+      "  - Exploratory notes unrelated to limits",
+      "---",
+      "# Boundary Value Analysis",
+      "",
+      "Use this context to review explicit boundaries.",
+      "",
+    ].join("\n"),
+  );
+}
+
+async function writeInvalidContextLens(repo: string): Promise<void> {
+  const directory = join(repo, "lenses", "testing");
+  await mkdir(directory, { recursive: true });
+  await writeFile(
+    join(directory, "spec-review.md"),
+    [
+      "---",
+      "id: lens.testing.spec-review",
+      "owner: qa-platform",
+      "status: experimental",
+      "applies_to:",
+      "  - context.testing.boundary-value-analysis",
+      "---",
+      "# Spec Review Lens",
+      "",
+      "Review boundary context for ambiguity.",
+      "",
+    ].join("\n"),
+  );
+}
+
 async function git(cwd: string, args: string[]): Promise<string> {
   const { stdout } = await execFile("git", ["-C", cwd, ...args]);
   return stdout.trim();
+}
+
+async function withCapturedStdout(
+  callback: () => Promise<number>,
+): Promise<{ code: number; stdout: string }> {
+  const stdoutWrite = process.stdout.write;
+  let stdout = "";
+
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    stdout += chunk.toString();
+    return true;
+  }) as typeof process.stdout.write;
+
+  try {
+    const code = await callback();
+    return { code, stdout };
+  } finally {
+    process.stdout.write = stdoutWrite;
+  }
 }

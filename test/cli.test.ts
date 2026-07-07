@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { main } from "../src/cli.js";
+import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
 import { scan } from "../src/scanner.js";
 
 test("scan discovers default artifacts and emits deterministic findings", async () => {
@@ -676,6 +677,68 @@ test("CLI prints catalog JSON and markdown", async () => {
   assert.match(markdown.stdout, /Dependents: requires:demo/);
 });
 
+test("CLI catalog includes blocking Context Lens diagnostics", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "contexts", "testing"), { recursive: true });
+  await mkdir(path.join(root, "lenses", "testing"), { recursive: true });
+  await writeFile(
+    path.join(root, "contexts", "testing", "boundary-value-analysis.md"),
+    [
+      "---",
+      "id: context.testing.boundary-value-analysis",
+      "owner: qa-platform",
+      "status: stable",
+      "---",
+      "# Boundary Value Analysis",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(root, "lenses", "testing", "spec-review.md"),
+    [
+      "---",
+      "id: lens.testing.spec-review",
+      "owner: qa-platform",
+      "status: experimental",
+      "applies_to:",
+      "  - context.testing.boundary-value-analysis",
+      "---",
+      "# Spec Review Lens",
+      "",
+      "Review boundary context for ambiguity.",
+      "",
+    ].join("\n"),
+  );
+
+  const json = await withCapturedConsole(() =>
+    main(["catalog", root, "--json"]),
+  );
+  const report = JSON.parse(json.stdout) as {
+    contextLens: { invalidLensCount: number };
+    diagnostics: Array<{ code?: string; severity: string }>;
+  };
+
+  assert.equal(json.code, 1);
+  assert.equal(report.contextLens.invalidLensCount, 1);
+  assert.ok(
+    report.diagnostics.some(
+      (diagnostic) =>
+        diagnostic.severity === "error" &&
+        diagnostic.code ===
+          CONTEXT_LENS_DIAGNOSTIC_CODES.MISSING_REQUIRED_FIELD,
+    ),
+  );
+
+  const markdown = await withCapturedConsole(() =>
+    main(["catalog", root, "--format", "markdown"]),
+  );
+  assert.equal(markdown.code, 1);
+  assert.match(
+    markdown.stdout,
+    /Context lens definition is missing required field "purpose"/,
+  );
+});
+
 test("CLI prints a Codex semantic split prompt", async () => {
   const root = await fixture();
   const skillDir = path.join(root, "skills", "setup");
@@ -1023,6 +1086,14 @@ test("help and invalid commands have expected exit codes", async () => {
   assert.match(invalid.stderr, /Unknown command "wat"/);
 });
 
+test("CLI version reports package version", async () => {
+  const version = await withCapturedConsole(() => main(["--version"]));
+
+  assert.equal(version.code, 0);
+  assert.equal(version.stdout.trim(), "0.12.0");
+  assert.equal(version.stderr, "");
+});
+
 test("scaffold skill writes deterministic file output", async () => {
   const root = await fixture();
   const target = path.join(
@@ -1125,15 +1196,23 @@ test("scaffold context_lens writes deterministic file output", async () => {
   const catalogResult = await withCapturedConsole(() =>
     main(["catalog", root, "--format", "json"]),
   );
-  assert.equal(catalogResult.code, 0);
+  assert.equal(catalogResult.code, 1);
   const catalog = JSON.parse(catalogResult.stdout) as {
     catalog: { entries: Array<{ id: string; kind: string }> };
+    diagnostics: Array<{ code?: string; severity: string }>;
   };
   assert.equal(
     catalog.catalog.entries[0]?.id,
     "lens.testing.spec-review.boundary-values",
   );
   assert.equal(catalog.catalog.entries[0]?.kind, "context_lens");
+  assert.ok(
+    catalog.diagnostics.some(
+      (diagnostic) =>
+        diagnostic.severity === "error" &&
+        diagnostic.code === CONTEXT_LENS_DIAGNOSTIC_CODES.TARGET_NOT_FOUND,
+    ),
+  );
 });
 
 test("scaffold refuses to overwrite an existing file", async () => {

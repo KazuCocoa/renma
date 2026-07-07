@@ -9,6 +9,7 @@ import {
   buildSecurityDiffSummary,
   type SecurityDiffSummary,
 } from "../security-diff.js";
+import type { ContextLensSummary } from "../context-lens.js";
 import type { SecurityPolicyInventorySummary } from "../security-policy-inventory.js";
 import type { ConfigOverrides } from "../config.js";
 
@@ -62,6 +63,7 @@ interface DiffEndpoint {
   totalAssets: number;
   readinessScore: number;
   readinessLevel: string;
+  contextLens?: ContextLensSummary;
   securityPolicyInventory?: SecurityPolicyInventorySummary;
 }
 
@@ -454,6 +456,7 @@ function endpoint(snapshot: Snapshot): DiffEndpoint {
     totalAssets: snapshot.readiness.summary.totalAssets,
     readinessScore: snapshot.readiness.score,
     readinessLevel: snapshot.readiness.level,
+    contextLens: snapshot.readiness.summary.contextLens,
     securityPolicyInventory: snapshot.readiness.summary.securityPolicyInventory,
   };
 }

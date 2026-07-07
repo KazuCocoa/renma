@@ -688,6 +688,7 @@ async function writeContextLens(
     markdown({
       ...metadata,
       type: "context_lens",
+      owner: metadata.owner ?? "platform",
       purpose: "Make setup context easier to review.",
       title: `# ${metadata.id}`,
     }),

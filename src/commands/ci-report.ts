@@ -93,7 +93,8 @@ export function formatCiReport(
 export function determineCiReportStatus(report: DiffReport): CiReportStatus {
   if (
     hasNewHighOrCriticalFinding(report) ||
-    hasNewUnresolvedRequiredEdge(report)
+    hasNewUnresolvedRequiredEdge(report) ||
+    hasBlockingContextLensDiagnostics(report)
   ) {
     return "fail";
   }
@@ -120,6 +121,10 @@ function hasNewUnresolvedRequiredEdge(report: DiffReport): boolean {
   return report.graph.newUnresolvedEdges.some(isRequiredEdge);
 }
 
+function hasBlockingContextLensDiagnostics(report: DiffReport): boolean {
+  return (report.to.contextLens?.diagnosticCounts.error ?? 0) > 0;
+}
+
 function newUnresolvedRequiredEdgeCount(report: DiffReport): number {
   return report.graph.newUnresolvedEdges.filter(isRequiredEdge).length;
 }
@@ -140,6 +145,9 @@ function reviewNotes(
   }
   if (hasNewHighOrCriticalFinding(report)) {
     notes.push("Review new high or critical findings before merge.");
+  }
+  if (hasBlockingContextLensDiagnostics(report)) {
+    notes.push("Review blocking Context Lens diagnostics before merge.");
   }
   if (addedSecurityPosture.riskClasses.violation > 0) {
     notes.push("Review new security violations before merge.");
