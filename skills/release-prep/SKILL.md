@@ -12,8 +12,6 @@ tags:
   - dogfooding
 requires_context:
   - context.release.prep
-optional_context:
-conflicts:
 allowed_data: public
 network_allowed: true
 external_upload_allowed: false
