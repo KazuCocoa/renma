@@ -9,6 +9,7 @@ import {
   formatReadinessMarkdown,
   type ReadinessReport,
 } from "../src/commands/readiness.js";
+import { zeroContextLensSummary } from "../src/context-lens.js";
 import { scan } from "../src/scanner.js";
 import { zeroSecurityPolicyInventorySummary } from "../src/security-policy-inventory.js";
 import { zeroSecurityPostureSummary } from "../src/security-posture.js";
@@ -214,6 +215,7 @@ function readinessReportWithFindings(count: number): ReadinessReport {
         fail: 0,
         readinessPercent: 100,
       },
+      contextLens: zeroContextLensSummary(),
       securityPosture: zeroSecurityPostureSummary(),
       securityPolicyInventory: zeroSecurityPolicyInventorySummary(),
     },

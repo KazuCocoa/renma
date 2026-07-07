@@ -183,7 +183,7 @@ renma inspect contexts/testing/boundary-value-analysis.md --format json
 renma inspect skills/testing/spec-review/SKILL.md --lines L10-L42
 ```
 
-Use this when editing one skill or context file and you want a deterministic outline without reading the whole repository catalog. Without `--lines`, output includes file size, line count, frontmatter range, headings, code fences, and links. Use `--lines <range>` for an exact source slice; ranges can look like `L10-L42` or `10-42`.
+Use this when editing one skill or context file and you want a deterministic outline without reading the whole repository catalog. Without `--lines`, output includes file size, line count, frontmatter range, headings, code fences, links, asset relationships, and a concise Context Lens governance summary when repository context can be inferred. Use `--lines <range>` for an exact source slice; ranges can look like `L10-L42` or `10-42`.
 
 ### `readiness`
 
@@ -195,11 +195,11 @@ renma readiness . --format markdown
 renma readiness . --format json
 ```
 
-Readiness combines catalog diagnostics, ownership metadata, graph resolution, required and optional context references, asset status, and selected scan findings into an agent-readiness score.
+Readiness combines catalog diagnostics, Context Lens governance diagnostics, ownership metadata, graph resolution, required and optional context references, asset status, and selected scan findings into an agent-readiness score.
 
-Output includes a readiness score and level, workflow checks, diagnostics, scan findings that affect readiness, and graph or ownership summary data.
+Output includes a readiness score and level, workflow checks, Context Lens counts, diagnostics, scan findings that affect readiness, and graph or ownership summary data. JSON output includes `summary.contextLens`; Markdown output includes a `Context Lens` section.
 
-Planned security posture summaries should remain static repository evidence in this report: effective policy, security profile resolution, allowed data, forbidden inputs, approved destinations, human approval requirements, and high-risk findings. Readiness does not choose runtime context or describe what an LLM actually used.
+Security posture and Context Lens summaries remain static repository evidence in this report. Readiness does not choose runtime context, assemble prompts, inject context, or describe what an LLM actually used.
 
 ### `diff`
 
@@ -306,6 +306,8 @@ npm run build
 renma scan . --fail-on high
 renma readiness . --format json > renma-readiness.json
 ```
+
+`renma readiness` exits `1` when blocking diagnostics make the repository not ready, including Context Lens governance errors such as duplicate lens IDs, missing required fields, or unresolved `applies_to` targets.
 
 ## Interpreting Results
 

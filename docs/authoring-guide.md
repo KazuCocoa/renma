@@ -61,15 +61,17 @@ Use these fields consistently:
 - `tags`: searchable labels that help navigation, ownership review, and reporting.
 - `when_to_use` and `when_not_to_use`: scope guidance for humans and agents.
 - `requires_context` and `optional_context`: static graph relationships to other assets. They do not make renma select runtime context.
-- `requires_lens` and `optional_lens`: experimental static graph relationships from a skill to context lens assets.
-- `applies_to`: experimental static graph relationship from a context lens to the context assets it interprets.
-- `focus` and `expected_outputs`: compact experimental lens metadata for catalog review.
+- `requires_lens` and `optional_lens`: static graph relationships from a skill to context lens assets.
+- `applies_to`: required static graph relationship from a context lens to the context assets it interprets.
+- `purpose`, `focus`, and `expected_outputs`: compact lens metadata for deterministic Context Lens governance review.
 - `conflicts`: assets that should not be used together without review.
 - `superseded_by`: replacement or migration relationships for deprecated or archived content.
 
 The supported list-style metadata fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `requires_lens`, `optional_lens`, `applies_to`, `focus`, `expected_outputs`, `conflicts`, and `superseded_by`.
 
-Lens fields are graph and catalog metadata. They do not make Renma select runtime lenses, rank context, assemble prompts, or inject context into agents.
+Lens fields are graph, catalog, readiness, and inspect metadata. A valid 0.12.0 lens declares `id`, `owner`, `purpose`, and `applies_to`. Lens fields do not make Renma select runtime lenses, rank context, assemble prompts, or inject context into agents.
+
+The Context Lens governance boundary is: LLM proposes. Renma verifies. Human approves.
 
 Keep `when_to_use` and `when_not_to_use` compact. They are routing boundaries for catalog and graph review, not full procedures. Put detailed explanation, examples, caveats, and rationale in the Markdown body or referenced context assets.
 

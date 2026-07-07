@@ -4,6 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { buildCatalog } from "../src/catalog.js";
+import {
+  CONTEXT_LENS_DIAGNOSTIC_CODES,
+  summarizeContextLensGovernance,
+} from "../src/context-lens.js";
 import { parseDocument } from "../src/markdown.js";
 import { parseAssetMetadata } from "../src/metadata.js";
 import { scan } from "../src/scanner.js";
@@ -267,6 +271,288 @@ applies_to:
   );
 });
 
+test("summarizeContextLensGovernance reports valid lens summary without errors", () => {
+  const documents = [
+    parseDocument(
+      artifact(
+        "contexts/testing/boundary-value-analysis.md",
+        "context",
+        `---
+id: context.testing.boundary-value-analysis
+owner: qa-platform
+status: stable
+---
+# Boundary Value Analysis
+`,
+      ),
+    ),
+    parseDocument(
+      artifact(
+        "lenses/testing/spec-review.md",
+        "context_lens",
+        `---
+id: lens.testing.spec-review
+owner: qa-platform
+status: experimental
+purpose: spec_review
+applies_to:
+  - context.testing.boundary-value-analysis
+focus:
+  - ambiguity
+expected_outputs:
+  - unresolved questions
+---
+# Spec Review Lens
+
+Review boundary context for ambiguity.
+`,
+      ),
+    ),
+  ];
+  const { catalog } = buildCatalog(documents);
+  const report = summarizeContextLensGovernance(documents, catalog);
+
+  assert.equal(report.summary.totalLensCount, 1);
+  assert.equal(report.summary.validLensCount, 1);
+  assert.equal(report.summary.invalidLensCount, 0);
+  assert.deepEqual(report.summary.diagnosticCounts, {
+    error: 0,
+    warning: 0,
+    info: 0,
+  });
+  assert.deepEqual(report.summary.definitionPaths, [
+    "lenses/testing/spec-review.md",
+  ]);
+  assert.deepEqual(report.summary.targetReferences, [
+    "context.testing.boundary-value-analysis",
+  ]);
+  assert.deepEqual(report.summary.targetPaths, [
+    "contexts/testing/boundary-value-analysis.md",
+  ]);
+  assert.deepEqual(report.diagnostics, []);
+});
+
+test("summarizeContextLensGovernance errors on missing required fields", () => {
+  const documents = [
+    parseDocument(
+      artifact(
+        "contexts/testing/boundary-value-analysis.md",
+        "context",
+        `---
+id: context.testing.boundary-value-analysis
+owner: qa-platform
+status: stable
+---
+# Boundary Value Analysis
+`,
+      ),
+    ),
+    parseDocument(
+      artifact(
+        "lenses/testing/spec-review.md",
+        "context_lens",
+        `---
+id: lens.testing.spec-review
+owner: qa-platform
+applies_to:
+  - context.testing.boundary-value-analysis
+---
+# Spec Review Lens
+`,
+      ),
+    ),
+  ];
+  const { catalog } = buildCatalog(documents);
+  const report = summarizeContextLensGovernance(documents, catalog);
+
+  assert.equal(report.summary.invalidLensCount, 1);
+  assert.equal(report.summary.diagnosticCounts.error, 1);
+  assert.equal(
+    report.diagnostics[0]?.code,
+    CONTEXT_LENS_DIAGNOSTIC_CODES.MISSING_REQUIRED_FIELD,
+  );
+  assert.match(report.diagnostics[0]?.message ?? "", /"purpose"/);
+});
+
+test("summarizeContextLensGovernance errors on duplicate lens ids", () => {
+  const documents = [
+    parseDocument(
+      artifact(
+        "contexts/testing/boundary-value-analysis.md",
+        "context",
+        `---
+id: context.testing.boundary-value-analysis
+owner: qa-platform
+status: stable
+---
+# Boundary Value Analysis
+`,
+      ),
+    ),
+    parseDocument(validLensArtifact("lenses/a.md", "lens.testing.duplicate")),
+    parseDocument(validLensArtifact("lenses/b.md", "lens.testing.duplicate")),
+  ];
+  const { catalog } = buildCatalog(documents);
+  const report = summarizeContextLensGovernance(documents, catalog);
+
+  assert.equal(report.summary.invalidLensCount, 2);
+  assert.equal(
+    report.diagnostics.filter(
+      (diagnostic) =>
+        diagnostic.code === CONTEXT_LENS_DIAGNOSTIC_CODES.DUPLICATE_ID,
+    ).length,
+    2,
+  );
+});
+
+test("summarizeContextLensGovernance errors on missing target path", () => {
+  const documents = [
+    parseDocument(
+      artifact(
+        "lenses/testing/spec-review.md",
+        "context_lens",
+        `---
+id: lens.testing.spec-review
+owner: qa-platform
+status: experimental
+purpose: spec_review
+applies_to:
+  - ./contexts/testing/missing.md
+---
+# Spec Review Lens
+`,
+      ),
+    ),
+  ];
+  const { catalog } = buildCatalog(documents);
+  const report = summarizeContextLensGovernance(documents, catalog);
+
+  assert.deepEqual(report.summary.unresolvedTargetReferences, [
+    "./contexts/testing/missing.md",
+  ]);
+  assert.ok(
+    report.diagnostics.some(
+      (diagnostic) =>
+        diagnostic.code === CONTEXT_LENS_DIAGNOSTIC_CODES.TARGET_NOT_FOUND &&
+        diagnostic.severity === "error",
+    ),
+  );
+  assert.ok(
+    report.diagnostics.some(
+      (diagnostic) =>
+        diagnostic.code ===
+          CONTEXT_LENS_DIAGNOSTIC_CODES.PATH_NORMALIZATION_MISMATCH &&
+        diagnostic.severity === "warning",
+    ),
+  );
+});
+
+test("summarizeContextLensGovernance reports unsupported kind scope and version", () => {
+  const documents = [
+    parseDocument(
+      artifact(
+        "contexts/testing/boundary-value-analysis.md",
+        "context",
+        `---
+id: context.testing.boundary-value-analysis
+owner: qa-platform
+status: stable
+---
+# Boundary Value Analysis
+`,
+      ),
+    ),
+    parseDocument(
+      artifact(
+        "skills/testing/spec-review/SKILL.md",
+        "skill",
+        `---
+id: skill.testing.spec-review
+type: context_lens
+owner: qa-platform
+---
+# Spec Review Skill
+`,
+      ),
+    ),
+    parseDocument(
+      artifact(
+        "lenses/testing/spec-review.md",
+        "context_lens",
+        `---
+id: lens.testing.spec-review
+owner: qa-platform
+scope: runtime
+version: 2
+purpose: spec_review
+applies_to:
+  - context.testing.boundary-value-analysis
+---
+# Spec Review Lens
+`,
+      ),
+    ),
+  ];
+  const { catalog } = buildCatalog(documents);
+  const report = summarizeContextLensGovernance(documents, catalog);
+  const codes = report.diagnostics.map((diagnostic) => diagnostic.code);
+
+  assert.ok(codes.includes(CONTEXT_LENS_DIAGNOSTIC_CODES.UNSUPPORTED_KIND));
+  assert.ok(codes.includes(CONTEXT_LENS_DIAGNOSTIC_CODES.UNSUPPORTED_SCOPE));
+  assert.ok(codes.includes(CONTEXT_LENS_DIAGNOSTIC_CODES.UNSUPPORTED_VERSION));
+  assert.equal(
+    report.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.code === CONTEXT_LENS_DIAGNOSTIC_CODES.UNSUPPORTED_KIND,
+    )?.severity,
+    "warning",
+  );
+});
+
+test("summarizeContextLensGovernance reports empty and meaningless definitions", () => {
+  const documents = [
+    parseDocument(artifact("lenses/empty.md", "context_lens", "")),
+    parseDocument(
+      artifact(
+        "lenses/meaningless.md",
+        "context_lens",
+        `---
+id: lens.testing.meaningless
+owner: qa-platform
+---
+# Empty Heading Only
+`,
+      ),
+    ),
+  ];
+  const { catalog } = buildCatalog(documents);
+  const report = summarizeContextLensGovernance(documents, catalog);
+  const codes = report.diagnostics.map((diagnostic) => diagnostic.code);
+
+  assert.ok(codes.includes(CONTEXT_LENS_DIAGNOSTIC_CODES.EMPTY_DEFINITION));
+  assert.ok(
+    codes.includes(CONTEXT_LENS_DIAGNOSTIC_CODES.GOVERNANCE_MEANINGLESS),
+  );
+});
+
+test("summarizeContextLensGovernance keeps output order stable", () => {
+  const documents = [
+    parseDocument(validLensArtifact("lenses/z.md", "lens.testing.z")),
+    parseDocument(validLensArtifact("lenses/a.md", "lens.testing.a")),
+  ];
+  const { catalog } = buildCatalog(documents);
+  const report = summarizeContextLensGovernance(documents, catalog);
+
+  assert.deepEqual(report.summary.definitionPaths, [
+    "lenses/a.md",
+    "lenses/z.md",
+  ]);
+  assert.deepEqual(
+    report.diagnostics.map((diagnostic) => diagnostic.path),
+    ["lenses/a.md", "lenses/z.md"],
+  );
+});
+
 test("scan uses generic missing id and owner finding titles for contexts and lenses", async () => {
   const root = await fixture();
   await mkdir(path.join(root, "contexts", "testing"), { recursive: true });
@@ -409,6 +695,25 @@ requires_lens:
 
 async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-context-lens-"));
+}
+
+function validLensArtifact(path: string, id: string): Artifact {
+  return artifact(
+    path,
+    "context_lens",
+    `---
+id: ${id}
+owner: qa-platform
+status: experimental
+purpose: spec_review
+applies_to:
+  - context.testing.boundary-value-analysis
+---
+# Spec Review Lens
+
+Review boundary context for ambiguity.
+`,
+  );
 }
 
 function artifact(path: string, kind: ArtifactKind, content: string): Artifact {

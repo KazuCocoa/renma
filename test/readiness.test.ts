@@ -13,6 +13,7 @@ import {
   type ReadinessReport,
   type ReadinessCheckStatus,
 } from "../src/commands/readiness.js";
+import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
 import type { Finding } from "../src/types.js";
 
 test("readiness report marks fully owned resolved inventory ready", async () => {
@@ -584,6 +585,46 @@ test("readiness markdown prints a compact reviewable report", async () => {
   assert.match(markdown, /\| workflow\.completion_criteria \| pass \| info \|/);
 });
 
+test("readiness includes Context Lens diagnostics and fails blocking issues", async () => {
+  const root = await fixture();
+  await writeContext(root, "testing", "boundary", {
+    owner: "docs",
+    status: "stable",
+  });
+  await writeLens(root, "testing", "spec-review", {
+    owner: "qa-platform",
+    appliesTo: ["testing.boundary"],
+  });
+
+  const report = await readiness(root);
+  const check = report.checks.find(
+    (candidate) => candidate.id === "context_lens.governance",
+  );
+
+  assert.equal(report.level, "not_ready");
+  assert.equal(report.summary.contextLens.totalLensCount, 1);
+  assert.equal(report.summary.contextLens.invalidLensCount, 1);
+  assert.equal(report.summary.contextLens.diagnosticCounts.error, 1);
+  assert.equal(
+    report.diagnostics?.[0]?.code,
+    CONTEXT_LENS_DIAGNOSTIC_CODES.MISSING_REQUIRED_FIELD,
+  );
+  assert.equal(check?.status, "fail");
+  assert.equal(check?.evidence?.[0]?.id, "CONTEXT-LENS-MISSING-REQUIRED-FIELD");
+
+  const result = await withCapturedConsole(() =>
+    main(["readiness", root, "--json"]),
+  );
+  const parsed = JSON.parse(result.stdout);
+
+  assert.equal(result.code, 1);
+  assert.equal(parsed.summary.contextLens.invalidLensCount, 1);
+  assert.equal(
+    parsed.diagnostics[0].code,
+    CONTEXT_LENS_DIAGNOSTIC_CODES.MISSING_REQUIRED_FIELD,
+  );
+});
+
 test("readiness CLI supports --json", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", { owner: "platform" });
@@ -737,6 +778,41 @@ async function writeContext(
       ...metadata,
       title: `# ${id}`,
     }),
+  );
+}
+
+async function writeLens(
+  root: string,
+  group: string,
+  id: string,
+  metadata: {
+    owner?: string;
+    purpose?: string;
+    appliesTo?: string[];
+    status?: string;
+  },
+): Promise<void> {
+  await mkdir(path.join(root, "lenses", group), { recursive: true });
+  await writeFile(
+    path.join(root, "lenses", group, `${id}.md`),
+    [
+      "---",
+      `id: lens.${group}.${id}`,
+      ...(metadata.owner ? [`owner: ${metadata.owner}`] : []),
+      ...(metadata.status ? [`status: ${metadata.status}`] : []),
+      ...(metadata.purpose ? [`purpose: ${metadata.purpose}`] : []),
+      ...(metadata.appliesTo
+        ? [
+            "applies_to:",
+            ...metadata.appliesTo.map((target) => `  - ${target}`),
+          ]
+        : []),
+      "---",
+      `# ${id}`,
+      "",
+      "Review declared context for deterministic governance coverage.",
+      "",
+    ].join("\n"),
   );
 }
 

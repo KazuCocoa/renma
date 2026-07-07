@@ -1,5 +1,9 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import {
+  zeroContextLensSummary,
+  type ContextLensSummary,
+} from "../context-lens.js";
 import { parseDocument } from "../markdown.js";
 import type {
   AssetKind,
@@ -25,6 +29,7 @@ export interface InspectOutline {
   lineCount: number;
   frontmatterRange: null | string;
   asset: InspectAssetSummary | null;
+  contextLens: ContextLensSummary;
   headings: Array<{
     depth: number;
     line: number;
@@ -119,16 +124,18 @@ export async function buildInspectOutline(
   };
   const document = parseDocument(artifact);
   const lineCount = document.lines.length;
+  const repository = await inspectRepositoryForTarget(absolutePath);
 
   return {
     bytes: artifact.sizeBytes,
-    asset: await inspectAssetForTarget(absolutePath),
+    asset: repository.asset,
     codeFences: document.codeFences.map((fence) => ({
       endLine: fence.endLine,
       language: fence.language,
       range: formatRange(fence.startLine, fence.endLine),
       startLine: fence.startLine,
     })),
+    contextLens: repository.contextLens,
     frontmatterRange: frontmatterRange(document.lines),
     headings: document.headings.map((heading, index) => {
       const nextHeading = document.headings
@@ -152,16 +159,22 @@ export async function buildInspectOutline(
   };
 }
 
-async function inspectAssetForTarget(
-  absolutePath: string,
-): Promise<InspectAssetSummary | null> {
+async function inspectRepositoryForTarget(absolutePath: string): Promise<{
+  asset: InspectAssetSummary | null;
+  contextLens: ContextLensSummary;
+}> {
   try {
     const root = inferCatalogRoot(absolutePath);
     const result = await catalog(root);
     const entry = result.catalog.entries.find(
       (candidate) => path.resolve(root, candidate.sourcePath) === absolutePath,
     );
-    if (!entry) return null;
+    if (!entry) {
+      return {
+        asset: null,
+        contextLens: result.contextLens,
+      };
+    }
 
     const resolver = createInspectRelationshipResolver(result.catalog.entries);
     const inboundDependents = result.catalog.dependencies
@@ -174,25 +187,31 @@ async function inspectAssetForTarget(
       .sort(compareInspectRelationships);
 
     return {
-      id: entry.id,
-      kind: entry.kind,
-      ...(entry.metadata.owner ? { owner: entry.metadata.owner } : {}),
-      ...(entry.metadata.status ? { status: entry.metadata.status } : {}),
-      ...(entry.metadata.purpose ? { purpose: entry.metadata.purpose } : {}),
-      appliesTo: entry.metadata.appliesTo ?? [],
-      focus: entry.metadata.focus ?? [],
-      expectedOutputs: entry.metadata.expectedOutputs ?? [],
-      inboundDependents,
-      outboundDependencies,
-      relationshipChains: relationshipChains(
-        entry,
+      asset: {
+        id: entry.id,
+        kind: entry.kind,
+        ...(entry.metadata.owner ? { owner: entry.metadata.owner } : {}),
+        ...(entry.metadata.status ? { status: entry.metadata.status } : {}),
+        ...(entry.metadata.purpose ? { purpose: entry.metadata.purpose } : {}),
+        appliesTo: entry.metadata.appliesTo ?? [],
+        focus: entry.metadata.focus ?? [],
+        expectedOutputs: entry.metadata.expectedOutputs ?? [],
         inboundDependents,
         outboundDependencies,
-      ),
-      tags: entry.metadata.tags,
+        relationshipChains: relationshipChains(
+          entry,
+          inboundDependents,
+          outboundDependencies,
+        ),
+        tags: entry.metadata.tags,
+      },
+      contextLens: result.contextLens,
     };
   } catch {
-    return null;
+    return {
+      asset: null,
+      contextLens: zeroContextLensSummary(),
+    };
   }
 }
 
@@ -437,6 +456,9 @@ function renderTextOutline(outline: InspectOutline): string {
       ? ["", "Asset:", ...renderAssetSummary(outline.asset)]
       : []),
     "",
+    "Context Lens:",
+    ...renderContextLensSummary(outline.contextLens),
+    "",
     "Headings:",
     ...outline.headings.flatMap((heading) => [
       `- ${"#".repeat(heading.depth)} ${heading.text} ${heading.range}`,
@@ -454,6 +476,18 @@ function renderTextOutline(outline: InspectOutline): string {
   ];
 
   return `${lines.join("\n")}\n`;
+}
+
+function renderContextLensSummary(contextLens: ContextLensSummary): string[] {
+  return [
+    `- Enabled: ${contextLens.enabled ? "yes" : "no"}`,
+    `- Detected: ${contextLens.detected ? "yes" : "no"}`,
+    `- Lenses: ${contextLens.validLensCount}/${contextLens.totalLensCount} valid (${contextLens.invalidLensCount} invalid)`,
+    `- Diagnostics: error ${contextLens.diagnosticCounts.error}, warning ${contextLens.diagnosticCounts.warning}, info ${contextLens.diagnosticCounts.info}`,
+    `- Representative diagnostic: ${contextLens.representativeDiagnosticCode ?? "(none)"}`,
+    `- Definition paths: ${list(contextLens.definitionPaths)}`,
+    `- Target references: ${list(contextLens.targetReferences)}`,
+  ];
 }
 
 function renderAssetSummary(asset: InspectAssetSummary): string[] {

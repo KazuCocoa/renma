@@ -65,6 +65,24 @@ These diagnostics are emitted after files are parsed into catalog entries. For s
 | `warning` | `Shared context asset contains currentness wording "<term>" without an explicit date or version.` | A canonical active shared context uses relative English currentness wording such as recently, latest, currently, or as of now. | Add an explicit date, version, freshness metadata, or stable wording. |
 | `warning` | `Shared context asset contains prompt or runtime-selection wording "<term>".` | A canonical active shared context looks like a prompt artifact or runtime context-selection rule. | Move prompt assembly, assistant role instructions, and runtime context selection outside shared context assets. |
 
+## Context Lens Diagnostics
+
+Context Lens governance diagnostics use stable `code` values in JSON output. `error` diagnostics are blocking for readiness; `warning` diagnostics are reported by default for review.
+
+| Code | Severity | Meaning | Fix |
+| --- | --- | --- | --- |
+| `CONTEXT-LENS-DEPRECATED-FIELD` | `warning` | A lens uses an old field alias such as `target`, `targets`, `output`, or `outputs`. | Use `applies_to` or `expected_outputs`. |
+| `CONTEXT-LENS-DUPLICATE-ID` | `error` | Two or more lens definitions declare the same `id`. | Give each lens a unique stable ID and update references. |
+| `CONTEXT-LENS-EMPTY-DEFINITION` | `error` | A discovered lens file is empty. | Add required metadata and body guidance, or remove the file. |
+| `CONTEXT-LENS-GOVERNANCE-MEANINGLESS` | `warning` | A lens has no purpose, target, focus, expected output, or body guidance. | Add compact governance metadata or reviewed interpretation guidance. |
+| `CONTEXT-LENS-MISSING-REQUIRED-FIELD` | `error` | A lens is missing `id`, `owner`, `purpose`, or `applies_to`. | Add the required field in frontmatter. |
+| `CONTEXT-LENS-PATH-NORMALIZATION-MISMATCH` | `warning` | A path target normalizes to a different repository-relative path. | Use the normalized path shown by the diagnostic. |
+| `CONTEXT-LENS-TARGET-NOT-FOUND` | `error` | An `applies_to` target does not resolve to a cataloged asset ID or path. | Correct the target, add the missing context asset, or update discovery config. |
+| `CONTEXT-LENS-UNPARSEABLE-FRONTMATTER` | `error` | A lens frontmatter block starts with `---` but does not close. | Add the closing `---` delimiter or remove malformed frontmatter. |
+| `CONTEXT-LENS-UNSUPPORTED-KIND` | `warning` or `error` | `type: context_lens` appears under an unsupported artifact kind, or a lens file declares an unsupported type. | Store lens definitions under `lenses/**`, `context/**`, or `contexts/**`, and use `type: context_lens`. |
+| `CONTEXT-LENS-UNSUPPORTED-SCOPE` | `error` | A lens declares a `scope` value not supported by 0.12.0. | Use `scope: context` or omit the field. |
+| `CONTEXT-LENS-UNSUPPORTED-VERSION` | `error` | A lens declares a schema `version` not supported by 0.12.0. | Use `version: 1` or omit the field. |
+
 ## Readiness Diagnostics
 
 `renma readiness` converts lower-level data into workflow checks. These messages are produced by readiness checks and may wrap discovery, catalog, graph, ownership, status, or scan-finding data.

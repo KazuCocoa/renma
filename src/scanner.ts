@@ -1,6 +1,7 @@
 import path from "node:path";
 import { buildCatalog } from "./catalog.js";
 import { loadConfig, type ConfigOverrides } from "./config.js";
+import { summarizeContextLensGovernance } from "./context-lens.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import { discoverArtifacts } from "./discovery.js";
 import { parseDocument } from "./markdown.js";
@@ -25,6 +26,10 @@ export async function scan(
   );
   const documents = artifacts.map(parseDocument);
   const catalogResult = buildCatalog(documents);
+  const contextLens = summarizeContextLensGovernance(
+    documents,
+    catalogResult.catalog,
+  );
   const rawFindings = [
     ...runRules(documents, config, catalogResult.catalog),
     ...detectRepeatedContextPatterns(documents),
@@ -42,9 +47,14 @@ export async function scan(
     ...(configPath ? { configPath } : {}),
     scannedFileCount: artifacts.length,
     format: config.format,
+    contextLens: contextLens.summary,
     securityPolicyInventory,
     findings: suppressed.findings,
-    diagnostics: [...diagnostics, ...suppressed.diagnostics],
+    diagnostics: [
+      ...diagnostics,
+      ...contextLens.diagnostics,
+      ...suppressed.diagnostics,
+    ],
     exitThreshold: config.failOn,
   };
 }

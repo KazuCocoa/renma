@@ -904,6 +904,14 @@ optional_lens:
 
   assert.equal(result.code, 0);
   assert.match(result.stdout, /Kind: context_lens/);
+  assert.match(result.stdout, /Context Lens:/);
+  assert.match(result.stdout, /Detected: yes/);
+  assert.match(result.stdout, /Lenses: 1\/1 valid \(0 invalid\)/);
+  assert.match(result.stdout, /Representative diagnostic: \(none\)/);
+  assert.match(
+    result.stdout,
+    /Definition paths: lenses\/testing\/spec-review-boundary-values\.md/,
+  );
   assert.match(result.stdout, /Purpose: spec_review/);
   assert.match(
     result.stdout,
@@ -936,6 +944,14 @@ optional_lens:
   );
   assert.equal(jsonResult.code, 0);
   const outline = JSON.parse(jsonResult.stdout) as {
+    contextLens: {
+      detected: boolean;
+      totalLensCount: number;
+      validLensCount: number;
+      invalidLensCount: number;
+      diagnosticCounts: { error: number; warning: number; info: number };
+      definitionPaths: string[];
+    };
     asset: {
       inboundDependents: Array<{
         from: string;
@@ -949,6 +965,18 @@ optional_lens:
       }>;
     } | null;
   };
+  assert.equal(outline.contextLens.detected, true);
+  assert.equal(outline.contextLens.totalLensCount, 1);
+  assert.equal(outline.contextLens.validLensCount, 1);
+  assert.equal(outline.contextLens.invalidLensCount, 0);
+  assert.deepEqual(outline.contextLens.diagnosticCounts, {
+    error: 0,
+    warning: 0,
+    info: 0,
+  });
+  assert.deepEqual(outline.contextLens.definitionPaths, [
+    "lenses/testing/spec-review-boundary-values.md",
+  ]);
   const pathBasedLensReference = outline.asset?.inboundDependents.find(
     (relationship) => relationship.from === "skill.testing.spec-review",
   );
