@@ -1090,7 +1090,7 @@ test("CLI version reports package version", async () => {
   const version = await withCapturedConsole(() => main(["--version"]));
 
   assert.equal(version.code, 0);
-  assert.equal(version.stdout.trim(), "0.12.0");
+  assert.equal(version.stdout.trim(), "0.13.0");
   assert.equal(version.stderr, "");
 });
 

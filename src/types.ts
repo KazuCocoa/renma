@@ -27,6 +27,60 @@ export interface Evidence {
   snippet: string;
 }
 
+/** Location shape used by LLM-actionable diagnostics v2. */
+export interface DiagnosticLocation {
+  path: string;
+  startLine?: number;
+  endLine?: number;
+  snippet?: string;
+}
+
+/** Repair guardrail attached to an LLM-actionable diagnostic. */
+export interface RepairConstraint {
+  kind:
+    | "must_preserve"
+    | "must_not_change"
+    | "allowed_change"
+    | "requires_human_decision"
+    | "risk";
+  text: string;
+}
+
+/** Verification step attached to an LLM-actionable diagnostic. */
+export interface VerificationStep {
+  text: string;
+  command?: string;
+  expected?: string;
+}
+
+/** Normalized diagnostic shape for LLM-assisted and human repair workflows. */
+export interface DiagnosticV2 {
+  version: 2;
+  code: string;
+  severity: "error" | "warning" | "info";
+  message: string;
+  location?: DiagnosticLocation;
+  relatedLocations?: DiagnosticLocation[];
+  repairConstraints?: RepairConstraint[];
+  verificationSteps?: VerificationStep[];
+  llmHint?: string;
+  details?: Record<string, unknown>;
+}
+
+/** Compact grouping of related diagnostics for review. */
+export interface ReviewBundle {
+  id: string;
+  title: string;
+  summary: string;
+  severity: "error" | "warning" | "info";
+  diagnosticCodes: string[];
+  diagnosticIds?: string[];
+  affectedAssets?: string[];
+  affectedFiles?: string[];
+  suggestedReviewOrder?: string[];
+  llmHint?: string;
+}
+
 /** Rule finding emitted by deterministic scans. */
 export interface Finding {
   id: string;
@@ -39,7 +93,9 @@ export interface Finding {
   whyItMatters: string;
   remediation: string;
   constraints?: string[];
+  repairConstraints?: RepairConstraint[];
   verificationSteps?: string[];
+  verificationStepsV2?: VerificationStep[];
   llmHint?: string;
 }
 
@@ -61,6 +117,10 @@ export interface Diagnostic {
   message: string;
   path?: string;
   evidence?: Evidence;
+  repairConstraints?: RepairConstraint[];
+  verificationSteps?: VerificationStep[];
+  llmHint?: string;
+  details?: Record<string, unknown>;
 }
 
 /** Repository layout mapping used by strict three-root policy diagnostics. */
@@ -181,5 +241,7 @@ export interface ScanResult {
   securityPolicyInventory?: SecurityPolicyInventorySummary;
   findings: Finding[];
   diagnostics: Diagnostic[];
+  diagnosticsV2: DiagnosticV2[];
+  reviewBundles: ReviewBundle[];
   exitThreshold: Severity;
 }

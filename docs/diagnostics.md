@@ -11,6 +11,111 @@ renma uses two severity systems:
 
 In JSON output, diagnostics usually appear as structured objects with a `severity`, a `message`, and, when available, a `path`.
 
+## LLM-Actionable Diagnostics V2
+
+`renma scan --json` includes an additive `diagnosticsV2` array. Existing
+`findings` and `diagnostics` fields remain compatible; v2 is a normalized view
+for LLM-assisted repair, code review tools, and humans who want explicit repair
+guardrails.
+
+Each v2 diagnostic includes:
+
+- `version`: currently `2`.
+- `code`: stable diagnostic or finding code.
+- `severity`: `error`, `warning`, or `info`. Scan finding severities are mapped
+  into this simpler diagnostic scale, while the original `findingSeverity`
+  remains in `details`.
+- `message`: concise human-readable issue summary.
+- `location`: repository path, line range, and snippet when available.
+- `repairConstraints`: typed guardrails for what must be preserved, what must
+  not change, allowed repair shapes, human decisions, and risks.
+- `verificationSteps`: concrete follow-up checks. When a command is known,
+  Renma uses real project commands such as `renma scan`, `renma catalog`,
+  `renma readiness`, `renma graph`, or `npm test`.
+- `llmHint`: short practical guidance for an LLM or coding agent. It is not a
+  source of truth; the diagnostic evidence and repair constraints remain
+  authoritative.
+- `details`: compatibility metadata such as original scan finding severity,
+  category, confidence, risk class, remediation, and why-it-matters text.
+
+Example:
+
+```json
+{
+  "version": 2,
+  "code": "META-DUPLICATE-ASSET-ID",
+  "severity": "warning",
+  "message": "Duplicate asset id",
+  "location": {
+    "path": "contexts/alpha/overview.md",
+    "startLine": 2,
+    "endLine": 2,
+    "snippet": "id: context.demo.duplicate"
+  },
+  "repairConstraints": [
+    {
+      "kind": "must_preserve",
+      "text": "Preserve existing references where possible and update only references affected by the chosen canonical id."
+    },
+    {
+      "kind": "must_not_change",
+      "text": "Do not rename every duplicate blindly; identify the canonical asset or ask for review when intent is ambiguous."
+    }
+  ],
+  "verificationSteps": [
+    {
+      "text": "Run renma scan.",
+      "command": "renma scan",
+      "expected": "No diagnostics with code META-DUPLICATE-ASSET-ID are reported."
+    }
+  ],
+  "llmHint": "Find all assets with id \"context.demo.duplicate\", compare their scope and metadata, and propose a merge/deprecation path or unique replacement ids."
+}
+```
+
+`repairConstraints` are deliberately conservative. A `must_preserve` constraint
+names repository intent or content that should survive the repair.
+`must_not_change` names unsafe shortcuts, such as creating fake dependencies or
+deleting orphaned context assets automatically. `allowed_change` describes safe
+edit shapes. `requires_human_decision` marks ambiguity that should not be guessed
+by automation. `risk` highlights security, data-handling, or destructive-action
+concerns.
+
+## Review Bundles
+
+`renma scan --json` also includes `reviewBundles`, a deterministic grouping of
+related v2 diagnostics. Bundles help reviewers decide what to inspect together,
+which files or assets are involved, and what order to follow.
+
+Renma currently groups duplicate IDs by duplicated id, unresolved references by
+source, orphaned context assets separately from hard validation errors, and
+dependency/reference issues by affected source. Suppressed findings are omitted
+from both `diagnosticsV2` and `reviewBundles`.
+
+Example:
+
+```json
+{
+  "id": "duplicate-id:context.demo.duplicate",
+  "title": "Duplicate id review: context.demo.duplicate",
+  "summary": "2 diagnostics report the same declared id and should be reviewed together before renaming or merging assets.",
+  "severity": "warning",
+  "diagnosticCodes": ["META-DUPLICATE-ASSET-ID"],
+  "affectedAssets": ["context.demo.duplicate"],
+  "affectedFiles": [
+    "contexts/alpha/overview.md",
+    "contexts/beta/overview.md"
+  ],
+  "suggestedReviewOrder": [
+    "Inspect duplicate declaration in contexts/alpha/overview.md",
+    "Inspect duplicate declaration in contexts/beta/overview.md",
+    "Choose canonical id before editing references.",
+    "Update references and rerun Renma scan."
+  ],
+  "llmHint": "Pick one canonical asset id before editing references; do not rename every duplicate in one blind pass."
+}
+```
+
 ## Scan Review Signals
 
 Renma scan findings always include `severity` and `confidence`. Security findings may also include `riskClass`, a human security-review interpretation.

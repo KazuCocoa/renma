@@ -1872,6 +1872,8 @@ test("text report calls out clean scans", () => {
     format: "text",
     findings: [],
     diagnostics: [],
+    diagnosticsV2: [],
+    reviewBundles: [],
     exitThreshold: "high",
   };
 

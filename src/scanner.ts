@@ -3,6 +3,7 @@ import { buildCatalog } from "./catalog.js";
 import { loadConfig, type ConfigOverrides } from "./config.js";
 import { summarizeContextLensGovernance } from "./context-lens.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
+import { createDiagnosticsV2, createReviewBundles } from "./diagnostics-v2.js";
 import { discoverArtifacts } from "./discovery.js";
 import { parseDocument } from "./markdown.js";
 import { detectRepeatedContextPatterns } from "./repeated-context.js";
@@ -41,6 +42,15 @@ export async function scan(
     return a.evidence.startLine - b.evidence.startLine;
   });
   const suppressed = applySuppressions(rawFindings, config.suppressions);
+  const scanDiagnostics = [
+    ...diagnostics,
+    ...contextLens.diagnostics,
+    ...suppressed.diagnostics,
+  ];
+  const diagnosticsV2 = createDiagnosticsV2({
+    findings: suppressed.findings,
+    diagnostics: scanDiagnostics,
+  });
 
   return {
     root,
@@ -50,11 +60,9 @@ export async function scan(
     contextLens: contextLens.summary,
     securityPolicyInventory,
     findings: suppressed.findings,
-    diagnostics: [
-      ...diagnostics,
-      ...contextLens.diagnostics,
-      ...suppressed.diagnostics,
-    ],
+    diagnostics: scanDiagnostics,
+    diagnosticsV2,
+    reviewBundles: createReviewBundles(diagnosticsV2),
     exitThreshold: config.failOn,
   };
 }
