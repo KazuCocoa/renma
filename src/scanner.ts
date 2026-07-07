@@ -101,6 +101,7 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
         ],
         llmHint:
           "Replace invalid lifecycle status values with supported values. If a file was replaced by a shared context asset, consider using status: deprecated plus a separate superseded_by field rather than status: delegated.",
+        ...(diagnostic.details ? { details: diagnostic.details } : {}),
       };
     }
 
@@ -147,6 +148,7 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
         ],
         llmHint:
           "Repair only the explicit freshness metadata fields. Do not add modified_at or infer review freshness from Git history.",
+        ...(diagnostic.details ? { details: diagnostic.details } : {}),
       };
     }
 
@@ -190,6 +192,7 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
         ],
         llmHint:
           "Shorten metadata without losing knowledge: keep concise routing/index fields in frontmatter, move long prose into body sections or referenced context assets, and preserve existing references.",
+        ...(diagnostic.details ? { details: diagnostic.details } : {}),
       };
     }
 
@@ -246,6 +249,7 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
         ],
         llmHint:
           "Ask the asset owner for concise positive and negative usage boundaries. Do not invent domain exclusions, owners, policies, or runtime routing behavior.",
+        ...(diagnostic.details ? { details: diagnostic.details } : {}),
       };
     }
 
@@ -301,6 +305,7 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
       ],
       llmHint:
         "Add missing asset governance metadata using the repository's existing frontmatter style, then rerun scan and catalog.",
+      ...(diagnostic.details ? { details: diagnostic.details } : {}),
     };
   });
 }

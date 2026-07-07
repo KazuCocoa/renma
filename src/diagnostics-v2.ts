@@ -16,6 +16,8 @@ type BundleSeed = {
   label?: string;
 };
 
+const RESERVED_DETAIL_KEYS = new Set(["diagnosticId", "source"]);
+
 /** Convert legacy diagnostics and findings into the LLM-actionable v2 shape. */
 export function createDiagnosticsV2(input: {
   findings: Finding[];
@@ -67,9 +69,7 @@ function findingToDiagnosticV2(finding: Finding, index: number): DiagnosticV2 {
     repairConstraints: repairConstraintsForFinding(finding),
     verificationSteps: verificationStepsForFinding(finding),
     llmHint: llmHintForFinding(finding),
-    details: compactRecord({
-      diagnosticId,
-      source: "finding",
+    details: diagnosticDetails("finding", diagnosticId, finding.details, {
       findingSeverity: finding.severity,
       category: finding.category,
       confidence: finding.confidence,
@@ -97,11 +97,7 @@ function rawDiagnosticToDiagnosticV2(
     repairConstraints: repairConstraintsForDiagnostic(code, diagnostic),
     verificationSteps: verificationStepsForDiagnostic(code, diagnostic),
     llmHint: llmHintForDiagnostic(code, diagnostic),
-    details: compactRecord({
-      diagnosticId,
-      source: "diagnostic",
-      ...diagnostic.details,
-    }),
+    details: diagnosticDetails("diagnostic", diagnosticId, diagnostic.details),
   });
 }
 
@@ -701,7 +697,66 @@ function diagnosticIdFor(
   return `${code}@${pathPart}:L${linePart}#${index}`;
 }
 
+function diagnosticDetails(
+  source: "finding" | "diagnostic",
+  diagnosticId: string,
+  facts: Record<string, unknown> | undefined,
+  compatibility: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const factRecord = facts ? compactRecord(facts) : {};
+  const safeFlatFacts = Object.fromEntries(
+    Object.entries(factRecord).filter(
+      ([key]) => !RESERVED_DETAIL_KEYS.has(key),
+    ),
+  );
+  return compactRecord({
+    ...safeFlatFacts,
+    ...compatibility,
+    diagnosticId,
+    source,
+    facts: Object.keys(factRecord).length > 0 ? factRecord : undefined,
+  });
+}
+
+function detailString(
+  diagnostic: DiagnosticV2,
+  key: string,
+): string | undefined {
+  const factValue = detailFacts(diagnostic)?.[key];
+  if (typeof factValue === "string" && factValue.length > 0) {
+    return factValue;
+  }
+  if (RESERVED_DETAIL_KEYS.has(key)) return undefined;
+  const value = diagnostic.details?.[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function detailStringArray(diagnostic: DiagnosticV2, key: string): string[] {
+  const values = [detailFacts(diagnostic)?.[key], diagnostic.details?.[key]];
+  for (const value of values) {
+    if (!Array.isArray(value)) continue;
+    return value.filter(
+      (item): item is string => typeof item === "string" && item.length > 0,
+    );
+  }
+  return [];
+}
+
+function detailFacts(
+  diagnostic: DiagnosticV2,
+): Record<string, unknown> | undefined {
+  const facts = diagnostic.details?.facts;
+  if (!facts || typeof facts !== "object" || Array.isArray(facts)) {
+    return undefined;
+  }
+  return facts as Record<string, unknown>;
+}
+
 function extractedAssetId(diagnostic: DiagnosticV2): string | undefined {
+  const structuredId =
+    detailString(diagnostic, "assetId") ?? detailString(diagnostic, "lensId");
+  if (structuredId) return structuredId;
+
   const sources = [
     diagnostic.message,
     diagnostic.location?.snippet,
@@ -717,6 +772,11 @@ function extractedAssetId(diagnostic: DiagnosticV2): string | undefined {
 }
 
 function affectedSource(diagnostic: DiagnosticV2): string {
+  const structuredSource =
+    detailString(diagnostic, "sourcePath") ??
+    detailString(diagnostic, "source");
+  if (structuredSource) return structuredSource;
+
   const declaredBy = diagnostic.llmHint?.match(/declared by "([^"]+)"/i)?.[1];
   if (declaredBy) return declaredBy;
   return diagnostic.location?.path ?? "global";
@@ -725,11 +785,25 @@ function affectedSource(diagnostic: DiagnosticV2): string {
 function filesForDiagnostic(diagnostic: DiagnosticV2): string[] {
   return [
     diagnostic.location?.path,
+    detailString(diagnostic, "sourcePath"),
+    detailString(diagnostic, "targetPath"),
+    ...detailStringArray(diagnostic, "duplicatePaths"),
     ...(diagnostic.relatedLocations ?? []).map((location) => location.path),
   ].filter((pathValue): pathValue is string => pathValue !== undefined);
 }
 
 function extractAssets(diagnostic: DiagnosticV2): string[] {
+  const structured = stableUnique(
+    [
+      detailString(diagnostic, "assetId"),
+      detailString(diagnostic, "lensId"),
+      detailString(diagnostic, "source"),
+      detailString(diagnostic, "target"),
+      ...detailStringArray(diagnostic, "replacementTargets"),
+    ].filter((value): value is string => value !== undefined),
+  );
+  if (structured.length > 0) return structured;
+
   const sources = [
     diagnostic.message,
     diagnostic.location?.snippet,

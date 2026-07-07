@@ -97,6 +97,7 @@ export interface Finding {
   verificationSteps?: string[];
   verificationStepsV2?: VerificationStep[];
   llmHint?: string;
+  details?: Record<string, unknown>;
 }
 
 /** Configured finding suppression scoped to rule id and repository paths. */

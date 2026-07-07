@@ -265,6 +265,10 @@ function requiredFieldDiagnostics(document: ParsedDocument): Diagnostic[] {
         path: document.artifact.path,
         message: `Context lens definition is missing required field "${field}".`,
         evidence: missingFieldEvidence(document, field),
+        details: {
+          sourcePath: document.artifact.path,
+          field,
+        },
       },
     ];
   });
@@ -343,6 +347,12 @@ function targetDiagnostics(
         path: document.artifact.path,
         message: `Context lens target path "${target}" normalizes to "${normalized}".`,
         evidence: listItemEvidence(document, "applies_to", index),
+        details: {
+          sourcePath: document.artifact.path,
+          target,
+          normalizedTarget: normalized,
+          field: "applies_to",
+        },
       });
     }
 
@@ -353,6 +363,11 @@ function targetDiagnostics(
         path: document.artifact.path,
         message: `Context lens target "${target}" does not resolve to a cataloged asset.`,
         evidence: listItemEvidence(document, "applies_to", index),
+        details: {
+          sourcePath: document.artifact.path,
+          target,
+          field: "applies_to",
+        },
       });
     }
 
@@ -423,6 +438,11 @@ function duplicateIdDiagnostics(lenses: LensDocument[]): Diagnostic[] {
       path: lens.document.artifact.path,
       message: `Context lens id "${id}" is duplicated by ${paths.join(", ")}.`,
       evidence: fieldEvidence(lens.document, "id"),
+      details: {
+        lensId: id,
+        duplicatePaths: paths,
+        sourcePath: lens.document.artifact.path,
+      },
     }));
   });
 }
@@ -519,6 +539,9 @@ function stableUnique(values: string[]): string[] {
 function unresolvedReferenceFromDiagnostic(
   diagnostic: Diagnostic,
 ): string | undefined {
+  if (typeof diagnostic.details?.target === "string") {
+    return diagnostic.details.target;
+  }
   return diagnostic.message.match(/"([^"]+)"/)?.[1];
 }
 
