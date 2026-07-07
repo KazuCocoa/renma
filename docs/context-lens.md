@@ -1,13 +1,14 @@
 # Context Lens Assets
 
-`context_lens` is an experimental Renma asset type for purpose-oriented interpretation over reusable context assets.
+`context_lens` is a Renma asset type for purpose-oriented interpretation over reusable context assets.
 
-It keeps the existing Renma boundary intact:
+It keeps the Renma core boundary intact:
 
 ```text
-Renma catalogs and validates repository assets.
-Agents and tools decide what to do at runtime.
+LLM proposes. Renma verifies. Human approves.
 ```
+
+Renma catalogs and validates repository assets. Agents and tools decide what to do at runtime.
 
 Renma does not select lenses for a task, rank lenses, assemble prompts, inject context, or run an LLM to judge lens quality.
 
@@ -35,46 +36,71 @@ For example, a payment retry context can support:
 
 The base context remains reusable. The lens explains how that context should be interpreted for a purpose.
 
-## Lens metadata
+See [`examples/context-lens`](../examples/context-lens) for a runnable fixture with two valid lenses, readiness output, inspect output, and an invalid diagnostic example.
 
-Prefer compact, flat metadata. Detailed interpretation guidance belongs in the Markdown body, not in frontmatter.
+## Minimal Valid Lens
+
+A minimal valid lens declares a stable ID, owner, purpose, and at least one `applies_to` target.
 
 ```yaml
 ---
 id: lens.testing.spec-review.boundary-values
 type: context_lens
-title: Spec Review Lens for Boundary Values
 owner: qa-platform
 status: experimental
-tags:
-  - testing
-  - spec-review
+purpose: spec_review
+applies_to:
+  - context.testing.boundary-value-analysis
+---
+# Spec Review Lens for Boundary Values
+
+Review the boundary value analysis context for ambiguity, missing limits, and unclear sources of truth.
+```
+
+`type: context_lens` is optional for files under `lenses/**`, but it is recommended because it makes the file's intent obvious in code review. It is required when a lens is stored under `context/**` or `contexts/**`.
+
+## Multiple Lenses
+
+Multiple lenses can interpret the same base context for different review purposes:
+
+```yaml
+---
+id: lens.testing.spec-review.boundary-values
+type: context_lens
+owner: qa-platform
+status: experimental
 purpose: spec_review
 applies_to:
   - context.testing.boundary-value-analysis
 focus:
   - ambiguity
   - missing boundary
-  - source of truth
 expected_outputs:
   - unresolved questions
   - risk notes
 ---
 ```
 
-Supported experimental lens fields:
+```yaml
+---
+id: lens.testing.test-design.boundary-values
+type: context_lens
+owner: qa-platform
+status: experimental
+purpose: test_design
+applies_to:
+  - context.testing.boundary-value-analysis
+focus:
+  - inclusive limits
+  - zero and empty values
+  - overflow behavior
+expected_outputs:
+  - test cases
+  - edge-case checklist
+---
+```
 
-- `type: context_lens`: identifies a lens for files under `context/` or `contexts/`.
-- `purpose`: short purpose label such as `spec_review`, `test_design`, or `failure_analysis`.
-- `applies_to`: context asset IDs this lens interprets.
-- `focus`: compact review focus terms.
-- `expected_outputs`: compact output expectations.
-
-`context_lens` is the only supported `type` value today. Other `type` strings may parse as raw metadata, but Renma does not assign them catalog meaning.
-
-## Skill metadata
-
-A skill can declare static lens relationships:
+A skill declares static lens relationships with `requires_lens` or `optional_lens`:
 
 ```yaml
 ---
@@ -88,9 +114,102 @@ requires_lens:
 ---
 ```
 
-`requires_lens` and `optional_lens` are graph metadata. They do not make Renma select runtime context or inject the lens into an agent.
+These fields create catalog and graph relationships. They do not make Renma choose runtime context or inject the lens into an agent.
 
-## Authoring helpers
+## Supported Fields
+
+Prefer compact, flat metadata. Detailed interpretation guidance belongs in the Markdown body, not in frontmatter.
+
+- `id`: required stable lens ID. Prefer the `lens.<domain>.<purpose>` prefix style.
+- `type`: recommended `context_lens` discriminator.
+- `owner`: required accountable owner.
+- `status`: optional lifecycle status: `experimental`, `stable`, `deprecated`, or `archived`.
+- `version`: optional lens schema version. The 0.12.0 governance checks support `version: 1`.
+- `scope`: optional lens scope. The 0.12.0 governance checks support `scope: context`.
+- `purpose`: required short purpose label such as `spec_review`, `test_design`, or `failure_analysis`.
+- `applies_to`: required context asset IDs or repository-relative paths this lens interprets.
+- `focus`: optional compact review focus terms.
+- `expected_outputs`: optional compact output expectations.
+
+Deprecated field aliases such as `target`, `targets`, `output`, and `outputs` produce warnings. Use `applies_to` and `expected_outputs`.
+
+## Diagnostics
+
+Context Lens governance diagnostics use stable string codes in JSON output. The detailed diagnostics appear in `scan` and `readiness`; concise summaries appear in `readiness` and `inspect`.
+
+Invalid example:
+
+```yaml
+---
+id: lens.testing.spec-review.boundary-values
+owner: qa-platform
+applies_to:
+  - ./contexts/testing/missing.md
+---
+# Spec Review Lens
+```
+
+Expected diagnostics include:
+
+- `CONTEXT-LENS-MISSING-REQUIRED-FIELD` because `purpose` is missing.
+- `CONTEXT-LENS-PATH-NORMALIZATION-MISMATCH` because `./contexts/testing/missing.md` normalizes to `contexts/testing/missing.md`.
+- `CONTEXT-LENS-TARGET-NOT-FOUND` because the target path does not resolve to a cataloged asset.
+
+Blocking Context Lens diagnostics are `error` diagnostics. Warnings are reported by default but do not fail readiness unless another policy makes the repository not ready.
+
+## Readiness And Inspect
+
+`renma readiness --json` includes an additive `summary.contextLens` object:
+
+```json
+{
+  "summary": {
+    "contextLens": {
+      "enabled": true,
+      "detected": true,
+      "totalLensCount": 2,
+      "validLensCount": 2,
+      "invalidLensCount": 0,
+      "diagnosticCounts": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      }
+    }
+  }
+}
+```
+
+Markdown readiness includes a `Context Lens` section with lens counts, diagnostic counts, a representative diagnostic code, definition paths, and target references.
+
+`renma inspect <file> --format text` includes a concise Context Lens summary:
+
+```text
+Context Lens:
+- Enabled: yes
+- Detected: yes
+- Lenses: 2/2 valid (0 invalid)
+- Diagnostics: error 0, warning 0, info 0
+- Representative diagnostic: (none)
+- Definition paths: lenses/testing/spec-review-boundary-values.md, lenses/testing/test-design-boundary-values.md
+- Target references: context.testing.boundary-value-analysis
+```
+
+`renma inspect <file> --format json` includes the same additive `contextLens` summary object.
+
+## CI Usage
+
+Use readiness in CI when Context Lens governance should block merges:
+
+```bash
+renma readiness . --json
+```
+
+The command exits `1` when readiness is not ready, including when blocking Context Lens diagnostics are present.
+
+For pull-request review artifacts, `renma ci-report` continues to report deterministic catalog, graph, readiness, finding, and security deltas. It does not call an LLM or make subjective lens-quality judgments.
+
+## Authoring Helpers
 
 Use `scaffold` to create a compact starter lens:
 
@@ -104,7 +223,7 @@ renma scaffold context_lens lenses/testing/spec-review-boundary-values.md \
 
 Use `inspect` on a lens to review its purpose metadata and declared graph neighborhood. Lens inspection shows inbound skill references, outbound `applies_to` context targets, and the static `skill -> lens -> context` chain.
 
-## Good lens boundaries
+## Good Lens Boundaries
 
 A lens should answer:
 
@@ -121,18 +240,14 @@ A lens should not become:
 - a QA-specific rule hardcoded into Renma core
 - a replacement for the skill entrypoint
 
-## Implementation status
+## Non-Goals For 0.12.0
 
-Initial support is intentionally small:
+Renma 0.12.0 intentionally does not implement:
 
-- `context_lens` assets are cataloged.
-- `lenses/**/*.md` is scanned by default.
-- `type: context_lens` can classify a context asset as a lens.
-- `applies_to`, `requires_lens`, and `optional_lens` create graph edges.
-- missing lens `purpose` or `applies_to` metadata is reported for active canonical lenses.
-- missing referenced lens or context IDs are reported through deterministic dependency diagnostics.
-- `inspect` summarizes lens metadata and declared inbound/outbound relationships.
-- `scaffold context_lens` creates a small reviewable starter file.
-- active lenses with no skill references, or active lenses applying to inactive context, are reported as low-severity maintenance advisories.
+- runtime selection
+- prompt assembly
+- context injection
+- automatic LLM judgment or subjective scoring
+- external signal imports from Codex, Claude, IDEs, or similar tools
 
-Future work may improve authoring workflows, readiness summaries, and optional profile-specific rules without changing the runtime boundary.
+The release stabilizes deterministic Context Lens governance: summary output, diagnostics, readiness integration, inspect integration, docs, and examples.

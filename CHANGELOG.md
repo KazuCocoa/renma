@@ -6,6 +6,20 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-07
+
+### Added
+
+- Added deterministic Context Lens governance summaries for scan, catalog JSON, readiness, and inspect output.
+- Added stable coded Context Lens diagnostics for missing required fields, duplicate IDs, unresolved targets, path normalization mismatches, unsupported kind/scope/version values, empty or governance-meaningless definitions, malformed frontmatter, and deprecated field aliases.
+- Added readiness integration with a `context_lens.governance` check and additive `summary.contextLens` JSON output.
+- Added inspect output that reports Context Lens detected state, lens counts, diagnostic counts, representative diagnostic code, definition paths, and target references.
+- Added Context Lens authoring examples, CI guidance, invalid diagnostic examples, and a multi-lens fixture.
+
+### Changed
+
+- Stabilized Context Lens as deterministic repository governance: Renma verifies declared lens definitions and relationships without runtime selection, prompt assembly, context injection, external tool signal imports, or automatic LLM judgment.
+
 ## [0.11.1] - 2026-07-06
 
 ### Added
@@ -198,7 +212,9 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/KazuCocoa/renma/compare/v0.11.1...v0.12.0
+[0.11.1]: https://github.com/KazuCocoa/renma/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/KazuCocoa/renma/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/KazuCocoa/renma/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/KazuCocoa/renma/compare/v0.8.1...v0.9.0

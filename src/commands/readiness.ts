@@ -1,5 +1,9 @@
 import { graph, type GraphEdge, type GraphReport } from "./graph.js";
 import { DIAGNOSTIC_IDS } from "../diagnostic-ids.js";
+import {
+  zeroContextLensSummary,
+  type ContextLensSummary,
+} from "../context-lens.js";
 import { scan } from "../scanner.js";
 import {
   summarizeSecurityPosture,
@@ -66,6 +70,7 @@ export interface ReadinessReport {
       info: number;
     };
     workflow: WorkflowReadinessSummary;
+    contextLens: ContextLensSummary;
     securityPosture: SecurityPostureSummary;
     securityPolicyInventory: SecurityPolicyInventorySummary;
   };
@@ -108,6 +113,7 @@ export async function readiness(
     graphReport,
     scanResult.findings,
     scanResult.diagnostics,
+    scanResult.contextLens,
     scanResult.securityPolicyInventory,
   );
 }
@@ -116,6 +122,7 @@ export function buildReadinessReport(
   graphReport: GraphReport,
   findings: Finding[] = [],
   diagnostics: Diagnostic[] = graphReport.diagnostics ?? [],
+  contextLens: ContextLensSummary = zeroContextLensSummary(),
   securityPolicyInventory: SecurityPolicyInventorySummary = zeroSecurityPolicyInventorySummary(),
 ): ReadinessReport {
   const diagnosticCounts = countDiagnostics(diagnostics);
@@ -152,6 +159,7 @@ export function buildReadinessReport(
     workflowClarityCheck(findings),
     workflowRequiredInputsCheck(findings),
     workflowCompletionCriteriaCheck(findings),
+    contextLensGovernanceCheck(contextLens, diagnostics),
     lifecycleCheck(lifecycleAssets),
     freshnessCheck(findings),
     minimumInventoryCheck(totalAssets),
@@ -280,6 +288,7 @@ export function buildReadinessReport(
       graphResolutionPercent,
       diagnosticCounts,
       workflow,
+      contextLens,
       securityPosture,
       securityPolicyInventory,
     },
@@ -306,6 +315,11 @@ function ownershipSummaryLine(report: ReadinessReport): string {
   return `- Ownership coverage: ${report.summary.ownershipCoveragePercent}% (${report.summary.ownedAssets}/${report.summary.totalAssets} assets owned)`;
 }
 
+function contextLensSummaryLine(report: ReadinessReport): string {
+  const lens = report.summary.contextLens;
+  return `- Context Lens: ${lens.detected ? "detected" : "not detected"} (${lens.validLensCount}/${lens.totalLensCount} valid, ${lens.diagnosticCounts.error} errors, ${lens.diagnosticCounts.warning} warnings)`;
+}
+
 export function formatReadinessMarkdown(report: ReadinessReport): string {
   const lines = [
     "# Agent Readiness",
@@ -317,6 +331,7 @@ export function formatReadinessMarkdown(report: ReadinessReport): string {
     workflowReadinessSummaryLine(report),
     graphResolutionSummaryLine(report),
     ownershipSummaryLine(report),
+    contextLensSummaryLine(report),
     "",
     "| Metric | Value |",
     "| --- | ---: |",
@@ -332,6 +347,10 @@ export function formatReadinessMarkdown(report: ReadinessReport): string {
     `| Diagnostic errors | ${report.summary.diagnosticCounts.error} |`,
     `| Diagnostic warnings | ${report.summary.diagnosticCounts.warning} |`,
     `| Diagnostic info | ${report.summary.diagnosticCounts.info} |`,
+    "",
+    "## Context Lens",
+    "",
+    ...formatContextLensMarkdown(report.summary.contextLens),
     "",
     "## Security Posture",
     "",
@@ -391,6 +410,25 @@ export function formatReadinessMarkdown(report: ReadinessReport): string {
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+function formatContextLensMarkdown(contextLens: ContextLensSummary): string[] {
+  return [
+    "| Metric | Value |",
+    "| --- | ---: |",
+    `| Enabled | ${contextLens.enabled ? "yes" : "no"} |`,
+    `| Detected | ${contextLens.detected ? "yes" : "no"} |`,
+    `| Total lenses | ${contextLens.totalLensCount} |`,
+    `| Valid lenses | ${contextLens.validLensCount} |`,
+    `| Invalid lenses | ${contextLens.invalidLensCount} |`,
+    `| Diagnostic errors | ${contextLens.diagnosticCounts.error} |`,
+    `| Diagnostic warnings | ${contextLens.diagnosticCounts.warning} |`,
+    `| Diagnostic info | ${contextLens.diagnosticCounts.info} |`,
+    `| Representative diagnostic | ${contextLens.representativeDiagnosticCode ?? "(none)"} |`,
+    "",
+    `- Definition paths: ${list(contextLens.definitionPaths)}`,
+    `- Target references: ${list(contextLens.targetReferences)}`,
+  ];
 }
 
 function formatSecurityPostureMarkdown(
@@ -893,6 +931,66 @@ function workflowCompletionCriteriaCheck(findings: Finding[]): ReadinessCheck {
   };
 }
 
+function contextLensGovernanceCheck(
+  contextLens: ContextLensSummary,
+  diagnostics: Diagnostic[],
+): ReadinessCheck {
+  const lensDiagnostics = diagnostics.filter((diagnostic) =>
+    diagnostic.code?.startsWith("CONTEXT-LENS-"),
+  );
+  const evidence = lensDiagnostics.map((diagnostic) => ({
+    ...(diagnostic.code ? { id: diagnostic.code } : {}),
+    ...(diagnostic.path ? { path: diagnostic.path } : {}),
+    message: diagnostic.message,
+  }));
+
+  if (contextLens.diagnosticCounts.error > 0) {
+    return {
+      id: "context_lens.governance",
+      title: "Context Lens governance",
+      status: "fail",
+      severity: "error",
+      summary: `${contextLens.invalidLensCount} of ${contextLens.totalLensCount} context lens definition${
+        contextLens.totalLensCount === 1 ? "" : "s"
+      } have blocking diagnostics.`,
+      evidence,
+    };
+  }
+
+  if (contextLens.diagnosticCounts.warning > 0) {
+    return {
+      id: "context_lens.governance",
+      title: "Context Lens governance",
+      status: "warn",
+      severity: "warning",
+      summary: `${contextLens.diagnosticCounts.warning} context lens warning${
+        contextLens.diagnosticCounts.warning === 1 ? "" : "s"
+      } reported.`,
+      evidence,
+    };
+  }
+
+  if (!contextLens.detected) {
+    return {
+      id: "context_lens.governance",
+      title: "Context Lens governance",
+      status: "pass",
+      severity: "info",
+      summary: "No context lens definitions were detected.",
+    };
+  }
+
+  return {
+    id: "context_lens.governance",
+    title: "Context Lens governance",
+    status: "pass",
+    severity: "info",
+    summary: `${contextLens.validLensCount} context lens definition${
+      contextLens.validLensCount === 1 ? "" : "s"
+    } passed deterministic governance checks.`,
+  };
+}
+
 function lifecycleCheck(nodes: GraphReport["nodes"]): ReadinessCheck {
   if (nodes.length === 0) {
     return {
@@ -1087,4 +1185,8 @@ function normalizeGraphPath(path: string): string {
 
 function escapeTableCell(value: string): string {
   return value.replaceAll("|", "\\|").replace(/\s+/g, " ");
+}
+
+function list(values: string[]): string {
+  return values.length > 0 ? values.join(", ") : "(none)";
 }

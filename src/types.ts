@@ -1,3 +1,4 @@
+import type { ContextLensSummary } from "./context-lens.js";
 import type { SecurityPolicyInventorySummary } from "./security-policy-inventory.js";
 
 /** Finding severity used for scan reports and failure thresholds. */
@@ -55,6 +56,7 @@ export type SuppressionExpiration = "never" | `${number}-${number}-${number}`;
 
 /** Non-finding diagnostic produced while loading, discovering, or parsing input. */
 export interface Diagnostic {
+  code?: string;
   severity: "info" | "warning" | "error";
   message: string;
   path?: string;
@@ -175,6 +177,7 @@ export interface ScanResult {
   configPath?: string;
   scannedFileCount: number;
   format: "text" | "json";
+  contextLens?: ContextLensSummary;
   securityPolicyInventory?: SecurityPolicyInventorySummary;
   findings: Finding[];
   diagnostics: Diagnostic[];

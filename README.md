@@ -258,6 +258,8 @@ Renma does not require an LLM for this loop. Its core analysis is deterministic 
 
 See [`examples/context-repo`](examples/context-repo) for a small skill and shared-context repository you can scan with renma.
 
+See [`examples/context-lens`](examples/context-lens) for a Context Lens governance example with valid lenses, readiness output, inspect output, and expected diagnostics for an invalid lens.
+
 ## CLI Commands
 
 ```bash

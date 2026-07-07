@@ -9,6 +9,8 @@ requires_context:
   - context.testing.boundary-value-analysis
 requires_lens:
   - lens.testing.spec-review.boundary-values
+optional_lens:
+  - lens.testing.test-design.boundary-values
 ---
 # Spec Review
 
