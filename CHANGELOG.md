@@ -6,6 +6,16 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-07-08
+
+### Added
+
+- Added owner-grouped ownership reports and `renma ownership --owner <owner>` filtering for owner-specific JSON and Markdown output.
+
+### Changed
+
+- Clarified ownership policy so missing `owner` metadata is accepted as unowned coverage information instead of becoming a default scan finding.
+
 ## [0.13.0] - 2026-07-07
 
 ### Added
@@ -220,7 +230,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/KazuCocoa/renma/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/KazuCocoa/renma/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/KazuCocoa/renma/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/KazuCocoa/renma/compare/v0.11.0...v0.11.1

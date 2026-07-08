@@ -1088,9 +1088,14 @@ test("help and invalid commands have expected exit codes", async () => {
 
 test("CLI version reports package version", async () => {
   const version = await withCapturedConsole(() => main(["--version"]));
+  const packageMetadata = JSON.parse(
+    await readFile("package.json", "utf8"),
+  ) as {
+    version: string;
+  };
 
   assert.equal(version.code, 0);
-  assert.equal(version.stdout.trim(), "0.13.0");
+  assert.equal(version.stdout.trim(), packageMetadata.version);
   assert.equal(version.stderr, "");
 });
 
