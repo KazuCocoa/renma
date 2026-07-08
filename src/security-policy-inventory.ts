@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   applySecurityConfig,
   effectiveAllowedDataClass,
@@ -6,7 +7,12 @@ import {
   securityProfileChain,
   type SecurityPolicy,
 } from "./security-policy.js";
-import type { Artifact, ArtifactKind, SecurityConfig } from "./types.js";
+import type {
+  Artifact,
+  ArtifactKind,
+  Evidence,
+  SecurityConfig,
+} from "./types.js";
 
 type InventoryArtifactKind = ArtifactKind;
 
@@ -44,6 +50,39 @@ export interface SecurityPolicyInventorySummary {
     path: string;
     kind: ArtifactKind;
   }>;
+}
+
+export interface EffectiveSecurityPolicyEvidence {
+  fingerprint: string;
+  allowedData: string[];
+  forbiddenInputs: string[];
+  networkAllowed: boolean | null;
+  externalUploadAllowed: boolean | null;
+  secretsAllowed: boolean | null;
+  humanApprovalRequired: boolean | null;
+  approvedNetworkDestinations: string[];
+  approvedUploadDestinations: string[];
+  disallowedCommands: string[];
+}
+
+export type SecurityProfileResolution =
+  | "none"
+  | "resolved"
+  | "missing"
+  | "cyclic";
+
+export interface SecurityPolicyAssetEvidence {
+  path: string;
+  kind: ArtifactKind;
+  hasLocalPolicyMetadata: boolean;
+  selectedSecurityProfile?: string;
+  profileResolution: SecurityProfileResolution;
+  profileChain: string[];
+  effectivePolicy: EffectiveSecurityPolicyEvidence;
+  evidence: {
+    selectedSecurityProfile?: Evidence;
+    policyFields: Evidence[];
+  };
 }
 
 const POLICY_INVENTORY_KINDS = new Set<ArtifactKind>([
@@ -154,6 +193,49 @@ export function summarizeSecurityPolicyInventory(
   );
 
   return summary;
+}
+
+export function collectSecurityPolicyAssetEvidence(
+  artifacts: Artifact[],
+  config?: SecurityConfig,
+): SecurityPolicyAssetEvidence[] {
+  return artifacts
+    .map((artifact): SecurityPolicyAssetEvidence | undefined => {
+      const parsedPolicy = parseSecurityPolicy(artifact.content);
+      const hasMetadata = hasLocalSecurityPolicyMetadata(parsedPolicy);
+      if (!isPolicyInventoryArtifact(artifact, hasMetadata)) return undefined;
+
+      const policy = applySecurityConfig(parsedPolicy, config);
+      const chain = securityProfileChain(parsedPolicy.securityProfile, config);
+      const selectedSecurityProfile = parsedPolicy.securityProfile;
+      const selectedSecurityProfileEvidence = policyFieldEvidence(
+        artifact,
+        parsedPolicy,
+        "securityProfile",
+      );
+      const row: SecurityPolicyAssetEvidence = {
+        path: artifact.path,
+        kind: artifact.kind,
+        hasLocalPolicyMetadata: hasMetadata,
+        ...(selectedSecurityProfile ? { selectedSecurityProfile } : {}),
+        profileResolution: profileResolution(selectedSecurityProfile, chain),
+        profileChain: chain.profiles.map((item) => item.name),
+        effectivePolicy: normalizeEffectivePolicy(policy),
+        evidence: {
+          ...(selectedSecurityProfileEvidence
+            ? { selectedSecurityProfile: selectedSecurityProfileEvidence }
+            : {}),
+          policyFields: policyFieldEvidenceList(artifact, parsedPolicy),
+        },
+      };
+      return row;
+    })
+    .filter((row): row is SecurityPolicyAssetEvidence => row !== undefined)
+    .sort((left, right) => {
+      const byPath = left.path.localeCompare(right.path);
+      if (byPath !== 0) return byPath;
+      return left.kind.localeCompare(right.kind);
+    });
 }
 
 export function zeroSecurityPolicyInventorySummary(): SecurityPolicyInventorySummary {
@@ -279,6 +361,91 @@ function countSecurityProfile(
   } else {
     summary.securityProfiles.resolved += 1;
   }
+}
+
+function normalizeEffectivePolicy(
+  policy: SecurityPolicy,
+): EffectiveSecurityPolicyEvidence {
+  const summary = {
+    allowedData: normalizeStringList([
+      ...(policy.allowedDataClass ? [policy.allowedDataClass] : []),
+      ...policy.allowedData,
+    ]),
+    forbiddenInputs: normalizeStringList(policy.forbiddenInputs),
+    networkAllowed: policy.networkAllowed ?? null,
+    externalUploadAllowed: policy.externalUploadAllowed ?? null,
+    secretsAllowed: policy.secretsAllowed ?? null,
+    humanApprovalRequired: policy.humanApprovalRequired ?? null,
+    approvedNetworkDestinations: normalizeStringList(
+      policy.approvedNetworkDestinations,
+    ),
+    approvedUploadDestinations: normalizeStringList(
+      policy.approvedUploadDestinations,
+    ),
+    disallowedCommands: normalizeStringList(policy.disallowedCommands),
+  };
+  return {
+    fingerprint: `sha256:${createHash("sha256")
+      .update(JSON.stringify(summary))
+      .digest("hex")}`,
+    ...summary,
+  };
+}
+
+function normalizeStringList(values: string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort(
+    (left, right) => left.localeCompare(right),
+  );
+}
+
+function profileResolution(
+  selectedSecurityProfile: string | undefined,
+  chain: ReturnType<typeof securityProfileChain>,
+): SecurityProfileResolution {
+  if (selectedSecurityProfile === undefined) return "none";
+  if (chain.missingProfile !== undefined) return "missing";
+  if (chain.cycle !== undefined) return "cyclic";
+  return "resolved";
+}
+
+function policyFieldEvidenceList(
+  artifact: Artifact,
+  policy: SecurityPolicy,
+): Evidence[] {
+  return [
+    "allowedData",
+    "forbiddenInputs",
+    "networkAllowed",
+    "externalUploadAllowed",
+    "secretsAllowed",
+    "humanApprovalRequired",
+    "securityProfile",
+    "approvedNetworkDestinations",
+    "approvedUploadDestinations",
+  ]
+    .map((field) => policyFieldEvidence(artifact, policy, field))
+    .filter((evidence): evidence is Evidence => evidence !== undefined)
+    .sort((left, right) => {
+      const byStart = left.startLine - right.startLine;
+      if (byStart !== 0) return byStart;
+      return left.snippet.localeCompare(right.snippet);
+    });
+}
+
+function policyFieldEvidence(
+  artifact: Artifact,
+  policy: SecurityPolicy,
+  field: string,
+): Evidence | undefined {
+  const startLine = policy.lineByField.get(field);
+  if (startLine === undefined) return undefined;
+  const line = artifact.content.split(/\r?\n/)[startLine - 1] ?? "";
+  return {
+    path: artifact.path,
+    startLine,
+    endLine: startLine,
+    snippet: line.trim(),
+  };
 }
 
 function topCounts<Key extends string>(

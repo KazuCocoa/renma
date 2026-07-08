@@ -94,7 +94,7 @@ For a runnable mini-repository with a skill, shared context assets, ownership me
 
 renma commands fall into a few groups:
 
-- Inventory and ownership: `catalog` lists discovered assets and references, `ownership` summarizes owned and unowned assets, and `graph` shows relationships between catalog nodes.
+- Inventory and ownership: `catalog` lists discovered assets and references, `ownership` summarizes owned and unowned assets, `graph` shows relationships between catalog nodes, and `trust-graph` exposes deterministic trust evidence.
 - Local inspection and authoring: `inspect` reads one file as an outline or exact line slice, `scaffold` creates starter assets or authoring prompts, `suggest-metadata` emits safe metadata retrofit guidance for existing assets, and `suggest-semantic-split` packages source context and helper commands so a human or coding agent can draft a split for mixed-purpose Markdown.
 - Review and CI: `scan` emits deterministic findings, `readiness` turns repository state into checks and a score, `diff` compares two refs, and `ci-report` formats the comparison for pull-request review.
 
@@ -108,7 +108,7 @@ renma scan . --format json
 renma scan . --fail-on high
 ```
 
-Use `--fail-on` in CI when findings at or above a severity should fail the job. The JSON output includes findings, evidence, diagnostics, `diagnosticsV2`, `reviewBundles`, and summary data that other tools can consume.
+Use `--fail-on` in CI when findings at or above a severity should fail the job. The JSON output includes findings, evidence, diagnostics, `diagnosticsV2`, `reviewBundles`, `trustGraph`, and summary data that other tools can consume.
 
 Output includes scan findings, discovery or catalog diagnostics, the effective exit threshold, and evidence paths or snippets for each finding. `diagnosticsV2` adds typed repair constraints, structured verification steps, and concise LLM hints; `reviewBundles` groups related diagnostics for code review.
 
@@ -172,6 +172,22 @@ When `--focus` is provided, renma keeps the matched asset, its directly connecte
 Note: this graph `focus` argument is a CLI option. It is not a metadata field on an asset.
 
 Output includes graph nodes, relationship edges, unresolved targets, and diagnostics. Mermaid output renders the same graph as a diagram definition.
+
+### `trust-graph`
+
+Prints deterministic Trust Graph evidence derived from catalog, graph, scan, and security policy data.
+
+```bash
+renma trust-graph .
+renma trust-graph . --format markdown
+renma trust-graph . --format json
+```
+
+Use this when a reviewer or downstream tool needs one stable evidence layer that links assets to owners, lifecycle status, declared dependencies, selected security profiles, effective policy fingerprints, and diagnostics.
+
+Trust Graph is repository evidence. It does not compute a trust score, select or inject runtime context, assemble prompts, call an LLM, collect telemetry, or enforce policy at runtime.
+
+Output includes stable node IDs, stable edge IDs, source evidence where parser support exists, normalized effective policy fingerprints, diagnostic links, and compact summary counts. JSON is the source of truth; Markdown is a review-oriented summary.
 
 ### `inspect`
 
@@ -309,6 +325,7 @@ Use `--format <format>` to select output and `--json` as a shortcut where the co
 | `diff` | `json`, `markdown` |
 | `ci-report` | `json`, `markdown` |
 | `graph` | `json`, `markdown`, `mermaid` |
+| `trust-graph` | `json`, `markdown` |
 | `inspect` | `text`, `json` |
 | `scaffold` | `file`, `prompt`, `json` |
 | `suggest-metadata` | `prompt`, `json` |

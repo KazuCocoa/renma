@@ -185,6 +185,8 @@ Renma can also summarize the effective static policy surface across discovered a
 
 The inventory reports policy coverage, network/upload/secrets booleans, human approval requirements, approved destinations, forbidden inputs, disallowed commands, and profile resolution counts. It is reporting-only in v1 and does not enforce runtime behavior.
 
+`renma trust-graph` also includes effective policy evidence. Each effective policy node uses a deterministic fingerprint over normalized allowed data, forbidden inputs, network/upload/secrets booleans, human approval requirement, approved destinations, and disallowed commands. The graph links assets to selected `security_profile` values and to their effective policy fingerprint; it does not enforce the policy at runtime.
+
 ### Security-aware semantic diff
 
 `renma diff` and `renma ci-report` can summarize how security posture and effective security policy inventory changed between two revisions.
