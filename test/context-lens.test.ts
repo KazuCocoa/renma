@@ -553,7 +553,7 @@ test("summarizeContextLensGovernance keeps output order stable", () => {
   );
 });
 
-test("scan uses generic missing id and owner finding titles for contexts and lenses", async () => {
+test("scan uses generic missing id finding titles for contexts and lenses", async () => {
   const root = await fixture();
   await mkdir(path.join(root, "contexts", "testing"), { recursive: true });
   await mkdir(path.join(root, "lenses", "testing"), { recursive: true });
@@ -568,10 +568,7 @@ test("scan uses generic missing id and owner finding titles for contexts and len
 
   const result = await scan(root);
   const missingFindings = result.findings
-    .filter(
-      (finding) =>
-        finding.id === "META-MISSING-ID" || finding.id === "META-MISSING-OWNER",
-    )
+    .filter((finding) => finding.id === "META-MISSING-ID")
     .map((finding) => ({
       path: finding.evidence.path,
       title: finding.title,
@@ -583,18 +580,14 @@ test("scan uses generic missing id and owner finding titles for contexts and len
       title: "Asset is missing an id",
     },
     {
-      path: "contexts/testing/missing.md",
-      title: "Asset is missing an owner",
-    },
-    {
       path: "lenses/testing/missing.md",
       title: "Asset is missing an id",
     },
-    {
-      path: "lenses/testing/missing.md",
-      title: "Asset is missing an owner",
-    },
   ]);
+  assert.equal(
+    result.findings.some((finding) => finding.id === "META-MISSING-OWNER"),
+    false,
+  );
 });
 
 test("scan reports active context lenses that are not referenced by skills", async () => {

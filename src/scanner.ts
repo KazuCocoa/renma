@@ -68,7 +68,10 @@ export async function scan(
 }
 
 function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
-  return diagnostics.map((diagnostic) => {
+  const findingDiagnostics = diagnostics.filter(
+    (diagnostic) => !/missing an owner/i.test(diagnostic.message),
+  );
+  return findingDiagnostics.map((diagnostic) => {
     const path = diagnostic.path ?? "(catalog)";
     const invalidStatus = diagnostic.message.match(/Invalid status "([^"]+)"/);
     if (invalidStatus) {
@@ -254,7 +257,6 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
     }
 
     const missingId = /missing an id/i.test(diagnostic.message);
-    const missingOwner = /missing an owner/i.test(diagnostic.message);
     const unknownDependency = /does not match a catalog entry/i.test(
       diagnostic.message,
     );
@@ -264,22 +266,18 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
     return {
       id: missingId
         ? DIAGNOSTIC_IDS.META_MISSING_ID
-        : missingOwner
-          ? DIAGNOSTIC_IDS.META_MISSING_OWNER
-          : unknownDependency
-            ? DIAGNOSTIC_IDS.META_UNKNOWN_DEPENDENCY
-            : inactiveDependency
-              ? DIAGNOSTIC_IDS.META_INACTIVE_DEPENDENCY
-              : DIAGNOSTIC_IDS.META_CATALOG_DIAGNOSTIC,
+        : unknownDependency
+          ? DIAGNOSTIC_IDS.META_UNKNOWN_DEPENDENCY
+          : inactiveDependency
+            ? DIAGNOSTIC_IDS.META_INACTIVE_DEPENDENCY
+            : DIAGNOSTIC_IDS.META_CATALOG_DIAGNOSTIC,
       title: missingId
         ? "Asset is missing an id"
-        : missingOwner
-          ? "Asset is missing an owner"
-          : unknownDependency
-            ? "Metadata dependency target is unknown"
-            : inactiveDependency
-              ? "Metadata dependency targets an inactive asset"
-              : "Catalog metadata diagnostic",
+        : unknownDependency
+          ? "Metadata dependency target is unknown"
+          : inactiveDependency
+            ? "Metadata dependency targets an inactive asset"
+            : "Catalog metadata diagnostic",
       category: "maintenance",
       severity: "medium",
       confidence: "high",
@@ -292,7 +290,7 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
       whyItMatters:
         "Catalog metadata is part of the repository governance contract. Missing or malformed metadata makes asset ownership, lifecycle, and relationships harder to review and validate.",
       remediation:
-        "Update the asset metadata so catalog construction can identify the asset and its owner.",
+        "Update the asset metadata so catalog construction can identify the asset and validate declared relationships.",
       constraints: [
         "Do not introduce runtime context resolution.",
         "Do not create prompt packages.",
@@ -304,7 +302,7 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
         "Run any project-specific validation checks that apply to this repository.",
       ],
       llmHint:
-        "Add missing asset governance metadata using the repository's existing frontmatter style, then rerun scan and catalog.",
+        "Add or correct asset governance metadata using the repository's existing frontmatter style, then rerun scan and catalog.",
       ...(diagnostic.details ? { details: diagnostic.details } : {}),
     };
   });

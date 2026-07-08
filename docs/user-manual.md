@@ -242,7 +242,7 @@ renma ownership . --format json
 
 Use this to find unowned assets, review what each owner is responsible for, and filter the report to assets owned by a specific owner.
 
-Output includes total asset count, owned asset count, ownership coverage, owner groups, and assets without declared owner. `--owner <owner>` keeps the repository-level totals for context and adds filtered matched assets for that owner. `--include-owned` also includes the backward-compatible flat owned asset list.
+Output includes total asset count, owned asset count, ownership coverage, owner groups, and assets without declared owner. `--owner <owner>` keeps the repository-level totals for context and adds filtered matched assets for that owner. Filtered JSON reports omit `unownedAssetList` so the repository-level `unownedAssets` count is not confused with owner-filtered asset details. `--include-owned` also includes the backward-compatible flat owned asset list.
 
 #### Ownership policy
 

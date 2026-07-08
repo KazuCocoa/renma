@@ -21,7 +21,7 @@ test("ownership report counts all assets owned", async () => {
   assert.equal(report.ownedAssets, 2);
   assert.equal(report.unownedAssets, 0);
   assert.equal(report.coveragePercent, 100);
-  assert.deepEqual(report.unownedAssetList, []);
+  assert.deepEqual(report.unownedAssetList ?? [], []);
   assert.deepEqual(report.byKind, [
     {
       kind: "skill",
@@ -77,7 +77,7 @@ test("ownership report lists mixed owned and unowned assets", async () => {
   assert.equal(report.ownedAssets, 1);
   assert.equal(report.unownedAssets, 1);
   assert.equal(report.coveragePercent, 50);
-  assert.deepEqual(report.unownedAssetList, [
+  assert.deepEqual(report.unownedAssetList ?? [], [
     {
       id: "unowned",
       kind: "skill",
@@ -100,7 +100,7 @@ test("ownership report treats empty and whitespace owners as unowned", async () 
   assert.equal(report.ownedAssets, 1);
   assert.equal(report.unownedAssets, 2);
   assert.deepEqual(
-    report.unownedAssetList.map((asset) => asset.id),
+    (report.unownedAssetList ?? []).map((asset) => asset.id),
     ["empty", "whitespace"],
   );
 });
@@ -114,7 +114,7 @@ test("ownership report uses stable deterministic ordering", async () => {
   const report = await ownership(root);
 
   assert.deepEqual(
-    report.unownedAssetList.map((asset) => [
+    (report.unownedAssetList ?? []).map((asset) => [
       asset.kind,
       asset.sourcePath,
       asset.id,
@@ -327,7 +327,7 @@ test("ownership --owner filters owned assets in JSON", async () => {
       tags: ["testing"],
     },
   ]);
-  assert.deepEqual(report.unownedAssetList, []);
+  assert.equal("unownedAssetList" in report, false);
 });
 
 test("ownership --owner unknown owner returns empty successful result", async () => {
@@ -369,6 +369,8 @@ test("ownership --owner markdown shows owner-centric filtered section", async ()
     result.stdout,
     /\| spec-review-basic \| skill \| skills\/spec-review-basic\/SKILL\.md \| stable \| testing \|/,
   );
+  assert.equal(result.stdout.match(/\| spec-review-basic \|/g)?.length, 1);
+  assert.doesNotMatch(result.stdout, /## Owned Assets/);
   assert.doesNotMatch(result.stdout, /release-notes/);
   assert.doesNotMatch(result.stdout, /## Unowned Assets/);
 });

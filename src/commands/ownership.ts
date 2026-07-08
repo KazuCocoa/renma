@@ -54,7 +54,7 @@ export interface OwnershipReport {
   coveragePercent: number;
   byKind: OwnershipKindSummary[];
   owners: OwnershipOwnerSummary[];
-  unownedAssetList: UnownedAsset[];
+  unownedAssetList?: UnownedAsset[];
   ownedAssetList?: OwnedAsset[];
   diagnostics?: Diagnostic[];
 }
@@ -115,7 +115,7 @@ export async function ownership(
     coveragePercent: percent(ownedAssets, totalAssets),
     byKind: summarizeByKind(assets),
     owners: summarizeByOwner(filteredOwnedAssetList),
-    unownedAssetList: ownerFilter ? [] : unownedAssetList,
+    ...(ownerFilter ? {} : { unownedAssetList }),
     ...(options.includeOwned || ownerFilter
       ? { ownedAssetList: filteredOwnedAssetList }
       : {}),
@@ -172,10 +172,10 @@ export function formatOwnershipMarkdown(report: OwnershipReport): string {
     lines.push("## Owners", "");
     appendOwners(lines, report.owners);
     lines.push("", "## Unowned Assets", "");
-    appendUnownedAssets(lines, report.unownedAssetList);
+    appendUnownedAssets(lines, report.unownedAssetList ?? []);
   }
 
-  if (report.ownedAssetList) {
+  if (report.ownedAssetList && !report.ownerFilter) {
     lines.push("", "## Owned Assets", "");
     if (report.ownedAssetList.length === 0) {
       lines.push("(none)");
