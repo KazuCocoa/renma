@@ -28,6 +28,11 @@ import {
 } from "./commands/scaffold.js";
 import { runScanCommand } from "./commands/scan.js";
 import {
+  runSuggestMetadataCommand,
+  SuggestMetadataTargetError,
+  type SuggestMetadataFormat,
+} from "./commands/suggest-metadata.js";
+import {
   runSuggestSemanticSplitCommand,
   type SuggestSemanticSplitFormat,
 } from "./commands/suggest-semantic-split.js";
@@ -88,6 +93,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     command !== "ownership" &&
     command !== "readiness" &&
     command !== "scaffold" &&
+    command !== "suggest-metadata" &&
     command !== "suggest-semantic-split" &&
     command !== "inspect"
   ) {
@@ -100,6 +106,14 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
   if (command === "suggest-semantic-split") {
     return runSuggestSemanticSplit(parsed.values, target);
+  }
+
+  if (command === "suggest-metadata") {
+    return runSuggestMetadata(
+      parsed.values,
+      target,
+      parsed.positionals.length > 1,
+    );
   }
 
   if (command === "scaffold") {
@@ -479,6 +493,37 @@ function runSuggestSemanticSplit(
   });
 }
 
+function runSuggestMetadata(
+  values: CliValues,
+  target: string,
+  targetProvided: boolean,
+): Promise<number> {
+  if (!targetProvided) {
+    console.error("suggest-metadata requires a target file.");
+    return Promise.resolve(2);
+  }
+
+  const format = values.json
+    ? "json"
+    : (stringValue(values.format) ?? "prompt");
+  if (format !== "prompt" && format !== "json") {
+    console.error("--format must be either prompt or json.");
+    return Promise.resolve(2);
+  }
+
+  const owner = stringValue(values.owner)?.trim();
+  return runSuggestMetadataCommand(target, {
+    format: format as SuggestMetadataFormat,
+    ...(owner ? { owner } : {}),
+  }).catch((error: unknown) => {
+    if (error instanceof SuggestMetadataTargetError) {
+      console.error(error.message);
+      return 2;
+    }
+    throw error;
+  });
+}
+
 function runInspect(values: CliValues, target: string): Promise<number> {
   const format = values.json ? "json" : (stringValue(values.format) ?? "json");
   if (format !== "text" && format !== "json") {
@@ -553,6 +598,7 @@ function helpText(): string {
     "  renma ownership [path] [options]",
     "  renma readiness [path] [options]",
     "  renma inspect <file> [options]",
+    "  renma suggest-metadata <file> [options]",
     "  renma suggest-semantic-split <file> [options]",
     "",
     "Commands:",
@@ -565,6 +611,7 @@ function helpText(): string {
     "  ownership                  Print deterministic ownership coverage report",
     "  readiness                  Print deterministic agent readiness report",
     "  inspect                    Inspect repository files/assets by outline or exact line slice",
+    "  suggest-metadata           Print a Codex-ready metadata retrofit prompt",
     "  suggest-semantic-split     Print a Codex-ready semantic split prompt",
     "",
     "The inspect command is an inspection helper; it does not choose task context or assemble prompts.",
@@ -572,12 +619,12 @@ function helpText(): string {
     "Options:",
     "  -c, --config <path>        scan: read JSON config from path",
     "      --fail-on <level>      scan: exit 1 when findings meet severity: low, medium, high, critical",
-    "      --format <format>      scan: text or json; catalog/ownership/readiness/ci-report: json or markdown; graph: json, markdown, or mermaid; suggest-semantic-split: prompt or json",
+    "      --format <format>      scan: text or json; catalog/ownership/readiness/ci-report: json or markdown; graph: json, markdown, or mermaid; suggest-metadata/suggest-semantic-split: prompt or json",
     "      --include-owned        ownership: include owned asset details",
     "      --json                 Shortcut for --format json",
     "      --view <view>          graph: summary, workflow, full, layered, or lens",
     "      --focus <asset-id-or-path>",
-    "      --owner <owner>       ownership: filter assets by owner; scaffold: declare owner metadata",
+    "      --owner <owner>        ownership: filter assets by owner; scaffold: declare owner metadata; suggest-metadata: explicitly suggest owner",
     "      --title <title>",
     "      --tags <tags>",
     "      --lines <range>        inspect: exact line range, e.g. L10-L42",

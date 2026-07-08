@@ -1082,6 +1082,10 @@ test("help and invalid commands have expected exit codes", async () => {
     help.stdout,
     /scaffold\s+Create deterministic authoring scaffolds and prompts/,
   );
+  assert.match(
+    help.stdout,
+    /suggest-metadata\s+Print a Codex-ready metadata retrofit prompt/,
+  );
   assert.equal(invalid.code, 2);
   assert.match(invalid.stderr, /Unknown command "wat"/);
 });
