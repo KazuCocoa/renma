@@ -285,6 +285,7 @@ renma scan . --format json
 renma scan . --fail-on high
 renma catalog . --format json
 renma ownership . --include-owned
+renma ownership . --owner qa-platform
 renma graph . --format mermaid
 renma graph . --focus skill.testing.spec-review --view full
 renma readiness .
@@ -386,7 +387,7 @@ Useful metadata includes:
 
 - `id`: Stable catalog ID
 - `title`: Human-readable asset title
-- `owner`: Team, person, or group responsible for the asset
+- `owner`: Recommended team, person, or group responsible for the asset
 - `status`: Lifecycle state such as `experimental`, `stable`, `deprecated`, or `archived`
 - `version`: Asset version when the repository uses explicit versioning
 - `last_reviewed_at`: ISO date for the last human review, such as `2026-06-28`
@@ -399,6 +400,14 @@ Useful metadata includes:
 - `superseded_by`: Replacement asset when this asset is deprecated
 
 Renma can infer some information from paths and headings, but explicit metadata makes ownership and dependency reports much more valuable.
+
+### Ownership policy
+
+Renma treats `owner` as governance metadata. Declaring an owner is recommended because it makes context assets easier to review, maintain, and share across teams.
+
+However, owner metadata is not globally required yet. Assets without an owner are accepted and reported as unowned in the ownership coverage report.
+
+Renma does not infer owners automatically. If an asset is unowned, choose an owner through human review or team policy.
 
 Renma reads deterministic frontmatter from skills and context assets. YAML-style block lists are supported for selected metadata fields, which keeps authored metadata explicit and reviewable:
 

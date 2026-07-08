@@ -236,12 +236,21 @@ Reports asset ownership.
 ```bash
 renma ownership .
 renma ownership . --include-owned
+renma ownership . --owner qa-platform
 renma ownership . --format json
 ```
 
-Use this to find unowned assets and to review what each owner is responsible for.
+Use this to find unowned assets, review what each owner is responsible for, and filter the report to assets owned by a specific owner.
 
-Output includes total asset count, owned asset count, ownership coverage, unowned assets, and optionally owned asset details when `--include-owned` is provided.
+Output includes total asset count, owned asset count, ownership coverage, owner groups, and assets without declared owner. `--owner <owner>` keeps the repository-level totals for context and adds filtered matched assets for that owner. `--include-owned` also includes the backward-compatible flat owned asset list.
+
+#### Ownership policy
+
+Renma treats `owner` as governance metadata. Declaring an owner is recommended because it makes context assets easier to review, maintain, and share across teams.
+
+However, owner metadata is not globally required yet. Assets without an owner are accepted and reported as unowned in the ownership coverage report.
+
+Renma does not infer owners automatically. If an asset is unowned, choose an owner through human review or team policy.
 
 ### `scaffold`
 

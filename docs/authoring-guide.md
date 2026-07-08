@@ -54,7 +54,7 @@ Use these fields consistently:
 
 - `id`: stable catalog asset ID. It should be deterministic and should not change when the file moves unless the asset's identity changes.
 - `title`: human-readable title.
-- `owner`: real owning team or maintainer. Avoid placeholder ownership in shared assets.
+- `owner`: recommended real owning team or maintainer. Avoid placeholder ownership in shared assets.
 - `status`: lifecycle only: `experimental`, `stable`, `deprecated`, or `archived`.
 - `version`: optional asset metadata. It is not the npm package version.
 - `type`: optional discriminator. Currently only `context_lens` has defined catalog meaning, and only for context files.
@@ -66,6 +66,14 @@ Use these fields consistently:
 - `purpose`, `focus`, and `expected_outputs`: compact lens metadata for deterministic Context Lens governance review.
 - `conflicts`: assets that should not be used together without review.
 - `superseded_by`: replacement or migration relationships for deprecated or archived content.
+
+### Ownership policy
+
+Renma treats `owner` as governance metadata. Declaring an owner is recommended because it makes context assets easier to review, maintain, and share across teams.
+
+However, owner metadata is not globally required yet. Assets without an owner are accepted and reported as unowned in the ownership coverage report.
+
+Renma does not infer owners automatically. If an asset is unowned, choose an owner through human review or team policy.
 
 The supported list-style metadata fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `requires_lens`, `optional_lens`, `applies_to`, `focus`, `expected_outputs`, `conflicts`, and `superseded_by`.
 

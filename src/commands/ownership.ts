@@ -30,15 +30,30 @@ export interface OwnedAsset {
   tags: string[];
 }
 
+export interface OwnershipOwnerKindSummary {
+  kind: AssetKind;
+  totalAssets: number;
+}
+
+export interface OwnershipOwnerSummary {
+  owner: string;
+  totalAssets: number;
+  byKind: OwnershipOwnerKindSummary[];
+  assets: Omit<OwnedAsset, "owner">[];
+}
+
 export interface OwnershipReport {
   root: string;
   configPath?: string;
   scannedFileCount: number;
+  ownerFilter?: string;
   totalAssets: number;
+  matchedAssets?: number;
   ownedAssets: number;
   unownedAssets: number;
   coveragePercent: number;
   byKind: OwnershipKindSummary[];
+  owners: OwnershipOwnerSummary[];
   unownedAssetList: UnownedAsset[];
   ownedAssetList?: OwnedAsset[];
   diagnostics?: Diagnostic[];
@@ -49,11 +64,14 @@ export async function runOwnershipCommand(
   options: {
     format: OwnershipFormat;
     includeOwned?: boolean;
+    owner?: string;
     overrides?: ConfigOverrides;
   },
 ): Promise<number> {
+  const owner = options.owner?.trim();
   const report = await ownership(targetPath, options.overrides ?? {}, {
     includeOwned: options.includeOwned ?? false,
+    ...(owner ? { owner } : {}),
   });
   process.stdout.write(
     options.format === "json"
@@ -70,28 +88,37 @@ export async function runOwnershipCommand(
 export async function ownership(
   targetPath: string,
   overrides: ConfigOverrides = {},
-  options: { includeOwned?: boolean } = {},
+  options: { includeOwned?: boolean; owner?: string } = {},
 ): Promise<OwnershipReport> {
   const result = await catalog(targetPath, overrides);
   const assets = stableAssets(result.catalog.assets);
+  const ownerFilter = options.owner?.trim();
   const totalAssets = assets.length;
   const ownedAssets = assets.filter(hasOwner).length;
   const unownedAssetList = assets
     .filter((asset) => !hasOwner(asset))
     .map(toUnownedAsset);
   const ownedAssetList = assets.filter(hasOwner).map(toOwnedAsset);
+  const filteredOwnedAssetList = ownerFilter
+    ? ownedAssetList.filter((asset) => asset.owner === ownerFilter)
+    : ownedAssetList;
 
   return {
     root: result.root,
     ...(result.configPath ? { configPath: result.configPath } : {}),
     scannedFileCount: result.scannedFileCount,
+    ...(ownerFilter ? { ownerFilter } : {}),
     totalAssets,
+    ...(ownerFilter ? { matchedAssets: filteredOwnedAssetList.length } : {}),
     ownedAssets,
     unownedAssets: totalAssets - ownedAssets,
     coveragePercent: percent(ownedAssets, totalAssets),
     byKind: summarizeByKind(assets),
-    unownedAssetList,
-    ...(options.includeOwned ? { ownedAssetList } : {}),
+    owners: summarizeByOwner(filteredOwnedAssetList),
+    unownedAssetList: ownerFilter ? [] : unownedAssetList,
+    ...(options.includeOwned || ownerFilter
+      ? { ownedAssetList: filteredOwnedAssetList }
+      : {}),
     ...(result.diagnostics.length > 0
       ? { diagnostics: result.diagnostics }
       : {}),
@@ -113,6 +140,12 @@ export function formatOwnershipMarkdown(report: OwnershipReport): string {
     `- Owned assets: ${report.ownedAssets}`,
     `- Unowned assets: ${report.unownedAssets}`,
     `- Coverage: ${report.coveragePercent}%`,
+    ...(report.ownerFilter
+      ? [
+          `- Owner filter: ${report.ownerFilter}`,
+          `- Matched assets: ${report.matchedAssets ?? 0}`,
+        ]
+      : []),
     "",
     "## By Kind",
     "",
@@ -123,20 +156,23 @@ export function formatOwnershipMarkdown(report: OwnershipReport): string {
         `| ${summary.kind} | ${summary.totalAssets} | ${summary.ownedAssets} | ${summary.unownedAssets} | ${summary.coveragePercent}% |`,
     ),
     "",
-    "## Unowned Assets",
-    "",
   ];
 
-  if (report.unownedAssetList.length === 0) {
-    lines.push("(none)");
-  } else {
-    lines.push("| ID | Kind | Source | Status | Tags |");
-    lines.push("| --- | --- | --- | --- | --- |");
-    for (const asset of report.unownedAssetList) {
-      lines.push(
-        `| ${asset.id} | ${asset.kind} | ${asset.sourcePath} | ${asset.status ?? ""} | ${asset.tags.join(", ")} |`,
-      );
+  if (report.ownerFilter) {
+    lines.push(`## Owner: ${report.ownerFilter}`, "");
+    const owner = report.owners.find(
+      (summary) => summary.owner === report.ownerFilter,
+    );
+    if (!owner) {
+      lines.push("(none)");
+    } else {
+      appendOwnerAssets(lines, owner.assets);
     }
+  } else {
+    lines.push("## Owners", "");
+    appendOwners(lines, report.owners);
+    lines.push("", "## Unowned Assets", "");
+    appendUnownedAssets(lines, report.unownedAssetList);
   }
 
   if (report.ownedAssetList) {
@@ -165,6 +201,60 @@ export function formatOwnershipMarkdown(report: OwnershipReport): string {
   return `${lines.join("\n")}\n`;
 }
 
+function appendOwners(lines: string[], owners: OwnershipOwnerSummary[]): void {
+  if (owners.length === 0) {
+    lines.push("(none)");
+    return;
+  }
+
+  for (const [index, owner] of owners.entries()) {
+    if (index > 0) lines.push("");
+    lines.push(`### ${owner.owner}`, "");
+    lines.push(`- Total assets: ${owner.totalAssets}`);
+    lines.push("");
+    lines.push("| Kind | Total |");
+    lines.push("| --- | ---: |");
+    for (const summary of owner.byKind) {
+      lines.push(`| ${summary.kind} | ${summary.totalAssets} |`);
+    }
+    lines.push("");
+    appendOwnerAssets(lines, owner.assets);
+  }
+}
+
+function appendOwnerAssets(
+  lines: string[],
+  assets: Omit<OwnedAsset, "owner">[],
+): void {
+  if (assets.length === 0) {
+    lines.push("(none)");
+    return;
+  }
+
+  lines.push("| ID | Kind | Source | Status | Tags |");
+  lines.push("| --- | --- | --- | --- | --- |");
+  for (const asset of assets) {
+    lines.push(
+      `| ${asset.id} | ${asset.kind} | ${asset.sourcePath} | ${asset.status ?? ""} | ${asset.tags.join(", ")} |`,
+    );
+  }
+}
+
+function appendUnownedAssets(lines: string[], assets: UnownedAsset[]): void {
+  if (assets.length === 0) {
+    lines.push("(none)");
+    return;
+  }
+
+  lines.push("| ID | Kind | Source | Status | Tags |");
+  lines.push("| --- | --- | --- | --- | --- |");
+  for (const asset of assets) {
+    lines.push(
+      `| ${asset.id} | ${asset.kind} | ${asset.sourcePath} | ${asset.status ?? ""} | ${asset.tags.join(", ")} |`,
+    );
+  }
+}
+
 function summarizeByKind(assets: Asset[]): OwnershipKindSummary[] {
   const summaries = new Map<
     AssetKind,
@@ -188,6 +278,46 @@ function summarizeByKind(assets: Asset[]): OwnershipKindSummary[] {
       unownedAssets: summary.totalAssets - summary.ownedAssets,
       coveragePercent: percent(summary.ownedAssets, summary.totalAssets),
     }))
+    .sort((left, right) => left.kind.localeCompare(right.kind));
+}
+
+function summarizeByOwner(assets: OwnedAsset[]): OwnershipOwnerSummary[] {
+  const summaries = new Map<string, OwnedAsset[]>();
+  for (const asset of assets) {
+    const ownerAssets = summaries.get(asset.owner) ?? [];
+    ownerAssets.push(asset);
+    summaries.set(asset.owner, ownerAssets);
+  }
+
+  return [...summaries.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([owner, ownerAssets]) => ({
+      owner,
+      totalAssets: ownerAssets.length,
+      byKind: summarizeOwnerByKind(ownerAssets),
+      assets: ownerAssets.map(toOwnerAsset),
+    }));
+}
+
+function toOwnerAsset(asset: OwnedAsset): Omit<OwnedAsset, "owner"> {
+  return {
+    id: asset.id,
+    kind: asset.kind,
+    sourcePath: asset.sourcePath,
+    status: asset.status,
+    tags: asset.tags,
+  };
+}
+
+function summarizeOwnerByKind(
+  assets: OwnedAsset[],
+): OwnershipOwnerKindSummary[] {
+  const summaries = new Map<AssetKind, number>();
+  for (const asset of assets) {
+    summaries.set(asset.kind, (summaries.get(asset.kind) ?? 0) + 1);
+  }
+  return [...summaries.entries()]
+    .map(([kind, totalAssets]) => ({ kind, totalAssets }))
     .sort((left, right) => left.kind.localeCompare(right.kind));
 }
 

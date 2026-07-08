@@ -31,6 +31,36 @@ test("ownership report counts all assets owned", async () => {
       coveragePercent: 100,
     },
   ]);
+  assert.deepEqual(report.owners, [
+    {
+      owner: "docs",
+      totalAssets: 1,
+      byKind: [{ kind: "skill", totalAssets: 1 }],
+      assets: [
+        {
+          id: "beta",
+          kind: "skill",
+          sourcePath: "skills/beta/SKILL.md",
+          status: "stable",
+          tags: [],
+        },
+      ],
+    },
+    {
+      owner: "platform",
+      totalAssets: 1,
+      byKind: [{ kind: "skill", totalAssets: 1 }],
+      assets: [
+        {
+          id: "alpha",
+          kind: "skill",
+          sourcePath: "skills/alpha/SKILL.md",
+          status: null,
+          tags: ["core"],
+        },
+      ],
+    },
+  ]);
 });
 
 test("ownership report lists mixed owned and unowned assets", async () => {
@@ -56,6 +86,23 @@ test("ownership report lists mixed owned and unowned assets", async () => {
       tags: ["needs-owner", "mobile"],
     },
   ]);
+});
+
+test("ownership report treats empty and whitespace owners as unowned", async () => {
+  const root = await fixture();
+  await writeSkill(root, "empty", { owner: "" });
+  await writeSkill(root, "whitespace", { owner: "   " });
+  await writeSkill(root, "owned", { owner: "platform" });
+
+  const report = await ownership(root);
+
+  assert.equal(report.totalAssets, 3);
+  assert.equal(report.ownedAssets, 1);
+  assert.equal(report.unownedAssets, 2);
+  assert.deepEqual(
+    report.unownedAssetList.map((asset) => asset.id),
+    ["empty", "whitespace"],
+  );
 });
 
 test("ownership report uses stable deterministic ordering", async () => {
@@ -97,6 +144,13 @@ test("ownership markdown output includes summary", async () => {
   assert.match(markdown, /- Unowned assets: 1/);
   assert.match(markdown, /- Coverage: 50%/);
   assert.match(markdown, /\| skill \| 2 \| 1 \| 1 \| 50% \|/);
+  assert.match(markdown, /## Owners/);
+  assert.match(markdown, /### platform/);
+  assert.match(
+    markdown,
+    /\| owned \| skill \| skills\/owned\/SKILL\.md \| {2}\| {2}\|/,
+  );
+  assert.match(markdown, /## Unowned Assets/);
   assert.match(
     markdown,
     /\| unowned \| skill \| skills\/unowned\/SKILL\.md \| {2}\| todo \|/,
@@ -116,7 +170,7 @@ test("ownership CLI rejects unsupported format", async () => {
   assert.match(result.stderr, /--format must be either json or markdown\./);
 });
 
-test("ownership default output does not include owned asset details", async () => {
+test("ownership default output does not include flat owned asset list", async () => {
   const root = await fixture();
   await writeSkill(root, "owned", { owner: "platform", status: "stable" });
   await writeSkill(root, "unowned", {});
@@ -129,8 +183,8 @@ test("ownership default output does not include owned asset details", async () =
 
   assert.equal(result.code, 0);
   assert.equal("ownedAssetList" in report, false);
+  assert.equal("owners" in report, true);
   assert.doesNotMatch(markdown, /## Owned Assets/);
-  assert.doesNotMatch(markdown, /platform/);
 });
 
 test("ownership --include-owned includes ownedAssetList in JSON", async () => {
@@ -160,6 +214,163 @@ test("ownership --include-owned includes ownedAssetList in JSON", async () => {
       tags: ["core"],
     },
   ]);
+});
+
+test("ownership report groups assets by owner and kind", async () => {
+  const root = await fixture();
+  await writeSkill(root, "spec-review-basic", {
+    owner: "qa-platform",
+    status: "stable",
+    tags: ["testing", "spec-review"],
+  });
+  await writeSkill(root, "release-notes", { owner: "docs" });
+  await writeContext(root, "testing", "boundary", {
+    owner: "qa-platform",
+    tags: ["testing"],
+  });
+
+  const report = await ownership(root);
+
+  assert.deepEqual(report.owners, [
+    {
+      owner: "docs",
+      totalAssets: 1,
+      byKind: [{ kind: "skill", totalAssets: 1 }],
+      assets: [
+        {
+          id: "release-notes",
+          kind: "skill",
+          sourcePath: "skills/release-notes/SKILL.md",
+          status: null,
+          tags: [],
+        },
+      ],
+    },
+    {
+      owner: "qa-platform",
+      totalAssets: 2,
+      byKind: [
+        { kind: "context", totalAssets: 1 },
+        { kind: "skill", totalAssets: 1 },
+      ],
+      assets: [
+        {
+          id: "testing.boundary",
+          kind: "context",
+          sourcePath: "contexts/testing/boundary.md",
+          status: null,
+          tags: ["testing"],
+        },
+        {
+          id: "spec-review-basic",
+          kind: "skill",
+          sourcePath: "skills/spec-review-basic/SKILL.md",
+          status: "stable",
+          tags: ["testing", "spec-review"],
+        },
+      ],
+    },
+  ]);
+});
+
+test("ownership --owner filters owned assets in JSON", async () => {
+  const root = await fixture();
+  await writeSkill(root, "spec-review-basic", {
+    owner: "qa-platform",
+    status: "stable",
+    tags: ["testing"],
+  });
+  await writeSkill(root, "release-notes", { owner: "docs" });
+  await writeContext(root, "testing", "boundary", {
+    owner: "qa-platform",
+  });
+  await writeSkill(root, "unowned", {});
+
+  const result = await withCapturedConsole(() =>
+    main(["ownership", root, "--json", "--owner", "qa-platform"]),
+  );
+  const report = JSON.parse(result.stdout) as {
+    ownerFilter?: string;
+    totalAssets?: number;
+    ownedAssets?: number;
+    unownedAssets?: number;
+    coveragePercent?: number;
+    matchedAssets?: number;
+    owners?: Array<Record<string, unknown>>;
+    ownedAssetList?: Array<Record<string, unknown>>;
+    unownedAssetList?: Array<Record<string, unknown>>;
+  };
+
+  assert.equal(result.code, 0);
+  assert.equal(report.ownerFilter, "qa-platform");
+  assert.equal(report.totalAssets, 4);
+  assert.equal(report.ownedAssets, 3);
+  assert.equal(report.unownedAssets, 1);
+  assert.equal(report.coveragePercent, 75);
+  assert.equal(report.matchedAssets, 2);
+  assert.equal(report.owners?.length, 1);
+  assert.deepEqual(report.ownedAssetList, [
+    {
+      id: "testing.boundary",
+      kind: "context",
+      sourcePath: "contexts/testing/boundary.md",
+      owner: "qa-platform",
+      status: null,
+      tags: [],
+    },
+    {
+      id: "spec-review-basic",
+      kind: "skill",
+      sourcePath: "skills/spec-review-basic/SKILL.md",
+      owner: "qa-platform",
+      status: "stable",
+      tags: ["testing"],
+    },
+  ]);
+  assert.deepEqual(report.unownedAssetList, []);
+});
+
+test("ownership --owner unknown owner returns empty successful result", async () => {
+  const root = await fixture();
+  await writeSkill(root, "owned", { owner: "platform" });
+
+  const result = await withCapturedConsole(() =>
+    main(["ownership", root, "--json", "--owner", "qa-platform"]),
+  );
+  const report = JSON.parse(result.stdout) as {
+    matchedAssets?: number;
+    owners?: unknown[];
+    ownedAssetList?: unknown[];
+  };
+
+  assert.equal(result.code, 0);
+  assert.equal(report.matchedAssets, 0);
+  assert.deepEqual(report.owners, []);
+  assert.deepEqual(report.ownedAssetList, []);
+});
+
+test("ownership --owner markdown shows owner-centric filtered section", async () => {
+  const root = await fixture();
+  await writeSkill(root, "spec-review-basic", {
+    owner: "qa-platform",
+    status: "stable",
+    tags: ["testing"],
+  });
+  await writeSkill(root, "release-notes", { owner: "docs" });
+
+  const result = await withCapturedConsole(() =>
+    main(["ownership", root, "--format", "markdown", "--owner", "qa-platform"]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /## Owner: qa-platform/);
+  assert.match(result.stdout, /- Matched assets: 1/);
+  assert.match(
+    result.stdout,
+    /\| spec-review-basic \| skill \| skills\/spec-review-basic\/SKILL\.md \| stable \| testing \|/,
+  );
+  assert.doesNotMatch(result.stdout, /release-notes/);
+  assert.doesNotMatch(result.stdout, /## Unowned Assets/);
 });
 
 test("ownership --include-owned adds markdown Owned Assets section", async () => {
@@ -252,7 +463,7 @@ function markdown(metadata: {
   return [
     "---",
     `id: ${metadata.id}`,
-    ...(metadata.owner ? [`owner: ${metadata.owner}`] : []),
+    ...(metadata.owner !== undefined ? [`owner: ${metadata.owner}`] : []),
     ...(metadata.status ? [`status: ${metadata.status}`] : []),
     ...(metadata.tags ? [`tags: ${metadata.tags.join(", ")}`] : []),
     "---",
