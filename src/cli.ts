@@ -397,9 +397,11 @@ async function runOwnership(
   };
 
   try {
+    const owner = stringValue(values.owner)?.trim();
     return await runOwnershipCommand(target, {
       format: format as OwnershipFormat,
       includeOwned: values["include-owned"] === true,
+      ...(owner ? { owner } : {}),
       overrides,
     });
   } catch (error) {
@@ -575,7 +577,7 @@ function helpText(): string {
     "      --json                 Shortcut for --format json",
     "      --view <view>          graph: summary, workflow, full, layered, or lens",
     "      --focus <asset-id-or-path>",
-    "      --owner <owner>",
+    "      --owner <owner>       ownership: filter assets by owner; scaffold: declare owner metadata",
     "      --title <title>",
     "      --tags <tags>",
     "      --lines <range>        inspect: exact line range, e.g. L10-L42",

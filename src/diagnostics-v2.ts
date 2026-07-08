@@ -241,7 +241,6 @@ function specificRepairConstraints(code: string): RepairConstraint[] {
 
   if (
     code === DIAGNOSTIC_IDS.META_MISSING_ID ||
-    code === DIAGNOSTIC_IDS.META_MISSING_OWNER ||
     code === CONTEXT_LENS_DIAGNOSTIC_CODES.MISSING_REQUIRED_FIELD
   ) {
     return [
