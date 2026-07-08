@@ -19,17 +19,20 @@ test("skill and context without policy metadata are counted as missing", () => {
   const summary = summarizeSecurityPolicyInventory([
     artifact("skills/demo/SKILL.md", "skill", "# Demo\n"),
     artifact("contexts/testing/demo.md", "context", "# Demo\n"),
+    artifact("lenses/testing/demo.md", "context_lens", "# Demo\n"),
   ]);
 
-  assert.equal(summary.totalPolicyAssets, 2);
+  assert.equal(summary.totalPolicyAssets, 3);
   assert.equal(summary.assetsWithPolicyMetadata, 0);
-  assert.equal(summary.assetsMissingPolicyMetadata, 2);
+  assert.equal(summary.assetsMissingPolicyMetadata, 3);
   assert.equal(summary.assetKinds.skill, 1);
   assert.equal(summary.assetKinds.context, 1);
-  assert.equal(summary.networkAllowed.unspecified, 2);
-  assert.equal(summary.securityProfiles.none, 2);
+  assert.equal(summary.assetKinds.context_lens, 1);
+  assert.equal(summary.networkAllowed.unspecified, 3);
+  assert.equal(summary.securityProfiles.none, 3);
   assert.deepEqual(summary.missingPolicyAssets, [
     { path: "contexts/testing/demo.md", kind: "context" },
+    { path: "lenses/testing/demo.md", kind: "context_lens" },
     { path: "skills/demo/SKILL.md", kind: "skill" },
   ]);
 });

@@ -88,6 +88,7 @@ export interface SecurityPolicyAssetEvidence {
 const POLICY_INVENTORY_KINDS = new Set<ArtifactKind>([
   "skill",
   "context",
+  "context_lens",
   "agent",
   "profile",
   "reference",
@@ -98,6 +99,7 @@ const POLICY_INVENTORY_KINDS = new Set<ArtifactKind>([
 const ASSET_KINDS: InventoryArtifactKind[] = [
   "skill",
   "context",
+  "context_lens",
   "agent",
   "profile",
   "reference",
@@ -290,7 +292,9 @@ function isMissingPolicyMetadataAsset(
   effectivePolicy: SecurityPolicy,
 ): boolean {
   return (
-    (artifact.kind === "skill" || artifact.kind === "context") &&
+    (artifact.kind === "skill" ||
+      artifact.kind === "context" ||
+      artifact.kind === "context_lens") &&
     effectiveAllowedDataClass(effectivePolicy) === undefined &&
     effectiveAllowedDataList(effectivePolicy).length === 0 &&
     !hasLocalSecurityPolicyMetadata(parsedPolicy)

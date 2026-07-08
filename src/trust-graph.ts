@@ -358,6 +358,8 @@ function diagnosticNode(finding: TrustGraphFinding): TrustGraphNode {
 }
 
 function assetNodeId(asset: Asset): string {
+  // Trust Graph v1 keeps asset IDs logical. Duplicate-id diagnostics preserve
+  // per-source evidence when multiple catalog assets share the same id.
   return `asset:${asset.id}`;
 }
 

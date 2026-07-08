@@ -8,6 +8,7 @@ import {
   formatTrustGraphMarkdown,
   trustGraph,
 } from "../src/commands/trust-graph.js";
+import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
 
 test("Trust Graph JSON is deterministic and sorted", async () => {
   const root = await fixture();
@@ -151,6 +152,74 @@ test("Trust Graph links selected security profiles and effective policy evidence
   );
 });
 
+test("Trust Graph links context lens security profiles and effective policy evidence", async () => {
+  const root = await fixture();
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({
+      security: {
+        approvedDomains: [],
+        approvedUploadDomains: [],
+        disallowedCommands: [],
+        profiles: {
+          "lens-local": {
+            allowedData: ["public"],
+            forbiddenInputs: ["credentials"],
+            networkAllowed: false,
+            externalUploadAllowed: false,
+            secretsAllowed: false,
+            humanApprovalRequired: true,
+            approvedDomains: [],
+            approvedUploadDomains: [],
+            disallowedCommands: [],
+          },
+        },
+      },
+    }),
+  );
+  await writeContext(root, "testing", "boundary", {
+    id: "context.testing.boundary",
+    owner: "qa-platform",
+    status: "stable",
+  });
+  await writeContextLens(root, "boundary", {
+    id: "lens.testing.boundary",
+    owner: "qa-platform",
+    status: "stable",
+    appliesTo: ["context.testing.boundary"],
+    securityProfile: "lens-local",
+  });
+
+  const graph = await trustGraph(root);
+  const assetNode = graph.nodes.find(
+    (node) => node.id === "asset:lens.testing.boundary",
+  );
+  const profileEdge = graph.edges.find(
+    (edge) =>
+      edge.type === "selects_security_profile" &&
+      edge.from === "asset:lens.testing.boundary",
+  );
+  const policyEdge = graph.edges.find(
+    (edge) =>
+      edge.type === "has_effective_policy" &&
+      edge.from === "asset:lens.testing.boundary",
+  );
+
+  assert.equal(assetNode?.type, "asset");
+  assert.equal(assetNode?.properties?.kind, "context_lens");
+  assert.equal(profileEdge?.to, "security_profile:lens-local");
+  assert.equal(
+    profileEdge?.evidence?.[0]?.snippet,
+    "security_profile: lens-local",
+  );
+  assert.match(policyEdge?.to ?? "", /^effective_policy:sha256:/);
+  assert.ok(
+    policyEdge?.evidence?.some(
+      (evidence) => evidence.snippet === "security_profile: lens-local",
+    ),
+  );
+});
+
 test("Trust Graph links diagnostics to related assets", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", {
@@ -175,6 +244,44 @@ test("Trust Graph links diagnostics to related assets", async () => {
   assert.ok(invalidStatusNode);
   assert.ok(diagnosticEdge);
   assert.equal(diagnosticEdge.evidence?.[0]?.snippet, "status: active");
+});
+
+test("Trust Graph preserves duplicate asset id evidence as findings and diagnostic nodes", async () => {
+  const root = await fixture();
+  await writeContext(root, "alpha", "shared", {
+    id: "context.testing.duplicate",
+    owner: "qa-platform",
+    status: "stable",
+  });
+  await writeContext(root, "beta", "shared", {
+    id: "context.testing.duplicate",
+    owner: "qa-platform",
+    status: "stable",
+  });
+
+  const graph = await trustGraph(root);
+  const duplicateFindings = graph.findings.filter(
+    (finding) => finding.id === DIAGNOSTIC_IDS.META_DUPLICATE_ASSET_ID,
+  );
+  const duplicateDiagnosticNodes = graph.nodes.filter(
+    (node) =>
+      node.type === "diagnostic" &&
+      node.properties?.id === DIAGNOSTIC_IDS.META_DUPLICATE_ASSET_ID,
+  );
+
+  assert.deepEqual(duplicateFindings.map((finding) => finding.path).sort(), [
+    "contexts/alpha/shared.md",
+    "contexts/beta/shared.md",
+  ]);
+  assert.deepEqual(
+    duplicateDiagnosticNodes.map((node) => node.properties?.path).sort(),
+    ["contexts/alpha/shared.md", "contexts/beta/shared.md"],
+  );
+  assert.equal(
+    graph.nodes.filter((node) => node.id === "asset:context.testing.duplicate")
+      .length,
+    1,
+  );
 });
 
 test("Trust Graph command prints JSON and compact markdown", async () => {
@@ -313,6 +420,30 @@ async function writeContext(
   );
 }
 
+async function writeContextLens(
+  root: string,
+  name: string,
+  metadata: {
+    id: string;
+    owner?: string;
+    status?: string;
+    appliesTo?: string[];
+    securityProfile?: string;
+  },
+): Promise<void> {
+  await mkdir(path.join(root, "lenses", "testing"), { recursive: true });
+  await writeFile(
+    path.join(root, "lenses", "testing", `${name}.md`),
+    markdown({
+      ...metadata,
+      type: "context_lens",
+      purpose: "Interpret boundary value analysis for review.",
+      title: `# ${metadata.id}`,
+      body: "Use this lens to interpret reusable context without runtime selection.",
+    }),
+  );
+}
+
 async function writeInvalidContextLens(root: string): Promise<void> {
   await mkdir(path.join(root, "lenses", "testing"), { recursive: true });
   await writeFile(
@@ -335,10 +466,13 @@ async function writeInvalidContextLens(root: string): Promise<void> {
 
 function markdown(metadata: {
   id: string;
+  type?: string;
   owner?: string;
   status?: string;
   requiresContext?: string[];
+  appliesTo?: string[];
   securityProfile?: string;
+  purpose?: string;
   whenToUse?: string[];
   whenNotToUse?: string[];
   title: string;
@@ -347,10 +481,15 @@ function markdown(metadata: {
   return [
     "---",
     `id: ${metadata.id}`,
+    ...(metadata.type ? [`type: ${metadata.type}`] : []),
     ...(metadata.owner ? [`owner: ${metadata.owner}`] : []),
     ...(metadata.status ? [`status: ${metadata.status}`] : []),
+    ...(metadata.purpose ? [`purpose: ${metadata.purpose}`] : []),
     ...(metadata.requiresContext
       ? [`requires_context: ${metadata.requiresContext.join(", ")}`]
+      : []),
+    ...(metadata.appliesTo
+      ? [`applies_to: ${metadata.appliesTo.join(", ")}`]
       : []),
     ...(metadata.securityProfile
       ? [`security_profile: ${metadata.securityProfile}`]
