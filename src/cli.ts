@@ -36,6 +36,10 @@ import {
   runSuggestSemanticSplitCommand,
   type SuggestSemanticSplitFormat,
 } from "./commands/suggest-semantic-split.js";
+import {
+  runTrustGraphCommand,
+  type TrustGraphFormat,
+} from "./commands/trust-graph.js";
 import { ConfigError, type ConfigOverrides } from "./config.js";
 import type { Severity } from "./types.js";
 
@@ -90,6 +94,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     command !== "diff" &&
     command !== "ci-report" &&
     command !== "graph" &&
+    command !== "trust-graph" &&
     command !== "ownership" &&
     command !== "readiness" &&
     command !== "scaffold" &&
@@ -138,6 +143,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
   if (command === "graph") {
     return runGraph(parsed.values, target);
+  }
+
+  if (command === "trust-graph") {
+    return runTrustGraph(parsed.values, target);
   }
 
   if (command === "ownership") {
@@ -382,6 +391,36 @@ async function runGraph(values: CliValues, target: string): Promise<number> {
   }
 }
 
+async function runTrustGraph(
+  values: CliValues,
+  target: string,
+): Promise<number> {
+  const format = values.json ? "json" : (stringValue(values.format) ?? "json");
+  if (format !== "json" && format !== "markdown") {
+    console.error("--format must be either json or markdown.");
+    return 2;
+  }
+
+  const configPath = stringValue(values.config);
+  const overrides: ConfigOverrides = {
+    ...(configPath ? { configPath } : {}),
+  };
+
+  try {
+    return await runTrustGraphCommand(target, {
+      format: format as TrustGraphFormat,
+      overrides,
+    });
+  } catch (error) {
+    console.error(
+      error instanceof ConfigError || error instanceof Error
+        ? error.message
+        : String(error),
+    );
+    return 2;
+  }
+}
+
 function normalizeGraphView(value: string): GraphView | undefined {
   if (value === "lens") return "layered";
   if (
@@ -592,6 +631,7 @@ function helpText(): string {
     "  renma diff [path] --from <ref> --to <ref> [options]",
     "  renma ci-report [path] --from <ref> --to <ref> [options]",
     "  renma graph [path] [options]",
+    "  renma trust-graph [path] [options]",
     "  renma scaffold skill <path> [options]",
     "  renma scaffold context <path> [options]",
     "  renma scaffold context_lens <path> [options]",
@@ -607,6 +647,7 @@ function helpText(): string {
     "  diff                       Compare deterministic readiness snapshots",
     "  ci-report                  Print deterministic CI / PR review report",
     "  graph                      Print deterministic repository graph snapshot",
+    "  trust-graph                Print deterministic trust evidence graph",
     "  scaffold                   Create deterministic authoring scaffolds and prompts",
     "  ownership                  Print deterministic ownership coverage report",
     "  readiness                  Print deterministic agent readiness report",
@@ -619,7 +660,7 @@ function helpText(): string {
     "Options:",
     "  -c, --config <path>        scan: read JSON config from path",
     "      --fail-on <level>      scan: exit 1 when findings meet severity: low, medium, high, critical",
-    "      --format <format>      scan: text or json; catalog/ownership/readiness/ci-report: json or markdown; graph: json, markdown, or mermaid; suggest-metadata/suggest-semantic-split: prompt or json",
+    "      --format <format>      scan: text or json; catalog/ownership/readiness/ci-report/trust-graph: json or markdown; graph: json, markdown, or mermaid; suggest-metadata/suggest-semantic-split: prompt or json",
     "      --include-owned        ownership: include owned asset details",
     "      --json                 Shortcut for --format json",
     "      --view <view>          graph: summary, workflow, full, layered, or lens",

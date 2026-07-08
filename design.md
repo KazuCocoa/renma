@@ -3,7 +3,7 @@
 Renma is a Git-native deterministic governance and quality CLI for repositories that hold
 agent-consumable context assets and skills.
 
-Current product surface includes `scan`, `catalog`, `ownership`, `graph`, focused graph views, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-semantic-split`, and security diagnostics v1 for agent-facing operational instructions.
+Current product surface includes `scan`, `catalog`, `ownership`, `graph`, focused graph views, `trust-graph`, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-semantic-split`, and security diagnostics v1 for agent-facing operational instructions.
 
 Focused graph views are inspection tools; they do not choose, inject, or load runtime context for an agent.
 
@@ -71,7 +71,7 @@ Security diagnostics are deterministic review guardrails for LLM-facing operatio
 
 The next product layer should turn these diagnostics into security posture summaries in readiness and CI reports. Security posture should summarize effective policy, security profile resolution, allowed data, forbidden inputs, approved network and upload destinations, human approval requirements, and high-risk findings without enforcing runtime behavior.
 
-Trust Graph should initially be a deterministic interpretation of existing catalog, graph, readiness, and security evidence. It may expose signals such as owner presence, lifecycle status, resolved dependencies, policy contradictions, unapproved destinations, missing metadata, and high-severity findings, but it should not introduce subjective trust scores or a separate runtime system.
+Trust Graph v1 is a deterministic interpretation of existing catalog, graph, scan, and security evidence. It exposes stable asset, owner, lifecycle, dependency, security profile, effective policy, and diagnostic evidence, but it does not introduce subjective trust scores or a separate runtime system. `scan` lists concrete problems, `graph` shows structural relationships, `trust-graph` connects trust-relevant evidence, and `readiness` summarizes repository-level preparedness.
 
 Repository Context BOM should begin as a declared repository manifest: assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence. It should not claim actual LLM runtime usage. Actual consumed-context evidence may be imported later from external agents or wrappers and validated against Renma's repository model.
 

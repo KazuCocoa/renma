@@ -9,8 +9,12 @@ import { parseDocument } from "./markdown.js";
 import { detectRepeatedContextPatterns } from "./repeated-context.js";
 import { runRules } from "./rules.js";
 import { securityDiagnosticFindings } from "./security-diagnostics.js";
-import { summarizeSecurityPolicyInventory } from "./security-policy-inventory.js";
+import {
+  collectSecurityPolicyAssetEvidence,
+  summarizeSecurityPolicyInventory,
+} from "./security-policy-inventory.js";
 import { applySuppressions } from "./suppressions.js";
+import { buildTrustGraph } from "./trust-graph.js";
 import type { Diagnostic, Finding, ScanResult } from "./types.js";
 
 /** Run the complete deterministic scan pipeline for a target path. */
@@ -22,6 +26,10 @@ export async function scan(
   const { config, configPath } = await loadConfig(root, overrides);
   const { artifacts, diagnostics } = await discoverArtifacts(root, config);
   const securityPolicyInventory = summarizeSecurityPolicyInventory(
+    artifacts,
+    config.security,
+  );
+  const securityPolicies = collectSecurityPolicyAssetEvidence(
     artifacts,
     config.security,
   );
@@ -51,6 +59,12 @@ export async function scan(
     findings: suppressed.findings,
     diagnostics: scanDiagnostics,
   });
+  const trustGraph = buildTrustGraph({
+    catalog: catalogResult.catalog,
+    findings: suppressed.findings,
+    diagnostics: scanDiagnostics,
+    securityPolicies,
+  });
 
   return {
     root,
@@ -59,6 +73,7 @@ export async function scan(
     format: config.format,
     contextLens: contextLens.summary,
     securityPolicyInventory,
+    trustGraph,
     findings: suppressed.findings,
     diagnostics: scanDiagnostics,
     diagnosticsV2,

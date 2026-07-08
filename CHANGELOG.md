@@ -6,6 +6,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added `renma trust-graph` for deterministic Trust Graph evidence over catalog, dependency, owner, lifecycle, security policy, and diagnostic signals.
+- Added `trustGraph` to JSON scan output for downstream CI and tooling consumers.
+
 ## [0.13.2] - 2026-07-08
 
 ### Added

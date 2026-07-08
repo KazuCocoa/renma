@@ -1,5 +1,6 @@
 import type { ContextLensSummary } from "./context-lens.js";
 import type { SecurityPolicyInventorySummary } from "./security-policy-inventory.js";
+import type { TrustGraph } from "./trust-graph.js";
 
 /** Finding severity used for scan reports and failure thresholds. */
 export type Severity = "low" | "medium" | "high" | "critical";
@@ -240,6 +241,7 @@ export interface ScanResult {
   format: "text" | "json";
   contextLens?: ContextLensSummary;
   securityPolicyInventory?: SecurityPolicyInventorySummary;
+  trustGraph?: TrustGraph;
   findings: Finding[];
   diagnostics: Diagnostic[];
   diagnosticsV2: DiagnosticV2[];

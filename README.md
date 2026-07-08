@@ -10,7 +10,7 @@ It helps teams manage reusable, human-curated context assets in Git so agents, c
 
 Renma is the deterministic governance and health layer around that repository knowledge. Instead of letting critical knowledge get copied into many prompts or buried in one-off Markdown files, Renma treats it as a software asset: named, owned, versioned, linked, checked in CI, and reviewed with deterministic diagnostics and scan findings.
 
-Renma now supports `scan`, `catalog`, `ownership`, `graph`, focused graph views, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-metadata`, `suggest-semantic-split`, and security diagnostics.
+Renma now supports `scan`, `catalog`, `ownership`, `graph`, focused graph views, `trust-graph`, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-metadata`, `suggest-semantic-split`, and security diagnostics.
 
 Renma is especially useful when a repository contains agent-facing material such as:
 
@@ -149,6 +149,7 @@ It produces:
 - Catalog reports with deterministic asset IDs
 - Ownership coverage reports
 - Dependency graph reports
+- Trust Graph evidence reports
 - Agent readiness reports
 - JSON output for CI and downstream tooling
 - Text output designed to become actionable repair prompts for humans or agents
@@ -156,6 +157,36 @@ It produces:
 Findings are meant to explain what is wrong, why it matters, where the evidence is, what to preserve while fixing it, and how to verify the repair. Renma does not apply large semantic rewrites itself; it emits structured diagnostics so a human or coding agent can propose a reviewable patch and run Renma again.
 
 JSON scan output also includes additive `diagnosticsV2` and `reviewBundles` fields for LLM-assisted repair and review tooling. These normalize findings and diagnostics into stable codes, locations, typed repair constraints, structured verification steps, concise `llmHint` guidance, and deterministic groups of related issues. See the [Diagnostics Reference](docs/diagnostics.md) for the schema and examples.
+
+## Scan, Graph, Trust Graph, and Readiness
+
+Renma exposes several deterministic views over the same repository evidence. They answer different questions.
+
+| Command | Main question | Best for | Output shape |
+| --- | --- | --- | --- |
+| `scan` | What concrete problems were found? | Fixing diagnostics and CI checks | Finding list |
+| `graph` | How are assets connected? | Inspecting dependencies and references | Asset relationship graph |
+| `trust-graph` | What evidence helps reviewers decide whether assets are safe, owned, current, and usable enough? | Tracing owner, lifecycle, policy, dependency, reference, and diagnostic evidence per asset | Evidence graph |
+| `readiness` | Is the repository broadly ready for agent-facing use? | Maintainer summary and CI reporting | Repository-level scorecard |
+
+`trust-graph` does not decide that an asset is trustworthy. It connects deterministic evidence that humans and downstream tools can review: owner, lifecycle status, dependency and reference relationships, selected security profiles, effective policy fingerprints, and diagnostics.
+
+In short:
+
+- `scan` lists problems.
+- `graph` shows structural relationships.
+- `trust-graph` connects trust-relevant evidence.
+- `readiness` summarizes repository health.
+
+Useful command examples:
+
+```bash
+renma scan . --format json
+renma graph . --format json
+renma trust-graph . --format markdown
+renma trust-graph . --format json
+renma readiness . --format markdown
+```
 
 ### Repeated context diagnostics
 
@@ -199,6 +230,7 @@ Try Renma against the current repository:
 npx renma scan .
 npx renma catalog . --format json
 npx renma graph . --format mermaid
+npx renma trust-graph . --format json
 npx renma readiness .
 npx renma diff . --from main --to HEAD --format markdown
 ```
@@ -218,6 +250,7 @@ Then inspect the catalog and graph:
 ```bash
 node dist/index.js catalog . --format json
 node dist/index.js graph . --format mermaid
+node dist/index.js trust-graph . --format json
 node dist/index.js readiness .
 node dist/index.js diff . --from main --to HEAD --format markdown
 ```
@@ -248,12 +281,13 @@ mutate the working tree.
 
 A practical first pass is:
 
-1. Run `scan` to find broken links, weak structure, risky instructions, missing lifecycle metadata, and other repairable issues.
-2. Run `catalog` to see which skills, context assets, references, examples, and support files Renma discovered.
-3. Run `ownership` to find assets without clear ownership.
-4. Run `suggest-metadata` on existing assets that need a safe metadata retrofit prompt for a reviewed patch.
-5. Run `graph` to inspect dependencies and discover orphaned or overly coupled knowledge.
-6. Run `readiness` to summarize whether the repository is healthy enough for agent use.
+1. Run `catalog` to see which skills, context assets, references, examples, and support files Renma discovered.
+2. Run `scan` to find broken links, weak structure, risky instructions, missing lifecycle metadata, and other repairable issues.
+3. Run `graph` to inspect dependencies and discover orphaned or overly coupled knowledge.
+4. Run `trust-graph` to inspect deterministic owner, lifecycle, policy, dependency, and diagnostic evidence without introducing a trust score.
+5. Run `readiness` to summarize whether the repository is healthy enough for agent use.
+6. Run `ownership` to find assets without clear ownership.
+7. Run `suggest-metadata` on existing assets that need a safe metadata retrofit prompt for a reviewed patch.
 
 Renma does not require an LLM for this loop. Its core analysis is deterministic so the same repository state produces stable evidence in local development, CI, and code review.
 
@@ -270,6 +304,7 @@ renma scan <path>
 renma catalog <path>
 renma ownership <path>
 renma graph <path>
+renma trust-graph <path>
 renma readiness <path>
 renma diff <path> --from <ref> --to <ref>
 renma ci-report <path> --from <ref> --to <ref>
@@ -288,9 +323,12 @@ renma scan . --fail-on high
 renma catalog . --format json
 renma ownership . --include-owned
 renma ownership . --owner qa-platform
+renma graph . --format json
 renma graph . --format mermaid
 renma graph . --focus skill.testing.spec-review --view full
-renma readiness .
+renma trust-graph . --format json
+renma trust-graph . --format markdown
+renma readiness . --format markdown
 renma diff . --from main --to HEAD --format markdown
 renma ci-report . --from main --to HEAD --format markdown
 renma inspect contexts/testing/boundary-value-analysis.md
@@ -299,6 +337,10 @@ renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform -
 ```
 
 Use JSON output when Renma is part of CI or another tool. Use markdown output for PR-review artifacts. Use text output when a person or coding agent needs a concise repair list.
+
+`renma trust-graph . --format markdown` is useful for human review. `renma trust-graph . --format json` is the source of truth for downstream Trust Graph consumers, and `renma scan . --format json` includes the same data under `trustGraph`.
+
+Trust Graph helps reviewers inspect owner evidence, lifecycle status evidence, dependency and reference evidence, selected security profiles, effective policy fingerprints, and diagnostics in one deterministic layer. Common review questions include finding assets without owners or lifecycle status, identifying assets that share the same effective policy fingerprint, and connecting diagnostics back to asset evidence.
 
 `ci-report` exit behavior:
 
@@ -572,9 +614,9 @@ Renma reports deterministic safety findings for agent-facing operational instruc
 
 These findings are guardrails for review. They do not replace secret scanning, SAST, dependency scanning, or human security review.
 
-Near-term security work is focused on stabilizing these diagnostics for the 0.7.0 line. After that, Renma should summarize security posture in readiness and CI reports, including effective policy, security profile resolution, approved destinations, forbidden inputs, human approval requirements, and high-risk findings.
+Near-term security work is focused on stabilizing these diagnostics for the 0.7.0 line. Renma now summarizes security posture in readiness and CI reports, and exposes Trust Graph evidence for effective policy, security profile resolution, approved destinations, forbidden inputs, human approval requirements, and high-risk findings.
 
-Future Trust Graph work should interpret existing catalog, graph, readiness, and security evidence as deterministic trust and risk signals. It should not become a separate runtime system or a subjective trust score.
+Trust Graph interprets existing catalog, graph, scan, and security evidence as deterministic repository evidence. It is not a runtime system, not enforcement, not context selection or prompt assembly, not telemetry collection, not an LLM call, and not a subjective trust score.
 
 Repository Context BOM work should start as a declared repository manifest of assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence. It should not claim what an LLM actually used at runtime. Later external consumed-context evidence may be imported and validated against Renma's repository model, while telemetry collection remains outside Renma.
 

@@ -335,7 +335,7 @@ Renma's shipped baseline is now grouped around:
 
 - Repository discovery for `contexts/**/*.md`, `context/**/*.md`, and skill-adjacent `references/`, `profiles/`, and `examples/`.
 - Deterministic scan and catalog diagnostics for metadata IDs, owners, tags, freshness, paths, references, dependencies, manifest shape, layout policy, duplicate context, repeated context, and security policy issues.
-- CLI-first views for `scan`, `catalog`, `ownership`, `graph`, focused graph views, `readiness`, `repeated-context`, `diff`, `ci-report`, `inspect`, `scaffold`, and `suggest-semantic-split`.
+- CLI-first views for `scan`, `catalog`, `ownership`, `graph`, focused graph views, `trust-graph`, `readiness`, `repeated-context`, `diff`, `ci-report`, `inspect`, `scaffold`, and `suggest-semantic-split`.
 - LLM-actionable output without an LLM runtime dependency: Markdown and JSON diagnostics provide stable IDs, severity, evidence, and repair guidance.
 - Security diagnostics v1 for agent-facing network, upload, and secret-material policy; approved network destinations; approved upload domains; command-risk patterns; profile inheritance and cycles; and policy contradictions.
 - Historical `0.1.0` manifests remain supported as legacy input. Current planning should describe the merged implementation, not a separate `0.2.0` security command.
@@ -343,7 +343,7 @@ Renma's shipped baseline is now grouped around:
 ### Near-Term Implementation
 
 - Deterministic network/upload/secret-material policy refinement and diagnostics coverage for agent-facing repository artifacts.
-- Security posture summaries for readiness and CI reports, derived from existing scan, catalog, graph, and policy evidence.
+- Security posture summaries for readiness, CI reports, and Trust Graph, derived from existing scan, catalog, graph, and policy evidence.
 - Optional external-LLM repository evaluation bundles remain external and advisory, not scan/catalog/graph/readiness/diff/CI truth.
 
 ### Security posture, Trust Graph, and Repository Context BOM
@@ -352,11 +352,16 @@ Renma should extend security diagnostics into repository-level security posture 
 
 Near-term work should keep improving deterministic security diagnostics for agent-facing artifacts. The next layer should summarize effective policy, profile resolution, approved destinations, human approval requirements, forbidden inputs, and high-risk findings in readiness and CI reports.
 
-Trust Graph should initially be an interpretation of existing catalog and graph evidence, not a new runtime system. Nodes may expose deterministic trust and risk signals such as owner presence, lifecycle status, resolved dependencies, security profile resolution, policy contradictions, unapproved destinations, missing policy metadata, and high-severity safety findings.
+Trust Graph v1 is an interpretation of existing catalog, graph, scan, and security evidence, not a new runtime system. Nodes expose deterministic trust and risk evidence such as owner presence, lifecycle status, declared dependencies, security profile resolution, effective policy fingerprints, and diagnostics without introducing a subjective score.
 
 Repository Context BOM should begin as a repository-level manifest of declared assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence. It should not claim actual LLM runtime usage.
 
 Actual consumed-context evidence may be imported later from external agents, editor integrations, prompt wrappers, or CI tools and validated against the repository model. Renma should remain telemetry-aware but not telemetry-responsible.
+
+Follow-up policy hygiene ideas belong after Trust Graph v1, not in the first implementation patch:
+
+- Consider a generic diagnostic for non-canonical security policy field spellings if repositories commonly use camelCase policy names in frontmatter and the warning can be made deterministic without branch-specific cleanup rules.
+- Consider surfacing profile inheritance details more richly in Trust Graph only when configuration evidence can point back to stable config paths and ranges.
 
 ### Later / External Evidence
 
