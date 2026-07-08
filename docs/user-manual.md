@@ -98,6 +98,38 @@ renma commands fall into a few groups:
 - Local inspection and authoring: `inspect` reads one file as an outline or exact line slice, `scaffold` creates starter assets or authoring prompts, `suggest-metadata` emits safe metadata retrofit guidance for existing assets, and `suggest-semantic-split` packages source context and helper commands so a human or coding agent can draft a split for mixed-purpose Markdown.
 - Review and CI: `scan` emits deterministic findings, `readiness` turns repository state into checks and a score, `diff` compares two refs, and `ci-report` formats the comparison for pull-request review.
 
+## Scan, Graph, Trust Graph, And Readiness
+
+These commands are related, but they answer different repository-review questions.
+
+| Command | Main question | Best for | Output shape |
+| --- | --- | --- | --- |
+| `scan` | What concrete problems were found? | Fixing diagnostics and CI checks | Finding list |
+| `graph` | How are assets connected? | Inspecting dependencies and references | Asset relationship graph |
+| `trust-graph` | What evidence helps reviewers decide whether assets are safe, owned, current, and usable enough? | Tracing owner, lifecycle, policy, dependency, reference, and diagnostic evidence per asset | Evidence graph |
+| `readiness` | Is the repository broadly ready for agent-facing use? | Maintainer summary and CI reporting | Repository-level scorecard |
+
+`graph` is about structure. `readiness` is about repository-level preparedness. `trust-graph` is about traceability of trust-relevant evidence.
+
+Use `trust-graph` when a reviewer asks: "Why should this asset be considered safe, owned, current, and usable enough for an agent-facing repository?" The command does not decide that an asset is trustworthy. It connects deterministic evidence that humans and downstream tools can review: owner, lifecycle status, dependency and reference relationships, selected security profiles, effective policy fingerprints, and diagnostics.
+
+In short:
+
+- `scan` lists problems.
+- `graph` shows structural relationships.
+- `trust-graph` connects trust-relevant evidence.
+- `readiness` summarizes repository health.
+
+Examples:
+
+```bash
+renma scan . --format json
+renma graph . --format json
+renma trust-graph . --format markdown
+renma trust-graph . --format json
+renma readiness . --format markdown
+```
+
 ### `scan`
 
 Scans a target path and prints findings.

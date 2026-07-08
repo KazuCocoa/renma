@@ -71,7 +71,7 @@ Security diagnostics are deterministic review guardrails for LLM-facing operatio
 
 The next product layer should turn these diagnostics into security posture summaries in readiness and CI reports. Security posture should summarize effective policy, security profile resolution, allowed data, forbidden inputs, approved network and upload destinations, human approval requirements, and high-risk findings without enforcing runtime behavior.
 
-Trust Graph v1 is a deterministic interpretation of existing catalog, graph, scan, and security evidence. It exposes stable asset, owner, lifecycle, dependency, security profile, effective policy, and diagnostic evidence, but it does not introduce subjective trust scores or a separate runtime system.
+Trust Graph v1 is a deterministic interpretation of existing catalog, graph, scan, and security evidence. It exposes stable asset, owner, lifecycle, dependency, security profile, effective policy, and diagnostic evidence, but it does not introduce subjective trust scores or a separate runtime system. `scan` lists concrete problems, `graph` shows structural relationships, `trust-graph` connects trust-relevant evidence, and `readiness` summarizes repository-level preparedness.
 
 Repository Context BOM should begin as a declared repository manifest: assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence. It should not claim actual LLM runtime usage. Actual consumed-context evidence may be imported later from external agents or wrappers and validated against Renma's repository model.
 

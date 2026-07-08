@@ -158,6 +158,36 @@ Findings are meant to explain what is wrong, why it matters, where the evidence 
 
 JSON scan output also includes additive `diagnosticsV2` and `reviewBundles` fields for LLM-assisted repair and review tooling. These normalize findings and diagnostics into stable codes, locations, typed repair constraints, structured verification steps, concise `llmHint` guidance, and deterministic groups of related issues. See the [Diagnostics Reference](docs/diagnostics.md) for the schema and examples.
 
+## Scan, Graph, Trust Graph, and Readiness
+
+Renma exposes several deterministic views over the same repository evidence. They answer different questions.
+
+| Command | Main question | Best for | Output shape |
+| --- | --- | --- | --- |
+| `scan` | What concrete problems were found? | Fixing diagnostics and CI checks | Finding list |
+| `graph` | How are assets connected? | Inspecting dependencies and references | Asset relationship graph |
+| `trust-graph` | What evidence helps reviewers decide whether assets are safe, owned, current, and usable enough? | Tracing owner, lifecycle, policy, dependency, reference, and diagnostic evidence per asset | Evidence graph |
+| `readiness` | Is the repository broadly ready for agent-facing use? | Maintainer summary and CI reporting | Repository-level scorecard |
+
+`trust-graph` does not decide that an asset is trustworthy. It connects deterministic evidence that humans and downstream tools can review: owner, lifecycle status, dependency and reference relationships, selected security profiles, effective policy fingerprints, and diagnostics.
+
+In short:
+
+- `scan` lists problems.
+- `graph` shows structural relationships.
+- `trust-graph` connects trust-relevant evidence.
+- `readiness` summarizes repository health.
+
+Useful command examples:
+
+```bash
+renma scan . --format json
+renma graph . --format json
+renma trust-graph . --format markdown
+renma trust-graph . --format json
+renma readiness . --format markdown
+```
+
 ### Repeated context diagnostics
 
 `renma scan` reports deterministic repeated-context candidates across discovered skills, agents, profiles, references, examples, and shared context assets. These findings are evidence for consolidation, not automatic source-of-truth decisions:
@@ -293,11 +323,12 @@ renma scan . --fail-on high
 renma catalog . --format json
 renma ownership . --include-owned
 renma ownership . --owner qa-platform
+renma graph . --format json
 renma graph . --format mermaid
 renma graph . --focus skill.testing.spec-review --view full
 renma trust-graph . --format json
 renma trust-graph . --format markdown
-renma readiness .
+renma readiness . --format markdown
 renma diff . --from main --to HEAD --format markdown
 renma ci-report . --from main --to HEAD --format markdown
 renma inspect contexts/testing/boundary-value-analysis.md
