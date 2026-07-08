@@ -201,6 +201,12 @@ function dependencyDiagnostics(
         path: dependency.sourcePath,
         message: `Metadata dependency "${dependency.to}" from "${dependency.from}" does not match a catalog entry.`,
         ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
+        details: {
+          source: dependency.from,
+          target: dependency.to,
+          referenceKind: dependency.kind,
+          sourcePath: dependency.sourcePath,
+        },
       });
       continue;
     }
@@ -215,6 +221,14 @@ function dependencyDiagnostics(
         path: dependency.sourcePath,
         message: `Metadata dependency "${dependency.to}" from "${dependency.from}" targets a ${target.metadata.status} asset.`,
         ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
+        details: {
+          source: dependency.from,
+          target: dependency.to,
+          referenceKind: dependency.kind,
+          sourcePath: dependency.sourcePath,
+          targetPath: target.sourcePath,
+          targetStatus: target.metadata.status,
+        },
       });
     }
   }

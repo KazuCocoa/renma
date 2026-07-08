@@ -3,6 +3,7 @@ import { buildCatalog } from "./catalog.js";
 import { loadConfig, type ConfigOverrides } from "./config.js";
 import { summarizeContextLensGovernance } from "./context-lens.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
+import { createDiagnosticsV2, createReviewBundles } from "./diagnostics-v2.js";
 import { discoverArtifacts } from "./discovery.js";
 import { parseDocument } from "./markdown.js";
 import { detectRepeatedContextPatterns } from "./repeated-context.js";
@@ -41,6 +42,15 @@ export async function scan(
     return a.evidence.startLine - b.evidence.startLine;
   });
   const suppressed = applySuppressions(rawFindings, config.suppressions);
+  const scanDiagnostics = [
+    ...diagnostics,
+    ...contextLens.diagnostics,
+    ...suppressed.diagnostics,
+  ];
+  const diagnosticsV2 = createDiagnosticsV2({
+    findings: suppressed.findings,
+    diagnostics: scanDiagnostics,
+  });
 
   return {
     root,
@@ -50,11 +60,9 @@ export async function scan(
     contextLens: contextLens.summary,
     securityPolicyInventory,
     findings: suppressed.findings,
-    diagnostics: [
-      ...diagnostics,
-      ...contextLens.diagnostics,
-      ...suppressed.diagnostics,
-    ],
+    diagnostics: scanDiagnostics,
+    diagnosticsV2,
+    reviewBundles: createReviewBundles(diagnosticsV2),
     exitThreshold: config.failOn,
   };
 }
@@ -93,6 +101,7 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
         ],
         llmHint:
           "Replace invalid lifecycle status values with supported values. If a file was replaced by a shared context asset, consider using status: deprecated plus a separate superseded_by field rather than status: delegated.",
+        ...(diagnostic.details ? { details: diagnostic.details } : {}),
       };
     }
 
@@ -139,6 +148,7 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
         ],
         llmHint:
           "Repair only the explicit freshness metadata fields. Do not add modified_at or infer review freshness from Git history.",
+        ...(diagnostic.details ? { details: diagnostic.details } : {}),
       };
     }
 
@@ -182,6 +192,7 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
         ],
         llmHint:
           "Shorten metadata without losing knowledge: keep concise routing/index fields in frontmatter, move long prose into body sections or referenced context assets, and preserve existing references.",
+        ...(diagnostic.details ? { details: diagnostic.details } : {}),
       };
     }
 
@@ -238,6 +249,7 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
         ],
         llmHint:
           "Ask the asset owner for concise positive and negative usage boundaries. Do not invent domain exclusions, owners, policies, or runtime routing behavior.",
+        ...(diagnostic.details ? { details: diagnostic.details } : {}),
       };
     }
 
@@ -293,6 +305,7 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
       ],
       llmHint:
         "Add missing asset governance metadata using the repository's existing frontmatter style, then rerun scan and catalog.",
+      ...(diagnostic.details ? { details: diagnostic.details } : {}),
     };
   });
 }

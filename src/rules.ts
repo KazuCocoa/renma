@@ -26,6 +26,7 @@ type FindingDetails = Partial<
     | "verificationSteps"
     | "llmHint"
     | "riskClass"
+    | "details"
   >
 >;
 
@@ -390,6 +391,11 @@ function duplicateAssetIdFindings(entries: CatalogEntry[]): Finding[] {
         "Confirm each asset id is unique and references still point to the intended asset.",
       ],
       llmHint: `Find all assets with id "${assetId}", compare their scope and metadata, and propose a merge/deprecation path or unique replacement ids. Duplicate paths: ${paths.join(", ")}`,
+      details: {
+        assetId,
+        duplicatePaths: paths,
+        sourcePath: entry.sourcePath,
+      },
     }));
   });
 }
@@ -430,6 +436,12 @@ function unknownReferenceFindings(
           "Confirm declared references resolve to known assets.",
         ],
         llmHint: `Search the repository for the intended asset by nearby filename, title, id, or path. Update or remove unresolved ${dependency.kind} reference "${dependency.to}" declared by "${dependency.from}".`,
+        details: {
+          source: dependency.from,
+          target: dependency.to,
+          referenceKind: dependency.kind,
+          sourcePath: dependency.sourcePath,
+        },
       },
     ];
   });
@@ -486,6 +498,14 @@ function referenceDeprecatedAssetFindings(
           "Confirm active assets do not declare dependencies on deprecated or archived assets unless intentionally documented.",
         ],
         llmHint: `Inspect "${target.sourcePath}" for superseded_by or canonical context metadata. If a canonical replacement exists, update ${dependency.kind} reference "${dependency.to}" declared by "${dependency.from}". If not, decide whether the reference should remain and document why.`,
+        details: {
+          source: dependency.from,
+          target: dependency.to,
+          referenceKind: dependency.kind,
+          sourcePath: dependency.sourcePath,
+          targetPath: target.sourcePath,
+          targetStatus: target.metadata.status,
+        },
       },
     ];
   });
@@ -539,6 +559,11 @@ function orphanedContextLensFindings(
           "Run renma graph focused on the lens or owning skill.",
         ],
         llmHint: `Search for skills that should declare "${entry.id}" in requires_lens or optional_lens. Do not add runtime selection logic or prompt assembly.`,
+        details: {
+          assetId: entry.id,
+          sourcePath: entry.sourcePath,
+          assetKind: entry.kind,
+        },
       },
     ];
   });
@@ -587,6 +612,14 @@ function contextLensAppliesToInactiveContextFindings(
           "Inspect the lens and applied context lifecycle metadata.",
         ],
         llmHint: `Inspect "${target.sourcePath}" for superseded_by or replacement guidance. Update the applies_to reference in "${source.sourcePath}" only if a reviewed replacement exists.`,
+        details: {
+          source: dependency.from,
+          target: dependency.to,
+          referenceKind: dependency.kind,
+          sourcePath: dependency.sourcePath,
+          targetPath: target.sourcePath,
+          targetStatus: target.metadata.status,
+        },
       },
     ];
   });
@@ -644,6 +677,11 @@ function orphanedContextAssetFindings(
           "Confirm context is referenced, intentionally standalone, deprecated, or archived.",
         ],
         llmHint: `Search the repository for related skills, contexts, filenames, headings, or domain terms for "${entry.sourcePath}". If this context should be used, add a declared reference from the appropriate skill or context. If obsolete, propose a deprecation or archive patch.`,
+        details: {
+          assetId: entry.id,
+          sourcePath: entry.sourcePath,
+          assetKind: entry.kind,
+        },
       },
     ];
   });
@@ -1330,6 +1368,12 @@ function skillContextReferenceNotDeclaredFindings(
         "Confirm the skill/context relationship appears in metadata and catalog output.",
       ],
       llmHint: `Find context paths mentioned in the skill body and add them to requires_context using the metadata syntax currently supported by Renma. Missing declaration: ${referencedPath}`,
+      details: {
+        source: metadataText(document.metadata.id) ?? document.artifact.path,
+        target: referencedPath,
+        referenceKind: "requires_context",
+        sourcePath: document.artifact.path,
+      },
     }));
 }
 
@@ -1401,6 +1445,15 @@ function skillReferencesSupersededAssetFindings(
         ],
         llmHint:
           "Inspect the deprecated local support file and its superseded_by or canonical_context metadata. If the shared context asset is now canonical, update skill guidance and metadata to reference the shared context directly. Keep the local reference only if it contains truly local notes or is intentionally preserved as a compatibility shim.",
+        details: {
+          source: metadataText(skill.metadata.id) ?? skill.artifact.path,
+          target: metadataText(document.metadata.id) ?? document.artifact.path,
+          referenceKind: "body_reference",
+          sourcePath: skill.artifact.path,
+          targetPath: document.artifact.path,
+          targetStatus: metadataText(document.metadata.status),
+          replacementTargets: canonicalTargets,
+        },
       },
     ];
   });
@@ -1517,6 +1570,18 @@ function assetReferencesSupersededAssetFindings(
           ],
           llmHint:
             "Inspect the referenced deprecated asset and its superseded_by or canonical context metadata. If the canonical shared context is the intended source of truth, update this asset to reference that context directly. Keep the superseded file only when it serves a deliberate compatibility or migration role.",
+          details: {
+            source:
+              metadataText(referencingDocument.metadata.id) ??
+              referencingDocument.artifact.path,
+            target:
+              metadataText(document.metadata.id) ?? document.artifact.path,
+            referenceKind: "body_reference",
+            sourcePath: referencingDocument.artifact.path,
+            targetPath: document.artifact.path,
+            targetStatus: metadataText(document.metadata.status),
+            replacementTargets: canonicalTargets,
+          },
         },
       ];
     });
@@ -2166,6 +2231,12 @@ function declaredDependencyLayoutFindings(
       remediation:
         "Rewrite declared requires_context or optional_context values to canonical repo-root paths.",
       verificationSteps: ["Run renma graph and confirm all edges resolve."],
+      details: {
+        source: dependency.from,
+        target: dependency.to,
+        referenceKind: dependency.kind,
+        sourcePath: source.sourcePath,
+      },
     });
   }
 
@@ -2302,6 +2373,7 @@ function finding(
       : {}),
     ...(details.llmHint ? { llmHint: details.llmHint } : {}),
     ...(details.riskClass ? { riskClass: details.riskClass } : {}),
+    ...(details.details ? { details: details.details } : {}),
   };
 }
 
@@ -2339,6 +2411,7 @@ function documentFinding(
       : {}),
     ...(details.llmHint ? { llmHint: details.llmHint } : {}),
     ...(details.riskClass ? { riskClass: details.riskClass } : {}),
+    ...(details.details ? { details: details.details } : {}),
   };
 }
 

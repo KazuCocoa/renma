@@ -6,6 +6,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-07-07
+
+### Added
+
+- Added LLM-actionable diagnostics v2 in scan JSON output with typed `repairConstraints`, structured `verificationSteps`, concise `llmHint` guidance, stable codes, and source locations.
+- Added deterministic review bundles that group related diagnostics by duplicate IDs, unresolved references, orphaned context assets, and shared dependency/reference sources.
+- Added documentation and tests for v2 diagnostic metadata, review bundles, suppression handling, and compatibility with existing scan findings.
+
 ## [0.12.0] - 2026-07-07
 
 ### Added
@@ -212,7 +220,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/KazuCocoa/renma/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/KazuCocoa/renma/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/KazuCocoa/renma/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/KazuCocoa/renma/compare/v0.10.0...v0.11.0
