@@ -46,12 +46,7 @@ export async function runTrustGraphCommand(
 ): Promise<number> {
   const graph = await trustGraph(targetPath, options.overrides ?? {});
   process.stdout.write(formatTrustGraph(graph, options.format));
-  return graph.findings.some(
-    (finding) =>
-      finding.source === "diagnostic" && finding.severity === "error",
-  )
-    ? 1
-    : 0;
+  return 0;
 }
 
 export async function trustGraph(
@@ -103,17 +98,22 @@ export function formatTrustGraphMarkdown(graph: TrustGraph): string {
     `- Effective policy fingerprints: ${graph.summary.nodeTypeCounts.effective_policy}`,
     `- Diagnostics linked to assets: ${graph.summary.edgeTypeCounts.has_diagnostic}`,
     "",
-    "## Finding Counts",
+    "## Finding Severity Counts",
     "",
-    "| Group | Count |",
+    "| Severity | Count |",
     "| --- | ---: |",
+    `| error | ${graph.summary.findingSeverityCounts.error} |`,
+    `| warning | ${graph.summary.findingSeverityCounts.warning} |`,
+    `| info | ${graph.summary.findingSeverityCounts.info} |`,
     `| critical | ${graph.summary.findingSeverityCounts.critical} |`,
     `| high | ${graph.summary.findingSeverityCounts.high} |`,
     `| medium | ${graph.summary.findingSeverityCounts.medium} |`,
     `| low | ${graph.summary.findingSeverityCounts.low} |`,
-    `| error | ${graph.summary.findingSeverityCounts.error} |`,
-    `| warning | ${graph.summary.findingSeverityCounts.warning} |`,
-    `| info | ${graph.summary.findingSeverityCounts.info} |`,
+    "",
+    "## Finding Risk Class Counts",
+    "",
+    "| Risk Class | Count |",
+    "| --- | ---: |",
     `| violation | ${graph.summary.riskClassCounts.violation} |`,
     `| suspicious | ${graph.summary.riskClassCounts.suspicious} |`,
     `| advisory | ${graph.summary.riskClassCounts.advisory} |`,

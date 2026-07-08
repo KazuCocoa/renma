@@ -205,7 +205,27 @@ test("Trust Graph command prints JSON and compact markdown", async () => {
   assert.match(markdown.stdout, /Owned assets: 1\/1/);
 });
 
-test("Trust Graph markdown formatter groups finding counts", async () => {
+test("Trust Graph command exits 0 when generated graph includes diagnostic errors", async () => {
+  const root = await fixture();
+  await writeContext(root, "testing", "boundary", {
+    id: "context.testing.boundary",
+    owner: "qa-platform",
+    status: "stable",
+  });
+  await writeInvalidContextLens(root);
+
+  const json = await withCapturedConsole(() =>
+    main(["trust-graph", root, "--json"]),
+  );
+  const parsed = JSON.parse(json.stdout) as {
+    summary: { findingSeverityCounts: { error: number } };
+  };
+
+  assert.equal(json.code, 0);
+  assert.equal(parsed.summary.findingSeverityCounts.error, 1);
+});
+
+test("Trust Graph markdown formatter separates severity and risk counts", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", {
     id: "skill.demo",
@@ -215,8 +235,11 @@ test("Trust Graph markdown formatter groups finding counts", async () => {
 
   const markdown = formatTrustGraphMarkdown(await trustGraph(root));
 
-  assert.match(markdown, /## Finding Counts/);
+  assert.doesNotMatch(markdown, /## Finding Counts/);
+  assert.match(markdown, /## Finding Severity Counts/);
+  assert.match(markdown, /## Finding Risk Class Counts/);
   assert.match(markdown, /\| medium \| [1-9]/);
+  assert.match(markdown, /\| unclassified \| [1-9]/);
   assert.match(markdown, /META-INVALID-STATUS/);
 });
 
@@ -287,6 +310,26 @@ async function writeContext(
       title: `# ${metadata.id}`,
       body: "This context asset exists to make Trust Graph tests deterministic.",
     }),
+  );
+}
+
+async function writeInvalidContextLens(root: string): Promise<void> {
+  await mkdir(path.join(root, "lenses", "testing"), { recursive: true });
+  await writeFile(
+    path.join(root, "lenses", "testing", "spec-review.md"),
+    [
+      "---",
+      "id: lens.testing.spec-review",
+      "owner: qa-platform",
+      "status: experimental",
+      "applies_to:",
+      "  - context.testing.boundary",
+      "---",
+      "# Spec Review Lens",
+      "",
+      "Review boundary context for ambiguity.",
+      "",
+    ].join("\n"),
   );
 }
 

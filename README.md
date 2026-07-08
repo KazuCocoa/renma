@@ -251,13 +251,13 @@ mutate the working tree.
 
 A practical first pass is:
 
-1. Run `scan` to find broken links, weak structure, risky instructions, missing lifecycle metadata, and other repairable issues.
-2. Run `catalog` to see which skills, context assets, references, examples, and support files Renma discovered.
-3. Run `ownership` to find assets without clear ownership.
-4. Run `suggest-metadata` on existing assets that need a safe metadata retrofit prompt for a reviewed patch.
-5. Run `graph` to inspect dependencies and discover orphaned or overly coupled knowledge.
-6. Run `trust-graph` to inspect deterministic owner, lifecycle, policy, dependency, and diagnostic evidence without introducing a trust score.
-7. Run `readiness` to summarize whether the repository is healthy enough for agent use.
+1. Run `catalog` to see which skills, context assets, references, examples, and support files Renma discovered.
+2. Run `scan` to find broken links, weak structure, risky instructions, missing lifecycle metadata, and other repairable issues.
+3. Run `graph` to inspect dependencies and discover orphaned or overly coupled knowledge.
+4. Run `trust-graph` to inspect deterministic owner, lifecycle, policy, dependency, and diagnostic evidence without introducing a trust score.
+5. Run `readiness` to summarize whether the repository is healthy enough for agent use.
+6. Run `ownership` to find assets without clear ownership.
+7. Run `suggest-metadata` on existing assets that need a safe metadata retrofit prompt for a reviewed patch.
 
 Renma does not require an LLM for this loop. Its core analysis is deterministic so the same repository state produces stable evidence in local development, CI, and code review.
 
@@ -295,6 +295,7 @@ renma ownership . --include-owned
 renma ownership . --owner qa-platform
 renma graph . --format mermaid
 renma graph . --focus skill.testing.spec-review --view full
+renma trust-graph . --format json
 renma trust-graph . --format markdown
 renma readiness .
 renma diff . --from main --to HEAD --format markdown
@@ -305,6 +306,10 @@ renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform -
 ```
 
 Use JSON output when Renma is part of CI or another tool. Use markdown output for PR-review artifacts. Use text output when a person or coding agent needs a concise repair list.
+
+`renma trust-graph . --format markdown` is useful for human review. `renma trust-graph . --format json` is the source of truth for downstream Trust Graph consumers, and `renma scan . --format json` includes the same data under `trustGraph`.
+
+Trust Graph helps reviewers inspect owner evidence, lifecycle status evidence, dependency and reference evidence, selected security profiles, effective policy fingerprints, and diagnostics in one deterministic layer. Common review questions include finding assets without owners or lifecycle status, identifying assets that share the same effective policy fingerprint, and connecting diagnostics back to asset evidence.
 
 `ci-report` exit behavior:
 

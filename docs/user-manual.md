@@ -178,16 +178,18 @@ Output includes graph nodes, relationship edges, unresolved targets, and diagnos
 Prints deterministic Trust Graph evidence derived from catalog, graph, scan, and security policy data.
 
 ```bash
-renma trust-graph .
 renma trust-graph . --format markdown
 renma trust-graph . --format json
+renma scan . --format json
 ```
 
 Use this when a reviewer or downstream tool needs one stable evidence layer that links assets to owners, lifecycle status, declared dependencies, selected security profiles, effective policy fingerprints, and diagnostics.
 
 Trust Graph is repository evidence. It does not compute a trust score, select or inject runtime context, assemble prompts, call an LLM, collect telemetry, or enforce policy at runtime.
 
-Output includes stable node IDs, stable edge IDs, source evidence where parser support exists, normalized effective policy fingerprints, diagnostic links, and compact summary counts. JSON is the source of truth; Markdown is a review-oriented summary.
+Output includes stable node IDs, stable edge IDs, source evidence where parser support exists, normalized effective policy fingerprints, diagnostic links, and compact summary counts. JSON is the source of truth for downstream tools; Markdown is for human review. `scan --format json` includes the same Trust Graph under `trustGraph` so CI consumers can read one scan report when they do not need a separate command.
+
+Reviewers can use Trust Graph to find assets without owners, find assets without lifecycle status, inspect assets sharing the same effective policy fingerprint, and connect diagnostics back to asset evidence. `trust-graph` exits `0` when the report is generated successfully; use `scan --fail-on` when CI should fail on findings.
 
 ### `inspect`
 
