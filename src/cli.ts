@@ -29,6 +29,7 @@ import {
 import { runScanCommand } from "./commands/scan.js";
 import {
   runSuggestMetadataCommand,
+  SuggestMetadataTargetError,
   type SuggestMetadataFormat,
 } from "./commands/suggest-metadata.js";
 import {
@@ -108,7 +109,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   }
 
   if (command === "suggest-metadata") {
-    return runSuggestMetadata(parsed.values, target);
+    return runSuggestMetadata(
+      parsed.values,
+      target,
+      parsed.positionals.length > 1,
+    );
   }
 
   if (command === "scaffold") {
@@ -491,7 +496,13 @@ function runSuggestSemanticSplit(
 function runSuggestMetadata(
   values: CliValues,
   target: string,
+  targetProvided: boolean,
 ): Promise<number> {
+  if (!targetProvided) {
+    console.error("suggest-metadata requires a target file.");
+    return Promise.resolve(2);
+  }
+
   const format = values.json
     ? "json"
     : (stringValue(values.format) ?? "prompt");
@@ -504,6 +515,12 @@ function runSuggestMetadata(
   return runSuggestMetadataCommand(target, {
     format: format as SuggestMetadataFormat,
     ...(owner ? { owner } : {}),
+  }).catch((error: unknown) => {
+    if (error instanceof SuggestMetadataTargetError) {
+      console.error(error.message);
+      return 2;
+    }
+    throw error;
   });
 }
 

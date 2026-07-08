@@ -26,6 +26,15 @@ export interface MetadataSuggestion {
   blockedMetadata: BlockedMetadata[];
 }
 
+export class SuggestMetadataTargetError extends Error {
+  constructor(target: string, cause: unknown) {
+    super(
+      `Could not read metadata target ${target}: ${readErrorReason(cause)}`,
+    );
+    this.name = "SuggestMetadataTargetError";
+  }
+}
+
 export async function runSuggestMetadataCommand(
   target: string,
   options: SuggestMetadataOptions = {},
@@ -45,7 +54,12 @@ export async function buildMetadataSuggestion(
   options: SuggestMetadataOptions = {},
 ): Promise<MetadataSuggestion> {
   const absolutePath = path.resolve(target);
-  const content = await readFile(absolutePath, "utf8");
+  let content: string;
+  try {
+    content = await readFile(absolutePath, "utf8");
+  } catch (error) {
+    throw new SuggestMetadataTargetError(target, error);
+  }
   const outputPath = toPosix(target);
   const initialKind = classifyPath(outputPath);
   const document = parseDocument({
@@ -64,8 +78,8 @@ export async function buildMetadataSuggestion(
   const existingTitle = optionalText(
     metadataValueText(document.metadata.title),
   );
-  const existingOwner = metadata.owner?.trim();
-  const explicitOwner = options.owner?.trim();
+  const existingOwner = optionalText(metadata.owner);
+  const explicitOwner = optionalText(options.owner);
   const candidateMetadata: Record<string, string> = {};
   const candidateId = inferCandidateId(kind, outputPath);
   const candidateTitle = mainHeadingTitle(document.headings);
@@ -85,6 +99,12 @@ export async function buildMetadataSuggestion(
     blockedMetadata.push({
       field: "owner",
       reason: "No owner was explicitly provided. Missing owner is allowed.",
+    });
+  }
+  if (existingOwner && explicitOwner && existingOwner !== explicitOwner) {
+    blockedMetadata.push({
+      field: "owner",
+      reason: `Existing owner "${existingOwner}" differs from explicitly provided owner "${explicitOwner}". Do not change ownership without human review.`,
     });
   }
 
@@ -150,11 +170,14 @@ function ownerInstruction(input: {
   existingOwner?: string | undefined;
   explicitOwner?: string | undefined;
 }): string {
+  if (input.existingOwner) {
+    if (input.explicitOwner && input.existingOwner !== input.explicitOwner) {
+      return `Existing owner is ${input.existingOwner}. The explicitly provided owner ${input.explicitOwner} differs, so do not change ownership without human review.`;
+    }
+    return `Preserve existing owner: ${input.existingOwner}.`;
+  }
   if (input.explicitOwner) {
     return `Use owner: ${input.explicitOwner} because the user explicitly provided it.`;
-  }
-  if (input.existingOwner) {
-    return `Preserve existing owner: ${input.existingOwner}.`;
   }
   return "Do not add owner unless the existing asset already declares one or a maintainer provides one.";
 }
@@ -270,4 +293,20 @@ function slugify(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function readErrorReason(error: unknown): string {
+  const code = errorCode(error);
+  if (code === "ENOENT") return "file does not exist";
+  if (code === "EISDIR") return "target is a directory";
+  if (code === "EACCES" || code === "EPERM") return "permission denied";
+  return error instanceof Error ? error.message : String(error);
+}
+
+function errorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return undefined;
+  }
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" ? code : undefined;
 }

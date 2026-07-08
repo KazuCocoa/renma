@@ -156,6 +156,156 @@ test("suggest-metadata JSON includes explicit owner candidate", async () => {
   assert.deepEqual(suggestion.blockedMetadata, []);
 });
 
+test("suggest-metadata preserves an existing owner in prompt", async () => {
+  const root = await fixture();
+  const target = path.join(root, "skills", "docs", "foo", "SKILL.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(
+    target,
+    [
+      "---",
+      "id: skill.docs.foo",
+      "title: Foo",
+      "owner: docs",
+      "---",
+      "# Foo",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await withCapturedConsole(() =>
+    main(["suggest-metadata", target, "--format", "prompt"]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /Preserve existing owner: docs\./);
+  assert.doesNotMatch(
+    result.stdout,
+    /Use owner: docs because the user explicitly provided it/,
+  );
+  assert.doesNotMatch(result.stdout, /owner: `docs`/);
+});
+
+test("suggest-metadata does not create owner candidate for same existing owner", async () => {
+  const root = await fixture();
+  const target = path.join(root, "skills", "qa", "foo", "SKILL.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(
+    target,
+    [
+      "---",
+      "id: skill.qa.foo",
+      "title: Foo",
+      "owner: qa-platform",
+      "---",
+      "# Foo",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await withCapturedConsole(() =>
+    main(["suggest-metadata", target, "--owner", "qa-platform", "--json"]),
+  );
+  const suggestion = JSON.parse(result.stdout) as {
+    candidateMetadata: Record<string, string>;
+    blockedMetadata: Array<{ field: string; reason: string }>;
+    instructions: string[];
+  };
+
+  assert.equal(result.code, 0);
+  assert.equal("owner" in suggestion.candidateMetadata, false);
+  assert.deepEqual(suggestion.blockedMetadata, []);
+  assert.ok(
+    suggestion.instructions.includes("Preserve existing owner: qa-platform."),
+  );
+});
+
+test("suggest-metadata blocks different explicit owner from replacing existing owner", async () => {
+  const root = await fixture();
+  const target = path.join(root, "skills", "docs", "foo", "SKILL.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(
+    target,
+    [
+      "---",
+      "id: skill.docs.foo",
+      "title: Foo",
+      "owner: docs",
+      "---",
+      "# Foo",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await withCapturedConsole(() =>
+    main([
+      "suggest-metadata",
+      target,
+      "--owner",
+      "qa-platform",
+      "--format",
+      "prompt",
+    ]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.match(
+    result.stdout,
+    /Existing owner is docs\. The explicitly provided owner qa-platform differs, so do not change ownership without human review\./,
+  );
+  assert.match(
+    result.stdout,
+    /owner: Existing owner "docs" differs from explicitly provided owner "qa-platform"\. Do not change ownership without human review\./,
+  );
+  assert.doesNotMatch(
+    result.stdout,
+    /Use owner: qa-platform because the user explicitly provided it/,
+  );
+  assert.doesNotMatch(result.stdout, /owner: `qa-platform`/);
+});
+
+test("suggest-metadata JSON represents blocked owner replacement", async () => {
+  const root = await fixture();
+  const target = path.join(root, "skills", "docs", "foo", "SKILL.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(
+    target,
+    [
+      "---",
+      "id: skill.docs.foo",
+      "title: Foo",
+      "owner: docs",
+      "---",
+      "# Foo",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await withCapturedConsole(() =>
+    main(["suggest-metadata", target, "--owner", "qa-platform", "--json"]),
+  );
+  const suggestion = JSON.parse(result.stdout) as {
+    candidateMetadata: Record<string, string>;
+    blockedMetadata: Array<{ field: string; reason: string }>;
+    instructions: string[];
+  };
+
+  assert.equal(result.code, 0);
+  assert.equal("owner" in suggestion.candidateMetadata, false);
+  assert.deepEqual(suggestion.blockedMetadata, [
+    {
+      field: "owner",
+      reason:
+        'Existing owner "docs" differs from explicitly provided owner "qa-platform". Do not change ownership without human review.',
+    },
+  ]);
+  assert.ok(
+    suggestion.instructions.includes(
+      "Existing owner is docs. The explicitly provided owner qa-platform differs, so do not change ownership without human review.",
+    ),
+  );
+});
+
 test("suggest-metadata rejects unsupported format", async () => {
   const result = await withCapturedConsole(() =>
     main(["suggest-metadata", "skills/demo/SKILL.md", "--format", "markdown"]),
@@ -164,6 +314,43 @@ test("suggest-metadata rejects unsupported format", async () => {
   assert.equal(result.code, 2);
   assert.equal(result.stdout, "");
   assert.match(result.stderr, /--format must be either prompt or json\./);
+});
+
+test("suggest-metadata requires a target file", async () => {
+  const result = await withCapturedConsole(() => main(["suggest-metadata"]));
+
+  assert.equal(result.code, 2);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /suggest-metadata requires a target file\./);
+});
+
+test("suggest-metadata reports missing file concisely", async () => {
+  const root = await fixture();
+  const target = path.join(root, "missing.md");
+
+  const result = await withCapturedConsole(() =>
+    main(["suggest-metadata", target]),
+  );
+
+  assert.equal(result.code, 2);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /Could not read metadata target .*missing\.md/);
+  assert.match(result.stderr, /file does not exist/);
+  assert.doesNotMatch(result.stderr, /\n\s+at\s+/);
+});
+
+test("suggest-metadata reports directory target concisely", async () => {
+  const root = await fixture();
+
+  const result = await withCapturedConsole(() =>
+    main(["suggest-metadata", root]),
+  );
+
+  assert.equal(result.code, 2);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /Could not read metadata target/);
+  assert.match(result.stderr, /target is a directory/);
+  assert.doesNotMatch(result.stderr, /\n\s+at\s+/);
 });
 
 test("suggest-metadata works for context assets", async () => {

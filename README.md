@@ -421,7 +421,7 @@ renma ownership .
 renma suggest-metadata skills/testing/spec-review/SKILL.md --format prompt
 ```
 
-`suggest-metadata` is not an auto-fixer. It tells a human or coding agent to inspect the existing asset, preserve existing frontmatter and Markdown body content, add only compact missing metadata that is clearly supported, and rerun `renma scan .` and `renma ownership .`. It does not infer owners. If you pass `--owner qa-platform`, the output may include that owner because it was explicitly provided; otherwise missing owner remains allowed and is reported as unowned by `ownership`.
+`suggest-metadata` is not an auto-fixer. It tells a human or coding agent to inspect the existing asset, preserve existing frontmatter and Markdown body content, add only compact missing metadata that is clearly supported, and rerun `renma scan .` and `renma ownership .`. It does not infer owners. If you pass `--owner qa-platform`, the output may include that owner because it was explicitly provided; otherwise missing owner remains allowed and is reported as unowned by `ownership`. If an existing asset already declares an owner, `suggest-metadata` preserves it; a different `--owner` value is treated as a human-review ownership change, not an automatic metadata suggestion.
 
 Renma reads deterministic frontmatter from skills and context assets. YAML-style block lists are supported for selected metadata fields, which keeps authored metadata explicit and reviewable:
 
