@@ -10,7 +10,7 @@ It helps teams manage reusable, human-curated context assets in Git so agents, c
 
 Renma is the deterministic governance and health layer around that repository knowledge. Instead of letting critical knowledge get copied into many prompts or buried in one-off Markdown files, Renma treats it as a software asset: named, owned, versioned, linked, checked in CI, and reviewed with deterministic diagnostics and scan findings.
 
-Renma now supports `scan`, `catalog`, `ownership`, `graph`, focused graph views, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-semantic-split`, and security diagnostics.
+Renma now supports `scan`, `catalog`, `ownership`, `graph`, focused graph views, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-metadata`, `suggest-semantic-split`, and security diagnostics.
 
 Renma is especially useful when a repository contains agent-facing material such as:
 
@@ -251,8 +251,9 @@ A practical first pass is:
 1. Run `scan` to find broken links, weak structure, risky instructions, missing lifecycle metadata, and other repairable issues.
 2. Run `catalog` to see which skills, context assets, references, examples, and support files Renma discovered.
 3. Run `ownership` to find assets without clear ownership.
-4. Run `graph` to inspect dependencies and discover orphaned or overly coupled knowledge.
-5. Run `readiness` to summarize whether the repository is healthy enough for agent use.
+4. Run `suggest-metadata` on existing assets that need a safe metadata retrofit prompt for a reviewed patch.
+5. Run `graph` to inspect dependencies and discover orphaned or overly coupled knowledge.
+6. Run `readiness` to summarize whether the repository is healthy enough for agent use.
 
 Renma does not require an LLM for this loop. Its core analysis is deterministic so the same repository state produces stable evidence in local development, CI, and code review.
 
@@ -274,6 +275,7 @@ renma diff <path> --from <ref> --to <ref>
 renma ci-report <path> --from <ref> --to <ref>
 renma inspect <file>
 renma inspect <file> --lines L10-L42
+renma suggest-metadata <file>
 renma suggest-semantic-split <file>
 ```
 
@@ -292,6 +294,8 @@ renma readiness .
 renma diff . --from main --to HEAD --format markdown
 renma ci-report . --from main --to HEAD --format markdown
 renma inspect contexts/testing/boundary-value-analysis.md
+renma suggest-metadata skills/testing/spec-review/SKILL.md --format prompt
+renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform --format json
 ```
 
 Use JSON output when Renma is part of CI or another tool. Use markdown output for PR-review artifacts. Use text output when a person or coding agent needs a concise repair list.
@@ -408,6 +412,16 @@ Renma treats `owner` as governance metadata. Declaring an owner is recommended b
 However, owner metadata is not globally required yet. Assets without an owner are accepted and reported as unowned in the ownership coverage report.
 
 Renma does not infer owners automatically. If an asset is unowned, choose an owner through human review or team policy.
+
+To retrofit metadata onto an existing skill or context asset without overwriting its body, ask Renma for a deterministic prompt or JSON payload:
+
+```bash
+renma scan .
+renma ownership .
+renma suggest-metadata skills/testing/spec-review/SKILL.md --format prompt
+```
+
+`suggest-metadata` is not an auto-fixer. It tells a human or coding agent to inspect the existing asset, preserve existing frontmatter and Markdown body content, add only compact missing metadata that is clearly supported, and rerun `renma scan .` and `renma ownership .`. It does not infer owners. If you pass `--owner qa-platform`, the output may include that owner because it was explicitly provided; otherwise missing owner remains allowed and is reported as unowned by `ownership`.
 
 Renma reads deterministic frontmatter from skills and context assets. YAML-style block lists are supported for selected metadata fields, which keeps authored metadata explicit and reviewable:
 

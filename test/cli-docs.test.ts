@@ -12,6 +12,7 @@ const COMMANDS = [
   "ownership",
   "readiness",
   "scaffold",
+  "suggest-metadata",
   "suggest-semantic-split",
   "inspect",
 ] as const;
@@ -26,6 +27,7 @@ const EXPECTED_FORMATS = new Map<string, string[]>([
   ["graph", ["json", "markdown", "mermaid"]],
   ["inspect", ["text", "json"]],
   ["scaffold", ["file", "prompt", "json"]],
+  ["suggest-metadata", ["prompt", "json"]],
   ["suggest-semantic-split", ["prompt", "json"]],
 ]);
 

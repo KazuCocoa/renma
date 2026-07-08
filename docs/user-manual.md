@@ -95,7 +95,7 @@ For a runnable mini-repository with a skill, shared context assets, ownership me
 renma commands fall into a few groups:
 
 - Inventory and ownership: `catalog` lists discovered assets and references, `ownership` summarizes owned and unowned assets, and `graph` shows relationships between catalog nodes.
-- Local inspection and authoring: `inspect` reads one file as an outline or exact line slice, `scaffold` creates starter assets or authoring prompts, and `suggest-semantic-split` packages source context and helper commands so a human or coding agent can draft a split for mixed-purpose Markdown.
+- Local inspection and authoring: `inspect` reads one file as an outline or exact line slice, `scaffold` creates starter assets or authoring prompts, `suggest-metadata` emits safe metadata retrofit guidance for existing assets, and `suggest-semantic-split` packages source context and helper commands so a human or coding agent can draft a split for mixed-purpose Markdown.
 - Review and CI: `scan` emits deterministic findings, `readiness` turns repository state into checks and a score, `diff` compares two refs, and `ci-report` formats the comparison for pull-request review.
 
 ### `scan`
@@ -265,6 +265,23 @@ renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform --f
 
 `scaffold --format file` writes a starter file, `--format prompt` emits an authoring prompt, and `--format json` emits structured scaffold data. The generated content is intentionally minimal; fill in metadata, dependencies, and verification steps before depending on it in automation.
 
+### `suggest-metadata`
+
+Suggests a safe metadata retrofit workflow for an existing asset.
+
+```bash
+renma scan .
+renma ownership .
+renma suggest-metadata skills/testing/spec-review/SKILL.md --format prompt
+renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform --format json
+```
+
+Use this after `scan` detects metadata issues or `ownership` shows unowned assets. The command does not rewrite files. It emits a deterministic prompt or JSON payload that a human or coding agent can use to prepare a reviewed patch.
+
+The prompt asks the agent to inspect the existing asset, preserve the Markdown body, preserve existing frontmatter values, add only compact missing metadata that is clearly supported, and rerun `renma scan .` and `renma ownership .` after editing.
+
+Owner metadata remains recommended but not required. Without `--owner`, `suggest-metadata` blocks owner as a suggested addition and says not to add one unless the asset already declares an owner or a maintainer provides one. With `--owner <owner>`, the command may include that owner because it was explicitly provided. Renma does not infer owners from Git history, file paths, prose, or authors.
+
 ### `suggest-semantic-split`
 
 Suggests a semantic split for large or mixed-purpose assets.
@@ -294,6 +311,7 @@ Use `--format <format>` to select output and `--json` as a shortcut where the co
 | `graph` | `json`, `markdown`, `mermaid` |
 | `inspect` | `text`, `json` |
 | `scaffold` | `file`, `prompt`, `json` |
+| `suggest-metadata` | `prompt`, `json` |
 | `suggest-semantic-split` | `prompt`, `json` |
 
 Prefer JSON in automation and markdown for human review in pull requests. Use Mermaid when you want to render a graph diagram.
