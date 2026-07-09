@@ -601,13 +601,12 @@ Security profiles can be defined under `security.profiles` and selected by artif
 {
   "security": {
     "profiles": {
-      "appium-disclosed-local": {
-        "allowedDataClass": "disclosed",
+      "appium-local-diagnostics": {
         "networkAllowed": true,
         "externalUploadAllowed": false,
         "secretsAllowed": false,
         "humanApprovalRequired": true,
-        "allowedData": ["sanitized diagnostics"],
+        "allowedData": ["repo-local-files", "sanitized-ci-diagnostics"],
         "forbiddenInputs": ["secrets", "credentials"],
         "approvedDomains": ["github.com"],
         "approvedUploadDomains": [],

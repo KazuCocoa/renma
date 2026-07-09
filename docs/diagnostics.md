@@ -248,7 +248,7 @@ Supported policy metadata includes:
 
 | Field                           | Meaning                                                                                                                                                                                            | Related findings                                                                                          |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `allowed_data`                  | Declares the asset's allowed data entries. It accepts scalar, inline list, and block list forms; `allowed_data: disclosed`, `allowed_data: [disclosed]`, and a one-item block list are equivalent. | `SEC-MISSING-POLICY-METADATA`, `SEC-FORBIDDEN-INPUT-INSTRUCTION`, `SEC-INSTRUCTION-VIOLATES-POLICY`       |
+| `allowed_data`                  | Declares the asset's allowed input data categories. It is flexible rather than a closed enum, but prefer descriptive values such as `repo-local-files`, `skill-bundled-context`, `public-docs`, `sanitized-ci-diagnostics`, and `disclosed-user-provided-data`. Scalar, inline list, and block list forms are equivalent. | `SEC-MISSING-POLICY-METADATA`, `SEC-FORBIDDEN-INPUT-INSTRUCTION`, `SEC-INSTRUCTION-VIOLATES-POLICY`       |
 | `network_allowed`               | Declares whether the asset may perform network actions such as fetching URLs or contacting APIs. Explicit `false` blocks network instructions even when repository config has approved domains.    | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-BODY-POLICY-CONTRADICTION`, `SEC-UNAPPROVED-NETWORK-DESTINATION`  |
 | `external_upload_allowed`       | Declares whether the asset may upload, publish, submit, sync, push, or otherwise send repository data externally.                                                                                  | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-EXTERNAL-UPLOAD-INSTRUCTION`, `SEC-UNAPPROVED-UPLOAD-DESTINATION` |
 | `secrets_allowed`               | Declares whether secret material is allowed as input or content for the asset.                                                                                                                     | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-SECRET-MATERIAL-INSTRUCTION`, `SEC-SENSITIVE-FILE-REFERENCE`      |
@@ -263,7 +263,9 @@ Boolean policy fields accept values such as `true`, `false`, `yes`, `no`, `allow
 Example:
 
 ```yaml
-allowed_data: public
+allowed_data:
+  - repo-local-files
+  - skill-bundled-context
 network_allowed: true
 external_upload_allowed: false
 secrets_allowed: false
