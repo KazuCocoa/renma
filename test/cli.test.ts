@@ -43,6 +43,93 @@ test("scan discovers default artifacts and emits deterministic findings", async 
   assert.equal(result.securityPolicyInventory?.assetsMissingPolicyMetadata, 1);
 });
 
+test("scan discovers canonical skills/skill.md entrypoint", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "skills"), { recursive: true });
+  await writeFile(path.join(root, "skills", "skill.md"), "# Demo\n");
+
+  const result = await scan(root);
+
+  assert.equal(result.scannedFileCount, 1);
+  assert.equal(result.securityPolicyInventory?.totalPolicyAssets, 1);
+  assert.ok(
+    result.findings.some(
+      (finding) => finding.evidence.path === "skills/skill.md",
+    ),
+  );
+  assert.equal(
+    result.diagnostics.some(
+      (diagnostic) => diagnostic.code === "DISCOVERY-SINGLE-SKILL-ROOT",
+    ),
+    false,
+  );
+});
+
+test("scan treats top-level skill.md as a single-skill root when skills is absent", async () => {
+  const root = await fixture();
+  await writeFile(path.join(root, "skill.md"), "# Demo\n");
+
+  const result = await scan(root);
+
+  assert.equal(result.scannedFileCount, 1);
+  assert.equal(result.securityPolicyInventory?.totalPolicyAssets, 1);
+  assert.ok(
+    result.findings.some((finding) => finding.evidence.path === "skill.md"),
+  );
+  assert.ok(
+    result.diagnostics.some(
+      (diagnostic) =>
+        diagnostic.code === "DISCOVERY-SINGLE-SKILL-ROOT" &&
+        diagnostic.severity === "info" &&
+        /Detected top-level skill\.md/.test(diagnostic.message) &&
+        /single-skill root/.test(diagnostic.message),
+    ),
+  );
+});
+
+test("scan prefers skills directory when both skills and top-level skill.md exist", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "skills"), { recursive: true });
+  await writeFile(path.join(root, "skills", "skill.md"), "# Canonical\n");
+  await writeFile(path.join(root, "skill.md"), "# Ignored\n");
+
+  const result = await scan(root);
+
+  assert.equal(result.scannedFileCount, 1);
+  assert.ok(
+    result.findings.some(
+      (finding) => finding.evidence.path === "skills/skill.md",
+    ),
+  );
+  assert.equal(
+    result.findings.some((finding) => finding.evidence.path === "skill.md"),
+    false,
+  );
+  assert.ok(
+    result.diagnostics.some(
+      (diagnostic) =>
+        diagnostic.code === "DISCOVERY-TOP-LEVEL-SKILL-IGNORED" &&
+        diagnostic.severity === "info" &&
+        /top-level skill\.md/.test(diagnostic.message) &&
+        /skills\/ is the canonical skills root/.test(diagnostic.message),
+    ),
+  );
+});
+
+test("scan does not select a single-skill root when neither skills nor skill.md exists", async () => {
+  const root = await fixture();
+
+  const result = await scan(root);
+
+  assert.equal(result.scannedFileCount, 0);
+  assert.equal(
+    result.diagnostics.some((diagnostic) =>
+      diagnostic.code?.startsWith("DISCOVERY-"),
+    ),
+    false,
+  );
+});
+
 test("local support examples are scanned and must be reachable from the skill", async () => {
   const root = await fixture();
   await mkdir(path.join(root, "skills", "demo", "examples"), {

@@ -65,6 +65,7 @@ function findingToDiagnosticV2(finding: Finding, index: number): DiagnosticV2 {
     code,
     severity: severityFromFinding(finding),
     message: finding.title,
+    repairPolicy: "preserve_semantics",
     location: locationFromEvidence(finding.evidence),
     repairConstraints: repairConstraintsForFinding(finding),
     verificationSteps: verificationStepsForFinding(finding),
@@ -93,6 +94,7 @@ function rawDiagnosticToDiagnosticV2(
     code,
     severity: diagnostic.severity,
     message: diagnostic.message,
+    repairPolicy: "preserve_semantics",
     location,
     repairConstraints: repairConstraintsForDiagnostic(code, diagnostic),
     verificationSteps: verificationStepsForDiagnostic(code, diagnostic),
@@ -103,6 +105,7 @@ function rawDiagnosticToDiagnosticV2(
 
 function repairConstraintsForFinding(finding: Finding): RepairConstraint[] {
   return uniqueConstraints([
+    ...semanticRepairConstraints(),
     ...specificRepairConstraints(finding.id),
     ...(finding.repairConstraints ?? []),
     ...constraintTextsToRepairConstraints(finding.constraints ?? []),
@@ -114,12 +117,47 @@ function repairConstraintsForDiagnostic(
   diagnostic: Diagnostic,
 ): RepairConstraint[] {
   return uniqueConstraints([
+    ...semanticRepairConstraints(),
     ...specificRepairConstraints(code),
     ...(diagnostic.repairConstraints ?? []),
   ]);
 }
 
+function semanticRepairConstraints(): RepairConstraint[] {
+  return [
+    {
+      kind: "must_preserve",
+      text: "Fix the underlying semantic issue, not just the warning count. Update the asset so it accurately represents the real dependencies, references, network requirements, and runtime behavior.",
+    },
+    {
+      kind: "must_not_change",
+      text: "Do not remove, weaken, relocate, or bypass declarations only to make the diagnostic disappear.",
+    },
+  ];
+}
+
 function specificRepairConstraints(code: string): RepairConstraint[] {
+  if (code === DIAGNOSTIC_IDS.SEC_UNAPPROVED_NETWORK_DESTINATION) {
+    return [
+      {
+        kind: "must_preserve",
+        text: "Enumerate the actual required domains in approved_network_destinations or the applicable profile/repository security config.",
+      },
+      {
+        kind: "must_not_change",
+        text: "Do not remove the network requirement, move the declaration elsewhere, or use broad wildcards only to silence this warning.",
+      },
+      {
+        kind: "must_not_change",
+        text: "Do not replace specific domains with broad wildcards unless the source documentation explicitly supports that exact scope.",
+      },
+      {
+        kind: "requires_human_decision",
+        text: "If the required domains are unknown, keep the issue visible and add a TODO with supporting references instead of guessing.",
+      },
+    ];
+  }
+
   if (
     code === DIAGNOSTIC_IDS.META_DUPLICATE_ASSET_ID ||
     code === CONTEXT_LENS_DIAGNOSTIC_CODES.DUPLICATE_ID

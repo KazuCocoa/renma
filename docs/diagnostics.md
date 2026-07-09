@@ -26,6 +26,8 @@ Each v2 diagnostic includes:
   into this simpler diagnostic scale, while the original `findingSeverity`
   remains in `details`.
 - `message`: concise human-readable issue summary.
+- `repairPolicy`: currently `preserve_semantics` when repairs must preserve the
+  intended behavior rather than merely satisfying the scanner.
 - `location`: repository path, line range, and snippet when available.
 - `repairConstraints`: typed guardrails for what must be preserved, what must
   not change, allowed repair shapes, human decisions, and risks.
@@ -51,6 +53,7 @@ Example:
   "code": "META-DUPLICATE-ASSET-ID",
   "severity": "warning",
   "message": "Duplicate asset id",
+  "repairPolicy": "preserve_semantics",
   "location": {
     "path": "contexts/alpha/overview.md",
     "startLine": 2,
@@ -361,7 +364,7 @@ forbidden_inputs:
 | `SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD`           | Privileged command lacks guardrails.                 | Content runs `sudo` or equivalent privileged actions without checks.                               | Add prerequisites, confirmation, and rollback guidance.                                                |
 | `SEC-SECRET-MATERIAL-INSTRUCTION`                | Instructions expose or request secret material.      | Content includes or asks for private keys, tokens, or credentials.                                 | Remove secret material and describe secure handling instead.                                           |
 | `SEC-SENSITIVE-FILE-REFERENCE`                   | Instructions reference sensitive files.              | Content points at credentials, keys, or local secret paths.                                        | Replace with safe examples or redacted placeholders.                                                   |
-| `SEC-UNAPPROVED-NETWORK-DESTINATION`             | Network destination is not approved.                 | Instructions contact a host outside the allowed list.                                              | Use an approved destination or update policy intentionally.                                            |
+| `SEC-UNAPPROVED-NETWORK-DESTINATION`             | Network destination is not approved.                 | Instructions contact a host outside the allowed list.                                              | Enumerate the actual required domains in approved network destinations after review.                   |
 | `SEC-UNAPPROVED-UPLOAD-DESTINATION`              | Upload destination is not approved.                  | Instructions upload data to an unapproved service or host.                                         | Use an approved destination or update policy intentionally.                                            |
 | `SEC-UNPINNED-DEPENDENCY-INSTALL`                | Dependency install is not pinned.                    | Examples install packages without exact versions or digests.                                       | Pin package versions or use a reproducible install source.                                             |
 | `SEC-UNPINNED-REMOTE-SCRIPT`                     | Remote script execution is unpinned.                 | Commands pipe or execute remote scripts without an immutable reference.                            | Pin the script source and verify it before execution.                                                  |

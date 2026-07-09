@@ -588,6 +588,35 @@ POST https://internal.example.com/other/upload.
   );
 });
 
+test("unapproved network destination guidance preserves semantic allowlists", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: disclosed
+network_allowed: true
+approved_network_destinations: github.com
+---
+
+Fetch https://api.example.com/upload metadata.
+`),
+  ]);
+  const finding = findings.find(
+    (item) => item.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+  );
+
+  assert.ok(finding);
+  assert.match(finding.remediation, /Enumerate the actual required domains/);
+  assert.match(finding.llmHint ?? "", /Do not remove the network requirement/);
+  assert.match(finding.llmHint ?? "", /broad wildcards/);
+  assert.match(finding.llmHint ?? "", /TODO with supporting references/);
+  assert.ok(
+    finding.constraints?.some((constraint) =>
+      /Do not replace specific domains with broad wildcards/.test(constraint),
+    ),
+  );
+  assert.doesNotMatch(finding.remediation, /remove the external network/i);
+  assert.doesNotMatch(finding.llmHint ?? "", /or remove the instruction/i);
+});
+
 test("security policy v2 reports contradictory policy metadata", () => {
   const findings = securityDiagnosticFindings([
     v2SecurityArtifact(`---

@@ -29,7 +29,9 @@ renma scan .
 
 renma is most useful when agent knowledge is stored in predictable places:
 
-- `skills/**/SKILL.md` for skill instructions.
+- `skills/**/SKILL.md` for skill instructions. Renma also accepts
+  `skills/**/skill.md`, `skills/**/*.skill.md`, and a top-level `skill.md`
+  as a single-skill root when no `skills/` directory exists.
 - `contexts/**` for shared context assets.
 - configurable prompt or documentation paths for reusable prompts and broader docs.
 - `*.renma.json` for structured metadata assets.
@@ -70,6 +72,8 @@ If `--config` is not provided, renma looks for repository config files such as `
 By default, renma scans these glob families when building its catalog and findings:
 
 - `skills/**/SKILL.md`
+- `skills/**/skill.md`
+- `skills/**/*.skill.md`
 - `.agents/**/*.md`
 - `AGENTS.md`
 - `README.md`

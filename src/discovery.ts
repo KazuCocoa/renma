@@ -7,6 +7,12 @@ import type {
   ScanConfig,
 } from "./types.js";
 
+const SINGLE_SKILL_FILENAMES = ["skill.md", "SKILL.md"] as const;
+const TOP_LEVEL_SINGLE_SKILL_MESSAGE =
+  "Detected top-level skill.md. Treating the current directory as a single-skill root. If this is not intended, move the file under skills/ or configure the skills root explicitly.";
+const TOP_LEVEL_SINGLE_SKILL_IGNORED_MESSAGE =
+  "Detected top-level skill.md, but skills/ is the canonical skills root and was selected. The top-level skill.md was not selected as the skills root. Move it under skills/ or configure the skills root explicitly if it should be scanned.";
+
 /** Discover and read scan artifacts according to the provided scan configuration. */
 export async function discoverArtifacts(
   root: string,
@@ -14,8 +20,10 @@ export async function discoverArtifacts(
 ): Promise<{ artifacts: Artifact[]; diagnostics: Diagnostic[] }> {
   const diagnostics: Diagnostic[] = [];
   const paths = new Set<string>();
+  const skillRoot = await detectSkillRoot(root);
+  diagnostics.push(...skillRoot.diagnostics);
 
-  for (const pattern of config.globs) {
+  for (const pattern of [...config.globs, ...skillRoot.additionalGlobs]) {
     try {
       for await (const match of glob(pattern, {
         cwd: root,
@@ -29,6 +37,10 @@ export async function discoverArtifacts(
         message: `Could not evaluate glob "${pattern}": ${errorMessage(error)}`,
       });
     }
+  }
+
+  for (const ignoredPath of skillRoot.ignoredPaths) {
+    paths.delete(ignoredPath);
   }
 
   const candidates = [...paths]
@@ -89,7 +101,7 @@ export async function discoverArtifacts(
 }
 
 function classify(relativePath: string): ArtifactKind {
-  if (relativePath.endsWith("/SKILL.md")) return "skill";
+  if (isSkillEntrypoint(relativePath)) return "skill";
   if (relativePath === "AGENTS.md" || relativePath.startsWith(".agents/"))
     return "agent";
   if (relativePath.startsWith("lenses/")) return "context_lens";
@@ -108,6 +120,87 @@ function classify(relativePath: string): ArtifactKind {
     return "config";
   }
   return "unknown";
+}
+
+async function detectSkillRoot(root: string): Promise<{
+  diagnostics: Diagnostic[];
+  additionalGlobs: string[];
+  ignoredPaths: string[];
+}> {
+  const hasCanonicalSkillsRoot = await isDirectory(path.join(root, "skills"));
+  const topLevelSkill = await existingTopLevelSkill(root);
+  if (!topLevelSkill) {
+    return { diagnostics: [], additionalGlobs: [], ignoredPaths: [] };
+  }
+
+  if (hasCanonicalSkillsRoot) {
+    return {
+      diagnostics: [
+        {
+          code: "DISCOVERY-TOP-LEVEL-SKILL-IGNORED",
+          severity: "info",
+          path: topLevelSkill,
+          message: TOP_LEVEL_SINGLE_SKILL_IGNORED_MESSAGE,
+        },
+      ],
+      additionalGlobs: [],
+      ignoredPaths: [...SINGLE_SKILL_FILENAMES],
+    };
+  }
+
+  return {
+    diagnostics: [
+      {
+        code: "DISCOVERY-SINGLE-SKILL-ROOT",
+        severity: "info",
+        path: topLevelSkill,
+        message: TOP_LEVEL_SINGLE_SKILL_MESSAGE,
+      },
+    ],
+    additionalGlobs: [topLevelSkill],
+    ignoredPaths: [],
+  };
+}
+
+async function existingTopLevelSkill(
+  root: string,
+): Promise<string | undefined> {
+  for (const filename of SINGLE_SKILL_FILENAMES) {
+    const candidate = path.join(root, filename);
+    try {
+      const info = await stat(candidate);
+      if (info.isFile()) return filename;
+    } catch {
+      // Try the next conventional spelling.
+    }
+  }
+  return undefined;
+}
+
+async function isDirectory(absolutePath: string): Promise<boolean> {
+  try {
+    return (await stat(absolutePath)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function isSkillEntrypoint(relativePath: string): boolean {
+  const normalized = toPosix(relativePath);
+  const basename = path.posix.basename(normalized);
+  const lowerBasename = basename.toLowerCase();
+  if (normalized === "skill.md" || normalized === "SKILL.md") return true;
+  if (!normalized.startsWith("skills/")) return false;
+  if (isSkillSupportPath(normalized)) return false;
+  return lowerBasename === "skill.md" || lowerBasename.endsWith(".skill.md");
+}
+
+function isSkillSupportPath(relativePath: string): boolean {
+  return relativePath
+    .split("/")
+    .some((segment) =>
+      ["profiles", "references", "examples", "scripts"].includes(segment),
+    );
 }
 
 async function mapLimit<T, R>(

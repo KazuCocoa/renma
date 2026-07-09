@@ -17,6 +17,8 @@ export const DEFAULT_CONFIG: ScanConfig = {
   format: "text",
   globs: [
     "skills/**/SKILL.md",
+    "skills/**/skill.md",
+    "skills/**/*.skill.md",
     ".agents/**/*.md",
     "AGENTS.md",
     "README.md",

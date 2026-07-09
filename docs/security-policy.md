@@ -202,7 +202,7 @@ Use this table to choose the right kind of fix. For full finding definitions, se
 | `SEC-MISSING-POLICY-METADATA` | Sensitive instructions lack a declared policy. | Add local policy fields or select a configured `security_profile`. | Metadata |
 | `SEC-INSTRUCTION-VIOLATES-POLICY` | Body text asks for behavior denied by policy. | Rewrite the instruction or adjust policy only after review. | Body text and metadata |
 | `SEC-MISSING-HUMAN-APPROVAL-GUARD` | A sensitive action lacks nearby approval wording. | Add explicit human approval close to the action. | Body text |
-| `SEC-UNAPPROVED-NETWORK-DESTINATION` | An instruction contacts a host outside approved network destinations. | Use an approved host or update asset/profile/repo network approvals intentionally. | Body text, metadata, or config |
+| `SEC-UNAPPROVED-NETWORK-DESTINATION` | An instruction contacts a host outside approved network destinations. | Enumerate the actual required domains in asset/profile/repo network approvals after review. | Body text, metadata, or config |
 | `SEC-UNAPPROVED-UPLOAD-DESTINATION` | An upload target is not in upload approvals. | Use an approved upload target or update upload approvals intentionally. | Body text, metadata, or config |
 | `SEC-FORBIDDEN-INPUT-INSTRUCTION` | The asset asks for data listed in `forbidden_inputs`. | Remove the request or replace it with redaction and placeholder guidance. | Body text and metadata |
 | `SEC-SECRET-MATERIAL-INSTRUCTION` | Instructions may expose private keys, tokens, credentials, or secret files. | Remove secret collection or disclosure instructions. | Body text |
