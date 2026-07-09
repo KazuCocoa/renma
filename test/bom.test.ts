@@ -6,11 +6,14 @@ import { test } from "node:test";
 import packageJson from "../package.json" with { type: "json" };
 import { main } from "../src/cli.js";
 import {
+  STABLE_GENERATED_AT,
   bom,
   formatBomJson,
   formatBomMarkdown,
   type BomReport,
 } from "../src/commands/bom.js";
+import { graphFromRepositoryEvidence } from "../src/commands/graph.js";
+import { collectRepositoryEvidence } from "../src/repository-evidence.js";
 
 test("bom report declares Repository Context BOM schema and scope", async () => {
   const report = await bom(await bomFixture());
@@ -18,7 +21,11 @@ test("bom report declares Repository Context BOM schema and scope", async () => 
   assert.equal(report.schemaVersion, "renma.repository-context-bom.v1");
   assert.equal(report.generator.name, "renma");
   assert.equal(report.generator.version, packageJson.version);
-  assert.match(report.generatedAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.match(
+    report.generatedAt,
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+  );
+  assert.notEqual(report.generatedAt, STABLE_GENERATED_AT);
   assert.equal(path.isAbsolute(report.root), true);
   assert.deepEqual(report.scope, {
     type: "declared_repository_manifest",
@@ -113,6 +120,63 @@ test("bom dependencies include resolved target evidence and unresolved edges", a
   assert.equal(report.summary.unresolvedDependencyCount, 1);
 });
 
+test("bom uses shared repository evidence for assets and dependencies", async () => {
+  const root = await bomFixture();
+  const evidence = await collectRepositoryEvidence(root);
+  const graphReport = graphFromRepositoryEvidence(evidence);
+  const report = await bom(root, {}, { stable: true });
+
+  assert.deepEqual(
+    report.assets.map((asset) => [
+      asset.id,
+      asset.kind,
+      asset.sourcePath,
+      asset.contentHash,
+    ]),
+    evidence.catalog.assets
+      .toSorted(
+        (left, right) =>
+          left.kind.localeCompare(right.kind) ||
+          left.sourcePath.localeCompare(right.sourcePath) ||
+          left.id.localeCompare(right.id),
+      )
+      .map((asset) => [
+        asset.id,
+        asset.kind,
+        asset.sourcePath,
+        asset.contentHash,
+      ]),
+  );
+  assert.deepEqual(
+    report.dependencies.map((dependency) => [
+      dependency.from,
+      dependency.kind,
+      dependency.to,
+      dependency.sourcePath,
+      dependency.resolved,
+      dependency.targetId,
+      dependency.targetPath,
+    ]),
+    graphReport.edges
+      .toSorted(
+        (left, right) =>
+          left.from.localeCompare(right.from) ||
+          left.kind.localeCompare(right.kind) ||
+          left.to.localeCompare(right.to) ||
+          left.sourcePath.localeCompare(right.sourcePath),
+      )
+      .map((edge) => [
+        edge.from,
+        edge.kind,
+        edge.to,
+        edge.sourcePath,
+        edge.resolved,
+        edge.targetId,
+        edge.targetPath,
+      ]),
+  );
+});
+
 test("bom includes readiness, security posture, and policy inventory evidence", async () => {
   const report = await bom(await bomFixture());
 
@@ -174,6 +238,25 @@ test("bom markdown is a compact human-review report", async () => {
   assert.match(markdown, /\| Network unspecified \| 2 \|/);
 });
 
+test("bom markdown escapes repository-derived table cells", async () => {
+  const report = await bom(await markdownEscapingFixture());
+  report.readiness.checks = report.readiness.checks.map((check, index) =>
+    index === 0 ? { ...check, summary: "readiness|summary" } : check,
+  );
+  const markdown = formatBomMarkdown(report);
+
+  assert.match(
+    markdown,
+    /context\.testing\.pipe \| context \| contexts\/pipe\\\|dir\/boundary\.md/,
+  );
+  assert.match(markdown, /qa\\\|platform/);
+  assert.match(
+    markdown,
+    /\| skill\.testing\.pipe \| requires \| context\.testing\.missing\\\|pipe \| skills\/pipe\\\|skill\/SKILL\.md \|/,
+  );
+  assert.match(markdown, /readiness\\\|summary/);
+});
+
 test("bom CLI supports JSON and Markdown formats", async () => {
   const root = await bomFixture();
 
@@ -199,6 +282,35 @@ test("bom CLI supports JSON and Markdown formats", async () => {
   assert.match(markdown.stdout, /^# Repository Context BOM/m);
   assert.equal(jsonShortcut.code, 0);
   assert.equal(JSON.parse(jsonShortcut.stdout).scope.telemetryCollected, false);
+});
+
+test("bom CLI stable JSON output is reproducible", async () => {
+  const root = await bomFixture();
+
+  const first = await withCapturedConsole(() =>
+    main(["bom", root, "--json", "--stable"]),
+  );
+  const second = await withCapturedConsole(() =>
+    main(["bom", root, "--json", "--stable"]),
+  );
+
+  assert.equal(first.code, 0);
+  assert.equal(second.code, 0);
+  assert.equal(first.stderr, "");
+  assert.equal(second.stderr, "");
+  assert.equal(first.stdout, second.stdout);
+  assert.equal(JSON.parse(first.stdout).generatedAt, STABLE_GENERATED_AT);
+});
+
+test("bom CLI stable Markdown output uses deterministic generatedAt", async () => {
+  const root = await bomFixture();
+
+  const result = await withCapturedConsole(() =>
+    main(["bom", root, "--format", "markdown", "--stable"]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /- Generated at: 1970-01-01T00:00:00\.000Z/);
 });
 
 test("bom CLI rejects unsupported format", async () => {
@@ -248,6 +360,65 @@ async function bomFixture(): Promise<string> {
 async function catalogWarningFixture(): Promise<string> {
   const root = await fixture();
   await writeOptionalMissingSkill(root);
+  return root;
+}
+
+async function markdownEscapingFixture(): Promise<string> {
+  const root = await fixture();
+  await mkdir(path.join(root, "skills", "pipe|skill"), { recursive: true });
+  await writeFile(
+    path.join(root, "skills", "pipe|skill", "SKILL.md"),
+    [
+      "---",
+      "id: skill.testing.pipe",
+      "owner: qa|platform",
+      "status: stable",
+      "requires_context:",
+      "  - contexts/pipe|dir/boundary.md",
+      "  - context.testing.missing|pipe",
+      "---",
+      "# Pipe Skill",
+      "",
+      "## When to use",
+      "Use this workflow for deterministic Repository Context BOM markdown escaping tests.",
+      "",
+      "## Required inputs",
+      "Required inputs: repository root and the requested BOM output format.",
+      "",
+      "## DO NOT USE FOR",
+      "Do not use this workflow for runtime task context selection or prompt assembly.",
+      "",
+      "## Preflight",
+      "Confirm the repository fixture exists and inputs are static.",
+      "",
+      "## Example",
+      "Input: BOM fixture. Output: deterministic manifest evidence.",
+      "",
+      "## Completion criteria",
+      "The workflow is complete when BOM markdown escapes table cells.",
+      "",
+      "## Verification",
+      "Verify by running the BOM command and checking Markdown output.",
+      "",
+    ].join("\n"),
+  );
+  await mkdir(path.join(root, "contexts", "pipe|dir"), { recursive: true });
+  await writeFile(
+    path.join(root, "contexts", "pipe|dir", "boundary.md"),
+    [
+      "---",
+      "id: context.testing.pipe",
+      "owner: qa|platform",
+      "status: stable",
+      "when_to_use: Review markdown escaping in deterministic BOM fixtures.",
+      "when_not_to_use: Do not use as runtime prompt assembly instructions.",
+      "---",
+      "# Pipe Context",
+      "",
+      "Use this shared context for static report tests.",
+      "",
+    ].join("\n"),
+  );
   return root;
 }
 

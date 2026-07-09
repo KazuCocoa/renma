@@ -63,6 +63,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         json: { type: "boolean" },
         lines: { type: "string" },
         owner: { type: "string" },
+        stable: { type: "boolean" },
         tags: { type: "string", multiple: true },
         title: { type: "string" },
         to: { type: "string" },
@@ -292,6 +293,7 @@ async function runBom(values: CliValues, target: string): Promise<number> {
     return await runBomCommand(target, {
       format: format as BomFormat,
       overrides,
+      stable: values.stable === true,
     });
   } catch (error) {
     console.error(
@@ -698,6 +700,7 @@ function helpText(): string {
     "      --format <format>      scan: text or json; bom/catalog/ownership/readiness/ci-report/trust-graph: json or markdown; graph: json, markdown, or mermaid; suggest-metadata/suggest-semantic-split: prompt or json",
     "      --include-owned        ownership: include owned asset details",
     "      --json                 Shortcut for --format json",
+    "      --stable               bom: use deterministic generatedAt for reproducible output",
     "      --view <view>          graph: summary, workflow, full, layered, or lens",
     "      --focus <asset-id-or-path>",
     "      --owner <owner>        ownership: filter assets by owner; scaffold: declare owner metadata; suggest-metadata: explicitly suggest owner",

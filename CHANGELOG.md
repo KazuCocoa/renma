@@ -12,6 +12,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 - Added `renma bom` for a declared Repository Context BOM that combines catalog assets, graph dependency resolution, readiness evidence, diagnostics, security posture, and security policy inventory.
 - Added JSON and Markdown BOM output with explicit scope metadata stating that runtime usage is false and telemetry is not collected.
+- Added `renma bom --stable` for reproducible BOM artifacts with deterministic `generatedAt`.
+
+### Changed
+
+- Reused one shared repository evidence snapshot for BOM catalog assets and graph dependencies.
+- Escaped repository-derived BOM Markdown table cells for safer PR-friendly output.
 
 ## [0.14.1] - 2026-07-08
 

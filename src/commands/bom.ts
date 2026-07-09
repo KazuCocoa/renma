@@ -1,11 +1,11 @@
 import packageJson from "../../package.json" with { type: "json" };
-import { catalog } from "./catalog.js";
-import { graph, type GraphEdge } from "./graph.js";
+import { graphFromRepositoryEvidence, type GraphEdge } from "./graph.js";
 import {
-  readiness,
+  buildReadinessReport,
   type ReadinessLevel,
   type ReadinessReport,
 } from "./readiness.js";
+import { scan } from "../scanner.js";
 import type { ConfigOverrides } from "../config.js";
 import type {
   Asset,
@@ -13,11 +13,17 @@ import type {
   AssetStatus,
   DependencyKind,
 } from "../model.js";
+import { collectRepositoryEvidence } from "../repository-evidence.js";
 import type { SecurityPolicyInventorySummary } from "../security-policy-inventory.js";
 import type { SecurityPostureSummary } from "../security-posture.js";
 import type { Diagnostic } from "../types.js";
 
 export type BomFormat = "json" | "markdown";
+export const STABLE_GENERATED_AT = "1970-01-01T00:00:00.000Z";
+
+export interface BomOptions {
+  stable?: boolean;
+}
 
 export interface BomReport {
   schemaVersion: "renma.repository-context-bom.v1";
@@ -112,9 +118,15 @@ export interface BomDependency {
 
 export async function runBomCommand(
   targetPath: string,
-  options: { format: BomFormat; overrides?: ConfigOverrides },
+  options: {
+    format: BomFormat;
+    overrides?: ConfigOverrides;
+    stable?: boolean;
+  },
 ): Promise<number> {
-  const report = await bom(targetPath, options.overrides ?? {});
+  const report = await bom(targetPath, options.overrides ?? {}, {
+    stable: options.stable === true,
+  });
   process.stdout.write(
     options.format === "json"
       ? formatBomJson(report)
@@ -130,16 +142,22 @@ export async function runBomCommand(
 export async function bom(
   targetPath: string,
   overrides: ConfigOverrides = {},
+  options: BomOptions = {},
 ): Promise<BomReport> {
-  const [catalogResult, graphReport, readinessReport] = await Promise.all([
-    catalog(targetPath, overrides),
-    graph(targetPath, overrides),
-    readiness(targetPath, overrides),
-  ]);
+  const evidence = await collectRepositoryEvidence(targetPath, overrides);
+  const graphReport = graphFromRepositoryEvidence(evidence);
+  const scanResult = await scan(targetPath, overrides);
+  const readinessReport = buildReadinessReport(
+    graphReport,
+    scanResult.findings,
+    scanResult.diagnostics,
+    scanResult.contextLens,
+    scanResult.securityPolicyInventory,
+  );
   const dependencies = stableEdges(graphReport.edges).map(toBomDependency);
   const diagnostics = stableDiagnostics(
     dedupeDiagnostics([
-      ...catalogResult.diagnostics,
+      ...evidence.diagnostics,
       ...(graphReport.diagnostics ?? []),
       ...(readinessReport.diagnostics ?? []),
     ]),
@@ -148,23 +166,23 @@ export async function bom(
 
   return {
     schemaVersion: "renma.repository-context-bom.v1",
-    generatedAt: new Date().toISOString(),
+    generatedAt: options.stable
+      ? STABLE_GENERATED_AT
+      : new Date().toISOString(),
     generator: {
       name: "renma",
       version: packageJson.version,
     },
-    root: catalogResult.root,
-    ...(catalogResult.configPath
-      ? { configPath: catalogResult.configPath }
-      : {}),
+    root: evidence.root,
+    ...(evidence.configPath ? { configPath: evidence.configPath } : {}),
     scope: {
       type: "declared_repository_manifest",
       runtimeUsage: false,
       telemetryCollected: false,
     },
     summary: {
-      scannedFileCount: catalogResult.scannedFileCount,
-      assetCount: catalogResult.catalog.assets.length,
+      scannedFileCount: evidence.scannedFileCount,
+      assetCount: evidence.catalog.assets.length,
       dependencyCount: dependencies.length,
       resolvedDependencyCount: dependencies.filter(
         (dependency) => dependency.resolved,
@@ -178,7 +196,7 @@ export async function bom(
       readinessLevel: readinessReport.level,
       diagnosticCounts,
     },
-    assets: stableAssets(catalogResult.catalog.assets).map((asset) =>
+    assets: stableAssets(evidence.catalog.assets).map((asset) =>
       toBomAsset(asset, dependencies, diagnostics),
     ),
     dependencies,
@@ -228,9 +246,11 @@ export function formatBomMarkdown(report: BomReport): string {
   } else {
     for (const asset of report.assets) {
       lines.push(
-        `| ${escapeTableCell(asset.id)} | ${asset.kind} | ${asset.sourcePath} | ${shortHash(
-          asset.contentHash,
-        )} | ${escapeTableCell(asset.owner ?? "")} | ${asset.status ?? ""} | ${asset.dependencies.length} |`,
+        `| ${escapeTableCell(asset.id)} | ${escapeTableCell(asset.kind)} | ${escapeTableCell(
+          asset.sourcePath,
+        )} | ${shortHash(asset.contentHash)} | ${escapeTableCell(
+          asset.owner ?? "",
+        )} | ${escapeTableCell(asset.status ?? "")} | ${asset.dependencies.length} |`,
       );
     }
   }
@@ -247,9 +267,11 @@ export function formatBomMarkdown(report: BomReport): string {
       "| --- | --- | --- | --- |",
       ...unresolved.map(
         (dependency) =>
-          `| ${escapeTableCell(dependency.from)} | ${dependency.kind} | ${escapeTableCell(
+          `| ${escapeTableCell(dependency.from)} | ${escapeTableCell(
+            dependency.kind,
+          )} | ${escapeTableCell(
             dependency.to,
-          )} | ${dependency.sourcePath} |`,
+          )} | ${escapeTableCell(dependency.sourcePath)} |`,
       ),
     );
   }
@@ -268,9 +290,9 @@ export function formatBomMarkdown(report: BomReport): string {
     "| --- | --- | --- | --- |",
     ...report.readiness.checks.map(
       (check) =>
-        `| ${check.id} | ${check.status} | ${check.severity} | ${escapeTableCell(
-          check.summary,
-        )} |`,
+        `| ${escapeTableCell(check.id)} | ${escapeTableCell(
+          check.status,
+        )} | ${escapeTableCell(check.severity)} | ${escapeTableCell(check.summary)} |`,
     ),
     "",
     "## Security Posture",

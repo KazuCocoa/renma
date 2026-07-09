@@ -1,6 +1,5 @@
 import path from "node:path";
 
-import { catalog } from "./catalog.js";
 import type { ConfigOverrides } from "../config.js";
 import type {
   Asset,
@@ -9,6 +8,10 @@ import type {
   Dependency,
   DependencyKind,
 } from "../model.js";
+import {
+  collectRepositoryEvidence,
+  type RepositoryEvidence,
+} from "../repository-evidence.js";
 import type { Diagnostic } from "../types.js";
 
 export type GraphFormat = "json" | "markdown" | "mermaid";
@@ -73,23 +76,30 @@ export async function graph(
   targetPath: string,
   overrides: ConfigOverrides = {},
 ): Promise<GraphReport> {
-  const result = await catalog(targetPath, overrides);
-  const nodes = stableAssets(result.catalog.assets).map(toNode);
-  const edges = stableDependencies(result.catalog.dependencies).map(
-    (dependency) => toEdge(dependency, result.catalog.assets),
+  return graphFromRepositoryEvidence(
+    await collectRepositoryEvidence(targetPath, overrides),
+  );
+}
+
+export function graphFromRepositoryEvidence(
+  evidence: RepositoryEvidence,
+): GraphReport {
+  const nodes = stableAssets(evidence.catalog.assets).map(toNode);
+  const edges = stableDependencies(evidence.catalog.dependencies).map(
+    (dependency) => toEdge(dependency, evidence.catalog.assets),
   );
 
   return {
-    root: result.root,
-    ...(result.configPath ? { configPath: result.configPath } : {}),
-    scannedFileCount: result.scannedFileCount,
+    root: evidence.root,
+    ...(evidence.configPath ? { configPath: evidence.configPath } : {}),
+    scannedFileCount: evidence.scannedFileCount,
     view: "full",
     nodeCount: nodes.length,
     edgeCount: edges.length,
     nodes,
     edges,
-    ...(result.diagnostics.length > 0
-      ? { diagnostics: result.diagnostics }
+    ...(evidence.diagnostics.length > 0
+      ? { diagnostics: evidence.diagnostics }
       : {}),
   };
 }

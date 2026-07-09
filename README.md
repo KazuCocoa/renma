@@ -194,6 +194,7 @@ renma trust-graph . --format json
 renma readiness . --format markdown
 renma bom . --format json
 renma bom . --format markdown
+renma bom . --format json --stable
 ```
 
 ### Repository Context BOM
@@ -203,11 +204,14 @@ renma bom . --format markdown
 ```bash
 renma bom . --format json
 renma bom . --format markdown
+renma bom . --format json --stable
 ```
 
 The BOM is a repository manifest, not a runtime usage report. It combines the catalog asset inventory, content hashes, owners, lifecycle metadata, declared dependency graph evidence, diagnostics, readiness checks, security posture, and security policy inventory into one reviewable artifact.
 
 It does not describe what an LLM actually used, assemble prompts, select task-specific context, inject context into agents, import consumed-context evidence, or collect telemetry. JSON is the source of truth; Markdown is the compact pull-request review view.
+
+By default, `generatedAt` records the actual generation time. Use `--stable` for reproducible CI artifacts and cleaner diffs; it keeps repository-derived fields unchanged and sets `generatedAt` to a deterministic value.
 
 ### Repeated context diagnostics
 

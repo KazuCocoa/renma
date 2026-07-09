@@ -341,6 +341,7 @@ Prints a declared Repository Context BOM.
 renma bom .
 renma bom . --format json
 renma bom . --format markdown
+renma bom . --format json --stable
 ```
 
 Use the BOM when reviewers or CI consumers need one stable repository manifest that combines existing Renma evidence: catalog asset inventory, repository-relative source paths, content hashes, owners, lifecycle metadata, tags, declared dependencies, graph resolution, diagnostics, readiness score and checks, workflow readiness, context lens summary, security posture, and security policy inventory.
@@ -348,6 +349,8 @@ Use the BOM when reviewers or CI consumers need one stable repository manifest t
 The BOM is not a record of actual LLM runtime usage. Renma does not collect telemetry, assemble prompts, choose task-specific context, inject context into agents, import consumed-context evidence, or claim what an LLM actually consumed.
 
 JSON is the source of truth for automation. Markdown is a compact pull-request review view.
+
+By default, `generatedAt` records when the BOM was produced. Add `--stable` when CI or review automation needs reproducible artifacts and cleaner diffs; stable mode uses a deterministic `generatedAt` while preserving the same declared repository evidence.
 
 ### `graph`
 
