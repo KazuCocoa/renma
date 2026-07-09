@@ -341,16 +341,18 @@ Prints a declared Repository Context BOM.
 renma bom .
 renma bom . --format json
 renma bom . --format markdown
-renma bom . --format json --stable
+renma bom . --format json --omit-generated-at
 ```
 
-Use the BOM when reviewers or CI consumers need one stable repository manifest that combines existing Renma evidence: catalog asset inventory, repository-relative source paths, content hashes, owners, lifecycle metadata, tags, declared dependencies, graph resolution, diagnostics, readiness score and checks, workflow readiness, context lens summary, security posture, and security policy inventory.
+Use the BOM when reviewers or CI consumers need one repository evidence manifest that combines existing Renma evidence: catalog asset inventory, repository-relative source paths, content hashes, owners, lifecycle metadata, tags, declared dependencies, graph resolution, diagnostics, readiness score and checks, workflow readiness, context lens summary, security posture, and security policy inventory.
 
 The BOM is not a record of actual LLM runtime usage. Renma does not collect telemetry, assemble prompts, choose task-specific context, inject context into agents, import consumed-context evidence, or claim what an LLM actually consumed.
 
 JSON is the source of truth for automation. Markdown is a compact pull-request review view.
 
-By default, `generatedAt` records when the BOM was produced. Add `--stable` when CI or review automation needs reproducible artifacts and cleaner diffs; stable mode keeps repository-derived fields unchanged and omits `generatedAt` because stable output should not embed run-time clock data.
+Renma collects one shared repository evidence snapshot for BOM catalog assets and graph dependencies so those sections stay internally consistent.
+
+By default, `generatedAt` records when the BOM was produced. Add `--omit-generated-at` when CI or review automation needs to avoid clock-based diffs. This option only removes the run-time generation timestamp; it does not ignore repository metadata timestamps such as `lastReviewedAt` or `expiresAt`, and it does not normalize absolute `root` or `configPath` values.
 
 ### `graph`
 

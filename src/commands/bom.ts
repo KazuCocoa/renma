@@ -19,15 +19,16 @@ import type { SecurityPostureSummary } from "../security-posture.js";
 import type { Diagnostic } from "../types.js";
 
 export type BomFormat = "json" | "markdown";
+export type BomOutputMode = "default" | "omit_generated_at";
 
 export interface BomOptions {
-  stable?: boolean;
+  omitGeneratedAt?: boolean;
 }
 
 export interface BomReport {
   schemaVersion: "renma.repository-context-bom.v1";
   generatedAt?: string;
-  outputMode: "default" | "stable";
+  outputMode: BomOutputMode;
   generator: {
     name: "renma";
     version: string;
@@ -121,11 +122,11 @@ export async function runBomCommand(
   options: {
     format: BomFormat;
     overrides?: ConfigOverrides;
-    stable?: boolean;
+    omitGeneratedAt?: boolean;
   },
 ): Promise<number> {
   const report = await bom(targetPath, options.overrides ?? {}, {
-    stable: options.stable === true,
+    omitGeneratedAt: options.omitGeneratedAt === true,
   });
   process.stdout.write(
     options.format === "json"
@@ -163,11 +164,12 @@ export async function bom(
     ]),
   );
   const diagnosticCounts = countDiagnostics(diagnostics);
+  const omitGeneratedAt = options.omitGeneratedAt === true;
 
   return {
     schemaVersion: "renma.repository-context-bom.v1",
-    outputMode: options.stable ? "stable" : "default",
-    ...(options.stable ? {} : { generatedAt: new Date().toISOString() }),
+    outputMode: omitGeneratedAt ? "omit_generated_at" : "default",
+    ...(omitGeneratedAt ? {} : { generatedAt: new Date().toISOString() }),
     generator: {
       name: "renma",
       version: packageJson.version,
@@ -226,7 +228,7 @@ export function formatBomMarkdown(report: BomReport): string {
     `- Output mode: ${report.outputMode}`,
     report.generatedAt
       ? `- Generated at: ${report.generatedAt}`
-      : "- Generated at: (omitted for stable output)",
+      : "- Generated at: (omitted)",
     "- Runtime usage: no",
     "- Telemetry collected: no",
     `- Assets: ${report.summary.assetCount}`,

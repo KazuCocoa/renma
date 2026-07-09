@@ -125,7 +125,7 @@ test("bom uses shared repository evidence for assets and dependencies", async ()
   const root = await bomFixture();
   const evidence = await collectRepositoryEvidence(root);
   const graphReport = graphFromRepositoryEvidence(evidence);
-  const report = await bom(root, {}, { stable: true });
+  const report = await bom(root, {}, { omitGeneratedAt: true });
 
   assert.deepEqual(
     report.assets.map((asset) => [
@@ -285,14 +285,14 @@ test("bom CLI supports JSON and Markdown formats", async () => {
   assert.equal(JSON.parse(jsonShortcut.stdout).scope.telemetryCollected, false);
 });
 
-test("bom CLI stable JSON output is reproducible", async () => {
+test("bom CLI generatedAt omission JSON output is reproducible", async () => {
   const root = await bomFixture();
 
   const first = await withCapturedConsole(() =>
-    main(["bom", root, "--json", "--stable"]),
+    main(["bom", root, "--json", "--omit-generated-at"]),
   );
   const second = await withCapturedConsole(() =>
-    main(["bom", root, "--json", "--stable"]),
+    main(["bom", root, "--json", "--omit-generated-at"]),
   );
 
   assert.equal(first.code, 0);
@@ -301,20 +301,25 @@ test("bom CLI stable JSON output is reproducible", async () => {
   assert.equal(second.stderr, "");
   assert.equal(first.stdout, second.stdout);
   const parsed = JSON.parse(first.stdout) as BomReport;
-  assert.equal(parsed.outputMode, "stable");
+  const asset = parsed.assets.find(
+    (candidate) => candidate.id === "context.testing.boundary-value-analysis",
+  );
+  assert.equal(parsed.outputMode, "omit_generated_at");
   assert.equal("generatedAt" in parsed, false);
+  assert.equal(asset?.lifecycle?.lastReviewedAt, "2026-06-28");
+  assert.equal(asset?.lifecycle?.expiresAt, "2026-12-31");
 });
 
-test("bom CLI stable Markdown output omits generatedAt", async () => {
+test("bom CLI generatedAt omission Markdown output says generatedAt was omitted", async () => {
   const root = await bomFixture();
 
   const result = await withCapturedConsole(() =>
-    main(["bom", root, "--format", "markdown", "--stable"]),
+    main(["bom", root, "--format", "markdown", "--omit-generated-at"]),
   );
 
   assert.equal(result.code, 0);
-  assert.match(result.stdout, /- Output mode: stable/);
-  assert.match(result.stdout, /- Generated at: \(omitted for stable output\)/);
+  assert.match(result.stdout, /- Output mode: omit_generated_at/);
+  assert.match(result.stdout, /- Generated at: \(omitted\)/);
   assert.doesNotMatch(result.stdout, /1970-01-01T00:00:00\.000Z/);
 });
 
