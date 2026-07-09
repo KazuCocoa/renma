@@ -35,16 +35,12 @@ test("bom report declares Repository Context BOM schema and scope", async () => 
 test("bom assets include catalog metadata and lifecycle evidence", async () => {
   const report = await bom(await bomFixture());
   const asset = report.assets.find(
-    (candidate) =>
-      candidate.id === "context.testing.boundary-value-analysis",
+    (candidate) => candidate.id === "context.testing.boundary-value-analysis",
   );
 
   assert.ok(asset);
   assert.equal(asset.kind, "context");
-  assert.equal(
-    asset.sourcePath,
-    "contexts/testing/boundary-value-analysis.md",
-  );
+  assert.equal(asset.sourcePath, "contexts/testing/boundary-value-analysis.md");
   assert.match(asset.contentHash, /^sha256:[a-f0-9]{64}$/);
   assert.equal(asset.owner, "qa-platform");
   assert.equal(asset.status, "stable");
@@ -193,7 +189,10 @@ test("bom CLI supports JSON and Markdown formats", async () => {
   );
 
   assert.equal(defaultJson.code, 0);
-  assert.equal(JSON.parse(defaultJson.stdout).schemaVersion, "renma.repository-context-bom.v1");
+  assert.equal(
+    JSON.parse(defaultJson.stdout).schemaVersion,
+    "renma.repository-context-bom.v1",
+  );
   assert.equal(explicitJson.code, 0);
   assert.equal(JSON.parse(explicitJson.stdout).scope.runtimeUsage, false);
   assert.equal(markdown.code, 0);

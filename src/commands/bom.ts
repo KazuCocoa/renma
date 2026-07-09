@@ -154,7 +154,9 @@ export async function bom(
       version: packageJson.version,
     },
     root: catalogResult.root,
-    ...(catalogResult.configPath ? { configPath: catalogResult.configPath } : {}),
+    ...(catalogResult.configPath
+      ? { configPath: catalogResult.configPath }
+      : {}),
     scope: {
       type: "declared_repository_manifest",
       runtimeUsage: false,
@@ -336,7 +338,9 @@ function assetLifecycle(asset: Asset): BomAssetLifecycle | undefined {
     ...(asset.metadata.reviewCycle
       ? { reviewCycle: asset.metadata.reviewCycle }
       : {}),
-    ...(asset.metadata.expiresAt ? { expiresAt: asset.metadata.expiresAt } : {}),
+    ...(asset.metadata.expiresAt
+      ? { expiresAt: asset.metadata.expiresAt }
+      : {}),
   };
   return Object.keys(lifecycle).length > 0 ? lifecycle : undefined;
 }
