@@ -60,6 +60,7 @@ export interface DiagnosticV2 {
   code: string;
   severity: "error" | "warning" | "info";
   message: string;
+  repairPolicy?: "preserve_semantics";
   location?: DiagnosticLocation;
   relatedLocations?: DiagnosticLocation[];
   repairConstraints?: RepairConstraint[];

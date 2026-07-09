@@ -18,8 +18,8 @@ id: skill.diagnostics.local-triage
 owner: qa-platform
 status: stable
 allowed_data:
-  - public
-  - sanitized diagnostics
+  - repo-local-files
+  - sanitized-ci-diagnostics
 network_allowed: true
 external_upload_allowed: false
 secrets_allowed: false
@@ -33,6 +33,77 @@ forbidden_inputs:
 
 Asset-local explicit denials remain stricter than inherited profile or repository allowances. For example, `external_upload_allowed: false` on an asset still blocks upload instructions even if a selected profile or repository config allows uploads elsewhere.
 
+### Allowed data vocabulary
+
+`allowed_data` describes what categories of input data a skill or context asset
+is allowed to use. It is not a strict closed enum: projects may define their own
+data-source categories when they need domain-specific names. Prefer descriptive,
+stable values so humans, diagnostics, trust graph output, readiness checks, and
+future automation can reason about declared data boundaries consistently.
+
+Recommended vocabulary:
+
+| Value | Meaning |
+| --- | --- |
+| `repo-local-files` | Files inside the target repository or scan root. |
+| `skill-bundled-context` | Context files bundled with or explicitly declared by the skill. |
+| `referenced-authenticated-internal-docs` | Authenticated internal documents explicitly referenced by the skill or its context assets. |
+| `sanitized-ci-diagnostics` | CI logs, test results, and failure diagnostics that have been sanitized or redacted before being provided to the LLM. |
+| `public-docs` | Publicly available documentation, specifications, or references. |
+| `disclosed-user-provided-data` | Data explicitly provided or disclosed by the user for the current task. |
+
+Important: `allowed_data` does not grant broad access to all matching data. For
+example, `referenced-authenticated-internal-docs` means authenticated internal
+documents that are explicitly referenced by the skill or its context assets. It
+does not mean that the skill may freely search all internal documents.
+
+Legacy or coarse values such as `public` and `disclosed` are still accepted, but
+prefer values such as `public-docs` and `disclosed-user-provided-data` in new or
+updated assets.
+
+Common patterns:
+
+Basic repo-local skill:
+
+```yaml
+allowed_data:
+  - repo-local-files
+  - skill-bundled-context
+```
+
+Internal-doc-backed review skill:
+
+```yaml
+allowed_data:
+  - repo-local-files
+  - skill-bundled-context
+  - referenced-authenticated-internal-docs
+```
+
+CI failure diagnosis skill:
+
+```yaml
+allowed_data:
+  - repo-local-files
+  - sanitized-ci-diagnostics
+```
+
+OSS or public documentation skill:
+
+```yaml
+allowed_data:
+  - repo-local-files
+  - public-docs
+```
+
+User-provided input skill:
+
+```yaml
+allowed_data:
+  - disclosed-user-provided-data
+  - skill-bundled-context
+```
+
 ### Reusable security profiles
 
 Use `security_profile` when many assets share the same policy, a team wants a reusable security contract, or policy should be centrally updated in `renma.config.json`.
@@ -43,8 +114,8 @@ Configure profiles under `security.profiles`:
 {
   "security": {
     "profiles": {
-      "disclosed-local-diagnostics": {
-        "allowedData": ["public", "sanitized diagnostics"],
+      "local-ci-diagnostics": {
+        "allowedData": ["repo-local-files", "sanitized-ci-diagnostics"],
         "networkAllowed": true,
         "externalUploadAllowed": false,
         "secretsAllowed": false,
@@ -62,7 +133,7 @@ Then select the profile from an asset:
 
 ```yaml
 ---
-security_profile: disclosed-local-diagnostics
+security_profile: local-ci-diagnostics
 ---
 ```
 
@@ -202,7 +273,7 @@ Use this table to choose the right kind of fix. For full finding definitions, se
 | `SEC-MISSING-POLICY-METADATA` | Sensitive instructions lack a declared policy. | Add local policy fields or select a configured `security_profile`. | Metadata |
 | `SEC-INSTRUCTION-VIOLATES-POLICY` | Body text asks for behavior denied by policy. | Rewrite the instruction or adjust policy only after review. | Body text and metadata |
 | `SEC-MISSING-HUMAN-APPROVAL-GUARD` | A sensitive action lacks nearby approval wording. | Add explicit human approval close to the action. | Body text |
-| `SEC-UNAPPROVED-NETWORK-DESTINATION` | An instruction contacts a host outside approved network destinations. | Use an approved host or update asset/profile/repo network approvals intentionally. | Body text, metadata, or config |
+| `SEC-UNAPPROVED-NETWORK-DESTINATION` | An instruction contacts a host outside approved network destinations. | Enumerate the actual required domains in asset/profile/repo network approvals after review. | Body text, metadata, or config |
 | `SEC-UNAPPROVED-UPLOAD-DESTINATION` | An upload target is not in upload approvals. | Use an approved upload target or update upload approvals intentionally. | Body text, metadata, or config |
 | `SEC-FORBIDDEN-INPUT-INSTRUCTION` | The asset asks for data listed in `forbidden_inputs`. | Remove the request or replace it with redaction and placeholder guidance. | Body text and metadata |
 | `SEC-SECRET-MATERIAL-INSTRUCTION` | Instructions may expose private keys, tokens, credentials, or secret files. | Remove secret collection or disclosure instructions. | Body text |

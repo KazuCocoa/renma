@@ -304,17 +304,20 @@ const RULES = {
     whyItMatters:
       "Agents need deterministic destination allowlists when instructions mention external hosts, APIs, or storage services.",
     remediation:
-      "Add the destination to approved_network_destinations after review, or remove the external network instruction.",
+      "Enumerate the actual required domains in approved_network_destinations or the applicable profile/repository security config after review.",
     constraints: [
       "Do not use fuzzy destination matching.",
       "Keep hostnames or URL prefixes explicit.",
+      "Do not remove the network requirement, use broad wildcards, or move the declaration elsewhere only to silence this warning.",
+      "Do not replace specific domains with broad wildcards unless the source documentation explicitly supports that exact scope.",
+      "If the required domains are unknown, keep the issue visible and add a TODO with supporting references instead of guessing.",
     ],
     verificationSteps: [
       "Run renma scan.",
-      "Confirm every external destination is approved or removed.",
+      "Confirm every real external destination is represented by a specific approved network destination.",
     ],
     llmHint:
-      "Compare the referenced URL or host to approved_network_destinations and either approve it explicitly or remove the instruction.",
+      "Enumerate the actual required domains. Do not remove the network requirement, use broad wildcards, or move the declaration elsewhere only to silence this warning. If the required domains are unknown, keep the issue visible and add a TODO with supporting references instead of guessing.",
     confidence: "high",
     riskClass: "violation",
   },

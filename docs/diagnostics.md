@@ -26,6 +26,8 @@ Each v2 diagnostic includes:
   into this simpler diagnostic scale, while the original `findingSeverity`
   remains in `details`.
 - `message`: concise human-readable issue summary.
+- `repairPolicy`: currently `preserve_semantics` when repairs must preserve the
+  intended behavior rather than merely satisfying the scanner.
 - `location`: repository path, line range, and snippet when available.
 - `repairConstraints`: typed guardrails for what must be preserved, what must
   not change, allowed repair shapes, human decisions, and risks.
@@ -51,6 +53,7 @@ Example:
   "code": "META-DUPLICATE-ASSET-ID",
   "severity": "warning",
   "message": "Duplicate asset id",
+  "repairPolicy": "preserve_semantics",
   "location": {
     "path": "contexts/alpha/overview.md",
     "startLine": 2,
@@ -245,7 +248,7 @@ Supported policy metadata includes:
 
 | Field                           | Meaning                                                                                                                                                                                            | Related findings                                                                                          |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `allowed_data`                  | Declares the asset's allowed data entries. It accepts scalar, inline list, and block list forms; `allowed_data: disclosed`, `allowed_data: [disclosed]`, and a one-item block list are equivalent. | `SEC-MISSING-POLICY-METADATA`, `SEC-FORBIDDEN-INPUT-INSTRUCTION`, `SEC-INSTRUCTION-VIOLATES-POLICY`       |
+| `allowed_data`                  | Declares the asset's allowed input data categories. It is flexible rather than a closed enum, but prefer descriptive values such as `repo-local-files`, `skill-bundled-context`, `public-docs`, `sanitized-ci-diagnostics`, and `disclosed-user-provided-data`. Scalar, inline list, and block list forms are equivalent. | `SEC-MISSING-POLICY-METADATA`, `SEC-FORBIDDEN-INPUT-INSTRUCTION`, `SEC-INSTRUCTION-VIOLATES-POLICY`       |
 | `network_allowed`               | Declares whether the asset may perform network actions such as fetching URLs or contacting APIs. Explicit `false` blocks network instructions even when repository config has approved domains.    | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-BODY-POLICY-CONTRADICTION`, `SEC-UNAPPROVED-NETWORK-DESTINATION`  |
 | `external_upload_allowed`       | Declares whether the asset may upload, publish, submit, sync, push, or otherwise send repository data externally.                                                                                  | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-EXTERNAL-UPLOAD-INSTRUCTION`, `SEC-UNAPPROVED-UPLOAD-DESTINATION` |
 | `secrets_allowed`               | Declares whether secret material is allowed as input or content for the asset.                                                                                                                     | `SEC-INSTRUCTION-VIOLATES-POLICY`, `SEC-SECRET-MATERIAL-INSTRUCTION`, `SEC-SENSITIVE-FILE-REFERENCE`      |
@@ -260,7 +263,9 @@ Boolean policy fields accept values such as `true`, `false`, `yes`, `no`, `allow
 Example:
 
 ```yaml
-allowed_data: public
+allowed_data:
+  - repo-local-files
+  - skill-bundled-context
 network_allowed: true
 external_upload_allowed: false
 secrets_allowed: false
@@ -361,7 +366,7 @@ forbidden_inputs:
 | `SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD`           | Privileged command lacks guardrails.                 | Content runs `sudo` or equivalent privileged actions without checks.                               | Add prerequisites, confirmation, and rollback guidance.                                                |
 | `SEC-SECRET-MATERIAL-INSTRUCTION`                | Instructions expose or request secret material.      | Content includes or asks for private keys, tokens, or credentials.                                 | Remove secret material and describe secure handling instead.                                           |
 | `SEC-SENSITIVE-FILE-REFERENCE`                   | Instructions reference sensitive files.              | Content points at credentials, keys, or local secret paths.                                        | Replace with safe examples or redacted placeholders.                                                   |
-| `SEC-UNAPPROVED-NETWORK-DESTINATION`             | Network destination is not approved.                 | Instructions contact a host outside the allowed list.                                              | Use an approved destination or update policy intentionally.                                            |
+| `SEC-UNAPPROVED-NETWORK-DESTINATION`             | Network destination is not approved.                 | Instructions contact a host outside the allowed list.                                              | Enumerate the actual required domains in approved network destinations after review.                   |
 | `SEC-UNAPPROVED-UPLOAD-DESTINATION`              | Upload destination is not approved.                  | Instructions upload data to an unapproved service or host.                                         | Use an approved destination or update policy intentionally.                                            |
 | `SEC-UNPINNED-DEPENDENCY-INSTALL`                | Dependency install is not pinned.                    | Examples install packages without exact versions or digests.                                       | Pin package versions or use a reproducible install source.                                             |
 | `SEC-UNPINNED-REMOTE-SCRIPT`                     | Remote script execution is unpinned.                 | Commands pipe or execute remote scripts without an immutable reference.                            | Pin the script source and verify it before execution.                                                  |

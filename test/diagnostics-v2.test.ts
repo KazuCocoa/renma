@@ -20,8 +20,25 @@ test("scan JSON includes LLM-actionable diagnostics v2 metadata", async () => {
 
   assert.equal(duplicate?.version, 2);
   assert.equal(duplicate?.severity, "warning");
+  assert.equal(duplicate?.repairPolicy, "preserve_semantics");
   assert.equal(duplicate?.location?.path, "contexts/alpha/overview.md");
   assert.equal(duplicate?.location?.startLine, 2);
+  assert.ok(
+    duplicate?.repairConstraints?.some(
+      (constraint) =>
+        constraint.kind === "must_preserve" &&
+        /Fix the underlying semantic issue/.test(constraint.text),
+    ),
+  );
+  assert.ok(
+    duplicate?.repairConstraints?.some(
+      (constraint) =>
+        constraint.kind === "must_not_change" &&
+        /Do not remove, weaken, relocate, or bypass declarations/.test(
+          constraint.text,
+        ),
+    ),
+  );
   assert.ok(
     duplicate?.repairConstraints?.some(
       (constraint) =>
@@ -50,6 +67,52 @@ test("scan JSON includes LLM-actionable diagnostics v2 metadata", async () => {
     (duplicate?.details?.facts as Record<string, unknown> | undefined)?.assetId,
     "context.demo.duplicate",
   );
+});
+
+test("network allow-list diagnostics include preserve-semantics repair policy", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-diagnostics-v2-"));
+  await mkdir(path.join(root, "skills", "network"), { recursive: true });
+  await writeFile(
+    path.join(root, "skills", "network", "SKILL.md"),
+    `---
+allowed_data: disclosed
+network_allowed: true
+approved_network_destinations: github.com
+---
+# Network
+
+Fetch https://api.example.com/status.
+`,
+  );
+
+  const result = await scan(root);
+  const diagnostic = result.diagnosticsV2.find(
+    (item) => item.code === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+  );
+
+  assert.ok(diagnostic);
+  assert.equal(diagnostic.repairPolicy, "preserve_semantics");
+  assert.match(
+    diagnostic.details?.remediation as string,
+    /actual required domains/,
+  );
+  assert.match(
+    diagnostic.llmHint ?? "",
+    /Enumerate the actual required domains/,
+  );
+  assert.ok(
+    diagnostic.repairConstraints?.some((constraint) =>
+      /Do not replace specific domains with broad wildcards/.test(
+        constraint.text,
+      ),
+    ),
+  );
+  assert.ok(
+    diagnostic.repairConstraints?.some((constraint) =>
+      /TODO with supporting references/.test(constraint.text),
+    ),
+  );
+  assert.doesNotMatch(diagnostic.llmHint ?? "", /or remove the instruction/i);
 });
 
 test("review bundles group related diagnostics deterministically", async () => {

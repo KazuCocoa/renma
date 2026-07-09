@@ -354,14 +354,45 @@ By default, Renma looks for:
 
 ```text
 skills/**/SKILL.md
+skills/**/skill.md
+skills/**/*.skill.md
+.agents/skills/**/SKILL.md
+.agents/skills/**/skill.md
+.agents/skills/**/*.skill.md
 .agents/**/*.md
 AGENTS.md
 README.md
 context/**/*.md
 contexts/**/*.md
 lenses/**/*.md
+skills/**/profiles/**/*.md
+skills/**/references/**/*.md
+skills/**/examples/**/*.md
+skills/**/scripts/**/*
 tools/**/*
 ```
+
+Skill-like files outside `skills/**` or `.agents/skills/**` are not treated as
+Renma skill assets by default. Renma may emit an informational layout diagnostic
+to suggest moving the file if it is intended to be a Renma skill.
+
+Under explicit skill roots, the path segments `examples`, `profiles`,
+`references`, and `scripts` are reserved for skill-local support files. These
+are valid support paths:
+
+- `skills/demo/examples/happy-path.md`
+- `skills/demo/references/spec.md`
+- `skills/demo/scripts/helper.sh`
+- `skills/demo/profiles/local.md`
+
+The same reserved names apply under `.agents/skills/**`.
+
+Avoid using reserved support directory names as skill names. For example,
+`skills/examples/SKILL.md`, `skills/references/SKILL.md`,
+`skills/scripts/SKILL.md`, and `skills/profiles/SKILL.md` are not treated as
+skill entrypoints by default. Rename the skill directory, such as
+`skills/example-review/SKILL.md`, if the file is intended to define a Renma
+skill.
 
 Renma can still discover legacy skill-local support files for compatibility, but canonical reusable knowledge belongs in `contexts/`, experimental interpretation layers belong in `lenses/`, and helper implementations belong in `tools/`. Shared knowledge that is reused across skills should usually move into `contexts/` so it can have its own owner, lifecycle, dependencies, and review history.
 
@@ -375,6 +406,8 @@ Add `renma.config.json` at the repository root to tune discovery and CI behavior
   "format": "json",
   "globs": [
     "skills/**/SKILL.md",
+    "skills/**/skill.md",
+    ".agents/skills/**/SKILL.md",
     "AGENTS.md",
     "contexts/**/*.md"
   ],
@@ -593,13 +626,12 @@ Security profiles can be defined under `security.profiles` and selected by artif
 {
   "security": {
     "profiles": {
-      "appium-disclosed-local": {
-        "allowedDataClass": "disclosed",
+      "appium-local-diagnostics": {
         "networkAllowed": true,
         "externalUploadAllowed": false,
         "secretsAllowed": false,
         "humanApprovalRequired": true,
-        "allowedData": ["sanitized diagnostics"],
+        "allowedData": ["repo-local-files", "sanitized-ci-diagnostics"],
         "forbiddenInputs": ["secrets", "credentials"],
         "approvedDomains": ["github.com"],
         "approvedUploadDomains": [],
