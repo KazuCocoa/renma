@@ -1,0 +1,11 @@
+{
+  "fail_on": "high",
+  "format": "text",
+  "globs": [
+    "skills/**/SKILL.md",
+    "contexts/**/*.md",
+    "tools/**/*"
+  ],
+  "exclude": ["node_modules", "dist", "dist-test", ".git", ".github"]
+}
+
