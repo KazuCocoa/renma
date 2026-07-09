@@ -365,12 +365,34 @@ README.md
 context/**/*.md
 contexts/**/*.md
 lenses/**/*.md
+skills/**/profiles/**/*.md
+skills/**/references/**/*.md
+skills/**/examples/**/*.md
+skills/**/scripts/**/*
 tools/**/*
 ```
 
 Skill-like files outside `skills/**` or `.agents/skills/**` are not treated as
 Renma skill assets by default. Renma may emit an informational layout diagnostic
 to suggest moving the file if it is intended to be a Renma skill.
+
+Under explicit skill roots, the path segments `examples`, `profiles`,
+`references`, and `scripts` are reserved for skill-local support files. These
+are valid support paths:
+
+- `skills/demo/examples/happy-path.md`
+- `skills/demo/references/spec.md`
+- `skills/demo/scripts/helper.sh`
+- `skills/demo/profiles/local.md`
+
+The same reserved names apply under `.agents/skills/**`.
+
+Avoid using reserved support directory names as skill names. For example,
+`skills/examples/SKILL.md`, `skills/references/SKILL.md`,
+`skills/scripts/SKILL.md`, and `skills/profiles/SKILL.md` are not treated as
+skill entrypoints by default. Rename the skill directory, such as
+`skills/example-review/SKILL.md`, if the file is intended to define a Renma
+skill.
 
 Renma can still discover legacy skill-local support files for compatibility, but canonical reusable knowledge belongs in `contexts/`, experimental interpretation layers belong in `lenses/`, and helper implementations belong in `tools/`. Shared knowledge that is reused across skills should usually move into `contexts/` so it can have its own owner, lifecycle, dependencies, and review history.
 

@@ -121,6 +121,116 @@ test(".agents/skills entrypoints are classified as skills before generic agent d
   );
 });
 
+test("reserved skill-local support directories remain support paths, not skill names", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "skills", "demo", "examples"), {
+    recursive: true,
+  });
+  await writeFile(path.join(root, "skills", "demo", "SKILL.md"), "# Demo\n");
+  await writeFile(
+    path.join(root, "skills", "demo", "examples", "happy-path.md"),
+    "# Happy Path\n\nInput -> output.\n",
+  );
+
+  const result = await scan(root);
+
+  assert.equal(result.scannedFileCount, 2);
+  assert.equal(result.securityPolicyInventory?.assetKinds.skill, 1);
+  assert.equal(result.securityPolicyInventory?.assetKinds.example, 1);
+  assert.equal(
+    result.diagnostics.some(
+      (diagnostic) =>
+        diagnostic.code ===
+        "LAYOUT-SKILL-ENTRYPOINT-UNDER-RESERVED-SUPPORT-DIR",
+    ),
+    false,
+  );
+});
+
+test("reserved support directory names are not classified as skills", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "skills", "examples"), { recursive: true });
+  await writeFile(
+    path.join(root, "skills", "examples", "SKILL.md"),
+    "# Example support note\n",
+  );
+
+  const result = await scan(root);
+
+  assert.equal(result.scannedFileCount, 1);
+  assert.equal(result.securityPolicyInventory?.assetKinds.skill, 0);
+  assert.equal(result.securityPolicyInventory?.assetKinds.example, 1);
+  assert.equal(result.securityPolicyInventory?.missingPolicyAssets.length, 0);
+
+  const diagnostic = result.diagnostics.find(
+    (item) =>
+      item.code === "LAYOUT-SKILL-ENTRYPOINT-UNDER-RESERVED-SUPPORT-DIR" &&
+      item.path === "skills/examples/SKILL.md",
+  );
+  assert.equal(diagnostic?.severity, "info");
+  assert.match(
+    diagnostic?.message ?? "",
+    /path segment "examples" is reserved for skill-local support files/,
+  );
+  assert.match(
+    diagnostic?.message ?? "",
+    /Rename the skill directory if this file is intended to define a Renma skill/,
+  );
+  assert.match(
+    diagnostic?.llmHint ?? "",
+    /use `skills\/example-review\/SKILL\.md` instead of `skills\/examples\/SKILL\.md`/,
+  );
+  assert.equal(
+    result.diagnostics.some(
+      (item) =>
+        item.code === "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR" &&
+        item.path === "skills/examples/SKILL.md",
+    ),
+    false,
+  );
+
+  const diagnosticV2 = result.diagnosticsV2.find(
+    (item) =>
+      item.code === "LAYOUT-SKILL-ENTRYPOINT-UNDER-RESERVED-SUPPORT-DIR" &&
+      item.location?.path === "skills/examples/SKILL.md",
+  );
+  assert.ok(diagnosticV2);
+  assert.equal(
+    Object.hasOwn(diagnosticV2, "repairPolicy"),
+    false,
+    "reserved support directory guidance must not require preserve-semantics repair",
+  );
+  assert.equal(diagnosticV2?.repairConstraints, undefined);
+  assert.equal(diagnosticV2?.verificationSteps, undefined);
+});
+
+test("reserved support directory guidance applies under .agents/skills", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, ".agents", "skills", "examples"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, ".agents", "skills", "examples", "SKILL.md"),
+    "# Example support note\n",
+  );
+
+  const result = await scan(root);
+
+  assert.equal(result.scannedFileCount, 1);
+  assert.equal(result.securityPolicyInventory?.assetKinds.skill, 0);
+  assert.equal(result.securityPolicyInventory?.assetKinds.agent, 0);
+  assert.equal(result.securityPolicyInventory?.assetKinds.example, 1);
+  assert.ok(
+    result.diagnostics.some(
+      (diagnostic) =>
+        diagnostic.code ===
+          "LAYOUT-SKILL-ENTRYPOINT-UNDER-RESERVED-SUPPORT-DIR" &&
+        diagnostic.path === ".agents/skills/examples/SKILL.md" &&
+        /path segment "examples" is reserved/.test(diagnostic.message),
+    ),
+  );
+});
+
 test("top-level skill-like files are layout guidance only, not skill assets", async () => {
   const root = await fixture();
   await writeFile(path.join(root, "skill.md"), "# Skill note\n");

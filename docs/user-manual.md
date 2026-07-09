@@ -38,6 +38,23 @@ renma is most useful when agent knowledge is stored in predictable places:
 
 Tool helper implementations usually belong under `tools/**`. They can be referenced from skills and commands, but they are not the same thing as user-facing documentation under `docs/**`.
 
+Under explicit skill roots, `examples`, `profiles`, `references`, and `scripts`
+are reserved for skill-local support directories. These are valid support paths:
+
+- `skills/demo/examples/happy-path.md`
+- `skills/demo/references/spec.md`
+- `skills/demo/scripts/helper.sh`
+- `skills/demo/profiles/local.md`
+
+The same reserved names apply under `.agents/skills/**`.
+
+Avoid using reserved support directory names as skill names. Paths such as
+`skills/examples/SKILL.md`, `skills/references/SKILL.md`,
+`skills/scripts/SKILL.md`, and `skills/profiles/SKILL.md` are not treated as
+skill entrypoints by default. If one of those files is intended to define a
+Renma skill, rename the skill directory, for example to
+`skills/example-review/SKILL.md`.
+
 Assets can declare metadata such as `id`, `owner`, `status`, `requires_context`, `optional_context`, and dependency references. The catalog and graph commands use that metadata to resolve links, identify weak references, and produce reports that can be checked in CI.
 
 ## Configuration

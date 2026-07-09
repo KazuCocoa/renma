@@ -19,6 +19,7 @@ type BundleSeed = {
 const RESERVED_DETAIL_KEYS = new Set(["diagnosticId", "source"]);
 const GUIDANCE_ONLY_DIAGNOSTIC_CODES = new Set([
   "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR",
+  "LAYOUT-SKILL-ENTRYPOINT-UNDER-RESERVED-SUPPORT-DIR",
 ]);
 
 /** Convert legacy diagnostics and findings into the LLM-actionable v2 shape. */
