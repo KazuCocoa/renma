@@ -7,11 +7,21 @@ import type {
   ScanConfig,
 } from "./types.js";
 
-const SINGLE_SKILL_FILENAMES = ["skill.md", "SKILL.md"] as const;
-const TOP_LEVEL_SINGLE_SKILL_MESSAGE =
-  "Detected top-level skill.md. Treating the current directory as a single-skill root. If this is not intended, move the file under skills/ or configure the skills root explicitly.";
-const TOP_LEVEL_SINGLE_SKILL_IGNORED_MESSAGE =
-  "Detected top-level skill.md, but skills/ is the canonical skills root and was selected. The top-level skill.md was not selected as the skills root. Move it under skills/ or configure the skills root explicitly if it should be scanned.";
+const SKILL_LIKE_FILE_OUTSIDE_SKILLS_DIR_CODE =
+  "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR";
+const SKILL_LIKE_FILE_GLOBS = [
+  "SKILL.md",
+  "skill.md",
+  "*.skill.md",
+  "**/SKILL.md",
+  "**/skill.md",
+  "**/*.skill.md",
+  ".agents/**/SKILL.md",
+  ".agents/**/skill.md",
+  ".agents/**/*.skill.md",
+];
+const SKILL_LIKE_FILE_LLM_HINT =
+  "No action is required unless this file is intended to be a Renma skill. If it is intended to be a skill, move it under skills/** or .agents/skills/**.";
 
 /** Discover and read scan artifacts according to the provided scan configuration. */
 export async function discoverArtifacts(
@@ -20,10 +30,9 @@ export async function discoverArtifacts(
 ): Promise<{ artifacts: Artifact[]; diagnostics: Diagnostic[] }> {
   const diagnostics: Diagnostic[] = [];
   const paths = new Set<string>();
-  const skillRoot = await detectSkillRoot(root);
-  diagnostics.push(...skillRoot.diagnostics);
+  diagnostics.push(...(await skillLikeLayoutDiagnostics(root, config)));
 
-  for (const pattern of [...config.globs, ...skillRoot.additionalGlobs]) {
+  for (const pattern of config.globs) {
     try {
       for await (const match of glob(pattern, {
         cwd: root,
@@ -37,10 +46,6 @@ export async function discoverArtifacts(
         message: `Could not evaluate glob "${pattern}": ${errorMessage(error)}`,
       });
     }
-  }
-
-  for (const ignoredPath of skillRoot.ignoredPaths) {
-    paths.delete(ignoredPath);
   }
 
   const candidates = [...paths]
@@ -101,7 +106,7 @@ export async function discoverArtifacts(
 }
 
 function classify(relativePath: string): ArtifactKind {
-  if (isSkillEntrypoint(relativePath)) return "skill";
+  if (isExplicitSkillEntrypoint(relativePath)) return "skill";
   if (relativePath === "AGENTS.md" || relativePath.startsWith(".agents/"))
     return "agent";
   if (relativePath.startsWith("lenses/")) return "context_lens";
@@ -122,76 +127,75 @@ function classify(relativePath: string): ArtifactKind {
   return "unknown";
 }
 
-async function detectSkillRoot(root: string): Promise<{
-  diagnostics: Diagnostic[];
-  additionalGlobs: string[];
-  ignoredPaths: string[];
-}> {
-  const hasCanonicalSkillsRoot = await isDirectory(path.join(root, "skills"));
-  const topLevelSkill = await existingTopLevelSkill(root);
-  if (!topLevelSkill) {
-    return { diagnostics: [], additionalGlobs: [], ignoredPaths: [] };
-  }
-
-  if (hasCanonicalSkillsRoot) {
-    return {
-      diagnostics: [
-        {
-          code: "DISCOVERY-TOP-LEVEL-SKILL-IGNORED",
-          severity: "info",
-          path: topLevelSkill,
-          message: TOP_LEVEL_SINGLE_SKILL_IGNORED_MESSAGE,
-        },
-      ],
-      additionalGlobs: [],
-      ignoredPaths: [...SINGLE_SKILL_FILENAMES],
-    };
-  }
-
-  return {
-    diagnostics: [
-      {
-        code: "DISCOVERY-SINGLE-SKILL-ROOT",
-        severity: "info",
-        path: topLevelSkill,
-        message: TOP_LEVEL_SINGLE_SKILL_MESSAGE,
-      },
-    ],
-    additionalGlobs: [topLevelSkill],
-    ignoredPaths: [],
-  };
-}
-
-async function existingTopLevelSkill(
+async function skillLikeLayoutDiagnostics(
   root: string,
-): Promise<string | undefined> {
-  for (const filename of SINGLE_SKILL_FILENAMES) {
-    const candidate = path.join(root, filename);
+  config: ScanConfig,
+): Promise<Diagnostic[]> {
+  const paths = new Set<string>();
+  const diagnostics: Diagnostic[] = [];
+
+  for (const pattern of SKILL_LIKE_FILE_GLOBS) {
     try {
-      const info = await stat(candidate);
-      if (info.isFile()) return filename;
-    } catch {
-      // Try the next conventional spelling.
+      for await (const match of glob(pattern, {
+        cwd: root,
+        exclude: globExcludes(config.exclude),
+        withFileTypes: false,
+      })) {
+        if (typeof match === "string") paths.add(toPosix(match));
+      }
+    } catch (error) {
+      diagnostics.push({
+        severity: "error",
+        message: `Could not evaluate glob "${pattern}": ${errorMessage(error)}`,
+      });
     }
   }
-  return undefined;
-}
 
-async function isDirectory(absolutePath: string): Promise<boolean> {
-  try {
-    return (await stat(absolutePath)).isDirectory();
-  } catch {
-    return false;
+  for (const relativePath of [...paths].sort((a, b) => a.localeCompare(b))) {
+    if (isExcluded(relativePath, config.exclude)) continue;
+    if (depth(relativePath) > config.maxDepth) continue;
+    if (isExplicitSkillsPath(relativePath)) continue;
+
+    try {
+      if (!(await stat(path.join(root, relativePath))).isFile()) continue;
+    } catch {
+      continue;
+    }
+
+    diagnostics.push({
+      code: SKILL_LIKE_FILE_OUTSIDE_SKILLS_DIR_CODE,
+      severity: "info",
+      path: relativePath,
+      message: `Detected a skill-like file outside an explicit skills directory: ${relativePath}. Renma only treats files under skills/** or .agents/skills/** as skill assets by default. Move this file under skills/ or .agents/skills/ if it is intended to be a Renma skill.`,
+      llmHint: SKILL_LIKE_FILE_LLM_HINT,
+      details: {
+        guidanceOnly: true,
+        repairRequired: false,
+      },
+    });
   }
+
+  return diagnostics;
 }
 
-function isSkillEntrypoint(relativePath: string): boolean {
+function isExplicitSkillEntrypoint(relativePath: string): boolean {
   const normalized = toPosix(relativePath);
   const basename = path.posix.basename(normalized);
   const lowerBasename = basename.toLowerCase();
-  if (normalized === "skill.md" || normalized === "SKILL.md") return true;
-  if (!normalized.startsWith("skills/")) return false;
+  if (!isSkillLikeFilename(lowerBasename)) return false;
+  if (!isExplicitSkillsPath(normalized)) return false;
   if (isSkillSupportPath(normalized)) return false;
+  return true;
+}
+
+function isExplicitSkillsPath(relativePath: string): boolean {
+  return (
+    relativePath.startsWith("skills/") ||
+    relativePath.startsWith(".agents/skills/")
+  );
+}
+
+function isSkillLikeFilename(lowerBasename: string): boolean {
   return lowerBasename === "skill.md" || lowerBasename.endsWith(".skill.md");
 }
 
@@ -232,6 +236,15 @@ function isExcluded(relativePath: string, excludes: string[]): boolean {
       relativePath === exclude ||
       relativePath.startsWith(`${exclude}/`),
   );
+}
+
+function globExcludes(excludes: string[]): string[] {
+  return excludes.flatMap((exclude) => [
+    exclude,
+    `${exclude}/**`,
+    `**/${exclude}`,
+    `**/${exclude}/**`,
+  ]);
 }
 
 function depth(relativePath: string): number {

@@ -17,6 +17,9 @@ type BundleSeed = {
 };
 
 const RESERVED_DETAIL_KEYS = new Set(["diagnosticId", "source"]);
+const GUIDANCE_ONLY_DIAGNOSTIC_CODES = new Set([
+  "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR",
+]);
 
 /** Convert legacy diagnostics and findings into the LLM-actionable v2 shape. */
 export function createDiagnosticsV2(input: {
@@ -89,18 +92,27 @@ function rawDiagnosticToDiagnosticV2(
   const code = diagnostic.code ?? inferredDiagnosticCode(diagnostic);
   const location = locationFromDiagnostic(diagnostic);
   const diagnosticId = diagnosticIdFor(code, location, index);
+  const guidanceOnly = isGuidanceOnlyDiagnostic(code);
   return compactDiagnostic({
     version: 2,
     code,
     severity: diagnostic.severity,
     message: diagnostic.message,
-    repairPolicy: "preserve_semantics",
+    repairPolicy: guidanceOnly ? undefined : "preserve_semantics",
     location,
-    repairConstraints: repairConstraintsForDiagnostic(code, diagnostic),
-    verificationSteps: verificationStepsForDiagnostic(code, diagnostic),
+    repairConstraints: guidanceOnly
+      ? undefined
+      : repairConstraintsForDiagnostic(code, diagnostic),
+    verificationSteps: guidanceOnly
+      ? undefined
+      : verificationStepsForDiagnostic(code, diagnostic),
     llmHint: llmHintForDiagnostic(code, diagnostic),
     details: diagnosticDetails("diagnostic", diagnosticId, diagnostic.details),
   });
+}
+
+function isGuidanceOnlyDiagnostic(code: string): boolean {
+  return GUIDANCE_ONLY_DIAGNOSTIC_CODES.has(code);
 }
 
 function repairConstraintsForFinding(finding: Finding): RepairConstraint[] {

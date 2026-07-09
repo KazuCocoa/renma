@@ -356,6 +356,9 @@ By default, Renma looks for:
 skills/**/SKILL.md
 skills/**/skill.md
 skills/**/*.skill.md
+.agents/skills/**/SKILL.md
+.agents/skills/**/skill.md
+.agents/skills/**/*.skill.md
 .agents/**/*.md
 AGENTS.md
 README.md
@@ -365,10 +368,9 @@ lenses/**/*.md
 tools/**/*
 ```
 
-If a scan target has no `skills/` directory but does have a top-level
-`skill.md`, Renma treats that target as a single-skill root and emits an
-informational diagnostic. If both exist, `skills/` remains canonical and the
-top-level file is not selected as the skills root.
+Skill-like files outside `skills/**` or `.agents/skills/**` are not treated as
+Renma skill assets by default. Renma may emit an informational layout diagnostic
+to suggest moving the file if it is intended to be a Renma skill.
 
 Renma can still discover legacy skill-local support files for compatibility, but canonical reusable knowledge belongs in `contexts/`, experimental interpretation layers belong in `lenses/`, and helper implementations belong in `tools/`. Shared knowledge that is reused across skills should usually move into `contexts/` so it can have its own owner, lifecycle, dependencies, and review history.
 
@@ -383,6 +385,7 @@ Add `renma.config.json` at the repository root to tune discovery and CI behavior
   "globs": [
     "skills/**/SKILL.md",
     "skills/**/skill.md",
+    ".agents/skills/**/SKILL.md",
     "AGENTS.md",
     "contexts/**/*.md"
   ],

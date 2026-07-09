@@ -39,84 +39,162 @@ test("scan discovers default artifacts and emits deterministic findings", async 
     "skills/demo/SKILL.md",
   );
   assert.equal(result.securityPolicyInventory?.totalPolicyAssets, 1);
+  assert.equal(result.securityPolicyInventory?.assetKinds.skill, 1);
   assert.equal(result.securityPolicyInventory?.assetsWithPolicyMetadata, 0);
   assert.equal(result.securityPolicyInventory?.assetsMissingPolicyMetadata, 1);
 });
 
-test("scan discovers canonical skills/skill.md entrypoint", async () => {
+test("scan discovers skills/demo/skill.md entrypoint as a skill", async () => {
   const root = await fixture();
-  await mkdir(path.join(root, "skills"), { recursive: true });
-  await writeFile(path.join(root, "skills", "skill.md"), "# Demo\n");
+  await mkdir(path.join(root, "skills", "demo"), { recursive: true });
+  await writeFile(path.join(root, "skills", "demo", "skill.md"), "# Demo\n");
 
   const result = await scan(root);
 
   assert.equal(result.scannedFileCount, 1);
-  assert.equal(result.securityPolicyInventory?.totalPolicyAssets, 1);
-  assert.ok(
-    result.findings.some(
-      (finding) => finding.evidence.path === "skills/skill.md",
-    ),
+  assert.equal(result.securityPolicyInventory?.assetKinds.skill, 1);
+  assert.deepEqual(
+    result.securityPolicyInventory?.missingPolicyAssets.map((asset) => [
+      asset.path,
+      asset.kind,
+    ]),
+    [["skills/demo/skill.md", "skill"]],
   );
   assert.equal(
     result.diagnostics.some(
-      (diagnostic) => diagnostic.code === "DISCOVERY-SINGLE-SKILL-ROOT",
+      (diagnostic) =>
+        diagnostic.code === "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR",
     ),
     false,
   );
 });
 
-test("scan treats top-level skill.md as a single-skill root when skills is absent", async () => {
+test("scan discovers skills/demo/foo.skill.md entrypoint as a skill", async () => {
   const root = await fixture();
-  await writeFile(path.join(root, "skill.md"), "# Demo\n");
+  await mkdir(path.join(root, "skills", "demo"), { recursive: true });
+  await writeFile(
+    path.join(root, "skills", "demo", "foo.skill.md"),
+    "# Demo\n",
+  );
 
   const result = await scan(root);
 
   assert.equal(result.scannedFileCount, 1);
-  assert.equal(result.securityPolicyInventory?.totalPolicyAssets, 1);
-  assert.ok(
-    result.findings.some((finding) => finding.evidence.path === "skill.md"),
-  );
-  assert.ok(
-    result.diagnostics.some(
-      (diagnostic) =>
-        diagnostic.code === "DISCOVERY-SINGLE-SKILL-ROOT" &&
-        diagnostic.severity === "info" &&
-        /Detected top-level skill\.md/.test(diagnostic.message) &&
-        /single-skill root/.test(diagnostic.message),
-    ),
+  assert.equal(result.securityPolicyInventory?.assetKinds.skill, 1);
+  assert.deepEqual(
+    result.securityPolicyInventory?.missingPolicyAssets.map((asset) => [
+      asset.path,
+      asset.kind,
+    ]),
+    [["skills/demo/foo.skill.md", "skill"]],
   );
 });
 
-test("scan prefers skills directory when both skills and top-level skill.md exist", async () => {
+test(".agents/skills entrypoints are classified as skills before generic agent docs", async () => {
   const root = await fixture();
-  await mkdir(path.join(root, "skills"), { recursive: true });
-  await writeFile(path.join(root, "skills", "skill.md"), "# Canonical\n");
-  await writeFile(path.join(root, "skill.md"), "# Ignored\n");
+  await mkdir(path.join(root, ".agents", "skills", "demo"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, ".agents", "skills", "demo", "SKILL.md"),
+    "# Demo\n",
+  );
 
   const result = await scan(root);
 
   assert.equal(result.scannedFileCount, 1);
+  assert.equal(result.securityPolicyInventory?.assetKinds.skill, 1);
+  assert.equal(result.securityPolicyInventory?.assetKinds.agent, 0);
+  assert.deepEqual(
+    result.securityPolicyInventory?.missingPolicyAssets.map((asset) => [
+      asset.path,
+      asset.kind,
+    ]),
+    [[".agents/skills/demo/SKILL.md", "skill"]],
+  );
   assert.ok(
     result.findings.some(
-      (finding) => finding.evidence.path === "skills/skill.md",
-    ),
-  );
-  assert.equal(
-    result.findings.some((finding) => finding.evidence.path === "skill.md"),
-    false,
-  );
-  assert.ok(
-    result.diagnostics.some(
-      (diagnostic) =>
-        diagnostic.code === "DISCOVERY-TOP-LEVEL-SKILL-IGNORED" &&
-        diagnostic.severity === "info" &&
-        /top-level skill\.md/.test(diagnostic.message) &&
-        /skills\/ is the canonical skills root/.test(diagnostic.message),
+      (finding) =>
+        finding.id === "SEC-MISSING-POLICY-METADATA" &&
+        finding.evidence.path === ".agents/skills/demo/SKILL.md",
     ),
   );
 });
 
-test("scan does not select a single-skill root when neither skills nor skill.md exists", async () => {
+test("top-level skill-like files are layout guidance only, not skill assets", async () => {
+  const root = await fixture();
+  await writeFile(path.join(root, "skill.md"), "# Skill note\n");
+  await writeFile(path.join(root, "SKILL.md"), "# Upper skill note\n");
+  await writeFile(path.join(root, "foo.skill.md"), "# Named skill note\n");
+
+  const result = await scan(root);
+
+  assert.equal(result.scannedFileCount, 0);
+  assert.equal(result.securityPolicyInventory?.assetKinds.skill, 0);
+  assert.equal(result.findings.length, 0);
+  const guidanceDiagnostics = result.diagnostics.filter(
+    (diagnostic) =>
+      diagnostic.code === "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR",
+  );
+  assert.deepEqual(
+    guidanceDiagnostics.map((diagnostic) => [
+      diagnostic.severity,
+      diagnostic.path,
+    ]),
+    [
+      ["info", "foo.skill.md"],
+      ["info", "skill.md"],
+      ["info", "SKILL.md"],
+    ],
+  );
+  const skillMdDiagnostic = guidanceDiagnostics.find(
+    (diagnostic) => diagnostic.path === "skill.md",
+  );
+  assert.match(
+    skillMdDiagnostic?.message ?? "",
+    /Renma only treats files under skills\/\*\* or \.agents\/skills\/\*\*/,
+  );
+  assert.match(
+    skillMdDiagnostic?.llmHint ?? "",
+    /No action is required unless this file is intended to be a Renma skill/,
+  );
+  const skillMdV2 = result.diagnosticsV2.find(
+    (diagnostic) =>
+      diagnostic.code === "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR" &&
+      diagnostic.location?.path === "skill.md",
+  );
+  assert.ok(skillMdV2);
+  assert.equal(
+    Object.hasOwn(skillMdV2, "repairPolicy"),
+    false,
+    "guidance-only diagnostics must not require preserve-semantics repair",
+  );
+  assert.equal(skillMdV2?.repairConstraints, undefined);
+  assert.equal(skillMdV2?.verificationSteps, undefined);
+});
+
+test("skill-like files outside explicit skill directories are not classified as skills", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, ".agents"), { recursive: true });
+  await writeFile(path.join(root, ".agents", "foo.skill.md"), "# Agent note\n");
+
+  const result = await scan(root);
+
+  assert.equal(result.scannedFileCount, 1);
+  assert.equal(result.securityPolicyInventory?.assetKinds.skill, 0);
+  assert.equal(result.securityPolicyInventory?.assetKinds.agent, 1);
+  assert.equal(result.securityPolicyInventory?.missingPolicyAssets.length, 0);
+  assert.ok(
+    result.diagnostics.some(
+      (diagnostic) =>
+        diagnostic.code === "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR" &&
+        diagnostic.severity === "info" &&
+        diagnostic.path === ".agents/foo.skill.md",
+    ),
+  );
+});
+
+test("scan does not select a skill root when neither explicit skill directory nor scanned artifacts exist", async () => {
   const root = await fixture();
 
   const result = await scan(root);
@@ -124,7 +202,7 @@ test("scan does not select a single-skill root when neither skills nor skill.md 
   assert.equal(result.scannedFileCount, 0);
   assert.equal(
     result.diagnostics.some((diagnostic) =>
-      diagnostic.code?.startsWith("DISCOVERY-"),
+      diagnostic.code?.startsWith("LAYOUT-SKILL-LIKE"),
     ),
     false,
   );
