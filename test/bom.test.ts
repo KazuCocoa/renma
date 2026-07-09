@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import packageJson from "../package.json" with { type: "json" };
 import { main } from "../src/cli.js";
 import {
   bom,
@@ -16,7 +17,7 @@ test("bom report declares Repository Context BOM schema and scope", async () => 
 
   assert.equal(report.schemaVersion, "renma.repository-context-bom.v1");
   assert.equal(report.generator.name, "renma");
-  assert.equal(report.generator.version, "0.15.0");
+  assert.equal(report.generator.version, packageJson.version);
   assert.match(report.generatedAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.equal(path.isAbsolute(report.root), true);
   assert.deepEqual(report.scope, {
@@ -133,6 +134,32 @@ test("bom includes readiness, security posture, and policy inventory evidence", 
   );
 });
 
+test("bom diagnostics include deduped catalog and graph warnings", async () => {
+  const report = await bom(await catalogWarningFixture());
+  const warnings = report.diagnostics.filter(
+    (diagnostic) =>
+      diagnostic.severity === "warning" &&
+      /Metadata dependency "context\.testing\.missing"/.test(
+        diagnostic.message,
+      ),
+  );
+
+  assert.equal(report.readiness.level, "ready");
+  assert.equal(warnings.length, 1);
+  assert.equal(report.summary.diagnosticCounts.warning, 1);
+  assert.deepEqual(report.summary.diagnosticCounts, {
+    error: report.diagnostics.filter(
+      (diagnostic) => diagnostic.severity === "error",
+    ).length,
+    warning: report.diagnostics.filter(
+      (diagnostic) => diagnostic.severity === "warning",
+    ).length,
+    info: report.diagnostics.filter(
+      (diagnostic) => diagnostic.severity === "info",
+    ).length,
+  });
+});
+
 test("bom markdown is a compact human-review report", async () => {
   const markdown = formatBomMarkdown(await bom(await bomFixture()));
 
@@ -145,6 +172,10 @@ test("bom markdown is a compact human-review report", async () => {
   );
   assert.match(markdown, /^## Readiness Evidence$/m);
   assert.match(markdown, /- Workflow readiness: /);
+  assert.match(markdown, /^## Security Policy Inventory$/m);
+  assert.match(markdown, /\| Policy assets \| 2 \|/);
+  assert.match(markdown, /\| Assets missing policy metadata \| 2 \|/);
+  assert.match(markdown, /\| Network unspecified \| 2 \|/);
 });
 
 test("bom CLI supports JSON and Markdown formats", async () => {
@@ -215,6 +246,12 @@ async function bomFixture(): Promise<string> {
   return root;
 }
 
+async function catalogWarningFixture(): Promise<string> {
+  const root = await fixture();
+  await writeOptionalMissingSkill(root);
+  return root;
+}
+
 async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-"));
 }
@@ -254,6 +291,47 @@ async function writeSkill(root: string): Promise<void> {
       "",
       "## Completion criteria",
       "The workflow is complete when BOM output contains catalog, graph, and readiness evidence.",
+      "",
+      "## Verification",
+      "Verify by running the BOM command and checking JSON or Markdown output.",
+      "",
+    ].join("\n"),
+  );
+}
+
+async function writeOptionalMissingSkill(root: string): Promise<void> {
+  await mkdir(path.join(root, "skills", "testing", "optional-review"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "skills", "testing", "optional-review", "SKILL.md"),
+    [
+      "---",
+      "id: skill.testing.optional-review",
+      "owner: qa-platform",
+      "status: stable",
+      "optional_context:",
+      "  - context.testing.missing",
+      "---",
+      "# Optional Review",
+      "",
+      "## When to use",
+      "Use this workflow for deterministic Repository Context BOM diagnostic tests.",
+      "",
+      "## Required inputs",
+      "Required inputs: repository root and the requested BOM output format.",
+      "",
+      "## DO NOT USE FOR",
+      "Do not use this workflow for runtime task context selection or prompt assembly.",
+      "",
+      "## Preflight",
+      "Confirm the repository fixture exists and inputs are static.",
+      "",
+      "## Example",
+      "Input: BOM fixture. Output: deterministic manifest evidence.",
+      "",
+      "## Completion criteria",
+      "The workflow is complete when BOM output contains deduped diagnostics.",
       "",
       "## Verification",
       "Verify by running the BOM command and checking JSON or Markdown output.",

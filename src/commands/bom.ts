@@ -137,7 +137,14 @@ export async function bom(
     readiness(targetPath, overrides),
   ]);
   const dependencies = stableEdges(graphReport.edges).map(toBomDependency);
-  const diagnostics = stableDiagnostics(readinessReport.diagnostics ?? []);
+  const diagnostics = stableDiagnostics(
+    dedupeDiagnostics([
+      ...catalogResult.diagnostics,
+      ...(graphReport.diagnostics ?? []),
+      ...(readinessReport.diagnostics ?? []),
+    ]),
+  );
+  const diagnosticCounts = countDiagnostics(diagnostics);
 
   return {
     schemaVersion: "renma.repository-context-bom.v1",
@@ -167,7 +174,7 @@ export async function bom(
       unownedAssetCount: readinessReport.summary.unownedAssets,
       readinessScore: readinessReport.score,
       readinessLevel: readinessReport.level,
-      diagnosticCounts: readinessReport.summary.diagnosticCounts,
+      diagnosticCounts,
     },
     assets: stableAssets(catalogResult.catalog.assets).map((asset) =>
       toBomAsset(asset, dependencies, diagnostics),
@@ -267,6 +274,10 @@ export function formatBomMarkdown(report: BomReport): string {
     "## Security Posture",
     "",
     ...formatSecurityPostureMarkdown(report.securityPosture),
+    "",
+    "## Security Policy Inventory",
+    "",
+    ...formatSecurityPolicyInventoryMarkdown(report.securityPolicyInventory),
     "",
     "## Diagnostics",
     "",
@@ -388,6 +399,67 @@ function stableDiagnostics(diagnostics: Diagnostic[]): Diagnostic[] {
   return [...diagnostics].sort(compareDiagnostics);
 }
 
+function dedupeDiagnostics(diagnostics: Diagnostic[]): Diagnostic[] {
+  const seen = new Set<string>();
+  const deduped: Diagnostic[] = [];
+  for (const diagnostic of diagnostics) {
+    const key = diagnosticKey(diagnostic);
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+    deduped.push(diagnostic);
+  }
+  return deduped;
+}
+
+function diagnosticKey(diagnostic: Diagnostic): string {
+  return stableStringify({
+    severity: diagnostic.severity,
+    code: diagnostic.code,
+    path: diagnostic.path,
+    message: diagnostic.message,
+    evidence: diagnostic.evidence
+      ? {
+          path: diagnostic.evidence.path,
+          startLine: diagnostic.evidence.startLine,
+          endLine: diagnostic.evidence.endLine,
+          snippet: diagnostic.evidence.snippet,
+        }
+      : undefined,
+    details: diagnostic.details,
+  });
+}
+
+function stableStringify(value: unknown): string {
+  return JSON.stringify(stableJsonValue(value));
+}
+
+function stableJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableJsonValue);
+  if (value === null || typeof value !== "object") return value;
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => [key, stableJsonValue(item)]),
+  );
+}
+
+function countDiagnostics(
+  diagnostics: Diagnostic[],
+): BomReport["summary"]["diagnosticCounts"] {
+  return {
+    error: diagnostics.filter((diagnostic) => diagnostic.severity === "error")
+      .length,
+    warning: diagnostics.filter(
+      (diagnostic) => diagnostic.severity === "warning",
+    ).length,
+    info: diagnostics.filter((diagnostic) => diagnostic.severity === "info")
+      .length,
+  };
+}
+
 function diagnosticsForPath(
   diagnostics: Diagnostic[],
   sourcePath: string,
@@ -442,6 +514,34 @@ function formatSecurityPostureMarkdown(
   }
 
   return lines;
+}
+
+function formatSecurityPolicyInventoryMarkdown(
+  inventory: SecurityPolicyInventorySummary,
+): string[] {
+  return [
+    "| Metric | Value |",
+    "| --- | ---: |",
+    `| Policy assets | ${inventory.totalPolicyAssets} |`,
+    `| Assets with policy metadata | ${inventory.assetsWithPolicyMetadata} |`,
+    `| Assets missing policy metadata | ${inventory.assetsMissingPolicyMetadata} |`,
+    `| Network allowed | ${inventory.networkAllowed.true} |`,
+    `| Network denied | ${inventory.networkAllowed.false} |`,
+    `| Network unspecified | ${inventory.networkAllowed.unspecified} |`,
+    `| Upload allowed | ${inventory.externalUploadAllowed.true} |`,
+    `| Upload denied | ${inventory.externalUploadAllowed.false} |`,
+    `| Upload unspecified | ${inventory.externalUploadAllowed.unspecified} |`,
+    `| Secrets allowed | ${inventory.secretsAllowed.true} |`,
+    `| Secrets denied | ${inventory.secretsAllowed.false} |`,
+    `| Secrets unspecified | ${inventory.secretsAllowed.unspecified} |`,
+    `| Human approval required | ${inventory.humanApprovalRequired.true} |`,
+    `| Referenced security profiles | ${inventory.securityProfiles.referenced} |`,
+    `| Missing security profiles | ${inventory.securityProfiles.missing} |`,
+    `| Cyclic security profiles | ${inventory.securityProfiles.cyclic} |`,
+    `| Approved network destinations | ${inventory.approvedNetworkDestinationCount} |`,
+    `| Approved upload destinations | ${inventory.approvedUploadDestinationCount} |`,
+    `| Forbidden inputs | ${inventory.forbiddenInputCount} |`,
+  ];
 }
 
 function shortHash(hash: string): string {
