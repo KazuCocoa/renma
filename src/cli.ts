@@ -700,7 +700,7 @@ function helpText(): string {
     "      --format <format>      scan: text or json; bom/catalog/ownership/readiness/ci-report/trust-graph: json or markdown; graph: json, markdown, or mermaid; suggest-metadata/suggest-semantic-split: prompt or json",
     "      --include-owned        ownership: include owned asset details",
     "      --json                 Shortcut for --format json",
-    "      --stable               bom: use deterministic generatedAt for reproducible output",
+    "      --stable               bom: omit generatedAt for reproducible output",
     "      --view <view>          graph: summary, workflow, full, layered, or lens",
     "      --focus <asset-id-or-path>",
     "      --owner <owner>        ownership: filter assets by owner; scaffold: declare owner metadata; suggest-metadata: explicitly suggest owner",

@@ -6,7 +6,6 @@ import { test } from "node:test";
 import packageJson from "../package.json" with { type: "json" };
 import { main } from "../src/cli.js";
 import {
-  STABLE_GENERATED_AT,
   bom,
   formatBomJson,
   formatBomMarkdown,
@@ -19,13 +18,14 @@ test("bom report declares Repository Context BOM schema and scope", async () => 
   const report = await bom(await bomFixture());
 
   assert.equal(report.schemaVersion, "renma.repository-context-bom.v1");
+  assert.equal(report.outputMode, "default");
   assert.equal(report.generator.name, "renma");
   assert.equal(report.generator.version, packageJson.version);
+  assert.ok(report.generatedAt);
   assert.match(
     report.generatedAt,
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
   );
-  assert.notEqual(report.generatedAt, STABLE_GENERATED_AT);
   assert.equal(path.isAbsolute(report.root), true);
   assert.deepEqual(report.scope, {
     type: "declared_repository_manifest",
@@ -35,6 +35,7 @@ test("bom report declares Repository Context BOM schema and scope", async () => 
 
   const parsed = JSON.parse(formatBomJson(report)) as BomReport;
   assert.equal(parsed.schemaVersion, "renma.repository-context-bom.v1");
+  assert.equal(parsed.outputMode, "default");
   assert.equal(parsed.scope.runtimeUsage, false);
   assert.equal(parsed.scope.telemetryCollected, false);
 });
@@ -299,10 +300,12 @@ test("bom CLI stable JSON output is reproducible", async () => {
   assert.equal(first.stderr, "");
   assert.equal(second.stderr, "");
   assert.equal(first.stdout, second.stdout);
-  assert.equal(JSON.parse(first.stdout).generatedAt, STABLE_GENERATED_AT);
+  const parsed = JSON.parse(first.stdout) as BomReport;
+  assert.equal(parsed.outputMode, "stable");
+  assert.equal("generatedAt" in parsed, false);
 });
 
-test("bom CLI stable Markdown output uses deterministic generatedAt", async () => {
+test("bom CLI stable Markdown output omits generatedAt", async () => {
   const root = await bomFixture();
 
   const result = await withCapturedConsole(() =>
@@ -310,7 +313,9 @@ test("bom CLI stable Markdown output uses deterministic generatedAt", async () =
   );
 
   assert.equal(result.code, 0);
-  assert.match(result.stdout, /- Generated at: 1970-01-01T00:00:00\.000Z/);
+  assert.match(result.stdout, /- Output mode: stable/);
+  assert.match(result.stdout, /- Generated at: \(omitted for stable output\)/);
+  assert.doesNotMatch(result.stdout, /1970-01-01T00:00:00\.000Z/);
 });
 
 test("bom CLI rejects unsupported format", async () => {

@@ -350,7 +350,7 @@ The BOM is not a record of actual LLM runtime usage. Renma does not collect tele
 
 JSON is the source of truth for automation. Markdown is a compact pull-request review view.
 
-By default, `generatedAt` records when the BOM was produced. Add `--stable` when CI or review automation needs reproducible artifacts and cleaner diffs; stable mode uses a deterministic `generatedAt` while preserving the same declared repository evidence.
+By default, `generatedAt` records when the BOM was produced. Add `--stable` when CI or review automation needs reproducible artifacts and cleaner diffs; stable mode keeps repository-derived fields unchanged and omits `generatedAt` because stable output should not embed run-time clock data.
 
 ### `graph`
 

@@ -19,7 +19,6 @@ import type { SecurityPostureSummary } from "../security-posture.js";
 import type { Diagnostic } from "../types.js";
 
 export type BomFormat = "json" | "markdown";
-export const STABLE_GENERATED_AT = "1970-01-01T00:00:00.000Z";
 
 export interface BomOptions {
   stable?: boolean;
@@ -27,7 +26,8 @@ export interface BomOptions {
 
 export interface BomReport {
   schemaVersion: "renma.repository-context-bom.v1";
-  generatedAt: string;
+  generatedAt?: string;
+  outputMode: "default" | "stable";
   generator: {
     name: "renma";
     version: string;
@@ -166,9 +166,8 @@ export async function bom(
 
   return {
     schemaVersion: "renma.repository-context-bom.v1",
-    generatedAt: options.stable
-      ? STABLE_GENERATED_AT
-      : new Date().toISOString(),
+    outputMode: options.stable ? "stable" : "default",
+    ...(options.stable ? {} : { generatedAt: new Date().toISOString() }),
     generator: {
       name: "renma",
       version: packageJson.version,
@@ -224,7 +223,10 @@ export function formatBomMarkdown(report: BomReport): string {
     `- Schema: ${report.schemaVersion}`,
     `- Root: ${report.root}`,
     `- Config: ${report.configPath ?? "(defaults)"}`,
-    `- Generated at: ${report.generatedAt}`,
+    `- Output mode: ${report.outputMode}`,
+    report.generatedAt
+      ? `- Generated at: ${report.generatedAt}`
+      : "- Generated at: (omitted for stable output)",
     "- Runtime usage: no",
     "- Telemetry collected: no",
     `- Assets: ${report.summary.assetCount}`,

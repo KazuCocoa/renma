@@ -211,7 +211,7 @@ The BOM is a repository manifest, not a runtime usage report. It combines the ca
 
 It does not describe what an LLM actually used, assemble prompts, select task-specific context, inject context into agents, import consumed-context evidence, or collect telemetry. JSON is the source of truth; Markdown is the compact pull-request review view.
 
-By default, `generatedAt` records the actual generation time. Use `--stable` for reproducible CI artifacts and cleaner diffs; it keeps repository-derived fields unchanged and sets `generatedAt` to a deterministic value.
+By default, `generatedAt` records the actual generation time. Use `--stable` for reproducible CI artifacts and cleaner diffs; it keeps repository-derived fields unchanged and omits `generatedAt` because stable output should not embed run-time clock data.
 
 ### Repeated context diagnostics
 
