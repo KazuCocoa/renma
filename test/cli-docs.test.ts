@@ -5,6 +5,7 @@ import test from "node:test";
 
 const COMMANDS = [
   "scan",
+  "bom",
   "catalog",
   "diff",
   "ci-report",
@@ -20,6 +21,7 @@ const COMMANDS = [
 
 const EXPECTED_FORMATS = new Map<string, string[]>([
   ["scan", ["text", "json"]],
+  ["bom", ["json", "markdown"]],
   ["catalog", ["json", "markdown"]],
   ["ownership", ["json", "markdown"]],
   ["readiness", ["json", "markdown"]],

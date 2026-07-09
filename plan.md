@@ -335,7 +335,7 @@ Renma's shipped baseline is now grouped around:
 
 - Repository discovery for `contexts/**/*.md`, `context/**/*.md`, and skill-adjacent `references/`, `profiles/`, and `examples/`.
 - Deterministic scan and catalog diagnostics for metadata IDs, owners, tags, freshness, paths, references, dependencies, manifest shape, layout policy, duplicate context, repeated context, and security policy issues.
-- CLI-first views for `scan`, `catalog`, `ownership`, `graph`, focused graph views, `trust-graph`, `readiness`, `repeated-context`, `diff`, `ci-report`, `inspect`, `scaffold`, and `suggest-semantic-split`.
+- CLI-first views for `scan`, `catalog`, `ownership`, `graph`, focused graph views, `trust-graph`, `readiness`, `bom`, `repeated-context`, `diff`, `ci-report`, `inspect`, `scaffold`, and `suggest-semantic-split`.
 - LLM-actionable output without an LLM runtime dependency: Markdown and JSON diagnostics provide stable IDs, severity, evidence, and repair guidance.
 - Security diagnostics v1 for agent-facing network, upload, and secret-material policy; approved network destinations; approved upload domains; command-risk patterns; profile inheritance and cycles; and policy contradictions.
 - Historical `0.1.0` manifests remain supported as legacy input. Current planning should describe the merged implementation, not a separate `0.2.0` security command.
@@ -354,7 +354,7 @@ Near-term work should keep improving deterministic security diagnostics for agen
 
 Trust Graph v1 is an interpretation of existing catalog, graph, scan, and security evidence, not a new runtime system. Nodes expose deterministic trust and risk evidence such as owner presence, lifecycle status, declared dependencies, security profile resolution, effective policy fingerprints, and diagnostics without introducing a subjective score.
 
-Repository Context BOM should begin as a repository-level manifest of declared assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence. It should not claim actual LLM runtime usage.
+Repository Context BOM v1 is a repository-level manifest of declared assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence. It does not claim actual LLM runtime usage.
 
 Actual consumed-context evidence may be imported later from external agents, editor integrations, prompt wrappers, or CI tools and validated against the repository model. Renma should remain telemetry-aware but not telemetry-responsible.
 

@@ -1,5 +1,6 @@
 import { parseArgs } from "node:util";
 import packageJson from "../package.json" with { type: "json" };
+import { runBomCommand, type BomFormat } from "./commands/bom.js";
 import { runCatalogCommand, type CatalogFormat } from "./commands/catalog.js";
 import {
   runCiReportCommand,
@@ -61,6 +62,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         id: { type: "string" },
         json: { type: "boolean" },
         lines: { type: "string" },
+        "omit-generated-at": { type: "boolean" },
         owner: { type: "string" },
         tags: { type: "string", multiple: true },
         title: { type: "string" },
@@ -90,6 +92,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   const [command = "scan", target = "."] = parsed.positionals;
   if (
     command !== "scan" &&
+    command !== "bom" &&
     command !== "catalog" &&
     command !== "diff" &&
     command !== "ci-report" &&
@@ -131,6 +134,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
   if (command === "catalog") {
     return runCatalog(parsed.values, target);
+  }
+
+  if (command === "bom") {
+    return runBom(parsed.values, target);
   }
 
   if (command === "diff") {
@@ -259,6 +266,34 @@ async function runCatalog(values: CliValues, target: string): Promise<number> {
     return await runCatalogCommand(target, {
       format: format as CatalogFormat,
       overrides,
+    });
+  } catch (error) {
+    console.error(
+      error instanceof ConfigError || error instanceof Error
+        ? error.message
+        : String(error),
+    );
+    return 2;
+  }
+}
+
+async function runBom(values: CliValues, target: string): Promise<number> {
+  const format = values.json ? "json" : (stringValue(values.format) ?? "json");
+  if (format !== "json" && format !== "markdown") {
+    console.error("--format must be either json or markdown.");
+    return 2;
+  }
+
+  const configPath = stringValue(values.config);
+  const overrides: ConfigOverrides = {
+    ...(configPath ? { configPath } : {}),
+  };
+
+  try {
+    return await runBomCommand(target, {
+      format: format as BomFormat,
+      overrides,
+      omitGeneratedAt: values["omit-generated-at"] === true,
     });
   } catch (error) {
     console.error(
@@ -627,6 +662,7 @@ function helpText(): string {
     "",
     "Additional usage:",
     "  renma scan [path] [options]",
+    "  renma bom [path] [options]",
     "  renma catalog [path] [options]",
     "  renma diff [path] --from <ref> --to <ref> [options]",
     "  renma ci-report [path] --from <ref> --to <ref> [options]",
@@ -643,6 +679,7 @@ function helpText(): string {
     "",
     "Commands:",
     "  scan                       Scan a repository or skill directory",
+    "  bom                        Print declared Repository Context BOM",
     "  catalog                    Print deterministic normalized asset catalog",
     "  diff                       Compare deterministic readiness snapshots",
     "  ci-report                  Print deterministic CI / PR review report",
@@ -660,9 +697,10 @@ function helpText(): string {
     "Options:",
     "  -c, --config <path>        scan: read JSON config from path",
     "      --fail-on <level>      scan: exit 1 when findings meet severity: low, medium, high, critical",
-    "      --format <format>      scan: text or json; catalog/ownership/readiness/ci-report/trust-graph: json or markdown; graph: json, markdown, or mermaid; suggest-metadata/suggest-semantic-split: prompt or json",
+    "      --format <format>      scan: text or json; bom/catalog/ownership/readiness/ci-report/trust-graph: json or markdown; graph: json, markdown, or mermaid; suggest-metadata/suggest-semantic-split: prompt or json",
     "      --include-owned        ownership: include owned asset details",
     "      --json                 Shortcut for --format json",
+    "      --omit-generated-at    bom: omit run-time generatedAt timestamp",
     "      --view <view>          graph: summary, workflow, full, layered, or lens",
     "      --focus <asset-id-or-path>",
     "      --owner <owner>        ownership: filter assets by owner; scaffold: declare owner metadata; suggest-metadata: explicitly suggest owner",

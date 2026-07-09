@@ -6,6 +6,19 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-07-09
+
+### Added
+
+- Added `renma bom` for a declared Repository Context BOM that combines catalog assets, graph dependency resolution, readiness evidence, diagnostics, security posture, and security policy inventory.
+- Added JSON and Markdown BOM output with explicit scope metadata stating that runtime usage is false and telemetry is not collected.
+- Added `renma bom --omit-generated-at` for BOM artifacts that omit run-time generation timestamps.
+
+### Changed
+
+- Reused one shared repository evidence snapshot for BOM catalog assets and graph dependencies.
+- Escaped repository-derived BOM Markdown table cells for safer PR-friendly output.
+
 ## [0.14.1] - 2026-07-08
 
 ### Added
@@ -254,7 +267,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.14.1...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/KazuCocoa/renma/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/KazuCocoa/renma/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/KazuCocoa/renma/compare/v0.13.2...v0.14.0
 [0.13.2]: https://github.com/KazuCocoa/renma/compare/v0.13.1...v0.13.2
