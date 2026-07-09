@@ -10,7 +10,7 @@ It helps teams manage reusable, human-curated context assets in Git so agents, c
 
 Renma is the deterministic governance and health layer around that repository knowledge. Instead of letting critical knowledge get copied into many prompts or buried in one-off Markdown files, Renma treats it as a software asset: named, owned, versioned, linked, checked in CI, and reviewed with deterministic diagnostics and scan findings.
 
-Renma now supports `scan`, `catalog`, `ownership`, `graph`, focused graph views, `trust-graph`, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-metadata`, `suggest-semantic-split`, and security diagnostics.
+Renma now supports `scan`, `catalog`, `ownership`, `graph`, focused graph views, `trust-graph`, `readiness`, Repository Context BOM reports, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-metadata`, `suggest-semantic-split`, and security diagnostics.
 
 Renma is especially useful when a repository contains agent-facing material such as:
 
@@ -151,6 +151,7 @@ It produces:
 - Dependency graph reports
 - Trust Graph evidence reports
 - Agent readiness reports
+- Repository Context BOM manifests
 - JSON output for CI and downstream tooling
 - Text output designed to become actionable repair prompts for humans or agents
 
@@ -158,35 +159,55 @@ Findings are meant to explain what is wrong, why it matters, where the evidence 
 
 JSON scan output also includes additive `diagnosticsV2` and `reviewBundles` fields for LLM-assisted repair and review tooling. These normalize findings and diagnostics into stable codes, locations, typed repair constraints, structured verification steps, concise `llmHint` guidance, and deterministic groups of related issues. See the [Diagnostics Reference](docs/diagnostics.md) for the schema and examples.
 
-## Scan, Graph, Trust Graph, and Readiness
+## Scan, Catalog, Graph, Readiness, And BOM
 
 Renma exposes several deterministic views over the same repository evidence. They answer different questions.
 
 | Command | Main question | Best for | Output shape |
 | --- | --- | --- | --- |
 | `scan` | What concrete problems were found? | Fixing diagnostics and CI checks | Finding list |
+| `catalog` | What assets exist? | Reviewing IDs, owners, lifecycle metadata, hashes, tags, and declared dependencies | Asset inventory |
 | `graph` | How are assets connected? | Inspecting dependencies and references | Asset relationship graph |
 | `trust-graph` | What evidence helps reviewers decide whether assets are safe, owned, current, and usable enough? | Tracing owner, lifecycle, policy, dependency, reference, and diagnostic evidence per asset | Evidence graph |
 | `readiness` | Is the repository broadly ready for agent-facing use? | Maintainer summary and CI reporting | Repository-level scorecard |
+| `bom` | What declared repository context manifest should reviewers inspect? | Combining catalog, graph, readiness, diagnostics, lifecycle, hashes, and security posture evidence | Repository Context BOM |
 
 `trust-graph` does not decide that an asset is trustworthy. It connects deterministic evidence that humans and downstream tools can review: owner, lifecycle status, dependency and reference relationships, selected security profiles, effective policy fingerprints, and diagnostics.
 
 In short:
 
 - `scan` lists problems.
+- `catalog` lists what assets exist.
 - `graph` shows structural relationships.
 - `trust-graph` connects trust-relevant evidence.
 - `readiness` summarizes repository health.
+- `bom` combines declared asset inventory, dependencies, hashes, lifecycle, diagnostics, readiness, and security posture evidence into a reviewable repository manifest.
 
 Useful command examples:
 
 ```bash
 renma scan . --format json
+renma catalog . --format json
 renma graph . --format json
 renma trust-graph . --format markdown
 renma trust-graph . --format json
 renma readiness . --format markdown
+renma bom . --format json
+renma bom . --format markdown
 ```
+
+### Repository Context BOM
+
+`renma bom` prints a declared Repository Context BOM generated from existing Renma evidence.
+
+```bash
+renma bom . --format json
+renma bom . --format markdown
+```
+
+The BOM is a repository manifest, not a runtime usage report. It combines the catalog asset inventory, content hashes, owners, lifecycle metadata, declared dependency graph evidence, diagnostics, readiness checks, security posture, and security policy inventory into one reviewable artifact.
+
+It does not describe what an LLM actually used, assemble prompts, select task-specific context, inject context into agents, import consumed-context evidence, or collect telemetry. JSON is the source of truth; Markdown is the compact pull-request review view.
 
 ### Repeated context diagnostics
 
@@ -650,7 +671,7 @@ Near-term security work is focused on stabilizing these diagnostics for the 0.7.
 
 Trust Graph interprets existing catalog, graph, scan, and security evidence as deterministic repository evidence. It is not a runtime system, not enforcement, not context selection or prompt assembly, not telemetry collection, not an LLM call, and not a subjective trust score.
 
-Repository Context BOM work should start as a declared repository manifest of assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence. It should not claim what an LLM actually used at runtime. Later external consumed-context evidence may be imported and validated against Renma's repository model, while telemetry collection remains outside Renma.
+Repository Context BOM is a declared repository manifest of assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence. It does not claim what an LLM actually used at runtime. Later external consumed-context evidence may be imported and validated against Renma's repository model, while telemetry collection remains outside Renma.
 
 ## Design Notes
 

@@ -6,6 +6,6 @@
     "contexts/**/*.md",
     "tools/**/*"
   ],
-  "exclude": ["node_modules", "dist", "dist-test", ".git", ".github"]
+  "exclude": ["node_modules", "dist", "dist-test", ".git", ".github", "examples", "scripts", "CHANGELOG.md", "LICENSE", "README.md"]
 }
 

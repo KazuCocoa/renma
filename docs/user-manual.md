@@ -118,40 +118,47 @@ For a runnable mini-repository with a skill, shared context assets, ownership me
 
 renma commands fall into a few groups:
 
-- Inventory and ownership: `catalog` lists discovered assets and references, `ownership` summarizes owned and unowned assets, `graph` shows relationships between catalog nodes, and `trust-graph` exposes deterministic trust evidence.
+- Inventory and ownership: `catalog` lists discovered assets and references, `ownership` summarizes owned and unowned assets, `graph` shows relationships between catalog nodes, `trust-graph` exposes deterministic trust evidence, and `bom` combines declared repository evidence into a reviewable Repository Context BOM.
 - Local inspection and authoring: `inspect` reads one file as an outline or exact line slice, `scaffold` creates starter assets or authoring prompts, `suggest-metadata` emits safe metadata retrofit guidance for existing assets, and `suggest-semantic-split` packages source context and helper commands so a human or coding agent can draft a split for mixed-purpose Markdown.
 - Review and CI: `scan` emits deterministic findings, `readiness` turns repository state into checks and a score, `diff` compares two refs, and `ci-report` formats the comparison for pull-request review.
 
-## Scan, Graph, Trust Graph, And Readiness
+## Scan, Catalog, Graph, Trust Graph, Readiness, And BOM
 
 These commands are related, but they answer different repository-review questions.
 
 | Command | Main question | Best for | Output shape |
 | --- | --- | --- | --- |
 | `scan` | What concrete problems were found? | Fixing diagnostics and CI checks | Finding list |
+| `catalog` | What assets exist? | Reviewing IDs, owners, lifecycle metadata, hashes, tags, and declared dependencies | Asset inventory |
 | `graph` | How are assets connected? | Inspecting dependencies and references | Asset relationship graph |
 | `trust-graph` | What evidence helps reviewers decide whether assets are safe, owned, current, and usable enough? | Tracing owner, lifecycle, policy, dependency, reference, and diagnostic evidence per asset | Evidence graph |
 | `readiness` | Is the repository broadly ready for agent-facing use? | Maintainer summary and CI reporting | Repository-level scorecard |
+| `bom` | What declared repository context manifest should reviewers inspect? | Combining catalog, graph, readiness, diagnostics, lifecycle, hashes, and security posture evidence | Repository Context BOM |
 
-`graph` is about structure. `readiness` is about repository-level preparedness. `trust-graph` is about traceability of trust-relevant evidence.
+`catalog` is about what assets exist. `graph` is about how assets relate. `readiness` is about repository-level health score and checks. `trust-graph` is about traceability of trust-relevant evidence. `bom` is the reviewable declared repository manifest that combines asset inventory, dependencies, hashes, lifecycle, diagnostics, readiness, and security posture evidence.
 
 Use `trust-graph` when a reviewer asks: "Why should this asset be considered safe, owned, current, and usable enough for an agent-facing repository?" The command does not decide that an asset is trustworthy. It connects deterministic evidence that humans and downstream tools can review: owner, lifecycle status, dependency and reference relationships, selected security profiles, effective policy fingerprints, and diagnostics.
 
 In short:
 
 - `scan` lists problems.
+- `catalog` lists what assets exist.
 - `graph` shows structural relationships.
 - `trust-graph` connects trust-relevant evidence.
 - `readiness` summarizes repository health.
+- `bom` combines declared catalog, graph, readiness, diagnostics, lifecycle, hash, and security posture evidence.
 
 Examples:
 
 ```bash
 renma scan . --format json
+renma catalog . --format json
 renma graph . --format json
 renma trust-graph . --format markdown
 renma trust-graph . --format json
 renma readiness . --format markdown
+renma bom . --format json
+renma bom . --format markdown
 ```
 
 ### `scan`
@@ -180,6 +187,22 @@ renma catalog . --format markdown
 Use the catalog to review asset IDs, owners, status, dependencies, and metadata-derived references.
 
 Output includes catalog assets, dependency edges, owners, lifecycle status, tags, and diagnostics.
+
+### `bom`
+
+Prints a declared Repository Context BOM.
+
+```bash
+renma bom .
+renma bom . --format json
+renma bom . --format markdown
+```
+
+Use the BOM when reviewers or CI consumers need one stable repository manifest that combines existing Renma evidence: catalog asset inventory, repository-relative source paths, content hashes, owners, lifecycle metadata, tags, declared dependencies, graph resolution, diagnostics, readiness score and checks, workflow readiness, context lens summary, security posture, and security policy inventory.
+
+The BOM is not a record of actual LLM runtime usage. Renma does not collect telemetry, assemble prompts, choose task-specific context, inject context into agents, import consumed-context evidence, or claim what an LLM actually consumed.
+
+JSON is the source of truth for automation. Markdown is a compact pull-request review view.
 
 ### `graph`
 
@@ -301,7 +324,7 @@ The report summarizes readiness deltas, graph-resolution changes, added and remo
 
 Output includes a CI status (`PASS`, `WARN`, or `FAIL`), a summary, readiness changes, graph changes, and review-focused finding changes.
 
-Future CI output may include security posture changes and declared Repository Context BOM evidence. Those artifacts should describe repository state, not prompt assembly, context injection, agent execution, or runtime telemetry.
+Repository Context BOM artifacts describe declared repository state, not prompt assembly, context injection, agent execution, actual LLM runtime usage, or telemetry. Use `renma bom . --format json` when CI needs a machine-readable manifest and `renma bom . --format markdown` for review comments or artifacts.
 
 ### `ownership`
 
@@ -377,6 +400,7 @@ Use `--format <format>` to select output and `--json` as a shortcut where the co
 | Command | Formats |
 | --- | --- |
 | `scan` | `text`, `json` |
+| `bom` | `json`, `markdown` |
 | `catalog` | `json`, `markdown` |
 | `ownership` | `json`, `markdown` |
 | `readiness` | `json`, `markdown` |
