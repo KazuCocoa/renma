@@ -2,7 +2,11 @@
 
 renma scans agent-facing repository assets and turns them into deterministic, agent-consumable reports. Use it to keep skills, shared context, prompts, docs, and ownership metadata reviewable in CI instead of relying on an LLM to infer repository intent.
 
-Renma does not call an LLM, choose runtime context, assemble prompts, inject context, execute agents, or own runtime telemetry.
+## What Renma Does And Does Not Do
+
+Renma is deterministic repository governance for context assets, skills, and agent-facing documentation. It reads local repository files, builds reviewable evidence, and reports what humans or coding agents should inspect.
+
+Renma does not call an LLM, choose runtime context, assemble prompts, inject context, execute agents, or collect telemetry.
 
 ## Install And Build
 
@@ -56,6 +60,147 @@ Renma skill, rename the skill directory, for example to
 `skills/example-review/SKILL.md`.
 
 Assets can declare metadata such as `id`, `owner`, `status`, `requires_context`, `optional_context`, and dependency references. The catalog and graph commands use that metadata to resolve links, identify weak references, and produce reports that can be checked in CI.
+
+## Quick Start
+
+For a first pass on an existing repository, run:
+
+```bash
+renma scan .
+renma catalog . --format markdown
+renma graph . --format markdown
+renma readiness . --format markdown
+```
+
+Read these reports together:
+
+- `scan` shows concrete problems to fix.
+- `catalog` shows what assets and metadata Renma discovered.
+- `graph` shows how skills and contexts are connected.
+- `readiness` summarizes repository-level health and checks.
+
+When you are creating new assets, start with `scaffold`, edit the generated files, then run the same checks. For deeper authoring guidance, see the [Authoring Guide](authoring-guide.md). For rule details, see the [Diagnostics Reference](diagnostics.md).
+
+## User Story: Create A New Skill With Scaffold
+
+Use this flow when you are adding a new agent-facing skill and want Renma to create the starter shape.
+
+1. Decide the skill path.
+
+```bash
+renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
+```
+
+2. Open and edit the generated skill.
+
+`scaffold` creates a starter file, not a complete production-ready skill. Fill in the purpose, when to use it, when not to use it, required inputs, completion criteria, verification steps, and required or optional context references.
+
+3. Add shared context assets when the skill depends on reusable knowledge.
+
+```bash
+renma scaffold context contexts/testing/boundary-value-analysis.md --owner qa-platform
+```
+
+Reusable domain, testing, product, platform, and tool knowledge should usually live under `contexts/**` instead of being buried inside one skill. A context asset can have its own owner, lifecycle state, review history, tags, and dependencies.
+
+4. Connect the skill to context assets.
+
+Add metadata such as `requires_context` or `optional_context` to the skill. These fields create static repository graph relationships. They do not make Renma choose runtime context for an agent.
+
+5. Run Renma checks.
+
+```bash
+renma scan .
+renma catalog . --format markdown
+renma graph . --format markdown
+renma readiness . --format markdown
+```
+
+6. Review and fix diagnostics.
+
+Use `scan` for concrete problems, `catalog` for discovered assets and metadata, `graph` for skill-to-context relationships, and `readiness` for the repository-level health score and checks. Renma emits diagnostics and guidance; it does not fix skills automatically. Humans or coding agents can use the output to prepare reviewable patches.
+
+7. Optionally generate a BOM for review or CI artifacts.
+
+```bash
+renma bom . --format markdown
+renma bom . --format json
+```
+
+The BOM is a declared repository manifest. It combines catalog, graph, diagnostics, readiness, lifecycle, hash, and security posture evidence. It is not a record of actual LLM runtime usage.
+
+## User Story: Improve Existing Skills With Diagnostics
+
+Use this flow when a repository already has skills or context assets and you want Renma to help make them easier to trust and review.
+
+1. Run `scan` on the existing repository.
+
+```bash
+renma scan .
+```
+
+`scan` reports concrete findings such as broken references, risky instructions, missing or invalid metadata, unclear workflow structure, and layout issues.
+
+2. Inspect the current asset inventory.
+
+```bash
+renma catalog . --format markdown
+```
+
+`catalog` helps you see existing skills, contexts, references, profiles, examples, IDs, owners, lifecycle states, hashes, tags, and declared dependencies.
+
+3. Check graph relationships.
+
+```bash
+renma graph . --format markdown
+renma graph . --focus skill.testing.spec-review --format markdown
+```
+
+`graph` helps find missing context, broken references, unexpected isolation, and unclear dependencies. Focused graph output keeps one asset and its direct neighborhood so you can inspect one skill or context without reading the whole graph.
+
+4. Check readiness.
+
+```bash
+renma readiness . --format markdown
+```
+
+`readiness` gives a repository-level health score and checks. It is a static repository review signal, not a runtime decision about which context an agent should use.
+
+5. Use `inspect` for one file.
+
+```bash
+renma inspect skills/testing/spec-review/SKILL.md
+renma inspect skills/testing/spec-review/SKILL.md --lines L10-L42
+```
+
+Use this when you want a compact outline or exact line slice before editing a specific asset.
+
+6. Use `suggest-metadata` when an existing asset lacks compact metadata.
+
+```bash
+renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform --format prompt
+```
+
+`suggest-metadata` does not rewrite files. It emits guidance that a human or coding agent can use to prepare a reviewed metadata patch while preserving the existing Markdown body.
+
+7. Use `suggest-semantic-split` when a file has grown too large or mixes multiple purposes.
+
+```bash
+renma suggest-semantic-split docs/large-runbook.md
+```
+
+`suggest-semantic-split` does not rewrite files either. It packages source context and guidance so a human or coding agent can draft a reviewable split.
+
+8. Rerun the checks after edits.
+
+```bash
+renma scan .
+renma catalog . --format markdown
+renma graph . --format markdown
+renma readiness . --format markdown
+```
+
+The loop is: Renma reports deterministic evidence, a human or coding agent prepares a patch, a human reviews it, and Renma verifies the result again.
 
 ## Configuration
 
