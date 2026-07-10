@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rename, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -7,12 +7,19 @@ import packageJson from "../package.json" with { type: "json" };
 import { main } from "../src/cli.js";
 import {
   bom,
+  buildBomReport,
   formatBomJson,
   formatBomMarkdown,
   type BomReport,
 } from "../src/commands/bom.js";
-import { graphFromRepositoryEvidence } from "../src/commands/graph.js";
-import { collectRepositoryEvidence } from "../src/repository-evidence.js";
+import {
+  graphFromRepositoryEvidence,
+  graphFromRepositorySnapshot,
+} from "../src/commands/graph.js";
+import {
+  collectRepositoryEvidence,
+  collectRepositorySnapshot,
+} from "../src/repository-evidence.js";
 
 test("bom report declares Repository Context BOM schema and scope", async () => {
   const report = await bom(await bomFixture());
@@ -38,6 +45,21 @@ test("bom report declares Repository Context BOM schema and scope", async () => 
   assert.equal(parsed.outputMode, "default");
   assert.equal(parsed.scope.runtimeUsage, false);
   assert.equal(parsed.scope.telemetryCollected, false);
+});
+
+test("bom v1 normalized contract shape is stable", async () => {
+  const report = buildBomReport(
+    await collectRepositorySnapshot(await bomContractFixture()),
+    {
+      generatedAt: new Date("2026-07-10T12:00:00.000Z"),
+      evaluationDate: "2026-07-10",
+    },
+  );
+
+  assert.equal(
+    JSON.stringify(normalizeBomContract(report), null, 2),
+    JSON.stringify(expectedBomContract(), null, 2),
+  );
 });
 
 test("bom assets include catalog metadata and lifecycle evidence", async () => {
@@ -178,6 +200,66 @@ test("bom uses shared repository evidence for assets and dependencies", async ()
   );
 });
 
+test("bom report builder does not rediscover files after snapshot collection", async () => {
+  const root = await bomFixture();
+  const snapshot = await collectRepositorySnapshot(root);
+  const options = {
+    omitGeneratedAt: true,
+    evaluationDate: "2026-07-10",
+  } as const;
+  const report = buildBomReport(snapshot, options);
+  const graphReport = graphFromRepositorySnapshot(snapshot);
+
+  await writeFile(
+    path.join(root, "contexts", "testing", "boundary-value-analysis.md"),
+    [
+      "---",
+      "id: context.testing.changed-after-snapshot",
+      "owner: changed-owner",
+      "status: deprecated",
+      "expires_at: 2000-01-01",
+      "---",
+      "# Changed After Snapshot",
+      "",
+      "token = super-secret-token-value",
+      "",
+    ].join("\n"),
+  );
+
+  assert.deepEqual(buildBomReport(snapshot, options), report);
+  assert.deepEqual(
+    await bom(root, {}, { omitGeneratedAt: true }),
+    buildBomReport(await collectRepositorySnapshot(root), {
+      omitGeneratedAt: true,
+    }),
+  );
+  assert.equal(report.summary.assetCount, snapshot.catalog.assets.length);
+  assert.equal(
+    report.readiness.summary.totalAssets,
+    snapshot.catalog.assets.length,
+  );
+  assert.equal(report.summary.dependencyCount, graphReport.edges.length);
+  assert.equal(report.readiness.summary.edgeCount, graphReport.edgeCount);
+  assert.equal(
+    report.summary.resolvedDependencyCount,
+    graphReport.edges.filter((edge) => edge.resolved).length,
+  );
+  assert.equal(
+    report.summary.unresolvedDependencyCount,
+    graphReport.edges.filter((edge) => !edge.resolved).length,
+  );
+  assert.equal(
+    report.assets.some(
+      (asset) => asset.id === "context.testing.changed-after-snapshot",
+    ),
+    false,
+  );
+  assert.equal(
+    report.securityPosture.totalSecurityFindings,
+    report.readiness.summary.securityPosture.totalSecurityFindings,
+  );
+});
+
 test("bom includes readiness, security posture, and policy inventory evidence", async () => {
   const report = await bom(await bomFixture());
 
@@ -310,6 +392,107 @@ test("bom CLI generatedAt omission JSON output is reproducible", async () => {
   assert.equal(asset?.lifecycle?.expiresAt, "2026-12-31");
 });
 
+test("bom --omit-generated-at keeps absolute roots environment-dependent", async () => {
+  const first = formatBomJson(
+    await bom(await bomFixture(), {}, { omitGeneratedAt: true }),
+  );
+  const second = formatBomJson(
+    await bom(await bomFixture(), {}, { omitGeneratedAt: true }),
+  );
+  const firstReport = JSON.parse(first) as BomReport;
+  const secondReport = JSON.parse(second) as BomReport;
+
+  assert.equal(path.isAbsolute(firstReport.root), true);
+  assert.equal(path.isAbsolute(secondReport.root), true);
+  assert.notEqual(firstReport.root, secondReport.root);
+  assert.notEqual(first, second);
+});
+
+test("bom treats file moves as meaningful sourcePath changes", async () => {
+  const root = await bomFixture();
+  const before = await bom(root, {}, { omitGeneratedAt: true });
+
+  await mkdir(path.join(root, "contexts", "renamed"), { recursive: true });
+  await rename(
+    path.join(root, "contexts", "testing", "boundary-value-analysis.md"),
+    path.join(root, "contexts", "renamed", "boundary-value-analysis.md"),
+  );
+
+  const after = await bom(root, {}, { omitGeneratedAt: true });
+  const beforeAsset = before.assets.find(
+    (asset) => asset.id === "context.testing.boundary-value-analysis",
+  );
+  const afterAsset = after.assets.find(
+    (asset) => asset.id === "context.testing.boundary-value-analysis",
+  );
+
+  assert.equal(
+    beforeAsset?.sourcePath,
+    "contexts/testing/boundary-value-analysis.md",
+  );
+  assert.equal(
+    afterAsset?.sourcePath,
+    "contexts/renamed/boundary-value-analysis.md",
+  );
+  assert.notEqual(formatBomJson(before), formatBomJson(after));
+});
+
+test("bom freshness diagnostics use a controlled UTC evaluation date", async () => {
+  const root = await fixture();
+  await writeContext(root, {
+    id: "context.testing.freshness-boundary",
+    fileName: "freshness-boundary",
+    owner: "qa-platform",
+    status: "stable",
+    version: "1.0.0",
+    tags: ["testing"],
+    lastReviewedAt: "2026-01-01",
+    reviewCycle: "P1D",
+    expiresAt: "2026-12-31",
+  });
+  const snapshot = await collectRepositorySnapshot(root);
+
+  const dueDay = buildBomReport(snapshot, {
+    omitGeneratedAt: true,
+    evaluationDate: "2026-01-02",
+  });
+  const afterDueDay = buildBomReport(snapshot, {
+    omitGeneratedAt: true,
+    evaluationDate: "2026-01-03",
+  });
+
+  assert.equal(
+    hasDiagnosticFinding(dueDay, "MAINT-ASSET-REVIEW-OVERDUE"),
+    false,
+  );
+  assert.equal(
+    hasDiagnosticFinding(afterDueDay, "MAINT-ASSET-REVIEW-OVERDUE"),
+    true,
+  );
+});
+
+test("bom evaluation date uses the UTC calendar day", async () => {
+  const root = await fixture();
+  await writeContext(root, {
+    id: "context.testing.utc-boundary",
+    fileName: "utc-boundary",
+    owner: "qa-platform",
+    status: "stable",
+    version: "1.0.0",
+    tags: ["testing"],
+    lastReviewedAt: "2026-07-09",
+    reviewCycle: "P30D",
+    expiresAt: "2026-07-09",
+  });
+  const snapshot = await collectRepositorySnapshot(root);
+  const report = buildBomReport(snapshot, {
+    omitGeneratedAt: true,
+    evaluationDate: new Date("2026-07-10T00:30:00.000Z"),
+  });
+
+  assert.equal(hasDiagnosticFinding(report, "MAINT-ASSET-EXPIRED"), true);
+});
+
 test("bom CLI generatedAt omission Markdown output says generatedAt was omitted", async () => {
   const root = await bomFixture();
 
@@ -364,6 +547,82 @@ async function bomFixture(): Promise<string> {
     reviewCycle: "P180D",
     expiresAt: "2026-12-31",
   });
+  return root;
+}
+
+async function bomContractFixture(): Promise<string> {
+  const root = await fixture();
+  await mkdir(path.join(root, "skills", "testing", "contract-review"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "skills", "testing", "contract-review", "SKILL.md"),
+    [
+      "---",
+      "id: skill.testing.contract-review",
+      "owner: qa-platform",
+      "status: stable",
+      "tags: testing",
+      "requires_context:",
+      "  - context.testing.contract",
+      "allowed_data: repository test fixtures only",
+      "network_allowed: false",
+      "external_upload_allowed: false",
+      "secrets_allowed: false",
+      "requires_human_approval: true",
+      "---",
+      "# Contract Review",
+      "",
+      "## When to use",
+      "Use this workflow for deterministic Repository Context BOM contract tests.",
+      "",
+      "## Required inputs",
+      "Required inputs: repository root and the requested BOM output format.",
+      "",
+      "## DO NOT USE FOR",
+      "Do not use this workflow for runtime task context selection or prompt assembly.",
+      "",
+      "## Preflight",
+      "Confirm the repository fixture exists and inputs are static.",
+      "",
+      "## Example",
+      "Input: BOM fixture. Output: deterministic manifest evidence.",
+      "",
+      "## Completion criteria",
+      "The workflow is complete when BOM output contains the expected v1 contract shape.",
+      "",
+      "## Verification",
+      "Verify by running the BOM command and checking JSON output.",
+      "",
+    ].join("\n"),
+  );
+  await mkdir(path.join(root, "contexts", "testing"), { recursive: true });
+  await writeFile(
+    path.join(root, "contexts", "testing", "contract.md"),
+    [
+      "---",
+      "id: context.testing.contract",
+      "owner: qa-platform",
+      "status: stable",
+      "version: 1.0.0",
+      "tags: testing",
+      "last_reviewed_at: 2026-06-28",
+      "review_cycle: P180D",
+      "expires_at: 2026-12-31",
+      "when_to_use: Review BOM v1 contract shape in deterministic fixtures.",
+      "when_not_to_use: Do not use as runtime prompt assembly instructions.",
+      "allowed_data: repository test fixtures only",
+      "network_allowed: false",
+      "external_upload_allowed: false",
+      "secrets_allowed: false",
+      "requires_human_approval: true",
+      "---",
+      "# Contract Context",
+      "",
+      "Use this shared context for static report tests.",
+      "",
+    ].join("\n"),
+  );
   return root;
 }
 
@@ -573,6 +832,443 @@ async function writeBrokenLens(root: string): Promise<void> {
       "",
     ].join("\n"),
   );
+}
+
+function hasDiagnosticFinding(report: BomReport, id: string): boolean {
+  return (
+    report.readiness.checks
+      .find((check) => check.id === "assets.freshness")
+      ?.evidence?.some((item) => item.id === id) === true
+  );
+}
+
+function normalizeBomContract(report: BomReport): BomReport {
+  return {
+    ...report,
+    root: "<absolute-root>",
+    ...(report.configPath ? { configPath: "<absolute-config-path>" } : {}),
+    assets: report.assets.map((asset) => ({
+      ...asset,
+      contentHash: "<sha256>",
+    })),
+  };
+}
+
+function expectedBomContract(): BomReport {
+  return {
+    schemaVersion: "renma.repository-context-bom.v1",
+    outputMode: "default",
+    generatedAt: "2026-07-10T12:00:00.000Z",
+    generator: {
+      name: "renma",
+      version: packageJson.version,
+    },
+    root: "<absolute-root>",
+    scope: {
+      type: "declared_repository_manifest",
+      runtimeUsage: false,
+      telemetryCollected: false,
+    },
+    summary: {
+      scannedFileCount: 2,
+      assetCount: 2,
+      dependencyCount: 1,
+      resolvedDependencyCount: 1,
+      unresolvedDependencyCount: 0,
+      ownedAssetCount: 2,
+      unownedAssetCount: 0,
+      readinessScore: 100,
+      readinessLevel: "ready",
+      diagnosticCounts: {
+        error: 0,
+        warning: 0,
+        info: 0,
+      },
+    },
+    assets: [
+      {
+        id: "context.testing.contract",
+        kind: "context",
+        sourcePath: "contexts/testing/contract.md",
+        contentHash: "<sha256>",
+        owner: "qa-platform",
+        status: "stable",
+        version: "1.0.0",
+        tags: ["testing"],
+        lifecycle: {
+          status: "stable",
+          lastReviewedAt: "2026-06-28",
+          reviewCycle: "P180D",
+          expiresAt: "2026-12-31",
+        },
+        dependencies: [],
+        dependents: [
+          {
+            kind: "requires",
+            from: "skill.testing.contract-review",
+            sourcePath: "skills/testing/contract-review/SKILL.md",
+          },
+        ],
+        diagnostics: [],
+      },
+      {
+        id: "skill.testing.contract-review",
+        kind: "skill",
+        sourcePath: "skills/testing/contract-review/SKILL.md",
+        contentHash: "<sha256>",
+        owner: "qa-platform",
+        status: "stable",
+        tags: ["testing"],
+        lifecycle: {
+          status: "stable",
+        },
+        dependencies: [
+          {
+            kind: "requires",
+            to: "context.testing.contract",
+            resolved: true,
+            targetId: "context.testing.contract",
+            targetKind: "context",
+            targetPath: "contexts/testing/contract.md",
+          },
+        ],
+        dependents: [],
+        diagnostics: [],
+      },
+    ],
+    dependencies: [
+      {
+        from: "skill.testing.contract-review",
+        to: "context.testing.contract",
+        kind: "requires",
+        sourcePath: "skills/testing/contract-review/SKILL.md",
+        resolved: true,
+        targetId: "context.testing.contract",
+        targetKind: "context",
+        targetPath: "contexts/testing/contract.md",
+      },
+    ],
+    readiness: {
+      score: 100,
+      level: "ready",
+      checks: [
+        {
+          id: "diagnostics.errors",
+          title: "Diagnostic errors",
+          status: "pass",
+          severity: "info",
+          summary: "No error diagnostics were reported.",
+        },
+        {
+          id: "ownership.coverage",
+          title: "Ownership coverage",
+          status: "pass",
+          severity: "info",
+          summary: "All cataloged assets declare an owner.",
+        },
+        {
+          id: "graph.unresolved_edges",
+          title: "Unresolved graph edges",
+          status: "pass",
+          severity: "info",
+          summary: "All declared graph edges resolve.",
+        },
+        {
+          id: "workflow.context_closure",
+          title: "Workflow context closure",
+          status: "pass",
+          severity: "info",
+          summary:
+            "All skill required context references resolve to usable assets.",
+        },
+        {
+          id: "workflow.optional_context",
+          title: "Workflow optional context",
+          status: "pass",
+          severity: "info",
+          summary: "No optional workflow context references were declared.",
+        },
+        {
+          id: "workflow.clarity",
+          title: "Workflow clarity",
+          status: "pass",
+          severity: "info",
+          summary:
+            "All skill workflow entrypoints include static routing clarity.",
+        },
+        {
+          id: "workflow.required_inputs",
+          title: "Workflow required inputs",
+          status: "pass",
+          severity: "info",
+          summary:
+            "All skill workflow entrypoints document required inputs or prerequisites.",
+        },
+        {
+          id: "workflow.completion_criteria",
+          title: "Workflow completion criteria",
+          status: "pass",
+          severity: "info",
+          summary:
+            "All skill workflow entrypoints document completion criteria.",
+        },
+        {
+          id: "context_lens.governance",
+          title: "Context Lens governance",
+          status: "pass",
+          severity: "info",
+          summary: "No context lens definitions were detected.",
+        },
+        {
+          id: "assets.lifecycle",
+          title: "Asset lifecycle",
+          status: "pass",
+          severity: "info",
+          summary: "No deprecated or archived assets were cataloged.",
+        },
+        {
+          id: "assets.freshness",
+          title: "Asset freshness",
+          status: "pass",
+          severity: "info",
+          summary:
+            "No expired, overdue, or invalid freshness metadata was found.",
+        },
+        {
+          id: "assets.minimum_inventory",
+          title: "Minimum inventory",
+          status: "pass",
+          severity: "info",
+          summary: "2 cataloged assets found.",
+        },
+        {
+          id: "layout.skills_thin",
+          title: "Thin skill entrypoints",
+          status: "pass",
+          severity: "info",
+          summary: "All skill entrypoints are thin routers.",
+        },
+        {
+          id: "layout.disallowed_skill_assets",
+          title: "Disallowed skill-local assets",
+          status: "pass",
+          severity: "info",
+          summary:
+            "No canonical references, profiles, examples, or scripts live under skills/**.",
+        },
+        {
+          id: "layout.context_root",
+          title: "Canonical context root",
+          status: "pass",
+          severity: "info",
+          summary:
+            "Context assets and declared context paths use canonical roots.",
+        },
+        {
+          id: "layout.helper_root",
+          title: "Canonical helper root",
+          status: "pass",
+          severity: "info",
+          summary: "Helper assets live under tools/**.",
+        },
+        {
+          id: "paths.helper_commands",
+          title: "Helper command paths",
+          status: "pass",
+          severity: "info",
+          summary: "Markdown helper commands resolve to tools/**.",
+        },
+        {
+          id: "docs.layout_consistency",
+          title: "Layout documentation consistency",
+          status: "pass",
+          severity: "info",
+          summary: "Repository docs describe the strict three-root layout.",
+        },
+      ],
+      summary: {
+        totalAssets: 2,
+        ownedAssets: 2,
+        unownedAssets: 0,
+        ownershipCoveragePercent: 100,
+        nodeCount: 2,
+        edgeCount: 1,
+        resolvedEdges: 1,
+        unresolvedEdges: 0,
+        graphResolutionPercent: 100,
+        diagnosticCounts: {
+          error: 0,
+          warning: 0,
+          info: 0,
+        },
+        workflow: {
+          skillEntrypoints: 1,
+          checks: 5,
+          pass: 5,
+          warn: 0,
+          fail: 0,
+          readinessPercent: 100,
+        },
+        contextLens: {
+          enabled: true,
+          detected: false,
+          totalLensCount: 0,
+          validLensCount: 0,
+          invalidLensCount: 0,
+          diagnosticCounts: {
+            error: 0,
+            warning: 0,
+            info: 0,
+          },
+          definitionPaths: [],
+          targetReferences: [],
+          targetPaths: [],
+          unresolvedTargetReferences: [],
+          scopeSummary: [],
+          lenses: [],
+        },
+        securityPosture: {
+          totalSecurityFindings: 0,
+          riskClasses: {
+            violation: 0,
+            suspicious: 0,
+            advisory: 0,
+            unclassified: 0,
+          },
+          severities: {
+            critical: 0,
+            high: 0,
+            medium: 0,
+            low: 0,
+          },
+          highOrCritical: 0,
+          topFindingIds: [],
+        },
+        securityPolicyInventory: {
+          totalPolicyAssets: 2,
+          assetsWithPolicyMetadata: 2,
+          assetsMissingPolicyMetadata: 0,
+          assetKinds: {
+            skill: 1,
+            context: 1,
+            context_lens: 0,
+            agent: 0,
+            profile: 0,
+            reference: 0,
+            example: 0,
+            config: 0,
+            unknown: 0,
+          },
+          networkAllowed: {
+            true: 0,
+            false: 2,
+            unspecified: 0,
+          },
+          externalUploadAllowed: {
+            true: 0,
+            false: 2,
+            unspecified: 0,
+          },
+          secretsAllowed: {
+            true: 0,
+            false: 2,
+            unspecified: 0,
+          },
+          humanApprovalRequired: {
+            true: 2,
+            false: 0,
+            unspecified: 0,
+          },
+          approvedNetworkDestinationCount: 0,
+          approvedUploadDestinationCount: 0,
+          forbiddenInputCount: 0,
+          disallowedCommandCount: 0,
+          securityProfiles: {
+            referenced: 0,
+            resolved: 0,
+            missing: 0,
+            cyclic: 0,
+            none: 2,
+            names: [],
+          },
+          topApprovedNetworkDestinations: [],
+          topApprovedUploadDestinations: [],
+          topForbiddenInputs: [],
+          missingPolicyAssets: [],
+        },
+      },
+    },
+    securityPosture: {
+      totalSecurityFindings: 0,
+      riskClasses: {
+        violation: 0,
+        suspicious: 0,
+        advisory: 0,
+        unclassified: 0,
+      },
+      severities: {
+        critical: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+      },
+      highOrCritical: 0,
+      topFindingIds: [],
+    },
+    securityPolicyInventory: {
+      totalPolicyAssets: 2,
+      assetsWithPolicyMetadata: 2,
+      assetsMissingPolicyMetadata: 0,
+      assetKinds: {
+        skill: 1,
+        context: 1,
+        context_lens: 0,
+        agent: 0,
+        profile: 0,
+        reference: 0,
+        example: 0,
+        config: 0,
+        unknown: 0,
+      },
+      networkAllowed: {
+        true: 0,
+        false: 2,
+        unspecified: 0,
+      },
+      externalUploadAllowed: {
+        true: 0,
+        false: 2,
+        unspecified: 0,
+      },
+      secretsAllowed: {
+        true: 0,
+        false: 2,
+        unspecified: 0,
+      },
+      humanApprovalRequired: {
+        true: 2,
+        false: 0,
+        unspecified: 0,
+      },
+      approvedNetworkDestinationCount: 0,
+      approvedUploadDestinationCount: 0,
+      forbiddenInputCount: 0,
+      disallowedCommandCount: 0,
+      securityProfiles: {
+        referenced: 0,
+        resolved: 0,
+        missing: 0,
+        cyclic: 0,
+        none: 2,
+        names: [],
+      },
+      topApprovedNetworkDestinations: [],
+      topApprovedUploadDestinations: [],
+      topForbiddenInputs: [],
+      missingPolicyAssets: [],
+    },
+    diagnostics: [],
+  };
 }
 
 async function withCapturedConsole(

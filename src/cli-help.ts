@@ -331,7 +331,8 @@ export const COMMAND_HELP = [
     interpretation: [
       "The BOM is a declared repository manifest, not a runtime usage report or telemetry.",
       "--omit-generated-at only removes the run-time generation timestamp.",
-      "The option does not normalize repository metadata timestamps such as lastReviewedAt or expiresAt, and it does not normalize all environment-dependent paths such as root or configPath.",
+      "With the same checkout path, config path, repository contents, Renma version, and UTC evaluation date, repeated --omit-generated-at JSON runs should be byte-identical.",
+      "The option does not remove freshness metadata, suppress freshness diagnostics, normalize absolute root or configPath values, hide file moves, or make output portable across runners.",
     ],
     nextSteps: [
       "Review diagnostics and readiness sections before merging.",

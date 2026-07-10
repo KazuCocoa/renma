@@ -30,6 +30,10 @@ type FindingDetails = Partial<
   >
 >;
 
+interface RuleOptions {
+  evaluationDate?: Date | string;
+}
+
 const SECRET_PATTERN =
   /\b(?:password|passwd|token|api[_-]?key|secret|credential|private[_-]?key)\b\s*[:=]\s*["']?([A-Za-z0-9_./+=-]{8,})/i;
 const PRIVATE_KEY_PATTERN =
@@ -160,8 +164,14 @@ export function runRules(
   documents: ParsedDocument[],
   config: ScanConfig,
   catalog?: Catalog,
+  options: RuleOptions = {},
 ): Finding[] {
-  const findings = runRuleRegistry(documents, RULES, catalog, config);
+  const findings = runRuleRegistry(
+    documents,
+    rulesForEvaluationDate(evaluationDay(options.evaluationDate)),
+    catalog,
+    config,
+  );
   return findings.sort((a, b) => {
     const byPath = a.evidence.path.localeCompare(b.evidence.path);
     if (byPath !== 0) return byPath;
@@ -169,72 +179,90 @@ export function runRules(
   });
 }
 
-const RULES: Rule[] = [
-  {
-    id: "strict-layout-policy",
-    run: (context) =>
-      strictLayoutPolicyFindings(
-        context.documents,
-        context.config,
-        context.catalog,
-      ),
-  },
-  {
-    id: "security",
-    run: ({ documents }) =>
-      documents.flatMap((document) => [
-        ...secretFindings(document),
-        ...commandFindings(document),
-      ]),
-  },
-  {
-    id: "shape",
-    run: ({ documents }) =>
-      documents.flatMap((document) => [
-        ...shapeFindings(document),
-        ...contextBudgetFindings(document),
-        ...profileFindings(document),
-      ]),
-  },
-  {
-    id: "skill-local-support-reachability",
-    run: ({ documents }) => skillLocalSupportReachabilityFindings(documents),
-  },
-  {
-    id: "support-asset-shared-context-candidate",
-    run: ({ documents }) =>
-      documents.flatMap((document) =>
-        supportSharedContextCandidateFindings(document),
-      ),
-  },
-  {
-    id: "context-path-non-semantic",
-    run: ({ documents }) =>
-      documents.flatMap((document) => contextPathNonSemanticFindings(document)),
-  },
-  {
-    id: "skill-context-reference-not-declared",
-    run: ({ documents }) =>
-      documents.flatMap((document) =>
-        skillContextReferenceNotDeclaredFindings(document),
-      ),
-  },
-  {
-    id: "skill-references-superseded-asset",
-    run: ({ documents }) => skillReferencesSupersededAssetFindings(documents),
-  },
-  {
-    id: "asset-references-superseded-asset",
-    run: ({ documents }) => assetReferencesSupersededAssetFindings(documents),
-  },
-  {
-    id: "catalog-declared-reference-governance",
-    run: ({ catalog }) => catalogDeclaredReferenceGovernanceFindings(catalog),
-  },
-];
+function rulesForEvaluationDate(evaluationDate: string): Rule[] {
+  return [
+    {
+      id: "strict-layout-policy",
+      run: (context) =>
+        strictLayoutPolicyFindings(
+          context.documents,
+          context.config,
+          context.catalog,
+        ),
+    },
+    {
+      id: "security",
+      run: ({ documents }) =>
+        documents.flatMap((document) => [
+          ...secretFindings(document),
+          ...commandFindings(document),
+        ]),
+    },
+    {
+      id: "shape",
+      run: ({ documents }) =>
+        documents.flatMap((document) => [
+          ...shapeFindings(document),
+          ...contextBudgetFindings(document),
+          ...profileFindings(document),
+        ]),
+    },
+    {
+      id: "skill-local-support-reachability",
+      run: ({ documents }) => skillLocalSupportReachabilityFindings(documents),
+    },
+    {
+      id: "support-asset-shared-context-candidate",
+      run: ({ documents }) =>
+        documents.flatMap((document) =>
+          supportSharedContextCandidateFindings(document),
+        ),
+    },
+    {
+      id: "context-path-non-semantic",
+      run: ({ documents }) =>
+        documents.flatMap((document) =>
+          contextPathNonSemanticFindings(document),
+        ),
+    },
+    {
+      id: "skill-context-reference-not-declared",
+      run: ({ documents }) =>
+        documents.flatMap((document) =>
+          skillContextReferenceNotDeclaredFindings(document),
+        ),
+    },
+    {
+      id: "skill-references-superseded-asset",
+      run: ({ documents }) => skillReferencesSupersededAssetFindings(documents),
+    },
+    {
+      id: "asset-references-superseded-asset",
+      run: ({ documents }) => assetReferencesSupersededAssetFindings(documents),
+    },
+    {
+      id: "catalog-declared-reference-governance",
+      run: ({ catalog }) =>
+        catalogDeclaredReferenceGovernanceFindings(catalog, evaluationDate),
+    },
+  ];
+}
+
+function evaluationDay(value: Date | string | undefined): string {
+  if (value === undefined) return todayIsoDate();
+  if (value instanceof Date) return todayIsoDate(value);
+  if (isIsoDate(value)) return value;
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`Invalid internal evaluation date: ${value}`);
+  }
+  return todayIsoDate(parsed);
+}
 
 function catalogDeclaredReferenceGovernanceFindings(
   catalog: Catalog | undefined,
+  today: string,
 ): Finding[] {
   if (!catalog) return [];
 
@@ -253,7 +281,7 @@ function catalogDeclaredReferenceGovernanceFindings(
       catalog.dependencies,
       resolver,
     ),
-    ...freshnessGovernanceFindings(catalog.entries),
+    ...freshnessGovernanceFindings(catalog.entries, today),
   ];
 
   return findings;

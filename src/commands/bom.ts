@@ -1,11 +1,11 @@
 import packageJson from "../../package.json" with { type: "json" };
-import { graphFromRepositoryEvidence, type GraphEdge } from "./graph.js";
+import { graphFromRepositorySnapshot, type GraphEdge } from "./graph.js";
 import {
   buildReadinessReport,
   type ReadinessLevel,
   type ReadinessReport,
 } from "./readiness.js";
-import { scan } from "../scanner.js";
+import { scanFromRepositorySnapshot } from "../scanner.js";
 import type { ConfigOverrides } from "../config.js";
 import type {
   Asset,
@@ -13,7 +13,10 @@ import type {
   AssetStatus,
   DependencyKind,
 } from "../model.js";
-import { collectRepositoryEvidence } from "../repository-evidence.js";
+import {
+  collectRepositorySnapshot,
+  type RepositorySnapshot,
+} from "../repository-evidence.js";
 import type { SecurityPolicyInventorySummary } from "../security-policy-inventory.js";
 import type { SecurityPostureSummary } from "../security-posture.js";
 import type { Diagnostic } from "../types.js";
@@ -23,6 +26,11 @@ export type BomOutputMode = "default" | "omit_generated_at";
 
 export interface BomOptions {
   omitGeneratedAt?: boolean;
+}
+
+interface BomBuildOptions extends BomOptions {
+  generatedAt?: Date | string;
+  evaluationDate?: Date | string;
 }
 
 export interface BomReport {
@@ -145,9 +153,23 @@ export async function bom(
   overrides: ConfigOverrides = {},
   options: BomOptions = {},
 ): Promise<BomReport> {
-  const evidence = await collectRepositoryEvidence(targetPath, overrides);
-  const graphReport = graphFromRepositoryEvidence(evidence);
-  const scanResult = await scan(targetPath, overrides);
+  return buildBomReport(
+    await collectRepositorySnapshot(targetPath, overrides),
+    options,
+  );
+}
+
+export function buildBomReport(
+  snapshot: RepositorySnapshot,
+  options: BomBuildOptions = {},
+): BomReport {
+  const graphReport = graphFromRepositorySnapshot(snapshot);
+  const scanResult = scanFromRepositorySnapshot(
+    snapshot,
+    options.evaluationDate === undefined
+      ? {}
+      : { evaluationDate: options.evaluationDate },
+  );
   const readinessReport = buildReadinessReport(
     graphReport,
     scanResult.findings,
@@ -158,7 +180,7 @@ export async function bom(
   const dependencies = stableEdges(graphReport.edges).map(toBomDependency);
   const diagnostics = stableDiagnostics(
     dedupeDiagnostics([
-      ...evidence.diagnostics,
+      ...snapshot.diagnostics,
       ...(graphReport.diagnostics ?? []),
       ...(readinessReport.diagnostics ?? []),
     ]),
@@ -169,21 +191,21 @@ export async function bom(
   return {
     schemaVersion: "renma.repository-context-bom.v1",
     outputMode: omitGeneratedAt ? "omit_generated_at" : "default",
-    ...(omitGeneratedAt ? {} : { generatedAt: new Date().toISOString() }),
+    ...(omitGeneratedAt ? {} : { generatedAt: generatedAtIso(options) }),
     generator: {
       name: "renma",
       version: packageJson.version,
     },
-    root: evidence.root,
-    ...(evidence.configPath ? { configPath: evidence.configPath } : {}),
+    root: snapshot.root,
+    ...(snapshot.configPath ? { configPath: snapshot.configPath } : {}),
     scope: {
       type: "declared_repository_manifest",
       runtimeUsage: false,
       telemetryCollected: false,
     },
     summary: {
-      scannedFileCount: evidence.scannedFileCount,
-      assetCount: evidence.catalog.assets.length,
+      scannedFileCount: snapshot.scannedFileCount,
+      assetCount: snapshot.catalog.assets.length,
       dependencyCount: dependencies.length,
       resolvedDependencyCount: dependencies.filter(
         (dependency) => dependency.resolved,
@@ -197,7 +219,7 @@ export async function bom(
       readinessLevel: readinessReport.level,
       diagnosticCounts,
     },
-    assets: stableAssets(evidence.catalog.assets).map((asset) =>
+    assets: stableAssets(snapshot.catalog.assets).map((asset) =>
       toBomAsset(asset, dependencies, diagnostics),
     ),
     dependencies,
@@ -211,6 +233,13 @@ export async function bom(
     securityPolicyInventory: readinessReport.summary.securityPolicyInventory,
     diagnostics,
   };
+}
+
+function generatedAtIso(options: BomBuildOptions): string {
+  if (options.generatedAt instanceof Date)
+    return options.generatedAt.toISOString();
+  if (typeof options.generatedAt === "string") return options.generatedAt;
+  return new Date().toISOString();
 }
 
 export function formatBomJson(report: BomReport): string {
