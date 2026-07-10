@@ -1435,6 +1435,7 @@ test("representative command help shows relevant boundaries and options", async 
         /renma scan \[path\] \[options\]/,
         /usually the first command/,
         /--fail-on <level>/,
+        /Output format: text or json\. Defaults to text\./,
         /repair constraints/,
         /inventing owners, references, source-of-truth documents, or product rules/,
       ],
@@ -1446,6 +1447,7 @@ test("representative command help shows relevant boundaries and options", async 
       includes: [
         /renma catalog \[path\] \[options\]/,
         /IDs, kinds, owners, lifecycle states, hashes, tags/,
+        /Output format: json or markdown\. Defaults to json\./,
         /inventory evidence/,
       ],
       excludes: [/--fail-on/, /--focus/],
@@ -1455,6 +1457,8 @@ test("representative command help shows relevant boundaries and options", async 
       argv: ["graph", "/path/that/does/not/exist", "--help"],
       includes: [
         /renma graph \[path\] \[options\]/,
+        /Output format: json, markdown, or mermaid\. Defaults to json\./,
+        /JSON defaults to the full view; non-JSON formats default to the summary view/,
         /--view <view>/,
         /--focus <asset-id-or-path>/,
         /does not select context for an LLM/,
@@ -1468,6 +1472,7 @@ test("representative command help shows relevant boundaries and options", async 
       includes: [
         /renma trust-graph \[path\] \[options\]/,
         /ownership, lifecycle, policy, references, dependencies, and diagnostics/,
+        /Output format: json or markdown\. Defaults to json\./,
         /not a subjective trust score/,
         /does not certify that an asset is trustworthy/,
       ],
@@ -1479,10 +1484,22 @@ test("representative command help shows relevant boundaries and options", async 
       includes: [
         /renma readiness \[path\] \[options\]/,
         /repository-level scorecard/,
+        /Output format: json or markdown\. Defaults to json\./,
         /Scan gives concrete findings; readiness gives a broad repository summary/,
         /particular context asset at runtime/,
       ],
       excludes: [/--focus/, /--fail-on/],
+    },
+    {
+      name: "ownership",
+      argv: ["ownership", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma ownership \[path\] \[options\]/,
+        /review owner coverage, unowned assets, and concentration/,
+        /Output format: json or markdown\. Defaults to json\./,
+        /Show owner-specific declared asset details while preserving repository-level coverage totals/,
+      ],
+      excludes: [/--focus/, /--fail-on/, /Set owner metadata on the scaffold/],
     },
     {
       name: "bom",
@@ -1490,11 +1507,47 @@ test("representative command help shows relevant boundaries and options", async 
       includes: [
         /renma bom \[path\] \[options\]/,
         /declared repository evidence snapshot/,
+        /structured JSON generated from deterministic repository evidence/,
+        /Output format: json or markdown\. Defaults to json\./,
         /--omit-generated-at/,
         /not a runtime usage report or telemetry/,
         /only removes the run-time generation timestamp/,
+        /does not normalize repository metadata timestamps/,
+        /does not normalize all environment-dependent paths/,
+      ],
+      excludes: [/--focus/, /--fail-on/, /deterministic JSON/],
+    },
+    {
+      name: "diff",
+      argv: ["diff", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma diff \[path\] --from <ref> --to <ref> \[options\]/,
+        /not arbitrary source hunks/,
+        /Output format: json or markdown\. Defaults to json\./,
       ],
       excludes: [/--focus/, /--fail-on/],
+    },
+    {
+      name: "ci-report",
+      argv: ["ci-report", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma ci-report \[path\] --from <ref> --to <ref> \[options\]/,
+        /pull-request-oriented summary/,
+        /Output format: json or markdown\. Defaults to markdown\./,
+        /PASS and WARN exit 0; FAIL exits 1/,
+      ],
+      excludes: [/--focus/, /--fail-on/],
+    },
+    {
+      name: "inspect",
+      argv: ["inspect", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma inspect <file> \[options\]/,
+        /compact outline or exact line slice/,
+        /Output format: text or json\. Defaults to json\./,
+        /--lines <range>/,
+      ],
+      excludes: [/--focus/, /--fail-on/, /--config/],
     },
     {
       name: "scaffold",
@@ -1505,9 +1558,16 @@ test("representative command help shows relevant boundaries and options", async 
         /renma scaffold skill skills\/testing\/spec-review\/SKILL\.md/,
         /renma scaffold context contexts\/testing\/boundary-value-analysis\.md/,
         /renma scaffold context_lens lenses\/testing\/spec-review-boundary-values\.md/,
+        /Output format: file, prompt, or json\. Defaults to file\./,
+        /File mode writes the scaffold to the target path and requires --owner/,
+        /Prompt and JSON modes print to stdout instead of creating the target file/,
+        /File mode creates the scaffold file at the target path/,
+        /refuses to overwrite existing files/,
         /starting structure, not a complete asset/,
+        /Domain knowledge must come from evidence or human input/,
+        /Set owner metadata on the scaffold\. Required when --format file is used\./,
       ],
-      excludes: [/--fail-on/, /--focus/, /--json/],
+      excludes: [/--fail-on/, /--focus/, /--json/, /Filter ownership/],
     },
     {
       name: "suggest-metadata",
@@ -1515,7 +1575,10 @@ test("representative command help shows relevant boundaries and options", async 
       includes: [
         /renma suggest-metadata <file> \[options\]/,
         /metadata-focused retrofit/,
-        /The command does not edit files/,
+        /Output format: prompt or json\. Defaults to prompt\./,
+        /prints to stdout and does not edit the target file/,
+        /Explicitly provide an owner candidate/,
+        /Renma must not infer an owner when this option is absent/,
         /Preserve existing Markdown body and semantics/,
         /Inferring an owner without evidence/,
       ],
@@ -1527,7 +1590,8 @@ test("representative command help shows relevant boundaries and options", async 
       includes: [
         /renma suggest-semantic-split <file> \[options\]/,
         /bounded source material/,
-        /The command does not edit files/,
+        /Output format: prompt or json\. Defaults to prompt\./,
+        /prints to stdout and does not edit files/,
         /preserve meaning and references/,
         /--max-source-bytes <n>/,
         /--max-context-bytes <n>/,
@@ -1548,6 +1612,39 @@ test("representative command help shows relevant boundaries and options", async 
       assert.doesNotMatch(result.stdout, pattern, item.name);
     }
   }
+});
+
+test("owner option help is command-specific", async () => {
+  const ownership = await withCapturedConsole(() =>
+    main(["ownership", "/path/that/does/not/exist", "--help"]),
+  );
+  const scaffold = await withCapturedConsole(() =>
+    main(["scaffold", "--help"]),
+  );
+  const suggestMetadata = await withCapturedConsole(() =>
+    main(["suggest-metadata", "/path/that/does/not/exist", "--help"]),
+  );
+
+  assert.equal(ownership.code, 0);
+  assert.match(
+    ownership.stdout,
+    /Show owner-specific declared asset details while preserving repository-level coverage totals/,
+  );
+  assert.doesNotMatch(ownership.stdout, /Set owner metadata on the scaffold/);
+
+  assert.equal(scaffold.code, 0);
+  assert.match(
+    scaffold.stdout,
+    /Set owner metadata on the scaffold\. Required when --format file is used\./,
+  );
+  assert.doesNotMatch(scaffold.stdout, /Filter ownership/);
+
+  assert.equal(suggestMetadata.code, 0);
+  assert.match(
+    suggestMetadata.stdout,
+    /Explicitly provide an owner candidate\. Renma must not infer an owner when this option is absent\./,
+  );
+  assert.doesNotMatch(suggestMetadata.stdout, /declare scaffold ownership/);
 });
 
 test("CLI version reports package version", async () => {

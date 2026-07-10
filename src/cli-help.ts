@@ -8,8 +8,15 @@ export interface CommandHelp {
   examples: readonly string[];
   interpretation: readonly string[];
   nextSteps: readonly string[];
-  options: readonly CliOptionName[];
+  options: readonly CommandOptionHelp[];
 }
+
+export type CommandOptionHelp =
+  | CliOptionName
+  | {
+      name: CliOptionName;
+      description?: string;
+    };
 
 const OPTION_HELP = {
   config: {
@@ -27,7 +34,7 @@ const OPTION_HELP = {
   },
   format: {
     flags: "--format <format>",
-    description: "Select the command output format.",
+    description: "Output format for commands that accept --format.",
   },
   from: {
     flags: "--from <ref>",
@@ -67,8 +74,7 @@ const OPTION_HELP = {
   },
   owner: {
     flags: "--owner <owner>",
-    description:
-      "Filter ownership, declare scaffold ownership, or explicitly provide metadata ownership.",
+    description: "Owner value for commands that accept --owner.",
   },
   tags: {
     flags: "--tags <tags>",
@@ -126,7 +132,16 @@ export const COMMAND_HELP = [
       "Prepare a minimal reviewable patch that preserves supported semantics.",
       "Rerun scan and any relevant structural commands after editing.",
     ],
-    options: ["config", "fail-on", "format", "json", "help"],
+    options: [
+      "config",
+      "fail-on",
+      {
+        name: "format",
+        description: "Output format: text or json. Defaults to text.",
+      },
+      "json",
+      "help",
+    ],
   },
   {
     name: "catalog",
@@ -158,7 +173,15 @@ export const COMMAND_HELP = [
       "Run readiness for repository-level summary.",
       "Run scan for concrete findings to fix.",
     ],
-    options: ["config", "format", "json", "help"],
+    options: [
+      "config",
+      {
+        name: "format",
+        description: "Output format: json or markdown. Defaults to json.",
+      },
+      "json",
+      "help",
+    ],
   },
   {
     name: "graph",
@@ -191,7 +214,18 @@ export const COMMAND_HELP = [
       "Use scan to fix concrete relationship findings.",
       "Rerun graph after metadata or reference changes.",
     ],
-    options: ["config", "format", "json", "view", "focus", "help"],
+    options: [
+      "config",
+      {
+        name: "format",
+        description:
+          "Output format: json, markdown, or mermaid. Defaults to json. JSON defaults to the full view; non-JSON formats default to the summary view.",
+      },
+      "json",
+      "view",
+      "focus",
+      "help",
+    ],
   },
   {
     name: "trust-graph",
@@ -223,7 +257,15 @@ export const COMMAND_HELP = [
       "Use ownership when owner coverage needs deeper review.",
       "Use readiness for repository-level summary.",
     ],
-    options: ["config", "format", "json", "help"],
+    options: [
+      "config",
+      {
+        name: "format",
+        description: "Output format: json or markdown. Defaults to json.",
+      },
+      "json",
+      "help",
+    ],
   },
   {
     name: "readiness",
@@ -255,7 +297,15 @@ export const COMMAND_HELP = [
       "Use catalog and graph to inspect inventory or relationship causes.",
       "Rerun readiness after the patch.",
     ],
-    options: ["config", "format", "json", "help"],
+    options: [
+      "config",
+      {
+        name: "format",
+        description: "Output format: json or markdown. Defaults to json.",
+      },
+      "json",
+      "help",
+    ],
   },
   {
     name: "bom",
@@ -266,7 +316,7 @@ export const COMMAND_HELP = [
     useWhen: [
       "Reviewers or CI consumers need one manifest of declared repository context evidence.",
       "You need a PR artifact that combines inventory, dependencies, diagnostics, readiness, lifecycle, hashes, and security posture.",
-      "You need deterministic JSON or compact Markdown.",
+      "You need structured JSON generated from deterministic repository evidence or compact Markdown for review.",
     ],
     doNotUseFor: [
       "Reporting what an LLM actually consumed.",
@@ -281,14 +331,23 @@ export const COMMAND_HELP = [
     interpretation: [
       "The BOM is a declared repository manifest, not a runtime usage report or telemetry.",
       "--omit-generated-at only removes the run-time generation timestamp.",
-      "The option does not normalize all repository or environment-dependent metadata.",
+      "The option does not normalize repository metadata timestamps such as lastReviewedAt or expiresAt, and it does not normalize all environment-dependent paths such as root or configPath.",
     ],
     nextSteps: [
       "Review diagnostics and readiness sections before merging.",
       "Use scan, catalog, or graph for focused follow-up.",
       "Store JSON when automation needs the source of truth.",
     ],
-    options: ["config", "format", "json", "omit-generated-at", "help"],
+    options: [
+      "config",
+      {
+        name: "format",
+        description: "Output format: json or markdown. Defaults to json.",
+      },
+      "json",
+      "omit-generated-at",
+      "help",
+    ],
   },
   {
     name: "ownership",
@@ -321,7 +380,21 @@ export const COMMAND_HELP = [
       "Use suggest-metadata when preparing a metadata-only retrofit.",
       "Rerun ownership and scan after ownership changes.",
     ],
-    options: ["config", "format", "json", "include-owned", "owner", "help"],
+    options: [
+      "config",
+      {
+        name: "format",
+        description: "Output format: json or markdown. Defaults to json.",
+      },
+      "json",
+      "include-owned",
+      {
+        name: "owner",
+        description:
+          "Show owner-specific declared asset details while preserving repository-level coverage totals.",
+      },
+      "help",
+    ],
   },
   {
     name: "diff",
@@ -353,7 +426,17 @@ export const COMMAND_HELP = [
       "Use scan or graph on the working tree to investigate changed evidence.",
       "Summarize changed evidence and remaining uncertainty for reviewers.",
     ],
-    options: ["config", "from", "to", "format", "json", "help"],
+    options: [
+      "config",
+      "from",
+      "to",
+      {
+        name: "format",
+        description: "Output format: json or markdown. Defaults to json.",
+      },
+      "json",
+      "help",
+    ],
   },
   {
     name: "ci-report",
@@ -385,7 +468,17 @@ export const COMMAND_HELP = [
       "Use diff for the underlying evidence comparison.",
       "Rerun ci-report after updating the branch.",
     ],
-    options: ["config", "from", "to", "format", "json", "help"],
+    options: [
+      "config",
+      "from",
+      "to",
+      {
+        name: "format",
+        description: "Output format: json or markdown. Defaults to markdown.",
+      },
+      "json",
+      "help",
+    ],
   },
   {
     name: "inspect",
@@ -418,7 +511,15 @@ export const COMMAND_HELP = [
       "Use catalog or graph if one-file inspection reveals relationship questions.",
       "Cite exact lines when summarizing edits for review.",
     ],
-    options: ["format", "json", "lines", "help"],
+    options: [
+      {
+        name: "format",
+        description: "Output format: text or json. Defaults to json.",
+      },
+      "json",
+      "lines",
+      "help",
+    ],
   },
   {
     name: "scaffold",
@@ -443,7 +544,9 @@ export const COMMAND_HELP = [
       "renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform --format prompt",
     ],
     interpretation: [
-      "File output is a starting structure, not a complete asset.",
+      "File mode creates the scaffold file at the target path and refuses to overwrite existing files.",
+      "Prompt and JSON modes print to stdout instead of creating the scaffold file.",
+      "Generated scaffold content is a starting structure, not a complete asset.",
       "The author must still provide purpose, routing boundaries, inputs, completion criteria, verification, and references.",
       "Domain knowledge must come from evidence or human input.",
     ],
@@ -452,7 +555,22 @@ export const COMMAND_HELP = [
       "Run scan, catalog, graph, and readiness after editing.",
       "Have a human review meaningful semantic content before merging.",
     ],
-    options: ["format", "owner", "id", "title", "tags", "help"],
+    options: [
+      {
+        name: "format",
+        description:
+          "Output format: file, prompt, or json. Defaults to file. File mode writes the scaffold to the target path and requires --owner. Prompt and JSON modes print to stdout instead of creating the target file.",
+      },
+      {
+        name: "owner",
+        description:
+          "Set owner metadata on the scaffold. Required when --format file is used.",
+      },
+      "id",
+      "title",
+      "tags",
+      "help",
+    ],
   },
   {
     name: "suggest-metadata",
@@ -475,7 +593,7 @@ export const COMMAND_HELP = [
       "renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform --format json",
     ],
     interpretation: [
-      "The command does not edit files.",
+      "The command prints to stdout and does not edit the target file.",
       "Without --owner, do not add owner metadata unless the asset already declares one or a maintainer confirms it.",
       "Preserve existing Markdown body and semantics for a metadata-only retrofit.",
     ],
@@ -484,7 +602,20 @@ export const COMMAND_HELP = [
       "Run scan and ownership after editing.",
       "Report any missing owner, reference, or source-of-truth uncertainty.",
     ],
-    options: ["format", "json", "owner", "help"],
+    options: [
+      {
+        name: "format",
+        description:
+          "Output format: prompt or json. Defaults to prompt. The command prints to stdout and does not edit the target file.",
+      },
+      "json",
+      {
+        name: "owner",
+        description:
+          "Explicitly provide an owner candidate. Renma must not infer an owner when this option is absent.",
+      },
+      "help",
+    ],
   },
   {
     name: "suggest-semantic-split",
@@ -508,7 +639,7 @@ export const COMMAND_HELP = [
       "renma suggest-semantic-split docs/large-runbook.md --max-source-bytes 32768",
     ],
     interpretation: [
-      "The command does not edit files.",
+      "The command prints to stdout and does not edit files.",
       "A split must preserve meaning and references.",
       "The resulting patch requires review.",
     ],
@@ -518,7 +649,11 @@ export const COMMAND_HELP = [
       "Run scan, catalog, graph, and readiness after editing.",
     ],
     options: [
-      "format",
+      {
+        name: "format",
+        description:
+          "Output format: prompt or json. Defaults to prompt. The command prints to stdout and does not edit files.",
+      },
       "json",
       "max-source-bytes",
       "max-context-bytes",
@@ -616,10 +751,19 @@ export function renderCommandHelp(name: CommandName, version: string): string {
     "",
     "Options",
     ...command.options.map((option) => {
-      const help = OPTION_HELP[option];
-      return `  ${help.flags.padEnd(28)} ${help.description}`;
+      const name = commandOptionName(option);
+      const help = OPTION_HELP[name];
+      const description =
+        typeof option === "string"
+          ? help.description
+          : (option.description ?? help.description);
+      return `  ${help.flags.padEnd(28)} ${description}`;
     }),
   ].join("\n");
+}
+
+function commandOptionName(option: CommandOptionHelp): CliOptionName {
+  return typeof option === "string" ? option : option.name;
 }
 
 function renderBullets(items: readonly string[]): string[] {
