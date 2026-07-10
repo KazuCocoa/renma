@@ -81,6 +81,29 @@ Read these reports together:
 
 When you are creating new assets, start with `scaffold`, edit the generated files, then run the same checks. For deeper authoring guidance, see the [Authoring Guide](authoring-guide.md). For rule details, see the [Diagnostics Reference](diagnostics.md).
 
+## LLM-Assisted Skill Maintenance
+
+Renma is useful when a junior engineer asks a coding agent to improve an existing skill or context repository. The agent should use Renma as deterministic evidence, not as permission to invent domain knowledge.
+
+Recommended loop:
+
+1. Ask the coding agent to run `renma --help`.
+2. Let it select and run the appropriate deterministic inspection commands.
+3. Review diagnostics and repository evidence.
+4. Prepare a minimal patch.
+5. Do not invent domain knowledge, ownership, references, product rules, or source-of-truth claims.
+6. Rerun Renma.
+7. Summarize changed files, resolved findings, remaining uncertainty, and commands used for verification.
+8. Require human review before merging meaningful semantic changes.
+
+Example instruction for an agent:
+
+```text
+Use Renma to inspect and improve the skills and context assets in this repository.
+
+Start by running `renma --help` and use command-specific help to choose the appropriate workflow. Make only evidence-backed changes. Do not invent owners, references, product rules, or source-of-truth claims. Preserve existing semantics unless a diagnostic or explicit requirement supports a change. Rerun the relevant Renma commands after editing and summarize both resolved and remaining findings.
+```
+
 ## User Story: Create A New Skill With Scaffold
 
 Use this flow when you are adding a new agent-facing skill and want Renma to create the starter shape.

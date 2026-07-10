@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
+import { COMMAND_HELP } from "../src/cli-help.js";
 
 const COMMANDS = [
   "scan",
@@ -78,24 +79,14 @@ function parseOutputFormatsTable(markdown: string): Map<string, string[]> {
   return table;
 }
 
-function parseSupportedCommands(cliSource: string): string[] {
-  return [...cliSource.matchAll(/command !== "([^"]+)"/g)]
-    .map((match) => match[1] ?? "")
-    .filter(Boolean);
-}
-
 test("User Manual documents every implemented CLI command", async () => {
-  const [cliSource, manual] = await Promise.all([
-    readRepoFile("src/cli.ts"),
-    readRepoFile("docs/user-manual.md"),
-  ]);
-
-  const implementedCommands = parseSupportedCommands(cliSource);
+  const manual = await readRepoFile("docs/user-manual.md");
+  const implementedCommands = COMMAND_HELP.map((command) => command.name);
 
   assert.deepEqual(
     implementedCommands.toSorted(),
     [...COMMANDS].toSorted(),
-    "src/cli.ts command list changed. Update docs/user-manual.md and this docs guardrail together.",
+    "src/cli-help.ts command list changed. Update docs/user-manual.md and this docs guardrail together.",
   );
 
   for (const command of implementedCommands) {

@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { main } from "../src/cli.js";
+import { COMMAND_HELP } from "../src/cli-help.js";
 import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
 import { scan } from "../src/scanner.js";
 
@@ -1347,22 +1348,303 @@ optional_lens:
   assert.doesNotMatch(skillResult.stdout, /Expected outputs:/);
 });
 
-test("help and invalid commands have expected exit codes", async () => {
+test("global help lists workflows, boundaries, and distinguishable commands", async () => {
   const help = await withCapturedConsole(() => main(["--help"]));
   const invalid = await withCapturedConsole(() => main(["wat"]));
+  const invalidHelp = await withCapturedConsole(() => main(["wat", "--help"]));
+  const repeated = await withCapturedConsole(() => main(["--help"]));
 
   assert.equal(help.code, 0);
-  assert.match(help.stdout, /Usage: renma scan/);
+  assert.equal(help.stderr, "");
+  assert.equal(help.stdout, repeated.stdout);
+  assert.match(help.stdout, /Usage\n {2}renma <command> \[args\] \[options\]/);
+  assert.match(help.stdout, /Start here: existing repository/);
+  assert.match(help.stdout, /renma scan \./);
+  assert.match(help.stdout, /renma catalog \. --format markdown/);
+  assert.match(help.stdout, /renma graph \. --format markdown/);
+  assert.match(help.stdout, /renma readiness \. --format markdown/);
+  assert.match(help.stdout, /Start here: new skill/);
   assert.match(
     help.stdout,
-    /scaffold\s+Create deterministic authoring scaffolds and prompts/,
+    /renma scaffold skill skills\/<name>\/SKILL\.md --owner <owner>/,
   );
   assert.match(
     help.stdout,
-    /suggest-metadata\s+Print a Codex-ready metadata retrofit prompt/,
+    /inspect evidence -> prepare a reviewable patch -> human review -> rerun Renma/,
+  );
+  assert.match(help.stdout, /Renma does not call an LLM/);
+  assert.match(help.stdout, /Renma does not select runtime context/);
+  assert.match(help.stdout, /Renma does not assemble prompts/);
+  assert.match(help.stdout, /Renma does not execute agents/);
+  assert.match(help.stdout, /Renma does not collect runtime telemetry/);
+  assert.match(
+    help.stdout,
+    /Renma does not automatically perform large semantic rewrites/,
+  );
+  for (const command of COMMAND_HELP) {
+    assert.match(
+      help.stdout,
+      new RegExp(
+        `${command.name.replaceAll("-", "\\-")}\\s+${escapeRegExp(
+          command.question,
+        )}`,
+      ),
+      command.name,
+    );
+  }
+  assert.equal(
+    new Set(COMMAND_HELP.map((command) => command.question)).size,
+    COMMAND_HELP.length,
   );
   assert.equal(invalid.code, 2);
   assert.match(invalid.stderr, /Unknown command "wat"/);
+  assert.match(invalid.stderr, /Run renma --help for usage/);
+  assert.equal(invalidHelp.code, 2);
+  assert.match(invalidHelp.stderr, /Unknown command "wat"/);
+});
+
+test("command-specific help is deterministic and does not execute commands", async () => {
+  for (const command of COMMAND_HELP) {
+    const result = await withCapturedConsole(() =>
+      main([command.name, "/path/that/does/not/exist", "--help"]),
+    );
+    const repeated = await withCapturedConsole(() =>
+      main([command.name, "/path/that/does/not/exist", "--help"]),
+    );
+
+    assert.equal(result.code, 0, command.name);
+    assert.equal(result.stderr, "", command.name);
+    assert.equal(result.stdout, repeated.stdout, command.name);
+    assert.match(result.stdout, new RegExp(escapeRegExp(command.usage)));
+    assert.match(result.stdout, /Purpose/);
+    assert.match(result.stdout, /Use when/);
+    assert.match(result.stdout, /Do not use for/);
+    assert.match(result.stdout, /Examples/);
+    assert.match(result.stdout, /How to interpret the result/);
+    assert.match(result.stdout, /Typical next steps/);
+    assert.match(result.stdout, /Options/);
+  }
+});
+
+test("representative command help shows relevant boundaries and options", async () => {
+  const cases = [
+    {
+      name: "scan",
+      argv: ["scan", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma scan \[path\] \[options\]/,
+        /usually the first command/,
+        /--fail-on <level>/,
+        /Output format: text or json\. Defaults to text\./,
+        /repair constraints/,
+        /inventing owners, references, source-of-truth documents, or product rules/,
+      ],
+      excludes: [/--focus/, /--omit-generated-at/],
+    },
+    {
+      name: "catalog",
+      argv: ["catalog", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma catalog \[path\] \[options\]/,
+        /IDs, kinds, owners, lifecycle states, hashes, tags/,
+        /Output format: json or markdown\. Defaults to json\./,
+        /inventory evidence/,
+      ],
+      excludes: [/--fail-on/, /--focus/],
+    },
+    {
+      name: "graph",
+      argv: ["graph", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma graph \[path\] \[options\]/,
+        /Output format: json, markdown, or mermaid\. Defaults to json\./,
+        /JSON defaults to the full view; non-JSON formats default to the summary view/,
+        /--view <view>/,
+        /--focus <asset-id-or-path>/,
+        /does not select context for an LLM/,
+        /does not prove that a dependency is semantically correct/,
+      ],
+      excludes: [/--fail-on/, /--omit-generated-at/],
+    },
+    {
+      name: "trust-graph",
+      argv: ["trust-graph", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma trust-graph \[path\] \[options\]/,
+        /ownership, lifecycle, policy, references, dependencies, and diagnostics/,
+        /Output format: json or markdown\. Defaults to json\./,
+        /not a subjective trust score/,
+        /does not certify that an asset is trustworthy/,
+      ],
+      excludes: [/--focus/, /--fail-on/],
+    },
+    {
+      name: "readiness",
+      argv: ["readiness", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma readiness \[path\] \[options\]/,
+        /repository-level scorecard/,
+        /Output format: json or markdown\. Defaults to json\./,
+        /Scan gives concrete findings; readiness gives a broad repository summary/,
+        /particular context asset at runtime/,
+      ],
+      excludes: [/--focus/, /--fail-on/],
+    },
+    {
+      name: "ownership",
+      argv: ["ownership", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma ownership \[path\] \[options\]/,
+        /review owner coverage, unowned assets, and concentration/,
+        /Output format: json or markdown\. Defaults to json\./,
+        /Show owner-specific declared asset details while preserving repository-level coverage totals/,
+      ],
+      excludes: [/--focus/, /--fail-on/, /Set owner metadata on the scaffold/],
+    },
+    {
+      name: "bom",
+      argv: ["bom", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma bom \[path\] \[options\]/,
+        /declared repository evidence snapshot/,
+        /structured JSON generated from deterministic repository evidence/,
+        /Output format: json or markdown\. Defaults to json\./,
+        /--omit-generated-at/,
+        /not a runtime usage report or telemetry/,
+        /only removes the run-time generation timestamp/,
+        /does not normalize repository metadata timestamps/,
+        /does not normalize all environment-dependent paths/,
+      ],
+      excludes: [/--focus/, /--fail-on/, /deterministic JSON/],
+    },
+    {
+      name: "diff",
+      argv: ["diff", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma diff \[path\] --from <ref> --to <ref> \[options\]/,
+        /not arbitrary source hunks/,
+        /Output format: json or markdown\. Defaults to json\./,
+      ],
+      excludes: [/--focus/, /--fail-on/],
+    },
+    {
+      name: "ci-report",
+      argv: ["ci-report", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma ci-report \[path\] --from <ref> --to <ref> \[options\]/,
+        /pull-request-oriented summary/,
+        /Output format: json or markdown\. Defaults to markdown\./,
+        /PASS and WARN exit 0; FAIL exits 1/,
+      ],
+      excludes: [/--focus/, /--fail-on/],
+    },
+    {
+      name: "inspect",
+      argv: ["inspect", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma inspect <file> \[options\]/,
+        /compact outline or exact line slice/,
+        /Output format: text or json\. Defaults to json\./,
+        /--lines <range>/,
+      ],
+      excludes: [/--focus/, /--fail-on/, /--config/],
+    },
+    {
+      name: "scaffold",
+      argv: ["scaffold", "--help"],
+      includes: [
+        /renma scaffold <skill\|context\|context_lens> <path> \[options\]/,
+        /starter structures/,
+        /renma scaffold skill skills\/testing\/spec-review\/SKILL\.md/,
+        /renma scaffold context contexts\/testing\/boundary-value-analysis\.md/,
+        /renma scaffold context_lens lenses\/testing\/spec-review-boundary-values\.md/,
+        /Output format: file, prompt, or json\. Defaults to file\./,
+        /File mode writes the scaffold to the target path and requires --owner/,
+        /Prompt and JSON modes print to stdout instead of creating the target file/,
+        /File mode creates the scaffold file at the target path/,
+        /refuses to overwrite existing files/,
+        /starting structure, not a complete asset/,
+        /Domain knowledge must come from evidence or human input/,
+        /Set owner metadata on the scaffold\. Required when --format file is used\./,
+      ],
+      excludes: [/--fail-on/, /--focus/, /--json/, /Filter ownership/],
+    },
+    {
+      name: "suggest-metadata",
+      argv: ["suggest-metadata", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma suggest-metadata <file> \[options\]/,
+        /metadata-focused retrofit/,
+        /Output format: prompt or json\. Defaults to prompt\./,
+        /prints to stdout and does not edit the target file/,
+        /Explicitly provide an owner candidate/,
+        /Renma must not infer an owner when this option is absent/,
+        /Preserve existing Markdown body and semantics/,
+        /Inferring an owner without evidence/,
+      ],
+      excludes: [/--focus/, /--omit-generated-at/],
+    },
+    {
+      name: "suggest-semantic-split",
+      argv: ["suggest-semantic-split", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma suggest-semantic-split <file> \[options\]/,
+        /bounded source material/,
+        /Output format: prompt or json\. Defaults to prompt\./,
+        /prints to stdout and does not edit files/,
+        /preserve meaning and references/,
+        /--max-source-bytes <n>/,
+        /--max-context-bytes <n>/,
+      ],
+      excludes: [/--focus/, /--omit-generated-at/, /--owner/],
+    },
+  ];
+
+  for (const item of cases) {
+    const result = await withCapturedConsole(() => main(item.argv));
+
+    assert.equal(result.code, 0, item.name);
+    assert.equal(result.stderr, "", item.name);
+    for (const pattern of item.includes) {
+      assert.match(result.stdout, pattern, item.name);
+    }
+    for (const pattern of item.excludes) {
+      assert.doesNotMatch(result.stdout, pattern, item.name);
+    }
+  }
+});
+
+test("owner option help is command-specific", async () => {
+  const ownership = await withCapturedConsole(() =>
+    main(["ownership", "/path/that/does/not/exist", "--help"]),
+  );
+  const scaffold = await withCapturedConsole(() =>
+    main(["scaffold", "--help"]),
+  );
+  const suggestMetadata = await withCapturedConsole(() =>
+    main(["suggest-metadata", "/path/that/does/not/exist", "--help"]),
+  );
+
+  assert.equal(ownership.code, 0);
+  assert.match(
+    ownership.stdout,
+    /Show owner-specific declared asset details while preserving repository-level coverage totals/,
+  );
+  assert.doesNotMatch(ownership.stdout, /Set owner metadata on the scaffold/);
+
+  assert.equal(scaffold.code, 0);
+  assert.match(
+    scaffold.stdout,
+    /Set owner metadata on the scaffold\. Required when --format file is used\./,
+  );
+  assert.doesNotMatch(scaffold.stdout, /Filter ownership/);
+
+  assert.equal(suggestMetadata.code, 0);
+  assert.match(
+    suggestMetadata.stdout,
+    /Explicitly provide an owner candidate\. Renma must not infer an owner when this option is absent\./,
+  );
+  assert.doesNotMatch(suggestMetadata.stdout, /declare scaffold ownership/);
 });
 
 test("CLI version reports package version", async () => {
@@ -1642,6 +1924,10 @@ test("scaffold prompt emits Codex-ready authoring instructions", async () => {
 
 async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-"));
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function withCapturedConsole(

@@ -6,6 +6,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added command-specific CLI help for every command, including purpose, use cases, boundaries, examples, next steps, and relevant options for human and coding-agent workflows.
+
+### Changed
+
+- Expanded top-level CLI help with Renma's deterministic governance boundaries, start-here workflows, and command-selection questions.
+- Improved CLI usage errors to point to the relevant command help page where applicable.
+
 ## [0.15.0] - 2026-07-09
 
 ### Added
