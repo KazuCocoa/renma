@@ -99,6 +99,8 @@ const LIST_METADATA_KEYS = new Set([
   "expected_outputs",
   "conflicts",
   "superseded_by",
+  "routes_to",
+  "discovery_aliases",
 ]);
 
 function parseFrontmatter(path: string, lines: string[]): ParsedMetadata {
