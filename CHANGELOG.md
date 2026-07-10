@@ -6,6 +6,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.15.2] - 2026-07-10
+
 ### Added
 
 - Added an authoritative Repository Context BOM v1 contract document covering schema compatibility, snapshot consistency, reproducibility, provenance, and future consumed-context evidence boundaries.
@@ -290,7 +292,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.15.1...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.15.2...HEAD
+[0.15.2]: https://github.com/KazuCocoa/renma/compare/v0.15.1...v0.15.2
 [0.15.1]: https://github.com/KazuCocoa/renma/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/KazuCocoa/renma/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/KazuCocoa/renma/compare/v0.14.0...v0.14.1
