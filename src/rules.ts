@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import path from "node:path";
 import type { Catalog, CatalogEntry, Dependency } from "./model.js";
 import {
@@ -8,6 +7,7 @@ import {
   todayIsoDate,
 } from "./freshness.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
+import { helperScriptPath } from "./repository-paths.js";
 import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import type {
   Evidence,
@@ -29,6 +29,11 @@ type FindingDetails = Partial<
     | "details"
   >
 >;
+
+interface RuleOptions {
+  evaluationDate?: Date | string;
+  repositoryPaths?: ReadonlySet<string>;
+}
 
 const SECRET_PATTERN =
   /\b(?:password|passwd|token|api[_-]?key|secret|credential|private[_-]?key)\b\s*[:=]\s*["']?([A-Za-z0-9_./+=-]{8,})/i;
@@ -160,8 +165,17 @@ export function runRules(
   documents: ParsedDocument[],
   config: ScanConfig,
   catalog?: Catalog,
+  options: RuleOptions = {},
 ): Finding[] {
-  const findings = runRuleRegistry(documents, RULES, catalog, config);
+  const findings = runRuleRegistry(
+    documents,
+    rulesForEvaluationDate(
+      evaluationDay(options.evaluationDate),
+      options.repositoryPaths,
+    ),
+    catalog,
+    config,
+  );
   return findings.sort((a, b) => {
     const byPath = a.evidence.path.localeCompare(b.evidence.path);
     if (byPath !== 0) return byPath;
@@ -169,72 +183,94 @@ export function runRules(
   });
 }
 
-const RULES: Rule[] = [
-  {
-    id: "strict-layout-policy",
-    run: (context) =>
-      strictLayoutPolicyFindings(
-        context.documents,
-        context.config,
-        context.catalog,
-      ),
-  },
-  {
-    id: "security",
-    run: ({ documents }) =>
-      documents.flatMap((document) => [
-        ...secretFindings(document),
-        ...commandFindings(document),
-      ]),
-  },
-  {
-    id: "shape",
-    run: ({ documents }) =>
-      documents.flatMap((document) => [
-        ...shapeFindings(document),
-        ...contextBudgetFindings(document),
-        ...profileFindings(document),
-      ]),
-  },
-  {
-    id: "skill-local-support-reachability",
-    run: ({ documents }) => skillLocalSupportReachabilityFindings(documents),
-  },
-  {
-    id: "support-asset-shared-context-candidate",
-    run: ({ documents }) =>
-      documents.flatMap((document) =>
-        supportSharedContextCandidateFindings(document),
-      ),
-  },
-  {
-    id: "context-path-non-semantic",
-    run: ({ documents }) =>
-      documents.flatMap((document) => contextPathNonSemanticFindings(document)),
-  },
-  {
-    id: "skill-context-reference-not-declared",
-    run: ({ documents }) =>
-      documents.flatMap((document) =>
-        skillContextReferenceNotDeclaredFindings(document),
-      ),
-  },
-  {
-    id: "skill-references-superseded-asset",
-    run: ({ documents }) => skillReferencesSupersededAssetFindings(documents),
-  },
-  {
-    id: "asset-references-superseded-asset",
-    run: ({ documents }) => assetReferencesSupersededAssetFindings(documents),
-  },
-  {
-    id: "catalog-declared-reference-governance",
-    run: ({ catalog }) => catalogDeclaredReferenceGovernanceFindings(catalog),
-  },
-];
+function rulesForEvaluationDate(
+  evaluationDate: string,
+  repositoryPaths?: ReadonlySet<string>,
+): Rule[] {
+  return [
+    {
+      id: "strict-layout-policy",
+      run: (context) =>
+        strictLayoutPolicyFindings(
+          context.documents,
+          context.config,
+          context.catalog,
+          repositoryPaths,
+        ),
+    },
+    {
+      id: "security",
+      run: ({ documents }) =>
+        documents.flatMap((document) => [
+          ...secretFindings(document),
+          ...commandFindings(document),
+        ]),
+    },
+    {
+      id: "shape",
+      run: ({ documents }) =>
+        documents.flatMap((document) => [
+          ...shapeFindings(document),
+          ...contextBudgetFindings(document),
+          ...profileFindings(document),
+        ]),
+    },
+    {
+      id: "skill-local-support-reachability",
+      run: ({ documents }) => skillLocalSupportReachabilityFindings(documents),
+    },
+    {
+      id: "support-asset-shared-context-candidate",
+      run: ({ documents }) =>
+        documents.flatMap((document) =>
+          supportSharedContextCandidateFindings(document),
+        ),
+    },
+    {
+      id: "context-path-non-semantic",
+      run: ({ documents }) =>
+        documents.flatMap((document) =>
+          contextPathNonSemanticFindings(document),
+        ),
+    },
+    {
+      id: "skill-context-reference-not-declared",
+      run: ({ documents }) =>
+        documents.flatMap((document) =>
+          skillContextReferenceNotDeclaredFindings(document),
+        ),
+    },
+    {
+      id: "skill-references-superseded-asset",
+      run: ({ documents }) => skillReferencesSupersededAssetFindings(documents),
+    },
+    {
+      id: "asset-references-superseded-asset",
+      run: ({ documents }) => assetReferencesSupersededAssetFindings(documents),
+    },
+    {
+      id: "catalog-declared-reference-governance",
+      run: ({ catalog }) =>
+        catalogDeclaredReferenceGovernanceFindings(catalog, evaluationDate),
+    },
+  ];
+}
+
+function evaluationDay(value: Date | string | undefined): string {
+  if (value === undefined) return todayIsoDate();
+  if (value instanceof Date) return todayIsoDate(value);
+  if (isIsoDate(value)) return value;
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`Invalid internal evaluation date: ${value}`);
+  }
+  return todayIsoDate(parsed);
+}
 
 function catalogDeclaredReferenceGovernanceFindings(
   catalog: Catalog | undefined,
+  today: string,
 ): Finding[] {
   if (!catalog) return [];
 
@@ -253,7 +289,7 @@ function catalogDeclaredReferenceGovernanceFindings(
       catalog.dependencies,
       resolver,
     ),
-    ...freshnessGovernanceFindings(catalog.entries),
+    ...freshnessGovernanceFindings(catalog.entries, today),
   ];
 
   return findings;
@@ -1878,22 +1914,24 @@ function strictLayoutPolicyFindings(
   documents: ParsedDocument[],
   config: ScanConfig,
   catalog?: Catalog,
+  repositoryPaths?: ReadonlySet<string>,
 ): Finding[] {
   const findings: Finding[] = [];
-  const root = repositoryRoot(documents);
-  const paths = new Set(documents.map((document) => document.artifact.path));
+  const paths =
+    repositoryPaths ??
+    new Set(documents.map((document) => document.artifact.path));
 
   for (const document of documents) {
     findings.push(...disallowedSkillAssetFindings(document, config));
     findings.push(...thinSkillLayoutFindings(document));
-    findings.push(...helperCommandFindings(document, root, paths, config));
+    findings.push(...helperCommandFindings(document, paths, config));
     findings.push(...layoutConsistencyFindings(document));
     findings.push(...contextRootFindings(document));
     findings.push(...helperRootFindings(document));
   }
 
   if (catalog) {
-    findings.push(...declaredDependencyLayoutFindings(catalog, paths, root));
+    findings.push(...declaredDependencyLayoutFindings(catalog, paths));
   }
 
   return findings;
@@ -2012,8 +2050,7 @@ function thinSkillLayoutFindings(document: ParsedDocument): Finding[] {
 
 function helperCommandFindings(
   document: ParsedDocument,
-  root: string | undefined,
-  paths: Set<string>,
+  paths: ReadonlySet<string>,
   config: ScanConfig,
 ): Finding[] {
   const findings: Finding[] = [];
@@ -2066,11 +2103,7 @@ function helperCommandFindings(
       continue;
     }
 
-    if (
-      scriptPath.startsWith("tools/") &&
-      !paths.has(scriptPath) &&
-      !(root && existsSync(path.join(root, scriptPath)))
-    ) {
+    if (scriptPath.startsWith("tools/") && !paths.has(scriptPath)) {
       findings.push(
         findingAt(
           document,
@@ -2199,15 +2232,14 @@ function helperRootFindings(document: ParsedDocument): Finding[] {
 
 function declaredDependencyLayoutFindings(
   catalog: Catalog,
-  paths: Set<string>,
-  root: string | undefined,
+  paths: ReadonlySet<string>,
 ): Finding[] {
   const findings: Finding[] = [];
 
   for (const dependency of catalog.dependencies) {
     const target = dependency.to;
     if (!isRepoPathLike(target)) continue;
-    if (!paths.has(target) && !(root && existsSync(path.join(root, target)))) {
+    if (!paths.has(target)) {
       continue;
     }
     if (
@@ -2266,13 +2298,6 @@ function firstExecutableCommand(
   return executableCommands(document)[0];
 }
 
-function helperScriptPath(command: string): string | undefined {
-  const parts = command.split(/\s+/).slice(1);
-  return parts.find((part) =>
-    /(?:^|\/)scripts\/.+\.(?:mjs|js|cjs|sh|bash|py)$/.test(part),
-  );
-}
-
 function canonicalHelperTarget(config: ScanConfig, scriptPath: string): string {
   const parts = scriptPath.split("/");
   const skillName = parts[1] ?? "unknown";
@@ -2303,15 +2328,6 @@ function helperAssetPath(
 
 function isCanonicalSkillEntrypoint(pathValue: string): boolean {
   return /^skills\/[^/]+\/SKILL\.md$/.test(pathValue);
-}
-
-function repositoryRoot(documents: ParsedDocument[]): string | undefined {
-  const document = documents[0];
-  if (!document) return undefined;
-  return document.artifact.absolutePath.slice(
-    0,
-    document.artifact.absolutePath.length - document.artifact.path.length,
-  );
 }
 
 function findingAt(

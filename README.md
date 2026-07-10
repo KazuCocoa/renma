@@ -199,7 +199,7 @@ renma bom . --format json --omit-generated-at
 
 ### Repository Context BOM
 
-`renma bom` prints a declared Repository Context BOM generated from existing Renma evidence.
+`renma bom` prints a declared Repository Context BOM generated from existing Renma evidence. See the [Repository Context BOM contract](docs/repository-context-bom.md) for the authoritative v1 schema, snapshot, reproducibility, provenance, and future consumed-context evidence boundaries.
 
 ```bash
 renma bom . --format json
@@ -209,11 +209,11 @@ renma bom . --format json --omit-generated-at
 
 The BOM is a repository manifest, not a runtime usage report. It combines the catalog asset inventory, content hashes, owners, lifecycle metadata, declared dependency graph evidence, diagnostics, readiness checks, security posture, and security policy inventory into one reviewable artifact.
 
-Renma collects one shared repository evidence snapshot for BOM catalog assets and graph dependencies so those sections stay internally consistent.
+Renma derives each BOM from one in-memory repository snapshot: configuration, discovered artifacts, parsed documents, catalog, graph evidence, diagnostics, readiness, and security summaries all come from the same collected state.
 
 It does not describe what an LLM actually used, assemble prompts, select task-specific context, inject context into agents, import consumed-context evidence, or collect telemetry. JSON is the source of truth; Markdown is the compact pull-request review view.
 
-By default, `generatedAt` records the actual generation time. Use `--omit-generated-at` when CI or review automation needs to avoid clock-based diffs. This option only removes the run-time generation timestamp; it does not ignore repository metadata timestamps such as `lastReviewedAt` or `expiresAt`, and it does not normalize absolute `root` or `configPath` values.
+By default, `generatedAt` records the actual generation time. Use `--omit-generated-at` when CI or review automation needs to avoid clock-based diffs. With the same checkout path, config path, repository contents, Renma version, and UTC evaluation date, repeated `--omit-generated-at` runs should produce byte-identical JSON. The option does not remove metadata freshness dates, suppress freshness diagnostics, normalize absolute `root` or `configPath`, hide file moves, or guarantee portable byte-for-byte output across runners.
 
 ### Repeated context diagnostics
 
@@ -679,7 +679,7 @@ Near-term security work is focused on stabilizing these diagnostics for the 0.7.
 
 Trust Graph interprets existing catalog, graph, scan, and security evidence as deterministic repository evidence. It is not a runtime system, not enforcement, not context selection or prompt assembly, not telemetry collection, not an LLM call, and not a subjective trust score.
 
-Repository Context BOM is a declared repository manifest of assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence. It does not claim what an LLM actually used at runtime. Later external consumed-context evidence may be imported and validated against Renma's repository model, while telemetry collection remains outside Renma.
+Repository Context BOM is a declared repository manifest of assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence. It does not claim what an LLM actually used at runtime. The v1 contract deliberately keeps Git revision identity in the surrounding CI/PR artifact context and keeps any future consumed-context evidence separate from the declared BOM meaning. See the [Repository Context BOM contract](docs/repository-context-bom.md).
 
 ## Design Notes
 

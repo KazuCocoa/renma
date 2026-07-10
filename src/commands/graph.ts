@@ -11,6 +11,7 @@ import type {
 import {
   collectRepositoryEvidence,
   type RepositoryEvidence,
+  type RepositorySnapshot,
 } from "../repository-evidence.js";
 import type { Diagnostic } from "../types.js";
 
@@ -102,6 +103,12 @@ export function graphFromRepositoryEvidence(
       ? { diagnostics: evidence.diagnostics }
       : {}),
   };
+}
+
+export function graphFromRepositorySnapshot(
+  snapshot: RepositorySnapshot,
+): GraphReport {
+  return graphFromRepositoryEvidence(snapshot);
 }
 
 export function formatGraphJson(report: GraphReport): string {

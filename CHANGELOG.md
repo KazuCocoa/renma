@@ -6,6 +6,17 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added an authoritative Repository Context BOM v1 contract document covering schema compatibility, snapshot consistency, reproducibility, provenance, and future consumed-context evidence boundaries.
+- Added a normalized BOM v1 contract-shape test that pins stable JSON fields, nested shapes, deterministic ordering, and scope declarations.
+
+### Changed
+
+- Hardened `renma bom` so graph, readiness, diagnostics, Context Lens evidence, security posture, and security policy inventory are derived from the same collected repository snapshot as catalog assets.
+- Captured referenced helper and dependency path existence in `RepositorySnapshot` so snapshot-derived BOM and scan reports do not query the live filesystem during rule evaluation.
+- Clarified `--omit-generated-at` as a same-environment reproducibility option that removes only the run-time `generatedAt` field and does not normalize freshness metadata, absolute paths, file moves, UTC evaluation date changes, or cross-runner portability.
+
 ## [0.15.1] - 2026-07-10
 
 ### Added

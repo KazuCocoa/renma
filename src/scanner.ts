@@ -1,11 +1,10 @@
-import path from "node:path";
-import { buildCatalog } from "./catalog.js";
-import { loadConfig, type ConfigOverrides } from "./config.js";
-import { summarizeContextLensGovernance } from "./context-lens.js";
+import type { ConfigOverrides } from "./config.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import { createDiagnosticsV2, createReviewBundles } from "./diagnostics-v2.js";
-import { discoverArtifacts } from "./discovery.js";
-import { parseDocument } from "./markdown.js";
+import {
+  collectRepositorySnapshot,
+  type RepositorySnapshot,
+} from "./repository-evidence.js";
 import { detectRepeatedContextPatterns } from "./repeated-context.js";
 import { runRules } from "./rules.js";
 import { securityDiagnosticFindings } from "./security-diagnostics.js";
@@ -17,42 +16,61 @@ import { applySuppressions } from "./suppressions.js";
 import { buildTrustGraph } from "./trust-graph.js";
 import type { Diagnostic, Finding, ScanResult } from "./types.js";
 
+interface ScanBuilderOptions {
+  evaluationDate?: Date | string;
+}
+
 /** Run the complete deterministic scan pipeline for a target path. */
 export async function scan(
   targetPath: string,
   overrides: ConfigOverrides = {},
 ): Promise<ScanResult> {
-  const root = path.resolve(targetPath);
-  const { config, configPath } = await loadConfig(root, overrides);
-  const { artifacts, diagnostics } = await discoverArtifacts(root, config);
+  return scanFromRepositorySnapshot(
+    await collectRepositorySnapshot(targetPath, overrides),
+  );
+}
+
+export function scanFromRepositorySnapshot(
+  snapshot: RepositorySnapshot,
+  options: ScanBuilderOptions = {},
+): ScanResult {
   const securityPolicyInventory = summarizeSecurityPolicyInventory(
-    artifacts,
-    config.security,
+    snapshot.artifacts,
+    snapshot.config.security,
   );
   const securityPolicies = collectSecurityPolicyAssetEvidence(
-    artifacts,
-    config.security,
+    snapshot.artifacts,
+    snapshot.config.security,
   );
-  const documents = artifacts.map(parseDocument);
-  const catalogResult = buildCatalog(documents);
-  const contextLens = summarizeContextLensGovernance(
-    documents,
-    catalogResult.catalog,
-  );
+  const ruleOptions =
+    options.evaluationDate === undefined
+      ? { repositoryPaths: snapshot.repositoryPaths }
+      : {
+          evaluationDate: options.evaluationDate,
+          repositoryPaths: snapshot.repositoryPaths,
+        };
   const rawFindings = [
-    ...runRules(documents, config, catalogResult.catalog),
-    ...detectRepeatedContextPatterns(documents),
-    ...catalogDiagnosticFindings(catalogResult.diagnostics),
-    ...securityDiagnosticFindings(artifacts, config),
+    ...runRules(
+      snapshot.documents,
+      snapshot.config,
+      snapshot.catalog,
+      ruleOptions,
+    ),
+    ...detectRepeatedContextPatterns(snapshot.documents),
+    ...catalogDiagnosticFindings(snapshot.catalogDiagnostics),
+    ...securityDiagnosticFindings(snapshot.artifacts, snapshot.config),
   ].sort((a, b) => {
     const byPath = a.evidence.path.localeCompare(b.evidence.path);
     if (byPath !== 0) return byPath;
     return a.evidence.startLine - b.evidence.startLine;
   });
-  const suppressed = applySuppressions(rawFindings, config.suppressions);
+  const suppressed = applySuppressions(
+    rawFindings,
+    snapshot.config.suppressions,
+  );
   const scanDiagnostics = [
-    ...diagnostics,
-    ...contextLens.diagnostics,
+    ...snapshot.discoveryDiagnostics,
+    ...snapshot.contextLensDiagnostics,
     ...suppressed.diagnostics,
   ];
   const diagnosticsV2 = createDiagnosticsV2({
@@ -60,25 +78,25 @@ export async function scan(
     diagnostics: scanDiagnostics,
   });
   const trustGraph = buildTrustGraph({
-    catalog: catalogResult.catalog,
+    catalog: snapshot.catalog,
     findings: suppressed.findings,
     diagnostics: scanDiagnostics,
     securityPolicies,
   });
 
   return {
-    root,
-    ...(configPath ? { configPath } : {}),
-    scannedFileCount: artifacts.length,
-    format: config.format,
-    contextLens: contextLens.summary,
+    root: snapshot.root,
+    ...(snapshot.configPath ? { configPath: snapshot.configPath } : {}),
+    scannedFileCount: snapshot.scannedFileCount,
+    format: snapshot.config.format,
+    contextLens: snapshot.contextLens,
     securityPolicyInventory,
     trustGraph,
     findings: suppressed.findings,
     diagnostics: scanDiagnostics,
     diagnosticsV2,
     reviewBundles: createReviewBundles(diagnosticsV2),
-    exitThreshold: config.failOn,
+    exitThreshold: snapshot.config.failOn,
   };
 }
 

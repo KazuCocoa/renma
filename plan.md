@@ -356,7 +356,9 @@ Trust Graph v1 is an interpretation of existing catalog, graph, scan, and securi
 
 Repository Context BOM v1 is a repository-level manifest of declared assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence. It does not claim actual LLM runtime usage.
 
-Actual consumed-context evidence may be imported later from external agents, editor integrations, prompt wrappers, or CI tools and validated against the repository model. Renma should remain telemetry-aware but not telemetry-responsible.
+The BOM v1 hardening decision is resolved: each BOM is derived from one collected in-memory repository snapshot; JSON is authoritative; Markdown is a review projection; `schemaVersion` is the consumer-facing schema; `generator.version` is the Renma implementation version; Git commit/branch/tag/dirty state are supplied by surrounding Git/CI artifact context rather than native BOM v1 fields; and `--omit-generated-at` only removes the run-time generation timestamp.
+
+Actual consumed-context evidence may be imported later from external agents, editor integrations, prompt wrappers, or CI tools and validated against the repository model. It must remain a separate artifact or explicitly separate attachment that relates back through stable values such as BOM digest or snapshot identity, asset ID, asset content hash, producer identity/version, and observation timestamp. Renma should remain telemetry-aware but not telemetry-responsible.
 
 Follow-up policy hygiene ideas belong after Trust Graph v1, not in the first implementation patch:
 
@@ -366,6 +368,7 @@ Follow-up policy hygiene ideas belong after Trust Graph v1, not in the first imp
 ### Later / External Evidence
 
 - Optional external signal import as repository evidence
+- Keep consumed-context evidence separate from the declared Repository Context BOM v1 meaning
 - Runtime telemetry ownership, dashboards, provider gateways, and prompt wrappers remain out of scope
 
 ### Historical Roadmap Detail
@@ -595,9 +598,9 @@ Potential producers:
 - CI integration
 - External agent signal import
 
-Renma may import those signals as repository evidence. Renma should not become the runtime, telemetry backend, provider gateway, or prompt wrapper.
+Renma may later import those signals as repository evidence. Renma should not become the runtime, telemetry backend, provider gateway, or prompt wrapper.
 
-Imported consumed-context evidence should be validated against the catalog, graph, readiness, and security posture model. It should not redefine the near-term Repository Context BOM, which remains a declared repository manifest rather than an actual runtime usage report.
+Imported consumed-context evidence should be validated against the catalog, graph, readiness, and security posture model. It should not redefine Repository Context BOM v1, which remains a declared repository manifest rather than an actual runtime usage report. Runtime evidence should stay in a separate artifact or explicitly separate attachment and relate back through stable identifiers such as asset ID, asset content hash, producer identity/version, observation timestamp, and a future BOM digest or snapshot identity.
 
 ## Out Of Scope
 
