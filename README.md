@@ -264,7 +264,7 @@ npx renma diff . --from main --to HEAD --format markdown
 
 The first command does not require you to design a knowledge architecture up front. It scans the repository, builds a local catalog, and reports obvious health issues such as broken links, unclear ownership, risky instructions, weak structure, and context that may be hard for agents to trust.
 
-For guided workflows, see the User Manual sections on [creating a new skill with scaffold](docs/user-manual.md#user-story-create-a-new-skill-with-scaffold) and [improving existing skills with diagnostics](docs/user-manual.md#user-story-improve-existing-skills-with-diagnostics).
+Command-specific help is designed for both humans and coding agents: start with `renma --help`, then run `renma <command> --help` before choosing a workflow. For guided workflows, see the User Manual sections on [LLM-assisted skill maintenance](docs/user-manual.md#llm-assisted-skill-maintenance), [creating a new skill with scaffold](docs/user-manual.md#user-story-create-a-new-skill-with-scaffold), and [improving existing skills with diagnostics](docs/user-manual.md#user-story-improve-existing-skills-with-diagnostics).
 
 If you are developing Renma from source:
 

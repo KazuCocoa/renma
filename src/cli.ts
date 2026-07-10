@@ -41,6 +41,12 @@ import {
   runTrustGraphCommand,
   type TrustGraphFormat,
 } from "./commands/trust-graph.js";
+import {
+  isCommandName,
+  renderCommandHelp,
+  renderGlobalHelp,
+  type CommandName,
+} from "./cli-help.js";
 import { ConfigError, type ConfigOverrides } from "./config.js";
 import type { Severity } from "./types.js";
 
@@ -79,9 +85,18 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     return 2;
   }
 
+  const [command = "scan", target = "."] = parsed.positionals;
+
   if (parsed.values.help) {
-    console.log(helpText());
-    return 0;
+    if (parsed.positionals.length === 0) {
+      console.log(renderGlobalHelp(packageJson.version));
+      return 0;
+    }
+
+    if (isCommandName(command)) {
+      console.log(renderCommandHelp(command, packageJson.version));
+      return 0;
+    }
   }
 
   if (parsed.values.version) {
@@ -89,22 +104,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     return 0;
   }
 
-  const [command = "scan", target = "."] = parsed.positionals;
-  if (
-    command !== "scan" &&
-    command !== "bom" &&
-    command !== "catalog" &&
-    command !== "diff" &&
-    command !== "ci-report" &&
-    command !== "graph" &&
-    command !== "trust-graph" &&
-    command !== "ownership" &&
-    command !== "readiness" &&
-    command !== "scaffold" &&
-    command !== "suggest-metadata" &&
-    command !== "suggest-semantic-split" &&
-    command !== "inspect"
-  ) {
+  if (!isCommandName(command)) {
     console.error(
       command ? `Unknown command "${command}".` : "Missing command.",
     );
@@ -177,25 +177,30 @@ async function runScaffold(
     kindValue !== "context" &&
     kindValue !== "context_lens"
   ) {
-    console.error("scaffold requires kind skill, context, or context_lens.");
-    return 2;
+    return usageError(
+      "scaffold",
+      "scaffold requires kind skill, context, or context_lens.",
+    );
   }
 
   if (!targetPath) {
-    console.error("scaffold requires a target path.");
-    return 2;
+    return usageError("scaffold", "scaffold requires a target path.");
   }
 
   const format = stringValue(values.format) ?? "file";
   if (format !== "file" && format !== "prompt" && format !== "json") {
-    console.error("--format must be one of file, prompt, or json.");
-    return 2;
+    return usageError(
+      "scaffold",
+      "--format must be one of file, prompt, or json.",
+    );
   }
 
   const owner = stringValue(values.owner);
   if (format === "file" && !owner) {
-    console.error("scaffold --format file requires --owner <owner>.");
-    return 2;
+    return usageError(
+      "scaffold",
+      "scaffold --format file requires --owner <owner>.",
+    );
   }
 
   try {
@@ -222,14 +227,15 @@ async function runScan(values: CliValues, target: string): Promise<number> {
   const failOnValue = stringValue(values["fail-on"]);
   const failOn = parseSeverity(failOnValue);
   if (failOnValue && !failOn) {
-    console.error("--fail-on must be one of: low, medium, high, critical.");
-    return 2;
+    return usageError(
+      "scan",
+      "--fail-on must be one of: low, medium, high, critical.",
+    );
   }
 
   const format = values.json ? "json" : stringValue(values.format);
   if (format !== undefined && format !== "text" && format !== "json") {
-    console.error("--format must be either text or json.");
-    return 2;
+    return usageError("scan", "--format must be either text or json.");
   }
 
   const configPath = stringValue(values.config);
@@ -253,8 +259,7 @@ async function runScan(values: CliValues, target: string): Promise<number> {
 async function runCatalog(values: CliValues, target: string): Promise<number> {
   const format = values.json ? "json" : (stringValue(values.format) ?? "json");
   if (format !== "json" && format !== "markdown") {
-    console.error("--format must be either json or markdown.");
-    return 2;
+    return usageError("catalog", "--format must be either json or markdown.");
   }
 
   const configPath = stringValue(values.config);
@@ -280,8 +285,7 @@ async function runCatalog(values: CliValues, target: string): Promise<number> {
 async function runBom(values: CliValues, target: string): Promise<number> {
   const format = values.json ? "json" : (stringValue(values.format) ?? "json");
   if (format !== "json" && format !== "markdown") {
-    console.error("--format must be either json or markdown.");
-    return 2;
+    return usageError("bom", "--format must be either json or markdown.");
   }
 
   const configPath = stringValue(values.config);
@@ -309,14 +313,12 @@ async function runDiff(values: CliValues, target: string): Promise<number> {
   const fromRef = stringValue(values.from);
   const toRef = stringValue(values.to);
   if (!fromRef || !toRef) {
-    console.error("diff requires --from <ref> and --to <ref>.");
-    return 2;
+    return usageError("diff", "diff requires --from <ref> and --to <ref>.");
   }
 
   const format = values.json ? "json" : (stringValue(values.format) ?? "json");
   if (format !== "json" && format !== "markdown") {
-    console.error("--format must be either json or markdown.");
-    return 2;
+    return usageError("diff", "--format must be either json or markdown.");
   }
 
   const configPath = stringValue(values.config);
@@ -345,16 +347,17 @@ async function runCiReport(values: CliValues, target: string): Promise<number> {
   const fromRef = stringValue(values.from);
   const toRef = stringValue(values.to);
   if (!fromRef || !toRef) {
-    console.error("ci-report requires --from <ref> and --to <ref>.");
-    return 2;
+    return usageError(
+      "ci-report",
+      "ci-report requires --from <ref> and --to <ref>.",
+    );
   }
 
   const format = values.json
     ? "json"
     : (stringValue(values.format) ?? "markdown");
   if (format !== "json" && format !== "markdown") {
-    console.error("--format must be either json or markdown.");
-    return 2;
+    return usageError("ci-report", "--format must be either json or markdown.");
   }
 
   const configPath = stringValue(values.config);
@@ -382,17 +385,19 @@ async function runCiReport(values: CliValues, target: string): Promise<number> {
 async function runGraph(values: CliValues, target: string): Promise<number> {
   const format = values.json ? "json" : (stringValue(values.format) ?? "json");
   if (format !== "json" && format !== "markdown" && format !== "mermaid") {
-    console.error("--format must be one of: json, markdown, mermaid.");
-    return 2;
+    return usageError(
+      "graph",
+      "--format must be one of: json, markdown, mermaid.",
+    );
   }
   const viewValue =
     stringValue(values.view) ?? (format === "json" ? "full" : "summary");
   const view = normalizeGraphView(viewValue);
   if (!view) {
-    console.error(
+    return usageError(
+      "graph",
       "--view must be one of: summary, workflow, full, layered, lens.",
     );
-    return 2;
   }
 
   const configPath = stringValue(values.config);
@@ -432,8 +437,10 @@ async function runTrustGraph(
 ): Promise<number> {
   const format = values.json ? "json" : (stringValue(values.format) ?? "json");
   if (format !== "json" && format !== "markdown") {
-    console.error("--format must be either json or markdown.");
-    return 2;
+    return usageError(
+      "trust-graph",
+      "--format must be either json or markdown.",
+    );
   }
 
   const configPath = stringValue(values.config);
@@ -475,8 +482,7 @@ async function runOwnership(
 ): Promise<number> {
   const format = values.json ? "json" : (stringValue(values.format) ?? "json");
   if (format !== "json" && format !== "markdown") {
-    console.error("--format must be either json or markdown.");
-    return 2;
+    return usageError("ownership", "--format must be either json or markdown.");
   }
 
   const configPath = stringValue(values.config);
@@ -508,8 +514,7 @@ async function runReadiness(
 ): Promise<number> {
   const format = values.json ? "json" : (stringValue(values.format) ?? "json");
   if (format !== "json" && format !== "markdown") {
-    console.error("--format must be either json or markdown.");
-    return 2;
+    return usageError("readiness", "--format must be either json or markdown.");
   }
 
   const configPath = stringValue(values.config);
@@ -540,8 +545,12 @@ function runSuggestSemanticSplit(
     ? "json"
     : (stringValue(values.format) ?? "prompt");
   if (format !== "prompt" && format !== "json") {
-    console.error("--format must be either prompt or json.");
-    return Promise.resolve(2);
+    return Promise.resolve(
+      usageError(
+        "suggest-semantic-split",
+        "--format must be either prompt or json.",
+      ),
+    );
   }
 
   let maxContextBytes: number | undefined;
@@ -556,8 +565,12 @@ function runSuggestSemanticSplit(
       "--max-source-bytes",
     );
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    return Promise.resolve(2);
+    return Promise.resolve(
+      usageError(
+        "suggest-semantic-split",
+        error instanceof Error ? error.message : String(error),
+      ),
+    );
   }
 
   return runSuggestSemanticSplitCommand(target, {
@@ -573,16 +586,21 @@ function runSuggestMetadata(
   targetProvided: boolean,
 ): Promise<number> {
   if (!targetProvided) {
-    console.error("suggest-metadata requires a target file.");
-    return Promise.resolve(2);
+    return Promise.resolve(
+      usageError(
+        "suggest-metadata",
+        "suggest-metadata requires a target file.",
+      ),
+    );
   }
 
   const format = values.json
     ? "json"
     : (stringValue(values.format) ?? "prompt");
   if (format !== "prompt" && format !== "json") {
-    console.error("--format must be either prompt or json.");
-    return Promise.resolve(2);
+    return Promise.resolve(
+      usageError("suggest-metadata", "--format must be either prompt or json."),
+    );
   }
 
   const owner = stringValue(values.owner)?.trim();
@@ -601,8 +619,9 @@ function runSuggestMetadata(
 function runInspect(values: CliValues, target: string): Promise<number> {
   const format = values.json ? "json" : (stringValue(values.format) ?? "json");
   if (format !== "text" && format !== "json") {
-    console.error("--format must be either text or json.");
-    return Promise.resolve(2);
+    return Promise.resolve(
+      usageError("inspect", "--format must be either text or json."),
+    );
   }
   const lines = stringValue(values.lines);
 
@@ -610,6 +629,12 @@ function runInspect(values: CliValues, target: string): Promise<number> {
     format: format as InspectFormat,
     ...(lines ? { lines } : {}),
   });
+}
+
+function usageError(command: CommandName, message: string): 2 {
+  console.error(message);
+  console.error(`Run \`renma ${command} --help\` for usage.`);
+  return 2;
 }
 
 function stringValue(value: unknown): string | undefined {
@@ -652,65 +677,4 @@ function parseOptionalPositiveInt(
     throw new ConfigError(`${name} must be a positive integer.`);
   }
   return parsed;
-}
-
-function helpText(): string {
-  return [
-    `renma ${packageJson.version}`,
-    "",
-    "Usage: renma scan [path] [options]",
-    "",
-    "Additional usage:",
-    "  renma scan [path] [options]",
-    "  renma bom [path] [options]",
-    "  renma catalog [path] [options]",
-    "  renma diff [path] --from <ref> --to <ref> [options]",
-    "  renma ci-report [path] --from <ref> --to <ref> [options]",
-    "  renma graph [path] [options]",
-    "  renma trust-graph [path] [options]",
-    "  renma scaffold skill <path> [options]",
-    "  renma scaffold context <path> [options]",
-    "  renma scaffold context_lens <path> [options]",
-    "  renma ownership [path] [options]",
-    "  renma readiness [path] [options]",
-    "  renma inspect <file> [options]",
-    "  renma suggest-metadata <file> [options]",
-    "  renma suggest-semantic-split <file> [options]",
-    "",
-    "Commands:",
-    "  scan                       Scan a repository or skill directory",
-    "  bom                        Print declared Repository Context BOM",
-    "  catalog                    Print deterministic normalized asset catalog",
-    "  diff                       Compare deterministic readiness snapshots",
-    "  ci-report                  Print deterministic CI / PR review report",
-    "  graph                      Print deterministic repository graph snapshot",
-    "  trust-graph                Print deterministic trust evidence graph",
-    "  scaffold                   Create deterministic authoring scaffolds and prompts",
-    "  ownership                  Print deterministic ownership coverage report",
-    "  readiness                  Print deterministic agent readiness report",
-    "  inspect                    Inspect repository files/assets by outline or exact line slice",
-    "  suggest-metadata           Print a Codex-ready metadata retrofit prompt",
-    "  suggest-semantic-split     Print a Codex-ready semantic split prompt",
-    "",
-    "The inspect command is an inspection helper; it does not choose task context or assemble prompts.",
-    "",
-    "Options:",
-    "  -c, --config <path>        scan: read JSON config from path",
-    "      --fail-on <level>      scan: exit 1 when findings meet severity: low, medium, high, critical",
-    "      --format <format>      scan: text or json; bom/catalog/ownership/readiness/ci-report/trust-graph: json or markdown; graph: json, markdown, or mermaid; suggest-metadata/suggest-semantic-split: prompt or json",
-    "      --include-owned        ownership: include owned asset details",
-    "      --json                 Shortcut for --format json",
-    "      --omit-generated-at    bom: omit run-time generatedAt timestamp",
-    "      --view <view>          graph: summary, workflow, full, layered, or lens",
-    "      --focus <asset-id-or-path>",
-    "      --owner <owner>        ownership: filter assets by owner; scaffold: declare owner metadata; suggest-metadata: explicitly suggest owner",
-    "      --title <title>",
-    "      --tags <tags>",
-    "      --lines <range>        inspect: exact line range, e.g. L10-L42",
-    "      --max-source-bytes <n> suggest-semantic-split: source file byte budget",
-    "      --max-context-bytes <n>",
-    "                             suggest-semantic-split: nearby context byte budget",
-    "  -h, --help                 Show help",
-    "  -v, --version              Show version",
-  ].join("\n");
 }
