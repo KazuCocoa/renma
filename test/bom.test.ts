@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rename, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rename, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -16,10 +16,13 @@ import {
   graphFromRepositoryEvidence,
   graphFromRepositorySnapshot,
 } from "../src/commands/graph.js";
+import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
 import {
   collectRepositoryEvidence,
   collectRepositorySnapshot,
 } from "../src/repository-evidence.js";
+import { scanFromRepositorySnapshot } from "../src/scanner.js";
+import type { ScanResult } from "../src/types.js";
 
 test("bom report declares Repository Context BOM schema and scope", async () => {
   const report = await bom(await bomFixture());
@@ -257,6 +260,111 @@ test("bom report builder does not rediscover files after snapshot collection", a
   assert.equal(
     report.securityPosture.totalSecurityFindings,
     report.readiness.summary.securityPosture.totalSecurityFindings,
+  );
+});
+
+test("snapshot path evidence keeps helper command missing when target is created later", async () => {
+  const root = await helperCommandPathFixture({ helperExists: false });
+  const snapshot = await collectRepositorySnapshot(root);
+
+  await writeHelperScript(root);
+
+  const staleScan = scanFromRepositorySnapshot(snapshot);
+  const freshScan = scanFromRepositorySnapshot(
+    await collectRepositorySnapshot(root),
+  );
+  const staleBom = buildBomReport(snapshot, { omitGeneratedAt: true });
+
+  assert.equal(
+    hasScanFinding(staleScan, DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_UNRESOLVED),
+    true,
+  );
+  assert.equal(
+    hasScanFinding(freshScan, DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_UNRESOLVED),
+    false,
+  );
+  assert.equal(
+    hasReadinessEvidence(
+      staleBom,
+      "paths.helper_commands",
+      DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_UNRESOLVED,
+    ),
+    true,
+  );
+});
+
+test("snapshot path evidence keeps helper command resolved when target is removed later", async () => {
+  const root = await helperCommandPathFixture({ helperExists: true });
+  const snapshot = await collectRepositorySnapshot(root);
+
+  await unlink(helperScriptPath(root));
+
+  const staleScan = scanFromRepositorySnapshot(snapshot);
+  const freshScan = scanFromRepositorySnapshot(
+    await collectRepositorySnapshot(root),
+  );
+
+  assert.equal(
+    hasScanFinding(staleScan, DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_UNRESOLVED),
+    false,
+  );
+  assert.equal(
+    hasScanFinding(freshScan, DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_UNRESOLVED),
+    true,
+  );
+});
+
+test("snapshot path evidence keeps declared dependency missing when target is created later", async () => {
+  const root = await declaredDependencyPathFixture({ targetExists: false });
+  const snapshot = await collectRepositorySnapshot(root);
+
+  await writeDeclaredDependencyTarget(root);
+
+  const staleScan = scanFromRepositorySnapshot(snapshot);
+  const freshScan = scanFromRepositorySnapshot(
+    await collectRepositorySnapshot(root),
+  );
+
+  assert.equal(
+    hasScanFinding(
+      staleScan,
+      DIAGNOSTIC_IDS.LAYOUT_CONTEXT_REFERENCE_NON_CANONICAL,
+    ),
+    false,
+  );
+  assert.equal(
+    hasScanFinding(
+      freshScan,
+      DIAGNOSTIC_IDS.LAYOUT_CONTEXT_REFERENCE_NON_CANONICAL,
+    ),
+    true,
+  );
+});
+
+test("snapshot path evidence keeps declared dependency present when target is removed later", async () => {
+  const root = await declaredDependencyPathFixture({ targetExists: true });
+  const snapshot = await collectRepositorySnapshot(root);
+
+  await unlink(declaredDependencyTargetPath(root));
+
+  const staleScan = scanFromRepositorySnapshot(snapshot);
+  const freshScan = scanFromRepositorySnapshot(
+    await collectRepositorySnapshot(root),
+  );
+
+  assert.equal(
+    hasScanFinding(
+      staleScan,
+      DIAGNOSTIC_IDS.LAYOUT_CONTEXT_REFERENCE_NON_CANONICAL,
+    ),
+    true,
+  );
+  assert.equal(
+    hasScanFinding(
+      freshScan,
+      DIAGNOSTIC_IDS.LAYOUT_CONTEXT_REFERENCE_NON_CANONICAL,
+    ),
+    false,
   );
 });
 
@@ -632,6 +740,102 @@ async function catalogWarningFixture(): Promise<string> {
   return root;
 }
 
+async function helperCommandPathFixture(options: {
+  helperExists: boolean;
+}): Promise<string> {
+  const root = await fixture();
+  await writeSnapshotPathConfig(root);
+  await mkdir(path.join(root, "skills", "testing", "helper-review"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "skills", "testing", "helper-review", "SKILL.md"),
+    [
+      "---",
+      "id: skill.testing.helper-review",
+      "owner: qa-platform",
+      "status: stable",
+      "---",
+      "# Helper Review",
+      "",
+      "## When to use",
+      "Use this workflow for deterministic Repository Context BOM helper path tests.",
+      "",
+      "## Required inputs",
+      "Required inputs: repository root and static helper path evidence.",
+      "",
+      "## DO NOT USE FOR",
+      "Do not use this workflow for runtime task context selection or prompt assembly.",
+      "",
+      "## Preflight",
+      "Confirm the repository fixture exists and inputs are static.",
+      "",
+      "## Example",
+      "Input: helper path fixture. Output: deterministic path evidence.",
+      "",
+      "## Completion criteria",
+      "The workflow is complete when helper path evidence is snapshot based.",
+      "",
+      "## Verification",
+      "Verify by running the BOM command and checking readiness evidence.",
+      "",
+      "```bash",
+      "bash tools/testing/scripts/setup.sh",
+      "```",
+      "",
+    ].join("\n"),
+  );
+  if (options.helperExists) await writeHelperScript(root);
+  return root;
+}
+
+async function declaredDependencyPathFixture(options: {
+  targetExists: boolean;
+}): Promise<string> {
+  const root = await fixture();
+  await writeSnapshotPathConfig(root);
+  await mkdir(path.join(root, "skills", "testing", "dependency-review"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "skills", "testing", "dependency-review", "SKILL.md"),
+    [
+      "---",
+      "id: skill.testing.dependency-review",
+      "owner: qa-platform",
+      "status: stable",
+      "requires_context:",
+      "  - docs/testing/legacy-context.md",
+      "---",
+      "# Dependency Review",
+      "",
+      "## When to use",
+      "Use this workflow for deterministic Repository Context BOM dependency path tests.",
+      "",
+      "## Required inputs",
+      "Required inputs: repository root and static dependency path evidence.",
+      "",
+      "## DO NOT USE FOR",
+      "Do not use this workflow for runtime task context selection or prompt assembly.",
+      "",
+      "## Preflight",
+      "Confirm the repository fixture exists and inputs are static.",
+      "",
+      "## Example",
+      "Input: dependency path fixture. Output: deterministic path evidence.",
+      "",
+      "## Completion criteria",
+      "The workflow is complete when dependency path evidence is snapshot based.",
+      "",
+      "## Verification",
+      "Verify by running scan and checking layout findings.",
+      "",
+    ].join("\n"),
+  );
+  if (options.targetExists) await writeDeclaredDependencyTarget(root);
+  return root;
+}
+
 async function markdownEscapingFixture(): Promise<string> {
   const root = await fixture();
   await mkdir(path.join(root, "skills", "pipe|skill"), { recursive: true });
@@ -693,6 +897,39 @@ async function markdownEscapingFixture(): Promise<string> {
 
 async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-"));
+}
+
+async function writeSnapshotPathConfig(root: string): Promise<void> {
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify(
+      {
+        globs: ["skills/**/SKILL.md", "contexts/**/*.md"],
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+async function writeHelperScript(root: string): Promise<void> {
+  await mkdir(path.dirname(helperScriptPath(root)), { recursive: true });
+  await writeFile(helperScriptPath(root), "#!/bin/sh\nexit 0\n");
+}
+
+function helperScriptPath(root: string): string {
+  return path.join(root, "tools", "testing", "scripts", "setup.sh");
+}
+
+async function writeDeclaredDependencyTarget(root: string): Promise<void> {
+  await mkdir(path.dirname(declaredDependencyTargetPath(root)), {
+    recursive: true,
+  });
+  await writeFile(declaredDependencyTargetPath(root), "# Legacy Context\n");
+}
+
+function declaredDependencyTargetPath(root: string): string {
+  return path.join(root, "docs", "testing", "legacy-context.md");
 }
 
 async function writeSkill(root: string): Promise<void> {
@@ -839,6 +1076,22 @@ function hasDiagnosticFinding(report: BomReport, id: string): boolean {
     report.readiness.checks
       .find((check) => check.id === "assets.freshness")
       ?.evidence?.some((item) => item.id === id) === true
+  );
+}
+
+function hasScanFinding(report: ScanResult, id: string): boolean {
+  return report.findings.some((finding) => finding.id === id);
+}
+
+function hasReadinessEvidence(
+  report: BomReport,
+  checkId: string,
+  findingId: string,
+): boolean {
+  return (
+    report.readiness.checks
+      .find((check) => check.id === checkId)
+      ?.evidence?.some((item) => item.id === findingId) === true
   );
 }
 

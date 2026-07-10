@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import path from "node:path";
 import type { Catalog, CatalogEntry, Dependency } from "./model.js";
 import {
@@ -8,6 +7,7 @@ import {
   todayIsoDate,
 } from "./freshness.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
+import { helperScriptPath } from "./repository-paths.js";
 import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import type {
   Evidence,
@@ -32,6 +32,7 @@ type FindingDetails = Partial<
 
 interface RuleOptions {
   evaluationDate?: Date | string;
+  repositoryPaths?: ReadonlySet<string>;
 }
 
 const SECRET_PATTERN =
@@ -168,7 +169,10 @@ export function runRules(
 ): Finding[] {
   const findings = runRuleRegistry(
     documents,
-    rulesForEvaluationDate(evaluationDay(options.evaluationDate)),
+    rulesForEvaluationDate(
+      evaluationDay(options.evaluationDate),
+      options.repositoryPaths,
+    ),
     catalog,
     config,
   );
@@ -179,7 +183,10 @@ export function runRules(
   });
 }
 
-function rulesForEvaluationDate(evaluationDate: string): Rule[] {
+function rulesForEvaluationDate(
+  evaluationDate: string,
+  repositoryPaths?: ReadonlySet<string>,
+): Rule[] {
   return [
     {
       id: "strict-layout-policy",
@@ -188,6 +195,7 @@ function rulesForEvaluationDate(evaluationDate: string): Rule[] {
           context.documents,
           context.config,
           context.catalog,
+          repositoryPaths,
         ),
     },
     {
@@ -1906,22 +1914,24 @@ function strictLayoutPolicyFindings(
   documents: ParsedDocument[],
   config: ScanConfig,
   catalog?: Catalog,
+  repositoryPaths?: ReadonlySet<string>,
 ): Finding[] {
   const findings: Finding[] = [];
-  const root = repositoryRoot(documents);
-  const paths = new Set(documents.map((document) => document.artifact.path));
+  const paths =
+    repositoryPaths ??
+    new Set(documents.map((document) => document.artifact.path));
 
   for (const document of documents) {
     findings.push(...disallowedSkillAssetFindings(document, config));
     findings.push(...thinSkillLayoutFindings(document));
-    findings.push(...helperCommandFindings(document, root, paths, config));
+    findings.push(...helperCommandFindings(document, paths, config));
     findings.push(...layoutConsistencyFindings(document));
     findings.push(...contextRootFindings(document));
     findings.push(...helperRootFindings(document));
   }
 
   if (catalog) {
-    findings.push(...declaredDependencyLayoutFindings(catalog, paths, root));
+    findings.push(...declaredDependencyLayoutFindings(catalog, paths));
   }
 
   return findings;
@@ -2040,8 +2050,7 @@ function thinSkillLayoutFindings(document: ParsedDocument): Finding[] {
 
 function helperCommandFindings(
   document: ParsedDocument,
-  root: string | undefined,
-  paths: Set<string>,
+  paths: ReadonlySet<string>,
   config: ScanConfig,
 ): Finding[] {
   const findings: Finding[] = [];
@@ -2094,11 +2103,7 @@ function helperCommandFindings(
       continue;
     }
 
-    if (
-      scriptPath.startsWith("tools/") &&
-      !paths.has(scriptPath) &&
-      !(root && existsSync(path.join(root, scriptPath)))
-    ) {
+    if (scriptPath.startsWith("tools/") && !paths.has(scriptPath)) {
       findings.push(
         findingAt(
           document,
@@ -2227,15 +2232,14 @@ function helperRootFindings(document: ParsedDocument): Finding[] {
 
 function declaredDependencyLayoutFindings(
   catalog: Catalog,
-  paths: Set<string>,
-  root: string | undefined,
+  paths: ReadonlySet<string>,
 ): Finding[] {
   const findings: Finding[] = [];
 
   for (const dependency of catalog.dependencies) {
     const target = dependency.to;
     if (!isRepoPathLike(target)) continue;
-    if (!paths.has(target) && !(root && existsSync(path.join(root, target)))) {
+    if (!paths.has(target)) {
       continue;
     }
     if (
@@ -2294,13 +2298,6 @@ function firstExecutableCommand(
   return executableCommands(document)[0];
 }
 
-function helperScriptPath(command: string): string | undefined {
-  const parts = command.split(/\s+/).slice(1);
-  return parts.find((part) =>
-    /(?:^|\/)scripts\/.+\.(?:mjs|js|cjs|sh|bash|py)$/.test(part),
-  );
-}
-
 function canonicalHelperTarget(config: ScanConfig, scriptPath: string): string {
   const parts = scriptPath.split("/");
   const skillName = parts[1] ?? "unknown";
@@ -2331,15 +2328,6 @@ function helperAssetPath(
 
 function isCanonicalSkillEntrypoint(pathValue: string): boolean {
   return /^skills\/[^/]+\/SKILL\.md$/.test(pathValue);
-}
-
-function repositoryRoot(documents: ParsedDocument[]): string | undefined {
-  const document = documents[0];
-  if (!document) return undefined;
-  return document.artifact.absolutePath.slice(
-    0,
-    document.artifact.absolutePath.length - document.artifact.path.length,
-  );
 }
 
 function findingAt(
