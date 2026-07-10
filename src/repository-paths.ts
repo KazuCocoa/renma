@@ -39,6 +39,8 @@ function repositoryPathCandidates(
     ...helperCommandPathCandidates(documents),
     ...catalog.dependencies
       .map((dependency) => dependency.to)
+      .map(normalizeRepositoryPath)
+      .filter((candidate): candidate is string => candidate !== undefined)
       .filter(isRepoPathLike),
   ].filter(
     (candidate, index, candidates) => candidates.indexOf(candidate) === index,
@@ -62,8 +64,18 @@ function helperCommandPathCandidates(documents: ParsedDocument[]): string[] {
 }
 
 function normalizeRepositoryPath(value: string): string | undefined {
-  const normalized = value.replace(/\\/g, path.posix.sep).replace(/^\.\//, "");
-  if (!normalized || normalized.startsWith(path.posix.sep)) return undefined;
+  const normalized = value.replace(/\\/g, "/").replace(/^\.\//, "");
+
+  if (
+    !normalized ||
+    path.posix.isAbsolute(normalized) ||
+    normalized === ".." ||
+    normalized.startsWith("../") ||
+    normalized.split("/").includes("..")
+  ) {
+    return undefined;
+  }
+
   return normalized;
 }
 
