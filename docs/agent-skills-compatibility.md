@@ -78,6 +78,23 @@ Renma continues discovering historical `skill.md` and `*.skill.md` spellings
 under those roots so `scan` can report validation and migration diagnostics.
 Discovery does not make those spellings Agent Skills-compatible.
 
+The entrypoint migration is explicit:
+
+```text
+skills/demo/skill.md
+  -> skills/demo/SKILL.md
+
+skills/testing/spec-review.skill.md
+  -> skills/testing/spec-review/SKILL.md
+```
+
+The same mappings apply under `.agents/skills/**`. A lowercase `skill.md`
+requires a rename. A flat `*.skill.md` requires a move into the filename-derived
+directory plus a rename. Structured `suggest-metadata` output reports
+`sourcePath`, `targetPath`, and `entrypointMigration` (`none`, `rename`, or
+`move-and-rename`) so the path change cannot be mistaken for an apply-ready
+frontmatter-only result.
+
 ## Validation During Scan
 
 Agent Skills validation is part of the existing scan workflow:
@@ -90,7 +107,7 @@ renma scan . --format json
 The JSON report includes a dedicated `agentSkills` summary and per-Skill
 results. Text output includes a concise valid/invalid summary, structural issues,
 authoring warnings, and a `suggest-metadata` migration command when historical
-Renma fields are present.
+Renma fields or a historical entrypoint spelling are present.
 
 The locally versioned validation profile uses the maintained `yaml` package in
 YAML 1.2 mode. It validates:
@@ -102,7 +119,9 @@ YAML 1.2 mode. It validates:
 - the allowed Agent Skills top-level fields;
 - required, non-empty string `name` and `description` values;
 - NFKC-normalized name length, Unicode letters/digits, lowercase and hyphen
-  rules, and normalized immediate-parent match;
+  rules, and normalized immediate-parent match. The YAML field is trimmed, but
+  the filesystem directory name is not; leading or trailing directory
+  whitespace is invalid rather than normalized away;
 - description and compatibility length limits;
 - optional field types;
 - `metadata` as a string-to-string mapping.
@@ -156,6 +175,10 @@ a prohibition without a supported alternative or stop behavior. Nested
 subsections under a prominent constraint heading remain prominent. These
 warnings do not make a structurally valid Agent Skill invalid.
 
+Agent Skills body inspection and migration description extraction ignore fenced
+examples opened with at least three backticks or at least three tildes. A fence
+closes only with the same character and a marker at least as long as its opener.
+
 ## Agent Skills Diagnostic Identifiers
 
 Agent Skills diagnostics use stable identifiers in the `agentSkills` portion of
@@ -207,11 +230,13 @@ historical Renma Skill
   -> metadata.renma.*
 ```
 
-Use the existing non-editing command:
+Use the existing non-editing command with canonical or historical entrypoints:
 
 ```bash
 renma scan .
 renma suggest-metadata skills/example/SKILL.md --format prompt
+renma suggest-metadata skills/example/skill.md --format json
+renma suggest-metadata skills/testing/spec-review.skill.md --format prompt
 # review and apply the proposed conversion
 renma scan .
 ```
@@ -222,6 +247,33 @@ valid description, conservatively extract description evidence from the body,
 move recognized historical fields to `metadata.renma.*`, and render canonical
 frontmatter for human review. It never edits the file and never proposes a
 reverse conversion for a canonical Agent Skill.
+
+For a valid canonical Agent Skill, an explicit `--owner <owner>` instead
+produces a canonical metadata retrofit candidate at `metadata.renma.owner`. An
+identical existing owner is preserved without a rewrite. A different existing
+owner blocks the proposal for human review. Without `--owner`, Renma does not
+invent owner metadata or emit a meaningless canonical rewrite. This retrofit is
+not reverse migration.
+
+## Historical Value Serialization
+
+Migration never converts native YAML numbers or booleans into text when doing
+so could lose the original lexical value.
+
+- Text scalar fields (`id`, `title`, `version`, `owner`, `status`, `purpose`,
+  `last_reviewed_at`, `review_cycle`, `expires_at`, and `security_profile`)
+  require YAML strings.
+- Boolean policy fields (`network_allowed`, `external_upload_allowed`,
+  `secrets_allowed`, and `requires_human_approval`) accept YAML booleans or the
+  exact strings `"true"` and `"false"`, then serialize as those lowercase
+  strings. Numeric `0` and `1` are blocked.
+- String-list fields accept YAML arrays containing strings only, legacy
+  comma-separated strings, or JSON-array strings containing strings only.
+  Numeric and boolean elements are blocked.
+
+For example, `version: "1.0"`, `tags: ["1.0"]`, and
+`network_allowed: false` are safe. `version: 1.0`, `tags: [1.0]`, and
+`network_allowed: 1` block canonical frontmatter generation.
 
 ## Unsafe Migration Blocking
 

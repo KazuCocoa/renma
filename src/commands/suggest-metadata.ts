@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { parseDocument } from "../markdown.js";
 import { parseAssetMetadata } from "../metadata.js";
+import { classifySkillEntrypointPath } from "../discovery.js";
 import {
   buildAgentSkillMigrationSuggestion,
   type AgentSkillMigrationSuggestion,
@@ -23,7 +24,10 @@ export interface BlockedMetadata {
 export interface MetadataSuggestion {
   path: string;
   kind: ArtifactKind;
-  suggestedMode: "metadata-retrofit" | "agent-skills-migration";
+  suggestedMode:
+    | "metadata-retrofit"
+    | "agent-skills-migration"
+    | "agent-skills-metadata-retrofit";
   ownerProvided: boolean;
   instructions: string[];
   candidateMetadata: Record<string, string>;
@@ -85,21 +89,36 @@ export async function buildMetadataSuggestion(
       document,
       explicitOwner,
     );
+    const metadataRetrofit =
+      agentSkills.proposalKind === "canonical-metadata-retrofit";
     return {
       path: outputPath,
       kind,
-      suggestedMode: "agent-skills-migration",
+      suggestedMode: metadataRetrofit
+        ? "agent-skills-metadata-retrofit"
+        : "agent-skills-migration",
       ownerProvided: Boolean(explicitOwner),
-      instructions: [
-        "Inspect the existing Skill before editing.",
-        "Preserve the Markdown body and existing standard Agent Skills fields.",
-        "Move only recognized historical Renma fields to flat metadata.renma.* string entries.",
-        "Preserve unknown renma.* and other-vendor metadata child keys.",
-        "Do not discard or automatically relocate unknown top-level fields.",
-        "Do not apply a proposal with blocked migration evidence.",
-        "Keep selection boundaries in description and execution constraints in the body.",
-        "Run renma scan . after human review and application.",
-      ],
+      instructions: metadataRetrofit
+        ? [
+            "Inspect the canonical Agent Skill before editing.",
+            "Preserve the Markdown body and existing standard Agent Skills fields.",
+            "Add only the explicitly provided owner as a flat metadata.renma.owner string entry.",
+            "Preserve unknown renma.* and other-vendor metadata child keys.",
+            "Do not apply a proposal with blocked ownership evidence.",
+            "Do not perform reverse migration.",
+            "Run renma scan . after human review and application.",
+          ]
+        : [
+            "Inspect the existing Skill before editing.",
+            "Preserve the Markdown body and existing standard Agent Skills fields.",
+            "Move only recognized historical Renma fields to flat metadata.renma.* string entries.",
+            "Preserve unknown renma.* and other-vendor metadata child keys.",
+            "Do not discard or automatically relocate unknown top-level fields.",
+            "Apply the entrypoint rename or move together with the frontmatter migration when required.",
+            "Do not apply a proposal with blocked migration evidence.",
+            "Keep selection boundaries in description and execution constraints in the body.",
+            "Run renma scan . after human review and application.",
+          ],
       candidateMetadata: {},
       blockedMetadata: agentSkills.blocked,
       agentSkills,
@@ -184,6 +203,8 @@ function renderAgentSkillMigrationPrompt(
 ): string {
   const migration = suggestion.agentSkills;
   if (!migration) return "";
+  const metadataRetrofit =
+    migration.proposalKind === "canonical-metadata-retrofit";
   const candidate = migration.canonicalFrontmatter
     ? [
         "Canonical Frontmatter Candidate:",
@@ -198,11 +219,17 @@ function renderAgentSkillMigrationPrompt(
         "(not generated while migration is blocked or unnecessary)",
       ];
   return `${[
-    "# Codex Task: Review One-Way Agent Skills Migration",
+    metadataRetrofit
+      ? "# Codex Task: Review Canonical Agent Skills Metadata Retrofit"
+      : "# Codex Task: Review One-Way Agent Skills Migration",
     "",
     `Asset: \`${suggestion.path}\``,
     `Source format: \`${migration.sourceFormat}\``,
     `Direction: \`${migration.direction}\``,
+    `Proposal: \`${migration.proposalKind}\``,
+    `Source path: \`${migration.sourcePath}\``,
+    `Target path: \`${migration.targetPath}\``,
+    `Entrypoint migration: \`${migration.entrypointMigration}\``,
     "",
     "Rules:",
     ...suggestion.instructions.map((instruction) => `- ${instruction}`),
@@ -224,7 +251,9 @@ function renderAgentSkillMigrationPrompt(
     "Verification:",
     "- Run `renma scan .`.",
     "",
-    "Return a small reviewed frontmatter patch. Do not rewrite the Skill body.",
+    migration.entrypointMigration === "none"
+      ? "Return a small reviewed frontmatter patch. Do not rewrite the Skill body."
+      : "Return one small reviewed patch containing both the entrypoint path migration and frontmatter migration. Do not rewrite the Skill body.",
   ].join("\n")}\n`;
 }
 
@@ -279,10 +308,10 @@ function blockedMetadataLines(blockedMetadata: BlockedMetadata[]): string[] {
 }
 
 function classifyPath(filePath: string): ArtifactKind {
+  if (classifySkillEntrypointPath(filePath)) return "skill";
   const parts = pathParts(filePath);
   const basename = parts.at(-1) ?? "";
 
-  if (basename === "SKILL.md") return "skill";
   if (parts.includes("lenses")) return "context_lens";
   if (parts.includes("contexts") || parts.includes("context")) return "context";
   if (parts.includes("profiles")) return "profile";

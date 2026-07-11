@@ -4,6 +4,7 @@ import {
   AGENT_SKILL_DIAGNOSTIC_IDS as IDS,
   type AgentSkillDiagnosticId,
 } from "./diagnostic-ids.js";
+import { classifySkillEntrypointPath } from "./discovery.js";
 import type { ParsedDocument } from "./types.js";
 import {
   parseAgentSkillFrontmatter,
@@ -285,7 +286,10 @@ export function validateAgentSkill(
     (issue) => issue.severity === "error",
   ).length;
   const warningCount = issues.length - errorCount;
-  const migrationRecommended = legacyFields.length > 0;
+  const entrypointPath = classifySkillEntrypointPath(document.artifact.path);
+  const migrationRecommended =
+    legacyFields.length > 0 ||
+    (entrypointPath !== undefined && entrypointPath.kind !== "canonical");
 
   return {
     path: document.artifact.path,
@@ -308,9 +312,30 @@ export function validateAgentSkill(
   };
 }
 
-/** Normalize and validate an Agent Skills name using the reference profile. */
+/** Normalize and validate an Agent Skills YAML name field. */
+export function normalizeAgentSkillNameField(
+  value: unknown,
+): AgentSkillNameValidation {
+  return normalizeAndValidateAgentSkillName(value, true);
+}
+
+/** Normalize and validate a Skill directory name without changing filesystem identity. */
+export function normalizeAgentSkillDirectoryName(
+  value: unknown,
+): AgentSkillNameValidation {
+  return normalizeAndValidateAgentSkillName(value, false);
+}
+
+/** Backward-compatible name for validating an Agent Skills YAML name field. */
 export function validateAgentSkillName(
   value: unknown,
+): AgentSkillNameValidation {
+  return normalizeAgentSkillNameField(value);
+}
+
+function normalizeAndValidateAgentSkillName(
+  value: unknown,
+  trim: boolean,
 ): AgentSkillNameValidation {
   if (typeof value !== "string") {
     return {
@@ -319,7 +344,7 @@ export function validateAgentSkillName(
     };
   }
 
-  const normalized = value.trim().normalize("NFKC");
+  const normalized = (trim ? value.trim() : value).normalize("NFKC");
   const problems: string[] = [];
   const length = characterLength(normalized);
   if (length < 1 || length > MAX_NAME_LENGTH)
@@ -382,7 +407,7 @@ function validateName(
     return;
   }
 
-  const nameValidation = validateAgentSkillName(rawName);
+  const nameValidation = normalizeAgentSkillNameField(rawName);
   if (nameValidation.problems.length > 0) {
     issues.push(
       createIssue(
@@ -400,7 +425,7 @@ function validateName(
   const parent = path.posix.basename(
     path.posix.dirname(document.artifact.path),
   );
-  const parentValidation = validateAgentSkillName(parent);
+  const parentValidation = normalizeAgentSkillDirectoryName(parent);
   if (
     nameValidation.normalized !== undefined &&
     parentValidation.normalized !== nameValidation.normalized
@@ -675,15 +700,14 @@ function collectBodyLines(
   document: ParsedDocument,
   frontmatter: ParsedYamlFrontmatter,
 ): BodyLine[] {
+  const fenceLines = agentSkillFenceLines(document.lines);
   const headings = document.headings
-    .filter((heading) => heading.line >= frontmatter.bodyStartLine)
+    .filter(
+      (heading) =>
+        heading.line >= frontmatter.bodyStartLine &&
+        !fenceLines.has(heading.line),
+    )
     .sort((left, right) => left.line - right.line);
-  const fenceLines = new Set<number>();
-  for (const fence of document.codeFences) {
-    for (let line = fence.startLine; line <= fence.endLine; line += 1) {
-      fenceLines.add(line);
-    }
-  }
   const ancestry: Array<{ depth: number; text: string }> = [];
   const result: BodyLine[] = [];
   let headingIndex = 0;
@@ -710,6 +734,37 @@ function collectBodyLines(
       ancestry: ancestry.map((heading) => heading.text),
     });
   }
+  return result;
+}
+
+/** Return all Markdown line numbers occupied by backtick or tilde fences. */
+export function agentSkillFenceLines(lines: string[]): Set<number> {
+  const result = new Set<number>();
+  let active: { character: "`" | "~"; length: number } | undefined;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const lineNumber = index + 1;
+    const line = lines[index] ?? "";
+    if (!active) {
+      const opening = /^(?: {0,3})(`{3,}|~{3,})/.exec(line);
+      if (!opening?.[1]) continue;
+      const marker = opening[1];
+      active = {
+        character: marker[0] as "`" | "~",
+        length: marker.length,
+      };
+      result.add(lineNumber);
+      continue;
+    }
+
+    result.add(lineNumber);
+    const escapedCharacter = active.character === "`" ? "`" : "~";
+    const closing = new RegExp(
+      `^(?: {0,3})${escapedCharacter}{${active.length},}\\s*$`,
+    );
+    if (closing.test(line)) active = undefined;
+  }
+
   return result;
 }
 

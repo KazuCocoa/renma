@@ -71,6 +71,9 @@ metadata:
 
   assert.equal(suggestion.agentSkills?.sourceFormat, "agent-skills");
   assert.equal(suggestion.agentSkills?.direction, "none");
+  assert.equal(suggestion.agentSkills?.sourcePath, target);
+  assert.equal(suggestion.agentSkills?.targetPath, target);
+  assert.equal(suggestion.agentSkills?.entrypointMigration, "none");
   assert.equal(suggestion.agentSkills?.canonicalFrontmatter, undefined);
 });
 
@@ -266,7 +269,13 @@ Use this skill when reviewing demo inputs.
       undefined,
       field,
     );
-    assert.match(block?.reason ?? "", /must be a scalar value/, field);
+    assert.match(
+      block?.reason ?? "",
+      field === "network_allowed"
+        ? /must be a boolean or the string/
+        : /must be a YAML string/,
+      field,
+    );
   }
 });
 
@@ -359,7 +368,7 @@ Use this skill when reviewing demo inputs.
     assert.match(
       suggestion.blockedMetadata.find((item) => item.field === field)?.reason ??
         "",
-      /must be a scalar value/,
+      /must be a YAML string/,
       field,
     );
   }
@@ -423,6 +432,213 @@ Use this skill when reviewing demo inputs.
       "",
     /duplicate semantic values/,
   );
+});
+
+test("migration blocks lossy native YAML values", async () => {
+  const cases = [
+    {
+      field: "version",
+      yaml: "version: 1.0",
+      message: /Historical version must be a YAML string/,
+    },
+    {
+      field: "id",
+      yaml: "id: 001",
+      message: /Historical id must be a YAML string/,
+    },
+    {
+      field: "owner",
+      yaml: "owner: true",
+      message: /Historical owner must be a YAML string/,
+    },
+    {
+      field: "status",
+      yaml: "status: false",
+      message: /Historical status must be a YAML string/,
+    },
+    {
+      field: "tags",
+      yaml: "tags: [1.0]",
+      message: /Historical tags must contain string values only/,
+    },
+    {
+      field: "allowed_data",
+      yaml: "allowed_data: [true]",
+      message: /Historical allowed_data must contain string values only/,
+    },
+    {
+      field: "network_allowed",
+      yaml: "network_allowed: 1",
+      message: /Historical network_allowed must be a boolean or the string/,
+    },
+  ];
+
+  for (const fixture of cases) {
+    const { target } = await skillFixture(
+      "demo",
+      `---\n${fixture.yaml}\n---\n# Demo\n\nUse this skill when reviewing demo inputs.\n`,
+    );
+    const suggestion = await buildMetadataSuggestion(target);
+    const block = suggestion.blockedMetadata.find(
+      (item) => item.field === fixture.field,
+    );
+
+    assert.equal(
+      suggestion.agentSkills?.canonicalFrontmatter,
+      undefined,
+      fixture.yaml,
+    );
+    assert.match(block?.reason ?? "", fixture.message, fixture.yaml);
+  }
+});
+
+test("migration preserves quoted text, safe booleans, and string-only lists", async () => {
+  const cases = [
+    ["version", 'version: "1.0"', "1.0"],
+    ["id", 'id: "001"', "001"],
+    ["owner", 'owner: "true"', "true"],
+    ["tags", 'tags: ["1.0"]', '["1.0"]'],
+    ["tags", `tags: '["1.0"]'`, '["1.0"]'],
+    ["network-allowed", "network_allowed: false", "false"],
+    ["network-allowed", 'network_allowed: "true"', "true"],
+  ] as const;
+
+  for (const [canonicalSuffix, yaml, expected] of cases) {
+    const { target } = await skillFixture(
+      "demo",
+      `---\n${yaml}\n---\n# Demo\n\nUse this skill when reviewing demo inputs.\n`,
+    );
+    const suggestion = await buildMetadataSuggestion(target);
+
+    assert.deepEqual(suggestion.blockedMetadata, [], yaml);
+    assert.equal(
+      suggestion.agentSkills?.candidateRenmaMetadata[
+        `renma.${canonicalSuffix}`
+      ],
+      expected,
+      yaml,
+    );
+    assert.ok(suggestion.agentSkills?.canonicalFrontmatter, yaml);
+  }
+});
+
+test("canonical Agent Skills support explicit owner metadata retrofit", async () => {
+  const noOwner = await skillFixture(
+    "demo",
+    `---
+name: demo
+description: Review demo inputs. Use when demo inputs need review.
+---
+# Demo
+`,
+  );
+  const added = await buildMetadataSuggestion(noOwner.target, {
+    owner: "qa-platform",
+  });
+
+  assert.equal(added.suggestedMode, "agent-skills-metadata-retrofit");
+  assert.equal(added.agentSkills?.direction, "none");
+  assert.equal(
+    added.agentSkills?.candidateRenmaMetadata["renma.owner"],
+    "qa-platform",
+  );
+  assert.match(
+    added.agentSkills?.canonicalFrontmatter ?? "",
+    /renma\.owner: qa-platform/,
+  );
+
+  const existing = await skillFixture(
+    "demo",
+    `---
+name: demo
+description: Review demo inputs. Use when demo inputs need review.
+metadata:
+  renma.owner: docs
+---
+# Demo
+`,
+  );
+  const same = await buildMetadataSuggestion(existing.target, {
+    owner: "docs",
+  });
+  const different = await buildMetadataSuggestion(existing.target, {
+    owner: "qa-platform",
+  });
+  const omitted = await buildMetadataSuggestion(noOwner.target);
+
+  assert.deepEqual(same.blockedMetadata, []);
+  assert.equal(same.agentSkills?.preservedMetadata["renma.owner"], "docs");
+  assert.deepEqual(same.agentSkills?.candidateRenmaMetadata, {});
+  assert.equal(same.agentSkills?.canonicalFrontmatter, undefined);
+
+  assert.equal(different.agentSkills?.canonicalFrontmatter, undefined);
+  assert.match(
+    different.blockedMetadata.find((item) => item.field === "owner")?.reason ??
+      "",
+    /differs from explicitly provided owner/,
+  );
+
+  assert.deepEqual(omitted.agentSkills?.candidateRenmaMetadata, {});
+  assert.equal(omitted.agentSkills?.canonicalFrontmatter, undefined);
+});
+
+test("migration validates the target directory without trimming filesystem names", async () => {
+  for (const name of ["demo ", " demo"]) {
+    const { target } = await skillFixture(
+      name,
+      "---\nid: skill.demo\n---\n# Demo\n\nUse this skill when reviewing demo inputs.\n",
+    );
+    const suggestion = await buildMetadataSuggestion(target);
+    assert.ok(
+      suggestion.blockedMetadata.some((item) => item.field === "name"),
+      JSON.stringify(name),
+    );
+    assert.equal(suggestion.agentSkills?.canonicalFrontmatter, undefined);
+  }
+});
+
+test("migration description extraction ignores both fence characters and lengths", async () => {
+  for (const fenced of [
+    [
+      "```markdown",
+      "Use this skill when performing a dangerous example action.",
+      "```",
+    ],
+    [
+      "~~~markdown",
+      "Use this skill when performing a dangerous example action.",
+      "~~~",
+    ],
+    [
+      "~~~~markdown",
+      "Use this skill when performing a dangerous example action.",
+      "~~~",
+      "Use this skill when performing another dangerous example action.",
+      "~~~~~",
+    ],
+  ]) {
+    const { target } = await skillFixture(
+      "demo",
+      [
+        "---",
+        "id: skill.demo",
+        "---",
+        "# Demo",
+        "",
+        ...fenced,
+        "",
+        "Use this skill when reviewing real demo inputs.",
+        "",
+      ].join("\n"),
+    );
+    const suggestion = await buildMetadataSuggestion(target);
+
+    assert.equal(
+      suggestion.agentSkills?.candidateAgentSkillsFields.description,
+      "Use this skill when reviewing real demo inputs.",
+    );
+    assert.ok(suggestion.agentSkills?.canonicalFrontmatter);
+  }
 });
 
 async function skillFixture(

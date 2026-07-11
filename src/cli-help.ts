@@ -579,10 +579,11 @@ export const COMMAND_HELP = [
     question:
       "How can a coding agent prepare a metadata retrofit or one-way Skill migration?",
     purpose:
-      "Suggest metadata emits a prompt or structured suggestion for one existing asset. Skill targets use the one-way historical Renma to Agent Skills migration path.",
+      "Suggest metadata emits a prompt or structured suggestion for one existing asset. Historical Skill targets use the one-way historical Renma to Agent Skills migration path; canonical Agent Skills support an explicit owner retrofit, never reverse migration.",
     useWhen: [
       "An asset lacks compact metadata and you want a reviewable metadata patch.",
-      "A legacy or hybrid SKILL.md needs an Agent Skills plus metadata.renma.* conversion proposal.",
+      "A legacy or hybrid SKILL.md, skill.md, or *.skill.md needs an Agent Skills plus metadata.renma.* conversion proposal.",
+      "A canonical Agent Skill needs an explicit metadata.renma.owner candidate from --owner.",
       "You need guidance that preserves the existing Markdown body and semantics.",
       "A human explicitly provides an owner with --owner or the asset already declares one.",
     ],
@@ -596,10 +597,13 @@ export const COMMAND_HELP = [
     examples: [
       "renma suggest-metadata skills/testing/spec-review/SKILL.md --format prompt",
       "renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform --format json",
+      "renma suggest-metadata skills/testing/spec-review.skill.md --format json",
     ],
     interpretation: [
       "The command prints to stdout and does not edit the target file.",
       "For Skill targets, canonical frontmatter is omitted when migration is unsafe or ambiguous.",
+      "Historical skill.md and *.skill.md targets report the required rename or move in structured output.",
+      "For canonical Agent Skills, --owner can propose a metadata retrofit without reverse migration.",
       "Without --owner, do not add owner metadata unless the asset already declares one or a maintainer confirms it.",
       "Preserve existing Markdown body and semantics for a metadata-only retrofit.",
     ],

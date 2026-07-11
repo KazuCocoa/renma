@@ -170,6 +170,24 @@ test("accepts Unicode names and NFKC-equivalent parent directories", () => {
   }
 });
 
+test("does not trim Agent Skill directory names", () => {
+  for (const parent of ["demo ", " demo"]) {
+    const validation = validateAgentSkill(
+      skill(
+        `skills/${parent}/SKILL.md`,
+        "---\nname: demo\ndescription: Review inputs. Use when inputs need review.\n---\n# Demo\n",
+      ),
+    );
+    assert.ok(
+      validation.issues.some(
+        (issue) => issue.code === "AS-SKILL-NAME-DIRECTORY-MISMATCH",
+      ),
+      JSON.stringify(parent),
+    );
+    assert.equal(validation.valid, false, JSON.stringify(parent));
+  }
+});
+
 test("rejects invalid Unicode name forms deterministically", () => {
   const cases = [
     { name: "Überblick", label: "uppercase Unicode" },
@@ -392,6 +410,46 @@ description: Review demo inputs. Use when a demo needs review.
       ),
       false,
       constraint,
+    );
+  }
+});
+
+test("authoring inspection ignores backtick and tilde fenced examples", () => {
+  for (const fenced of [
+    ["```markdown", "## Procedure", "Do not delete production data.", "```"],
+    ["~~~markdown", "## Procedure", "Do not delete production data.", "~~~"],
+    [
+      "~~~~markdown",
+      "## Procedure",
+      "Do not delete production data.",
+      "~~~",
+      "Never upload production data.",
+      "~~~~~",
+    ],
+  ]) {
+    const validation = validateAgentSkill(
+      skill(
+        "skills/demo/SKILL.md",
+        [
+          "---",
+          "name: demo",
+          "description: Review demo inputs. Use when demo inputs need review.",
+          "---",
+          "# Demo",
+          "",
+          ...fenced,
+          "",
+          "Review the real input and return a summary.",
+          "",
+        ].join("\n"),
+      ),
+    );
+    assert.equal(
+      validation.issues.some((issue) =>
+        issue.code.startsWith("RN-SKILL-EXECUTION-CONSTRAINT"),
+      ),
+      false,
+      fenced[0],
     );
   }
 });

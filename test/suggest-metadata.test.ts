@@ -361,6 +361,119 @@ test("suggest-metadata works for context assets", async () => {
   });
 });
 
+test("scan commands execute historical Skill entrypoint migrations end to end", async () => {
+  const root = await fixture();
+  const fixtures = [
+    {
+      source: "skills/demo/skill.md",
+      target: "skills/demo/SKILL.md",
+      name: "demo",
+      migration: "rename",
+    },
+    {
+      source: "skills/testing/spec-review.skill.md",
+      target: "skills/testing/spec-review/SKILL.md",
+      name: "spec-review",
+      migration: "move-and-rename",
+    },
+    {
+      source: ".agents/skills/demo/skill.md",
+      target: ".agents/skills/demo/SKILL.md",
+      name: "demo",
+      migration: "rename",
+    },
+    {
+      source: ".agents/skills/testing/spec-review.skill.md",
+      target: ".agents/skills/testing/spec-review/SKILL.md",
+      name: "spec-review",
+      migration: "move-and-rename",
+    },
+  ] as const;
+  const original =
+    "---\nid: skill.legacy\n---\n# Legacy\n\nUse this skill when reviewing legacy inputs.\n";
+
+  for (const entry of fixtures) {
+    const absolute = path.join(root, ...entry.source.split("/"));
+    await mkdir(path.dirname(absolute), { recursive: true });
+    await writeFile(absolute, original);
+  }
+
+  const textScan = await withCapturedConsole(() =>
+    main(["scan", root, "--format", "text"]),
+  );
+  const jsonScan = await withCapturedConsole(() =>
+    main(["scan", root, "--format", "json"]),
+  );
+  const report = JSON.parse(jsonScan.stdout) as {
+    agentSkills: {
+      results: Array<{ path: string; migrationCommand?: string }>;
+    };
+  };
+
+  for (const entry of fixtures) {
+    assert.match(
+      textScan.stdout,
+      new RegExp(
+        `renma suggest-metadata ${entry.source.replaceAll(".", "\\.")}`,
+      ),
+      entry.source,
+    );
+    assert.equal(
+      report.agentSkills.results.find((item) => item.path === entry.source)
+        ?.migrationCommand,
+      `renma suggest-metadata ${entry.source}`,
+      entry.source,
+    );
+
+    const absoluteSource = path.join(root, ...entry.source.split("/"));
+    const result = await withCapturedConsole(() =>
+      main(["suggest-metadata", absoluteSource, "--format", "json"]),
+    );
+    const suggestion = JSON.parse(result.stdout) as {
+      kind: string;
+      suggestedMode: string;
+      agentSkills: {
+        sourcePath: string;
+        targetPath: string;
+        entrypointMigration: string;
+        candidateAgentSkillsFields: Record<string, string>;
+      };
+    };
+
+    assert.equal(suggestion.kind, "skill", entry.source);
+    assert.equal(
+      suggestion.suggestedMode,
+      "agent-skills-migration",
+      entry.source,
+    );
+    assert.equal(
+      suggestion.agentSkills.sourcePath,
+      absoluteSource,
+      entry.source,
+    );
+    assert.equal(
+      suggestion.agentSkills.targetPath,
+      path.join(root, ...entry.target.split("/")),
+      entry.source,
+    );
+    assert.equal(
+      suggestion.agentSkills.entrypointMigration,
+      entry.migration,
+      entry.source,
+    );
+    assert.equal(
+      suggestion.agentSkills.candidateAgentSkillsFields.name,
+      entry.name,
+      entry.source,
+    );
+    assert.equal(
+      await readFile(absoluteSource, "utf8"),
+      original,
+      entry.source,
+    );
+  }
+});
+
 async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-suggest-metadata-"));
 }

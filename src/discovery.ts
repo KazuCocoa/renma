@@ -33,6 +33,70 @@ const SKILL_LIKE_FILE_LLM_HINT =
 const SKILL_ENTRYPOINT_UNDER_RESERVED_SUPPORT_DIR_LLM_HINT =
   "Do not move or rename this file only to reduce diagnostics. Rename the skill directory only if this file is intended to define a Renma skill. For example, use `skills/example-review/SKILL.md` instead of `skills/examples/SKILL.md`.";
 
+export type SkillEntrypointPath =
+  | {
+      kind: "canonical";
+      currentPath: string;
+      targetPath: string;
+      candidateName: string;
+    }
+  | {
+      kind: "lowercase-entrypoint";
+      currentPath: string;
+      targetPath: string;
+      candidateName: string;
+    }
+  | {
+      kind: "flat-legacy-entrypoint";
+      currentPath: string;
+      targetPath: string;
+      candidateName: string;
+    };
+
+/** Classify canonical and historical Skill entrypoints under explicit Skill roots. */
+export function classifySkillEntrypointPath(
+  filePath: string,
+): SkillEntrypointPath | undefined {
+  const currentPath = toPosix(filePath);
+  const root = explicitSkillsRoot(currentPath);
+  if (!root) return undefined;
+
+  const basename = path.posix.basename(currentPath);
+  const directory = path.posix.dirname(currentPath);
+  const localDirectories = root.segments.slice(root.endIndex, -1);
+  if (
+    localDirectories.some((segment) =>
+      RESERVED_SKILL_SUPPORT_DIRS.includes(segment),
+    )
+  ) {
+    return undefined;
+  }
+
+  if (basename === "SKILL.md" || basename === "skill.md") {
+    const candidateName = path.posix.basename(directory);
+    if (!candidateName || candidateName === ".") return undefined;
+    return {
+      kind: basename === "SKILL.md" ? "canonical" : "lowercase-entrypoint",
+      currentPath,
+      targetPath:
+        basename === "SKILL.md"
+          ? currentPath
+          : path.posix.join(directory, "SKILL.md"),
+      candidateName,
+    };
+  }
+
+  if (!basename.endsWith(".skill.md")) return undefined;
+  const candidateName = basename.slice(0, -".skill.md".length);
+  if (!candidateName) return undefined;
+  return {
+    kind: "flat-legacy-entrypoint",
+    currentPath,
+    targetPath: path.posix.join(directory, candidateName, "SKILL.md"),
+    candidateName,
+  };
+}
+
 /** Discover and read scan artifacts according to the provided scan configuration. */
 export async function discoverArtifacts(
   root: string,
@@ -225,36 +289,39 @@ async function skillLikeLayoutDiagnostics(
 }
 
 function isExplicitSkillEntrypoint(relativePath: string): boolean {
-  const normalized = toPosix(relativePath);
-  const basename = path.posix.basename(normalized);
-  const lowerBasename = basename.toLowerCase();
-  if (!isSkillLikeFilename(lowerBasename)) return false;
-  if (!isExplicitSkillsPath(normalized)) return false;
-  if (skillSupportPathSegment(normalized) !== undefined) return false;
-  return true;
+  return classifySkillEntrypointPath(relativePath) !== undefined;
 }
 
 function isExplicitSkillsPath(relativePath: string): boolean {
-  return (
-    relativePath.startsWith("skills/") ||
-    relativePath.startsWith(".agents/skills/")
-  );
-}
-
-function isSkillLikeFilename(lowerBasename: string): boolean {
-  return lowerBasename === "skill.md" || lowerBasename.endsWith(".skill.md");
+  return explicitSkillsRoot(relativePath) !== undefined;
 }
 
 function skillSupportPathSegment(relativePath: string): string | undefined {
   const normalized = toPosix(relativePath);
-  if (!isExplicitSkillsPath(normalized)) return undefined;
-
-  const segments = normalized.split("/");
-  const rootSegmentCount = normalized.startsWith(".agents/skills/") ? 2 : 1;
-  const skillLocalSegments = segments.slice(rootSegmentCount, -1);
+  const root = explicitSkillsRoot(normalized);
+  if (!root) return undefined;
+  const skillLocalSegments = root.segments.slice(root.endIndex, -1);
   return skillLocalSegments.find((segment) =>
     RESERVED_SKILL_SUPPORT_DIRS.includes(segment),
   );
+}
+
+function explicitSkillsRoot(
+  filePath: string,
+): { segments: string[]; endIndex: number } | undefined {
+  const segments = toPosix(filePath).split("/").filter(Boolean);
+  let match: { segments: string[]; endIndex: number } | undefined;
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    if (segments[index] === ".agents" && segments[index + 1] === "skills") {
+      match = { segments, endIndex: index + 2 };
+      index += 1;
+      continue;
+    }
+    if (segments[index] === "skills") {
+      match = { segments, endIndex: index + 1 };
+    }
+  }
+  return match;
 }
 
 async function mapLimit<T, R>(
@@ -302,7 +369,7 @@ function depth(relativePath: string): number {
 }
 
 function toPosix(value: string): string {
-  return value.split(path.sep).join(path.posix.sep);
+  return value.replaceAll("\\", path.posix.sep);
 }
 
 function errorMessage(error: unknown): string {

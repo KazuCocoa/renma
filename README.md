@@ -399,6 +399,11 @@ skills/**/*.skill.md
 .agents/skills/**/*.skill.md
 ```
 
+For migration, `skills/demo/skill.md` targets `skills/demo/SKILL.md`, while
+`skills/testing/spec-review.skill.md` targets
+`skills/testing/spec-review/SKILL.md`. `suggest-metadata` reports these path
+changes explicitly and does not edit files.
+
 Other default scan inputs include:
 
 ```text
