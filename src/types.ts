@@ -241,7 +241,7 @@ export interface ScanResult {
   configPath?: string;
   scannedFileCount: number;
   format: "text" | "json";
-  agentSkills: AgentSkillsValidationSummary;
+  agentSkills?: AgentSkillsValidationSummary;
   contextLens?: ContextLensSummary;
   securityPolicyInventory?: SecurityPolicyInventorySummary;
   trustGraph?: TrustGraph;
