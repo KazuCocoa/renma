@@ -1,5 +1,9 @@
 import path from "node:path";
 
+import {
+  AGENT_SKILL_DIAGNOSTIC_IDS as IDS,
+  type AgentSkillDiagnosticId,
+} from "./diagnostic-ids.js";
 import type { ParsedDocument } from "./types.js";
 import {
   parseAgentSkillFrontmatter,
@@ -64,7 +68,7 @@ export type AgentSkillFormat =
   | "unknown";
 
 export interface AgentSkillValidationIssue {
-  code: string;
+  code: AgentSkillDiagnosticId;
   severity: "error" | "warning";
   category: "specification" | "renma-authoring";
   path: string;
@@ -168,7 +172,7 @@ export function validateAgentSkill(
     issues.push(
       createIssue(
         document,
-        "AS-SKILL-NONCANONICAL-FILENAME",
+        IDS.AS_NONCANONICAL_FILENAME,
         "error",
         "specification",
         "Agent Skills requires the skill entrypoint filename to be exactly SKILL.md.",
@@ -181,7 +185,7 @@ export function validateAgentSkill(
     issues.push(
       createIssue(
         document,
-        "AS-SKILL-MISSING-FRONTMATTER",
+        IDS.AS_MISSING_FRONTMATTER,
         "error",
         "specification",
         "SKILL.md must start with YAML frontmatter delimited by ---.",
@@ -192,7 +196,7 @@ export function validateAgentSkill(
     issues.push(
       createIssue(
         document,
-        "AS-SKILL-UNCLOSED-FRONTMATTER",
+        IDS.AS_UNCLOSED_FRONTMATTER,
         "error",
         "specification",
         "SKILL.md frontmatter must be closed with --- before the Markdown body.",
@@ -205,7 +209,7 @@ export function validateAgentSkill(
     issues.push({
       ...createIssue(
         document,
-        "AS-SKILL-INVALID-YAML",
+        IDS.AS_INVALID_YAML,
         "error",
         "specification",
         `Invalid Agent Skills YAML frontmatter: ${error.message}`,
@@ -224,7 +228,7 @@ export function validateAgentSkill(
     issues.push(
       createIssue(
         document,
-        "AS-SKILL-FRONTMATTER-NOT-MAPPING",
+        IDS.AS_FRONTMATTER_NOT_MAPPING,
         "error",
         "specification",
         "Agent Skills frontmatter must parse to a YAML mapping.",
@@ -238,7 +242,7 @@ export function validateAgentSkill(
       fieldIssue(
         document,
         duplicate,
-        "AS-SKILL-DUPLICATE-FIELD",
+        IDS.AS_DUPLICATE_FIELD,
         `Agent Skills frontmatter field "${duplicate.key}" is declared more than once.`,
       ),
     );
@@ -248,7 +252,7 @@ export function validateAgentSkill(
       fieldIssue(
         document,
         duplicate,
-        "AS-SKILL-DUPLICATE-METADATA-KEY",
+        IDS.AS_DUPLICATE_METADATA_KEY,
         `Agent Skills metadata key "${duplicate.key}" is declared more than once.`,
         `metadata.${duplicate.key}`,
       ),
@@ -261,7 +265,7 @@ export function validateAgentSkill(
       fieldIssue(
         document,
         unexpected,
-        "AS-SKILL-UNEXPECTED-TOP-LEVEL-FIELD",
+        IDS.AS_UNEXPECTED_TOP_LEVEL_FIELD,
         `Unexpected top-level Agent Skills field "${unexpected.key}". Renma extensions belong under metadata using renma.* string keys.`,
       ),
     );
@@ -353,7 +357,7 @@ function validateName(
     issues.push(
       createIssue(
         document,
-        "AS-SKILL-MISSING-NAME",
+        IDS.AS_MISSING_NAME,
         "error",
         "specification",
         "Agent Skills requires a non-empty string name.",
@@ -367,7 +371,7 @@ function validateName(
     issues.push(
       createIssue(
         document,
-        "AS-SKILL-INVALID-NAME",
+        IDS.AS_INVALID_NAME,
         "error",
         "specification",
         "Agent Skills name must be a non-empty string.",
@@ -383,7 +387,7 @@ function validateName(
     issues.push(
       createIssue(
         document,
-        "AS-SKILL-INVALID-NAME",
+        IDS.AS_INVALID_NAME,
         "error",
         "specification",
         `Invalid Agent Skills name "${rawName}": ${nameValidation.problems.join("; ")}.`,
@@ -404,7 +408,7 @@ function validateName(
     issues.push({
       ...createIssue(
         document,
-        "AS-SKILL-NAME-DIRECTORY-MISMATCH",
+        IDS.AS_NAME_DIRECTORY_MISMATCH,
         "error",
         "specification",
         `Agent Skills name "${rawName}" must match parent directory "${parent}".`,
@@ -427,7 +431,7 @@ function validateDescription(
     issues.push(
       createIssue(
         document,
-        "AS-SKILL-MISSING-DESCRIPTION",
+        IDS.AS_MISSING_DESCRIPTION,
         "error",
         "specification",
         "Agent Skills requires a non-empty description describing what the skill does and when to use it.",
@@ -441,7 +445,7 @@ function validateDescription(
     issues.push(
       createIssue(
         document,
-        "AS-SKILL-INVALID-DESCRIPTION",
+        IDS.AS_INVALID_DESCRIPTION,
         "error",
         "specification",
         "Agent Skills description must be a non-empty string.",
@@ -455,7 +459,7 @@ function validateDescription(
     issues.push(
       createIssue(
         document,
-        "AS-SKILL-DESCRIPTION-TOO-LONG",
+        IDS.AS_DESCRIPTION_TOO_LONG,
         "error",
         "specification",
         `Agent Skills description exceeds ${MAX_DESCRIPTION_LENGTH} characters.`,
@@ -481,7 +485,7 @@ function validateOptionalFields(
     issues.push(
       createIssue(
         document,
-        "AS-SKILL-INVALID-COMPATIBILITY",
+        IDS.AS_INVALID_COMPATIBILITY,
         "error",
         "specification",
         "Agent Skills compatibility must be a non-empty string when provided.",
@@ -493,7 +497,7 @@ function validateOptionalFields(
     issues.push(
       createIssue(
         document,
-        "AS-SKILL-COMPATIBILITY-TOO-LONG",
+        IDS.AS_COMPATIBILITY_TOO_LONG,
         "error",
         "specification",
         `Agent Skills compatibility exceeds ${MAX_COMPATIBILITY_LENGTH} characters.`,
@@ -512,11 +516,14 @@ function validateOptionalString(
 ): void {
   const value = frontmatter.values[fieldName];
   if (value === undefined || typeof value === "string") return;
-  const codeField = fieldName.toUpperCase();
+  const code =
+    fieldName === "license"
+      ? IDS.AS_INVALID_LICENSE
+      : IDS.AS_INVALID_ALLOWED_TOOLS;
   issues.push(
     createIssue(
       document,
-      `AS-SKILL-INVALID-${codeField}`,
+      code,
       "error",
       "specification",
       `Agent Skills ${fieldName} must be a string when provided.`,
@@ -542,7 +549,7 @@ function validateMetadata(
     issues.push(
       createIssue(
         document,
-        "AS-SKILL-INVALID-METADATA",
+        IDS.AS_INVALID_METADATA,
         "error",
         "specification",
         "Agent Skills metadata must be a mapping from string keys to string values.",
@@ -574,7 +581,7 @@ function authoringIssues(
     issues.push(
       createIssue(
         document,
-        "RN-SKILL-DESCRIPTION-MISSING-USAGE-BOUNDARY",
+        IDS.RN_DESCRIPTION_MISSING_USAGE_BOUNDARY,
         "warning",
         "renma-authoring",
         "Description should state when the agent should use this skill.",
@@ -596,7 +603,7 @@ function authoringIssues(
     issues.push(
       createIssue(
         document,
-        "RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY",
+        IDS.RN_DESCRIPTION_OMITS_SELECTION_BOUNDARY,
         "warning",
         "renma-authoring",
         "The body declares a skill-selection exclusion that is absent from the Agent Skills description.",
@@ -622,7 +629,7 @@ function authoringIssues(
     issues.push(
       createIssue(
         document,
-        "RN-SKILL-EXECUTION-CONSTRAINT-NOT-PROMINENT",
+        IDS.RN_EXECUTION_CONSTRAINT_NOT_PROMINENT,
         "warning",
         "renma-authoring",
         "Execution constraints should appear under a prominent Hard Constraints, Prohibited Actions, Safety Constraints, or equivalent heading.",
@@ -638,7 +645,7 @@ function authoringIssues(
     issues.push(
       createIssue(
         document,
-        "RN-SKILL-EXECUTION-CONSTRAINT-SCATTERED",
+        IDS.RN_EXECUTION_CONSTRAINT_SCATTERED,
         "warning",
         "renma-authoring",
         "Execution constraints are scattered across sections; centralize them without changing their meaning.",
@@ -652,7 +659,7 @@ function authoringIssues(
     issues.push(
       createIssue(
         document,
-        "RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE",
+        IDS.RN_EXECUTION_CONSTRAINT_MISSING_ALTERNATIVE,
         "warning",
         "renma-authoring",
         "Execution constraint has no nearby supported alternative or stop behavior. Request human clarification; do not invent one.",
@@ -758,7 +765,7 @@ function firstField(
 function fieldIssue(
   document: ParsedDocument,
   field: YamlFrontmatterField,
-  code: string,
+  code: AgentSkillDiagnosticId,
   message: string,
   fieldName = field.key,
 ): AgentSkillValidationIssue {
@@ -776,7 +783,7 @@ function fieldIssue(
 
 function createIssue(
   document: ParsedDocument,
-  code: string,
+  code: AgentSkillDiagnosticId,
   severity: "error" | "warning",
   category: "specification" | "renma-authoring",
   message: string,

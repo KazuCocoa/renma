@@ -156,6 +156,47 @@ a prohibition without a supported alternative or stop behavior. Nested
 subsections under a prominent constraint heading remain prominent. These
 warnings do not make a structurally valid Agent Skill invalid.
 
+## Agent Skills Diagnostic Identifiers
+
+Agent Skills diagnostics use stable identifiers in the `agentSkills` portion of
+scan output. `AS-SKILL-*` identifiers are specification errors and make the
+Skill invalid. `RN-SKILL-*` identifiers are Renma authoring warnings and do not
+affect structural validity or the existing `--fail-on` threshold.
+
+### Specification errors
+
+| Identifier | Meaning |
+| --- | --- |
+| `AS-SKILL-NONCANONICAL-FILENAME` | The entrypoint filename is not exactly `SKILL.md`. |
+| `AS-SKILL-MISSING-FRONTMATTER` | YAML frontmatter is absent. |
+| `AS-SKILL-UNCLOSED-FRONTMATTER` | The opening frontmatter delimiter has no closing delimiter. |
+| `AS-SKILL-INVALID-YAML` | The frontmatter is not valid YAML. |
+| `AS-SKILL-FRONTMATTER-NOT-MAPPING` | The frontmatter root is not a YAML mapping. |
+| `AS-SKILL-DUPLICATE-FIELD` | A top-level frontmatter field is declared more than once. |
+| `AS-SKILL-DUPLICATE-METADATA-KEY` | A key in `metadata` is declared more than once. |
+| `AS-SKILL-UNEXPECTED-TOP-LEVEL-FIELD` | A top-level field is outside the Agent Skills field set. |
+| `AS-SKILL-MISSING-NAME` | The required `name` field is absent or empty. |
+| `AS-SKILL-INVALID-NAME` | `name` has the wrong type or violates the name rules. |
+| `AS-SKILL-NAME-DIRECTORY-MISMATCH` | The normalized `name` does not match its immediate parent directory. |
+| `AS-SKILL-MISSING-DESCRIPTION` | The required `description` field is absent or empty. |
+| `AS-SKILL-INVALID-DESCRIPTION` | `description` is not a string. |
+| `AS-SKILL-DESCRIPTION-TOO-LONG` | `description` exceeds 1,024 Unicode code points. |
+| `AS-SKILL-INVALID-COMPATIBILITY` | `compatibility` is not a non-empty string. |
+| `AS-SKILL-COMPATIBILITY-TOO-LONG` | `compatibility` exceeds 500 Unicode code points. |
+| `AS-SKILL-INVALID-LICENSE` | `license` is present but is not a string. |
+| `AS-SKILL-INVALID-ALLOWED-TOOLS` | `allowed-tools` is present but is not a string. |
+| `AS-SKILL-INVALID-METADATA` | `metadata` is not a string-to-string mapping. |
+
+### Renma authoring warnings
+
+| Identifier | Meaning |
+| --- | --- |
+| `RN-SKILL-DESCRIPTION-MISSING-USAGE-BOUNDARY` | The description does not state when the Skill should be used. |
+| `RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY` | A body selection exclusion is absent from the description. |
+| `RN-SKILL-EXECUTION-CONSTRAINT-NOT-PROMINENT` | An execution constraint is outside a prominent constraint section. |
+| `RN-SKILL-EXECUTION-CONSTRAINT-SCATTERED` | Execution constraints are scattered across sections. |
+| `RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE` | A prohibition has no nearby supported alternative or stop behavior. |
+
 ## One-Way Migration
 
 Historical top-level Renma Skill fields are migration input only:
