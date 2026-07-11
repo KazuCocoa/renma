@@ -156,12 +156,10 @@ Move reusable domain, testing, platform, product, or tool knowledge into separat
 
 ## Hard Constraints
 
-- Keep recommendations grounded in provided inputs and repository evidence.
-- Do not invent domain facts, policies, owners, dependencies, or product behavior.
-- State what the agent must do instead when a prohibited action or missing-input condition applies.
-- Do not choose runtime task context beyond this skill's declared scope.
-- Do not assemble prompts for live model calls.
-- Do not call external services unless the surrounding workflow explicitly allows it.
+Hard constraints apply after this skill has been activated. Replace these examples with repository-grounded constraints, adding domain-specific prohibitions only when evidence supports them.
+
+- When source evidence is missing, do not infer product behavior. Stop and report the missing evidence.
+- Do not modify production files. Produce a proposed patch for human review instead.
 
 ## Validation
 
@@ -279,8 +277,10 @@ function renderPrompt(input: {
           "- Preserve top-level name and description as the Agent Skills discovery surface.",
           "- Keep Renma extensions inside the metadata mapping with renma.* string keys.",
           "- Store Renma list metadata as JSON array strings.",
-          "- Make the important negative selection boundary visible in description.",
-          "- Group activated-workflow prohibitions under a prominent Do Not Use or Hard Constraints section, and state the required alternative or stop behavior.",
+          "- Keep Use this skill when and Do not use this skill when focused on skill selection.",
+          "- Add a description exclusion only when it genuinely affects skill selection.",
+          "- Keep activated-workflow prohibitions separate under Hard Constraints, and preserve condition, prohibited action, and an evidence-backed alternative or stop behavior.",
+          "- Request human review when an execution constraint has no supported alternative; do not invent one.",
         ]
       : [];
 
@@ -373,7 +373,7 @@ function inferSkillName(targetPath: string): string {
 }
 
 function draftSkillDescription(title: string): string {
-  return `Drafts reviewed guidance for ${title}. Use when the requested task matches this skill's documented purpose, inputs, and routing boundary. Do not use until the placeholders and hard constraints in this scaffold have been replaced with repository-grounded guidance.`;
+  return `Drafts reviewed guidance for ${title}. Use when the requested task matches this skill's documented purpose, inputs, and routing boundary. Do not use this skill until the placeholders and hard constraints in this scaffold have been replaced with repository-grounded guidance.`;
 }
 
 function titleFromId(id: string): string {

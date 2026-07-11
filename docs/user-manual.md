@@ -550,6 +550,8 @@ Use this after `scan` detects metadata issues or `ownership` shows unowned asset
 
 The prompt asks the agent to inspect the existing asset, preserve the Markdown body, preserve existing frontmatter values, add only compact missing metadata that is clearly supported, and rerun `renma scan .` and `renma ownership .` after editing.
 
+For skills, the prompt reports `Selection-boundary review` separately from `Execution-constraint review`. Selection exclusions belong in `description` or supported `when_not_to_use` governance metadata only when they define tasks that should not select the skill. Execution prohibitions remain in the activated `SKILL.md` body, preferably under a prominent constraint heading with a source-backed alternative or stop behavior. Missing behavior requires human review; the command does not invent it.
+
 Owner metadata remains recommended but not required. Without `--owner`, `suggest-metadata` blocks owner as a suggested addition and says not to add one unless the asset already declares an owner or a maintainer provides one. With `--owner <owner>`, the command may include that owner because it was explicitly provided. If an existing asset already declares an owner, `suggest-metadata` preserves it; a different `--owner` value is treated as a human-review ownership change, not an automatic metadata suggestion. Renma does not infer owners from Git history, file paths, prose, or authors.
 
 ### `suggest-semantic-split`

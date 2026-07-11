@@ -440,54 +440,96 @@ function authoringIssues(
   description: string | undefined,
 ): AgentSkillValidationIssue[] {
   const issues: AgentSkillValidationIssue[] = [];
-  const body = markdownBody(document);
-  const hasNegativeDirective = negativeDirectivePattern().test(body);
-  const hasNegativeHeading = document.headings.some((heading) =>
-    negativeHeadingPattern().test(heading.text),
+  const bodyLines = authoringBodyLines(document);
+  const selectionBoundaryLines = bodyLines.filter((line) =>
+    hasExplicitSkillSelectionBoundary(line.text),
   );
-  const descriptionHasNegative = description
-    ? negativeDirectivePattern().test(description)
+  const hasSelectionBoundaryHeading = document.headings.some((heading) =>
+    selectionBoundaryHeadingPattern().test(heading.text),
+  );
+  const descriptionHasSelectionBoundary = description
+    ? hasExplicitSkillSelectionBoundary(description)
     : false;
+  const executionConstraints = bodyLines.filter(
+    (line) =>
+      hasExplicitExecutionConstraint(line.text) &&
+      !hasExplicitSkillSelectionBoundary(line.text),
+  );
+  const hasConstraintHeading = document.headings.some((heading) =>
+    executionConstraintHeadingPattern().test(heading.text),
+  );
 
-  if ((hasNegativeDirective || hasNegativeHeading) && !descriptionHasNegative) {
+  if (
+    (selectionBoundaryLines.length > 0 || hasSelectionBoundaryHeading) &&
+    !descriptionHasSelectionBoundary
+  ) {
     issues.push(
       issue(
         document,
-        "RN-SKILL-DESCRIPTION-OMITS-NEGATIVE-BOUNDARY",
+        "RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY",
         "warning",
         "renma-authoring",
-        "The body declares negative usage guidance, but description does not expose a selection-critical exclusion. Reflect the important 'do not use' boundary in description without copying full procedures.",
+        "The body explicitly excludes a class of tasks from this skill, but description does not expose that selection boundary. Add only the supported skill-selection exclusion; do not copy execution constraints into description.",
         fieldLine(document, "description"),
         "description",
       ),
     );
   }
 
-  if (!hasNegativeDirective && !hasNegativeHeading && !descriptionHasNegative) {
+  if (executionConstraints.length > 0 && !hasConstraintHeading) {
     issues.push(
       issue(
         document,
-        "RN-SKILL-MISSING-NEGATIVE-USAGE-BOUNDARY",
+        "RN-SKILL-EXECUTION-CONSTRAINT-NOT-PROMINENT",
         "warning",
         "renma-authoring",
-        "Skill does not state when it must not be used. Add a reviewed negative usage boundary rather than leaving nearby cases to model inference.",
-        document.headings[0]?.line ?? 1,
+        "Execution prohibitions are present but no prominent Hard Constraints, Prohibited Actions, Safety Constraints, or equivalent constraint section exists. Group the existing constraints without changing their meaning.",
+        executionConstraints[0]?.line ?? 1,
       ),
     );
   }
 
-  if (hasNegativeDirective && !hasNegativeHeading) {
-    const line = firstMatchingLine(document, negativeDirectivePattern());
+  const executionSections = new Set(
+    executionConstraints.map((constraint) => constraint.section),
+  );
+  if (
+    executionConstraints.length > 1 &&
+    executionSections.size > 1 &&
+    !hasConstraintHeading
+  ) {
     issues.push(
       issue(
         document,
-        "RN-SKILL-NEGATIVE-DIRECTIVES-NOT-PROMINENT",
+        "RN-SKILL-EXECUTION-CONSTRAINT-SCATTERED",
         "warning",
         "renma-authoring",
-        "Negative directives are present but not grouped under a prominent 'Do Not Use' or 'Hard Constraints' section. Make critical constraints easy to find after activation without changing their meaning.",
-        line,
+        "Execution prohibitions appear in multiple sections without a central constraint section. Group the existing prohibitions for review without inventing or broadening them.",
+        executionConstraints[0]?.line ?? 1,
       ),
     );
+  }
+
+  const constraintLines = new Set(
+    executionConstraints.map((constraint) => constraint.line),
+  );
+  const missingAlternatives = executionConstraints.filter(
+    (constraint) =>
+      !hasAlternativeOrStopBehavior(
+        nearbyConstraintText(document, constraint.line, constraintLines),
+      ),
+  );
+  if (missingAlternatives.length > 0) {
+    issues.push({
+      ...issue(
+        document,
+        "RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE",
+        "warning",
+        "renma-authoring",
+        "An execution prohibition has no nearby reviewed alternative or stop behavior. Add the existing required action when supported; otherwise request human clarification. Do not invent replacement behavior.",
+        missingAlternatives[0]?.line ?? 1,
+      ),
+      details: { lines: missingAlternatives.map((item) => item.line) },
+    });
   }
 
   return issues;
@@ -615,31 +657,92 @@ function fieldLine(document: ParsedDocument, field: string): number {
   return document.metadataFields[field]?.startLine ?? 1;
 }
 
-function markdownBody(document: ParsedDocument): string {
-  if (document.lines[0]?.trim() !== "---") return document.artifact.content;
-  const end = document.lines.findIndex(
-    (line, index) => index > 0 && line.trim() === "---",
-  );
-  return (end >= 0 ? document.lines.slice(end + 1) : document.lines).join("\n");
-}
-
-function firstMatchingLine(document: ParsedDocument, pattern: RegExp): number {
-  const flags = pattern.flags.replace("g", "");
-  const safePattern = new RegExp(pattern.source, flags);
-  const index = document.lines.findIndex((line) => safePattern.test(line));
-  return index >= 0 ? index + 1 : 1;
-}
-
 function usageLanguagePattern(): RegExp {
   return /\b(?:use|used|when|whenever|for requests?|for tasks?|applies?)\b|(?:使用|利用|とき|場合|向け)/iu;
 }
 
-function negativeDirectivePattern(): RegExp {
-  return /\b(?:do not|don't|never|must not|should not|avoid|not for|not when)\b|(?:使用しない|利用しない|してはいけない|禁止|避ける|対象外)/iu;
+export function hasExplicitSkillSelectionBoundary(value: string): boolean {
+  return selectionBoundaryPattern().test(value);
 }
 
-function negativeHeadingPattern(): RegExp {
-  return /\b(?:do not use|when not to use|not for|hard constraints?|constraints?|prohibited|out of scope)\b|(?:使用しない|利用しない|禁止|制約|対象外)/iu;
+export function hasExplicitExecutionConstraint(value: string): boolean {
+  return executionConstraintPattern().test(value);
+}
+
+function selectionBoundaryPattern(): RegExp {
+  return /\b(?:do not use(?: this skill| it)? for|do not use this skill|when not to use|not for (?:this|the|these) tasks?|use (?:another|a different|an alternative|the [\w-]+) skill (?:instead )?when|out of scope for this skill)\b|(?:このスキルを使用しない|このスキルを利用しない|このスキルの対象外)/iu;
+}
+
+function selectionBoundaryHeadingPattern(): RegExp {
+  return /^(?:do not use(?: this skill)?(?: when| for)?|when not to use|not for(?: this skill)?|out of scope(?: for this skill)?)$/iu;
+}
+
+function executionConstraintPattern(): RegExp {
+  return /\b(?:do not|don't|never|must not|should not)\b|(?:してはいけない|禁止)/iu;
+}
+
+function executionConstraintHeadingPattern(): RegExp {
+  return /^(?:(?:hard|safety|execution|operational) constraints?|constraints?|prohibited actions?)$/iu;
+}
+
+interface AuthoringBodyLine {
+  line: number;
+  text: string;
+  section: string;
+}
+
+function authoringBodyLines(document: ParsedDocument): AuthoringBodyLine[] {
+  const bodyStart = bodyStartLine(document);
+  const fencedLines = new Set<number>();
+  for (const fence of document.codeFences) {
+    for (let line = fence.startLine; line <= fence.endLine; line += 1) {
+      fencedLines.add(line);
+    }
+  }
+
+  let section = "<body>";
+  const result: AuthoringBodyLine[] = [];
+  for (let index = bodyStart - 1; index < document.lines.length; index += 1) {
+    const line = index + 1;
+    if (fencedLines.has(line)) continue;
+    const text = document.lines[index] ?? "";
+    const heading = text.match(/^(#{1,6})\s+(.+?)\s*#*$/);
+    if (heading) {
+      section = heading[2]?.trim() ?? "<body>";
+      continue;
+    }
+    if (text.trim().length > 0) result.push({ line, text, section });
+  }
+  return result;
+}
+
+function bodyStartLine(document: ParsedDocument): number {
+  if (document.lines[0]?.trim() !== "---") return 1;
+  const end = document.lines.findIndex(
+    (line, index) => index > 0 && line.trim() === "---",
+  );
+  return end >= 0 ? end + 2 : 1;
+}
+
+function nearbyConstraintText(
+  document: ParsedDocument,
+  line: number,
+  constraintLines: Set<number>,
+): string {
+  const nearby = [document.lines[line - 1] ?? ""];
+  for (const candidateLine of [line - 1, line + 1]) {
+    if (candidateLine < 1 || constraintLines.has(candidateLine)) continue;
+    const candidate = document.lines[candidateLine - 1]?.trim() ?? "";
+    if (candidate.length === 0 || /^#{1,6}\s+/.test(candidate)) continue;
+    nearby.push(candidate);
+  }
+  return nearby.join("\n");
+}
+
+function hasAlternativeOrStopBehavior(value: string): boolean {
+  return /(?:^|[.;:]\s+|\n\s*(?:[-*+]\s+|\d+[.)]\s+)?|\bthen\s+|\band\s+)(?:(?!(?:do not|don't|never|must not|should not)\b)[^.\n]{0,80}\binstead\b|stop\b|report\b|ask\b|record\b|return\b|leave\b[^.\n]{0,40}\bunchanged\b|produce\b[^.\n]{0,40}\b(?:proposal|patch)\b|require\b[^.\n]{0,40}\bhuman review\b)/iu.test(
+    value,
+  );
 }
 
 function characterLength(value: string): number {

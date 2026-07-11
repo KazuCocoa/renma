@@ -44,10 +44,9 @@ Use a more appropriate review or execution workflow instead of stretching this l
 
 ## Hard Constraints
 
-- Do not invent limits, defaults, or acceptance criteria.
-- Do not use the lens as a runtime prompt selector or context injection rule.
-- Do not execute tests or diagnose observed failures from this review skill.
-- When a boundary is absent, record it as missing evidence.
+- When source evidence is missing, do not invent limits, defaults, or acceptance criteria. Record the absent boundary as missing evidence.
+- Do not use the lens as a runtime prompt selector or context injection rule. Keep it as static interpretation guidance instead.
+- Do not execute tests or diagnose observed failures from this review skill. Use the workflow that owns test execution or failure diagnosis instead.
 
 ## Validation
 

@@ -3,6 +3,8 @@ import path from "node:path";
 
 import {
   AGENT_SKILLS_SPECIFICATION,
+  hasExplicitExecutionConstraint,
+  hasExplicitSkillSelectionBoundary,
   validateAgentSkill,
   type AgentSkillFormat,
   type AgentSkillValidationResult,
@@ -45,7 +47,8 @@ export interface AgentSkillsMigrationSuggestion {
   candidateRenmaMetadata: Record<string, string>;
   canonicalFrontmatter?: string;
   descriptionDraftRequired: boolean;
-  authoringRecommendations: string[];
+  selectionBoundaryReview: string[];
+  executionConstraintReview: string[];
 }
 
 export interface MetadataSuggestion {
@@ -196,8 +199,11 @@ export function renderMetadataPrompt(suggestion: MetadataSuggestion): string {
               "- (blocked until a reviewed description can be drafted from existing evidence)",
             ]),
         "",
-        "Authoring Review:",
-        ...agentSkills.authoringRecommendations.map((item) => `- ${item}`),
+        "Selection-boundary review:",
+        ...agentSkills.selectionBoundaryReview.map((item) => `- ${item}`),
+        "",
+        "Execution-constraint review:",
+        ...agentSkills.executionConstraintReview.map((item) => `- ${item}`),
       ]
     : [];
 
@@ -305,7 +311,7 @@ function buildAgentSkillsMigrationSuggestion(input: {
     candidateRenmaMetadata,
     ...(canonicalFrontmatter ? { canonicalFrontmatter } : {}),
     descriptionDraftRequired: !extractedDescription,
-    authoringRecommendations: authoringRecommendations(validation),
+    ...authoringReviews(validation),
   };
 }
 
@@ -394,18 +400,36 @@ function renderCanonicalSkillFrontmatter(input: {
   return lines.join("\n");
 }
 
-function authoringRecommendations(
+function authoringReviews(
   validation: AgentSkillValidationResult,
-): string[] {
-  const recommendations = validation.issues
+): Pick<
+  AgentSkillsMigrationSuggestion,
+  "selectionBoundaryReview" | "executionConstraintReview"
+> {
+  const authoringIssues = validation.issues
     .filter((issue) => issue.category === "renma-authoring")
+    .map((issue) => ({ code: issue.code, message: issue.message }));
+  const selectionBoundaryReview = authoringIssues
+    .filter((issue) => issue.code.includes("SELECTION-BOUNDARY"))
     .map((issue) => issue.message);
-  if (recommendations.length === 0) {
-    return [
-      "Preserve the existing usage boundaries and hard constraints while moving only the metadata representation.",
-    ];
-  }
-  return recommendations;
+  const executionConstraintReview = authoringIssues
+    .filter((issue) => issue.code.includes("EXECUTION-CONSTRAINT"))
+    .map((issue) => issue.message);
+
+  return {
+    selectionBoundaryReview:
+      selectionBoundaryReview.length > 0
+        ? selectionBoundaryReview
+        : [
+            "Do not add a description exclusion unless the body explicitly excludes a class of tasks from this skill. Preserve supported when_to_use and when_not_to_use evidence.",
+          ],
+    executionConstraintReview:
+      executionConstraintReview.length > 0
+        ? executionConstraintReview
+        : [
+            "Keep execution constraints in the activated skill body. Preserve existing constraints and alternatives without inventing new behavior.",
+          ],
+  };
 }
 
 function buildInstructions(input: {
@@ -433,8 +457,10 @@ function buildInstructions(input: {
       "Keep only name, description, license, compatibility, metadata, and allowed-tools at the top level of SKILL.md frontmatter.",
       "Move Renma extension values under metadata using renma.* string keys and remove the migrated legacy top-level duplicates after review.",
       "Preserve unrelated client-specific metadata entries.",
-      "Treat description as the discovery surface: state what the skill does, when to use it, and any selection-critical exclusion already supported by the body.",
-      "A narrowly scoped body organization change is allowed only to group existing negative directives under a prominent Do Not Use or Hard Constraints section; preserve their meaning and state an existing alternative or stop behavior when available.",
+      "Treat description as the discovery surface: state what the skill does and when to use it. Add an exclusion only when the body explicitly excludes a class of tasks from this skill.",
+      "Review selection boundaries separately from execution constraints. Keep supported when_to_use and when_not_to_use values as selection-scope evidence.",
+      "Keep execution prohibitions in the body. A narrowly scoped organization change may group existing prohibitions under Hard Constraints, Prohibited Actions, or Safety Constraints without changing their meaning.",
+      "Prefer condition, prohibited action, and an existing alternative or stop behavior. If no alternative is supported by the source, request human review rather than inventing one.",
       "Do not invent new prohibitions, policies, domain facts, owners, dependencies, or routing promises.",
     );
   }
@@ -573,12 +599,41 @@ function extractDescriptionCandidate(
   }
   flush();
 
-  const candidate = candidates.find(
+  const candidateParagraph = candidates.find(
     (value) =>
       /\b(?:use this skill|use when|use for|when the request|when reviewing)\b|(?:このスキル|使用|利用|場合|とき)/iu.test(
         value,
       ) && value.length <= 1024,
   );
+  if (!candidateParagraph) return undefined;
+
+  const sentences =
+    candidateParagraph.match(/[^.!?]+[.!?]?/gu)?.map((item) => item.trim()) ??
+    [];
+  const discoverySentences: string[] = [];
+  let executionConstraintSeen = false;
+  for (const sentence of sentences) {
+    if (hasExplicitSkillSelectionBoundary(sentence)) {
+      discoverySentences.push(sentence);
+      continue;
+    }
+    if (hasExplicitExecutionConstraint(sentence)) {
+      executionConstraintSeen = true;
+      continue;
+    }
+    if (!executionConstraintSeen) discoverySentences.push(sentence);
+  }
+
+  const candidate = discoverySentences.join(" ").trim();
+  if (
+    candidate.length === 0 ||
+    candidate.length > 1024 ||
+    !/\b(?:use this skill|use when|use for|when the request|when reviewing)\b|(?:このスキル|使用|利用|場合|とき)/iu.test(
+      candidate,
+    )
+  ) {
+    return undefined;
+  }
   return candidate;
 }
 

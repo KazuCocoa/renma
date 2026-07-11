@@ -213,6 +213,8 @@ renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform -
 
 The command emits a deterministic prompt or JSON payload for a human or coding agent. It tells the agent to inspect the existing asset, preserve the Markdown body, preserve existing frontmatter values, add only missing metadata that is clearly supported, and rerun `renma scan .` and `renma ownership .` after editing.
 
+For Agent Skills, `description`, `when_to_use`, and `when_not_to_use` describe discovery and selection scope. A generic body instruction such as `Do not modify production files` is an execution constraint after activation, so keep it in a prominent body section such as `Hard Constraints`; do not copy it into selection metadata. Prefer constraints that state the condition, prohibited action, and supported alternative or stop behavior. When the source does not provide an alternative, require human review instead of inventing one. Renma can improve visibility and testability, but it cannot guarantee model compliance.
+
 Owner policy stays the same: `owner` is recommended governance metadata, not globally required. Renma accepts unowned assets and reports them in ownership coverage. Without `--owner`, the prompt says not to add owner unless one is already declared or a maintainer provides one. With `--owner <owner>`, the prompt may include that owner because it was explicitly provided. If an existing asset already declares an owner, `suggest-metadata` preserves it; a different `--owner` value is treated as a human-review ownership change, not an automatic metadata suggestion. Renma does not infer owners from Git history, file paths, prose, or authors.
 
 ### When To Create Context Assets

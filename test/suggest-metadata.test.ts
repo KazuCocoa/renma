@@ -56,6 +56,8 @@ test("suggest-metadata prompt for an existing skill without owner", async () => 
   assert.match(result.stdout, /owner: No owner was explicitly provided/);
   assert.match(result.stdout, /renma scan \./);
   assert.match(result.stdout, /renma ownership \./);
+  assert.match(result.stdout, /Selection-boundary review:/);
+  assert.match(result.stdout, /Execution-constraint review:/);
 });
 
 test("suggest-metadata prompt includes explicit user-provided owner", async () => {

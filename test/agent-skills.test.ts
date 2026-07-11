@@ -102,16 +102,16 @@ description: Reviews demo inputs. Use when a demo needs review. Do not use for p
   );
 });
 
-test("warns when a body-level exclusion is absent from description", () => {
+test("warns when an explicit skill-selection exclusion is absent from description", () => {
   const content = `---
 name: demo
 description: Reviews demo inputs. Use when a demo needs review.
 ---
 # Demo
 
-## Do Not Use For
+## Do not use this skill when
 
-- Do not use for production work.
+- Do not use this skill for production deployment.
 `;
   const validation = validateAgentSkill(
     parseDocument(artifact("skills/demo/SKILL.md", content)),
@@ -120,7 +120,172 @@ description: Reviews demo inputs. Use when a demo needs review.
   assert.equal(validation.valid, true);
   assert.ok(
     validation.issues.some(
-      (issue) => issue.code === "RN-SKILL-DESCRIPTION-OMITS-NEGATIVE-BOUNDARY",
+      (issue) => issue.code === "RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY",
+    ),
+  );
+});
+
+test("does not copy a prominent execution constraint into description", () => {
+  const content = `---
+name: demo
+description: Reviews demo inputs. Use when a demo needs review.
+---
+# Demo
+
+## Hard Constraints
+
+- Do not modify production files. Produce a patch for review instead.
+`;
+  const validation = validateAgentSkill(
+    parseDocument(artifact("skills/demo/SKILL.md", content)),
+  );
+  const codes = validation.issues.map((issue) => issue.code);
+
+  assert.equal(validation.valid, true);
+  assert.equal(
+    codes.includes("RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY"),
+    false,
+  );
+  assert.equal(
+    codes.includes("RN-SKILL-EXECUTION-CONSTRAINT-NOT-PROMINENT"),
+    false,
+  );
+  assert.equal(
+    codes.includes("RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE"),
+    false,
+  );
+});
+
+test("warns when an execution constraint is buried in procedure", () => {
+  const content = `---
+name: demo
+description: Reviews demo inputs. Use when a demo needs review.
+---
+# Demo
+
+## Procedure
+
+1. Inspect the repository.
+2. Do not modify production files.
+3. Prepare findings.
+`;
+  const validation = validateAgentSkill(
+    parseDocument(artifact("skills/demo/SKILL.md", content)),
+  );
+
+  assert.ok(
+    validation.issues.some(
+      (issue) => issue.code === "RN-SKILL-EXECUTION-CONSTRAINT-NOT-PROMINENT",
+    ),
+  );
+  assert.equal(
+    validation.issues.some(
+      (issue) => issue.code === "RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY",
+    ),
+    false,
+  );
+});
+
+test("accepts a nearby stop and alternative for an execution constraint", () => {
+  const content = `---
+name: demo
+description: Reviews demo inputs. Use when a demo needs review.
+---
+# Demo
+
+## Hard Constraints
+
+- When evidence is missing, do not infer behavior. Stop and report the missing evidence.
+`;
+  const validation = validateAgentSkill(
+    parseDocument(artifact("skills/demo/SKILL.md", content)),
+  );
+
+  assert.equal(
+    validation.issues.some(
+      (issue) =>
+        issue.code === "RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE",
+    ),
+    false,
+  );
+});
+
+test("accepts an instead clause as an execution alternative", () => {
+  const content = `---
+name: demo
+description: Reviews demo inputs. Use when a demo needs review.
+---
+# Demo
+
+## Hard Constraints
+
+- Do not execute tests from this review skill. Use the test-execution workflow instead.
+`;
+  const validation = validateAgentSkill(
+    parseDocument(artifact("skills/demo/SKILL.md", content)),
+  );
+
+  assert.equal(
+    validation.issues.some(
+      (issue) =>
+        issue.code === "RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE",
+    ),
+    false,
+  );
+});
+
+test("requests human review when an execution constraint has no alternative", () => {
+  const content = `---
+name: demo
+description: Reviews demo inputs. Use when a demo needs review.
+---
+# Demo
+
+## Hard Constraints
+
+- Do not infer product behavior.
+`;
+  const validation = validateAgentSkill(
+    parseDocument(artifact("skills/demo/SKILL.md", content)),
+  );
+  const warning = validation.issues.find(
+    (issue) =>
+      issue.code === "RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE",
+  );
+
+  assert.ok(warning);
+  assert.match(warning.message, /human clarification/i);
+  assert.match(warning.message, /Do not invent/i);
+  assert.equal(
+    validation.issues.some(
+      (issue) => issue.code === "RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY",
+    ),
+    false,
+  );
+});
+
+test("warns when execution constraints are scattered across sections", () => {
+  const content = `---
+name: demo
+description: Reviews demo inputs. Use when a demo needs review.
+---
+# Demo
+
+## Procedure
+
+- Do not modify production files. Produce a patch instead.
+
+## Validation
+
+- Never upload secrets. Stop and report the blocked validation.
+`;
+  const validation = validateAgentSkill(
+    parseDocument(artifact("skills/demo/SKILL.md", content)),
+  );
+
+  assert.ok(
+    validation.issues.some(
+      (issue) => issue.code === "RN-SKILL-EXECUTION-CONSTRAINT-SCATTERED",
     ),
   );
 });
@@ -175,6 +340,15 @@ test("new skill scaffold is Agent Skills compatible", () => {
   assert.match(bundle.content, /metadata:\n {2}renma\.id:/);
   assert.match(bundle.content, /## Do not use this skill when/);
   assert.match(bundle.content, /## Hard Constraints/);
+  assert.match(bundle.content, /Hard constraints apply after this skill/);
+  assert.match(
+    bundle.content,
+    /When source evidence is missing, do not infer product behavior\. Stop and report the missing evidence\./,
+  );
+  assert.match(
+    bundle.content,
+    /Do not modify production files\. Produce a proposed patch for human review instead\./,
+  );
 });
 
 test("suggest-metadata emits legacy-to-Agent-Skills migration evidence", async () => {
@@ -220,6 +394,36 @@ Use this skill when reviewing demo inputs before implementation. Do not use it f
     suggestion.agentSkills?.canonicalFrontmatter ?? "",
     /^owner:/m,
   );
+  assert.ok(suggestion.agentSkills?.selectionBoundaryReview.length);
+  assert.ok(suggestion.agentSkills?.executionConstraintReview.length);
+});
+
+test("suggest-metadata keeps execution constraints out of a description candidate", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-agent-skills-"));
+  const target = path.join(root, "skills", "demo", "SKILL.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(
+    target,
+    `---
+id: skill.demo
+---
+# Demo
+
+Use this skill when reviewing demo inputs. Do not modify production files. Produce a proposed patch for human review instead.
+
+## Hard Constraints
+
+- Do not modify production files. Produce a proposed patch for human review instead.
+`,
+  );
+
+  const suggestion = await buildMetadataSuggestion(target, {});
+  const description =
+    suggestion.agentSkills?.candidateAgentSkillsMetadata.description ?? "";
+
+  assert.match(description, /Use this skill when reviewing demo inputs\./);
+  assert.doesNotMatch(description, /modify production files/);
+  assert.doesNotMatch(description, /proposed patch/);
 });
 
 function artifact(filePath: string, content: string): Artifact {

@@ -27,7 +27,6 @@ Use this skill when preparing a reviewed Renma release candidate from the local 
 ## Do Not Use For
 
 - Publishing a package, creating or pushing a Git tag, or modifying a remote repository unless those actions are separately and explicitly requested.
-- Guessing a release version, release scope, changelog content, or readiness state when repository evidence is incomplete.
 - Unrelated changelog cleanup, dependency upgrades, feature work, or source refactors.
 
 When one of these exclusions applies, stop at the reviewed local evidence boundary and report the missing decision or separately requested action.
@@ -55,8 +54,8 @@ When one of these exclusions applies, stop at the reviewed local evidence bounda
 
 ## Hard Constraints
 
-- Do not invent release notes, versions, owners, publication targets, or policy exceptions.
-- Do not publish, tag, push, or upload unless the user separately authorizes that exact action.
+- When repository evidence is incomplete, do not invent release notes, versions, owners, publication targets, or policy exceptions. Stop and request a human decision.
+- Do not publish, tag, push, or upload unless the user separately authorizes that exact action. Stop at the reviewed release proposal instead.
 - Do not include credentials, customer data, or secrets in release artifacts or external requests.
 - Stop and request a human decision when version evidence, changelog scope, or publication authority is ambiguous.
 

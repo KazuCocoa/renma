@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { main } from "../src/cli.js";
 import { COMMAND_HELP } from "../src/cli-help.js";
+import { runValidateSkillsCli } from "../src/commands/validate-skills.js";
 import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
 import { scan } from "../src/scanner.js";
 
@@ -1707,8 +1708,11 @@ test("scaffold skill writes deterministic file output", async () => {
   assert.match(content, /^## Required Inputs$/m);
   assert.match(content, /^## Context References$/m);
   assert.match(content, /^## Hard Constraints$/m);
-  assert.match(content, /Do not choose runtime task context/);
-  assert.match(content, /Do not assemble prompts for live model calls/);
+  assert.match(content, /Hard constraints apply after this skill/);
+  assert.match(content, /do not infer product behavior/);
+  assert.match(content, /Produce a proposed patch for human review instead/);
+  assert.doesNotMatch(content, /Do not choose runtime task context/);
+  assert.doesNotMatch(content, /Do not assemble prompts for live model calls/);
   assert.doesNotMatch(content, /Renma can verify/);
 
   const catalogResult = await withCapturedConsole(() =>
@@ -1723,6 +1727,65 @@ test("scaffold skill writes deterministic file output", async () => {
     "spec-review",
     "qa",
   ]);
+});
+
+test("validate-skills keeps Renma authoring warnings non-gating", async () => {
+  const root = await fixture();
+  const target = path.join(root, "skills", "demo", "SKILL.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(
+    target,
+    `---
+name: demo
+description: Reviews demo inputs. Use when a demo needs review.
+---
+# Demo
+
+## Hard Constraints
+
+- Do not infer product behavior.
+`,
+  );
+
+  const result = await withCapturedConsole(() =>
+    runValidateSkillsCli([root, "--format", "json"]),
+  );
+  const report = JSON.parse(result.stdout) as {
+    invalidSkillCount: number;
+    warningCount: number;
+    results: Array<{ issues: Array<{ code: string }> }>;
+  };
+
+  assert.equal(result.code, 0);
+  assert.equal(report.invalidSkillCount, 0);
+  assert.equal(report.warningCount, 1);
+  assert.deepEqual(
+    report.results[0]?.issues.map((issue) => issue.code),
+    ["RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE"],
+  );
+});
+
+test("validate-skills keeps Agent Skills specification errors gating", async () => {
+  const root = await fixture();
+  const target = path.join(root, "skills", "demo", "SKILL.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(target, "---\nname: demo\n---\n# Demo\n");
+
+  const result = await withCapturedConsole(() =>
+    runValidateSkillsCli([root, "--format", "json"]),
+  );
+  const report = JSON.parse(result.stdout) as {
+    invalidSkillCount: number;
+    results: Array<{ issues: Array<{ code: string }> }>;
+  };
+
+  assert.equal(result.code, 1);
+  assert.equal(report.invalidSkillCount, 1);
+  assert.ok(
+    report.results[0]?.issues.some(
+      (issue) => issue.code === "AS-SKILL-MISSING-DESCRIPTION",
+    ),
+  );
 });
 
 test("scaffold context_lens writes deterministic file output", async () => {

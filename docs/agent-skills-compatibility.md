@@ -72,8 +72,9 @@ renma validate-skills . --format json
 ```
 
 The command exits `1` when at least one discovered skill violates the Agent
-Skills specification. Renma authoring warnings, such as an omitted negative
-usage boundary, do not fail validation by themselves.
+Skills specification. Renma authoring warnings, such as an omitted explicit
+selection boundary or a buried execution constraint, do not fail validation by
+themselves.
 
 `renma scan .` also includes an `agentSkills` summary in JSON and text output so
 repository quality, security, and specification evidence can be reviewed
@@ -162,17 +163,18 @@ Renma reports `RENMA-METADATA-CONFLICTING-SOURCES`; it does not silently decide
 which semantic value should survive. Resolve the conflict through human review,
 then remove the legacy duplicate.
 
-## Making “Do Not” Boundaries Visible
+## Separating Selection Boundaries From Execution Constraints
 
-A prohibition can be correct in prose and still be ineffective if it is absent
-from the surface an agent sees at the relevant time. Renma therefore reviews
-three layers:
+A `do not ...` statement is not automatically a skill-selection exclusion.
+Renma uses narrow, deterministic wording as evidence and does not claim to
+understand the semantics of arbitrary prose. It reviews three separate layers:
 
 ### 1. Discovery boundary
 
 Agent Skills clients commonly discover skills from `name` and `description`
 before loading the full body. A selection-critical exclusion belongs in
-`description`:
+`description`. A description should say what the skill does and when to use it;
+it needs a negative clause only when an exclusion genuinely affects selection:
 
 ```yaml
 description: Review specifications before implementation. Use for ambiguity and boundary analysis. Do not use for test execution or observed-failure diagnosis.
@@ -180,8 +182,8 @@ description: Review specifications before implementation. Use for ambiguity and 
 
 ### 2. Governance boundary
 
-Renma can keep compact positive and negative boundaries for catalog, review, and
-relationship evidence:
+Renma can keep compact positive and negative selection scope for catalog,
+review, and relationship evidence:
 
 ```yaml
 metadata:
@@ -189,20 +191,21 @@ metadata:
   renma.when-not-to-use: '["Executing tests","Diagnosing an observed failure"]'
 ```
 
-This metadata does not replace the Agent Skills description and does not make
-Renma a runtime selector.
+`metadata.renma.when-not-to-use` is a governance representation of selection
+scope. It does not replace the Agent Skills description, does not hold generic
+execution prohibitions, and does not make Renma a runtime selector.
 
 ### 3. Activated-workflow boundary
 
-After activation, important constraints should be easy to find in the body:
+After activation, important execution constraints remain in the skill body and
+should be easy to find under a heading such as `Hard Constraints`, `Prohibited
+Actions`, or `Safety Constraints`:
 
 ```markdown
 ## Hard Constraints
 
-- Do not infer product behavior when source evidence is missing.
-- Stop and list the missing evidence instead.
-- Do not silently resolve an ambiguous requirement.
-- Record it as an unresolved question for human review.
+- When source evidence is missing, do not infer product behavior. Stop and list the missing evidence.
+- Do not silently resolve an ambiguous requirement. Record it as an unresolved question for human review.
 ```
 
 Strong constraints state:
@@ -214,10 +217,27 @@ condition
   -> verification
 ```
 
-Renma warns when negative directives are scattered, when a visible body-level
-exclusion is absent from `description`, or when no negative usage boundary is
-present. These are review prompts, not claims that Renma can prove runtime
-compliance.
+Renma warns when an explicit selection exclusion is absent from `description`,
+when execution constraints lack a prominent section, when multiple constraints
+are scattered across unrelated sections, or when a prohibition has no nearby
+deterministic stop or alternative instruction. It does not require every skill
+to have a negative description clause, copy execution constraints into
+`description` or `metadata.renma.when-not-to-use`, or invent missing behavior.
+
+These warnings improve visibility and reviewability; they cannot guarantee
+model compliance. Important constraints should be made testable where possible.
+Prefer a condition, the prohibited action, and the required alternative or stop
+behavior. If the existing skill does not support an alternative, request human
+clarification instead of generating one.
+
+The deterministic authoring diagnostics are:
+
+- `RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY` for an explicit body-level skill exclusion missing from discovery metadata;
+- `RN-SKILL-EXECUTION-CONSTRAINT-NOT-PROMINENT` for execution prohibitions without a recognized constraint heading;
+- `RN-SKILL-EXECUTION-CONSTRAINT-SCATTERED` for multiple prohibitions in multiple sections without a central constraint section;
+- `RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE` when no nearby supported alternative or stop instruction is visible.
+
+They are Renma authoring warnings, not Agent Skills specification errors.
 
 ## New Skill Creation
 
