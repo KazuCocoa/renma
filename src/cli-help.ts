@@ -576,16 +576,20 @@ export const COMMAND_HELP = [
   {
     name: "suggest-metadata",
     usage: "renma suggest-metadata <file> [options]",
-    question: "How can a coding agent prepare a metadata-only retrofit?",
+    question:
+      "How can a coding agent prepare a metadata retrofit or one-way Skill migration?",
     purpose:
-      "Suggest metadata emits a prompt or structured suggestion for a metadata-focused retrofit of one existing asset.",
+      "Suggest metadata emits a prompt or structured suggestion for one existing asset. Skill targets use the one-way historical Renma to Agent Skills migration path.",
     useWhen: [
       "An asset lacks compact metadata and you want a reviewable metadata patch.",
+      "A legacy or hybrid SKILL.md needs an Agent Skills plus metadata.renma.* conversion proposal.",
       "You need guidance that preserves the existing Markdown body and semantics.",
       "A human explicitly provides an owner with --owner or the asset already declares one.",
     ],
     doNotUseFor: [
       "Editing the file automatically.",
+      "Converting a canonical Agent Skill back to historical Renma frontmatter.",
+      "Silently resolving blocked, conflicting, duplicate, or unknown migration input.",
       "Changing the Markdown body or asset semantics unless explicitly requested.",
       "Inferring an owner without evidence.",
     ],
@@ -595,6 +599,7 @@ export const COMMAND_HELP = [
     ],
     interpretation: [
       "The command prints to stdout and does not edit the target file.",
+      "For Skill targets, canonical frontmatter is omitted when migration is unsafe or ambiguous.",
       "Without --owner, do not add owner metadata unless the asset already declares one or a maintainer confirms it.",
       "Preserve existing Markdown body and semantics for a metadata-only retrofit.",
     ],

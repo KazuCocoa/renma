@@ -12,6 +12,7 @@ export function formatText(result: ScanResult): string {
     `Root: ${result.root}`,
     `Config: ${result.configPath ?? "(defaults)"}`,
     `Files scanned: ${result.scannedFileCount}`,
+    `Agent Skills: ${result.agentSkills.validSkillCount}/${result.agentSkills.totalSkillCount} valid (${result.agentSkills.invalidSkillCount} invalid, ${result.agentSkills.legacySkillCount} legacy, ${result.agentSkills.hybridSkillCount} hybrid)`,
     ...(result.contextLens
       ? [
           `Context lenses: ${result.contextLens.validLensCount}/${result.contextLens.totalLensCount} valid (${result.contextLens.invalidLensCount} invalid)`,
@@ -22,6 +23,22 @@ export function formatText(result: ScanResult): string {
     `Exit threshold: ${result.exitThreshold}`,
     `Findings: ${result.findings.length}`,
   ];
+
+  for (const skill of result.agentSkills.results) {
+    if (skill.issues.length === 0) continue;
+    lines.push("");
+    lines.push(`${skill.valid ? "VALID" : "INVALID"} ${skill.path}`);
+    for (const issue of skill.issues) {
+      lines.push(
+        `  ${issue.severity.toUpperCase()} ${issue.code} L${issue.startLine}: ${issue.message}`,
+      );
+    }
+    if (skill.migrationCommand) {
+      lines.push("");
+      lines.push("  Migration:");
+      lines.push(`    ${skill.migrationCommand}`);
+    }
+  }
 
   if (result.findings.length === 0) {
     lines.push("No findings.");

@@ -2,6 +2,11 @@
 
 Use this guide when creating or refining Renma skills and context assets. For CLI command syntax, see the [User Manual](user-manual.md). For experimental context lens assets, see [Context Lens Assets](context-lens.md). For security-sensitive skills or context assets, read the [Security Policy Guide](security-policy.md). For finding details, use the [Diagnostics Reference](diagnostics.md). For shared-context wording guidance, see [Context Language Diagnostics](context-language-diagnostics.md).
 
+For the target 0.16.0 `SKILL.md` format and migration rules, use the normative
+[Agent Skills Compatibility and Migration](agent-skills-compatibility.md)
+document. Agent Skills owns standard top-level Skill fields; Renma governance
+extensions use flat `metadata.renma.*` string values.
+
 Renma is a tool-assisted authoring and verification layer. It emits deterministic repository evidence that humans and external LLM tools can use, but Renma does not call an LLM, choose runtime context, assemble prompts, inject context into agents, execute agent workflows, or own runtime telemetry.
 
 A practical authoring loop is:
@@ -96,7 +101,11 @@ Context assets are independently owned source-of-truth knowledge units. They sho
 
 Keep skills thin. A skill should reference context assets instead of embedding all reusable knowledge directly in `SKILL.md`.
 
-Example skill metadata:
+The following is historical Renma Skill metadata and is a migration source for
+0.16.0, not the canonical target format. See the Agent Skills compatibility
+document for the canonical equivalent.
+
+Historical example:
 
 ```yaml
 ---
@@ -212,6 +221,11 @@ renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform -
 ```
 
 The command emits a deterministic prompt or JSON payload for a human or coding agent. It tells the agent to inspect the existing asset, preserve the Markdown body, preserve existing frontmatter values, add only missing metadata that is clearly supported, and rerun `renma scan .` and `renma ownership .` after editing.
+
+For a Skill target, `suggest-metadata` instead produces a one-way Agent Skills
+migration proposal and refuses to render canonical frontmatter when data would
+be lost or a semantic choice requires human review. It preserves unknown valid
+metadata child keys and never relocates unknown top-level fields automatically.
 
 Owner policy stays the same: `owner` is recommended governance metadata, not globally required. Renma accepts unowned assets and reports them in ownership coverage. Without `--owner`, the prompt says not to add owner unless one is already declared or a maintainer provides one. With `--owner <owner>`, the prompt may include that owner because it was explicitly provided. If an existing asset already declares an owner, `suggest-metadata` preserves it; a different `--owner` value is treated as a human-review ownership change, not an automatic metadata suggestion. Renma does not infer owners from Git history, file paths, prose, or authors.
 
