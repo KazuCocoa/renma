@@ -1,0 +1,41 @@
+name: Debug Lint Output
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  capture-lint:
+    name: Capture ESLint output
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 'lts/*'
+
+      - uses: SocketDev/action@v1
+        with:
+          mode: firewall-free
+
+      - name: Install dependencies
+        run: sfw npm install
+
+      - name: Capture ESLint output
+        shell: bash
+        run: |
+          set +e
+          npm run lint > lint.log 2>&1
+          echo "exit_code=$?" >> lint.log
+          exit 0
+
+      - name: Upload ESLint output
+        uses: actions/upload-artifact@v4
+        with:
+          name: eslint-output
+          path: lint.log
+          if-no-files-found: error
