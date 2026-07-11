@@ -1,68 +1,70 @@
 ---
 name: release-prep
-description: Prepare a Renma release by checking git history, changelog, package metadata, docs, release notes, and dogfooding Renma CLI reports before producing release-ready artifacts.
-id: skill.release-prep
-title: Release Prep
-version: 0.1.0
-owner: maintainers
-status: stable
-tags:
-  - release
-  - maintenance
-  - dogfooding
-requires_context:
-  - context.release.prep
-allowed_data: public
-network_allowed: true
-external_upload_allowed: false
-secrets_allowed: false
-requires_human_approval: true
-forbidden_inputs:
-  - secrets
-  - credentials
-  - tokens
+description: Prepare a Renma release by validating repository evidence, version consistency, changelog readiness, and build artifacts. Use for reviewed local release preparation. Do not use for publishing packages, pushing tags, changing remote repositories, or unrelated changelog cleanup unless those actions are explicitly requested.
+metadata:
+  renma.id: skill.release-prep
+  renma.title: Release Prep
+  renma.version: "0.1.0"
+  renma.owner: maintainers
+  renma.status: stable
+  renma.tags: '["release","maintenance","dogfooding"]'
+  renma.requires-context: '["context.release.prep"]'
+  renma.allowed-data: '["public"]'
+  renma.network-allowed: "true"
+  renma.external-upload-allowed: "false"
+  renma.secrets-allowed: "false"
+  renma.requires-human-approval: "true"
+  renma.forbidden-inputs: '["credentials","customer data"]'
+  renma.approved-network-destinations: '["registry.npmjs.org","github.com"]'
 ---
 
 # Release Prep
 
-## Purpose
+## Use This Skill When
 
-Use this skill to prepare a Renma release from a local checkout. It routes to `context.release.prep` and the deterministic `tools/release-prep.mjs` helper, including GitHub-ready release note generation.
+Use this skill when preparing a reviewed Renma release candidate from the local repository. It coordinates deterministic repository checks, version consistency, changelog readiness, build artifacts, and the release evidence a human maintainer needs before deciding whether to publish.
 
 ## Do Not Use For
 
-- Distribution work or remote repository changes unless the user separately asks for those actions.
-- General changelog cleanup that is not part of release preparation.
+- Publishing a package, creating or pushing a Git tag, or modifying a remote repository unless those actions are separately and explicitly requested.
+- Guessing a release version, release scope, changelog content, or readiness state when repository evidence is incomplete.
+- Unrelated changelog cleanup, dependency upgrades, feature work, or source refactors.
+
+When one of these exclusions applies, stop at the reviewed local evidence boundary and report the missing decision or separately requested action.
 
 ## Required Inputs
 
-- Target version or release intent, such as patch, minor, major, or prerelease.
-- The base ref for release comparison, usually the latest `v*` tag.
-- Any known release theme, blockers, or user-facing changes.
+- The repository state to review, including the current package version, changelog, lockfile, and relevant source changes.
+- The intended release scope and target version from a maintainer or explicit repository evidence.
+- Any project-specific release checklist or publishing policy referenced by the repository.
 
 ## Instructions
 
-1. Read `context.release.prep`.
-2. Run `node tools/release-prep.mjs --check-only` before editing release files.
-3. Prepare only the release-ready files needed for the requested version.
-4. Generate the GitHub Release body with `node tools/release-prep.mjs --release-notes --version <version>`; include `--from <tag>` or `--to <ref>` when the default comparison range is not the intended release range.
-5. Run `node tools/release-prep.mjs` for validation evidence.
-6. If finalization is requested, run `node tools/release-prep.mjs --finalize`.
-7. Report changed artifacts, release note output location or body, blockers, validation status, commit, and tag.
+1. Read `contexts/release/prep.md` before changing release metadata.
+2. Inspect the current repository status and confirm the intended release scope is explicit.
+3. Verify package and lockfile version consistency.
+4. Review the changelog for a matching release section and ensure entries reflect repository evidence.
+5. Run the deterministic verification commands required by the release context.
+6. Build the package and inspect the generated package contents before proposing publication.
+7. Summarize evidence, unresolved decisions, and any blocked publication step for human approval.
 
-## Constraints
+## Context References
 
-- Keep recommendations grounded in provided inputs and repository evidence.
-- Do not invent domain facts, policies, owners, dependencies, or product behavior.
-- Prefer local `node dist/index.js ...` commands for dogfooding this checkout over installed global binaries.
+- Required: `context.release.prep` in `contexts/release/prep.md`.
+- Load other contexts only when the release scope explicitly depends on them.
 
-## Completion Criteria
+## Hard Constraints
 
-- Release metadata, changelog, docs, and release notes are consistent for the target version.
-- GitHub-ready release notes are generated from `CHANGELOG.md` and the intended comparison range.
-- Required Renma reports have been run or any skipped report is explained.
-- The final handoff names blockers, residual risks, and the local commit/tag state.
+- Do not invent release notes, versions, owners, publication targets, or policy exceptions.
+- Do not publish, tag, push, or upload unless the user separately authorizes that exact action.
+- Do not include credentials, customer data, or secrets in release artifacts or external requests.
+- Stop and request a human decision when version evidence, changelog scope, or publication authority is ambiguous.
 
 ## Validation
 
-- Run the validation commands listed in `context.release.prep`.
+- Run `npm run quality`.
+- Run `npm test`.
+- Run `npm run build`.
+- Run `npm pack --dry-run` and inspect the package file list.
+- Run `renma scan .` and confirm this skill remains Agent Skills compatible.
+- Present the release evidence and blocked decisions to a human maintainer before any publication step.
