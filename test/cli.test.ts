@@ -1688,16 +1688,25 @@ test("scaffold skill writes deterministic file output", async () => {
 
   assert.equal(result.code, 0);
   const content = await readFile(target, "utf8");
-  assert.match(content, /^id: testing.spec-review$/m);
-  assert.match(content, /^title: Spec Review$/m);
-  assert.match(content, /^owner: qa-platform$/m);
-  assert.match(content, /^status: experimental$/m);
-  assert.match(content, /^tags:\n {2}- testing\n {2}- spec-review\n {2}- qa$/m);
-  assert.match(content, /^requires_context:$/m);
-  assert.match(content, /^## Purpose$/m);
+  assert.match(content, /^name: 'spec-review'$/m);
+  assert.match(
+    content,
+    /^description: 'Drafts reviewed guidance for Spec Review\./m,
+  );
+  assert.match(content, /^metadata:$/m);
+  assert.match(content, /^ {2}renma\.id: 'skill\.testing\.spec-review'$/m);
+  assert.match(content, /^ {2}renma\.title: 'Spec Review'$/m);
+  assert.match(content, /^ {2}renma\.owner: 'qa-platform'$/m);
+  assert.match(content, /^ {2}renma\.status: 'experimental'$/m);
+  assert.match(
+    content,
+    /^ {2}renma\.tags: '\["testing","spec-review","qa"\]'$/m,
+  );
+  assert.match(content, /^## Use this skill when$/m);
+  assert.match(content, /^## Do not use this skill when$/m);
   assert.match(content, /^## Required Inputs$/m);
   assert.match(content, /^## Context References$/m);
-  assert.match(content, /^## Constraints$/m);
+  assert.match(content, /^## Hard Constraints$/m);
   assert.match(content, /Do not choose runtime task context/);
   assert.match(content, /Do not assemble prompts for live model calls/);
   assert.doesNotMatch(content, /Renma can verify/);
@@ -1880,7 +1889,7 @@ test("scaffold context_lens can emit json", async () => {
   assert.match(bundle.content, /^type: context_lens$/m);
   assert.match(bundle.content, /^purpose: spec_review$/m);
   assert.match(bundle.prompt, /Create a Renma context_lens asset/);
-  assert.match(bundle.prompt, /use `applies_to`/);
+  assert.match(bundle.prompt, /use applies_to/);
   assert.match(bundle.prompt, /runtime selectors/);
 });
 
@@ -1907,7 +1916,8 @@ test("scaffold prompt emits Codex-ready authoring instructions", async () => {
 
   assert.equal(result.code, 0);
   assert.match(result.stdout, /Create a Renma skill asset/);
-  assert.match(result.stdout, /id: `testing.spec-review`/);
+  assert.match(result.stdout, /id: skill\.testing\.spec-review/);
+  assert.match(result.stdout, /Agent Skills name: spec-review/);
   assert.match(
     result.stdout,
     /Move durable domain, testing, platform, product, or tool knowledge/,
@@ -1917,7 +1927,7 @@ test("scaffold prompt emits Codex-ready authoring instructions", async () => {
   assert.match(result.stdout, /Do not call external services/);
   assert.match(
     result.stdout,
-    /renma graph \. --focus testing\.spec-review --format mermaid/,
+    /renma graph \. --focus skill\.testing\.spec-review --format mermaid/,
   );
   assert.doesNotMatch(result.stdout, /does\.not\.exist/);
   assert.match(result.stdout, /Do not invent owners/);

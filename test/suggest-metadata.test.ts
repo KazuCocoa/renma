@@ -5,6 +5,12 @@ import path from "node:path";
 import { test } from "node:test";
 import { main } from "../src/cli.js";
 
+const DESCRIPTION_BLOCKED_METADATA = {
+  field: "description",
+  reason:
+    "No reviewed Agent Skills description can be extracted from the existing body. Draft what the skill does, when to use it, and any selection-critical exclusion from repository evidence; require human review.",
+};
+
 test("suggest-metadata prompt for an existing skill without owner", async () => {
   const root = await fixture();
   const target = path.join(
@@ -121,6 +127,7 @@ test("suggest-metadata JSON includes conservative candidate metadata", async () 
       field: "owner",
       reason: "No owner was explicitly provided. Missing owner is allowed.",
     },
+    DESCRIPTION_BLOCKED_METADATA,
   ]);
   assert.ok(
     suggestion.instructions.includes(
@@ -153,7 +160,7 @@ test("suggest-metadata JSON includes explicit owner candidate", async () => {
   assert.equal(result.code, 0);
   assert.equal(suggestion.ownerProvided, true);
   assert.equal(suggestion.candidateMetadata.owner, "qa-platform");
-  assert.deepEqual(suggestion.blockedMetadata, []);
+  assert.deepEqual(suggestion.blockedMetadata, [DESCRIPTION_BLOCKED_METADATA]);
 });
 
 test("suggest-metadata preserves an existing owner in prompt", async () => {
@@ -183,7 +190,8 @@ test("suggest-metadata preserves an existing owner in prompt", async () => {
     result.stdout,
     /Use owner: docs because the user explicitly provided it/,
   );
-  assert.doesNotMatch(result.stdout, /owner: `docs`/);
+  assert.doesNotMatch(result.stdout, /(?:^|\n)- owner: `docs`/);
+  assert.match(result.stdout, /renma\.owner: `docs`/);
 });
 
 test("suggest-metadata does not create owner candidate for same existing owner", async () => {
@@ -214,7 +222,7 @@ test("suggest-metadata does not create owner candidate for same existing owner",
 
   assert.equal(result.code, 0);
   assert.equal("owner" in suggestion.candidateMetadata, false);
-  assert.deepEqual(suggestion.blockedMetadata, []);
+  assert.deepEqual(suggestion.blockedMetadata, [DESCRIPTION_BLOCKED_METADATA]);
   assert.ok(
     suggestion.instructions.includes("Preserve existing owner: qa-platform."),
   );
@@ -298,6 +306,7 @@ test("suggest-metadata JSON represents blocked owner replacement", async () => {
       reason:
         'Existing owner "docs" differs from explicitly provided owner "qa-platform". Do not change ownership without human review.',
     },
+    DESCRIPTION_BLOCKED_METADATA,
   ]);
   assert.ok(
     suggestion.instructions.includes(
