@@ -172,7 +172,7 @@ test("new skill scaffold is Agent Skills compatible", () => {
   assert.equal(bundle.name, "spec-review");
   assert.equal(validation.valid, true);
   assert.match(bundle.content, /^---\nname: 'spec-review'/);
-  assert.match(bundle.content, /metadata:\n  renma\.id:/);
+  assert.match(bundle.content, /metadata:\n {2}renma\.id:/);
   assert.match(bundle.content, /## Do not use this skill when/);
   assert.match(bundle.content, /## Hard Constraints/);
 });
