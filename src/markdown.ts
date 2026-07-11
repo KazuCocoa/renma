@@ -1,3 +1,4 @@
+import { applyRenmaMetadataEvidenceAliases } from "./renma-metadata.js";
 import type {
   Artifact,
   CodeFence,
@@ -99,23 +100,33 @@ const LIST_METADATA_KEYS = new Set([
   "expected_outputs",
   "conflicts",
   "superseded_by",
+  "allowed_data",
+  "forbidden_inputs",
+  "approved_network_destinations",
+  "approved_upload_destinations",
 ]);
 
 function parseFrontmatter(path: string, lines: string[]): ParsedMetadata {
   const values: Record<string, MetadataValue> = {};
   const fields: Record<string, MetadataFieldEvidence> = {};
   const listItems: Record<string, MetadataFieldEvidence[]> = {};
-  if (lines[0] !== "---") return { values, fields, listItems };
+  const result = { values, fields, listItems };
+  if (lines[0]?.trim() !== "---") return result;
 
   let activeListKey: string | undefined;
   let activeListStartLine: number | undefined;
+  let activeNestedMap: string | undefined;
+
   for (let index = 1; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (line === "---") break;
-    const listItem = line?.match(/^\s+-\s+(.+)$/);
+    const line = lines[index] ?? "";
+    if (line.trim() === "---") break;
+
+    const listItem = line.match(/^\s+-\s+(.+)$/);
     if (activeListKey && listItem) {
       const current = values[activeListKey];
-      if (Array.isArray(current)) current.push(listItem[1]?.trim() ?? "");
+      if (Array.isArray(current)) {
+        current.push(parseScalar(listItem[1] ?? ""));
+      }
       const activeListItems = (listItems[activeListKey] ??= []);
       activeListItems.push(
         frontmatterFieldEvidence(path, activeListKey, lines, index, index),
@@ -130,13 +141,53 @@ function parseFrontmatter(path: string, lines: string[]): ParsedMetadata {
       continue;
     }
 
+    if (activeNestedMap) {
+      const nested = line.match(/^\s{2,}([A-Za-z0-9_.-]+):\s*(.*)$/);
+      if (nested) {
+        const key = `${activeNestedMap}.${nested[1] ?? ""}`;
+        const value = nested[2]?.trim() ?? "";
+        const block = blockScalarMarker(value);
+        if (block) {
+          const parsed = parseBlockScalar(lines, index, block);
+          values[key] = parsed.value;
+          fields[key] = frontmatterFieldEvidence(
+            path,
+            key,
+            lines,
+            index,
+            parsed.endIndex,
+          );
+          index = parsed.endIndex;
+        } else {
+          values[key] = parseScalar(value);
+          fields[key] = frontmatterFieldEvidence(
+            path,
+            key,
+            lines,
+            index,
+            index,
+          );
+        }
+        continue;
+      }
+      if (line.trim().length === 0 || /^\s*#/.test(line)) continue;
+      activeNestedMap = undefined;
+    }
+
     activeListKey = undefined;
     activeListStartLine = undefined;
-    const match = line?.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+    const match = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
     if (!match) continue;
 
     const key = match[1] as string;
     const value = match[2]?.trim() ?? "";
+    if (key === "metadata" && value.length === 0) {
+      values[key] = "";
+      fields[key] = frontmatterFieldEvidence(path, key, lines, index, index);
+      activeNestedMap = key;
+      continue;
+    }
+
     if (LIST_METADATA_KEYS.has(key) && value.length === 0) {
       values[key] = [];
       listItems[key] = [];
@@ -146,10 +197,102 @@ function parseFrontmatter(path: string, lines: string[]): ParsedMetadata {
       continue;
     }
 
-    values[key] = value;
+    const block = blockScalarMarker(value);
+    if (block) {
+      const parsed = parseBlockScalar(lines, index, block);
+      values[key] = parsed.value;
+      fields[key] = frontmatterFieldEvidence(
+        path,
+        key,
+        lines,
+        index,
+        parsed.endIndex,
+      );
+      index = parsed.endIndex;
+      continue;
+    }
+
+    values[key] = parseScalar(value);
     fields[key] = frontmatterFieldEvidence(path, key, lines, index, index);
   }
-  return { values, fields, listItems };
+
+  return applyRenmaMetadataEvidenceAliases(result);
+}
+
+function blockScalarMarker(value: string): "literal" | "folded" | undefined {
+  if (/^\|[-+]?\s*$/.test(value)) return "literal";
+  if (/^>[-+]?\s*$/.test(value)) return "folded";
+  return undefined;
+}
+
+function parseBlockScalar(
+  lines: string[],
+  startIndex: number,
+  mode: "literal" | "folded",
+): { value: string; endIndex: number } {
+  const collected: string[] = [];
+  let endIndex = startIndex;
+
+  for (let index = startIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index] ?? "";
+    if (
+      line.trim() === "---" ||
+      (/^[A-Za-z0-9_-]+:/.test(line) && line.length > 0)
+    ) {
+      break;
+    }
+    if (line.length > 0 && !/^\s+/.test(line)) break;
+    collected.push(line);
+    endIndex = index;
+  }
+
+  const nonEmptyIndents = collected
+    .filter((line) => line.trim().length > 0)
+    .map((line) => line.match(/^\s*/)?.[0].length ?? 0);
+  const indent = nonEmptyIndents.length > 0 ? Math.min(...nonEmptyIndents) : 0;
+  const normalized = collected.map((line) =>
+    line.trim().length === 0 ? "" : line.slice(indent),
+  );
+  const value =
+    mode === "literal"
+      ? normalized.join("\n").trim()
+      : foldBlockScalar(normalized);
+  return { value, endIndex };
+}
+
+function foldBlockScalar(lines: string[]): string {
+  const paragraphs: string[] = [];
+  let active: string[] = [];
+  const flush = () => {
+    if (active.length > 0) paragraphs.push(active.join(" "));
+    active = [];
+  };
+  for (const line of lines) {
+    if (line.trim().length === 0) {
+      flush();
+      continue;
+    }
+    active.push(line.trim());
+  }
+  flush();
+  return paragraphs.join("\n").trim();
+}
+
+function parseScalar(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.length < 2) return trimmed;
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      return typeof parsed === "string" ? parsed : trimmed;
+    } catch {
+      return trimmed.slice(1, -1);
+    }
+  }
+  if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
+    return trimmed.slice(1, -1).replaceAll("''", "'");
+  }
+  return trimmed;
 }
 
 function frontmatterFieldEvidence(
