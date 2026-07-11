@@ -12,6 +12,8 @@ export function formatText(result: ScanResult): string {
     `Root: ${result.root}`,
     `Config: ${result.configPath ?? "(defaults)"}`,
     `Files scanned: ${result.scannedFileCount}`,
+    `Agent Skills: ${result.agentSkills.validSkillCount}/${result.agentSkills.totalSkillCount} valid (${result.agentSkills.invalidSkillCount} invalid, ${result.agentSkills.legacySkillCount} legacy, ${result.agentSkills.hybridSkillCount} hybrid)`,
+    `Agent Skills profile: ${result.agentSkills.profile}`,
     ...(result.contextLens
       ? [
           `Context lenses: ${result.contextLens.validLensCount}/${result.contextLens.totalLensCount} valid (${result.contextLens.invalidLensCount} invalid)`,
@@ -25,6 +27,14 @@ export function formatText(result: ScanResult): string {
 
   if (result.findings.length === 0) {
     lines.push("No findings.");
+  }
+
+  for (const validation of result.agentSkills.results) {
+    for (const issue of validation.issues) {
+      lines.push(
+        `agent-skills ${issue.severity} ${issue.code}: ${issue.path}:${issue.startLine}: ${issue.message}`,
+      );
+    }
   }
 
   for (const diagnostic of result.diagnostics) {
