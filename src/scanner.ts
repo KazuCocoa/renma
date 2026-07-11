@@ -1,4 +1,5 @@
 import type { ConfigOverrides } from "./config.js";
+import { validateAgentSkills } from "./agent-skills.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import { createDiagnosticsV2, createReviewBundles } from "./diagnostics-v2.js";
 import {
@@ -34,6 +35,7 @@ export function scanFromRepositorySnapshot(
   snapshot: RepositorySnapshot,
   options: ScanBuilderOptions = {},
 ): ScanResult {
+  const agentSkills = validateAgentSkills(snapshot.documents);
   const securityPolicyInventory = summarizeSecurityPolicyInventory(
     snapshot.artifacts,
     snapshot.config.security,
@@ -89,6 +91,7 @@ export function scanFromRepositorySnapshot(
     ...(snapshot.configPath ? { configPath: snapshot.configPath } : {}),
     scannedFileCount: snapshot.scannedFileCount,
     format: snapshot.config.format,
+    agentSkills,
     contextLens: snapshot.contextLens,
     securityPolicyInventory,
     trustGraph,
