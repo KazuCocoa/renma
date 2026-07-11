@@ -1,7 +1,27 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+
+import {
+  AGENT_SKILLS_SPECIFICATION,
+  validateAgentSkill,
+  type AgentSkillFormat,
+  type AgentSkillValidationResult,
+} from "../agent-skills.js";
 import { parseDocument } from "../markdown.js";
 import { parseAssetMetadata } from "../metadata.js";
+import {
+  canonicalRenmaMetadataKey,
+  encodeRenmaMetadataList,
+  isCanonicalRenmaMetadataKey,
+  legacyRenmaMetadataFields,
+  metadataValueAsList,
+  metadataValueAsText,
+  readRenmaMetadataValue,
+  RENMA_LIST_METADATA_KEYS,
+  RENMA_METADATA_KEYS,
+  yamlString,
+  type LegacyRenmaMetadataKey,
+} from "../renma-metadata.js";
 import type { Artifact, ArtifactKind, MetadataValue } from "../types.js";
 
 export type SuggestMetadataFormat = "prompt" | "json";
@@ -16,6 +36,19 @@ export interface BlockedMetadata {
   reason: string;
 }
 
+export interface AgentSkillsMigrationSuggestion {
+  specification: string;
+  direction: "legacy-to-agent-skills" | "none";
+  sourceFormat: AgentSkillFormat;
+  targetFormat: "agent-skills";
+  validation: AgentSkillValidationResult;
+  candidateAgentSkillsMetadata: Record<string, string>;
+  candidateRenmaMetadata: Record<string, string>;
+  canonicalFrontmatter?: string;
+  descriptionDraftRequired: boolean;
+  authoringRecommendations: string[];
+}
+
 export interface MetadataSuggestion {
   path: string;
   kind: ArtifactKind;
@@ -24,6 +57,7 @@ export interface MetadataSuggestion {
   instructions: string[];
   candidateMetadata: Record<string, string>;
   blockedMetadata: BlockedMetadata[];
+  agentSkills?: AgentSkillsMigrationSuggestion;
 }
 
 export class SuggestMetadataTargetError extends Error {
@@ -108,18 +142,66 @@ export async function buildMetadataSuggestion(
     });
   }
 
+  const agentSkills =
+    kind === "skill"
+      ? buildAgentSkillsMigrationSuggestion({
+          document,
+          outputPath,
+          ...(candidateId ? { candidateId } : {}),
+          ...(candidateTitle ? { candidateTitle } : {}),
+          ...(existingOwner ? { existingOwner } : {}),
+          ...(explicitOwner ? { explicitOwner } : {}),
+          blockedMetadata,
+        })
+      : undefined;
+
   return {
     path: outputPath,
     kind,
     suggestedMode: "metadata-retrofit",
     ownerProvided: Boolean(explicitOwner),
-    instructions: buildInstructions({ existingOwner, explicitOwner }),
+    instructions: buildInstructions({
+      kind,
+      existingOwner,
+      explicitOwner,
+      agentSkills,
+    }),
     candidateMetadata,
     blockedMetadata,
+    ...(agentSkills ? { agentSkills } : {}),
   };
 }
 
 export function renderMetadataPrompt(suggestion: MetadataSuggestion): string {
+  const agentSkills = suggestion.agentSkills;
+  const migrationSection = agentSkills
+    ? [
+        "",
+        "Agent Skills Compatibility:",
+        `- Specification: ${agentSkills.specification}`,
+        `- Source format: ${agentSkills.sourceFormat}`,
+        `- Migration direction: ${agentSkills.direction}`,
+        `- Specification errors: ${agentSkills.validation.errorCount}`,
+        `- Renma authoring warnings: ${agentSkills.validation.warningCount}`,
+        "",
+        "Candidate Agent Skills Metadata:",
+        ...metadataLines(agentSkills.candidateAgentSkillsMetadata),
+        "",
+        "Candidate Renma Extension Metadata:",
+        ...metadataLines(agentSkills.candidateRenmaMetadata),
+        "",
+        "Canonical Frontmatter:",
+        ...(agentSkills.canonicalFrontmatter
+          ? ["```yaml", agentSkills.canonicalFrontmatter, "```"]
+          : [
+              "- (blocked until a reviewed description can be drafted from existing evidence)",
+            ]),
+        "",
+        "Authoring Review:",
+        ...agentSkills.authoringRecommendations.map((item) => `- ${item}`),
+      ]
+    : [];
+
   return `${[
     "# Codex Task: Safely Retrofit Renma Metadata",
     "",
@@ -138,20 +220,202 @@ export function renderMetadataPrompt(suggestion: MetadataSuggestion): string {
     "",
     "Blocked Metadata:",
     ...blockedMetadataLines(suggestion.blockedMetadata),
+    ...migrationSection,
     "",
     "Verification:",
     "- Run `renma scan .`.",
+    "- Confirm the Agent Skills validation summary reports this SKILL.md as valid.",
     "- Run `renma ownership .`.",
     "",
-    "Return a small reviewed patch. Do not rewrite the asset body.",
+    "Return a small reviewed patch. Do not broadly rewrite the asset body.",
   ].join("\n")}\n`;
 }
 
+function buildAgentSkillsMigrationSuggestion(input: {
+  document: ReturnType<typeof parseDocument>;
+  outputPath: string;
+  candidateId?: string;
+  candidateTitle?: string;
+  existingOwner?: string;
+  explicitOwner?: string;
+  blockedMetadata: BlockedMetadata[];
+}): AgentSkillsMigrationSuggestion {
+  const validation = validateAgentSkill(input.document);
+  const existingName = optionalText(
+    metadataValueText(input.document.metadata.name),
+  );
+  const existingDescription = optionalText(
+    metadataValueText(input.document.metadata.description),
+  );
+  const name = validSkillName(existingName, input.outputPath)
+    ? existingName
+    : inferSkillName(input.outputPath);
+  const extractedDescription =
+    existingDescription ?? extractDescriptionCandidate(input.document);
+  const candidateAgentSkillsMetadata: Record<string, string> = {};
+  if (!existingName || existingName !== name) {
+    candidateAgentSkillsMetadata.name = name;
+  }
+  if (!existingDescription && extractedDescription) {
+    candidateAgentSkillsMetadata.description = extractedDescription;
+  }
+
+  for (const field of ["license", "compatibility", "allowed-tools"]) {
+    const value = optionalText(
+      metadataValueText(input.document.metadata[field]),
+    );
+    if (value) candidateAgentSkillsMetadata[field] = value;
+  }
+
+  const candidateRenmaMetadata = collectRenmaMigrationMetadata({
+    document: input.document,
+    ...(input.candidateId ? { candidateId: input.candidateId } : {}),
+    ...(input.candidateTitle ? { candidateTitle: input.candidateTitle } : {}),
+    ...(input.existingOwner ? { existingOwner: input.existingOwner } : {}),
+    ...(input.explicitOwner ? { explicitOwner: input.explicitOwner } : {}),
+  });
+  const clientMetadata = collectClientMetadata(input.document);
+  const canonicalFrontmatter = extractedDescription
+    ? renderCanonicalSkillFrontmatter({
+        name,
+        description: extractedDescription,
+        agentSkillsMetadata: candidateAgentSkillsMetadata,
+        clientMetadata,
+        renmaMetadata: candidateRenmaMetadata,
+      })
+    : undefined;
+
+  if (!extractedDescription) {
+    input.blockedMetadata.push({
+      field: "description",
+      reason:
+        "No reviewed Agent Skills description can be extracted from the existing body. Draft what the skill does, when to use it, and any selection-critical exclusion from repository evidence; require human review.",
+    });
+  }
+
+  return {
+    specification: AGENT_SKILLS_SPECIFICATION,
+    direction:
+      validation.format === "agent-skills" && !validation.migrationRecommended
+        ? "none"
+        : "legacy-to-agent-skills",
+    sourceFormat: validation.format,
+    targetFormat: "agent-skills",
+    validation,
+    candidateAgentSkillsMetadata,
+    candidateRenmaMetadata,
+    ...(canonicalFrontmatter ? { canonicalFrontmatter } : {}),
+    descriptionDraftRequired: !extractedDescription,
+    authoringRecommendations: authoringRecommendations(validation),
+  };
+}
+
+function collectRenmaMigrationMetadata(input: {
+  document: ReturnType<typeof parseDocument>;
+  candidateId?: string;
+  candidateTitle?: string;
+  existingOwner?: string;
+  explicitOwner?: string;
+}): Record<string, string> {
+  const result: Record<string, string> = {};
+
+  for (const legacyKey of Object.keys(
+    RENMA_METADATA_KEYS,
+  ) as LegacyRenmaMetadataKey[]) {
+    const value = readRenmaMetadataValue(input.document, legacyKey);
+    if (value === undefined) continue;
+    const canonicalKey = canonicalRenmaMetadataKey(legacyKey).replace(
+      /^metadata\./,
+      "",
+    );
+    if (RENMA_LIST_METADATA_KEYS.has(legacyKey)) {
+      result[canonicalKey] = encodeRenmaMetadataList(
+        metadataValueAsList(value),
+      );
+    } else {
+      const text = metadataValueAsText(value);
+      if (text !== undefined) result[canonicalKey] = text;
+    }
+  }
+
+  if (!result["renma.id"] && input.candidateId) {
+    result["renma.id"] = input.candidateId;
+  }
+  if (!result["renma.title"] && input.candidateTitle) {
+    result["renma.title"] = input.candidateTitle;
+  }
+  if (!result["renma.owner"] && !input.existingOwner && input.explicitOwner) {
+    result["renma.owner"] = input.explicitOwner;
+  }
+
+  return sortRecord(result);
+}
+
+function collectClientMetadata(
+  document: ReturnType<typeof parseDocument>,
+): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(document.metadata)) {
+    if (!key.startsWith("metadata.")) continue;
+    if (isCanonicalRenmaMetadataKey(key)) continue;
+    const childKey = key.slice("metadata.".length);
+    const text = metadataValueAsText(value);
+    if (childKey && text !== undefined) result[childKey] = text;
+  }
+  return sortRecord(result);
+}
+
+function renderCanonicalSkillFrontmatter(input: {
+  name: string;
+  description: string;
+  agentSkillsMetadata: Record<string, string>;
+  clientMetadata: Record<string, string>;
+  renmaMetadata: Record<string, string>;
+}): string {
+  const lines = [
+    "---",
+    `name: ${yamlString(input.name)}`,
+    `description: ${yamlString(input.description)}`,
+  ];
+  for (const field of ["license", "compatibility", "allowed-tools"]) {
+    const value = input.agentSkillsMetadata[field];
+    if (value) lines.push(`${field}: ${yamlString(value)}`);
+  }
+  const metadata = {
+    ...input.clientMetadata,
+    ...input.renmaMetadata,
+  };
+  if (Object.keys(metadata).length > 0) {
+    lines.push("metadata:");
+    for (const [key, value] of Object.entries(sortRecord(metadata))) {
+      lines.push(`  ${key}: ${yamlString(value)}`);
+    }
+  }
+  lines.push("---");
+  return lines.join("\n");
+}
+
+function authoringRecommendations(
+  validation: AgentSkillValidationResult,
+): string[] {
+  const recommendations = validation.issues
+    .filter((issue) => issue.category === "renma-authoring")
+    .map((issue) => issue.message);
+  if (recommendations.length === 0) {
+    return [
+      "Preserve the existing usage boundaries and hard constraints while moving only the metadata representation.",
+    ];
+  }
+  return recommendations;
+}
+
 function buildInstructions(input: {
+  kind: ArtifactKind;
   existingOwner?: string | undefined;
   explicitOwner?: string | undefined;
+  agentSkills?: AgentSkillsMigrationSuggestion | undefined;
 }): string[] {
-  return [
+  const base = [
     "Inspect the existing asset before editing.",
     "Preserve the existing markdown body content.",
     "Preserve existing frontmatter fields and values unless they are clearly invalid.",
@@ -162,8 +426,22 @@ function buildInstructions(input: {
     "Avoid placeholder metadata.",
     "Keep metadata compact.",
     ownerInstruction(input),
-    "Run renma scan . and renma ownership . after editing.",
   ];
+
+  if (input.kind === "skill" && input.agentSkills) {
+    base.push(
+      "Apply migration only from legacy top-level Renma skill metadata to the Agent Skills-compatible form; never migrate a valid Agent Skill back to the legacy form.",
+      "Keep only name, description, license, compatibility, metadata, and allowed-tools at the top level of SKILL.md frontmatter.",
+      "Move Renma extension values under metadata using renma.* string keys and remove the migrated legacy top-level duplicates after review.",
+      "Preserve unrelated client-specific metadata entries.",
+      "Treat description as the discovery surface: state what the skill does, when to use it, and any selection-critical exclusion already supported by the body.",
+      "A narrowly scoped body organization change is allowed only to group existing negative directives under a prominent Do Not Use or Hard Constraints section; preserve their meaning and state an existing alternative or stop behavior when available.",
+      "Do not invent new prohibitions, policies, domain facts, owners, dependencies, or routing promises.",
+    );
+  }
+
+  base.push("Run renma scan . and renma ownership . after editing.");
+  return base;
 }
 
 function ownerInstruction(input: {
@@ -253,6 +531,58 @@ function inferRootedId(
   return [prefix, ...idParts].join(".");
 }
 
+function inferSkillName(filePath: string): string {
+  const parts = pathParts(filePath);
+  return slugify(parts.at(-2) ?? "skill");
+}
+
+function validSkillName(
+  value: string | undefined,
+  filePath: string,
+): value is string {
+  if (!value) return false;
+  return value === inferSkillName(filePath);
+}
+
+function extractDescriptionCandidate(
+  document: ReturnType<typeof parseDocument>,
+): string | undefined {
+  const bodyStart =
+    document.lines[0]?.trim() === "---"
+      ? document.lines.findIndex(
+          (line, index) => index > 0 && line.trim() === "---",
+        ) + 1
+      : 0;
+  const candidates: string[] = [];
+  let paragraph: string[] = [];
+  const flush = () => {
+    if (paragraph.length > 0) candidates.push(paragraph.join(" ").trim());
+    paragraph = [];
+  };
+
+  for (const line of document.lines.slice(Math.max(0, bodyStart))) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+      flush();
+      continue;
+    }
+    if (/^#{1,6}\s+/.test(trimmed) || /^[-*+]\s+/.test(trimmed)) {
+      flush();
+      continue;
+    }
+    paragraph.push(trimmed);
+  }
+  flush();
+
+  const candidate = candidates.find(
+    (value) =>
+      /\b(?:use this skill|use when|use for|when the request|when reviewing)\b|(?:このスキル|使用|利用|場合|とき)/iu.test(
+        value,
+      ) && value.length <= 1024,
+  );
+  return candidate;
+}
+
 function mainHeadingTitle(headings: Array<{ depth: number; text: string }>) {
   return headings.find((heading) => heading.depth === 1)?.text.trim();
 }
@@ -293,6 +623,12 @@ function slugify(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function sortRecord(input: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(input).sort(([a], [b]) => a.localeCompare(b)),
+  );
 }
 
 function readErrorReason(error: unknown): string {
