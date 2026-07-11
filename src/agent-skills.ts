@@ -26,7 +26,7 @@ export const AGENT_SKILLS_TOP_LEVEL_FIELDS = [
   "allowed-tools",
 ] as const;
 
-export const LEGACY_RENMA_SKILL_FIELDS = [
+const LEGACY_RENMA_OPERATIONAL_SKILL_FIELDS = [
   "id",
   "title",
   "version",
@@ -45,6 +45,10 @@ export const LEGACY_RENMA_SKILL_FIELDS = [
   "optional_lens",
   "conflicts",
   "superseded_by",
+] as const;
+
+/** Pre-0.16 security fields whose canonical adoption is deferred to Stage 3. */
+export const DEFERRED_STAGE_3_SECURITY_FIELDS = new Set<string>([
   "allowed_data",
   "network_allowed",
   "external_upload_allowed",
@@ -54,6 +58,11 @@ export const LEGACY_RENMA_SKILL_FIELDS = [
   "approved_network_destinations",
   "approved_upload_destinations",
   "security_profile",
+]);
+
+export const LEGACY_RENMA_SKILL_FIELDS = [
+  ...LEGACY_RENMA_OPERATIONAL_SKILL_FIELDS,
+  ...DEFERRED_STAGE_3_SECURITY_FIELDS,
 ] as const;
 
 const ALLOWED_TOP_LEVEL_FIELDS = new Set<string>(AGENT_SKILLS_TOP_LEVEL_FIELDS);

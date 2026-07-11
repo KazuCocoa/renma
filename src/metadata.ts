@@ -74,7 +74,7 @@ export function parseAssetMetadata(document: ParsedDocument): {
   diagnostics: Diagnostic[];
 } {
   const diagnostics: Diagnostic[] = [];
-  const source = operationalMetadataSource(document);
+  const source = operationalMetadataSource(document, diagnostics);
   const rawStatusText = metadataText(source.values.status);
   const rawStatus = source.canonicalSkill
     ? rawStatusText?.trim()
@@ -249,14 +249,15 @@ function invalidMetadataDiagnostic(
 
 function operationalMetadataSource(
   document: ParsedDocument,
+  diagnostics: Diagnostic[],
 ): OperationalMetadataSource {
   if (document.artifact.kind !== "skill") {
     return legacyMetadataSource(document);
   }
 
   const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
-  if (hasCanonicalAgentSkillsIdentity(frontmatter)) {
-    return canonicalSkillMetadataSource(document, frontmatter);
+  if (hasCanonicalAgentSkillsIdentity(document, frontmatter)) {
+    return canonicalSkillMetadataSource(document, frontmatter, diagnostics);
   }
 
   // Temporary migration compatibility: pre-0.16-only Skills remain readable so
@@ -280,10 +281,45 @@ function legacyMetadataSource(
 function canonicalSkillMetadataSource(
   document: ParsedDocument,
   frontmatter: ParsedYamlFrontmatter,
+  diagnostics: Diagnostic[],
 ): OperationalMetadataSource {
   const values: Record<string, unknown> = {};
   const fields = withoutCanonicalOperationalKeys(document.metadataFields);
   const listItems = withoutCanonicalOperationalKeys(document.metadataListItems);
+  const duplicateMetadataMapping = frontmatter.duplicateFields.find(
+    (field) => field.key === "metadata",
+  );
+
+  if (duplicateMetadataMapping) {
+    diagnostics.push({
+      severity: "warning",
+      path: document.artifact.path,
+      message:
+        "Canonical Agent Skills metadata is ambiguous because the top-level metadata mapping is declared more than once. No metadata.renma.* values were selected.",
+      evidence: {
+        path: document.artifact.path,
+        startLine: duplicateMetadataMapping.startLine,
+        endLine: duplicateMetadataMapping.endLine,
+        snippet: document.lines
+          .slice(
+            duplicateMetadataMapping.startLine - 1,
+            duplicateMetadataMapping.endLine,
+          )
+          .join("\n"),
+      },
+    });
+  }
+
+  if (
+    !frontmatter.closed ||
+    !frontmatter.mapping ||
+    frontmatter.errors.length > 0 ||
+    !canonicalMetadataMappingIsSafe(frontmatter) ||
+    duplicateMetadataMapping
+  ) {
+    return { values, fields, listItems, canonicalSkill: true };
+  }
+
   const duplicateKeys = new Set(
     frontmatter.duplicateMetadataKeys.map((field) => field.key),
   );
@@ -321,11 +357,32 @@ function withoutCanonicalOperationalKeys<T>(
 }
 
 function hasCanonicalAgentSkillsIdentity(
+  document: ParsedDocument,
   frontmatter: ParsedYamlFrontmatter,
 ): boolean {
   return (
-    nonEmptyString(frontmatter.values.name) !== undefined &&
-    nonEmptyString(frontmatter.values.description) !== undefined
+    (nonEmptyString(frontmatter.values.name) !== undefined &&
+      nonEmptyString(frontmatter.values.description) !== undefined) ||
+    // The focused YAML parser intentionally exposes no values for some unsafe
+    // structures (notably unclosed frontmatter). The Markdown parser still
+    // gives us a conservative identity signal, which prevents malformed
+    // canonical Skills from falling back to pre-0.16 operational metadata.
+    (nonEmptyString(document.metadata.name) !== undefined &&
+      nonEmptyString(document.metadata.description) !== undefined)
+  );
+}
+
+function canonicalMetadataMappingIsSafe(
+  frontmatter: ParsedYamlFrontmatter,
+): boolean {
+  if (!frontmatter.fields.some((field) => field.key === "metadata")) {
+    return true;
+  }
+  const metadata = frontmatter.values.metadata;
+  return (
+    metadata !== null &&
+    typeof metadata === "object" &&
+    !Array.isArray(metadata)
   );
 }
 

@@ -162,12 +162,15 @@ top-level security fields is intentionally hybrid during this transition. The
 security parser continues reading those top-level fields without Stage 2
 reinterpretation.
 
-Stage 1 migration assistance may show the future canonical serialization for
-security keys. That does not make those keys operational in Stage 2. Preserve
-the pre-0.16 top-level security fields in an operational Skill until Stage 3.
-Because those fields are outside the Agent Skills standard top-level field set,
-an intentionally hybrid Skill remains a migration-state document and can still
-receive Stage 1 validation or migration diagnostics.
+Stage 2 migration assistance reports the names of detected pre-0.16 top-level
+security fields as blocked evidence. It does not propose canonical security
+keys, values, or serialization. If any recognized pre-0.16 security field
+remains, `suggest-metadata` treats the full conversion as deferred and does not
+emit canonical frontmatter that is ready to apply. Preserve every such field in
+its pre-0.16 top-level form until Stage 3. Because those fields are outside the
+Agent Skills standard top-level field set, an intentionally hybrid Skill
+remains a migration-state document and can still receive Stage 1 validation or
+migration diagnostics.
 
 ## Entrypoint Paths
 
@@ -370,16 +373,26 @@ renma scan .
 renma suggest-metadata skills/example/SKILL.md --format prompt
 renma suggest-metadata skills/example/skill.md --format json
 renma suggest-metadata skills/testing/spec-review.skill.md --format prompt
-# review and apply the proposed conversion
+# apply only an unblocked canonical frontmatter candidate
 renma scan .
 ```
 
 For Skill targets, `suggest-metadata` can preserve valid standard Agent Skills
 fields, use a valid immediate parent directory as `name`, preserve an existing
 valid description, conservatively extract description evidence from the body,
-move recognized pre-0.16 Renma Skill fields to `metadata.renma.*`, and render
-canonical frontmatter for human review. It never edits the file and never
-proposes a reverse conversion for a canonical Agent Skill.
+move recognized non-security pre-0.16 Renma Skill fields to
+`metadata.renma.*`, and render canonical frontmatter for human review. It never
+edits the file and never proposes a reverse conversion for a canonical Agent
+Skill.
+
+During Stage 2, pre-0.16 security fields are a deferral boundary, not migration
+input for an apply-ready conversion. `suggest-metadata` lists the detected
+top-level field names as blocked evidence, proposes no canonical security values
+or serialization, and omits canonical frontmatter while any such field remains.
+Do not delete or relocate the top-level field. A maintainer may separately make
+a reviewed partial Stage 2 conversion of identity and non-security fields while
+preserving every security field at the top level; the result is intentionally
+hybrid and is not a completed migration.
 
 Before presenting a non-canonical entrypoint migration, Renma renders the candidate
 frontmatter, combines it with the unchanged Markdown body at the target
@@ -402,20 +415,20 @@ not reverse migration.
 Migration never converts native YAML numbers or booleans into text when doing
 so could lose the original lexical value.
 
+These rules apply only to the non-security fields adopted in Stage 2. Security
+field values are not converted, compared, or serialized into canonical
+candidate metadata; `suggest-metadata` reports only their detected top-level
+field names and defers them to Stage 3.
+
 - Text scalar fields (`id`, `title`, `version`, `owner`, `status`, `purpose`,
-  `last_reviewed_at`, `review_cycle`, `expires_at`, and `security_profile`)
-  require YAML strings.
-- Boolean policy fields (`network_allowed`, `external_upload_allowed`,
-  `secrets_allowed`, and `requires_human_approval`) accept YAML booleans or the
-  exact strings `"true"` and `"false"`, then serialize as those lowercase
-  strings. Numeric `0` and `1` are blocked.
+  `last_reviewed_at`, `review_cycle`, and `expires_at`) require YAML strings.
 - String-list fields accept YAML arrays containing strings only, pre-0.16
   comma-separated strings, or JSON-array strings containing strings only.
   Numeric and boolean elements are blocked.
 
-For example, `version: "1.0"`, `tags: ["1.0"]`, and
-`network_allowed: false` are safe. `version: 1.0`, `tags: [1.0]`, and
-`network_allowed: 1` block canonical frontmatter generation.
+For example, `version: "1.0"` and `tags: ["1.0"]` are safe. `version: 1.0`
+and `tags: [1.0]` block canonical frontmatter generation. A field such as
+`network_allowed` is deferred regardless of its value shape.
 
 ## Unsafe Migration Blocking
 
@@ -428,6 +441,7 @@ or lossy. Blocking cases include:
 - non-string metadata values;
 - an invalid Skill directory name or conflicting identity;
 - conflicting Agent Skills and pre-0.16 Renma Skill values;
+- any recognized pre-0.16 security field during Stage 2;
 - an unknown top-level field;
 - missing evidence for a usable description;
 - duplicate semantic list values or unsupported pre-0.16 value shapes.
@@ -480,7 +494,9 @@ Stage 3 will establish:
 The repository-owned `release-prep` Skill is intentionally hybrid in Stage 2.
 Its identity and non-security operational fields use the canonical Agent Skills
 shape, while its remaining pre-0.16 top-level fields are security fields
-deferred to Stage 3. The 0.16.0 migration is not complete yet.
+deferred to Stage 3. Do not use `suggest-metadata` to move or remove those
+security fields, and do not describe the partial conversion as complete. The
+0.16.0 migration is not complete yet.
 
 These stages do not add runtime Skill selection, prompt assembly, context
 injection, execution, or telemetry.

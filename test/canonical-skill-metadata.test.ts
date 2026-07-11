@@ -270,6 +270,220 @@ metadata:
   );
 });
 
+test("duplicate top-level metadata mappings are ignored operationally", () => {
+  const document = skillDocument(`---
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+id: skill.legacy
+owner: legacy-team
+status: stable
+requires_context: context.legacy
+metadata:
+  renma.id: skill.first
+  renma.owner: first-team
+  renma.status: stable
+  renma.requires-context: '["context.first"]'
+metadata:
+  renma.id: skill.second
+  renma.owner: second-team
+  renma.status: deprecated
+  renma.requires-context: '["context.second"]'
+---
+# Demo
+`);
+
+  const result = parseAssetMetadata(document);
+  const validation = validateAgentSkill(document);
+  const { catalog, diagnostics } = buildCatalog([document]);
+  const entry = catalog.entries[0];
+  const trustGraph = buildTrustGraph({ catalog });
+  const assetEdges = trustGraph.edges.filter(
+    (edge) => edge.from === "asset:skills/demo/SKILL.md",
+  );
+
+  assert.equal(result.metadata.id, undefined);
+  assert.equal(result.metadata.owner, undefined);
+  assert.equal(result.metadata.status, undefined);
+  assert.deepEqual(result.metadata.requiresContext, []);
+  assert.equal(result.metadataFields.id, undefined);
+  assert.equal(result.metadataFields.owner, undefined);
+  assert.equal(result.metadataFields.status, undefined);
+  assert.equal(result.metadataFields.requires_context, undefined);
+  assert.equal(entry?.id, "skills/demo/SKILL.md");
+  assert.deepEqual(catalog.dependencies, []);
+  assert.equal(
+    assetEdges.some((edge) =>
+      ["owned_by", "has_lifecycle_status", "declares_dependency"].includes(
+        edge.type,
+      ),
+    ),
+    false,
+  );
+
+  const operationalDiagnostic = result.diagnostics.find((diagnostic) =>
+    diagnostic.message.startsWith(
+      "Canonical Agent Skills metadata is ambiguous",
+    ),
+  );
+  assert.ok(operationalDiagnostic);
+  assert.equal(operationalDiagnostic.evidence?.startLine, 13);
+  assert.equal(operationalDiagnostic.evidence?.endLine, 17);
+  assert.match(
+    operationalDiagnostic.evidence?.snippet ?? "",
+    /^metadata:\n {2}renma\.id: skill\.second/m,
+  );
+  assert.ok(
+    diagnostics.some(
+      (diagnostic) => diagnostic.message === operationalDiagnostic.message,
+    ),
+  );
+  assert.ok(
+    validation.issues.some(
+      (issue) =>
+        issue.code === "AS-SKILL-DUPLICATE-FIELD" && issue.field === "metadata",
+    ),
+  );
+});
+
+test("structurally unsafe canonical frontmatter never selects partial or legacy values", () => {
+  const cases = [
+    {
+      label: "unclosed frontmatter",
+      content: `---
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+owner: legacy-team
+metadata:
+  renma.owner: canonical-team
+`,
+    },
+    {
+      label: "YAML parser error",
+      content: `---
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+owner: legacy-team
+metadata:
+  renma.owner: canonical-team
+broken: [unterminated
+---
+# Demo
+`,
+    },
+    {
+      label: "non-mapping metadata",
+      content: `---
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+owner: legacy-team
+metadata: canonical-team
+---
+# Demo
+`,
+    },
+    {
+      label: "non-mapping root",
+      content: `---
+- invalid-root
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+owner: legacy-team
+---
+# Demo
+`,
+    },
+  ];
+
+  for (const fixture of cases) {
+    const result = parseAssetMetadata(skillDocument(fixture.content));
+    assert.equal(result.metadata.owner, undefined, fixture.label);
+    assert.equal(result.metadataFields.owner, undefined, fixture.label);
+  }
+});
+
+test("Renma authoring warnings do not block structurally valid canonical metadata", () => {
+  const document = skillDocument(`---
+name: demo
+description: Review demo inputs carefully.
+metadata:
+  renma.owner: qa-platform
+---
+# Demo
+`);
+
+  const validation = validateAgentSkill(document);
+  const result = parseAssetMetadata(document);
+
+  assert.ok(
+    validation.issues.some(
+      (issue) =>
+        issue.category === "renma-authoring" && issue.severity === "warning",
+    ),
+  );
+  assert.equal(result.metadata.owner, "qa-platform");
+  assert.equal(result.metadataFields.owner?.raw, "  renma.owner: qa-platform");
+});
+
+test("multiline canonical values preserve complete operational evidence", () => {
+  const result = parseAssetMetadata(
+    skillDocument(`---
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+metadata:
+  renma.tags: >-
+    ["testing","review"]
+  renma.purpose: >-
+    Review the specification
+    before implementation.
+---
+# Demo
+`),
+  );
+
+  assert.deepEqual(result.metadata.tags, ["testing", "review"]);
+  assert.equal(
+    result.metadata.purpose,
+    "Review the specification before implementation.",
+  );
+  assert.equal(result.metadataFields.tags?.startLine, 5);
+  assert.equal(result.metadataFields.tags?.endLine, 6);
+  assert.equal(
+    result.metadataFields.tags?.raw,
+    `  renma.tags: >-\n    ["testing","review"]`,
+  );
+  assert.equal(result.metadataFields.purpose?.startLine, 7);
+  assert.equal(result.metadataFields.purpose?.endLine, 9);
+  assert.equal(
+    result.metadataFields.purpose?.raw,
+    "  renma.purpose: >-\n    Review the specification\n    before implementation.",
+  );
+  assert.deepEqual(result.diagnostics, []);
+});
+
+test("invalid multiline canonical lists retain their complete value evidence", () => {
+  const result = parseAssetMetadata(
+    skillDocument(`---
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+metadata:
+  renma.tags: |-
+    ["testing",1]
+---
+# Demo
+`),
+  );
+
+  assert.deepEqual(result.metadata.tags, []);
+  assert.equal(result.diagnostics.length, 1);
+  assert.match(result.diagnostics[0]?.message ?? "", /string array members/);
+  assert.equal(result.diagnostics[0]?.evidence?.startLine, 5);
+  assert.equal(result.diagnostics[0]?.evidence?.endLine, 6);
+  assert.equal(
+    result.diagnostics[0]?.evidence?.snippet,
+    `  renma.tags: |-\n    ["testing",1]`,
+  );
+});
+
 test("pre-0.16-only Skills retain temporary permissive metadata parsing", () => {
   const result = parseAssetMetadata(
     skillDocument(`---

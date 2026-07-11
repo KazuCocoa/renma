@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { main } from "../src/cli.js";
 import { buildMetadataSuggestion } from "../src/commands/suggest-metadata.js";
+import { parseSecurityPolicy } from "../src/security-policy.js";
 
 test("suggest-metadata prompt reports blocked legacy Skill migration", async () => {
   const root = await fixture();
@@ -115,6 +116,88 @@ test("suggest-metadata JSON exposes the Skill migration contract", async () => {
       "Preserve the Markdown body and existing standard Agent Skills fields.",
     ),
   );
+});
+
+test("suggest-metadata JSON and prompt block the repository release-prep security migration", async () => {
+  const target = "skills/release-prep/SKILL.md";
+  const original = await readFile(target, "utf8");
+  const policyBefore = parseSecurityPolicy(original);
+  const result = await withCapturedConsole(() =>
+    main(["suggest-metadata", target, "--format", "json"]),
+  );
+  const suggestion = JSON.parse(result.stdout) as {
+    instructions: string[];
+    blockedMetadata: Array<{ field: string; reason: string }>;
+    agentSkills: {
+      canonicalFrontmatter?: string;
+      candidateRenmaMetadata: Record<string, string>;
+    };
+  };
+  const after = await readFile(target, "utf8");
+  const securityBlock = suggestion.blockedMetadata.find(
+    (item) => item.field === "security",
+  );
+
+  assert.equal(result.code, 0);
+  assert.match(
+    securityBlock?.reason ?? "",
+    /Security metadata migration is deferred to Renma 0\.16\.0 Stage 3/,
+  );
+  assert.match(
+    securityBlock?.reason ?? "",
+    /allowed_data, network_allowed, external_upload_allowed, secrets_allowed, requires_human_approval, forbidden_inputs/,
+  );
+  assert.equal(
+    Object.hasOwn(suggestion.agentSkills, "canonicalFrontmatter"),
+    false,
+  );
+  assert.equal(
+    suggestion.agentSkills.candidateRenmaMetadata["renma.allowed-data"],
+    undefined,
+  );
+  assert.equal(
+    suggestion.agentSkills.candidateRenmaMetadata["renma.network-allowed"],
+    undefined,
+  );
+  assert.equal(after, original);
+  assert.deepEqual(parseSecurityPolicy(after), policyBefore);
+  assert.ok(
+    suggestion.instructions.includes(
+      "Preserve existing pre-0.16 top-level security fields in place because the current security parser does not yet consume their metadata.renma.* equivalents.",
+    ),
+  );
+  assert.ok(
+    suggestion.instructions.includes(
+      "Do not delete, move, replace, or relocate pre-0.16 top-level security fields.",
+    ),
+  );
+  assert.equal(
+    suggestion.instructions.some((instruction) =>
+      /^(?:Delete|Move|Remove|Relocate) .*top-level security fields/i.test(
+        instruction,
+      ),
+    ),
+    false,
+  );
+
+  const promptResult = await withCapturedConsole(() =>
+    main(["suggest-metadata", target, "--format", "prompt"]),
+  );
+
+  assert.equal(promptResult.code, 0);
+  assert.match(
+    promptResult.stdout,
+    /Security metadata migration is deferred to Renma 0\.16\.0 Stage 3/,
+  );
+  assert.match(
+    promptResult.stdout,
+    /Preserve the existing source and every pre-0\.16 top-level security field exactly where it is/,
+  );
+  assert.doesNotMatch(
+    promptResult.stdout,
+    /Return (?:a|one) small reviewed (?:frontmatter )?patch/,
+  );
+  assert.equal(await readFile(target, "utf8"), original);
 });
 
 test("suggest-metadata JSON records explicit owner without unsafe output", async () => {

@@ -143,7 +143,11 @@ Stage 2 does not adopt canonical security metadata. Keep existing Skill
 security policy fields in their pre-0.16 top-level form until Stage 3; a Skill
 that combines those fields with canonical identity and non-security metadata is
 intentionally hybrid. Do not remove those fields before the security parser can
-consume their canonical equivalents.
+consume their canonical equivalents. While any recognized pre-0.16 security
+field remains, `suggest-metadata` does not emit canonical frontmatter that is
+ready to apply. It reports only the detected top-level security field names as
+blocked evidence and proposes no canonical security keys, values, or
+serialization. Preserve the operational top-level field.
 
 The following uses the pre-0.16 Renma Skill format and is a migration source for
 0.16.0, not the canonical target format. See the Agent Skills compatibility
@@ -183,8 +187,10 @@ renma scaffold skill skills/testing/spec-review/SKILL.md \
 During Stage 2, this Skill scaffold is still a pre-0.16 migration-source
 starter. Replace its placeholder prose, then run `suggest-metadata` and review
 the one-way proposal before converting it to Agent Skills identity plus
-`metadata.renma.*`. Context and context-lens scaffolds keep their existing
-top-level metadata shape.
+non-security `metadata.renma.*`. Apply only an unblocked canonical frontmatter
+candidate. If security fields are present, keep them top-level and defer the
+complete migration to Stage 3. Context and context-lens scaffolds keep their
+existing top-level metadata shape.
 
 If you want to hand the scaffold and authoring constraints to an external or local LLM before creating the file, emit a prompt instead:
 
@@ -273,13 +279,20 @@ renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform -
 The command emits a deterministic prompt or JSON payload for a human or coding agent. It tells the agent to inspect the existing asset, preserve the Markdown body, preserve existing frontmatter values, add only missing metadata that is clearly supported, and rerun `renma scan .` and `renma ownership .` after editing.
 
 For a Skill target using the pre-0.16 Renma Skill format, `suggest-metadata`
-produces a one-way Agent Skills metadata migration proposal. Separately,
-`skill.md` and `*.skill.md` targets make any required entrypoint rename or move
-explicit, even when their frontmatter already uses Agent Skills fields. For a
-canonical Agent Skill, `--owner` may instead produce a
-`metadata.renma.owner` retrofit; it never causes reverse migration. Unsafe or
-ambiguous input blocks canonical frontmatter. See the normative compatibility
-document for the detailed migration contract.
+produces a one-way Agent Skills metadata migration proposal for non-security
+fields. Separately, `skill.md` and `*.skill.md` targets make any required
+entrypoint rename or move explicit, even when their frontmatter already uses
+Agent Skills fields. For a canonical Agent Skill, `--owner` may instead produce
+a `metadata.renma.owner` retrofit; it never causes reverse migration. Unsafe or
+ambiguous input blocks canonical frontmatter.
+
+Pre-0.16 security fields also block an apply-ready conversion throughout Stage
+2. The output lists detected top-level security field names as blocked evidence
+without proposing canonical security values or serialization. Keep the
+operational fields top-level until Stage 3. A reviewed partial conversion of
+identity and non-security fields is intentionally hybrid, as with the
+repository-owned `release-prep` Skill, and must not be treated as complete. See
+the normative compatibility document for the detailed migration contract.
 
 Owner policy stays the same: `owner` is recommended governance metadata, not globally required. Renma accepts unowned assets and reports them in ownership coverage. Without `--owner`, the prompt says not to add owner unless one is already declared or a maintainer provides one. With `--owner <owner>`, the prompt may include that owner because it was explicitly provided. If an existing asset already declares an owner, `suggest-metadata` preserves it; a different `--owner` value is treated as a human-review ownership change, not an automatic metadata suggestion. Renma does not infer owners from Git history, file paths, prose, or authors.
 

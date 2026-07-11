@@ -164,6 +164,128 @@ Review deterministic boundaries.
   assert.match(finding.llmHint ?? "", /pre-0\.16-only Skills/);
 });
 
+test("duplicate canonical metadata mappings never select operational values", async () => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "renma-duplicate-metadata-"),
+  );
+  await writeRepositoryFile(
+    root,
+    "skills/demo/SKILL.md",
+    `---
+name: demo
+description: Review demo inputs. Use when deterministic repository context is required.
+owner: legacy-team
+metadata:
+  renma.id: skill.first
+  renma.owner: first-team
+  renma.status: stable
+  renma.requires-context: '["context.testing.boundaries"]'
+metadata:
+  renma.id: skill.second
+  renma.owner: second-team
+  renma.status: archived
+  renma.requires-context: '["context.testing.other"]'
+---
+# Demo
+`,
+  );
+  await writeRepositoryFile(
+    root,
+    "contexts/testing/boundaries.md",
+    `---
+id: context.testing.boundaries
+owner: qa-platform
+status: stable
+when_to_use: specification review
+when_not_to_use: runtime execution
+---
+# Boundaries
+`,
+  );
+
+  const snapshot = await collectRepositorySnapshot(root);
+  const graph = graphFromRepositorySnapshot(snapshot);
+  const scan = scanFromRepositorySnapshot(snapshot, {
+    evaluationDate: "2026-07-11",
+  });
+  const bom = buildBomReport(snapshot, {
+    omitGeneratedAt: true,
+    evaluationDate: "2026-07-11",
+  });
+  const ownershipReport = await ownership(root, {}, { includeOwned: true });
+  const fallbackId = "skills/demo/SKILL.md";
+  const asset = snapshot.catalog.assets.find(
+    (candidate) => candidate.sourcePath === fallbackId,
+  );
+
+  assert.ok(asset);
+  assert.equal(asset.id, fallbackId);
+  assert.equal(asset.metadata.id, undefined);
+  assert.equal(asset.metadata.owner, undefined);
+  assert.equal(asset.metadata.status, undefined);
+  assert.deepEqual(asset.metadata.requiresContext, []);
+  assert.equal(
+    snapshot.catalog.dependencies.some(
+      (dependency) => dependency.from === fallbackId,
+    ),
+    false,
+  );
+
+  const ambiguity = snapshot.catalogDiagnostics.find((diagnostic) =>
+    /canonical Agent Skills metadata is ambiguous/i.test(diagnostic.message),
+  );
+  assert.ok(ambiguity);
+  assert.equal(ambiguity.evidence?.startLine, 10);
+  assert.match(ambiguity.evidence?.snippet ?? "", /^metadata:/m);
+  assert.match(ambiguity.evidence?.snippet ?? "", /renma\.owner: second-team/);
+
+  assert.equal(ownershipReport.totalAssets, 2);
+  assert.equal(ownershipReport.ownedAssets, 1);
+  assert.equal(ownershipReport.unownedAssets, 1);
+  assert.equal(
+    ownershipReport.unownedAssetList?.some(
+      (unowned) => unowned.id === fallbackId,
+    ),
+    true,
+  );
+
+  const graphNode = graph.nodes.find((node) => node.id === fallbackId);
+  assert.ok(graphNode);
+  assert.equal(graphNode.owner, undefined);
+  assert.equal(graphNode.status, undefined);
+  assert.equal(
+    graph.edges.some((edge) => edge.from === fallbackId),
+    false,
+  );
+
+  const bomAsset = bom.assets.find((candidate) => candidate.id === fallbackId);
+  assert.ok(bomAsset);
+  assert.equal(bomAsset.owner, undefined);
+  assert.equal(bomAsset.status, undefined);
+  assert.deepEqual(bomAsset.dependencies, []);
+
+  const trustNodeId = `asset:${fallbackId}`;
+  const trustNode = scan.trustGraph?.nodes.find(
+    (node) => node.id === trustNodeId,
+  );
+  assert.ok(trustNode);
+  assert.equal(trustNode.properties?.owner, undefined);
+  assert.equal(trustNode.properties?.status, undefined);
+  assert.equal(
+    scan.trustGraph?.edges.some(
+      (edge) =>
+        edge.from === trustNodeId &&
+        [
+          "owned_by",
+          "has_lifecycle_status",
+          "declares_dependency",
+          "references",
+        ].includes(edge.type),
+    ),
+    false,
+  );
+});
+
 async function operationalConsumerView(root: string) {
   const snapshot = await collectRepositorySnapshot(root);
   const graph = graphFromRepositorySnapshot(snapshot);

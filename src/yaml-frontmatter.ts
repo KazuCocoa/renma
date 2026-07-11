@@ -121,9 +121,21 @@ function mapFields(
   return pairs.flatMap((pair) => {
     const key = scalarString(pair.key);
     if (key === undefined) return [];
-    const range = nodeRange(pair.key) ?? nodeRange(pair.value);
-    const startLine = (range ? lineCounter.linePos(range[0]).line : 1) + 1;
-    const endLine = (range ? lineCounter.linePos(range[2]).line : 1) + 1;
+    const keyRange = nodeRange(pair.key);
+    const valueRange = nodeRange(pair.value);
+    const startOffset = keyRange?.[0] ?? valueRange?.[0];
+    const endOffset = valueRange?.[2] ?? keyRange?.[2];
+    const startLine =
+      (startOffset === undefined ? 1 : lineCounter.linePos(startOffset).line) +
+      1;
+    // YAML node ranges use an exclusive end offset. Pointing at that offset
+    // can advance evidence to the following field, so locate the final byte
+    // belonging to this pair instead.
+    const endLine =
+      (endOffset === undefined
+        ? startLine - 1
+        : lineCounter.linePos(Math.max(startOffset ?? 0, endOffset - 1)).line) +
+      1;
     return [
       {
         key,

@@ -100,6 +100,9 @@ export async function buildMetadataSuggestion(
     });
     const metadataRetrofit =
       agentSkills.proposalKind === "canonical-metadata-retrofit";
+    const securityMigrationDeferred = isDeferredStage3SecurityMigration(
+      agentSkills.blocked,
+    );
     return {
       path: outputPath,
       kind,
@@ -120,7 +123,16 @@ export async function buildMetadataSuggestion(
         : [
             "Inspect the existing Skill before editing.",
             "Preserve the Markdown body and existing standard Agent Skills fields.",
-            "If present, move only recognized pre-0.16 Renma Skill fields to flat metadata.renma.* string entries.",
+            securityMigrationDeferred
+              ? "If present, move only recognized pre-0.16 non-security Renma Skill fields to flat metadata.renma.* string entries."
+              : "If present, move only recognized pre-0.16 Renma Skill fields to flat metadata.renma.* string entries.",
+            ...(securityMigrationDeferred
+              ? [
+                  "Security metadata migration is deferred to Renma 0.16.0 Stage 3.",
+                  "Preserve existing pre-0.16 top-level security fields in place because the current security parser does not yet consume their metadata.renma.* equivalents.",
+                  "Do not delete, move, replace, or relocate pre-0.16 top-level security fields.",
+                ]
+              : []),
             "Preserve unknown renma.* and other-vendor metadata child keys.",
             "Do not discard or automatically relocate unknown top-level fields.",
             "Apply the entrypoint rename or move together with the frontmatter migration when required.",
@@ -214,6 +226,9 @@ function renderAgentSkillMigrationPrompt(
   if (!migration) return "";
   const metadataRetrofit =
     migration.proposalKind === "canonical-metadata-retrofit";
+  const securityMigrationDeferred = isDeferredStage3SecurityMigration(
+    migration.blocked,
+  );
   const candidate = migration.canonicalFrontmatter
     ? [
         "Canonical Frontmatter Candidate:",
@@ -260,10 +275,26 @@ function renderAgentSkillMigrationPrompt(
     "Verification:",
     "- Run `renma scan .`.",
     "",
-    migration.entrypointMigration === "none"
-      ? "Return a small reviewed frontmatter patch. Do not rewrite the Skill body."
-      : "Return one small reviewed patch containing both the entrypoint path migration and frontmatter migration. Do not rewrite the Skill body.",
+    migration.canonicalFrontmatter
+      ? migration.entrypointMigration === "none"
+        ? "Return a small reviewed frontmatter patch. Do not rewrite the Skill body."
+        : "Return one small reviewed patch containing both the entrypoint path migration and frontmatter migration. Do not rewrite the Skill body."
+      : securityMigrationDeferred
+        ? "Do not return or apply a frontmatter patch in Stage 2. Preserve the existing source and every pre-0.16 top-level security field exactly where it is."
+        : migration.blocked.length > 0
+          ? "Do not return or apply a frontmatter patch while migration is blocked. Preserve the existing source until every blocked item is resolved with human review."
+          : "No frontmatter patch is proposed. Preserve the existing source.",
   ].join("\n")}\n`;
+}
+
+function isDeferredStage3SecurityMigration(blocks: BlockedMetadata[]): boolean {
+  return blocks.some(
+    (block) =>
+      block.field === "security" &&
+      block.reason.startsWith(
+        "Security metadata migration is deferred to Renma 0.16.0 Stage 3.",
+      ),
+  );
 }
 
 function buildInstructions(input: {
