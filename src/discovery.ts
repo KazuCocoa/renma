@@ -12,6 +12,7 @@ const SKILL_LIKE_FILE_OUTSIDE_SKILLS_DIR_CODE =
 const SKILL_ENTRYPOINT_UNDER_RESERVED_SUPPORT_DIR_CODE =
   "LAYOUT-SKILL-ENTRYPOINT-UNDER-RESERVED-SUPPORT-DIR";
 const RESERVED_SKILL_SUPPORT_DIRS = [
+  "assets",
   "examples",
   "profiles",
   "references",
@@ -57,8 +58,8 @@ export type SkillEntrypointPath =
 export function classifyRepositorySkillEntrypointPath(
   relativePath: string,
 ): SkillEntrypointPath | undefined {
-  const currentPath = toPosix(relativePath);
-  if (isAbsoluteLike(currentPath)) return undefined;
+  const currentPath = normalizeRepositoryRelativePath(relativePath);
+  if (!currentPath) return undefined;
   const segments = currentPath.split("/").filter(Boolean);
   const rootEndIndex = repositorySkillRootEndIndex(segments);
   if (rootEndIndex === undefined) return undefined;
@@ -69,12 +70,45 @@ export function classifyRepositorySkillEntrypointPath(
 export function classifyAbsoluteSkillEntrypointPath(
   absolutePath: string,
 ): SkillEntrypointPath | undefined {
-  const currentPath = toPosix(absolutePath);
-  if (!isAbsoluteLike(currentPath)) return undefined;
+  const rawPath = toPosix(absolutePath);
+  if (!isAbsoluteLike(rawPath)) return undefined;
+  const rawRoots = absoluteSkillRoots(rawPath.split("/").filter(Boolean));
+  if (rawRoots.length !== 1) return undefined;
+  const currentPath = path.posix.normalize(rawPath);
   const segments = currentPath.split("/").filter(Boolean);
   const roots = absoluteSkillRoots(segments);
   if (roots.length !== 1) return undefined;
   return classifySkillEntrypointAtRoot(currentPath, segments, roots[0]!);
+}
+
+/** Normalize a repository-relative Skill path without allowing root escape. */
+export function normalizeRepositoryRelativePath(
+  filePath: string,
+): string | undefined {
+  const normalizedSeparators = toPosix(filePath);
+  if (isAbsoluteLike(normalizedSeparators)) return undefined;
+  const rawSegments = normalizedSeparators.split("/");
+  while (rawSegments[0] === "." || rawSegments[0] === "") {
+    rawSegments.shift();
+  }
+
+  const rootEndIndex = repositorySkillRootEndIndex(rawSegments);
+  if (rootEndIndex === undefined) return undefined;
+  const resolved = rawSegments.slice(0, rootEndIndex);
+  for (const segment of rawSegments.slice(rootEndIndex)) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") {
+      if (resolved.length <= rootEndIndex) return undefined;
+      resolved.pop();
+      continue;
+    }
+    resolved.push(segment);
+  }
+
+  const normalized = resolved.join("/");
+  if (normalized === ".." || normalized.startsWith("../")) return undefined;
+  const normalizedRootEndIndex = repositorySkillRootEndIndex(resolved);
+  return normalizedRootEndIndex === rootEndIndex ? normalized : undefined;
 }
 
 function classifySkillEntrypointAtRoot(
@@ -229,6 +263,8 @@ function classifyExplicitSkillSupportPath(
   relativePath: string,
 ): ArtifactKind | undefined {
   switch (skillSupportPathSegment(relativePath)) {
+    case "assets":
+      return "unknown";
     case "profiles":
       return "profile";
     case "references":
@@ -314,16 +350,12 @@ function isExplicitSkillEntrypoint(relativePath: string): boolean {
 }
 
 function isExplicitSkillsPath(relativePath: string): boolean {
-  const normalized = toPosix(relativePath);
-  if (isAbsoluteLike(normalized)) return false;
-  return (
-    normalized.startsWith("skills/") || normalized.startsWith(".agents/skills/")
-  );
+  return normalizeRepositoryRelativePath(relativePath) !== undefined;
 }
 
 function skillSupportPathSegment(relativePath: string): string | undefined {
-  const normalized = toPosix(relativePath);
-  if (isAbsoluteLike(normalized)) return undefined;
+  const normalized = normalizeRepositoryRelativePath(relativePath);
+  if (!normalized) return undefined;
   const segments = normalized.split("/").filter(Boolean);
   const rootEndIndex = repositorySkillRootEndIndex(segments);
   if (rootEndIndex === undefined) return undefined;

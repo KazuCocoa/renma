@@ -542,6 +542,27 @@ description: Review demo inputs. Use when demo inputs need review.
   }
 });
 
+test("relative path normalization preserves exact migration command argv", () => {
+  const validation = validateAgentSkill(
+    skill(
+      "./skills/demo/skill.md",
+      `---
+name: demo
+description: Review demo inputs. Use when demo inputs need review.
+---
+# Demo
+`,
+    ),
+  );
+
+  assert.equal(validation.migrationRecommended, true);
+  assert.deepEqual(validation.migrationCommand, {
+    command: "renma",
+    args: ["suggest-metadata", "./skills/demo/skill.md"],
+    display: "renma suggest-metadata ./skills/demo/skill.md",
+  });
+});
+
 test("summarizes Agent Skills inside JSON and text scan output", async () => {
   const root = await fixture();
   await writeSkill(root, "valid", canonical("valid"));

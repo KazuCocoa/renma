@@ -588,6 +588,58 @@ test("suggest-metadata does not infer a Skill from ambiguous absolute roots", as
   assert.equal(suggestion.agentSkills, undefined);
 });
 
+test("suggest-metadata safely normalizes repository-relative dot segments", async () => {
+  const root = await fixture();
+  const source = path.join(root, "skills", "demo", "skill.md");
+  const docsTarget = path.join(root, "docs", "SKILL.md");
+  await mkdir(path.dirname(source), { recursive: true });
+  await mkdir(path.dirname(docsTarget), { recursive: true });
+  const original = `---
+name: demo
+description: Review demo inputs. Use when demo inputs need review.
+---
+# Demo
+`;
+  await writeFile(source, original);
+  await writeFile(docsTarget, "# Documentation\n");
+
+  const previousDirectory = process.cwd();
+  try {
+    process.chdir(root);
+    const result = await withCapturedConsole(() =>
+      main(["suggest-metadata", "./skills/demo/skill.md", "--format", "json"]),
+    );
+    const suggestion = JSON.parse(result.stdout) as {
+      kind: string;
+      suggestedMode: string;
+      agentSkills: {
+        sourcePath: string;
+        targetPath: string;
+        entrypointMigration: string;
+      };
+    };
+
+    assert.equal(suggestion.kind, "skill");
+    assert.equal(suggestion.suggestedMode, "agent-skills-migration");
+    assert.equal(suggestion.agentSkills.sourcePath, "skills/demo/skill.md");
+    assert.equal(suggestion.agentSkills.targetPath, "skills/demo/SKILL.md");
+    assert.equal(suggestion.agentSkills.entrypointMigration, "rename");
+    assert.equal(await readFile(source, "utf8"), original);
+
+    for (const escaped of [
+      "skills/../docs/SKILL.md",
+      "skills/demo/../../docs/SKILL.md",
+      ".agents/skills/../../docs/SKILL.md",
+    ]) {
+      const escapedSuggestion = await buildMetadataSuggestion(escaped);
+      assert.notEqual(escapedSuggestion.kind, "skill", escaped);
+      assert.equal(escapedSuggestion.agentSkills, undefined, escaped);
+    }
+  } finally {
+    process.chdir(previousDirectory);
+  }
+});
+
 async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-suggest-metadata-"));
 }

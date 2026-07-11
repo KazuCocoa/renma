@@ -102,6 +102,18 @@ not a repository Skill, and a later `skills` segment cannot escape a reserved
 Renma requires one unambiguous Skill root and rejects paths with multiple
 possible roots.
 
+Repository-relative classification normalizes leading and internal `.` segments
+and safe `..` segments before checking the root. A path is rejected if `..`
+escapes its original `skills/` or `.agents/skills/` root, even if a later segment
+would appear to re-enter it. User-facing structured command argv retains the
+exact path discovered by `scan` or supplied by the user.
+
+Inside an Agent Skill directory, `assets/`, `scripts/`, and `references/`
+contain Skill-local support material and are not treated as nested Skill roots.
+Renma also reserves its existing `examples/` and `profiles/` support
+directories. The same reserved names cannot be used as top-level Skill names
+under `skills/` or `.agents/skills/` without reserved-name guidance.
+
 ## Validation During Scan
 
 Agent Skills validation is part of the existing scan workflow:
