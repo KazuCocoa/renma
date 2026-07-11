@@ -70,6 +70,105 @@ Do not use unprefixed shared keys such as `metadata.owner`. Do not use a nested
 metadata remain valid metadata and are preserved during migration without
 interpretation.
 
+## Operational Metadata During Stage 2
+
+Stage 2 makes these non-security keys operational for canonical Skills:
+
+```text
+renma.id
+renma.title
+renma.version
+renma.owner
+renma.status
+renma.purpose
+renma.last-reviewed-at
+renma.review-cycle
+renma.expires-at
+renma.tags
+renma.when-to-use
+renma.when-not-to-use
+renma.requires-context
+renma.optional-context
+renma.requires-lens
+renma.optional-lens
+renma.conflicts
+renma.superseded-by
+```
+
+Renma normalizes these values into the existing asset metadata model used by
+scan findings, inspect, catalog, ownership, graph and dependency resolution,
+readiness, BOM, Trust Graph, diff, and CI reporting. This is a serialization
+change, not a second governance model or a change to those consumers'
+semantics.
+
+Text values are trimmed strings, and `renma.status` retains the existing
+`experimental`, `stable`, `deprecated`, and `archived` lifecycle values. List
+values are JSON-array strings containing strings only:
+
+```yaml
+metadata:
+  renma.tags: '["testing","spec-review"]'
+  renma.requires-context: '["context.testing.boundaries"]'
+  renma.optional-context: '[]'
+```
+
+Canonical list metadata is not comma-separated. Malformed JSON, non-array
+JSON, and non-string array members are invalid rather than guessed. Diagnostics
+for canonical values retain evidence for the specific child key under
+`metadata`, not just the parent mapping.
+
+Empty text, invalid status, and invalid lifecycle or freshness values retain
+their existing operational diagnostic semantics and stable finding IDs where
+applicable.
+
+Operational source selection during this stage is explicit:
+
+```text
+canonical or hybrid Agent Skills identity
+  -> non-security metadata comes only from metadata.renma.*
+
+pre-0.16-only Skill
+  -> temporary top-level metadata compatibility for migration
+
+non-Skill asset
+  -> existing top-level Renma metadata syntax
+```
+
+A canonical or hybrid Skill never falls back to or merges a top-level
+non-security equivalent. If both forms are present, `metadata.renma.*` is the
+operational source of truth and Stage 1 migration conflict diagnostics remain
+available. Contexts, context lenses, profiles, references, examples, agents,
+configuration files, and other non-Skill assets keep their existing metadata
+syntax and behavior.
+
+Security metadata is not part of Stage 2. These existing Skill fields remain in
+their pre-0.16 top-level form until Stage 3 makes their `metadata.renma.*`
+equivalents operational:
+
+```text
+allowed_data
+network_allowed
+external_upload_allowed
+secrets_allowed
+requires_human_approval
+forbidden_inputs
+approved_network_destinations
+approved_upload_destinations
+security_profile
+```
+
+A Skill that combines canonical identity and Stage 2 metadata with these
+top-level security fields is intentionally hybrid during this transition. The
+security parser continues reading those top-level fields without Stage 2
+reinterpretation.
+
+Stage 1 migration assistance may show the future canonical serialization for
+security keys. That does not make those keys operational in Stage 2. Preserve
+the pre-0.16 top-level security fields in an operational Skill until Stage 3.
+Because those fields are outside the Agent Skills standard top-level field set,
+an intentionally hybrid Skill remains a migration-state document and can still
+receive Stage 1 validation or migration diagnostics.
+
 ## Entrypoint Paths
 
 Canonical Agent Skills entrypoints use the exact filename:
@@ -158,7 +257,7 @@ YAML 1.2 mode. It validates:
 The validation profile is local. Renma does not fetch a schema or validation
 rules at runtime.
 
-This first stage does not add a separate validation command and does not change
+Agent Skills validation does not add a separate validation command or change
 the existing `scan` or `--fail-on` exit contract. Agent Skills results are
 visible in scan output but are not inserted into the existing finding threshold
 path.
@@ -181,10 +280,12 @@ unknown
   neither Agent Skills identity nor a recognized migration source
 ```
 
-Classification supports validation and migration guidance only in this stage.
-It does not create `agent-skills`-versus-`renma-legacy` fallback for catalog,
-ownership, graph, readiness, BOM, trust, lifecycle, context dependency, or
-security processing.
+Classification remains migration-oriented. Stage 2 operational normalization
+uses Agent Skills identity only to select the metadata source described above:
+canonical and hybrid Skills use canonical non-security metadata, while a
+`renma-legacy` Skill remains temporarily readable from its top-level metadata.
+This does not change Stage 1 validation or migration classification, and it
+does not adopt canonical security metadata.
 
 ## Selection Boundaries and Execution Constraints
 
@@ -355,22 +456,31 @@ unknown top-level field
 
 ## Staged 0.16.0 Rollout
 
-Stage 1, established here:
+Stage 1 established:
 
 - Agent Skills validation in `scan`;
 - one-way migration suggestions in `suggest-metadata`;
 - this normative compatibility and migration document.
 
-Stage 1 validates and proposes migration but does not migrate repository-owned
-operational Skills yet. Dedicated fixtures cover canonical Agent Skills,
-pre-0.16 Renma, hybrid, and blocked migration behavior until operational
-metadata consumers are updated in a later stage.
+Stage 2 establishes:
 
-Later 0.16.0 stages will make `metadata.renma.*` operational across catalog,
-ownership, graph, readiness, BOM, trust, lifecycle, context dependency, and
-security processing. Until those focused stages land, this validation and
-migration code must not act as a fallback metadata reader for normal Renma
-operations.
+- operational adoption of the non-security `metadata.renma.*` keys documented
+  above through the existing asset metadata model;
+- canonical metadata as the source of truth for canonical and hybrid Skills;
+- temporary top-level compatibility for pre-0.16-only Skills;
+- unchanged top-level metadata behavior for non-Skill assets.
 
-This stage does not add Skill discovery, runtime selection, prompt assembly,
-context injection, execution, or telemetry.
+Stage 3 will establish:
+
+- operational adoption of canonical Renma security metadata;
+- removal of the remaining pre-0.16 security fields from the repository-owned
+  `release-prep` Skill;
+- the final repository Skill migration.
+
+The repository-owned `release-prep` Skill is intentionally hybrid in Stage 2.
+Its identity and non-security operational fields use the canonical Agent Skills
+shape, while its remaining pre-0.16 top-level fields are security fields
+deferred to Stage 3. The 0.16.0 migration is not complete yet.
+
+These stages do not add runtime Skill selection, prompt assembly, context
+injection, execution, or telemetry.

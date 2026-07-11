@@ -34,6 +34,12 @@ workflow, see [Agent Skills Compatibility and Migration](agent-skills-compatibil
 Agent Skills results appear inside `scan`; there is no separate Skill-validation
 command.
 
+The 0.16.0 transition is staged. Stage 1 added validation and migration
+assistance. Stage 2 makes canonical non-security `metadata.renma.*` values
+operational through the existing Renma reports. Stage 3 will adopt canonical
+security metadata and complete the repository-owned Skill migration. The
+migration is not complete yet.
+
 ## Repository Layout
 
 renma is most useful when agent knowledge is stored in predictable places:
@@ -67,7 +73,18 @@ Avoid using reserved support directory names as skill names. Paths such as
 one of those files is intended to define a Renma skill, rename the directory, for example to
 `skills/example-review/SKILL.md`.
 
-Assets can declare metadata such as `id`, `owner`, `status`, `requires_context`, `optional_context`, and dependency references. The catalog and graph commands use that metadata to resolve links, identify weak references, and produce reports that can be checked in CI.
+Canonical and hybrid Skills declare non-security governance values as flat
+string-valued `metadata.renma.*` entries. JSON-array strings represent lists;
+Renma does not treat comma-separated canonical values as lists. These canonical
+values feed the same catalog, ownership, graph, readiness, BOM, Trust Graph,
+lifecycle, and reporting behavior as the pre-0.16 fields they replace.
+
+For canonical or hybrid Skills, Renma does not fall back to top-level
+non-security fields. Pre-0.16-only Skills remain temporarily readable so they
+can be scanned and migrated. Contexts, context lenses, profiles, references,
+examples, agents, configuration files, and other non-Skill assets continue to
+use their existing top-level metadata syntax. Skill security fields also remain
+in their pre-0.16 top-level form until Stage 3.
 
 ## Quick Start
 
@@ -126,6 +143,12 @@ renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
 
 `scaffold` creates a starter file, not a complete production-ready skill. Fill in the purpose, when to use it, when not to use it, required inputs, completion criteria, verification steps, and required or optional context references.
 
+During Stage 2, the Skill scaffold remains a pre-0.16 migration-source starter.
+After replacing its placeholder prose, run `suggest-metadata`, review the
+proposal, and apply the one-way conversion to Agent Skills identity plus
+`metadata.renma.*`. Context and context-lens scaffolds keep their existing
+top-level metadata shape.
+
 3. Add shared context assets when the skill depends on reusable knowledge.
 
 ```bash
@@ -136,7 +159,11 @@ Reusable domain, testing, product, platform, and tool knowledge should usually l
 
 4. Connect the skill to context assets.
 
-Add metadata such as `requires_context` or `optional_context` to the skill. These fields create static repository graph relationships. They do not make Renma choose runtime context for an agent.
+In a canonical Skill, add `renma.requires-context` or
+`renma.optional-context` under `metadata` as JSON-array strings. A pre-0.16
+scaffold uses `requires_context` and `optional_context` only until it is
+migrated. These fields create static repository graph relationships. They do
+not make Renma choose runtime context for an agent.
 
 5. Run Renma checks.
 

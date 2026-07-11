@@ -30,7 +30,14 @@ export function buildCatalog(documents: ParsedDocument[]): {
     .map((document): CatalogEntry | undefined => {
       const result = parseAssetMetadata(document);
       const kind = catalogedKind(document, result.metadata);
-      diagnostics.push(...metadataBudgetDiagnostics(document));
+      diagnostics.push(
+        ...metadataBudgetDiagnostics(
+          document,
+          result.metadata,
+          result.metadataFields,
+          result.metadataListItems,
+        ),
+      );
       diagnostics.push(...result.diagnostics);
       if (kind) {
         diagnostics.push(
@@ -45,8 +52,8 @@ export function buildCatalog(documents: ParsedDocument[]): {
         sourcePath: document.artifact.path,
         contentHash: contentHash(document.artifact.content),
         metadata: result.metadata,
-        metadataFields: document.metadataFields,
-        metadataListItems: document.metadataListItems,
+        metadataFields: result.metadataFields,
+        metadataListItems: result.metadataListItems,
       };
 
       if (kind === "skill") {
@@ -119,7 +126,12 @@ function catalogedKind(
   return undefined;
 }
 
-function metadataBudgetDiagnostics(document: ParsedDocument): Diagnostic[] {
+function metadataBudgetDiagnostics(
+  document: ParsedDocument,
+  metadata: AssetMetadata,
+  metadataFields: Record<string, CatalogEntry["metadataFields"][string]>,
+  metadataListItems: CatalogEntry["metadataListItems"],
+): Diagnostic[] {
   const frontmatter = frontmatterRange(document);
   if (!frontmatter) return [];
 
@@ -144,7 +156,7 @@ function metadataBudgetDiagnostics(document: ParsedDocument): Diagnostic[] {
     });
   }
 
-  for (const [key, items] of Object.entries(document.metadataListItems)) {
+  for (const [key, items] of Object.entries(metadataListItems)) {
     for (const item of items) {
       const itemText = metadataListItemText(item.raw);
       if (itemText.length <= METADATA_LIST_ITEM_MAX_CHARS) continue;
@@ -163,7 +175,42 @@ function metadataBudgetDiagnostics(document: ParsedDocument): Diagnostic[] {
     }
   }
 
+  for (const [key, values] of operationalMetadataLists(metadata)) {
+    const field = metadataFields[key];
+    if (!field?.key.startsWith("renma.")) continue;
+    for (const value of values) {
+      if (value.length <= METADATA_LIST_ITEM_MAX_CHARS) continue;
+      diagnostics.push({
+        severity: "warning",
+        path: document.artifact.path,
+        message: `Metadata list item is too long in ${key}. Item has ${value.length} characters; keep list items short and move routing prose into the markdown body or referenced context assets.`,
+        evidence: {
+          path: field.path,
+          startLine: field.startLine,
+          endLine: field.endLine,
+          snippet: field.raw,
+        },
+      });
+    }
+  }
+
   return diagnostics;
+}
+
+function operationalMetadataLists(
+  metadata: AssetMetadata,
+): Array<[string, string[]]> {
+  return [
+    ["tags", metadata.tags],
+    ["when_to_use", metadata.whenToUse],
+    ["when_not_to_use", metadata.whenNotToUse],
+    ["requires_context", metadata.requiresContext],
+    ["optional_context", metadata.optionalContext],
+    ["requires_lens", metadata.requiresLens ?? []],
+    ["optional_lens", metadata.optionalLens ?? []],
+    ["conflicts", metadata.conflicts],
+    ["superseded_by", metadata.supersededBy],
+  ];
 }
 
 function frontmatterRange(

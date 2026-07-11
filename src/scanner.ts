@@ -138,7 +138,7 @@ function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
           "Run any project-specific validation checks that apply to this repository.",
         ],
         llmHint:
-          "Replace invalid lifecycle status values with supported values. If a file was replaced by a shared context asset, consider using status: deprecated plus a separate superseded_by field rather than status: delegated.",
+          "Replace invalid lifecycle status values with supported values. If a file was replaced by a shared context asset, consider a deprecated lifecycle status plus a separate supersession reference. Canonical Skills use metadata.renma.status and metadata.renma.superseded-by; non-Skills and pre-0.16-only migration inputs use status and superseded_by.",
         ...(diagnostic.details ? { details: diagnostic.details } : {}),
       };
     }

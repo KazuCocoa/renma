@@ -1,0 +1,613 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { test } from "node:test";
+
+import { validateAgentSkill } from "../src/agent-skills.js";
+import { buildCatalog } from "../src/catalog.js";
+import { buildBomReport } from "../src/commands/bom.js";
+import { graphFromRepositorySnapshot } from "../src/commands/graph.js";
+import { parseDocument } from "../src/markdown.js";
+import { parseAssetMetadata } from "../src/metadata.js";
+import { collectRepositorySnapshot } from "../src/repository-evidence.js";
+import { scanFromRepositorySnapshot } from "../src/scanner.js";
+import { parseSecurityPolicy } from "../src/security-policy.js";
+import { buildTrustGraph } from "../src/trust-graph.js";
+import type { Artifact, ArtifactKind } from "../src/types.js";
+
+test("canonical Skill metadata normalizes every Stage 2 field", () => {
+  const document = skillDocument(`---
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+metadata:
+  renma.id: " skill.demo "
+  renma.title: " Demo Review "
+  renma.version: " 1.2.3 "
+  renma.owner: " qa-platform "
+  renma.status: " stable "
+  renma.purpose: " Review demo inputs. "
+  renma.last-reviewed-at: " 2026-07-01 "
+  renma.review-cycle: " P90D "
+  renma.expires-at: " 2026-12-31 "
+  renma.tags: '["testing","review"]'
+  renma.when-to-use: '["specification review"]'
+  renma.when-not-to-use: '[]'
+  renma.requires-context: '["context.testing.boundaries"]'
+  renma.optional-context: '[]'
+  renma.requires-lens: '["lens.testing.spec-review"]'
+  renma.optional-lens: '[]'
+  renma.conflicts: '["skill.testing.old-review"]'
+  renma.superseded-by: '["skill.testing.next-review"]'
+---
+# Demo
+`);
+
+  const result = parseAssetMetadata(document);
+
+  assert.deepEqual(result.metadata, {
+    id: "skill.demo",
+    title: "Demo Review",
+    version: "1.2.3",
+    owner: "qa-platform",
+    status: "stable",
+    purpose: "Review demo inputs.",
+    lastReviewedAt: "2026-07-01",
+    reviewCycle: "P90D",
+    expiresAt: "2026-12-31",
+    tags: ["testing", "review"],
+    whenToUse: ["specification review"],
+    whenNotToUse: [],
+    requiresContext: ["context.testing.boundaries"],
+    optionalContext: [],
+    conflicts: ["skill.testing.old-review"],
+    supersededBy: ["skill.testing.next-review"],
+    requiresLens: ["lens.testing.spec-review"],
+  });
+  assert.deepEqual(result.diagnostics, []);
+  assert.equal(result.metadataFields.status?.key, "renma.status");
+  assert.equal(result.metadataFields.status?.startLine, 9);
+  assert.equal(result.metadataFields.status?.endLine, 9);
+  assert.equal(result.metadataFields.status?.raw, '  renma.status: " stable "');
+  assert.equal(
+    result.metadataFields.requires_context?.raw,
+    "  renma.requires-context: '[\"context.testing.boundaries\"]'",
+  );
+});
+
+test("canonical Skill list metadata accepts only JSON string arrays", () => {
+  const cases = [
+    {
+      label: "malformed JSON and comma syntax",
+      line: "  renma.tags: testing,review",
+      reason: /valid JSON/,
+    },
+    {
+      label: "non-array JSON",
+      line: `  renma.tags: '{"tag":"testing"}'`,
+      reason: /JSON array/,
+    },
+    {
+      label: "non-string member",
+      line: `  renma.tags: '["testing",1]'`,
+      reason: /only string array members/,
+    },
+    {
+      label: "native YAML array",
+      line: "  renma.tags: [testing, review]",
+      reason: /string containing a JSON array/,
+    },
+  ];
+
+  for (const fixture of cases) {
+    const result = parseAssetMetadata(
+      skillDocument(`---
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+metadata:
+${fixture.line}
+---
+# Demo
+`),
+    );
+
+    assert.deepEqual(result.metadata.tags, [], fixture.label);
+    assert.equal(result.diagnostics.length, 1, fixture.label);
+    assert.match(
+      result.diagnostics[0]?.message ?? "",
+      /Invalid metadata\.renma\.tags/,
+      fixture.label,
+    );
+    assert.match(
+      result.diagnostics[0]?.message ?? "",
+      fixture.reason,
+      fixture.label,
+    );
+    assert.equal(result.diagnostics[0]?.evidence?.startLine, 5, fixture.label);
+    assert.equal(
+      result.diagnostics[0]?.evidence?.snippet,
+      fixture.line,
+      fixture.label,
+    );
+  }
+});
+
+test("canonical Skill diagnostics retain exact child evidence and stable wording", () => {
+  const result = parseAssetMetadata(
+    skillDocument(`---
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+metadata:
+  renma.status: unsupported
+  renma.last-reviewed-at: 2026-02-31
+  renma.review-cycle: P3M
+  renma.expires-at: tomorrow
+---
+# Demo
+`),
+  );
+
+  assert.equal(result.metadata.status, undefined);
+  const expectations = [
+    ["Invalid status", 5, "  renma.status: unsupported"],
+    ["Invalid last_reviewed_at", 6, "  renma.last-reviewed-at: 2026-02-31"],
+    ["Invalid review_cycle", 7, "  renma.review-cycle: P3M"],
+    ["Invalid expires_at", 8, "  renma.expires-at: tomorrow"],
+  ] as const;
+
+  for (const [message, line, snippet] of expectations) {
+    const diagnostic = result.diagnostics.find((candidate) =>
+      candidate.message.startsWith(message),
+    );
+    assert.ok(diagnostic, message);
+    assert.equal(diagnostic.evidence?.startLine, line);
+    assert.equal(diagnostic.evidence?.endLine, line);
+    assert.equal(diagnostic.evidence?.snippet, snippet);
+  }
+});
+
+test("canonical empty text values retain existing optional-field semantics", () => {
+  const result = parseAssetMetadata(
+    skillDocument(`---
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+metadata:
+  renma.id: "   "
+  renma.title: "   "
+  renma.version: "   "
+  renma.owner: "   "
+  renma.status: "   "
+  renma.purpose: "   "
+  renma.last-reviewed-at: "   "
+  renma.review-cycle: "   "
+  renma.expires-at: "   "
+---
+# Demo
+`),
+  );
+
+  assert.equal(result.metadata.id, undefined);
+  assert.equal(result.metadata.title, undefined);
+  assert.equal(result.metadata.version, undefined);
+  assert.equal(result.metadata.owner, undefined);
+  assert.equal(result.metadata.status, undefined);
+  assert.equal(result.metadata.purpose, undefined);
+  assert.equal(result.metadata.lastReviewedAt, undefined);
+  assert.equal(result.metadata.reviewCycle, undefined);
+  assert.equal(result.metadata.expiresAt, undefined);
+  assert.equal(result.diagnostics.length, 1);
+  assert.match(result.diagnostics[0]?.message ?? "", /^Invalid status/);
+});
+
+test("canonical metadata is the non-security source of truth for hybrid Skills", () => {
+  const result = parseAssetMetadata(
+    skillDocument(`---
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+id: skill.legacy
+version: 0.9.0
+owner: legacy-team
+tags: legacy, merged
+requires_context: context.legacy
+metadata:
+  renma.id: skill.canonical
+  renma.owner: canonical-team
+  renma.tags: '["canonical"]'
+  renma.requires-context: '["context.canonical"]'
+---
+# Demo
+`),
+  );
+
+  assert.equal(result.metadata.id, "skill.canonical");
+  assert.equal(result.metadata.owner, "canonical-team");
+  assert.equal(result.metadata.version, undefined);
+  assert.deepEqual(result.metadata.tags, ["canonical"]);
+  assert.deepEqual(result.metadata.requiresContext, ["context.canonical"]);
+  assert.equal(result.metadataFields.owner?.key, "renma.owner");
+  assert.equal(result.metadataFields.version, undefined);
+});
+
+test("invalid canonical metadata never falls back to a hybrid legacy value", () => {
+  const result = parseAssetMetadata(
+    skillDocument(`---
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+tags: legacy, fallback
+metadata:
+  renma.tags: testing,review
+---
+# Demo
+`),
+  );
+
+  assert.deepEqual(result.metadata.tags, []);
+  assert.equal(result.diagnostics.length, 1);
+  assert.match(result.diagnostics[0]?.message ?? "", /renma\.tags/);
+});
+
+test("duplicate canonical keys are diagnosed by Stage 1 and not guessed operationally", () => {
+  const document = skillDocument(`---
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+metadata:
+  renma.owner: first-team
+  renma.owner: second-team
+---
+# Demo
+`);
+
+  const result = parseAssetMetadata(document);
+  const validation = validateAgentSkill(document);
+
+  assert.equal(result.metadata.owner, undefined);
+  assert.equal(result.metadataFields.owner, undefined);
+  assert.ok(
+    validation.issues.some((issue) =>
+      issue.message.includes(
+        'Agent Skills metadata key "renma.owner" is declared more than once.',
+      ),
+    ),
+  );
+});
+
+test("pre-0.16-only Skills retain temporary permissive metadata parsing", () => {
+  const result = parseAssetMetadata(
+    skillDocument(`---
+id: skill.demo
+owner: legacy-team
+tags: testing, review
+requires_context:
+  - context.testing.boundaries
+---
+# Demo
+`),
+  );
+
+  assert.equal(result.metadata.id, "skill.demo");
+  assert.equal(result.metadata.owner, "legacy-team");
+  assert.deepEqual(result.metadata.tags, ["testing", "review"]);
+  assert.deepEqual(result.metadata.requiresContext, [
+    "context.testing.boundaries",
+  ]);
+});
+
+test("non-Skill assets keep top-level Renma metadata behavior", () => {
+  const document = parseDocument(
+    artifact(
+      "contexts/testing/boundaries.md",
+      "context",
+      `---
+id: context.testing.boundaries
+title: Testing Boundaries
+owner: context-team
+status: stable
+tags: testing, boundaries
+requires_context:
+  - context.testing.base
+metadata:
+  renma.id: context.ignored
+  renma.owner: ignored-team
+  renma.tags: '["ignored"]'
+---
+# Boundaries
+`,
+    ),
+  );
+
+  const result = parseAssetMetadata(document);
+
+  assert.equal(result.metadata.id, "context.testing.boundaries");
+  assert.equal(result.metadata.title, undefined);
+  assert.equal(result.metadata.owner, "context-team");
+  assert.equal(result.metadata.status, "stable");
+  assert.deepEqual(result.metadata.tags, ["testing", "boundaries"]);
+  assert.deepEqual(result.metadata.requiresContext, ["context.testing.base"]);
+  assert.equal(result.metadataFields.owner?.raw, "owner: context-team");
+});
+
+test("catalog and Trust Graph use canonical child evidence aliases", () => {
+  const { catalog } = buildCatalog([
+    skillDocument(`---
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+metadata:
+  renma.id: skill.demo
+  renma.owner: qa-platform
+  renma.status: stable
+  renma.requires-context: '["context.testing.boundaries"]'
+---
+# Demo
+`),
+    parseDocument(
+      artifact(
+        "contexts/testing/boundaries.md",
+        "context",
+        `---
+id: context.testing.boundaries
+owner: qa-platform
+status: stable
+---
+# Boundaries
+`,
+      ),
+    ),
+  ]);
+
+  const skill = catalog.entries.find((entry) => entry.kind === "skill");
+  const dependency = catalog.dependencies.find(
+    (candidate) => candidate.from === "skill.demo",
+  );
+  const trustGraph = buildTrustGraph({ catalog });
+  const ownershipEdge = trustGraph.edges.find(
+    (edge) => edge.from === "asset:skill.demo" && edge.type === "owned_by",
+  );
+  const lifecycleEdge = trustGraph.edges.find(
+    (edge) =>
+      edge.from === "asset:skill.demo" && edge.type === "has_lifecycle_status",
+  );
+
+  assert.equal(skill?.metadataFields.owner?.key, "renma.owner");
+  assert.equal(skill?.metadataFields.owner?.startLine, 6);
+  assert.equal(
+    dependency?.evidence?.snippet,
+    `  renma.requires-context: '["context.testing.boundaries"]'`,
+  );
+  assert.equal(
+    ownershipEdge?.evidence?.[0]?.snippet,
+    "  renma.owner: qa-platform",
+  );
+  assert.equal(lifecycleEdge?.evidence?.[0]?.snippet, "  renma.status: stable");
+});
+
+test("canonical list items retain the existing metadata budget diagnostic", () => {
+  const longBoundary = "x".repeat(141);
+  const { diagnostics } = buildCatalog([
+    skillDocument(`---
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+metadata:
+  renma.when-to-use: '["${longBoundary}"]'
+---
+# Demo
+`),
+  ]);
+  const diagnostic = diagnostics.find((candidate) =>
+    candidate.message.includes("Metadata list item is too long in when_to_use"),
+  );
+
+  assert.ok(diagnostic);
+  assert.equal(diagnostic.evidence?.startLine, 5);
+  assert.equal(
+    diagnostic.evidence?.snippet,
+    `  renma.when-to-use: '["${longBoundary}"]'`,
+  );
+});
+
+test("ignored hybrid list metadata cannot emit operational budget diagnostics", () => {
+  const ignoredLegacyBoundary = "x".repeat(141);
+  const { catalog, diagnostics } = buildCatalog([
+    skillDocument(`---
+name: demo
+description: Review demo inputs. Use when a demo needs deterministic review.
+when_to_use:
+  - ${ignoredLegacyBoundary}
+metadata:
+  renma.when-to-use: '["canonical"]'
+---
+# Demo
+`),
+  ]);
+
+  assert.deepEqual(catalog.entries[0]?.metadata.whenToUse, ["canonical"]);
+  assert.equal(
+    diagnostics.some((diagnostic) =>
+      diagnostic.message.includes("Metadata list item is too long"),
+    ),
+    false,
+  );
+});
+
+test("repository release-prep keeps Stage 2 operations and Stage 3 security behavior", async () => {
+  const relativePath = "skills/release-prep/SKILL.md";
+  const absolutePath = path.resolve(relativePath);
+  const content = await readFile(absolutePath, "utf8");
+  const document = parseDocument({
+    path: relativePath,
+    absolutePath,
+    kind: "skill",
+    sizeBytes: Buffer.byteLength(content),
+    content,
+  });
+  const result = parseAssetMetadata(document);
+  const validation = validateAgentSkill(document);
+  const policy = parseSecurityPolicy(content);
+  const { catalog } = buildCatalog([document]);
+  const snapshot = await collectRepositorySnapshot(path.resolve("."));
+  const graph = graphFromRepositorySnapshot(snapshot);
+  const scan = scanFromRepositorySnapshot(snapshot, {
+    evaluationDate: "2026-07-11",
+  });
+  const bom = buildBomReport(snapshot, {
+    omitGeneratedAt: true,
+    evaluationDate: "2026-07-11",
+  });
+
+  assert.equal(validation.format, "hybrid");
+  assert.deepEqual(validation.legacyFields, [
+    "allowed_data",
+    "external_upload_allowed",
+    "forbidden_inputs",
+    "network_allowed",
+    "requires_human_approval",
+    "secrets_allowed",
+  ]);
+  assert.equal(result.metadata.id, "skill.release-prep");
+  assert.equal(result.metadata.title, "Release Prep");
+  assert.equal(result.metadata.version, "0.1.0");
+  assert.equal(result.metadata.owner, "maintainers");
+  assert.equal(result.metadata.status, "stable");
+  assert.deepEqual(result.metadata.tags, [
+    "release",
+    "maintenance",
+    "dogfooding",
+  ]);
+  assert.deepEqual(result.metadata.requiresContext, ["context.release.prep"]);
+  assert.deepEqual(
+    catalog.dependencies.map((dependency) => ({
+      from: dependency.from,
+      to: dependency.to,
+      kind: dependency.kind,
+    })),
+    [
+      {
+        from: "skill.release-prep",
+        to: "context.release.prep",
+        kind: "requires",
+      },
+    ],
+  );
+  assert.deepEqual(policy.allowedData, ["public"]);
+  assert.equal(policy.networkAllowed, true);
+  assert.equal(policy.externalUploadAllowed, false);
+  assert.equal(policy.secretsAllowed, false);
+  assert.equal(policy.humanApprovalRequired, true);
+  assert.deepEqual(policy.forbiddenInputs, [
+    "secrets",
+    "credentials",
+    "tokens",
+  ]);
+
+  const graphNode = graph.nodes.find(
+    (node) => node.id === "skill.release-prep",
+  );
+  assert.deepEqual(graphNode, {
+    id: "skill.release-prep",
+    kind: "skill",
+    sourcePath: relativePath,
+    owner: "maintainers",
+    status: "stable",
+    tags: ["release", "maintenance", "dogfooding"],
+  });
+  assert.ok(
+    graph.edges.some(
+      (edge) =>
+        edge.from === "skill.release-prep" &&
+        edge.to === "context.release.prep" &&
+        edge.kind === "requires" &&
+        edge.resolved &&
+        edge.targetPath === "contexts/release/prep.md",
+    ),
+  );
+
+  const bomAsset = bom.assets.find(
+    (asset) => asset.id === "skill.release-prep",
+  );
+  assert.ok(bomAsset);
+  assert.equal(bomAsset.owner, "maintainers");
+  assert.equal(bomAsset.status, "stable");
+  assert.equal(bomAsset.version, "0.1.0");
+  assert.deepEqual(bomAsset.tags, ["dogfooding", "maintenance", "release"]);
+  assert.deepEqual(bomAsset.lifecycle, { status: "stable" });
+  assert.ok(
+    bomAsset.dependencies.some(
+      (dependency) =>
+        dependency.kind === "requires" &&
+        dependency.to === "context.release.prep" &&
+        dependency.resolved,
+    ),
+  );
+
+  const trustEdges = scan.trustGraph?.edges.filter(
+    (edge) => edge.from === "asset:skill.release-prep",
+  );
+  assert.ok(
+    trustEdges?.some(
+      (edge) => edge.type === "owned_by" && edge.to === "owner:maintainers",
+    ),
+  );
+  assert.ok(
+    trustEdges?.some(
+      (edge) =>
+        edge.type === "has_lifecycle_status" &&
+        edge.to === "lifecycle_status:stable",
+    ),
+  );
+  assert.ok(
+    trustEdges?.some(
+      (edge) =>
+        edge.type === "declares_dependency" &&
+        edge.properties?.declaredTarget === "context.release.prep",
+    ),
+  );
+  assert.ok(
+    trustEdges?.some(
+      (edge) =>
+        edge.type === "has_effective_policy" &&
+        edge.properties?.hasLocalPolicyMetadata === true,
+    ),
+  );
+
+  assert.equal(scan.securityPolicyInventory?.totalPolicyAssets, 2);
+  assert.equal(scan.securityPolicyInventory?.assetsWithPolicyMetadata, 2);
+  assert.deepEqual(scan.securityPolicyInventory?.networkAllowed, {
+    true: 2,
+    false: 0,
+    unspecified: 0,
+  });
+  assert.deepEqual(scan.securityPolicyInventory?.externalUploadAllowed, {
+    true: 0,
+    false: 2,
+    unspecified: 0,
+  });
+  assert.deepEqual(scan.securityPolicyInventory?.secretsAllowed, {
+    true: 0,
+    false: 2,
+    unspecified: 0,
+  });
+  assert.deepEqual(scan.securityPolicyInventory?.humanApprovalRequired, {
+    true: 2,
+    false: 0,
+    unspecified: 0,
+  });
+  assert.equal(
+    scan.findings.some(
+      (finding) =>
+        finding.evidence.path === relativePath && finding.id.startsWith("SEC-"),
+    ),
+    false,
+  );
+});
+
+function skillDocument(content: string) {
+  return parseDocument(artifact("skills/demo/SKILL.md", "skill", content));
+}
+
+function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
+  return {
+    path,
+    absolutePath: `/tmp/${path}`,
+    kind,
+    sizeBytes: Buffer.byteLength(content),
+    content,
+  };
+}

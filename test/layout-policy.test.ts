@@ -113,13 +113,16 @@ test("strict layout passes refactored appium three-root layout", async () => {
   await writeMarkdown(
     root,
     "skills/setup/SKILL.md",
-    frontmatter({
-      owner: "appium",
-      name: "setup",
-      description:
-        "Route setup work to canonical contexts and helper scripts without owning procedure content while preserving deterministic usage guidance, non-goals, preflight checks, examples, and verification expectations.",
-      requires_context: "contexts/tools/appium/setup/routing.md",
-    }) +
+    [
+      "---",
+      "name: setup",
+      "description: Route setup work to canonical contexts and helper scripts without owning procedure content while preserving deterministic usage guidance, non-goals, preflight checks, examples, and verification expectations.",
+      "metadata:",
+      "  renma.owner: appium",
+      `  renma.requires-context: '["contexts/tools/appium/setup/routing.md"]'`,
+      "---",
+      "",
+    ].join("\n") +
       [
         "# Appium Router Entry",
         "",
