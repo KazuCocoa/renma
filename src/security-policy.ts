@@ -38,10 +38,21 @@ const DESTINATION_POLICY_FIELDS = new Set(["approved_network_destinations"]);
 const UPLOAD_DESTINATION_POLICY_FIELDS = new Set([
   "approved_upload_destinations",
 ]);
-
 const ALLOWED_DATA_POLICY_FIELDS = new Set(["allowed_data"]);
 const FORBIDDEN_INPUT_POLICY_FIELDS = new Set(["forbidden_inputs"]);
 const SECURITY_PROFILE_POLICY_FIELDS = new Set(["security_profile"]);
+
+const CANONICAL_SECURITY_KEYS = new Map<string, string>([
+  ["network-allowed", "network_allowed"],
+  ["external-upload-allowed", "external_upload_allowed"],
+  ["secrets-allowed", "secrets_allowed"],
+  ["requires-human-approval", "requires_human_approval"],
+  ["approved-network-destinations", "approved_network_destinations"],
+  ["approved-upload-destinations", "approved_upload_destinations"],
+  ["allowed-data", "allowed_data"],
+  ["forbidden-inputs", "forbidden_inputs"],
+  ["security-profile", "security_profile"],
+]);
 
 type ParsedBlockList = {
   values: string[];
@@ -66,20 +77,34 @@ export function parseSecurityPolicy(content: string): SecurityPolicy {
       : -1;
   const scanEnd =
     frontmatterEnd > 0 ? frontmatterEnd : Math.min(lines.length, 80);
+  let insideMetadata = false;
 
   for (let index = 0; index < scanEnd; index += 1) {
     const line = lines[index] ?? "";
-    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*):\s*(.*?)\s*$/);
-    if (!match) {
+    const topLevel = line.match(/^([A-Za-z_][A-Za-z0-9_]*):\s*(.*?)\s*$/);
+    if (topLevel) {
+      insideMetadata = (topLevel[1] ?? "") === "metadata";
+    }
+
+    const canonical = insideMetadata
+      ? line.match(/^\s{2,}renma\.([A-Za-z0-9-]+):\s*(.*?)\s*$/)
+      : undefined;
+    const legacy = topLevel;
+    const rawKey = canonical
+      ? CANONICAL_SECURITY_KEYS.get(canonical[1] ?? "")
+      : legacy?.[1];
+    if (!rawKey) {
+      if (insideMetadata && line.trim().length > 0 && !/^\s+/.test(line)) {
+        insideMetadata = false;
+      }
       continue;
     }
 
-    const rawKey = match[1] ?? "";
-    const rawValue = match[2] ?? "";
+    const rawValue = canonical ? (canonical[2] ?? "") : (legacy?.[2] ?? "");
     const key = rawKey.trim();
-    const value = rawValue.trim();
+    const value = decodeScalar(rawValue.trim());
     const blockList =
-      value.length === 0
+      value.length === 0 && !canonical
         ? parseBlockList(lines, index, scanEnd)
         : { values: [], nextIndex: index + 1 };
 
@@ -263,7 +288,11 @@ export function effectiveAllowedDataList(policy: SecurityPolicy): string[] {
 }
 
 export function isSecurityPolicyLine(line: string): boolean {
-  const key = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*):/)?.[1];
+  const legacyKey = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*):/)?.[1];
+  const canonicalKey = line.match(/^\s*renma\.([A-Za-z0-9-]+):/)?.[1];
+  const key =
+    legacyKey ??
+    (canonicalKey ? CANONICAL_SECURITY_KEYS.get(canonicalKey) : undefined);
   return (
     key !== undefined &&
     (BOOLEAN_POLICY_FIELDS.has(key) ||
@@ -308,7 +337,7 @@ function uniqueStrings(values: string[]): string[] {
 }
 
 function parseBoolean(value: string): boolean | undefined {
-  const normalized = value.toLowerCase();
+  const normalized = decodeScalar(value).toLowerCase();
   if (["true", "yes", "allowed", "allow", "1"].includes(normalized)) {
     return true;
   }
@@ -319,10 +348,40 @@ function parseBoolean(value: string): boolean | undefined {
 }
 
 function parseList(value: string): string[] {
-  return value
+  const decoded = decodeScalar(value).trim();
+  if (decoded.startsWith("[") && decoded.endsWith("]")) {
+    try {
+      const parsed = JSON.parse(decoded) as unknown;
+      if (
+        Array.isArray(parsed) &&
+        parsed.every((item): item is string => typeof item === "string")
+      ) {
+        return parsed.map((item) => item.trim()).filter(Boolean);
+      }
+    } catch {
+      // Fall through to the legacy comma-separated representation.
+    }
+  }
+  return decoded
     .replace(/^\[/, "")
     .replace(/\]$/, "")
     .split(",")
-    .map((item) => item.trim().replace(/^["']|["']$/g, ""))
+    .map((item) => decodeScalar(item.trim()))
     .filter((item) => item.length > 0);
+}
+
+function decodeScalar(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.length >= 2 && trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      return typeof parsed === "string" ? parsed : trimmed;
+    } catch {
+      return trimmed.slice(1, -1);
+    }
+  }
+  if (trimmed.length >= 2 && trimmed.startsWith("'") && trimmed.endsWith("'")) {
+    return trimmed.slice(1, -1).replaceAll("''", "'");
+  }
+  return trimmed;
 }
