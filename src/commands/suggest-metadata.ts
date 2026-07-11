@@ -3,6 +3,7 @@ import path from "node:path";
 
 import {
   AGENT_SKILLS_SPECIFICATION,
+  agentSkillDirectoryName,
   hasExplicitExecutionConstraint,
   hasExplicitSkillSelectionBoundary,
   validateAgentSkill,
@@ -24,6 +25,7 @@ import {
   type LegacyRenmaMetadataKey,
 } from "../renma-metadata.js";
 import type { Artifact, ArtifactKind, MetadataValue } from "../types.js";
+import { parseYamlFrontmatter } from "../yaml-frontmatter.js";
 
 export type SuggestMetadataFormat = "prompt" | "json";
 
@@ -47,6 +49,7 @@ export interface AgentSkillsMigrationSuggestion {
   candidateRenmaMetadata: Record<string, string>;
   canonicalFrontmatter?: string;
   descriptionDraftRequired: boolean;
+  metadataConflicts: string[];
   selectionBoundaryReview: string[];
   executionConstraintReview: string[];
 }
@@ -105,32 +108,46 @@ export async function buildMetadataSuggestion(
     sizeBytes: Buffer.byteLength(content),
     content,
   } satisfies Artifact);
-  const { metadata } = parseAssetMetadata(document);
+  const parsedMetadata = parseAssetMetadata(document);
+  const { metadata } = parsedMetadata;
   const kind =
     initialKind === "context" && metadata.type === "context_lens"
       ? "context_lens"
       : initialKind;
-  const existingId = optionalText(metadataValueText(document.metadata.id));
-  const existingTitle = optionalText(
-    metadataValueText(document.metadata.title),
-  );
+  const existingId = optionalText(metadata.id);
+  const existingTitle = optionalText(metadata.title);
   const existingOwner = optionalText(metadata.owner);
   const explicitOwner = optionalText(options.owner);
   const candidateMetadata: Record<string, string> = {};
   const candidateId = inferCandidateId(kind, outputPath);
   const candidateTitle = mainHeadingTitle(document.headings);
 
-  if (!existingId && candidateId) {
-    candidateMetadata.id = candidateId;
-  }
-  if (!existingTitle && candidateTitle) {
-    candidateMetadata.title = candidateTitle;
-  }
-  if (!existingOwner && explicitOwner) {
-    candidateMetadata.owner = explicitOwner;
+  if (kind !== "skill") {
+    if (!existingId && candidateId) {
+      candidateMetadata.id = candidateId;
+    }
+    if (!existingTitle && candidateTitle) {
+      candidateMetadata.title = candidateTitle;
+    }
+    if (!existingOwner && explicitOwner) {
+      candidateMetadata.owner = explicitOwner;
+    }
   }
 
   const blockedMetadata: BlockedMetadata[] = [];
+  const metadataConflicts = parsedMetadata.diagnostics.flatMap((diagnostic) => {
+    if (diagnostic.code !== "RENMA-METADATA-CONFLICTING-SOURCES") return [];
+    const legacyKey = diagnostic.details?.legacyKey;
+    const canonicalKey = diagnostic.details?.canonicalKey;
+    if (typeof legacyKey !== "string" || typeof canonicalKey !== "string") {
+      return [];
+    }
+    blockedMetadata.push({
+      field: legacyKey,
+      reason: `Canonical ${canonicalKey} conflicts with legacy ${legacyKey}. Human review is required before migration.`,
+    });
+    return [legacyKey];
+  });
   if (!existingOwner && !explicitOwner) {
     blockedMetadata.push({
       field: "owner",
@@ -153,6 +170,7 @@ export async function buildMetadataSuggestion(
           ...(candidateTitle ? { candidateTitle } : {}),
           ...(existingOwner ? { existingOwner } : {}),
           ...(explicitOwner ? { explicitOwner } : {}),
+          metadataConflicts,
           blockedMetadata,
         })
       : undefined;
@@ -196,7 +214,7 @@ export function renderMetadataPrompt(suggestion: MetadataSuggestion): string {
         ...(agentSkills.canonicalFrontmatter
           ? ["```yaml", agentSkills.canonicalFrontmatter, "```"]
           : [
-              "- (blocked until a reviewed description can be drafted from existing evidence)",
+              "- (blocked until the listed name, description, or metadata conflicts are resolved by human review)",
             ]),
         "",
         "Selection-boundary review:",
@@ -243,22 +261,32 @@ function buildAgentSkillsMigrationSuggestion(input: {
   candidateTitle?: string;
   existingOwner?: string;
   explicitOwner?: string;
+  metadataConflicts: string[];
   blockedMetadata: BlockedMetadata[];
 }): AgentSkillsMigrationSuggestion {
   const validation = validateAgentSkill(input.document);
+  const yamlFrontmatter = parseYamlFrontmatter(input.document.artifact.content);
   const existingName = optionalText(
-    metadataValueText(input.document.metadata.name),
+    metadataValueText(yamlFrontmatter.values.name as MetadataValue | undefined),
   );
   const existingDescription = optionalText(
-    metadataValueText(input.document.metadata.description),
+    metadataValueText(
+      yamlFrontmatter.values.description as MetadataValue | undefined,
+    ),
   );
-  const name = validSkillName(existingName, input.outputPath)
-    ? existingName
-    : inferSkillName(input.outputPath);
+  const directoryName = agentSkillDirectoryName(input.outputPath);
+  const name =
+    directoryName.reasons.length === 0 ? directoryName.name : undefined;
+  if (!name) {
+    input.blockedMetadata.push({
+      field: "name",
+      reason: `Parent directory "${directoryName.parentDirectory}" is not a valid Agent Skills name. Rename the directory to a valid lowercase Agent Skills name before migration.`,
+    });
+  }
   const extractedDescription =
     existingDescription ?? extractDescriptionCandidate(input.document);
   const candidateAgentSkillsMetadata: Record<string, string> = {};
-  if (!existingName || existingName !== name) {
+  if (name && (!existingName || existingName !== name)) {
     candidateAgentSkillsMetadata.name = name;
   }
   if (!existingDescription && extractedDescription) {
@@ -278,17 +306,19 @@ function buildAgentSkillsMigrationSuggestion(input: {
     ...(input.candidateTitle ? { candidateTitle: input.candidateTitle } : {}),
     ...(input.existingOwner ? { existingOwner: input.existingOwner } : {}),
     ...(input.explicitOwner ? { explicitOwner: input.explicitOwner } : {}),
+    metadataConflicts: input.metadataConflicts,
   });
   const clientMetadata = collectClientMetadata(input.document);
-  const canonicalFrontmatter = extractedDescription
-    ? renderCanonicalSkillFrontmatter({
-        name,
-        description: extractedDescription,
-        agentSkillsMetadata: candidateAgentSkillsMetadata,
-        clientMetadata,
-        renmaMetadata: candidateRenmaMetadata,
-      })
-    : undefined;
+  const canonicalFrontmatter =
+    name && extractedDescription && input.metadataConflicts.length === 0
+      ? renderCanonicalSkillFrontmatter({
+          name,
+          description: extractedDescription,
+          agentSkillsMetadata: candidateAgentSkillsMetadata,
+          clientMetadata,
+          renmaMetadata: candidateRenmaMetadata,
+        })
+      : undefined;
 
   if (!extractedDescription) {
     input.blockedMetadata.push({
@@ -311,6 +341,7 @@ function buildAgentSkillsMigrationSuggestion(input: {
     candidateRenmaMetadata,
     ...(canonicalFrontmatter ? { canonicalFrontmatter } : {}),
     descriptionDraftRequired: !extractedDescription,
+    metadataConflicts: input.metadataConflicts,
     ...authoringReviews(validation),
   };
 }
@@ -321,12 +352,14 @@ function collectRenmaMigrationMetadata(input: {
   candidateTitle?: string;
   existingOwner?: string;
   explicitOwner?: string;
+  metadataConflicts: string[];
 }): Record<string, string> {
   const result: Record<string, string> = {};
 
   for (const legacyKey of Object.keys(
     RENMA_METADATA_KEYS,
   ) as LegacyRenmaMetadataKey[]) {
+    if (input.metadataConflicts.includes(legacyKey)) continue;
     const value = readRenmaMetadataValue(input.document, legacyKey);
     if (value === undefined) continue;
     const canonicalKey = canonicalRenmaMetadataKey(legacyKey).replace(
@@ -343,13 +376,26 @@ function collectRenmaMigrationMetadata(input: {
     }
   }
 
-  if (!result["renma.id"] && input.candidateId) {
+  if (
+    !input.metadataConflicts.includes("id") &&
+    !result["renma.id"] &&
+    input.candidateId
+  ) {
     result["renma.id"] = input.candidateId;
   }
-  if (!result["renma.title"] && input.candidateTitle) {
+  if (
+    !input.metadataConflicts.includes("title") &&
+    !result["renma.title"] &&
+    input.candidateTitle
+  ) {
     result["renma.title"] = input.candidateTitle;
   }
-  if (!result["renma.owner"] && !input.existingOwner && input.explicitOwner) {
+  if (
+    !input.metadataConflicts.includes("owner") &&
+    !result["renma.owner"] &&
+    !input.existingOwner &&
+    input.explicitOwner
+  ) {
     result["renma.owner"] = input.explicitOwner;
   }
 
@@ -455,7 +501,13 @@ function buildInstructions(input: {
     base.push(
       "Apply migration only from legacy top-level Renma skill metadata to the Agent Skills-compatible form; never migrate a valid Agent Skill back to the legacy form.",
       "Keep only name, description, license, compatibility, metadata, and allowed-tools at the top level of SKILL.md frontmatter.",
-      "Move Renma extension values under metadata using renma.* string keys and remove the migrated legacy top-level duplicates after review.",
+      ...(input.agentSkills.metadataConflicts.length > 0
+        ? [
+            "Preserve both canonical and legacy sources for conflicting Renma metadata until a human chooses the retained semantic value; do not remove either source during this migration attempt.",
+          ]
+        : [
+            "Move Renma extension values under metadata using renma.* string keys and remove the migrated legacy top-level duplicates after review.",
+          ]),
       "Preserve unrelated client-specific metadata entries.",
       "Treat description as the discovery surface: state what the skill does and when to use it. Add an exclusion only when the body explicitly excludes a class of tasks from this skill.",
       "Review selection boundaries separately from execution constraints. Keep supported when_to_use and when_not_to_use values as selection-scope evidence.",
@@ -472,7 +524,11 @@ function buildInstructions(input: {
 function ownerInstruction(input: {
   existingOwner?: string | undefined;
   explicitOwner?: string | undefined;
+  agentSkills?: AgentSkillsMigrationSuggestion | undefined;
 }): string {
+  if (input.agentSkills?.metadataConflicts.includes("owner")) {
+    return "Canonical and legacy owner values conflict. Preserve both sources and require human review; do not choose an owner during migration.";
+  }
   if (input.existingOwner) {
     if (input.explicitOwner && input.existingOwner !== input.explicitOwner) {
       return `Existing owner is ${input.existingOwner}. The explicitly provided owner ${input.explicitOwner} differs, so do not change ownership without human review.`;
@@ -554,19 +610,6 @@ function inferRootedId(
   if (idParts.length === 0) return undefined;
   if (idParts[0] === prefix) return idParts.join(".");
   return [prefix, ...idParts].join(".");
-}
-
-function inferSkillName(filePath: string): string {
-  const parts = pathParts(filePath);
-  return slugify(parts.at(-2) ?? "skill");
-}
-
-function validSkillName(
-  value: string | undefined,
-  filePath: string,
-): value is string {
-  if (!value) return false;
-  return value === inferSkillName(filePath);
 }
 
 function extractDescriptionCandidate(

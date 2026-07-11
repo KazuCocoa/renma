@@ -343,6 +343,19 @@ Use `--fail-on` in CI when findings at or above a severity should fail the job. 
 
 Output includes scan findings, discovery or catalog diagnostics, the effective exit threshold, and evidence paths or snippets for each finding. `diagnosticsV2` adds typed repair constraints, structured verification steps, and concise LLM hints; `reviewBundles` groups related diagnostics for code review.
 
+### `validate-skills`
+
+Validates discovered `SKILL.md` files against Renma's locally versioned Agent Skills profile.
+
+```bash
+renma validate-skills .
+renma validate-skills . --format json
+```
+
+The command is a first-class Renma CLI workflow. It exits `1` for Agent Skills specification errors, including invalid YAML, non-mapping frontmatter, invalid field types, duplicate keys, invalid names, and directory mismatches. Renma authoring warnings remain visible but non-gating, so a specification-valid Skill exits `0` even when review guidance is present. Usage and configuration errors exit `2`.
+
+Specification validation uses a real YAML 1.2 parser; the lightweight Markdown parser remains responsible only for repository evidence such as headings, links, and code fences. Agent Skills names come from valid immediate parent directories and are not silently slugified.
+
 ### `catalog`
 
 Builds a deterministic catalog of discovered assets.
@@ -535,6 +548,8 @@ renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform --f
 
 `scaffold --format file` writes a starter file, `--format prompt` emits an authoring prompt, and `--format json` emits structured scaffold data. The generated content is intentionally minimal; fill in metadata, dependencies, and verification steps before depending on it in automation.
 
+For Skills, the immediate parent directory must already be a valid Agent Skills name. Scaffold preserves that normalized directory identity, supports valid Unicode letters and numbers, and refuses invalid names instead of creating a slugified substitute.
+
 ### `suggest-metadata`
 
 Suggests a safe metadata retrofit workflow for an existing asset.
@@ -551,6 +566,8 @@ Use this after `scan` detects metadata issues or `ownership` shows unowned asset
 The prompt asks the agent to inspect the existing asset, preserve the Markdown body, preserve existing frontmatter values, add only compact missing metadata that is clearly supported, and rerun `renma scan .` and `renma ownership .` after editing.
 
 For skills, the prompt reports `Selection-boundary review` separately from `Execution-constraint review`. Selection exclusions belong in `description` or supported `when_not_to_use` governance metadata only when they define tasks that should not select the skill. Execution prohibitions remain in the activated `SKILL.md` body, preferably under a prominent constraint heading with a source-backed alternative or stop behavior. Missing behavior requires human review; the command does not invent it.
+
+When canonical `metadata.renma.*` conflicts with a legacy top-level field, the command adds blocked metadata, preserves both sources, and omits canonical frontmatter until a human chooses the retained semantic value. It never suggests legacy top-level `id`, `title`, or `owner` fields for an already-canonical Skill.
 
 Owner metadata remains recommended but not required. Without `--owner`, `suggest-metadata` blocks owner as a suggested addition and says not to add one unless the asset already declares an owner or a maintainer provides one. With `--owner <owner>`, the command may include that owner because it was explicitly provided. If an existing asset already declares an owner, `suggest-metadata` preserves it; a different `--owner` value is treated as a human-review ownership change, not an automatic metadata suggestion. Renma does not infer owners from Git history, file paths, prose, or authors.
 
@@ -575,6 +592,7 @@ Use `--format <format>` to select output and `--json` as a shortcut where the co
 | Command | Formats |
 | --- | --- |
 | `scan` | `text`, `json` |
+| `validate-skills` | `text`, `json` |
 | `bom` | `json`, `markdown` |
 | `catalog` | `json`, `markdown` |
 | `ownership` | `json`, `markdown` |

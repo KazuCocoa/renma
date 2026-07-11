@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { agentSkillDirectoryName } from "../agent-skills.js";
 import { encodeRenmaMetadataList, yamlString } from "../renma-metadata.js";
 
 export type ScaffoldKind = "skill" | "context" | "context_lens";
@@ -61,7 +62,7 @@ export function buildScaffoldBundle(options: ScaffoldOptions): ScaffoldBundle {
   const skillIdentity =
     options.kind === "skill"
       ? {
-          name: inferSkillName(options.targetPath),
+          name: requiredAgentSkillName(options.targetPath),
           description: draftSkillDescription(title),
         }
       : undefined;
@@ -366,10 +367,12 @@ function inferId(kind: ScaffoldKind, targetPath: string): string {
     : ["context", ...parts].join(".");
 }
 
-function inferSkillName(targetPath: string): string {
-  const normalized = targetPath.replaceAll("\\", "/");
-  const directory = normalized.slice(0, normalized.lastIndexOf("/"));
-  return slugify(directory.split("/").filter(Boolean).at(-1) ?? "skill");
+function requiredAgentSkillName(targetPath: string): string {
+  const result = agentSkillDirectoryName(targetPath);
+  if (result.reasons.length === 0) return result.name;
+  throw new Error(
+    `Cannot scaffold an Agent Skill at ${targetPath} because the parent directory "${result.parentDirectory}" is not a valid Agent Skills name. Rename the directory to a valid lowercase Agent Skills name.`,
+  );
 }
 
 function draftSkillDescription(title: string): string {

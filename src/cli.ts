@@ -42,6 +42,10 @@ import {
   type TrustGraphFormat,
 } from "./commands/trust-graph.js";
 import {
+  runValidateSkillsCommand,
+  type ValidateSkillsFormat,
+} from "./commands/validate-skills.js";
+import {
   isCommandName,
   renderCommandHelp,
   renderGlobalHelp,
@@ -126,6 +130,14 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
   if (command === "scaffold") {
     return runScaffold(parsed.values, target, parsed.positionals[2]);
+  }
+
+  if (command === "validate-skills") {
+    return runValidateSkills(
+      parsed.values,
+      target,
+      parsed.positionals.length > 2,
+    );
   }
 
   if (command === "inspect") {
@@ -221,6 +233,31 @@ async function runScaffold(
     console.error(error instanceof Error ? error.message : String(error));
     return 2;
   }
+}
+
+async function runValidateSkills(
+  values: CliValues,
+  target: string,
+  hasExtraPositionals: boolean,
+): Promise<number> {
+  if (hasExtraPositionals) {
+    return usageError(
+      "validate-skills",
+      "validate-skills accepts at most one repository path.",
+    );
+  }
+  const format = values.json ? "json" : (stringValue(values.format) ?? "text");
+  if (format !== "text" && format !== "json") {
+    return usageError(
+      "validate-skills",
+      "--format must be one of: text, json.",
+    );
+  }
+  const configPath = stringValue(values.config);
+  return runValidateSkillsCommand(target, {
+    format: format as ValidateSkillsFormat,
+    ...(configPath ? { configPath } : {}),
+  });
 }
 
 async function runScan(values: CliValues, target: string): Promise<number> {

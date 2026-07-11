@@ -144,6 +144,46 @@ export const COMMAND_HELP = [
     ],
   },
   {
+    name: "validate-skills",
+    usage: "renma validate-skills [path] [options]",
+    question: "Are discovered Skills Agent Skills compatible?",
+    purpose:
+      "Validate discovered SKILL.md files against Renma's locally versioned Agent Skills profile and report separate non-gating authoring guidance.",
+    useWhen: [
+      "You need deterministic Agent Skills frontmatter and naming validation.",
+      "You are migrating legacy Renma Skill metadata to canonical Agent Skills metadata.",
+      "CI must gate specification errors without gating Renma authoring warnings.",
+    ],
+    doNotUseFor: [
+      "Selecting a Skill for a live task.",
+      "Rewriting Skill files or resolving metadata conflicts automatically.",
+      "Guaranteeing that a runtime model follows execution constraints.",
+    ],
+    examples: [
+      "renma validate-skills .",
+      "renma validate-skills . --format json",
+    ],
+    interpretation: [
+      "Specification errors make the command exit 1.",
+      "Renma authoring warnings remain visible but do not change a valid exit code from 0.",
+      "Invalid YAML is an Agent Skills specification error.",
+    ],
+    nextSteps: [
+      "Fix specification errors before relying on the Skill as a portable Agent Skill.",
+      "Review authoring warnings without inventing missing constraints or metadata semantics.",
+      "Rerun validate-skills and scan after editing.",
+    ],
+    options: [
+      "config",
+      {
+        name: "format",
+        description: "Output format: text or json. Defaults to text.",
+      },
+      "json",
+      "help",
+    ],
+  },
+  {
     name: "catalog",
     usage: "renma catalog [path] [options]",
     question: "What assets and metadata exist?",

@@ -4,7 +4,11 @@ import {
   canonicalRenmaMetadataFields,
   legacyRenmaMetadataFields,
 } from "./renma-metadata.js";
-import type { MetadataValue, ParsedDocument } from "./types.js";
+import type { ParsedDocument } from "./types.js";
+import {
+  parseYamlFrontmatter,
+  type ParsedYamlFrontmatter,
+} from "./yaml-frontmatter.js";
 
 export const AGENT_SKILLS_SPECIFICATION =
   "https://agentskills.io/specification";
@@ -68,22 +72,6 @@ export interface AgentSkillsValidationSummary {
   results: AgentSkillValidationResult[];
 }
 
-interface RawFrontmatterField {
-  key: string;
-  value: string;
-  startLine: number;
-  endLine: number;
-}
-
-interface RawFrontmatter {
-  present: boolean;
-  closed: boolean;
-  fields: RawFrontmatterField[];
-  metadataFields: RawFrontmatterField[];
-  duplicateFields: RawFrontmatterField[];
-  metadataShapeValid: boolean;
-}
-
 export function validateAgentSkills(
   documents: ParsedDocument[],
 ): AgentSkillsValidationSummary {
@@ -117,12 +105,12 @@ export function validateAgentSkills(
 export function validateAgentSkill(
   document: ParsedDocument,
 ): AgentSkillValidationResult {
-  const raw = parseRawFrontmatter(document);
+  const frontmatter = parseYamlFrontmatter(document.artifact.content);
   const issues: AgentSkillValidationIssue[] = [];
   const legacyFields = legacyRenmaMetadataFields(document);
   const canonicalFields = canonicalRenmaMetadataFields(document);
-  const name = metadataText(document.metadata.name);
-  const description = metadataText(document.metadata.description);
+  const name = metadataText(frontmatter.values.name);
+  const description = metadataText(frontmatter.values.description);
   const format = skillFormat({
     hasAgentSkillsIdentity: Boolean(name || description),
     legacyFields,
@@ -142,7 +130,7 @@ export function validateAgentSkill(
     );
   }
 
-  if (!raw.present) {
+  if (!frontmatter.present) {
     issues.push(
       issue(
         document,
@@ -153,7 +141,7 @@ export function validateAgentSkill(
         1,
       ),
     );
-  } else if (!raw.closed) {
+  } else if (!frontmatter.closed) {
     issues.push(
       issue(
         document,
@@ -166,11 +154,47 @@ export function validateAgentSkill(
     );
   }
 
-  const unexpectedFields = raw.fields
-    .map((field) => field.key)
-    .filter((field) => !ALLOWED_TOP_LEVEL_FIELDS.has(field));
+  for (const yamlError of frontmatter.errors) {
+    issues.push({
+      ...issue(
+        document,
+        "AS-SKILL-INVALID-YAML",
+        "error",
+        "specification",
+        `Invalid Agent Skills YAML frontmatter: ${yamlError.message}`,
+        yamlError.line,
+      ),
+      details: { yamlCode: yamlError.code },
+    });
+  }
+
+  if (
+    frontmatter.present &&
+    frontmatter.closed &&
+    frontmatter.errors.length === 0 &&
+    !frontmatter.mapping
+  ) {
+    issues.push(
+      issue(
+        document,
+        "AS-SKILL-FRONTMATTER-NOT-MAPPING",
+        "error",
+        "specification",
+        "Agent Skills frontmatter must parse to a YAML mapping.",
+        2,
+      ),
+    );
+  }
+
+  const unexpectedFields = [
+    ...new Set(
+      frontmatter.fields
+        .map((field) => field.key)
+        .filter((field) => !ALLOWED_TOP_LEVEL_FIELDS.has(field)),
+    ),
+  ];
   if (unexpectedFields.length > 0) {
-    const first = raw.fields.find((field) =>
+    const first = frontmatter.fields.find((field) =>
       unexpectedFields.includes(field.key),
     );
     issues.push({
@@ -186,7 +210,7 @@ export function validateAgentSkill(
     });
   }
 
-  for (const duplicate of raw.duplicateFields) {
+  for (const duplicate of frontmatter.duplicateFields) {
     issues.push(
       issue(
         document,
@@ -200,8 +224,24 @@ export function validateAgentSkill(
     );
   }
 
-  if (!raw.metadataShapeValid) {
-    const metadata = raw.fields.find((field) => field.key === "metadata");
+  for (const duplicate of frontmatter.duplicateMetadataKeys) {
+    issues.push(
+      issue(
+        document,
+        "AS-SKILL-DUPLICATE-METADATA-KEY",
+        "error",
+        "specification",
+        `Agent Skills metadata key "${duplicate.key}" is declared more than once.`,
+        duplicate.startLine,
+        `metadata.${duplicate.key}`,
+      ),
+    );
+  }
+
+  if (!validMetadataMapping(frontmatter.values.metadata)) {
+    const metadata = frontmatter.fields.find(
+      (field) => field.key === "metadata",
+    );
     issues.push(
       issue(
         document,
@@ -215,16 +255,36 @@ export function validateAgentSkill(
     );
   }
 
-  validateName(document, name, issues);
-  validateDescription(document, description, issues);
+  validateName(document, frontmatter.values.name, name, frontmatter, issues);
+  validateDescription(
+    document,
+    frontmatter.values.description,
+    description,
+    frontmatter,
+    issues,
+  );
   validateOptionalTextField(
     document,
     "compatibility",
+    frontmatter.values.compatibility,
     MAX_COMPATIBILITY_LENGTH,
+    frontmatter,
     issues,
   );
-  validateStringField(document, "license", issues);
-  validateStringField(document, "allowed-tools", issues);
+  validateStringField(
+    document,
+    "license",
+    frontmatter.values.license,
+    frontmatter,
+    issues,
+  );
+  validateStringField(
+    document,
+    "allowed-tools",
+    frontmatter.values["allowed-tools"],
+    frontmatter,
+    issues,
+  );
 
   issues.push(...authoringIssues(document, description));
   issues.sort((a, b) => {
@@ -255,11 +315,13 @@ export function validateAgentSkill(
 
 function validateName(
   document: ParsedDocument,
+  rawName: unknown,
   name: string | undefined,
+  frontmatter: ParsedYamlFrontmatter,
   issues: AgentSkillValidationIssue[],
 ): void {
-  const line = fieldLine(document, "name");
-  if (!name) {
+  const line = frontmatterFieldLine(frontmatter, "name");
+  if (rawName === undefined || (typeof rawName === "string" && !name)) {
     issues.push(
       issue(
         document,
@@ -274,27 +336,23 @@ function validateName(
     return;
   }
 
-  const reasons: string[] = [];
-  const normalized = name.normalize("NFKC");
-  if (characterLength(normalized) > MAX_NAME_LENGTH) {
-    reasons.push(`must not exceed ${MAX_NAME_LENGTH} characters`);
+  if (typeof rawName !== "string") {
+    issues.push(
+      issue(
+        document,
+        "AS-SKILL-INVALID-NAME",
+        "error",
+        "specification",
+        "Agent Skills name must be a non-empty string.",
+        line,
+        "name",
+      ),
+    );
+    return;
   }
-  if (normalized !== normalized.toLowerCase()) {
-    reasons.push("must be lowercase");
-  }
-  if (normalized.startsWith("-") || normalized.endsWith("-")) {
-    reasons.push("must not start or end with a hyphen");
-  }
-  if (normalized.includes("--")) {
-    reasons.push("must not contain consecutive hyphens");
-  }
-  if (
-    ![...normalized].every(
-      (character) => character === "-" || /[\p{L}\p{N}]/u.test(character),
-    )
-  ) {
-    reasons.push("may contain only lowercase letters, numbers, and hyphens");
-  }
+
+  const normalized = rawName.normalize("NFKC");
+  const reasons = agentSkillNameValidationReasons(rawName);
   if (reasons.length > 0) {
     issues.push(
       issue(
@@ -302,7 +360,7 @@ function validateName(
         "AS-SKILL-INVALID-NAME",
         "error",
         "specification",
-        `Invalid Agent Skills name "${name}": ${reasons.join("; ")}.`,
+        `Invalid Agent Skills name "${rawName}": ${reasons.join("; ")}.`,
         line,
         "name",
       ),
@@ -330,11 +388,16 @@ function validateName(
 
 function validateDescription(
   document: ParsedDocument,
+  rawDescription: unknown,
   description: string | undefined,
+  frontmatter: ParsedYamlFrontmatter,
   issues: AgentSkillValidationIssue[],
 ): void {
-  const line = fieldLine(document, "description");
-  if (!description) {
+  const line = frontmatterFieldLine(frontmatter, "description");
+  if (
+    rawDescription === undefined ||
+    (typeof rawDescription === "string" && !description)
+  ) {
     issues.push(
       issue(
         document,
@@ -349,7 +412,22 @@ function validateDescription(
     return;
   }
 
-  if (characterLength(description) > MAX_DESCRIPTION_LENGTH) {
+  if (typeof rawDescription !== "string") {
+    issues.push(
+      issue(
+        document,
+        "AS-SKILL-INVALID-DESCRIPTION",
+        "error",
+        "specification",
+        "Agent Skills description must be a non-empty string.",
+        line,
+        "description",
+      ),
+    );
+    return;
+  }
+
+  if (characterLength(rawDescription) > MAX_DESCRIPTION_LENGTH) {
     issues.push(
       issue(
         document,
@@ -363,7 +441,7 @@ function validateDescription(
     );
   }
 
-  if (!usageLanguagePattern().test(description)) {
+  if (!usageLanguagePattern().test(rawDescription)) {
     issues.push(
       issue(
         document,
@@ -381,12 +459,13 @@ function validateDescription(
 function validateOptionalTextField(
   document: ParsedDocument,
   field: string,
+  value: unknown,
   maxLength: number,
+  frontmatter: ParsedYamlFrontmatter,
   issues: AgentSkillValidationIssue[],
 ): void {
-  const value = document.metadata[field];
   if (value === undefined) return;
-  if (Array.isArray(value) || value.trim().length === 0) {
+  if (typeof value !== "string" || value.trim().length === 0) {
     issues.push(
       issue(
         document,
@@ -394,7 +473,7 @@ function validateOptionalTextField(
         "error",
         "specification",
         `Agent Skills ${field} must be a non-empty string when provided.`,
-        fieldLine(document, field),
+        frontmatterFieldLine(frontmatter, field),
         field,
       ),
     );
@@ -408,7 +487,7 @@ function validateOptionalTextField(
         "error",
         "specification",
         `Agent Skills ${field} exceeds ${maxLength} characters.`,
-        fieldLine(document, field),
+        frontmatterFieldLine(frontmatter, field),
         field,
       ),
     );
@@ -418,9 +497,10 @@ function validateOptionalTextField(
 function validateStringField(
   document: ParsedDocument,
   field: string,
+  value: unknown,
+  frontmatter: ParsedYamlFrontmatter,
   issues: AgentSkillValidationIssue[],
 ): void {
-  const value = document.metadata[field];
   if (value === undefined || typeof value === "string") return;
   issues.push(
     issue(
@@ -429,7 +509,7 @@ function validateStringField(
       "error",
       "specification",
       `Agent Skills ${field} must be a string when provided.`,
-      fieldLine(document, field),
+      frontmatterFieldLine(frontmatter, field),
       field,
     ),
   );
@@ -455,8 +535,9 @@ function authoringIssues(
       hasExplicitExecutionConstraint(line.text) &&
       !hasExplicitSkillSelectionBoundary(line.text),
   );
-  const hasConstraintHeading = document.headings.some((heading) =>
-    executionConstraintHeadingPattern().test(heading.text),
+  const nonProminentConstraints = executionConstraints.filter(
+    (constraint) =>
+      !executionConstraintHeadingPattern().test(constraint.section),
   );
 
   if (
@@ -476,7 +557,7 @@ function authoringIssues(
     );
   }
 
-  if (executionConstraints.length > 0 && !hasConstraintHeading) {
+  if (nonProminentConstraints.length > 0) {
     issues.push(
       issue(
         document,
@@ -484,7 +565,7 @@ function authoringIssues(
         "warning",
         "renma-authoring",
         "Execution prohibitions are present but no prominent Hard Constraints, Prohibited Actions, Safety Constraints, or equivalent constraint section exists. Group the existing constraints without changing their meaning.",
-        executionConstraints[0]?.line ?? 1,
+        nonProminentConstraints[0]?.line ?? 1,
       ),
     );
   }
@@ -492,11 +573,7 @@ function authoringIssues(
   const executionSections = new Set(
     executionConstraints.map((constraint) => constraint.section),
   );
-  if (
-    executionConstraints.length > 1 &&
-    executionSections.size > 1 &&
-    !hasConstraintHeading
-  ) {
+  if (executionConstraints.length > 1 && executionSections.size > 1) {
     issues.push(
       issue(
         document,
@@ -535,83 +612,6 @@ function authoringIssues(
   return issues;
 }
 
-function parseRawFrontmatter(document: ParsedDocument): RawFrontmatter {
-  const lines = document.lines;
-  if (lines[0]?.trim() !== "---") {
-    return {
-      present: false,
-      closed: false,
-      fields: [],
-      metadataFields: [],
-      duplicateFields: [],
-      metadataShapeValid: true,
-    };
-  }
-
-  const fields: RawFrontmatterField[] = [];
-  const metadataFields: RawFrontmatterField[] = [];
-  const duplicateFields: RawFrontmatterField[] = [];
-  const seen = new Set<string>();
-  let closed = false;
-  let metadataShapeValid = true;
-  let inMetadata = false;
-
-  for (let index = 1; index < lines.length; index += 1) {
-    const line = lines[index] ?? "";
-    if (line.trim() === "---") {
-      closed = true;
-      break;
-    }
-
-    const topLevel = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
-    if (topLevel) {
-      const key = topLevel[1] ?? "";
-      const value = topLevel[2] ?? "";
-      const field = {
-        key,
-        value,
-        startLine: index + 1,
-        endLine: index + 1,
-      };
-      fields.push(field);
-      if (seen.has(key)) duplicateFields.push(field);
-      seen.add(key);
-      inMetadata = key === "metadata";
-      if (inMetadata && value.trim().length > 0) metadataShapeValid = false;
-      continue;
-    }
-
-    if (inMetadata) {
-      const child = line.match(/^\s{2,}([A-Za-z0-9_.-]+):\s*(.*)$/);
-      if (child) {
-        const value = child[2] ?? "";
-        if (value.trim().length === 0 || /^[|>][-+]?\s*$/.test(value.trim())) {
-          metadataShapeValid = false;
-        }
-        metadataFields.push({
-          key: child[1] ?? "",
-          value,
-          startLine: index + 1,
-          endLine: index + 1,
-        });
-        continue;
-      }
-      if (/^\s+-\s+/.test(line) || line.trim().length > 0) {
-        metadataShapeValid = false;
-      }
-    }
-  }
-
-  return {
-    present: true,
-    closed,
-    fields,
-    metadataFields,
-    duplicateFields,
-    metadataShapeValid,
-  };
-}
-
 function skillFormat(input: {
   hasAgentSkillsIdentity: boolean;
   legacyFields: string[];
@@ -626,10 +626,18 @@ function skillFormat(input: {
   return "unknown";
 }
 
-function metadataText(value: MetadataValue | undefined): string | undefined {
+function metadataText(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function validMetadataMapping(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  return Object.values(value).every((item) => typeof item === "string");
 }
 
 function issue(
@@ -655,6 +663,63 @@ function issue(
 
 function fieldLine(document: ParsedDocument, field: string): number {
   return document.metadataFields[field]?.startLine ?? 1;
+}
+
+function frontmatterFieldLine(
+  frontmatter: ParsedYamlFrontmatter,
+  field: string,
+): number {
+  return (
+    frontmatter.fields.find((candidate) => candidate.key === field)
+      ?.startLine ?? 1
+  );
+}
+
+export function agentSkillNameValidationReasons(value: string): string[] {
+  const normalized = value.normalize("NFKC");
+  const reasons: string[] = [];
+  if (characterLength(normalized) > MAX_NAME_LENGTH) {
+    reasons.push(`must not exceed ${MAX_NAME_LENGTH} characters`);
+  }
+  if (normalized !== normalized.toLowerCase()) {
+    reasons.push("must be lowercase");
+  }
+  if (normalized.startsWith("-") || normalized.endsWith("-")) {
+    reasons.push("must not start or end with a hyphen");
+  }
+  if (normalized.includes("--")) {
+    reasons.push("must not contain consecutive hyphens");
+  }
+  if (
+    normalized.length === 0 ||
+    ![...normalized].every(
+      (character) => character === "-" || /[\p{L}\p{N}]/u.test(character),
+    )
+  ) {
+    reasons.push("may contain only lowercase letters, numbers, and hyphens");
+  }
+  return reasons;
+}
+
+export interface AgentSkillDirectoryName {
+  parentDirectory: string;
+  name: string;
+  reasons: string[];
+}
+
+export function agentSkillDirectoryName(
+  filePath: string,
+): AgentSkillDirectoryName {
+  const normalizedPath = filePath.replaceAll("\\", "/");
+  const parentDirectory = path.posix.basename(
+    path.posix.dirname(normalizedPath),
+  );
+  const name = parentDirectory.normalize("NFKC");
+  return {
+    parentDirectory,
+    name,
+    reasons: agentSkillNameValidationReasons(name),
+  };
 }
 
 function usageLanguagePattern(): RegExp {
@@ -719,7 +784,7 @@ function authoringBodyLines(document: ParsedDocument): AuthoringBodyLine[] {
 function bodyStartLine(document: ParsedDocument): number {
   if (document.lines[0]?.trim() !== "---") return 1;
   const end = document.lines.findIndex(
-    (line, index) => index > 0 && line.trim() === "---",
+    (line, index) => index > 0 && /^---\s*$/.test(line),
   );
   return end >= 0 ? end + 2 : 1;
 }

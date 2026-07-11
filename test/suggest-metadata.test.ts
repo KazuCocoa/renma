@@ -114,15 +114,17 @@ test("suggest-metadata JSON includes conservative candidate metadata", async () 
     candidateMetadata: Record<string, string>;
     blockedMetadata: Array<{ field: string; reason: string }>;
     instructions: string[];
+    agentSkills: { candidateRenmaMetadata: Record<string, string> };
   };
 
   assert.equal(result.code, 0);
   assert.equal(suggestion.kind, "skill");
   assert.equal(suggestion.suggestedMode, "metadata-retrofit");
   assert.equal(suggestion.ownerProvided, false);
-  assert.deepEqual(suggestion.candidateMetadata, {
-    id: "skill.testing.spec-review",
-    title: "Spec Review",
+  assert.deepEqual(suggestion.candidateMetadata, {});
+  assert.deepEqual(suggestion.agentSkills.candidateRenmaMetadata, {
+    "renma.id": "skill.testing.spec-review",
+    "renma.title": "Spec Review",
   });
   assert.deepEqual(suggestion.blockedMetadata, [
     {
@@ -157,11 +159,16 @@ test("suggest-metadata JSON includes explicit owner candidate", async () => {
     ownerProvided: boolean;
     candidateMetadata: Record<string, string>;
     blockedMetadata: Array<{ field: string; reason: string }>;
+    agentSkills: { candidateRenmaMetadata: Record<string, string> };
   };
 
   assert.equal(result.code, 0);
   assert.equal(suggestion.ownerProvided, true);
-  assert.equal(suggestion.candidateMetadata.owner, "qa-platform");
+  assert.deepEqual(suggestion.candidateMetadata, {});
+  assert.equal(
+    suggestion.agentSkills.candidateRenmaMetadata["renma.owner"],
+    "qa-platform",
+  );
   assert.deepEqual(suggestion.blockedMetadata, [DESCRIPTION_BLOCKED_METADATA]);
 });
 
@@ -314,6 +321,172 @@ test("suggest-metadata JSON represents blocked owner replacement", async () => {
     suggestion.instructions.includes(
       "Existing owner is docs. The explicitly provided owner qa-platform differs, so do not change ownership without human review.",
     ),
+  );
+});
+
+test("suggest-metadata blocks canonical and legacy metadata conflicts", async () => {
+  const cases = [
+    {
+      field: "owner",
+      canonicalKey: "owner",
+      legacy: "owner: legacy-team",
+      canonical: "  renma.owner: canonical-team",
+    },
+    {
+      field: "id",
+      canonicalKey: "id",
+      legacy: "id: skill.legacy",
+      canonical: "  renma.id: skill.canonical",
+    },
+    {
+      field: "title",
+      canonicalKey: "title",
+      legacy: "title: Legacy Demo",
+      canonical: "  renma.title: Canonical Demo",
+    },
+    {
+      field: "requires_context",
+      canonicalKey: "requires-context",
+      legacy: "requires_context: '[\"context.legacy\"]'",
+      canonical: "  renma.requires-context: '[\"context.canonical\"]'",
+    },
+    {
+      field: "allowed_data",
+      canonicalKey: "allowed-data",
+      legacy: "allowed_data: '[\"legacy\"]'",
+      canonical: "  renma.allowed-data: '[\"canonical\"]'",
+    },
+    {
+      field: "network_allowed",
+      canonicalKey: "network-allowed",
+      legacy: "network_allowed: true",
+      canonical: "  renma.network-allowed: 'false'",
+    },
+  ];
+
+  for (const fixtureCase of cases) {
+    const root = await fixture();
+    const target = path.join(root, "skills", "demo", "SKILL.md");
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(
+      target,
+      `---
+name: demo
+description: Reviews demo inputs. Use when reviewing demo inputs.
+${fixtureCase.legacy}
+metadata:
+${fixtureCase.canonical}
+---
+# Demo
+`,
+    );
+
+    const result = await withCapturedConsole(() =>
+      main(["suggest-metadata", target, "--format", "json"]),
+    );
+    const suggestion = JSON.parse(result.stdout) as {
+      blockedMetadata: Array<{ field: string; reason: string }>;
+      instructions: string[];
+      agentSkills: {
+        canonicalFrontmatter?: string;
+        candidateRenmaMetadata: Record<string, string>;
+        metadataConflicts: string[];
+      };
+    };
+    const blocked = suggestion.blockedMetadata.find(
+      (item) => item.field === fixtureCase.field,
+    );
+
+    assert.equal(result.code, 0, fixtureCase.field);
+    assert.ok(blocked, fixtureCase.field);
+    assert.match(blocked.reason, /Human review is required before migration/);
+    assert.equal(suggestion.agentSkills.canonicalFrontmatter, undefined);
+    assert.ok(
+      suggestion.agentSkills.metadataConflicts.includes(fixtureCase.field),
+      fixtureCase.field,
+    );
+    assert.equal(
+      `renma.${fixtureCase.canonicalKey}` in
+        suggestion.agentSkills.candidateRenmaMetadata,
+      false,
+      fixtureCase.field,
+    );
+    assert.equal(
+      suggestion.instructions.some((instruction) =>
+        instruction.includes("remove the migrated legacy"),
+      ),
+      false,
+      fixtureCase.field,
+    );
+  }
+});
+
+test("suggest-metadata does not suggest legacy fields for a canonical Skill", async () => {
+  const root = await fixture();
+  const target = path.join(root, "skills", "demo", "SKILL.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(
+    target,
+    `---
+name: demo
+description: Reviews demo inputs. Use when reviewing demo inputs.
+metadata:
+  renma.id: skill.demo
+  renma.title: Demo
+---
+# Demo
+`,
+  );
+
+  const result = await withCapturedConsole(() =>
+    main(["suggest-metadata", target, "--format", "json"]),
+  );
+  const suggestion = JSON.parse(result.stdout) as {
+    candidateMetadata: Record<string, string>;
+    agentSkills: { direction: string };
+  };
+
+  assert.equal(result.code, 0);
+  assert.deepEqual(suggestion.candidateMetadata, {});
+  assert.equal(suggestion.agentSkills.direction, "none");
+});
+
+test("suggest-metadata blocks migration for an invalid Skill directory name", async () => {
+  const root = await fixture();
+  const target = path.join(root, "skills", "MySkill", "SKILL.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(
+    target,
+    `---
+id: skill.demo
+---
+# Demo
+
+Use this skill when reviewing demo inputs.
+`,
+  );
+
+  const result = await withCapturedConsole(() =>
+    main(["suggest-metadata", target, "--format", "json"]),
+  );
+  const suggestion = JSON.parse(result.stdout) as {
+    blockedMetadata: Array<{ field: string; reason: string }>;
+    agentSkills: {
+      canonicalFrontmatter?: string;
+      candidateAgentSkillsMetadata: Record<string, string>;
+    };
+  };
+
+  assert.equal(result.code, 0);
+  assert.equal(suggestion.agentSkills.canonicalFrontmatter, undefined);
+  assert.equal(
+    "name" in suggestion.agentSkills.candidateAgentSkillsMetadata,
+    false,
+  );
+  assert.match(
+    suggestion.blockedMetadata.find((item) => item.field === "name")?.reason ??
+      "",
+    /Rename the directory/,
   );
 });
 

@@ -354,6 +354,66 @@ test("top lists sort by count then name and are limited to ten", () => {
   ]);
 });
 
+test("canonical security metadata replaces legacy values in either field order", () => {
+  const legacy = [
+    "network_allowed: true",
+    "external_upload_allowed: true",
+    "secrets_allowed: true",
+    "requires_human_approval: false",
+    "allowed_data: legacy",
+    "forbidden_inputs: legacy-secret",
+    "approved_network_destinations: stale.example",
+    "approved_upload_destinations: stale-upload.example",
+    "security_profile: legacy-profile",
+  ];
+  const canonical = [
+    "metadata:",
+    "  renma.network-allowed: 'false'",
+    "  renma.external-upload-allowed: 'false'",
+    "  renma.secrets-allowed: 'false'",
+    "  renma.requires-human-approval: 'true'",
+    "  renma.allowed-data: '[\"canonical\"]'",
+    "  renma.forbidden-inputs: '[\"canonical-secret\"]'",
+    "  renma.approved-network-destinations: '[\"safe.example\"]'",
+    "  renma.approved-upload-destinations: '[\"safe-upload.example\"]'",
+    "  renma.security-profile: canonical-profile",
+  ];
+
+  for (const frontmatter of [
+    [...legacy, ...canonical],
+    [...canonical, ...legacy],
+  ]) {
+    const content = ["---", ...frontmatter, "---", "# Demo"].join("\n");
+    const parsed = parseSecurityPolicy(content);
+    const summary = summarizeSecurityPolicyInventory([
+      artifact("skills/demo/SKILL.md", "skill", content),
+    ]);
+
+    assert.equal(parsed.networkAllowed, false);
+    assert.equal(parsed.externalUploadAllowed, false);
+    assert.equal(parsed.secretsAllowed, false);
+    assert.equal(parsed.humanApprovalRequired, true);
+    assert.equal(parsed.securityProfile, "canonical-profile");
+    assert.deepEqual(parsed.allowedData, ["canonical"]);
+    assert.deepEqual(parsed.forbiddenInputs, ["canonical-secret"]);
+    assert.deepEqual(parsed.approvedNetworkDestinations, ["safe.example"]);
+    assert.deepEqual(parsed.approvedUploadDestinations, [
+      "safe-upload.example",
+    ]);
+    assert.deepEqual(summary.networkAllowed, {
+      true: 0,
+      false: 1,
+      unspecified: 0,
+    });
+    assert.deepEqual(summary.topApprovedNetworkDestinations, [
+      { destination: "safe.example", count: 1 },
+    ]);
+    assert.deepEqual(summary.topApprovedUploadDestinations, [
+      { destination: "safe-upload.example", count: 1 },
+    ]);
+  }
+});
+
 function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
   return {
     path,

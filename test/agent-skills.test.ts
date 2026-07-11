@@ -102,6 +102,124 @@ description: Reviews demo inputs. Use when a demo needs review. Do not use for p
   );
 });
 
+test("uses YAML 1.2 parsing for Agent Skills frontmatter", () => {
+  const invalidCases = [
+    {
+      label: "unterminated quoted description",
+      content: `---\nname: demo\ndescription: "Use when reviewing demo inputs.\n---\n# Demo\n`,
+    },
+    {
+      label: "invalid escape sequence",
+      content: `---\nname: demo\ndescription: "Use when reviewing \\q inputs."\n---\n# Demo\n`,
+    },
+    {
+      label: "malformed YAML sequence",
+      content: `---\nname: demo\ndescription: [Use when reviewing demo inputs.\n---\n# Demo\n`,
+    },
+  ];
+
+  for (const fixture of invalidCases) {
+    const validation = validateAgentSkill(
+      parseDocument(artifact("skills/demo/SKILL.md", fixture.content)),
+    );
+    assert.equal(validation.valid, false, fixture.label);
+    assert.ok(
+      validation.issues.some((issue) => issue.code === "AS-SKILL-INVALID-YAML"),
+      fixture.label,
+    );
+  }
+});
+
+test("requires Agent Skills frontmatter to parse to a mapping", () => {
+  const validation = validateAgentSkill(
+    parseDocument(
+      artifact(
+        "skills/demo/SKILL.md",
+        `---\n- name: demo\n- description: Use when reviewing demo inputs.\n---\n# Demo\n`,
+      ),
+    ),
+  );
+
+  assert.ok(
+    validation.issues.some(
+      (issue) => issue.code === "AS-SKILL-FRONTMATTER-NOT-MAPPING",
+    ),
+  );
+});
+
+test("reports duplicate top-level and metadata mapping keys", () => {
+  const validation = validateAgentSkill(
+    parseDocument(
+      artifact(
+        "skills/demo/SKILL.md",
+        `---
+name: demo
+name: demo
+description: Use when reviewing demo inputs.
+metadata:
+  renma.owner: first
+  renma.owner: second
+---
+# Demo
+`,
+      ),
+    ),
+  );
+  const codes = validation.issues.map((issue) => issue.code);
+
+  assert.ok(codes.includes("AS-SKILL-DUPLICATE-FIELD"));
+  assert.ok(codes.includes("AS-SKILL-DUPLICATE-METADATA-KEY"));
+});
+
+test("requires Agent Skills metadata child values to be strings", () => {
+  for (const metadataValue of ["[one, two]", "true"]) {
+    const validation = validateAgentSkill(
+      parseDocument(
+        artifact(
+          "skills/demo/SKILL.md",
+          `---
+name: demo
+description: Use when reviewing demo inputs.
+metadata:
+  renma.owner: ${metadataValue}
+---
+# Demo
+`,
+        ),
+      ),
+    );
+    assert.ok(
+      validation.issues.some(
+        (issue) => issue.code === "AS-SKILL-INVALID-METADATA",
+      ),
+      metadataValue,
+    );
+  }
+});
+
+test("accepts standard YAML scalar and multiline description forms", () => {
+  const descriptions = [
+    "'Use when reviewing demo inputs.'",
+    '"Use when reviewing demo inputs."',
+    "Use when reviewing demo inputs. # discovery guidance",
+    "|\n  Use when reviewing demo inputs.\n  Return reviewed findings.",
+    ">\n  Use when reviewing demo inputs.\n  Return reviewed findings.",
+  ];
+
+  for (const description of descriptions) {
+    const validation = validateAgentSkill(
+      parseDocument(
+        artifact(
+          "skills/demo/SKILL.md",
+          `---\nname: demo\ndescription: ${description}\n---\n# Demo\n`,
+        ),
+      ),
+    );
+    assert.equal(validation.valid, true, description);
+    assert.equal(validation.errorCount, 0, description);
+  }
+});
+
 test("warns when an explicit skill-selection exclusion is absent from description", () => {
   const content = `---
 name: demo
@@ -184,6 +302,56 @@ description: Reviews demo inputs. Use when a demo needs review.
     ),
     false,
   );
+});
+
+test("does not let an unrelated constraint heading hide a buried constraint", () => {
+  const content = `---
+name: demo
+description: Reviews demo inputs. Use when a demo needs review.
+---
+# Demo
+
+## Hard Constraints
+
+- Add reviewed constraints here.
+
+## Procedure
+
+- Do not modify production files. Produce a patch instead.
+`;
+  const validation = validateAgentSkill(
+    parseDocument(artifact("skills/demo/SKILL.md", content)),
+  );
+
+  assert.ok(
+    validation.issues.some(
+      (issue) => issue.code === "RN-SKILL-EXECUTION-CONSTRAINT-NOT-PROMINENT",
+    ),
+  );
+});
+
+test("reports mixed prominent and buried constraints as scattered", () => {
+  const content = `---
+name: demo
+description: Reviews demo inputs. Use when a demo needs review.
+---
+# Demo
+
+## Hard Constraints
+
+- Do not infer behavior. Stop and report missing evidence.
+
+## Procedure
+
+- Never upload secrets. Stop and report the blocked operation.
+`;
+  const validation = validateAgentSkill(
+    parseDocument(artifact("skills/demo/SKILL.md", content)),
+  );
+  const codes = validation.issues.map((issue) => issue.code);
+
+  assert.ok(codes.includes("RN-SKILL-EXECUTION-CONSTRAINT-NOT-PROMINENT"));
+  assert.ok(codes.includes("RN-SKILL-EXECUTION-CONSTRAINT-SCATTERED"));
 });
 
 test("accepts a nearby stop and alternative for an execution constraint", () => {

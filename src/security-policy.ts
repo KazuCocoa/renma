@@ -1,4 +1,12 @@
-import type { SecurityConfig } from "./types.js";
+import { parseDocument } from "./markdown.js";
+import {
+  metadataValueAsList,
+  metadataValueAsText,
+  readRenmaMetadataField,
+  readRenmaMetadataValue,
+  type LegacyRenmaMetadataKey,
+} from "./renma-metadata.js";
+import type { Artifact, SecurityConfig } from "./types.js";
 
 export interface SecurityPolicy {
   networkAllowed?: boolean;
@@ -54,11 +62,6 @@ const CANONICAL_SECURITY_KEYS = new Map<string, string>([
   ["security-profile", "security_profile"],
 ]);
 
-type ParsedBlockList = {
-  values: string[];
-  nextIndex: number;
-};
-
 export function parseSecurityPolicy(content: string): SecurityPolicy {
   const policy: SecurityPolicy = {
     allowedData: [],
@@ -70,98 +73,90 @@ export function parseSecurityPolicy(content: string): SecurityPolicy {
     lineByField: new Map(),
   };
 
-  const lines = content.split(/\r?\n/);
-  const frontmatterEnd =
-    lines[0]?.trim() === "---"
-      ? lines.findIndex((line, index) => index > 0 && line.trim() === "---")
-      : -1;
-  const scanEnd =
-    frontmatterEnd > 0 ? frontmatterEnd : Math.min(lines.length, 80);
-  let insideMetadata = false;
+  const normalizedContent = securityFrontmatterContent(content);
+  const document = parseDocument({
+    path: "<security-policy>",
+    absolutePath: "<security-policy>",
+    kind: "unknown",
+    sizeBytes: Buffer.byteLength(normalizedContent),
+    content: normalizedContent,
+  } satisfies Artifact);
 
-  for (let index = 0; index < scanEnd; index += 1) {
-    const line = lines[index] ?? "";
-    const topLevel = line.match(/^([A-Za-z_][A-Za-z0-9_]*):\s*(.*?)\s*$/);
-    if (topLevel) {
-      insideMetadata = (topLevel[1] ?? "") === "metadata";
-    }
+  for (const [key, booleanField] of BOOLEAN_POLICY_FIELDS) {
+    const legacyKey = key as LegacyRenmaMetadataKey;
+    const value = metadataValueAsText(
+      readRenmaMetadataValue(document, legacyKey),
+    );
+    const parsed = value === undefined ? undefined : parseBoolean(value);
+    if (parsed === undefined) continue;
+    (policy[booleanField] as boolean | undefined) = parsed;
+    declarePolicyField(document, policy, legacyKey, booleanField);
+  }
 
-    const canonical = insideMetadata
-      ? line.match(/^\s{2,}renma\.([A-Za-z0-9-]+):\s*(.*?)\s*$/)
-      : undefined;
-    const legacy = topLevel;
-    const rawKey = canonical
-      ? CANONICAL_SECURITY_KEYS.get(canonical[1] ?? "")
-      : legacy?.[1];
-    if (!rawKey) {
-      if (insideMetadata && line.trim().length > 0 && !/^\s+/.test(line)) {
-        insideMetadata = false;
-      }
-      continue;
-    }
+  assignPolicyList(
+    document,
+    policy,
+    "approved_network_destinations",
+    "approvedNetworkDestinations",
+  );
+  assignPolicyList(
+    document,
+    policy,
+    "approved_upload_destinations",
+    "approvedUploadDestinations",
+  );
+  assignPolicyList(document, policy, "allowed_data", "allowedData");
+  assignPolicyList(document, policy, "forbidden_inputs", "forbiddenInputs");
 
-    const rawValue = canonical ? (canonical[2] ?? "") : (legacy?.[2] ?? "");
-    const key = rawKey.trim();
-    const value = decodeScalar(rawValue.trim());
-    const blockList =
-      value.length === 0 && !canonical
-        ? parseBlockList(lines, index, scanEnd)
-        : { values: [], nextIndex: index + 1 };
-
-    const booleanField = BOOLEAN_POLICY_FIELDS.get(key);
-    if (booleanField !== undefined) {
-      const parsed = parseBoolean(value);
-      if (parsed !== undefined) {
-        (policy[booleanField] as boolean | undefined) = parsed;
-        policy.declared.add(booleanField);
-        policy.lineByField.set(booleanField, index + 1);
-      }
-      continue;
-    }
-
-    if (DESTINATION_POLICY_FIELDS.has(key)) {
-      const destinations = policyListValues(value, blockList);
-      policy.approvedNetworkDestinations.push(...destinations);
-      policy.declared.add("approvedNetworkDestinations");
-      policy.lineByField.set("approvedNetworkDestinations", index + 1);
-      if (consumesBlockList(value, blockList)) index = blockList.nextIndex - 1;
-      continue;
-    }
-
-    if (UPLOAD_DESTINATION_POLICY_FIELDS.has(key)) {
-      const destinations = policyListValues(value, blockList);
-      policy.approvedUploadDestinations.push(...destinations);
-      policy.declared.add("approvedUploadDestinations");
-      policy.lineByField.set("approvedUploadDestinations", index + 1);
-      if (consumesBlockList(value, blockList)) index = blockList.nextIndex - 1;
-      continue;
-    }
-
-    if (ALLOWED_DATA_POLICY_FIELDS.has(key)) {
-      const values = policyListValues(value, blockList);
-      policy.allowedData.push(...values);
-      policy.declared.add("allowedData");
-      policy.lineByField.set("allowedData", index + 1);
-      if (consumesBlockList(value, blockList)) index = blockList.nextIndex - 1;
-      continue;
-    }
-
-    if (FORBIDDEN_INPUT_POLICY_FIELDS.has(key)) {
-      policy.forbiddenInputs.push(...policyListValues(value, blockList));
-      policy.declared.add("forbiddenInputs");
-      policy.lineByField.set("forbiddenInputs", index + 1);
-      if (consumesBlockList(value, blockList)) index = blockList.nextIndex - 1;
-      continue;
-    }
-
-    if (SECURITY_PROFILE_POLICY_FIELDS.has(key)) {
-      policy.securityProfile = value;
-      policy.declared.add("securityProfile");
-      policy.lineByField.set("securityProfile", index + 1);
-    }
+  const securityProfile = metadataValueAsText(
+    readRenmaMetadataValue(document, "security_profile"),
+  );
+  if (securityProfile !== undefined) {
+    policy.securityProfile = securityProfile;
+    declarePolicyField(document, policy, "security_profile", "securityProfile");
   }
 
   return policy;
+}
+
+function securityFrontmatterContent(content: string): string {
+  const lines = content.split(/\r?\n/);
+  if (lines[0]?.trim() === "---") return content;
+  const start = lines.findIndex(
+    (line, index) => index < 80 && line.trim() === "---",
+  );
+  if (start < 0) return content;
+  const end = lines.findIndex(
+    (line, index) => index > start && line.trim() === "---",
+  );
+  return end > start ? lines.slice(start).join("\n") : content;
+}
+
+function assignPolicyList(
+  document: ReturnType<typeof parseDocument>,
+  policy: SecurityPolicy,
+  metadataKey: LegacyRenmaMetadataKey,
+  policyKey:
+    | "approvedNetworkDestinations"
+    | "approvedUploadDestinations"
+    | "allowedData"
+    | "forbiddenInputs",
+): void {
+  const value = readRenmaMetadataValue(document, metadataKey);
+  if (value === undefined) return;
+  policy[policyKey] = metadataValueAsList(value);
+  declarePolicyField(document, policy, metadataKey, policyKey);
+}
+
+function declarePolicyField(
+  document: ReturnType<typeof parseDocument>,
+  policy: SecurityPolicy,
+  metadataKey: LegacyRenmaMetadataKey,
+  policyKey: keyof SecurityPolicy,
+): void {
+  policy.declared.add(policyKey);
+  const line = readRenmaMetadataField(document, metadataKey)?.startLine;
+  if (line !== undefined) policy.lineByField.set(policyKey, line);
 }
 
 export function applySecurityConfig(
@@ -304,34 +299,6 @@ export function isSecurityPolicyLine(line: string): boolean {
   );
 }
 
-function parseBlockList(
-  lines: string[],
-  startIndex: number,
-  scanEnd: number,
-): ParsedBlockList {
-  const values: string[] = [];
-  let index = startIndex + 1;
-  for (; index < scanEnd; index += 1) {
-    const line = lines[index] ?? "";
-    if (line.trim().length === 0) break;
-
-    const match = line.match(/^\s*-\s*(.*?)\s*$/);
-    if (!match) break;
-
-    values.push(...parseList(match[1] ?? ""));
-  }
-
-  return { values, nextIndex: index };
-}
-
-function policyListValues(value: string, blockList: ParsedBlockList): string[] {
-  return value.length > 0 ? parseList(value) : blockList.values;
-}
-
-function consumesBlockList(value: string, blockList: ParsedBlockList): boolean {
-  return value.length === 0 && blockList.values.length > 0;
-}
-
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values)];
 }
@@ -345,29 +312,6 @@ function parseBoolean(value: string): boolean | undefined {
     return false;
   }
   return undefined;
-}
-
-function parseList(value: string): string[] {
-  const decoded = decodeScalar(value).trim();
-  if (decoded.startsWith("[") && decoded.endsWith("]")) {
-    try {
-      const parsed = JSON.parse(decoded) as unknown;
-      if (
-        Array.isArray(parsed) &&
-        parsed.every((item): item is string => typeof item === "string")
-      ) {
-        return parsed.map((item) => item.trim()).filter(Boolean);
-      }
-    } catch {
-      // Fall through to the legacy comma-separated representation.
-    }
-  }
-  return decoded
-    .replace(/^\[/, "")
-    .replace(/\]$/, "")
-    .split(",")
-    .map((item) => decodeScalar(item.trim()))
-    .filter((item) => item.length > 0);
 }
 
 function decodeScalar(value: string): string {

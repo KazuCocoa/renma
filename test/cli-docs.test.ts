@@ -6,6 +6,7 @@ import { COMMAND_HELP } from "../src/cli-help.js";
 
 const COMMANDS = [
   "scan",
+  "validate-skills",
   "bom",
   "catalog",
   "diff",
@@ -22,6 +23,7 @@ const COMMANDS = [
 
 const EXPECTED_FORMATS = new Map<string, string[]>([
   ["scan", ["text", "json"]],
+  ["validate-skills", ["text", "json"]],
   ["bom", ["json", "markdown"]],
   ["catalog", ["json", "markdown"]],
   ["ownership", ["json", "markdown"]],

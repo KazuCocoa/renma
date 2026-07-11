@@ -55,6 +55,11 @@ export function parseAssetMetadata(document: ParsedDocument): {
   assignOptional(metadata, "id", optionalText(metadataText(document, "id")));
   assignOptional(
     metadata,
+    "title",
+    optionalText(metadataText(document, "title")),
+  );
+  assignOptional(
+    metadata,
     "type",
     optionalText(metadataText(document, "type")),
   );

@@ -5,7 +5,6 @@ import path from "node:path";
 import { test } from "node:test";
 import { main } from "../src/cli.js";
 import { COMMAND_HELP } from "../src/cli-help.js";
-import { runValidateSkillsCli } from "../src/commands/validate-skills.js";
 import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
 import { scan } from "../src/scanner.js";
 
@@ -1443,6 +1442,18 @@ test("representative command help shows relevant boundaries and options", async 
       excludes: [/--focus/, /--omit-generated-at/],
     },
     {
+      name: "validate-skills",
+      argv: ["validate-skills", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma validate-skills \[path\] \[options\]/,
+        /Agent Skills frontmatter and naming validation/,
+        /Specification errors make the command exit 1/,
+        /authoring warnings remain visible but do not change a valid exit code/,
+        /Output format: text or json\. Defaults to text\./,
+      ],
+      excludes: [/--fail-on/, /--focus/, /--owner/],
+    },
+    {
       name: "catalog",
       argv: ["catalog", "/path/that/does/not/exist", "--help"],
       includes: [
@@ -1729,6 +1740,34 @@ test("scaffold skill writes deterministic file output", async () => {
   ]);
 });
 
+test("scaffold uses valid parent-directory names without slugifying them", async () => {
+  for (const name of ["demo", "spec-review", "日本語"]) {
+    const root = await fixture();
+    const target = path.join(root, "skills", name, "SKILL.md");
+    const result = await withCapturedConsole(() =>
+      main(["scaffold", "skill", target, "--owner", "qa-platform"]),
+    );
+
+    assert.equal(result.code, 0, name);
+    const content = await readFile(target, "utf8");
+    assert.match(content, new RegExp(`^name: '${name}'$`, "m"), name);
+  }
+});
+
+test("scaffold refuses invalid Agent Skills parent-directory names", async () => {
+  for (const name of ["MySkill", "-demo", "demo--review"]) {
+    const root = await fixture();
+    const target = path.join(root, "skills", name, "SKILL.md");
+    const result = await withCapturedConsole(() =>
+      main(["scaffold", "skill", target, "--owner", "qa-platform"]),
+    );
+
+    assert.equal(result.code, 2, name);
+    assert.match(result.stderr, /not a valid Agent Skills name/, name);
+    await assert.rejects(readFile(target, "utf8"));
+  }
+});
+
 test("validate-skills keeps Renma authoring warnings non-gating", async () => {
   const root = await fixture();
   const target = path.join(root, "skills", "demo", "SKILL.md");
@@ -1748,7 +1787,7 @@ description: Reviews demo inputs. Use when a demo needs review.
   );
 
   const result = await withCapturedConsole(() =>
-    runValidateSkillsCli([root, "--format", "json"]),
+    main(["validate-skills", root, "--format", "json"]),
   );
   const report = JSON.parse(result.stdout) as {
     invalidSkillCount: number;
@@ -1769,10 +1808,18 @@ test("validate-skills keeps Agent Skills specification errors gating", async () 
   const root = await fixture();
   const target = path.join(root, "skills", "demo", "SKILL.md");
   await mkdir(path.dirname(target), { recursive: true });
-  await writeFile(target, "---\nname: demo\n---\n# Demo\n");
+  await writeFile(
+    target,
+    `---
+name: demo
+description: "Use when reviewing demo inputs.
+---
+# Demo
+`,
+  );
 
   const result = await withCapturedConsole(() =>
-    runValidateSkillsCli([root, "--format", "json"]),
+    main(["validate-skills", root, "--format", "json"]),
   );
   const report = JSON.parse(result.stdout) as {
     invalidSkillCount: number;
@@ -1783,7 +1830,7 @@ test("validate-skills keeps Agent Skills specification errors gating", async () 
   assert.equal(report.invalidSkillCount, 1);
   assert.ok(
     report.results[0]?.issues.some(
-      (issue) => issue.code === "AS-SKILL-MISSING-DESCRIPTION",
+      (issue) => issue.code === "AS-SKILL-INVALID-YAML",
     ),
   );
 });

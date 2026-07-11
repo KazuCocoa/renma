@@ -254,6 +254,8 @@ export function metadataValueAsList(
   }
 
   return trimmed
+    .replace(/^\[/, "")
+    .replace(/\]$/, "")
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);

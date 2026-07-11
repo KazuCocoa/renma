@@ -19,6 +19,7 @@ export type DependencyKind =
 /** Normalized shared metadata for cataloged assets. */
 export interface AssetMetadata {
   id?: string;
+  title?: string;
   type?: string;
   version?: string;
   owner?: string;

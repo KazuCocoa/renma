@@ -62,6 +62,13 @@ renma.id
 A file move may require changing `name`. A reviewed asset whose meaning remains
 the same can retain its `renma.id`.
 
+Renma takes an Agent Skills `name` from the immediate parent directory after
+NFKC normalization and validates it with the same rules as `validate-skills`.
+It does not ASCII-slugify or silently rename that identity. A directory such as
+`MySkill`, `-demo`, or `demo--review` must be renamed before scaffolding or
+migration can continue. Valid Unicode letters and numbers remain supported;
+Renma ID normalization is a separate repository-governance concern.
+
 ## Validation
 
 Run strict specification validation with:
@@ -80,16 +87,27 @@ themselves.
 repository quality, security, and specification evidence can be reviewed
 together.
 
+Agent Skills specification validity comes from the maintained `yaml` package
+using YAML 1.2 parsing, strict errors, source positions, and explicit duplicate
+key detection. A real parser is required because regex scalar parsing cannot
+reliably validate quoting, escapes, comments, sequences, or literal and folded
+multiline values. Renma does not fetch schemas or validation logic at runtime;
+the validation profile remains locally implemented and versioned.
+
 Validation covers deterministic requirements including:
 
 - the canonical `SKILL.md` filename;
-- YAML frontmatter presence and closure;
+- YAML frontmatter presence, closure, syntax, and mapping shape;
 - allowed top-level fields;
 - required `name` and `description` fields;
 - name length, casing, characters, hyphen rules, and directory match;
 - description and compatibility length limits;
 - `metadata` as a string-to-string mapping;
-- duplicate top-level fields.
+- duplicate top-level fields and duplicate `metadata` child keys.
+
+Invalid YAML is a gating specification failure. The lightweight repository
+Markdown parser remains in use for headings, links, code fences, legacy context
+assets, and line evidence; it is not the source of Agent Skills validity.
 
 Renma additionally emits authoring warnings for boundaries that are important to
 agent behavior but are not structural specification errors.
@@ -163,6 +181,13 @@ Renma reports `RENMA-METADATA-CONFLICTING-SOURCES`; it does not silently decide
 which semantic value should survive. Resolve the conflict through human review,
 then remove the legacy duplicate.
 
+For deterministic security evaluation, a canonical value replaces its legacy
+counterpart regardless of field order. Canonical lists replace rather than
+union with legacy lists, so stale legacy permissions or destinations cannot
+widen the effective policy. The conflict diagnostic remains visible, and
+`suggest-metadata` blocks canonical frontmatter generation while preserving
+both sources until a human chooses the retained semantic value.
+
 ## Separating Selection Boundaries From Execution Constraints
 
 A `do not ...` statement is not automatically a skill-selection exclusion.
@@ -218,9 +243,11 @@ condition
 ```
 
 Renma warns when an explicit selection exclusion is absent from `description`,
-when execution constraints lack a prominent section, when multiple constraints
-are scattered across unrelated sections, or when a prohibition has no nearby
-deterministic stop or alternative instruction. It does not require every skill
+when an execution constraint is outside a prominent constraint section, when
+constraints are scattered across sections, or when a prohibition has no nearby
+deterministic stop or alternative instruction. Prominence is evaluated for the
+section containing each constraint; an empty `Hard Constraints` heading does
+not make a prohibition buried under `Procedure` prominent. It does not require every skill
 to have a negative description clause, copy execution constraints into
 `description` or `metadata.renma.when-not-to-use`, or invent missing behavior.
 
@@ -261,6 +288,10 @@ skill. The scaffold includes:
 - context references;
 - hard constraints;
 - validation.
+
+Scaffolding refuses to create a Skill when its immediate parent directory is
+not already a valid Agent Skills name. It does not create a lowercased or
+ASCII-only substitute.
 
 ## Repository Boundary
 
