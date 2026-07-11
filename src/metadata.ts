@@ -1,6 +1,14 @@
 import type { AssetMetadata, AssetStatus } from "./model.js";
-import type { Diagnostic, MetadataValue, ParsedDocument } from "./types.js";
+import type { Diagnostic, ParsedDocument } from "./types.js";
 import { isIsoDate, parseDayDuration } from "./freshness.js";
+import {
+  metadataValueAsList,
+  metadataValueAsText,
+  readRenmaMetadataField,
+  readRenmaMetadataValue,
+  renmaMetadataConflictDiagnostics,
+  type LegacyRenmaMetadataKey,
+} from "./renma-metadata.js";
 
 const STATUSES: AssetStatus[] = [
   "experimental",
@@ -14,24 +22,24 @@ export function parseAssetMetadata(document: ParsedDocument): {
   metadata: AssetMetadata;
   diagnostics: Diagnostic[];
 } {
-  const diagnostics: Diagnostic[] = [];
-  const rawStatus = metadataText(document.metadata.status);
+  const diagnostics: Diagnostic[] = [
+    ...renmaMetadataConflictDiagnostics(document),
+  ];
+  const rawStatus = metadataText(document, "status");
   const status = parseStatus(rawStatus);
   const lastReviewedAt = optionalText(
-    metadataText(document.metadata.last_reviewed_at),
+    metadataText(document, "last_reviewed_at"),
   );
-  const reviewCycle = optionalText(
-    metadataText(document.metadata.review_cycle),
-  );
-  const expiresAt = optionalText(metadataText(document.metadata.expires_at));
+  const reviewCycle = optionalText(metadataText(document, "review_cycle"));
+  const expiresAt = optionalText(metadataText(document, "expires_at"));
   const metadata: AssetMetadata = {
-    tags: listValue(document.metadata.tags),
-    whenToUse: listValue(document.metadata.when_to_use),
-    whenNotToUse: listValue(document.metadata.when_not_to_use),
-    requiresContext: listValue(document.metadata.requires_context),
-    optionalContext: listValue(document.metadata.optional_context),
-    conflicts: listValue(document.metadata.conflicts),
-    supersededBy: listValue(document.metadata.superseded_by),
+    tags: metadataList(document, "tags"),
+    whenToUse: metadataList(document, "when_to_use"),
+    whenNotToUse: metadataList(document, "when_not_to_use"),
+    requiresContext: metadataList(document, "requires_context"),
+    optionalContext: metadataList(document, "optional_context"),
+    conflicts: metadataList(document, "conflicts"),
+    supersededBy: metadataList(document, "superseded_by"),
   };
 
   if (rawStatus !== undefined && status === undefined) {
@@ -44,31 +52,27 @@ export function parseAssetMetadata(document: ParsedDocument): {
     });
   }
 
-  assignOptional(
-    metadata,
-    "id",
-    optionalText(metadataText(document.metadata.id)),
-  );
+  assignOptional(metadata, "id", optionalText(metadataText(document, "id")));
   assignOptional(
     metadata,
     "type",
-    optionalText(metadataText(document.metadata.type)),
+    optionalText(metadataText(document, "type")),
   );
   assignOptional(
     metadata,
     "version",
-    optionalText(metadataText(document.metadata.version)),
+    optionalText(metadataText(document, "version")),
   );
   assignOptional(
     metadata,
     "owner",
-    optionalText(metadataText(document.metadata.owner)),
+    optionalText(metadataText(document, "owner")),
   );
   assignOptional(metadata, "status", status);
   assignOptional(
     metadata,
     "purpose",
-    optionalText(metadataText(document.metadata.purpose)),
+    optionalText(metadataText(document, "purpose")),
   );
   assignOptional(metadata, "lastReviewedAt", lastReviewedAt);
   assignOptional(metadata, "reviewCycle", reviewCycle);
@@ -76,23 +80,23 @@ export function parseAssetMetadata(document: ParsedDocument): {
   assignOptionalList(
     metadata,
     "appliesTo",
-    listValue(document.metadata.applies_to),
+    metadataList(document, "applies_to"),
   );
-  assignOptionalList(metadata, "focus", listValue(document.metadata.focus));
+  assignOptionalList(metadata, "focus", metadataList(document, "focus"));
   assignOptionalList(
     metadata,
     "expectedOutputs",
-    listValue(document.metadata.expected_outputs),
+    metadataList(document, "expected_outputs"),
   );
   assignOptionalList(
     metadata,
     "requiresLens",
-    listValue(document.metadata.requires_lens),
+    metadataList(document, "requires_lens"),
   );
   assignOptionalList(
     metadata,
     "optionalLens",
-    listValue(document.metadata.optional_lens),
+    metadataList(document, "optional_lens"),
   );
 
   if (lastReviewedAt !== undefined && !isIsoDate(lastReviewedAt)) {
@@ -136,7 +140,7 @@ export function parseAssetMetadata(document: ParsedDocument): {
 
 function invalidMetadataDiagnostic(
   document: ParsedDocument,
-  field: string,
+  field: LegacyRenmaMetadataKey,
   message: string,
 ): Diagnostic {
   const evidence = metadataFieldEvidence(document, field);
@@ -160,23 +164,25 @@ function optionalText(value: string | undefined): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-function listValue(value: MetadataValue | undefined): string[] {
-  if (!value) return [];
-  if (Array.isArray(value)) {
-    return value.map((item) => item.trim()).filter(Boolean);
-  }
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+function metadataText(
+  document: ParsedDocument,
+  key: LegacyRenmaMetadataKey,
+): string | undefined {
+  return metadataValueAsText(readRenmaMetadataValue(document, key));
 }
 
-function metadataText(value: MetadataValue | undefined): string | undefined {
-  return typeof value === "string" ? value : undefined;
+function metadataList(
+  document: ParsedDocument,
+  key: LegacyRenmaMetadataKey,
+): string[] {
+  return metadataValueAsList(readRenmaMetadataValue(document, key));
 }
 
-function metadataFieldEvidence(document: ParsedDocument, key: string) {
-  const field = document.metadataFields[key];
+function metadataFieldEvidence(
+  document: ParsedDocument,
+  key: LegacyRenmaMetadataKey,
+) {
+  const field = readRenmaMetadataField(document, key);
   if (!field) return undefined;
   return {
     path: field.path,
