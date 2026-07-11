@@ -101,11 +101,11 @@ Context assets are independently owned source-of-truth knowledge units. They sho
 
 Keep skills thin. A skill should reference context assets instead of embedding all reusable knowledge directly in `SKILL.md`.
 
-The following is historical Renma Skill metadata and is a migration source for
+The following uses the pre-0.16 Renma Skill format and is a migration source for
 0.16.0, not the canonical target format. See the Agent Skills compatibility
 document for the canonical equivalent.
 
-Historical example:
+Pre-0.16 example:
 
 ```yaml
 ---
@@ -222,12 +222,14 @@ renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform -
 
 The command emits a deterministic prompt or JSON payload for a human or coding agent. It tells the agent to inspect the existing asset, preserve the Markdown body, preserve existing frontmatter values, add only missing metadata that is clearly supported, and rerun `renma scan .` and `renma ownership .` after editing.
 
-For a historical Skill target, including `skill.md` and `*.skill.md`,
-`suggest-metadata` produces a one-way Agent Skills migration proposal and makes
-any required entrypoint rename or move explicit. For a canonical Agent Skill,
-`--owner` may instead produce a `metadata.renma.owner` retrofit; it never causes
-reverse migration. Unsafe or ambiguous input blocks canonical frontmatter. See
-the normative compatibility document for the detailed migration contract.
+For a Skill target using the pre-0.16 Renma Skill format, `suggest-metadata`
+produces a one-way Agent Skills metadata migration proposal. Separately,
+`skill.md` and `*.skill.md` targets make any required entrypoint rename or move
+explicit, even when their frontmatter already uses Agent Skills fields. For a
+canonical Agent Skill, `--owner` may instead produce a
+`metadata.renma.owner` retrofit; it never causes reverse migration. Unsafe or
+ambiguous input blocks canonical frontmatter. See the normative compatibility
+document for the detailed migration contract.
 
 Owner policy stays the same: `owner` is recommended governance metadata, not globally required. Renma accepts unowned assets and reports them in ownership coverage. Without `--owner`, the prompt says not to add owner unless one is already declared or a maintainer provides one. With `--owner <owner>`, the prompt may include that owner because it was explicitly provided. If an existing asset already declares an owner, `suggest-metadata` preserves it; a different `--owner` value is treated as a human-review ownership change, not an automatic metadata suggestion. Renma does not infer owners from Git history, file paths, prose, or authors.
 

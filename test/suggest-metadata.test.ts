@@ -36,6 +36,10 @@ test("suggest-metadata prompt reports blocked legacy Skill migration", async () 
   assert.equal(after, original);
   assert.match(result.stdout, /Review One-Way Agent Skills Migration/);
   assert.match(result.stdout, /Preserve the Markdown body/);
+  assert.match(
+    result.stdout,
+    /If present, move only recognized pre-0\.16 Renma Skill fields/,
+  );
   assert.match(result.stdout, /Source format: `renma-legacy`/);
   assert.match(result.stdout, /renma\.status: `experimental`/);
   assert.match(result.stdout, /description: No unambiguous, usable/);

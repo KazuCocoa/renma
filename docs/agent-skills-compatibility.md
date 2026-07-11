@@ -5,6 +5,11 @@ transition. [Agent Skills](https://agentskills.io/specification) owns the
 portable Skill format. Renma extends it with deterministic governance evidence,
 without defining a competing Skill format.
 
+In this document, “pre-0.16 Renma Skill format” refers to the top-level Renma
+metadata syntax supported before Renma 0.16.0. It is the migration source
+format. The 0.16.0 target uses Agent Skills standard fields plus flat
+`metadata.renma.*` entries.
+
 This rollout follows one operating principle:
 
 ```text
@@ -125,8 +130,8 @@ renma scan . --format json
 
 The JSON report includes a dedicated `agentSkills` summary and per-Skill
 results. Text output includes a concise valid/invalid summary, structural issues,
-authoring warnings, and a `suggest-metadata` migration command when historical
-Renma fields or a historical entrypoint spelling are present.
+authoring warnings, and a `suggest-metadata` migration command when pre-0.16
+Renma Skill fields or a historical entrypoint spelling are present.
 
 In JSON, `migrationCommand` contains structured `command` and `args` fields plus
 a display string. The argv fields preserve the exact path and are the source of
@@ -164,22 +169,22 @@ Each inspected Skill receives one migration-oriented classification:
 
 ```text
 agent-skills
-  Agent Skills identity with no historical top-level Renma fields
+  Agent Skills identity with no pre-0.16 Renma Skill fields
 
 renma-legacy
-  historical top-level Renma fields without Agent Skills identity
+  pre-0.16 Renma Skill fields without Agent Skills identity
 
 hybrid
-  Agent Skills identity plus historical top-level Renma fields
+  Agent Skills identity plus pre-0.16 Renma Skill fields
 
 unknown
   neither Agent Skills identity nor a recognized migration source
 ```
 
 Classification supports validation and migration guidance only in this stage.
-It does not create canonical-versus-legacy fallback for catalog, ownership,
-graph, readiness, BOM, trust, lifecycle, context dependency, or security
-processing.
+It does not create `agent-skills`-versus-`renma-legacy` fallback for catalog,
+ownership, graph, readiness, BOM, trust, lifecycle, context dependency, or
+security processing.
 
 ## Selection Boundaries and Execution Constraints
 
@@ -248,15 +253,16 @@ affect structural validity or the existing `--fail-on` threshold.
 
 ## One-Way Migration
 
-Historical top-level Renma Skill fields are migration input only:
+Pre-0.16 Renma Skill fields are migration input only:
 
 ```text
-historical Renma Skill
+pre-0.16 Renma Skill
   -> Agent Skills identity
   -> metadata.renma.*
 ```
 
-Use the existing non-editing command with canonical or historical entrypoints:
+Use the existing non-editing command with canonical or non-canonical
+entrypoints:
 
 ```bash
 renma scan .
@@ -270,11 +276,11 @@ renma scan .
 For Skill targets, `suggest-metadata` can preserve valid standard Agent Skills
 fields, use a valid immediate parent directory as `name`, preserve an existing
 valid description, conservatively extract description evidence from the body,
-move recognized historical fields to `metadata.renma.*`, and render canonical
-frontmatter for human review. It never edits the file and never proposes a
-reverse conversion for a canonical Agent Skill.
+move recognized pre-0.16 Renma Skill fields to `metadata.renma.*`, and render
+canonical frontmatter for human review. It never edits the file and never
+proposes a reverse conversion for a canonical Agent Skill.
 
-Before presenting a historical path migration, Renma renders the candidate
+Before presenting a non-canonical entrypoint migration, Renma renders the candidate
 frontmatter, combines it with the unchanged Markdown body at the target
 `SKILL.md` path, and runs the existing Agent Skills validator on that in-memory
 result. Any specification error blocks the proposal. If the target entrypoint
@@ -290,7 +296,7 @@ owner blocks the proposal for human review. Without `--owner`, Renma does not
 invent owner metadata or emit a meaningless canonical rewrite. This retrofit is
 not reverse migration.
 
-## Historical Value Serialization
+## Pre-0.16 Value Serialization
 
 Migration never converts native YAML numbers or booleans into text when doing
 so could lose the original lexical value.
@@ -302,7 +308,7 @@ so could lose the original lexical value.
   `secrets_allowed`, and `requires_human_approval`) accept YAML booleans or the
   exact strings `"true"` and `"false"`, then serialize as those lowercase
   strings. Numeric `0` and `1` are blocked.
-- String-list fields accept YAML arrays containing strings only, legacy
+- String-list fields accept YAML arrays containing strings only, pre-0.16
   comma-separated strings, or JSON-array strings containing strings only.
   Numeric and boolean elements are blocked.
 
@@ -320,10 +326,10 @@ or lossy. Blocking cases include:
 - duplicate top-level or metadata keys;
 - non-string metadata values;
 - an invalid Skill directory name or conflicting identity;
-- conflicting canonical and historical values;
+- conflicting Agent Skills and pre-0.16 Renma Skill values;
 - an unknown top-level field;
 - missing evidence for a usable description;
-- duplicate semantic list values or unsupported historical value shapes.
+- duplicate semantic list values or unsupported pre-0.16 value shapes.
 - a candidate that remains invalid at its target `SKILL.md` path;
 - an existing distinct target entrypoint or an unverifiable target collision;
 
@@ -356,9 +362,9 @@ Stage 1, established here:
 - this normative compatibility and migration document.
 
 Stage 1 validates and proposes migration but does not migrate repository-owned
-operational Skills yet. Dedicated fixtures cover canonical, legacy, hybrid, and
-blocked migration behavior until operational metadata consumers are updated in
-a later stage.
+operational Skills yet. Dedicated fixtures cover canonical Agent Skills,
+pre-0.16 Renma, hybrid, and blocked migration behavior until operational
+metadata consumers are updated in a later stage.
 
 Later 0.16.0 stages will make `metadata.renma.*` operational across catalog,
 ownership, graph, readiness, BOM, trust, lifecycle, context dependency, and

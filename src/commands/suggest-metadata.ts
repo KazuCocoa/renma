@@ -120,7 +120,7 @@ export async function buildMetadataSuggestion(
         : [
             "Inspect the existing Skill before editing.",
             "Preserve the Markdown body and existing standard Agent Skills fields.",
-            "Move only recognized historical Renma fields to flat metadata.renma.* string entries.",
+            "If present, move only recognized pre-0.16 Renma Skill fields to flat metadata.renma.* string entries.",
             "Preserve unknown renma.* and other-vendor metadata child keys.",
             "Do not discard or automatically relocate unknown top-level fields.",
             "Apply the entrypoint rename or move together with the frontmatter migration when required.",

@@ -101,7 +101,10 @@ metadata:
 
   assert.equal(suggestion.agentSkills?.sourceFormat, "hybrid");
   assert.equal(suggestion.agentSkills?.canonicalFrontmatter, undefined);
-  assert.match(ownerBlock?.reason ?? "", /conflicts with historical owner/);
+  assert.match(
+    ownerBlock?.reason ?? "",
+    /conflicts with pre-0\.16 Renma Skill field owner/,
+  );
   assert.match(ownerBlock?.reason ?? "", /Human review is required/);
 });
 
@@ -442,37 +445,40 @@ test("migration blocks lossy native YAML values", async () => {
     {
       field: "version",
       yaml: "version: 1.0",
-      message: /Historical version must be a YAML string/,
+      message: /Pre-0\.16 Renma Skill field version must be a YAML string/,
     },
     {
       field: "id",
       yaml: "id: 001",
-      message: /Historical id must be a YAML string/,
+      message: /Pre-0\.16 Renma Skill field id must be a YAML string/,
     },
     {
       field: "owner",
       yaml: "owner: true",
-      message: /Historical owner must be a YAML string/,
+      message: /Pre-0\.16 Renma Skill field owner must be a YAML string/,
     },
     {
       field: "status",
       yaml: "status: false",
-      message: /Historical status must be a YAML string/,
+      message: /Pre-0\.16 Renma Skill field status must be a YAML string/,
     },
     {
       field: "tags",
       yaml: "tags: [1.0]",
-      message: /Historical tags must contain string values only/,
+      message:
+        /Pre-0\.16 Renma Skill field tags must contain string values only/,
     },
     {
       field: "allowed_data",
       yaml: "allowed_data: [true]",
-      message: /Historical allowed_data must contain string values only/,
+      message:
+        /Pre-0\.16 Renma Skill field allowed_data must contain string values only/,
     },
     {
       field: "network_allowed",
       yaml: "network_allowed: 1",
-      message: /Historical network_allowed must be a boolean or the string/,
+      message:
+        /Pre-0\.16 Renma Skill field network_allowed must be a boolean or the string/,
     },
   ];
 

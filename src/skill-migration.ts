@@ -145,7 +145,7 @@ export function buildAgentSkillMigrationSuggestion(
       reviewPrompt:
         validation.format === "agent-skills"
           ? "This Skill already uses Agent Skills identity. No metadata retrofit or reverse migration is proposed."
-          : "No recognized historical Renma Skill metadata was found. No migration is proposed.",
+          : "No recognized pre-0.16 Renma Skill metadata was found. No migration is proposed.",
     };
   }
 
@@ -291,7 +291,7 @@ export function buildAgentSkillMigrationSuggestion(
     ) {
       blocked.push({
         field: legacyField,
-        reason: `Canonical ${canonicalKey} conflicts with historical ${legacyField}. Human review is required before migration.`,
+        reason: `Canonical ${canonicalKey} conflicts with pre-0.16 Renma Skill field ${legacyField}. Human review is required before migration.`,
       });
       delete candidateRenmaMetadata[canonicalKey];
       continue;
@@ -547,13 +547,13 @@ function serializeLegacyValue(
     if (typeof value === "string") {
       if (!value.trim()) {
         return {
-          blockedReason: `Historical ${field} is empty. Human review is required before migration.`,
+          blockedReason: `Pre-0.16 Renma Skill field ${field} is empty. Human review is required before migration.`,
         };
       }
       return { value };
     }
     return {
-      blockedReason: `Historical ${field} must be a YAML string to preserve its exact value.`,
+      blockedReason: `Pre-0.16 Renma Skill field ${field} must be a YAML string to preserve its exact value.`,
     };
   }
 
@@ -561,7 +561,7 @@ function serializeLegacyValue(
     if (typeof value === "boolean") return { value: String(value) };
     if (value === "true" || value === "false") return { value };
     return {
-      blockedReason: `Historical ${field} must be a boolean or the string "true" or "false".`,
+      blockedReason: `Pre-0.16 Renma Skill field ${field} must be a boolean or the string "true" or "false".`,
     };
   }
 
@@ -570,14 +570,14 @@ function serializeLegacyValue(
     if (typeof value === "string") {
       if (!value.trim()) {
         return {
-          blockedReason: `Historical ${field} is empty. Human review is required before migration.`,
+          blockedReason: `Pre-0.16 Renma Skill field ${field} is empty. Human review is required before migration.`,
         };
       }
       normalized = parseLegacyStringList(value);
     } else if (Array.isArray(value)) {
       if (!value.every((item) => typeof item === "string")) {
         return {
-          blockedReason: `Historical ${field} must contain string values only.`,
+          blockedReason: `Pre-0.16 Renma Skill field ${field} must contain string values only.`,
         };
       }
       normalized = value;
@@ -585,19 +585,19 @@ function serializeLegacyValue(
 
     if (normalized === undefined) {
       return {
-        blockedReason: `Historical ${field} cannot be interpreted as a string list. Human review is required before migration.`,
+        blockedReason: `Pre-0.16 Renma Skill field ${field} cannot be interpreted as a string list. Human review is required before migration.`,
       };
     }
     if (new Set(normalized).size !== normalized.length) {
       return {
-        blockedReason: `Historical ${field} contains ambiguous duplicate semantic values. Human review is required before migration.`,
+        blockedReason: `Pre-0.16 Renma Skill field ${field} contains ambiguous duplicate semantic values. Human review is required before migration.`,
       };
     }
     return { value: JSON.stringify(normalized) };
   }
 
   return {
-    blockedReason: `Historical ${field} is not part of the supported migration profile. Human review is required before migration.`,
+    blockedReason: `Pre-0.16 Renma Skill field ${field} is not part of the supported migration profile. Human review is required before migration.`,
   };
 }
 

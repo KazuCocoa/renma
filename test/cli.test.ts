@@ -1576,7 +1576,7 @@ test("representative command help shows relevant boundaries and options", async 
       argv: ["suggest-metadata", "/path/that/does/not/exist", "--help"],
       includes: [
         /renma suggest-metadata <file> \[options\]/,
-        /one-way historical Renma to Agent Skills migration path/,
+        /Pre-0\.16 Renma Skill targets use the one-way migration path to Agent Skills/,
         /Output format: prompt or json\. Defaults to prompt\./,
         /prints to stdout and does not edit the target file/,
         /Explicitly provide an owner candidate/,

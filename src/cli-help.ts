@@ -580,17 +580,18 @@ export const COMMAND_HELP = [
     question:
       "How can a coding agent prepare a metadata retrofit or one-way Skill migration?",
     purpose:
-      "Suggest metadata emits a prompt or structured suggestion for one existing asset. Historical Skill targets use the one-way historical Renma to Agent Skills migration path; canonical Agent Skills support an explicit owner retrofit, never reverse migration.",
+      "Suggest metadata emits a prompt or structured suggestion for one existing asset. Pre-0.16 Renma Skill targets use the one-way migration path to Agent Skills; non-canonical Skill filenames separately report any required entrypoint migration. Canonical Agent Skills support an explicit owner retrofit, never reverse migration.",
     useWhen: [
       "An asset lacks compact metadata and you want a reviewable metadata patch.",
-      "A legacy or hybrid SKILL.md, skill.md, or *.skill.md needs an Agent Skills plus metadata.renma.* conversion proposal.",
+      "A Skill with pre-0.16 Renma fields needs an Agent Skills plus metadata.renma.* conversion proposal.",
+      "A skill.md or *.skill.md entrypoint needs its required rename or move reported.",
       "A canonical Agent Skill needs an explicit metadata.renma.owner candidate from --owner.",
       "You need guidance that preserves the existing Markdown body and semantics.",
       "A human explicitly provides an owner with --owner or the asset already declares one.",
     ],
     doNotUseFor: [
       "Editing the file automatically.",
-      "Converting a canonical Agent Skill back to historical Renma frontmatter.",
+      "Converting a canonical Agent Skill back to pre-0.16 Renma frontmatter.",
       "Silently resolving blocked, conflicting, duplicate, or unknown migration input.",
       "Changing the Markdown body or asset semantics unless explicitly requested.",
       "Inferring an owner without evidence.",
@@ -603,7 +604,7 @@ export const COMMAND_HELP = [
     interpretation: [
       "The command prints to stdout and does not edit the target file.",
       "For Skill targets, canonical frontmatter is omitted when migration is unsafe or ambiguous.",
-      "Historical skill.md and *.skill.md targets report the required rename or move in structured output.",
+      "Historical skill.md and *.skill.md filename forms report the required rename or move in structured output.",
       "A path migration is blocked when the target exists separately or the rendered target Skill remains specification-invalid.",
       "For canonical Agent Skills, --owner can propose a metadata retrofit without reverse migration.",
       "Without --owner, do not add owner metadata unless the asset already declares one or a maintainer confirms it.",
