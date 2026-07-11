@@ -41,7 +41,7 @@ export function formatText(result: ScanResult): string {
   }
 
   if (result.findings.length === 0) {
-    lines.push("No findings.");
+    lines.push("No rule findings.");
   }
 
   for (const diagnostic of result.diagnostics) {

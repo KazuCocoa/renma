@@ -150,6 +150,49 @@ test("validates required identity, filename, name constraints, and directory mat
   }
 });
 
+test("accepts Unicode names and NFKC-equivalent parent directories", () => {
+  const cases = [
+    { parent: "日本語", name: "日本語" },
+    { parent: "überblick", name: "überblick" },
+    { parent: "테스트", name: "테스트" },
+    { parent: "é", name: "e\u0301" },
+  ];
+
+  for (const fixture of cases) {
+    const validation = validateAgentSkill(
+      skill(
+        `skills/${fixture.parent}/SKILL.md`,
+        `---\nname: ${fixture.name}\ndescription: Review inputs. Use when inputs need review.\n---\n# Demo\n`,
+      ),
+    );
+    assert.equal(validation.valid, true, fixture.parent);
+    assert.equal(validation.errorCount, 0, fixture.parent);
+  }
+});
+
+test("rejects invalid Unicode name forms deterministically", () => {
+  const cases = [
+    { name: "Überblick", label: "uppercase Unicode" },
+    { name: "demo!", label: "punctuation" },
+    { name: "-demo", label: "leading hyphen" },
+    { name: "demo-", label: "trailing hyphen" },
+    { name: "demo--review", label: "consecutive hyphens" },
+  ];
+
+  for (const fixture of cases) {
+    const validation = validateAgentSkill(
+      skill(
+        `skills/${fixture.name}/SKILL.md`,
+        `---\nname: ${fixture.name}\ndescription: Review inputs. Use when inputs need review.\n---\n# Demo\n`,
+      ),
+    );
+    assert.ok(
+      validation.issues.some((issue) => issue.code === "AS-SKILL-INVALID-NAME"),
+      fixture.label,
+    );
+  }
+});
+
 test("requires metadata child values and optional fields to have specification types", () => {
   const invalidMetadata = validateAgentSkill(
     skill(
@@ -288,6 +331,71 @@ description: Review demo inputs. Use when a demo needs review.
   );
 });
 
+test("does not treat verbs inside a prohibition as execution alternatives", () => {
+  for (const constraint of [
+    "Do not return secrets.",
+    "Do not produce unreviewed output.",
+    "Do not keep credentials in logs.",
+    "Do not report private data.",
+  ]) {
+    const validation = validateAgentSkill(
+      skill(
+        "skills/demo/SKILL.md",
+        `---
+name: demo
+description: Review demo inputs. Use when a demo needs review.
+---
+# Demo
+
+## Hard Constraints
+
+- ${constraint}
+`,
+      ),
+    );
+    assert.ok(
+      validation.issues.some(
+        (issue) =>
+          issue.code === "RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE",
+      ),
+      constraint,
+    );
+  }
+});
+
+test("recognizes a separate positive instruction after a prohibition", () => {
+  for (const constraint of [
+    "Do not return secrets. Stop and report the blocked request.",
+    "Do not modify production files. Produce a patch instead.",
+    "Do not resolve the ambiguity; request human review.",
+    "Do not run this workflow. Use the test-execution skill instead.",
+  ]) {
+    const validation = validateAgentSkill(
+      skill(
+        "skills/demo/SKILL.md",
+        `---
+name: demo
+description: Review demo inputs. Use when a demo needs review.
+---
+# Demo
+
+## Hard Constraints
+
+- ${constraint}
+`,
+      ),
+    );
+    assert.equal(
+      validation.issues.some(
+        (issue) =>
+          issue.code === "RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE",
+      ),
+      false,
+      constraint,
+    );
+  }
+});
+
 test("summarizes Agent Skills inside JSON and text scan output", async () => {
   const root = await fixture();
   await writeSkill(root, "valid", canonical("valid"));
@@ -321,6 +429,17 @@ test("Agent Skills issues do not change existing scan exit threshold behavior", 
 
   assert.equal(report.agentSkills.invalidSkillCount, 1);
   assert.equal(result.code, 0);
+});
+
+test("text output distinguishes Agent Skills issues from rule findings", async () => {
+  const root = await fixture();
+  await writeSkill(root, "legacy", "---\nid: skill.legacy\n---\n# Legacy\n");
+  const result = await scan(root, { failOn: "critical" });
+  const text = formatText({ ...result, findings: [] });
+
+  assert.match(text, /INVALID skills\/legacy\/SKILL\.md/);
+  assert.match(text, /No rule findings\./);
+  assert.doesNotMatch(text, /No findings\./);
 });
 
 test("repository-wide summary is deterministic", () => {

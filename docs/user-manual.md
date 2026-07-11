@@ -38,9 +38,10 @@ command.
 
 renma is most useful when agent knowledge is stored in predictable places:
 
-- `skills/**/SKILL.md` for skill instructions. Renma also accepts
-  `skills/**/skill.md`, `skills/**/*.skill.md`, and the same entrypoint
-  spellings under `.agents/skills/**`.
+- `skills/**/SKILL.md` and `.agents/skills/**/SKILL.md` are the canonical Agent
+  Skills entrypoints. Renma still discovers historical `skill.md` and
+  `*.skill.md` spellings under those roots for migration diagnostics, but those
+  spellings are not Agent Skills-compatible.
 - `contexts/**` for shared context assets.
 - configurable prompt or documentation paths for reusable prompts and broader docs.
 - `*.renma.json` for structured metadata assets.
@@ -264,14 +265,20 @@ Use a date in `YYYY-MM-DD` for temporary workarounds, or `"never"` when the exce
 
 If `--config` is not provided, renma looks for repository config files such as `renma.config.json` or `.renma.json` while resolving the scan target.
 
-By default, renma scans these glob families when building its catalog and findings:
+Canonical Agent Skills entrypoints are:
 
 - `skills/**/SKILL.md`
+- `.agents/skills/**/SKILL.md`
+
+Renma also discovers these historical spellings for migration diagnostics:
+
 - `skills/**/skill.md`
 - `skills/**/*.skill.md`
-- `.agents/skills/**/SKILL.md`
 - `.agents/skills/**/skill.md`
 - `.agents/skills/**/*.skill.md`
+
+Other default scan glob families are:
+
 - `.agents/**/*.md`
 - `AGENTS.md`
 - `README.md`

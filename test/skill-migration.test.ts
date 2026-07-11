@@ -213,6 +213,158 @@ metadata:
   assert.ok(suggestion.agentSkills?.canonicalFrontmatter);
 });
 
+test("migration accepts valid Unicode Skill directory names", async () => {
+  for (const name of ["日本語", "überblick", "테스트"]) {
+    const { target } = await skillFixture(
+      name,
+      `---
+id: skill.unicode
+---
+# Unicode Skill
+
+Use this skill when reviewing Unicode inputs.
+`,
+    );
+
+    const suggestion = await buildMetadataSuggestion(target);
+
+    assert.equal(
+      suggestion.blockedMetadata.some((item) => item.field === "name"),
+      false,
+      name,
+    );
+    assert.equal(suggestion.agentSkills?.candidateAgentSkillsFields.name, name);
+    assert.ok(suggestion.agentSkills?.canonicalFrontmatter, name);
+  }
+});
+
+test("migration blocks arrays for scalar historical fields", async () => {
+  for (const [field, value] of [
+    ["owner", "qa-platform"],
+    ["id", "skill.demo"],
+    ["status", "stable"],
+    ["network_allowed", "true"],
+  ] as const) {
+    const { target } = await skillFixture(
+      "demo",
+      `---
+${field}: [${value}]
+---
+# Demo
+
+Use this skill when reviewing demo inputs.
+`,
+    );
+
+    const suggestion = await buildMetadataSuggestion(target);
+    const block = suggestion.blockedMetadata.find(
+      (item) => item.field === field,
+    );
+
+    assert.equal(
+      suggestion.agentSkills?.canonicalFrontmatter,
+      undefined,
+      field,
+    );
+    assert.match(block?.reason ?? "", /must be a scalar value/, field);
+  }
+});
+
+test("migration accepts arrays for established list fields", async () => {
+  const { target } = await skillFixture(
+    "demo",
+    `---
+id: skill.demo
+tags: [demo, review]
+requires_context: [context.demo, context.review]
+allowed_data: [public, internal]
+forbidden_inputs: [secrets, credentials]
+---
+# Demo
+
+Use this skill when reviewing demo inputs.
+`,
+  );
+
+  const suggestion = await buildMetadataSuggestion(target);
+  const metadata = suggestion.agentSkills?.candidateRenmaMetadata;
+
+  assert.deepEqual(suggestion.blockedMetadata, []);
+  assert.equal(metadata?.["renma.tags"], '["demo","review"]');
+  assert.equal(
+    metadata?.["renma.requires-context"],
+    '["context.demo","context.review"]',
+  );
+  assert.equal(metadata?.["renma.allowed-data"], '["public","internal"]');
+  assert.equal(
+    metadata?.["renma.forbidden-inputs"],
+    '["secrets","credentials"]',
+  );
+  assert.ok(suggestion.agentSkills?.canonicalFrontmatter);
+});
+
+test("migration recognizes established purpose and freshness fields", async () => {
+  const { target } = await skillFixture(
+    "demo",
+    `---
+id: skill.demo
+purpose: Release preparation
+last_reviewed_at: 2026-07-01
+review_cycle: P90D
+expires_at: 2026-12-31
+---
+# Demo
+
+Use this skill when preparing a release.
+`,
+  );
+
+  const suggestion = await buildMetadataSuggestion(target);
+  const metadata = suggestion.agentSkills?.candidateRenmaMetadata;
+
+  assert.deepEqual(suggestion.blockedMetadata, []);
+  assert.equal(metadata?.["renma.purpose"], "Release preparation");
+  assert.equal(metadata?.["renma.last-reviewed-at"], "2026-07-01");
+  assert.equal(metadata?.["renma.review-cycle"], "P90D");
+  assert.equal(metadata?.["renma.expires-at"], "2026-12-31");
+  assert.ok(suggestion.agentSkills?.canonicalFrontmatter);
+});
+
+test("migration blocks malformed shapes for established scalar fields", async () => {
+  for (const field of [
+    "purpose",
+    "last_reviewed_at",
+    "review_cycle",
+    "expires_at",
+  ]) {
+    const { target } = await skillFixture(
+      "demo",
+      `---
+id: skill.demo
+${field}: [invalid]
+---
+# Demo
+
+Use this skill when reviewing demo inputs.
+`,
+    );
+
+    const suggestion = await buildMetadataSuggestion(target);
+
+    assert.equal(
+      suggestion.agentSkills?.canonicalFrontmatter,
+      undefined,
+      field,
+    );
+    assert.match(
+      suggestion.blockedMetadata.find((item) => item.field === field)?.reason ??
+        "",
+      /must be a scalar value/,
+      field,
+    );
+  }
+});
+
 test("migration blocks invalid directory names and missing description evidence", async () => {
   const invalidDirectory = await skillFixture(
     "MySkill",

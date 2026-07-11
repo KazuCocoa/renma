@@ -27,6 +27,10 @@ export const LEGACY_RENMA_SKILL_FIELDS = [
   "version",
   "owner",
   "status",
+  "purpose",
+  "last_reviewed_at",
+  "review_cycle",
+  "expires_at",
   "tags",
   "when_to_use",
   "when_not_to_use",
@@ -98,6 +102,11 @@ export interface AgentSkillsValidationSummary {
   hybridSkillCount: number;
   warningCount: number;
   results: AgentSkillValidationResult[];
+}
+
+export interface AgentSkillNameValidation {
+  normalized: string | undefined;
+  problems: string[];
 }
 
 /** Validate every discovered Skill using one locally versioned Agent Skills profile. */
@@ -295,8 +304,33 @@ export function validateAgentSkill(
   };
 }
 
-export function isValidAgentSkillName(value: string): boolean {
-  return agentSkillNameProblems(value).length === 0;
+/** Normalize and validate an Agent Skills name using the reference profile. */
+export function validateAgentSkillName(
+  value: unknown,
+): AgentSkillNameValidation {
+  if (typeof value !== "string") {
+    return {
+      normalized: undefined,
+      problems: ["must be a non-empty string"],
+    };
+  }
+
+  const normalized = value.trim().normalize("NFKC");
+  const problems: string[] = [];
+  const length = characterLength(normalized);
+  if (length < 1 || length > MAX_NAME_LENGTH)
+    problems.push(`must contain 1-${MAX_NAME_LENGTH} Unicode code points`);
+  if (normalized !== normalized.toLowerCase())
+    problems.push("must equal its lowercase form after NFKC normalization");
+  if (!/^[\p{L}\p{N}-]+$/u.test(normalized))
+    problems.push(
+      "must contain only Unicode letters, Unicode digits, and hyphens",
+    );
+  if (normalized.startsWith("-") || normalized.endsWith("-"))
+    problems.push("must not start or end with a hyphen");
+  if (normalized.includes("--"))
+    problems.push("must not contain consecutive hyphens");
+  return { normalized, problems };
 }
 
 export function legacyRenmaMetadataKey(field: string): string | undefined {
@@ -344,15 +378,15 @@ function validateName(
     return;
   }
 
-  const problems = agentSkillNameProblems(rawName);
-  if (problems.length > 0) {
+  const nameValidation = validateAgentSkillName(rawName);
+  if (nameValidation.problems.length > 0) {
     issues.push(
       createIssue(
         document,
         "AS-SKILL-INVALID-NAME",
         "error",
         "specification",
-        `Invalid Agent Skills name "${rawName}": ${problems.join("; ")}.`,
+        `Invalid Agent Skills name "${rawName}": ${nameValidation.problems.join("; ")}.`,
         field?.startLine ?? 1,
         "name",
       ),
@@ -362,7 +396,11 @@ function validateName(
   const parent = path.posix.basename(
     path.posix.dirname(document.artifact.path),
   );
-  if (rawName !== parent) {
+  const parentValidation = validateAgentSkillName(parent);
+  if (
+    nameValidation.normalized !== undefined &&
+    parentValidation.normalized !== nameValidation.normalized
+  ) {
     issues.push({
       ...createIssue(
         document,
@@ -672,17 +710,32 @@ function hasNearbyAlternative(
   constraint: BodyLine,
   lines: BodyLine[],
 ): boolean {
+  const sameLineAlternative = textAfterProhibition(constraint.text);
+  if (
+    sameLineAlternative !== undefined &&
+    alternativeClausePattern().test(sameLineAlternative)
+  ) {
+    return true;
+  }
+
   const index = lines.findIndex((line) => line.line === constraint.line);
-  const nearby = lines
-    .slice(Math.max(0, index - 1), index + 3)
-    .filter(
-      (line) =>
-        line.line === constraint.line ||
-        line.ancestry.join(" > ") === constraint.ancestry.join(" > "),
-    )
-    .map((line) => line.text)
-    .join(" ");
-  return alternativePattern().test(nearby);
+  return lines.slice(index + 1, index + 3).some((line) => {
+    if (line.ancestry.join(" > ") !== constraint.ancestry.join(" > ")) {
+      return false;
+    }
+    if (executionConstraintPattern().test(line.text)) return false;
+    return alternativeClausePattern().test(line.text);
+  });
+}
+
+function textAfterProhibition(text: string): string | undefined {
+  const prohibition = executionConstraintPattern().exec(text);
+  if (!prohibition) return undefined;
+  const remainder = text.slice(prohibition.index + prohibition[0].length);
+  const delimiterIndex = remainder.search(/[.;\n]/);
+  return delimiterIndex < 0
+    ? undefined
+    : remainder.slice(delimiterIndex + 1).trim();
 }
 
 function classifyAgentSkillFormat(
@@ -693,22 +746,6 @@ function classifyAgentSkillFormat(
   if (hasAgentSkillsIdentity) return "agent-skills";
   if (hasLegacyFields) return "renma-legacy";
   return "unknown";
-}
-
-function agentSkillNameProblems(value: string): string[] {
-  const problems: string[] = [];
-  const length = characterLength(value);
-  if (length < 1 || length > MAX_NAME_LENGTH)
-    problems.push(`must contain 1-${MAX_NAME_LENGTH} characters`);
-  if (!/^[a-z0-9-]+$/.test(value))
-    problems.push(
-      "must contain only lowercase ASCII letters, numbers, and hyphens",
-    );
-  if (value.startsWith("-") || value.endsWith("-"))
-    problems.push("must not start or end with a hyphen");
-  if (value.includes("--"))
-    problems.push("must not contain consecutive hyphens");
-  return problems;
 }
 
 function firstField(
@@ -799,6 +836,6 @@ function prominentConstraintHeading(): RegExp {
   return /^(?:hard |safety |execution )?constraints?$|^prohibited actions?$/i;
 }
 
-function alternativePattern(): RegExp {
-  return /\b(?:instead|stop|report|ask|request human|use .+ instead|produce|return|keep|leave unchanged|skip|require human|escalate)\b/i;
+function alternativeClausePattern(): RegExp {
+  return /(?:\binstead\b|\bthen\b|(?:^|[-*+]\s+)stop\b|(?:^|[-*+]\s+)ask\b|\brequest human (?:review|approval)\b|\bescalate\b|\bleave\b.+\bunchanged\b|(?:^|[-*+]\s+)skip\b|\buse\b.+\binstead\b)/i;
 }

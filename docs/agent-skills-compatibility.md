@@ -65,6 +65,19 @@ Do not use unprefixed shared keys such as `metadata.owner`. Do not use a nested
 metadata remain valid metadata and are preserved during migration without
 interpretation.
 
+## Entrypoint Paths
+
+Canonical Agent Skills entrypoints use the exact filename:
+
+```text
+skills/**/SKILL.md
+.agents/skills/**/SKILL.md
+```
+
+Renma continues discovering historical `skill.md` and `*.skill.md` spellings
+under those roots so `scan` can report validation and migration diagnostics.
+Discovery does not make those spellings Agent Skills-compatible.
+
 ## Validation During Scan
 
 Agent Skills validation is part of the existing scan workflow:
@@ -88,7 +101,8 @@ YAML 1.2 mode. It validates:
 - duplicate top-level and `metadata` keys;
 - the allowed Agent Skills top-level fields;
 - required, non-empty string `name` and `description` values;
-- name length, characters, hyphen rules, and immediate-parent match;
+- NFKC-normalized name length, Unicode letters/digits, lowercase and hyphen
+  rules, and normalized immediate-parent match;
 - description and compatibility length limits;
 - optional field types;
 - `metadata` as a string-to-string mapping.
@@ -210,6 +224,11 @@ Stage 1, established here:
 - Agent Skills validation in `scan`;
 - one-way migration suggestions in `suggest-metadata`;
 - this normative compatibility and migration document.
+
+Stage 1 validates and proposes migration but does not migrate repository-owned
+operational Skills yet. Dedicated fixtures cover canonical, legacy, hybrid, and
+blocked migration behavior until operational metadata consumers are updated in
+a later stage.
 
 Later 0.16.0 stages will make `metadata.renma.*` operational across catalog,
 ownership, graph, readiness, BOM, trust, lifecycle, context dependency, and

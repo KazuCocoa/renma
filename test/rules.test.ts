@@ -1893,5 +1893,5 @@ test("text report calls out clean scans", () => {
 
   assert.match(textReport, /Diagnostics: 0/);
   assert.match(textReport, /Findings: 0/);
-  assert.match(textReport, /No findings\./);
+  assert.match(textReport, /No rule findings\./);
 });

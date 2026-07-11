@@ -97,9 +97,12 @@ Renma supports existing skill-local references, profiles, and examples. The pref
 ```text
 skills/
   testing/
-    test-case-generation.skill.md
-    spec-review.skill.md
-    regression-planning.skill.md
+    test-case-generation/
+      SKILL.md
+    spec-review/
+      SKILL.md
+    regression-planning/
+      SKILL.md
 
 contexts/
   testing/
@@ -379,15 +382,26 @@ Trust Graph helps reviewers inspect owner evidence, lifecycle status evidence, d
 
 ## What Gets Scanned
 
-By default, Renma looks for:
+Canonical Agent Skills entrypoints use the exact `SKILL.md` filename:
 
 ```text
 skills/**/SKILL.md
+.agents/skills/**/SKILL.md
+```
+
+Renma also discovers these historical spellings so `scan` can report migration
+diagnostics; they are not Agent Skills-compatible entrypoints:
+
+```text
 skills/**/skill.md
 skills/**/*.skill.md
-.agents/skills/**/SKILL.md
 .agents/skills/**/skill.md
 .agents/skills/**/*.skill.md
+```
+
+Other default scan inputs include:
+
+```text
 .agents/**/*.md
 AGENTS.md
 README.md
@@ -435,7 +449,6 @@ Add `renma.config.json` at the repository root to tune discovery and CI behavior
   "format": "json",
   "globs": [
     "skills/**/SKILL.md",
-    "skills/**/skill.md",
     ".agents/skills/**/SKILL.md",
     "AGENTS.md",
     "contexts/**/*.md"

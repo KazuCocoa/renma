@@ -139,3 +139,25 @@ test("README uses current inspect syntax", async () => {
     "README.md should document 'renma inspect <file> --lines L10-L42'.",
   );
 });
+
+test("Skill path guidance distinguishes canonical and historical entrypoints", async () => {
+  const readme = await readRepoFile("README.md");
+  const manual = await readRepoFile("docs/user-manual.md");
+  const compatibility = await readRepoFile(
+    "docs/agent-skills-compatibility.md",
+  );
+
+  assert.match(
+    readme,
+    /spec-review\/\n\s+SKILL\.md/,
+    "README repository shape should recommend directory-based SKILL.md entrypoints.",
+  );
+  for (const document of [readme, manual, compatibility]) {
+    assert.match(document, /Canonical Agent Skills entrypoints?/);
+    assert.match(document, /historical/i);
+    assert.match(
+      document,
+      /not(?: make those spellings)? Agent Skills-compatible/,
+    );
+  }
+});

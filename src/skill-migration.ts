@@ -4,10 +4,10 @@ import { stringify } from "yaml";
 
 import {
   AGENT_SKILLS_TOP_LEVEL_FIELDS,
-  isValidAgentSkillName,
   legacyRenmaMetadataKey,
   LEGACY_RENMA_SKILL_FIELDS,
   validateAgentSkill,
+  validateAgentSkillName,
   type AgentSkillFormat,
 } from "./agent-skills.js";
 import type { ParsedDocument } from "./types.js";
@@ -25,9 +25,26 @@ const LIST_LEGACY_FIELDS = new Set([
   "optional_lens",
   "conflicts",
   "superseded_by",
+  "allowed_data",
   "forbidden_inputs",
   "approved_network_destinations",
   "approved_upload_destinations",
+]);
+const SCALAR_LEGACY_FIELDS = new Set([
+  "id",
+  "title",
+  "version",
+  "owner",
+  "status",
+  "purpose",
+  "last_reviewed_at",
+  "review_cycle",
+  "expires_at",
+  "network_allowed",
+  "external_upload_allowed",
+  "secrets_allowed",
+  "requires_human_approval",
+  "security_profile",
 ]);
 
 export interface SkillMigrationBlock {
@@ -83,23 +100,29 @@ export function buildAgentSkillMigrationSuggestion(
   const parentDirectory = path.posix.basename(
     path.posix.dirname(document.artifact.path.replaceAll("\\", "/")),
   );
-  if (!isValidAgentSkillName(parentDirectory)) {
+  const parentName = validateAgentSkillName(parentDirectory);
+  if (parentName.problems.length > 0 || parentName.normalized === undefined) {
     blocked.push({
       field: "name",
-      reason: `Skill directory "${parentDirectory}" is not a valid Agent Skills name. Rename the directory before migration.`,
+      reason: `Skill directory "${parentDirectory}" is not a valid Agent Skills name: ${parentName.problems.join("; ")}. Rename the directory before migration.`,
     });
   } else {
     const existingName = frontmatter.values.name;
-    if (
-      existingName !== undefined &&
-      (typeof existingName !== "string" || existingName !== parentDirectory)
-    ) {
-      blocked.push({
-        field: "name",
-        reason: `Existing Agent Skills name conflicts with parent directory "${parentDirectory}". Human review is required before migration.`,
-      });
+    if (existingName !== undefined) {
+      const existingNameValidation = validateAgentSkillName(existingName);
+      if (
+        existingNameValidation.problems.length > 0 ||
+        existingNameValidation.normalized !== parentName.normalized
+      ) {
+        blocked.push({
+          field: "name",
+          reason: `Existing Agent Skills name conflicts with parent directory "${parentDirectory}". Human review is required before migration.`,
+        });
+      } else {
+        candidateAgentSkillsFields.name = (existingName as string).trim();
+      }
     } else {
-      candidateAgentSkillsFields.name = parentDirectory;
+      candidateAgentSkillsFields.name = parentName.normalized;
     }
   }
 
@@ -346,55 +369,70 @@ function serializeLegacyValue(
   field: string,
   value: unknown,
 ): { value?: string; blockedReason?: string } {
-  if (typeof value === "string") {
-    if (!value.trim()) {
+  if (SCALAR_LEGACY_FIELDS.has(field)) {
+    if (Array.isArray(value) || isRecord(value)) {
       return {
-        blockedReason: `Historical ${field} is empty. Human review is required before migration.`,
+        blockedReason: `Historical ${field} must be a scalar value. Human review is required before migration.`,
       };
     }
-    if (!LIST_LEGACY_FIELDS.has(field)) return { value };
-    const parsed = parseLegacyStringList(value);
-    if (parsed === undefined) {
+    if (typeof value === "string") {
+      if (!value.trim()) {
+        return {
+          blockedReason: `Historical ${field} is empty. Human review is required before migration.`,
+        };
+      }
+      return { value };
+    }
+    if (typeof value === "boolean" || typeof value === "number") {
+      return { value: String(value) };
+    }
+    return {
+      blockedReason: `Historical ${field} must be a scalar value. Human review is required before migration.`,
+    };
+  }
+
+  if (LIST_LEGACY_FIELDS.has(field)) {
+    let normalized: string[] | undefined;
+    if (typeof value === "string") {
+      if (!value.trim()) {
+        return {
+          blockedReason: `Historical ${field} is empty. Human review is required before migration.`,
+        };
+      }
+      normalized = parseLegacyStringList(value);
+    } else if (typeof value === "boolean" || typeof value === "number") {
+      normalized = [String(value)];
+    } else if (Array.isArray(value)) {
+      if (
+        !value.every(
+          (item) =>
+            typeof item === "string" ||
+            typeof item === "number" ||
+            typeof item === "boolean",
+        )
+      ) {
+        return {
+          blockedReason: `Historical ${field} contains a non-scalar list value. Human review is required before migration.`,
+        };
+      }
+      normalized = value.map(String);
+    }
+
+    if (normalized === undefined) {
       return {
         blockedReason: `Historical ${field} cannot be interpreted as a string list. Human review is required before migration.`,
       };
     }
-    if (new Set(parsed).size !== parsed.length) {
-      return {
-        blockedReason: `Historical ${field} contains ambiguous duplicate semantic values. Human review is required before migration.`,
-      };
-    }
-    return { value: JSON.stringify(parsed) };
-  }
-  if (typeof value === "boolean" || typeof value === "number") {
-    return { value: String(value) };
-  }
-  if (Array.isArray(value)) {
-    if (
-      !value.every(
-        (item) =>
-          typeof item === "string" ||
-          typeof item === "number" ||
-          typeof item === "boolean",
-      )
-    ) {
-      return {
-        blockedReason: `Historical ${field} contains a non-scalar list value. Human review is required before migration.`,
-      };
-    }
-    const normalized = value.map(String);
-    if (
-      LIST_LEGACY_FIELDS.has(field) &&
-      new Set(normalized).size !== normalized.length
-    ) {
+    if (new Set(normalized).size !== normalized.length) {
       return {
         blockedReason: `Historical ${field} contains ambiguous duplicate semantic values. Human review is required before migration.`,
       };
     }
     return { value: JSON.stringify(normalized) };
   }
+
   return {
-    blockedReason: `Historical ${field} has an unsupported value type. Human review is required before migration.`,
+    blockedReason: `Historical ${field} is not part of the supported migration profile. Human review is required before migration.`,
   };
 }
 
@@ -428,12 +466,7 @@ function metadataValuesEquivalent(
   migratedValue: string,
 ): boolean {
   if (canonicalValue === migratedValue) return true;
-  if (
-    !LIST_LEGACY_FIELDS.has(legacyField) &&
-    !(canonicalValue.trim().startsWith("[") && migratedValue.startsWith("["))
-  ) {
-    return false;
-  }
+  if (!LIST_LEGACY_FIELDS.has(legacyField)) return false;
   const canonicalList = parseJsonScalarList(canonicalValue);
   const migratedList = parseJsonScalarList(migratedValue);
   return (
@@ -483,6 +516,10 @@ function isStringRecord(value: unknown): value is Record<string, string> {
     !Array.isArray(value) &&
     Object.values(value).every((item) => typeof item === "string")
   );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function deduplicateBlocks(
