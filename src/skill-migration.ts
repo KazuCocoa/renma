@@ -9,9 +9,11 @@ import {
   normalizeAgentSkillNameField,
   validateAgentSkill,
   type AgentSkillFormat,
+  type AgentSkillValidationResult,
 } from "./agent-skills.js";
-import { classifySkillEntrypointPath } from "./discovery.js";
-import type { ParsedDocument } from "./types.js";
+import type { SkillEntrypointPath } from "./discovery.js";
+import { parseDocument } from "./markdown.js";
+import type { Artifact, ParsedDocument } from "./types.js";
 import { parseAgentSkillFrontmatter } from "./yaml-frontmatter.js";
 
 const STANDARD_FIELDS = new Set<string>(AGENT_SKILLS_TOP_LEVEL_FIELDS);
@@ -71,18 +73,28 @@ export interface AgentSkillMigrationSuggestion {
   reviewPrompt: string;
 }
 
+export interface AgentSkillMigrationOptions {
+  explicitOwner?: string;
+  entrypoint?: SkillEntrypointPath;
+  additionalBlocks?: SkillMigrationBlock[];
+}
+
 /** Build a one-way, non-editing migration proposal for a Skill target. */
 export function buildAgentSkillMigrationSuggestion(
   document: ParsedDocument,
-  explicitOwner?: string,
+  options: AgentSkillMigrationOptions = {},
 ): AgentSkillMigrationSuggestion {
   const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
   const validation = validateAgentSkill(document);
+  const entrypoint = options.entrypoint;
+  const historicalEntrypoint =
+    entrypoint !== undefined && entrypoint.kind !== "canonical";
   const direction =
-    validation.format === "renma-legacy" || validation.format === "hybrid"
+    validation.format === "renma-legacy" ||
+    validation.format === "hybrid" ||
+    historicalEntrypoint
       ? "legacy-to-agent-skills"
       : "none";
-  const entrypoint = classifySkillEntrypointPath(document.artifact.path);
   const sourcePath =
     entrypoint?.currentPath ?? document.artifact.path.replaceAll("\\", "/");
   const targetPath = entrypoint?.targetPath ?? sourcePath;
@@ -92,7 +104,7 @@ export function buildAgentSkillMigrationSuggestion(
       : entrypoint?.kind === "flat-legacy-entrypoint"
         ? "move-and-rename"
         : "none";
-  const blocked: SkillMigrationBlock[] = [];
+  const blocked: SkillMigrationBlock[] = [...(options.additionalBlocks ?? [])];
   const candidateAgentSkillsFields: Record<string, string> = {};
   const candidateRenmaMetadata: Record<string, string> = {};
   const preservedMetadata: Record<string, string> = {};
@@ -106,18 +118,51 @@ export function buildAgentSkillMigrationSuggestion(
     }
   }
 
-  if (direction === "none") {
+  const requestedOwner = options.explicitOwner?.trim();
+  const proposalKind =
+    direction === "legacy-to-agent-skills"
+      ? "historical-migration"
+      : validation.format === "agent-skills" && requestedOwner
+        ? "canonical-metadata-retrofit"
+        : "none";
+
+  if (proposalKind === "none") {
     for (const key of Object.keys(candidateRenmaMetadata)) {
       delete candidateRenmaMetadata[key];
     }
-    const proposalKind =
-      entrypointMigration !== "none"
-        ? "historical-migration"
-        : validation.format === "agent-skills" && explicitOwner?.trim()
-          ? "canonical-metadata-retrofit"
-          : "none";
-    const requestedOwner = explicitOwner?.trim();
-    if (validation.format === "agent-skills" && requestedOwner) {
+    return {
+      sourceFormat: validation.format,
+      direction,
+      proposalKind,
+      sourcePath,
+      targetPath,
+      entrypointMigration,
+      bodyPreserved: true,
+      candidateAgentSkillsFields,
+      candidateRenmaMetadata,
+      preservedMetadata,
+      blocked: deduplicateBlocks(blocked),
+      reviewPrompt:
+        validation.format === "agent-skills"
+          ? "This Skill already uses Agent Skills identity. No metadata retrofit or reverse migration is proposed."
+          : "No recognized historical Renma Skill metadata was found. No migration is proposed.",
+    };
+  }
+
+  if (proposalKind === "canonical-metadata-retrofit") {
+    for (const key of Object.keys(candidateRenmaMetadata)) {
+      delete candidateRenmaMetadata[key];
+    }
+    if (entrypoint?.kind !== "canonical" || !validation.valid) {
+      collectSpecificationBlocks(validation, blocked, "Existing Agent Skill");
+      if (entrypoint?.kind !== "canonical") {
+        blocked.push({
+          field: "entrypoint",
+          reason:
+            "Canonical Agent Skills metadata retrofit requires the exact SKILL.md entrypoint.",
+        });
+      }
+    } else if (requestedOwner) {
       const existingOwner = preservedMetadata["renma.owner"];
       if (existingOwner !== undefined && existingOwner !== requestedOwner) {
         blocked.push({
@@ -129,11 +174,10 @@ export function buildAgentSkillMigrationSuggestion(
         candidateRenmaMetadata["renma.owner"] = requestedOwner;
       }
     }
-    const shouldRenderRetrofit =
-      validation.format === "agent-skills" &&
-      candidateRenmaMetadata["renma.owner"] !== undefined;
-    const canonicalFrontmatter =
-      shouldRenderRetrofit && blocked.length === 0
+
+    let canonicalFrontmatter =
+      candidateRenmaMetadata["renma.owner"] !== undefined &&
+      blocked.length === 0
         ? renderCanonicalFrontmatter(
             frontmatter.values,
             {
@@ -143,6 +187,19 @@ export function buildAgentSkillMigrationSuggestion(
             preservedMetadata,
           )
         : undefined;
+    if (canonicalFrontmatter) {
+      const candidateBlocks = validateMigrationCandidate(
+        document,
+        frontmatter.bodyStartLine,
+        targetPath,
+        canonicalFrontmatter,
+      );
+      if (candidateBlocks.length > 0) {
+        blocked.push(...candidateBlocks);
+        canonicalFrontmatter = undefined;
+      }
+    }
+
     return {
       sourceFormat: validation.format,
       direction,
@@ -156,22 +213,11 @@ export function buildAgentSkillMigrationSuggestion(
       preservedMetadata,
       ...(canonicalFrontmatter ? { canonicalFrontmatter } : {}),
       blocked: deduplicateBlocks(blocked),
-      reviewPrompt:
-        proposalKind === "historical-migration"
-          ? blocked.length > 0
-            ? "Resolve every blocked item with human review. Do not apply the required entrypoint path migration while the Skill content is ambiguous."
-            : canonicalFrontmatter
-              ? `Review the canonical metadata retrofit and ${entrypointMigration} entrypoint proposal together, preserve the Markdown body byte-for-byte, apply both changes only after human approval, and rerun renma scan. No reverse migration is proposed.`
-              : `Review and apply the required ${entrypointMigration} entrypoint proposal, preserve the Skill content byte-for-byte, and rerun renma scan. No reverse migration is proposed.`
-          : proposalKind === "canonical-metadata-retrofit"
-            ? canonicalFrontmatter
-              ? "Review the canonical Renma metadata retrofit, preserve the Markdown body byte-for-byte, apply only after human approval, and rerun renma scan. No reverse migration is proposed."
-              : blocked.length > 0
-                ? "Resolve every blocked item with human review. Do not change canonical Agent Skills metadata while ownership evidence conflicts. No reverse migration is proposed."
-                : "The canonical Agent Skill already has the explicitly provided owner. Preserve it; no rewrite or reverse migration is proposed."
-            : validation.format === "agent-skills"
-              ? "This Skill already uses Agent Skills identity. No metadata retrofit or reverse migration is proposed."
-              : "No recognized historical Renma Skill metadata was found. No migration is proposed.",
+      reviewPrompt: canonicalFrontmatter
+        ? "Review the canonical Renma metadata retrofit, preserve the Markdown body byte-for-byte, apply only after human approval, and rerun renma scan. No reverse migration is proposed."
+        : blocked.length > 0
+          ? "Resolve every blocked item with human review. Do not change canonical Agent Skills metadata while specification or ownership evidence is invalid. No reverse migration is proposed."
+          : "The canonical Agent Skill already has the explicitly provided owner. Preserve it; no rewrite or reverse migration is proposed.",
     };
   }
 
@@ -197,6 +243,7 @@ export function buildAgentSkillMigrationSuggestion(
         existingNameValidation.problems.length > 0 ||
         existingNameValidation.normalized !== parentName.normalized
       ) {
+        candidateAgentSkillsFields.name = parentName.normalized;
         blocked.push({
           field: "name",
           reason: `Existing Agent Skills name conflicts with target directory "${candidateDirectory}". Human review is required before migration.`,
@@ -254,7 +301,6 @@ export function buildAgentSkillMigrationSuggestion(
     candidateRenmaMetadata[canonicalKey] = retainedValue;
   }
 
-  const requestedOwner = explicitOwner?.trim();
   if (requestedOwner) {
     const existingOwner = preservedMetadata["renma.owner"];
     if (existingOwner !== undefined && existingOwner !== requestedOwner) {
@@ -268,7 +314,7 @@ export function buildAgentSkillMigrationSuggestion(
     }
   }
 
-  const canonicalFrontmatter =
+  let canonicalFrontmatter =
     blocked.length === 0
       ? renderCanonicalFrontmatter(
           frontmatter.values,
@@ -276,11 +322,23 @@ export function buildAgentSkillMigrationSuggestion(
           preservedMetadata,
         )
       : undefined;
+  if (canonicalFrontmatter) {
+    const candidateBlocks = validateMigrationCandidate(
+      document,
+      frontmatter.bodyStartLine,
+      targetPath,
+      canonicalFrontmatter,
+    );
+    if (candidateBlocks.length > 0) {
+      blocked.push(...candidateBlocks);
+      canonicalFrontmatter = undefined;
+    }
+  }
 
   return {
     sourceFormat: validation.format,
     direction,
-    proposalKind: "historical-migration",
+    proposalKind,
     sourcePath,
     targetPath,
     entrypointMigration,
@@ -297,6 +355,47 @@ export function buildAgentSkillMigrationSuggestion(
           : `Review the canonical frontmatter and ${entrypointMigration} entrypoint proposal together, preserve the Markdown body byte-for-byte, apply both path and content changes only after human approval, and rerun renma scan.`
         : "Resolve every blocked item with human review. Do not generate or apply canonical frontmatter while input is ambiguous.",
   };
+}
+
+function collectSpecificationBlocks(
+  validation: AgentSkillValidationResult,
+  blocked: SkillMigrationBlock[],
+  subject: string,
+): void {
+  for (const issue of validation.issues.filter(
+    (candidate) =>
+      candidate.category === "specification" && candidate.severity === "error",
+  )) {
+    blocked.push({
+      field: issue.field ?? "agent-skills",
+      reason: `${subject} is invalid: ${issue.message}`,
+    });
+  }
+}
+
+function validateMigrationCandidate(
+  source: ParsedDocument,
+  bodyStartLine: number,
+  targetPath: string,
+  canonicalFrontmatter: string,
+): SkillMigrationBlock[] {
+  const body = source.lines.slice(bodyStartLine - 1).join("\n");
+  const content = `${canonicalFrontmatter}\n${body}`;
+  const candidate = parseDocument({
+    path: targetPath,
+    absolutePath: targetPath,
+    kind: "skill",
+    sizeBytes: Buffer.byteLength(content),
+    content,
+  } satisfies Artifact);
+  const validation = validateAgentSkill(candidate);
+  const blocked: SkillMigrationBlock[] = [];
+  collectSpecificationBlocks(
+    validation,
+    blocked,
+    "Resulting Agent Skills candidate",
+  );
+  return blocked;
 }
 
 function collectStructuralBlocks(
@@ -406,7 +505,10 @@ function migrationDescription(
     if (active.length > 0) paragraphs.push(active.join(" "));
     active = [];
   };
-  const fenceLines = agentSkillFenceLines(document.lines);
+  const fenceLines = agentSkillFenceLines(
+    document.lines,
+    frontmatter.bodyStartLine,
+  );
   for (let index = 0; index < lines.length; index += 1) {
     const rawLine = lines[index] ?? "";
     const lineNumber = frontmatter.bodyStartLine + index;

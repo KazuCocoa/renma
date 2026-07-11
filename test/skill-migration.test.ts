@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
+import { validateAgentSkill } from "../src/agent-skills.js";
 import { buildMetadataSuggestion } from "../src/commands/suggest-metadata.js";
+import { parseDocument } from "../src/markdown.js";
+import type { Artifact } from "../src/types.js";
 
 test("suggest-metadata proposes a one-way legacy-to-Agent-Skills conversion", async () => {
   const { target, original } = await skillFixture(
@@ -641,6 +644,233 @@ test("migration description extraction ignores both fence characters and lengths
   }
 });
 
+test("canonical owner retrofit blocks specification-invalid Agent Skills", async () => {
+  const cases = [
+    {
+      label: "invalid name",
+      content: `---
+name: InvalidName
+description: Review demo inputs. Use when demo inputs need review.
+---
+# Demo
+`,
+      field: "name",
+    },
+    {
+      label: "invalid metadata",
+      content: `---
+name: demo
+description: Review demo inputs. Use when demo inputs need review.
+metadata:
+  renma.owner: [docs]
+---
+# Demo
+`,
+      field: "metadata",
+    },
+  ];
+
+  for (const fixture of cases) {
+    const { target } = await skillFixture("demo", fixture.content);
+    const suggestion = await buildMetadataSuggestion(target, {
+      owner: "qa-platform",
+    });
+
+    assert.equal(
+      suggestion.suggestedMode,
+      "agent-skills-metadata-retrofit",
+      fixture.label,
+    );
+    assert.equal(
+      suggestion.agentSkills?.canonicalFrontmatter,
+      undefined,
+      fixture.label,
+    );
+    assert.ok(
+      suggestion.blockedMetadata.some((item) => item.field === fixture.field),
+      fixture.label,
+    );
+  }
+});
+
+test("historical entrypoints with valid Agent Skills identity render target-valid candidates", async () => {
+  for (const fixture of [
+    {
+      source: "skills/demo/skill.md",
+      target: "skills/demo/SKILL.md",
+      name: "demo",
+      migration: "rename",
+    },
+    {
+      source: "skills/testing/spec-review.skill.md",
+      target: "skills/testing/spec-review/SKILL.md",
+      name: "spec-review",
+      migration: "move-and-rename",
+    },
+  ] as const) {
+    const body = `# Demo
+
+Review the requested input.
+`;
+    const original = `---
+name: ${fixture.name}
+description: Review demo inputs. Use when demo inputs need review.
+---
+${body}`;
+    const { root, target: source } = await skillEntrypointFixture(
+      fixture.source,
+      original,
+    );
+    const suggestion = await buildMetadataSuggestion(source);
+    const canonicalFrontmatter =
+      suggestion.agentSkills?.canonicalFrontmatter ?? "";
+    const targetPath = path.join(root, ...fixture.target.split("/"));
+    const candidateContent = `${canonicalFrontmatter}\n${body}`;
+    const candidate = parseDocument({
+      path: targetPath,
+      absolutePath: targetPath,
+      kind: "skill",
+      sizeBytes: Buffer.byteLength(candidateContent),
+      content: candidateContent,
+    } satisfies Artifact);
+
+    assert.equal(suggestion.agentSkills?.sourceFormat, "agent-skills");
+    assert.equal(suggestion.agentSkills?.direction, "legacy-to-agent-skills");
+    assert.equal(suggestion.agentSkills?.targetPath, targetPath);
+    assert.equal(
+      suggestion.agentSkills?.entrypointMigration,
+      fixture.migration,
+    );
+    assert.equal(
+      suggestion.agentSkills?.candidateAgentSkillsFields.name,
+      fixture.name,
+    );
+    assert.ok(canonicalFrontmatter, fixture.source);
+    assert.equal(validateAgentSkill(candidate).valid, true, fixture.source);
+    assert.equal(await readFile(source, "utf8"), original, fixture.source);
+  }
+});
+
+test("historical entrypoint migration blocks invalid or mismatched names", async () => {
+  const cases = [
+    {
+      source: "skills/demo/skill.md",
+      name: "InvalidName",
+      candidate: "demo",
+    },
+    {
+      source: "skills/testing/spec-review.skill.md",
+      name: "testing",
+      candidate: "spec-review",
+    },
+  ];
+
+  for (const fixture of cases) {
+    const { target } = await skillEntrypointFixture(
+      fixture.source,
+      `---
+name: ${fixture.name}
+description: Review demo inputs. Use when demo inputs need review.
+---
+# Demo
+`,
+    );
+    const suggestion = await buildMetadataSuggestion(target);
+
+    assert.equal(
+      suggestion.agentSkills?.candidateAgentSkillsFields.name,
+      fixture.candidate,
+    );
+    assert.equal(suggestion.agentSkills?.canonicalFrontmatter, undefined);
+    assert.ok(
+      suggestion.blockedMetadata.some((item) => item.field === "name"),
+      fixture.source,
+    );
+  }
+});
+
+test("path migration blocks when a distinct target entrypoint already exists", async () => {
+  for (const fixture of [
+    {
+      source: "skills/demo/skill.md",
+      target: "skills/demo/SKILL.md",
+      migration: "rename",
+    },
+    {
+      source: "skills/testing/spec-review.skill.md",
+      target: "skills/testing/spec-review/SKILL.md",
+      migration: "move-and-rename",
+    },
+  ] as const) {
+    const name = fixture.source.includes("spec-review")
+      ? "spec-review"
+      : "demo";
+    const content = `---
+name: ${name}
+description: Review demo inputs. Use when demo inputs need review.
+---
+# Demo
+`;
+    const { root, target: source } = await skillEntrypointFixture(
+      fixture.source,
+      content,
+    );
+    const absent = await buildMetadataSuggestion(source);
+    assert.equal(absent.agentSkills?.entrypointMigration, fixture.migration);
+    assert.ok(absent.agentSkills?.canonicalFrontmatter, fixture.source);
+
+    const target = path.join(root, ...fixture.target.split("/"));
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, content);
+    const collision = await buildMetadataSuggestion(source);
+    const [sourceInfo, targetInfo] = await Promise.all([
+      stat(source),
+      stat(target),
+    ]);
+    const sameEntry =
+      sourceInfo.dev === targetInfo.dev && sourceInfo.ino === targetInfo.ino;
+
+    if (sameEntry) {
+      assert.ok(collision.agentSkills?.canonicalFrontmatter, fixture.source);
+      assert.equal(
+        collision.blockedMetadata.some((item) => item.field === "targetPath"),
+        false,
+        fixture.source,
+      );
+    } else {
+      assert.equal(collision.agentSkills?.canonicalFrontmatter, undefined);
+      assert.match(
+        collision.blockedMetadata.find((item) => item.field === "targetPath")
+          ?.reason ?? "",
+        /Target Agent Skills entrypoint already exists/,
+        fixture.source,
+      );
+    }
+  }
+});
+
+test("frontmatter fence-like text does not hide body migration evidence", async () => {
+  const { target } = await skillFixture(
+    "demo",
+    `---
+id: skill.demo
+purpose: |
+  Example marker:
+  ~~~
+---
+# Demo
+
+Use this skill when reviewing real demo inputs.
+`,
+  );
+  const suggestion = await buildMetadataSuggestion(target);
+
+  assert.equal(
+    suggestion.agentSkills?.candidateAgentSkillsFields.description,
+    "Use this skill when reviewing real demo inputs.",
+  );
+});
+
 async function skillFixture(
   name: string,
   content: string,
@@ -650,4 +880,15 @@ async function skillFixture(
   await mkdir(path.dirname(target), { recursive: true });
   await writeFile(target, content);
   return { target, original: content };
+}
+
+async function skillEntrypointFixture(
+  relativePath: string,
+  content: string,
+): Promise<{ root: string; target: string; original: string }> {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-skill-entrypoint-"));
+  const target = path.join(root, ...relativePath.split("/"));
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(target, content);
+  return { root, target, original: content };
 }

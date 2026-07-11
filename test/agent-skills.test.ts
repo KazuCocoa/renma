@@ -454,6 +454,94 @@ test("authoring inspection ignores backtick and tilde fenced examples", () => {
   }
 });
 
+test("frontmatter fence-like text does not hide body authoring constraints", () => {
+  const validation = validateAgentSkill(
+    skill(
+      "skills/demo/SKILL.md",
+      `---
+name: demo
+description: |
+  Review demo inputs. Use when demo inputs need review.
+  ~~~
+---
+# Demo
+
+## Procedure
+
+- Do not modify production files.
+`,
+    ),
+  );
+
+  assert.ok(
+    validation.issues.some(
+      (issue) => issue.code === "RN-SKILL-EXECUTION-CONSTRAINT-NOT-PROMINENT",
+    ),
+  );
+  assert.ok(
+    validation.issues.some(
+      (issue) =>
+        issue.code === "RN-SKILL-EXECUTION-CONSTRAINT-MISSING-ALTERNATIVE",
+    ),
+  );
+});
+
+test("scan migration commands preserve argv and safely quote shell metacharacters", async () => {
+  const root = await fixture();
+  const cases = [
+    {
+      directory: "demo skill",
+      display: "renma suggest-metadata 'skills/demo skill/skill.md'",
+    },
+    {
+      directory: "demo'quote",
+      display: `renma suggest-metadata 'skills/demo'"'"'quote/skill.md'`,
+    },
+    {
+      directory: "demo;echo-danger",
+      display: "renma suggest-metadata 'skills/demo;echo-danger/skill.md'",
+    },
+    {
+      directory: "demo$dollar",
+      display: "renma suggest-metadata 'skills/demo$dollar/skill.md'",
+    },
+    {
+      directory: "demo(test)",
+      display: "renma suggest-metadata 'skills/demo(test)/skill.md'",
+    },
+  ];
+
+  for (const fixtureCase of cases) {
+    const directory = path.join(root, "skills", fixtureCase.directory);
+    await mkdir(directory, { recursive: true });
+    await writeFile(
+      path.join(directory, "skill.md"),
+      `---
+name: demo
+description: Review demo inputs. Use when demo inputs need review.
+---
+# Demo
+`,
+    );
+  }
+
+  const result = await scan(root, { failOn: "critical" });
+  const text = formatText(result);
+  for (const fixtureCase of cases) {
+    const skillPath = `skills/${fixtureCase.directory}/skill.md`;
+    const command = result.agentSkills.results.find(
+      (item) => item.path === skillPath,
+    )?.migrationCommand;
+
+    assert.deepEqual(command, {
+      command: "renma",
+      args: ["suggest-metadata", skillPath],
+      display: fixtureCase.display,
+    });
+    assert.ok(text.includes(fixtureCase.display), skillPath);
+  }
+});
+
 test("summarizes Agent Skills inside JSON and text scan output", async () => {
   const root = await fixture();
   await writeSkill(root, "valid", canonical("valid"));

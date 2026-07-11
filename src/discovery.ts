@@ -53,17 +53,38 @@ export type SkillEntrypointPath =
       candidateName: string;
     };
 
-/** Classify canonical and historical Skill entrypoints under explicit Skill roots. */
-export function classifySkillEntrypointPath(
-  filePath: string,
+/** Classify a repository-relative Skill entrypoint only at an explicit root. */
+export function classifyRepositorySkillEntrypointPath(
+  relativePath: string,
 ): SkillEntrypointPath | undefined {
-  const currentPath = toPosix(filePath);
-  const root = explicitSkillsRoot(currentPath);
-  if (!root) return undefined;
+  const currentPath = toPosix(relativePath);
+  if (isAbsoluteLike(currentPath)) return undefined;
+  const segments = currentPath.split("/").filter(Boolean);
+  const rootEndIndex = repositorySkillRootEndIndex(segments);
+  if (rootEndIndex === undefined) return undefined;
+  return classifySkillEntrypointAtRoot(currentPath, segments, rootEndIndex);
+}
 
+/** Classify an absolute Skill path only when it contains one unambiguous root. */
+export function classifyAbsoluteSkillEntrypointPath(
+  absolutePath: string,
+): SkillEntrypointPath | undefined {
+  const currentPath = toPosix(absolutePath);
+  if (!isAbsoluteLike(currentPath)) return undefined;
+  const segments = currentPath.split("/").filter(Boolean);
+  const roots = absoluteSkillRoots(segments);
+  if (roots.length !== 1) return undefined;
+  return classifySkillEntrypointAtRoot(currentPath, segments, roots[0]!);
+}
+
+function classifySkillEntrypointAtRoot(
+  currentPath: string,
+  segments: string[],
+  rootEndIndex: number,
+): SkillEntrypointPath | undefined {
   const basename = path.posix.basename(currentPath);
   const directory = path.posix.dirname(currentPath);
-  const localDirectories = root.segments.slice(root.endIndex, -1);
+  const localDirectories = segments.slice(rootEndIndex, -1);
   if (
     localDirectories.some((segment) =>
       RESERVED_SKILL_SUPPORT_DIRS.includes(segment),
@@ -289,39 +310,50 @@ async function skillLikeLayoutDiagnostics(
 }
 
 function isExplicitSkillEntrypoint(relativePath: string): boolean {
-  return classifySkillEntrypointPath(relativePath) !== undefined;
+  return classifyRepositorySkillEntrypointPath(relativePath) !== undefined;
 }
 
 function isExplicitSkillsPath(relativePath: string): boolean {
-  return explicitSkillsRoot(relativePath) !== undefined;
+  const normalized = toPosix(relativePath);
+  if (isAbsoluteLike(normalized)) return false;
+  return (
+    normalized.startsWith("skills/") || normalized.startsWith(".agents/skills/")
+  );
 }
 
 function skillSupportPathSegment(relativePath: string): string | undefined {
   const normalized = toPosix(relativePath);
-  const root = explicitSkillsRoot(normalized);
-  if (!root) return undefined;
-  const skillLocalSegments = root.segments.slice(root.endIndex, -1);
+  if (isAbsoluteLike(normalized)) return undefined;
+  const segments = normalized.split("/").filter(Boolean);
+  const rootEndIndex = repositorySkillRootEndIndex(segments);
+  if (rootEndIndex === undefined) return undefined;
+  const skillLocalSegments = segments.slice(rootEndIndex, -1);
   return skillLocalSegments.find((segment) =>
     RESERVED_SKILL_SUPPORT_DIRS.includes(segment),
   );
 }
 
-function explicitSkillsRoot(
-  filePath: string,
-): { segments: string[]; endIndex: number } | undefined {
-  const segments = toPosix(filePath).split("/").filter(Boolean);
-  let match: { segments: string[]; endIndex: number } | undefined;
-  for (let index = 0; index < segments.length - 1; index += 1) {
+function repositorySkillRootEndIndex(segments: string[]): number | undefined {
+  if (segments[0] === "skills") return 1;
+  if (segments[0] === ".agents" && segments[1] === "skills") return 2;
+  return undefined;
+}
+
+function absoluteSkillRoots(segments: string[]): number[] {
+  const roots: number[] = [];
+  for (let index = 0; index < segments.length; index += 1) {
     if (segments[index] === ".agents" && segments[index + 1] === "skills") {
-      match = { segments, endIndex: index + 2 };
+      roots.push(index + 2);
       index += 1;
-      continue;
-    }
-    if (segments[index] === "skills") {
-      match = { segments, endIndex: index + 1 };
+    } else if (segments[index] === "skills") {
+      roots.push(index + 1);
     }
   }
-  return match;
+  return roots;
+}
+
+function isAbsoluteLike(filePath: string): boolean {
+  return filePath.startsWith("/") || /^[A-Za-z]:\//.test(filePath);
 }
 
 async function mapLimit<T, R>(

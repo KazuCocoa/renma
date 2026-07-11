@@ -1,8 +1,12 @@
-import { readFile } from "node:fs/promises";
+import { lstat, readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { parseDocument } from "../markdown.js";
 import { parseAssetMetadata } from "../metadata.js";
-import { classifySkillEntrypointPath } from "../discovery.js";
+import {
+  classifyAbsoluteSkillEntrypointPath,
+  classifyRepositorySkillEntrypointPath,
+  type SkillEntrypointPath,
+} from "../discovery.js";
 import {
   buildAgentSkillMigrationSuggestion,
   type AgentSkillMigrationSuggestion,
@@ -70,7 +74,8 @@ export async function buildMetadataSuggestion(
     throw new SuggestMetadataTargetError(target, error);
   }
   const outputPath = toPosix(target);
-  const initialKind = classifyPath(outputPath);
+  const entrypoint = classifySuggestionSkillEntrypointPath(outputPath);
+  const initialKind = classifyPath(outputPath, entrypoint);
   const document = parseDocument({
     path: outputPath,
     absolutePath,
@@ -85,10 +90,14 @@ export async function buildMetadataSuggestion(
       : initialKind;
   const explicitOwner = optionalText(options.owner);
   if (kind === "skill") {
-    const agentSkills = buildAgentSkillMigrationSuggestion(
-      document,
-      explicitOwner,
-    );
+    const collisionBlock = entrypoint
+      ? await pathMigrationCollision(entrypoint, absolutePath)
+      : undefined;
+    const agentSkills = buildAgentSkillMigrationSuggestion(document, {
+      ...(explicitOwner ? { explicitOwner } : {}),
+      ...(entrypoint ? { entrypoint } : {}),
+      ...(collisionBlock ? { additionalBlocks: [collisionBlock] } : {}),
+    });
     const metadataRetrofit =
       agentSkills.proposalKind === "canonical-metadata-retrofit";
     return {
@@ -307,8 +316,11 @@ function blockedMetadataLines(blockedMetadata: BlockedMetadata[]): string[] {
   return blockedMetadata.map((item) => `- ${item.field}: ${item.reason}`);
 }
 
-function classifyPath(filePath: string): ArtifactKind {
-  if (classifySkillEntrypointPath(filePath)) return "skill";
+function classifyPath(
+  filePath: string,
+  entrypoint: SkillEntrypointPath | undefined,
+): ArtifactKind {
+  if (entrypoint) return "skill";
   const parts = pathParts(filePath);
   const basename = parts.at(-1) ?? "";
 
@@ -322,6 +334,69 @@ function classifyPath(filePath: string): ArtifactKind {
     return "config";
   }
   return "unknown";
+}
+
+function classifySuggestionSkillEntrypointPath(
+  filePath: string,
+): SkillEntrypointPath | undefined {
+  return isAbsoluteLike(filePath)
+    ? classifyAbsoluteSkillEntrypointPath(filePath)
+    : classifyRepositorySkillEntrypointPath(filePath);
+}
+
+async function pathMigrationCollision(
+  entrypoint: SkillEntrypointPath,
+  sourceAbsolutePath: string,
+): Promise<BlockedMetadata | undefined> {
+  if (entrypoint.kind === "canonical") return undefined;
+  const targetAbsolutePath = path.resolve(entrypoint.targetPath);
+  try {
+    await lstat(targetAbsolutePath);
+  } catch (error) {
+    if (isMissingFileError(error)) return undefined;
+    return {
+      field: "targetPath",
+      reason: `Could not safely inspect migration target ${entrypoint.targetPath}: ${readErrorReason(error)} Human review is required before migration.`,
+    };
+  }
+
+  try {
+    const [sourceInfo, targetInfo, sourceRealPath, targetRealPath] =
+      await Promise.all([
+        stat(sourceAbsolutePath),
+        stat(targetAbsolutePath),
+        realpath(sourceAbsolutePath),
+        realpath(targetAbsolutePath),
+      ]);
+    if (
+      sourceRealPath === targetRealPath ||
+      (sourceInfo.dev === targetInfo.dev && sourceInfo.ino === targetInfo.ino)
+    ) {
+      return undefined;
+    }
+    return {
+      field: "targetPath",
+      reason: `Target Agent Skills entrypoint already exists at ${entrypoint.targetPath}. Human review is required before migration.`,
+    };
+  } catch (error) {
+    return {
+      field: "targetPath",
+      reason: `Could not safely verify migration target ${entrypoint.targetPath}: ${readErrorReason(error)} Human review is required before migration.`,
+    };
+  }
+}
+
+function isAbsoluteLike(filePath: string): boolean {
+  return path.isAbsolute(filePath) || /^[A-Za-z]:\//.test(filePath);
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "ENOENT"
+  );
 }
 
 function inferCandidateId(

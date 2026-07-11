@@ -36,7 +36,7 @@ export function formatText(result: ScanResult): string {
     if (skill.migrationCommand) {
       lines.push("");
       lines.push("  Migration:");
-      lines.push(`    ${skill.migrationCommand}`);
+      lines.push(`    ${skill.migrationCommand.display}`);
     }
   }
 

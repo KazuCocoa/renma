@@ -95,6 +95,13 @@ directory plus a rename. Structured `suggest-metadata` output reports
 `move-and-rename`) so the path change cannot be mistaken for an apply-ready
 frontmatter-only result.
 
+Repository discovery recognizes these roots only at the beginning of a
+repository-relative path. A nested path such as `docs/skills/demo/SKILL.md` is
+not a repository Skill, and a later `skills` segment cannot escape a reserved
+`references` or `examples` directory. For absolute `suggest-metadata` targets,
+Renma requires one unambiguous Skill root and rejects paths with multiple
+possible roots.
+
 ## Validation During Scan
 
 Agent Skills validation is part of the existing scan workflow:
@@ -108,6 +115,11 @@ The JSON report includes a dedicated `agentSkills` summary and per-Skill
 results. Text output includes a concise valid/invalid summary, structural issues,
 authoring warnings, and a `suggest-metadata` migration command when historical
 Renma fields or a historical entrypoint spelling are present.
+
+In JSON, `migrationCommand` contains structured `command` and `args` fields plus
+a display string. The argv fields preserve the exact path and are the source of
+truth for tools. Text output uses POSIX shell quoting when a path contains
+spaces or shell metacharacters.
 
 The locally versioned validation profile uses the maintained `yaml` package in
 YAML 1.2 mode. It validates:
@@ -178,6 +190,8 @@ warnings do not make a structurally valid Agent Skill invalid.
 Agent Skills body inspection and migration description extraction ignore fenced
 examples opened with at least three backticks or at least three tildes. A fence
 closes only with the same character and a marker at least as long as its opener.
+Fence inspection starts at the Markdown body; fence-like text inside YAML block
+scalars does not hide body diagnostics.
 
 ## Agent Skills Diagnostic Identifiers
 
@@ -248,7 +262,16 @@ move recognized historical fields to `metadata.renma.*`, and render canonical
 frontmatter for human review. It never edits the file and never proposes a
 reverse conversion for a canonical Agent Skill.
 
-For a valid canonical Agent Skill, an explicit `--owner <owner>` instead
+Before presenting a historical path migration, Renma renders the candidate
+frontmatter, combines it with the unchanged Markdown body at the target
+`SKILL.md` path, and runs the existing Agent Skills validator on that in-memory
+result. Any specification error blocks the proposal. If the target entrypoint
+already exists as a distinct filesystem entry, migration is also blocked; Renma
+does not propose overwriting, merging, or deleting either file. Case-only
+renames that resolve to the same filesystem entry are not treated as a
+collision.
+
+For a specification-valid canonical `SKILL.md`, an explicit `--owner <owner>` instead
 produces a canonical metadata retrofit candidate at `metadata.renma.owner`. An
 identical existing owner is preserved without a rewrite. A different existing
 owner blocks the proposal for human review. Without `--owner`, Renma does not
@@ -289,6 +312,8 @@ or lossy. Blocking cases include:
 - an unknown top-level field;
 - missing evidence for a usable description;
 - duplicate semantic list values or unsupported historical value shapes.
+- a candidate that remains invalid at its target `SKILL.md` path;
+- an existing distinct target entrypoint or an unverifiable target collision;
 
 Renma reports structured blocked evidence with the field and reason. It never
 selects the last duplicate value, silently deletes an unknown field, or assigns

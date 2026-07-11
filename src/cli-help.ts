@@ -125,6 +125,7 @@ export const COMMAND_HELP = [
     interpretation: [
       "Text output is a human-readable finding list.",
       "JSON output includes structured diagnostics, review bundles, and guidance intended for downstream tools and coding agents.",
+      "Agent Skills migration commands use structured command and args fields in JSON; text display paths use POSIX shell quoting when needed.",
       "When repair constraints or verification steps are present, follow them instead of broadening the edit.",
     ],
     nextSteps: [
@@ -603,6 +604,7 @@ export const COMMAND_HELP = [
       "The command prints to stdout and does not edit the target file.",
       "For Skill targets, canonical frontmatter is omitted when migration is unsafe or ambiguous.",
       "Historical skill.md and *.skill.md targets report the required rename or move in structured output.",
+      "A path migration is blocked when the target exists separately or the rendered target Skill remains specification-invalid.",
       "For canonical Agent Skills, --owner can propose a metadata retrofit without reverse migration.",
       "Without --owner, do not add owner metadata unless the asset already declares one or a maintainer confirms it.",
       "Preserve existing Markdown body and semantics for a metadata-only retrofit.",

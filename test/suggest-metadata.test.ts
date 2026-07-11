@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { main } from "../src/cli.js";
+import { buildMetadataSuggestion } from "../src/commands/suggest-metadata.js";
 
 test("suggest-metadata prompt reports blocked legacy Skill migration", async () => {
   const root = await fixture();
@@ -406,7 +407,14 @@ test("scan commands execute historical Skill entrypoint migrations end to end", 
   );
   const report = JSON.parse(jsonScan.stdout) as {
     agentSkills: {
-      results: Array<{ path: string; migrationCommand?: string }>;
+      results: Array<{
+        path: string;
+        migrationCommand?: {
+          command: string;
+          args: [string, string];
+          display: string;
+        };
+      }>;
     };
   };
 
@@ -418,10 +426,14 @@ test("scan commands execute historical Skill entrypoint migrations end to end", 
       ),
       entry.source,
     );
-    assert.equal(
+    assert.deepEqual(
       report.agentSkills.results.find((item) => item.path === entry.source)
         ?.migrationCommand,
-      `renma suggest-metadata ${entry.source}`,
+      {
+        command: "renma",
+        args: ["suggest-metadata", entry.source],
+        display: `renma suggest-metadata ${entry.source}`,
+      },
       entry.source,
     );
 
@@ -472,6 +484,108 @@ test("scan commands execute historical Skill entrypoint migrations end to end", 
       entry.source,
     );
   }
+});
+
+test("scan recommends historical filename migration without legacy Renma fields", async () => {
+  const root = await fixture();
+  const fixtures = [
+    ["skills/demo/skill.md", "demo"],
+    ["skills/testing/spec-review.skill.md", "spec-review"],
+    [".agents/skills/demo/skill.md", "demo"],
+    [".agents/skills/testing/spec-review.skill.md", "spec-review"],
+  ] as const;
+
+  for (const [source, name] of fixtures) {
+    const target = path.join(root, ...source.split("/"));
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(
+      target,
+      `---
+name: ${name}
+description: Review ${name} inputs. Use when ${name} inputs need review.
+---
+# ${name}
+`,
+    );
+  }
+
+  const textResult = await withCapturedConsole(() =>
+    main(["scan", root, "--format", "text"]),
+  );
+  const jsonResult = await withCapturedConsole(() =>
+    main(["scan", root, "--format", "json"]),
+  );
+  const report = JSON.parse(jsonResult.stdout) as {
+    agentSkills: {
+      results: Array<{
+        path: string;
+        migrationRecommended: boolean;
+        migrationCommand?: {
+          command: string;
+          args: [string, string];
+          display: string;
+        };
+      }>;
+    };
+  };
+
+  for (const [source] of fixtures) {
+    const validation = report.agentSkills.results.find(
+      (item) => item.path === source,
+    );
+    assert.equal(validation?.migrationRecommended, true, source);
+    assert.deepEqual(validation?.migrationCommand?.args, [
+      "suggest-metadata",
+      source,
+    ]);
+    assert.ok(
+      textResult.stdout.includes(`renma suggest-metadata ${source}`),
+      source,
+    );
+
+    const suggestionResult = await withCapturedConsole(() =>
+      main([
+        "suggest-metadata",
+        path.join(root, ...source.split("/")),
+        "--format",
+        "json",
+      ]),
+    );
+    const suggestion = JSON.parse(suggestionResult.stdout) as {
+      agentSkills: {
+        direction: string;
+        canonicalFrontmatter?: string;
+      };
+    };
+    assert.equal(
+      suggestion.agentSkills.direction,
+      "legacy-to-agent-skills",
+      source,
+    );
+    assert.ok(suggestion.agentSkills.canonicalFrontmatter, source);
+  }
+});
+
+test("suggest-metadata does not infer a Skill from ambiguous absolute roots", async () => {
+  const root = await fixture();
+  const target = path.join(
+    root,
+    "skills",
+    "demo",
+    "references",
+    "skills",
+    "example",
+    "SKILL.md",
+  );
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(
+    target,
+    "---\nname: example\ndescription: Review examples. Use when examples need review.\n---\n",
+  );
+
+  const suggestion = await buildMetadataSuggestion(target);
+  assert.notEqual(suggestion.kind, "skill");
+  assert.equal(suggestion.agentSkills, undefined);
 });
 
 async function fixture(): Promise<string> {

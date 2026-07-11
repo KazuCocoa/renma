@@ -4,7 +4,7 @@ import {
   AGENT_SKILL_DIAGNOSTIC_IDS as IDS,
   type AgentSkillDiagnosticId,
 } from "./diagnostic-ids.js";
-import { classifySkillEntrypointPath } from "./discovery.js";
+import { classifyRepositorySkillEntrypointPath } from "./discovery.js";
 import type { ParsedDocument } from "./types.js";
 import {
   parseAgentSkillFrontmatter,
@@ -88,12 +88,18 @@ export interface AgentSkillValidationResult {
   description?: string;
   migrationRecommended: boolean;
   migrationDirection?: "legacy-to-agent-skills";
-  migrationCommand?: string;
+  migrationCommand?: AgentSkillMigrationCommand;
   legacyFields: string[];
   canonicalRenmaFields: string[];
   errorCount: number;
   warningCount: number;
   issues: AgentSkillValidationIssue[];
+}
+
+export interface AgentSkillMigrationCommand {
+  command: "renma";
+  args: ["suggest-metadata", string];
+  display: string;
 }
 
 export interface AgentSkillsValidationSummary {
@@ -286,7 +292,9 @@ export function validateAgentSkill(
     (issue) => issue.severity === "error",
   ).length;
   const warningCount = issues.length - errorCount;
-  const entrypointPath = classifySkillEntrypointPath(document.artifact.path);
+  const entrypointPath = classifyRepositorySkillEntrypointPath(
+    document.artifact.path,
+  );
   const migrationRecommended =
     legacyFields.length > 0 ||
     (entrypointPath !== undefined && entrypointPath.kind !== "canonical");
@@ -301,7 +309,7 @@ export function validateAgentSkill(
     ...(migrationRecommended
       ? {
           migrationDirection: "legacy-to-agent-skills" as const,
-          migrationCommand: `renma suggest-metadata ${document.artifact.path}`,
+          migrationCommand: migrationCommand(document.artifact.path),
         }
       : {}),
     legacyFields,
@@ -310,6 +318,19 @@ export function validateAgentSkill(
     warningCount,
     issues,
   };
+}
+
+function migrationCommand(skillPath: string): AgentSkillMigrationCommand {
+  return {
+    command: "renma",
+    args: ["suggest-metadata", skillPath],
+    display: `renma suggest-metadata ${posixShellArgument(skillPath)}`,
+  };
+}
+
+function posixShellArgument(value: string): string {
+  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(value)) return value;
+  return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
 /** Normalize and validate an Agent Skills YAML name field. */
@@ -700,7 +721,10 @@ function collectBodyLines(
   document: ParsedDocument,
   frontmatter: ParsedYamlFrontmatter,
 ): BodyLine[] {
-  const fenceLines = agentSkillFenceLines(document.lines);
+  const fenceLines = agentSkillFenceLines(
+    document.lines,
+    frontmatter.bodyStartLine,
+  );
   const headings = document.headings
     .filter(
       (heading) =>
@@ -738,11 +762,18 @@ function collectBodyLines(
 }
 
 /** Return all Markdown line numbers occupied by backtick or tilde fences. */
-export function agentSkillFenceLines(lines: string[]): Set<number> {
+export function agentSkillFenceLines(
+  lines: string[],
+  bodyStartLine: number,
+): Set<number> {
   const result = new Set<number>();
   let active: { character: "`" | "~"; length: number } | undefined;
 
-  for (let index = 0; index < lines.length; index += 1) {
+  for (
+    let index = Math.max(bodyStartLine - 1, 0);
+    index < lines.length;
+    index += 1
+  ) {
     const lineNumber = index + 1;
     const line = lines[index] ?? "";
     if (!active) {
