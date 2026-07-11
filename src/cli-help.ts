@@ -125,6 +125,7 @@ export const COMMAND_HELP = [
     interpretation: [
       "Text output is a human-readable finding list.",
       "JSON output includes structured diagnostics, review bundles, and guidance intended for downstream tools and coding agents.",
+      "Agent Skills migration commands use structured command and args fields in JSON; text display paths use POSIX shell quoting when needed.",
       "When repair constraints or verification steps are present, follow them instead of broadening the edit.",
     ],
     nextSteps: [
@@ -576,25 +577,36 @@ export const COMMAND_HELP = [
   {
     name: "suggest-metadata",
     usage: "renma suggest-metadata <file> [options]",
-    question: "How can a coding agent prepare a metadata-only retrofit?",
+    question:
+      "How can a coding agent prepare a metadata retrofit or one-way Skill migration?",
     purpose:
-      "Suggest metadata emits a prompt or structured suggestion for a metadata-focused retrofit of one existing asset.",
+      "Suggest metadata emits a prompt or structured suggestion for one existing asset. Pre-0.16 Renma Skill targets use the one-way migration path to Agent Skills; non-canonical Skill filenames separately report any required entrypoint migration. Canonical Agent Skills support an explicit owner retrofit, never reverse migration.",
     useWhen: [
       "An asset lacks compact metadata and you want a reviewable metadata patch.",
+      "A Skill with pre-0.16 Renma fields needs an Agent Skills plus metadata.renma.* conversion proposal.",
+      "A skill.md or *.skill.md entrypoint needs its required rename or move reported.",
+      "A canonical Agent Skill needs an explicit metadata.renma.owner candidate from --owner.",
       "You need guidance that preserves the existing Markdown body and semantics.",
       "A human explicitly provides an owner with --owner or the asset already declares one.",
     ],
     doNotUseFor: [
       "Editing the file automatically.",
+      "Converting a canonical Agent Skill back to pre-0.16 Renma frontmatter.",
+      "Silently resolving blocked, conflicting, duplicate, or unknown migration input.",
       "Changing the Markdown body or asset semantics unless explicitly requested.",
       "Inferring an owner without evidence.",
     ],
     examples: [
       "renma suggest-metadata skills/testing/spec-review/SKILL.md --format prompt",
       "renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform --format json",
+      "renma suggest-metadata skills/testing/spec-review.skill.md --format json",
     ],
     interpretation: [
       "The command prints to stdout and does not edit the target file.",
+      "For Skill targets, canonical frontmatter is omitted when migration is unsafe or ambiguous.",
+      "Historical skill.md and *.skill.md filename forms report the required rename or move in structured output.",
+      "A path migration is blocked when the target exists separately or the rendered target Skill remains specification-invalid.",
+      "For canonical Agent Skills, --owner can propose a metadata retrofit without reverse migration.",
       "Without --owner, do not add owner metadata unless the asset already declares one or a maintainer confirms it.",
       "Preserve existing Markdown body and semantics for a metadata-only retrofit.",
     ],

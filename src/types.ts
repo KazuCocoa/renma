@@ -1,3 +1,4 @@
+import type { AgentSkillsValidationSummary } from "./agent-skills.js";
 import type { ContextLensSummary } from "./context-lens.js";
 import type { SecurityPolicyInventorySummary } from "./security-policy-inventory.js";
 import type { TrustGraph } from "./trust-graph.js";
@@ -240,6 +241,7 @@ export interface ScanResult {
   configPath?: string;
   scannedFileCount: number;
   format: "text" | "json";
+  agentSkills: AgentSkillsValidationSummary;
   contextLens?: ContextLensSummary;
   securityPolicyInventory?: SecurityPolicyInventorySummary;
   trustGraph?: TrustGraph;

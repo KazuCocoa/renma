@@ -29,22 +29,30 @@ When renma is installed as a package, use the `renma` binary:
 renma scan .
 ```
 
+For the breaking 0.16.0 Skill format, scan validation, and one-way migration
+workflow, see [Agent Skills Compatibility and Migration](agent-skills-compatibility.md).
+Agent Skills results appear inside `scan`; there is no separate Skill-validation
+command.
+
 ## Repository Layout
 
 renma is most useful when agent knowledge is stored in predictable places:
 
-- `skills/**/SKILL.md` for skill instructions. Renma also accepts
-  `skills/**/skill.md`, `skills/**/*.skill.md`, and the same entrypoint
-  spellings under `.agents/skills/**`.
+- `skills/**/SKILL.md` and `.agents/skills/**/SKILL.md` are the canonical Agent
+  Skills entrypoints. Renma still discovers historical `skill.md` and
+  `*.skill.md` spellings under those roots for migration diagnostics, but those
+  spellings are not Agent Skills-compatible.
 - `contexts/**` for shared context assets.
 - configurable prompt or documentation paths for reusable prompts and broader docs.
 - `*.renma.json` for structured metadata assets.
 
 Tool helper implementations usually belong under `tools/**`. They can be referenced from skills and commands, but they are not the same thing as user-facing documentation under `docs/**`.
 
-Under explicit skill roots, `examples`, `profiles`, `references`, and `scripts`
-are reserved for skill-local support directories. These are valid support paths:
+Under explicit skill roots, `assets`, `examples`, `profiles`, `references`, and
+`scripts` are reserved for skill-local support directories. These are valid
+support paths:
 
+- `skills/demo/assets/template.md`
 - `skills/demo/examples/happy-path.md`
 - `skills/demo/references/spec.md`
 - `skills/demo/scripts/helper.sh`
@@ -53,10 +61,10 @@ are reserved for skill-local support directories. These are valid support paths:
 The same reserved names apply under `.agents/skills/**`.
 
 Avoid using reserved support directory names as skill names. Paths such as
-`skills/examples/SKILL.md`, `skills/references/SKILL.md`,
-`skills/scripts/SKILL.md`, and `skills/profiles/SKILL.md` are not treated as
-skill entrypoints by default. If one of those files is intended to define a
-Renma skill, rename the skill directory, for example to
+`skills/assets/SKILL.md`, `skills/examples/SKILL.md`,
+`skills/references/SKILL.md`, `skills/scripts/SKILL.md`, and
+`skills/profiles/SKILL.md` are not treated as skill entrypoints by default. If
+one of those files is intended to define a Renma skill, rename the directory, for example to
 `skills/example-review/SKILL.md`.
 
 Assets can declare metadata such as `id`, `owner`, `status`, `requires_context`, `optional_context`, and dependency references. The catalog and graph commands use that metadata to resolve links, identify weak references, and produce reports that can be checked in CI.
@@ -206,6 +214,11 @@ renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform -
 
 `suggest-metadata` does not rewrite files. It emits guidance that a human or coding agent can use to prepare a reviewed metadata patch while preserving the existing Markdown body.
 
+For a `SKILL.md` target, the command proposes only the one-way transition from
+pre-0.16 Renma Skill fields to Agent Skills identity plus flat
+`metadata.renma.*` string values. Unsafe or ambiguous input blocks canonical
+frontmatter output. See [Agent Skills Compatibility and Migration](agent-skills-compatibility.md).
+
 7. Use `suggest-semantic-split` when a file has grown too large or mixes multiple purposes.
 
 ```bash
@@ -254,14 +267,20 @@ Use a date in `YYYY-MM-DD` for temporary workarounds, or `"never"` when the exce
 
 If `--config` is not provided, renma looks for repository config files such as `renma.config.json` or `.renma.json` while resolving the scan target.
 
-By default, renma scans these glob families when building its catalog and findings:
+Canonical Agent Skills entrypoints are:
 
 - `skills/**/SKILL.md`
+- `.agents/skills/**/SKILL.md`
+
+Renma also discovers these historical spellings for migration diagnostics:
+
 - `skills/**/skill.md`
 - `skills/**/*.skill.md`
-- `.agents/skills/**/SKILL.md`
 - `.agents/skills/**/skill.md`
 - `.agents/skills/**/*.skill.md`
+
+Other default scan glob families are:
+
 - `.agents/**/*.md`
 - `AGENTS.md`
 - `README.md`
@@ -549,6 +568,15 @@ renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform -
 Use this after `scan` detects metadata issues or `ownership` shows unowned assets. The command does not rewrite files. It emits a deterministic prompt or JSON payload that a human or coding agent can use to prepare a reviewed patch.
 
 The prompt asks the agent to inspect the existing asset, preserve the Markdown body, preserve existing frontmatter values, add only compact missing metadata that is clearly supported, and rerun `renma scan .` and `renma ownership .` after editing.
+
+For Skill targets using the pre-0.16 Renma Skill format, the 0.16.0 metadata
+migration path is one-way: pre-0.16 frontmatter becomes Agent Skills identity
+plus `metadata.renma.*`. Separately, `skill.md` and `*.skill.md` targets report
+any required entrypoint rename or move, even when their frontmatter already
+uses Agent Skills fields. For a canonical Agent Skill, `--owner` may instead
+propose an owner metadata retrofit; it never causes reverse migration. The
+normative behavior is documented in
+[Agent Skills Compatibility and Migration](agent-skills-compatibility.md).
 
 Owner metadata remains recommended but not required. Without `--owner`, `suggest-metadata` blocks owner as a suggested addition and says not to add one unless the asset already declares an owner or a maintainer provides one. With `--owner <owner>`, the command may include that owner because it was explicitly provided. If an existing asset already declares an owner, `suggest-metadata` preserves it; a different `--owner` value is treated as a human-review ownership change, not an automatic metadata suggestion. Renma does not infer owners from Git history, file paths, prose, or authors.
 

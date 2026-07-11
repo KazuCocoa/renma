@@ -12,6 +12,7 @@ const SKILL_LIKE_FILE_OUTSIDE_SKILLS_DIR_CODE =
 const SKILL_ENTRYPOINT_UNDER_RESERVED_SUPPORT_DIR_CODE =
   "LAYOUT-SKILL-ENTRYPOINT-UNDER-RESERVED-SUPPORT-DIR";
 const RESERVED_SKILL_SUPPORT_DIRS = [
+  "assets",
   "examples",
   "profiles",
   "references",
@@ -32,6 +33,124 @@ const SKILL_LIKE_FILE_LLM_HINT =
   "No action is required unless this file is intended to be a Renma skill. If it is intended to be a skill, move it under skills/** or .agents/skills/**.";
 const SKILL_ENTRYPOINT_UNDER_RESERVED_SUPPORT_DIR_LLM_HINT =
   "Do not move or rename this file only to reduce diagnostics. Rename the skill directory only if this file is intended to define a Renma skill. For example, use `skills/example-review/SKILL.md` instead of `skills/examples/SKILL.md`.";
+
+export type SkillEntrypointPath =
+  | {
+      kind: "canonical";
+      currentPath: string;
+      targetPath: string;
+      candidateName: string;
+    }
+  | {
+      kind: "lowercase-entrypoint";
+      currentPath: string;
+      targetPath: string;
+      candidateName: string;
+    }
+  | {
+      kind: "flat-legacy-entrypoint";
+      currentPath: string;
+      targetPath: string;
+      candidateName: string;
+    };
+
+/** Classify a repository-relative Skill entrypoint only at an explicit root. */
+export function classifyRepositorySkillEntrypointPath(
+  relativePath: string,
+): SkillEntrypointPath | undefined {
+  const currentPath = normalizeRepositoryRelativePath(relativePath);
+  if (!currentPath) return undefined;
+  const segments = currentPath.split("/").filter(Boolean);
+  const rootEndIndex = repositorySkillRootEndIndex(segments);
+  if (rootEndIndex === undefined) return undefined;
+  return classifySkillEntrypointAtRoot(currentPath, segments, rootEndIndex);
+}
+
+/** Classify an absolute Skill path only when it contains one unambiguous root. */
+export function classifyAbsoluteSkillEntrypointPath(
+  absolutePath: string,
+): SkillEntrypointPath | undefined {
+  const rawPath = toPosix(absolutePath);
+  if (!isAbsoluteLike(rawPath)) return undefined;
+  const rawRoots = absoluteSkillRoots(rawPath.split("/").filter(Boolean));
+  if (rawRoots.length !== 1) return undefined;
+  const currentPath = path.posix.normalize(rawPath);
+  const segments = currentPath.split("/").filter(Boolean);
+  const roots = absoluteSkillRoots(segments);
+  if (roots.length !== 1) return undefined;
+  return classifySkillEntrypointAtRoot(currentPath, segments, roots[0]!);
+}
+
+/** Normalize a repository-relative Skill path without allowing root escape. */
+export function normalizeRepositoryRelativePath(
+  filePath: string,
+): string | undefined {
+  const normalizedSeparators = toPosix(filePath);
+  if (isAbsoluteLike(normalizedSeparators)) return undefined;
+  const rawSegments = normalizedSeparators.split("/");
+  while (rawSegments[0] === "." || rawSegments[0] === "") {
+    rawSegments.shift();
+  }
+
+  const rootEndIndex = repositorySkillRootEndIndex(rawSegments);
+  if (rootEndIndex === undefined) return undefined;
+  const resolved = rawSegments.slice(0, rootEndIndex);
+  for (const segment of rawSegments.slice(rootEndIndex)) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") {
+      if (resolved.length <= rootEndIndex) return undefined;
+      resolved.pop();
+      continue;
+    }
+    resolved.push(segment);
+  }
+
+  const normalized = resolved.join("/");
+  if (normalized === ".." || normalized.startsWith("../")) return undefined;
+  const normalizedRootEndIndex = repositorySkillRootEndIndex(resolved);
+  return normalizedRootEndIndex === rootEndIndex ? normalized : undefined;
+}
+
+function classifySkillEntrypointAtRoot(
+  currentPath: string,
+  segments: string[],
+  rootEndIndex: number,
+): SkillEntrypointPath | undefined {
+  const basename = path.posix.basename(currentPath);
+  const directory = path.posix.dirname(currentPath);
+  const localDirectories = segments.slice(rootEndIndex, -1);
+  if (
+    localDirectories.some((segment) =>
+      RESERVED_SKILL_SUPPORT_DIRS.includes(segment),
+    )
+  ) {
+    return undefined;
+  }
+
+  if (basename === "SKILL.md" || basename === "skill.md") {
+    const candidateName = path.posix.basename(directory);
+    if (!candidateName || candidateName === ".") return undefined;
+    return {
+      kind: basename === "SKILL.md" ? "canonical" : "lowercase-entrypoint",
+      currentPath,
+      targetPath:
+        basename === "SKILL.md"
+          ? currentPath
+          : path.posix.join(directory, "SKILL.md"),
+      candidateName,
+    };
+  }
+
+  if (!basename.endsWith(".skill.md")) return undefined;
+  const candidateName = basename.slice(0, -".skill.md".length);
+  if (!candidateName) return undefined;
+  return {
+    kind: "flat-legacy-entrypoint",
+    currentPath,
+    targetPath: path.posix.join(directory, candidateName, "SKILL.md"),
+    candidateName,
+  };
+}
 
 /** Discover and read scan artifacts according to the provided scan configuration. */
 export async function discoverArtifacts(
@@ -144,6 +263,8 @@ function classifyExplicitSkillSupportPath(
   relativePath: string,
 ): ArtifactKind | undefined {
   switch (skillSupportPathSegment(relativePath)) {
+    case "assets":
+      return "unknown";
     case "profiles":
       return "profile";
     case "references":
@@ -225,36 +346,46 @@ async function skillLikeLayoutDiagnostics(
 }
 
 function isExplicitSkillEntrypoint(relativePath: string): boolean {
-  const normalized = toPosix(relativePath);
-  const basename = path.posix.basename(normalized);
-  const lowerBasename = basename.toLowerCase();
-  if (!isSkillLikeFilename(lowerBasename)) return false;
-  if (!isExplicitSkillsPath(normalized)) return false;
-  if (skillSupportPathSegment(normalized) !== undefined) return false;
-  return true;
+  return classifyRepositorySkillEntrypointPath(relativePath) !== undefined;
 }
 
 function isExplicitSkillsPath(relativePath: string): boolean {
-  return (
-    relativePath.startsWith("skills/") ||
-    relativePath.startsWith(".agents/skills/")
-  );
-}
-
-function isSkillLikeFilename(lowerBasename: string): boolean {
-  return lowerBasename === "skill.md" || lowerBasename.endsWith(".skill.md");
+  return normalizeRepositoryRelativePath(relativePath) !== undefined;
 }
 
 function skillSupportPathSegment(relativePath: string): string | undefined {
-  const normalized = toPosix(relativePath);
-  if (!isExplicitSkillsPath(normalized)) return undefined;
-
-  const segments = normalized.split("/");
-  const rootSegmentCount = normalized.startsWith(".agents/skills/") ? 2 : 1;
-  const skillLocalSegments = segments.slice(rootSegmentCount, -1);
+  const normalized = normalizeRepositoryRelativePath(relativePath);
+  if (!normalized) return undefined;
+  const segments = normalized.split("/").filter(Boolean);
+  const rootEndIndex = repositorySkillRootEndIndex(segments);
+  if (rootEndIndex === undefined) return undefined;
+  const skillLocalSegments = segments.slice(rootEndIndex, -1);
   return skillLocalSegments.find((segment) =>
     RESERVED_SKILL_SUPPORT_DIRS.includes(segment),
   );
+}
+
+function repositorySkillRootEndIndex(segments: string[]): number | undefined {
+  if (segments[0] === "skills") return 1;
+  if (segments[0] === ".agents" && segments[1] === "skills") return 2;
+  return undefined;
+}
+
+function absoluteSkillRoots(segments: string[]): number[] {
+  const roots: number[] = [];
+  for (let index = 0; index < segments.length; index += 1) {
+    if (segments[index] === ".agents" && segments[index + 1] === "skills") {
+      roots.push(index + 2);
+      index += 1;
+    } else if (segments[index] === "skills") {
+      roots.push(index + 1);
+    }
+  }
+  return roots;
+}
+
+function isAbsoluteLike(filePath: string): boolean {
+  return filePath.startsWith("/") || /^[A-Za-z]:\//.test(filePath);
 }
 
 async function mapLimit<T, R>(
@@ -302,7 +433,7 @@ function depth(relativePath: string): number {
 }
 
 function toPosix(value: string): string {
-  return value.split(path.sep).join(path.posix.sep);
+  return value.replaceAll("\\", path.posix.sep);
 }
 
 function errorMessage(error: unknown): string {

@@ -1,7 +1,16 @@
-import { readFile } from "node:fs/promises";
+import { lstat, readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { parseDocument } from "../markdown.js";
 import { parseAssetMetadata } from "../metadata.js";
+import {
+  classifyAbsoluteSkillEntrypointPath,
+  classifyRepositorySkillEntrypointPath,
+  type SkillEntrypointPath,
+} from "../discovery.js";
+import {
+  buildAgentSkillMigrationSuggestion,
+  type AgentSkillMigrationSuggestion,
+} from "../skill-migration.js";
 import type { Artifact, ArtifactKind, MetadataValue } from "../types.js";
 
 export type SuggestMetadataFormat = "prompt" | "json";
@@ -19,11 +28,15 @@ export interface BlockedMetadata {
 export interface MetadataSuggestion {
   path: string;
   kind: ArtifactKind;
-  suggestedMode: "metadata-retrofit";
+  suggestedMode:
+    | "metadata-retrofit"
+    | "agent-skills-migration"
+    | "agent-skills-metadata-retrofit";
   ownerProvided: boolean;
   instructions: string[];
   candidateMetadata: Record<string, string>;
   blockedMetadata: BlockedMetadata[];
+  agentSkills?: AgentSkillMigrationSuggestion;
 }
 
 export class SuggestMetadataTargetError extends Error {
@@ -61,7 +74,8 @@ export async function buildMetadataSuggestion(
     throw new SuggestMetadataTargetError(target, error);
   }
   const outputPath = toPosix(target);
-  const initialKind = classifyPath(outputPath);
+  const entrypoint = classifySuggestionSkillEntrypointPath(outputPath);
+  const initialKind = classifyPath(outputPath, entrypoint);
   const document = parseDocument({
     path: outputPath,
     absolutePath,
@@ -74,12 +88,56 @@ export async function buildMetadataSuggestion(
     initialKind === "context" && metadata.type === "context_lens"
       ? "context_lens"
       : initialKind;
+  const explicitOwner = optionalText(options.owner);
+  if (kind === "skill") {
+    const collisionBlock = entrypoint
+      ? await pathMigrationCollision(entrypoint, absolutePath)
+      : undefined;
+    const agentSkills = buildAgentSkillMigrationSuggestion(document, {
+      ...(explicitOwner ? { explicitOwner } : {}),
+      ...(entrypoint ? { entrypoint } : {}),
+      ...(collisionBlock ? { additionalBlocks: [collisionBlock] } : {}),
+    });
+    const metadataRetrofit =
+      agentSkills.proposalKind === "canonical-metadata-retrofit";
+    return {
+      path: outputPath,
+      kind,
+      suggestedMode: metadataRetrofit
+        ? "agent-skills-metadata-retrofit"
+        : "agent-skills-migration",
+      ownerProvided: Boolean(explicitOwner),
+      instructions: metadataRetrofit
+        ? [
+            "Inspect the canonical Agent Skill before editing.",
+            "Preserve the Markdown body and existing standard Agent Skills fields.",
+            "Add only the explicitly provided owner as a flat metadata.renma.owner string entry.",
+            "Preserve unknown renma.* and other-vendor metadata child keys.",
+            "Do not apply a proposal with blocked ownership evidence.",
+            "Do not perform reverse migration.",
+            "Run renma scan . after human review and application.",
+          ]
+        : [
+            "Inspect the existing Skill before editing.",
+            "Preserve the Markdown body and existing standard Agent Skills fields.",
+            "If present, move only recognized pre-0.16 Renma Skill fields to flat metadata.renma.* string entries.",
+            "Preserve unknown renma.* and other-vendor metadata child keys.",
+            "Do not discard or automatically relocate unknown top-level fields.",
+            "Apply the entrypoint rename or move together with the frontmatter migration when required.",
+            "Do not apply a proposal with blocked migration evidence.",
+            "Keep selection boundaries in description and execution constraints in the body.",
+            "Run renma scan . after human review and application.",
+          ],
+      candidateMetadata: {},
+      blockedMetadata: agentSkills.blocked,
+      agentSkills,
+    };
+  }
   const existingId = optionalText(metadataValueText(document.metadata.id));
   const existingTitle = optionalText(
     metadataValueText(document.metadata.title),
   );
   const existingOwner = optionalText(metadata.owner);
-  const explicitOwner = optionalText(options.owner);
   const candidateMetadata: Record<string, string> = {};
   const candidateId = inferCandidateId(kind, outputPath);
   const candidateTitle = mainHeadingTitle(document.headings);
@@ -120,6 +178,8 @@ export async function buildMetadataSuggestion(
 }
 
 export function renderMetadataPrompt(suggestion: MetadataSuggestion): string {
+  if (suggestion.agentSkills)
+    return renderAgentSkillMigrationPrompt(suggestion);
   return `${[
     "# Codex Task: Safely Retrofit Renma Metadata",
     "",
@@ -144,6 +204,65 @@ export function renderMetadataPrompt(suggestion: MetadataSuggestion): string {
     "- Run `renma ownership .`.",
     "",
     "Return a small reviewed patch. Do not rewrite the asset body.",
+  ].join("\n")}\n`;
+}
+
+function renderAgentSkillMigrationPrompt(
+  suggestion: MetadataSuggestion,
+): string {
+  const migration = suggestion.agentSkills;
+  if (!migration) return "";
+  const metadataRetrofit =
+    migration.proposalKind === "canonical-metadata-retrofit";
+  const candidate = migration.canonicalFrontmatter
+    ? [
+        "Canonical Frontmatter Candidate:",
+        "",
+        "```yaml",
+        migration.canonicalFrontmatter,
+        "```",
+      ]
+    : [
+        "Canonical Frontmatter Candidate:",
+        "",
+        "(not generated while migration is blocked or unnecessary)",
+      ];
+  return `${[
+    metadataRetrofit
+      ? "# Codex Task: Review Canonical Agent Skills Metadata Retrofit"
+      : "# Codex Task: Review One-Way Agent Skills Migration",
+    "",
+    `Asset: \`${suggestion.path}\``,
+    `Source format: \`${migration.sourceFormat}\``,
+    `Direction: \`${migration.direction}\``,
+    `Proposal: \`${migration.proposalKind}\``,
+    `Source path: \`${migration.sourcePath}\``,
+    `Target path: \`${migration.targetPath}\``,
+    `Entrypoint migration: \`${migration.entrypointMigration}\``,
+    "",
+    "Rules:",
+    ...suggestion.instructions.map((instruction) => `- ${instruction}`),
+    "",
+    "Candidate Agent Skills Fields:",
+    ...metadataLines(migration.candidateAgentSkillsFields),
+    "",
+    "Candidate Renma Metadata:",
+    ...metadataLines(migration.candidateRenmaMetadata),
+    "",
+    ...candidate,
+    "",
+    "Blocked Migration Evidence:",
+    ...blockedMetadataLines(suggestion.blockedMetadata),
+    "",
+    "Human Review:",
+    migration.reviewPrompt,
+    "",
+    "Verification:",
+    "- Run `renma scan .`.",
+    "",
+    migration.entrypointMigration === "none"
+      ? "Return a small reviewed frontmatter patch. Do not rewrite the Skill body."
+      : "Return one small reviewed patch containing both the entrypoint path migration and frontmatter migration. Do not rewrite the Skill body.",
   ].join("\n")}\n`;
 }
 
@@ -197,11 +316,14 @@ function blockedMetadataLines(blockedMetadata: BlockedMetadata[]): string[] {
   return blockedMetadata.map((item) => `- ${item.field}: ${item.reason}`);
 }
 
-function classifyPath(filePath: string): ArtifactKind {
+function classifyPath(
+  filePath: string,
+  entrypoint: SkillEntrypointPath | undefined,
+): ArtifactKind {
+  if (entrypoint) return "skill";
   const parts = pathParts(filePath);
   const basename = parts.at(-1) ?? "";
 
-  if (basename === "SKILL.md") return "skill";
   if (parts.includes("lenses")) return "context_lens";
   if (parts.includes("contexts") || parts.includes("context")) return "context";
   if (parts.includes("profiles")) return "profile";
@@ -212,6 +334,69 @@ function classifyPath(filePath: string): ArtifactKind {
     return "config";
   }
   return "unknown";
+}
+
+function classifySuggestionSkillEntrypointPath(
+  filePath: string,
+): SkillEntrypointPath | undefined {
+  return isAbsoluteLike(filePath)
+    ? classifyAbsoluteSkillEntrypointPath(filePath)
+    : classifyRepositorySkillEntrypointPath(filePath);
+}
+
+async function pathMigrationCollision(
+  entrypoint: SkillEntrypointPath,
+  sourceAbsolutePath: string,
+): Promise<BlockedMetadata | undefined> {
+  if (entrypoint.kind === "canonical") return undefined;
+  const targetAbsolutePath = path.resolve(entrypoint.targetPath);
+  try {
+    await lstat(targetAbsolutePath);
+  } catch (error) {
+    if (isMissingFileError(error)) return undefined;
+    return {
+      field: "targetPath",
+      reason: `Could not safely inspect migration target ${entrypoint.targetPath}: ${readErrorReason(error)} Human review is required before migration.`,
+    };
+  }
+
+  try {
+    const [sourceInfo, targetInfo, sourceRealPath, targetRealPath] =
+      await Promise.all([
+        stat(sourceAbsolutePath),
+        stat(targetAbsolutePath),
+        realpath(sourceAbsolutePath),
+        realpath(targetAbsolutePath),
+      ]);
+    if (
+      sourceRealPath === targetRealPath ||
+      (sourceInfo.dev === targetInfo.dev && sourceInfo.ino === targetInfo.ino)
+    ) {
+      return undefined;
+    }
+    return {
+      field: "targetPath",
+      reason: `Target Agent Skills entrypoint already exists at ${entrypoint.targetPath}. Human review is required before migration.`,
+    };
+  } catch (error) {
+    return {
+      field: "targetPath",
+      reason: `Could not safely verify migration target ${entrypoint.targetPath}: ${readErrorReason(error)} Human review is required before migration.`,
+    };
+  }
+}
+
+function isAbsoluteLike(filePath: string): boolean {
+  return path.isAbsolute(filePath) || /^[A-Za-z]:\//.test(filePath);
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "ENOENT"
+  );
 }
 
 function inferCandidateId(

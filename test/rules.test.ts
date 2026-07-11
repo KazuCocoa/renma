@@ -1870,6 +1870,18 @@ test("text report calls out clean scans", () => {
     root: "/repo",
     scannedFileCount: 1,
     format: "text",
+    agentSkills: {
+      specification: "https://agentskills.io/specification",
+      profile: "agentskills.io/specification@2026-07-11",
+      totalSkillCount: 0,
+      validSkillCount: 0,
+      invalidSkillCount: 0,
+      canonicalSkillCount: 0,
+      legacySkillCount: 0,
+      hybridSkillCount: 0,
+      warningCount: 0,
+      results: [],
+    },
     findings: [],
     diagnostics: [],
     diagnosticsV2: [],
@@ -1881,5 +1893,5 @@ test("text report calls out clean scans", () => {
 
   assert.match(textReport, /Diagnostics: 0/);
   assert.match(textReport, /Findings: 0/);
-  assert.match(textReport, /No findings\./);
+  assert.match(textReport, /No rule findings\./);
 });
