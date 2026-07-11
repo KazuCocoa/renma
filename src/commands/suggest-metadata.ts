@@ -13,7 +13,6 @@ import {
   canonicalRenmaMetadataKey,
   encodeRenmaMetadataList,
   isCanonicalRenmaMetadataKey,
-  legacyRenmaMetadataFields,
   metadataValueAsList,
   metadataValueAsText,
   readRenmaMetadataValue,
