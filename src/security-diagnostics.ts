@@ -671,7 +671,7 @@ function securityFindingsForArtifact(
   artifact: Artifact,
   securityConfig?: SecurityConfig,
 ): Finding[] {
-  const parsedPolicy = parseSecurityPolicy(artifact.content);
+  const parsedPolicy = parseSecurityPolicy(artifact.content, artifact.kind);
   const policy = applySecurityConfig(parsedPolicy, securityConfig);
   const detections: Detection[] = securityPolicyResolutionDetections(
     parsedPolicy,

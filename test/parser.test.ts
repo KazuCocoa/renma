@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { parseDocument } from "../src/markdown.js";
 import type { Artifact } from "../src/types.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 test("parseDocument extracts frontmatter, headings, links, and code fences", () => {
   const document = parseDocument(
@@ -20,8 +21,11 @@ npm test
   );
 
   assert.deepEqual(document.metadata, {
-    id: "demo-skill",
-    owner: "qa-platform",
+    name: "demo",
+    description:
+      "Use this demo skill for deterministic repository fixture checks.",
+    "metadata.renma.id": "demo-skill",
+    "metadata.renma.owner": "qa-platform",
   });
   assert.deepEqual(
     document.headings.map((heading) => heading.text),
@@ -44,6 +48,6 @@ function artifact(content: string): Artifact {
     absolutePath: "/tmp/skills/demo/SKILL.md",
     kind: "skill",
     sizeBytes: Buffer.byteLength(content),
-    content,
+    content: canonicalSkillFixture("skills/demo/SKILL.md", content),
   };
 }

@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { scan } from "../src/scanner.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 const metadataBudgetFindingIds = new Set([
   "META-FRONTMATTER-TOO-LARGE",
@@ -15,15 +16,19 @@ test("scan reports oversized frontmatter metadata", async () => {
   const root = await fixtureRoot();
   const extraFields = Array.from(
     { length: 25 },
-    (_, index) => `routing_note_${index + 1}: keep metadata compact`,
+    (_, index) =>
+      `  other-client.routing-note-${index + 1}: keep metadata compact`,
   ).join("\n");
   await writeAsset(
     root,
     "skills/metadata-fat/SKILL.md",
     `---
-id: skill.metadata-fat
-owner: qa-platform
-status: stable
+name: metadata-fat
+description: Use this metadata-fat skill when reviewing canonical metadata budgets.
+metadata:
+  renma.id: skill.metadata-fat
+  renma.owner: qa-platform
+  renma.status: stable
 ${extraFields}
 ---
 # Metadata Fat
@@ -95,7 +100,7 @@ Run renma scan.
   assert.equal(finding?.severity, "low");
   assert.equal(finding?.confidence, "high");
   assert.equal(finding?.evidence.path, "skills/metadata-list/SKILL.md");
-  assert.equal(finding?.evidence.startLine, 6);
+  assert.equal(finding?.evidence.startLine, 8);
   assert.match(
     finding?.evidence.snippet ?? "",
     /reviewing product specifications/,
@@ -154,5 +159,10 @@ async function writeAsset(
 ): Promise<void> {
   const filePath = path.join(root, relativePath);
   await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, content);
+  await writeFile(
+    filePath,
+    relativePath.endsWith("/SKILL.md")
+      ? canonicalSkillFixture(relativePath, content)
+      : content,
+  );
 }

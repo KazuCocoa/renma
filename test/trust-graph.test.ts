@@ -9,6 +9,7 @@ import {
   trustGraph,
 } from "../src/commands/trust-graph.js";
 import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 test("Trust Graph JSON is deterministic and sorted", async () => {
   const root = await fixture();
@@ -125,9 +126,9 @@ test("Trust Graph links selected security profiles and effective policy evidence
 
   assert.equal(profileEdge?.from, "asset:skill.demo");
   assert.equal(profileEdge?.to, "security_profile:strict-local");
-  assert.equal(
-    profileEdge?.evidence?.[0]?.snippet,
-    "security_profile: strict-local",
+  assert.match(
+    profileEdge?.evidence?.[0]?.snippet ?? "",
+    /renma\.security-profile/,
   );
   assert.equal(policyEdge?.from, "asset:skill.demo");
   assert.match(policyNode?.id ?? "", /^effective_policy:sha256:/);
@@ -146,8 +147,8 @@ test("Trust Graph links selected security profiles and effective policy evidence
   ]);
   assert.equal(policyNode?.properties?.humanApprovalRequired, true);
   assert.ok(
-    policyEdge?.evidence?.some(
-      (evidence) => evidence.snippet === "security_profile: strict-local",
+    policyEdge?.evidence?.some((evidence) =>
+      /renma\.security-profile/.test(evidence.snippet),
     ),
   );
 });
@@ -243,7 +244,7 @@ test("Trust Graph links diagnostics to related assets", async () => {
 
   assert.ok(invalidStatusNode);
   assert.ok(diagnosticEdge);
-  assert.equal(diagnosticEdge.evidence?.[0]?.snippet, "status: active");
+  assert.match(diagnosticEdge.evidence?.[0]?.snippet ?? "", /renma\.status/);
 });
 
 test("Trust Graph preserves duplicate asset id evidence as findings and diagnostic nodes", async () => {
@@ -368,32 +369,35 @@ async function writeSkill(
   await mkdir(path.join(root, "skills", name), { recursive: true });
   await writeFile(
     path.join(root, "skills", name, "SKILL.md"),
-    markdown({
-      ...metadata,
-      title: `# ${metadata.id}`,
-      body: [
-        "Use this workflow for trust graph fixture checks with deterministic routing, security policy evidence, reviewable outputs, and verification expectations.",
-        "",
-        "## Do Not Use For",
-        "Do not use for production release decisions.",
-        "",
-        "## Required Inputs",
-        "- A small fixture repository.",
-        "",
-        "## Instructions",
-        "1. Inspect the fixture evidence.",
-        "2. Report the deterministic result.",
-        "",
-        "## Examples",
-        "Input: fixture. Output: trust graph evidence.",
-        "",
-        "## Completion Criteria",
-        "The graph contains stable nodes, edges, and findings.",
-        "",
-        "## Verification",
-        "Run the trust-graph command and inspect JSON or Markdown output.",
-      ].join("\n"),
-    }),
+    canonicalSkillFixture(
+      path.join("skills", name, "SKILL.md"),
+      markdown({
+        ...metadata,
+        title: `# ${metadata.id}`,
+        body: [
+          "Use this workflow for trust graph fixture checks with deterministic routing, security policy evidence, reviewable outputs, and verification expectations.",
+          "",
+          "## Do Not Use For",
+          "Do not use for production release decisions.",
+          "",
+          "## Required Inputs",
+          "- A small fixture repository.",
+          "",
+          "## Instructions",
+          "1. Inspect the fixture evidence.",
+          "2. Report the deterministic result.",
+          "",
+          "## Examples",
+          "Input: fixture. Output: trust graph evidence.",
+          "",
+          "## Completion Criteria",
+          "The graph contains stable nodes, edges, and findings.",
+          "",
+          "## Verification",
+          "Run the trust-graph command and inspect JSON or Markdown output.",
+        ].join("\n"),
+      }),
+    ),
   );
 }
 

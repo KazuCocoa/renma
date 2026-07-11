@@ -48,13 +48,17 @@ export function formatValidationText(
     lines.push("");
     lines.push(`${result.valid ? "VALID" : "INVALID"} ${result.path}`);
     lines.push(`  format: ${result.format}`);
-    if (result.migrationRecommended) {
-      lines.push("  migration: legacy -> Agent Skills canonical form");
-    }
     for (const issue of result.issues) {
       lines.push(
         `  ${issue.severity.toUpperCase()} ${issue.code} L${issue.startLine}: ${issue.message}`,
       );
+    }
+    if (result.migrationRecommended) {
+      lines.push("");
+      lines.push("  Migration candidate:");
+      lines.push("    Historical top-level Renma Skill metadata was detected.");
+      lines.push("    Run:");
+      lines.push(`      ${result.migrationCommand}`);
     }
   }
 

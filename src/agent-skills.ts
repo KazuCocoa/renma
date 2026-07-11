@@ -2,7 +2,7 @@ import path from "node:path";
 
 import {
   canonicalRenmaMetadataFields,
-  legacyRenmaMetadataFields,
+  inspectLegacyRenmaSkillMetadata,
 } from "./renma-metadata.js";
 import type { ParsedDocument } from "./types.js";
 import {
@@ -52,6 +52,8 @@ export interface AgentSkillValidationResult {
   name?: string;
   description?: string;
   migrationRecommended: boolean;
+  migrationDirection?: "legacy-to-agent-skills";
+  migrationCommand?: string;
   legacyFields: string[];
   canonicalRenmaFields: string[];
   errorCount: number;
@@ -107,8 +109,8 @@ export function validateAgentSkill(
 ): AgentSkillValidationResult {
   const frontmatter = parseYamlFrontmatter(document.artifact.content);
   const issues: AgentSkillValidationIssue[] = [];
-  const legacyFields = legacyRenmaMetadataFields(document);
-  const canonicalFields = canonicalRenmaMetadataFields(document);
+  const legacyFields = inspectLegacyRenmaSkillMetadata(frontmatter).fields;
+  const canonicalFields = canonicalRenmaMetadataFields(frontmatter);
   const name = metadataText(frontmatter.values.name);
   const description = metadataText(frontmatter.values.description);
   const format = skillFormat({
@@ -295,16 +297,20 @@ export function validateAgentSkill(
 
   const errorCount = issues.filter((item) => item.severity === "error").length;
   const warningCount = issues.length - errorCount;
+  const migrationRecommended = legacyFields.length > 0;
   return {
     path: document.artifact.path,
     format,
     valid: errorCount === 0,
     ...(name ? { name } : {}),
     ...(description ? { description } : {}),
-    migrationRecommended:
-      format === "renma-legacy" ||
-      format === "hybrid" ||
-      unexpectedFields.length > 0,
+    migrationRecommended,
+    ...(migrationRecommended
+      ? {
+          migrationDirection: "legacy-to-agent-skills" as const,
+          migrationCommand: `renma suggest-metadata ${document.artifact.path}`,
+        }
+      : {}),
     legacyFields,
     canonicalRenmaFields: canonicalFields,
     errorCount,
@@ -536,8 +542,7 @@ function authoringIssues(
       !hasExplicitSkillSelectionBoundary(line.text),
   );
   const nonProminentConstraints = executionConstraints.filter(
-    (constraint) =>
-      !executionConstraintHeadingPattern().test(constraint.section),
+    (constraint) => prominentConstraintSection(constraint) === undefined,
   );
 
   if (
@@ -571,7 +576,10 @@ function authoringIssues(
   }
 
   const executionSections = new Set(
-    executionConstraints.map((constraint) => constraint.section),
+    executionConstraints.map(
+      (constraint) =>
+        prominentConstraintSection(constraint) ?? constraint.section,
+    ),
   );
   if (executionConstraints.length > 1 && executionSections.size > 1) {
     issues.push(
@@ -754,6 +762,7 @@ interface AuthoringBodyLine {
   line: number;
   text: string;
   section: string;
+  ancestors: string[];
 }
 
 function authoringBodyLines(document: ParsedDocument): AuthoringBodyLine[] {
@@ -766,6 +775,7 @@ function authoringBodyLines(document: ParsedDocument): AuthoringBodyLine[] {
   }
 
   let section = "<body>";
+  const headingStack: Array<{ depth: number; text: string }> = [];
   const result: AuthoringBodyLine[] = [];
   for (let index = bodyStart - 1; index < document.lines.length; index += 1) {
     const line = index + 1;
@@ -773,12 +783,30 @@ function authoringBodyLines(document: ParsedDocument): AuthoringBodyLine[] {
     const text = document.lines[index] ?? "";
     const heading = text.match(/^(#{1,6})\s+(.+?)\s*#*$/);
     if (heading) {
+      const depth = heading[1]?.length ?? 1;
       section = heading[2]?.trim() ?? "<body>";
+      while ((headingStack.at(-1)?.depth ?? 0) >= depth) headingStack.pop();
+      headingStack.push({ depth, text: section });
       continue;
     }
-    if (text.trim().length > 0) result.push({ line, text, section });
+    if (text.trim().length > 0) {
+      result.push({
+        line,
+        text,
+        section,
+        ancestors: headingStack.slice(0, -1).map((heading) => heading.text),
+      });
+    }
   }
   return result;
+}
+
+function prominentConstraintSection(
+  line: AuthoringBodyLine,
+): string | undefined {
+  return [line.section, ...line.ancestors]
+    .reverse()
+    .find((heading) => executionConstraintHeadingPattern().test(heading));
 }
 
 function bodyStartLine(document: ParsedDocument): number {

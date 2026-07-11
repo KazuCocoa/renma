@@ -1,5 +1,13 @@
 import path from "node:path";
 import type { Catalog, CatalogEntry } from "./model.js";
+import {
+  isLegacyRenmaMetadataKey,
+  metadataValueAsList,
+  metadataValueAsText,
+  readCanonicalRenmaMetadataField,
+  readCanonicalRenmaMetadataListItems,
+  readCanonicalRenmaMetadataValue,
+} from "./renma-metadata.js";
 import type { Diagnostic, Evidence, ParsedDocument } from "./types.js";
 
 export const CONTEXT_LENS_DIAGNOSTIC_CODES = {
@@ -549,6 +557,11 @@ function textMetadata(
   document: ParsedDocument,
   field: string,
 ): string | undefined {
+  if (document.artifact.kind === "skill" && isLegacyRenmaMetadataKey(field)) {
+    return metadataValueAsText(
+      readCanonicalRenmaMetadataValue(document, field),
+    );
+  }
   const value = document.metadata[field];
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
@@ -556,6 +569,11 @@ function textMetadata(
 }
 
 function listMetadata(document: ParsedDocument, field: string): string[] {
+  if (document.artifact.kind === "skill" && isLegacyRenmaMetadataKey(field)) {
+    return metadataValueAsList(
+      readCanonicalRenmaMetadataValue(document, field),
+    );
+  }
   const value = document.metadata[field];
   if (Array.isArray(value)) {
     return value.map((item) => item.trim()).filter(Boolean);
@@ -570,7 +588,10 @@ function listMetadata(document: ParsedDocument, field: string): string[] {
 }
 
 function fieldEvidence(document: ParsedDocument, field: string): Evidence {
-  const metadata = document.metadataFields[field];
+  const metadata =
+    document.artifact.kind === "skill" && isLegacyRenmaMetadataKey(field)
+      ? readCanonicalRenmaMetadataField(document, field)
+      : document.metadataFields[field];
   if (metadata) {
     return {
       path: metadata.path,
@@ -587,7 +608,10 @@ function listItemEvidence(
   field: string,
   index: number,
 ): Evidence {
-  const item = document.metadataListItems[field]?.[index];
+  const item =
+    document.artifact.kind === "skill" && isLegacyRenmaMetadataKey(field)
+      ? readCanonicalRenmaMetadataListItems(document, field)[index]
+      : document.metadataListItems[field]?.[index];
   if (item) {
     return {
       path: item.path,

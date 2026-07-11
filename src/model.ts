@@ -42,6 +42,44 @@ export interface AssetMetadata {
   optionalLens?: string[];
 }
 
+/** Serialization-independent governance semantics for an Agent Skill. */
+export interface SkillGovernance {
+  id?: string | undefined;
+  title?: string | undefined;
+  owner?: string | undefined;
+  lifecycle: {
+    status?: string | undefined;
+    version?: string | undefined;
+    lastReviewedAt?: string | undefined;
+    reviewCycle?: string | undefined;
+    expiresAt?: string | undefined;
+  };
+  selection: {
+    useWhen: string[];
+    doNotUseWhen: string[];
+  };
+  dependencies: {
+    requiredContext: string[];
+    optionalContext: string[];
+    requiredLens: string[];
+    optionalLens: string[];
+    conflicts: string[];
+  };
+  security: {
+    networkAllowed?: boolean | undefined;
+    externalUploadAllowed?: boolean | undefined;
+    secretsAllowed?: boolean | undefined;
+    humanApprovalRequired?: boolean | undefined;
+    allowedData: string[];
+    forbiddenInputs: string[];
+    approvedNetworkDestinations: string[];
+    approvedUploadDestinations: string[];
+    profile?: string | undefined;
+  };
+  /** All valid Agent Skills metadata entries, including unknown vendors. */
+  extensionMetadata: Record<string, string>;
+}
+
 /** Repository object Renma can catalog, validate, reference, or report on. */
 export interface Asset {
   id: string;

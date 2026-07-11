@@ -5,11 +5,16 @@ import type {
   ParsedDocument,
   ParsedMetadata,
 } from "./types.js";
+import type {
+  ParsedYamlFrontmatter,
+  YamlFrontmatterField,
+} from "./yaml-frontmatter.js";
 
 /**
  * Agent Skills permits client-specific string metadata under the top-level
  * `metadata` mapping. Renma writes its extension values as `renma.*` keys there
- * while continuing to read the historical top-level snake_case fields.
+ * Historical top-level fields are inspected only by the one-way Skill
+ * migration path. Normal Skill operations read canonical keys exclusively.
  */
 export const RENMA_METADATA_KEYS = {
   id: "id",
@@ -66,7 +71,12 @@ export const RENMA_LIST_METADATA_KEYS = new Set<LegacyRenmaMetadataKey>([
   "approved_upload_destinations",
 ]);
 
-const RENMA_CANONICAL_PREFIX = "metadata.renma.";
+export const RENMA_CANONICAL_PREFIX = "metadata.renma.";
+const KNOWN_CANONICAL_RENMA_KEYS = new Set(
+  Object.values(RENMA_METADATA_KEYS).map(
+    (key) => `${RENMA_CANONICAL_PREFIX}${key}`,
+  ),
+);
 
 export function canonicalRenmaMetadataKey(
   legacyKey: LegacyRenmaMetadataKey,
@@ -80,46 +90,69 @@ export function isLegacyRenmaMetadataKey(
   return Object.hasOwn(RENMA_METADATA_KEYS, value);
 }
 
-export function isCanonicalRenmaMetadataKey(value: string): boolean {
+export function isRenmaNamespacedMetadataKey(value: string): boolean {
   return value.startsWith(RENMA_CANONICAL_PREFIX);
 }
 
-export function readRenmaMetadataValue(
+export function isKnownCanonicalRenmaMetadataKey(value: string): boolean {
+  return KNOWN_CANONICAL_RENMA_KEYS.has(value);
+}
+
+export function readCanonicalRenmaMetadataValue(
   document: ParsedDocument,
   legacyKey: LegacyRenmaMetadataKey,
 ): MetadataValue | undefined {
-  return (
-    document.metadata[canonicalRenmaMetadataKey(legacyKey)] ??
-    document.metadata[legacyKey]
-  );
+  return document.metadata[canonicalRenmaMetadataKey(legacyKey)];
 }
 
-export function readRenmaMetadataField(
+export function readCanonicalRenmaMetadataField(
   document: ParsedDocument,
   legacyKey: LegacyRenmaMetadataKey,
 ): MetadataFieldEvidence | undefined {
-  return (
-    document.metadataFields[canonicalRenmaMetadataKey(legacyKey)] ??
-    document.metadataFields[legacyKey]
-  );
+  return document.metadataFields[canonicalRenmaMetadataKey(legacyKey)];
 }
 
-export function readRenmaMetadataListItems(
+export function readCanonicalRenmaMetadataListItems(
   document: ParsedDocument,
   legacyKey: LegacyRenmaMetadataKey,
 ): MetadataFieldEvidence[] {
-  return (
-    document.metadataListItems[canonicalRenmaMetadataKey(legacyKey)] ??
-    document.metadataListItems[legacyKey] ??
-    []
-  );
+  return document.metadataListItems[canonicalRenmaMetadataKey(legacyKey)] ?? [];
+}
+
+export function readCanonicalRenmaYamlValue(
+  frontmatter: ParsedYamlFrontmatter,
+  legacyKey: LegacyRenmaMetadataKey,
+): unknown {
+  const key = `renma.${RENMA_METADATA_KEYS[legacyKey]}`;
+  return frontmatter.metadataFields.find((field) => field.key === key)?.value;
+}
+
+export function readLegacyRenmaMetadataValue(
+  document: ParsedDocument,
+  key: LegacyRenmaMetadataKey,
+): MetadataValue | undefined {
+  return document.metadata[key];
+}
+
+export function readLegacyRenmaMetadataField(
+  document: ParsedDocument,
+  key: LegacyRenmaMetadataKey,
+): MetadataFieldEvidence | undefined {
+  return document.metadataFields[key];
+}
+
+export function readLegacyRenmaMetadataListItems(
+  document: ParsedDocument,
+  key: LegacyRenmaMetadataKey,
+): MetadataFieldEvidence[] {
+  return document.metadataListItems[key] ?? [];
 }
 
 /**
  * Add evidence aliases for existing catalog and graph code. Values stay
  * separate so canonical-vs-legacy conflicts can still be detected.
  */
-export function applyRenmaMetadataEvidenceAliases(
+export function applyCanonicalRenmaMetadataEvidenceAliases(
   metadata: ParsedMetadata,
 ): ParsedMetadata {
   for (const legacyKey of Object.keys(
@@ -136,24 +169,43 @@ export function applyRenmaMetadataEvidenceAliases(
   return metadata;
 }
 
-export function legacyRenmaMetadataFields(
-  document: ParsedDocument,
-): LegacyRenmaMetadataKey[] {
-  return (Object.keys(RENMA_METADATA_KEYS) as LegacyRenmaMetadataKey[]).filter(
-    (key) => document.metadata[key] !== undefined,
-  );
+export interface LegacyRenmaSkillMetadataInspection {
+  fields: LegacyRenmaMetadataKey[];
+  values: Partial<Record<LegacyRenmaMetadataKey, unknown>>;
+  fieldEvidence: Partial<Record<LegacyRenmaMetadataKey, YamlFrontmatterField>>;
+}
+
+/** Inspect historical Skill fields without making them operational metadata. */
+export function inspectLegacyRenmaSkillMetadata(
+  frontmatter: ParsedYamlFrontmatter,
+): LegacyRenmaSkillMetadataInspection {
+  const values: Partial<Record<LegacyRenmaMetadataKey, unknown>> = {};
+  const fieldEvidence: Partial<
+    Record<LegacyRenmaMetadataKey, YamlFrontmatterField>
+  > = {};
+  const fields: LegacyRenmaMetadataKey[] = [];
+  for (const field of frontmatter.fields) {
+    if (!isLegacyRenmaMetadataKey(field.key)) continue;
+    if (!fields.includes(field.key)) fields.push(field.key);
+    values[field.key] = field.value;
+    fieldEvidence[field.key] = field;
+  }
+  return { fields: fields.sort(), values, fieldEvidence };
 }
 
 export function canonicalRenmaMetadataFields(
-  document: ParsedDocument,
+  frontmatter: ParsedYamlFrontmatter,
 ): string[] {
-  return Object.keys(document.metadata)
-    .filter(isCanonicalRenmaMetadataKey)
+  return frontmatter.metadataFields
+    .map((field) => `metadata.${field.key}`)
+    .filter(isRenmaNamespacedMetadataKey)
     .sort((a, b) => a.localeCompare(b));
 }
 
-export function renmaMetadataConflictDiagnostics(
+export function legacySkillMetadataConflictDiagnostics(
   document: ParsedDocument,
+  legacy: LegacyRenmaSkillMetadataInspection,
+  frontmatter: ParsedYamlFrontmatter,
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
@@ -161,16 +213,17 @@ export function renmaMetadataConflictDiagnostics(
     RENMA_METADATA_KEYS,
   ) as LegacyRenmaMetadataKey[]) {
     const canonicalKey = canonicalRenmaMetadataKey(legacyKey);
-    const canonical = document.metadata[canonicalKey];
-    const legacy = document.metadata[legacyKey];
-    if (canonical === undefined || legacy === undefined) continue;
+    const canonical = readCanonicalRenmaYamlValue(frontmatter, legacyKey);
+    const legacyValue = migrationMetadataValue(legacy.values[legacyKey]);
+    if (canonical === undefined || legacyValue === undefined) continue;
+    if (!isMetadataValue(canonical)) continue;
 
     const canonicalNormalized = normalizedMetadataValue(
       canonical,
       RENMA_LIST_METADATA_KEYS.has(legacyKey),
     );
     const legacyNormalized = normalizedMetadataValue(
-      legacy,
+      legacyValue,
       RENMA_LIST_METADATA_KEYS.has(legacyKey),
     );
     if (canonicalNormalized === legacyNormalized) continue;
@@ -180,7 +233,7 @@ export function renmaMetadataConflictDiagnostics(
       code: "RENMA-METADATA-CONFLICTING-SOURCES",
       severity: "warning",
       path: document.artifact.path,
-      message: `Renma metadata field "${legacyKey}" differs between canonical ${canonicalKey} and the legacy top-level field. The canonical Agent Skills metadata value takes precedence.`,
+      message: `Renma metadata field "${legacyKey}" differs between canonical ${canonicalKey} and the historical top-level field. Migration is blocked until a human chooses the retained value.`,
       ...(field
         ? {
             evidence: {
@@ -213,12 +266,30 @@ export function renmaMetadataConflictDiagnostics(
         canonicalKey,
         legacyKey,
         canonicalValue: canonical,
-        legacyValue: legacy,
+        legacyValue,
       },
     });
   }
 
   return diagnostics;
+}
+
+function isMetadataValue(value: unknown): value is MetadataValue {
+  return (
+    typeof value === "string" ||
+    (Array.isArray(value) && value.every((item) => typeof item === "string"))
+  );
+}
+
+function migrationMetadataValue(value: unknown): MetadataValue | undefined {
+  if (typeof value === "string") return value;
+  if (typeof value === "boolean" || typeof value === "number") {
+    return String(value);
+  }
+  if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+    return value;
+  }
+  return undefined;
 }
 
 export function metadataValueAsText(

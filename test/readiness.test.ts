@@ -15,6 +15,7 @@ import {
 } from "../src/commands/readiness.js";
 import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
 import type { Finding } from "../src/types.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 test("readiness report marks fully owned resolved inventory ready", async () => {
   const root = await fixture();
@@ -755,12 +756,15 @@ async function writeSkill(
   await mkdir(path.join(root, "skills", id), { recursive: true });
   await writeFile(
     path.join(root, "skills", id, "SKILL.md"),
-    markdown({
-      id,
-      ...metadata,
-      title: `# ${id}`,
-      body: metadata.body ?? workflowReadySkillBody(id),
-    }),
+    canonicalSkillFixture(
+      path.join("skills", id, "SKILL.md"),
+      markdown({
+        id,
+        ...metadata,
+        title: `# ${id}`,
+        body: metadata.body ?? workflowReadySkillBody(id),
+      }),
+    ),
   );
 }
 
@@ -820,18 +824,21 @@ async function writePolicySkill(root: string): Promise<void> {
   await mkdir(path.join(root, "skills", "policy"), { recursive: true });
   await writeFile(
     path.join(root, "skills", "policy", "SKILL.md"),
-    [
-      "---",
-      "id: policy",
-      "owner: platform",
-      "status: stable",
-      "description: Clear workflow routing for readiness report tests with deterministic security policy metadata and verification expectations.",
-      "network_allowed: true",
-      "approved_network_destinations: api.example.com",
-      "forbidden_inputs: credentials",
-      "---",
-      workflowReadySkillBody("policy"),
-    ].join("\n"),
+    canonicalSkillFixture(
+      "skills/policy/SKILL.md",
+      [
+        "---",
+        "id: policy",
+        "owner: platform",
+        "status: stable",
+        "description: Clear workflow routing for readiness report tests with deterministic security policy metadata and verification expectations.",
+        "network_allowed: true",
+        "approved_network_destinations: api.example.com",
+        "forbidden_inputs: credentials",
+        "---",
+        workflowReadySkillBody("policy"),
+      ].join("\n"),
+    ),
   );
 }
 

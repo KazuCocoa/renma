@@ -5,6 +5,7 @@ import { buildCatalog } from "../src/catalog.js";
 import { parseDocument } from "../src/markdown.js";
 import { parseAssetMetadata } from "../src/metadata.js";
 import type { Artifact, ArtifactKind } from "../src/types.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 test("parseAssetMetadata normalizes supported frontmatter", () => {
   const document = parseDocument(
@@ -311,14 +312,15 @@ conflicts: android
 ---
 # Demo
 `;
-  const { catalog } = buildCatalog([
-    parseDocument(artifact("skills/demo/SKILL.md", "skill", skillContent)),
-  ]);
+  const skillDocument = parseDocument(
+    artifact("skills/demo/SKILL.md", "skill", skillContent),
+  );
+  const { catalog } = buildCatalog([skillDocument]);
 
   assert.equal(catalog.assets, catalog.entries);
   assert.equal(
     catalog.entries[0]?.contentHash,
-    `sha256:${createHash("sha256").update(skillContent).digest("hex")}`,
+    `sha256:${createHash("sha256").update(skillDocument.artifact.content).digest("hex")}`,
   );
   assert.deepEqual(
     catalog.dependencies.map((dependency) => ({
@@ -404,28 +406,31 @@ test("parseDocument records frontmatter field evidence", () => {
       "skills/demo/SKILL.md",
       "skill",
       `---
-id: skill.demo
-requires_context:
-  - context.demo.required
+name: demo
+description: Use this demo skill for deterministic catalog evidence tests.
+metadata:
+  renma.id: skill.demo
+  renma.requires-context: '["context.demo.required"]'
 ---
 # Demo
 `,
     ),
   );
 
-  assert.deepEqual(document.metadata.requires_context, [
-    "context.demo.required",
-  ]);
-  assert.equal(document.metadataFields.requires_context?.startLine, 3);
-  assert.equal(document.metadataFields.requires_context?.endLine, 4);
   assert.equal(
-    document.metadataFields.requires_context?.raw,
-    "requires_context:\n  - context.demo.required",
+    document.metadata["metadata.renma.requires-context"],
+    '["context.demo.required"]',
   );
-  assert.equal(document.metadataListItems.requires_context?.[0]?.startLine, 4);
+  assert.equal(document.metadataFields.requires_context?.startLine, 6);
+  assert.equal(document.metadataFields.requires_context?.endLine, 6);
+  assert.match(
+    document.metadataFields.requires_context?.raw ?? "",
+    /renma\.requires-context/,
+  );
+  assert.equal(document.metadataListItems.requires_context?.[0]?.startLine, 6);
   assert.equal(
     document.metadataListItems.requires_context?.[0]?.raw,
-    "  - context.demo.required",
+    "  renma.requires-context: '[\"context.demo.required\"]'",
   );
 });
 
@@ -436,9 +441,11 @@ test("buildCatalog uses metadata field evidence on dependency edges", () => {
         "skills/demo/SKILL.md",
         "skill",
         `---
-id: skill.demo
-requires_context:
-  - context.demo.required
+name: demo
+description: Use this demo skill for deterministic catalog evidence tests.
+metadata:
+  renma.id: skill.demo
+  renma.requires-context: '["context.demo.required"]'
 ---
 # Demo
 `,
@@ -459,11 +466,11 @@ status: stable
     ),
   ]);
 
-  assert.equal(catalog.dependencies[0]?.evidence?.startLine, 4);
-  assert.equal(catalog.dependencies[0]?.evidence?.endLine, 4);
-  assert.equal(
-    catalog.dependencies[0]?.evidence?.snippet,
-    "  - context.demo.required",
+  assert.equal(catalog.dependencies[0]?.evidence?.startLine, 6);
+  assert.equal(catalog.dependencies[0]?.evidence?.endLine, 6);
+  assert.match(
+    catalog.dependencies[0]?.evidence?.snippet ?? "",
+    /renma\.requires-context/,
   );
 });
 
@@ -474,10 +481,11 @@ test("buildCatalog validates dependency targets", () => {
         "skills/demo/SKILL.md",
         "skill",
         `---
-id: skill.demo
-optional_context:
-  - context.demo.missing
-  - context.demo.old
+name: demo
+description: Use this demo skill for deterministic catalog evidence tests.
+metadata:
+  renma.id: skill.demo
+  renma.optional-context: '["context.demo.missing","context.demo.old"]'
 ---
 # Demo
 `,
@@ -501,14 +509,14 @@ status: deprecated
   const unknown = diagnostics.find((diagnostic) =>
     diagnostic.message.includes("does not match a catalog entry"),
   );
-  assert.equal(unknown?.evidence?.startLine, 4);
-  assert.equal(unknown?.evidence?.endLine, 4);
+  assert.equal(unknown?.evidence?.startLine, 6);
+  assert.equal(unknown?.evidence?.endLine, 6);
 
   const inactive = diagnostics.find((diagnostic) =>
     diagnostic.message.includes("targets a deprecated asset"),
   );
-  assert.equal(inactive?.evidence?.startLine, 5);
-  assert.equal(inactive?.evidence?.endLine, 5);
+  assert.equal(inactive?.evidence?.startLine, 6);
+  assert.equal(inactive?.evidence?.endLine, 6);
 });
 
 test("buildCatalog suppresses generic missing-target diagnostics for conflicts", () => {
@@ -576,6 +584,6 @@ function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
     absolutePath: `/tmp/${path}`,
     kind,
     sizeBytes: Buffer.byteLength(content),
-    content,
+    content: kind === "skill" ? canonicalSkillFixture(path, content) : content,
   };
 }

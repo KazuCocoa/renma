@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { formatReadiness, readiness } from "../src/commands/readiness.js";
 import { scan } from "../src/scanner.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 test("strict layout findings explain generic skill-local support moves", async () => {
   const root = await fixture();
@@ -239,7 +240,13 @@ async function writeMarkdown(
   relativePath: string,
   content: string,
 ): Promise<void> {
-  await writeFileInRepo(root, relativePath, content);
+  await writeFileInRepo(
+    root,
+    relativePath,
+    relativePath.endsWith("/SKILL.md")
+      ? canonicalSkillFixture(relativePath, content)
+      : content,
+  );
 }
 
 async function writeFileInRepo(

@@ -54,6 +54,10 @@ export async function runScaffoldCommand(
 }
 
 export function buildScaffoldBundle(options: ScaffoldOptions): ScaffoldBundle {
+  const skillName =
+    options.kind === "skill"
+      ? requiredAgentSkillName(options.targetPath)
+      : undefined;
   const id = options.id ?? inferId(options.kind, options.targetPath);
   const title = options.title ?? titleFromId(id);
   const owner = options.owner ?? "unowned";
@@ -62,7 +66,7 @@ export function buildScaffoldBundle(options: ScaffoldOptions): ScaffoldBundle {
   const skillIdentity =
     options.kind === "skill"
       ? {
-          name: requiredAgentSkillName(options.targetPath),
+          name: skillName ?? "skill",
           description: draftSkillDescription(title),
         }
       : undefined;
@@ -337,12 +341,20 @@ function renderTagBlock(tags: string[]): string {
 
 function inferId(kind: ScaffoldKind, targetPath: string): string {
   const withoutExtension = targetPath.replace(/\.[^/.]+$/, "");
-  const normalized = withoutExtension
+  const rawParts = withoutExtension
     .split(/[\\/]+/)
     .filter(Boolean)
-    .filter((part) => part !== "SKILL")
-    .map(slugify)
-    .filter(Boolean);
+    .filter((part) => part !== "SKILL");
+  if (kind === "skill") {
+    const skillRoot = rawParts.lastIndexOf("skills");
+    const skillParts = rawParts.slice(skillRoot >= 0 ? skillRoot + 1 : 0);
+    if (skillParts.some((part) => slugify(part) !== part)) {
+      throw new Error(
+        `Cannot derive a unique Renma ID from the Skill path "${targetPath}". Provide --id explicitly.`,
+      );
+    }
+  }
+  const normalized = rawParts.map(slugify).filter(Boolean);
 
   if (kind === "skill") {
     const skillRoot = normalized.lastIndexOf("skills");

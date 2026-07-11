@@ -5,6 +5,18 @@ format for agent-facing `SKILL.md` files. Renma does not define a competing skil
 format. It validates the portable Agent Skills surface and stores repository
 governance extensions inside the standard `metadata` mapping.
 
+## Breaking Change in 0.16.0
+
+Starting with Renma 0.16.0, Agent Skills-compatible frontmatter is the only
+operational format for `SKILL.md`. Historical top-level Renma Skill fields are
+read only by the one-way migration assistant. They do not provide IDs, owners,
+relationships, lifecycle state, or security policy to scan, catalog, graph,
+ownership, readiness, BOM, trust, or security processing. Legacy and hybrid
+Skills remain invalid until migration is complete.
+
+This breaking format transition applies to Skills only. Context assets and
+context lenses retain their existing Renma frontmatter format.
+
 This design keeps two responsibilities separate:
 
 ```text
@@ -67,7 +79,9 @@ NFKC normalization and validates it with the same rules as `validate-skills`.
 It does not ASCII-slugify or silently rename that identity. A directory such as
 `MySkill`, `-demo`, or `demo--review` must be renamed before scaffolding or
 migration can continue. Valid Unicode letters and numbers remain supported;
-Renma ID normalization is a separate repository-governance concern.
+Renma ID normalization is a separate repository-governance concern. If a
+unique, non-lossy Renma ID cannot be derived from a Unicode path, scaffolding or
+migration requires an explicit `--id` rather than collapsing names to `skill`.
 
 ## Validation
 
@@ -105,9 +119,11 @@ Validation covers deterministic requirements including:
 - `metadata` as a string-to-string mapping;
 - duplicate top-level fields and duplicate `metadata` child keys.
 
-Invalid YAML is a gating specification failure. The lightweight repository
+Invalid YAML is a gating specification failure. The parsed YAML 1.2 tree is also
+the source of canonical Skill metadata for normal Renma operations, including
+quoted keys, inline mappings, and inline comments. The lightweight repository
 Markdown parser remains in use for headings, links, code fences, legacy context
-assets, and line evidence; it is not the source of Agent Skills validity.
+assets, and body evidence; it does not reinterpret Skill frontmatter.
 
 Renma additionally emits authoring warnings for boundaries that are important to
 agent behavior but are not structural specification errors.
@@ -117,8 +133,8 @@ will obey every instruction.
 
 ## One-Way Legacy Migration
 
-Renma continues to read historical top-level metadata so existing repositories
-can be inspected and migrated:
+Renma's migration inspector reads historical top-level metadata so existing
+repositories can be converted:
 
 ```yaml
 ---
@@ -166,9 +182,11 @@ For a skill, the result now includes:
 The command still does not edit files. An external coding agent may propose the
 small patch, Renma verifies it, and a human approves it.
 
-## Metadata Precedence During Migration
+## Legacy and Hybrid Migration Inputs
 
-Renma reads both forms during the transition:
+Normal Skill operations never apply legacy fallback or precedence. In this
+hybrid input, operational metadata can come only from `metadata.renma.*`, while
+the top-level value is migration evidence:
 
 ```yaml
 owner: legacy-owner
@@ -176,17 +194,34 @@ metadata:
   renma.owner: canonical-owner
 ```
 
-The canonical `metadata.renma.*` value takes precedence. If the two forms differ,
-Renma reports `RENMA-METADATA-CONFLICTING-SOURCES`; it does not silently decide
-which semantic value should survive. Resolve the conflict through human review,
-then remove the legacy duplicate.
+The Skill is invalid because `owner` is not an Agent Skills top-level field.
+The migration assistant reports `RENMA-METADATA-CONFLICTING-SOURCES`, preserves
+both sources, and blocks canonical output until a human chooses the retained
+semantic value. It never selects a winner. Invalid YAML, non-mapping
+frontmatter, duplicate keys, invalid metadata value types, invalid directory
+names, and ungrounded descriptions also block canonical output.
 
-For deterministic security evaluation, a canonical value replaces its legacy
-counterpart regardless of field order. Canonical lists replace rather than
-union with legacy lists, so stale legacy permissions or destinations cannot
-widen the effective policy. The conflict diagnostic remains visible, and
-`suggest-metadata` blocks canonical frontmatter generation while preserving
-both sources until a human chooses the retained semantic value.
+## Namespace, Preservation, and Governance Role
+
+Agent Skills owns `name`, `description`, `license`, `compatibility`, `metadata`,
+and `allowed-tools`. Renma owns flat metadata keys beginning with `renma.`. A
+nested `metadata.renma` mapping is not used because Agent Skills metadata values
+must be strings.
+
+Known `renma.*` values are interpreted into a serialization-independent Skill
+governance model covering identity, ownership, lifecycle, selection evidence,
+dependencies, and security. Unknown `renma.*` values and other vendors' string
+metadata are preserved without interpretation during suggestions and canonical
+rewrites. This supports future Renma versions, third-party clients, and explicit
+migrations to future standard Agent Skills fields without inventing those fields
+now.
+
+Renma metadata is deterministic governance evidence. A generic Agent Skills
+client may not send arbitrary metadata to a model, so behavior-critical
+requirements remain on the portable LLM-facing surface: selection boundaries in
+`description`, execution constraints in the body, and supporting knowledge in
+body references. Renma can check consistency, but metadata itself does not
+guarantee runtime behavior or model compliance.
 
 ## Separating Selection Boundaries From Execution Constraints
 
@@ -246,8 +281,9 @@ Renma warns when an explicit selection exclusion is absent from `description`,
 when an execution constraint is outside a prominent constraint section, when
 constraints are scattered across sections, or when a prohibition has no nearby
 deterministic stop or alternative instruction. Prominence is evaluated for the
-section containing each constraint; an empty `Hard Constraints` heading does
-not make a prohibition buried under `Procedure` prominent. It does not require every skill
+section containing each constraint and its heading ancestry. Subsections under
+`Hard Constraints` remain prominent, while an unrelated empty constraint
+heading does not make a prohibition buried under `Procedure` prominent. It does not require every skill
 to have a negative description clause, copy execution constraints into
 `description` or `metadata.renma.when-not-to-use`, or invent missing behavior.
 
@@ -291,7 +327,8 @@ skill. The scaffold includes:
 
 Scaffolding refuses to create a Skill when its immediate parent directory is
 not already a valid Agent Skills name. It does not create a lowercased or
-ASCII-only substitute.
+ASCII-only substitute. A Unicode Skill name is valid, but requires `--id` when
+the path cannot produce a unique non-lossy Renma ID.
 
 ## Repository Boundary
 

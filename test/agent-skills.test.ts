@@ -12,7 +12,7 @@ import {
 import { buildScaffoldBundle } from "../src/commands/scaffold.js";
 import { buildMetadataSuggestion } from "../src/commands/suggest-metadata.js";
 import { parseDocument } from "../src/markdown.js";
-import { parseAssetMetadata } from "../src/metadata.js";
+import { parseAssetMetadata, parseSkillGovernance } from "../src/metadata.js";
 import type { Artifact } from "../src/types.js";
 
 test("validates the Agent Skills specification and canonical Renma metadata", () => {
@@ -68,6 +68,11 @@ when_not_to_use:
   assert.equal(validation.valid, false);
   assert.equal(validation.format, "renma-legacy");
   assert.equal(validation.migrationRecommended, true);
+  assert.equal(validation.migrationDirection, "legacy-to-agent-skills");
+  assert.equal(
+    validation.migrationCommand,
+    "renma suggest-metadata skills/demo/SKILL.md",
+  );
   assert.ok(
     validation.issues.some(
       (issue) => issue.code === "AS-SKILL-UNEXPECTED-TOP-LEVEL-FIELD",
@@ -456,6 +461,82 @@ description: Reviews demo inputs. Use when a demo needs review.
       (issue) => issue.code === "RN-SKILL-EXECUTION-CONSTRAINT-SCATTERED",
     ),
   );
+});
+
+test("treats nested constraint subsections as prominent", () => {
+  const content = `---
+name: demo
+description: Reviews demo inputs. Use when a demo needs review.
+---
+# Demo
+
+## Hard Constraints
+
+### File Changes
+
+- Do not modify production files. Produce a patch instead.
+
+### Network Safety
+
+- Never upload secrets. Stop and report the blocked operation.
+`;
+  const validation = validateAgentSkill(
+    parseDocument(artifact("skills/demo/SKILL.md", content)),
+  );
+
+  assert.equal(
+    validation.issues.some((issue) => issue.code.includes("NOT-PROMINENT")),
+    false,
+  );
+  assert.equal(
+    validation.issues.some((issue) => issue.code.includes("SCATTERED")),
+    false,
+  );
+});
+
+test("uses one YAML interpretation for quoted and inline canonical metadata", () => {
+  for (const metadataYaml of [
+    'metadata:\n  "renma.owner": "qa-platform"',
+    'metadata: { "renma.owner": "qa-platform", "renma.future-field": "keep-me", "other-client.priority": "high" }',
+    "metadata: # repository governance\n  renma.owner: qa-platform",
+  ]) {
+    const content = `---
+name: demo
+description: Reviews demo inputs. Use when a demo needs review.
+${metadataYaml}
+---
+# Demo
+`;
+    const document = parseDocument(artifact("skills/demo/SKILL.md", content));
+    const validation = validateAgentSkill(document);
+    const { metadata } = parseAssetMetadata(document);
+
+    assert.equal(validation.valid, true, metadataYaml);
+    assert.equal(metadata.owner, "qa-platform", metadataYaml);
+  }
+});
+
+test("Skill governance preserves unknown Renma and vendor metadata", () => {
+  const content = `---
+name: demo
+description: Reviews demo inputs. Use when a demo needs review.
+metadata:
+  renma.id: skill.demo
+  renma.future-field: keep-me
+  other-client.priority: high
+---
+# Demo
+`;
+  const governance = parseSkillGovernance(
+    parseDocument(artifact("skills/demo/SKILL.md", content)),
+  );
+
+  assert.equal(governance.id, "skill.demo");
+  assert.deepEqual(governance.extensionMetadata, {
+    "renma.id": "skill.demo",
+    "renma.future-field": "keep-me",
+    "other-client.priority": "high",
+  });
 });
 
 test("summarizes repository-wide Agent Skills validation", () => {

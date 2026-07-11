@@ -2,11 +2,13 @@ import { parseDocument } from "./markdown.js";
 import {
   metadataValueAsList,
   metadataValueAsText,
-  readRenmaMetadataField,
-  readRenmaMetadataValue,
+  readCanonicalRenmaMetadataField,
+  readCanonicalRenmaMetadataValue,
+  readLegacyRenmaMetadataField,
+  readLegacyRenmaMetadataValue,
   type LegacyRenmaMetadataKey,
 } from "./renma-metadata.js";
-import type { Artifact, SecurityConfig } from "./types.js";
+import type { Artifact, ArtifactKind, SecurityConfig } from "./types.js";
 
 export interface SecurityPolicy {
   networkAllowed?: boolean;
@@ -62,7 +64,10 @@ const CANONICAL_SECURITY_KEYS = new Map<string, string>([
   ["security-profile", "security_profile"],
 ]);
 
-export function parseSecurityPolicy(content: string): SecurityPolicy {
+export function parseSecurityPolicy(
+  content: string,
+  artifactKind: ArtifactKind = "unknown",
+): SecurityPolicy {
   const policy: SecurityPolicy = {
     allowedData: [],
     forbiddenInputs: [],
@@ -77,7 +82,7 @@ export function parseSecurityPolicy(content: string): SecurityPolicy {
   const document = parseDocument({
     path: "<security-policy>",
     absolutePath: "<security-policy>",
-    kind: "unknown",
+    kind: artifactKind,
     sizeBytes: Buffer.byteLength(normalizedContent),
     content: normalizedContent,
   } satisfies Artifact);
@@ -85,7 +90,7 @@ export function parseSecurityPolicy(content: string): SecurityPolicy {
   for (const [key, booleanField] of BOOLEAN_POLICY_FIELDS) {
     const legacyKey = key as LegacyRenmaMetadataKey;
     const value = metadataValueAsText(
-      readRenmaMetadataValue(document, legacyKey),
+      readPolicyMetadataValue(document, legacyKey),
     );
     const parsed = value === undefined ? undefined : parseBoolean(value);
     if (parsed === undefined) continue;
@@ -109,7 +114,7 @@ export function parseSecurityPolicy(content: string): SecurityPolicy {
   assignPolicyList(document, policy, "forbidden_inputs", "forbiddenInputs");
 
   const securityProfile = metadataValueAsText(
-    readRenmaMetadataValue(document, "security_profile"),
+    readPolicyMetadataValue(document, "security_profile"),
   );
   if (securityProfile !== undefined) {
     policy.securityProfile = securityProfile;
@@ -142,7 +147,7 @@ function assignPolicyList(
     | "allowedData"
     | "forbiddenInputs",
 ): void {
-  const value = readRenmaMetadataValue(document, metadataKey);
+  const value = readPolicyMetadataValue(document, metadataKey);
   if (value === undefined) return;
   policy[policyKey] = metadataValueAsList(value);
   declarePolicyField(document, policy, metadataKey, policyKey);
@@ -155,8 +160,26 @@ function declarePolicyField(
   policyKey: keyof SecurityPolicy,
 ): void {
   policy.declared.add(policyKey);
-  const line = readRenmaMetadataField(document, metadataKey)?.startLine;
+  const line = readPolicyMetadataField(document, metadataKey)?.startLine;
   if (line !== undefined) policy.lineByField.set(policyKey, line);
+}
+
+function readPolicyMetadataValue(
+  document: ReturnType<typeof parseDocument>,
+  key: LegacyRenmaMetadataKey,
+) {
+  return document.artifact.kind === "skill"
+    ? readCanonicalRenmaMetadataValue(document, key)
+    : readLegacyRenmaMetadataValue(document, key);
+}
+
+function readPolicyMetadataField(
+  document: ReturnType<typeof parseDocument>,
+  key: LegacyRenmaMetadataKey,
+) {
+  return document.artifact.kind === "skill"
+    ? readCanonicalRenmaMetadataField(document, key)
+    : readLegacyRenmaMetadataField(document, key);
 }
 
 export function applySecurityConfig(

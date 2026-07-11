@@ -131,7 +131,7 @@ export function summarizeSecurityPolicyInventory(
   const profileNames = new Map<string, number>();
 
   for (const artifact of artifacts) {
-    const parsedPolicy = parseSecurityPolicy(artifact.content);
+    const parsedPolicy = parseSecurityPolicy(artifact.content, artifact.kind);
     const hasMetadata = hasLocalSecurityPolicyMetadata(parsedPolicy);
     if (!isPolicyInventoryArtifact(artifact, hasMetadata)) continue;
 
@@ -203,7 +203,7 @@ export function collectSecurityPolicyAssetEvidence(
 ): SecurityPolicyAssetEvidence[] {
   return artifacts
     .map((artifact): SecurityPolicyAssetEvidence | undefined => {
-      const parsedPolicy = parseSecurityPolicy(artifact.content);
+      const parsedPolicy = parseSecurityPolicy(artifact.content, artifact.kind);
       const hasMetadata = hasLocalSecurityPolicyMetadata(parsedPolicy);
       if (!isPolicyInventoryArtifact(artifact, hasMetadata)) return undefined;
 
@@ -272,7 +272,7 @@ export function zeroSecurityPolicyInventorySummary(): SecurityPolicyInventorySum
 export function isPolicyInventoryArtifact(
   artifact: Artifact,
   hasLocalMetadata = hasLocalSecurityPolicyMetadata(
-    parseSecurityPolicy(artifact.content),
+    parseSecurityPolicy(artifact.content, artifact.kind),
   ),
 ): boolean {
   return POLICY_INVENTORY_KINDS.has(artifact.kind) || hasLocalMetadata;

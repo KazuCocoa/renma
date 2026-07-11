@@ -5,7 +5,7 @@ import { parseDocument } from "../src/markdown.js";
 import { parseAssetMetadata } from "../src/metadata.js";
 import type { Artifact } from "../src/types.js";
 
-test("canonical Renma metadata takes precedence over legacy fields and preserves evidence", () => {
+test("normal Skill metadata ignores historical top-level fields", () => {
   const content = `---
 name: demo
 description: Reviews demo inputs. Use when a demo needs review. Do not use for production work.
@@ -21,18 +21,28 @@ metadata:
   const document = parseDocument(artifact(content));
   const result = parseAssetMetadata(document);
 
-  assert.equal(result.metadata.owner, "canonical-owner");
-  assert.deepEqual(result.metadata.requiresContext, ["context.canonical"]);
-  assert.equal(
-    document.metadataFields.requires_context?.startLine,
-    document.metadataFields["metadata.renma.requires-context"]?.startLine,
-  );
-  assert.equal(
-    result.diagnostics.filter(
-      (diagnostic) => diagnostic.code === "RENMA-METADATA-CONFLICTING-SOURCES",
-    ).length,
-    2,
-  );
+  assert.equal(result.metadata.owner, undefined);
+  assert.deepEqual(result.metadata.requiresContext, []);
+  assert.equal(document.metadataFields.requires_context, undefined);
+  assert.deepEqual(result.diagnostics, []);
+  assert.equal(document.metadata["metadata.renma.owner"], undefined);
+  assert.equal(document.metadata.requires_context, undefined);
+});
+
+test("legacy-only Skill metadata is not operational", () => {
+  const content = `---
+id: skill.demo
+owner: qa-platform
+requires_context:
+  - context.demo
+---
+# Demo
+`;
+  const result = parseAssetMetadata(parseDocument(artifact(content)));
+
+  assert.equal(result.metadata.id, undefined);
+  assert.equal(result.metadata.owner, undefined);
+  assert.deepEqual(result.metadata.requiresContext, []);
 });
 
 function artifact(content: string): Artifact {

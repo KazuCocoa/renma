@@ -1,4 +1,9 @@
-import { applyRenmaMetadataEvidenceAliases } from "./renma-metadata.js";
+import {
+  applyCanonicalRenmaMetadataEvidenceAliases,
+  RENMA_LIST_METADATA_KEYS,
+  RENMA_METADATA_KEYS,
+  type LegacyRenmaMetadataKey,
+} from "./renma-metadata.js";
 import type {
   Artifact,
   CodeFence,
@@ -9,6 +14,10 @@ import type {
   ParsedMetadata,
   ParsedDocument,
 } from "./types.js";
+import {
+  parseYamlFrontmatter,
+  yamlFrontmatterFieldEvidence,
+} from "./yaml-frontmatter.js";
 
 /** Parse a markdown artifact into headings, links, code fences, and frontmatter metadata. */
 export function parseDocument(artifact: Artifact): ParsedDocument {
@@ -16,7 +25,10 @@ export function parseDocument(artifact: Artifact): ParsedDocument {
   const headings: Heading[] = [];
   const links: Link[] = [];
   const codeFences: CodeFence[] = [];
-  const metadata = parseFrontmatter(artifact.path, lines);
+  const metadata =
+    artifact.kind === "skill"
+      ? parseCanonicalSkillFrontmatter(artifact.path, lines, artifact.content)
+      : parseFrontmatter(artifact.path, lines);
   let fenceStart: number | undefined;
   let fenceLanguage = "";
   let fenceLines: string[] = [];
@@ -216,7 +228,109 @@ function parseFrontmatter(path: string, lines: string[]): ParsedMetadata {
     fields[key] = frontmatterFieldEvidence(path, key, lines, index, index);
   }
 
-  return applyRenmaMetadataEvidenceAliases(result);
+  return result;
+}
+
+/** Build the operational Skill metadata view from the same YAML tree used by validation. */
+function parseCanonicalSkillFrontmatter(
+  path: string,
+  lines: string[],
+  content: string,
+): ParsedMetadata {
+  const values: Record<string, MetadataValue> = {};
+  const fields: Record<string, MetadataFieldEvidence> = {};
+  const listItems: Record<string, MetadataFieldEvidence[]> = {};
+  const result = { values, fields, listItems };
+  const parsed = parseYamlFrontmatter(content);
+
+  // Ambiguous YAML never becomes operational metadata. Validation still reports
+  // the exact parser and duplicate-key failures from the full YAML result.
+  if (
+    !parsed.present ||
+    !parsed.closed ||
+    !parsed.mapping ||
+    parsed.errors.length > 0 ||
+    parsed.duplicateFields.length > 0 ||
+    parsed.duplicateMetadataKeys.length > 0
+  ) {
+    return result;
+  }
+
+  const allowedTopLevelFields = new Set([
+    "name",
+    "description",
+    "license",
+    "compatibility",
+    "metadata",
+    "allowed-tools",
+  ]);
+  if (
+    parsed.fields.some((field) => !allowedTopLevelFields.has(field.key)) ||
+    typeof parsed.values.name !== "string" ||
+    parsed.values.name.trim().length === 0 ||
+    typeof parsed.values.description !== "string" ||
+    parsed.values.description.trim().length === 0 ||
+    ["license", "compatibility", "allowed-tools"].some(
+      (key) =>
+        parsed.values[key] !== undefined &&
+        typeof parsed.values[key] !== "string",
+    ) ||
+    (parsed.values.metadata !== undefined &&
+      (typeof parsed.values.metadata !== "object" ||
+        parsed.values.metadata === null ||
+        Array.isArray(parsed.values.metadata) ||
+        Object.values(parsed.values.metadata).some(
+          (value) => typeof value !== "string",
+        )))
+  ) {
+    return result;
+  }
+
+  const standardFields = new Set([
+    "name",
+    "description",
+    "license",
+    "compatibility",
+    "allowed-tools",
+  ]);
+  for (const field of parsed.fields) {
+    if (!standardFields.has(field.key) || typeof field.value !== "string") {
+      continue;
+    }
+    values[field.key] = field.value;
+    fields[field.key] = yamlFrontmatterFieldEvidence(path, lines, field);
+  }
+
+  for (const field of parsed.metadataFields) {
+    if (typeof field.value !== "string") continue;
+    const key = `metadata.${field.key}`;
+    values[key] = field.value;
+    fields[key] = yamlFrontmatterFieldEvidence(path, lines, field, key);
+    const legacyKey = (
+      Object.entries(RENMA_METADATA_KEYS) as Array<
+        [LegacyRenmaMetadataKey, string]
+      >
+    ).find(([, canonical]) => field.key === `renma.${canonical}`)?.[0];
+    if (legacyKey && RENMA_LIST_METADATA_KEYS.has(legacyKey)) {
+      try {
+        const parsed = JSON.parse(field.value) as unknown;
+        if (
+          Array.isArray(parsed) &&
+          parsed.every((item) => typeof item === "string")
+        ) {
+          listItems[key] = parsed.map(() =>
+            yamlFrontmatterFieldEvidence(path, lines, field, key),
+          );
+        }
+      } catch {
+        // List normalization retains the legacy comma-separated interpretation.
+      }
+    }
+  }
+
+  // Downstream evidence is organized by governance meaning. These are evidence
+  // aliases only: no top-level legacy Skill value is read or copied.
+  return applyCanonicalRenmaMetadataEvidenceAliases(result);
 }
 
 function blockScalarMarker(value: string): "literal" | "folded" | undefined {

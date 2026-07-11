@@ -12,6 +12,7 @@ import { parseDocument } from "../src/markdown.js";
 import { parseAssetMetadata } from "../src/metadata.js";
 import { scan } from "../src/scanner.js";
 import type { Artifact, ArtifactKind } from "../src/types.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 test("parseAssetMetadata captures context lens metadata", () => {
   const document = parseDocument(
@@ -715,6 +716,6 @@ function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
     absolutePath: `/tmp/${path}`,
     kind,
     sizeBytes: Buffer.byteLength(content),
-    content,
+    content: kind === "skill" ? canonicalSkillFixture(path, content) : content,
   };
 }

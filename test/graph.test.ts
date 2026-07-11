@@ -9,6 +9,7 @@ import {
   formatGraphMermaid,
   graph,
 } from "../src/commands/graph.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 test("graph JSON includes nodes and metadata dependency edges", async () => {
   const root = await fixture();
@@ -645,11 +646,14 @@ async function writeSkill(
   await mkdir(path.join(root, "skills", id), { recursive: true });
   await writeFile(
     path.join(root, "skills", id, "SKILL.md"),
-    markdown({
-      id,
-      ...metadata,
-      title: `# ${id}`,
-    }),
+    canonicalSkillFixture(
+      path.join("skills", id, "SKILL.md"),
+      markdown({
+        id,
+        ...metadata,
+        title: `# ${id}`,
+      }),
+    ),
   );
 }
 

@@ -356,6 +356,8 @@ The command is a first-class Renma CLI workflow. It exits `1` for Agent Skills s
 
 Specification validation uses a real YAML 1.2 parser; the lightweight Markdown parser remains responsible only for repository evidence such as headings, links, and code fences. Agent Skills names come from valid immediate parent directories and are not silently slugified.
 
+Starting with 0.16.0, this is a breaking format transition: Agent Skills-compatible frontmatter is the only operational `SKILL.md` format. Historical top-level Renma Skill metadata is migration input only and does not affect catalog, ownership, relationships, lifecycle, security, readiness, trust, BOM, or reporting. Legacy and hybrid Skills remain invalid. Validation text and JSON include an actionable one-way migration command when historical fields are detected.
+
 ### `catalog`
 
 Builds a deterministic catalog of discovered assets.
@@ -548,7 +550,7 @@ renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform --f
 
 `scaffold --format file` writes a starter file, `--format prompt` emits an authoring prompt, and `--format json` emits structured scaffold data. The generated content is intentionally minimal; fill in metadata, dependencies, and verification steps before depending on it in automation.
 
-For Skills, the immediate parent directory must already be a valid Agent Skills name. Scaffold preserves that normalized directory identity, supports valid Unicode letters and numbers, and refuses invalid names instead of creating a slugified substitute.
+For Skills, the immediate parent directory must already be a valid Agent Skills name. Scaffold preserves that normalized directory identity, supports valid Unicode letters and numbers, and refuses invalid names instead of creating a slugified substitute. When a Unicode path cannot produce a unique non-lossy Renma ID, provide `--id` explicitly.
 
 ### `suggest-metadata`
 
@@ -559,6 +561,7 @@ renma scan .
 renma ownership .
 renma suggest-metadata skills/testing/spec-review/SKILL.md --format prompt
 renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform --format json
+renma suggest-metadata skills/日本語/SKILL.md --id skill.testing.japanese --format json
 ```
 
 Use this after `scan` detects metadata issues or `ownership` shows unowned assets. The command does not rewrite files. It emits a deterministic prompt or JSON payload that a human or coding agent can use to prepare a reviewed patch.
@@ -567,7 +570,9 @@ The prompt asks the agent to inspect the existing asset, preserve the Markdown b
 
 For skills, the prompt reports `Selection-boundary review` separately from `Execution-constraint review`. Selection exclusions belong in `description` or supported `when_not_to_use` governance metadata only when they define tasks that should not select the skill. Execution prohibitions remain in the activated `SKILL.md` body, preferably under a prominent constraint heading with a source-backed alternative or stop behavior. Missing behavior requires human review; the command does not invent it.
 
-When canonical `metadata.renma.*` conflicts with a legacy top-level field, the command adds blocked metadata, preserves both sources, and omits canonical frontmatter until a human chooses the retained semantic value. It never suggests legacy top-level `id`, `title`, or `owner` fields for an already-canonical Skill.
+When canonical `metadata.renma.*` conflicts with a historical top-level field, the migration assistant adds blocked metadata, preserves both sources, and omits canonical frontmatter until a human chooses the retained semantic value. Normal commands do not apply legacy fallback. Invalid YAML, duplicate keys, invalid metadata types, invalid directory names, lossy ID inference, and ungrounded descriptions also block canonical output. Unknown `renma.*` fields and other vendor metadata are preserved.
+
+Renma metadata provides deterministic governance evidence; it is not the primary LLM instruction surface and does not guarantee model compliance. Keep selection behavior in the Agent Skills description, execution constraints in prominent body sections, and supporting knowledge in body references. Future standard Agent Skills fields may replace equivalent Renma extensions only through explicit migrations.
 
 Owner metadata remains recommended but not required. Without `--owner`, `suggest-metadata` blocks owner as a suggested addition and says not to add one unless the asset already declares an owner or a maintainer provides one. With `--owner <owner>`, the command may include that owner because it was explicitly provided. If an existing asset already declares an owner, `suggest-metadata` preserves it; a different `--owner` value is treated as a human-review ownership change, not an automatic metadata suggestion. Renma does not infer owners from Git history, file paths, prose, or authors.
 

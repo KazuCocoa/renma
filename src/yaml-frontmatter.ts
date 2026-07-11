@@ -34,6 +34,21 @@ export interface ParsedYamlFrontmatter {
   errors: YamlFrontmatterError[];
 }
 
+export function yamlFrontmatterFieldEvidence(
+  path: string,
+  lines: string[],
+  field: YamlFrontmatterField,
+  key = field.key,
+) {
+  return {
+    path,
+    key,
+    startLine: field.startLine,
+    endLine: field.endLine,
+    raw: lines.slice(field.startLine - 1, field.endLine).join("\n"),
+  };
+}
+
 /** Parse YAML frontmatter without changing the repository-wide Markdown parser. */
 export function parseYamlFrontmatter(content: string): ParsedYamlFrontmatter {
   const lines = content.split(/\r?\n/);

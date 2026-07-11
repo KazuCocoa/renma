@@ -641,9 +641,11 @@ function runSuggestMetadata(
   }
 
   const owner = stringValue(values.owner)?.trim();
+  const id = stringValue(values.id)?.trim();
   return runSuggestMetadataCommand(target, {
     format: format as SuggestMetadataFormat,
     ...(owner ? { owner } : {}),
+    ...(id ? { id } : {}),
   }).catch((error: unknown) => {
     if (error instanceof SuggestMetadataTargetError) {
       console.error(error.message);

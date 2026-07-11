@@ -1,12 +1,13 @@
-import type { AssetMetadata, AssetStatus } from "./model.js";
+import type { AssetMetadata, AssetStatus, SkillGovernance } from "./model.js";
 import type { Diagnostic, ParsedDocument } from "./types.js";
 import { isIsoDate, parseDayDuration } from "./freshness.js";
 import {
   metadataValueAsList,
   metadataValueAsText,
-  readRenmaMetadataField,
-  readRenmaMetadataValue,
-  renmaMetadataConflictDiagnostics,
+  readCanonicalRenmaMetadataField,
+  readCanonicalRenmaMetadataValue,
+  readLegacyRenmaMetadataField,
+  readLegacyRenmaMetadataValue,
   type LegacyRenmaMetadataKey,
 } from "./renma-metadata.js";
 
@@ -22,10 +23,13 @@ export function parseAssetMetadata(document: ParsedDocument): {
   metadata: AssetMetadata;
   diagnostics: Diagnostic[];
 } {
-  const diagnostics: Diagnostic[] = [
-    ...renmaMetadataConflictDiagnostics(document),
-  ];
-  const rawStatus = metadataText(document, "status");
+  const diagnostics: Diagnostic[] = [];
+  const governance =
+    document.artifact.kind === "skill"
+      ? parseSkillGovernance(document)
+      : undefined;
+  const rawStatus =
+    governance?.lifecycle.status ?? metadataText(document, "status");
   const status = parseStatus(rawStatus);
   const lastReviewedAt = optionalText(
     metadataText(document, "last_reviewed_at"),
@@ -34,11 +38,19 @@ export function parseAssetMetadata(document: ParsedDocument): {
   const expiresAt = optionalText(metadataText(document, "expires_at"));
   const metadata: AssetMetadata = {
     tags: metadataList(document, "tags"),
-    whenToUse: metadataList(document, "when_to_use"),
-    whenNotToUse: metadataList(document, "when_not_to_use"),
-    requiresContext: metadataList(document, "requires_context"),
-    optionalContext: metadataList(document, "optional_context"),
-    conflicts: metadataList(document, "conflicts"),
+    whenToUse:
+      governance?.selection.useWhen ?? metadataList(document, "when_to_use"),
+    whenNotToUse:
+      governance?.selection.doNotUseWhen ??
+      metadataList(document, "when_not_to_use"),
+    requiresContext:
+      governance?.dependencies.requiredContext ??
+      metadataList(document, "requires_context"),
+    optionalContext:
+      governance?.dependencies.optionalContext ??
+      metadataList(document, "optional_context"),
+    conflicts:
+      governance?.dependencies.conflicts ?? metadataList(document, "conflicts"),
     supersededBy: metadataList(document, "superseded_by"),
   };
 
@@ -52,11 +64,15 @@ export function parseAssetMetadata(document: ParsedDocument): {
     });
   }
 
-  assignOptional(metadata, "id", optionalText(metadataText(document, "id")));
+  assignOptional(
+    metadata,
+    "id",
+    governance?.id ?? optionalText(metadataText(document, "id")),
+  );
   assignOptional(
     metadata,
     "title",
-    optionalText(metadataText(document, "title")),
+    governance?.title ?? optionalText(metadataText(document, "title")),
   );
   assignOptional(
     metadata,
@@ -66,12 +82,13 @@ export function parseAssetMetadata(document: ParsedDocument): {
   assignOptional(
     metadata,
     "version",
-    optionalText(metadataText(document, "version")),
+    governance?.lifecycle.version ??
+      optionalText(metadataText(document, "version")),
   );
   assignOptional(
     metadata,
     "owner",
-    optionalText(metadataText(document, "owner")),
+    governance?.owner ?? optionalText(metadataText(document, "owner")),
   );
   assignOptional(metadata, "status", status);
   assignOptional(
@@ -96,12 +113,14 @@ export function parseAssetMetadata(document: ParsedDocument): {
   assignOptionalList(
     metadata,
     "requiresLens",
-    metadataList(document, "requires_lens"),
+    governance?.dependencies.requiredLens ??
+      metadataList(document, "requires_lens"),
   );
   assignOptionalList(
     metadata,
     "optionalLens",
-    metadataList(document, "optional_lens"),
+    governance?.dependencies.optionalLens ??
+      metadataList(document, "optional_lens"),
   );
 
   if (lastReviewedAt !== undefined && !isIsoDate(lastReviewedAt)) {
@@ -143,6 +162,80 @@ export function parseAssetMetadata(document: ParsedDocument): {
   };
 }
 
+/** Adapt canonical metadata.renma.* serialization into durable Skill semantics. */
+export function parseSkillGovernance(
+  document: ParsedDocument,
+): SkillGovernance {
+  if (document.artifact.kind !== "skill") {
+    throw new Error(
+      "Skill governance can only be parsed from a Skill artifact.",
+    );
+  }
+  const text = (key: LegacyRenmaMetadataKey) =>
+    metadataValueAsText(readCanonicalRenmaMetadataValue(document, key));
+  const list = (key: LegacyRenmaMetadataKey) =>
+    metadataValueAsList(readCanonicalRenmaMetadataValue(document, key));
+  const bool = (key: LegacyRenmaMetadataKey) => {
+    const value = text(key)?.toLowerCase();
+    if (value === "true") return true;
+    if (value === "false") return false;
+    return undefined;
+  };
+  const extensionMetadata = Object.fromEntries(
+    Object.entries(document.metadata).flatMap(([key, value]) => {
+      if (!key.startsWith("metadata.") || typeof value !== "string") return [];
+      return [[key.slice("metadata.".length), value]];
+    }),
+  );
+  return {
+    ...(text("id") ? { id: text("id") } : {}),
+    ...(text("title") ? { title: text("title") } : {}),
+    ...(text("owner") ? { owner: text("owner") } : {}),
+    lifecycle: {
+      ...(text("status") ? { status: text("status") } : {}),
+      ...(text("version") ? { version: text("version") } : {}),
+      ...(text("last_reviewed_at")
+        ? { lastReviewedAt: text("last_reviewed_at") }
+        : {}),
+      ...(text("review_cycle") ? { reviewCycle: text("review_cycle") } : {}),
+      ...(text("expires_at") ? { expiresAt: text("expires_at") } : {}),
+    },
+    selection: {
+      useWhen: list("when_to_use"),
+      doNotUseWhen: list("when_not_to_use"),
+    },
+    dependencies: {
+      requiredContext: list("requires_context"),
+      optionalContext: list("optional_context"),
+      requiredLens: list("requires_lens"),
+      optionalLens: list("optional_lens"),
+      conflicts: list("conflicts"),
+    },
+    security: {
+      ...(bool("network_allowed") !== undefined
+        ? { networkAllowed: bool("network_allowed") }
+        : {}),
+      ...(bool("external_upload_allowed") !== undefined
+        ? { externalUploadAllowed: bool("external_upload_allowed") }
+        : {}),
+      ...(bool("secrets_allowed") !== undefined
+        ? { secretsAllowed: bool("secrets_allowed") }
+        : {}),
+      ...(bool("requires_human_approval") !== undefined
+        ? { humanApprovalRequired: bool("requires_human_approval") }
+        : {}),
+      allowedData: list("allowed_data"),
+      forbiddenInputs: list("forbidden_inputs"),
+      approvedNetworkDestinations: list("approved_network_destinations"),
+      approvedUploadDestinations: list("approved_upload_destinations"),
+      ...(text("security_profile")
+        ? { profile: text("security_profile") }
+        : {}),
+    },
+    extensionMetadata,
+  };
+}
+
 function invalidMetadataDiagnostic(
   document: ParsedDocument,
   field: LegacyRenmaMetadataKey,
@@ -173,21 +266,24 @@ function metadataText(
   document: ParsedDocument,
   key: LegacyRenmaMetadataKey,
 ): string | undefined {
-  return metadataValueAsText(readRenmaMetadataValue(document, key));
+  return metadataValueAsText(metadataValue(document, key));
 }
 
 function metadataList(
   document: ParsedDocument,
   key: LegacyRenmaMetadataKey,
 ): string[] {
-  return metadataValueAsList(readRenmaMetadataValue(document, key));
+  return metadataValueAsList(metadataValue(document, key));
 }
 
 function metadataFieldEvidence(
   document: ParsedDocument,
   key: LegacyRenmaMetadataKey,
 ) {
-  const field = readRenmaMetadataField(document, key);
+  const field =
+    document.artifact.kind === "skill"
+      ? readCanonicalRenmaMetadataField(document, key)
+      : readLegacyRenmaMetadataField(document, key);
   if (!field) return undefined;
   return {
     path: field.path,
@@ -195,6 +291,12 @@ function metadataFieldEvidence(
     endLine: field.endLine,
     snippet: field.raw,
   };
+}
+
+function metadataValue(document: ParsedDocument, key: LegacyRenmaMetadataKey) {
+  return document.artifact.kind === "skill"
+    ? readCanonicalRenmaMetadataValue(document, key)
+    : readLegacyRenmaMetadataValue(document, key);
 }
 
 function assignOptional<K extends keyof AssetMetadata>(

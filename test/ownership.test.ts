@@ -8,6 +8,7 @@ import {
   formatOwnershipMarkdown,
   ownership,
 } from "../src/commands/ownership.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 test("ownership report counts all assets owned", async () => {
   const root = await fixture();
@@ -430,11 +431,14 @@ async function writeSkill(
   await mkdir(path.join(root, "skills", id), { recursive: true });
   await writeFile(
     path.join(root, "skills", id, "SKILL.md"),
-    markdown({
-      id,
-      ...metadata,
-      title: `# ${id}`,
-    }),
+    canonicalSkillFixture(
+      path.join("skills", id, "SKILL.md"),
+      markdown({
+        id,
+        ...metadata,
+        title: `# ${id}`,
+      }),
+    ),
   );
 }
 

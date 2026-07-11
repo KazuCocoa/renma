@@ -17,6 +17,11 @@ import type {
   ScanConfig,
   Severity,
 } from "./types.js";
+import {
+  isLegacyRenmaMetadataKey,
+  metadataValueAsList,
+  readCanonicalRenmaMetadataValue,
+} from "./renma-metadata.js";
 
 type FindingDetails = Partial<
   Pick<
@@ -1361,7 +1366,7 @@ function skillContextReferenceNotDeclaredFindings(
   if (document.artifact.kind !== "skill") return [];
 
   const declaredContexts = new Set(
-    listMetadataValue(document.metadata.requires_context),
+    listMetadataValue(operationalMetadataValue(document, "requires_context")),
   );
   const bodyLineIndexes = markdownBodyLineIndexes(document);
   const matches = new Map<string, { line: number; text: string }>();
@@ -1405,7 +1410,9 @@ function skillContextReferenceNotDeclaredFindings(
       ],
       llmHint: `Find context paths mentioned in the skill body and add them to requires_context using the metadata syntax currently supported by Renma. Missing declaration: ${referencedPath}`,
       details: {
-        source: metadataText(document.metadata.id) ?? document.artifact.path,
+        source:
+          metadataText(operationalMetadataValue(document, "id")) ??
+          document.artifact.path,
         target: referencedPath,
         referenceKind: "requires_context",
         sourcePath: document.artifact.path,
@@ -1427,8 +1434,9 @@ function skillReferencesSupersededAssetFindings(
 
     const canonicalTargets = sharedContextTargets(document);
     const supersededStatus =
-      metadataText(document.metadata.status) === "deprecated" ||
-      metadataText(document.metadata.status) === "archived";
+      metadataText(operationalMetadataValue(document, "status")) ===
+        "deprecated" ||
+      metadataText(operationalMetadataValue(document, "status")) === "archived";
     if (!supersededStatus && canonicalTargets.length === 0) return [];
     if (canonicalTargets.length === 0) return [];
 
@@ -1482,12 +1490,18 @@ function skillReferencesSupersededAssetFindings(
         llmHint:
           "Inspect the deprecated local support file and its superseded_by or canonical_context metadata. If the shared context asset is now canonical, update skill guidance and metadata to reference the shared context directly. Keep the local reference only if it contains truly local notes or is intentionally preserved as a compatibility shim.",
         details: {
-          source: metadataText(skill.metadata.id) ?? skill.artifact.path,
-          target: metadataText(document.metadata.id) ?? document.artifact.path,
+          source:
+            metadataText(operationalMetadataValue(skill, "id")) ??
+            skill.artifact.path,
+          target:
+            metadataText(operationalMetadataValue(document, "id")) ??
+            document.artifact.path,
           referenceKind: "body_reference",
           sourcePath: skill.artifact.path,
           targetPath: document.artifact.path,
-          targetStatus: metadataText(document.metadata.status),
+          targetStatus: metadataText(
+            operationalMetadataValue(document, "status"),
+          ),
           replacementTargets: canonicalTargets,
         },
       },
@@ -1504,7 +1518,7 @@ function isSkillLocalReference(document: ParsedDocument): boolean {
 
 function sharedContextTargets(document: ParsedDocument): string[] {
   return [
-    ...listMetadataValue(document.metadata.superseded_by),
+    ...listMetadataValue(operationalMetadataValue(document, "superseded_by")),
     ...listMetadataValue(document.metadata.canonical_context),
   ].filter(
     (target, index, targets) =>
@@ -1546,8 +1560,10 @@ function assetReferencesSupersededAssetFindings(
     }))
     .filter(
       ({ document, canonicalTargets }) =>
-        metadataText(document.metadata.status) === "deprecated" ||
-        metadataText(document.metadata.status) === "archived" ||
+        metadataText(operationalMetadataValue(document, "status")) ===
+          "deprecated" ||
+        metadataText(operationalMetadataValue(document, "status")) ===
+          "archived" ||
         canonicalTargets.length > 0,
     )
     .filter(({ canonicalTargets }) => canonicalTargets.length > 0);
@@ -1608,14 +1624,18 @@ function assetReferencesSupersededAssetFindings(
             "Inspect the referenced deprecated asset and its superseded_by or canonical context metadata. If the canonical shared context is the intended source of truth, update this asset to reference that context directly. Keep the superseded file only when it serves a deliberate compatibility or migration role.",
           details: {
             source:
-              metadataText(referencingDocument.metadata.id) ??
-              referencingDocument.artifact.path,
+              metadataText(
+                operationalMetadataValue(referencingDocument, "id"),
+              ) ?? referencingDocument.artifact.path,
             target:
-              metadataText(document.metadata.id) ?? document.artifact.path,
+              metadataText(operationalMetadataValue(document, "id")) ??
+              document.artifact.path,
             referenceKind: "body_reference",
             sourcePath: referencingDocument.artifact.path,
             targetPath: document.artifact.path,
-            targetStatus: metadataText(document.metadata.status),
+            targetStatus: metadataText(
+              operationalMetadataValue(document, "status"),
+            ),
             replacementTargets: canonicalTargets,
           },
         },
@@ -1880,13 +1900,17 @@ function markdownBodyLineIndexes(document: ParsedDocument): number[] {
 }
 
 function listMetadataValue(value: MetadataValue | undefined): string[] {
-  if (!value) return [];
-  if (Array.isArray(value))
-    return value.map((item) => item.trim()).filter(Boolean);
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+  return metadataValueAsList(value);
+}
+
+function operationalMetadataValue(
+  document: ParsedDocument,
+  key: string,
+): MetadataValue | undefined {
+  if (document.artifact.kind === "skill" && isLegacyRenmaMetadataKey(key)) {
+    return readCanonicalRenmaMetadataValue(document, key);
+  }
+  return document.metadata[key];
 }
 
 function metadataText(value: MetadataValue | undefined): string | undefined {

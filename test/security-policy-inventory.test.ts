@@ -7,6 +7,7 @@ import {
 } from "../src/security-policy-inventory.js";
 import { parseSecurityPolicy } from "../src/security-policy.js";
 import type { Artifact, ArtifactKind, SecurityConfig } from "../src/types.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 test("empty policy inventory returns a zero summary", () => {
   assert.deepEqual(
@@ -354,7 +355,7 @@ test("top lists sort by count then name and are limited to ten", () => {
   ]);
 });
 
-test("canonical security metadata replaces legacy values in either field order", () => {
+test("hybrid Skill security metadata is not operational", () => {
   const legacy = [
     "network_allowed: true",
     "external_upload_allowed: true",
@@ -384,37 +385,45 @@ test("canonical security metadata replaces legacy values in either field order",
     [...canonical, ...legacy],
   ]) {
     const content = ["---", ...frontmatter, "---", "# Demo"].join("\n");
-    const parsed = parseSecurityPolicy(content);
+    const parsed = parseSecurityPolicy(content, "skill");
     const summary = summarizeSecurityPolicyInventory([
-      artifact("skills/demo/SKILL.md", "skill", content),
+      rawArtifact("skills/demo/SKILL.md", "skill", content),
     ]);
 
-    assert.equal(parsed.networkAllowed, false);
-    assert.equal(parsed.externalUploadAllowed, false);
-    assert.equal(parsed.secretsAllowed, false);
-    assert.equal(parsed.humanApprovalRequired, true);
-    assert.equal(parsed.securityProfile, "canonical-profile");
-    assert.deepEqual(parsed.allowedData, ["canonical"]);
-    assert.deepEqual(parsed.forbiddenInputs, ["canonical-secret"]);
-    assert.deepEqual(parsed.approvedNetworkDestinations, ["safe.example"]);
-    assert.deepEqual(parsed.approvedUploadDestinations, [
-      "safe-upload.example",
-    ]);
+    assert.equal(parsed.networkAllowed, undefined);
+    assert.equal(parsed.externalUploadAllowed, undefined);
+    assert.equal(parsed.secretsAllowed, undefined);
+    assert.equal(parsed.humanApprovalRequired, undefined);
+    assert.equal(parsed.securityProfile, undefined);
+    assert.deepEqual(parsed.allowedData, []);
+    assert.deepEqual(parsed.forbiddenInputs, []);
+    assert.deepEqual(parsed.approvedNetworkDestinations, []);
+    assert.deepEqual(parsed.approvedUploadDestinations, []);
     assert.deepEqual(summary.networkAllowed, {
       true: 0,
-      false: 1,
-      unspecified: 0,
+      false: 0,
+      unspecified: 1,
     });
-    assert.deepEqual(summary.topApprovedNetworkDestinations, [
-      { destination: "safe.example", count: 1 },
-    ]);
-    assert.deepEqual(summary.topApprovedUploadDestinations, [
-      { destination: "safe-upload.example", count: 1 },
-    ]);
+    assert.deepEqual(summary.topApprovedNetworkDestinations, []);
+    assert.deepEqual(summary.topApprovedUploadDestinations, []);
   }
 });
 
 function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
+  return {
+    path,
+    absolutePath: `/repo/${path}`,
+    kind,
+    sizeBytes: Buffer.byteLength(content),
+    content: kind === "skill" ? canonicalSkillFixture(path, content) : content,
+  };
+}
+
+function rawArtifact(
+  path: string,
+  kind: ArtifactKind,
+  content: string,
+): Artifact {
   return {
     path,
     absolutePath: `/repo/${path}`,

@@ -7,6 +7,7 @@ import { main } from "../src/cli.js";
 import { COMMAND_HELP } from "../src/cli-help.js";
 import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
 import { scan } from "../src/scanner.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 test("scan discovers default artifacts and emits deterministic findings", async () => {
   const root = await fixture();
@@ -845,21 +846,24 @@ test("CLI prints catalog JSON and markdown", async () => {
   await mkdir(path.join(root, "contexts", "testing"), { recursive: true });
   await writeFile(
     path.join(root, "skills", "demo", "SKILL.md"),
-    [
-      "---",
-      "id: demo",
-      "owner: qa-platform",
-      "status: stable",
-      "last_reviewed_at: 2026-06-28",
-      "review_cycle: P90D",
-      "expires_at: 2026-12-31",
-      "tags: appium, android",
-      "requires_context: demo.guide, testing.boundary-value-analysis",
-      "---",
-      "# Demo",
-      "Use for demo requests.",
-      "",
-    ].join("\n"),
+    canonicalSkillFixture(
+      "skills/demo/SKILL.md",
+      [
+        "---",
+        "id: demo",
+        "owner: qa-platform",
+        "status: stable",
+        "last_reviewed_at: 2026-06-28",
+        "review_cycle: P90D",
+        "expires_at: 2026-12-31",
+        "tags: appium, android",
+        "requires_context: demo.guide, testing.boundary-value-analysis",
+        "---",
+        "# Demo",
+        "Use for demo requests.",
+        "",
+      ].join("\n"),
+    ),
   );
   await writeFile(
     path.join(root, "skills", "demo", "references", "guide.md"),
@@ -919,10 +923,10 @@ test("CLI prints catalog JSON and markdown", async () => {
       sourcePath: "skills/demo/SKILL.md",
       evidence: {
         path: "skills/demo/SKILL.md",
-        startLine: 9,
-        endLine: 9,
+        startLine: 12,
+        endLine: 12,
         snippet:
-          "requires_context: demo.guide, testing.boundary-value-analysis",
+          "  renma.requires-context: 'demo.guide, testing.boundary-value-analysis'",
       },
     },
     {
@@ -932,10 +936,10 @@ test("CLI prints catalog JSON and markdown", async () => {
       sourcePath: "skills/demo/SKILL.md",
       evidence: {
         path: "skills/demo/SKILL.md",
-        startLine: 9,
-        endLine: 9,
+        startLine: 12,
+        endLine: 12,
         snippet:
-          "requires_context: demo.guide, testing.boundary-value-analysis",
+          "  renma.requires-context: 'demo.guide, testing.boundary-value-analysis'",
       },
     },
   ]);
@@ -1214,7 +1218,9 @@ expected_outputs:
   );
   await writeFile(
     path.join(root, "skills", "testing", "spec-review", "SKILL.md"),
-    `---
+    canonicalSkillFixture(
+      "skills/testing/spec-review/SKILL.md",
+      `---
 id: skill.testing.spec-review
 owner: qa-platform
 status: experimental
@@ -1223,10 +1229,13 @@ requires_lens:
 ---
 # Spec Review
 `,
+    ),
   );
   await writeFile(
     path.join(root, "skills", "testing", "exploratory", "SKILL.md"),
-    `---
+    canonicalSkillFixture(
+      "skills/testing/exploratory/SKILL.md",
+      `---
 id: skill.testing.exploratory
 owner: qa-platform
 status: experimental
@@ -1235,6 +1244,7 @@ optional_lens:
 ---
 # Exploratory Review
 `,
+    ),
   );
 
   const result = await withCapturedConsole(() =>
@@ -1740,8 +1750,8 @@ test("scaffold skill writes deterministic file output", async () => {
   ]);
 });
 
-test("scaffold uses valid parent-directory names without slugifying them", async () => {
-  for (const name of ["demo", "spec-review", "日本語"]) {
+test("scaffold uses safely derivable parent-directory names without slugifying them", async () => {
+  for (const name of ["demo", "spec-review"]) {
     const root = await fixture();
     const target = path.join(root, "skills", name, "SKILL.md");
     const result = await withCapturedConsole(() =>
@@ -1752,6 +1762,30 @@ test("scaffold uses valid parent-directory names without slugifying them", async
     const content = await readFile(target, "utf8");
     assert.match(content, new RegExp(`^name: '${name}'$`, "m"), name);
   }
+});
+
+test("scaffold requires an explicit Renma ID for a Unicode Skill path", async () => {
+  const root = await fixture();
+  const target = path.join(root, "skills", "日本語", "SKILL.md");
+  const blocked = await withCapturedConsole(() =>
+    main(["scaffold", "skill", target, "--owner", "qa-platform"]),
+  );
+  assert.equal(blocked.code, 2);
+  assert.match(blocked.stderr, /Provide --id explicitly/);
+
+  const created = await withCapturedConsole(() =>
+    main([
+      "scaffold",
+      "skill",
+      target,
+      "--owner",
+      "qa-platform",
+      "--id",
+      "skill.testing.japanese",
+    ]),
+  );
+  assert.equal(created.code, 0);
+  assert.match(await readFile(target, "utf8"), /^name: '日本語'$/m);
 });
 
 test("scaffold refuses invalid Agent Skills parent-directory names", async () => {

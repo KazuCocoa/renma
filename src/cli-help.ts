@@ -50,7 +50,8 @@ const OPTION_HELP = {
   },
   id: {
     flags: "--id <id>",
-    description: "Set the scaffolded asset ID instead of deriving one.",
+    description:
+      "Set an asset ID explicitly when scaffolding or migration cannot derive one safely.",
   },
   json: {
     flags: "--json",
@@ -151,7 +152,7 @@ export const COMMAND_HELP = [
       "Validate discovered SKILL.md files against Renma's locally versioned Agent Skills profile and report separate non-gating authoring guidance.",
     useWhen: [
       "You need deterministic Agent Skills frontmatter and naming validation.",
-      "You are migrating legacy Renma Skill metadata to canonical Agent Skills metadata.",
+      "You are using the one-way migration path from historical Renma Skill metadata.",
       "CI must gate specification errors without gating Renma authoring warnings.",
     ],
     doNotUseFor: [
@@ -167,6 +168,7 @@ export const COMMAND_HELP = [
       "Specification errors make the command exit 1.",
       "Renma authoring warnings remain visible but do not change a valid exit code from 0.",
       "Invalid YAML is an Agent Skills specification error.",
+      "Legacy and hybrid Skills are invalid migration candidates, not supported operational formats.",
     ],
     nextSteps: [
       "Fix specification errors before relying on the Skill as a portable Agent Skill.",
@@ -650,6 +652,7 @@ export const COMMAND_HELP = [
           "Output format: prompt or json. Defaults to prompt. The command prints to stdout and does not edit the target file.",
       },
       "json",
+      "id",
       {
         name: "owner",
         description:
@@ -743,6 +746,12 @@ export function renderGlobalHelp(version: string): string {
     "  renma catalog . --format markdown",
     "  renma graph . --format markdown",
     "  renma readiness . --format markdown",
+    "",
+    "Migrate an existing Renma Skill",
+    "  renma suggest-metadata skills/<name>/SKILL.md",
+    "  review and apply the proposed conversion",
+    "  renma validate-skills .",
+    "  renma scan .",
     "",
     "Normal maintenance loop",
     "  inspect evidence -> prepare a reviewable patch -> human review -> rerun Renma",

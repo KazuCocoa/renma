@@ -10,6 +10,7 @@ import {
   zeroSecurityPolicyInventorySummary,
   type SecurityPolicyInventorySummary,
 } from "../src/security-policy-inventory.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 const execFile = promisify(execFileCallback);
 
@@ -521,7 +522,13 @@ async function writeSkill(
 ): Promise<void> {
   const directory = join(repo, "skills", id);
   await mkdir(directory, { recursive: true });
-  await writeFile(join(directory, "SKILL.md"), skillMarkdown(id, status));
+  await writeFile(
+    join(directory, "SKILL.md"),
+    canonicalSkillFixture(
+      join("skills", id, "SKILL.md"),
+      skillMarkdown(id, status),
+    ),
+  );
 }
 
 function skillMarkdown(id: string, status: string): string {

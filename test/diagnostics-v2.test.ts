@@ -7,6 +7,7 @@ import { createReviewBundles } from "../src/diagnostics-v2.js";
 import { formatJson } from "../src/report.js";
 import { scan } from "../src/scanner.js";
 import type { DiagnosticV2, ReviewBundle } from "../src/types.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 test("scan JSON includes LLM-actionable diagnostics v2 metadata", async () => {
   const root = await duplicateContextFixture();
@@ -74,7 +75,9 @@ test("network allow-list diagnostics include preserve-semantics repair policy", 
   await mkdir(path.join(root, "skills", "network"), { recursive: true });
   await writeFile(
     path.join(root, "skills", "network", "SKILL.md"),
-    `---
+    canonicalSkillFixture(
+      "skills/network/SKILL.md",
+      `---
 allowed_data: disclosed
 network_allowed: true
 approved_network_destinations: github.com
@@ -83,6 +86,7 @@ approved_network_destinations: github.com
 
 Fetch https://api.example.com/status.
 `,
+    ),
   );
 
   const result = await scan(root);
@@ -266,7 +270,9 @@ async function unknownReferenceFixture(): Promise<string> {
   await mkdir(path.join(root, "skills", "demo"), { recursive: true });
   await writeFile(
     path.join(root, "skills", "demo", "SKILL.md"),
-    `---
+    canonicalSkillFixture(
+      "skills/demo/SKILL.md",
+      `---
 id: skill.demo
 description: Use this skill for demo workflows when routing, preflight, verification, examples, and context references all need checking.
 requires_context:
@@ -289,6 +295,7 @@ Output: result.
 ## Verification
 Run the demo check.
 `,
+    ),
   );
   return root;
 }

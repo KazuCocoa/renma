@@ -10,6 +10,11 @@ const DESCRIPTION_BLOCKED_METADATA = {
   reason:
     "No reviewed Agent Skills description can be extracted from the existing body. Draft what the skill does, when to use it, and any selection-critical exclusion from repository evidence; require human review.",
 };
+const FRONTMATTER_BLOCKED_METADATA = {
+  field: "frontmatter",
+  reason:
+    "Migration is unsafe until AS-SKILL-MISSING-FRONTMATTER is resolved: SKILL.md must start with YAML frontmatter delimited by ---.",
+};
 
 test("suggest-metadata prompt for an existing skill without owner", async () => {
   const root = await fixture();
@@ -131,6 +136,7 @@ test("suggest-metadata JSON includes conservative candidate metadata", async () 
       field: "owner",
       reason: "No owner was explicitly provided. Missing owner is allowed.",
     },
+    FRONTMATTER_BLOCKED_METADATA,
     DESCRIPTION_BLOCKED_METADATA,
   ]);
   assert.ok(
@@ -169,7 +175,10 @@ test("suggest-metadata JSON includes explicit owner candidate", async () => {
     suggestion.agentSkills.candidateRenmaMetadata["renma.owner"],
     "qa-platform",
   );
-  assert.deepEqual(suggestion.blockedMetadata, [DESCRIPTION_BLOCKED_METADATA]);
+  assert.deepEqual(suggestion.blockedMetadata, [
+    FRONTMATTER_BLOCKED_METADATA,
+    DESCRIPTION_BLOCKED_METADATA,
+  ]);
 });
 
 test("suggest-metadata preserves an existing owner in prompt", async () => {
@@ -487,6 +496,118 @@ Use this skill when reviewing demo inputs.
     suggestion.blockedMetadata.find((item) => item.field === "name")?.reason ??
       "",
     /Rename the directory/,
+  );
+});
+
+test("suggest-metadata preserves unknown Renma and vendor metadata", async () => {
+  const root = await fixture();
+  const target = path.join(root, "skills", "demo", "SKILL.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(
+    target,
+    `---
+name: demo
+description: Reviews demo inputs. Use when reviewing demo inputs.
+metadata:
+  renma.id: skill.demo
+  renma.future-field: keep-me
+  other-client.priority: high
+---
+# Demo
+`,
+  );
+
+  const result = await withCapturedConsole(() =>
+    main(["suggest-metadata", target, "--format", "json"]),
+  );
+  const suggestion = JSON.parse(result.stdout) as {
+    agentSkills: { canonicalFrontmatter?: string };
+  };
+
+  assert.equal(result.code, 0);
+  assert.match(
+    suggestion.agentSkills.canonicalFrontmatter ?? "",
+    /renma\.future-field: 'keep-me'/,
+  );
+  assert.match(
+    suggestion.agentSkills.canonicalFrontmatter ?? "",
+    /other-client\.priority: 'high'/,
+  );
+});
+
+test("suggest-metadata blocks structurally unsafe migration input", async () => {
+  const cases = [
+    `---\ndescription: First\ndescription: Second\nid: skill.demo\n---\n# Demo\n`,
+    `---\nid: skill.demo\nmetadata:\n  renma.owner: one\n  renma.owner: two\n---\n# Demo\n`,
+    `---\nid: skill.demo\ndescription: "unterminated\n---\n# Demo\n`,
+    `---\nname: demo\ndescription: Reviews demo inputs. Use when reviewing demo inputs.\nmetadata:\n  renma.owner: [qa-platform]\n---\n# Demo\n`,
+  ];
+
+  for (const content of cases) {
+    const root = await fixture();
+    const target = path.join(root, "skills", "demo", "SKILL.md");
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, content);
+    const result = await withCapturedConsole(() =>
+      main(["suggest-metadata", target, "--format", "json"]),
+    );
+    const suggestion = JSON.parse(result.stdout) as {
+      blockedMetadata: Array<{ reason: string }>;
+      agentSkills: { canonicalFrontmatter?: string };
+    };
+
+    assert.equal(result.code, 0);
+    assert.equal(suggestion.agentSkills.canonicalFrontmatter, undefined);
+    assert.ok(
+      suggestion.blockedMetadata.some((item) => /unsafe/i.test(item.reason)),
+    );
+  }
+});
+
+test("Unicode Skill migration requires an explicit non-lossy Renma ID", async () => {
+  const root = await fixture();
+  const target = path.join(root, "skills", "日本語", "SKILL.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(
+    target,
+    `---
+owner: qa-platform
+---
+# 日本語
+
+Use this skill when reviewing Japanese inputs.
+`,
+  );
+
+  const blockedResult = await withCapturedConsole(() =>
+    main(["suggest-metadata", target, "--format", "json"]),
+  );
+  const blocked = JSON.parse(blockedResult.stdout) as {
+    blockedMetadata: Array<{ field: string; reason: string }>;
+    agentSkills: { canonicalFrontmatter?: string };
+  };
+  assert.equal(blocked.agentSkills.canonicalFrontmatter, undefined);
+  assert.match(
+    blocked.blockedMetadata.find((item) => item.field === "id")?.reason ?? "",
+    /Provide --id explicitly/,
+  );
+
+  const explicitResult = await withCapturedConsole(() =>
+    main([
+      "suggest-metadata",
+      target,
+      "--id",
+      "skill.testing.japanese",
+      "--format",
+      "json",
+    ]),
+  );
+  const explicit = JSON.parse(explicitResult.stdout) as {
+    agentSkills: { canonicalFrontmatter?: string };
+  };
+  assert.match(
+    explicit.agentSkills.canonicalFrontmatter ?? "",
+    /renma\.id: 'skill\.testing\.japanese'/,
   );
 });
 
