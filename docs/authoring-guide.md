@@ -168,13 +168,17 @@ payload to stdout. It does not edit, rename, or move the file. Its supported
 responsibilities are:
 
 - compact canonical metadata suggestions;
-- explicit owner or security metadata completion;
+- explicit owner retrofit and one-way migration of recognized pre-0.16
+  governance and security metadata;
 - pre-0.16 to canonical Agent Skills migration candidates;
 - conflict and unsafe-evidence detection; and
 - validation of the rendered candidate.
 
 It does not rewrite the body, infer ownership, choose between conflicting
-semantic values, or propose reverse migration for a canonical Skill.
+semantic values, infer missing security policy, or propose reverse migration
+for a canonical Skill. An owner candidate requires explicit human-provided
+evidence. Security policy remains intentionally authored and deterministically
+validated.
 
 ### 3. Review before applying
 
@@ -257,6 +261,12 @@ select, load, or inject Context at runtime.
 
 Context and Context Lens scaffolds keep their top-level Renma metadata syntax;
 the Agent Skills `metadata.renma.*` serialization boundary applies to Skills.
+
+For current guidance on deriving several thin, bounded Skills from a broad
+existing Skill—including focused `inspect`, graph, Context reuse, and Appium
+examples—see [Advanced Skill Authoring](advanced-skill-authoring.md). That guide
+keeps current thin-Skill authoring separate from proposed 0.18.0 Skill-to-Skill
+discovery.
 
 ## Optional Codex Example
 

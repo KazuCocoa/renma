@@ -277,7 +277,7 @@ ${input.content}\`\`\`
 
 ${
   input.kind === "skill"
-    ? `Use your platform's standard Skill authoring guidance to refine the generated Skill's description, instructions, workflow, constraints, and completion criteria. Treat the scaffold as a starting point, preserve the repository's intended behavior, and do not invent owners, policies, dependencies, domain rules, or source-of-truth claims. After editing, run \`renma scan . --fail-on high\`, address relevant diagnostics, and rerun the scan. Do not weaken security policy or add suppressions merely to make validation pass.\n\n`
+    ? `Use your platform's standard Skill authoring guidance to refine the generated Skill's description, instructions, workflow, constraints, and completion criteria. Treat the scaffold as a starting point, preserve the repository's intended behavior, and do not invent owners, policies, dependencies, domain rules, or source-of-truth claims. After editing, run \`renma scan . --fail-on high\`, address relevant diagnostics, and rerun the scan. Do not weaken security policy or add suppressions merely to make validation pass. Have a human review meaningful semantic changes before merging.\n\n`
     : ""
 }Constraints:
 
@@ -307,6 +307,7 @@ function renderSkillNextSteps(): string {
     "2. Complete the description, instructions, workflow, constraints, completion criteria, and intended metadata.",
     "3. Run `renma scan . --fail-on high`.",
     "4. Fix relevant diagnostics and rerun the scan.",
+    "5. Have a human review meaningful semantic changes before merging.",
   ].join("\n");
 }
 

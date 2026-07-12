@@ -1702,6 +1702,10 @@ test("scaffold skill writes deterministic file output", async () => {
   assert.match(result.stdout, /^Created .+SKILL\.md\n\nNext steps:/);
   assert.match(result.stdout, /platform's standard Skill authoring guidance/);
   assert.match(result.stdout, /renma scan \. --fail-on high/);
+  assert.match(
+    result.stdout,
+    /5\. Have a human review meaningful semantic changes before merging\.\n$/,
+  );
   const content = await readFile(target, "utf8");
   assert.match(content, /^name: spec-review$/m);
   assert.match(content, /^description: .*Use when /m);
@@ -1810,6 +1814,21 @@ test("scaffold context_lens writes deterministic file output", async () => {
         diagnostic.code === CONTEXT_LENS_DIAGNOSTIC_CODES.TARGET_NOT_FOUND,
     ),
   );
+});
+
+test("scaffold context file output omits Skill-specific next steps", async () => {
+  const root = await fixture();
+  const target = path.join(root, "contexts", "testing", "boundary.md");
+
+  const result = await withCapturedConsole(() =>
+    main(["scaffold", "context", target, "--owner", "qa-platform"]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.equal(result.stderr, "");
+  assert.equal(result.stdout, `Created ${target}\n`);
+  assert.doesNotMatch(result.stdout, /Next steps:/);
+  assert.doesNotMatch(result.stdout, /standard Skill authoring guidance/);
 });
 
 test("scaffold refuses to overwrite an existing file", async () => {
@@ -1924,6 +1943,43 @@ test("scaffold context_lens can emit json", async () => {
   assert.match(bundle.prompt, /runtime selectors/);
 });
 
+test("scaffold skill JSON keeps its field shape and includes the human-review boundary", async () => {
+  const target = "skills/testing/json-review/SKILL.md";
+  const result = await withCapturedConsole(() =>
+    main([
+      "scaffold",
+      "skill",
+      target,
+      "--owner",
+      "qa-platform",
+      "--format",
+      "json",
+    ]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.equal(result.stderr, "");
+  const bundle = JSON.parse(result.stdout) as Record<string, unknown> & {
+    prompt: string;
+  };
+  assert.deepEqual(Object.keys(bundle), [
+    "kind",
+    "path",
+    "id",
+    "title",
+    "owner",
+    "tags",
+    "format",
+    "content",
+    "prompt",
+  ]);
+  assert.match(
+    bundle.prompt,
+    /Have a human review meaningful semantic changes before merging/,
+  );
+  await assert.rejects(readFile(target, "utf8"));
+});
+
 test("scaffold prompt emits platform-neutral authoring instructions", async () => {
   const root = await fixture();
   const target = path.join(
@@ -1971,6 +2027,10 @@ test("scaffold prompt emits platform-neutral authoring instructions", async () =
   assert.match(
     result.stdout,
     /Do not weaken security policy or add suppressions/,
+  );
+  assert.match(
+    result.stdout,
+    /Have a human review meaningful semantic changes before merging/,
   );
   await assert.rejects(readFile(target, "utf8"));
 });

@@ -39,6 +39,8 @@ export interface MetadataSuggestion {
   agentSkills?: AgentSkillMigrationSuggestion;
 }
 
+type SkillSuggestionPromptState = "blocked" | "candidate" | "no-proposal";
+
 export class SuggestMetadataTargetError extends Error {
   constructor(target: string, cause: unknown) {
     super(
@@ -240,7 +242,13 @@ function renderAgentSkillMigrationPrompt(
         "",
         "(not generated while migration is blocked or unnecessary)",
       ];
-  const nextSteps = renderSkillSuggestionNextSteps(suggestion);
+  const promptState: SkillSuggestionPromptState =
+    suggestion.blockedMetadata.length > 0
+      ? "blocked"
+      : noMigrationProposed || !migration.canonicalFrontmatter
+        ? "no-proposal"
+        : "candidate";
+  const nextSteps = renderSkillSuggestionNextSteps(promptState);
   return `${[
     noMigrationProposed
       ? "# Renma Task: Inspect Canonical Agent Skill (No Migration Proposed)"
@@ -289,15 +297,25 @@ function renderAgentSkillMigrationPrompt(
 }
 
 function renderSkillSuggestionNextSteps(
-  suggestion: MetadataSuggestion,
+  state: SkillSuggestionPromptState,
 ): string[] {
-  if (suggestion.blockedMetadata.length > 0) {
+  if (state === "blocked") {
     return [
       "Next steps:",
       "1. Review the conflicts or invalid evidence and confirm the Skill's intent using your platform's standard Skill authoring guidance.",
       "2. Do not apply a candidate while Renma cannot generate it safely.",
       "3. Correct the source evidence, then rerun `renma suggest-metadata <SKILL.md>`.",
       "4. After intended corrections, run `renma scan . --fail-on high`, fix relevant diagnostics, and rerun the scan.",
+    ];
+  }
+
+  if (state === "no-proposal") {
+    return [
+      "Next steps:",
+      "1. Review the Skill's trigger description, instructions, workflow, constraints, and completion criteria using your platform's standard Skill authoring guidance.",
+      "2. No metadata or migration change is proposed; preserve the existing source.",
+      "3. If a separate, intentionally reviewed authoring change is made, run `renma scan . --fail-on high`.",
+      "4. Fix relevant diagnostics and rerun the scan.",
     ];
   }
 

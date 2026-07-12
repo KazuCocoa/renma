@@ -24,6 +24,9 @@ Use this index to choose the smallest document that answers your question.
 
 ## Focused References
 
+- [Advanced Skill Authoring](advanced-skill-authoring.md): deriving thin,
+  bounded Skills from existing workflows while reusing Context Assets; does not
+  implement proposed 0.18.0 Skill discovery.
 - [Context Lens](context-lens.md)
 - [Context Lifecycle Diagnostics](context-lifecycle-diagnostics.md)
 - [Context Conflict Diagnostics](context-conflict-diagnostics.md)

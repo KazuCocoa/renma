@@ -193,6 +193,20 @@ test("Skill authoring docs preserve the platform and Renma responsibility bounda
     authoring,
     /Do not apply a candidate while Renma cannot generate it safely/,
   );
+  assert.match(
+    authoring,
+    /explicit owner retrofit and one-way migration of recognized pre-0\.16\s+governance and security metadata/,
+  );
+  assert.match(authoring, /infer missing security policy/);
+  assert.doesNotMatch(authoring, /owner or security metadata completion/);
+
+  const docsIndex = await readRepoFile("docs/README.md");
+  const advanced = await readRepoFile("docs/advanced-skill-authoring.md");
+  assert.match(authoring, /Advanced Skill Authoring/);
+  assert.match(docsIndex, /Advanced Skill Authoring/);
+  assert.match(advanced, /current 0\.17\.0 authoring guidance/);
+  assert.match(advanced, /Proposed 0\.18\.0 Skill-to-Skill discovery/);
+  assert.doesNotMatch(advanced, /`routes_to`|`skill-index`/);
   assert.match(readme, /proposed 0\.18\.0 Skill Discovery/i);
 });
 

@@ -55,6 +55,10 @@ test("suggest-metadata prompt reports blocked legacy Skill migration", async () 
   assert.match(result.stdout, /Correct the source evidence/);
   assert.match(result.stdout, /renma suggest-metadata <SKILL\.md>/);
   assert.match(result.stdout, /renma scan \. --fail-on high/);
+  assert.doesNotMatch(
+    result.stdout,
+    /Apply only the intended metadata or migration changes/,
+  );
 });
 
 test("suggest-metadata does not invent a migration source from owner input", async () => {
@@ -161,6 +165,16 @@ test("suggest-metadata proposes no migration or rewrite for canonical release-pr
   assert.equal(suggestion.agentSkills.sourceFormat, "agent-skills");
   assert.equal(suggestion.agentSkills.direction, "none");
   assert.equal(suggestion.agentSkills.proposalKind, "none");
+  assert.deepEqual(Object.keys(suggestion), [
+    "path",
+    "kind",
+    "suggestedMode",
+    "ownerProvided",
+    "instructions",
+    "candidateMetadata",
+    "blockedMetadata",
+    "agentSkills",
+  ]);
   assert.deepEqual(suggestion.blockedMetadata, []);
   assert.equal(
     Object.hasOwn(suggestion.agentSkills, "canonicalFrontmatter"),
@@ -187,10 +201,68 @@ test("suggest-metadata proposes no migration or rewrite for canonical release-pr
     promptResult.stdout,
     /Review the Skill's trigger description, instructions, workflow, constraints, and completion criteria using your platform's standard Skill authoring guidance/,
   );
+  assert.match(
+    promptResult.stdout,
+    /No metadata or migration change is proposed; preserve the existing source/,
+  );
+  assert.match(
+    promptResult.stdout,
+    /If a separate, intentionally reviewed authoring change is made/,
+  );
   assert.match(promptResult.stdout, /renma scan \. --fail-on high/);
   assert.doesNotMatch(
     promptResult.stdout,
+    /Apply only the intended metadata or migration changes/,
+  );
+  assert.doesNotMatch(
+    promptResult.stdout,
     /Return (?:a|one) small reviewed (?:frontmatter )?patch/,
+  );
+  assert.equal(await readFile(target, "utf8"), original);
+});
+
+test("suggest-metadata keeps candidate application guidance for a real owner retrofit", async () => {
+  const root = await fixture();
+  const target = path.join(root, "skills", "spec-review", "SKILL.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  const original = [
+    "---",
+    "name: spec-review",
+    "description: Review specifications. Use when requirements need evidence-backed review.",
+    "metadata:",
+    "  renma.id: skill.spec-review",
+    "---",
+    "",
+    "# Spec Review",
+    "",
+  ].join("\n");
+  await writeFile(target, original);
+
+  const result = await withCapturedConsole(() =>
+    main([
+      "suggest-metadata",
+      target,
+      "--owner",
+      "qa-platform",
+      "--format",
+      "prompt",
+    ]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.equal(result.stderr, "");
+  assert.match(
+    result.stdout,
+    /Review Canonical Agent Skills Metadata Retrofit/,
+  );
+  assert.match(
+    result.stdout,
+    /Apply only the intended metadata or migration changes/,
+  );
+  assert.match(result.stdout, /Return a small reviewed frontmatter patch/);
+  assert.doesNotMatch(
+    result.stdout,
+    /No metadata or migration change is proposed/,
   );
   assert.equal(await readFile(target, "utf8"), original);
 });
