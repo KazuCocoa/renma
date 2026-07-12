@@ -1,5 +1,6 @@
 import type { ConfigOverrides } from "../config.js";
 import type { ContextLensSummary } from "../context-lens.js";
+import { resolveDependencyTarget } from "../dependency-resolution.js";
 import type { Catalog, CatalogEntry, Dependency } from "../model.js";
 import { collectRepositoryEvidence } from "../repository-evidence.js";
 import type { Diagnostic } from "../types.js";
@@ -88,7 +89,7 @@ export function formatCatalogMarkdown(result: CatalogResult): string {
       `- Dependencies: ${dependencySummary(entry, result.catalog.dependencies)}`,
     );
     lines.push(
-      `- Dependents: ${dependentSummary(entry, result.catalog.dependencies)}`,
+      `- Dependents: ${dependentSummary(entry, result.catalog.dependencies, result.catalog.assets)}`,
     );
   }
 
@@ -113,9 +114,11 @@ function dependencySummary(
 function dependentSummary(
   entry: CatalogEntry,
   dependencies: Dependency[],
+  assets: Catalog["assets"],
 ): string {
   const inbound = dependencies.filter(
-    (dependency) => dependency.to === entry.id,
+    (dependency) =>
+      resolveDependencyTarget(dependency, assets)?.id === entry.id,
   );
   if (inbound.length === 0) return "(none)";
   return inbound

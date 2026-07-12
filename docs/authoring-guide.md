@@ -134,9 +134,10 @@ Use this sequence for an existing Skill:
 
 ```text
 review with platform-native Skill authoring guidance
-  -> renma suggest-metadata <SKILL.md>
-  -> review the candidate
-  -> apply only intended changes
+  -> renma scan . --fail-on high
+  -> inspect relevant diagnostics and repository evidence
+  -> use suggest-metadata only for metadata or migration work
+  -> prepare and review intended changes
   -> renma scan . --fail-on high
   -> fix relevant diagnostics
   -> rerun validation
@@ -149,7 +150,19 @@ Use platform-native authoring guidance to review the trigger description,
 instructions, workflow, constraints, examples, and completion criteria. This is
 semantic authoring review; `suggest-metadata` does not perform it.
 
-### 2. Generate a metadata or migration suggestion
+### 2. Scan and inspect repository evidence
+
+```bash
+renma scan . --fail-on high
+renma inspect skills/testing/spec-review/SKILL.md
+```
+
+`scan` is the general deterministic starting point for an existing Skill. Use
+`inspect`, `catalog`, `graph`, `ownership`, or `readiness` when one of those
+commands answers a specific evidence question. Renma reports structural and
+governance evidence; it does not perform the whole-Skill semantic review.
+
+### 3. Generate a metadata or migration suggestion when needed
 
 ```bash
 renma suggest-metadata skills/testing/spec-review/SKILL.md
@@ -180,7 +193,11 @@ for a canonical Skill. An owner candidate requires explicit human-provided
 evidence. Security policy remains intentionally authored and deterministically
 validated.
 
-### 3. Review before applying
+Do not route an already canonical Skill through `suggest-metadata` as ceremony.
+Use it only for a metadata retrofit, explicit owner retrofit, recognized
+pre-0.16 one-way migration, or blocked migration review.
+
+### 4. Review before applying
 
 Treat the output as a candidate. Compare it with the source and apply only the
 intended metadata, path migration, or migration changes. Preserve the Markdown

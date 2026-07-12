@@ -1364,7 +1364,11 @@ test("global help lists workflows, boundaries, and distinguishable commands", as
   assert.equal(help.stdout, repeated.stdout);
   assert.match(help.stdout, /Usage\n {2}renma <command> \[args\] \[options\]/);
   assert.match(help.stdout, /Start here: existing repository/);
-  assert.match(help.stdout, /renma scan \./);
+  assert.match(help.stdout, /renma scan \. --fail-on high/);
+  assert.match(
+    help.stdout,
+    /use suggest-metadata only for metadata retrofit or Skill migration work/,
+  );
   assert.match(help.stdout, /renma catalog \. --format markdown/);
   assert.match(help.stdout, /renma graph \. --format markdown/);
   assert.match(help.stdout, /renma readiness \. --format markdown/);

@@ -117,7 +117,7 @@ export async function buildMetadataSuggestion(
             "Inspect the canonical Agent Skill without rewriting it.",
             "Preserve the Markdown body, standard Agent Skills fields, and metadata.renma.* extensions.",
             "Do not propose reverse migration or an unnecessary frontmatter rewrite.",
-            "Run renma scan . if the Skill is edited for another reason.",
+            "Only if a separate, intentional authoring change is made, run renma scan . --fail-on high, fix relevant diagnostics, and rerun the scan.",
           ]
         : metadataRetrofit
           ? [
@@ -248,6 +248,7 @@ function renderAgentSkillMigrationPrompt(
       : noMigrationProposed || !migration.canonicalFrontmatter
         ? "no-proposal"
         : "candidate";
+  const verification = renderSkillSuggestionVerification(promptState);
   const nextSteps = renderSkillSuggestionNextSteps(promptState);
   return `${[
     noMigrationProposed
@@ -281,8 +282,7 @@ function renderAgentSkillMigrationPrompt(
     "Human Review:",
     migration.reviewPrompt,
     "",
-    "Verification:",
-    "- Run `renma scan .`.",
+    ...verification,
     "",
     ...nextSteps,
     "",
@@ -292,8 +292,22 @@ function renderAgentSkillMigrationPrompt(
         : "Return one small reviewed patch containing both the entrypoint path migration and frontmatter migration. Do not rewrite the Skill body."
       : migration.blocked.length > 0
         ? "Do not return or apply a frontmatter patch while migration is blocked. Preserve the existing source until every blocked item is resolved with human review."
-        : "No frontmatter patch is proposed. Preserve the existing source.",
+        : "No frontmatter patch is proposed. Do not return or apply a frontmatter patch; preserve the existing source.",
   ].join("\n")}\n`;
+}
+
+function renderSkillSuggestionVerification(
+  state: SkillSuggestionPromptState,
+): string[] {
+  if (state === "no-proposal") {
+    return [
+      "Verification:",
+      "- No verification change is required when no separate authoring change is made.",
+      "- Only if a separate, intentional authoring change is made: run `renma scan . --fail-on high`, fix relevant diagnostics, and rerun the scan.",
+    ];
+  }
+
+  return ["Verification:", "- Run `renma scan . --fail-on high`."];
 }
 
 function renderSkillSuggestionNextSteps(
@@ -314,8 +328,8 @@ function renderSkillSuggestionNextSteps(
       "Next steps:",
       "1. Review the Skill's trigger description, instructions, workflow, constraints, and completion criteria using your platform's standard Skill authoring guidance.",
       "2. No metadata or migration change is proposed; preserve the existing source.",
-      "3. If a separate, intentionally reviewed authoring change is made, run `renma scan . --fail-on high`.",
-      "4. Fix relevant diagnostics and rerun the scan.",
+      "3. If a separate, intentionally reviewed authoring change is made, run `renma scan . --fail-on high`, fix relevant diagnostics, and rerun the scan.",
+      "4. If no separate change is made, stop without manufacturing work.",
     ];
   }
 

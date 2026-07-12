@@ -130,8 +130,9 @@ export const COMMAND_HELP = [
     ],
     nextSteps: [
       "Inspect evidence before editing.",
+      "Use suggest-metadata only when metadata retrofit or Skill migration work is needed.",
       "Prepare a minimal reviewable patch that preserves supported semantics.",
-      "Rerun scan and any relevant structural commands after editing.",
+      "Rerun scan with --fail-on high and any relevant structural commands after editing.",
     ],
     options: [
       "config",
@@ -612,8 +613,9 @@ export const COMMAND_HELP = [
       "For Skills, metadata review is only one part of authoring review; use the platform's standard Skill guidance for the trigger description, instructions, workflow, constraints, and completion criteria.",
     ],
     nextSteps: [
-      "Review the suggestion and apply only intended, evidence-backed metadata or migration changes.",
-      "Run renma scan . --fail-on high, fix relevant diagnostics, and rerun the scan.",
+      "Review the output; apply only an available, intended, evidence-backed metadata or migration candidate.",
+      "If no proposal is available, preserve the source unless a separate intentional authoring change is reviewed.",
+      "After intended changes, run renma scan . --fail-on high, fix relevant diagnostics, and rerun the scan.",
       "Report any missing owner, reference, or source-of-truth uncertainty.",
     ],
     options: [
@@ -705,7 +707,10 @@ export function renderGlobalHelp(version: string): string {
     "  renma <command> --help",
     "",
     "Start here: existing repository",
-    "  renma scan .",
+    "  review existing Skills with your platform's standard Skill authoring guidance",
+    "  renma scan . --fail-on high",
+    "  inspect relevant diagnostics and repository evidence",
+    "  use suggest-metadata only for metadata retrofit or Skill migration work",
     "  renma catalog . --format markdown",
     "  renma graph . --format markdown",
     "  renma readiness . --format markdown",

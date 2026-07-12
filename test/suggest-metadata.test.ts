@@ -209,7 +209,19 @@ test("suggest-metadata proposes no migration or rewrite for canonical release-pr
     promptResult.stdout,
     /If a separate, intentionally reviewed authoring change is made/,
   );
-  assert.match(promptResult.stdout, /renma scan \. --fail-on high/);
+  assert.match(
+    promptResult.stdout,
+    /Only if a separate, intentional authoring change is made: run `renma scan \. --fail-on high`, fix relevant diagnostics, and rerun the scan/,
+  );
+  assert.match(
+    promptResult.stdout,
+    /If no separate change is made, stop without manufacturing work/,
+  );
+  assert.match(
+    promptResult.stdout,
+    /Do not return or apply a frontmatter patch; preserve the existing source/,
+  );
+  assert.doesNotMatch(promptResult.stdout, /- Run `renma scan \.`\./);
   assert.doesNotMatch(
     promptResult.stdout,
     /Apply only the intended metadata or migration changes/,
@@ -259,6 +271,7 @@ test("suggest-metadata keeps candidate application guidance for a real owner ret
     result.stdout,
     /Apply only the intended metadata or migration changes/,
   );
+  assert.match(result.stdout, /Run `renma scan \. --fail-on high`/);
   assert.match(result.stdout, /Return a small reviewed frontmatter patch/);
   assert.doesNotMatch(
     result.stdout,

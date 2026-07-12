@@ -45,6 +45,11 @@ Use this index to choose the smallest document that answers your question.
 
 ## Examples
 
-- [Example Context Repository](../examples/context-repo)
-- [Context Lens Example](../examples/context-lens)
-- [GitHub Actions example](../examples/github-actions/renma-ci-report.yml)
+- [Interactive Placeholder Example](../examples/interactive-placeholder): a
+  minimal hands-on clarify-before-act Skill interaction with a local tool.
+- [Example Context Repository](../examples/context-repo): richer
+  repository-aware Skill, Context Lens, and Context Asset governance.
+- [Context Lens Example](../examples/context-lens): focused Context Lens
+  governance.
+- [GitHub Actions example](../examples/github-actions/renma-ci-report.yml): CI
+  report integration.

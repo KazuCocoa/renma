@@ -85,9 +85,10 @@ For an existing Skill:
 
 ```text
 review with platform-native Skill authoring guidance
-  -> renma suggest-metadata <SKILL.md>
-  -> review the candidate
-  -> apply only intended changes
+  -> renma scan . --fail-on high
+  -> inspect relevant diagnostics and repository evidence
+  -> use suggest-metadata only for metadata or migration work
+  -> prepare and review intended changes
   -> renma scan . --fail-on high
   -> fix relevant diagnostics
   -> rerun validation
@@ -121,11 +122,15 @@ npx renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
 npx renma scan . --fail-on high
 ```
 
-Review an existing Skill without editing it automatically:
+Review an existing Skill without editing it automatically. Start with `scan`;
+use `suggest-metadata` only when the evidence identifies metadata retrofit or
+migration work:
 
 ```bash
-npx renma suggest-metadata skills/testing/spec-review/SKILL.md
 npx renma scan . --fail-on high
+npx renma inspect skills/testing/spec-review/SKILL.md
+# Conditional: metadata retrofit, explicit owner retrofit, or migration only.
+npx renma suggest-metadata skills/testing/spec-review/SKILL.md
 ```
 
 Inspect one file or an exact slice:
@@ -236,8 +241,13 @@ canonical and migration rules.
 - [Product Design](design.md)
 - [Current Roadmap](plan.md)
 - [Proposed 0.18.0 Skill Discovery](plan-discovery.md)
-- [Example Context Repository](examples/context-repo)
-- [Context Lens Example](examples/context-lens)
+- [Interactive Placeholder Example](examples/interactive-placeholder): minimal
+  hands-on clarify-before-act Skill interaction with a local tool.
+- [Example Context Repository](examples/context-repo): richer repository-aware
+  Skill, Context Lens, and Context Asset governance.
+- [Context Lens Example](examples/context-lens): focused Context Lens governance.
+- [GitHub Actions Example](examples/github-actions/renma-ci-report.yml): CI report
+  integration.
 
 The governing review loop remains:
 

@@ -176,6 +176,18 @@ test("Skill authoring docs preserve the platform and Renma responsibility bounda
     assert.match(document, /renma scan \. --fail-on high/);
   }
 
+  for (const document of [readme, manual, authoring]) {
+    const scanIndex = document.indexOf("renma scan . --fail-on high");
+    const conditionalSuggestionIndex = document.search(
+      /suggest-metadata`? only|use suggest-metadata only/i,
+    );
+    assert.ok(scanIndex >= 0);
+    assert.ok(
+      conditionalSuggestionIndex > scanIndex,
+      "Existing-Skill guidance should start with scan and make suggest-metadata conditional.",
+    );
+  }
+
   assert.match(authoring, /Do not run two independent generators/);
   assert.match(authoring, /Optional Codex Example/);
   assert.match(authoring, /skill-creator/);

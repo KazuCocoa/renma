@@ -236,10 +236,13 @@ platform-native guidance before treating metadata suggestions as complete.
 
 ```mermaid
 flowchart TD
-  Authoring["Platform-native authoring review"] --> Suggest["Run renma suggest-metadata"]
-  Suggest --> Candidate["Review the candidate"]
-  Candidate --> Apply["Apply only intended changes"]
-  Apply --> Validate["Run renma scan . --fail-on high"]
+  Authoring["Platform-native authoring review"] --> Scan["Run renma scan . --fail-on high"]
+  Scan --> Evidence["Inspect relevant diagnostics and repository evidence"]
+  Evidence --> NeedMetadata{"Metadata or migration work needed?"}
+  NeedMetadata -- Yes --> Suggest["Run renma suggest-metadata and review the candidate"]
+  NeedMetadata -- No --> Prepare["Prepare and review intended changes, if any"]
+  Suggest --> Prepare
+  Prepare --> Validate["Rerun renma scan . --fail-on high"]
   Validate --> Fix["Fix relevant diagnostics and rerun"]
   Fix --> Review["Human review"]
 ```
@@ -258,7 +261,10 @@ renma scan . --fail-on high
 
 `scan` reports concrete findings such as broken references, risky instructions, missing or invalid metadata, unclear workflow structure, and layout issues.
 
-3. Inspect the current asset inventory.
+3. Inspect relevant repository evidence. Use only the views that answer the
+   current question; they are not mandatory ceremony.
+
+Inspect the current asset inventory when needed:
 
 ```bash
 renma catalog . --format markdown
@@ -266,7 +272,7 @@ renma catalog . --format markdown
 
 `catalog` helps you see existing skills, contexts, references, profiles, examples, IDs, owners, lifecycle states, hashes, tags, and declared dependencies.
 
-4. Check graph relationships.
+Check graph relationships when needed:
 
 ```bash
 renma graph . --format markdown
@@ -275,7 +281,7 @@ renma graph . --focus skill.testing.spec-review --format markdown
 
 `graph` helps find missing context, broken references, unexpected isolation, and unclear dependencies. Focused graph output keeps one asset and its direct neighborhood so you can inspect one skill or context without reading the whole graph.
 
-5. Check readiness.
+Check readiness when needed:
 
 ```bash
 renma readiness . --format markdown
@@ -283,7 +289,7 @@ renma readiness . --format markdown
 
 `readiness` gives a repository-level health score and checks. It is a static repository review signal, not a runtime decision about which context an agent should use.
 
-6. Use `inspect` for one file.
+Use `inspect` for one file:
 
 ```bash
 renma inspect skills/testing/spec-review/SKILL.md
@@ -292,7 +298,7 @@ renma inspect skills/testing/spec-review/SKILL.md --lines L10-L42
 
 Use this when you want a compact outline or exact line slice before editing a specific asset.
 
-7. Use `suggest-metadata` for the metadata or migration portion of the review.
+4. Use `suggest-metadata` only when metadata or migration work is needed.
 
 ```bash
 renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform --format prompt
@@ -311,7 +317,10 @@ confirm intent using platform-native guidance, do not apply a candidate, correct
 the source evidence, and rerun `suggest-metadata`. See
 [Agent Skills Compatibility and Migration](agent-skills-compatibility.md).
 
-8. Use `suggest-semantic-split` when a file has grown too large or mixes multiple purposes.
+An already canonical Skill with no metadata or migration need should not pass
+through `suggest-metadata` merely as ceremony.
+
+5. Use `suggest-semantic-split` when a file has grown too large or mixes multiple purposes.
 
 ```bash
 renma suggest-semantic-split docs/large-runbook.md
@@ -319,7 +328,8 @@ renma suggest-semantic-split docs/large-runbook.md
 
 `suggest-semantic-split` does not rewrite files either. It packages source context and guidance so a human or coding agent can draft a reviewable split.
 
-9. Validate intended changes, fix relevant diagnostics, and rerun.
+6. Prepare and review intended changes, then validate, fix relevant
+   diagnostics, and rerun.
 
 ```bash
 renma scan . --fail-on high
@@ -396,9 +406,14 @@ Other default scan glob families are:
 - New to Renma? Start with [Authoring Guide](authoring-guide.md).
 - Writing security-sensitive skills or context assets? Read [Security Policy Guide](security-policy.md).
 - Fixing scan findings? See [Diagnostics Reference](diagnostics.md).
-- Trying a repository-aware example? See the statically navigable
-  specification-review fixture in
-  [`examples/context-repo`](../examples/context-repo).
+- Trying a minimal clarify-before-act Skill interaction? Use
+  [`examples/interactive-placeholder`](../examples/interactive-placeholder).
+- Trying richer repository-aware Skill, Context Lens, and Context Asset
+  governance? See [`examples/context-repo`](../examples/context-repo).
+- Focusing specifically on Context Lens governance? See
+  [`examples/context-lens`](../examples/context-lens).
+- Adding Renma evidence to CI? See the
+  [GitHub Actions example](../examples/github-actions/renma-ci-report.yml).
 
 ## Commands
 
