@@ -55,10 +55,12 @@ Context Assets, Context Lenses, policies, references, ownership, lifecycle,
 dependencies, and evidence remain independently governed repository assets.
 
 In short, Renma is **Agent Skills-compatible, but not Agent Skills-defined**. A
-repository may organize multiple Skills and knowledge assets around domains,
-products, teams, or workflows; Renma does not require one repository-wide
-`skills/` layout. It is not an Agent Skills runtime, registry, or live router.
-For the exact 0.16.0 syntax and migration boundary, see
+repository may organize its broader knowledge assets around domains, products,
+teams, or workflows without embedding them inside Skill directories. Canonical
+Skill entrypoints in 0.16.0 are still discovered only under
+`skills/**/SKILL.md` and `.agents/skills/**/SKILL.md`; arbitrary Skill roots are
+not implemented. Renma is not an Agent Skills runtime, registry, or live
+router. For the exact 0.16.0 syntax and migration boundary, see
 [Agent Skills Compatibility and Migration](docs/agent-skills-compatibility.md).
 
 ## The Layer Model
@@ -69,27 +71,30 @@ flowchart TD
     Skills["Skills: agent-facing entrypoints and usage guides"]
     Lenses["Context Lenses: purpose-oriented interpretation"]
     Assets["Context Assets: reusable source-of-truth knowledge"]
-    Catalog["Catalog: IDs, ownership, lifecycle, dependencies, evidence"]
+    Skills -->|may reference| Lenses
+    Skills -->|may reference directly| Assets
+    Lenses -->|interprets| Assets
   end
-  Renma["Renma: deterministic governance and repository health"]
+  Renma["Renma: discover, parse, normalize, and validate"]
+  Catalog["Catalog: generated projection of IDs, ownership, lifecycle, dependencies, evidence"]
+  Views["Graph, Trust Graph, Readiness, and BOM projections"]
   Consumers["External tools and agents — runtime behavior outside Renma"]
-  Skills -->|may reference| Lenses
-  Skills -->|may reference directly| Assets
-  Lenses -->|interprets| Assets
-  Catalog -.-> Skills
-  Catalog -.-> Lenses
-  Catalog -.-> Assets
-  Renma -->|discovers, normalizes, validates| Catalog
+  Skills --> Renma
+  Lenses --> Renma
+  Assets --> Renma
+  Renma --> Catalog
+  Renma --> Views
   Consumers -->|consume according to their runtime behavior| Skills
   Consumers -->|may also consume| Lenses
   Consumers -->|may also consume| Assets
 ```
 
 Skills may point through a Context Lens or directly to a Context Asset; a Lens
-is not required for every asset. The Catalog describes repository assets rather
-than creating them. Renma validates those static declarations but does not
-select a Skill, choose or inject task Context, assemble a prompt, or execute the
-consumer's workflow.
+is not required for every asset. Renma generates the Catalog and other
+governance projections from repository source assets and declarations; the
+Catalog describes those assets rather than creating them. Renma validates
+static declarations but does not select a Skill, choose or inject task Context,
+assemble a prompt, or execute the consumer's workflow.
 
 ## Primary Workflows
 
@@ -99,8 +104,8 @@ Renma supports two common user journeys:
 2. [Improve an existing Skill or context repository](docs/user-manual.md#user-story-improve-existing-skills-with-diagnostics) from deterministic diagnostics, optionally using a coding agent to propose a patch that a human reviews.
 
 The [`examples/context-repo`](examples/context-repo) fixture demonstrates the
-second journey as an interactive specification review with an explicit Renma,
-agent, and human responsibility boundary.
+second journey as a repository-aware, statically navigable specification review
+with an explicit Renma, agent, and human responsibility boundary.
 
 ## How Renma Relates to RAG and Agent Memory
 
@@ -374,7 +379,8 @@ Renma does not require an LLM for this loop. Its core analysis is deterministic 
 
 ## Example repository
 
-See [`examples/context-repo`](examples/context-repo) for a small skill and shared-context repository you can scan with renma.
+See [`examples/context-repo`](examples/context-repo) for a repository-aware
+Skill and shared-context fixture you can inspect with Renma.
 
 See [`examples/context-lens`](examples/context-lens) for a Context Lens governance example with valid lenses, readiness output, inspect output, and expected diagnostics for an invalid lens.
 

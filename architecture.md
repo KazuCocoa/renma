@@ -100,11 +100,14 @@ graph/
 catalog/
 ```
 
-This tree is not a required repository-wide schema. Domains, products, teams,
-and workflows may each own Skills and knowledge assets in the structure that
-fits the repository. Canonical Skills use Agent Skills-compatible `SKILL.md`
-entrypoints, while Renma's normalized repository model remains broader than the
-Agent Skills format.
+This tree is not a required layout for every repository asset. Context Assets,
+Context Lenses, policies, references, and other knowledge may be organized by
+domain, product, team, or workflow. Canonical Skill entrypoints in 0.16.0 are
+nevertheless discovered only under `skills/**/SKILL.md` and
+`.agents/skills/**/SKILL.md`. A custom scan glob does not turn an arbitrary path
+such as `docs/skills/demo/SKILL.md` into a Skill. Renma's normalized repository
+model is broader than the Agent Skills format, but arbitrary Skill roots are not
+implemented.
 
 `contexts/` is preferred. `context/` is also scanned for compatibility.
 

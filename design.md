@@ -198,11 +198,14 @@ graph/
 catalog/
 ```
 
-This is not a required repository-wide layout. A repository may organize
-multiple Skills and knowledge assets by domain, product, team, workflow, or a
-combination of those dimensions. Canonical Skills use Agent Skills-compatible
-syntax, but Renma's repository model also governs Context Lenses, Context
-Assets, references, ownership, lifecycle, dependencies, and evidence.
+This is not a required layout for every repository asset. A repository may
+organize Context Assets, Context Lenses, policies, references, evidence, and
+other knowledge by domain, product, team, workflow, or a combination of those
+dimensions. Canonical Skill entrypoints in 0.16.0 remain under
+`skills/**/SKILL.md` and `.agents/skills/**/SKILL.md`; arbitrary Skill roots and
+domain-local `*/skills/**/SKILL.md` layouts are not implemented. Renma's broader
+model means repository knowledge need not be embedded inside those Skill
+directories.
 
 `contexts/` is preferred for shared context assets. `context/` remains supported
 as a compatibility alias. Files under either root are classified as the

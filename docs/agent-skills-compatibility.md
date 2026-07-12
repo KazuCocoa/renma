@@ -9,8 +9,13 @@ Compatibility is the portable authoring boundary for Skill entrypoints, not
 Renma's complete repository model. A Renma repository may also contain Context
 Lenses, independently owned Context Assets, references, policies, lifecycle and
 ownership declarations, dependencies, and evidence organized across domains,
-products, teams, or workflows. Renma is not defined by one repository-wide
-`skills/` layout and is not an Agent Skills registry, runtime, or live router.
+products, teams, or workflows. That flexibility applies to the broader
+repository assets, not to arbitrary Skill roots: canonical Skill entrypoints in
+0.16.0 are discovered only under `skills/**/SKILL.md` and
+`.agents/skills/**/SKILL.md`. A custom scan glob does not make a path such as
+`docs/skills/demo/SKILL.md` a Skill. Renma is not an Agent Skills registry,
+runtime, or live router, and repository knowledge does not need to be embedded
+inside the supported Skill directories.
 
 In this document, “pre-0.16 Renma Skill format” refers to the top-level Renma
 metadata syntax supported before Renma 0.16.0. It is the migration source

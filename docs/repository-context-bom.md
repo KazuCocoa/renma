@@ -29,7 +29,6 @@ flowchart TD
   Bom --> Json
   Bom --> Markdown
   Revision -.-> Bom
-  Runtime -.-> Bom
 ```
 
 The diagram separates collection from projection: every BOM section is derived

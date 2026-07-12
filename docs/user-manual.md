@@ -287,10 +287,11 @@ renma readiness . --format markdown
 
 The loop is: Renma reports deterministic evidence, a human or coding agent prepares a patch, a human reviews it, and Renma verifies the result again.
 
-For a complete interactive workflow using a Skill, a Context Lens, and direct
-Context Asset relationships, see the
-[`examples/context-repo`](../examples/context-repo) specification-review
-example.
+For a repository-aware specification-review example using a Skill, a Context
+Lens, and direct Context Asset relationships, see
+[`examples/context-repo`](../examples/context-repo). It is statically navigable
+only for a consumer with the repository checkout that follows the Skill and
+Lens relative links; Renma validates the relationships but does not load them.
 
 ## Configuration
 
@@ -351,14 +352,17 @@ Other default scan glob families are:
 - New to Renma? Start with [Authoring Guide](authoring-guide.md).
 - Writing security-sensitive skills or context assets? Read [Security Policy Guide](security-policy.md).
 - Fixing scan findings? See [Diagnostics Reference](diagnostics.md).
-- Trying a runnable example? See the interactive specification-review workflow
-  in [`examples/context-repo`](../examples/context-repo).
+- Trying a repository-aware example? See the statically navigable
+  specification-review fixture in
+  [`examples/context-repo`](../examples/context-repo).
 
 ## Commands
 
-For a runnable mini-repository with an interactive Skill, a Context Lens,
-shared Context Assets, ownership metadata, and graph relationships, see
-[`examples/context-repo`](../examples/context-repo).
+For a mini-repository with a statically navigable Skill, a Context Lens, shared
+Context Assets, ownership metadata, and graph relationships, see
+[`examples/context-repo`](../examples/context-repo). The consumer must have the
+checkout and follow the Skill and Lens relative links; the fixture is not a
+portable self-contained Agent Skills package.
 
 renma commands fall into a few groups:
 

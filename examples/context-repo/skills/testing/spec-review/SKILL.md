@@ -8,7 +8,7 @@ metadata:
   renma.owner: qa-platform
   renma.status: experimental
   renma.tags: '["testing","spec-review"]'
-  renma.requires-context: '["context.testing.negative-testing"]'
+  renma.requires-context: '["contexts/testing/negative-testing.md"]'
   renma.optional-context: '["context.domain.payment.idempotency"]'
   renma.requires-lens: '["lens.testing.spec-review.boundary-values"]'
 ---
@@ -26,6 +26,20 @@ validates the Skill and its declared relationships.
 - The incomplete request and any available criteria, examples, or references.
 - Known constraints, integrations, user states, and decision owners.
 
+## Repository Context
+
+This Skill is statically navigable inside this repository checkout. The
+consuming agent must open these relative links; Renma validates the matching
+asset IDs and relationships but does not load or inject their contents:
+
+- [Spec Review Boundary Values Lens](../../../lenses/testing/spec-review-boundary-values.md)
+- [Negative Testing](../../../contexts/testing/negative-testing.md)
+- [Example asset index](../../../README.md#repository-assets), which locates the
+  optional Payment Idempotency Context Asset for retryable payment writes
+
+Copying this `SKILL.md` without its linked repository assets is not a
+self-contained or portable workflow.
+
 ## Hard Constraints
 
 - Do not invent requirements, sources, or ownership. Ask a focused question;
@@ -40,9 +54,9 @@ validates the Skill and its declared relationships.
 4. Repeat until intended behavior, acceptance criteria, boundaries, error or
    retry behavior, and remaining decision owners are clear enough for review.
    Keep unavailable answers as unresolved questions.
-5. Apply `lens.testing.spec-review.boundary-values` to the reusable boundary
-   analysis Context Asset. Use `context.testing.negative-testing` directly. Use
-   `context.domain.payment.idempotency` only for retryable payment writes.
+5. Open the linked Lens and Context Assets. Apply the Lens to boundary-value
+   analysis, use Negative Testing directly, and use Payment Idempotency only
+   for retryable payment writes.
 6. Record facts and sources, clarifications, assumptions, open questions,
    applied Context and rationale, and findings with evidence and impact.
 7. Present the record to a human, who accepts, rejects, or corrects it.

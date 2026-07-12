@@ -11,24 +11,36 @@ tags:
 
 # Example Context Repository
 
-This fixture is a focused, end-to-end specification-review workflow. A
-consuming agent can follow the Skill to inspect an incomplete request, ask
-focused clarification questions, apply reusable Context, record evidence and
-assumptions, and produce findings for human review. Renma discovers and
-validates the repository assets; it does not execute the interaction.
+This fixture is a focused workflow-authoring and repository-governance example.
+It is statically navigable for a consuming agent that has this repository
+checkout and can follow the relative Markdown links in the Skill. The agent can
+inspect an incomplete request, ask focused clarification questions, apply
+reusable Context, record evidence and assumptions, and produce findings for
+human review. Renma discovers and validates the repository assets; it does not
+open the links or execute the interaction.
 
 ## Repository Assets
 
-- `skills/testing/spec-review/SKILL.md` is the Agent Skills-compatible
-  entrypoint and interactive usage guide.
-- `lenses/testing/spec-review-boundary-values.md` interprets reusable boundary
-  knowledge for specification review.
-- `contexts/testing/boundary-value-analysis.md` is the independently owned
-  source of truth used through the Lens.
-- `contexts/testing/negative-testing.md` is used directly by the Skill; a
-  Context Lens is not required for every Context Asset.
-- `contexts/domain/payment/idempotency.md` is optional and applies only when a
-  review covers retryable payment writes.
+- [`skills/testing/spec-review/SKILL.md`](skills/testing/spec-review/SKILL.md)
+  is the Agent Skills-compatible entrypoint and interactive usage guide.
+- [`lenses/testing/spec-review-boundary-values.md`](lenses/testing/spec-review-boundary-values.md)
+  interprets reusable boundary knowledge for specification review.
+- [`contexts/testing/boundary-value-analysis.md`](contexts/testing/boundary-value-analysis.md)
+  is the independently owned source of truth used through the Lens.
+- [`contexts/testing/negative-testing.md`](contexts/testing/negative-testing.md)
+  is used directly by the Skill; a Context Lens is not required for every
+  Context Asset.
+- [`contexts/domain/payment/idempotency.md`](contexts/domain/payment/idempotency.md)
+  is optional and applies only when a review covers retryable payment writes.
+
+The `metadata.renma.*` dependency values are governance relationships. Generic
+Agent Skills clients are not required to resolve them, so the Skill and Lens
+bodies provide a repository-relative path to every required asset. The Skill
+links the Lens and direct Context Asset, the Lens links Boundary Value Analysis,
+and the Skill links this asset index for its optional payment branch. Agent
+Skills-compatible syntax alone does not make those external assets portable,
+and copying the Skill without the rest of this fixture produces an incomplete
+workflow.
 
 The declared relationships demonstrate both supported shapes:
 
@@ -54,7 +66,7 @@ The consuming agent:
 
 - interprets the user's request and follows the Skill guidance;
 - asks focused clarification questions without inventing missing requirements;
-- reads the declared Context according to its runtime behavior;
+- opens the explicit repository-relative links in the Skill and Lens;
 - applies the Lens and direct Context relationships where relevant; and
 - records evidence, assumptions, unresolved questions, rationale, and findings.
 
@@ -118,7 +130,8 @@ This fixture does not add or imply a Renma runtime state machine, automatic
 question generation, live Skill or Context selection, prompt assembly, agent
 execution, automatic file rewriting, telemetry collection, or automatic human
 approval. The interactive behavior belongs to the consuming agent and the
-final judgment belongs to the human.
+final judgment belongs to the human. Renma metadata does not make the workflow
+self-contained or cause a generic Agent Skills client to load external assets.
 
 The declared relationship shape is:
 

@@ -24,9 +24,10 @@ expected_outputs:
 
 # Spec Review Boundary Values Lens
 
-Interpret boundary-value analysis for specification review. Identify missing
-limits, whether endpoints are inclusive or exclusive, behavior for empty and
-zero values, overflow behavior, and retry limits.
+Interpret [Boundary Value Analysis](../../contexts/testing/boundary-value-analysis.md)
+for specification review. Identify missing limits, whether endpoints are
+inclusive or exclusive, behavior for empty and zero values, overflow behavior,
+and retry limits.
 
 Ask focused questions when the specification does not define those decisions.
 Record unresolved source-of-truth gaps instead of inventing a boundary. This

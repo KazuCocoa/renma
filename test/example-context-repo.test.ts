@@ -36,7 +36,7 @@ test("example context repository scans and builds catalog/graph reports", async 
   assert.ok(graphNodeIds.includes("skill.testing.spec-review"));
   assert.ok(
     graphEdges.includes(
-      "skill.testing.spec-review->context.testing.negative-testing",
+      "skill.testing.spec-review->contexts/testing/negative-testing.md",
     ),
   );
   assert.ok(
