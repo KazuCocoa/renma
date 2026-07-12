@@ -1,7 +1,7 @@
 # Agent Skills Compatibility and Migration
 
-This document defines Renma's target `SKILL.md` format for the breaking 0.16.0
-transition. [Agent Skills](https://agentskills.io/specification) owns the
+This document defines Renma's `SKILL.md` compatibility and migration contract,
+including the 0.18.0 focused-workflow model. [Agent Skills](https://agentskills.io/specification) owns the
 portable Skill format. Renma extends it with deterministic governance evidence,
 without defining a competing Skill format.
 
@@ -114,6 +114,13 @@ renma.optional-lens
 renma.conflicts
 renma.superseded-by
 ```
+
+For new canonical Skills, `description` is the portable discovery source of
+truth for what the Skill does and when it should be selected. Existing
+`renma.when-to-use` and `renma.when-not-to-use` values remain recognized for
+governance and one-way migration preservation, but are deprecated for new Skill
+authoring because duplicating discovery semantics invites drift. They remain
+appropriate top-level governance fields for shared non-Skill Context Assets.
 
 Renma normalizes these values into the existing asset metadata model used by
 scan findings, inspect, catalog, ownership, graph and dependency resolution,
@@ -358,6 +365,7 @@ affect structural validity or the existing `--fail-on` threshold.
 | Identifier | Meaning |
 | --- | --- |
 | `RN-SKILL-DESCRIPTION-MISSING-USAGE-BOUNDARY` | The description does not state when the Skill should be used. |
+| `RN-SKILL-DESCRIPTION-MISSING-CAPABILITY` | The description does not clearly state what the Skill does. This is a Renma authoring warning, not an Agent Skills validity error. |
 | `RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY` | A body selection exclusion is absent from the description. |
 | `RN-SKILL-EXECUTION-CONSTRAINT-NOT-PROMINENT` | An execution constraint is outside a prominent constraint section. |
 | `RN-SKILL-EXECUTION-CONSTRAINT-SCATTERED` | Execution constraints are scattered across sections. |

@@ -19,6 +19,8 @@ import {
 } from "./repository-paths.js";
 import { parseAssetMetadata } from "./metadata.js";
 import { runRuleRegistry, type Rule } from "./rule-engine.js";
+import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
+import { estimateTokens, markdownBody } from "./token-estimator.js";
 import type {
   Evidence,
   Finding,
@@ -56,91 +58,45 @@ const ENV_COPY_PATTERN =
 const USER_LOCAL_PATH_PATTERN =
   /(?:^|[^a-z0-9_])(?:\/Users\/[^\s/\\]+|\/home\/[^\s/\\]+|[A-Za-z]:\\Users\\[^\s\\]+)(?:\/|$)/iu;
 
-const SKILL_TOKEN_LIMIT = 500;
-const DESCRIPTION_MIN_CHARS = 150;
-const REUSABLE_CONTEXT_MIN_LINES = 24;
-const REUSABLE_CONTEXT_MIN_TOKENS = 180;
+const QUALITY = DEFAULT_QUALITY_PROFILE;
+const MAX_LOCAL_SUPPORT_REFERENCE_HOPS =
+  QUALITY.agentSkills.recommendedReferenceDepth + 1;
 const REQUIRED_INPUTS_PATTERN =
   /\b(?:required inputs?|inputs|input requirements?|required information|prerequisites?|required context|required files|required permissions?|permission requirements?|environment requirements?|before running,\s*provide|before you begin,\s*provide|the user must provide|needs the following|target files|permissions required|environment required)\b|\brequires:/;
 const COMPLETION_CRITERIA_PATTERN =
   /\b(?:completion criteria|completion checklist|success criteria|success requirements|done criteria|done when|definition of done|acceptance criteria|deliverables?|final response|final answer|expected outcomes?|expected results?|expected output|required output|output requirements?|report should include|patch should include|when complete|workflow is complete|the workflow is complete after|task is complete|counts as complete|completion requirements?|stop when|do not finish until)\b/;
-const REUSABLE_CONTEXT_MIN_SIGNALS = 3;
-const SUPPORT_SHARED_CONTEXT_MIN_LINES = 18;
-const SUPPORT_SHARED_CONTEXT_MIN_TOKENS = 140;
-const SUPPORT_SHARED_CONTEXT_MIN_HEADINGS = 2;
-const SUPPORT_SHARED_CONTEXT_MIN_PHRASES = 2;
 const REUSABLE_CONTEXT_HEADING_PATTERNS: Array<[RegExp, string]> = [
-  [/\bsetup\b/i, "Setup"],
-  [/\binstallation\b/i, "Installation"],
-  [/\bconfiguration\b/i, "Configuration"],
-  [/\benvironment\b/i, "Environment"],
-  [/\bprerequisites?\b/i, "Prerequisites"],
-  [/\bplatform\b/i, "Platform"],
-  [/\btroubleshooting\b/i, "Troubleshooting"],
+  [/\bplatform facts?\b/i, "Platform Facts"],
+  [/\breusable troubleshooting\b/i, "Reusable Troubleshooting"],
   [/\bknown issues?\b/i, "Known Issues"],
-  [/\blimitations?\b/i, "Limitations"],
-  [/\bbest practices?\b/i, "Best Practices"],
-  [/\btesting heuristics?\b/i, "Testing Heuristics"],
-  [/\btest strategy\b/i, "Test Strategy"],
-  [/\bverification\b/i, "Verification"],
-  [/\bexamples?\b/i, "Examples"],
-  [/\bedge cases?\b/i, "Edge Cases"],
-  [/\brisks?\b/i, "Risks"],
   [/\bdomain rules?\b/i, "Domain Rules"],
-  [/\bfailure modes?\b/i, "Failure Modes"],
-  [/\bflaky tests?\b/i, "Flaky Tests"],
+  [/\bcompatibility (?:matrix|matrices)\b/i, "Compatibility Matrix"],
+  [/\bproduct polic(?:y|ies)\b/i, "Product Policy"],
+  [/\bshared testing heuristics?\b/i, "Shared Testing Heuristics"],
 ];
 const REUSABLE_CONTEXT_PHRASE_PATTERNS: Array<[RegExp, string]> = [
-  [/\buse this when\b/i, "use this when"],
   [/\bknown issue\b/i, "known issue"],
-  [/\blimitation\b/i, "limitation"],
-  [/\btroubleshooting\b/i, "troubleshooting"],
-  [/\bflaky\b/i, "flaky"],
-  [/\bretry\b/i, "retry"],
+  [/\breusable troubleshooting\b/i, "reusable troubleshooting"],
   [/\bplatform-specific\b/i, "platform-specific"],
-  [/\bedge case\b/i, "edge case"],
-  [/\brisk\b/i, "risk"],
-  [/\bheuristic\b/i, "heuristic"],
-  [/\bbest practice\b/i, "best practice"],
-  [/\bdo not\b/i, "do not"],
-  [/\bavoid\b/i, "avoid"],
-  [/\balways\b/i, "always"],
-  [/\bnever\b/i, "never"],
+  [/\bsource of truth\b/i, "source of truth"],
+  [/\bused by (?:multiple|several) skills\b/i, "cross-Skill use"],
+  [/\bshared (?:rule|policy|heuristic|knowledge)\b/i, "shared knowledge"],
 ];
 
 const SUPPORT_SHARED_CONTEXT_HEADING_PATTERNS: Array<[RegExp, string]> = [
   ...REUSABLE_CONTEXT_HEADING_PATTERNS,
-  [/\bdecision logic\b/i, "Decision Logic"],
-  [/\bsafety notes?\b/i, "Safety Notes"],
-  [/\bvalidation\b/i, "Validation"],
-  [/\boperating model\b/i, "Operating Model"],
   [/\bpolicy\b/i, "Policy"],
-  [/\bguidelines?\b/i, "Guidelines"],
-  [/\bprocedures?\b/i, "Procedure"],
-  [/\bchecklist\b/i, "Checklist"],
   [/\bcompatibility\b/i, "Compatibility"],
-  [/\bconstraints?\b/i, "Constraints"],
+  [/\bsource of truth\b/i, "Source of Truth"],
 ];
 
 const SUPPORT_SHARED_CONTEXT_PHRASE_PATTERNS: Array<[RegExp, string]> = [
-  [/\bmust\b/i, "must"],
-  [/\bshould\b/i, "should"],
-  [/\balways\b/i, "always"],
-  [/\bnever\b/i, "never"],
-  [/\bavoid\b/i, "avoid"],
-  [/\bprefer\b/i, "prefer"],
-  [/\bdo not\b/i, "do not"],
-  [/\brequired\b/i, "required"],
-  [/\brecommended\b/i, "recommended"],
   [/\bknown issue\b/i, "known issue"],
-  [/\blimitation\b/i, "limitation"],
-  [/\bfailure mode\b/i, "failure mode"],
-  [/\btroubleshooting\b/i, "troubleshooting"],
-  [/\bedge case\b/i, "edge case"],
-  [/\brisk\b/i, "risk"],
-  [/\bbest practice\b/i, "best practice"],
-  [/\bvalidate\b/i, "validate"],
-  [/\bverify\b/i, "verify"],
+  [/\breusable troubleshooting\b/i, "reusable troubleshooting"],
+  [/\bsource of truth\b/i, "source of truth"],
+  [/\bused by (?:multiple|several) skills\b/i, "cross-Skill use"],
+  [/\bindependent (?:owner|ownership|lifecycle)\b/i, "independent ownership"],
+  [/\bshared (?:rule|policy|heuristic|knowledge)\b/i, "shared knowledge"],
 ];
 const NON_SEMANTIC_CONTEXT_PATH_SEGMENTS = new Set([
   "promoted",
@@ -163,12 +119,7 @@ const NON_SEMANTIC_CONTEXT_PATH_SEGMENTS = new Set([
   "candidate",
   "candidates",
 ]);
-const CONTEXT_TOKEN_LIMITS = {
-  context: 1200,
-  profile: 500,
-  reference: 800,
-  example: 800,
-} as const;
+const CONTEXT_TOKEN_LIMITS = QUALITY.contentTokenWarn;
 
 /** Run all deterministic rules and return findings in stable source order. */
 export function runRules(
@@ -226,7 +177,8 @@ function rulesForEvaluationDate(
     },
     {
       id: "skill-local-support-reachability",
-      run: ({ documents }) => skillLocalSupportReachabilityFindings(documents),
+      run: ({ documents }) =>
+        skillLocalSupportReachabilityFindings(documents, repositoryPaths),
     },
     {
       id: "support-asset-shared-context-candidate",
@@ -879,7 +831,11 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     document.artifact.kind === "skill"
       ? (resolvedAgentSkillDescription(document) ?? "")
       : (document.metadata.description ?? "");
-  const tokenCount = approximateTokenCount(document.artifact.content);
+  // Skill budgets measure only Markdown after frontmatter. Agent Skills loads
+  // metadata separately, and Renma applies independent metadata budgets.
+  const bodyTokenCount = estimateTokens(
+    markdownBody(document.artifact.content),
+  );
 
   if (!description) {
     findings.push(
@@ -894,7 +850,8 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     );
   } else if (
     document.artifact.kind === "skill" &&
-    description.length < DESCRIPTION_MIN_CHARS
+    QUALITY.descriptionMinChars > 0 &&
+    description.length < QUALITY.descriptionMinChars
   ) {
     findings.push(
       documentFinding(
@@ -903,43 +860,63 @@ function shapeFindings(document: ParsedDocument): Finding[] {
         "Skill description is too short for routing clarity",
         "quality",
         "low",
-        `Expand frontmatter description to at least ${DESCRIPTION_MIN_CHARS} characters with usage routing guidance.`,
+        `Expand frontmatter description to at least ${QUALITY.descriptionMinChars} characters with usage routing guidance.`,
       ),
     );
   }
 
   const reusableContextFinding = reusableContextCandidateFinding(
     document,
-    tokenCount,
+    bodyTokenCount,
   );
   if (reusableContextFinding) findings.push(reusableContextFinding);
 
-  if (document.artifact.kind === "skill" && tokenCount > SKILL_TOKEN_LIMIT) {
+  if (
+    document.artifact.kind === "skill" &&
+    bodyTokenCount > QUALITY.skillTokenWarn
+  ) {
+    const limit =
+      bodyTokenCount > QUALITY.skillTokenStrongWarn
+        ? QUALITY.skillTokenStrongWarn
+        : QUALITY.skillTokenWarn;
+    const severity =
+      bodyTokenCount > QUALITY.skillTokenStrongWarn ? "medium" : "low";
     findings.push(
       documentFinding(
         document,
         DIAGNOSTIC_IDS.QUAL_SKILL_TOKEN_BUDGET,
-        "Skill entrypoint exceeds token budget",
+        "Skill body exceeds advisory token budget",
         "quality",
-        "medium",
-        `Keep SKILL.md under about ${SKILL_TOKEN_LIMIT} tokens as a compact usage guide. Move detailed procedures into reference files, but preserve them losslessly in ordered parts when needed. Do not delete, summarize, or merge away procedural steps. SKILL.md should reference every required support file or index without embedding the full procedure.`,
+        severity,
+        "Review progressive disclosure without deleting workflow steps. Keep selection boundaries, read conditions, ordered workflow, constraints, and completion criteria in SKILL.md. Move Skill-specific conditional detail to references/, deterministic repeated implementation to scripts/, output material to assets/, and independently owned cross-Skill knowledge to contexts/.",
         {
           whyItMatters:
-            "Large skills can mix LLM-facing usage guidance with reusable domain knowledge. Skills should remain concise routing contracts and usage guides, while reusable QA heuristics, domain rules, and tool guidance live in independently owned shared context assets.",
+            "Long Skill bodies can make activated workflows harder to navigate. Size is advisory evidence only; Agent Skills recommends staying under 5,000 tokens and Renma adds an earlier low review point at 2,000 estimated tokens.",
           constraints: [
             "Do not introduce runtime context resolution.",
             "Do not create prompt packages.",
             "Do not make Renma responsible for selecting context.",
-            "Preserve the skill as an LLM-facing entrypoint / usage guide.",
-            "Give extracted context assets stable metadata such as id, owner, and status.",
+            "Preserve ordered workflow steps, constraints, and completion criteria.",
+            "Choose a destination by semantic ownership, not by size alone.",
           ],
           verificationSteps: [
             "Run renma scan.",
             "Run any project-specific validation checks that apply to this repository.",
-            "Confirm the skill is shorter and extracted knowledge is represented as shared context assets.",
+            "Confirm any moved material remains statically reachable and semantically owned by its destination.",
           ],
           llmHint:
-            "If this skill mixes reusable knowledge with usage guidance, split reusable knowledge into first-class context assets under contexts/ and update the skill metadata or text to reference them.",
+            "Review the Skill for progressive disclosure. Keep core workflow in SKILL.md; use references/ for local detail, scripts/ for deterministic implementation, assets/ for output resources, and contexts/ only for independently owned shared knowledge.",
+          details: {
+            measured: bodyTokenCount,
+            limit,
+            unit: "estimated_tokens",
+            profile: QUALITY.profile,
+            measurement: "markdown_body_after_frontmatter",
+            source:
+              limit === QUALITY.skillTokenStrongWarn
+                ? "agent_skills_recommendation_and_renma_severity"
+                : "renma_quality_policy",
+          },
         },
       ),
     );
@@ -1099,8 +1076,8 @@ function shapeFindings(document: ParsedDocument): Finding[] {
   }
 
   if (
-    document.headings.length < 2 &&
-    document.artifact.content.split(/\s+/).length > 120
+    document.headings.length < QUALITY.lowHeadingDensityMinHeadings &&
+    bodyTokenCount >= QUALITY.lowHeadingDensityMinTokens
   ) {
     findings.push(
       documentFinding(
@@ -1109,7 +1086,16 @@ function shapeFindings(document: ParsedDocument): Finding[] {
         "Long instruction file has few headings",
         "structure",
         "low",
-        "Split long prose into task-oriented headings so agents can navigate it reliably.",
+        "Add task-oriented headings so agents can navigate the body reliably.",
+        {
+          details: {
+            measured: bodyTokenCount,
+            limit: QUALITY.lowHeadingDensityMinTokens,
+            unit: "estimated_tokens",
+            profile: QUALITY.profile,
+            measurement: "markdown_body_after_frontmatter",
+          },
+        },
       ),
     );
   }
@@ -1119,12 +1105,12 @@ function shapeFindings(document: ParsedDocument): Finding[] {
 
 function reusableContextCandidateFinding(
   document: ParsedDocument,
-  tokenCount: number,
+  estimatedTokens: number,
 ): Finding | undefined {
   if (document.artifact.kind !== "skill") return undefined;
   if (
-    document.lines.length < REUSABLE_CONTEXT_MIN_LINES &&
-    tokenCount < REUSABLE_CONTEXT_MIN_TOKENS
+    document.lines.length < QUALITY.reusableContextCandidate.minLines &&
+    estimatedTokens < QUALITY.reusableContextCandidate.minTokens
   )
     return undefined;
 
@@ -1157,7 +1143,11 @@ function reusableContextCandidateFinding(
   ];
   const phraseLabels = [...new Set(phraseMatches.map((match) => match.label))];
   const signalCount = new Set([...headingLabels, ...phraseLabels]).size;
-  if (signalCount < REUSABLE_CONTEXT_MIN_SIGNALS) return undefined;
+  // All patterns above are reusable-knowledge evidence. Ordinary workflow
+  // headings such as Verification, Examples, Steps, Risks, and Constraints are
+  // intentionally excluded and cannot qualify a Skill by themselves.
+  if (signalCount < QUALITY.reusableContextCandidate.minSignals)
+    return undefined;
 
   const evidenceLine =
     headingMatches[0]?.line ??
@@ -1177,8 +1167,8 @@ function reusableContextCandidateFinding(
   ].filter((part): part is string => Boolean(part));
 
   return {
-    id: DIAGNOSTIC_IDS.MAINT_SKILL_REUSABLE_CONTEXT_CANDIDATE,
-    title: "Skill may contain reusable context worth extracting",
+    id: DIAGNOSTIC_IDS.QUAL_SKILL_MIXED_RESPONSIBILITY,
+    title: "Skill may mix its workflow with reusable knowledge",
     category: "maintenance",
     severity: "low",
     confidence: "medium",
@@ -1186,12 +1176,12 @@ function reusableContextCandidateFinding(
     whyItMatters:
       "Reusable setup notes, troubleshooting, platform guidance, testing heuristics, or domain rules are easier to own, review, and reuse when they live in shared context assets instead of only inside one skill.",
     remediation:
-      "Review the matched headings and phrases. If they describe reusable knowledge, extract that knowledge into first-class shared context assets under contexts/ and keep SKILL.md as a concise LLM-facing usage guide.",
+      "Review the matched headings and phrases. Promote content to contexts/ only when it needs cross-Skill reuse, independent ownership, lifecycle, or source-of-truth status; otherwise keep Skill-specific detail in SKILL.md or references/.",
     constraints: [
       "Do not make Renma select runtime context.",
       "Do not assemble prompt packages.",
       "Do not automatically rewrite or split skills.",
-      "Preserve SKILL.md as the routing contract / usage guide.",
+      "Preserve SKILL.md as a focused workflow entrypoint.",
       "Give extracted context assets stable metadata such as id, owner, and status.",
     ],
     verificationSteps: [
@@ -1199,7 +1189,18 @@ function reusableContextCandidateFinding(
       "Confirm the advisory is resolved or intentionally accepted after reusable knowledge is represented as shared context assets.",
     ],
     llmHint:
-      "Look for reusable setup, troubleshooting, platform, testing, or domain guidance in this skill. If reusable, move it into owned contexts/ assets and update the skill to reference those assets without adding runtime context selection.",
+      "Check whether the matched knowledge is used across Skills or needs independent ownership. Use contexts/ only for shared knowledge; keep Skill-local procedures and edge cases in SKILL.md or references/.",
+    details: {
+      measured: estimatedTokens,
+      limit: QUALITY.reusableContextCandidate.minTokens,
+      unit: "estimated_tokens",
+      lines: document.lines.length,
+      minLines: QUALITY.reusableContextCandidate.minLines,
+      distinctSignals: signalCount,
+      minSignals: QUALITY.reusableContextCandidate.minSignals,
+      profile: QUALITY.profile,
+      measurement: "markdown_body_after_frontmatter",
+    },
   };
 }
 
@@ -1216,10 +1217,12 @@ function supportSharedContextCandidateFindings(
     return [];
   }
 
-  const tokenCount = approximateTokenCount(document.artifact.content);
+  const estimatedTokens = estimateTokens(
+    markdownBody(document.artifact.content),
+  );
   if (
-    document.lines.length < SUPPORT_SHARED_CONTEXT_MIN_LINES &&
-    tokenCount < SUPPORT_SHARED_CONTEXT_MIN_TOKENS
+    document.lines.length < QUALITY.sharedSupportCandidate.minLines &&
+    estimatedTokens < QUALITY.sharedSupportCandidate.minTokens
   ) {
     return [];
   }
@@ -1263,8 +1266,10 @@ function supportSharedContextCandidateFindings(
 
   const sourceSignals = [...headingMatches, ...phraseMatches];
   if (
-    headingMatches.length < SUPPORT_SHARED_CONTEXT_MIN_HEADINGS ||
-    phraseMatches.length < SUPPORT_SHARED_CONTEXT_MIN_PHRASES
+    new Set(headingMatches.map((match) => match.label)).size <
+      QUALITY.sharedSupportCandidate.minHeadings ||
+    new Set(phraseMatches.map((match) => match.label)).size <
+      QUALITY.sharedSupportCandidate.minPhrases
   ) {
     return [];
   }
@@ -1317,6 +1322,19 @@ function supportSharedContextCandidateFindings(
       ],
       llmHint:
         "Search the repository for similar headings, filenames, repeated procedures, commands, constraints, or overlapping guidance. If this support file appears reusable, propose a first-class context asset under contexts/, move the reusable details without losing information, keep truly local notes in the skill directory, and update declared context references.",
+      details: {
+        measured: estimatedTokens,
+        limit: QUALITY.sharedSupportCandidate.minTokens,
+        unit: "estimated_tokens",
+        lines: document.lines.length,
+        minLines: QUALITY.sharedSupportCandidate.minLines,
+        headings: new Set(headingMatches.map((match) => match.label)).size,
+        minHeadings: QUALITY.sharedSupportCandidate.minHeadings,
+        phrases: new Set(phraseMatches.map((match) => match.label)).size,
+        minPhrases: QUALITY.sharedSupportCandidate.minPhrases,
+        profile: QUALITY.profile,
+        measurement: "full_file",
+      },
     },
   ];
 }
@@ -1709,8 +1727,8 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
   }
 
   const limit = CONTEXT_TOKEN_LIMITS[document.artifact.kind];
-  const tokenCount = approximateTokenCount(document.artifact.content);
-  if (tokenCount <= limit) return [];
+  const estimatedTokens = estimateTokens(document.artifact.content);
+  if (estimatedTokens <= limit) return [];
 
   return [
     documentFinding(
@@ -1719,14 +1737,15 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
       "Support asset exceeds token guidance",
       "quality",
       "low",
-      `Keep ${document.artifact.kind} assets under about ${limit} tokens where practical. If a file is too large, run \`renma suggest-semantic-split ${document.artifact.path}\` to get a semantic split proposal, then split it losslessly into meaning-based ordered part files. Do not delete, summarize, or merge away procedural steps. The parent file or SKILL.md should reference every part in order, and the split should preserve the original procedure text exactly. Verify by reconstructing the parts and comparing them to the original content before accepting the fix.`,
+      `Review whether this ${document.artifact.kind} asset still has one coherent scope. Size alone does not require a split. Consider headings, read conditions, reference depth, mixed responsibilities, and maintained duplication before using \`renma suggest-semantic-split ${document.artifact.path}\`.`,
       {
         whyItMatters:
-          "Oversized support assets are harder for humans and LLM coding agents to review safely. Shared context and local support files should stay modular enough that ownership, scope, and static references remain clear.",
+          "Large content assets deserve a low-advisory coherence review, but an intentionally focused asset can remain intact above the threshold.",
         constraints: [
           "Do not introduce runtime context resolution.",
           "Do not create prompt packages.",
-          "Preserve concrete procedural steps losslessly.",
+          "Do not split based on size alone.",
+          "Preserve concrete procedural steps losslessly if a semantic split is chosen.",
           "Keep static references from the parent file or SKILL.md to every split part.",
         ],
         verificationSteps: [
@@ -1735,7 +1754,14 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
           "Confirm the finding is resolved or reduced and every split part remains reachable.",
         ],
         llmHint:
-          "Split oversized support content into meaning-based ordered part files, keep the original procedure text intact, and update static references so Renma can validate reachability.",
+          "Review scope, headings, read conditions, reference depth, responsibilities, and duplication. Propose a semantic split only when those signals justify it.",
+        details: {
+          measured: estimatedTokens,
+          limit,
+          unit: "estimated_tokens",
+          profile: QUALITY.profile,
+          measurement: "full_file",
+        },
       },
     ),
   ];
@@ -1759,6 +1785,7 @@ function profileFindings(document: ParsedDocument): Finding[] {
 
 function skillLocalSupportReachabilityFindings(
   documents: ParsedDocument[],
+  repositoryPaths?: ReadonlySet<string>,
 ): Finding[] {
   const skills = documents.filter(
     (document) => document.artifact.kind === "skill",
@@ -1767,18 +1794,17 @@ function skillLocalSupportReachabilityFindings(
     const skillDir = path.posix.dirname(skill.artifact.path);
     const localSupportDocs = documents.filter(
       (document) =>
-        ["profile", "reference", "example"].includes(document.artifact.kind) &&
-        document.artifact.path.startsWith(`${skillDir}/`),
+        ["profile", "reference", "example", "script", "asset"].includes(
+          document.artifact.kind,
+        ) && document.artifact.path.startsWith(`${skillDir}/`),
     );
-    if (localSupportDocs.length === 0) return [];
-
     const findings: Finding[] = [];
     const text = skill.artifact.content.toLowerCase();
     const hasLocalSupportGuidance =
-      /support file|local support|context route|context map|mixin|profiles?\/|references?\/|examples?\/|load .*?(?:profile|reference|example)|reference .*?(?:profile|reference|example)/.test(
+      /support file|local support|context route|context map|mixin|profiles?\/|references?\/|examples?\/|scripts?\/|assets?\/|load .*?(?:profile|reference|example|script|asset)|(?:read|run|reference) .*?(?:profile|reference|example|script|asset)/.test(
         text,
       );
-    if (!hasLocalSupportGuidance) {
+    if (localSupportDocs.length > 0 && !hasLocalSupportGuidance) {
       findings.push(
         documentFinding(
           skill,
@@ -1786,7 +1812,7 @@ function skillLocalSupportReachabilityFindings(
           "Skill has local support files but no reachability guidance",
           "structure",
           "medium",
-          "Add local support file reachability guidance so the top-level skill declares when profiles, references, examples, or scripts are reachable. If support content was split into ordered parts, reference the index or all parts in order. Preserve original concrete steps. Do not delete, summarize, or merge away procedural steps.",
+          "Add local support file reachability guidance so the top-level skill declares when profiles, references, examples, scripts, or assets are reachable. If support content was split into ordered parts, reference the index or all parts in order. Preserve original concrete steps. Do not delete, summarize, or merge away procedural steps.",
           {
             whyItMatters:
               "Local support files should be statically discoverable from the skill so humans and LLM coding agents can tell which repository evidence belongs to the skill without relying on runtime context selection.",
@@ -1799,21 +1825,22 @@ function skillLocalSupportReachabilityFindings(
             verificationSteps: [
               "Run renma scan.",
               "Run any project-specific validation checks that apply to this repository.",
-              "Confirm each local profile, reference, or example is reachable from SKILL.md or from a referenced parent support file.",
+              "Confirm each local profile, reference, example, script, or asset is reachable from SKILL.md or from a referenced parent support file.",
             ],
             llmHint:
-              "Add concise reachability guidance in SKILL.md that references local profiles, references, examples, or ordered support indexes without adding runtime routing behavior.",
+              "Add concise reachability guidance in SKILL.md that references local profiles, references, examples, scripts, assets, or ordered support indexes without adding runtime routing behavior.",
           },
         ),
       );
     }
 
-    const reachableLocalSupportPaths = reachableLocalSupportDocuments(
+    const reachabilityDepth = localSupportReachabilityDepth(
       skill,
       localSupportDocs,
     );
     for (const document of localSupportDocs) {
-      if (!reachableLocalSupportPaths.has(document.artifact.path)) {
+      const depth = reachabilityDepth.get(document.artifact.path);
+      if (depth === undefined) {
         findings.push(
           documentFinding(
             document,
@@ -1841,6 +1868,66 @@ function skillLocalSupportReachabilityFindings(
             },
           ),
         );
+      } else if (depth > MAX_LOCAL_SUPPORT_REFERENCE_HOPS) {
+        findings.push(
+          documentFinding(
+            document,
+            DIAGNOSTIC_IDS.SUPPORT_DEEP_REFERENCE_CHAIN,
+            "Skill-local resource is behind a deep reference chain",
+            "structure",
+            "low",
+            "Reference this resource directly from SKILL.md or through one directly referenced index/reference. Agent Skills recommends shallow file-reference chains.",
+            {
+              details: {
+                measured: depth,
+                limit: MAX_LOCAL_SUPPORT_REFERENCE_HOPS,
+                unit: "static_reference_hops",
+                profile: QUALITY.profile,
+              },
+            },
+          ),
+        );
+      }
+    }
+
+    const missingPathSources = [
+      skill,
+      ...localSupportDocs.filter(
+        (document) =>
+          (reachabilityDepth.get(document.artifact.path) ?? 99) <=
+          MAX_LOCAL_SUPPORT_REFERENCE_HOPS,
+      ),
+    ];
+    const reportedMissingPaths = new Set<string>();
+    for (const source of missingPathSources) {
+      for (const reference of localSupportPathReferences(source, skillDir)) {
+        if (
+          repositoryPathExists(repositoryPaths, reference.target) ||
+          repositoryPathExists(repositoryPaths, reference.relative) ||
+          reportedMissingPaths.has(
+            `${source.artifact.path}:${reference.target}`,
+          )
+        )
+          continue;
+        reportedMissingPaths.add(`${source.artifact.path}:${reference.target}`);
+        findings.push(
+          findingAt(
+            source,
+            DIAGNOSTIC_IDS.SUPPORT_MISSING_PATH,
+            "Skill-local resource path does not exist",
+            "structure",
+            "medium",
+            reference.line,
+            reference.raw,
+            `Create ${reference.relative} under the Skill root or correct the relative path.`,
+            {
+              details: {
+                target: reference.target,
+                profile: QUALITY.profile,
+              },
+            },
+          ),
+        );
       }
     }
 
@@ -1848,33 +1935,85 @@ function skillLocalSupportReachabilityFindings(
   });
 }
 
-function reachableLocalSupportDocuments(
+function repositoryPathExists(
+  repositoryPaths: ReadonlySet<string> | undefined,
+  candidate: string,
+): boolean {
+  if (!repositoryPaths) return false;
+  if (repositoryPaths.has(candidate)) return true;
+  const directoryPrefix = `${candidate.replace(/\/$/, "")}/`;
+  for (const filePath of repositoryPaths) {
+    if (filePath.startsWith(directoryPrefix)) return true;
+  }
+  return false;
+}
+
+function localSupportReachabilityDepth(
   skill: ParsedDocument,
   localSupportDocs: ParsedDocument[],
-): Set<string> {
-  const reachable = new Set<string>();
+): Map<string, number> {
+  const reachable = new Map<string, number>();
   let changed = true;
 
   while (changed) {
     changed = false;
     for (const document of localSupportDocs) {
       if (reachable.has(document.artifact.path)) continue;
-      const possibleRouters = [
-        skill,
-        ...localSupportDocs.filter((candidate) =>
-          reachable.has(candidate.artifact.path),
-        ),
-      ];
-      if (
-        possibleRouters.some((router) => referencesDocument(router, document))
-      ) {
-        reachable.add(document.artifact.path);
+      if (referencesDocument(skill, document)) {
+        reachable.set(document.artifact.path, 1);
+        changed = true;
+        continue;
+      }
+      const parent = localSupportDocs
+        .filter((candidate) => reachable.has(candidate.artifact.path))
+        .sort(
+          (left, right) =>
+            (reachable.get(left.artifact.path) ?? 0) -
+            (reachable.get(right.artifact.path) ?? 0),
+        )
+        .find((candidate) => referencesDocument(candidate, document));
+      if (parent) {
+        reachable.set(
+          document.artifact.path,
+          (reachable.get(parent.artifact.path) ?? 0) + 1,
+        );
         changed = true;
       }
     }
   }
 
   return reachable;
+}
+
+function localSupportPathReferences(
+  document: ParsedDocument,
+  skillDir: string,
+): Array<{ raw: string; relative: string; target: string; line: number }> {
+  const references: Array<{
+    raw: string;
+    relative: string;
+    target: string;
+    line: number;
+  }> = [];
+  for (let index = 0; index < document.lines.length; index += 1) {
+    const line = document.lines[index] ?? "";
+    for (const match of line.matchAll(
+      /(?:^|[[\s(`'"])((?:references|scripts|assets|profiles|examples)\/[A-Za-z0-9_.@%+~/-]+)/g,
+    )) {
+      const relative = match[1]?.replace(/[),.;:'"\]]+$/, "");
+      if (!relative || relative.includes("..")) continue;
+      // Missing-path diagnostics apply to statically named files. Bare support
+      // directory names can also describe repository locations or scopes.
+      if (!path.posix.basename(relative).includes(".")) continue;
+      references.push({
+        raw: match[0]?.trim() ?? relative,
+        relative,
+        target: path.posix.join(skillDir, relative),
+        line: index + 1,
+      });
+    }
+  }
+  return references;
 }
 
 function referencesDocument(
@@ -1969,65 +2108,11 @@ function thinSkillLayoutFindings(document: ParsedDocument): Finding[] {
     "canonical"
   )
     return [];
-
-  const findings: Finding[] = [];
-  const wordCount = words(document.artifact.content).length;
-  const procedureSignals = [
-    /^#{2,}\s+(procedure|steps?|install|configure|troubleshoot|diagnose|setup)\b/im,
-    /\b(step\s+\d+|first,|next,|finally)\b/i,
-  ];
-
-  if (
-    wordCount > 450 ||
-    procedureSignals.some((pattern) => pattern.test(document.artifact.content))
-  ) {
-    findings.push(
-      documentFinding(
-        document,
-        DIAGNOSTIC_IDS.LAYOUT_SKILL_NOT_THIN,
-        "Skill entrypoint contains procedure content",
-        "structure",
-        wordCount > 700 ? "medium" : "low",
-        "Move reusable procedure content into contexts/** and keep SKILL.md as a concise router that points to the required context assets.",
-        {
-          whyItMatters:
-            "Canonical Skill entrypoints should route agents instead of owning reusable knowledge, helper implementations, or detailed procedures.",
-          verificationSteps: [
-            "Confirm SKILL.md contains routing guidance and required context references only.",
-            "Run renma readiness and check layout.skills_thin.",
-          ],
-          llmHint:
-            "Extract long procedure sections into contexts/**, add metadata.renma.requires-context or metadata.renma.optional-context JSON-array strings, and keep SKILL.md focused on when to use or not use the Skill. Pre-0.16 top-level references are migration input only.",
-        },
-      ),
-    );
-  }
-
-  const command = firstExecutableCommand(document);
-  if (command) {
-    findings.push(
-      findingAt(
-        document,
-        DIAGNOSTIC_IDS.LAYOUT_SKILL_EXECUTABLE_COMMAND,
-        "Skill entrypoint contains executable command",
-        "structure",
-        "low",
-        command.line,
-        command.command,
-        "Move executable command detail into Skill-local references or governed contexts/** procedures, and keep SKILL.md as a router.",
-        {
-          whyItMatters:
-            "Executable setup commands in SKILL.md make the entrypoint procedural instead of a concise routing layer.",
-          verificationSteps: [
-            "Move the command guidance to a context/reference/procedure.",
-            "If the command invokes a helper script, ensure it resolves to local scripts/** in the owning Skill or a shared tools/** helper.",
-          ],
-        },
-      ),
-    );
-  }
-
-  return findings;
+  // Agent Skills explicitly permits step-by-step instructions and command
+  // examples in SKILL.md. Focused-workflow quality is evaluated by dedicated
+  // routing, input, completion, progressive-disclosure, and mixed-knowledge
+  // rules instead of the removed 0.17 thin-router heuristic.
+  return [];
 }
 
 function helperCommandFindings(
@@ -2265,12 +2350,6 @@ function executableCommands(document: ParsedDocument): Array<{
   );
 }
 
-function firstExecutableCommand(
-  document: ParsedDocument,
-): { command: string; line: number } | undefined {
-  return executableCommands(document)[0];
-}
-
 function unresolvedHelperCommandFinding(
   document: ParsedDocument,
   command: { command: string; line: number },
@@ -2329,10 +2408,6 @@ function lineText(document: ParsedDocument, line: number): string {
 
 function isRepoPathLike(value: string): boolean {
   return /^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+$/.test(value);
-}
-
-function words(text: string): string[] {
-  return text.match(/[A-Za-z0-9_./+=-]+|[^\sA-Za-z0-9_./+=-]/g) ?? [];
 }
 
 function finding(
@@ -2420,16 +2495,13 @@ function localSupportUnreachableRuleId(
 ): string {
   if (kind === "profile") return DIAGNOSTIC_IDS.SUPPORT_UNREACHABLE_PROFILE;
   if (kind === "example") return DIAGNOSTIC_IDS.SUPPORT_UNREACHABLE_EXAMPLE;
+  if (kind === "script") return DIAGNOSTIC_IDS.SUPPORT_UNREACHABLE_SCRIPT;
+  if (kind === "asset") return DIAGNOSTIC_IDS.SUPPORT_UNREACHABLE_ASSET;
   return DIAGNOSTIC_IDS.SUPPORT_UNREACHABLE_REFERENCE;
 }
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function approximateTokenCount(text: string): number {
-  const matches = text.match(/[A-Za-z0-9_./+=-]+|[^\sA-Za-z0-9_./+=-]/g);
-  return matches?.length ?? 0;
 }
 
 function isPlaceholder(line: string): boolean {

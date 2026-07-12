@@ -39,6 +39,10 @@ export interface GraphNode {
   id: string;
   kind: AssetKind;
   sourcePath: string;
+  contentHash?: string;
+  sizeBytes?: number;
+  contentClassification?: "text" | "binary";
+  markdownParserEligible?: boolean;
   owner?: string;
   status?: AssetStatus;
   tags: string[];
@@ -618,6 +622,10 @@ function toNode(asset: Asset): GraphNode {
     id: asset.id,
     kind: asset.kind,
     sourcePath: asset.sourcePath,
+    contentHash: asset.contentHash,
+    sizeBytes: asset.sizeBytes ?? 0,
+    contentClassification: asset.contentClassification ?? "text",
+    markdownParserEligible: asset.markdownParserEligible ?? true,
     ...(asset.metadata.owner ? { owner: asset.metadata.owner } : {}),
     ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
     tags: asset.metadata.tags,

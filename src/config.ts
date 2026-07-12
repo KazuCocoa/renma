@@ -7,6 +7,7 @@ import type {
   SuppressionConfig,
   SuppressionExpiration,
 } from "./types.js";
+import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 
 const SEVERITIES = ["low", "medium", "high", "critical"] as const;
 const FORMATS = ["text", "json"] as const;
@@ -32,12 +33,18 @@ export const DEFAULT_CONFIG: ScanConfig = {
     "skills/**/references/**/*.md",
     "skills/**/examples/**/*.md",
     "skills/**/scripts/**/*",
+    "skills/**/assets/**/*",
+    ".agents/skills/**/profiles/**/*.md",
+    ".agents/skills/**/references/**/*",
+    ".agents/skills/**/examples/**/*.md",
+    ".agents/skills/**/scripts/**/*",
+    ".agents/skills/**/assets/**/*",
     "tools/**/*",
   ],
   exclude: ["node_modules", "dist", ".git"],
-  maxFileSizeBytes: 512 * 1024,
-  maxDepth: 16,
-  concurrency: 16,
+  maxFileSizeBytes: DEFAULT_QUALITY_PROFILE.scan.defaultMaxFileSizeBytes,
+  maxDepth: DEFAULT_QUALITY_PROFILE.scan.defaultMaxDepth,
+  concurrency: DEFAULT_QUALITY_PROFILE.scan.defaultConcurrency,
   suppressions: [],
   layout: {
     workflowAliases: {},

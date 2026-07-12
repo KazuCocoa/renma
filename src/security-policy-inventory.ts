@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import {
   applySecurityConfig,
   effectiveAllowedDataClass,
@@ -14,7 +15,7 @@ import type {
   SecurityConfig,
 } from "./types.js";
 
-type InventoryArtifactKind = ArtifactKind;
+type InventoryArtifactKind = Exclude<ArtifactKind, "script" | "asset">;
 
 export interface PolicyBooleanCounts {
   true: number;
@@ -137,7 +138,7 @@ export function summarizeSecurityPolicyInventory(
 
     const policy = applySecurityConfig(parsedPolicy, config);
     summary.totalPolicyAssets += 1;
-    summary.assetKinds[artifact.kind] += 1;
+    summary.assetKinds[artifact.kind as InventoryArtifactKind] += 1;
 
     if (hasMetadata) {
       summary.assetsWithPolicyMetadata += 1;
@@ -275,6 +276,7 @@ export function isPolicyInventoryArtifact(
     parseOperationalSecurityPolicy(artifact),
   ),
 ): boolean {
+  if (artifact.kind === "script" || artifact.kind === "asset") return false;
   return POLICY_INVENTORY_KINDS.has(artifact.kind) || hasLocalMetadata;
 }
 
@@ -474,7 +476,7 @@ function topCounts<Key extends string>(
       if (left.count !== right.count) return right.count - left.count;
       return left[key].localeCompare(right[key]);
     })
-    .slice(0, 10);
+    .slice(0, DEFAULT_QUALITY_PROFILE.presentation.topSummaryItemCap);
 }
 
 function uniqueStrings(values: string[]): string[] {

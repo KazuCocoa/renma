@@ -161,9 +161,9 @@ test("artifact classification preserves nested support and outside-root kinds", 
     kinds["skills/demo/examples/skills/example/SKILL.md"],
     "example",
   );
-  assert.equal(kinds["skills/demo/assets/SKILL.md"], "unknown");
-  assert.equal(kinds[".agents/skills/demo/assets/SKILL.md"], "unknown");
-  assert.equal(kinds["skills/demo/assets/example.skill.md"], "unknown");
+  assert.equal(kinds["skills/demo/assets/SKILL.md"], "asset");
+  assert.equal(kinds[".agents/skills/demo/assets/SKILL.md"], "asset");
+  assert.equal(kinds["skills/demo/assets/example.skill.md"], "asset");
   for (const reservedPath of [
     "skills/assets/SKILL.md",
     ".agents/skills/assets/SKILL.md",

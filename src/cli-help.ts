@@ -76,6 +76,11 @@ const OPTION_HELP = {
     flags: "--owner <owner>",
     description: "Owner value for commands that accept --owner.",
   },
+  resources: {
+    flags: "--resources <directories>",
+    description:
+      "Create selected Skill-local directories: references,scripts,assets.",
+  },
   tags: {
     flags: "--tags <tags>",
     description: "Set comma-separated or repeated scaffold tags.",
@@ -545,10 +550,12 @@ export const COMMAND_HELP = [
       "renma scaffold context contexts/testing/boundary-value-analysis.md --owner qa-platform",
       "renma scaffold context_lens lenses/testing/spec-review-boundary-values.md --owner qa-platform",
       "renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform --format prompt",
+      "renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform --resources references,scripts,assets",
     ],
     interpretation: [
       "File mode creates the scaffold file at the target path and refuses to overwrite existing files.",
       "Prompt and JSON modes print to stdout instead of creating the scaffold file.",
+      "--resources creates only selected empty directories and never placeholder files.",
       "Generated scaffold content is a starting structure, not a complete asset.",
       "For Skills, use the platform's standard Skill authoring guidance to complete the description, instructions, workflow, constraints, and completion criteria.",
       "Domain knowledge must come from evidence or human input.",
@@ -572,6 +579,7 @@ export const COMMAND_HELP = [
       "id",
       "title",
       "tags",
+      "resources",
       "help",
     ],
   },

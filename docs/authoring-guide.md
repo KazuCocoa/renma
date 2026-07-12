@@ -30,6 +30,39 @@ Renma does not replace platform-native authoring guidance, generate domain
 intent, or automatically improve a Skill body. Human judgment remains required
 for semantics, ownership, policy, dependencies, and source-of-truth claims.
 
+## Focused Workflow Model
+
+A Skill is a focused workflow entrypoint, not a thin router. `SKILL.md` may own
+positive and negative selection boundaries, required inputs, preflight checks,
+ordered instructions, decisions, short Skill-specific commands, examples,
+edge cases, safety constraints, completion criteria, and verification. Renma
+does not warn merely because a Skill is procedural or includes an executable
+command.
+
+Use Agent Skills progressive disclosure deliberately:
+
+1. Metadata: `name` and `description` let a client decide whether to activate
+   the Skill.
+2. Instructions: the activated `SKILL.md` carries the focused workflow and
+   explicit read or execution conditions.
+3. Resources: local files are read or executed only when the workflow calls
+   for them.
+
+Choose placement by responsibility, not size alone:
+
+| Content | Place it in | Ownership test |
+| --- | --- | --- |
+| Selection boundaries, ordered workflow, constraints, completion | `SKILL.md` | Required to perform this focused workflow |
+| Skill-specific detail, variants, edge cases | `references/` | Owned and loaded by one Skill |
+| Deterministic repeatedly executed implementation | `scripts/` | Code is safer and more repeatable than prose |
+| Templates, images, data, output resources | `assets/` | Consumed or copied as material, not instructions |
+| Shared knowledge | `contexts/` | Used by multiple Skills or needs independent ownership, lifecycle, or source-of-truth status |
+| Purpose-specific interpretation of Context | `lenses/` | A static governance view over Context Assets |
+| Provider-specific UI metadata | provider-owned files such as `agents/openai.yaml` | Optional interface metadata, not Renma core schema |
+
+The canonical defaults and their Agent Skills/Renma provenance are in the
+[Quality Profile](quality-profile.md).
+
 ## New Skill Workflow
 
 Use this sequence for a new Skill:
@@ -55,6 +88,12 @@ Before generating a file, use the standard guidance for your platform to define:
 - safety and repository constraints; and
 - the output and completion criteria.
 
+Write concrete positive and near-miss negative trigger examples before
+scaffolding. Define the expected output and completion criteria early. Match
+implementation freedom to fragility: use prose when judgment is central, a
+parameterized script when a stable operation needs flexible inputs, and a fixed
+script when ordering or exact behavior is safety-critical.
+
 Do not guess missing owners, policies, dependencies, product behavior, domain
 rules, or source-of-truth documents. Record gaps for a human to resolve.
 
@@ -67,13 +106,18 @@ renma scaffold skill skills/testing/spec-review/SKILL.md \
   --id skill.testing.spec-review \
   --title "Spec Review" \
   --owner qa-platform \
-  --tags testing,spec-review
+  --tags testing,spec-review \
+  --resources references,scripts,assets
 ```
 
 The target must be a canonical `SKILL.md` under `skills/**` or
 `.agents/skills/**`. File mode refuses to overwrite an existing file and
 requires an explicit owner. The output is a deterministic starting point, not
 a finished Skill.
+
+`--resources` creates only the requested empty directories and no placeholder
+files. In the completed Skill, state when each reference should be read, each
+script should be run, and each asset should be used.
 
 Do not run two independent generators against the same target file. Some
 platform-native authoring tools create files themselves, so choose one of these
@@ -83,6 +127,10 @@ safe approaches:
    that existing file.
 2. Ask the platform tool to use `renma scaffold skill` as the starting point
    instead of independently generating the same target.
+
+In a Codex workflow, use Renma as the one generator, then ask Codex's
+`skill-creator` to semantically review the existing scaffold. Do not ask both
+generators to independently create the same target.
 
 `--format prompt` prints the deterministic scaffold and constraints without
 writing the file. `--format json` prints the existing structured bundle. These
@@ -102,6 +150,15 @@ Use platform-native guidance to complete:
 Preserve the repository's intended behavior. Keep reusable domain, testing,
 product, platform, or tool knowledge in independently owned Context Assets when
 it should outlive one Skill.
+
+Preserve Agent Skills optional fields, unknown `metadata.renma.*` values, and
+other vendors' string metadata. Provider-specific `agents/openai.yaml` is
+permitted but is not required by Renma core.
+
+Execute and test every script. Forward-test complex Skills with raw user
+prompts, outputs, and execution logs in the external runtime that consumes the
+Skill. Do not leak expected answers, diagnoses, or intended fixes to evaluation
+agents. Renma remains deterministic; runtime evaluation stays external.
 
 ### 4. Validate, fix, and rerun
 

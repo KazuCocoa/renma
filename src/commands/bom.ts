@@ -82,6 +82,9 @@ export interface BomAsset {
   kind: AssetKind;
   sourcePath: string;
   contentHash: string;
+  sizeBytes?: number;
+  contentClassification?: "text" | "binary";
+  markdownParserEligible?: boolean;
   owner?: string;
   status?: AssetStatus;
   version?: string;
@@ -176,6 +179,7 @@ export function buildBomReport(
     scanResult.diagnostics,
     scanResult.contextLens,
     scanResult.securityPolicyInventory,
+    scanResult.agentSkills,
   );
   const dependencies = stableEdges(graphReport.edges).map(toBomDependency);
   const diagnostics = stableDiagnostics(
@@ -367,6 +371,9 @@ function toBomAsset(
     kind: asset.kind,
     sourcePath: asset.sourcePath,
     contentHash: asset.contentHash,
+    sizeBytes: asset.sizeBytes ?? 0,
+    contentClassification: asset.contentClassification ?? "text",
+    markdownParserEligible: asset.markdownParserEligible ?? true,
     ...(asset.metadata.owner ? { owner: asset.metadata.owner } : {}),
     ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
     ...(asset.metadata.version ? { version: asset.metadata.version } : {}),

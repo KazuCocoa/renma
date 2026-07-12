@@ -42,8 +42,8 @@ test("readiness report marks fully owned resolved inventory ready", async () => 
   assert.equal(report.summary.graphResolutionPercent, 100);
   assert.deepEqual(report.summary.workflow, {
     skillEntrypoints: 1,
-    checks: 5,
-    pass: 5,
+    checks: 6,
+    pass: 6,
     warn: 0,
     fail: 0,
     readinessPercent: 100,
@@ -57,6 +57,7 @@ test("readiness report marks fully owned resolved inventory ready", async () => 
     "workflow.clarity",
     "workflow.required_inputs",
     "workflow.completion_criteria",
+    "workflow.skills_focused",
   ]);
   assertCheckStatuses(report, {
     "diagnostics.errors": "pass",
@@ -69,10 +70,38 @@ test("readiness report marks fully owned resolved inventory ready", async () => 
     "workflow.completion_criteria": "pass",
     "assets.lifecycle": "pass",
     "assets.minimum_inventory": "pass",
-    "layout.skills_thin": "pass",
+    "workflow.skills_focused": "pass",
     "layout.disallowed_skill_assets": "pass",
     "paths.helper_commands": "pass",
   });
+});
+
+test("Agent Skills specification failures remain blocking", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "skills", "invalid"), { recursive: true });
+  await writeFile(
+    path.join(root, "skills", "invalid", "SKILL.md"),
+    "---\nname: invalid\n---\n# Invalid\n",
+  );
+
+  const report = await readiness(root);
+  const check = report.checks.find(
+    (candidate) => candidate.id === "specification.agent_skills",
+  );
+  assert.equal(report.level, "not_ready");
+  assert.equal(check?.status, "fail");
+  assert.equal(check?.evidence?.[0]?.path, "skills/invalid/SKILL.md");
+});
+
+test("high security findings remain blocking", () => {
+  const report = buildReadinessReport(securityGraphReport(), [
+    readinessFinding("SEC-UNAPPROVED-NETWORK-DESTINATION", "high", "violation"),
+  ]);
+  assert.equal(report.level, "not_ready");
+  assert.equal(
+    report.checks.find((check) => check.id === "security.blocking")?.status,
+    "fail",
+  );
 });
 
 test("readiness report scores unresolved and unowned assets deterministically", async () => {
@@ -84,7 +113,7 @@ test("readiness report scores unresolved and unowned assets deterministically", 
 
   const report = await readiness(root);
 
-  assert.equal(report.score, 45);
+  assert.equal(report.score, 50);
   assert.equal(report.level, "not_ready");
   assert.equal(report.summary.totalAssets, 1);
   assert.equal(report.summary.ownedAssets, 0);
@@ -93,11 +122,11 @@ test("readiness report scores unresolved and unowned assets deterministically", 
   assert.equal(report.summary.diagnosticCounts.error, 0);
   assert.deepEqual(report.summary.workflow, {
     skillEntrypoints: 1,
-    checks: 5,
-    pass: 4,
+    checks: 6,
+    pass: 5,
     warn: 0,
     fail: 1,
-    readinessPercent: 80,
+    readinessPercent: 83,
   });
   assertCheckStatuses(report, {
     "diagnostics.errors": "pass",
@@ -108,9 +137,9 @@ test("readiness report scores unresolved and unowned assets deterministically", 
     "workflow.clarity": "pass",
     "workflow.required_inputs": "pass",
     "workflow.completion_criteria": "pass",
-    "assets.lifecycle": "warn",
+    "assets.lifecycle": "pass",
     "assets.minimum_inventory": "pass",
-    "layout.skills_thin": "pass",
+    "workflow.skills_focused": "pass",
     "layout.disallowed_skill_assets": "pass",
     "paths.helper_commands": "pass",
   });
@@ -238,8 +267,8 @@ test("readiness passes workflow optional context when none is declared", async (
   assert.equal(report.level, "ready");
   assert.deepEqual(report.summary.workflow, {
     skillEntrypoints: 1,
-    checks: 5,
-    pass: 5,
+    checks: 6,
+    pass: 6,
     warn: 0,
     fail: 0,
     readinessPercent: 100,
@@ -325,7 +354,7 @@ test("readiness warns for deprecated workflow optional context", async () => {
   );
 
   // Optional-context and lifecycle warnings each apply a 5-point penalty.
-  assert.equal(report.score, 90);
+  assert.equal(report.score, 95);
   assert.equal(report.level, "ready");
   assert.equal(check?.status, "warn");
   assert.equal(check?.severity, "warning");
@@ -354,7 +383,7 @@ test("readiness warns for archived workflow optional context", async () => {
   );
 
   // Optional-context and lifecycle warnings each apply a 5-point penalty.
-  assert.equal(report.score, 90);
+  assert.equal(report.score, 95);
   assert.equal(report.level, "ready");
   assert.equal(check?.status, "warn");
   assert.equal(check?.severity, "warning");
@@ -379,7 +408,7 @@ test("readiness warns for unclear skill workflow entrypoint", async () => {
     (candidate) => candidate.id === "workflow.clarity",
   );
 
-  assert.equal(report.score, 75);
+  assert.equal(report.score, 85);
   assert.equal(report.level, "needs_attention");
   assert.equal(check?.status, "warn");
   assert.equal(check?.severity, "warning");
@@ -400,7 +429,7 @@ test("readiness warns and applies penalty for missing workflow required inputs",
     (candidate) => candidate.id === "workflow.required_inputs",
   );
 
-  assert.equal(report.score, 90);
+  assert.equal(report.score, 95);
   assert.equal(report.level, "ready");
   assert.equal(check?.status, "warn");
   assert.equal(check?.severity, "warning");
@@ -421,16 +450,16 @@ test("readiness warns and applies penalty for missing workflow completion criter
     (candidate) => candidate.id === "workflow.completion_criteria",
   );
 
-  assert.equal(report.score, 85);
+  assert.equal(report.score, 90);
   assert.deepEqual(report.summary.workflow, {
     skillEntrypoints: 1,
-    checks: 5,
-    pass: 4,
+    checks: 6,
+    pass: 5,
     warn: 1,
     fail: 0,
-    readinessPercent: 80,
+    readinessPercent: 83,
   });
-  assert.equal(report.level, "needs_attention");
+  assert.equal(report.level, "ready");
   assert.equal(check?.status, "warn");
   assert.equal(check?.severity, "warning");
   assert.equal(check?.evidence?.[0]?.id, "QUAL-MISSING-COMPLETION-CRITERIA");
@@ -450,18 +479,18 @@ test("readiness applies stable score contract for workflow warnings", async () =
 
   assert.deepEqual(report.summary.workflow, {
     skillEntrypoints: 1,
-    checks: 5,
-    pass: 3,
+    checks: 6,
+    pass: 4,
     warn: 2,
     fail: 0,
-    readinessPercent: 60,
+    readinessPercent: 67,
   });
   assertCheckStatuses(report, {
     "graph.unresolved_edges": "pass",
     "workflow.optional_context": "warn",
     "workflow.completion_criteria": "warn",
   });
-  assert.equal(report.score, 80);
+  assert.equal(report.score, 85);
   assert.equal(report.level, "needs_attention");
 });
 
@@ -573,7 +602,7 @@ test("readiness markdown prints a compact reviewable report", async () => {
   assert.match(markdown, /\| Workflow readiness \| 100% \|/);
   assert.ok(
     markdown.includes(
-      "- Workflow readiness: 100% (5/5 workflow checks passing)",
+      "- Workflow readiness: 100% (6/6 workflow checks passing)",
     ),
   );
   assert.ok(markdown.includes("- Graph resolution: 100% (0/0 edges resolved)"));
@@ -639,8 +668,8 @@ test("readiness CLI supports --json", async () => {
   assert.equal(parsed.level, "ready");
   assert.deepEqual(parsed.summary.workflow, {
     skillEntrypoints: 1,
-    checks: 5,
-    pass: 5,
+    checks: 6,
+    pass: 6,
     warn: 0,
     fail: 0,
     readinessPercent: 100,

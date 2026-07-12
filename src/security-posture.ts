@@ -1,4 +1,5 @@
 import type { RiskClass, Severity } from "./types.js";
+import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 
 const RISK_CLASS_ORDER: Record<RiskClass, number> = {
   advisory: 1,
@@ -112,7 +113,7 @@ export function summarizeSecurityPosture(
       if (severityComparison !== 0) return severityComparison;
       return left.id.localeCompare(right.id);
     })
-    .slice(0, 10);
+    .slice(0, DEFAULT_QUALITY_PROFILE.presentation.topSummaryItemCap);
 
   return summary;
 }

@@ -603,7 +603,7 @@ status: stable
 });
 
 test("canonical list items retain the existing metadata budget diagnostic", () => {
-  const longBoundary = "x".repeat(141);
+  const longBoundary = "x".repeat(257);
   const { diagnostics } = buildCatalog([
     skillDocument(`---
 name: demo
@@ -719,14 +719,16 @@ test("repository release-prep is fully canonical with unchanged operational beha
   const graphNode = graph.nodes.find(
     (node) => node.id === "skill.release-prep",
   );
-  assert.deepEqual(graphNode, {
-    id: "skill.release-prep",
-    kind: "skill",
-    sourcePath: relativePath,
-    owner: "maintainers",
-    status: "stable",
-    tags: ["release", "maintenance", "dogfooding"],
-  });
+  assert.equal(graphNode?.id, "skill.release-prep");
+  assert.equal(graphNode?.kind, "skill");
+  assert.equal(graphNode?.sourcePath, relativePath);
+  assert.equal(graphNode?.owner, "maintainers");
+  assert.equal(graphNode?.status, "stable");
+  assert.deepEqual(graphNode?.tags, ["release", "maintenance", "dogfooding"]);
+  assert.equal(graphNode?.contentClassification, "text");
+  assert.equal(graphNode?.markdownParserEligible, true);
+  assert.equal(graphNode?.sizeBytes, Buffer.byteLength(content));
+  assert.match(graphNode?.contentHash ?? "", /^sha256:[a-f0-9]{64}$/);
   assert.ok(
     graph.edges.some(
       (edge) =>

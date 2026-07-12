@@ -125,6 +125,11 @@ scaffold, or ask it to use `renma scaffold skill` as its starting point.
 The [Authoring Guide](docs/authoring-guide.md) is the canonical walkthrough for
 both workflows.
 
+Renma 0.18.0 uses focused workflows rather than a thin-router model. See the
+[canonical quality profile](docs/quality-profile.md) for every fixed threshold,
+unit, rationale, provenance, and diagnostic mapping. Quality thresholds are not
+configurable through `renma.config.json` in this release.
+
 ## Install And Quick Start
 
 Run Renma without installing it globally:
@@ -260,6 +265,7 @@ canonical and migration rules.
 - [Authoring Guide](docs/authoring-guide.md)
 - [Agent Skills Compatibility and Migration](docs/agent-skills-compatibility.md)
 - [Diagnostics Reference](docs/diagnostics.md)
+- [Renma 0.18.0 Quality Profile](docs/quality-profile.md)
 - [Security Policy Guide](docs/security-policy.md)
 - [Repository Context BOM contract](docs/repository-context-bom.md)
 - [Architecture](architecture.md)

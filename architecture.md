@@ -162,11 +162,16 @@ Normalized asset kinds:
 - `profile`
 - `reference`
 - `example`
+- `script`
+- `asset`
 - `agent`
 - `config`
 - `unknown`
 
-Shared Markdown under `contexts/` or `context/` uses the dedicated `context` kind. Skill-local supporting material remains `reference`.
+Shared Markdown under `contexts/` or `context/` uses the dedicated `context`
+kind. Skill-local scripts and assets are first-class inventory. Repository files
+carry original-byte size and hash, text or binary classification, and Markdown
+parser eligibility. Opaque files are never decoded into diagnostic snippets.
 
 ### Dependency
 

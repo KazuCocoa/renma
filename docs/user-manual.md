@@ -418,6 +418,12 @@ Other default scan glob families are:
 - `skills/**/references/**/*.md`
 - `skills/**/examples/**/*.md`
 - `skills/**/scripts/**/*`
+- `skills/**/assets/**/*`
+- `.agents/skills/**/profiles/**/*.md`
+- `.agents/skills/**/references/**/*`
+- `.agents/skills/**/examples/**/*.md`
+- `.agents/skills/**/scripts/**/*`
+- `.agents/skills/**/assets/**/*`
 - `tools/**/*`
 
 ## Where To Go Next
@@ -425,6 +431,7 @@ Other default scan glob families are:
 - New to Renma? Start with [Authoring Guide](authoring-guide.md).
 - Writing security-sensitive skills or context assets? Read [Security Policy Guide](security-policy.md).
 - Fixing scan findings? See [Diagnostics Reference](diagnostics.md).
+- Reviewing thresholds? See [Renma 0.18.0 Quality Profile](quality-profile.md).
 - Trying a minimal clarify-before-act Skill interaction? Use
   [`examples/interactive-placeholder`](../examples/interactive-placeholder).
 - Trying richer repository-aware Skill, Context Lens, and Context Asset

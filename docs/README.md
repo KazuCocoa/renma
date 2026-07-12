@@ -21,12 +21,13 @@ Use this index to choose the smallest document that answers your question.
   snapshot, output, reproducibility, schema, and provenance contract.
 - [Diagnostics Reference](diagnostics.md): scan finding identifiers and repair
   guidance.
+- [Renma 0.18.0 Quality Profile](quality-profile.md): canonical thresholds,
+  units, provenance, rationale, false-positive risks, and configuration status.
 
 ## Focused References
 
-- [Advanced Skill Authoring](advanced-skill-authoring.md): deriving thin,
-  bounded Skills from existing workflows while reusing Context Assets; does not
-  implement proposed 0.18.0 Skill discovery.
+- [Advanced Skill Authoring](advanced-skill-authoring.md): deriving focused,
+  bounded Skills from existing workflows while using progressive disclosure.
 - [Context Lens](context-lens.md)
 - [Context Lifecycle Diagnostics](context-lifecycle-diagnostics.md)
 - [Context Conflict Diagnostics](context-conflict-diagnostics.md)

@@ -12,6 +12,7 @@ import {
   type SecurityPolicyInventorySummary,
 } from "../security-policy-inventory.js";
 import type { ConfigOverrides } from "../config.js";
+import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 
 export type CiReportFormat = DiffFormat;
 export type CiReportStatus = "pass" | "warn" | "fail";
@@ -36,7 +37,7 @@ interface CiReportOptions {
   overrides?: ConfigOverrides;
 }
 
-const MAX_LIST_ITEMS = 10;
+const MAX_LIST_ITEMS = DEFAULT_QUALITY_PROFILE.presentation.topSummaryItemCap;
 
 interface ReportFinding {
   id: string;

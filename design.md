@@ -235,9 +235,16 @@ Renma normalizes scanned files into asset kinds:
 - `profile`: skill-local overlay or variant
 - `reference`: skill-local supporting material
 - `example`: skill-local example or fixture text
+- `script`: Skill-local deterministic executable implementation
+- `asset`: Skill-local template, image, data, font, PDF, or output resource
 - `agent`: repository or agent instruction file
 - `config`: Renma configuration
 - `unknown`: scanned file that does not match a known kind
+
+Catalog, graph, Trust Graph, and BOM output include script and asset inventory.
+Each cataloged asset records original-byte size and hash, text/binary
+classification, and Markdown-parser eligibility. Binary assets remain opaque;
+Renma does not decode them as UTF-8 or expose their bytes in snippets.
 
 The dedicated `context` kind is central to the product model. It lets catalog,
 graph, and validation output distinguish reusable team-owned knowledge from

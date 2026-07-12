@@ -204,6 +204,29 @@ rm -rf /tmp/output
   );
 });
 
+test("privileged commands accept an explicit guard in the same parent safety section", async () => {
+  const findings = await securityFindings(`
+## Safety
+
+Require explicit human approval before privileged commands.
+
+### Execute after review
+
+Confirm the target directory and record the intended permission change.
+Keep the review evidence with the task.
+
+\`\`\`bash
+sudo chmod 755 /opt/example
+\`\`\`
+`);
+  assert.equal(
+    findings.some(
+      (finding) => finding.id === "SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD",
+    ),
+    false,
+  );
+});
+
 test("predictable temp paths are higher severity near sensitive wording", async () => {
   const sensitiveFindings = await securityFindings(`
 \`\`\`bash

@@ -11,11 +11,12 @@ import {
   type ParsedYamlFrontmatter,
   type YamlFrontmatterField,
 } from "./yaml-frontmatter.js";
+import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 
 export const AGENT_SKILLS_SPECIFICATION =
   "https://agentskills.io/specification";
 export const AGENT_SKILLS_VALIDATION_PROFILE =
-  "agentskills.io/specification@2026-07-11";
+  "agentskills.io/specification@2026-07-12";
 
 export const AGENT_SKILLS_TOP_LEVEL_FIELDS = [
   "name",
@@ -58,9 +59,10 @@ export const LEGACY_RENMA_SKILL_FIELDS = [
 
 const ALLOWED_TOP_LEVEL_FIELDS = new Set<string>(AGENT_SKILLS_TOP_LEVEL_FIELDS);
 const LEGACY_FIELDS = new Set<string>(LEGACY_RENMA_SKILL_FIELDS);
-const MAX_NAME_LENGTH = 64;
-const MAX_DESCRIPTION_LENGTH = 1024;
-const MAX_COMPATIBILITY_LENGTH = 500;
+const AGENT_SKILLS_LIMITS = DEFAULT_QUALITY_PROFILE.agentSkills;
+const MAX_NAME_LENGTH = AGENT_SKILLS_LIMITS.nameMaxChars;
+const MAX_DESCRIPTION_LENGTH = AGENT_SKILLS_LIMITS.descriptionMaxChars;
+const MAX_COMPATIBILITY_LENGTH = AGENT_SKILLS_LIMITS.compatibilityMaxChars;
 
 export type AgentSkillFormat =
   | "agent-skills"
@@ -659,6 +661,20 @@ function authoringIssues(
   const descriptionLine =
     firstField(frontmatter, "description")?.startLine ?? 1;
 
+  if (!descriptionCapabilityPattern().test(description)) {
+    issues.push(
+      createIssue(
+        document,
+        IDS.RN_DESCRIPTION_MISSING_CAPABILITY,
+        "warning",
+        "renma-authoring",
+        "Description should state what the skill does, not only that it should be used.",
+        descriptionLine,
+        "description",
+      ),
+    );
+  }
+
   if (!usageBoundaryPattern().test(description)) {
     issues.push(
       createIssue(
@@ -943,6 +959,15 @@ function characterLength(value: string): number {
 
 function usageBoundaryPattern(): RegExp {
   return /\b(?:use(?: this skill)? (?:when|for|to)|when (?:a|an|the|you|reviewing|working|handling))\b/i;
+}
+
+/**
+ * Conservative English capability evidence for the Agent Skills "what" clause.
+ * Non-ASCII descriptions are accepted because Renma cannot reliably infer
+ * capability semantics across languages with a deterministic word list.
+ */
+function descriptionCapabilityPattern(): RegExp {
+  return /[^\p{ASCII}]|\b(?:address(?:es|ing)?|analy[sz](?:e|es|ing)|analysis|automat(?:e|es|ing|ion)|build(?:s|ing)?|calculat(?:e|es|ing|ion)|compar(?:e|es|ing|ison)|configur(?:e|es|ing|ation)|convert(?:s|ing)?|creat(?:e|es|ing|ion)|debug(?:s|ging)?|deploy(?:s|ing|ment)?|design(?:s|ing)?|diagnos(?:e|es|ing|is)|document(?:s|ing|ation)?|edit(?:s|ing)?|evaluat(?:e|es|ing|ion)|extract(?:s|ing|ion)?|find(?:s|ing)?|fix(?:es|ing)?|generat(?:e|es|ing|ion)|guid(?:e|es|ing|ance)|implement(?:s|ing|ation)?|inspect(?:s|ing|ion)?|install(?:s|ing|ation)?|manage(?:s|ment|ing)?|migrat(?:e|es|ing|ion)|monitor(?:s|ing)?|organiz(?:e|es|ing|ation)|plan(?:s|ning)?|prepar(?:e|es|ing|ation)|produc(?:e|es|ing|tion)|publish(?:es|ing)?|read(?:s|ing)?|releas(?:e|es|ing)|render(?:s|ing)?|review(?:s|ing)?|rout(?:e|es|ing)|scaffold(?:s|ing)?|search(?:es|ing)?|summari[sz](?:e|es|ing|ation)|test(?:s|ing)?|transform(?:s|ing|ation)?|triag(?:e|es|ing)|updat(?:e|es|ing)|validat(?:e|es|ing|ion)|verif(?:y|ies|ying|ication)|writ(?:e|es|ing))\b/iu;
 }
 
 function explicitSelectionBoundaryPattern(): RegExp {

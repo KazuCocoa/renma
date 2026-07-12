@@ -10,11 +10,10 @@ import type {
   DependencyKind,
 } from "./model.js";
 import { parseAssetMetadata } from "./metadata.js";
+import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import type { Diagnostic, Evidence, ParsedDocument } from "./types.js";
 
-const FRONTMATTER_MAX_LINES = 24;
-const FRONTMATTER_MAX_CHARS = 1200;
-const METADATA_LIST_ITEM_MAX_CHARS = 140;
+const QUALITY = DEFAULT_QUALITY_PROFILE;
 const PLACEHOLDER_USAGE_BOUNDARY_PATTERN =
   /^(?:todo|tbd|tba|unknown|n\/?a|none|placeholder|to be defined)(?:[\s:-].*)?$/i;
 
@@ -50,7 +49,14 @@ export function buildCatalog(documents: ParsedDocument[]): {
       const base = {
         id: result.metadata.id ?? document.artifact.path,
         sourcePath: document.artifact.path,
-        contentHash: contentHash(document.artifact.content),
+        contentHash:
+          document.artifact.contentHash ??
+          contentHash(document.artifact.content),
+        sizeBytes: document.artifact.sizeBytes,
+        contentClassification:
+          document.artifact.contentClassification ?? "text",
+        markdownParserEligible:
+          document.artifact.markdownParserEligible ?? true,
         metadata: result.metadata,
         metadataFields: result.metadataFields,
         metadataListItems: result.metadataListItems,
@@ -119,7 +125,9 @@ function catalogedKind(
     document.artifact.kind === "context" ||
     document.artifact.kind === "profile" ||
     document.artifact.kind === "reference" ||
-    document.artifact.kind === "example"
+    document.artifact.kind === "example" ||
+    document.artifact.kind === "script" ||
+    document.artifact.kind === "asset"
   ) {
     return document.artifact.kind;
   }
@@ -142,7 +150,10 @@ function metadataBudgetDiagnostics(
   );
   const lineCount = frontmatterLines.length;
   const charCount = frontmatterLines.join("\n").length;
-  if (lineCount > FRONTMATTER_MAX_LINES || charCount > FRONTMATTER_MAX_CHARS) {
+  if (
+    lineCount > QUALITY.frontmatterMaxLines ||
+    charCount > QUALITY.frontmatterMaxChars
+  ) {
     diagnostics.push({
       severity: "warning",
       path: document.artifact.path,
@@ -153,13 +164,23 @@ function metadataBudgetDiagnostics(
         endLine: frontmatter.endLine,
         snippet: `frontmatter: ${lineCount} lines, ${charCount} characters`,
       },
+      details: {
+        measured: { lines: lineCount, chars: charCount },
+        limit: {
+          lines: QUALITY.frontmatterMaxLines,
+          chars: QUALITY.frontmatterMaxChars,
+        },
+        unit: "frontmatter_lines_and_characters",
+        profile: QUALITY.profile,
+      },
     });
   }
 
   for (const [key, items] of Object.entries(metadataListItems)) {
     for (const item of items) {
       const itemText = metadataListItemText(item.raw);
-      if (itemText.length <= METADATA_LIST_ITEM_MAX_CHARS) continue;
+      if (!shouldBudgetMetadataItem(key, itemText)) continue;
+      if (itemText.length <= QUALITY.metadataListItemMaxChars) continue;
 
       diagnostics.push({
         severity: "warning",
@@ -171,6 +192,13 @@ function metadataBudgetDiagnostics(
           endLine: item.endLine,
           snippet: item.raw,
         },
+        details: {
+          measured: itemText.length,
+          limit: QUALITY.metadataListItemMaxChars,
+          unit: "characters",
+          profile: QUALITY.profile,
+          field: key,
+        },
       });
     }
   }
@@ -179,7 +207,8 @@ function metadataBudgetDiagnostics(
     const field = metadataFields[key];
     if (!field?.key.startsWith("renma.")) continue;
     for (const value of values) {
-      if (value.length <= METADATA_LIST_ITEM_MAX_CHARS) continue;
+      if (!shouldBudgetMetadataItem(key, value)) continue;
+      if (value.length <= QUALITY.metadataListItemMaxChars) continue;
       diagnostics.push({
         severity: "warning",
         path: document.artifact.path,
@@ -189,6 +218,13 @@ function metadataBudgetDiagnostics(
           startLine: field.startLine,
           endLine: field.endLine,
           snippet: field.raw,
+        },
+        details: {
+          measured: value.length,
+          limit: QUALITY.metadataListItemMaxChars,
+          unit: "characters",
+          profile: QUALITY.profile,
+          field: key,
         },
       });
     }
@@ -226,6 +262,18 @@ function frontmatterRange(
 
 function metadataListItemText(raw: string): string {
   return raw.replace(/^\s*-\s*/, "").trim();
+}
+
+function shouldBudgetMetadataItem(key: string, value: string): boolean {
+  if (key === "tags") return true;
+  if (key === "when_to_use" || key === "when_not_to_use") return true;
+  // IDs, paths, and URLs are machine-facing relationship values and may need
+  // to exceed the prose advisory. Their structural validity is checked by the
+  // relevant schema and graph rules instead.
+  return !(
+    /^(?:https?:\/\/|[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.@%+~-]+)+)/.test(value) ||
+    /^[a-z][a-z0-9_.-]+$/i.test(value)
+  );
 }
 
 function dependencyDiagnostics(

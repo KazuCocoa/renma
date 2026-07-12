@@ -291,6 +291,35 @@ description: Reviews demo inputs.
   );
 });
 
+test("separates clear short capability descriptions from generic selection prose", () => {
+  const clear = validateAgentSkill(
+    skill(
+      "skills/demo/SKILL.md",
+      "---\nname: demo\ndescription: Review PDFs. Use when a PDF needs review.\n---\n# Demo\n",
+    ),
+  );
+  const generic = validateAgentSkill(
+    skill(
+      "skills/demo/SKILL.md",
+      "---\nname: demo\ndescription: Use this skill when needed.\n---\n# Demo\n",
+    ),
+  );
+
+  assert.equal(clear.valid, true);
+  assert.equal(
+    clear.issues.some(
+      (issue) => issue.code === "RN-SKILL-DESCRIPTION-MISSING-CAPABILITY",
+    ),
+    false,
+  );
+  assert.equal(generic.valid, true);
+  assert.ok(
+    generic.issues.some(
+      (issue) => issue.code === "RN-SKILL-DESCRIPTION-MISSING-CAPABILITY",
+    ),
+  );
+});
+
 test("does not turn an execution constraint into a description warning", () => {
   const validation = validateAgentSkill(
     skill(

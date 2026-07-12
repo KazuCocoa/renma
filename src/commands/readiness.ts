@@ -16,10 +16,14 @@ import {
 } from "../security-policy-inventory.js";
 import type { ConfigOverrides } from "../config.js";
 import type { Diagnostic, Finding } from "../types.js";
+import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
+import type { AgentSkillsValidationSummary } from "../agent-skills.js";
 
 export type ReadinessFormat = "json" | "markdown";
 
-const MARKDOWN_FINDINGS_LIMIT = 50;
+const QUALITY = DEFAULT_QUALITY_PROFILE;
+const MARKDOWN_FINDINGS_LIMIT =
+  QUALITY.presentation.markdownReadinessFindingCap;
 const WORKFLOW_CLARITY_FINDING_IDS = new Set<string>([
   DIAGNOSTIC_IDS.QUAL_MISSING_DESCRIPTION,
   DIAGNOSTIC_IDS.QUAL_SHORT_DESCRIPTION,
@@ -116,6 +120,7 @@ export async function readiness(
     scanResult.diagnostics,
     scanResult.contextLens,
     scanResult.securityPolicyInventory,
+    scanResult.agentSkills,
   );
 }
 
@@ -125,6 +130,7 @@ export function buildReadinessReport(
   diagnostics: Diagnostic[] = graphReport.diagnostics ?? [],
   contextLens: ContextLensSummary = zeroContextLensSummary(),
   securityPolicyInventory: SecurityPolicyInventorySummary = zeroSecurityPolicyInventorySummary(),
+  agentSkills?: AgentSkillsValidationSummary,
 ): ReadinessReport {
   const diagnosticCounts = countDiagnostics(diagnostics);
   const totalAssets = graphReport.nodes.length;
@@ -153,6 +159,8 @@ export function buildReadinessReport(
    */
   const checks: ReadinessCheck[] = [
     diagnosticsCheck(diagnosticCounts.error, diagnostics),
+    agentSkillsSpecificationCheck(agentSkills),
+    blockingSecurityCheck(findings),
     ownershipCheck(unownedAssets, totalAssets, graphReport.nodes),
     graphEdgesCheck(unresolvedBlockingEdges),
     workflowContextClosureCheck(graphReport),
@@ -165,15 +173,15 @@ export function buildReadinessReport(
     freshnessCheck(findings),
     minimumInventoryCheck(totalAssets),
     findingCheck(
-      "layout.skills_thin",
-      "Thin skill entrypoints",
+      "workflow.skills_focused",
+      "Focused skill workflows",
       findings,
       [
-        DIAGNOSTIC_IDS.LAYOUT_SKILL_NOT_THIN,
-        DIAGNOSTIC_IDS.LAYOUT_SKILL_EXECUTABLE_COMMAND,
+        DIAGNOSTIC_IDS.QUAL_SKILL_MIXED_RESPONSIBILITY,
+        DIAGNOSTIC_IDS.QUAL_SKILL_PROGRESSIVE_DISCLOSURE,
       ],
       "warn",
-      "All skill entrypoints are thin routers.",
+      "Skill entrypoints are focused, discoverable workflows that use progressive disclosure appropriately.",
     ),
     findingCheck(
       "layout.disallowed_skill_assets",
@@ -224,7 +232,12 @@ export function buildReadinessReport(
   ];
 
   const ownershipPenalty =
-    totalAssets === 0 ? 0 : Math.round((unownedAssets / totalAssets) * 20);
+    totalAssets === 0
+      ? 0
+      : Math.round(
+          (unownedAssets / totalAssets) *
+            QUALITY.readiness.ownershipMaximumPenalty,
+        );
   const layoutPenalty = layoutReadinessPenalty(checks);
   const hasWorkflowClarityWarning = checks.some(
     (check) => check.id === "workflow.clarity" && check.status === "warn",
@@ -241,24 +254,29 @@ export function buildReadinessReport(
     (check) =>
       check.id === "workflow.completion_criteria" && check.status === "warn",
   );
-  const workflowClarityPenalty = hasWorkflowClarityWarning ? 15 : 0;
+  const workflowClarityPenalty = hasWorkflowClarityWarning
+    ? QUALITY.readiness.workflowClarityPenalty
+    : 0;
   const workflowOptionalContextPenalty = hasWorkflowOptionalContextWarning
-    ? 5
+    ? QUALITY.readiness.workflowOptionalContextPenalty
     : 0;
   const workflowRequiredInputsPenalty = hasWorkflowRequiredInputsWarning
-    ? 10
+    ? QUALITY.readiness.workflowRequiredInputsPenalty
     : 0;
   const workflowCompletionCriteriaPenalty = hasWorkflowCompletionCriteriaWarning
-    ? 15
+    ? QUALITY.readiness.workflowCompletionCriteriaPenalty
     : 0;
   const score = Math.max(
     0,
     100 -
-      (diagnosticCounts.error > 0 ? 40 : 0) -
-      (unresolvedBlockingEdges.length > 0 ? 30 : 0) -
+      (diagnosticCounts.error > 0
+        ? QUALITY.readiness.blockingDiagnosticPenalty
+        : 0) -
+      (unresolvedBlockingEdges.length > 0
+        ? QUALITY.readiness.unresolvedRequiredGraphPenalty
+        : 0) -
       ownershipPenalty -
-      (totalAssets === 0 ? 10 : 0) -
-      (lifecycleAssets.length > 0 ? 5 : 0) -
+      (totalAssets === 0 ? QUALITY.readiness.emptyInventoryPenalty : 0) -
       layoutPenalty -
       workflowClarityPenalty -
       workflowOptionalContextPenalty -
@@ -295,6 +313,63 @@ export function buildReadinessReport(
     checks,
     ...(diagnostics.length > 0 ? { diagnostics } : {}),
     ...(findings.length > 0 ? { findings } : {}),
+  };
+}
+
+function agentSkillsSpecificationCheck(
+  summary: AgentSkillsValidationSummary | undefined,
+): ReadinessCheck {
+  const invalid = summary?.results.filter((result) => !result.valid) ?? [];
+  if (invalid.length === 0) {
+    return {
+      id: "specification.agent_skills",
+      title: "Agent Skills specification",
+      status: "pass",
+      severity: "info",
+      summary: summary
+        ? `${summary.validSkillCount}/${summary.totalSkillCount} Skill entrypoints pass Agent Skills validation.`
+        : "No Agent Skills validation failures were provided.",
+    };
+  }
+  return {
+    id: "specification.agent_skills",
+    title: "Agent Skills specification",
+    status: "fail",
+    severity: "error",
+    summary: `${invalid.length} Skill entrypoint${invalid.length === 1 ? "" : "s"} fail Agent Skills validation.`,
+    evidence: invalid.map((result) => ({
+      path: result.path,
+      message: `${result.errorCount} specification error${result.errorCount === 1 ? "" : "s"}.`,
+    })),
+  };
+}
+
+function blockingSecurityCheck(findings: Finding[]): ReadinessCheck {
+  const blocking = findings.filter(
+    (finding) =>
+      finding.category === "safety" &&
+      (finding.severity === "high" || finding.severity === "critical"),
+  );
+  if (blocking.length === 0) {
+    return {
+      id: "security.blocking",
+      title: "Blocking security findings",
+      status: "pass",
+      severity: "info",
+      summary: "No high or critical security findings were reported.",
+    };
+  }
+  return {
+    id: "security.blocking",
+    title: "Blocking security findings",
+    status: "fail",
+    severity: "error",
+    summary: `${blocking.length} high or critical security finding${blocking.length === 1 ? "" : "s"} require review.`,
+    evidence: blocking.map((finding) => ({
+      id: finding.id,
+      path: finding.evidence.path,
+      message: finding.remediation,
+    })),
   };
 }
 
@@ -1005,11 +1080,11 @@ function lifecycleCheck(nodes: GraphReport["nodes"]): ReadinessCheck {
   return {
     id: "assets.lifecycle",
     title: "Asset lifecycle",
-    status: "warn",
-    severity: "warning",
-    summary: `${nodes.length} deprecated or archived asset${
+    status: "pass",
+    severity: "info",
+    summary: `${nodes.length} intentionally retained deprecated or archived asset${
       nodes.length === 1 ? "" : "s"
-    } cataloged.`,
+    } cataloged; inactive assets do not reduce Readiness merely by existing.`,
     evidence: nodes.map((node) => ({
       id: node.id,
       path: node.sourcePath,
@@ -1115,8 +1190,10 @@ function layoutReadinessPenalty(checks: ReadinessCheck[]): number {
   return checks.reduce((penalty, check) => {
     if (!check.id.startsWith("layout.") && check.id !== "paths.helper_commands")
       return penalty;
-    if (check.status === "fail") return penalty + 15;
-    if (check.status === "warn") return penalty + 5;
+    if (check.status === "fail")
+      return penalty + QUALITY.readiness.layoutFailurePenalty;
+    if (check.status === "warn")
+      return penalty + QUALITY.readiness.layoutWarningPenalty;
     return penalty;
   }, 0);
 }
@@ -1161,8 +1238,10 @@ function readinessLevel(
   score: number,
   hasFailingCheck: boolean,
 ): ReadinessLevel {
-  if (score >= 90 && !hasFailingCheck) return "ready";
-  if (score < 60 || hasFailingCheck) return "not_ready";
+  if (score >= QUALITY.readiness.readyMinimumScore && !hasFailingCheck)
+    return "ready";
+  if (score < QUALITY.readiness.needsAttentionMinimumScore || hasFailingCheck)
+    return "not_ready";
   return "needs_attention";
 }
 

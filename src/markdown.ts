@@ -11,6 +11,18 @@ import type {
 
 /** Parse a markdown artifact into headings, links, code fences, and frontmatter metadata. */
 export function parseDocument(artifact: Artifact): ParsedDocument {
+  if (artifact.contentClassification === "binary") {
+    return {
+      artifact,
+      lines: [],
+      headings: [],
+      codeFences: [],
+      links: [],
+      metadata: {},
+      metadataFields: {},
+      metadataListItems: {},
+    };
+  }
   const lines = artifact.content.split(/\r?\n/);
   const headings: Heading[] = [];
   const links: Link[] = [];

@@ -14,7 +14,7 @@ const metadataBudgetFindingIds = new Set([
 test("scan reports oversized frontmatter metadata", async () => {
   const root = await fixtureRoot();
   const extraFields = Array.from(
-    { length: 25 },
+    { length: 50 },
     (_, index) => `routing_note_${index + 1}: keep metadata compact`,
   ).join("\n");
   await writeAsset(
@@ -51,7 +51,7 @@ Run renma scan.
   assert.equal(finding?.confidence, "high");
   assert.equal(finding?.evidence.path, "skills/metadata-fat/SKILL.md");
   assert.equal(finding?.evidence.startLine, 1);
-  assert.ok((finding?.evidence.endLine ?? 0) > 24);
+  assert.ok((finding?.evidence.endLine ?? 0) > 48);
   assert.match(finding?.whyItMatters ?? "", /token use/);
   assert.match(finding?.remediation ?? "", /compact deterministic index/);
   assert.match(finding?.llmHint ?? "", /Shorten metadata/);
@@ -60,7 +60,7 @@ Run renma scan.
 test("scan reports overlong block-list metadata items", async () => {
   const root = await fixtureRoot();
   const longRoutingItem =
-    "Use this when reviewing product specifications that involve many services, implicit ownership boundaries, nested exception cases, downstream QA planning details, release risk tradeoffs, and ambiguous acceptance criteria that should live in the body instead.";
+    "Use this when reviewing product specifications that involve many services, implicit ownership boundaries, nested exception cases, downstream QA planning details, release risk tradeoffs, and ambiguous acceptance criteria that should live in the body instead, with additional prose that intentionally exceeds the Renma metadata advisory.";
   await writeAsset(
     root,
     "skills/metadata-list/SKILL.md",

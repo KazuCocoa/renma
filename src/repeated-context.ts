@@ -1,15 +1,11 @@
 import { createHash } from "node:crypto";
-import path from "node:path";
 
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
+import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
+import { estimateTokens, estimatedTokenUnits } from "./token-estimator.js";
 import type { Finding, ParsedDocument } from "./types.js";
 
-type RepeatKind =
-  | "section_hash"
-  | "heading"
-  | "code_block"
-  | "link_target"
-  | "token_shingle";
+type RepeatKind = "section_hash" | "heading" | "code_block" | "token_shingle";
 
 type RepeatedContextFindingId =
   | typeof DIAGNOSTIC_IDS.MAINT_REPEATED_SECTION
@@ -32,15 +28,19 @@ interface RepeatGroup {
   occurrences: Occurrence[];
 }
 
+const QUALITY = DEFAULT_QUALITY_PROFILE;
 const FINDING_CAPS: Record<RepeatedContextFindingId, number> = {
-  [DIAGNOSTIC_IDS.MAINT_REPEATED_SECTION]: 10,
-  [DIAGNOSTIC_IDS.MAINT_REPEATED_HEADING]: 10,
-  [DIAGNOSTIC_IDS.MAINT_REPEATED_CODE_BLOCK]: 10,
-  [DIAGNOSTIC_IDS.MAINT_REPEATED_LINK]: 10,
-  [DIAGNOSTIC_IDS.MAINT_REPEATED_CONTEXT_PATTERN]: 10,
+  [DIAGNOSTIC_IDS.MAINT_REPEATED_SECTION]: QUALITY.repeatedContext.findingCap,
+  [DIAGNOSTIC_IDS.MAINT_REPEATED_HEADING]: QUALITY.repeatedContext.findingCap,
+  [DIAGNOSTIC_IDS.MAINT_REPEATED_CODE_BLOCK]:
+    QUALITY.repeatedContext.findingCap,
+  [DIAGNOSTIC_IDS.MAINT_REPEATED_LINK]: QUALITY.repeatedContext.findingCap,
+  [DIAGNOSTIC_IDS.MAINT_REPEATED_CONTEXT_PATTERN]:
+    QUALITY.repeatedContext.findingCap,
 };
-const SHINGLE_SIZE = 24;
-const TOKEN_SHINGLE_NEARBY_LINE_WINDOW = 8;
+const SHINGLE_SIZE = QUALITY.repeatedContext.tokenShingleTokens;
+const TOKEN_SHINGLE_NEARBY_LINE_WINDOW =
+  QUALITY.repeatedContext.tokenShingleNearbyLineWindow;
 
 export function repeatedContextFindingCap(
   id: RepeatedContextFindingId,
@@ -115,13 +115,6 @@ export function detectRepeatedContextPatterns(
       "Move the repeated command or code sample into one maintained reference, then link to it from dependent skills or docs.",
     ),
     ...groupsToFindings(
-      DIAGNOSTIC_IDS.MAINT_REPEATED_LINK,
-      "Repeated link target",
-      "link_target",
-      collectRepeatedLinks(documents),
-      "Check whether the repeated link target should be declared as a shared reference or source-of-truth dependency.",
-    ),
-    ...groupsToFindings(
       DIAGNOSTIC_IDS.MAINT_REPEATED_CONTEXT_PATTERN,
       "Repeated context pattern",
       "token_shingle",
@@ -144,7 +137,12 @@ function collectRepeatedSections(documents: ParsedDocument[]): RepeatGroup[] {
       const endLine = findSectionEndLine(document, index);
       const lines = document.lines.slice(heading.line - 1, endLine);
       const normalized = normalizeWhitespace(lines.join("\n"));
-      if (tokenCount(normalized) < 40 || normalized.length < 240) continue;
+      if (
+        estimateTokens(normalized) <
+          QUALITY.repeatedContext.exactSectionMinTokens ||
+        normalized.length < QUALITY.repeatedContext.exactSectionMinChars
+      )
+        continue;
 
       const key = hashText(normalized);
       addOccurrence(groups, {
@@ -161,7 +159,10 @@ function collectRepeatedSections(documents: ParsedDocument[]): RepeatGroup[] {
     }
   }
 
-  return repeatedCrossFileGroups(groups, 2);
+  return repeatedCrossFileGroups(
+    groups,
+    QUALITY.repeatedContext.exactSectionMinFiles,
+  );
 }
 
 function collectRepeatedHeadings(documents: ParsedDocument[]): RepeatGroup[] {
@@ -171,8 +172,8 @@ function collectRepeatedHeadings(documents: ParsedDocument[]): RepeatGroup[] {
     for (const heading of document.headings) {
       const normalized = normalizeHeading(heading.text);
       if (
-        normalized.length < 24 ||
-        tokenCount(normalized) < 3 ||
+        normalized.length < QUALITY.repeatedContext.headingMinChars ||
+        estimateTokens(normalized) < QUALITY.repeatedContext.headingMinTokens ||
         GENERIC_HEADINGS.has(normalized)
       ) {
         continue;
@@ -192,7 +193,10 @@ function collectRepeatedHeadings(documents: ParsedDocument[]): RepeatGroup[] {
     }
   }
 
-  return repeatedCrossFileGroups(groups, 2);
+  return repeatedCrossFileGroups(
+    groups,
+    QUALITY.repeatedContext.headingMinFiles,
+  );
 }
 
 function collectRepeatedCodeBlocks(documents: ParsedDocument[]): RepeatGroup[] {
@@ -201,7 +205,11 @@ function collectRepeatedCodeBlocks(documents: ParsedDocument[]): RepeatGroup[] {
   for (const document of documents) {
     for (const fence of document.codeFences) {
       const normalized = normalizeWhitespace(fence.content);
-      if (normalized.length < 80 || tokenCount(normalized) < 10) continue;
+      if (
+        normalized.length < QUALITY.repeatedContext.exactCodeMinChars ||
+        estimateTokens(normalized) < QUALITY.repeatedContext.exactCodeMinTokens
+      )
+        continue;
 
       const language = fence.language || "plain";
       const key = hashText(`${language}\n${normalized}`);
@@ -221,35 +229,10 @@ function collectRepeatedCodeBlocks(documents: ParsedDocument[]): RepeatGroup[] {
     }
   }
 
-  return repeatedCrossFileGroups(groups, 2);
-}
-
-function collectRepeatedLinks(documents: ParsedDocument[]): RepeatGroup[] {
-  const groups = new Map<string, RepeatGroup>();
-
-  for (const document of documents) {
-    for (const link of document.links) {
-      const target = normalizeLocalMarkdownLinkTarget(
-        link.target,
-        document.artifact.path,
-      );
-      if (!target) continue;
-
-      addOccurrence(groups, {
-        kind: "link_target",
-        key: target,
-        label: target,
-        occurrence: {
-          path: document.artifact.path,
-          startLine: link.line,
-          endLine: link.line,
-          snippet: document.lines[link.line - 1] ?? link.target,
-        },
-      });
-    }
-  }
-
-  return repeatedCrossFileGroups(groups, 3);
+  return repeatedCrossFileGroups(
+    groups,
+    QUALITY.repeatedContext.exactCodeMinFiles,
+  );
 }
 
 function collectRepeatedTokenShingles(
@@ -285,7 +268,12 @@ function collectRepeatedTokenShingles(
     }
   }
 
-  return collapseNearDuplicateTokenShingles(repeatedCrossFileGroups(groups, 2));
+  return collapseNearDuplicateTokenShingles(
+    repeatedCrossFileGroups(
+      groups,
+      QUALITY.repeatedContext.tokenShingleMinFiles,
+    ),
+  );
 }
 
 function groupsToFindings(
@@ -311,8 +299,7 @@ function groupsToFindings(
           id,
           title,
           category: "maintenance",
-          severity:
-            kind === "heading" || kind === "link_target" ? "low" : "medium",
+          severity: kind === "heading" ? "low" : "medium",
           confidence: confidenceForKind(kind),
           evidence: {
             path: first.path,
@@ -333,6 +320,11 @@ function groupsToFindings(
             "Review all reported occurrences and choose an owned source of truth.",
             "Run renma scan after any consolidation patch.",
           ],
+          details: {
+            profile: QUALITY.profile,
+            unit: "estimated_tokens",
+            occurrenceCount: occurrences.length,
+          },
         },
       ];
     });
@@ -468,11 +460,9 @@ function tokenizeDocument(
     if (codeLines.has(lineNumber)) continue;
 
     const line = document.lines[index] ?? "";
-    const matches = line.matchAll(/[A-Za-z0-9][A-Za-z0-9_./:-]*/g);
-    for (const match of matches) {
-      const value = match[0]?.toLowerCase();
-      if (!value || value.length < 3) continue;
-      tokens.push({ value, line: lineNumber });
+    for (const unit of estimatedTokenUnits(line)) {
+      if (!unit.value) continue;
+      tokens.push({ value: unit.value, line: lineNumber });
     }
   }
 
@@ -481,56 +471,14 @@ function tokenizeDocument(
 
 function isUsefulShingle(words: string[]): boolean {
   const uniqueWords = new Set(words);
-  if (uniqueWords.size < 12) return false;
+  if (uniqueWords.size < QUALITY.repeatedContext.tokenShingleMinUniqueTokens)
+    return false;
 
   const usefulWords = words.filter((word) => !COMMON_CONTEXT_TOKENS.has(word));
-  if (usefulWords.length < 14) return false;
+  if (usefulWords.length < QUALITY.repeatedContext.tokenShingleMinUsefulTokens)
+    return false;
 
-  return words.join(" ").length >= 140;
-}
-
-function normalizeLocalMarkdownLinkTarget(
-  value: string,
-  sourcePath: string,
-): string | undefined {
-  const target = normalizeWhitespace(value);
-  if (
-    !target ||
-    target.startsWith("#") ||
-    /^[a-z][a-z0-9+.-]*:/i.test(target)
-  ) {
-    return undefined;
-  }
-
-  const withoutFragment = target.replace(/#.*/, "").replace(/\?.*/, "");
-  if (!withoutFragment) return undefined;
-
-  const normalizedTarget = withoutFragment.replace(/\\/g, "/");
-  const normalizedSource = sourcePath.replace(/\\/g, "/");
-  const sourceDirectory = path.posix.dirname(normalizedSource);
-  const resolved = normalizedTarget.startsWith("/")
-    ? path.posix.normalize(normalizedTarget.slice(1))
-    : path.posix.normalize(
-        path.posix.join(
-          sourceDirectory === "." ? "" : sourceDirectory,
-          normalizedTarget,
-        ),
-      );
-
-  if (!resolved || resolved === "." || resolved.startsWith("../")) {
-    return undefined;
-  }
-
-  const repositoryRelative = resolved.replace(/^\.\//, "");
-  if (
-    !repositoryRelative.includes("/") &&
-    !repositoryRelative.endsWith(".md") &&
-    !repositoryRelative.endsWith(".mdx")
-  ) {
-    return undefined;
-  }
-
-  return repositoryRelative;
+  return words.join(" ").length >= QUALITY.repeatedContext.tokenShingleMinChars;
 }
 
 function normalizeHeading(value: string): string {
@@ -546,10 +494,6 @@ function normalizeWhitespace(value: string): string {
 
 function hashText(value: string): string {
   return createHash("sha256").update(value).digest("hex");
-}
-
-function tokenCount(value: string): number {
-  return value.length === 0 ? 0 : value.split(/\s+/).length;
 }
 
 function snippet(lines: string[]): string {
@@ -593,7 +537,6 @@ function confidenceForKind(kind: RepeatKind): Finding["confidence"] {
     case "token_shingle":
       return "medium";
     case "heading":
-    case "link_target":
       return "low";
   }
 }

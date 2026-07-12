@@ -48,6 +48,9 @@ export interface Asset {
   kind: AssetKind;
   sourcePath: string;
   contentHash: string;
+  sizeBytes?: number;
+  contentClassification?: "text" | "binary";
+  markdownParserEligible?: boolean;
   metadata: AssetMetadata;
   metadataFields: Record<string, MetadataFieldEvidence>;
   metadataListItems: Record<string, MetadataFieldEvidence[]>;

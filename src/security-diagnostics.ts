@@ -12,6 +12,7 @@ import {
   type SecurityProfileChain,
 } from "./security-policy.js";
 import type { Artifact, Finding, RiskClass, SecurityConfig } from "./types.js";
+import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 
 type SecurityCategory = "safety";
 
@@ -759,12 +760,16 @@ function securityFindingsForArtifact(
     const hasHumanApprovalGuard =
       hasExplicitHumanApprovalGuard(line) ||
       (recentHumanApprovalLine > 0 &&
-        lineNumber - recentHumanApprovalLine <= 2);
+        lineNumber - recentHumanApprovalLine <=
+          DEFAULT_QUALITY_PROFILE.security.precedingLineFastPath) ||
+      hasStructuredGuard(lines, index, hasExplicitHumanApprovalGuard);
     const hasCommandRiskGuard =
       hasHumanApprovalGuard ||
       hasLocalRiskMitigationGuard(line) ||
       (recentRiskMitigationLine > 0 &&
-        lineNumber - recentRiskMitigationLine <= 2);
+        lineNumber - recentRiskMitigationLine <=
+          DEFAULT_QUALITY_PROFILE.security.precedingLineFastPath) ||
+      hasStructuredGuard(lines, index, hasLocalRiskMitigationGuard);
     const commandLine =
       !shellComment &&
       (inFence ||
@@ -1682,6 +1687,65 @@ function hasExplicitHumanApprovalGuard(line: string): boolean {
 
 function hasLocalRiskMitigationGuard(line: string): boolean {
   return RECOVERY_GUARD_RE.test(line);
+}
+
+function hasStructuredGuard(
+  lines: string[],
+  commandIndex: number,
+  guard: (line: string) => boolean,
+): boolean {
+  const command = lines[commandIndex] ?? "";
+  const commandIndent = command.match(/^\s*/)?.[0].length ?? 0;
+
+  // Same Markdown list item, including an indented fenced command.
+  if (commandIndent > 0) {
+    for (let index = commandIndex - 1; index >= 0; index -= 1) {
+      const line = lines[index] ?? "";
+      if (/^\s*#{1,6}\s+/.test(line) || line.trim() === "---") break;
+      if (/^\s*[-*+]\s+/.test(line)) return guard(line);
+      const indent = line.match(/^\s*/)?.[0].length ?? 0;
+      if (line.trim() && indent < commandIndent) break;
+    }
+  }
+
+  // Paragraph directly associated with the command or its opening fence.
+  let cursor = commandIndex - 1;
+  while (cursor >= 0 && /^\s*```/.test(lines[cursor] ?? "")) cursor -= 1;
+  while (cursor >= 0 && !(lines[cursor] ?? "").trim()) cursor -= 1;
+  const paragraph: string[] = [];
+  while (cursor >= 0) {
+    const line = lines[cursor] ?? "";
+    if (!line.trim() || line.trim() === "---" || /^\s*#{1,6}\s+/.test(line))
+      break;
+    paragraph.unshift(line);
+    cursor -= 1;
+  }
+  if (paragraph.some(guard)) return true;
+
+  // Explicit guard prose earlier in the same safety/constraint section is
+  // structurally associated without depending on a fixed distance.
+  const headingIndex = findParentSafetyHeading(lines, commandIndex);
+  return (
+    headingIndex >= 0 && lines.slice(headingIndex, commandIndex + 1).some(guard)
+  );
+}
+
+function findParentSafetyHeading(lines: string[], fromIndex: number): number {
+  let childDepth = 7;
+  for (let index = fromIndex - 1; index >= 0; index -= 1) {
+    const match = (lines[index] ?? "").match(/^\s*(#{1,6})\s+(.+)$/);
+    if (!match) continue;
+    const depth = match[1]?.length ?? 1;
+    if (depth >= childDepth) continue;
+    if (
+      /\b(human approval|safety|constraints?|guardrails?)\b/i.test(
+        match[2] ?? "",
+      )
+    )
+      return index;
+    childDepth = depth;
+  }
+  return -1;
 }
 
 function requiresHumanApprovalGuard(line: string): boolean {

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { glob, lstat, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import type {
@@ -291,12 +292,20 @@ export async function discoverArtifacts(
           });
           return undefined;
         }
-        const content = await readFile(absolutePath, "utf8");
+        const bytes = await readFile(absolutePath);
+        const contentClassification = classifyContent(bytes, relativePath);
+        const content =
+          contentClassification === "text" ? bytes.toString("utf8") : "";
         return {
           path: relativePath,
           absolutePath,
           kind: classify(relativePath),
           sizeBytes: info.size,
+          contentHash: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
+          contentClassification,
+          markdownParserEligible:
+            contentClassification === "text" &&
+            /(?:^|\/)(?:[^/]+\.)?mdx?$/i.test(relativePath),
           content,
         } satisfies Artifact;
       } catch (error) {
@@ -312,8 +321,8 @@ export async function discoverArtifacts(
 
   return {
     artifacts: artifacts.filter(
-      (artifact): artifact is Artifact => artifact !== undefined,
-    ),
+      (artifact) => artifact !== undefined,
+    ) as Artifact[],
     diagnostics,
   };
 }
@@ -323,6 +332,8 @@ function classify(relativePath: string): ArtifactKind {
   const explicitSkillSupportKind =
     classifyExplicitSkillSupportPath(relativePath);
   if (explicitSkillSupportKind !== undefined) return explicitSkillSupportKind;
+  if (classifyRepositorySkillPath(relativePath)?.kind === "reserved-root")
+    return "unknown";
   if (relativePath === "AGENTS.md" || relativePath.startsWith(".agents/"))
     return "agent";
   if (relativePath.startsWith("lenses/")) return "context_lens";
@@ -353,16 +364,49 @@ function classifyExplicitSkillSupportPath(
       : undefined;
   switch (supportDirectory) {
     case "assets":
-      return "unknown";
+      return classified?.kind === "support" ? "asset" : undefined;
     case "profiles":
       return "profile";
     case "references":
       return "reference";
     case "examples":
       return "example";
+    case "scripts":
+      return classified?.kind === "support" ? "script" : undefined;
     default:
       return undefined;
   }
+}
+
+const OPAQUE_EXTENSIONS = new Set([
+  ".avif",
+  ".bmp",
+  ".eot",
+  ".gif",
+  ".ico",
+  ".jpeg",
+  ".jpg",
+  ".otf",
+  ".pdf",
+  ".png",
+  ".ttf",
+  ".webp",
+  ".woff",
+  ".woff2",
+  ".zip",
+]);
+
+function classifyContent(
+  bytes: Uint8Array,
+  relativePath: string,
+): "text" | "binary" {
+  if (OPAQUE_EXTENSIONS.has(path.posix.extname(relativePath).toLowerCase()))
+    return "binary";
+  const sample = bytes.subarray(0, Math.min(bytes.length, 8_192));
+  if (sample.includes(0)) return "binary";
+  const decoded = Buffer.from(sample).toString("utf8");
+  const replacements = [...decoded].filter((char) => char === "�").length;
+  return replacements > 0 ? "binary" : "text";
 }
 
 async function skillLikeLayoutDiagnostics(

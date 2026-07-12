@@ -1126,6 +1126,7 @@ function normalizeBomContract(report: BomReport): BomReport {
     assets: report.assets.map((asset) => ({
       ...asset,
       contentHash: "<sha256>",
+      sizeBytes: -1,
     })),
   };
 }
@@ -1167,6 +1168,9 @@ function expectedBomContract(): BomReport {
         kind: "context",
         sourcePath: "contexts/testing/contract.md",
         contentHash: "<sha256>",
+        sizeBytes: -1,
+        contentClassification: "text",
+        markdownParserEligible: true,
         owner: "qa-platform",
         status: "stable",
         version: "1.0.0",
@@ -1192,6 +1196,9 @@ function expectedBomContract(): BomReport {
         kind: "skill",
         sourcePath: "skills/testing/contract-review/SKILL.md",
         contentHash: "<sha256>",
+        sizeBytes: -1,
+        contentClassification: "text",
+        markdownParserEligible: true,
         owner: "qa-platform",
         status: "stable",
         tags: ["testing"],
@@ -1234,6 +1241,20 @@ function expectedBomContract(): BomReport {
           status: "pass",
           severity: "info",
           summary: "No error diagnostics were reported.",
+        },
+        {
+          id: "specification.agent_skills",
+          title: "Agent Skills specification",
+          status: "pass",
+          severity: "info",
+          summary: "1/1 Skill entrypoints pass Agent Skills validation.",
+        },
+        {
+          id: "security.blocking",
+          title: "Blocking security findings",
+          status: "pass",
+          severity: "info",
+          summary: "No high or critical security findings were reported.",
         },
         {
           id: "ownership.coverage",
@@ -1318,11 +1339,12 @@ function expectedBomContract(): BomReport {
           summary: "2 cataloged assets found.",
         },
         {
-          id: "layout.skills_thin",
-          title: "Thin skill entrypoints",
+          id: "workflow.skills_focused",
+          title: "Focused skill workflows",
           status: "pass",
           severity: "info",
-          summary: "All skill entrypoints are thin routers.",
+          summary:
+            "Skill entrypoints are focused, discoverable workflows that use progressive disclosure appropriately.",
         },
         {
           id: "layout.disallowed_skill_assets",
@@ -1382,8 +1404,8 @@ function expectedBomContract(): BomReport {
         },
         workflow: {
           skillEntrypoints: 1,
-          checks: 5,
-          pass: 5,
+          checks: 6,
+          pass: 6,
           warn: 0,
           fail: 0,
           readinessPercent: 100,

@@ -6,6 +6,104 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-07-12
+
+### Added
+
+- Added the internal `renma-quality@0.18.0` profile and canonical threshold
+  documentation with units, provenance, rationale, false-positive risks, and
+  future-configurability status.
+- Added one deterministic Unicode-aware `estimated_tokens` implementation for
+  Skill, content-asset, reuse-candidate, and repeated-context analysis.
+- Added first-class `script` and `asset` artifact kinds under both supported
+  Skill roots, including original-byte hashes, sizes, text/binary
+  classification, Markdown eligibility, and catalog, graph, Trust Graph, and
+  BOM inventory.
+- Added direct, one-index-hop, deep-chain, unreachable, and missing-path static
+  support reachability for references, scripts, assets, profiles, and examples.
+- Added `renma scaffold skill --resources references,scripts,assets`; file mode
+  creates only selected empty directories, while prompt and JSON modes report
+  the selected resource contract without writing files.
+
+### Changed
+
+- Replaced the thin-router model with focused workflow entrypoints. Ordered
+  procedures, completion criteria, and short command examples are valid in
+  `SKILL.md`; progressive disclosure is reviewed by semantic destination.
+- Changed Skill body advisories to low above 2,000 and medium above 5,000
+  estimated tokens. Changed content advisories to Context 4,000, Reference
+  5,000, Profile 2,000, and Example 2,500 estimated tokens.
+- Changed metadata advisories to 48 frontmatter lines, 4,096 frontmatter
+  characters, and 256 characters per prose-like list item, with practical
+  exemptions for IDs, repository paths, and URLs.
+- Changed reusable Context eligibility to 60 lines or 800 estimated tokens plus
+  four reusable signals. Changed shared-reference eligibility to 80 lines or
+  1,200 estimated tokens plus three reusable headings and four reusable
+  phrases. Ordinary workflow headings and constraint words do not qualify.
+- Changed repeated headings to require three files and token shingles to 40
+  estimated tokens in three files. Exact-section, exact-code, and per-category
+  caps retain their established defaults.
+- Changed Readiness to `workflow.skills_focused`, removed the five-point
+  existence penalty for deprecated/archived assets, and reduced subjective
+  workflow advisory weights while preserving blocking graph and diagnostic
+  failures.
+- Deprecated `metadata.renma.when-to-use` and
+  `metadata.renma.when-not-to-use` for new Skill authoring. They remain
+  recognized for governance and migration preservation; portable
+  `description` is the Skill discovery source of truth.
+
+### Fixed
+
+- Stopped overcounting Japanese one character at a time in quality rules and
+  undercounting unspaced Japanese as one token in repeated-context analysis.
+- Stopped decoding images, PDFs, fonts, and other opaque assets as UTF-8
+  Markdown or exposing binary bytes in diagnostic snippets.
+- Stopped treating a command, Procedure/Steps/Setup headings, ordered workflow
+  wording, or 450/700-word counts as evidence of a bad Skill.
+- Stopped recommending Context Assets as the default destination for
+  Skill-specific procedures, variants, edge cases, scripts, and output
+  resources.
+- Stopped repeated links to the same specification or source from producing
+  maintenance findings by default.
+
+### Removed
+
+- Removed default emission of `QUAL-SHORT-DESCRIPTION`,
+  `LAYOUT-SKILL-NOT-THIN`, `LAYOUT-SKILL-EXECUTABLE-COMMAND`, and
+  `MAINT-REPEATED-LINK`.
+- Removed the Readiness `layout.skills_thin` contract and the unconditional
+  lifecycle-status penalty.
+
+### Compatibility
+
+- No public quality-threshold configuration was added to
+  `renma.config.json`. The versioned internal profile is shaped for possible
+  later overrides after usage evidence.
+- `ArtifactKind`, catalog entries, graph nodes, Trust Graph asset properties,
+  and Repository Context BOM assets add `script`/`asset` and binary-safety
+  evidence. Consumers that exhaustively match kinds or exact-normalize these
+  schemas must update for 0.18.0.
+- Scaffold file, prompt, and JSON contracts add selected resource directories;
+  existing invocations without `--resources` create no extra directories.
+- Agent Skills specification errors remain separate from Renma advisories:
+  `description` is required, a string, and 1-1,024 characters; 150 characters
+  is not an Agent Skills minimum.
+
+### Migration
+
+- `LAYOUT-SKILL-NOT-THIN` -> `QUAL-SKILL-MIXED-RESPONSIBILITY` when reusable
+  knowledge evidence exists, otherwise no finding.
+- `LAYOUT-SKILL-EXECUTABLE-COMMAND` -> no layout finding; security,
+  unresolved-helper, path-escape, and large-inline-implementation checks remain.
+- `QUAL-SHORT-DESCRIPTION` -> Agent Skills description validity plus
+  `RN-SKILL-DESCRIPTION-MISSING-CAPABILITY`,
+  `RN-SKILL-DESCRIPTION-MISSING-USAGE-BOUNDARY`, and
+  `RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY` where applicable.
+- `MAINT-REPEATED-LINK` -> no maintenance finding by default.
+- Readiness `layout.skills_thin` -> `workflow.skills_focused`.
+- Rebaseline exact catalog, graph, Trust Graph, BOM, Readiness, scaffold JSON,
+  and package-content fixtures against the 0.18.0 schemas before release.
+
 ## [0.17.0] - 2026-07-11
 
 ### Added
@@ -343,7 +441,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/KazuCocoa/renma/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/KazuCocoa/renma/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/KazuCocoa/renma/compare/v0.15.2...v0.16.0
 [0.15.2]: https://github.com/KazuCocoa/renma/compare/v0.15.1...v0.15.2
