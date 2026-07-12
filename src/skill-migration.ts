@@ -13,6 +13,7 @@ import {
 } from "./agent-skills.js";
 import type { SkillEntrypointPath } from "./discovery.js";
 import { parseDocument } from "./markdown.js";
+import { validateCanonicalSecurityMetadata } from "./security-policy.js";
 import type { Artifact, ParsedDocument } from "./types.js";
 import { parseAgentSkillFrontmatter } from "./yaml-frontmatter.js";
 
@@ -411,6 +412,15 @@ function validateMigrationCandidate(
     blocked,
     "Resulting Agent Skills candidate",
   );
+  if (validation.valid) {
+    const security = validateCanonicalSecurityMetadata(candidate);
+    for (const issue of security.issues) {
+      blocked.push({
+        field: `metadata.${issue.key}`,
+        reason: `Resulting Agent Skills candidate has invalid canonical security metadata: ${issue.reason}.`,
+      });
+    }
+  }
   return blocked;
 }
 

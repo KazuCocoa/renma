@@ -6,17 +6,50 @@ Renma security diagnostics are deterministic repository checks for agent-facing 
 
 ## Security Policy Quickstart
 
-Add small security policy metadata to agent-facing skills or context assets when they include network, upload, secret-handling, command execution, or other sensitive operational instructions.
+Add small security policy metadata to agent-facing Skills or context assets when they include network, upload, secret-handling, command execution, or other sensitive operational instructions. Renma 0.16.0 uses different serialization boundaries for Skills and non-Skill assets.
 
-### Asset-local security policy
+### Canonical Skill security policy
 
-Use asset-local policy when one asset has stricter or unique requirements, the body contains sensitive instructions, or local denials should be explicit and reviewable:
+Operational Skills must be specification-valid Agent Skills. Put every Renma
+security field under `metadata` as a flat `renma.*` string entry. Boolean values
+are the exact strings `"true"` or `"false"`; lists are JSON-array strings
+containing strings only:
 
 ```yaml
 ---
-id: skill.diagnostics.local-triage
-owner: qa-platform
-status: stable
+name: local-triage
+description: Review local diagnostics safely. Use when repository-local failure evidence needs deterministic security review.
+metadata:
+  renma.id: skill.diagnostics.local-triage
+  renma.owner: qa-platform
+  renma.status: stable
+  renma.allowed-data: '["repo-local-files","sanitized-ci-diagnostics"]'
+  renma.network-allowed: "true"
+  renma.external-upload-allowed: "false"
+  renma.secrets-allowed: "false"
+  renma.requires-human-approval: "true"
+  renma.forbidden-inputs: '["secrets","credentials","tokens"]'
+---
+```
+
+Canonical list fields also include
+`renma.approved-network-destinations` and
+`renma.approved-upload-destinations`. Invalid recognized canonical values fail
+closed: Renma reports their exact evidence and does not replace them with a
+more permissive profile or repository value.
+
+Asset-local explicit denials remain stricter than inherited profile or
+repository allowances. For example, `renma.external-upload-allowed: "false"`
+still blocks upload instructions even if a selected profile or repository
+config allows uploads elsewhere.
+
+### Non-Skill security policy
+
+Contexts and other non-Skill assets retain the existing top-level syntax:
+
+```yaml
+---
+id: context.diagnostics.local-triage
 allowed_data:
   - repo-local-files
   - sanitized-ci-diagnostics
@@ -28,15 +61,22 @@ forbidden_inputs:
   - secrets
   - credentials
   - tokens
+approved_network_destinations:
+  - github.com
+approved_upload_destinations: []
+security_profile: local-ci-diagnostics
 ---
 ```
 
-Asset-local explicit denials remain stricter than inherited profile or repository allowances. For example, `external_upload_allowed: false` on an asset still blocks upload instructions even if a selected profile or repository config allows uploads elsewhere.
+These top-level fields are operational only for non-Skill assets. Pre-0.16
+top-level Skill security fields are accepted only by `suggest-metadata` as
+one-way migration input; normal scan consumers do not use them as Skill policy.
 
 ### Allowed data vocabulary
 
-`allowed_data` describes what categories of input data a skill or context asset
-is allowed to use. It is not a strict closed enum: projects may define their own
+For Skills, `renma.allowed-data` describes the allowed input categories. For
+non-Skill assets, the equivalent field is `allowed_data`. This vocabulary is
+not a strict closed enum: projects may define their own
 data-source categories when they need domain-specific names. Prefer descriptive,
 stable values so humans, diagnostics, trust graph output, readiness checks, and
 future automation can reason about declared data boundaries consistently.
@@ -52,7 +92,7 @@ Recommended vocabulary:
 | `public-docs` | Publicly available documentation, specifications, or references. |
 | `disclosed-user-provided-data` | Data explicitly provided or disclosed by the user for the current task. |
 
-Important: `allowed_data` does not grant broad access to all matching data. For
+Important: allowed-data metadata does not grant broad access to all matching data. For
 example, `referenced-authenticated-internal-docs` means authenticated internal
 documents that are explicitly referenced by the skill or its context assets. It
 does not mean that the skill may freely search all internal documents.
@@ -63,50 +103,44 @@ updated assets.
 
 Common patterns:
 
-Basic repo-local skill:
+Basic repo-local Skill:
 
 ```yaml
-allowed_data:
-  - repo-local-files
-  - skill-bundled-context
+metadata:
+  renma.allowed-data: '["repo-local-files","skill-bundled-context"]'
 ```
 
 Internal-doc-backed review skill:
 
 ```yaml
-allowed_data:
-  - repo-local-files
-  - skill-bundled-context
-  - referenced-authenticated-internal-docs
+metadata:
+  renma.allowed-data: '["repo-local-files","skill-bundled-context","referenced-authenticated-internal-docs"]'
 ```
 
 CI failure diagnosis skill:
 
 ```yaml
-allowed_data:
-  - repo-local-files
-  - sanitized-ci-diagnostics
+metadata:
+  renma.allowed-data: '["repo-local-files","sanitized-ci-diagnostics"]'
 ```
 
 OSS or public documentation skill:
 
 ```yaml
-allowed_data:
-  - repo-local-files
-  - public-docs
+metadata:
+  renma.allowed-data: '["repo-local-files","public-docs"]'
 ```
 
 User-provided input skill:
 
 ```yaml
-allowed_data:
-  - disclosed-user-provided-data
-  - skill-bundled-context
+metadata:
+  renma.allowed-data: '["disclosed-user-provided-data","skill-bundled-context"]'
 ```
 
 ### Reusable security profiles
 
-Use `security_profile` when many assets share the same policy, a team wants a reusable security contract, or policy should be centrally updated in `renma.config.json`.
+Use a security profile when many assets share the same policy, a team wants a reusable security contract, or policy should be centrally updated in `renma.config.json`.
 
 Configure profiles under `security.profiles`:
 
@@ -129,13 +163,19 @@ Configure profiles under `security.profiles`:
 }
 ```
 
-Then select the profile from an asset:
+Select the profile from a Skill with canonical metadata:
 
 ```yaml
 ---
-security_profile: local-ci-diagnostics
+name: local-triage
+description: Review local diagnostics safely. Use when repository-local failure evidence needs deterministic security review.
+metadata:
+  renma.security-profile: local-ci-diagnostics
 ---
 ```
+
+For a non-Skill asset, use the existing top-level
+`security_profile: local-ci-diagnostics` field.
 
 ### Repository-level security config
 
@@ -157,14 +197,17 @@ Use repo-level `security.approvedDomains`, `security.approvedUploadDomains`, or 
 Prefer the narrowest policy location that matches the decision:
 
 - Use asset-local fields for one-off restrictions, explicit denials, or sensitive instructions that need nearby review.
-- Use `security_profile` for reusable team contracts shared by several assets.
+- Use `renma.security-profile` for a Skill or top-level `security_profile` for a non-Skill asset when selecting reusable team contracts.
 - Use repository-level security config for common approved network destinations, upload destinations, or disallowed commands that apply broadly.
 
 If settings disagree, keep the stricter effective policy. Do not relax asset-local denials through a profile or repository allowance.
 
 ### Human approval semantics
 
-`requires_human_approval: true` requires explicit nearby approval wording for sensitive actions. Dry-run, backup, rollback, or restore guidance is useful, but it does not replace explicit approval when approval is required.
+For a Skill, `renma.requires-human-approval: "true"` requires explicit nearby
+approval wording for sensitive actions. The non-Skill equivalent is top-level
+`requires_human_approval: true`. Dry-run, backup, rollback, or restore guidance
+is useful, but it does not replace explicit approval when approval is required.
 
 Keep approval wording close to the action it guards, especially for uploads, external sharing, privileged commands, destructive commands, or secret-handling workflows.
 
@@ -172,11 +215,19 @@ Keep approval wording close to the action it guards, especially for uploads, ext
 
 `approvedDomains` does not imply upload approval. Network access and upload permission are separate decisions.
 
-Use `approved_network_destinations`, profile `approvedDomains`, or repository `security.approvedDomains` for general network destinations. Use `approved_upload_destinations`, profile `approvedUploadDomains`, or repository `security.approvedUploadDomains` for upload destinations.
+For Skills, use `renma.approved-network-destinations` and
+`renma.approved-upload-destinations` JSON-array strings. For non-Skill assets,
+use top-level `approved_network_destinations` and
+`approved_upload_destinations`. Profile `approvedDomains` and
+`approvedUploadDomains`, and repository `security.approvedDomains` and
+`security.approvedUploadDomains`, keep their existing config syntax.
 
 ### Forbidden inputs
 
-Use `forbidden_inputs` to name data classes an asset must not request, copy, upload, summarize, or include in prompts. Common examples are `secrets`, `credentials`, `tokens`, `private keys`, `.env files`, customer data, and production logs.
+Use `renma.forbidden-inputs` for a Skill and top-level `forbidden_inputs` for a
+non-Skill asset to name data classes it must not request, copy, upload,
+summarize, or include in prompts. Common examples are `secrets`, `credentials`,
+`tokens`, `private keys`, `.env files`, customer data, and production logs.
 
 Safe negative wording is useful:
 
@@ -252,11 +303,11 @@ Runtime enforcement remains outside Renma.
 
 ### Effective policy inventory
 
-Renma can also summarize the effective static policy surface across discovered assets. The inventory is derived from asset-local policy metadata, selected `security_profile` chains, and repository-level `security` config.
+Renma can also summarize the effective static policy surface across discovered assets. The inventory is derived from asset-local policy metadata, selected security-profile chains, and repository-level `security` config.
 
 The inventory reports policy coverage, network/upload/secrets booleans, human approval requirements, approved destinations, forbidden inputs, disallowed commands, and profile resolution counts. It is reporting-only in v1 and does not enforce runtime behavior.
 
-`renma trust-graph` also includes effective policy evidence. Each effective policy node uses a deterministic fingerprint over normalized allowed data, forbidden inputs, network/upload/secrets booleans, human approval requirement, approved destinations, and disallowed commands. The graph links assets to selected `security_profile` values and to their effective policy fingerprint; it does not enforce the policy at runtime.
+`renma trust-graph` also includes effective policy evidence. Each effective policy node uses a deterministic fingerprint over normalized allowed data, forbidden inputs, network/upload/secrets booleans, human approval requirement, approved destinations, and disallowed commands. The graph links assets to selected security-profile values and to their effective policy fingerprint; it does not enforce the policy at runtime.
 
 ### Security-aware semantic diff
 
@@ -270,12 +321,13 @@ Use this table to choose the right kind of fix. For full finding definitions, se
 
 | Finding | Usually means | What to change | Fix area |
 | --- | --- | --- | --- |
-| `SEC-MISSING-POLICY-METADATA` | Sensitive instructions lack a declared policy. | Add local policy fields or select a configured `security_profile`. | Metadata |
+| `SEC-INVALID-CANONICAL-POLICY-METADATA` | A recognized Skill `metadata.renma.*` security value has an invalid encoding. | Confirm the intended policy, then replace it with the exact documented string encoding; do not guess a permissive value. | Skill metadata |
+| `SEC-MISSING-POLICY-METADATA` | Sensitive instructions lack a declared policy. | Add local policy fields or select a configured security profile using the syntax for that asset kind. | Metadata |
 | `SEC-INSTRUCTION-VIOLATES-POLICY` | Body text asks for behavior denied by policy. | Rewrite the instruction or adjust policy only after review. | Body text and metadata |
 | `SEC-MISSING-HUMAN-APPROVAL-GUARD` | A sensitive action lacks nearby approval wording. | Add explicit human approval close to the action. | Body text |
 | `SEC-UNAPPROVED-NETWORK-DESTINATION` | An instruction contacts a host outside approved network destinations. | Enumerate the actual required domains in asset/profile/repo network approvals after review. | Body text, metadata, or config |
 | `SEC-UNAPPROVED-UPLOAD-DESTINATION` | An upload target is not in upload approvals. | Use an approved upload target or update upload approvals intentionally. | Body text, metadata, or config |
-| `SEC-FORBIDDEN-INPUT-INSTRUCTION` | The asset asks for data listed in `forbidden_inputs`. | Remove the request or replace it with redaction and placeholder guidance. | Body text and metadata |
+| `SEC-FORBIDDEN-INPUT-INSTRUCTION` | The asset asks for data listed in its forbidden-input policy. | Remove the request or replace it with redaction and placeholder guidance. | Body text and metadata |
 | `SEC-SECRET-MATERIAL-INSTRUCTION` | Instructions may expose private keys, tokens, credentials, or secret files. | Remove secret collection or disclosure instructions. | Body text |
 | `SEC-DESTRUCTIVE-COMMAND` | A destructive command appears without enough local safety context. | Remove it, scope it tightly, or add explicit approval and recovery guidance. | Body text |
 | `SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD` | `sudo` or similar privileged action lacks guardrails. | Add prerequisites, confirmation, rollback, and verification guidance. | Body text |
