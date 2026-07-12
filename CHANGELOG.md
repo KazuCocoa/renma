@@ -6,6 +6,24 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-07-11
+
+### Added
+
+- Added Agent Skills specification validation to `scan`, including stable diagnostics for entrypoint naming, frontmatter, metadata, and body requirements.
+- Added deterministic migration assistance to `suggest-metadata` for pre-0.16 Skill entrypoints and metadata, with conflict detection and canonical candidate validation.
+- Added comprehensive Agent Skills compatibility and migration documentation, canonical authoring guidance, and a Context Lens example for boundary-value spec review.
+
+### Changed
+
+- Required operational Skills to use specification-valid Agent Skills frontmatter with Renma extensions under flat, string-valued `metadata.renma.*` keys.
+- Updated catalog, graph, ownership, readiness, BOM, security, scaffold, and reporting consumers to use canonical Skill metadata while retaining legacy forms only as migration input.
+- Expanded the README, architecture, design, user manual, security guidance, and example repository for the 0.16.0 Skill format and repository model.
+
+### Fixed
+
+- Corrected the repository-owned release-prep Skill syntax and kept its operational workflow in the required release context.
+
 ## [0.15.2] - 2026-07-10
 
 ### Added
@@ -292,7 +310,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.15.2...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/KazuCocoa/renma/compare/v0.15.2...v0.16.0
 [0.15.2]: https://github.com/KazuCocoa/renma/compare/v0.15.1...v0.15.2
 [0.15.1]: https://github.com/KazuCocoa/renma/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/KazuCocoa/renma/compare/v0.14.1...v0.15.0
