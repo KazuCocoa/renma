@@ -2,13 +2,14 @@
 
 Status: proposed
 
-Target: post-0.15.0 planning
+Target: 0.18.0
 
 Scope: optional, backward-compatible skill discovery for large single repositories
 
 Only **Current Baseline** describes implemented behavior. Route metadata,
 `skill-index`, discovery diagnostics, and the integrations proposed elsewhere in
-this document are not implemented in 0.16.0.
+this document are not implemented in 0.17.0. This plan is intentionally outside
+the 0.17.0 usability and documentation-consolidation release.
 
 ## Summary
 
@@ -42,7 +43,9 @@ LLM proposes. Renma verifies. Human approves.
 
 ## Current Baseline
 
-As of 0.15.0, Renma already has most of the infrastructure needed for this work:
+The current 0.16.0 product model provides most of the infrastructure needed for
+this work, and 0.17.0 improves the usability of that baseline without
+implementing discovery:
 
 - Repository discovery for skills, context assets, context lenses, profiles, references, examples, agents, config, and supporting files.
 - A normalized catalog model with deterministic IDs, paths, hashes, owners, lifecycle metadata, tags, and declared dependencies.
@@ -53,6 +56,24 @@ As of 0.15.0, Renma already has most of the infrastructure needed for this work:
 - A compact metadata parser that supports scalar values and selected block-list fields while intentionally discouraging large nested frontmatter.
 
 Skill discovery should extend this baseline. It should not create a parallel scanner, a second catalog, a new runtime service, or a separate source of truth.
+
+## Decision Status
+
+Accepted constraints for 0.18.0 design are:
+
+- Renma remains a deterministic repository-governance layer, not a runtime
+  selector.
+- Existing canonical `SKILL.md` files remain source assets.
+- Discovery is a projection over shared repository evidence.
+- No required category, product, team, or workflow directory hierarchy is
+  introduced.
+- Adoption remains backward-compatible and human-reviewable.
+
+Everything else in this document is prototype knowledge or a proposed
+implementation decision until code, contract tests, and release review accept
+it. In particular, `routes_to`, `skill-index`, discovery aliases, explicit
+entrypoints, diagnostic identifiers, report fields, views, thresholds, and
+phase ordering are proposals rather than current product contracts.
 
 ## Problem
 

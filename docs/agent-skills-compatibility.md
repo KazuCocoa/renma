@@ -51,6 +51,13 @@ been activated. Generic Agent Skills clients may not send arbitrary metadata
 to a model. Renma metadata therefore does not guarantee model compliance and
 must not replace behavior-critical instructions.
 
+Use your platform's standard Skill authoring guidance for the name, trigger
+description, instructions, workflow, constraints, examples, and completion
+criteria. Use Renma for repository-specific governance and validation. The
+[Authoring Guide](authoring-guide.md) owns the general new-Skill and
+existing-Skill workflows; this document owns the canonical format and migration
+contract.
+
 ## Canonical 0.16.0 Frontmatter
 
 Agent Skills owns the standard top-level fields:
@@ -370,12 +377,12 @@ Use the existing non-editing command with canonical or non-canonical
 entrypoints:
 
 ```bash
-renma scan .
+renma scan . --fail-on high
 renma suggest-metadata skills/example/SKILL.md --format prompt
 renma suggest-metadata skills/example/skill.md --format json
 renma suggest-metadata skills/testing/spec-review.skill.md --format prompt
 # apply only an unblocked canonical frontmatter candidate
-renma scan .
+renma scan . --fail-on high
 ```
 
 For Skill targets, `suggest-metadata` can preserve valid standard Agent Skills
@@ -406,6 +413,12 @@ identical existing owner is preserved without a rewrite. A different existing
 owner blocks the proposal for human review. Without `--owner`, Renma does not
 invent owner metadata or emit a meaningless canonical rewrite. This retrofit is
 not reverse migration.
+
+After generating a suggestion, review the Skill's trigger description,
+instructions, workflow, constraints, and completion criteria using
+platform-native authoring guidance. Review the candidate, apply only intended
+metadata or migration changes, run `renma scan . --fail-on high`, fix relevant
+diagnostics, and rerun validation before human approval.
 
 ## Pre-0.16 Value Serialization
 
@@ -447,6 +460,11 @@ Renma reports structured blocked evidence with the field and reason. It never
 selects the last duplicate value, silently deletes an unknown field, or assigns
 an unknown top-level field to a vendor namespace.
 
+When blocked, do not apply a candidate. Review the conflict or invalid evidence,
+confirm the Skill's intent using platform-native authoring guidance, correct
+the source evidence, and rerun `suggest-metadata`. After intended corrections,
+run `renma scan . --fail-on high`, fix relevant diagnostics, and rerun the scan.
+
 Within a valid `metadata` mapping, Renma distinguishes:
 
 ```text
@@ -463,7 +481,7 @@ unknown top-level field
   block migration
 ```
 
-## Renma 0.16.0 Boundary
+## Renma 0.16+ Boundary
 
 Renma 0.16.0 completes the repository format migration:
 

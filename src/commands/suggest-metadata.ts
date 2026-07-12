@@ -191,7 +191,7 @@ export function renderMetadataPrompt(suggestion: MetadataSuggestion): string {
   if (suggestion.agentSkills)
     return renderAgentSkillMigrationPrompt(suggestion);
   return `${[
-    "# Codex Task: Safely Retrofit Renma Metadata",
+    "# Renma Task: Safely Retrofit Renma Metadata",
     "",
     "Update this existing Renma asset metadata safely.",
     "",
@@ -240,12 +240,13 @@ function renderAgentSkillMigrationPrompt(
         "",
         "(not generated while migration is blocked or unnecessary)",
       ];
+  const nextSteps = renderSkillSuggestionNextSteps(suggestion);
   return `${[
     noMigrationProposed
-      ? "# Codex Task: Inspect Canonical Agent Skill (No Migration Proposed)"
+      ? "# Renma Task: Inspect Canonical Agent Skill (No Migration Proposed)"
       : metadataRetrofit
-        ? "# Codex Task: Review Canonical Agent Skills Metadata Retrofit"
-        : "# Codex Task: Review One-Way Agent Skills Migration",
+        ? "# Renma Task: Review Canonical Agent Skills Metadata Retrofit"
+        : "# Renma Task: Review One-Way Agent Skills Migration",
     "",
     `Asset: \`${suggestion.path}\``,
     `Source format: \`${migration.sourceFormat}\``,
@@ -275,6 +276,8 @@ function renderAgentSkillMigrationPrompt(
     "Verification:",
     "- Run `renma scan .`.",
     "",
+    ...nextSteps,
+    "",
     migration.canonicalFrontmatter
       ? migration.entrypointMigration === "none"
         ? "Return a small reviewed frontmatter patch. Do not rewrite the Skill body."
@@ -283,6 +286,29 @@ function renderAgentSkillMigrationPrompt(
         ? "Do not return or apply a frontmatter patch while migration is blocked. Preserve the existing source until every blocked item is resolved with human review."
         : "No frontmatter patch is proposed. Preserve the existing source.",
   ].join("\n")}\n`;
+}
+
+function renderSkillSuggestionNextSteps(
+  suggestion: MetadataSuggestion,
+): string[] {
+  if (suggestion.blockedMetadata.length > 0) {
+    return [
+      "Next steps:",
+      "1. Review the conflicts or invalid evidence and confirm the Skill's intent using your platform's standard Skill authoring guidance.",
+      "2. Do not apply a candidate while Renma cannot generate it safely.",
+      "3. Correct the source evidence, then rerun `renma suggest-metadata <SKILL.md>`.",
+      "4. After intended corrections, run `renma scan . --fail-on high`, fix relevant diagnostics, and rerun the scan.",
+    ];
+  }
+
+  return [
+    "Next steps:",
+    "1. Review the suggestion; Renma does not edit the Skill automatically.",
+    "2. Review the Skill's trigger description, instructions, workflow, constraints, and completion criteria using your platform's standard Skill authoring guidance.",
+    "3. Apply only the intended metadata or migration changes.",
+    "4. Run `renma scan . --fail-on high`.",
+    "5. Fix relevant diagnostics and rerun the scan.",
+  ];
 }
 
 function buildInstructions(input: {

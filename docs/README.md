@@ -1,0 +1,47 @@
+# Renma Documentation
+
+Use this index to choose the smallest document that answers your question.
+
+## Start Here
+
+- [README](../README.md): product identity, boundaries, quick start, primary
+  workflows, and command orientation.
+- [User Manual](user-manual.md): operational workflows, command behavior,
+  output formats, and CI usage.
+- [Authoring Guide](authoring-guide.md): canonical new-Skill and existing-Skill
+  authoring workflows, including platform-native guidance and human review.
+
+## Format And Governance Contracts
+
+- [Agent Skills Compatibility and Migration](agent-skills-compatibility.md):
+  canonical Skill format, pre-0.16 migration, conflicts, and blocked migration.
+- [Security Policy Guide](security-policy.md): security metadata semantics,
+  profiles, diagnostics, and review boundaries.
+- [Repository Context BOM](repository-context-bom.md): authoritative BOM v1
+  snapshot, output, reproducibility, schema, and provenance contract.
+- [Diagnostics Reference](diagnostics.md): scan finding identifiers and repair
+  guidance.
+
+## Focused References
+
+- [Context Lens](context-lens.md)
+- [Context Lifecycle Diagnostics](context-lifecycle-diagnostics.md)
+- [Context Conflict Diagnostics](context-conflict-diagnostics.md)
+- [Context Language Diagnostics](context-language-diagnostics.md)
+- [Metadata Budget](metadata-budget.md)
+
+## Product Model And Direction
+
+- [Product Design](../design.md): asset semantics and relationships.
+- [Architecture](../architecture.md): processing architecture and product
+  boundaries.
+- [Current Roadmap](../plan.md): current definition, completed baseline, and
+  planned release direction.
+- [Proposed 0.18.0 Skill Discovery](../plan-discovery.md): proposed static Skill
+  discovery design; it is not implemented behavior.
+
+## Examples
+
+- [Example Context Repository](../examples/context-repo)
+- [Context Lens Example](../examples/context-lens)
+- [GitHub Actions example](../examples/github-actions/renma-ci-report.yml)

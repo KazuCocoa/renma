@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { COMMAND_HELP } from "../src/cli-help.js";
@@ -161,3 +161,121 @@ test("Skill path guidance distinguishes canonical and historical entrypoints", a
     );
   }
 });
+
+test("Skill authoring docs preserve the platform and Renma responsibility boundary", async () => {
+  const readme = await readRepoFile("README.md");
+  const manual = await readRepoFile("docs/user-manual.md");
+  const authoring = await readRepoFile("docs/authoring-guide.md");
+  const compatibility = await readRepoFile(
+    "docs/agent-skills-compatibility.md",
+  );
+  const cliSource = await readRepoFile("src/cli-help.ts");
+
+  for (const document of [readme, manual, authoring, compatibility]) {
+    assert.match(document, /platform(?:'s|-native).*Skill authoring guidance/i);
+    assert.match(document, /renma scan \. --fail-on high/);
+  }
+
+  assert.match(authoring, /Do not run two independent generators/);
+  assert.match(authoring, /Optional Codex Example/);
+  assert.match(authoring, /skill-creator/);
+  assert.doesNotMatch(cliSource, /skill-creator/);
+  assert.doesNotMatch(await readRepoFile("src/commands/scaffold.ts"), /Codex/);
+  assert.doesNotMatch(
+    await readRepoFile("src/commands/suggest-metadata.ts"),
+    /Codex/,
+  );
+  assert.doesNotMatch(
+    await readRepoFile("src/commands/suggest-semantic-split.ts"),
+    /Codex/,
+  );
+  assert.match(
+    authoring,
+    /Do not apply a candidate while Renma cannot generate it safely/,
+  );
+  assert.match(readme, /proposed 0\.18\.0 Skill Discovery/i);
+});
+
+test("relative Markdown links in current documentation resolve", async () => {
+  const documents = [
+    "README.md",
+    "architecture.md",
+    "design.md",
+    "plan.md",
+    "plan-discovery.md",
+    ...(await markdownFilesUnder("docs")),
+    ...(await markdownFilesUnder("examples")),
+  ];
+
+  for (const documentPath of documents) {
+    const markdown = await readRepoFile(documentPath);
+    for (const match of markdown.matchAll(/!?\[[^\]]*\]\(([^)]+)\)/g)) {
+      const rawTarget = (match[1] ?? "").trim();
+      if (
+        rawTarget === "" ||
+        rawTarget.startsWith("#") ||
+        /^[a-z][a-z0-9+.-]*:/i.test(rawTarget)
+      ) {
+        continue;
+      }
+
+      const withoutTitle = rawTarget.startsWith("<")
+        ? rawTarget.slice(1, rawTarget.indexOf(">"))
+        : (rawTarget.split(/\s+["']/)[0] ?? rawTarget);
+      const relativeTarget = decodeURIComponent(
+        withoutTitle.split("#", 1)[0] ?? "",
+      );
+      if (relativeTarget === "") continue;
+
+      const resolved = path.resolve(path.dirname(documentPath), relativeTarget);
+      await assert.doesNotReject(
+        access(resolved),
+        `${documentPath} contains an unresolved relative link: ${rawTarget}`,
+      );
+    }
+  }
+});
+
+test("Mermaid documentation blocks have supported GitHub entry directives", async () => {
+  const documents = [
+    "README.md",
+    "architecture.md",
+    "design.md",
+    "plan.md",
+    "plan-discovery.md",
+    ...(await markdownFilesUnder("docs")),
+    ...(await markdownFilesUnder("examples")),
+  ];
+  const supportedDirective =
+    /^(?:flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|gantt|pie|mindmap|timeline|gitGraph)\b/;
+
+  for (const documentPath of documents) {
+    const markdown = await readRepoFile(documentPath);
+    const blocks = [...markdown.matchAll(/```mermaid\s*\n([\s\S]*?)```/g)];
+    const openingCount = [...markdown.matchAll(/```mermaid\b/g)].length;
+    assert.equal(
+      blocks.length,
+      openingCount,
+      `${documentPath} contains an unclosed Mermaid block.`,
+    );
+    for (const block of blocks) {
+      assert.match(
+        (block[1] ?? "").trimStart(),
+        supportedDirective,
+        `${documentPath} contains an unsupported Mermaid entry directive.`,
+      );
+    }
+  }
+});
+
+async function markdownFilesUnder(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const nested = await Promise.all(
+    entries.map(async (entry) => {
+      const entryPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) return markdownFilesUnder(entryPath);
+      return entry.isFile() && entry.name.endsWith(".md") ? [entryPath] : [];
+    }),
+  );
+  return nested.flat().sort();
+}

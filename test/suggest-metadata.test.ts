@@ -44,7 +44,17 @@ test("suggest-metadata prompt reports blocked legacy Skill migration", async () 
   assert.match(result.stdout, /renma\.status: `experimental`/);
   assert.match(result.stdout, /description: No unambiguous, usable/);
   assert.match(result.stdout, /not generated while migration is blocked/);
-  assert.match(result.stdout, /renma scan \./);
+  assert.match(
+    result.stdout,
+    /confirm the Skill's intent using your platform's standard Skill authoring guidance/,
+  );
+  assert.match(
+    result.stdout,
+    /Do not apply a candidate while Renma cannot generate it safely/,
+  );
+  assert.match(result.stdout, /Correct the source evidence/);
+  assert.match(result.stdout, /renma suggest-metadata <SKILL\.md>/);
+  assert.match(result.stdout, /renma scan \. --fail-on high/);
 });
 
 test("suggest-metadata does not invent a migration source from owner input", async () => {
@@ -115,6 +125,17 @@ test("suggest-metadata JSON exposes the Skill migration contract", async () => {
       "Preserve the Markdown body and existing standard Agent Skills fields.",
     ),
   );
+  assert.deepEqual(Object.keys(suggestion), [
+    "path",
+    "kind",
+    "suggestedMode",
+    "ownerProvided",
+    "instructions",
+    "candidateMetadata",
+    "blockedMetadata",
+    "agentSkills",
+  ]);
+  assert.equal("nextSteps" in suggestion, false);
 });
 
 test("suggest-metadata proposes no migration or rewrite for canonical release-prep", async () => {
@@ -162,6 +183,11 @@ test("suggest-metadata proposes no migration or rewrite for canonical release-pr
     promptResult.stdout,
     /Inspect Canonical Agent Skill \(No Migration Proposed\)/,
   );
+  assert.match(
+    promptResult.stdout,
+    /Review the Skill's trigger description, instructions, workflow, constraints, and completion criteria using your platform's standard Skill authoring guidance/,
+  );
+  assert.match(promptResult.stdout, /renma scan \. --fail-on high/);
   assert.doesNotMatch(
     promptResult.stdout,
     /Return (?:a|one) small reviewed (?:frontmatter )?patch/,
@@ -416,6 +442,15 @@ test("suggest-metadata works for context assets", async () => {
     id: "context.testing.boundary-value-analysis",
     title: "Boundary Value Analysis",
   });
+
+  const promptResult = await withCapturedConsole(() =>
+    main(["suggest-metadata", target, "--format", "prompt"]),
+  );
+  assert.doesNotMatch(
+    promptResult.stdout,
+    /platform's standard Skill authoring guidance/,
+  );
+  assert.doesNotMatch(promptResult.stdout, /renma scan \. --fail-on high/);
 });
 
 test("scan commands execute historical Skill entrypoint migrations end to end", async () => {

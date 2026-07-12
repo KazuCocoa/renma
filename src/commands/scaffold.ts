@@ -44,7 +44,11 @@ export async function runScaffoldCommand(
 
   await mkdir(path.dirname(options.targetPath), { recursive: true });
   await writeFile(options.targetPath, bundle.content, { flag: "wx" });
-  process.stdout.write(`Created ${options.targetPath}\n`);
+  process.stdout.write(
+    `Created ${options.targetPath}\n${
+      options.kind === "skill" ? `\n${renderSkillNextSteps()}\n` : ""
+    }`,
+  );
   return 0;
 }
 
@@ -271,7 +275,11 @@ Start from this deterministic scaffold and replace placeholder prose with reposi
 \`\`\`md
 ${input.content}\`\`\`
 
-Constraints:
+${
+  input.kind === "skill"
+    ? `Use your platform's standard Skill authoring guidance to refine the generated Skill's description, instructions, workflow, constraints, and completion criteria. Treat the scaffold as a starting point, preserve the repository's intended behavior, and do not invent owners, policies, dependencies, domain rules, or source-of-truth claims. After editing, run \`renma scan . --fail-on high\`, address relevant diagnostics, and rerun the scan. Do not weaken security policy or add suppressions merely to make validation pass.\n\n`
+    : ""
+}Constraints:
 
 - Preserve the YAML frontmatter shape unless the repository already requires a stricter local convention.
 - Use only supported statuses: experimental, stable, deprecated, archived.
@@ -290,6 +298,16 @@ ${skillGuidance.join("\n")}
 - Keep the asset LLM-facing and Renma-verifiable.
 - After creating files, run \`renma scan .\`, \`renma catalog . --format json\`, and \`renma graph . --focus ${input.id} --format mermaid\`.
 `;
+}
+
+function renderSkillNextSteps(): string {
+  return [
+    "Next steps:",
+    "1. Review the generated Skill using your platform's standard Skill authoring guidance.",
+    "2. Complete the description, instructions, workflow, constraints, completion criteria, and intended metadata.",
+    "3. Run `renma scan . --fail-on high`.",
+    "4. Fix relevant diagnostics and rerun the scan.",
+  ].join("\n");
 }
 
 function renderTagBlock(tags: string[]): string {
