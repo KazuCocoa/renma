@@ -1,0 +1,6 @@
+{
+  "fail_on": "high",
+  "format": "text",
+  "globs": ["skills/**/SKILL.md", "tools/**/*", "README.md"],
+  "exclude": ["node_modules", "dist", ".git", "workspace"]
+}

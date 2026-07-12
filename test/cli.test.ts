@@ -1016,7 +1016,7 @@ test("CLI catalog includes blocking Context Lens diagnostics", async () => {
   );
 });
 
-test("CLI prints a Codex semantic split prompt", async () => {
+test("CLI prints a platform-neutral semantic split prompt", async () => {
   const root = await fixture();
   const skillDir = path.join(root, "skills", "setup");
   const referencesDir = path.join(skillDir, "references");
@@ -1052,7 +1052,7 @@ test("CLI prints a Codex semantic split prompt", async () => {
     main(["suggest-semantic-split", source]),
   );
   assert.equal(prompt.code, 0);
-  assert.match(prompt.stdout, /# Codex Task: Suggest Semantic Reference Split/);
+  assert.match(prompt.stdout, /# Renma Task: Suggest Semantic Reference Split/);
   assert.match(
     prompt.stdout,
     /Infer the best split direction as a human maintainer/,
@@ -1364,7 +1364,11 @@ test("global help lists workflows, boundaries, and distinguishable commands", as
   assert.equal(help.stdout, repeated.stdout);
   assert.match(help.stdout, /Usage\n {2}renma <command> \[args\] \[options\]/);
   assert.match(help.stdout, /Start here: existing repository/);
-  assert.match(help.stdout, /renma scan \./);
+  assert.match(help.stdout, /renma scan \. --fail-on high/);
+  assert.match(
+    help.stdout,
+    /use suggest-metadata only for metadata retrofit or Skill migration work/,
+  );
   assert.match(help.stdout, /renma catalog \. --format markdown/);
   assert.match(help.stdout, /renma graph \. --format markdown/);
   assert.match(help.stdout, /renma readiness \. --format markdown/);
@@ -1375,8 +1379,10 @@ test("global help lists workflows, boundaries, and distinguishable commands", as
   );
   assert.match(
     help.stdout,
-    /inspect evidence -> prepare a reviewable patch -> human review -> rerun Renma/,
+    /authoring review -> intended changes -> repository validation -> fix -> rerun -> human review/,
   );
+  assert.match(help.stdout, /platform's standard Skill authoring guidance/);
+  assert.match(help.stdout, /renma scan \. --fail-on high/);
   assert.match(help.stdout, /Renma does not call an LLM/);
   assert.match(help.stdout, /Renma does not select runtime context/);
   assert.match(help.stdout, /Renma does not assemble prompts/);
@@ -1571,10 +1577,12 @@ test("representative command help shows relevant boundaries and options", async 
         /File mode creates the scaffold file at the target path/,
         /refuses to overwrite existing files/,
         /starting structure, not a complete asset/,
+        /platform's standard Skill authoring guidance/,
+        /renma scan \. --fail-on high/,
         /Domain knowledge must come from evidence or human input/,
         /Set owner metadata on the scaffold\. Required when --format file is used\./,
       ],
-      excludes: [/--fail-on/, /--focus/, /--json/, /Filter ownership/],
+      excludes: [/--focus/, /--json/, /Filter ownership/],
     },
     {
       name: "suggest-metadata",
@@ -1587,6 +1595,8 @@ test("representative command help shows relevant boundaries and options", async 
         /Explicitly provide an owner candidate/,
         /Renma must not infer an owner when this option is absent/,
         /Preserve existing Markdown body and semantics/,
+        /platform's standard Skill guidance/,
+        /renma scan \. --fail-on high/,
         /Inferring an owner without evidence/,
       ],
       excludes: [/--focus/, /--omit-generated-at/],
@@ -1692,6 +1702,14 @@ test("scaffold skill writes deterministic file output", async () => {
   );
 
   assert.equal(result.code, 0);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /^Created .+SKILL\.md\n\nNext steps:/);
+  assert.match(result.stdout, /platform's standard Skill authoring guidance/);
+  assert.match(result.stdout, /renma scan \. --fail-on high/);
+  assert.match(
+    result.stdout,
+    /5\. Have a human review meaningful semantic changes before merging\.\n$/,
+  );
   const content = await readFile(target, "utf8");
   assert.match(content, /^name: spec-review$/m);
   assert.match(content, /^description: .*Use when /m);
@@ -1759,6 +1777,8 @@ test("scaffold context_lens writes deterministic file output", async () => {
   );
 
   assert.equal(result.code, 0);
+  assert.doesNotMatch(result.stdout, /standard Skill authoring guidance/);
+  assert.doesNotMatch(result.stdout, /Next steps:/);
   const content = await readFile(target, "utf8");
   assert.match(content, /^id: lens\.testing\.spec-review\.boundary-values$/m);
   assert.match(content, /^type: context_lens$/m);
@@ -1798,6 +1818,21 @@ test("scaffold context_lens writes deterministic file output", async () => {
         diagnostic.code === CONTEXT_LENS_DIAGNOSTIC_CODES.TARGET_NOT_FOUND,
     ),
   );
+});
+
+test("scaffold context file output omits Skill-specific next steps", async () => {
+  const root = await fixture();
+  const target = path.join(root, "contexts", "testing", "boundary.md");
+
+  const result = await withCapturedConsole(() =>
+    main(["scaffold", "context", target, "--owner", "qa-platform"]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.equal(result.stderr, "");
+  assert.equal(result.stdout, `Created ${target}\n`);
+  assert.doesNotMatch(result.stdout, /Next steps:/);
+  assert.doesNotMatch(result.stdout, /standard Skill authoring guidance/);
 });
 
 test("scaffold refuses to overwrite an existing file", async () => {
@@ -1857,6 +1892,17 @@ test("scaffold context can emit json", async () => {
   assert.equal(bundle.id, "context.testing.boundary-value-analysis");
   assert.equal(bundle.title, "Boundary Value Analysis");
   assert.equal(bundle.owner, "qa-platform");
+  assert.deepEqual(Object.keys(bundle), [
+    "kind",
+    "path",
+    "id",
+    "title",
+    "owner",
+    "tags",
+    "format",
+    "content",
+    "prompt",
+  ]);
   assert.match(
     bundle.content,
     /^id: context\.testing\.boundary-value-analysis$/m,
@@ -1901,7 +1947,44 @@ test("scaffold context_lens can emit json", async () => {
   assert.match(bundle.prompt, /runtime selectors/);
 });
 
-test("scaffold prompt emits Codex-ready authoring instructions", async () => {
+test("scaffold skill JSON keeps its field shape and includes the human-review boundary", async () => {
+  const target = "skills/testing/json-review/SKILL.md";
+  const result = await withCapturedConsole(() =>
+    main([
+      "scaffold",
+      "skill",
+      target,
+      "--owner",
+      "qa-platform",
+      "--format",
+      "json",
+    ]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.equal(result.stderr, "");
+  const bundle = JSON.parse(result.stdout) as Record<string, unknown> & {
+    prompt: string;
+  };
+  assert.deepEqual(Object.keys(bundle), [
+    "kind",
+    "path",
+    "id",
+    "title",
+    "owner",
+    "tags",
+    "format",
+    "content",
+    "prompt",
+  ]);
+  assert.match(
+    bundle.prompt,
+    /Have a human review meaningful semantic changes before merging/,
+  );
+  await assert.rejects(readFile(target, "utf8"));
+});
+
+test("scaffold prompt emits platform-neutral authoring instructions", async () => {
   const root = await fixture();
   const target = path.join(
     root,
@@ -1938,6 +2021,21 @@ test("scaffold prompt emits Codex-ready authoring instructions", async () => {
   );
   assert.doesNotMatch(result.stdout, /does\.not\.exist/);
   assert.match(result.stdout, /Do not invent owners/);
+  assert.match(result.stdout, /platform's standard Skill authoring guidance/);
+  assert.match(result.stdout, /starting point/);
+  assert.match(
+    result.stdout,
+    /description, instructions, workflow, constraints, and completion criteria/,
+  );
+  assert.match(result.stdout, /renma scan \. --fail-on high/);
+  assert.match(
+    result.stdout,
+    /Do not weaken security policy or add suppressions/,
+  );
+  assert.match(
+    result.stdout,
+    /Have a human review meaningful semantic changes before merging/,
+  );
   await assert.rejects(readFile(target, "utf8"));
 });
 

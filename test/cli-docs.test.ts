@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { COMMAND_HELP } from "../src/cli-help.js";
@@ -140,6 +140,24 @@ test("README uses current inspect syntax", async () => {
   );
 });
 
+test("README preserves the Context Repository philosophy", async () => {
+  const readme = await readRepoFile("README.md");
+  const philosophyIndex = readme.indexOf("## Why A Context Repository?");
+  const agentSkillsIndex = readme.indexOf("## Agent Skills And Renma");
+
+  assert.ok(philosophyIndex >= 0);
+  assert.ok(
+    philosophyIndex < agentSkillsIndex,
+    "Context Repository philosophy should precede Agent Skills guidance.",
+  );
+  assert.match(
+    readme,
+    /A Context Repository is a Git-reviewed source of truth/,
+  );
+  assert.match(readme, /reusable knowledge/);
+  assert.match(readme, /https:\/\/kazucocoa\.blog\/context-repository\//);
+});
+
 test("Skill path guidance distinguishes canonical and historical entrypoints", async () => {
   const readme = await readRepoFile("README.md");
   const manual = await readRepoFile("docs/user-manual.md");
@@ -161,3 +179,147 @@ test("Skill path guidance distinguishes canonical and historical entrypoints", a
     );
   }
 });
+
+test("Skill authoring docs preserve the platform and Renma responsibility boundary", async () => {
+  const readme = await readRepoFile("README.md");
+  const manual = await readRepoFile("docs/user-manual.md");
+  const authoring = await readRepoFile("docs/authoring-guide.md");
+  const compatibility = await readRepoFile(
+    "docs/agent-skills-compatibility.md",
+  );
+  const cliSource = await readRepoFile("src/cli-help.ts");
+
+  for (const document of [readme, manual, authoring, compatibility]) {
+    assert.match(document, /platform(?:'s|-native).*Skill authoring guidance/i);
+    assert.match(document, /renma scan \. --fail-on high/);
+  }
+
+  for (const document of [readme, manual, authoring]) {
+    const scanIndex = document.indexOf("renma scan . --fail-on high");
+    const conditionalSuggestionIndex = document.search(
+      /suggest-metadata`? only|use suggest-metadata only/i,
+    );
+    assert.ok(scanIndex >= 0);
+    assert.ok(
+      conditionalSuggestionIndex > scanIndex,
+      "Existing-Skill guidance should start with scan and make suggest-metadata conditional.",
+    );
+  }
+
+  assert.match(authoring, /Do not run two independent generators/);
+  assert.match(authoring, /Optional Codex Example/);
+  assert.match(authoring, /skill-creator/);
+  assert.doesNotMatch(cliSource, /skill-creator/);
+  assert.doesNotMatch(await readRepoFile("src/commands/scaffold.ts"), /Codex/);
+  assert.doesNotMatch(
+    await readRepoFile("src/commands/suggest-metadata.ts"),
+    /Codex/,
+  );
+  assert.doesNotMatch(
+    await readRepoFile("src/commands/suggest-semantic-split.ts"),
+    /Codex/,
+  );
+  assert.match(
+    authoring,
+    /Do not apply a candidate while Renma cannot generate it safely/,
+  );
+  assert.match(
+    authoring,
+    /explicit owner retrofit and one-way migration of recognized pre-0\.16\s+governance and security metadata/,
+  );
+  assert.match(authoring, /infer missing security policy/);
+  assert.doesNotMatch(authoring, /owner or security metadata completion/);
+
+  const docsIndex = await readRepoFile("docs/README.md");
+  const advanced = await readRepoFile("docs/advanced-skill-authoring.md");
+  assert.match(authoring, /Advanced Skill Authoring/);
+  assert.match(docsIndex, /Advanced Skill Authoring/);
+  assert.match(advanced, /current 0\.17\.0 authoring guidance/);
+  assert.match(advanced, /Proposed 0\.18\.0 Skill-to-Skill discovery/);
+  assert.doesNotMatch(advanced, /`routes_to`|`skill-index`/);
+  assert.match(readme, /proposed 0\.18\.0 Skill Discovery/i);
+});
+
+test("relative Markdown links in current documentation resolve", async () => {
+  const documents = [
+    "README.md",
+    "architecture.md",
+    "design.md",
+    "plan.md",
+    "plan-discovery.md",
+    ...(await markdownFilesUnder("docs")),
+    ...(await markdownFilesUnder("examples")),
+  ];
+
+  for (const documentPath of documents) {
+    const markdown = await readRepoFile(documentPath);
+    for (const match of markdown.matchAll(/!?\[[^\]]*\]\(([^)]+)\)/g)) {
+      const rawTarget = (match[1] ?? "").trim();
+      if (
+        rawTarget === "" ||
+        rawTarget.startsWith("#") ||
+        /^[a-z][a-z0-9+.-]*:/i.test(rawTarget)
+      ) {
+        continue;
+      }
+
+      const withoutTitle = rawTarget.startsWith("<")
+        ? rawTarget.slice(1, rawTarget.indexOf(">"))
+        : (rawTarget.split(/\s+["']/)[0] ?? rawTarget);
+      const relativeTarget = decodeURIComponent(
+        withoutTitle.split("#", 1)[0] ?? "",
+      );
+      if (relativeTarget === "") continue;
+
+      const resolved = path.resolve(path.dirname(documentPath), relativeTarget);
+      await assert.doesNotReject(
+        access(resolved),
+        `${documentPath} contains an unresolved relative link: ${rawTarget}`,
+      );
+    }
+  }
+});
+
+test("Mermaid documentation blocks have supported GitHub entry directives", async () => {
+  const documents = [
+    "README.md",
+    "architecture.md",
+    "design.md",
+    "plan.md",
+    "plan-discovery.md",
+    ...(await markdownFilesUnder("docs")),
+    ...(await markdownFilesUnder("examples")),
+  ];
+  const supportedDirective =
+    /^(?:flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|gantt|pie|mindmap|timeline|gitGraph)\b/;
+
+  for (const documentPath of documents) {
+    const markdown = await readRepoFile(documentPath);
+    const blocks = [...markdown.matchAll(/```mermaid\s*\n([\s\S]*?)```/g)];
+    const openingCount = [...markdown.matchAll(/```mermaid\b/g)].length;
+    assert.equal(
+      blocks.length,
+      openingCount,
+      `${documentPath} contains an unclosed Mermaid block.`,
+    );
+    for (const block of blocks) {
+      assert.match(
+        (block[1] ?? "").trimStart(),
+        supportedDirective,
+        `${documentPath} contains an unsupported Mermaid entry directive.`,
+      );
+    }
+  }
+});
+
+async function markdownFilesUnder(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const nested = await Promise.all(
+    entries.map(async (entry) => {
+      const entryPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) return markdownFilesUnder(entryPath);
+      return entry.isFile() && entry.name.endsWith(".md") ? [entryPath] : [];
+    }),
+  );
+  return nested.flat().sort();
+}

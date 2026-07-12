@@ -42,7 +42,7 @@ test("split-reference writes ordered parts and verifies reconstruction", async (
   assert.match(stdout, /Verified reconstruction byte-for-byte/);
 });
 
-test("suggest-semantic-split builds a Codex prompt that asks for inferred categories", async () => {
+test("suggest-semantic-split builds a platform-neutral prompt that asks for inferred categories", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-semantic-split-"));
   const skillDir = path.join(root, "skills", "setup");
   const referencesDir = path.join(skillDir, "references");
@@ -80,7 +80,7 @@ test("suggest-semantic-split builds a Codex prompt that asks for inferred catego
     source,
   ]);
 
-  assert.match(prompt, /# Codex Task: Suggest Semantic Reference Split/);
+  assert.match(prompt, /# Renma Task: Suggest Semantic Reference Split/);
   assert.match(prompt, /Infer the best split direction as a human maintainer/);
   assert.match(prompt, /Name files by meaning, not by part number/);
   assert.match(prompt, /Return JSON only/);

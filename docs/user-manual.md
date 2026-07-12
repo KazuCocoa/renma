@@ -8,6 +8,13 @@ Renma is deterministic repository governance for context assets, skills, and age
 
 Renma does not call an LLM, choose runtime context, assemble prompts, inject context, execute agents, or collect telemetry.
 
+Use your platform's standard Skill authoring guidance for general Skill design,
+then use Renma for repository-specific governance and validation. Platform
+guidance owns the trigger description, instructions, workflow, constraints,
+examples, and completion criteria. Renma owns deterministic repository evidence
+for compatibility, metadata, relationships, ownership, lifecycle, security
+policy, diagnostics, and readiness.
+
 ## Install And Build
 
 From a checkout:
@@ -103,62 +110,86 @@ Read these reports together:
 - `graph` shows how skills and contexts are connected.
 - `readiness` summarizes repository-level health and checks.
 
-When you are creating new assets, start with `scaffold`, edit the generated files, then run the same checks. For deeper authoring guidance, see the [Authoring Guide](authoring-guide.md). For rule details, see the [Diagnostics Reference](diagnostics.md).
+When creating a Skill, design it with platform-native authoring guidance, run
+`scaffold skill` once, complete the generated file, and validate with
+`renma scan . --fail-on high`. For deeper authoring guidance, see the
+[Authoring Guide](authoring-guide.md). For rule details, see the
+[Diagnostics Reference](diagnostics.md).
 
 ## LLM-Assisted Skill Maintenance
 
-Renma is useful when a junior engineer asks a coding agent to improve an existing skill or context repository. The agent should use Renma as deterministic evidence, not as permission to invent domain knowledge.
+Renma output can support a human or coding agent, but the authoring and
+governance responsibilities remain separate. Review the Skill with the
+platform's standard authoring guidance, then use Renma as deterministic
+repository evidence. Do not treat a clean scan as permission to invent domain
+knowledge or as proof that the workflow is semantically correct.
 
 Recommended loop:
 
-1. Ask the coding agent to run `renma --help`.
-2. Let it select and run the appropriate deterministic inspection commands.
+1. Review triggers, instructions, workflow, constraints, and completion criteria
+   using platform-native authoring guidance.
+2. Run `renma --help` and the relevant deterministic inspection commands.
 3. Review diagnostics and repository evidence.
-4. Prepare a minimal patch.
-5. Do not invent domain knowledge, ownership, references, product rules, or source-of-truth claims.
-6. Rerun Renma.
-7. Summarize changed files, resolved findings, remaining uncertainty, and commands used for verification.
-8. Require human review before merging meaningful semantic changes.
+4. Prepare a minimal patch without inventing domain knowledge, ownership,
+   references, product rules, or source-of-truth claims.
+5. Run `renma scan . --fail-on high`, fix relevant diagnostics, and rerun it.
+6. Summarize changed files, resolved findings, remaining uncertainty, and
+   verification commands.
+7. Require human review before merging meaningful semantic changes.
 
 Example instruction for an agent:
 
 ```text
-Use Renma to inspect and improve the skills and context assets in this repository.
+Review the Skill with this platform's standard Skill authoring guidance, then use Renma to inspect its repository governance.
 
-Start by running `renma --help` and use command-specific help to choose the appropriate workflow. Make only evidence-backed changes. Do not invent owners, references, product rules, or source-of-truth claims. Preserve existing semantics unless a diagnostic or explicit requirement supports a change. Rerun the relevant Renma commands after editing and summarize both resolved and remaining findings.
+Start by running `renma --help` and use command-specific help to choose the appropriate workflow. Make only evidence-backed changes. Do not invent owners, references, product rules, or source-of-truth claims. Preserve existing semantics unless a diagnostic or explicit requirement supports a change. Run `renma scan . --fail-on high` after editing, fix relevant diagnostics, rerun it, and summarize both resolved and remaining findings.
 ```
 
 ## User Story: Create A New Skill With Scaffold
 
-Use this flow when you are adding a new agent-facing skill and want Renma to create the starter shape.
+Use this flow when adding a new agent-facing Skill. Platform-native guidance
+defines the Skill; Renma creates one repository-compatible starting point and
+validates the result.
 
 ```mermaid
 flowchart LR
-  Identify["Identify the workflow"] --> Scaffold["Scaffold the Skill"]
-  Scaffold --> Context["Add guidance and reusable Context"]
-  Context --> Validate["Run deterministic Renma validation"]
-  Validate --> Review["Human review and refinement"]
+  Design["Platform-native authoring guidance"] --> Scaffold["Run renma scaffold skill once"]
+  Scaffold --> Complete["Review and complete the Skill"]
+  Complete --> Validate["Run renma scan . --fail-on high"]
+  Validate --> Fix["Fix relevant diagnostics and rerun"]
+  Fix --> Review["Human review"]
 ```
 
 Renma creates and validates repository assets; the consuming agent follows the
 finished Skill later according to its own runtime behavior.
 
-1. Decide the skill path.
+1. Use platform-native authoring guidance to design the Skill's purpose,
+   trigger, workflow, constraints, and completion criteria.
+
+2. Run the Renma generator once for the target path.
 
 ```bash
 renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
 ```
 
-2. Open and edit the generated skill.
+3. Open and review the generated Skill.
 
-`scaffold` creates a starter file, not a complete production-ready skill. Fill in the purpose, when to use it, when not to use it, required inputs, completion criteria, verification steps, and required or optional context references.
+`scaffold` creates a starter file, not a complete production-ready Skill. Use
+platform-native guidance to complete the description, instructions, workflow,
+constraints, completion criteria, and intended metadata.
 
 The Skill scaffold writes canonical Agent Skills identity and
 `metadata.renma.*` fields directly. Replace its placeholder prose and fill in
 any required security policy before depending on it. Context and context-lens
-scaffolds keep their existing top-level metadata shape.
+scaffolds keep their existing top-level metadata shape. Preserve intended
+repository behavior and do not invent owners, policies, dependencies, domain
+rules, or source-of-truth claims.
 
-3. Add shared context assets when the skill depends on reusable knowledge.
+Do not run a second independent generator against the same target. If a
+platform-native tool can generate Skills, ask it to refine the existing Renma
+scaffold or to use `renma scaffold skill` as its starting point.
+
+4. Add shared Context Assets when the Skill depends on reusable knowledge.
 
 ```bash
 renma scaffold context contexts/testing/boundary-value-analysis.md --owner qa-platform
@@ -166,27 +197,30 @@ renma scaffold context contexts/testing/boundary-value-analysis.md --owner qa-pl
 
 Reusable domain, testing, product, platform, and tool knowledge should usually live under `contexts/**` instead of being buried inside one skill. A context asset can have its own owner, lifecycle state, review history, tags, and dependencies.
 
-4. Connect the skill to context assets.
+5. Connect the Skill to Context Assets.
 
 In a canonical Skill, add `renma.requires-context` or
 `renma.optional-context` under `metadata` as JSON-array strings. These fields
 create static repository graph relationships. They do
 not make Renma choose runtime context for an agent.
 
-5. Run Renma checks.
+6. Run repository validation.
 
 ```bash
-renma scan .
+renma scan . --fail-on high
 renma catalog . --format markdown
 renma graph . --format markdown
 renma readiness . --format markdown
 ```
 
-6. Review and fix diagnostics.
+7. Fix relevant diagnostics and rerun the scan.
 
-Use `scan` for concrete problems, `catalog` for discovered assets and metadata, `graph` for skill-to-context relationships, and `readiness` for the repository-level health score and checks. Renma emits diagnostics and guidance; it does not fix skills automatically. Humans or coding agents can use the output to prepare reviewable patches.
+Use `scan` for concrete problems, `catalog` for discovered assets and metadata,
+`graph` for Skill-to-Context relationships, and `readiness` for repository-level
+health. Do not weaken security policy or add suppressions merely to pass. After
+fixes, rerun `renma scan . --fail-on high` and complete human review.
 
-7. Optionally generate a BOM for review or CI artifacts.
+8. Optionally generate a BOM for review or CI artifacts.
 
 ```bash
 renma bom . --format markdown
@@ -197,31 +231,40 @@ The BOM is a declared repository manifest. It combines catalog, graph, diagnosti
 
 ## User Story: Improve Existing Skills With Diagnostics
 
-Use this flow when a repository already has skills or context assets and you want Renma to help make them easier to trust and review.
+Use this flow when improving an existing Skill. Review the whole Skill with
+platform-native guidance before treating metadata suggestions as complete.
 
 ```mermaid
 flowchart TD
-  Run["Run Renma"] --> Inspect["Inspect deterministic diagnostics"]
-  Inspect --> Propose["Human or coding agent proposes a patch"]
-  Propose --> Review["Human reviews the patch"]
-  Review --> Rerun["Rerun Renma"]
-  Rerun --> Decide{"Accept or refine?"}
-  Decide -->|refine| Inspect
-  Decide -->|accept| Complete["Merge through the repository's normal review process"]
+  Authoring["Platform-native authoring review"] --> Scan["Run renma scan . --fail-on high"]
+  Scan --> Evidence["Inspect relevant diagnostics and repository evidence"]
+  Evidence --> NeedMetadata{"Metadata or migration work needed?"}
+  NeedMetadata -- Yes --> Suggest["Run renma suggest-metadata and review the candidate"]
+  NeedMetadata -- No --> Prepare["Prepare and review intended changes, if any"]
+  Suggest --> Prepare
+  Prepare --> Validate["Rerun renma scan . --fail-on high"]
+  Validate --> Fix["Fix relevant diagnostics and rerun"]
+  Fix --> Review["Human review"]
 ```
 
 LLM assistance is optional. Renma does not rewrite files or accept a proposed
 change automatically.
 
-1. Run `scan` on the existing repository.
+1. Review the trigger description, instructions, workflow, constraints, and
+   completion criteria using the platform's standard Skill guidance.
+
+2. Run `scan` on the existing repository.
 
 ```bash
-renma scan .
+renma scan . --fail-on high
 ```
 
 `scan` reports concrete findings such as broken references, risky instructions, missing or invalid metadata, unclear workflow structure, and layout issues.
 
-2. Inspect the current asset inventory.
+3. Inspect relevant repository evidence. Use only the views that answer the
+   current question; they are not mandatory ceremony.
+
+Inspect the current asset inventory when needed:
 
 ```bash
 renma catalog . --format markdown
@@ -229,7 +272,7 @@ renma catalog . --format markdown
 
 `catalog` helps you see existing skills, contexts, references, profiles, examples, IDs, owners, lifecycle states, hashes, tags, and declared dependencies.
 
-3. Check graph relationships.
+Check graph relationships when needed:
 
 ```bash
 renma graph . --format markdown
@@ -238,7 +281,7 @@ renma graph . --focus skill.testing.spec-review --format markdown
 
 `graph` helps find missing context, broken references, unexpected isolation, and unclear dependencies. Focused graph output keeps one asset and its direct neighborhood so you can inspect one skill or context without reading the whole graph.
 
-4. Check readiness.
+Check readiness when needed:
 
 ```bash
 renma readiness . --format markdown
@@ -246,7 +289,7 @@ renma readiness . --format markdown
 
 `readiness` gives a repository-level health score and checks. It is a static repository review signal, not a runtime decision about which context an agent should use.
 
-5. Use `inspect` for one file.
+Use `inspect` for one file:
 
 ```bash
 renma inspect skills/testing/spec-review/SKILL.md
@@ -255,20 +298,29 @@ renma inspect skills/testing/spec-review/SKILL.md --lines L10-L42
 
 Use this when you want a compact outline or exact line slice before editing a specific asset.
 
-6. Use `suggest-metadata` when an existing asset lacks compact metadata.
+4. Use `suggest-metadata` only when metadata or migration work is needed.
 
 ```bash
 renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform --format prompt
 ```
 
-`suggest-metadata` does not rewrite files. It emits guidance that a human or coding agent can use to prepare a reviewed metadata patch while preserving the existing Markdown body.
+`suggest-metadata` does not rewrite files. It emits a deterministic prompt or
+JSON payload that a human or coding agent can use to prepare a reviewed metadata
+or one-way migration patch while preserving the existing Markdown body. Review
+the candidate and apply only intended changes.
 
 For a `SKILL.md` target, the command proposes only the one-way transition from
 pre-0.16 Renma Skill fields to Agent Skills identity plus flat
 `metadata.renma.*` string values. Unsafe or ambiguous input blocks canonical
-frontmatter output. See [Agent Skills Compatibility and Migration](agent-skills-compatibility.md).
+frontmatter output. When blocked, review the conflicts or invalid evidence,
+confirm intent using platform-native guidance, do not apply a candidate, correct
+the source evidence, and rerun `suggest-metadata`. See
+[Agent Skills Compatibility and Migration](agent-skills-compatibility.md).
 
-7. Use `suggest-semantic-split` when a file has grown too large or mixes multiple purposes.
+An already canonical Skill with no metadata or migration need should not pass
+through `suggest-metadata` merely as ceremony.
+
+5. Use `suggest-semantic-split` when a file has grown too large or mixes multiple purposes.
 
 ```bash
 renma suggest-semantic-split docs/large-runbook.md
@@ -276,16 +328,18 @@ renma suggest-semantic-split docs/large-runbook.md
 
 `suggest-semantic-split` does not rewrite files either. It packages source context and guidance so a human or coding agent can draft a reviewable split.
 
-8. Rerun the checks after edits.
+6. Prepare and review intended changes, then validate, fix relevant
+   diagnostics, and rerun.
 
 ```bash
-renma scan .
+renma scan . --fail-on high
 renma catalog . --format markdown
 renma graph . --format markdown
 renma readiness . --format markdown
 ```
 
-The loop is: Renma reports deterministic evidence, a human or coding agent prepares a patch, a human reviews it, and Renma verifies the result again.
+The loop ends with human review. A metadata suggestion or clean scan does not
+replace semantic review of the Skill.
 
 For a repository-aware specification-review example using a Skill, a Context
 Lens, and direct Context Asset relationships, see
@@ -352,9 +406,14 @@ Other default scan glob families are:
 - New to Renma? Start with [Authoring Guide](authoring-guide.md).
 - Writing security-sensitive skills or context assets? Read [Security Policy Guide](security-policy.md).
 - Fixing scan findings? See [Diagnostics Reference](diagnostics.md).
-- Trying a repository-aware example? See the statically navigable
-  specification-review fixture in
-  [`examples/context-repo`](../examples/context-repo).
+- Trying a minimal clarify-before-act Skill interaction? Use
+  [`examples/interactive-placeholder`](../examples/interactive-placeholder).
+- Trying richer repository-aware Skill, Context Lens, and Context Asset
+  governance? See [`examples/context-repo`](../examples/context-repo).
+- Focusing specifically on Context Lens governance? See
+  [`examples/context-lens`](../examples/context-lens).
+- Adding Renma evidence to CI? See the
+  [GitHub Actions example](../examples/github-actions/renma-ci-report.yml).
 
 ## Commands
 
@@ -615,6 +674,16 @@ renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform --f
 
 `scaffold --format file` writes a starter file, `--format prompt` emits an authoring prompt, and `--format json` emits structured scaffold data. The generated content is intentionally minimal; fill in metadata, dependencies, and verification steps before depending on it in automation.
 
+For a Skill, use platform-native authoring guidance before and after scaffolding.
+File mode prints concise Skill-only next steps after the `Created` line. Prompt
+mode includes the same responsibility boundary and validation loop. Context and
+Context Lens output does not receive Skill-specific guidance. JSON retains the
+existing bundle shape.
+
+After completing a Skill, run `renma scan . --fail-on high`, fix relevant
+diagnostics, rerun the scan, and complete human review. Do not use a second
+independent generator against the same target file.
+
 ### `suggest-metadata`
 
 Suggests a safe metadata retrofit workflow for an existing asset.
@@ -628,7 +697,13 @@ renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform -
 
 Use this after `scan` detects metadata issues or `ownership` shows unowned assets. The command does not rewrite files. It emits a deterministic prompt or JSON payload that a human or coding agent can use to prepare a reviewed patch.
 
-The prompt asks the agent to inspect the existing asset, preserve the Markdown body, preserve existing frontmatter values, add only compact missing metadata that is clearly supported, and rerun `renma scan .` and `renma ownership .` after editing.
+For Skill targets, the prompt also makes clear that metadata suggestion is not
+the full authoring process. Review the trigger description, instructions,
+workflow, constraints, and completion criteria with platform-native guidance;
+apply only intended metadata or migration changes; run
+`renma scan . --fail-on high`; fix relevant diagnostics; and rerun the scan.
+Context Asset output does not receive this Skill-specific authoring guidance.
+JSON retains the existing structured suggestion shape.
 
 For Skill targets using the pre-0.16 Renma Skill format, the 0.16.0 metadata
 migration path is one-way: recognized governance and security frontmatter
@@ -644,6 +719,11 @@ exact strings `"true"` or `"false"`, and lists become JSON-array strings of
 strings. Unsafe or ambiguous values block canonical frontmatter generation.
 For an already canonical Skill, `suggest-metadata` proposes neither migration
 nor an unnecessary rewrite unless an explicit supported retrofit is requested.
+
+When migration is blocked, do not apply a candidate. Review the conflict or
+invalid evidence, confirm the Skill's intent with platform-native authoring
+guidance, correct the source evidence, rerun `suggest-metadata`, then validate
+intended corrections with `renma scan . --fail-on high`.
 
 Owner metadata remains recommended but not required. Without `--owner`, `suggest-metadata` blocks owner as a suggested addition and says not to add one unless the asset already declares an owner or a maintainer provides one. With `--owner <owner>`, the command may include that owner because it was explicitly provided. If an existing asset already declares an owner, `suggest-metadata` preserves it; a different `--owner` value is treated as a human-review ownership change, not an automatic metadata suggestion. Renma does not infer owners from Git history, file paths, prose, or authors.
 

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
 
-import { catalog } from "../src/commands/catalog.js";
+import { catalog, formatCatalogMarkdown } from "../src/commands/catalog.js";
 import { graph } from "../src/commands/graph.js";
 import { readiness } from "../src/commands/readiness.js";
 import { scan } from "../src/scanner.js";
@@ -20,12 +20,29 @@ test("example context repository scans and builds catalog/graph reports", async 
 
   const catalogResult = await catalog(EXAMPLE_ROOT);
   const assetIds = catalogResult.catalog.assets.map((asset) => asset.id);
+  const catalogMarkdown = formatCatalogMarkdown(catalogResult);
 
   assert.ok(assetIds.includes("skill.testing.spec-review"));
   assert.ok(assetIds.includes("context.testing.boundary-value-analysis"));
   assert.ok(assetIds.includes("context.testing.negative-testing"));
   assert.ok(assetIds.includes("context.domain.payment.idempotency"));
   assert.ok(assetIds.includes("lens.testing.spec-review.boundary-values"));
+  assert.ok(
+    catalogResult.catalog.dependencies.some(
+      (dependency) =>
+        dependency.from === "skill.testing.spec-review" &&
+        dependency.to === "contexts/testing/negative-testing.md",
+    ),
+    "Catalog JSON evidence should preserve the declared path target.",
+  );
+  assert.match(
+    catalogMarkdown,
+    /### context\.testing\.negative-testing[\s\S]*- Dependents: requires:skill\.testing\.spec-review/,
+  );
+  assert.match(
+    catalogMarkdown,
+    /### lens\.testing\.spec-review\.boundary-values[\s\S]*- Dependents: requires:skill\.testing\.spec-review/,
+  );
 
   const graphResult = await graph(EXAMPLE_ROOT);
   const graphNodeIds = graphResult.nodes.map((node) => node.id);
@@ -40,9 +57,27 @@ test("example context repository scans and builds catalog/graph reports", async 
     ),
   );
   assert.ok(
+    graphResult.edges.some(
+      (edge) =>
+        edge.from === "skill.testing.spec-review" &&
+        edge.to === "contexts/testing/negative-testing.md" &&
+        edge.targetId === "context.testing.negative-testing",
+    ),
+    "Graph should resolve the same path target shown in Catalog.",
+  );
+  assert.ok(
     graphEdges.includes(
       "skill.testing.spec-review->lens.testing.spec-review.boundary-values",
     ),
+  );
+  assert.ok(
+    graphResult.edges.some(
+      (edge) =>
+        edge.from === "skill.testing.spec-review" &&
+        edge.to === "lens.testing.spec-review.boundary-values" &&
+        edge.targetId === "lens.testing.spec-review.boundary-values",
+    ),
+    "ID-based dependencies should continue to resolve.",
   );
   assert.ok(
     graphEdges.includes(

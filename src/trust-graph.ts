@@ -1,4 +1,8 @@
 import { createHash } from "node:crypto";
+import {
+  normalizeDependencyReference,
+  resolveDependencyTarget,
+} from "./dependency-resolution.js";
 import type { Asset, Catalog, Dependency } from "./model.js";
 import type {
   EffectiveSecurityPolicyEvidence,
@@ -129,7 +133,10 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
   const assets = stableAssets(input.catalog.assets);
   const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
   const assetsByPath = new Map(
-    assets.map((asset) => [normalizeReference(asset.sourcePath), asset]),
+    assets.map((asset) => [
+      normalizeDependencyReference(asset.sourcePath),
+      asset,
+    ]),
   );
 
   for (const asset of assets) {
@@ -174,7 +181,7 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
   }
 
   for (const policy of input.securityPolicies ?? []) {
-    const asset = assetsByPath.get(normalizeReference(policy.path));
+    const asset = assetsByPath.get(normalizeDependencyReference(policy.path));
     if (!asset) continue;
     addPolicyEvidence(nodes, edges, asset, policy);
   }
@@ -187,7 +194,7 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
     const diagnostic = diagnosticNode(finding);
     addNode(nodes, diagnostic);
     const asset = finding.path
-      ? assetsByPath.get(normalizeReference(finding.path))
+      ? assetsByPath.get(normalizeDependencyReference(finding.path))
       : undefined;
     if (asset) {
       addEdge(edges, {
@@ -542,22 +549,6 @@ function zeroCounts<const T extends string>(
     T,
     number
   >;
-}
-
-function resolveDependencyTarget(
-  dependency: Dependency,
-  assets: Asset[],
-): Asset | undefined {
-  const target = normalizeReference(dependency.to);
-  return assets.find(
-    (asset) =>
-      asset.id === dependency.to ||
-      normalizeReference(asset.sourcePath) === target,
-  );
-}
-
-function normalizeReference(reference: string): string {
-  return reference.replace(/\\/g, "/").replace(/^\.\//, "");
 }
 
 function stableAssets(assets: Asset[]): Asset[] {

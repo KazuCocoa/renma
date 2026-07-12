@@ -1,6 +1,10 @@
 import path from "node:path";
 
 import type { ConfigOverrides } from "../config.js";
+import {
+  normalizeDependencyReference,
+  resolveDependencyTarget,
+} from "../dependency-resolution.js";
 import type {
   Asset,
   AssetKind,
@@ -532,7 +536,7 @@ function edgeTargetsKind(
     (edge.targetId ? nodesById.get(edge.targetId)?.kind : undefined);
   if (targetKind === kind) return true;
 
-  const target = normalizeReference(edge.to);
+  const target = normalizeDependencyReference(edge.to);
   if (kind === "context_lens") {
     return target.startsWith("lens.") || target.startsWith("lenses/");
   }
@@ -543,7 +547,7 @@ function edgeTargetsKind(
 }
 
 function groupPath(sourcePath: string, view: GraphView): string | undefined {
-  const path = normalizeReference(sourcePath);
+  const path = normalizeDependencyReference(sourcePath);
   const parts = path.split("/");
   const supportIndex = parts.findIndex((part) =>
     ["references", "profiles", "examples", "scripts"].includes(part),
@@ -561,7 +565,7 @@ function groupPath(sourcePath: string, view: GraphView): string | undefined {
 }
 
 function keepWorkflowNode(sourcePath: string): boolean {
-  const path = normalizeReference(sourcePath);
+  const path = normalizeDependencyReference(sourcePath);
   if (/^skills\/[^/]+\/SKILL\.md$/.test(path)) return true;
   if (!path.startsWith("contexts/")) return false;
   const name = path.split("/").at(-1) ?? "";
@@ -633,22 +637,6 @@ function toEdge(dependency: Dependency, assets: Asset[]): GraphEdge {
         }
       : {}),
   };
-}
-
-function resolveDependencyTarget(
-  dependency: Dependency,
-  assets: Asset[],
-): Asset | undefined {
-  const target = normalizeReference(dependency.to);
-  return assets.find(
-    (asset) =>
-      asset.id === dependency.to ||
-      normalizeReference(asset.sourcePath) === target,
-  );
-}
-
-function normalizeReference(reference: string): string {
-  return reference.replace(/\\/g, "/").replace(/^\.\//, "");
 }
 
 function edgeTarget(edge: GraphEdge): string {

@@ -61,7 +61,7 @@ export async function runSuggestSemanticSplitCommand(
   process.stdout.write(
     format === "json"
       ? `${JSON.stringify(semanticSplitReviewBundle, null, 2)}\n`
-      : renderCodexPrompt(semanticSplitReviewBundle),
+      : renderReviewPrompt(semanticSplitReviewBundle),
   );
   return 0;
 }
@@ -116,7 +116,7 @@ async function buildSemanticSplitReviewBundle(
   };
 }
 
-function renderCodexPrompt(
+function renderReviewPrompt(
   semanticSplitReviewBundle: SemanticSplitReviewBundle,
 ): string {
   const { source } = semanticSplitReviewBundle;
@@ -134,7 +134,7 @@ function renderCodexPrompt(
       : "(none found)";
 
   return `${[
-    "# Codex Task: Suggest Semantic Reference Split",
+    "# Renma Task: Suggest Semantic Reference Split",
     "",
     "You are improving an AI-agent skill repository.",
     "",

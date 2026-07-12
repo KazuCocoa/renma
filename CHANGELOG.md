@@ -6,6 +6,27 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-07-11
+
+### Added
+
+- Added platform-neutral, Skill-specific next steps to scaffold file and prompt output, including the authoring-review, scan, fix, rerun, and human-review loop.
+- Added Skill-specific `suggest-metadata` prompt guidance that separates whole-Skill authoring review from metadata or one-way migration suggestions and keeps blocked migrations conservative.
+- Added a documentation index with reading paths for workflows, format contracts, governance references, product design, architecture, and roadmap material.
+
+### Changed
+
+- Clarified that platform-native guidance owns general Skill design while Renma complements it with repository-specific governance and validation.
+- Consolidated the README around product identity, boundaries, primary workflows, quick start, command orientation, a canonical example, and documentation navigation.
+- Made the authoring guide the canonical new-Skill and existing-Skill workflow, including safe generator boundaries and an optional Codex `skill-creator` example.
+- Reworked the user manual and compatibility guide around actual CLI behavior, review responsibilities, scan/fix/rerun validation, and blocked migration recovery.
+- Rewrote the roadmap around the shipped 0.16.0 baseline, the 0.17.0 usability release, and proposed 0.18.0 graph-based Skill discovery; removed stale release sequencing from architecture and design.
+
+### Compatibility
+
+- Preserved scaffold and `suggest-metadata` JSON field shapes, stdout-only prompt behavior, and non-editing metadata suggestions.
+- Kept Skill-specific guidance out of Context Asset and Context Lens scaffold and suggestion output.
+
 ## [0.16.0] - 2026-07-11
 
 ### Added
@@ -310,7 +331,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/KazuCocoa/renma/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/KazuCocoa/renma/compare/v0.15.2...v0.16.0
 [0.15.2]: https://github.com/KazuCocoa/renma/compare/v0.15.1...v0.15.2
 [0.15.1]: https://github.com/KazuCocoa/renma/compare/v0.15.0...v0.15.1

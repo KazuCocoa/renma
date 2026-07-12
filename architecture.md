@@ -36,7 +36,7 @@ assemble prompts, or execute workflows. Agents and runtimes decide how to use
 repository assets for a task. Future evidence validation does not make Renma a
 runtime telemetry collector; signal production and collection remain external.
 
-Near-term provenance features should stay repository-level. A Repository Context BOM is a manifest of declared assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence; it is not a report of actual LLM runtime usage. BOM v1 keeps Git revision identity in the surrounding Git/CI/PR artifact context and keeps future consumed-context evidence separate from the declared repository manifest contract.
+Provenance remains repository-level. A Repository Context BOM is a manifest of declared assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence; it is not a report of actual LLM runtime usage. BOM v1 keeps Git revision identity in the surrounding Git/CI/PR artifact context and keeps any future consumed-context evidence separate from the declared repository manifest contract.
 
 ## Goals
 
@@ -449,31 +449,17 @@ Renma may later import these as repository evidence. Ownership of telemetry coll
 
 Consumed-context evidence from external agents, editor integrations, prompt wrappers, or CI tools may be useful later, but it should be a separate artifact or explicitly separate attachment. It should relate back to declared repository evidence using stable values such as BOM digest or snapshot identity, asset ID, asset content hash, producer identity/version, and observation timestamp. Renma should validate that evidence against the catalog, graph, readiness, and security model instead of becoming the telemetry producer.
 
-## Roadmap Layers
+## Architecture Stability
 
-Completed baseline:
+The scanner, normalized asset model, graph-backed governance, ownership,
+Readiness, repeated-context evidence, semantic diff, security diagnostics,
+Trust Graph, and Repository Context BOM v1 are implemented architecture. New
+projections should reuse the shared repository-evidence snapshot and remain
+additive unless a separately versioned contract requires a breaking change.
 
-1. Scanner and metadata stabilization
-2. First-class context assets
-3. Catalog generation
-4. Graph-backed metadata governance for duplicate IDs, unknown references, deprecated or archived references, and orphaned context assets
-5. Ownership coverage reporting
-6. Context graph snapshot reporting
-7. Readiness repository health report
-8. Repeated-context discovery
-9. Semantic diff across Git refs
-10. CI / PR review report artifact
-11. Security diagnostics v1
-12. Trust Graph evidence
-13. Repository Context BOM v1 declared manifest
-
-Near-term implementation:
-
-1. Continue deterministic security diagnostics and policy tuning.
-2. Keep Trust Graph and Repository Context BOM v1 additive and backward compatible.
-3. Optional consumed-context evidence import from external tools after the repository model is stable.
-
-This sequence prioritizes shared context assets, CI review examples, and repository health before later external signal import work.
+Release sequencing belongs in [plan.md](plan.md). Proposed Skill discovery is
+isolated in [plan-discovery.md](plan-discovery.md) and is not implemented by the
+current processing pipeline.
 
 ## Implementation Notes
 

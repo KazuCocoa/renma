@@ -69,14 +69,16 @@ Renma does not own runtime behavior:
 - No provider gateway or agent coordination layer
 - No telemetry collection responsibility
 
-Renma may become telemetry-aware by importing external signals from CI, IDE
-wrappers, Codex plugins, Claude extensions, or other agent integrations. Those
-signals are offline review evidence. Renma itself should not become
-telemetry-responsible.
+Any future import of external signals from CI, IDE wrappers, agent plugins, or
+other integrations must treat those signals as separately produced offline
+review evidence. Renma itself is not telemetry-responsible.
 
 ## LLM-Actionable Diagnostics
 
-Security diagnostics for 0.7.0 focus on conservative operational-instruction risks, policy metadata, security profile resolution, approved network and upload destination checks, and explicit human approval guards. They remain deterministic repository checks, not runtime enforcement.
+Security diagnostics focus on conservative operational-instruction risks,
+policy metadata, security profile resolution, approved network and upload
+destination checks, and explicit human approval guards. They remain
+deterministic repository checks, not runtime enforcement.
 
 Security diagnostics are deterministic review guardrails for LLM-facing operational instructions. They flag patterns such as unpinned remote shell execution, unpinned dependency installs, privileged commands without nearby guardrails, predictable temporary paths, and credential-like command arguments; they do not replace SAST, secret scanning, dependency scanning, or human security review.
 
@@ -98,10 +100,9 @@ Renma should not apply large semantic rewrites by itself. It should produce
 structured diagnostics that can be pasted into Codex, Claude, Cursor, or another
 agent to guide a reviewable repository patch.
 
-Existing findings already include evidence, `whyItMatters`, and `remediation`.
-Over time, findings may also include repair constraints, verification steps, and
-LLM-specific hints. These fields should remain deterministic rule output, not
-LLM-generated validation.
+Current diagnostics include evidence, `whyItMatters`, remediation, typed repair
+constraints, verification steps, and LLM-facing hints where applicable. These
+fields remain deterministic rule output, not LLM-generated validation.
 
 Example diagnostic shape:
 
@@ -335,8 +336,8 @@ Renma should keep the deterministic path boring and reliable:
    status, tags, declared dependencies, dependents, and diagnostics.
 6. Build graph snapshots from declared references and dependency metadata.
 7. Run deterministic rules over parsed files and graph evidence.
-8. Emit text, JSON, markdown, and future SARIF-style reports suitable for Git
-   review and CI.
+8. Emit the command's documented text, JSON, Markdown, or Mermaid projection
+   for Git review and CI.
 
 Optional LLM assistance may help with semantic split suggestions, duplicate
 labeling, or review summaries. LLM output is advisory. Deterministic evidence is
