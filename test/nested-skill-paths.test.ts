@@ -70,6 +70,7 @@ test("nested canonical Skills participate in workflow and thin-Skill readiness c
   for (const skillPath of CANONICAL_SKILL_PATHS) {
     const root = await fixture();
     await writeRepoFile(root, skillPath, incompleteProceduralSkill());
+    await writeRepoFile(root, "tools/demo.mjs", "console.log('demo');\n");
 
     const scanResult = await scan(root);
     const ids = new Set(

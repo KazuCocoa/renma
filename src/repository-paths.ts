@@ -1,7 +1,17 @@
 import { access } from "node:fs/promises";
 import path from "node:path";
+import { classifyRepositorySkillPath } from "./discovery.js";
 import type { Catalog } from "./model.js";
 import type { Artifact, ParsedDocument } from "./types.js";
+
+export type HelperScriptPathResolution =
+  | {
+      kind: "candidate";
+      path: string;
+      source: "repository-root" | "skill-relative";
+    }
+  | { kind: "unsafe"; path: string }
+  | { kind: "unscoped"; path: string };
 
 /** Collect immutable repository-relative path existence evidence for rules. */
 export async function collectRepositoryPaths(
@@ -26,9 +36,49 @@ export async function collectRepositoryPaths(
 
 export function helperScriptPath(command: string): string | undefined {
   const parts = command.split(/\s+/).slice(1);
-  return parts.find((part) =>
-    /(?:^|\/)scripts\/.+\.(?:mjs|js|cjs|sh|bash|py)$/.test(part),
+  return parts.find(
+    (part) =>
+      /(?:^|\/)scripts\/.+\.(?:mjs|js|cjs|sh|bash|py)$/.test(part) ||
+      /^(?:\.\/)?tools\/.+\.(?:mjs|js|cjs|sh|bash|py)$/.test(part),
   );
+}
+
+/** Resolve a helper command path without escaping an unambiguous owning Skill. */
+export function resolveHelperScriptPath(
+  sourcePath: string,
+  scriptPath: string,
+): HelperScriptPathResolution {
+  const rawPath = scriptPath.replace(/\\/g, "/");
+  const sourceSkill = owningSkillPath(sourcePath);
+  const isSkillRelative = /^(?:\.\/)?scripts\//.test(rawPath);
+  const hasTraversal = rawPath.split("/").includes("..");
+
+  if (isSkillRelative) {
+    if (!sourceSkill) return { kind: "unscoped", path: rawPath };
+    if (hasTraversal) return { kind: "unsafe", path: rawPath };
+    const relativePath = rawPath.replace(/^\.\//, "");
+    const candidate = normalizeRepositoryPath(
+      path.posix.join(sourceSkill.skillDirectory, relativePath),
+    );
+    if (!candidate || !isWithinSkill(candidate, sourceSkill.skillDirectory)) {
+      return { kind: "unsafe", path: rawPath };
+    }
+    return { kind: "candidate", path: candidate, source: "skill-relative" };
+  }
+
+  if (hasTraversal) {
+    return sourceSkill
+      ? { kind: "unsafe", path: rawPath }
+      : { kind: "unscoped", path: rawPath };
+  }
+
+  const candidate = normalizeRepositoryPath(rawPath);
+  if (!candidate) {
+    return sourceSkill
+      ? { kind: "unsafe", path: rawPath }
+      : { kind: "unscoped", path: rawPath };
+  }
+  return { kind: "candidate", path: candidate, source: "repository-root" };
 }
 
 function repositoryPathCandidates(
@@ -55,11 +105,36 @@ function helperCommandPathCandidates(documents: ParsedDocument[]): string[] {
         .map((line) => line.trim())
         .filter((command) => /^(node|bash|sh|python|python3)\s+/.test(command))
         .map(helperScriptPath)
-        .map((candidate) =>
-          candidate ? normalizeRepositoryPath(candidate) : undefined,
-        )
+        .map((candidate) => {
+          if (!candidate) return undefined;
+          const resolution = resolveHelperScriptPath(
+            document.artifact.path,
+            candidate,
+          );
+          return resolution.kind === "candidate" ? resolution.path : undefined;
+        })
         .filter((candidate): candidate is string => candidate !== undefined),
     ),
+  );
+}
+
+function owningSkillPath(
+  sourcePath: string,
+): { skillDirectory: string } | undefined {
+  const classified = classifyRepositorySkillPath(sourcePath);
+  if (classified?.kind === "support") return classified;
+  if (
+    classified?.kind === "entrypoint" &&
+    classified.entrypoint.kind === "canonical"
+  ) {
+    return classified;
+  }
+  return undefined;
+}
+
+function isWithinSkill(candidate: string, skillDirectory: string): boolean {
+  return (
+    candidate === skillDirectory || candidate.startsWith(`${skillDirectory}/`)
   );
 }
 

@@ -219,7 +219,7 @@ export function buildReadinessReport(
       findings,
       [DIAGNOSTIC_IDS.DOCS_LAYOUT_INCONSISTENT],
       "warn",
-      "Repository docs describe the strict three-root layout.",
+      "Repository docs describe canonical Skill roots, valid local support, governed Context Assets, and shared helpers consistently.",
     ),
   ];
 

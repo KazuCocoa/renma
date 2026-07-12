@@ -786,7 +786,7 @@ async function helperCommandPathFixture(options: {
         "Verify by running the BOM command and checking readiness evidence.",
         "",
         "```bash",
-        "bash tools/testing/scripts/setup.sh",
+        "bash scripts/setup.sh",
         "```",
         "",
       ].join("\n"),
@@ -931,7 +931,14 @@ async function writeHelperScript(root: string): Promise<void> {
 }
 
 function helperScriptPath(root: string): string {
-  return path.join(root, "tools", "testing", "scripts", "setup.sh");
+  return path.join(
+    root,
+    "skills",
+    "testing",
+    "helper-review",
+    "scripts",
+    "setup.sh",
+  );
 }
 
 async function writeDeclaredDependencyTarget(root: string): Promise<void> {
@@ -1354,7 +1361,8 @@ function expectedBomContract(): BomReport {
           title: "Layout documentation consistency",
           status: "pass",
           severity: "info",
-          summary: "Repository docs describe the strict three-root layout.",
+          summary:
+            "Repository docs describe canonical Skill roots, valid local support, governed Context Assets, and shared helpers consistently.",
         },
       ],
       summary: {

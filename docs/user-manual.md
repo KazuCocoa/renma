@@ -371,10 +371,19 @@ The JSON configuration supports the same names used by the implementation, inclu
 - `concurrency`: scan concurrency.
 - `fail_on`: scan exit threshold: `low`, `medium`, `high`, or `critical`.
 - `format`: default report format.
-- `layout`: workflow aliases and layout policy.
+- `layout`: compatibility-only `tool_namespace` and `workflow_aliases` input retained for existing configurations. These fields are validated and normalized but do not currently change findings or force Skill-local support migration.
 - `security`: command, network, upload, and profile policy.
 
 CLI flags override config values when both are provided.
+
+Within a canonical Skill entrypoint or one of its classified support documents,
+helper commands may use `scripts/helper.mjs` or `./scripts/helper.mjs`; Renma
+resolves these paths against the owning Skill directory. Repository-root paths
+such as `skills/testing/demo/scripts/helper.mjs`,
+`.agents/skills/testing/demo/scripts/helper.mjs`, and
+`tools/testing/helper.mjs` remain valid. Relative paths that escape the owning
+Skill are reported, and non-Skill documents do not receive an inferred
+Skill-relative base.
 
 Use `exclude` for files Renma should not scan. Use `suppressions` for audited exceptions where Renma should scan the file, detect matching findings internally, then omit those findings from normal reports and failure decisions. A suppression applies only when both `id` and `paths` match. Each suppression includes `id`, `paths`, required `reason`, and optional `expires`; the reason lives in config for auditability.
 

@@ -25,12 +25,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Made canonical nested Skills under both `skills/**` and `.agents/skills/**` participate consistently in Readiness, thin-Skill, graph, support, and parent-Skill checks.
 - Allowed valid Skill-local Agent Skills support directories without path-only disallowed-layout findings; reusable Context and shared-helper promotion remains evidence-based and human-reviewed.
 - Normalized expected CLI target and option errors, enforced command-specific options and positional arity, and rejected partial positive-integer values.
+- Retained `layout.tool_namespace` and `layout.workflow_aliases` as validated compatibility-only input; they no longer force path-only migration of valid Skill-local support.
 
 ### Fixed
 
 - Corrected Readiness false-positive `ready` results for nested Skills with missing workflow guidance.
 - Updated the Context Lens example to current 0.17.0 quality with conservative local policy, complete workflow guidance, and clean scan/readiness output.
 - Included README-linked architecture, design, roadmap, documentation, and examples in the npm package.
+- Stopped treating documented Skill-local support paths as stale and resolved `scripts/**` helper commands against an unambiguous owning Skill using repository snapshot evidence.
 
 ### Compatibility
 

@@ -9,6 +9,7 @@ import {
   formatReadinessMarkdown,
   type ReadinessReport,
 } from "../src/commands/readiness.js";
+import { loadConfig } from "../src/config.js";
 import { zeroContextLensSummary } from "../src/context-lens.js";
 import { scan } from "../src/scanner.js";
 import { zeroSecurityPolicyInventorySummary } from "../src/security-policy-inventory.js";
@@ -99,6 +100,27 @@ test("configured layout aliases do not force local support promotion", async () 
     ),
     false,
   );
+});
+
+test("layout fields remain normalized compatibility-only input", async () => {
+  const root = await fixture("renma-layout-compatibility-");
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({
+      layout: {
+        tool_namespace: "mobile",
+        workflow_aliases: {
+          "device-setup": "real-device",
+        },
+      },
+    }),
+  );
+
+  const { config } = await loadConfig(root, {});
+  assert.equal(config.layout.toolNamespace, "mobile");
+  assert.deepEqual(config.layout.workflowAliases, {
+    "device-setup": "real-device",
+  });
 });
 
 test("readiness markdown limits findings while JSON stays complete", () => {

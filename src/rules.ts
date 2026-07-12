@@ -13,7 +13,10 @@ import {
   classifyRepositorySkillPath,
   normalizeRepositoryRelativePath,
 } from "./discovery.js";
-import { helperScriptPath } from "./repository-paths.js";
+import {
+  helperScriptPath,
+  resolveHelperScriptPath,
+} from "./repository-paths.js";
 import { parseAssetMetadata } from "./metadata.js";
 import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import type {
@@ -2011,13 +2014,13 @@ function thinSkillLayoutFindings(document: ParsedDocument): Finding[] {
         "low",
         command.line,
         command.command,
-        "Move executable setup commands into contexts/** procedures or tools/** helper documentation, and keep SKILL.md as a router.",
+        "Move executable command detail into Skill-local references or governed contexts/** procedures, and keep SKILL.md as a router.",
         {
           whyItMatters:
-            "Executable setup commands in SKILL.md make the entrypoint procedural and harder to migrate to the strict three-root layout.",
+            "Executable setup commands in SKILL.md make the entrypoint procedural instead of a concise routing layer.",
           verificationSteps: [
             "Move the command guidance to a context/reference/procedure.",
-            "If the command invokes a helper script, ensure it points under tools/**.",
+            "If the command invokes a helper script, ensure it resolves to local scripts/** in the owning Skill or a shared tools/** helper.",
           ],
         },
       ),
@@ -2034,8 +2037,22 @@ function helperCommandFindings(
   const findings: Finding[] = [];
 
   for (const command of executableCommands(document)) {
-    const scriptPath = helperScriptPath(command.command);
-    if (!scriptPath) continue;
+    const commandPath = helperScriptPath(command.command);
+    if (!commandPath) continue;
+    const resolution = resolveHelperScriptPath(
+      document.artifact.path,
+      commandPath,
+    );
+    if (resolution.kind === "unscoped") continue;
+    if (resolution.kind === "unsafe") {
+      findings.push(
+        unresolvedHelperCommandFinding(document, command, commandPath, {
+          details: { unsafePath: true },
+        }),
+      );
+      continue;
+    }
+    const scriptPath = resolution.path;
 
     const skillPath = classifyRepositorySkillPath(scriptPath);
     if (
@@ -2101,11 +2118,6 @@ function layoutConsistencyFindings(document: ParsedDocument): Finding[] {
         "Describe self-improvement prompts as loaded context/reference/procedure workflow prompts instead of SKILL.md-only content.",
     },
     {
-      pattern: /skills\/[^/\s`]+\/(?:references|profiles|examples|scripts)\//,
-      message:
-        "Update docs to point to canonical contexts/** assets or tools/** helper scripts instead of skill-local support directories.",
-    },
-    {
       pattern: /\]\(contexts\/tools\//,
       message:
         "Use backtick repo-root paths for contexts/tools/... references instead of file-relative Markdown links.",
@@ -2120,7 +2132,7 @@ function layoutConsistencyFindings(document: ParsedDocument): Finding[] {
       findingAt(
         document,
         DIAGNOSTIC_IDS.DOCS_LAYOUT_INCONSISTENT,
-        "Repository docs describe a non-canonical layout",
+        "Repository docs contradict the supported layout",
         "maintenance",
         "low",
         line,
@@ -2128,9 +2140,9 @@ function layoutConsistencyFindings(document: ParsedDocument): Finding[] {
         stale.message,
         {
           whyItMatters:
-            "README.md and AGENTS.md should teach agents the same strict three-root layout that Renma enforces.",
+            "README.md and AGENTS.md should describe the current repository model without treating valid Skill-local support as stale.",
           verificationSteps: [
-            "Update README.md and AGENTS.md to mention skills/, contexts/, and tools/ canonical roots.",
+            "Confirm docs distinguish canonical Skill roots and valid local support from governed contexts/** assets and shared tools/** helpers.",
             "Run renma scan again.",
           ],
         },
@@ -2263,7 +2275,9 @@ function unresolvedHelperCommandFinding(
   document: ParsedDocument,
   command: { command: string; line: number },
   scriptPath: string,
+  details: FindingDetails = {},
 ): Finding {
+  const unsafePath = details.details?.unsafePath === true;
   return findingAt(
     document,
     DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_UNRESOLVED,
@@ -2272,10 +2286,17 @@ function unresolvedHelperCommandFinding(
     "medium",
     command.line,
     command.command,
-    `Create \`${scriptPath}\` or update this command to the correct local helper path.`,
+    unsafePath
+      ? "Update this command to a path inside the owning Skill's scripts/** directory or to a repository-root tools/** helper; do not escape the Skill with `..`."
+      : `Create \`${scriptPath}\` or update this command to the correct local helper path.`,
     {
       whyItMatters:
-        "Agents need helper commands in Markdown procedures to resolve deterministically before running them.",
+        "Agents need shared tools/** helpers and Skill-local scripts to resolve deterministically before running them.",
+      verificationSteps: [
+        "Confirm the command resolves to an existing tools/** helper or to scripts/** inside its owning Skill.",
+        "Run renma readiness and check paths.helper_commands.",
+      ],
+      ...details,
     },
   );
 }

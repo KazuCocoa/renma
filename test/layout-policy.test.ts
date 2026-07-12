@@ -85,7 +85,133 @@ test("valid Skill-local support is not categorically disallowed", async () => {
   );
 });
 
-test("strict layout passes refactored appium three-root layout", async () => {
+test("README and AGENTS may document valid Skill-local support paths", async () => {
+  const root = await fixture();
+  const snippets = [
+    "skills/demo/references/spec.md",
+    "skills/testing/demo/examples/happy-path.md",
+    "skills/testing/demo/scripts/helper.mjs",
+    ".agents/skills/demo/profiles/local.md",
+    ".agents/skills/testing/demo/assets/template.md",
+  ];
+  await writeMarkdown(
+    root,
+    "README.md",
+    `# Layout\n\n${snippets.join("\n")}\n`,
+  );
+  await writeMarkdown(
+    root,
+    "AGENTS.md",
+    `# Agent layout\n\n${snippets.map((item) => `Use \`${item}\`.`).join("\n")}\n`,
+  );
+
+  const result = await scan(root);
+  assert.equal(
+    result.findings.some(
+      (finding) => finding.id === "DOCS-LAYOUT-INCONSISTENT",
+    ),
+    false,
+  );
+});
+
+test("genuinely stale repository documentation remains actionable", async () => {
+  const root = await fixture();
+  await writeMarkdown(
+    root,
+    "README.md",
+    "# Legacy model\n\nUse copy-paste prompt templates for every workflow.\n",
+  );
+
+  const finding = (await scan(root)).findings.find(
+    (candidate) => candidate.id === "DOCS-LAYOUT-INCONSISTENT",
+  );
+  assert(finding);
+  assert.equal(
+    finding.title,
+    "Repository docs contradict the supported layout",
+  );
+});
+
+test("helper commands resolve relative to every canonical Skill shape", async () => {
+  const root = await fixture();
+  const skillDirectories = [
+    "skills/demo",
+    "skills/testing/demo",
+    ".agents/skills/demo",
+    ".agents/skills/testing/demo",
+  ];
+  await writeFileInRepo(
+    root,
+    "tools/shared/existing.mjs",
+    "console.log('shared');\n",
+  );
+
+  for (const skillDirectory of skillDirectories) {
+    await writeFileInRepo(
+      root,
+      `${skillDirectory}/scripts/existing.mjs`,
+      "console.log('local');\n",
+    );
+    await writeMarkdown(
+      root,
+      `${skillDirectory}/SKILL.md`,
+      helperCommandDocument(skillDirectory),
+    );
+  }
+  const referencePath =
+    ".agents/skills/testing/demo/references/helper-commands.md";
+  await writeMarkdown(
+    root,
+    referencePath,
+    helperCommandDocument(".agents/skills/testing/demo"),
+  );
+
+  const result = await scan(root);
+  for (const sourcePath of [
+    ...skillDirectories.map((directory) => `${directory}/SKILL.md`),
+    referencePath,
+  ]) {
+    const unresolved = result.findings.filter(
+      (finding) =>
+        finding.id === "PATH-HELPER-COMMAND-UNRESOLVED" &&
+        finding.evidence.path === sourcePath,
+    );
+    assert.deepEqual(
+      unresolved.map((finding) => finding.evidence.snippet),
+      [
+        "node scripts/missing.mjs",
+        "node tools/shared/missing.mjs",
+        "node ../scripts/escape.mjs",
+      ],
+      sourcePath,
+    );
+  }
+  assert.equal(
+    result.findings.some(
+      (finding) => finding.id === "PATH-HELPER-COMMAND-NON_TOOLS",
+    ),
+    false,
+  );
+});
+
+test("non-Skill documents do not guess a Skill-relative helper base", async () => {
+  const root = await fixture();
+  await writeMarkdown(
+    root,
+    "README.md",
+    "# Commands\n\n```bash\nnode scripts/missing.mjs\n```\n",
+  );
+
+  const result = await scan(root);
+  assert.equal(
+    result.findings.some(
+      (finding) => finding.id === "PATH-HELPER-COMMAND-UNRESOLVED",
+    ),
+    false,
+  );
+});
+
+test("supported layout passes refactored appium repository shape", async () => {
   const root = await fixture();
   await writeFile(
     path.join(root, "renma.config.json"),
@@ -255,6 +381,23 @@ function frontmatter(values: Record<string, string>): string {
 
 function context(id: string, body: string): string {
   return `${frontmatter({ owner: "appium", id })}# ${id}\n\n${body}\n`;
+}
+
+function helperCommandDocument(skillDirectory: string): string {
+  return [
+    "# Helper commands",
+    "",
+    "```bash",
+    "node scripts/existing.mjs",
+    "node ./scripts/existing.mjs",
+    "node scripts/missing.mjs",
+    `node ${skillDirectory}/scripts/existing.mjs`,
+    "node tools/shared/existing.mjs",
+    "node tools/shared/missing.mjs",
+    "node ../scripts/escape.mjs",
+    "```",
+    "",
+  ].join("\n");
 }
 
 test("layout aliases do not force valid local support into shared roots", async () => {

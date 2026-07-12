@@ -127,7 +127,7 @@ export interface Diagnostic {
   details?: Record<string, unknown>;
 }
 
-/** Repository layout mapping used by strict three-root policy diagnostics. */
+/** Compatibility-only layout input retained without forcing local migration. */
 export interface LayoutPolicyConfig {
   toolNamespace?: string;
   workflowAliases: Record<string, string>;
