@@ -4,6 +4,7 @@
   "globs": [
     "skills/**/SKILL.md",
     "contexts/**/*.md",
+    "lenses/**/*.md",
     "tools/**/*",
     "README.md"
   ],

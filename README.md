@@ -4,11 +4,16 @@
 [![Downloads](http://img.shields.io/npm/dm/renma.svg)](https://npmjs.org/package/renma)
 
 
-Renma is an opinionated Context Repository toolkit for LLM-era software teams.
+Renma is a Git-native context repository and deterministic governance tool for
+LLM-facing knowledge. It manages reusable Skills, Context Lenses, Context
+Assets, references, ownership, lifecycle, dependencies, and evidence as
+maintainable software assets.
 
-It helps teams manage reusable, human-curated context assets in Git so agents, coding tools, and future AI runtimes can consume team knowledge more safely and consistently.
-
-Renma is the deterministic governance and health layer around that repository knowledge. Instead of letting critical knowledge get copied into many prompts or buried in one-off Markdown files, Renma treats it as a software asset: named, owned, versioned, linked, checked in CI, and reviewed with deterministic diagnostics and scan findings.
+Instead of letting critical knowledge get copied into prompts or buried in
+one-off Markdown files, Renma keeps it named, owned, versioned, linked, checked
+in CI, and reviewed through deterministic diagnostics. Agents, coding tools,
+and other runtimes consume those repository assets according to their own
+runtime behavior.
 
 Renma now supports `scan`, `catalog`, `ownership`, `graph`, focused graph views, `trust-graph`, `readiness`, Repository Context BOM reports, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-metadata`, `suggest-semantic-split`, and security diagnostics.
 
@@ -20,7 +25,10 @@ Renma is especially useful when a repository contains agent-facing material such
 - Team-owned context assets that should outlive a single prompt
 - References and examples that agents should be able to cite or inspect
 
-Renma is not an agent runtime, not a prompt library, not a vector database, and not a general Markdown linter. Markdown is the storage format today; the product is the catalog, dependency graph, ownership model, and readiness checks around agent-consumable repository knowledge.
+Renma is not an agent runtime, prompt builder, live context selector, workflow
+engine, telemetry collector, vector database, or general Markdown linter.
+Markdown is the storage format today; the product is the repository model and
+the deterministic governance views around agent-consumable knowledge.
 
 Use Renma when you need to answer repository-level questions such as:
 
@@ -38,29 +46,61 @@ It is not a prompt library. It is not a vector database. It is not an agent memo
 
 It is a place where teams maintain context assets with ownership, lifecycle state, dependencies, references, and review history.
 
+## Agent Skills Compatibility
+
+Renma recognizes and validates [Agent Skills-compatible syntax](https://agentskills.io/specification)
+as a familiar, portable authoring entrypoint. This lowers adoption cost without
+making the Agent Skills format Renma's complete repository model: shared
+Context Assets, Context Lenses, policies, references, ownership, lifecycle,
+dependencies, and evidence remain independently governed repository assets.
+
+In short, Renma is **Agent Skills-compatible, but not Agent Skills-defined**. A
+repository may organize multiple Skills and knowledge assets around domains,
+products, teams, or workflows; Renma does not require one repository-wide
+`skills/` layout. It is not an Agent Skills runtime, registry, or live router.
+For the exact 0.16.0 syntax and migration boundary, see
+[Agent Skills Compatibility and Migration](docs/agent-skills-compatibility.md).
+
 ## The Layer Model
 
-```text
-Tools
-  Codex, Claude, Cursor, CI, editors, internal CLIs
-
-Skills
-  agent-facing entrypoints that route an agent toward a task
-
-Context Lenses
-  purpose-oriented interpretation layers over context assets
-
-Context Assets
-  Shared domain, product, testing, platform, and tool knowledge
-
-Catalog
-  Deterministic IDs, ownership, lifecycle state, dependencies, evidence
-
-Repository
-  Git-reviewed source of truth for agent-consumable knowledge
+```mermaid
+flowchart TD
+  subgraph Repository["Git-reviewed Repository — source of truth"]
+    Skills["Skills: agent-facing entrypoints and usage guides"]
+    Lenses["Context Lenses: purpose-oriented interpretation"]
+    Assets["Context Assets: reusable source-of-truth knowledge"]
+    Catalog["Catalog: IDs, ownership, lifecycle, dependencies, evidence"]
+  end
+  Renma["Renma: deterministic governance and repository health"]
+  Consumers["External tools and agents — runtime behavior outside Renma"]
+  Skills -->|may reference| Lenses
+  Skills -->|may reference directly| Assets
+  Lenses -->|interprets| Assets
+  Catalog -.-> Skills
+  Catalog -.-> Lenses
+  Catalog -.-> Assets
+  Renma -->|discovers, normalizes, validates| Catalog
+  Consumers -->|consume according to their runtime behavior| Skills
+  Consumers -->|may also consume| Lenses
+  Consumers -->|may also consume| Assets
 ```
 
-Tools decide what to do at runtime. Skills tell an agent when and how to use a capability. Context lenses describe purpose-oriented interpretation over reusable knowledge. Context assets hold that reusable knowledge. Renma catalogs and validates the layer underneath so tools and agents are not guessing from stale, orphaned, duplicated, or unowned files.
+Skills may point through a Context Lens or directly to a Context Asset; a Lens
+is not required for every asset. The Catalog describes repository assets rather
+than creating them. Renma validates those static declarations but does not
+select a Skill, choose or inject task Context, assemble a prompt, or execute the
+consumer's workflow.
+
+## Primary Workflows
+
+Renma supports two common user journeys:
+
+1. [Create a new Skill with `scaffold`](docs/user-manual.md#user-story-create-a-new-skill-with-scaffold), add reusable Context, validate the repository, and review the result.
+2. [Improve an existing Skill or context repository](docs/user-manual.md#user-story-improve-existing-skills-with-diagnostics) from deterministic diagnostics, optionally using a coding agent to propose a patch that a human reviews.
+
+The [`examples/context-repo`](examples/context-repo) fixture demonstrates the
+second journey as an interactive specification review with an explicit Renma,
+agent, and human responsibility boundary.
 
 ## How Renma Relates to RAG and Agent Memory
 
@@ -131,7 +171,12 @@ lenses/
     spec-review-boundary-values.md
 ```
 
-`contexts/` is preferred. `context/` is also scanned for compatibility. Files under either root are cataloged as first-class `context` assets, while experimental `context_lens` assets live under `lenses/` or opt in from context files with `type: context_lens`. Skill-local `references/` remain supported as `reference` assets.
+This is an illustrative domain-oriented layout, not a required repository
+schema. `contexts/` is preferred and `context/` is also scanned for
+compatibility. Files under either root are cataloged as first-class `context`
+assets, while `context_lens` assets live under `lenses/` or opt in from context
+files with `type: context_lens`. Skill-local `references/` remain supported as
+`reference` assets.
 
 ## What Renma Does Today
 
@@ -337,6 +382,7 @@ See [`examples/context-lens`](examples/context-lens) for a Context Lens governan
 
 ```bash
 renma scan <path>
+renma bom <path>
 renma catalog <path>
 renma ownership <path>
 renma graph <path>
@@ -346,6 +392,7 @@ renma diff <path> --from <ref> --to <ref>
 renma ci-report <path> --from <ref> --to <ref>
 renma inspect <file>
 renma inspect <file> --lines L10-L42
+renma scaffold <skill|context|context_lens> <path>
 renma suggest-metadata <file>
 renma suggest-semantic-split <file>
 ```
@@ -718,7 +765,10 @@ Renma reports deterministic safety findings for agent-facing operational instruc
 
 These findings are guardrails for review. They do not replace secret scanning, SAST, dependency scanning, or human security review.
 
-Near-term security work is focused on stabilizing these diagnostics for the 0.7.0 line. Renma now summarizes security posture in readiness and CI reports, and exposes Trust Graph evidence for effective policy, security profile resolution, approved destinations, forbidden inputs, human approval requirements, and high-risk findings.
+Renma summarizes security posture in Readiness and CI reports, and exposes
+Trust Graph evidence for effective policy, security profile resolution,
+approved destinations, forbidden inputs, human approval requirements, and
+high-risk findings.
 
 Trust Graph interprets existing catalog, graph, scan, and security evidence as deterministic repository evidence. It is not a runtime system, not enforcement, not context selection or prompt assembly, not telemetry collection, not an LLM call, and not a subjective trust score.
 

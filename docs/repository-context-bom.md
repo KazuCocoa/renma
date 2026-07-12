@@ -4,6 +4,40 @@
 
 The BOM is not a runtime usage report. It does not describe what an LLM actually consumed, assemble prompts, choose task-specific context, inject context into agents, execute agents, call an LLM, import consumed-context evidence, or collect telemetry.
 
+```mermaid
+flowchart TD
+  Sources["Repository files and configuration"]
+  Snapshot["One collected in-memory repository snapshot"]
+  Catalog["Catalog and dependency graph"]
+  Diagnostics["Diagnostics and Readiness"]
+  Governance["Lifecycle and ownership evidence"]
+  Security["Security posture and policy inventory"]
+  Bom["Repository Context BOM v1"]
+  Json["Authoritative JSON"]
+  Markdown["Markdown review projection"]
+  Revision["Git, CI, or PR context supplies revision identity"]
+  Runtime["Future runtime consumed-context evidence — separate artifact"]
+  Sources --> Snapshot
+  Snapshot --> Catalog
+  Snapshot --> Diagnostics
+  Snapshot --> Governance
+  Snapshot --> Security
+  Catalog --> Bom
+  Diagnostics --> Bom
+  Governance --> Bom
+  Security --> Bom
+  Bom --> Json
+  Bom --> Markdown
+  Revision -.-> Bom
+  Runtime -.-> Bom
+```
+
+The diagram separates collection from projection: every BOM section is derived
+from one collected snapshot, JSON is authoritative, and Markdown is a review
+view. `--omit-generated-at` removes generation-time noise only. Revision
+identity stays in the surrounding Git, CI, or pull-request context, and any
+runtime consumed-context evidence remains a separate future artifact.
+
 ## Snapshot Contract
 
 One BOM execution is derived from one in-memory repository snapshot:

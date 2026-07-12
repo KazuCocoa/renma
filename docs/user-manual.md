@@ -132,6 +132,17 @@ Start by running `renma --help` and use command-specific help to choose the appr
 
 Use this flow when you are adding a new agent-facing skill and want Renma to create the starter shape.
 
+```mermaid
+flowchart LR
+  Identify["Identify the workflow"] --> Scaffold["Scaffold the Skill"]
+  Scaffold --> Context["Add guidance and reusable Context"]
+  Context --> Validate["Run deterministic Renma validation"]
+  Validate --> Review["Human review and refinement"]
+```
+
+Renma creates and validates repository assets; the consuming agent follows the
+finished Skill later according to its own runtime behavior.
+
 1. Decide the skill path.
 
 ```bash
@@ -187,6 +198,20 @@ The BOM is a declared repository manifest. It combines catalog, graph, diagnosti
 ## User Story: Improve Existing Skills With Diagnostics
 
 Use this flow when a repository already has skills or context assets and you want Renma to help make them easier to trust and review.
+
+```mermaid
+flowchart TD
+  Run["Run Renma"] --> Inspect["Inspect deterministic diagnostics"]
+  Inspect --> Propose["Human or coding agent proposes a patch"]
+  Propose --> Review["Human reviews the patch"]
+  Review --> Rerun["Rerun Renma"]
+  Rerun --> Decide{"Accept or refine?"}
+  Decide -->|refine| Inspect
+  Decide -->|accept| Complete["Merge through the repository's normal review process"]
+```
+
+LLM assistance is optional. Renma does not rewrite files or accept a proposed
+change automatically.
 
 1. Run `scan` on the existing repository.
 
@@ -262,6 +287,11 @@ renma readiness . --format markdown
 
 The loop is: Renma reports deterministic evidence, a human or coding agent prepares a patch, a human reviews it, and Renma verifies the result again.
 
+For a complete interactive workflow using a Skill, a Context Lens, and direct
+Context Asset relationships, see the
+[`examples/context-repo`](../examples/context-repo) specification-review
+example.
+
 ## Configuration
 
 Use `--config <path>` with commands that scan the repository:
@@ -321,11 +351,14 @@ Other default scan glob families are:
 - New to Renma? Start with [Authoring Guide](authoring-guide.md).
 - Writing security-sensitive skills or context assets? Read [Security Policy Guide](security-policy.md).
 - Fixing scan findings? See [Diagnostics Reference](diagnostics.md).
-- Trying a runnable example? See [`examples/context-repo`](../examples/context-repo).
+- Trying a runnable example? See the interactive specification-review workflow
+  in [`examples/context-repo`](../examples/context-repo).
 
 ## Commands
 
-For a runnable mini-repository with a skill, shared context assets, ownership metadata, and graph relationships, see [`examples/context-repo`](../examples/context-repo).
+For a runnable mini-repository with an interactive Skill, a Context Lens,
+shared Context Assets, ownership metadata, and graph relationships, see
+[`examples/context-repo`](../examples/context-repo).
 
 renma commands fall into a few groups:
 
