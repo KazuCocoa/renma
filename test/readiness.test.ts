@@ -1040,7 +1040,11 @@ function securityGraphReport(): GraphReport {
         id: "security",
         kind: "skill",
         sourcePath: "skills/security/SKILL.md",
-        owner: "platform",
+        ownership: {
+          declaredOwner: "platform",
+          effectiveOwner: "platform",
+          source: "declared",
+        },
         status: "stable",
         tags: [],
       },

@@ -1334,6 +1334,8 @@ function v2SecurityArtifact(
     kind,
     depth: 2,
     sizeBytes: Buffer.byteLength(operationalContent),
+    contentClassification: "text" as const,
+    markdownParserEligible: true,
     content: operationalContent,
   };
 }

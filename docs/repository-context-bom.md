@@ -1,6 +1,6 @@
 # Repository Context BOM
 
-`renma bom` emits the Repository Context BOM: a declared repository manifest for review and CI consumers. It is generated from Renma's local repository evidence and keeps `schemaVersion` at `renma.repository-context-bom.v1`.
+`renma bom` emits a declared repository manifest for review and CI consumers. Schema v2 is the default; `--schema v1` selects the frozen compatibility projection.
 
 The BOM is not a runtime usage report. It does not describe what an LLM actually consumed, assemble prompts, choose task-specific context, inject context into agents, execute agents, call an LLM, import consumed-context evidence, or collect telemetry.
 
@@ -12,7 +12,7 @@ flowchart TD
   Diagnostics["Diagnostics and Readiness"]
   Governance["Lifecycle and ownership evidence"]
   Security["Security posture and policy inventory"]
-  Bom["Repository Context BOM v1"]
+  Bom["Repository Context BOM v1 or v2"]
   Json["Authoritative JSON"]
   Markdown["Markdown review projection"]
   Revision["Git, CI, or PR context supplies revision identity"]
@@ -56,11 +56,10 @@ JSON is the authoritative BOM output. Markdown is a compact review projection fo
 
 Array ordering is deterministic and part of Renma's output contract. Asset `sourcePath` values remain repository-relative. `root` and `configPath` remain absolute paths from the current environment.
 
-Asset `owner` is the effective owner used by ownership and Readiness. Existing
-declared-owner output is unchanged. Skill-local support that inherits its
-nearest Skill's owner adds optional `ownerSource: "inherited"` and
-`ownerInheritedFrom` provenance. Ownership totals use this same effective-owner
-meaning.
+V2 assets use `ownership.declaredOwner`, `ownership.effectiveOwner`,
+`ownership.source`, and optional `ownership.inheritedFrom`. Readiness v2 uses
+the effective owner. V1 exposes only a flat declared `owner`; inherited support
+therefore remains unowned in v1.
 
 ## Reproducibility
 
@@ -89,18 +88,32 @@ Freshness evaluation uses the UTC calendar date. Metadata dates remain part of t
 
 `schemaVersion` represents the consumer-facing BOM schema. `generator.version` represents the Renma implementation version and is not the schema version.
 
-Within BOM v1, changes should be backward-compatible and additive:
+Both schemas are explicit contracts. V1 remains frozen for legacy consumers;
+v2 is the default contract for normalized ownership, first-class support
+assets, and static support relationships.
+
+Within a schema, changes should be backward-compatible and additive:
 
 - existing fields must not be removed, renamed, or given incompatible types or meanings;
 - new optional fields may be added when a real consumer requires them;
 - enum additions are consumer-visible changes and must be documented;
-- a future breaking contract requires a new schema version rather than silently changing v1 semantics.
+- a future breaking contract requires a new schema version rather than silently changing existing semantics.
+
+## Migration Notes
+
+- Pin `--schema v1` while a consumer still reads flat `owner`.
+- Move v2 consumers to the normalized `ownership` object.
+- Treat `owns_local_resource`, `statically_references`, `inherits_owner`, and
+  `inherits_policy` as static repository evidence, not runtime behavior.
+- Branch on `schemaVersion`; `generator.version` is provenance only.
+
+Follow-up documentation task: publish complete JSON Schema files and field-by-field examples for both BOM and Trust Graph versions in a documentation-only pull request.
 
 `--omit-generated-at` does not make the report a generic canonical JSON format or a portable artifact.
 
 ## Source Provenance
 
-BOM v1 provenance is deliberately repository-local:
+BOM provenance is deliberately repository-local in both schemas:
 
 - repository-relative source paths;
 - per-asset content hashes;
@@ -108,11 +121,11 @@ BOM v1 provenance is deliberately repository-local:
 - current absolute `root` and `configPath` information when available;
 - lifecycle, dependency, diagnostic, readiness, security posture, and security policy inventory evidence.
 
-Renma does not automatically invoke Git or add Git commit, branch, tag, or dirty-state fields in BOM v1. Git revision identity is expected to come from the surrounding Git, CI, artifact, or pull-request context. Native Git provenance fields and a BOM digest may be considered later if external artifact storage or cross-run consumers require them.
+Renma does not automatically invoke Git or add Git commit, branch, tag, or dirty-state fields. Git revision identity is expected to come from the surrounding Git, CI, artifact, or pull-request context. Native Git provenance fields and a BOM digest may be considered later if external artifact storage or cross-run consumers require them.
 
 ## Consumed-Context Evidence
 
-BOM v1 describes declared repository state. Future consumed-context evidence must not redefine or mutate that meaning.
+Both BOM schemas describe declared repository state. Future consumed-context evidence must not redefine or mutate that meaning.
 
 Runtime evidence should be a separate artifact or explicitly separate attachment. A future evidence record should relate back to a BOM using stable values such as a BOM digest or snapshot identity, asset ID, asset content hash, producer identity and version, and observation timestamp.
 

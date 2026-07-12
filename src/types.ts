@@ -184,8 +184,8 @@ export interface Artifact {
   sizeBytes: number;
   /** Hash of the original bytes; binary files are never decoded to compute it. */
   contentHash?: string;
-  contentClassification?: "text" | "binary";
-  markdownParserEligible?: boolean;
+  contentClassification: "text" | "binary";
+  markdownParserEligible: boolean;
   /** UTF-8 text only. Binary artifacts use an empty string and false eligibility. */
   content: string;
 }

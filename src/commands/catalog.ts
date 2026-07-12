@@ -83,11 +83,15 @@ export function formatCatalogMarkdown(result: CatalogResult): string {
     const owner = effectiveAssetOwner(entry);
     lines.push(
       `- Owner: ${owner ?? "(none)"}${
-        entry.ownership?.source === "inherited"
+        entry.ownership.source === "inherited" && entry.ownership.inheritedFrom
           ? ` (inherited from ${entry.ownership.inheritedFrom.sourcePath})`
           : ""
       }`,
     );
+    lines.push(
+      `- Declared owner: ${entry.ownership.declaredOwner ?? "(none)"}`,
+    );
+    lines.push(`- Ownership source: ${entry.ownership.source}`);
     lines.push(`- Status: ${entry.metadata.status ?? "(unspecified)"}`);
     lines.push(
       `- Last reviewed: ${entry.metadata.lastReviewedAt ?? "(unspecified)"}`,

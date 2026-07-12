@@ -32,6 +32,18 @@ const SKILL_LIKE_FILE_GLOBS = [
   ".agents/**/skill.md",
   ".agents/**/*.skill.md",
 ];
+const SKILL_SUPPORT_EXISTENCE_GLOBS = [
+  "skills/**/profiles/**/*",
+  "skills/**/references/**/*",
+  "skills/**/examples/**/*",
+  "skills/**/scripts/**/*",
+  "skills/**/assets/**/*",
+  ".agents/skills/**/profiles/**/*",
+  ".agents/skills/**/references/**/*",
+  ".agents/skills/**/examples/**/*",
+  ".agents/skills/**/scripts/**/*",
+  ".agents/skills/**/assets/**/*",
+];
 const SKILL_LIKE_FILE_LLM_HINT =
   "No action is required unless this file is intended to be a Renma skill. If it is intended to be a skill, move it under skills/** or .agents/skills/**.";
 const SKILL_ENTRYPOINT_UNDER_RESERVED_SUPPORT_DIR_LLM_HINT =
@@ -265,10 +277,28 @@ export async function discoverArtifacts(
       });
     }
   }
+  const discoveredPaths = new Set(paths);
+  for (const pattern of SKILL_SUPPORT_EXISTENCE_GLOBS) {
+    try {
+      for await (const match of glob(pattern, {
+        cwd: root,
+        withFileTypes: false,
+      })) {
+        if (typeof match === "string") discoveredPaths.add(toPosix(match));
+      }
+    } catch (error) {
+      diagnostics.push({
+        severity: "error",
+        message: `Could not evaluate existence glob "${pattern}": ${errorMessage(error)}`,
+      });
+    }
+  }
 
   const candidates = [...paths]
     .filter((relativePath) => !isExcluded(relativePath, config.exclude))
-    .filter((relativePath) => depth(relativePath) <= config.maxDepth)
+    .filter(
+      (relativePath) => repositoryPathDepth(relativePath) <= config.maxDepth,
+    )
     .sort((a, b) => a.localeCompare(b));
 
   const artifacts = await mapLimit(
@@ -328,7 +358,8 @@ export async function discoverArtifacts(
       (artifact) => artifact !== undefined,
     ) as Artifact[],
     diagnostics,
-    discoveredPaths: new Set(candidates),
+    // Preserve existence evidence before exclusion/depth/content parsing.
+    discoveredPaths,
   };
 }
 
@@ -442,7 +473,7 @@ async function skillLikeLayoutDiagnostics(
 
   for (const relativePath of [...paths].sort((a, b) => a.localeCompare(b))) {
     if (isExcluded(relativePath, config.exclude)) continue;
-    if (depth(relativePath) > config.maxDepth) continue;
+    if (repositoryPathDepth(relativePath) > config.maxDepth) continue;
 
     try {
       if (!(await stat(path.join(root, relativePath))).isFile()) continue;
@@ -554,7 +585,7 @@ async function mapLimit<T, R>(
   return results;
 }
 
-function isExcluded(relativePath: string, excludes: string[]): boolean {
+export function isExcluded(relativePath: string, excludes: string[]): boolean {
   const segments = relativePath.split("/");
   return excludes.some(
     (exclude) =>
@@ -573,7 +604,7 @@ function globExcludes(excludes: string[]): string[] {
   ]);
 }
 
-function depth(relativePath: string): number {
+export function repositoryPathDepth(relativePath: string): number {
   return relativePath.split("/").filter(Boolean).length;
 }
 

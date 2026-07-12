@@ -15,7 +15,10 @@ import type {
 } from "./security-policy-inventory.js";
 import type { Diagnostic, Evidence, Finding, RiskClass } from "./types.js";
 
-export type TrustGraphSchemaVersion = "renma.trustGraph.v1";
+export type TrustGraphSchema = "v1" | "v2";
+export type TrustGraphSchemaVersion =
+  | "renma.trustGraph.v1"
+  | "renma.trustGraph.v2";
 
 export type TrustGraphNodeType =
   | "asset"
@@ -30,6 +33,9 @@ export type TrustGraphEdgeType =
   | "has_lifecycle_status"
   | "declares_dependency"
   | "references"
+  | "owns_local_resource"
+  | "statically_references"
+  | "inherits_owner"
   | "selects_security_profile"
   | "inherits_policy"
   | "has_effective_policy"
@@ -109,6 +115,9 @@ const EDGE_TYPES: TrustGraphEdgeType[] = [
   "has_lifecycle_status",
   "declares_dependency",
   "references",
+  "owns_local_resource",
+  "statically_references",
+  "inherits_owner",
   "selects_security_profile",
   "inherits_policy",
   "has_effective_policy",
@@ -132,7 +141,10 @@ const RISK_CLASSES: Array<RiskClass | "unclassified"> = [
   "unclassified",
 ];
 
-export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
+export function buildTrustGraph(
+  input: TrustGraphInput,
+  schema: TrustGraphSchema = "v2",
+): TrustGraph {
   const nodes = new Map<string, TrustGraphNode>();
   const edges = new Map<string, TrustGraphEdge>();
   const assets = stableAssets(input.catalog.assets);
@@ -151,7 +163,7 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
       const ownerNodeId = ownerNode(owner).id;
       addNode(nodes, ownerNode(owner));
       const inheritedOwnerAsset =
-        asset.ownership?.source === "inherited"
+        asset.ownership.source === "inherited" && asset.ownership.inheritedFrom
           ? assetsByPath.get(
               normalizeDependencyReference(
                 asset.ownership.inheritedFrom.sourcePath,
@@ -162,7 +174,8 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
         from: assetNodeId(asset),
         to: ownerNodeId,
         type: "owned_by",
-        ...(asset.ownership?.source === "inherited"
+        ...(asset.ownership.source === "inherited" &&
+        asset.ownership.inheritedFrom
           ? {
               properties: {
                 ownershipSource: "inherited",
@@ -194,11 +207,19 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
     addEdge(edges, {
       from: assetNodeId(source),
       to: assetNodeId(target),
-      type:
-        dependency.kind === "references" ? "references" : "declares_dependency",
+      type: trustEdgeTypeForDependency(dependency),
       properties: {
         dependencyKind: dependency.kind,
         declaredTarget: dependency.to,
+        ...(dependency.kind === "inherits_owner" ||
+        dependency.kind === "inherits_policy"
+          ? {
+              inheritedFrom: {
+                id: target.id,
+                sourcePath: target.sourcePath,
+              },
+            }
+          : {}),
       },
       evidence: dependency.evidence ? [dependency.evidence] : [],
     });
@@ -207,7 +228,25 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
   for (const policy of input.securityPolicies ?? []) {
     const asset = assetsByPath.get(normalizeDependencyReference(policy.path));
     if (!asset) continue;
-    addPolicyEvidence(nodes, edges, asset, policy);
+    const inheritedAsset = policy.inheritedFrom
+      ? assetsByPath.get(
+          normalizeDependencyReference(policy.inheritedFrom.sourcePath),
+        )
+      : undefined;
+    addPolicyEvidence(
+      nodes,
+      edges,
+      asset,
+      inheritedAsset
+        ? {
+            ...policy,
+            inheritedFrom: {
+              id: inheritedAsset.id,
+              sourcePath: inheritedAsset.sourcePath,
+            },
+          }
+        : policy,
+    );
   }
 
   const findings = stableTrustGraphFindings(
@@ -232,8 +271,8 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
 
   const sortedNodes = [...nodes.values()].sort(compareNodes);
   const sortedEdges = [...edges.values()].sort(compareEdges);
-  return {
-    schemaVersion: "renma.trustGraph.v1",
+  const graph: TrustGraph = {
+    schemaVersion: "renma.trustGraph.v2",
     summary: summarizeTrustGraph(
       assets.length,
       sortedNodes,
@@ -244,6 +283,97 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
     edges: sortedEdges,
     findings,
   };
+  return schema === "v1" ? projectTrustGraphV1(graph) : graph;
+}
+
+/** Project v2 evidence to the frozen legacy surface without inherited owners. */
+export function projectTrustGraphV1(graph: TrustGraph): TrustGraph {
+  const supportAssetNodeIds = new Set(
+    graph.nodes
+      .filter(
+        (node) =>
+          node.type === "asset" &&
+          (node.properties?.kind === "script" ||
+            node.properties?.kind === "asset"),
+      )
+      .map((node) => node.id),
+  );
+  const nodes = graph.nodes
+    .filter((node) => !supportAssetNodeIds.has(node.id))
+    .map((node) => {
+      if (node.type !== "asset" || !node.properties) return node;
+      const properties = { ...node.properties };
+      const ownership = properties.ownership as
+        | { declaredOwner?: string | null }
+        | undefined;
+      delete properties.ownership;
+      if (ownership?.declaredOwner) properties.owner = ownership.declaredOwner;
+      return { ...node, properties };
+    });
+  const edges = graph.edges.filter((edge) => {
+    if (
+      supportAssetNodeIds.has(edge.from) ||
+      supportAssetNodeIds.has(edge.to)
+    ) {
+      return false;
+    }
+    if (
+      [
+        "owns_local_resource",
+        "statically_references",
+        "inherits_owner",
+      ].includes(edge.type)
+    ) {
+      return false;
+    }
+    if (
+      supportAssetNodeIds.has(edge.from) &&
+      [
+        "selects_security_profile",
+        "inherits_policy",
+        "has_effective_policy",
+      ].includes(edge.type)
+    ) {
+      return false;
+    }
+    return (
+      edge.type !== "owned_by" ||
+      edge.properties?.ownershipSource !== "inherited"
+    );
+  });
+  const referencedNodeIds = new Set(
+    edges.flatMap((edge) => [edge.from, edge.to]),
+  );
+  const projectedNodes = nodes.filter(
+    (node) => node.type !== "owner" || referencedNodeIds.has(node.id),
+  );
+  return {
+    schemaVersion: "renma.trustGraph.v1",
+    summary: summarizeTrustGraph(
+      projectedNodes.filter((node) => node.type === "asset").length,
+      projectedNodes,
+      edges,
+      graph.findings,
+    ),
+    nodes: projectedNodes,
+    edges,
+    findings: graph.findings,
+  };
+}
+
+function trustEdgeTypeForDependency(
+  dependency: Dependency,
+): TrustGraphEdgeType {
+  if (dependency.kind === "references") return "references";
+  if (
+    dependency.kind === "owns_local_resource" ||
+    dependency.kind === "statically_references" ||
+    dependency.kind === "inherits_owner" ||
+    dependency.kind === "inherits_policy"
+  ) {
+    return dependency.kind;
+  }
+  return "declares_dependency";
 }
 
 function addPolicyEvidence(
@@ -298,7 +428,6 @@ function addPolicyEvidence(
 }
 
 function assetNode(asset: Asset): TrustGraphNode {
-  const owner = effectiveAssetOwner(asset);
   return {
     id: assetNodeId(asset),
     type: "asset",
@@ -308,15 +437,11 @@ function assetNode(asset: Asset): TrustGraphNode {
       kind: asset.kind,
       sourcePath: asset.sourcePath,
       contentHash: asset.contentHash,
-      sizeBytes: asset.sizeBytes ?? 0,
-      contentClassification: asset.contentClassification ?? "text",
-      markdownParserEligible: asset.markdownParserEligible ?? true,
+      sizeBytes: asset.sizeBytes,
+      contentClassification: asset.contentClassification,
+      markdownParserEligible: asset.markdownParserEligible,
       tags: asset.metadata.tags,
-      ...(owner ? { owner } : {}),
-      ...(asset.ownership ? { ownerSource: asset.ownership.source } : {}),
-      ...(asset.ownership?.source === "inherited"
-        ? { ownerInheritedFrom: asset.ownership.inheritedFrom }
-        : {}),
+      ownership: asset.ownership,
       ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
     },
     evidence: [

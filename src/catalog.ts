@@ -15,6 +15,7 @@ import { classifyRepositorySkillPath } from "./discovery.js";
 import { parseAssetMetadata } from "./metadata.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import type { Diagnostic, Evidence, ParsedDocument } from "./types.js";
+import { buildStaticSupportDependencies } from "./static-support.js";
 
 const QUALITY = DEFAULT_QUALITY_PROFILE;
 const PLACEHOLDER_USAGE_BOUNDARY_PATTERN =
@@ -23,24 +24,45 @@ const PLACEHOLDER_USAGE_BOUNDARY_PATTERN =
 type CatalogedKind = CatalogEntry["kind"];
 
 /** Build a deterministic catalog of skill and context entries from parsed documents. */
-export function buildCatalog(documents: ParsedDocument[]): {
+export function buildCatalog(
+  documents: ParsedDocument[],
+  repositoryPaths: ReadonlySet<string> = new Set(
+    documents.map((document) => document.artifact.path),
+  ),
+): {
   catalog: Catalog;
   diagnostics: Diagnostic[];
 } {
   const diagnostics: Diagnostic[] = [];
   const skillOwners = new Map<
     string,
-    { owner: string; id: string; sourcePath: string }
+    Array<{ owner: string | null; id: string; sourcePath: string }>
   >();
   for (const document of documents) {
     if (document.artifact.kind !== "skill") continue;
     const metadata = parseAssetMetadata(document).metadata;
-    const owner = metadata.owner?.trim();
-    if (!owner) continue;
-    skillOwners.set(path.posix.dirname(document.artifact.path), {
-      owner,
+    const skillDirectory = path.posix.dirname(document.artifact.path);
+    const candidates = skillOwners.get(skillDirectory) ?? [];
+    candidates.push({
+      owner: metadata.owner?.trim() || null,
       id: metadata.id ?? document.artifact.path,
       sourcePath: document.artifact.path,
+    });
+    skillOwners.set(skillDirectory, candidates);
+  }
+  for (const [skillDirectory, candidates] of skillOwners) {
+    if (candidates.length <= 1) continue;
+    diagnostics.push({
+      severity: "warning",
+      path: skillDirectory,
+      message:
+        "Ambiguous owning Skill evidence; local support ownership remains unowned.",
+      details: {
+        skillDirectory,
+        candidatePaths: candidates
+          .map((candidate) => candidate.sourcePath)
+          .sort((left, right) => left.localeCompare(right)),
+      },
     });
   }
   const entries = documents
@@ -77,11 +99,9 @@ export function buildCatalog(documents: ParsedDocument[]): {
           document.artifact.contentHash ??
           contentHash(document.artifact.content),
         sizeBytes: document.artifact.sizeBytes,
-        contentClassification:
-          document.artifact.contentClassification ?? "text",
-        markdownParserEligible:
-          document.artifact.markdownParserEligible ?? true,
-        ...(ownership ? { ownership } : {}),
+        contentClassification: document.artifact.contentClassification,
+        markdownParserEligible: document.artifact.markdownParserEligible,
+        ownership,
         metadata: result.metadata,
         metadataFields: result.metadataFields,
         metadataListItems: result.metadataListItems,
@@ -111,15 +131,16 @@ export function buildCatalog(documents: ParsedDocument[]): {
       return a.sourcePath.localeCompare(b.sourcePath);
     });
 
-  const dependencies = entries
-    .flatMap((entry) => dependenciesForEntry(entry))
-    .sort((a, b) => {
-      const byFrom = a.from.localeCompare(b.from);
-      if (byFrom !== 0) return byFrom;
-      const byKind = dependencyKindOrder(a.kind) - dependencyKindOrder(b.kind);
-      if (byKind !== 0) return byKind;
-      return a.to.localeCompare(b.to);
-    });
+  const dependencies = [
+    ...entries.flatMap((entry) => dependenciesForEntry(entry)),
+    ...buildStaticSupportDependencies(documents, entries, repositoryPaths),
+  ].sort((a, b) => {
+    const byFrom = a.from.localeCompare(b.from);
+    if (byFrom !== 0) return byFrom;
+    const byKind = dependencyKindOrder(a.kind) - dependencyKindOrder(b.kind);
+    if (byKind !== 0) return byKind;
+    return a.to.localeCompare(b.to);
+  });
   diagnostics.push(...dependencyDiagnostics(entries, dependencies));
   diagnostics.push(...lifecycleDiagnostics(entries));
   diagnostics.push(...conflictDiagnostics(entries));
@@ -139,18 +160,30 @@ function resolveAssetOwnership(
   metadata: AssetMetadata,
   skillOwners: ReadonlyMap<
     string,
-    { owner: string; id: string; sourcePath: string }
+    Array<{ owner: string | null; id: string; sourcePath: string }>
   >,
-): AssetOwnership | undefined {
-  const declaredOwner = metadata.owner?.trim();
-  if (declaredOwner) return undefined;
+): AssetOwnership {
+  const declaredOwner = metadata.owner?.trim() || null;
+  if (declaredOwner) {
+    return {
+      declaredOwner,
+      effectiveOwner: declaredOwner,
+      source: "declared",
+    };
+  }
 
   const classified = classifyRepositorySkillPath(document.artifact.path);
-  if (classified?.kind !== "support") return undefined;
-  const owningSkill = skillOwners.get(classified.skillDirectory);
-  if (!owningSkill) return undefined;
+  if (classified?.kind !== "support") {
+    return { declaredOwner: null, effectiveOwner: null, source: "unowned" };
+  }
+  const owningSkills = skillOwners.get(classified.skillDirectory) ?? [];
+  if (owningSkills.length !== 1 || !owningSkills[0]?.owner) {
+    return { declaredOwner: null, effectiveOwner: null, source: "unowned" };
+  }
+  const owningSkill = owningSkills[0];
   return {
-    owner: owningSkill.owner,
+    declaredOwner: null,
+    effectiveOwner: owningSkill.owner,
     source: "inherited",
     inheritedFrom: {
       id: owningSkill.id,

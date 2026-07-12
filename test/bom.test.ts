@@ -28,7 +28,7 @@ import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 test("bom report declares Repository Context BOM schema and scope", async () => {
   const report = await bom(await bomFixture());
 
-  assert.equal(report.schemaVersion, "renma.repository-context-bom.v1");
+  assert.equal(report.schemaVersion, "renma.repository-context-bom.v2");
   assert.equal(report.outputMode, "default");
   assert.equal(report.generator.name, "renma");
   assert.equal(report.generator.version, packageJson.version);
@@ -45,7 +45,7 @@ test("bom report declares Repository Context BOM schema and scope", async () => 
   });
 
   const parsed = JSON.parse(formatBomJson(report)) as BomReport;
-  assert.equal(parsed.schemaVersion, "renma.repository-context-bom.v1");
+  assert.equal(parsed.schemaVersion, "renma.repository-context-bom.v2");
   assert.equal(parsed.outputMode, "default");
   assert.equal(parsed.scope.runtimeUsage, false);
   assert.equal(parsed.scope.telemetryCollected, false);
@@ -57,6 +57,7 @@ test("bom v1 normalized contract shape is stable", async () => {
     {
       generatedAt: new Date("2026-07-10T12:00:00.000Z"),
       evaluationDate: "2026-07-10",
+      schema: "v1",
     },
   );
 
@@ -73,10 +74,11 @@ test("bom assets include catalog metadata and lifecycle evidence", async () => {
   );
 
   assert.ok(asset);
+  assert.ok(asset.ownership);
   assert.equal(asset.kind, "context");
   assert.equal(asset.sourcePath, "contexts/testing/boundary-value-analysis.md");
   assert.match(asset.contentHash, /^sha256:[a-f0-9]{64}$/);
-  assert.equal(asset.owner, "qa-platform");
+  assert.equal(asset.ownership.effectiveOwner, "qa-platform");
   assert.equal(asset.status, "stable");
   assert.equal(asset.version, "1.0.0");
   assert.deepEqual(asset.tags, ["testing"]);
@@ -462,11 +464,14 @@ test("bom CLI supports JSON and Markdown formats", async () => {
   const jsonShortcut = await withCapturedConsole(() =>
     main(["bom", root, "--json"]),
   );
+  const legacyJson = await withCapturedConsole(() =>
+    main(["bom", root, "--schema", "v1", "--json"]),
+  );
 
   assert.equal(defaultJson.code, 0);
   assert.equal(
     JSON.parse(defaultJson.stdout).schemaVersion,
-    "renma.repository-context-bom.v1",
+    "renma.repository-context-bom.v2",
   );
   assert.equal(explicitJson.code, 0);
   assert.equal(JSON.parse(explicitJson.stdout).scope.runtimeUsage, false);
@@ -474,6 +479,34 @@ test("bom CLI supports JSON and Markdown formats", async () => {
   assert.match(markdown.stdout, /^# Repository Context BOM/m);
   assert.equal(jsonShortcut.code, 0);
   assert.equal(JSON.parse(jsonShortcut.stdout).scope.telemetryCollected, false);
+  assert.equal(legacyJson.code, 0);
+  assert.equal(
+    JSON.parse(legacyJson.stdout).schemaVersion,
+    "renma.repository-context-bom.v1",
+  );
+});
+
+test("bom v1 and v2 deterministic projections are independently stable", async () => {
+  const snapshot = await collectRepositorySnapshot(await bomFixture());
+  for (const schema of ["v1", "v2"] as const) {
+    const options = {
+      schema,
+      omitGeneratedAt: true,
+      evaluationDate: "2026-07-10",
+    };
+    assert.equal(
+      formatBomJson(buildBomReport(snapshot, options)),
+      formatBomJson(buildBomReport(snapshot, options)),
+    );
+  }
+});
+
+test("bom CLI rejects unsupported schemas", async () => {
+  const result = await withCapturedConsole(() =>
+    main(["bom", ".", "--schema", "v3"]),
+  );
+  assert.equal(result.code, 2);
+  assert.match(result.stderr, /--schema must be either v1 or v2/);
 });
 
 test("bom CLI generatedAt omission JSON output is reproducible", async () => {

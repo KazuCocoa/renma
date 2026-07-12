@@ -6,7 +6,9 @@ import type {
   TrustGraphFinding,
   TrustGraphFindingSeverity,
   TrustGraphNodeType,
+  TrustGraphSchema,
 } from "../trust-graph.js";
+import { projectTrustGraphV1 } from "../trust-graph.js";
 
 export type TrustGraphFormat = "json" | "markdown";
 
@@ -24,6 +26,9 @@ const EDGE_TYPES: TrustGraphEdgeType[] = [
   "has_lifecycle_status",
   "declares_dependency",
   "references",
+  "owns_local_resource",
+  "statically_references",
+  "inherits_owner",
   "selects_security_profile",
   "inherits_policy",
   "has_effective_policy",
@@ -42,9 +47,17 @@ const REVIEW_SEVERITY_ORDER: TrustGraphFindingSeverity[] = [
 
 export async function runTrustGraphCommand(
   targetPath: string,
-  options: { format: TrustGraphFormat; overrides?: ConfigOverrides },
+  options: {
+    format: TrustGraphFormat;
+    overrides?: ConfigOverrides;
+    schema?: TrustGraphSchema;
+  },
 ): Promise<number> {
-  const graph = await trustGraph(targetPath, options.overrides ?? {});
+  const graph = await trustGraph(
+    targetPath,
+    options.overrides ?? {},
+    options.schema ?? "v2",
+  );
   process.stdout.write(formatTrustGraph(graph, options.format));
   return 0;
 }
@@ -52,12 +65,15 @@ export async function runTrustGraphCommand(
 export async function trustGraph(
   targetPath: string,
   overrides: ConfigOverrides = {},
+  schema: TrustGraphSchema = "v2",
 ): Promise<TrustGraph> {
   const result = await scan(targetPath, overrides);
   if (!result.trustGraph) {
     throw new Error("scan did not produce Trust Graph evidence.");
   }
-  return result.trustGraph;
+  return schema === "v1"
+    ? projectTrustGraphV1(result.trustGraph)
+    : result.trustGraph;
 }
 
 export function formatTrustGraphJson(graph: TrustGraph): string {

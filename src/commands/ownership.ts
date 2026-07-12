@@ -4,6 +4,7 @@ import {
   effectiveAssetOwner,
   type Asset,
   type AssetKind,
+  type AssetOwnership,
   type AssetStatus,
 } from "../model.js";
 import type { Diagnostic } from "../types.js";
@@ -22,6 +23,7 @@ export interface UnownedAsset {
   id: string;
   kind: AssetKind;
   sourcePath: string;
+  ownership: AssetOwnership;
   status?: AssetStatus;
   tags: string[];
 }
@@ -30,9 +32,7 @@ export interface OwnedAsset {
   id: string;
   kind: AssetKind;
   sourcePath: string;
-  owner: string;
-  ownerSource?: "declared" | "inherited";
-  ownerInheritedFrom?: { id: string; sourcePath: string };
+  ownership: AssetOwnership;
   status: AssetStatus | null;
   tags: string[];
 }
@@ -46,7 +46,7 @@ export interface OwnershipOwnerSummary {
   owner: string;
   totalAssets: number;
   byKind: OwnershipOwnerKindSummary[];
-  assets: Omit<OwnedAsset, "owner">[];
+  assets: OwnedAsset[];
 }
 
 export interface OwnershipReport {
@@ -107,7 +107,9 @@ export async function ownership(
     .map(toUnownedAsset);
   const ownedAssetList = assets.filter(hasOwner).map(toOwnedAsset);
   const filteredOwnedAssetList = ownerFilter
-    ? ownedAssetList.filter((asset) => asset.owner === ownerFilter)
+    ? ownedAssetList.filter(
+        (asset) => asset.ownership.effectiveOwner === ownerFilter,
+      )
     : ownedAssetList;
 
   return {
@@ -187,11 +189,11 @@ export function formatOwnershipMarkdown(report: OwnershipReport): string {
     if (report.ownedAssetList.length === 0) {
       lines.push("(none)");
     } else {
-      lines.push("| ID | Kind | Source | Owner | Status | Tags |");
+      lines.push("| ID | Kind | Source | Ownership | Status | Tags |");
       lines.push("| --- | --- | --- | --- | --- | --- |");
       for (const asset of report.ownedAssetList) {
         lines.push(
-          `| ${asset.id} | ${asset.kind} | ${asset.sourcePath} | ${asset.owner} | ${asset.status ?? ""} | ${asset.tags.join(", ")} |`,
+          `| ${asset.id} | ${asset.kind} | ${asset.sourcePath} | ${formatAssetOwnership(asset.ownership)} | ${asset.status ?? ""} | ${asset.tags.join(", ")} |`,
         );
       }
     }
@@ -229,20 +231,17 @@ function appendOwners(lines: string[], owners: OwnershipOwnerSummary[]): void {
   }
 }
 
-function appendOwnerAssets(
-  lines: string[],
-  assets: Omit<OwnedAsset, "owner">[],
-): void {
+function appendOwnerAssets(lines: string[], assets: OwnedAsset[]): void {
   if (assets.length === 0) {
     lines.push("(none)");
     return;
   }
 
-  lines.push("| ID | Kind | Source | Status | Tags |");
-  lines.push("| --- | --- | --- | --- | --- |");
+  lines.push("| ID | Kind | Source | Ownership | Status | Tags |");
+  lines.push("| --- | --- | --- | --- | --- | --- |");
   for (const asset of assets) {
     lines.push(
-      `| ${asset.id} | ${asset.kind} | ${asset.sourcePath} | ${asset.status ?? ""} | ${asset.tags.join(", ")} |`,
+      `| ${asset.id} | ${asset.kind} | ${asset.sourcePath} | ${formatAssetOwnership(asset.ownership)} | ${asset.status ?? ""} | ${asset.tags.join(", ")} |`,
     );
   }
 }
@@ -253,11 +252,11 @@ function appendUnownedAssets(lines: string[], assets: UnownedAsset[]): void {
     return;
   }
 
-  lines.push("| ID | Kind | Source | Status | Tags |");
-  lines.push("| --- | --- | --- | --- | --- |");
+  lines.push("| ID | Kind | Source | Ownership | Status | Tags |");
+  lines.push("| --- | --- | --- | --- | --- | --- |");
   for (const asset of assets) {
     lines.push(
-      `| ${asset.id} | ${asset.kind} | ${asset.sourcePath} | ${asset.status ?? ""} | ${asset.tags.join(", ")} |`,
+      `| ${asset.id} | ${asset.kind} | ${asset.sourcePath} | ${formatAssetOwnership(asset.ownership)} | ${asset.status ?? ""} | ${asset.tags.join(", ")} |`,
     );
   }
 }
@@ -291,9 +290,11 @@ function summarizeByKind(assets: Asset[]): OwnershipKindSummary[] {
 function summarizeByOwner(assets: OwnedAsset[]): OwnershipOwnerSummary[] {
   const summaries = new Map<string, OwnedAsset[]>();
   for (const asset of assets) {
-    const ownerAssets = summaries.get(asset.owner) ?? [];
+    const owner = asset.ownership.effectiveOwner;
+    if (!owner) continue;
+    const ownerAssets = summaries.get(owner) ?? [];
     ownerAssets.push(asset);
-    summaries.set(asset.owner, ownerAssets);
+    summaries.set(owner, ownerAssets);
   }
 
   return [...summaries.entries()]
@@ -302,22 +303,8 @@ function summarizeByOwner(assets: OwnedAsset[]): OwnershipOwnerSummary[] {
       owner,
       totalAssets: ownerAssets.length,
       byKind: summarizeOwnerByKind(ownerAssets),
-      assets: ownerAssets.map(toOwnerAsset),
+      assets: ownerAssets,
     }));
-}
-
-function toOwnerAsset(asset: OwnedAsset): Omit<OwnedAsset, "owner"> {
-  return {
-    id: asset.id,
-    kind: asset.kind,
-    sourcePath: asset.sourcePath,
-    ...(asset.ownerSource ? { ownerSource: asset.ownerSource } : {}),
-    ...(asset.ownerInheritedFrom
-      ? { ownerInheritedFrom: asset.ownerInheritedFrom }
-      : {}),
-    status: asset.status,
-    tags: asset.tags,
-  };
 }
 
 function summarizeOwnerByKind(
@@ -347,29 +334,30 @@ function toUnownedAsset(asset: Asset): UnownedAsset {
     id: asset.id,
     kind: asset.kind,
     sourcePath: asset.sourcePath,
+    ownership: asset.ownership,
     ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
     tags: asset.metadata.tags,
   };
 }
 
 function toOwnedAsset(asset: Asset): OwnedAsset {
-  const owner = effectiveAssetOwner(asset) ?? "";
   return {
     id: asset.id,
     kind: asset.kind,
     sourcePath: asset.sourcePath,
-    owner,
-    ...(asset.ownership
-      ? {
-          ownerSource: asset.ownership.source,
-          ...(asset.ownership.source === "inherited"
-            ? { ownerInheritedFrom: asset.ownership.inheritedFrom }
-            : {}),
-        }
-      : {}),
+    ownership: asset.ownership,
     status: asset.metadata.status ?? null,
     tags: asset.metadata.tags,
   };
+}
+
+function formatAssetOwnership(ownership: AssetOwnership): string {
+  if (ownership.source === "unowned") return "(unowned)";
+  const provenance =
+    ownership.source === "inherited" && ownership.inheritedFrom
+      ? ` from ${ownership.inheritedFrom.sourcePath}`
+      : "";
+  return `${ownership.effectiveOwner ?? "(unowned)"} (${ownership.source}${provenance})`;
 }
 
 function hasOwner(asset: Asset): boolean {

@@ -128,7 +128,7 @@ test("graph markdown output includes node and edge tables", async () => {
   );
   assert.match(
     markdown,
-    /\| demo \| skill \| skills\/demo\/SKILL\.md \| platform \| {2}\| {2}\|/,
+    /\| demo \| skill \| skills\/demo\/SKILL\.md \| platform \(declared\) \| {2}\| {2}\|/,
   );
   assert.match(markdown, /## Edges/);
   assert.match(markdown, /\| From \| Kind \| To \| Resolved \| Target \|/);
@@ -262,6 +262,11 @@ test("graph mermaid output escapes labels and keeps diagnostics as comments", ()
           id: 'quote-"node"\nnext',
           kind: "context",
           sourcePath: "contexts/quote.md",
+          ownership: {
+            declaredOwner: null,
+            effectiveOwner: null,
+            source: "unowned",
+          },
           tags: [],
         },
       ],

@@ -8,11 +8,11 @@ import {
 import type {
   Asset,
   AssetKind,
+  AssetOwnership,
   AssetStatus,
   Dependency,
   DependencyKind,
 } from "../model.js";
-import { effectiveAssetOwner } from "../model.js";
 import { classifyRepositorySkillEntrypointPath } from "../discovery.js";
 import {
   collectRepositoryEvidence,
@@ -44,9 +44,7 @@ export interface GraphNode {
   sizeBytes?: number;
   contentClassification?: "text" | "binary";
   markdownParserEligible?: boolean;
-  owner?: string;
-  ownerSource?: "declared" | "inherited";
-  ownerInheritedFrom?: { id: string; sourcePath: string };
+  ownership: AssetOwnership;
   status?: AssetStatus;
   tags: string[];
   groupedCount?: number;
@@ -330,7 +328,7 @@ export function formatGraphMarkdown(
   } else {
     for (const node of report.nodes) {
       lines.push(
-        `| ${node.id} | ${node.kind} | ${node.sourcePath} | ${node.owner ?? ""} | ${node.status ?? ""} | ${node.tags.join(", ")} |`,
+        `| ${node.id} | ${node.kind} | ${node.sourcePath} | ${formatOwnership(node.ownership)} | ${node.status ?? ""} | ${node.tags.join(", ")} |`,
       );
     }
   }
@@ -432,6 +430,7 @@ function graphViewReport(report: GraphReport, view: GraphView): GraphReport {
         id: to,
         kind: "context",
         sourcePath: to,
+        ownership: unownedOwnership(),
         tags: [],
         groupedCount: 1,
       });
@@ -473,6 +472,7 @@ function projectedNode(node: GraphNode, view: GraphView): GraphNode {
     id: groupId,
     kind: node.kind,
     sourcePath: groupId,
+    ownership: unownedOwnership(),
     tags: [],
     groupedCount: 0,
   };
@@ -621,27 +621,35 @@ function singleLine(value: string): string {
 }
 
 function toNode(asset: Asset): GraphNode {
-  const owner = effectiveAssetOwner(asset);
   return {
     id: asset.id,
     kind: asset.kind,
     sourcePath: asset.sourcePath,
     contentHash: asset.contentHash,
-    sizeBytes: asset.sizeBytes ?? 0,
-    contentClassification: asset.contentClassification ?? "text",
-    markdownParserEligible: asset.markdownParserEligible ?? true,
-    ...(owner ? { owner } : {}),
-    ...(asset.ownership
-      ? {
-          ownerSource: asset.ownership.source,
-          ...(asset.ownership.source === "inherited"
-            ? { ownerInheritedFrom: asset.ownership.inheritedFrom }
-            : {}),
-        }
-      : {}),
+    sizeBytes: asset.sizeBytes,
+    contentClassification: asset.contentClassification,
+    markdownParserEligible: asset.markdownParserEligible,
+    ownership: asset.ownership,
     ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
     tags: asset.metadata.tags,
   };
+}
+
+function unownedOwnership(): AssetOwnership {
+  return {
+    declaredOwner: null,
+    effectiveOwner: null,
+    source: "unowned",
+  };
+}
+
+function formatOwnership(ownership: AssetOwnership): string {
+  if (ownership.source === "unowned") return "(unowned)";
+  const provenance =
+    ownership.source === "inherited" && ownership.inheritedFrom
+      ? ` from ${ownership.inheritedFrom.sourcePath}`
+      : "";
+  return `${ownership.effectiveOwner ?? "(unowned)"} (${ownership.source}${provenance})`;
 }
 
 function toEdge(dependency: Dependency, assets: Asset[]): GraphEdge {

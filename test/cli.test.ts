@@ -914,32 +914,44 @@ test("CLI prints catalog JSON and markdown", async () => {
     conflicts: [],
     supersededBy: [],
   });
-  assert.deepEqual(report.catalog.dependencies, [
-    {
-      from: "demo",
-      to: "demo.guide",
-      kind: "requires",
-      sourcePath: "skills/demo/SKILL.md",
-      evidence: {
-        path: "skills/demo/SKILL.md",
-        startLine: 12,
-        endLine: 12,
-        snippet: `  renma.requires-context: '["demo.guide","testing.boundary-value-analysis"]'`,
+  assert.deepEqual(
+    report.catalog.dependencies.filter(
+      (dependency) => dependency.kind === "requires",
+    ),
+    [
+      {
+        from: "demo",
+        to: "demo.guide",
+        kind: "requires",
+        sourcePath: "skills/demo/SKILL.md",
+        evidence: {
+          path: "skills/demo/SKILL.md",
+          startLine: 12,
+          endLine: 12,
+          snippet: `  renma.requires-context: '["demo.guide","testing.boundary-value-analysis"]'`,
+        },
       },
-    },
-    {
-      from: "demo",
-      to: "testing.boundary-value-analysis",
-      kind: "requires",
-      sourcePath: "skills/demo/SKILL.md",
-      evidence: {
-        path: "skills/demo/SKILL.md",
-        startLine: 12,
-        endLine: 12,
-        snippet: `  renma.requires-context: '["demo.guide","testing.boundary-value-analysis"]'`,
+      {
+        from: "demo",
+        to: "testing.boundary-value-analysis",
+        kind: "requires",
+        sourcePath: "skills/demo/SKILL.md",
+        evidence: {
+          path: "skills/demo/SKILL.md",
+          startLine: 12,
+          endLine: 12,
+          snippet: `  renma.requires-context: '["demo.guide","testing.boundary-value-analysis"]'`,
+        },
       },
-    },
-  ]);
+    ],
+  );
+  assert.ok(
+    report.catalog.dependencies.some(
+      (dependency) =>
+        dependency.kind === "owns_local_resource" &&
+        dependency.to === "demo.guide",
+    ),
+  );
 
   const markdown = await withCapturedConsole(() =>
     main(["catalog", root, "--format", "markdown"]),

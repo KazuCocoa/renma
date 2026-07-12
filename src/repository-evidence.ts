@@ -8,7 +8,12 @@ import {
 import { discoverArtifacts } from "./discovery.js";
 import { parseDocument } from "./markdown.js";
 import type { Catalog } from "./model.js";
-import { collectRepositoryPaths } from "./repository-paths.js";
+import {
+  collectRepositoryPaths,
+  collectRepositoryPathStates,
+  repositoryPathCandidates,
+  type RepositoryPathState,
+} from "./repository-paths.js";
 import type {
   Artifact,
   Diagnostic,
@@ -30,6 +35,7 @@ export interface RepositorySnapshot extends RepositoryEvidence {
   artifacts: Artifact[];
   documents: ParsedDocument[];
   repositoryPaths: ReadonlySet<string>;
+  repositoryPathStates: ReadonlyMap<string, RepositoryPathState>;
   discoveryDiagnostics: Diagnostic[];
   catalogDiagnostics: Diagnostic[];
   contextLensDiagnostics: Diagnostic[];
@@ -62,7 +68,7 @@ export async function collectRepositorySnapshot(
     discoveredPaths,
   } = await discoverArtifacts(root, config);
   const documents = artifacts.map(parseDocument);
-  const built = buildCatalog(documents);
+  const built = buildCatalog(documents, discoveredPaths);
   const contextLens = summarizeContextLensGovernance(documents, built.catalog);
   const repositoryPaths = await collectRepositoryPaths(
     root,
@@ -70,6 +76,12 @@ export async function collectRepositorySnapshot(
     documents,
     built.catalog,
     discoveredPaths,
+  );
+  const repositoryPathStates = await collectRepositoryPathStates(
+    root,
+    [...repositoryPaths, ...repositoryPathCandidates(documents, built.catalog)],
+    artifacts,
+    config,
   );
 
   return {
@@ -79,6 +91,7 @@ export async function collectRepositorySnapshot(
     artifacts,
     documents,
     repositoryPaths,
+    repositoryPathStates,
     scannedFileCount: artifacts.length,
     catalog: built.catalog,
     contextLens: contextLens.summary,

@@ -13,6 +13,10 @@ import {
 } from "./security-policy.js";
 import type { Artifact, Finding, RiskClass, SecurityConfig } from "./types.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
+import {
+  policyArtifactFor,
+  skillArtifactsByDirectory,
+} from "./security-policy-inventory.js";
 
 type SecurityCategory = "safety";
 
@@ -687,20 +691,34 @@ export function securityDiagnosticFindings(
   artifacts: Artifact[],
   config: SecurityDiagnosticsConfig = {},
 ): Finding[] {
+  const owningSkills = skillArtifactsByDirectory(artifacts);
   return artifacts.flatMap((artifact) =>
-    securityFindingsForArtifact(artifact, config.security),
+    securityFindingsForArtifact(
+      artifact,
+      config.security,
+      artifact.kind === "script" || artifact.kind === "asset"
+        ? policyArtifactFor(artifact, owningSkills)
+        : artifact,
+    ),
   );
 }
 
 function securityFindingsForArtifact(
   artifact: Artifact,
   securityConfig?: SecurityConfig,
+  policyArtifact?: Artifact,
 ): Finding[] {
-  const policyResolution = resolveOperationalSecurityPolicy(artifact);
+  if (artifact.kind === "asset" || artifact.contentClassification === "binary")
+    return [];
+  const policyResolution = resolveOperationalSecurityPolicy(
+    policyArtifact ?? { ...artifact, content: "" },
+  );
   const parsedPolicy = policyResolution.policy;
   const policy = applySecurityConfig(parsedPolicy, securityConfig);
   const detections: Detection[] = [
-    ...invalidCanonicalSecurityDetections(policyResolution.issues),
+    ...(policyArtifact === artifact
+      ? invalidCanonicalSecurityDetections(policyResolution.issues)
+      : []),
     ...securityPolicyResolutionDetections(
       parsedPolicy,
       policy,

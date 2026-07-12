@@ -4,7 +4,7 @@ import packageJson from "../package.json" with { type: "json" };
  * Renma's versioned deterministic quality policy.
  *
  * These values are Renma advisories unless a field is explicitly grouped
- * under `agentSkills`. They are deliberately internal in 0.18.0: repositories
+ * under `agentSkills`. They are deliberately internal: repositories
  * cannot override them through renma.config.json yet.
  */
 export const RENMA_QUALITY_PROFILE_VERSION =

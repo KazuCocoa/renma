@@ -69,9 +69,9 @@ test("canonical Skill metadata is operational while pre-0.16 metadata is migrati
     (node) => node.sourcePath === "skills/demo/SKILL.md",
   );
   assert.equal(canonicalGraphSkill?.id, "skill.demo");
-  assert.equal(canonicalGraphSkill?.owner, "qa-platform");
+  assert.equal(canonicalGraphSkill?.ownership.effectiveOwner, "qa-platform");
   assert.equal(legacyGraphSkill?.id, "skills/demo/SKILL.md");
-  assert.equal(legacyGraphSkill?.owner, undefined);
+  assert.equal(legacyGraphSkill?.ownership.effectiveOwner, null);
   assert.equal(
     legacy.graph.edges.some((edge) => edge.from === "skills/demo/SKILL.md"),
     false,
@@ -87,8 +87,16 @@ test("canonical Skill metadata is operational while pre-0.16 metadata is migrati
   const legacyBomSkill = (
     legacy.bom.assets as Array<Record<string, unknown>>
   ).find((asset) => asset.sourcePath === "skills/demo/SKILL.md");
-  assert.equal(canonicalBomSkill?.owner, "qa-platform");
-  assert.equal(legacyBomSkill?.owner, undefined);
+  assert.deepEqual(canonicalBomSkill?.ownership, {
+    declaredOwner: "qa-platform",
+    effectiveOwner: "qa-platform",
+    source: "declared",
+  });
+  assert.deepEqual(legacyBomSkill?.ownership, {
+    declaredOwner: null,
+    effectiveOwner: null,
+    source: "unowned",
+  });
 
   assert.ok(canonical.inspect);
   assert.ok(legacy.inspect);
@@ -105,7 +113,11 @@ test("canonical Skill metadata is operational while pre-0.16 metadata is migrati
       | undefined
   )?.find((node) => node.id === "asset:skills/demo/SKILL.md");
   assert.ok(legacyTrustSkill);
-  assert.equal(legacyTrustSkill.properties?.owner, undefined);
+  assert.deepEqual(legacyTrustSkill.properties?.ownership, {
+    declaredOwner: null,
+    effectiveOwner: null,
+    source: "unowned",
+  });
   assert.equal(
     legacy.trustGraph.edges?.some(
       (edge) =>
@@ -337,7 +349,7 @@ when_not_to_use: runtime execution
 
   const graphNode = graph.nodes.find((node) => node.id === fallbackId);
   assert.ok(graphNode);
-  assert.equal(graphNode.owner, undefined);
+  assert.equal(graphNode.ownership.effectiveOwner, null);
   assert.equal(graphNode.status, undefined);
   assert.equal(
     graph.edges.some((edge) => edge.from === fallbackId),
@@ -346,7 +358,8 @@ when_not_to_use: runtime execution
 
   const bomAsset = bom.assets.find((candidate) => candidate.id === fallbackId);
   assert.ok(bomAsset);
-  assert.equal(bomAsset.owner, undefined);
+  assert.ok(bomAsset.ownership);
+  assert.equal(bomAsset.ownership.effectiveOwner, null);
   assert.equal(bomAsset.status, undefined);
   assert.deepEqual(bomAsset.dependencies, []);
 
@@ -355,7 +368,11 @@ when_not_to_use: runtime execution
     (node) => node.id === trustNodeId,
   );
   assert.ok(trustNode);
-  assert.equal(trustNode.properties?.owner, undefined);
+  assert.deepEqual(trustNode.properties?.ownership, {
+    declaredOwner: null,
+    effectiveOwner: null,
+    source: "unowned",
+  });
   assert.equal(trustNode.properties?.status, undefined);
   assert.equal(
     scan.trustGraph?.edges.some(

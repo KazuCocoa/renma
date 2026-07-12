@@ -10,23 +10,26 @@ import type { ConfigOverrides } from "../config.js";
 import type {
   Asset,
   AssetKind,
+  AssetOwnership,
   AssetStatus,
   DependencyKind,
 } from "../model.js";
-import { effectiveAssetOwner } from "../model.js";
 import {
   collectRepositorySnapshot,
   type RepositorySnapshot,
 } from "../repository-evidence.js";
 import type { SecurityPolicyInventorySummary } from "../security-policy-inventory.js";
+import { summarizeSecurityPolicyInventory } from "../security-policy-inventory.js";
 import type { SecurityPostureSummary } from "../security-posture.js";
 import type { Diagnostic } from "../types.js";
 
 export type BomFormat = "json" | "markdown";
 export type BomOutputMode = "default" | "omit_generated_at";
+export type BomSchema = "v1" | "v2";
 
 export interface BomOptions {
   omitGeneratedAt?: boolean;
+  schema?: BomSchema;
 }
 
 interface BomBuildOptions extends BomOptions {
@@ -35,7 +38,9 @@ interface BomBuildOptions extends BomOptions {
 }
 
 export interface BomReport {
-  schemaVersion: "renma.repository-context-bom.v1";
+  schemaVersion:
+    | "renma.repository-context-bom.v1"
+    | "renma.repository-context-bom.v2";
   generatedAt?: string;
   outputMode: BomOutputMode;
   generator: {
@@ -83,12 +88,12 @@ export interface BomAsset {
   kind: AssetKind;
   sourcePath: string;
   contentHash: string;
-  sizeBytes?: number;
-  contentClassification?: "text" | "binary";
-  markdownParserEligible?: boolean;
+  sizeBytes: number;
+  contentClassification: "text" | "binary";
+  markdownParserEligible: boolean;
+  ownership?: AssetOwnership;
+  /** Legacy v1 projection. V2 always uses ownership. */
   owner?: string;
-  ownerSource?: "declared" | "inherited";
-  ownerInheritedFrom?: { id: string; sourcePath: string };
   status?: AssetStatus;
   version?: string;
   tags: string[];
@@ -137,10 +142,12 @@ export async function runBomCommand(
     format: BomFormat;
     overrides?: ConfigOverrides;
     omitGeneratedAt?: boolean;
+    schema?: BomSchema;
   },
 ): Promise<number> {
   const report = await bom(targetPath, options.overrides ?? {}, {
     omitGeneratedAt: options.omitGeneratedAt === true,
+    schema: options.schema ?? "v2",
   });
   process.stdout.write(
     options.format === "json"
@@ -170,21 +177,51 @@ export function buildBomReport(
   options: BomBuildOptions = {},
 ): BomReport {
   const graphReport = graphFromRepositorySnapshot(snapshot);
+  const schema = options.schema ?? "v2";
+  const readinessGraph =
+    schema === "v1" ? declaredOwnershipGraph(graphReport) : graphReport;
   const scanResult = scanFromRepositorySnapshot(
     snapshot,
     options.evaluationDate === undefined
       ? {}
       : { evaluationDate: options.evaluationDate },
   );
-  const readinessReport = buildReadinessReport(
-    graphReport,
+  const securityPolicyInventory =
+    schema === "v1"
+      ? summarizeSecurityPolicyInventory(
+          snapshot.artifacts,
+          snapshot.config.security,
+          "v1",
+        )
+      : scanResult.securityPolicyInventory;
+  const builtReadinessReport = buildReadinessReport(
+    readinessGraph,
     scanResult.findings,
     scanResult.diagnostics,
     scanResult.contextLens,
-    scanResult.securityPolicyInventory,
+    securityPolicyInventory,
     scanResult.agentSkills,
   );
-  const dependencies = stableEdges(graphReport.edges).map(toBomDependency);
+  const readinessReport =
+    schema === "v1"
+      ? {
+          ...builtReadinessReport,
+          checks: builtReadinessReport.checks.map((check) =>
+            check.id === "ownership.coverage"
+              ? {
+                  ...check,
+                  summary:
+                    builtReadinessReport.summary.unownedAssets === 0
+                      ? "All cataloged assets declare an owner."
+                      : `${builtReadinessReport.summary.unownedAssets} of ${builtReadinessReport.summary.totalAssets} cataloged assets do not declare an owner.`,
+                }
+              : check,
+          ),
+        }
+      : builtReadinessReport;
+  const dependencies = stableEdges(
+    schema === "v1" ? readinessGraph.edges : graphReport.edges,
+  ).map(toBomDependency);
   const diagnostics = stableDiagnostics(
     dedupeDiagnostics([
       ...snapshot.diagnostics,
@@ -196,7 +233,7 @@ export function buildBomReport(
   const omitGeneratedAt = options.omitGeneratedAt === true;
 
   return {
-    schemaVersion: "renma.repository-context-bom.v1",
+    schemaVersion: `renma.repository-context-bom.${schema}`,
     outputMode: omitGeneratedAt ? "omit_generated_at" : "default",
     ...(omitGeneratedAt ? {} : { generatedAt: generatedAtIso(options) }),
     generator: {
@@ -212,7 +249,7 @@ export function buildBomReport(
     },
     summary: {
       scannedFileCount: snapshot.scannedFileCount,
-      assetCount: snapshot.catalog.assets.length,
+      assetCount: readinessGraph.nodes.length,
       dependencyCount: dependencies.length,
       resolvedDependencyCount: dependencies.filter(
         (dependency) => dependency.resolved,
@@ -226,9 +263,13 @@ export function buildBomReport(
       readinessLevel: readinessReport.level,
       diagnosticCounts,
     },
-    assets: stableAssets(snapshot.catalog.assets).map((asset) =>
-      toBomAsset(asset, dependencies, diagnostics),
-    ),
+    assets: stableAssets(
+      schema === "v1"
+        ? snapshot.catalog.assets.filter(
+            (asset) => asset.kind !== "script" && asset.kind !== "asset",
+          )
+        : snapshot.catalog.assets,
+    ).map((asset) => toBomAsset(asset, dependencies, diagnostics, schema)),
     dependencies,
     readiness: {
       score: readinessReport.score,
@@ -289,7 +330,7 @@ export function formatBomMarkdown(report: BomReport): string {
         `| ${escapeTableCell(asset.id)} | ${escapeTableCell(asset.kind)} | ${escapeTableCell(
           asset.sourcePath,
         )} | ${shortHash(asset.contentHash)} | ${escapeTableCell(
-          asset.owner ?? "",
+          bomAssetOwner(asset),
         )} | ${escapeTableCell(asset.status ?? "")} | ${asset.dependencies.length} |`,
       );
     }
@@ -367,26 +408,22 @@ function toBomAsset(
   asset: Asset,
   dependencies: BomDependency[],
   diagnostics: Diagnostic[],
+  schema: BomSchema,
 ): BomAsset {
   const lifecycle = assetLifecycle(asset);
-  const owner = effectiveAssetOwner(asset);
   return {
     id: asset.id,
     kind: asset.kind,
     sourcePath: asset.sourcePath,
     contentHash: asset.contentHash,
-    sizeBytes: asset.sizeBytes ?? 0,
-    contentClassification: asset.contentClassification ?? "text",
-    markdownParserEligible: asset.markdownParserEligible ?? true,
-    ...(owner ? { owner } : {}),
-    ...(asset.ownership
-      ? {
-          ownerSource: asset.ownership.source,
-          ...(asset.ownership.source === "inherited"
-            ? { ownerInheritedFrom: asset.ownership.inheritedFrom }
-            : {}),
-        }
-      : {}),
+    sizeBytes: asset.sizeBytes,
+    contentClassification: asset.contentClassification,
+    markdownParserEligible: asset.markdownParserEligible,
+    ...(schema === "v2"
+      ? { ownership: asset.ownership }
+      : asset.ownership.declaredOwner
+        ? { owner: asset.ownership.declaredOwner }
+        : {}),
     ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
     ...(asset.metadata.version ? { version: asset.metadata.version } : {}),
     tags: [...asset.metadata.tags].sort((left, right) =>
@@ -401,6 +438,71 @@ function toBomAsset(
       .map(toAssetDependent),
     diagnostics: diagnosticsForPath(diagnostics, asset.sourcePath),
   };
+}
+
+function formatOwnership(ownership: AssetOwnership): string {
+  if (ownership.source === "unowned") return "(unowned)";
+  const provenance =
+    ownership.source === "inherited" && ownership.inheritedFrom
+      ? ` from ${ownership.inheritedFrom.sourcePath}`
+      : "";
+  return `${ownership.effectiveOwner ?? "(unowned)"} (${ownership.source}${provenance})`;
+}
+
+function bomAssetOwner(asset: BomAsset): string {
+  if (asset.ownership) return formatOwnership(asset.ownership);
+  return asset.owner ? `${asset.owner} (declared)` : "(unowned)";
+}
+
+function declaredOwnershipGraph(
+  graphReport: ReturnType<typeof graphFromRepositorySnapshot>,
+): ReturnType<typeof graphFromRepositorySnapshot> {
+  const omittedNodeIds = new Set(
+    graphReport.nodes
+      .filter((node) => node.kind === "script" || node.kind === "asset")
+      .map((node) => node.id),
+  );
+  const nodes = graphReport.nodes.filter(
+    (node) => !omittedNodeIds.has(node.id),
+  );
+  const edges = graphReport.edges.filter(
+    (edge) =>
+      !isV2StaticEdge(edge) &&
+      !omittedNodeIds.has(edge.from) &&
+      !omittedNodeIds.has(edge.targetId ?? edge.to),
+  );
+  return {
+    ...graphReport,
+    nodeCount: nodes.length,
+    edgeCount: edges.length,
+    edges,
+    nodes: nodes.map((node) => {
+      const declaredOwner = node.ownership.declaredOwner;
+      return {
+        ...node,
+        ownership: declaredOwner
+          ? {
+              declaredOwner,
+              effectiveOwner: declaredOwner,
+              source: "declared" as const,
+            }
+          : {
+              declaredOwner: null,
+              effectiveOwner: null,
+              source: "unowned" as const,
+            },
+      };
+    }),
+  };
+}
+
+function isV2StaticEdge(edge: GraphEdge): boolean {
+  return [
+    "owns_local_resource",
+    "statically_references",
+    "inherits_owner",
+    "inherits_policy",
+  ].includes(edge.kind);
 }
 
 function assetLifecycle(asset: Asset): BomAssetLifecycle | undefined {

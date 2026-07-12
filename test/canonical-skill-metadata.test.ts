@@ -724,7 +724,7 @@ test("repository release-prep is fully canonical with unchanged operational beha
   assert.equal(graphNode?.id, "skill.release-prep");
   assert.equal(graphNode?.kind, "skill");
   assert.equal(graphNode?.sourcePath, relativePath);
-  assert.equal(graphNode?.owner, "maintainers");
+  assert.equal(graphNode?.ownership.effectiveOwner, "maintainers");
   assert.equal(graphNode?.status, "stable");
   assert.deepEqual(graphNode?.tags, ["release", "maintenance", "dogfooding"]);
   assert.equal(graphNode?.contentClassification, "text");
@@ -746,7 +746,8 @@ test("repository release-prep is fully canonical with unchanged operational beha
     (asset) => asset.id === "skill.release-prep",
   );
   assert.ok(bomAsset);
-  assert.equal(bomAsset.owner, "maintainers");
+  assert.ok(bomAsset.ownership);
+  assert.equal(bomAsset.ownership.effectiveOwner, "maintainers");
   assert.equal(bomAsset.status, "stable");
   assert.equal(bomAsset.version, "0.1.0");
   assert.deepEqual(bomAsset.tags, ["dogfooding", "maintenance", "release"]);

@@ -81,6 +81,10 @@ const OPTION_HELP = {
     description:
       "Create selected Skill-local directories: references,scripts,assets.",
   },
+  schema: {
+    flags: "--schema <v1|v2>",
+    description: "Select an explicit report schema. Defaults to v2.",
+  },
   tags: {
     flags: "--tags <tags>",
     description: "Set comma-separated or repeated scaffold tags.",
@@ -253,6 +257,7 @@ export const COMMAND_HELP = [
     examples: [
       "renma trust-graph . --format markdown",
       "renma trust-graph . --format json",
+      "renma trust-graph . --schema v1 --format json",
     ],
     interpretation: [
       "The report connects evidence; it does not decide trust for you.",
@@ -271,6 +276,7 @@ export const COMMAND_HELP = [
         description: "Output format: json or markdown. Defaults to json.",
       },
       "json",
+      "schema",
       "help",
     ],
   },
@@ -333,6 +339,7 @@ export const COMMAND_HELP = [
     examples: [
       "renma bom . --format json",
       "renma bom . --format markdown",
+      "renma bom . --schema v1 --format json",
       "renma bom . --format json --omit-generated-at",
     ],
     interpretation: [
@@ -353,6 +360,7 @@ export const COMMAND_HELP = [
         description: "Output format: json or markdown. Defaults to json.",
       },
       "json",
+      "schema",
       "omit-generated-at",
       "help",
     ],

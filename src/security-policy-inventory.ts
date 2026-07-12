@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { classifyRepositorySkillPath } from "./discovery.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import {
   applySecurityConfig,
@@ -76,6 +77,8 @@ export interface SecurityPolicyAssetEvidence {
   path: string;
   kind: ArtifactKind;
   hasLocalPolicyMetadata: boolean;
+  policySource: "local" | "inherited" | "none";
+  inheritedFrom?: { id: string; sourcePath: string };
   selectedSecurityProfile?: string;
   profileResolution: SecurityProfileResolution;
   profileChain: string[];
@@ -126,17 +129,30 @@ const LOCAL_POLICY_METADATA_FIELDS = new Set([
 export function summarizeSecurityPolicyInventory(
   artifacts: Artifact[],
   config?: SecurityConfig,
+  schema: "v1" | "v2" = "v2",
 ): SecurityPolicyInventorySummary {
   const summary = zeroSecurityPolicyInventorySummary();
   const networkDestinations = new Map<string, number>();
   const uploadDestinations = new Map<string, number>();
   const forbiddenInputs = new Map<string, number>();
   const profileNames = new Map<string, number>();
+  const owningSkills = skillArtifactsByDirectory(artifacts);
 
   for (const artifact of artifacts) {
-    const parsedPolicy = parseOperationalSecurityPolicy(artifact);
+    if (
+      schema === "v1" &&
+      (artifact.kind === "script" || artifact.kind === "asset")
+    ) {
+      continue;
+    }
+    const policyArtifact = policyArtifactFor(artifact, owningSkills);
+    if (isRawSupportArtifact(artifact) && !policyArtifact) continue;
+    const parsedPolicy = parseOperationalSecurityPolicy(
+      policyArtifact ?? artifact,
+    );
     const hasMetadata = hasLocalSecurityPolicyMetadata(parsedPolicy);
-    if (!isPolicyInventoryArtifact(artifact, hasMetadata)) continue;
+    if (!isPolicyInventoryArtifact(artifact, hasMetadata, policyArtifact))
+      continue;
 
     const policy = applySecurityConfig(parsedPolicy, config);
     summary.totalPolicyAssets += 1;
@@ -204,24 +220,42 @@ export function collectSecurityPolicyAssetEvidence(
   artifacts: Artifact[],
   config?: SecurityConfig,
 ): SecurityPolicyAssetEvidence[] {
+  const owningSkills = skillArtifactsByDirectory(artifacts);
   return artifacts
     .map((artifact): SecurityPolicyAssetEvidence | undefined => {
-      const parsedPolicy = parseOperationalSecurityPolicy(artifact);
+      const policyArtifact = policyArtifactFor(artifact, owningSkills);
+      if (isRawSupportArtifact(artifact) && !policyArtifact) return undefined;
+      const evidenceArtifact = policyArtifact ?? artifact;
+      const parsedPolicy = parseOperationalSecurityPolicy(evidenceArtifact);
       const hasMetadata = hasLocalSecurityPolicyMetadata(parsedPolicy);
-      if (!isPolicyInventoryArtifact(artifact, hasMetadata)) return undefined;
+      if (!isPolicyInventoryArtifact(artifact, hasMetadata, policyArtifact))
+        return undefined;
 
       const policy = applySecurityConfig(parsedPolicy, config);
       const chain = securityProfileChain(parsedPolicy.securityProfile, config);
       const selectedSecurityProfile = parsedPolicy.securityProfile;
       const selectedSecurityProfileEvidence = policyFieldEvidence(
-        artifact,
+        evidenceArtifact,
         parsedPolicy,
         "securityProfile",
       );
       const row: SecurityPolicyAssetEvidence = {
         path: artifact.path,
         kind: artifact.kind,
-        hasLocalPolicyMetadata: hasMetadata,
+        hasLocalPolicyMetadata: !isRawSupportArtifact(artifact) && hasMetadata,
+        policySource: policyArtifact
+          ? "inherited"
+          : hasMetadata
+            ? "local"
+            : "none",
+        ...(policyArtifact
+          ? {
+              inheritedFrom: {
+                id: policyArtifact.path,
+                sourcePath: policyArtifact.path,
+              },
+            }
+          : {}),
         ...(selectedSecurityProfile ? { selectedSecurityProfile } : {}),
         profileResolution: profileResolution(selectedSecurityProfile, chain),
         profileChain: chain.profiles.map((item) => item.name),
@@ -230,7 +264,7 @@ export function collectSecurityPolicyAssetEvidence(
           ...(selectedSecurityProfileEvidence
             ? { selectedSecurityProfile: selectedSecurityProfileEvidence }
             : {}),
-          policyFields: policyFieldEvidenceList(artifact, parsedPolicy),
+          policyFields: policyFieldEvidenceList(evidenceArtifact, parsedPolicy),
         },
       };
       return row;
@@ -277,10 +311,41 @@ export function isPolicyInventoryArtifact(
   hasLocalMetadata = hasLocalSecurityPolicyMetadata(
     parseOperationalSecurityPolicy(artifact),
   ),
+  inheritedPolicyArtifact?: Artifact,
 ): boolean {
   if (artifact.kind === "script" || artifact.kind === "asset")
-    return hasLocalMetadata;
+    return inheritedPolicyArtifact !== undefined;
   return POLICY_INVENTORY_KINDS.has(artifact.kind) || hasLocalMetadata;
+}
+
+function isRawSupportArtifact(artifact: Artifact): boolean {
+  return artifact.kind === "script" || artifact.kind === "asset";
+}
+
+export function skillArtifactsByDirectory(
+  artifacts: Artifact[],
+): ReadonlyMap<string, Artifact | null> {
+  const skills = new Map<string, Artifact | null>();
+  for (const artifact of artifacts) {
+    if (artifact.kind !== "skill") continue;
+    const classified = classifyRepositorySkillPath(artifact.path);
+    if (classified?.kind !== "entrypoint") continue;
+    skills.set(
+      classified.skillDirectory,
+      skills.has(classified.skillDirectory) ? null : artifact,
+    );
+  }
+  return skills;
+}
+
+export function policyArtifactFor(
+  artifact: Artifact,
+  skills: ReadonlyMap<string, Artifact | null>,
+): Artifact | undefined {
+  if (!isRawSupportArtifact(artifact)) return undefined;
+  const classified = classifyRepositorySkillPath(artifact.path);
+  if (classified?.kind !== "support") return undefined;
+  return skills.get(classified.skillDirectory) ?? undefined;
 }
 
 export function hasLocalSecurityPolicyMetadata(

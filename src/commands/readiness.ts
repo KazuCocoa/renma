@@ -135,7 +135,7 @@ export function buildReadinessReport(
   const diagnosticCounts = countDiagnostics(diagnostics);
   const totalAssets = graphReport.nodes.length;
   const ownedAssets = graphReport.nodes.filter((node) =>
-    hasOwner(node.owner),
+    hasOwner(node.ownership.effectiveOwner ?? undefined),
   ).length;
   const unownedAssets = totalAssets - ownedAssets;
   const ownershipCoveragePercent = percentage(ownedAssets, totalAssets);
@@ -705,7 +705,7 @@ function ownershipCheck(
       summary:
         totalAssets === 0
           ? "No assets were cataloged."
-          : "All cataloged assets declare an owner.",
+          : "All cataloged assets have an effective owner.",
     };
   }
 
@@ -714,13 +714,13 @@ function ownershipCheck(
     title: "Ownership coverage",
     status: "warn",
     severity: "warning",
-    summary: `${unownedAssets} of ${totalAssets} cataloged assets do not declare an owner.`,
+    summary: `${unownedAssets} of ${totalAssets} cataloged assets do not have an effective owner.`,
     evidence: nodes
-      .filter((node) => !hasOwner(node.owner))
+      .filter((node) => !hasOwner(node.ownership.effectiveOwner ?? undefined))
       .map((node) => ({
         id: node.id,
         path: node.sourcePath,
-        message: "Missing owner metadata.",
+        message: "Missing effective owner.",
       })),
   };
 }

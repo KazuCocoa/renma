@@ -301,8 +301,17 @@ test("Trust Graph command prints JSON and compact markdown", async () => {
     summary: { assetCount: number };
   };
   assert.equal(json.code, 0);
-  assert.equal(parsed.schemaVersion, "renma.trustGraph.v1");
+  assert.equal(parsed.schemaVersion, "renma.trustGraph.v2");
   assert.equal(parsed.summary.assetCount, 1);
+
+  const legacyJson = await withCapturedConsole(() =>
+    main(["trust-graph", root, "--schema", "v1", "--json"]),
+  );
+  assert.equal(legacyJson.code, 0);
+  assert.equal(
+    JSON.parse(legacyJson.stdout).schemaVersion,
+    "renma.trustGraph.v1",
+  );
 
   const markdown = await withCapturedConsole(() =>
     main(["trust-graph", root, "--format", "markdown"]),
@@ -311,6 +320,37 @@ test("Trust Graph command prints JSON and compact markdown", async () => {
   assert.match(markdown.stdout, /^# Renma Trust Graph/);
   assert.match(markdown.stdout, /## Trust Evidence Highlights/);
   assert.match(markdown.stdout, /Owned assets: 1\/1/);
+});
+
+test("Trust Graph v1 omits v2 support nodes and static inheritance edges", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    id: "skill.demo",
+    owner: "platform",
+    status: "stable",
+  });
+  await mkdir(path.join(root, "skills", "demo", "scripts"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "skills", "demo", "scripts", "run.mjs"),
+    "console.log('ok');\n",
+  );
+
+  const v2 = await trustGraph(root, {}, "v2");
+  const v1 = await trustGraph(root, {}, "v1");
+  assert.equal(v2.schemaVersion, "renma.trustGraph.v2");
+  assert.ok(v2.nodes.some((node) => node.properties?.kind === "script"));
+  assert.ok(v2.edges.some((edge) => edge.type === "inherits_owner"));
+  assert.equal(v1.schemaVersion, "renma.trustGraph.v1");
+  assert.equal(
+    v1.nodes.some((node) => node.properties?.kind === "script"),
+    false,
+  );
+  assert.equal(
+    v1.edges.some((edge) => edge.type === "inherits_owner"),
+    false,
+  );
 });
 
 test("Trust Graph command exits 0 when generated graph includes diagnostic errors", async () => {

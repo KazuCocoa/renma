@@ -1,0 +1,243 @@
+import path from "node:path";
+
+import { classifyRepositorySkillPath } from "./discovery.js";
+import type { CatalogEntry, Dependency } from "./model.js";
+import type { ParsedDocument } from "./types.js";
+
+const SUPPORT_ROOTS = [
+  "references",
+  "scripts",
+  "assets",
+  "profiles",
+  "examples",
+] as const;
+
+export interface StaticSupportReference {
+  sourcePath: string;
+  targetPath: string;
+  relativePath: string;
+  line: number;
+  raw: string;
+}
+
+/** Parse exact, repository-local support references once for rules and graphs. */
+export function staticSupportReferences(
+  document: ParsedDocument,
+  skillDirectory: string,
+  localCandidatePaths: readonly string[],
+): StaticSupportReference[] {
+  const candidatesByBasename = new Map<string, string[]>();
+  for (const candidate of localCandidatePaths) {
+    const basename = path.posix.basename(candidate);
+    const values = candidatesByBasename.get(basename) ?? [];
+    values.push(candidate);
+    candidatesByBasename.set(basename, values);
+  }
+
+  const references: StaticSupportReference[] = [];
+  const seen = new Set<string>();
+  for (let index = 0; index < document.lines.length; index += 1) {
+    const line = document.lines[index] ?? "";
+    const values: Array<{ raw: string; value: string }> = [];
+
+    for (const match of line.matchAll(/\[[^\]]*\]\(\s*(<[^>]+>|[^)]+)\)/g)) {
+      const body = match[1]?.trim() ?? "";
+      const destination = body.startsWith("<")
+        ? body.slice(1, body.indexOf(">"))
+        : (body.match(/^(\S+)/)?.[1] ?? "");
+      if (destination)
+        values.push({ raw: match[0], value: decodePath(destination) });
+    }
+    for (const match of line.matchAll(
+      /([`'"])((?:\.\/)?(?:references|scripts|assets|profiles|examples)\/.*?)\1/g,
+    )) {
+      if (match[2]) values.push({ raw: match[0], value: match[2] });
+    }
+    for (const match of line.matchAll(
+      /(?:^|[\s([])((?:\.\/)?(?:references|scripts|assets|profiles|examples)\/[^\s)`'"\],;]+)/g,
+    )) {
+      if (match[1]) values.push({ raw: match[0].trim(), value: match[1] });
+    }
+
+    for (const [basename, paths] of candidatesByBasename) {
+      if (paths.length !== 1 || !containsExactBasename(line, basename))
+        continue;
+      values.push({ raw: basename, value: paths[0]! });
+    }
+
+    for (const value of values) {
+      const normalized = normalizeStaticSupportReference(
+        value.value,
+        skillDirectory,
+      );
+      if (!normalized) continue;
+      const key = `${index + 1}:${normalized.targetPath}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      references.push({
+        sourcePath: document.artifact.path,
+        targetPath: normalized.targetPath,
+        relativePath: normalized.relativePath,
+        line: index + 1,
+        raw: value.raw,
+      });
+    }
+  }
+  return references.sort(
+    (left, right) =>
+      left.line - right.line ||
+      left.targetPath.localeCompare(right.targetPath) ||
+      left.raw.localeCompare(right.raw),
+  );
+}
+
+export function buildStaticSupportDependencies(
+  documents: ParsedDocument[],
+  entries: CatalogEntry[],
+  repositoryPaths: ReadonlySet<string>,
+): Dependency[] {
+  const documentsByPath = new Map(
+    documents.map((document) => [document.artifact.path, document]),
+  );
+  const entriesByPath = new Map(
+    entries.map((entry) => [entry.sourcePath, entry]),
+  );
+  const skillEntries = entries.filter((entry) => entry.kind === "skill");
+  const skillCounts = new Map<string, number>();
+  for (const skill of skillEntries) {
+    const directory = path.posix.dirname(skill.sourcePath);
+    skillCounts.set(directory, (skillCounts.get(directory) ?? 0) + 1);
+  }
+  const result: Dependency[] = [];
+
+  for (const skill of skillEntries) {
+    const skillDirectory = path.posix.dirname(skill.sourcePath);
+    if (skillCounts.get(skillDirectory) !== 1) continue;
+    const localEntries = entries.filter((entry) => {
+      const classified = classifyRepositorySkillPath(entry.sourcePath);
+      return (
+        classified?.kind === "support" &&
+        classified.skillDirectory === skillDirectory
+      );
+    });
+    for (const local of localEntries) {
+      result.push({
+        from: skill.id,
+        to: local.id,
+        kind: "owns_local_resource",
+        sourcePath: skill.sourcePath,
+      });
+      if (local.ownership.source === "inherited") {
+        result.push({
+          from: local.id,
+          to: skill.id,
+          kind: "inherits_owner",
+          sourcePath: local.sourcePath,
+        });
+      }
+      if (local.kind === "script" || local.kind === "asset") {
+        result.push({
+          from: local.id,
+          to: skill.id,
+          kind: "inherits_policy",
+          sourcePath: local.sourcePath,
+        });
+      }
+    }
+
+    const candidatePaths = [...repositoryPaths].filter((candidate) => {
+      const classified = classifyRepositorySkillPath(candidate);
+      return (
+        classified?.kind === "support" &&
+        classified.skillDirectory === skillDirectory
+      );
+    });
+    const sources = [skill, ...localEntries]
+      .map((entry) => documentsByPath.get(entry.sourcePath))
+      .filter((document): document is ParsedDocument => document !== undefined);
+    for (const source of sources) {
+      for (const reference of staticSupportReferences(
+        source,
+        skillDirectory,
+        candidatePaths,
+      )) {
+        const target = entriesByPath.get(reference.targetPath);
+        if (
+          !target ||
+          target.id === entriesByPath.get(source.artifact.path)?.id
+        )
+          continue;
+        result.push({
+          from: entriesByPath.get(source.artifact.path)?.id ?? skill.id,
+          to: target.id,
+          kind: "statically_references",
+          sourcePath: source.artifact.path,
+          evidence: {
+            path: source.artifact.path,
+            startLine: reference.line,
+            endLine: reference.line,
+            snippet: reference.raw,
+          },
+        });
+      }
+    }
+  }
+
+  return dedupeDependencies(result);
+}
+
+function normalizeStaticSupportReference(
+  value: string,
+  skillDirectory: string,
+): { targetPath: string; relativePath: string } | undefined {
+  const cleaned = decodePath(value)
+    .trim()
+    .replace(/^<|>$/g, "")
+    .replace(/[?#].*$/, "")
+    .replace(/[),.;:]+$/, "")
+    .replace(/^\.\//, "");
+  if (!cleaned || path.posix.isAbsolute(cleaned)) return undefined;
+  if (cleaned.split("/").includes("..")) return undefined;
+  const repositoryRelative = cleaned.startsWith(`${skillDirectory}/`)
+    ? cleaned
+    : path.posix.join(skillDirectory, cleaned);
+  const normalized = path.posix.normalize(repositoryRelative);
+  const relativePath = path.posix.relative(skillDirectory, normalized);
+  if (
+    relativePath.startsWith("../") ||
+    relativePath === ".." ||
+    !SUPPORT_ROOTS.includes(
+      relativePath.split("/")[0] as (typeof SUPPORT_ROOTS)[number],
+    ) ||
+    relativePath.endsWith("/")
+  ) {
+    return undefined;
+  }
+  return { targetPath: normalized, relativePath };
+}
+
+function containsExactBasename(content: string, basename: string): boolean {
+  const escaped = basename.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(
+    `(?:^|[\\s\`'"()\\[\\]{},;:])${escaped}(?=$|[\\s\`'"()\\[\\]{},;:?!]|\\.(?=\\s|$))`,
+    "m",
+  ).test(content);
+}
+
+function decodePath(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function dedupeDependencies(dependencies: Dependency[]): Dependency[] {
+  const seen = new Set<string>();
+  return dependencies.filter((dependency) => {
+    const key = `${dependency.from}\0${dependency.kind}\0${dependency.to}\0${dependency.sourcePath}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}

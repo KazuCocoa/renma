@@ -14,7 +14,11 @@ export type DependencyKind =
   | "extends"
   | "references"
   | "applies_to"
-  | "covered_by";
+  | "covered_by"
+  | "owns_local_resource"
+  | "statically_references"
+  | "inherits_owner"
+  | "inherits_policy";
 
 /** Normalized shared metadata for cataloged assets. */
 export interface AssetMetadata {
@@ -42,19 +46,15 @@ export interface AssetMetadata {
   optionalLens?: string[];
 }
 
-export type AssetOwnership =
-  | {
-      owner: string;
-      source: "declared";
-    }
-  | {
-      owner: string;
-      source: "inherited";
-      inheritedFrom: {
-        id: string;
-        sourcePath: string;
-      };
-    };
+export interface AssetOwnership {
+  declaredOwner: string | null;
+  effectiveOwner: string | null;
+  source: "declared" | "inherited" | "unowned";
+  inheritedFrom?: {
+    id: string;
+    sourcePath: string;
+  };
+}
 
 /** Repository object Renma can catalog, validate, reference, or report on. */
 export interface Asset {
@@ -62,11 +62,11 @@ export interface Asset {
   kind: AssetKind;
   sourcePath: string;
   contentHash: string;
-  sizeBytes?: number;
-  contentClassification?: "text" | "binary";
-  markdownParserEligible?: boolean;
-  /** Effective ownership plus whether it was declared locally or inherited. */
-  ownership?: AssetOwnership;
+  sizeBytes: number;
+  contentClassification: "text" | "binary";
+  markdownParserEligible: boolean;
+  /** Declared and effective ownership with explicit provenance. */
+  ownership: AssetOwnership;
   metadata: AssetMetadata;
   metadataFields: Record<string, MetadataFieldEvidence>;
   metadataListItems: Record<string, MetadataFieldEvidence[]>;
@@ -74,7 +74,7 @@ export interface Asset {
 
 /** Return the deterministic owner used by catalog consumers and Readiness. */
 export function effectiveAssetOwner(asset: Asset): string | undefined {
-  return asset.ownership?.owner ?? asset.metadata.owner;
+  return asset.ownership.effectiveOwner ?? undefined;
 }
 
 export interface Skill extends Asset {

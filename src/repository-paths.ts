@@ -1,8 +1,23 @@
-import { access } from "node:fs/promises";
+import { access, lstat } from "node:fs/promises";
 import path from "node:path";
-import { classifyRepositorySkillPath } from "./discovery.js";
+import {
+  classifyRepositorySkillPath,
+  isExcluded,
+  repositoryPathDepth,
+} from "./discovery.js";
 import type { Catalog } from "./model.js";
-import type { Artifact, ParsedDocument } from "./types.js";
+import { staticSupportReferences } from "./static-support.js";
+import type { Artifact, ParsedDocument, ScanConfig } from "./types.js";
+
+export type RepositoryPathState =
+  | "parsed"
+  | "excluded"
+  | "oversize"
+  | "deep"
+  | "unsupported"
+  | "symlink"
+  | "unreadable"
+  | "absent";
 
 export type HelperScriptPathResolution =
   | {
@@ -87,12 +102,13 @@ export function resolveHelperScriptPath(
   return { kind: "candidate", path: candidate, source: "repository-root" };
 }
 
-function repositoryPathCandidates(
+export function repositoryPathCandidates(
   documents: ParsedDocument[],
   catalog: Catalog,
 ): string[] {
   return [
     ...helperCommandPathCandidates(documents),
+    ...staticSupportPathCandidates(documents),
     ...catalog.dependencies
       .map((dependency) => dependency.to)
       .map(normalizeRepositoryPath)
@@ -101,6 +117,68 @@ function repositoryPathCandidates(
   ].filter(
     (candidate, index, candidates) => candidates.indexOf(candidate) === index,
   );
+}
+
+function staticSupportPathCandidates(documents: ParsedDocument[]): string[] {
+  return documents.flatMap((document) => {
+    const classified = classifyRepositorySkillPath(document.artifact.path);
+    if (classified?.kind !== "entrypoint" && classified?.kind !== "support") {
+      return [];
+    }
+    const localCandidates = documents
+      .filter((candidate) => {
+        const candidatePath = classifyRepositorySkillPath(
+          candidate.artifact.path,
+        );
+        return (
+          candidatePath?.kind === "support" &&
+          candidatePath.skillDirectory === classified.skillDirectory
+        );
+      })
+      .map((candidate) => candidate.artifact.path);
+    return staticSupportReferences(
+      document,
+      classified.skillDirectory,
+      localCandidates,
+    ).map((reference) => reference.targetPath);
+  });
+}
+
+/** Capture exact lstat-based states once without following symbolic links. */
+export async function collectRepositoryPathStates(
+  root: string,
+  candidates: Iterable<string>,
+  artifacts: Artifact[],
+  config: ScanConfig,
+): Promise<ReadonlyMap<string, RepositoryPathState>> {
+  const parsed = new Set(artifacts.map((artifact) => artifact.path));
+  const states = new Map<string, RepositoryPathState>();
+  for (const candidate of [...new Set(candidates)].sort((a, b) =>
+    a.localeCompare(b),
+  )) {
+    const normalized = normalizeRepositoryPath(candidate);
+    if (!normalized) continue;
+    try {
+      const info = await lstat(path.join(root, normalized));
+      if (info.isSymbolicLink()) {
+        states.set(normalized, "symlink");
+      } else if (isExcluded(normalized, config.exclude)) {
+        states.set(normalized, "excluded");
+      } else if (repositoryPathDepth(normalized) > config.maxDepth) {
+        states.set(normalized, "deep");
+      } else if (info.isFile() && info.size > config.maxFileSizeBytes) {
+        states.set(normalized, "oversize");
+      } else if (parsed.has(normalized)) {
+        states.set(normalized, "parsed");
+      } else {
+        states.set(normalized, "unsupported");
+      }
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      states.set(normalized, code === "ENOENT" ? "absent" : "unreadable");
+    }
+  }
+  return states;
 }
 
 function helperCommandPathCandidates(documents: ParsedDocument[]): string[] {

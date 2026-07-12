@@ -29,6 +29,8 @@ import type {
   ScanConfig,
   Severity,
 } from "./types.js";
+import type { RepositoryPathState } from "./repository-paths.js";
+import { staticSupportReferences } from "./static-support.js";
 
 type FindingDetails = Partial<
   Pick<
@@ -45,6 +47,7 @@ type FindingDetails = Partial<
 interface RuleOptions {
   evaluationDate?: Date | string;
   repositoryPaths?: ReadonlySet<string>;
+  repositoryPathStates?: ReadonlyMap<string, RepositoryPathState>;
 }
 
 const SECRET_PATTERN =
@@ -133,6 +136,7 @@ export function runRules(
     rulesForEvaluationDate(
       evaluationDay(options.evaluationDate),
       options.repositoryPaths,
+      options.repositoryPathStates,
     ),
     catalog,
     config,
@@ -147,6 +151,7 @@ export function runRules(
 function rulesForEvaluationDate(
   evaluationDate: string,
   repositoryPaths?: ReadonlySet<string>,
+  repositoryPathStates?: ReadonlyMap<string, RepositoryPathState>,
 ): Rule[] {
   return [
     {
@@ -178,7 +183,11 @@ function rulesForEvaluationDate(
     {
       id: "skill-local-support-reachability",
       run: ({ documents }) =>
-        skillLocalSupportReachabilityFindings(documents, repositoryPaths),
+        skillLocalSupportReachabilityFindings(
+          documents,
+          repositoryPaths,
+          repositoryPathStates,
+        ),
     },
     {
       id: "support-asset-shared-context-candidate",
@@ -1786,6 +1795,7 @@ function profileFindings(document: ParsedDocument): Finding[] {
 function skillLocalSupportReachabilityFindings(
   documents: ParsedDocument[],
   repositoryPaths?: ReadonlySet<string>,
+  repositoryPathStates?: ReadonlyMap<string, RepositoryPathState>,
 ): Finding[] {
   const skills = documents.filter(
     (document) => document.artifact.kind === "skill",
@@ -1805,6 +1815,15 @@ function skillLocalSupportReachabilityFindings(
         classified?.kind === "support" && classified.skillDirectory === skillDir
       );
     });
+    const localSupportPaths = repositoryPaths
+      ? [...repositoryPaths].filter((candidate) => {
+          const classified = classifyRepositorySkillPath(candidate);
+          return (
+            classified?.kind === "support" &&
+            classified.skillDirectory === skillDir
+          );
+        })
+      : localSupportDocs.map((document) => document.artifact.path);
     const findings: Finding[] = [];
     const text = skill.artifact.content.toLowerCase();
     const hasLocalSupportGuidance =
@@ -1844,6 +1863,7 @@ function skillLocalSupportReachabilityFindings(
     const reachabilityDepth = localSupportReachabilityDepth(
       skill,
       localSupportDocs,
+      localSupportPaths,
     );
     for (const document of localSupportDocs) {
       const depth = reachabilityDepth.get(document.artifact.path);
@@ -1907,10 +1927,28 @@ function skillLocalSupportReachabilityFindings(
     ];
     const reportedMissingPaths = new Set<string>();
     for (const source of missingPathSources) {
-      for (const reference of localSupportPathReferences(source, skillDir)) {
+      for (const reference of localSupportPathReferences(
+        source,
+        skillDir,
+        localSupportPaths,
+      )) {
         if (
-          repositoryPathExists(repositoryPaths, reference.target) ||
-          repositoryPathExists(repositoryPaths, reference.relative) ||
+          reference.relative.startsWith("examples/") &&
+          !path.posix.basename(reference.relative).includes(".")
+        ) {
+          continue;
+        }
+        if (
+          repositoryPathExists(
+            repositoryPaths,
+            reference.target,
+            repositoryPathStates,
+          ) ||
+          repositoryPathExists(
+            repositoryPaths,
+            reference.relative,
+            repositoryPathStates,
+          ) ||
           reportedMissingPaths.has(
             `${source.artifact.path}:${reference.target}`,
           )
@@ -1945,7 +1983,10 @@ function skillLocalSupportReachabilityFindings(
 function repositoryPathExists(
   repositoryPaths: ReadonlySet<string> | undefined,
   candidate: string,
+  repositoryPathStates?: ReadonlyMap<string, RepositoryPathState>,
 ): boolean {
+  const state = repositoryPathStates?.get(candidate);
+  if (state !== undefined) return state !== "absent";
   if (!repositoryPaths) return false;
   if (repositoryPaths.has(candidate)) return true;
   const directoryPrefix = `${candidate.replace(/\/$/, "")}/`;
@@ -1958,15 +1999,28 @@ function repositoryPathExists(
 function localSupportReachabilityDepth(
   skill: ParsedDocument,
   localSupportDocs: ParsedDocument[],
+  candidatePaths: string[],
 ): Map<string, number> {
   const reachable = new Map<string, number>();
+  const references = new Map(
+    [skill, ...localSupportDocs].map((document) => [
+      document.artifact.path,
+      new Set(
+        staticSupportReferences(
+          document,
+          path.posix.dirname(skill.artifact.path),
+          candidatePaths,
+        ).map((reference) => reference.targetPath),
+      ),
+    ]),
+  );
   let changed = true;
 
   while (changed) {
     changed = false;
     for (const document of localSupportDocs) {
       if (reachable.has(document.artifact.path)) continue;
-      if (referencesDocument(skill, document)) {
+      if (references.get(skill.artifact.path)?.has(document.artifact.path)) {
         reachable.set(document.artifact.path, 1);
         changed = true;
         continue;
@@ -1978,7 +2032,9 @@ function localSupportReachabilityDepth(
             (reachable.get(left.artifact.path) ?? 0) -
             (reachable.get(right.artifact.path) ?? 0),
         )
-        .find((candidate) => referencesDocument(candidate, document));
+        .find((candidate) =>
+          references.get(candidate.artifact.path)?.has(document.artifact.path),
+        );
       if (parent) {
         reachable.set(
           document.artifact.path,
@@ -1995,124 +2051,16 @@ function localSupportReachabilityDepth(
 function localSupportPathReferences(
   document: ParsedDocument,
   skillDir: string,
+  candidatePaths: string[],
 ): Array<{ raw: string; relative: string; target: string; line: number }> {
-  const references: Array<{
-    raw: string;
-    relative: string;
-    target: string;
-    line: number;
-  }> = [];
-  const seen = new Set<string>();
-  for (let index = 0; index < document.lines.length; index += 1) {
-    const line = document.lines[index] ?? "";
-    const candidates: Array<{ raw: string; value: string }> = [];
-    for (const match of line.matchAll(
-      /\[[^\]]*\]\(\s*(?:<([^>]+)>|([^)]+))\s*\)/g,
-    )) {
-      const value = (match[1] ?? match[2] ?? "").trim();
-      if (value) candidates.push({ raw: match[0], value });
-    }
-    for (const match of line.matchAll(
-      /([`'"])((?:\.\/)?(?:references|scripts|assets|profiles|examples)\/.*?)\1/g,
-    )) {
-      const value = match[2]?.trim();
-      if (value) candidates.push({ raw: match[0], value });
-    }
-    const unquotedLine = line
-      .replace(/\[[^\]]*\]\(\s*(?:<[^>]+>|[^)]+)\s*\)/g, (match) =>
-        " ".repeat(match.length),
-      )
-      .replace(
-        /([`'"])((?:\.\/)?(?:references|scripts|assets|profiles|examples)\/.*?)\1/g,
-        (match) => " ".repeat(match.length),
-      );
-    for (const match of unquotedLine.matchAll(
-      /(?:^|[[\s(])((?:\.\/)?(?:references|scripts|assets|profiles|examples)\/[^\s)`'"\],;]+)/g,
-    )) {
-      const value = match[1]?.trim();
-      if (value) candidates.push({ raw: match[0]?.trim() ?? value, value });
-    }
-
-    for (const candidate of candidates) {
-      const relative = normalizeLocalSupportReference(candidate.value);
-      if (!relative) continue;
-      const key = `${index + 1}:${relative}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      references.push({
-        raw: candidate.raw,
-        relative,
-        target: path.posix.join(skillDir, relative),
-        line: index + 1,
-      });
-    }
-  }
-  return references;
-}
-
-function normalizeLocalSupportReference(value: string): string | undefined {
-  const withoutFragment = value
-    .trim()
-    .replace(/^<|>$/g, "")
-    .replace(/[?#].*$/, "")
-    .replace(/[),.;:]+$/, "")
-    .replace(/^\.\//, "");
-  if (!withoutFragment || withoutFragment.endsWith("/")) return undefined;
-  if (path.posix.isAbsolute(withoutFragment)) return undefined;
-  const segments = withoutFragment.split("/");
-  if (segments.includes("..") || segments.some((segment) => !segment))
-    return undefined;
-  if (
-    !["references", "scripts", "assets", "profiles", "examples"].includes(
-      segments[0] ?? "",
-    ) ||
-    segments.length < 2
-  ) {
-    return undefined;
-  }
-  if (
-    segments[0] !== "scripts" &&
-    !path.posix.basename(withoutFragment).includes(".")
-  ) {
-    return undefined;
-  }
-  return segments.join("/");
-}
-
-function referencesDocument(
-  source: ParsedDocument,
-  target: ParsedDocument,
-): boolean {
-  const basename = path.posix.basename(target.artifact.path);
-  const sourceSkill = classifyRepositorySkillPath(source.artifact.path);
-  const targetSkill = classifyRepositorySkillPath(target.artifact.path);
-  const skillDirectory =
-    sourceSkill?.kind === "entrypoint" || sourceSkill?.kind === "support"
-      ? sourceSkill.skillDirectory
-      : targetSkill?.kind === "support"
-        ? targetSkill.skillDirectory
-        : undefined;
-  const relative = skillDirectory
-    ? path.posix.relative(skillDirectory, target.artifact.path)
-    : undefined;
-  return (
-    containsExplicitReference(source.artifact.content, target.artifact.path) ||
-    (relative !== undefined &&
-      !relative.startsWith("../") &&
-      containsExplicitReference(source.artifact.content, relative)) ||
-    containsExplicitReference(source.artifact.content, basename)
+  return staticSupportReferences(document, skillDir, candidatePaths).map(
+    (reference) => ({
+      raw: reference.raw,
+      relative: reference.relativePath,
+      target: reference.targetPath,
+      line: reference.line,
+    }),
   );
-}
-
-function containsExplicitReference(
-  content: string,
-  candidate: string,
-): boolean {
-  const boundary = "[\\s`'\"()\\[\\]{},;:]";
-  return new RegExp(
-    `(?:^|${boundary})${escapeRegExp(candidate)}(?=$|${boundary}|[.?!#])`,
-    "m",
-  ).test(content);
 }
 
 function markdownBodyLineIndexes(document: ParsedDocument): number[] {
@@ -2581,10 +2529,6 @@ function localSupportUnreachableRuleId(
   if (kind === "script") return DIAGNOSTIC_IDS.SUPPORT_UNREACHABLE_SCRIPT;
   if (kind === "asset") return DIAGNOSTIC_IDS.SUPPORT_UNREACHABLE_ASSET;
   return DIAGNOSTIC_IDS.SUPPORT_UNREACHABLE_REFERENCE;
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function isPlaceholder(line: string): boolean {

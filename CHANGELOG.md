@@ -26,6 +26,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Added `renma scaffold skill --resources references,scripts,assets`; file mode
   creates only selected empty directories, while prompt and JSON modes report
   the selected resource contract without writing files.
+- Added explicit BOM and Trust Graph v1/v2 schemas with v2 defaults and
+  `--schema v1|v2` selection.
+- Added normalized ownership provenance and static local-resource relationship
+  edges across catalog, graph, readiness, BOM, and Trust Graph output.
 
 ### Changed
 
@@ -65,8 +69,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Fixed nearest-Skill support ownership, nested Skill boundaries, explicit path
   reachability, extensionless and spaced paths, and oversized-file existence
   evidence.
-- Included explicitly policy-bearing text scripts and assets consistently in
-  security inventory and Trust Graph evidence while keeping binary data opaque.
+- Prevented script and asset bytes from declaring policy. Skill-local scripts
+  and assets inherit the nearest unambiguous Skill policy; text scripts may be
+  scanned under it, while binary files and ordinary output assets stay opaque.
 - Stopped treating a command, Procedure/Steps/Setup headings, ordered workflow
   wording, or 450/700-word counts as evidence of a bad Skill.
 - Stopped recommending Context Assets as the default destination for

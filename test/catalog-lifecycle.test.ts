@@ -89,6 +89,14 @@ function contextEntry(options: {
     kind: "context",
     sourcePath: `${options.id.replaceAll(".", "/")}.md`,
     contentHash: "sha256:test",
+    sizeBytes: 0,
+    contentClassification: "text",
+    markdownParserEligible: true,
+    ownership: {
+      declaredOwner: "qa-platform",
+      effectiveOwner: "qa-platform",
+      source: "declared",
+    },
     metadata: {
       id: options.id,
       owner: "qa-platform",

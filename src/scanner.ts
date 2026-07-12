@@ -45,10 +45,14 @@ export function scanFromRepositorySnapshot(
   );
   const ruleOptions =
     options.evaluationDate === undefined
-      ? { repositoryPaths: snapshot.repositoryPaths }
+      ? {
+          repositoryPaths: snapshot.repositoryPaths,
+          repositoryPathStates: snapshot.repositoryPathStates,
+        }
       : {
           evaluationDate: options.evaluationDate,
           repositoryPaths: snapshot.repositoryPaths,
+          repositoryPathStates: snapshot.repositoryPathStates,
         };
   const rawFindings = [
     ...runRules(

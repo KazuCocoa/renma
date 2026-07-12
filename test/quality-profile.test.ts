@@ -114,8 +114,8 @@ test("quality-profile documentation uses the stable family name", async () => {
   ];
   for (const path of paths) {
     const content = await readFile(path, "utf8");
-    assert.doesNotMatch(content, /renma-quality@0\.18\.0/);
-    assert.doesNotMatch(content, /Renma 0\.18\.0 Quality Profile/);
+    assert.doesNotMatch(content, /renma-quality@\d+\.\d+\.\d+/);
+    assert.doesNotMatch(content, /Renma \d+\.\d+\.\d+ Quality Profile/);
   }
   const canonical = await readFile("docs/quality-profile.md", "utf8");
   assert.match(
