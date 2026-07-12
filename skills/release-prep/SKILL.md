@@ -1,6 +1,6 @@
 ---
 name: release-prep
-description: Prepare a Renma release from a local checkout by checking repository history, changelog, package metadata, docs, release notes, and Renma CLI reports. Use when release-ready artifacts and validation evidence are needed. Do not use for distribution, remote repository changes, or unrelated changelog cleanup.
+description: Prepare a Renma release from a local checkout by checking repository history, changelog, package metadata, docs, release notes, and Renma CLI reports. Use when release-ready artifacts or validation evidence are needed, or when asked to generate or display GitHub Release notes for a Renma version. Do not use for distribution, remote repository changes, or unrelated changelog cleanup.
 metadata:
   renma.id: skill.release-prep
   renma.title: Release Prep
@@ -25,5 +25,10 @@ Use this skill as the entrypoint for the required `context.release.prep` workflo
 
 1. Read `context.release.prep` before preparing or changing release artifacts.
 2. Follow its required inputs, workflow, constraints, validation, and completion criteria.
-3. Use `tools/release-prep.mjs` only as directed by that context.
-4. Return the release artifacts and evidence specified by the context.
+3. For a request to generate or display GitHub Release notes, run `node tools/release-prep.mjs --release-notes --version <version>` and return its Markdown output.
+4. Use `tools/release-prep.mjs` for other operations only as directed by that context.
+5. Return the release artifacts and evidence specified by the context.
+
+## Hard Constraints
+
+- For a release-notes-only request, do not finalize, commit, tag, push, or publish. Instead, return the generated Markdown and stop.

@@ -35,6 +35,7 @@ This context applies when:
 
 - Preparing a new Renma release from a local checkout.
 - Reconciling `CHANGELOG.md`, `package.json`, `package-lock.json`, docs, and release notes for a target version.
+- Generating or displaying GitHub-ready release notes from an existing changelog section.
 - Producing release evidence for review or CI.
 
 This context does not apply when:
@@ -50,6 +51,10 @@ This context does not apply when:
 - Any known release theme, blockers, or user-facing changes.
 
 ## Workflow
+
+For a release-notes-only request, run `node tools/release-prep.mjs --release-notes --version <version>`, add `--from <tag>` or `--to <ref>` when needed, and return the Markdown output directly. Do not edit release artifacts or create commits, tags, pushes, packages, or public releases unless separately requested.
+
+For full release preparation:
 
 1. Inspect `package.json`, `package-lock.json`, `CHANGELOG.md`, and release-relevant docs.
 2. Run `node tools/release-prep.mjs --check-only` to check version, changelog, and base-tag consistency.
@@ -76,6 +81,6 @@ Run `node tools/release-prep.mjs`; use `--check-only` for metadata checks only, 
 ## Completion Criteria
 
 - Release metadata, changelog, docs, and release notes are consistent for the target version.
-- GitHub-ready release notes are generated from `CHANGELOG.md` and the intended comparison range.
+- GitHub-ready release notes are generated from `CHANGELOG.md` and the intended comparison range, and displayed directly when that is the user's request.
 - Required Renma reports have been run, or any skipped report is explained.
 - The final handoff names blockers, residual risks, and the local commit and tag state.

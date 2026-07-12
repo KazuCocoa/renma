@@ -1,6 +1,18 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import test from "node:test";
+
+test("release-prep routes release-notes-only requests without finalization", () => {
+  const skill = readFileSync("skills/release-prep/SKILL.md", "utf8");
+  const context = readFileSync("contexts/release/prep.md", "utf8");
+
+  assert.match(skill, /generate or display GitHub Release notes/);
+  assert.match(skill, /--release-notes --version <version>/);
+  assert.match(skill, /do not finalize, commit, tag, push, or publish/i);
+  assert.match(context, /For a release-notes-only request/);
+  assert.match(context, /return the Markdown output directly/);
+});
 
 test("release-prep prints GitHub release notes from the target changelog section", () => {
   const result = spawnSync(
