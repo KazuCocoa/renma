@@ -12,6 +12,7 @@ import { parseDocument } from "../src/markdown.js";
 import { parseAssetMetadata } from "../src/metadata.js";
 import { scan } from "../src/scanner.js";
 import type { Artifact, ArtifactKind } from "../src/types.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 test("parseAssetMetadata captures context lens metadata", () => {
   const document = parseDocument(
@@ -447,7 +448,7 @@ applies_to:
   );
 });
 
-test("summarizeContextLensGovernance reports unsupported kind scope and version", () => {
+test("summarizeContextLensGovernance ignores invalid Skill lens metadata and reports lens scope and version", () => {
   const documents = [
     parseDocument(
       artifact(
@@ -497,16 +498,12 @@ applies_to:
   const report = summarizeContextLensGovernance(documents, catalog);
   const codes = report.diagnostics.map((diagnostic) => diagnostic.code);
 
-  assert.ok(codes.includes(CONTEXT_LENS_DIAGNOSTIC_CODES.UNSUPPORTED_KIND));
+  assert.equal(
+    codes.includes(CONTEXT_LENS_DIAGNOSTIC_CODES.UNSUPPORTED_KIND),
+    false,
+  );
   assert.ok(codes.includes(CONTEXT_LENS_DIAGNOSTIC_CODES.UNSUPPORTED_SCOPE));
   assert.ok(codes.includes(CONTEXT_LENS_DIAGNOSTIC_CODES.UNSUPPORTED_VERSION));
-  assert.equal(
-    report.diagnostics.find(
-      (diagnostic) =>
-        diagnostic.code === CONTEXT_LENS_DIAGNOSTIC_CODES.UNSUPPORTED_KIND,
-    )?.severity,
-    "warning",
-  );
 });
 
 test("summarizeContextLensGovernance reports empty and meaningless definitions", () => {
@@ -710,11 +707,13 @@ Review boundary context for ambiguity.
 }
 
 function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
+  const operationalContent =
+    kind === "skill" ? canonicalSkillFixture(path, content) : content;
   return {
     path,
     absolutePath: `/tmp/${path}`,
     kind,
-    sizeBytes: Buffer.byteLength(content),
-    content,
+    sizeBytes: Buffer.byteLength(operationalContent),
+    content: operationalContent,
   };
 }

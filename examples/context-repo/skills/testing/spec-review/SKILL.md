@@ -1,17 +1,15 @@
 ---
-id: skill.testing.spec-review
-title: Spec Review
-version: 0.1.0
-owner: qa-platform
-status: experimental
-tags:
-  - testing
-  - spec-review
-requires_context:
-  - context.testing.boundary-value-analysis
-  - context.testing.negative-testing
-optional_context:
-  - context.domain.payment.idempotency
+name: spec-review
+description: Review a product or test specification before implementation. Use when requirements need concrete, risk-based review notes.
+metadata:
+  renma.id: skill.testing.spec-review
+  renma.title: Spec Review
+  renma.version: "0.1.0"
+  renma.owner: qa-platform
+  renma.status: experimental
+  renma.tags: '["testing","spec-review"]'
+  renma.requires-context: '["context.testing.boundary-value-analysis","context.testing.negative-testing"]'
+  renma.optional-context: '["context.domain.payment.idempotency"]'
 ---
 
 # Spec Review

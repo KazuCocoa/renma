@@ -12,7 +12,7 @@ import { buildReadinessReport } from "../src/commands/readiness.js";
 import { collectRepositorySnapshot } from "../src/repository-evidence.js";
 import { scanFromRepositorySnapshot } from "../src/scanner.js";
 
-test("canonical and pre-0.16 Skill metadata are operationally equivalent", async () => {
+test("canonical Skill metadata is operational while pre-0.16 metadata is migration-only", async () => {
   const [legacyRoot, canonicalRoot] = await Promise.all([
     operationalFixture("legacy"),
     operationalFixture("canonical"),
@@ -23,14 +23,99 @@ test("canonical and pre-0.16 Skill metadata are operationally equivalent", async
     operationalConsumerView(canonicalRoot),
   ]);
 
-  assert.deepEqual(canonical.catalog, legacy.catalog);
-  assert.deepEqual(canonical.ownership, legacy.ownership);
-  assert.deepEqual(canonical.graph, legacy.graph);
-  assert.deepEqual(canonical.readiness, legacy.readiness);
-  assert.deepEqual(canonical.bom, legacy.bom);
-  assert.deepEqual(canonical.trustGraph, legacy.trustGraph);
-  assert.deepEqual(canonical.inspect, legacy.inspect);
-  assert.deepEqual(canonical.lifecycleFindings, legacy.lifecycleFindings);
+  const canonicalSkillEntry = canonical.catalog.entries.find(
+    (entry) => entry.sourcePath === "skills/demo/SKILL.md",
+  );
+  const legacySkillEntry = legacy.catalog.entries.find(
+    (entry) => entry.sourcePath === "skills/demo/SKILL.md",
+  );
+  assert.equal(canonicalSkillEntry?.id, "skill.demo");
+  assert.equal(canonicalSkillEntry?.metadata.owner, "qa-platform");
+  assert.deepEqual(canonicalSkillEntry?.requiredContext, [
+    "contexts/testing/boundaries.md",
+  ]);
+  assert.equal(legacySkillEntry?.id, "skills/demo/SKILL.md");
+  assert.equal(legacySkillEntry?.metadata.id, undefined);
+  assert.equal(legacySkillEntry?.metadata.owner, undefined);
+  assert.deepEqual(legacySkillEntry?.requiredContext, []);
+  assert.equal(
+    canonical.catalog.dependencies.some(
+      (dependency) => dependency.from === "skill.demo",
+    ),
+    true,
+  );
+  assert.equal(
+    legacy.catalog.dependencies.some(
+      (dependency) => dependency.from === "skills/demo/SKILL.md",
+    ),
+    false,
+  );
+
+  assert.equal(canonical.ownership.ownedAssets, 3);
+  assert.equal(canonical.ownership.unownedAssets, 0);
+  assert.equal(legacy.ownership.ownedAssets, 2);
+  assert.equal(legacy.ownership.unownedAssets, 1);
+  assert.equal(
+    legacy.ownership.unownedAssetList?.some(
+      (asset) => asset.id === "skills/demo/SKILL.md",
+    ),
+    true,
+  );
+
+  const canonicalGraphSkill = canonical.graph.nodes.find(
+    (node) => node.sourcePath === "skills/demo/SKILL.md",
+  );
+  const legacyGraphSkill = legacy.graph.nodes.find(
+    (node) => node.sourcePath === "skills/demo/SKILL.md",
+  );
+  assert.equal(canonicalGraphSkill?.id, "skill.demo");
+  assert.equal(canonicalGraphSkill?.owner, "qa-platform");
+  assert.equal(legacyGraphSkill?.id, "skills/demo/SKILL.md");
+  assert.equal(legacyGraphSkill?.owner, undefined);
+  assert.equal(
+    legacy.graph.edges.some((edge) => edge.from === "skills/demo/SKILL.md"),
+    false,
+  );
+
+  assert.equal(canonical.readiness.summary.ownedAssets, 3);
+  assert.equal(legacy.readiness.summary.ownedAssets, 2);
+  assert.equal(canonical.bom.summary.dependencyCount, 3);
+  assert.equal(legacy.bom.summary.dependencyCount, 1);
+  const canonicalBomSkill = (
+    canonical.bom.assets as Array<Record<string, unknown>>
+  ).find((asset) => asset.sourcePath === "skills/demo/SKILL.md");
+  const legacyBomSkill = (
+    legacy.bom.assets as Array<Record<string, unknown>>
+  ).find((asset) => asset.sourcePath === "skills/demo/SKILL.md");
+  assert.equal(canonicalBomSkill?.owner, "qa-platform");
+  assert.equal(legacyBomSkill?.owner, undefined);
+
+  assert.ok(canonical.inspect);
+  assert.ok(legacy.inspect);
+  assert.equal(canonical.inspect.id, "skill.demo");
+  assert.equal(canonical.inspect.owner, "qa-platform");
+  assert.equal(legacy.inspect.id, "skills/demo/SKILL.md");
+  assert.equal(legacy.inspect.owner, undefined);
+  assert.ok(canonical.lifecycleFindings.length > 0);
+  assert.deepEqual(legacy.lifecycleFindings, []);
+
+  const legacyTrustSkill = (
+    legacy.trustGraph.nodes as
+      | Array<{ id?: string; properties?: Record<string, unknown> }>
+      | undefined
+  )?.find((node) => node.id === "asset:skills/demo/SKILL.md");
+  assert.ok(legacyTrustSkill);
+  assert.equal(legacyTrustSkill.properties?.owner, undefined);
+  assert.equal(
+    legacy.trustGraph.edges?.some(
+      (edge) =>
+        edge.from === "asset:skills/demo/SKILL.md" &&
+        ["owned_by", "has_lifecycle_status", "declares_dependency"].includes(
+          String(edge.type),
+        ),
+    ),
+    false,
+  );
   assert.equal(
     canonical.findingIds.includes("MAINT-SKILL-CONTEXT-REFERENCE-NOT-DECLARED"),
     false,
@@ -161,7 +246,8 @@ Review deterministic boundaries.
   assert.match(finding.remediation, /metadata\.renma\.requires-context/);
   assert.match(finding.remediation, /JSON-array string/);
   assert.match(finding.llmHint ?? "", /metadata\.renma\.requires-context/);
-  assert.match(finding.llmHint ?? "", /pre-0\.16-only Skills/);
+  assert.match(finding.llmHint ?? "", /Pre-0\.16 requires_context/);
+  assert.match(finding.llmHint ?? "", /not operational/);
 });
 
 test("duplicate canonical metadata mappings never select operational values", async () => {

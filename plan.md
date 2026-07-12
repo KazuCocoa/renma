@@ -336,6 +336,9 @@ Renma's shipped baseline is now grouped around:
 - Repository discovery for `contexts/**/*.md`, `context/**/*.md`, and skill-adjacent `references/`, `profiles/`, and `examples/`.
 - Deterministic scan and catalog diagnostics for metadata IDs, owners, tags, freshness, paths, references, dependencies, manifest shape, layout policy, duplicate context, repeated context, and security policy issues.
 - CLI-first views for `scan`, `catalog`, `ownership`, `graph`, focused graph views, `trust-graph`, `readiness`, `bom`, `repeated-context`, `diff`, `ci-report`, `inspect`, `scaffold`, and `suggest-semantic-split`.
+- Agent Skills-compatible `SKILL.md` validation and operational
+  `metadata.renma.*` governance/security metadata, with pre-0.16 top-level
+  Skill fields retained only as one-way migration input.
 - LLM-actionable output without an LLM runtime dependency: Markdown and JSON diagnostics provide stable IDs, severity, evidence, and repair guidance.
 - Security diagnostics v1 for agent-facing network, upload, and secret-material policy; approved network destinations; approved upload domains; command-risk patterns; profile inheritance and cycles; and policy contradictions.
 - Historical `0.1.0` manifests remain supported as legacy input. Current planning should describe the merged implementation, not a separate `0.2.0` security command.
@@ -637,8 +640,12 @@ Renma does not execute skills, install dependencies, or call an LLM to judge con
 
 The merged security diagnostics are narrower than a generic command block-list. They understand LLM-facing policy metadata and instruction text for:
 
-- `network_allowed` and approved network destinations, including `approved_network_destinations` and `security.approvedDomains`.
-- `external_upload_allowed` and approved upload domains, including `approved_upload_domains` and `security.approvedUploadDomains`.
+- Skill `metadata.renma.network-allowed` and approved network destinations,
+  plus the existing non-Skill `network_allowed`,
+  `approved_network_destinations`, and `security.approvedDomains` forms.
+- Skill `metadata.renma.external-upload-allowed` and approved upload
+  destinations, plus the existing non-Skill `external_upload_allowed`,
+  `approved_upload_domains`, and `security.approvedUploadDomains` forms.
 - Secret-material and credential handling, including commands that pass credentials in arguments.
 - Security profile inheritance, missing profiles, cycles, contradictions, and artifact-local policy overrides.
 - Risky command/context patterns such as predictable temp paths, broad chmod or sudo usage, ignored recovery paths, and upload/network instructions that violate declared policy.

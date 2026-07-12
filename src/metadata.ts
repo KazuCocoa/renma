@@ -1,4 +1,5 @@
 import type { AssetMetadata, AssetStatus } from "./model.js";
+import { inspectAgentSkill } from "./agent-skills.js";
 import type {
   Diagnostic,
   MetadataFieldEvidence,
@@ -6,10 +7,7 @@ import type {
   ParsedDocument,
 } from "./types.js";
 import { isIsoDate, parseDayDuration } from "./freshness.js";
-import {
-  parseAgentSkillFrontmatter,
-  type ParsedYamlFrontmatter,
-} from "./yaml-frontmatter.js";
+import type { ParsedYamlFrontmatter } from "./yaml-frontmatter.js";
 
 const STATUSES: AssetStatus[] = [
   "experimental",
@@ -255,16 +253,13 @@ function operationalMetadataSource(
     return legacyMetadataSource(document);
   }
 
-  const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
-  if (hasCanonicalAgentSkillsIdentity(document, frontmatter)) {
-    return canonicalSkillMetadataSource(document, frontmatter, diagnostics);
-  }
-
-  // Temporary migration compatibility: pre-0.16-only Skills remain readable so
-  // scan can emit Stage 1 migration guidance. Canonical and hybrid Skills never
-  // fall back to these top-level non-security fields. Remove this branch only
-  // after the legacy Skill migration window closes.
-  return legacyMetadataSource(document);
+  const inspection = inspectAgentSkill(document);
+  return canonicalSkillMetadataSource(
+    document,
+    inspection.frontmatter,
+    inspection.validation.valid,
+    diagnostics,
+  );
 }
 
 function legacyMetadataSource(
@@ -281,11 +276,12 @@ function legacyMetadataSource(
 function canonicalSkillMetadataSource(
   document: ParsedDocument,
   frontmatter: ParsedYamlFrontmatter,
+  validAgentSkill: boolean,
   diagnostics: Diagnostic[],
 ): OperationalMetadataSource {
   const values: Record<string, unknown> = {};
-  const fields = withoutCanonicalOperationalKeys(document.metadataFields);
-  const listItems = withoutCanonicalOperationalKeys(document.metadataListItems);
+  const fields: Record<string, MetadataFieldEvidence> = {};
+  const listItems: Record<string, MetadataFieldEvidence[]> = {};
   const duplicateMetadataMapping = frontmatter.duplicateFields.find(
     (field) => field.key === "metadata",
   );
@@ -310,13 +306,7 @@ function canonicalSkillMetadataSource(
     });
   }
 
-  if (
-    !frontmatter.closed ||
-    !frontmatter.mapping ||
-    frontmatter.errors.length > 0 ||
-    !canonicalMetadataMappingIsSafe(frontmatter) ||
-    duplicateMetadataMapping
-  ) {
+  if (!validAgentSkill) {
     return { values, fields, listItems, canonicalSkill: true };
   }
 
@@ -325,7 +315,7 @@ function canonicalSkillMetadataSource(
   );
 
   for (const field of frontmatter.metadataFields) {
-    // Stage 1 diagnoses duplicate canonical metadata keys. Do not guess which
+    // Agent Skills validation diagnoses duplicate canonical metadata keys. Do not guess which
     // duplicate value should become operational, and never fall back to legacy.
     if (duplicateKeys.has(field.key)) continue;
     const operationalKey = CANONICAL_SKILL_KEY_TO_OPERATIONAL.get(field.key);
@@ -342,54 +332,6 @@ function canonicalSkillMetadataSource(
   }
 
   return { values, fields, listItems, canonicalSkill: true };
-}
-
-function withoutCanonicalOperationalKeys<T>(
-  source: Record<string, T>,
-): Record<string, T> {
-  return Object.fromEntries(
-    Object.entries(source).filter(
-      ([key]) =>
-        !Object.hasOwn(CANONICAL_SKILL_METADATA_KEYS, key) &&
-        !CANONICAL_LIST_KEYS.has(key as CanonicalSkillOperationalKey),
-    ),
-  );
-}
-
-function hasCanonicalAgentSkillsIdentity(
-  document: ParsedDocument,
-  frontmatter: ParsedYamlFrontmatter,
-): boolean {
-  return (
-    (nonEmptyString(frontmatter.values.name) !== undefined &&
-      nonEmptyString(frontmatter.values.description) !== undefined) ||
-    // The focused YAML parser intentionally exposes no values for some unsafe
-    // structures (notably unclosed frontmatter). The Markdown parser still
-    // gives us a conservative identity signal, which prevents malformed
-    // canonical Skills from falling back to pre-0.16 operational metadata.
-    (nonEmptyString(document.metadata.name) !== undefined &&
-      nonEmptyString(document.metadata.description) !== undefined)
-  );
-}
-
-function canonicalMetadataMappingIsSafe(
-  frontmatter: ParsedYamlFrontmatter,
-): boolean {
-  if (!frontmatter.fields.some((field) => field.key === "metadata")) {
-    return true;
-  }
-  const metadata = frontmatter.values.metadata;
-  return (
-    metadata !== null &&
-    typeof metadata === "object" &&
-    !Array.isArray(metadata)
-  );
-}
-
-function nonEmptyString(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 function operationalListValue(

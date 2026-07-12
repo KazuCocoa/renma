@@ -295,9 +295,9 @@ npx renma scaffold context contexts/testing/boundary-value-analysis.md --id cont
 npx renma scaffold context_lens lenses/testing/spec-review-boundary-values.md --id lens.testing.spec-review.boundary-values --title "Spec Review Boundary Values Lens" --owner qa-platform --tags testing,spec-review
 ```
 
-During Stage 2, the Skill scaffold remains a pre-0.16 migration-source starter.
-Use `suggest-metadata` to produce and review its one-way canonical conversion;
-context and context-lens scaffolds retain their existing top-level metadata.
+The Skill scaffold writes a canonical Agent Skills `SKILL.md` directly, with
+Renma governance values under flat, string-valued `metadata.renma.*` keys.
+Context and context-lens scaffolds retain their existing top-level metadata.
 
 Inspect a focused graph for the new skill:
 
@@ -393,14 +393,13 @@ skills/**/SKILL.md
 .agents/skills/**/SKILL.md
 ```
 
-During the staged 0.16.0 transition, canonical and hybrid Skills use flat
-string-valued `metadata.renma.*` entries as the operational source for
-non-security governance metadata; list values are JSON-array strings.
-Pre-0.16-only Skills remain temporarily readable for migration, while contexts
-and other non-Skill assets keep their existing top-level metadata syntax.
-Canonical security metadata is deferred to Stage 3, so the repository-owned
-`release-prep` Skill temporarily retains its pre-0.16 top-level security fields.
-The 0.16.0 migration is not complete yet. See
+Renma 0.16.0 requires Agent Skills format for operational Skills. Renma
+governance and security values use flat, string-valued `metadata.renma.*`
+entries; list values are JSON-array strings and booleans are the exact strings
+`"true"` or `"false"`. Pre-0.16 top-level Skill metadata is discovered only as
+migration input for `suggest-metadata`; catalog, ownership, graph, readiness,
+BOM, Trust Graph, lifecycle, and security consumers do not use it. Contexts and
+other non-Skill assets keep their existing top-level metadata syntax. See
 [Agent Skills Compatibility and Migration](docs/agent-skills-compatibility.md)
 for the normative boundary.
 
@@ -508,8 +507,8 @@ Each suppression requires a rule `id`, one or more path patterns, and an audit `
 ## Asset Metadata
 
 Contexts and other non-Skill assets declare lightweight metadata in frontmatter
-using the existing top-level syntax. Canonical Skills instead use the Stage 2
-`metadata.renma.*` syntax described above.
+using the existing top-level syntax. Skills use canonical Agent Skills
+frontmatter and `metadata.renma.*` as described above.
 
 ```markdown
 ---
@@ -564,9 +563,10 @@ renma suggest-metadata skills/testing/spec-review/SKILL.md --format prompt
 
 `suggest-metadata` is not an auto-fixer. It tells a human or coding agent to inspect the existing asset, preserve existing frontmatter and Markdown body content, add only compact missing metadata that is clearly supported, and rerun `renma scan .` and `renma ownership .`. It does not infer owners. If you pass `--owner qa-platform`, the output may include that owner because it was explicitly provided; otherwise missing owner remains allowed and is reported as unowned by `ownership`. If an existing asset already declares an owner, `suggest-metadata` preserves it; a different `--owner` value is treated as a human-review ownership change, not an automatic metadata suggestion.
 
-For non-Skill assets and pre-0.16-only Skills, YAML-style block lists are
-supported for selected metadata fields, which keeps authored metadata explicit
-and reviewable:
+For non-Skill assets, YAML-style block lists are supported for selected
+metadata fields, which keeps authored metadata explicit and reviewable.
+Pre-0.16 Skill fields may use this shape as migration input, but are not
+operational in Renma 0.16.0:
 
 ```yaml
 ---

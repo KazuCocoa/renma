@@ -847,14 +847,17 @@ test("CLI prints catalog JSON and markdown", async () => {
     path.join(root, "skills", "demo", "SKILL.md"),
     [
       "---",
-      "id: demo",
-      "owner: qa-platform",
-      "status: stable",
-      "last_reviewed_at: 2026-06-28",
-      "review_cycle: P90D",
-      "expires_at: 2026-12-31",
-      "tags: appium, android",
-      "requires_context: demo.guide, testing.boundary-value-analysis",
+      "name: demo",
+      "description: Use this skill for demo requests. Use when catalog metadata and dependency evidence need deterministic review.",
+      "metadata:",
+      "  renma.id: demo",
+      "  renma.owner: qa-platform",
+      "  renma.status: stable",
+      "  renma.last-reviewed-at: 2026-06-28",
+      "  renma.review-cycle: P90D",
+      "  renma.expires-at: 2026-12-31",
+      `  renma.tags: '["appium","android"]'`,
+      `  renma.requires-context: '["demo.guide","testing.boundary-value-analysis"]'`,
       "---",
       "# Demo",
       "Use for demo requests.",
@@ -919,10 +922,9 @@ test("CLI prints catalog JSON and markdown", async () => {
       sourcePath: "skills/demo/SKILL.md",
       evidence: {
         path: "skills/demo/SKILL.md",
-        startLine: 9,
-        endLine: 9,
-        snippet:
-          "requires_context: demo.guide, testing.boundary-value-analysis",
+        startLine: 12,
+        endLine: 12,
+        snippet: `  renma.requires-context: '["demo.guide","testing.boundary-value-analysis"]'`,
       },
     },
     {
@@ -932,10 +934,9 @@ test("CLI prints catalog JSON and markdown", async () => {
       sourcePath: "skills/demo/SKILL.md",
       evidence: {
         path: "skills/demo/SKILL.md",
-        startLine: 9,
-        endLine: 9,
-        snippet:
-          "requires_context: demo.guide, testing.boundary-value-analysis",
+        startLine: 12,
+        endLine: 12,
+        snippet: `  renma.requires-context: '["demo.guide","testing.boundary-value-analysis"]'`,
       },
     },
   ]);
@@ -1215,11 +1216,13 @@ expected_outputs:
   await writeFile(
     path.join(root, "skills", "testing", "spec-review", "SKILL.md"),
     `---
-id: skill.testing.spec-review
-owner: qa-platform
-status: experimental
-requires_lens:
-  - lenses/testing/spec-review-boundary-values.md
+name: spec-review
+description: Review specifications with a declared lens. Use when boundary analysis needs deterministic context.
+metadata:
+  renma.id: skill.testing.spec-review
+  renma.owner: qa-platform
+  renma.status: experimental
+  renma.requires-lens: '["lenses/testing/spec-review-boundary-values.md"]'
 ---
 # Spec Review
 `,
@@ -1227,11 +1230,13 @@ requires_lens:
   await writeFile(
     path.join(root, "skills", "testing", "exploratory", "SKILL.md"),
     `---
-id: skill.testing.exploratory
-owner: qa-platform
-status: experimental
-optional_lens:
-  - lens.testing.spec-review.boundary-values
+name: exploratory
+description: Review exploratory specifications with an optional lens. Use when boundary analysis may add useful context.
+metadata:
+  renma.id: skill.testing.exploratory
+  renma.owner: qa-platform
+  renma.status: experimental
+  renma.optional-lens: '["lens.testing.spec-review.boundary-values"]'
 ---
 # Exploratory Review
 `,
@@ -1688,12 +1693,19 @@ test("scaffold skill writes deterministic file output", async () => {
 
   assert.equal(result.code, 0);
   const content = await readFile(target, "utf8");
-  assert.match(content, /^id: testing.spec-review$/m);
-  assert.match(content, /^title: Spec Review$/m);
-  assert.match(content, /^owner: qa-platform$/m);
-  assert.match(content, /^status: experimental$/m);
-  assert.match(content, /^tags:\n {2}- testing\n {2}- spec-review\n {2}- qa$/m);
-  assert.match(content, /^requires_context:$/m);
+  assert.match(content, /^name: spec-review$/m);
+  assert.match(content, /^description: .*Use when /m);
+  assert.match(content, /^metadata:$/m);
+  assert.match(content, /^ {2}renma\.id: 'testing\.spec-review'$/m);
+  assert.match(content, /^ {2}renma\.title: 'Spec Review'$/m);
+  assert.match(content, /^ {2}renma\.owner: 'qa-platform'$/m);
+  assert.match(content, /^ {2}renma\.status: experimental$/m);
+  assert.match(
+    content,
+    /^ {2}renma\.tags: '\["testing","spec-review","qa"\]'$/m,
+  );
+  assert.match(content, /^ {2}renma\.requires-context: '\[\]'$/m);
+  assert.doesNotMatch(content, /^requires_context:/m);
   assert.match(content, /^## Purpose$/m);
   assert.match(content, /^## Required Inputs$/m);
   assert.match(content, /^## Context References$/m);
@@ -1701,6 +1713,11 @@ test("scaffold skill writes deterministic file output", async () => {
   assert.match(content, /Do not choose runtime task context/);
   assert.match(content, /Do not assemble prompts for live model calls/);
   assert.doesNotMatch(content, /Renma can verify/);
+
+  const scanResult = await scan(root);
+  assert.equal(scanResult.agentSkills.results[0]?.format, "agent-skills");
+  assert.equal(scanResult.agentSkills.results[0]?.valid, true);
+  assert.equal(scanResult.agentSkills.results[0]?.migrationRecommended, false);
 
   const catalogResult = await withCapturedConsole(() =>
     main(["catalog", root, "--format", "json"]),

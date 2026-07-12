@@ -34,13 +34,11 @@ workflow, see [Agent Skills Compatibility and Migration](agent-skills-compatibil
 Agent Skills results appear inside `scan`; there is no separate Skill-validation
 command.
 
-The 0.16.0 transition is staged. Stage 1 added validation and migration
-assistance. Stage 2 makes canonical non-security `metadata.renma.*` values
-operational through the existing Renma reports. Stage 3 will adopt canonical
-security metadata and complete the repository-owned Skill migration. The
-repository-owned `release-prep` Skill is intentionally hybrid until then; its
-remaining top-level security fields must not be moved or removed during Stage
-2. The migration is not complete yet.
+Renma 0.16.0 requires specification-valid Agent Skills for operational Skills.
+All Renma Skill governance and security metadata uses flat, string-valued
+`metadata.renma.*` entries. Pre-0.16 top-level Skill metadata is accepted only
+as migration input for `suggest-metadata`; non-Skill metadata behavior is
+unchanged.
 
 ## Repository Layout
 
@@ -75,18 +73,17 @@ Avoid using reserved support directory names as skill names. Paths such as
 one of those files is intended to define a Renma skill, rename the directory, for example to
 `skills/example-review/SKILL.md`.
 
-Canonical and hybrid Skills declare non-security governance values as flat
-string-valued `metadata.renma.*` entries. JSON-array strings represent lists;
+Specification-valid Agent Skills declare governance and security values as
+flat string-valued `metadata.renma.*` entries. JSON-array strings represent lists;
 Renma does not treat comma-separated canonical values as lists. These canonical
 values feed the same catalog, ownership, graph, readiness, BOM, Trust Graph,
 lifecycle, and reporting behavior as the pre-0.16 fields they replace.
 
-For canonical or hybrid Skills, Renma does not fall back to top-level
-non-security fields. Pre-0.16-only Skills remain temporarily readable so they
-can be scanned and migrated. Contexts, context lenses, profiles, references,
+Renma does not fall back to top-level pre-0.16 Skill fields. Invalid, hybrid,
+and pre-0.16 Skills can be scanned and migrated but contribute no operational
+Skill metadata. Contexts, context lenses, profiles, references,
 examples, agents, configuration files, and other non-Skill assets continue to
-use their existing top-level metadata syntax. Skill security fields also remain
-in their pre-0.16 top-level form until Stage 3.
+use their existing top-level metadata syntax.
 
 ## Quick Start
 
@@ -145,13 +142,10 @@ renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
 
 `scaffold` creates a starter file, not a complete production-ready skill. Fill in the purpose, when to use it, when not to use it, required inputs, completion criteria, verification steps, and required or optional context references.
 
-During Stage 2, the Skill scaffold remains a pre-0.16 migration-source starter.
-After replacing its placeholder prose, run `suggest-metadata`, review the
-proposal, and apply the one-way conversion to Agent Skills identity plus
-non-security `metadata.renma.*` only when the proposal is unblocked. If the
-Skill declares pre-0.16 security fields, preserve them at the top level and
-defer the complete migration to Stage 3. Context and context-lens scaffolds keep
-their existing top-level metadata shape.
+The Skill scaffold writes canonical Agent Skills identity and
+`metadata.renma.*` fields directly. Replace its placeholder prose and fill in
+any required security policy before depending on it. Context and context-lens
+scaffolds keep their existing top-level metadata shape.
 
 3. Add shared context assets when the skill depends on reusable knowledge.
 
@@ -164,9 +158,8 @@ Reusable domain, testing, product, platform, and tool knowledge should usually l
 4. Connect the skill to context assets.
 
 In a canonical Skill, add `renma.requires-context` or
-`renma.optional-context` under `metadata` as JSON-array strings. A pre-0.16
-scaffold uses `requires_context` and `optional_context` only until it is
-migrated. These fields create static repository graph relationships. They do
+`renma.optional-context` under `metadata` as JSON-array strings. These fields
+create static repository graph relationships. They do
 not make Renma choose runtime context for an agent.
 
 5. Run Renma checks.
@@ -601,22 +594,19 @@ Use this after `scan` detects metadata issues or `ownership` shows unowned asset
 The prompt asks the agent to inspect the existing asset, preserve the Markdown body, preserve existing frontmatter values, add only compact missing metadata that is clearly supported, and rerun `renma scan .` and `renma ownership .` after editing.
 
 For Skill targets using the pre-0.16 Renma Skill format, the 0.16.0 metadata
-migration path is one-way: non-security frontmatter becomes Agent Skills
-identity plus `metadata.renma.*`. Separately, `skill.md` and `*.skill.md` targets
+migration path is one-way: recognized governance and security frontmatter
+becomes Agent Skills identity plus `metadata.renma.*`. Separately, `skill.md` and `*.skill.md` targets
 report any required entrypoint rename or move, even when their frontmatter
 already uses Agent Skills fields. For a canonical Agent Skill, `--owner` may
 instead propose an owner metadata retrofit; it never causes reverse migration.
 The normative behavior is documented in
 [Agent Skills Compatibility and Migration](agent-skills-compatibility.md).
 
-Stage 2 does not produce an apply-ready `suggest-metadata` conversion while a
-recognized pre-0.16 security field remains. The output lists only the detected
-top-level security field names as blocked evidence; it proposes no canonical
-security keys, values, or serialization. Canonical frontmatter is omitted and
-the top-level security field must be preserved until Stage 3. A reviewed partial
-conversion may move identity and non-security fields while leaving security
-fields top-level; that intentionally hybrid result, including the
-repository-owned `release-prep` Skill, is not a completed migration.
+Pre-0.16 security fields migrate with strict serialization: booleans become the
+exact strings `"true"` or `"false"`, and lists become JSON-array strings of
+strings. Unsafe or ambiguous values block canonical frontmatter generation.
+For an already canonical Skill, `suggest-metadata` proposes neither migration
+nor an unnecessary rewrite unless an explicit supported retrofit is requested.
 
 Owner metadata remains recommended but not required. Without `--owner`, `suggest-metadata` blocks owner as a suggested addition and says not to add one unless the asset already declares an owner or a maintainer provides one. With `--owner <owner>`, the command may include that owner because it was explicitly provided. If an existing asset already declares an owner, `suggest-metadata` preserves it; a different `--owner` value is treated as a human-review ownership change, not an automatic metadata suggestion. Renma does not infer owners from Git history, file paths, prose, or authors.
 

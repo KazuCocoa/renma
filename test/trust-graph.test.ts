@@ -127,7 +127,7 @@ test("Trust Graph links selected security profiles and effective policy evidence
   assert.equal(profileEdge?.to, "security_profile:strict-local");
   assert.equal(
     profileEdge?.evidence?.[0]?.snippet,
-    "security_profile: strict-local",
+    "  renma.security-profile: strict-local",
   );
   assert.equal(policyEdge?.from, "asset:skill.demo");
   assert.match(policyNode?.id ?? "", /^effective_policy:sha256:/);
@@ -147,7 +147,8 @@ test("Trust Graph links selected security profiles and effective policy evidence
   assert.equal(policyNode?.properties?.humanApprovalRequired, true);
   assert.ok(
     policyEdge?.evidence?.some(
-      (evidence) => evidence.snippet === "security_profile: strict-local",
+      (evidence) =>
+        evidence.snippet === "  renma.security-profile: strict-local",
     ),
   );
 });
@@ -243,7 +244,7 @@ test("Trust Graph links diagnostics to related assets", async () => {
 
   assert.ok(invalidStatusNode);
   assert.ok(diagnosticEdge);
-  assert.equal(diagnosticEdge.evidence?.[0]?.snippet, "status: active");
+  assert.equal(diagnosticEdge.evidence?.[0]?.snippet, "  renma.status: active");
 });
 
 test("Trust Graph preserves duplicate asset id evidence as findings and diagnostic nodes", async () => {
@@ -369,6 +370,7 @@ async function writeSkill(
   await writeFile(
     path.join(root, "skills", name, "SKILL.md"),
     markdown({
+      skillName: name,
       ...metadata,
       title: `# ${metadata.id}`,
       body: [
@@ -465,6 +467,7 @@ async function writeInvalidContextLens(root: string): Promise<void> {
 }
 
 function markdown(metadata: {
+  skillName?: string;
   id: string;
   type?: string;
   owner?: string;
@@ -478,6 +481,30 @@ function markdown(metadata: {
   title: string;
   body: string;
 }): string {
+  if (metadata.skillName) {
+    return [
+      "---",
+      `name: ${metadata.skillName}`,
+      "description: Use this skill for deterministic trust graph fixture checks. Use when ownership, lifecycle, dependencies, and policy evidence need review.",
+      "metadata:",
+      `  renma.id: ${metadata.id}`,
+      ...(metadata.owner ? [`  renma.owner: ${metadata.owner}`] : []),
+      ...(metadata.status ? [`  renma.status: ${metadata.status}`] : []),
+      ...(metadata.requiresContext
+        ? [
+            `  renma.requires-context: '${JSON.stringify(metadata.requiresContext)}'`,
+          ]
+        : []),
+      ...(metadata.securityProfile
+        ? [`  renma.security-profile: ${metadata.securityProfile}`]
+        : []),
+      "---",
+      metadata.title,
+      "",
+      metadata.body,
+      "",
+    ].join("\n");
+  }
   return [
     "---",
     `id: ${metadata.id}`,

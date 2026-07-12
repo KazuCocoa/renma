@@ -26,7 +26,7 @@ export const AGENT_SKILLS_TOP_LEVEL_FIELDS = [
   "allowed-tools",
 ] as const;
 
-const LEGACY_RENMA_OPERATIONAL_SKILL_FIELDS = [
+export const LEGACY_RENMA_SKILL_FIELDS = [
   "id",
   "title",
   "version",
@@ -45,10 +45,6 @@ const LEGACY_RENMA_OPERATIONAL_SKILL_FIELDS = [
   "optional_lens",
   "conflicts",
   "superseded_by",
-] as const;
-
-/** Pre-0.16 security fields whose canonical adoption is deferred to Stage 3. */
-export const DEFERRED_STAGE_3_SECURITY_FIELDS = new Set<string>([
   "allowed_data",
   "network_allowed",
   "external_upload_allowed",
@@ -58,11 +54,6 @@ export const DEFERRED_STAGE_3_SECURITY_FIELDS = new Set<string>([
   "approved_network_destinations",
   "approved_upload_destinations",
   "security_profile",
-]);
-
-export const LEGACY_RENMA_SKILL_FIELDS = [
-  ...LEGACY_RENMA_OPERATIONAL_SKILL_FIELDS,
-  ...DEFERRED_STAGE_3_SECURITY_FIELDS,
 ] as const;
 
 const ALLOWED_TOP_LEVEL_FIELDS = new Set<string>(AGENT_SKILLS_TOP_LEVEL_FIELDS);
@@ -103,6 +94,11 @@ export interface AgentSkillValidationResult {
   errorCount: number;
   warningCount: number;
   issues: AgentSkillValidationIssue[];
+}
+
+export interface AgentSkillInspection {
+  frontmatter: ParsedYamlFrontmatter;
+  validation: AgentSkillValidationResult;
 }
 
 export interface AgentSkillMigrationCommand {
@@ -165,6 +161,34 @@ export function validateAgentSkill(
   document: ParsedDocument,
 ): AgentSkillValidationResult {
   const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
+  return validateAgentSkillFrontmatter(document, frontmatter);
+}
+
+/** Parse and validate a Skill once for canonical operational consumers. */
+export function inspectAgentSkill(
+  document: ParsedDocument,
+): AgentSkillInspection {
+  const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
+  return {
+    frontmatter,
+    validation: validateAgentSkillFrontmatter(document, frontmatter),
+  };
+}
+
+/** Resolve the YAML description value used by Skill quality rules. */
+export function resolvedAgentSkillDescription(
+  document: ParsedDocument,
+): string | undefined {
+  if (document.artifact.kind !== "skill") return undefined;
+  return nonEmptyString(
+    parseAgentSkillFrontmatter(document.artifact.content).values.description,
+  );
+}
+
+function validateAgentSkillFrontmatter(
+  document: ParsedDocument,
+  frontmatter: ParsedYamlFrontmatter,
+): AgentSkillValidationResult {
   const issues: AgentSkillValidationIssue[] = [];
   const name = nonEmptyString(frontmatter.values.name);
   const description = nonEmptyString(frontmatter.values.description);
@@ -277,12 +301,15 @@ export function validateAgentSkill(
   for (const unexpected of frontmatter.fields.filter(
     (field) => !ALLOWED_TOP_LEVEL_FIELDS.has(field.key),
   )) {
+    const legacyField = LEGACY_FIELDS.has(unexpected.key);
     issues.push(
       fieldIssue(
         document,
         unexpected,
         IDS.AS_UNEXPECTED_TOP_LEVEL_FIELD,
-        `Unexpected top-level Agent Skills field "${unexpected.key}". Renma extensions belong under metadata using renma.* string keys.`,
+        legacyField
+          ? `Pre-0.16 top-level Skill field "${unexpected.key}" is not operationally supported in Renma 0.16.0. Migrate the Skill to Agent Skills metadata.renma.* before catalog, ownership, graph, or security consumers trust this metadata.`
+          : `Unexpected top-level Agent Skills field "${unexpected.key}". Renma extensions belong under metadata using renma.* string keys.`,
       ),
     );
   }

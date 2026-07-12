@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { normalizeAgentSkillDirectoryName } from "../agent-skills.js";
 
 export type ScaffoldKind = "skill" | "context" | "context_lens";
 export type ScaffoldFormat = "file" | "prompt" | "json";
@@ -55,7 +56,13 @@ export function buildScaffoldBundle(options: ScaffoldOptions): ScaffoldBundle {
     options.tags && options.tags.length > 0 ? options.tags : ["authoring"];
   const content =
     options.kind === "skill"
-      ? renderSkillScaffold({ id, title, owner, tags })
+      ? renderSkillScaffold({
+          name: canonicalSkillName(options.targetPath),
+          id,
+          title,
+          owner,
+          tags,
+        })
       : options.kind === "context_lens"
         ? renderContextLensScaffold({ id, title, owner, tags })
         : renderContextScaffold({ id, title, owner, tags });
@@ -82,21 +89,25 @@ export function buildScaffoldBundle(options: ScaffoldOptions): ScaffoldBundle {
 }
 
 function renderSkillScaffold(metadata: {
+  name: string;
   id: string;
   title: string;
   owner: string;
   tags: string[];
 }): string {
   return `---
-id: ${metadata.id}
-title: ${metadata.title}
-version: 0.1.0
-owner: ${metadata.owner}
-status: experimental
-${renderTagBlock(metadata.tags)}
-requires_context:
-optional_context:
-conflicts:
+name: ${metadata.name}
+description: Replace this description with clear routing guidance. Use when the intended workflow applies.
+metadata:
+  renma.id: ${yamlString(metadata.id)}
+  renma.title: ${yamlString(metadata.title)}
+  renma.version: "0.1.0"
+  renma.owner: ${yamlString(metadata.owner)}
+  renma.status: experimental
+  renma.tags: ${yamlString(JSON.stringify(metadata.tags))}
+  renma.requires-context: '[]'
+  renma.optional-context: '[]'
+  renma.conflicts: '[]'
 ---
 
 # ${metadata.title}
@@ -117,7 +128,7 @@ Describe the recurring task, decision, or workflow this skill should guide.
 
 ## Context References
 
-Use \`requires_context\` and \`optional_context\` in frontmatter to reference durable context assets.
+Use \`metadata.renma.requires-context\` and \`metadata.renma.optional-context\` JSON-array strings to reference durable context assets.
 
 Move reusable domain, testing, platform, product, or tool knowledge into separately owned context assets under \`contexts/\`.
 
@@ -235,6 +246,15 @@ function renderPrompt(input: {
   tags: string[];
   content: string;
 }): string {
+  const skillGuidance =
+    input.kind === "skill"
+      ? [
+          "- Keep the Skill in Agent Skills format with Renma extensions under `metadata.renma.*`.",
+          "- Use `metadata.renma.requires-context` for context the skill normally depends on, encoded as a JSON-array string.",
+          "- Use `metadata.renma.optional-context` for context useful only in some cases, encoded as a JSON-array string.",
+          "- Use `metadata.renma.requires-lens` or `metadata.renma.optional-lens` for static lens relationships, encoded as JSON-array strings.",
+        ]
+      : [];
   return `Create a Renma ${input.kind} asset at \`${input.targetPath}\`.
 
 Use this metadata exactly:
@@ -256,9 +276,7 @@ Constraints:
 - Preserve the YAML frontmatter shape unless the repository already requires a stricter local convention.
 - Use only supported statuses: experimental, stable, deprecated, archived.
 - Move durable domain, testing, platform, product, or tool knowledge into separately owned context assets under \`contexts/\`.
-- For skill assets, use \`requires_context\` for context the skill normally depends on.
-- For skill assets, use \`optional_context\` for context useful only in some cases.
-- For skill assets, use \`requires_lens\` or \`optional_lens\` for static lens relationships.
+${skillGuidance.join("\n")}
 - For context lens assets, use \`applies_to\` for context assets the lens interprets.
 - Use simple supported metadata shapes only.
 - For context assets, keep content durable, reviewable, and source-backed.
@@ -277,6 +295,25 @@ Constraints:
 function renderTagBlock(tags: string[]): string {
   return `tags:
 ${tags.map((tag) => `  - ${tag}`).join("\n")}`;
+}
+
+function canonicalSkillName(targetPath: string): string {
+  const normalizedPath = targetPath.replaceAll("\\", "/");
+  if (path.posix.basename(normalizedPath) !== "SKILL.md") {
+    throw new Error("Skill scaffolds require the canonical SKILL.md filename.");
+  }
+  const directory = path.posix.basename(path.posix.dirname(normalizedPath));
+  const validation = normalizeAgentSkillDirectoryName(directory);
+  if (validation.normalized === undefined || validation.problems.length > 0) {
+    throw new Error(
+      `Skill scaffold directory "${directory}" is not a valid Agent Skills name: ${validation.problems.join("; ")}.`,
+    );
+  }
+  return validation.normalized;
+}
+
+function yamlString(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`;
 }
 
 function inferId(kind: ScaffoldKind, targetPath: string): string {

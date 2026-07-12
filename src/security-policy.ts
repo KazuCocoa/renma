@@ -1,4 +1,12 @@
-import type { SecurityConfig } from "./types.js";
+import { inspectAgentSkill } from "./agent-skills.js";
+import { parseDocument } from "./markdown.js";
+import type { Artifact, ParsedDocument, SecurityConfig } from "./types.js";
+
+export interface SecurityPolicyFieldEvidence {
+  startLine: number;
+  endLine: number;
+  snippet: string;
+}
 
 export interface SecurityPolicy {
   networkAllowed?: boolean;
@@ -14,6 +22,7 @@ export interface SecurityPolicy {
   disallowedCommands: string[];
   declared: Set<string>;
   lineByField: Map<string, number>;
+  evidenceByField: Map<string, SecurityPolicyFieldEvidence>;
 }
 
 export interface SecurityProfileChainItem {
@@ -43,21 +52,35 @@ const ALLOWED_DATA_POLICY_FIELDS = new Set(["allowed_data"]);
 const FORBIDDEN_INPUT_POLICY_FIELDS = new Set(["forbidden_inputs"]);
 const SECURITY_PROFILE_POLICY_FIELDS = new Set(["security_profile"]);
 
+const CANONICAL_BOOLEAN_POLICY_FIELDS = new Map<string, keyof SecurityPolicy>([
+  ["renma.network-allowed", "networkAllowed"],
+  ["renma.external-upload-allowed", "externalUploadAllowed"],
+  ["renma.secrets-allowed", "secretsAllowed"],
+  ["renma.requires-human-approval", "humanApprovalRequired"],
+]);
+
+const CANONICAL_LIST_POLICY_FIELDS = new Map<
+  string,
+  | "allowedData"
+  | "forbiddenInputs"
+  | "approvedNetworkDestinations"
+  | "approvedUploadDestinations"
+>([
+  ["renma.allowed-data", "allowedData"],
+  ["renma.forbidden-inputs", "forbiddenInputs"],
+  ["renma.approved-network-destinations", "approvedNetworkDestinations"],
+  ["renma.approved-upload-destinations", "approvedUploadDestinations"],
+]);
+
+const CANONICAL_SECURITY_PROFILE_FIELD = "renma.security-profile";
+
 type ParsedBlockList = {
   values: string[];
   nextIndex: number;
 };
 
 export function parseSecurityPolicy(content: string): SecurityPolicy {
-  const policy: SecurityPolicy = {
-    allowedData: [],
-    forbiddenInputs: [],
-    approvedNetworkDestinations: [],
-    approvedUploadDestinations: [],
-    disallowedCommands: [],
-    declared: new Set(),
-    lineByField: new Map(),
-  };
+  const policy = emptySecurityPolicy();
 
   const lines = content.split(/\r?\n/);
   const frontmatterEnd =
@@ -139,6 +162,47 @@ export function parseSecurityPolicy(content: string): SecurityPolicy {
   return policy;
 }
 
+/** Resolve the operational security source for one repository artifact. */
+export function parseOperationalSecurityPolicy(
+  input: Artifact | ParsedDocument,
+): SecurityPolicy {
+  const document = isParsedDocument(input) ? input : parseDocument(input);
+  if (document.artifact.kind !== "skill") {
+    return parseSecurityPolicy(document.artifact.content);
+  }
+
+  const inspection = inspectAgentSkill(document);
+  if (!inspection.validation.valid) return emptySecurityPolicy();
+
+  const policy = emptySecurityPolicy();
+  for (const field of inspection.frontmatter.metadataFields) {
+    const booleanField = CANONICAL_BOOLEAN_POLICY_FIELDS.get(field.key);
+    if (booleanField !== undefined) {
+      if (field.value !== "true" && field.value !== "false") continue;
+      (policy[booleanField] as boolean | undefined) = field.value === "true";
+      recordCanonicalPolicyField(document, policy, booleanField, field);
+      continue;
+    }
+
+    const listField = CANONICAL_LIST_POLICY_FIELDS.get(field.key);
+    if (listField !== undefined) {
+      const values = canonicalStringArray(field.value);
+      if (values === undefined) continue;
+      policy[listField].push(...values);
+      recordCanonicalPolicyField(document, policy, listField, field);
+      continue;
+    }
+
+    if (field.key === CANONICAL_SECURITY_PROFILE_FIELD) {
+      if (typeof field.value !== "string" || !field.value.trim()) continue;
+      policy.securityProfile = field.value.trim();
+      recordCanonicalPolicyField(document, policy, "securityProfile", field);
+    }
+  }
+
+  return policy;
+}
+
 export function applySecurityConfig(
   policy: SecurityPolicy,
   config?: SecurityConfig,
@@ -147,6 +211,7 @@ export function applySecurityConfig(
 
   const declared = new Set(policy.declared);
   const lineByField = new Map(policy.lineByField);
+  const evidenceByField = new Map(policy.evidenceByField);
   const resolved: SecurityPolicy = {
     ...policy,
     allowedData: [...policy.allowedData],
@@ -156,6 +221,7 @@ export function applySecurityConfig(
     disallowedCommands: [...policy.disallowedCommands],
     declared,
     lineByField,
+    evidenceByField,
   };
 
   const chain = securityProfileChain(policy.securityProfile, config);
@@ -216,6 +282,58 @@ export function applySecurityConfig(
   resolved.disallowedCommands = uniqueStrings(resolved.disallowedCommands);
 
   return resolved;
+}
+
+function emptySecurityPolicy(): SecurityPolicy {
+  return {
+    allowedData: [],
+    forbiddenInputs: [],
+    approvedNetworkDestinations: [],
+    approvedUploadDestinations: [],
+    disallowedCommands: [],
+    declared: new Set(),
+    lineByField: new Map(),
+    evidenceByField: new Map(),
+  };
+}
+
+function isParsedDocument(
+  input: Artifact | ParsedDocument,
+): input is ParsedDocument {
+  return "artifact" in input;
+}
+
+function canonicalStringArray(value: unknown): string[] | undefined {
+  if (typeof value !== "string") return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+  if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "string"))
+    return undefined;
+  return parsed.map((item) => item.trim()).filter(Boolean);
+}
+
+function recordCanonicalPolicyField(
+  document: ParsedDocument,
+  policy: SecurityPolicy,
+  operationalField: string,
+  field: {
+    startLine: number;
+    endLine: number;
+  },
+): void {
+  policy.declared.add(operationalField);
+  policy.lineByField.set(operationalField, field.startLine);
+  policy.evidenceByField.set(operationalField, {
+    startLine: field.startLine,
+    endLine: field.endLine,
+    snippet: document.lines
+      .slice(field.startLine - 1, field.endLine)
+      .join("\n"),
+  });
 }
 
 export function securityProfileChain(

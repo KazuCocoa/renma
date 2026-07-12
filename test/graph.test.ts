@@ -646,6 +646,7 @@ async function writeSkill(
   await writeFile(
     path.join(root, "skills", id, "SKILL.md"),
     markdown({
+      skillName: id,
       id,
       ...metadata,
       title: `# ${id}`,
@@ -696,6 +697,7 @@ async function writeContextLens(
 }
 
 function markdown(metadata: {
+  skillName?: string;
   id: string;
   type?: string;
   owner?: string;
@@ -708,6 +710,36 @@ function markdown(metadata: {
   appliesTo?: string[];
   title: string;
 }): string {
+  if (metadata.skillName) {
+    return [
+      "---",
+      `name: ${metadata.skillName}`,
+      "description: Use this skill for deterministic graph report tests. Use when repository relationships need review.",
+      "metadata:",
+      `  renma.id: ${metadata.id}`,
+      ...(metadata.owner ? [`  renma.owner: ${metadata.owner}`] : []),
+      ...(metadata.status ? [`  renma.status: ${metadata.status}`] : []),
+      ...(metadata.purpose ? [`  renma.purpose: ${metadata.purpose}`] : []),
+      ...(metadata.tags
+        ? [`  renma.tags: '${JSON.stringify(metadata.tags)}'`]
+        : []),
+      ...(metadata.requiresContext
+        ? [
+            `  renma.requires-context: '${JSON.stringify(metadata.requiresContext)}'`,
+          ]
+        : []),
+      ...(metadata.requiresLens
+        ? [`  renma.requires-lens: '${JSON.stringify(metadata.requiresLens)}'`]
+        : []),
+      ...(metadata.optionalLens
+        ? [`  renma.optional-lens: '${JSON.stringify(metadata.optionalLens)}'`]
+        : []),
+      "---",
+      metadata.title,
+      "Use for graph report tests.",
+      "",
+    ].join("\n");
+  }
   return [
     "---",
     `id: ${metadata.id}`,

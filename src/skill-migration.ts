@@ -3,7 +3,6 @@ import { stringify } from "yaml";
 import {
   AGENT_SKILLS_TOP_LEVEL_FIELDS,
   agentSkillFenceLines,
-  DEFERRED_STAGE_3_SECURITY_FIELDS,
   legacyRenmaMetadataKey,
   LEGACY_RENMA_SKILL_FIELDS,
   normalizeAgentSkillDirectoryName,
@@ -29,6 +28,10 @@ const LIST_LEGACY_FIELDS = new Set([
   "optional_lens",
   "conflicts",
   "superseded_by",
+  "allowed_data",
+  "forbidden_inputs",
+  "approved_network_destinations",
+  "approved_upload_destinations",
 ]);
 const TEXT_SCALAR_LEGACY_FIELDS = new Set([
   "id",
@@ -40,6 +43,13 @@ const TEXT_SCALAR_LEGACY_FIELDS = new Set([
   "last_reviewed_at",
   "review_cycle",
   "expires_at",
+  "security_profile",
+]);
+const BOOLEAN_SCALAR_LEGACY_FIELDS = new Set([
+  "network_allowed",
+  "external_upload_allowed",
+  "secrets_allowed",
+  "requires_human_approval",
 ]);
 
 export interface SkillMigrationBlock {
@@ -105,16 +115,6 @@ export function buildAgentSkillMigrationSuggestion(
   const duplicateMetadataKeys = new Set(
     frontmatter.duplicateMetadataKeys.map((field) => field.key),
   );
-  const deferredSecurityFields = Array.from(
-    DEFERRED_STAGE_3_SECURITY_FIELDS,
-  ).filter((field) => field in frontmatter.values);
-  if (deferredSecurityFields.length > 0) {
-    blocked.push({
-      field: "security",
-      reason: `Security metadata migration is deferred to Renma 0.16.0 Stage 3. Detected pre-0.16 top-level security fields: ${deferredSecurityFields.join(", ")}. Preserve the existing pre-0.16 top-level security fields because the current security parser does not yet consume their metadata.renma.* equivalents. Do not delete, move, replace, or relocate those fields.`,
-    });
-  }
-
   const existingMetadata = frontmatter.values.metadata;
   if (!duplicateTopLevelMetadata && isStringRecord(existingMetadata)) {
     for (const [key, value] of Object.entries(existingMetadata)) {
@@ -283,7 +283,6 @@ export function buildAgentSkillMigrationSuggestion(
   for (const legacyField of LEGACY_RENMA_SKILL_FIELDS) {
     if (duplicateTopLevelMetadata) continue;
     if (!(legacyField in frontmatter.values)) continue;
-    if (DEFERRED_STAGE_3_SECURITY_FIELDS.has(legacyField)) continue;
     const canonicalKey = legacyRenmaMetadataKey(legacyField);
     if (!canonicalKey) continue;
     if (duplicateMetadataKeys.has(canonicalKey)) continue;
@@ -370,9 +369,7 @@ export function buildAgentSkillMigrationSuggestion(
         ? entrypointMigration === "none"
           ? "Review the canonical frontmatter proposal, preserve the Markdown body byte-for-byte, apply only after human approval, and rerun renma scan."
           : `Review the canonical frontmatter and ${entrypointMigration} entrypoint proposal together, preserve the Markdown body byte-for-byte, apply both path and content changes only after human approval, and rerun renma scan.`
-        : deferredSecurityFields.length > 0
-          ? "Resolve every blocked item with human review. Security metadata migration is deferred to Renma 0.16.0 Stage 3. Preserve the existing pre-0.16 top-level security fields in place; do not delete, move, replace, or relocate them. No canonical frontmatter is apply-ready."
-          : "Resolve every blocked item with human review. Do not generate or apply canonical frontmatter while input is ambiguous.",
+        : "Resolve every blocked item with human review. Do not generate or apply canonical frontmatter while input is ambiguous.",
   };
 }
 
@@ -573,6 +570,14 @@ function serializeLegacyValue(
     }
     return {
       blockedReason: `Pre-0.16 Renma Skill field ${field} must be a YAML string to preserve its exact value.`,
+    };
+  }
+
+  if (BOOLEAN_SCALAR_LEGACY_FIELDS.has(field)) {
+    if (typeof value === "boolean") return { value: String(value) };
+    if (value === "true" || value === "false") return { value };
+    return {
+      blockedReason: `Pre-0.16 Renma Skill field ${field} must be a boolean or the string "true" or "false".`,
     };
   }
 

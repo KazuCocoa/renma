@@ -5,7 +5,6 @@ import path from "node:path";
 import { test } from "node:test";
 import { main } from "../src/cli.js";
 import { buildMetadataSuggestion } from "../src/commands/suggest-metadata.js";
-import { parseSecurityPolicy } from "../src/security-policy.js";
 
 test("suggest-metadata prompt reports blocked legacy Skill migration", async () => {
   const root = await fixture();
@@ -118,10 +117,9 @@ test("suggest-metadata JSON exposes the Skill migration contract", async () => {
   );
 });
 
-test("suggest-metadata JSON and prompt block the repository release-prep security migration", async () => {
+test("suggest-metadata proposes no migration or rewrite for canonical release-prep", async () => {
   const target = "skills/release-prep/SKILL.md";
   const original = await readFile(target, "utf8");
-  const policyBefore = parseSecurityPolicy(original);
   const result = await withCapturedConsole(() =>
     main(["suggest-metadata", target, "--format", "json"]),
   );
@@ -129,55 +127,30 @@ test("suggest-metadata JSON and prompt block the repository release-prep securit
     instructions: string[];
     blockedMetadata: Array<{ field: string; reason: string }>;
     agentSkills: {
+      sourceFormat: string;
+      direction: string;
+      proposalKind: string;
       canonicalFrontmatter?: string;
       candidateRenmaMetadata: Record<string, string>;
     };
   };
   const after = await readFile(target, "utf8");
-  const securityBlock = suggestion.blockedMetadata.find(
-    (item) => item.field === "security",
-  );
 
   assert.equal(result.code, 0);
-  assert.match(
-    securityBlock?.reason ?? "",
-    /Security metadata migration is deferred to Renma 0\.16\.0 Stage 3/,
-  );
-  assert.match(
-    securityBlock?.reason ?? "",
-    /allowed_data, network_allowed, external_upload_allowed, secrets_allowed, requires_human_approval, forbidden_inputs/,
-  );
+  assert.equal(suggestion.agentSkills.sourceFormat, "agent-skills");
+  assert.equal(suggestion.agentSkills.direction, "none");
+  assert.equal(suggestion.agentSkills.proposalKind, "none");
+  assert.deepEqual(suggestion.blockedMetadata, []);
   assert.equal(
     Object.hasOwn(suggestion.agentSkills, "canonicalFrontmatter"),
     false,
   );
-  assert.equal(
-    suggestion.agentSkills.candidateRenmaMetadata["renma.allowed-data"],
-    undefined,
-  );
-  assert.equal(
-    suggestion.agentSkills.candidateRenmaMetadata["renma.network-allowed"],
-    undefined,
-  );
+  assert.deepEqual(suggestion.agentSkills.candidateRenmaMetadata, {});
   assert.equal(after, original);
-  assert.deepEqual(parseSecurityPolicy(after), policyBefore);
   assert.ok(
     suggestion.instructions.includes(
-      "Preserve existing pre-0.16 top-level security fields in place because the current security parser does not yet consume their metadata.renma.* equivalents.",
+      "Do not propose reverse migration or an unnecessary frontmatter rewrite.",
     ),
-  );
-  assert.ok(
-    suggestion.instructions.includes(
-      "Do not delete, move, replace, or relocate pre-0.16 top-level security fields.",
-    ),
-  );
-  assert.equal(
-    suggestion.instructions.some((instruction) =>
-      /^(?:Delete|Move|Remove|Relocate) .*top-level security fields/i.test(
-        instruction,
-      ),
-    ),
-    false,
   );
 
   const promptResult = await withCapturedConsole(() =>
@@ -187,11 +160,7 @@ test("suggest-metadata JSON and prompt block the repository release-prep securit
   assert.equal(promptResult.code, 0);
   assert.match(
     promptResult.stdout,
-    /Security metadata migration is deferred to Renma 0\.16\.0 Stage 3/,
-  );
-  assert.match(
-    promptResult.stdout,
-    /Preserve the existing source and every pre-0\.16 top-level security field exactly where it is/,
+    /Inspect Canonical Agent Skill \(No Migration Proposed\)/,
   );
   assert.doesNotMatch(
     promptResult.stdout,

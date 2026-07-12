@@ -7,6 +7,7 @@ import {
 } from "../src/security-policy-inventory.js";
 import { parseSecurityPolicy } from "../src/security-policy.js";
 import type { Artifact, ArtifactKind, SecurityConfig } from "../src/types.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 test("empty policy inventory returns a zero summary", () => {
   assert.deepEqual(
@@ -355,12 +356,14 @@ test("top lists sort by count then name and are limited to ten", () => {
 });
 
 function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
+  const operationalContent =
+    kind === "skill" ? canonicalSkillFixture(path, content) : content;
   return {
     path,
     absolutePath: `/repo/${path}`,
     kind,
-    sizeBytes: Buffer.byteLength(content),
-    content,
+    sizeBytes: Buffer.byteLength(operationalContent),
+    content: operationalContent,
   };
 }
 

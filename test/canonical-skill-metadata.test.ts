@@ -11,11 +11,11 @@ import { parseDocument } from "../src/markdown.js";
 import { parseAssetMetadata } from "../src/metadata.js";
 import { collectRepositorySnapshot } from "../src/repository-evidence.js";
 import { scanFromRepositorySnapshot } from "../src/scanner.js";
-import { parseSecurityPolicy } from "../src/security-policy.js";
+import { parseOperationalSecurityPolicy } from "../src/security-policy.js";
 import { buildTrustGraph } from "../src/trust-graph.js";
 import type { Artifact, ArtifactKind } from "../src/types.js";
 
-test("canonical Skill metadata normalizes every Stage 2 field", () => {
+test("canonical Skill metadata normalizes every governance field", () => {
   const document = skillDocument(`---
 name: demo
 description: Review demo inputs. Use when a demo needs deterministic review.
@@ -94,23 +94,33 @@ test("canonical Skill list metadata accepts only JSON string arrays", () => {
     {
       label: "native YAML array",
       line: "  renma.tags: [testing, review]",
-      reason: /string containing a JSON array/,
+      reason: /Agent Skills metadata must be a mapping/,
+      specificationInvalid: true,
     },
   ];
 
   for (const fixture of cases) {
-    const result = parseAssetMetadata(
-      skillDocument(`---
+    const document = skillDocument(`---
 name: demo
 description: Review demo inputs. Use when a demo needs deterministic review.
 metadata:
 ${fixture.line}
 ---
 # Demo
-`),
-    );
+`);
+    const result = parseAssetMetadata(document);
 
     assert.deepEqual(result.metadata.tags, [], fixture.label);
+    if (fixture.specificationInvalid) {
+      assert.deepEqual(result.diagnostics, [], fixture.label);
+      assert.ok(
+        validateAgentSkill(document).issues.some((issue) =>
+          fixture.reason.test(issue.message),
+        ),
+        fixture.label,
+      );
+      continue;
+    }
     assert.equal(result.diagnostics.length, 1, fixture.label);
     assert.match(
       result.diagnostics[0]?.message ?? "",
@@ -198,9 +208,8 @@ metadata:
   assert.match(result.diagnostics[0]?.message ?? "", /^Invalid status/);
 });
 
-test("canonical metadata is the non-security source of truth for hybrid Skills", () => {
-  const result = parseAssetMetadata(
-    skillDocument(`---
+test("hybrid Skills fail closed instead of selecting canonical or legacy metadata", () => {
+  const document = skillDocument(`---
 name: demo
 description: Review demo inputs. Use when a demo needs deterministic review.
 id: skill.legacy
@@ -215,15 +224,16 @@ metadata:
   renma.requires-context: '["context.canonical"]'
 ---
 # Demo
-`),
-  );
+`);
+  const result = parseAssetMetadata(document);
 
-  assert.equal(result.metadata.id, "skill.canonical");
-  assert.equal(result.metadata.owner, "canonical-team");
+  assert.equal(validateAgentSkill(document).format, "hybrid");
+  assert.equal(result.metadata.id, undefined);
+  assert.equal(result.metadata.owner, undefined);
   assert.equal(result.metadata.version, undefined);
-  assert.deepEqual(result.metadata.tags, ["canonical"]);
-  assert.deepEqual(result.metadata.requiresContext, ["context.canonical"]);
-  assert.equal(result.metadataFields.owner?.key, "renma.owner");
+  assert.deepEqual(result.metadata.tags, []);
+  assert.deepEqual(result.metadata.requiresContext, []);
+  assert.equal(result.metadataFields.owner, undefined);
   assert.equal(result.metadataFields.version, undefined);
 });
 
@@ -241,11 +251,10 @@ metadata:
   );
 
   assert.deepEqual(result.metadata.tags, []);
-  assert.equal(result.diagnostics.length, 1);
-  assert.match(result.diagnostics[0]?.message ?? "", /renma\.tags/);
+  assert.deepEqual(result.diagnostics, []);
 });
 
-test("duplicate canonical keys are diagnosed by Stage 1 and not guessed operationally", () => {
+test("duplicate canonical keys are diagnosed and not guessed operationally", () => {
   const document = skillDocument(`---
 name: demo
 description: Review demo inputs. Use when a demo needs deterministic review.
@@ -484,9 +493,8 @@ metadata:
   );
 });
 
-test("pre-0.16-only Skills retain temporary permissive metadata parsing", () => {
-  const result = parseAssetMetadata(
-    skillDocument(`---
+test("pre-0.16-only Skill metadata is migration input, not operational metadata", () => {
+  const document = skillDocument(`---
 id: skill.demo
 owner: legacy-team
 tags: testing, review
@@ -494,15 +502,16 @@ requires_context:
   - context.testing.boundaries
 ---
 # Demo
-`),
-  );
+`);
+  const result = parseAssetMetadata(document);
+  const validation = validateAgentSkill(document);
 
-  assert.equal(result.metadata.id, "skill.demo");
-  assert.equal(result.metadata.owner, "legacy-team");
-  assert.deepEqual(result.metadata.tags, ["testing", "review"]);
-  assert.deepEqual(result.metadata.requiresContext, [
-    "context.testing.boundaries",
-  ]);
+  assert.equal(validation.format, "renma-legacy");
+  assert.equal(validation.migrationRecommended, true);
+  assert.equal(result.metadata.id, undefined);
+  assert.equal(result.metadata.owner, undefined);
+  assert.deepEqual(result.metadata.tags, []);
+  assert.deepEqual(result.metadata.requiresContext, []);
 });
 
 test("non-Skill assets keep top-level Renma metadata behavior", () => {
@@ -632,7 +641,7 @@ metadata:
 `),
   ]);
 
-  assert.deepEqual(catalog.entries[0]?.metadata.whenToUse, ["canonical"]);
+  assert.deepEqual(catalog.entries[0]?.metadata.whenToUse, []);
   assert.equal(
     diagnostics.some((diagnostic) =>
       diagnostic.message.includes("Metadata list item is too long"),
@@ -641,7 +650,7 @@ metadata:
   );
 });
 
-test("repository release-prep keeps Stage 2 operations and Stage 3 security behavior", async () => {
+test("repository release-prep is fully canonical with unchanged operational behavior", async () => {
   const relativePath = "skills/release-prep/SKILL.md";
   const absolutePath = path.resolve(relativePath);
   const content = await readFile(absolutePath, "utf8");
@@ -654,7 +663,7 @@ test("repository release-prep keeps Stage 2 operations and Stage 3 security beha
   });
   const result = parseAssetMetadata(document);
   const validation = validateAgentSkill(document);
-  const policy = parseSecurityPolicy(content);
+  const policy = parseOperationalSecurityPolicy(document);
   const { catalog } = buildCatalog([document]);
   const snapshot = await collectRepositorySnapshot(path.resolve("."));
   const graph = graphFromRepositorySnapshot(snapshot);
@@ -666,15 +675,10 @@ test("repository release-prep keeps Stage 2 operations and Stage 3 security beha
     evaluationDate: "2026-07-11",
   });
 
-  assert.equal(validation.format, "hybrid");
-  assert.deepEqual(validation.legacyFields, [
-    "allowed_data",
-    "external_upload_allowed",
-    "forbidden_inputs",
-    "network_allowed",
-    "requires_human_approval",
-    "secrets_allowed",
-  ]);
+  assert.equal(validation.format, "agent-skills");
+  assert.equal(validation.valid, true);
+  assert.equal(validation.migrationRecommended, false);
+  assert.deepEqual(validation.legacyFields, []);
   assert.equal(result.metadata.id, "skill.release-prep");
   assert.equal(result.metadata.title, "Release Prep");
   assert.equal(result.metadata.version, "0.1.0");

@@ -431,6 +431,7 @@ async function writeSkill(
   await writeFile(
     path.join(root, "skills", id, "SKILL.md"),
     markdown({
+      skillName: id,
       id,
       ...metadata,
       title: `# ${id}`,
@@ -456,12 +457,33 @@ async function writeContext(
 }
 
 function markdown(metadata: {
+  skillName?: string;
   id: string;
   owner?: string;
   status?: string;
   tags?: string[];
   title: string;
 }): string {
+  if (metadata.skillName) {
+    return [
+      "---",
+      `name: ${metadata.skillName}`,
+      "description: Use this skill for deterministic ownership report tests. Use when repository ownership needs review.",
+      "metadata:",
+      `  renma.id: ${metadata.id}`,
+      ...(metadata.owner !== undefined
+        ? [`  renma.owner: '${metadata.owner.replaceAll("'", "''")}'`]
+        : []),
+      ...(metadata.status ? [`  renma.status: ${metadata.status}`] : []),
+      ...(metadata.tags
+        ? [`  renma.tags: '${JSON.stringify(metadata.tags)}'`]
+        : []),
+      "---",
+      metadata.title,
+      "Use for ownership report tests.",
+      "",
+    ].join("\n");
+  }
   return [
     "---",
     `id: ${metadata.id}`,

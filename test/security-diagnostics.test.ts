@@ -7,6 +7,7 @@ import test from "node:test";
 import { scan } from "../src/scanner.js";
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
 import type { Finding } from "../src/types.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 const securityDiagnosticsV1Ids = new Set([
   "SEC-CREDENTIAL-IN-COMMAND-ARG",
@@ -496,10 +497,14 @@ async function fixtureRoot(content: string): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-security-"));
   const skillsDir = path.join(root, "skills", "security");
   await mkdir(skillsDir, { recursive: true });
-  await writeFile(
-    path.join(skillsDir, "SKILL.md"),
-    `# Security Fixture\n${content}`,
-  );
+  const artifactPath = "skills/security/SKILL.md";
+  const rawContent = content.trimStart().startsWith("---")
+    ? `${content}\n# Security Fixture\n`
+    : `# Security Fixture\n${content}`;
+  const operationalContent = content.trimStart().startsWith("---")
+    ? canonicalSkillFixture(artifactPath, rawContent)
+    : rawContent;
+  await writeFile(path.join(skillsDir, "SKILL.md"), operationalContent);
   return root;
 }
 
@@ -1291,18 +1296,21 @@ function v2SecurityArtifact(
   content: string,
   kind: "skill" | "context" = "skill",
 ) {
+  const artifactPath =
+    kind === "skill"
+      ? "skills/security/SKILL.md"
+      : "contexts/security/policy.md";
+  const operationalContent =
+    kind === "skill" ? canonicalSkillFixture(artifactPath, content) : content;
   return {
-    path:
-      kind === "skill"
-        ? "skills/security/SKILL.md"
-        : "contexts/security/policy.md",
+    path: artifactPath,
     absolutePath:
       kind === "skill"
         ? "/repo/skills/security/SKILL.md"
         : "/repo/contexts/security/policy.md",
     kind,
     depth: 2,
-    sizeBytes: Buffer.byteLength(content),
-    content,
+    sizeBytes: Buffer.byteLength(operationalContent),
+    content: operationalContent,
   };
 }

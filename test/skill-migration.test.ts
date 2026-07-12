@@ -394,7 +394,7 @@ Use this skill when reviewing demo inputs.
   }
 });
 
-test("migration accepts arrays for Stage 2 list fields", async () => {
+test("migration accepts arrays for canonical list fields", async () => {
   const { target } = await skillFixture(
     "demo",
     `---
@@ -420,7 +420,7 @@ Use this skill when reviewing demo inputs.
   assert.ok(suggestion.agentSkills?.canonicalFrontmatter);
 });
 
-test("migration defers network policy to Stage 3 and preserves its top-level field", async () => {
+test("migration serializes legacy boolean security policy as canonical strings", async () => {
   const { target, original } = await skillFixture(
     "demo",
     `---
@@ -434,39 +434,35 @@ Use this skill when reviewing demo inputs.
   );
 
   const suggestion = await buildMetadataSuggestion(target);
-  const block = suggestion.blockedMetadata.find(
-    (item) => item.field === "security",
-  );
-
   assert.equal(await readFile(target, "utf8"), original);
-  assert.equal(suggestion.agentSkills?.canonicalFrontmatter, undefined);
+  assert.deepEqual(suggestion.blockedMetadata, []);
   assert.equal(
     suggestion.agentSkills?.candidateRenmaMetadata["renma.network-allowed"],
-    undefined,
+    "true",
   );
-  assert.match(block?.reason ?? "", /deferred to Renma 0\.16\.0 Stage 3/);
-  assert.match(block?.reason ?? "", /network_allowed/);
   assert.match(
-    block?.reason ?? "",
-    /Preserve the existing pre-0\.16 top-level security fields/,
+    suggestion.agentSkills?.canonicalFrontmatter ?? "",
+    /renma\.network-allowed: "true"/,
   );
   assert.match(
     suggestion.agentSkills?.reviewPrompt ?? "",
-    /do not delete, move, replace, or relocate them/,
+    /Review the canonical frontmatter proposal/,
   );
 });
 
-test("migration reports deferred security lists without proposing canonical replacements", async () => {
+test("migration serializes legacy security lists as canonical JSON strings", async () => {
   for (const fixture of [
     {
       field: "allowed_data",
       canonicalKey: "renma.allowed-data",
       value: "[public, internal]",
+      expected: '["public","internal"]',
     },
     {
       field: "forbidden_inputs",
       canonicalKey: "renma.forbidden-inputs",
       value: "[secrets, credentials]",
+      expected: '["secrets","credentials"]',
     },
   ]) {
     const { target, original } = await skillFixture(
@@ -482,27 +478,14 @@ Use this skill when reviewing demo inputs.
     );
 
     const suggestion = await buildMetadataSuggestion(target);
-    const block = suggestion.blockedMetadata.find(
-      (item) => item.field === "security",
-    );
-
     assert.equal(await readFile(target, "utf8"), original, fixture.field);
-    assert.equal(
-      suggestion.agentSkills?.canonicalFrontmatter,
-      undefined,
-      fixture.field,
-    );
+    assert.deepEqual(suggestion.blockedMetadata, [], fixture.field);
     assert.equal(
       suggestion.agentSkills?.candidateRenmaMetadata[fixture.canonicalKey],
-      undefined,
+      fixture.expected,
       fixture.field,
     );
-    assert.match(block?.reason ?? "", new RegExp(fixture.field), fixture.field);
-    assert.match(
-      block?.reason ?? "",
-      /current security parser does not yet consume their metadata\.renma\.\* equivalents/,
-      fixture.field,
-    );
+    assert.ok(suggestion.agentSkills?.canonicalFrontmatter, fixture.field);
   }
 });
 
@@ -656,6 +639,18 @@ test("migration blocks lossy native YAML values", async () => {
       message:
         /Pre-0\.16 Renma Skill field tags must contain string values only/,
     },
+    {
+      field: "network_allowed",
+      yaml: "network_allowed: 1",
+      message:
+        /Pre-0\.16 Renma Skill field network_allowed must be a boolean or the string/,
+    },
+    {
+      field: "allowed_data",
+      yaml: "allowed_data: [true]",
+      message:
+        /Pre-0\.16 Renma Skill field allowed_data must contain string values only/,
+    },
   ];
 
   for (const fixture of cases) {
@@ -684,6 +679,9 @@ test("migration preserves quoted text, safe booleans, and string-only lists", as
     ["owner", 'owner: "true"', "true"],
     ["tags", 'tags: ["1.0"]', '["1.0"]'],
     ["tags", `tags: '["1.0"]'`, '["1.0"]'],
+    ["network-allowed", "network_allowed: false", "false"],
+    ["network-allowed", 'network_allowed: "true"', "true"],
+    ["security-profile", "security_profile: strict-local", "strict-local"],
   ] as const;
 
   for (const [canonicalSuffix, yaml, expected] of cases) {

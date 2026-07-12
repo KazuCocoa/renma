@@ -756,6 +756,7 @@ async function writeSkill(
   await writeFile(
     path.join(root, "skills", id, "SKILL.md"),
     markdown({
+      skillName: id,
       id,
       ...metadata,
       title: `# ${id}`,
@@ -822,13 +823,15 @@ async function writePolicySkill(root: string): Promise<void> {
     path.join(root, "skills", "policy", "SKILL.md"),
     [
       "---",
-      "id: policy",
-      "owner: platform",
-      "status: stable",
+      "name: policy",
       "description: Clear workflow routing for readiness report tests with deterministic security policy metadata and verification expectations.",
-      "network_allowed: true",
-      "approved_network_destinations: api.example.com",
-      "forbidden_inputs: credentials",
+      "metadata:",
+      "  renma.id: policy",
+      "  renma.owner: platform",
+      "  renma.status: stable",
+      '  renma.network-allowed: "true"',
+      `  renma.approved-network-destinations: '["api.example.com"]'`,
+      `  renma.forbidden-inputs: '["credentials"]'`,
       "---",
       workflowReadySkillBody("policy"),
     ].join("\n"),
@@ -836,6 +839,7 @@ async function writePolicySkill(root: string): Promise<void> {
 }
 
 function markdown(metadata: {
+  skillName?: string;
   id: string;
   owner?: string;
   description?: string;
@@ -846,6 +850,37 @@ function markdown(metadata: {
   title: string;
   body?: string;
 }): string {
+  if (metadata.skillName) {
+    return [
+      "---",
+      `name: ${metadata.skillName}`,
+      `description: ${
+        metadata.description ??
+        "Clear workflow routing for readiness report tests with deterministic usage guidance, non-goals, preflight checks, examples, and verification expectations for agent consumers."
+      }`,
+      "metadata:",
+      `  renma.id: ${metadata.id}`,
+      ...(metadata.owner ? [`  renma.owner: ${metadata.owner}`] : []),
+      ...(metadata.status ? [`  renma.status: ${metadata.status}`] : []),
+      ...(metadata.tags
+        ? [`  renma.tags: '${JSON.stringify(metadata.tags)}'`]
+        : []),
+      ...(metadata.requiresContext
+        ? [
+            `  renma.requires-context: '${JSON.stringify(metadata.requiresContext)}'`,
+          ]
+        : []),
+      ...(metadata.optionalContext
+        ? [
+            `  renma.optional-context: '${JSON.stringify(metadata.optionalContext)}'`,
+          ]
+        : []),
+      "---",
+      metadata.body ??
+        [metadata.title, "Use for readiness report tests."].join("\n"),
+      "",
+    ].join("\n");
+  }
   return [
     "---",
     `id: ${metadata.id}`,

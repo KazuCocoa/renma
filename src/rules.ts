@@ -1,4 +1,5 @@
 import path from "node:path";
+import { resolvedAgentSkillDescription } from "./agent-skills.js";
 import type { Catalog, CatalogEntry, Dependency } from "./model.js";
 import {
   addDaysIsoDate,
@@ -867,7 +868,10 @@ function shapeFindings(document: ParsedDocument): Finding[] {
 
   const text = document.artifact.content.toLowerCase();
   const findings: Finding[] = [];
-  const description = document.metadata.description ?? "";
+  const description =
+    document.artifact.kind === "skill"
+      ? (resolvedAgentSkillDescription(document) ?? "")
+      : (document.metadata.description ?? "");
   const tokenCount = approximateTokenCount(document.artifact.content);
 
   if (!description) {
@@ -1391,7 +1395,7 @@ function skillContextReferenceNotDeclaredFindings(
       whyItMatters:
         "Declared context references make skill/context relationships visible to catalog, graph, and validation reports. If a skill only mentions a context in prose, humans may see the dependency but repository tooling cannot validate it.",
       remediation:
-        "Add the referenced shared context asset to the Skill's required-context metadata, or remove the prose reference if it is no longer needed. Canonical and hybrid Skills use metadata.renma.requires-context as a JSON-array string; pre-0.16-only Skills use requires_context only during migration.",
+        "Add the referenced shared context asset to metadata.renma.requires-context as a JSON-array string, or remove the prose reference if it is no longer needed. Pre-0.16 requires_context is migration input only and is not operational in Renma 0.16.0.",
       constraints: [
         "Do not select runtime context.",
         "Do not assemble prompt packages.",
@@ -1403,7 +1407,7 @@ function skillContextReferenceNotDeclaredFindings(
         "Run renma catalog.",
         "Confirm the skill/context relationship appears in metadata and catalog output.",
       ],
-      llmHint: `Find context paths mentioned in the Skill body and add the missing declaration using the Skill's operational format. Canonical and hybrid Skills use metadata.renma.requires-context as a JSON-array string; pre-0.16-only Skills use requires_context only during migration. Missing declaration: ${referencedPath}`,
+      llmHint: `Find context paths mentioned in the Skill body and add the missing declaration using metadata.renma.requires-context as a JSON-array string. Pre-0.16 requires_context is accepted only by suggest-metadata and is not operational. Missing declaration: ${referencedPath}`,
       details: {
         source: operationalMetadata.id ?? document.artifact.path,
         target: referencedPath,
@@ -2023,7 +2027,7 @@ function thinSkillLayoutFindings(document: ParsedDocument): Finding[] {
             "Run renma readiness and check layout.skills_thin.",
           ],
           llmHint:
-            "Extract long procedure sections into contexts/**, add required or optional context references, and keep SKILL.md focused on when to use or not use the Skill. Canonical and hybrid Skills use metadata.renma.requires-context or metadata.renma.optional-context JSON-array strings; pre-0.16-only Skills use requires_context or optional_context only during migration.",
+            "Extract long procedure sections into contexts/**, add metadata.renma.requires-context or metadata.renma.optional-context JSON-array strings, and keep SKILL.md focused on when to use or not use the Skill. Pre-0.16 top-level references are migration input only.",
         },
       ),
     );

@@ -65,11 +65,13 @@ test("scan reports overlong block-list metadata items", async () => {
     root,
     "skills/metadata-list/SKILL.md",
     `---
-id: skill.metadata-list
-owner: qa-platform
-status: stable
-when_to_use:
-  - ${longRoutingItem}
+name: metadata-list
+description: Review metadata list length. Use when routing metadata needs deterministic budget checks.
+metadata:
+  renma.id: skill.metadata-list
+  renma.owner: qa-platform
+  renma.status: stable
+  renma.when-to-use: '${JSON.stringify([longRoutingItem])}'
 ---
 # Metadata List
 
@@ -95,7 +97,7 @@ Run renma scan.
   assert.equal(finding?.severity, "low");
   assert.equal(finding?.confidence, "high");
   assert.equal(finding?.evidence.path, "skills/metadata-list/SKILL.md");
-  assert.equal(finding?.evidence.startLine, 6);
+  assert.equal(finding?.evidence.startLine, 8);
   assert.match(
     finding?.evidence.snippet ?? "",
     /reviewing product specifications/,
@@ -110,13 +112,14 @@ test("scan does not report compact metadata budget findings", async () => {
     root,
     "skills/metadata-compact/SKILL.md",
     `---
-id: skill.metadata-compact
-owner: qa-platform
-status: stable
-tags:
-  - qa
-when_to_use:
-  - Metadata budget review
+name: metadata-compact
+description: Review compact metadata budgets. Use when routing metadata needs deterministic validation.
+metadata:
+  renma.id: skill.metadata-compact
+  renma.owner: qa-platform
+  renma.status: stable
+  renma.tags: '["qa"]'
+  renma.when-to-use: '["Metadata budget review"]'
 ---
 # Metadata Compact
 

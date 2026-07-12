@@ -5,7 +5,7 @@ import {
   effectiveAllowedDataClass,
   effectiveAllowedDataList,
   isSecurityPolicyLine,
-  parseSecurityPolicy,
+  parseOperationalSecurityPolicy,
   securityProfileChain,
   type SecurityPolicy,
   type SecurityProfileChain,
@@ -50,7 +50,7 @@ const RULES = {
     whyItMatters:
       "LLM-facing security policy metadata gives humans and agents a deterministic contract for network, upload, and secret-handling instructions.",
     remediation:
-      "Add explicit security policy metadata such as network_allowed, external_upload_allowed, secrets_allowed, and any approved network destinations.",
+      "For Skills, add canonical metadata.renma.* string fields such as renma.network-allowed and renma.approved-network-destinations. For non-Skills, use the existing top-level policy fields.",
     constraints: [
       "Keep the policy deterministic and local to the artifact.",
       "Do not infer approval from prose alone.",
@@ -62,7 +62,7 @@ const RULES = {
       "Review the security-sensitive instruction against the declared policy.",
     ],
     llmHint:
-      "Add small frontmatter policy fields that describe whether network access, external uploads, and secret material are allowed for this artifact.",
+      "Add small policy fields that describe whether network access, external uploads, and secret material are allowed. Use canonical metadata.renma.* strings for Skills and top-level fields only for non-Skills.",
     confidence: "medium",
     riskClass: "advisory",
   },
@@ -671,7 +671,7 @@ function securityFindingsForArtifact(
   artifact: Artifact,
   securityConfig?: SecurityConfig,
 ): Finding[] {
-  const parsedPolicy = parseSecurityPolicy(artifact.content);
+  const parsedPolicy = parseOperationalSecurityPolicy(artifact);
   const policy = applySecurityConfig(parsedPolicy, securityConfig);
   const detections: Detection[] = securityPolicyResolutionDetections(
     parsedPolicy,
