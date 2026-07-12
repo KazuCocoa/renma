@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { formatReadiness, readiness } from "../src/commands/readiness.js";
 import { scan } from "../src/scanner.js";
 
-test("strict layout findings explain generic skill-local support moves", async () => {
+test("valid Skill-local support is not categorically disallowed", async () => {
   const root = await fixture();
   await writeMarkdown(
     root,
@@ -65,22 +65,11 @@ test("strict layout findings explain generic skill-local support moves", async (
   const result = await scan(root);
   const ids = result.findings.map((finding) => finding.id);
 
-  assert(ids.includes("LAYOUT-DISALLOWED-SKILL-ASSET"));
-  assert(ids.includes("PATH-HELPER-COMMAND-SKILL-SCRIPTS"));
-  assert(ids.includes("LAYOUT-HELPER-NON_TOOLS"));
+  assert(!ids.includes("LAYOUT-DISALLOWED-SKILL-ASSET"));
+  assert(!ids.includes("PATH-HELPER-COMMAND-SKILL-SCRIPTS"));
+  assert(!ids.includes("LAYOUT-HELPER-NON_TOOLS"));
+  assert(ids.includes("LAYOUT-SKILL-EXECUTABLE-COMMAND"));
   assert(ids.includes("DOCS-LAYOUT-INCONSISTENT"));
-  assert(
-    result.findings.some((finding) =>
-      finding.remediation.includes(
-        "contexts/setup/references/node/node-decision-logic.md",
-      ),
-    ),
-  );
-  assert(
-    result.findings.some((finding) =>
-      finding.remediation.includes("tools/setup/scripts/check-node-env.mjs"),
-    ),
-  );
 
   const report = await readiness(root);
   assert.notEqual(report.level, "ready");
@@ -88,11 +77,11 @@ test("strict layout findings explain generic skill-local support moves", async (
   assert.equal(
     report.checks.find((check) => check.id === "layout.disallowed_skill_assets")
       ?.status,
-    "fail",
+    "pass",
   );
   assert.equal(
     report.checks.find((check) => check.id === "paths.helper_commands")?.status,
-    "fail",
+    "pass",
   );
 });
 
@@ -268,7 +257,7 @@ function context(id: string, body: string): string {
   return `${frontmatter({ owner: "appium", id })}# ${id}\n\n${body}\n`;
 }
 
-test("strict layout suggestions use configured namespace and workflow aliases", async () => {
+test("layout aliases do not force valid local support into shared roots", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-layout-config-"));
   await writeFile(
     path.join(root, "renma.config.json"),
@@ -293,23 +282,19 @@ test("strict layout suggestions use configured namespace and workflow aliases", 
   );
 
   const result = await scan(root);
-  const remediations = result.findings.map((finding) => finding.remediation);
-
-  assert(
-    remediations.some((remediation) =>
-      remediation.includes(
-        "contexts/tools/mobile/real-device/references/setup.md",
-      ),
+  assert.equal(
+    result.findings.some(
+      (finding) => finding.id === "LAYOUT-DISALLOWED-SKILL-ASSET",
     ),
+    false,
   );
-  assert(
-    remediations.some((remediation) =>
-      remediation.includes("tools/mobile/real-device/scripts/check-device.mjs"),
-    ),
+  assert.equal(
+    result.findings.some((finding) => finding.id === "LAYOUT-HELPER-NON_TOOLS"),
+    false,
   );
 });
 
-test("strict layout suggestions use appium config for appium workflow aliases", async () => {
+test("appium aliases preserve valid local support", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-layout-appium-"));
   await writeFile(
     path.join(root, "renma.config.json"),
@@ -335,21 +320,15 @@ test("strict layout suggestions use appium config for appium workflow aliases", 
   );
 
   const result = await scan(root);
-  const remediations = result.findings.map((finding) => finding.remediation);
-
-  assert(
-    remediations.some((remediation) =>
-      remediation.includes(
-        "contexts/tools/appium/troubleshooting/references/session-startup.md",
-      ),
+  assert.equal(
+    result.findings.some(
+      (finding) => finding.id === "LAYOUT-DISALLOWED-SKILL-ASSET",
     ),
+    false,
   );
-  assert(
-    remediations.some((remediation) =>
-      remediation.includes(
-        "tools/appium/real-device/scripts/check-real-device.mjs",
-      ),
-    ),
+  assert.equal(
+    result.findings.some((finding) => finding.id === "LAYOUT-HELPER-NON_TOOLS"),
+    false,
   );
 });
 
@@ -383,19 +362,9 @@ test("readiness markdown includes layout findings as a repair brief", async () =
   const markdown = formatReadiness(report, "markdown");
 
   assert.match(markdown, /## Findings/);
-  assert.match(
-    markdown,
-    /LAYOUT-DISALLOWED-SKILL-ASSET.*skills\/setup\/references\/node\/node-decision-logic\.md:1/,
-  );
-  assert.match(
-    markdown,
-    /contexts\/setup\/references\/node\/node-decision-logic\.md/,
-  );
-  assert.match(
-    markdown,
-    /PATH-HELPER-COMMAND-SKILL-SCRIPTS.*skills\/setup\/SKILL\.md/,
-  );
-  assert.match(markdown, /tools\/setup\/scripts\/check-node-env\.mjs/);
+  assert.match(markdown, /LAYOUT-SKILL-EXECUTABLE-COMMAND/);
+  assert.doesNotMatch(markdown, /LAYOUT-DISALLOWED-SKILL-ASSET/);
+  assert.doesNotMatch(markdown, /PATH-HELPER-COMMAND-SKILL-SCRIPTS/);
 });
 
 function isStrictLayoutFinding(id: string): boolean {

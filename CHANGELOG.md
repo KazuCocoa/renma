@@ -13,6 +13,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Added platform-neutral, Skill-specific next steps to scaffold file and prompt output, including the authoring-review, scan, fix, rerun, and human-review loop.
 - Added Skill-specific `suggest-metadata` prompt guidance that separates whole-Skill authoring review from metadata or one-way migration suggestions and keeps blocked migrations conservative.
 - Added a documentation index with reading paths for workflows, format contracts, governance references, product design, architecture, and roadmap material.
+- Added the interactive-placeholder onboarding example and package-content verification for version-matched README documentation and examples.
 
 ### Changed
 
@@ -21,6 +22,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Made the authoring guide the canonical new-Skill and existing-Skill workflow, including safe generator boundaries and an optional Codex `skill-creator` example.
 - Reworked the user manual and compatibility guide around actual CLI behavior, review responsibilities, scan/fix/rerun validation, and blocked migration recovery.
 - Rewrote the roadmap around the shipped 0.16.0 baseline, the 0.17.0 usability release, and proposed 0.18.0 graph-based Skill discovery; removed stale release sequencing from architecture and design.
+- Made canonical nested Skills under both `skills/**` and `.agents/skills/**` participate consistently in Readiness, thin-Skill, graph, support, and parent-Skill checks.
+- Allowed valid Skill-local Agent Skills support directories without path-only disallowed-layout findings; reusable Context and shared-helper promotion remains evidence-based and human-reviewed.
+- Normalized expected CLI target and option errors, enforced command-specific options and positional arity, and rejected partial positive-integer values.
+
+### Fixed
+
+- Corrected Readiness false-positive `ready` results for nested Skills with missing workflow guidance.
+- Updated the Context Lens example to current 0.17.0 quality with conservative local policy, complete workflow guidance, and clean scan/readiness output.
+- Included README-linked architecture, design, roadmap, documentation, and examples in the npm package.
 
 ### Compatibility
 

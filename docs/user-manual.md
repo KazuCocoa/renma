@@ -73,6 +73,12 @@ support paths:
 
 The same reserved names apply under `.agents/skills/**`.
 
+These Skill-local support directories are valid. Keep material local when it is
+specific to one Skill. Promote reusable source-of-truth knowledge to an owned
+Context Asset, or a helper shared across workflows to `tools/**`, only when
+repository evidence supports that change; Renma does not move files
+automatically.
+
 Avoid using reserved support directory names as skill names. Paths such as
 `skills/assets/SKILL.md`, `skills/examples/SKILL.md`,
 `skills/references/SKILL.md`, `skills/scripts/SKILL.md`, and
@@ -395,6 +401,7 @@ Other default scan glob families are:
 - `README.md`
 - `context/**/*.md`
 - `contexts/**/*.md`
+- `lenses/**/*.md`
 - `skills/**/profiles/**/*.md`
 - `skills/**/references/**/*.md`
 - `skills/**/examples/**/*.md`

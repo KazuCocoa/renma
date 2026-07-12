@@ -53,7 +53,7 @@ jobs:
           fi
 
       - name: Check package contents
-        run: npm pack --dry-run
+        run: npm run verify:package
 
       - name: Publish package
         # Uses npm trusted publishing (OIDC); configure this workflow as a trusted publisher on npmjs.com.

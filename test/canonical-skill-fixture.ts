@@ -65,7 +65,7 @@ export function canonicalSkillFixture(
     description:
       typeof source.description === "string" && source.description.trim()
         ? source.description
-        : `Use this skill for deterministic ${name} fixture checks. Use when repository behavior needs review.`,
+        : `Use this skill for deterministic ${name} fixture checks when repository behavior needs review and stable evidence must be verified; do not use it for runtime routing, prompt assembly, or automatic repository edits.`,
   };
   for (const field of ["license", "compatibility", "allowed-tools"] as const) {
     if (typeof source[field] === "string") frontmatter[field] = source[field];

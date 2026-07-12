@@ -12,6 +12,7 @@ import type {
   Dependency,
   DependencyKind,
 } from "../model.js";
+import { classifyRepositorySkillEntrypointPath } from "../discovery.js";
 import {
   collectRepositoryEvidence,
   type RepositoryEvidence,
@@ -566,7 +567,9 @@ function groupPath(sourcePath: string, view: GraphView): string | undefined {
 
 function keepWorkflowNode(sourcePath: string): boolean {
   const path = normalizeDependencyReference(sourcePath);
-  if (/^skills\/[^/]+\/SKILL\.md$/.test(path)) return true;
+  if (classifyRepositorySkillEntrypointPath(path)?.kind === "canonical") {
+    return true;
+  }
   if (!path.startsWith("contexts/")) return false;
   const name = path.split("/").at(-1) ?? "";
   return (

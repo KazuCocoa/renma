@@ -111,7 +111,11 @@ implemented.
 
 `contexts/` is preferred. `context/` is also scanned for compatibility.
 
-Skill-local `profiles/`, `references/`, and `examples/` remain supported, but shared context assets should become the durable source of truth when knowledge is reused across skills, teams, tools, or agents.
+Skill-local `assets/`, `profiles/`, `references/`, `examples/`, and `scripts/`
+remain supported. Shared Context Assets should become the durable source of
+truth when knowledge is reused across Skills, teams, tools, or agents; shared
+helper implementations belong under `tools/**`. Location alone does not prove
+that local support should be promoted.
 
 ## Core Concepts
 

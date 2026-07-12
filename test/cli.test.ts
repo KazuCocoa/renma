@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { main } from "../src/cli.js";
-import { COMMAND_HELP } from "../src/cli-help.js";
+import { COMMAND_HELP, commandOptionNames } from "../src/cli-help.js";
 import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
 import { scan } from "../src/scanner.js";
 
@@ -1434,6 +1434,97 @@ test("command-specific help is deterministic and does not execute commands", asy
     assert.match(result.stdout, /How to interpret the result/);
     assert.match(result.stdout, /Typical next steps/);
     assert.match(result.stdout, /Options/);
+  }
+});
+
+test("command contracts reject unrelated options and invalid positional arity", async () => {
+  const requiredPositionals: Partial<
+    Record<(typeof COMMAND_HELP)[number]["name"], string[]>
+  > = {
+    inspect: ["README.md"],
+    scaffold: ["context", "contexts/demo.md"],
+    "suggest-metadata": ["README.md"],
+    "suggest-semantic-split": ["README.md"],
+  };
+
+  for (const command of COMMAND_HELP) {
+    const allowed = commandOptionNames(command.name);
+    const unrelated = allowed.includes("owner") ? "focus" : "owner";
+    const unsupported = await withCapturedConsole(() =>
+      main([command.name, `--${unrelated}`, "unexpected"]),
+    );
+    assert.equal(unsupported.code, 2, command.name);
+    assert.equal(unsupported.stdout, "", command.name);
+    assert.match(
+      unsupported.stderr,
+      new RegExp(`${command.name} does not support --${unrelated}`),
+      command.name,
+    );
+    assert.match(
+      unsupported.stderr,
+      new RegExp(`renma ${command.name} --help`),
+    );
+
+    const positionals = requiredPositionals[command.name] ?? ["."];
+    const invalidArity = await withCapturedConsole(() =>
+      main([command.name, ...positionals, "extra-positional"]),
+    );
+    assert.equal(invalidArity.code, 2, command.name);
+    assert.equal(invalidArity.stdout, "", command.name);
+    assert.match(
+      invalidArity.stderr,
+      /unexpected positional argument/,
+      command.name,
+    );
+  }
+});
+
+test("command help lists every accepted command option", async () => {
+  for (const command of COMMAND_HELP) {
+    const result = await withCapturedConsole(() =>
+      main([command.name, "--help"]),
+    );
+    assert.equal(result.code, 0, command.name);
+    assert.equal(result.stderr, "", command.name);
+    for (const option of commandOptionNames(command.name)) {
+      assert.match(
+        result.stdout,
+        new RegExp(`--${option}\\b`),
+        `${command.name}: ${option}`,
+      );
+    }
+  }
+});
+
+test("expected inspect and semantic-split target errors are concise usage errors", async () => {
+  const root = await fixture();
+  const cases = [
+    ["inspect", "does-not-exist.md"],
+    ["inspect", root],
+    ["inspect", "README.md", "--lines", "nope"],
+    ["suggest-semantic-split", "does-not-exist.md"],
+    ["suggest-semantic-split", root],
+  ];
+
+  for (const argv of cases) {
+    const result = await withCapturedConsole(() => main(argv));
+    assert.equal(result.code, 2, argv.join(" "));
+    assert.equal(result.stdout, "", argv.join(" "));
+    assert.match(result.stderr, /Run `renma .* --help` for usage/);
+    assert.doesNotMatch(result.stderr, /\n\s+at\s+/);
+    assert.doesNotMatch(result.stderr, /node:internal/);
+  }
+});
+
+test("positive integer options require complete positive decimal strings", async () => {
+  for (const option of ["--max-source-bytes", "--max-context-bytes"]) {
+    for (const value of ["0", "-1", "1.5", "12x", "x12", "NaN", "Infinity"]) {
+      const result = await withCapturedConsole(() =>
+        main(["suggest-semantic-split", "README.md", `${option}=${value}`]),
+      );
+      assert.equal(result.code, 2, `${option} ${value}`);
+      assert.match(result.stderr, /must be a positive integer/);
+    }
   }
 });
 

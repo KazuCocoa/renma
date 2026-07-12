@@ -44,3 +44,6 @@ jobs:
 
       - name: Run Unit Tests
         run: npm run test
+
+      - name: Verify package contents
+        run: npm run verify:package

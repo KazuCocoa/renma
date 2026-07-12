@@ -3,21 +3,22 @@ id: lens.testing.test-design.boundary-values
 type: context_lens
 owner: qa-platform
 status: experimental
+version: 1
+scope: context
 tags:
   - testing
   - test-design
 purpose: test_design
 applies_to:
   - context.testing.boundary-value-analysis
-focus:
-  - inclusive limits
-  - empty and zero values
-  - overflow behavior
-  - retry limits
-expected_outputs:
-  - test cases
-  - edge-case checklist
-  - coverage notes
+focus: inclusive limits, empty and zero values, overflow behavior, retry limits
+expected_outputs: test cases, edge-case checklist, coverage notes
+allowed_data:
+  - repo-local-files
+network_allowed: false
+external_upload_allowed: false
+secrets_allowed: false
+requires_human_approval: false
 ---
 # Test Design Lens for Boundary Values
 

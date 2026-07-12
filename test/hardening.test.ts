@@ -64,22 +64,20 @@ test("layout config validation errors exit with usage code", async () => {
   }
 });
 
-test("generic layout suggestions stay namespace-free by default", async () => {
+test("generic layout keeps valid Skill-local support in place", async () => {
   const root = await fixture("renma-layout-generic-");
   await writeSkillSupport(root, "setup", "Demo");
 
   const report = await scan(root);
-  const remediation = layoutRemediation(report.findings);
-
-  assert.match(remediation, /contexts\/setup\/references\/foo\.md/);
-  assert.match(remediation, /contexts\/setup\/profiles\/foo\.md/);
-  assert.match(remediation, /contexts\/setup\/examples\/foo\.md/);
-  assert.match(remediation, /tools\/setup\/scripts\/foo\.mjs/);
-  assert.doesNotMatch(remediation, /contexts\/tools\/appium\//);
-  assert.doesNotMatch(remediation, /contexts\/tools\/project\//);
+  assert.equal(
+    report.findings.some(
+      (finding) => finding.id === "LAYOUT-DISALLOWED-SKILL-ASSET",
+    ),
+    false,
+  );
 });
 
-test("configured layout namespace and workflow aliases shape suggestions", async () => {
+test("configured layout aliases do not force local support promotion", async () => {
   const root = await fixture("renma-layout-namespaced-");
   await writeFile(
     path.join(root, "renma.config.json"),
@@ -95,21 +93,12 @@ test("configured layout namespace and workflow aliases shape suggestions", async
   await writeSkillSupport(root, "device-setup");
 
   const report = await scan(root);
-  const remediation = layoutRemediation(report.findings);
-
-  assert.match(
-    remediation,
-    /contexts\/tools\/mobile\/real-device\/references\/foo\.md/,
+  assert.equal(
+    report.findings.some(
+      (finding) => finding.id === "LAYOUT-DISALLOWED-SKILL-ASSET",
+    ),
+    false,
   );
-  assert.match(
-    remediation,
-    /contexts\/tools\/mobile\/real-device\/profiles\/foo\.md/,
-  );
-  assert.match(
-    remediation,
-    /contexts\/tools\/mobile\/real-device\/examples\/foo\.md/,
-  );
-  assert.match(remediation, /tools\/mobile\/real-device\/scripts\/foo\.mjs/);
 });
 
 test("readiness markdown limits findings while JSON stays complete", () => {
@@ -177,13 +166,6 @@ async function writeSkillSupport(
     path.join(root, "skills", workflow, "scripts", "foo.mjs"),
     "console.log('ok');\n",
   );
-}
-
-function layoutRemediation(findings: Finding[]): string {
-  return findings
-    .filter((finding) => finding.id === "LAYOUT-DISALLOWED-SKILL-ASSET")
-    .map((finding) => finding.remediation)
-    .join("\n");
 }
 
 function readinessReportWithFindings(count: number): ReadinessReport {

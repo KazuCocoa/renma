@@ -124,8 +124,8 @@ Prefer compact, flat metadata. Detailed interpretation guidance belongs in the M
 - `type`: recommended `context_lens` discriminator.
 - `owner`: required accountable owner.
 - `status`: optional lifecycle status: `experimental`, `stable`, `deprecated`, or `archived`.
-- `version`: optional lens schema version. The 0.12.0 governance checks support `version: 1`.
-- `scope`: optional lens scope. The 0.12.0 governance checks support `scope: context`.
+- `version`: optional lens schema version. The supported schema version is `1`.
+- `scope`: optional lens scope. The supported scope is `context`.
 - `purpose`: required short purpose label such as `spec_review`, `test_design`, or `failure_analysis`.
 - `applies_to`: required context asset IDs or repository-relative paths this lens interprets.
 - `focus`: optional compact review focus terms.
