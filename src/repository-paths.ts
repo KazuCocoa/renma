@@ -36,11 +36,16 @@ export async function collectRepositoryPaths(
 
 export function helperScriptPath(command: string): string | undefined {
   const parts = command.split(/\s+/).slice(1);
-  return parts.find(
-    (part) =>
-      /(?:^|\/)scripts\/.+\.(?:mjs|js|cjs|sh|bash|py)$/.test(part) ||
-      /^(?:\.\/)?tools\/.+\.(?:mjs|js|cjs|sh|bash|py)$/.test(part),
+  const target = parts.find((part) => !part.startsWith("-"));
+  if (!target) return undefined;
+
+  const hasSupportedExtension = /\.(?:mjs|js|cjs|sh|bash|py)$/.test(target);
+  if (!hasSupportedExtension) return undefined;
+  const startsAtSupportedRoot = /^(?:(?:\.\.?\/)+)?(?:scripts|tools)\//.test(
+    target,
   );
+  const isExplicitSkillScript = /(?:^|\/)scripts\//.test(target);
+  return startsAtSupportedRoot || isExplicitSkillScript ? target : undefined;
 }
 
 /** Resolve a helper command path without escaping an unambiguous owning Skill. */

@@ -378,11 +378,14 @@ CLI flags override config values when both are provided.
 
 Within a canonical Skill entrypoint or one of its classified support documents,
 helper commands may use `scripts/helper.mjs` or `./scripts/helper.mjs`; Renma
-resolves these paths against the owning Skill directory. Repository-root paths
-such as `skills/testing/demo/scripts/helper.mjs`,
+resolves these paths against the owning Skill directory. `tools/helper.mjs` and
+`./tools/helper.mjs` resolve from the repository root. Explicit repository-root
+paths such as `skills/testing/demo/scripts/helper.mjs`,
 `.agents/skills/testing/demo/scripts/helper.mjs`, and
-`tools/testing/helper.mjs` remain valid. Relative paths that escape the owning
-Skill are reported, and non-Skill documents do not receive an inferred
+`tools/testing/helper.mjs` remain valid. Renma rejects helper candidates whose
+relative traversal would escape the owning Skill boundary and checks existence
+against the collected repository snapshot. It validates the declared path but
+does not execute the command. Non-Skill documents do not receive an inferred
 Skill-relative base.
 
 Use `exclude` for files Renma should not scan. Use `suppressions` for audited exceptions where Renma should scan the file, detect matching findings internally, then omit those findings from normal reports and failure decisions. A suppression applies only when both `id` and `paths` match. Each suppression includes `id`, `paths`, required `reason`, and optional `expires`; the reason lives in config for auditability.

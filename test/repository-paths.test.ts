@@ -5,7 +5,11 @@ import path from "node:path";
 import { test } from "node:test";
 import { parseDocument } from "../src/markdown.js";
 import type { Catalog } from "../src/model.js";
-import { collectRepositoryPaths } from "../src/repository-paths.js";
+import {
+  collectRepositoryPaths,
+  helperScriptPath,
+  resolveHelperScriptPath,
+} from "../src/repository-paths.js";
 import type { Artifact } from "../src/types.js";
 
 test("collectRepositoryPaths normalizes repo paths without resolving traversal outside the snapshot root", async () => {
@@ -78,6 +82,53 @@ test("collectRepositoryPaths normalizes repo paths without resolving traversal o
   assert.equal(paths.has("../outside/scripts/setup.sh"), false);
   assert.equal(paths.has("../outside/context.md"), false);
   assert.equal(paths.has(absoluteOutsideScript), false);
+});
+
+test("helper script extraction forwards plausible traversal without parsing arbitrary arguments", () => {
+  for (const candidate of [
+    "../tools/helper.mjs",
+    "../scripts/helper.mjs",
+    "./../tools/helper.mjs",
+    "./../scripts/helper.mjs",
+    "tools/../../scripts/helper.mjs",
+    "scripts/../../tools/helper.mjs",
+  ]) {
+    assert.equal(helperScriptPath(`node ${candidate}`), candidate);
+    assert.deepEqual(
+      resolveHelperScriptPath("skills/testing/demo/SKILL.md", candidate),
+      { kind: "unsafe", path: candidate },
+    );
+  }
+
+  for (const candidate of [
+    "scripts/helper.mjs",
+    "./scripts/helper.mjs",
+    "tools/helper.mjs",
+    "./tools/helper.mjs",
+  ]) {
+    assert.equal(helperScriptPath(`node ${candidate}`), candidate);
+  }
+
+  assert.equal(helperScriptPath("node /tmp/tools/helper.mjs"), undefined);
+  assert.equal(
+    helperScriptPath("node /tmp/scripts/helper.mjs"),
+    "/tmp/scripts/helper.mjs",
+  );
+  assert.deepEqual(
+    resolveHelperScriptPath(
+      "skills/testing/demo/SKILL.md",
+      "/tmp/scripts/helper.mjs",
+    ),
+    { kind: "unsafe", path: "/tmp/scripts/helper.mjs" },
+  );
+  assert.equal(
+    helperScriptPath("node runner.mjs ../tools/helper.mjs"),
+    undefined,
+  );
+  assert.equal(
+    helperScriptPath("node runner.mjs --config tools/a.mjs"),
+    undefined,
+  );
 });
 
 function artifactFixture(
