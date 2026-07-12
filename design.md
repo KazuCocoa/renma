@@ -1,16 +1,19 @@
 # Renma Product Design
 
-Renma is a Git-native deterministic governance and quality CLI for repositories that hold
-agent-consumable context assets and skills.
+Renma is a Git-native context repository and deterministic governance CLI for
+repositories that hold LLM-facing knowledge.
 
-Current product surface includes `scan`, `catalog`, `ownership`, `graph`, focused graph views, `trust-graph`, `readiness`, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`, `suggest-semantic-split`, and security diagnostics v1 for agent-facing operational instructions.
+Current product surface includes `scan`, `catalog`, `ownership`, `graph`,
+focused graph views, `trust-graph`, `readiness`, Repository Context BOM reports,
+repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`,
+`suggest-metadata`, `suggest-semantic-split`, Agent Skills validation, and
+security diagnostics for agent-facing operational instructions.
 
 Focused graph views are inspection tools; they do not choose, inject, or load runtime context for an agent.
 
-```text
-Renma prepares the environment.
-Agents operate within that environment.
-```
+Renma prepares deterministic repository evidence. Agents operate outside Renma
+and decide how to consume repository assets according to their own runtime
+behavior.
 
 Renma helps teams keep shared knowledge discoverable, owned, validated,
 reviewable, and reusable in Git. It is not an agent runtime and does not decide
@@ -18,10 +21,14 @@ what context an agent should load at task time.
 
 ## Core Distinction
 
-```text
-Skill = agent-facing entrypoint / routing contract / usage guide
-Context Lens = purpose-oriented interpretation layer over context assets
-Context = independently owned source-of-truth knowledge asset
+```mermaid
+flowchart LR
+  Skill["Skill: agent-facing entrypoint, routing contract, usage guide"]
+  Lens["Context Lens: purpose-oriented interpretation"]
+  Asset["Context Asset: independently owned source-of-truth knowledge"]
+  Skill -->|may reference| Lens
+  Skill -->|may reference directly| Asset
+  Lens -->|interprets| Asset
 ```
 
 Skills tell an agent when and how to use a capability. They can reference
@@ -32,9 +39,13 @@ Context assets hold reusable expertise. They should be maintainable outside a
 single skill, owned by the right team, versioned, reviewed, and reused across
 skills, agents, tools, and future agent runtimes.
 
-Context lenses describe how one or more context assets should be interpreted for
+Context Lenses describe how one or more Context Assets should be interpreted for
 a purpose. They are repository governance metadata, not runtime lens selection
 or prompt assembly.
+
+These arrows are declared repository relationships, not a runtime loading
+pipeline. Renma validates them but does not select a Lens, choose task-specific
+Context, or inject either asset into an agent session.
 
 ## Product Boundary
 
@@ -69,7 +80,10 @@ Security diagnostics for 0.7.0 focus on conservative operational-instruction ris
 
 Security diagnostics are deterministic review guardrails for LLM-facing operational instructions. They flag patterns such as unpinned remote shell execution, unpinned dependency installs, privileged commands without nearby guardrails, predictable temporary paths, and credential-like command arguments; they do not replace SAST, secret scanning, dependency scanning, or human security review.
 
-The next product layer should turn these diagnostics into security posture summaries in readiness and CI reports. Security posture should summarize effective policy, security profile resolution, allowed data, forbidden inputs, approved network and upload destinations, human approval requirements, and high-risk findings without enforcing runtime behavior.
+Security posture summaries in Readiness and CI reports describe effective
+policy, security profile resolution, allowed data, forbidden inputs, approved
+network and upload destinations, human approval requirements, and high-risk
+findings without enforcing runtime behavior.
 
 Trust Graph v1 is a deterministic interpretation of existing catalog, graph, scan, and security evidence. It exposes stable asset, owner, lifecycle, dependency, security profile, effective policy, and diagnostic evidence, but it does not introduce subjective trust scores or a separate runtime system. `scan` lists concrete problems, `graph` shows structural relationships, `trust-graph` connects trust-relevant evidence, and `readiness` summarizes repository-level preparedness.
 
@@ -98,7 +112,7 @@ Example diagnostic shape:
   "category": "structure",
   "title": "Skill mixes reusable knowledge with usage guidance",
   "evidence": {
-    "path": "skills/testing/test-case-generation.skill.md",
+    "path": "skills/testing/test-case-generation/SKILL.md",
     "startLine": 42,
     "endLine": 78,
     "snippet": "boundary value analysis"
@@ -141,14 +155,17 @@ calling agent to apply.
 
 ## Repository Model
 
-The target repository shape gives shared context assets first-class space:
+An illustrative repository shape gives shared Context Assets first-class space:
 
 ```text
 skills/
   testing/
-    test-case-generation.skill.md
-    spec-review.skill.md
-    regression-planning.skill.md
+    test-case-generation/
+      SKILL.md
+    spec-review/
+      SKILL.md
+    regression-planning/
+      SKILL.md
 
 contexts/
   testing/
@@ -180,6 +197,15 @@ metadata/
 graph/
 catalog/
 ```
+
+This is not a required layout for every repository asset. A repository may
+organize Context Assets, Context Lenses, policies, references, evidence, and
+other knowledge by domain, product, team, workflow, or a combination of those
+dimensions. Canonical Skill entrypoints in 0.16.0 remain under
+`skills/**/SKILL.md` and `.agents/skills/**/SKILL.md`; arbitrary Skill roots and
+domain-local `*/skills/**/SKILL.md` layouts are not implemented. Renma's broader
+model means repository knowledge need not be embedded inside those Skill
+directories.
 
 `contexts/` is preferred for shared context assets. `context/` remains supported
 as a compatibility alias. Files under either root are classified as the
@@ -341,11 +367,11 @@ Implemented deterministic rules focus on repository health:
 - Broad environment copying into subprocesses
 - Hardcoded user-local paths in reusable guidance
 
-Current reporting includes deterministic readiness output, ownership coverage,
-context graph snapshots, and static safety findings for agent-facing repository
-content. Near-term reporting should extend repeated context discovery, semantic
-diffs, security diagnostics stabilization, security posture summaries, CI
-examples, and optional external-LLM advisory evaluation bundles.
+Current reporting includes deterministic Readiness output, ownership coverage,
+graph snapshots, repeated-context diagnostics, semantic diff, Trust Graph,
+Repository Context BOM, security posture summaries, CI reports, and optional
+LLM-friendly review bundles. These are repository projections and evidence, not
+runtime selection or execution services.
 
 Passing Renma checks does not prove a workflow is safe. It means the repository
 met the deterministic governance checks that were enabled.

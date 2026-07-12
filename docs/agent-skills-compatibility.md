@@ -5,6 +5,18 @@ transition. [Agent Skills](https://agentskills.io/specification) owns the
 portable Skill format. Renma extends it with deterministic governance evidence,
 without defining a competing Skill format.
 
+Compatibility is the portable authoring boundary for Skill entrypoints, not
+Renma's complete repository model. A Renma repository may also contain Context
+Lenses, independently owned Context Assets, references, policies, lifecycle and
+ownership declarations, dependencies, and evidence organized across domains,
+products, teams, or workflows. That flexibility applies to the broader
+repository assets, not to arbitrary Skill roots: canonical Skill entrypoints in
+0.16.0 are discovered only under `skills/**/SKILL.md` and
+`.agents/skills/**/SKILL.md`. A custom scan glob does not make a path such as
+`docs/skills/demo/SKILL.md` a Skill. Renma is not an Agent Skills registry,
+runtime, or live router, and repository knowledge does not need to be embedded
+inside the supported Skill directories.
+
 In this document, “pre-0.16 Renma Skill format” refers to the top-level Renma
 metadata syntax supported before Renma 0.16.0. It is the migration source
 format. The 0.16.0 target uses Agent Skills standard fields plus flat

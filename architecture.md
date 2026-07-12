@@ -1,43 +1,40 @@
 # Renma Architecture Direction
 
-Renma is a Git-native deterministic governance and health layer for LLM-ready context assets and skills. It keeps shared repositories healthy so agents can consume team-owned expertise correctly.
+Renma is a Git-native context repository and deterministic governance layer for
+LLM-facing knowledge. It keeps Skills, Context Lenses, Context Assets,
+references, ownership, lifecycle, dependencies, and evidence reviewable as
+maintainable software assets.
 
-The current CLI surface covers `scan`, `catalog`, `ownership`, `graph`, `readiness`, repeated-context diagnostics, semantic diff, and `ci-report`. Security diagnostics v1 adds deterministic safety findings for agent-facing operational instructions without executing commands or calling external services.
-
-The 0.7.0 direction is to stabilize and document security diagnostics. Follow-on releases should add security posture summaries to readiness and CI output, expose Trust Graph evidence as deterministic graph/catalog/readiness signals, and then produce a Repository Context BOM as a declared repository manifest.
+The current CLI surface covers `scan`, `catalog`, `ownership`, `graph`, focused
+graph views, `trust-graph`, `readiness`, Repository Context BOM reports,
+repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`,
+`suggest-metadata`, and `suggest-semantic-split`. Agent Skills validation and
+security diagnostics are deterministic repository checks; they do not execute
+commands or call external services.
 
 Renma sits at the repository governance layer, not the runtime layer.
 
-```text
-Shared repository
-  skills/
-  contexts/
-  metadata/
-  graph/
-  catalog/
-
-Renma
-  scan
-  validate
-  catalog
-  graph
-  report
-  suggest improvements
-
-Agents and runtimes
-  Codex
-  Claude
-  Cursor
-  future agents
-
-External signal producers
-  Codex plugin
-  Claude extension
-  prompt wrapper
-  CI and external signal integrations
+```mermaid
+flowchart TD
+  Repository["Git-reviewed repository assets"]
+  Renma["Renma: deterministic governance and repository health"]
+  Reports["Catalog, graph, diagnostics, Readiness, and BOM"]
+  Review["Human or coding-agent review"]
+  Runtimes["Agents and runtimes — outside Renma"]
+  Producers["External signal producers — outside Renma"]
+  Evidence["Separately produced evidence — future input"]
+  Repository --> Renma
+  Renma --> Reports
+  Reports --> Review
+  Repository -->|consumed according to runtime behavior| Runtimes
+  Producers -.-> Evidence
+  Evidence -.-> Renma
 ```
 
-Renma does not choose task context, assemble prompts, inject context, or execute agent workflows. Agents and runtimes decide how to use repository assets for a task.
+Renma does not select Skills for live tasks, select or inject task Context,
+assemble prompts, or execute workflows. Agents and runtimes decide how to use
+repository assets for a task. Future evidence validation does not make Renma a
+runtime telemetry collector; signal production and collection remain external.
 
 Near-term provenance features should stay repository-level. A Repository Context BOM is a manifest of declared assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence; it is not a report of actual LLM runtime usage. BOM v1 keeps Git revision identity in the surrounding Git/CI/PR artifact context and keeps future consumed-context evidence separate from the declared repository manifest contract.
 
@@ -66,14 +63,17 @@ Renma is telemetry-aware, but not telemetry-responsible. It may import external 
 
 ## Source Layout
 
-Preferred repository layout:
+One illustrative repository layout is:
 
 ```text
 skills/
   testing/
-    test-case-generation.skill.md
-    spec-review.skill.md
-    regression-planning.skill.md
+    test-case-generation/
+      SKILL.md
+    spec-review/
+      SKILL.md
+    regression-planning/
+      SKILL.md
 contexts/
   testing/
     boundary-value-analysis.md
@@ -100,6 +100,15 @@ graph/
 catalog/
 ```
 
+This tree is not a required layout for every repository asset. Context Assets,
+Context Lenses, policies, references, and other knowledge may be organized by
+domain, product, team, or workflow. Canonical Skill entrypoints in 0.16.0 are
+nevertheless discovered only under `skills/**/SKILL.md` and
+`.agents/skills/**/SKILL.md`. A custom scan glob does not turn an arbitrary path
+such as `docs/skills/demo/SKILL.md` into a Skill. Renma's normalized repository
+model is broader than the Agent Skills format, but arbitrary Skill roots are not
+implemented.
+
 `contexts/` is preferred. `context/` is also scanned for compatibility.
 
 Skill-local `profiles/`, `references/`, and `examples/` remain supported, but shared context assets should become the durable source of truth when knowledge is reused across skills, teams, tools, or agents.
@@ -108,9 +117,21 @@ Skill-local `profiles/`, `references/`, and `examples/` remain supported, but sh
 
 ### Skill
 
-A skill is an LLM-facing entrypoint and routing contract. It tells an agent when and how to use a capability, what preflight questions matter, which safety and verification steps apply, and which context assets are relevant.
+A Skill is an agent-facing entrypoint, routing contract, and usage guide. It
+tells a consuming agent when and how to use a capability, what preflight
+questions matter, which safety and verification steps apply, and which Context
+Assets or Context Lenses are relevant. Renma recognizes Agent Skills-compatible
+syntax as the portable authoring boundary without reducing its internal model
+to the Agent Skills data model.
 
 A skill should not be the only source of truth for reusable expert knowledge.
+
+### Context Lens
+
+A Context Lens is a purpose-oriented interpretation layer over one or more
+Context Assets. It records a static repository relationship for governance and
+review; Renma does not select a Lens at runtime, automatically load Context, or
+assemble a prompt.
 
 ### Context Asset
 
@@ -129,15 +150,17 @@ Good context assets have:
 
 An asset is any repository object Renma can catalog, validate, reference, or include in graph checks.
 
-Initial asset kinds:
+Normalized asset kinds:
 
 - `skill`
 - `context`
+- `context_lens`
 - `profile`
 - `reference`
 - `example`
 - `agent`
 - `config`
+- `unknown`
 
 Shared Markdown under `contexts/` or `context/` uses the dedicated `context` kind. Skill-local supporting material remains `reference`.
 
@@ -161,26 +184,16 @@ Declared reference validation is deterministic. Renma resolves references by exa
 
 ## Architecture
 
-```text
-Markdown, frontmatter, config, docs snapshots
-  |
-  v
-Importers and parsers
-  |
-  v
-Normalized asset model
-  |
-  v
-Catalog snapshot + context graph snapshot
-  |
-  v
-Validation, repeated-context discovery, semantic diff
-  |
-  v
-Reports, repository manifests, readiness output
- |
- v
-Humans and LLM coding agents review diagnostics, propose patches, and rerun Renma
+```mermaid
+flowchart TD
+  Inputs["Markdown, frontmatter, configuration, and documentation snapshots"]
+  Parsers["Importers and parsers"]
+  Model["Normalized repository model"]
+  Projections["Catalog and graph projections"]
+  Analysis["Validation, repeated-context analysis, and semantic diff"]
+  Outputs["Reports, Readiness, and repository manifests"]
+  Review["Human or coding-agent review"]
+  Inputs --> Parsers --> Model --> Projections --> Analysis --> Outputs --> Review
 ```
 
 The normalized model is the contract between files and higher-level features. Users work with Markdown and small metadata blocks. Renma uses the model internally to keep output deterministic and testable.
@@ -226,7 +239,9 @@ for validation. Diagnostics such as
 `MAINT-SUPPORT-ASSET-SHARED-CONTEXT-CANDIDATE` can guide a calling LLM or human
 toward semantic review, but Renma itself remains the deterministic evaluator.
 
-The repair loop stays reviewable:
+The repair loop stays reviewable: Renma emits evidence, a human or calling
+agent may propose a patch, a human reviews it, and Renma validates the updated
+repository. An LLM is optional throughout this loop.
 
 ```text
 renma scan/catalog -> deterministic diagnostics or review bundle
@@ -237,22 +252,33 @@ renma scan/catalog -> validates the result deterministically
 
 ## Metadata
 
-Renma should validate a small stable subset first:
+Renma validates a small stable metadata subset. Canonical Skills serialize
+Renma fields as flat, string-valued `metadata.renma.*` entries; this top-level
+example is the retained syntax for Context Assets and other non-Skill assets:
 
 ```yaml
 id: domain.payment.idempotency
 version: 1.0.0
 owner: payments
 status: stable
-tags: payment, qa
-when_to_use: Testing payment retry or duplicate-submit behavior
-when_not_to_use: Non-payment checkout UI copy review
-requires_context: testing.negative-testing
-optional_context: testing.regression-risk
-conflicts: archived.payment.retry-v0
+tags:
+  - payment
+  - qa
+when_to_use:
+  - Testing payment retry or duplicate-submit behavior
+when_not_to_use:
+  - Non-payment checkout UI copy review
+requires_context:
+  - testing.negative-testing
+optional_context:
+  - testing.regression-risk
+conflicts:
+  - archived.payment.retry-v0
 ```
 
-The current parser supports simple one-line values and comma-separated lists. Richer YAML block-list frontmatter is a future parser improvement.
+The parser supports scalar values and YAML-style block lists for selected
+non-Skill metadata fields. Canonical Skill list metadata uses JSON-array
+strings. See `docs/agent-skills-compatibility.md` for the exact 0.16.0 boundary.
 
 Status values:
 
@@ -295,12 +321,12 @@ The graph should represent assets and typed dependencies. It should power:
 - Semantic diff
 - Future visualization
 
-Current command:
+Current commands:
 
 ```bash
-renma graph --format json
-renma graph --format markdown
-renma graph --format mermaid
+renma graph . --format json
+renma graph . --format markdown
+renma graph . --format mermaid
 ```
 
 The graph is not a runtime selection engine. It is repository evidence.
@@ -375,10 +401,10 @@ Categories:
 - Repeated-context candidate changes
 - Safety and risk changes
 
-Possible command:
+Current command:
 
 ```bash
-renma diff --from main --to HEAD
+renma diff . --from main --to HEAD
 ```
 
 ## Repository Health Reports
@@ -451,15 +477,21 @@ This sequence prioritizes shared context assets, CI review examples, and reposit
 
 ## Implementation Notes
 
-Current CLI commands:
+Representative current CLI commands:
 
 ```bash
 renma scan [path]
+renma bom [path]
 renma catalog [path]
 renma graph [path]
+renma trust-graph [path]
 renma ownership [path]
 renma readiness [path]
+renma diff [path] --from <ref> --to <ref>
+renma ci-report [path] --from <ref> --to <ref>
 renma inspect <file>
+renma scaffold <skill|context|context_lens> <path>
+renma suggest-metadata <file>
 renma suggest-semantic-split <file>
 ```
 
@@ -481,14 +513,16 @@ Baseline now in place:
 - Deprecated or archived dependency validation.
 - Orphaned context asset detection.
 - Readiness v1 repository-health report.
-- 0.1.0 release baseline.
+- Repeated context discovery across shared contexts, Skills, agents,
+  references, profiles, and examples.
+- Security diagnostics, security posture summaries, and effective policy
+  inventory for agent-facing repository content.
+- Trust Graph evidence and Repository Context BOM v1.
+- CI integration examples and optional LLM-assisted review bundles.
 
-Near-term implementation work:
-
-- Repeated context discovery across shared contexts, skills, agents, references, profiles, and examples.
-- Security diagnostics stabilization and security posture summaries for agent-facing repository content.
-- CI integration examples and sample readiness reports.
-- Optional LLM-assisted repository evaluation bundles.
+Future work may add imported external evidence after its contract is defined;
+that does not move runtime selection, execution, or telemetry collection into
+Renma.
 
 ## Principle
 

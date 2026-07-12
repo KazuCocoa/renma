@@ -25,6 +25,7 @@ test("example context repository scans and builds catalog/graph reports", async 
   assert.ok(assetIds.includes("context.testing.boundary-value-analysis"));
   assert.ok(assetIds.includes("context.testing.negative-testing"));
   assert.ok(assetIds.includes("context.domain.payment.idempotency"));
+  assert.ok(assetIds.includes("lens.testing.spec-review.boundary-values"));
 
   const graphResult = await graph(EXAMPLE_ROOT);
   const graphNodeIds = graphResult.nodes.map((node) => node.id);
@@ -35,12 +36,17 @@ test("example context repository scans and builds catalog/graph reports", async 
   assert.ok(graphNodeIds.includes("skill.testing.spec-review"));
   assert.ok(
     graphEdges.includes(
-      "skill.testing.spec-review->context.testing.boundary-value-analysis",
+      "skill.testing.spec-review->contexts/testing/negative-testing.md",
     ),
   );
   assert.ok(
     graphEdges.includes(
-      "skill.testing.spec-review->context.testing.negative-testing",
+      "skill.testing.spec-review->lens.testing.spec-review.boundary-values",
+    ),
+  );
+  assert.ok(
+    graphEdges.includes(
+      "lens.testing.spec-review.boundary-values->context.testing.boundary-value-analysis",
     ),
   );
 });
@@ -57,6 +63,7 @@ test("example context repository produces a stable readiness report shape", asyn
   assert.ok(assetIds.includes("skill.testing.spec-review"));
   assert.ok(assetIds.includes("context.testing.boundary-value-analysis"));
   assert.ok(assetIds.includes("context.testing.negative-testing"));
+  assert.ok(assetIds.includes("lens.testing.spec-review.boundary-values"));
 
   assert.equal(readinessReport.summary.totalAssets, assetIds.length);
   assert.equal(
@@ -73,6 +80,8 @@ test("example context repository produces a stable readiness report shape", asyn
   assert.equal(readinessReport.summary.unresolvedEdges, 0);
   assert.equal(readinessReport.summary.workflow.skillEntrypoints, 1);
   assert.equal(readinessReport.summary.workflow.readinessPercent, 100);
+  assert.equal(readinessReport.summary.contextLens.totalLensCount, 1);
+  assert.equal(readinessReport.summary.contextLens.validLensCount, 1);
 
   assert.ok(checkIds.includes("ownership.coverage"));
   assert.ok(checkIds.includes("graph.unresolved_edges"));

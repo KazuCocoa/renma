@@ -6,6 +6,10 @@ Target: post-0.15.0 planning
 
 Scope: optional, backward-compatible skill discovery for large single repositories
 
+Only **Current Baseline** describes implemented behavior. Route metadata,
+`skill-index`, discovery diagnostics, and the integrations proposed elsewhere in
+this document are not implemented in 0.16.0.
+
 ## Summary
 
 Renma should add a static skill discovery projection for repositories that have grown beyond the point where an agent can reliably inspect every `SKILL.md` before choosing where to start.
@@ -15,7 +19,7 @@ The implementation should preserve Renma's current model and boundaries:
 ```text
 Skill = agent-facing entrypoint / routing contract / usage guide
 Context Lens = purpose-oriented interpretation layer over context assets
-Context = independently owned source-of-truth knowledge asset
+Context Asset = independently owned source-of-truth knowledge
 ```
 
 The new capability should not introduce a required directory hierarchy, move existing files, select a skill for a live task, assemble prompts, or call an LLM. It should model the layered `SKILL.md` routing that repositories already use, validate that routing deterministically, and generate compact indexes and visualizations from the same repository evidence used by catalog, graph, readiness, diff, Trust Graph, and Repository Context BOM.
@@ -59,15 +63,27 @@ A repository with 100 or more skills and many contributing teams has two differe
 
 The first problem is already within Renma's current governance model. The second becomes difficult when a flat catalog exposes too many plausible skills at once.
 
-Existing repositories often solve this with layered skills:
+Existing repositories often solve this with layered Skills. The proposed model
+records that topology as a graph rather than requiring this directory tree:
 
-```text
-top-level entrypoint SKILL.md
-  -> category or product SKILL.md
-    -> team, workflow, or platform SKILL.md
-      -> concrete workflow SKILL.md
-        -> lenses and contexts
+```mermaid
+flowchart TD
+  Top["Top-level entrypoint Skill"]
+  Group["Category, product, or team entrypoint Skill"]
+  Workflow["Concrete workflow Skill"]
+  Lens["Context Lens"]
+  Assets["Context Assets"]
+  Top -->|proposed routes_to| Group
+  Top -->|may route directly| Workflow
+  Group -->|proposed routes_to| Workflow
+  Workflow -->|declared relationship| Lens
+  Workflow -->|may reference directly| Assets
+  Lens -->|applies_to| Assets
 ```
+
+Existing `SKILL.md` files would remain the source of routing policy. Renma would
+record, validate, and present declared routes; tree-like views would remain
+projections, and Renma would not select a Skill for a live user request.
 
 Examples include:
 
@@ -108,7 +124,9 @@ Multi-repository federation, package synchronization, and organization-wide dist
 
 ### 2. Preserve every existing `SKILL.md`
 
-All existing `SKILL.md` files remain valid skill assets. Renma must not require a migration to a new directory shape or a new skill type.
+All existing specification-valid `SKILL.md` files remain Skill assets. This
+proposal must not require a migration to a new directory shape or a new Skill
+type.
 
 A category entrypoint, product entrypoint, team entrypoint, hybrid router, and concrete workflow are all still `skill` assets. Their role is expressed through their route relationships and existing usage boundaries, not through a mandatory physical hierarchy.
 
@@ -229,10 +247,13 @@ The default inference should be conservative:
 - Deprecated and archived skills are not published as normal roots.
 - Standalone skills remain visible even when they are not yet connected.
 
-An optional flat metadata field may be added when repositories need to override inference:
+An optional flat Renma metadata field may be added when repositories need to
+override inference. Under the canonical 0.16.0 Skill syntax, the proposal would
+use a string value under `metadata`:
 
 ```yaml
-discovery_entrypoint: true
+metadata:
+  renma.discovery-entrypoint: "true"
 ```
 
 An optional config list may later provide a small repository-level root set. It must contain only broad roots and must not become a central list of every skill.
@@ -241,40 +262,34 @@ An optional config list may later provide a small repository-level root set. It 
 
 The current parser intentionally supports compact scalar and list metadata. Discovery should preserve that constraint.
 
-Potential additive fields are:
+Potential additive semantics are shown below using the canonical 0.16.0 Skill
+serialization. These names are proposals, not currently operational fields:
 
 ```yaml
-routes_to:
-  - products.checkout.test-case-generation
-  - products.search.test-case-generation
-
-discovery_aliases:
-  - generate test cases
-  - test case design
-
-discovery_entrypoint: true
+metadata:
+  renma.routes-to: '["products.checkout.test-case-generation","products.search.test-case-generation"]'
+  renma.discovery-aliases: '["generate test cases","test case design"]'
+  renma.discovery-entrypoint: "true"
 ```
 
 Existing fields remain primary routing evidence:
 
-- `id`
-- `owner`
-- `status`
-- `tags`
-- `when_to_use`
-- `when_not_to_use`
-- `requires_context`
-- `optional_context`
-- `requires_lens`
-- `optional_lens`
+- `renma.id`
+- `renma.owner`
+- `renma.status`
+- `renma.tags`
+- `renma.when-to-use`
+- `renma.when-not-to-use`
+- `renma.requires-context`
+- `renma.optional-context`
+- `renma.requires-lens`
+- `renma.optional-lens`
 
 Namespaced tags can provide optional facets without fixing a hierarchy:
 
 ```yaml
-tags:
-  - category:test-case-generation
-  - product:checkout
-  - platform:android
+metadata:
+  renma.tags: '["category:test-case-generation","product:checkout","platform:android"]'
 ```
 
 Do not add nested discovery maps to frontmatter in the first implementation. Do not require all fields on all skills. Add a field only when a command or deterministic diagnostic uses it.
