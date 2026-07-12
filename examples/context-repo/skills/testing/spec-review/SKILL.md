@@ -17,14 +17,13 @@ metadata:
 
 ## Routing
 
-Use this Skill when an incomplete specification needs clarification and
-evidence-backed review. The consuming agent follows this guidance; Renma only
-validates the Skill and its declared relationships.
+Use for incomplete specification clarification and evidence-backed review. The
+agent follows this Skill; Renma validates it and its declared relationships.
 
 ## Required Inputs
 
-- The incomplete request and any available criteria, examples, or references.
-- Known constraints, integrations, user states, and decision owners.
+- The incomplete request, available criteria, examples, and references.
+- Known constraints, integrations, user states, and owners.
 
 ## Repository Context
 
@@ -37,8 +36,7 @@ asset IDs and relationships but does not load or inject their contents:
 - [Example asset index](../../../README.md#repository-assets), which locates the
   optional Payment Idempotency Context Asset for retryable payment writes
 
-Copying this `SKILL.md` without its linked repository assets is not a
-self-contained or portable workflow.
+Copying this `SKILL.md` without its linked assets is not a complete workflow.
 
 ## Hard Constraints
 

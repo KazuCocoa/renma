@@ -11,13 +11,15 @@ const SKILL_LIKE_FILE_OUTSIDE_SKILLS_DIR_CODE =
   "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR";
 const SKILL_ENTRYPOINT_UNDER_RESERVED_SUPPORT_DIR_CODE =
   "LAYOUT-SKILL-ENTRYPOINT-UNDER-RESERVED-SUPPORT-DIR";
-const RESERVED_SKILL_SUPPORT_DIRS = [
+export const RESERVED_SKILL_SUPPORT_DIRS = [
   "assets",
   "examples",
   "profiles",
   "references",
   "scripts",
-];
+] as const;
+export type ReservedSkillSupportDirectory =
+  (typeof RESERVED_SKILL_SUPPORT_DIRS)[number];
 const SKILL_LIKE_FILE_GLOBS = [
   "SKILL.md",
   "skill.md",
@@ -54,16 +56,102 @@ export type SkillEntrypointPath =
       candidateName: string;
     };
 
-/** Classify a repository-relative Skill entrypoint only at an explicit root. */
-export function classifyRepositorySkillEntrypointPath(
+export type RepositorySkillPath =
+  | {
+      kind: "entrypoint";
+      currentPath: string;
+      root: "skills" | ".agents/skills";
+      skillDirectory: string;
+      skillName: string;
+      domainPath: string[];
+      relativeToSkillDirectory: string;
+      entrypoint: SkillEntrypointPath;
+    }
+  | {
+      kind: "support";
+      currentPath: string;
+      root: "skills" | ".agents/skills";
+      skillDirectory: string;
+      skillName: string;
+      domainPath: string[];
+      relativeToSkillDirectory: string;
+      supportDirectory: ReservedSkillSupportDirectory;
+    }
+  | {
+      kind: "reserved-root";
+      currentPath: string;
+      root: "skills" | ".agents/skills";
+      supportDirectory: ReservedSkillSupportDirectory;
+    };
+
+/** Classify canonical, historical, and reserved support paths at explicit Skill roots. */
+export function classifyRepositorySkillPath(
   relativePath: string,
-): SkillEntrypointPath | undefined {
+): RepositorySkillPath | undefined {
   const currentPath = normalizeRepositoryRelativePath(relativePath);
   if (!currentPath) return undefined;
   const segments = currentPath.split("/").filter(Boolean);
   const rootEndIndex = repositorySkillRootEndIndex(segments);
   if (rootEndIndex === undefined) return undefined;
-  return classifySkillEntrypointAtRoot(currentPath, segments, rootEndIndex);
+  const root = repositorySkillRoot(segments);
+  const localSegments = segments.slice(rootEndIndex);
+  const supportIndex = localSegments.findIndex(isReservedSkillSupportDirectory);
+
+  if (supportIndex >= 0) {
+    const supportDirectory = localSegments[
+      supportIndex
+    ] as ReservedSkillSupportDirectory;
+    if (supportIndex === 0) {
+      return { kind: "reserved-root", currentPath, root, supportDirectory };
+    }
+    const skillSegments = localSegments.slice(0, supportIndex);
+    const skillName = skillSegments.at(-1);
+    if (!skillName) return undefined;
+    const skillDirectory = [
+      ...segments.slice(0, rootEndIndex),
+      ...skillSegments,
+    ].join("/");
+    return {
+      kind: "support",
+      currentPath,
+      root,
+      skillDirectory,
+      skillName,
+      domainPath: skillSegments.slice(0, -1),
+      relativeToSkillDirectory: localSegments.slice(supportIndex).join("/"),
+      supportDirectory,
+    };
+  }
+
+  const entrypoint = classifySkillEntrypointAtRoot(
+    currentPath,
+    segments,
+    rootEndIndex,
+  );
+  if (!entrypoint) return undefined;
+  const skillDirectory = path.posix.dirname(entrypoint.targetPath);
+  const skillDirectorySegments = skillDirectory.split("/").filter(Boolean);
+  const skillSegments = skillDirectorySegments.slice(rootEndIndex);
+  const skillName = skillSegments.at(-1);
+  if (!skillName) return undefined;
+  return {
+    kind: "entrypoint",
+    currentPath,
+    root,
+    skillDirectory,
+    skillName,
+    domainPath: skillSegments.slice(0, -1),
+    relativeToSkillDirectory: path.posix.relative(skillDirectory, currentPath),
+    entrypoint,
+  };
+}
+
+/** Classify a repository-relative Skill entrypoint only at an explicit root. */
+export function classifyRepositorySkillEntrypointPath(
+  relativePath: string,
+): SkillEntrypointPath | undefined {
+  const classified = classifyRepositorySkillPath(relativePath);
+  return classified?.kind === "entrypoint" ? classified.entrypoint : undefined;
 }
 
 /** Classify an absolute Skill path only when it contains one unambiguous root. */
@@ -119,11 +207,7 @@ function classifySkillEntrypointAtRoot(
   const basename = path.posix.basename(currentPath);
   const directory = path.posix.dirname(currentPath);
   const localDirectories = segments.slice(rootEndIndex, -1);
-  if (
-    localDirectories.some((segment) =>
-      RESERVED_SKILL_SUPPORT_DIRS.includes(segment),
-    )
-  ) {
+  if (localDirectories.some(isReservedSkillSupportDirectory)) {
     return undefined;
   }
 
@@ -262,7 +346,12 @@ function classify(relativePath: string): ArtifactKind {
 function classifyExplicitSkillSupportPath(
   relativePath: string,
 ): ArtifactKind | undefined {
-  switch (skillSupportPathSegment(relativePath)) {
+  const classified = classifyRepositorySkillPath(relativePath);
+  const supportDirectory =
+    classified?.kind === "support" || classified?.kind === "reserved-root"
+      ? classified.supportDirectory
+      : undefined;
+  switch (supportDirectory) {
     case "assets":
       return "unknown";
     case "profiles":
@@ -354,15 +443,20 @@ function isExplicitSkillsPath(relativePath: string): boolean {
 }
 
 function skillSupportPathSegment(relativePath: string): string | undefined {
-  const normalized = normalizeRepositoryRelativePath(relativePath);
-  if (!normalized) return undefined;
-  const segments = normalized.split("/").filter(Boolean);
-  const rootEndIndex = repositorySkillRootEndIndex(segments);
-  if (rootEndIndex === undefined) return undefined;
-  const skillLocalSegments = segments.slice(rootEndIndex, -1);
-  return skillLocalSegments.find((segment) =>
-    RESERVED_SKILL_SUPPORT_DIRS.includes(segment),
-  );
+  const classified = classifyRepositorySkillPath(relativePath);
+  return classified?.kind === "support" || classified?.kind === "reserved-root"
+    ? classified.supportDirectory
+    : undefined;
+}
+
+function isReservedSkillSupportDirectory(
+  segment: string,
+): segment is ReservedSkillSupportDirectory {
+  return (RESERVED_SKILL_SUPPORT_DIRS as readonly string[]).includes(segment);
+}
+
+function repositorySkillRoot(segments: string[]): "skills" | ".agents/skills" {
+  return segments[0] === "skills" ? "skills" : ".agents/skills";
 }
 
 function repositorySkillRootEndIndex(segments: string[]): number | undefined {

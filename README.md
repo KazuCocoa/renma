@@ -213,7 +213,10 @@ lenses/
 
 This is an illustrative layout, not a required domain hierarchy. `contexts/`
 is preferred and `context/` remains supported. Skill-local `references/`,
-`assets/`, `scripts/`, `examples/`, and `profiles/` remain support material.
+`assets/`, `scripts/`, `examples/`, and `profiles/` are valid support material.
+When deterministic evidence shows that knowledge is reusable beyond one Skill,
+promote it to an owned Context Asset rather than moving it based on location
+alone.
 
 The relationship model supports both:
 

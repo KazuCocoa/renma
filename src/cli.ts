@@ -42,15 +42,55 @@ import {
   type TrustGraphFormat,
 } from "./commands/trust-graph.js";
 import {
+  commandOptionNames,
   isCommandName,
   renderCommandHelp,
   renderGlobalHelp,
+  type CliOptionName,
   type CommandName,
 } from "./cli-help.js";
 import { ConfigError, type ConfigOverrides } from "./config.js";
 import type { Severity } from "./types.js";
 
 type CliValues = ReturnType<typeof parseArgs>["values"];
+
+interface CommandContract {
+  minPositionals: number;
+  maxPositionals: number;
+  missingPositionalsMessage?: string;
+}
+
+const COMMAND_CONTRACTS: Record<CommandName, CommandContract> = {
+  scan: { minPositionals: 0, maxPositionals: 1 },
+  catalog: { minPositionals: 0, maxPositionals: 1 },
+  graph: { minPositionals: 0, maxPositionals: 1 },
+  "trust-graph": { minPositionals: 0, maxPositionals: 1 },
+  readiness: { minPositionals: 0, maxPositionals: 1 },
+  bom: { minPositionals: 0, maxPositionals: 1 },
+  ownership: { minPositionals: 0, maxPositionals: 1 },
+  diff: { minPositionals: 0, maxPositionals: 1 },
+  "ci-report": { minPositionals: 0, maxPositionals: 1 },
+  inspect: {
+    minPositionals: 1,
+    maxPositionals: 1,
+    missingPositionalsMessage: "inspect requires a target file.",
+  },
+  scaffold: {
+    minPositionals: 2,
+    maxPositionals: 2,
+    missingPositionalsMessage: "scaffold requires a kind and target path.",
+  },
+  "suggest-metadata": {
+    minPositionals: 1,
+    maxPositionals: 1,
+    missingPositionalsMessage: "suggest-metadata requires a target file.",
+  },
+  "suggest-semantic-split": {
+    minPositionals: 1,
+    maxPositionals: 1,
+    missingPositionalsMessage: "suggest-semantic-split requires a target file.",
+  },
+};
 
 export async function main(argv = process.argv.slice(2)): Promise<number> {
   let parsed;
@@ -81,8 +121,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       },
     });
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    return 2;
+    const message = error instanceof Error ? error.message : String(error);
+    const requestedCommand = argv[0];
+    return requestedCommand && isCommandName(requestedCommand)
+      ? usageError(requestedCommand, message)
+      : globalUsageError(message);
   }
 
   const [command = "scan", target = "."] = parsed.positionals;
@@ -112,59 +155,72 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     return 2;
   }
 
-  if (command === "suggest-semantic-split") {
-    return runSuggestSemanticSplit(parsed.values, target);
-  }
+  const contractError = validateCommandInvocation(
+    command,
+    parsed.positionals,
+    parsed.values,
+  );
+  if (contractError) return usageError(command, contractError);
 
-  if (command === "suggest-metadata") {
-    return runSuggestMetadata(
-      parsed.values,
-      target,
-      parsed.positionals.length > 1,
-    );
-  }
+  try {
+    if (command === "suggest-semantic-split") {
+      return await runSuggestSemanticSplit(parsed.values, target);
+    }
 
-  if (command === "scaffold") {
-    return runScaffold(parsed.values, target, parsed.positionals[2]);
-  }
+    if (command === "suggest-metadata") {
+      return await runSuggestMetadata(
+        parsed.values,
+        target,
+        parsed.positionals.length > 1,
+      );
+    }
 
-  if (command === "inspect") {
-    return runInspect(parsed.values, target);
-  }
+    if (command === "scaffold") {
+      return await runScaffold(parsed.values, target, parsed.positionals[2]);
+    }
 
-  if (command === "catalog") {
-    return runCatalog(parsed.values, target);
-  }
+    if (command === "inspect") {
+      return await runInspect(parsed.values, target);
+    }
 
-  if (command === "bom") {
-    return runBom(parsed.values, target);
-  }
+    if (command === "catalog") {
+      return await runCatalog(parsed.values, target);
+    }
 
-  if (command === "diff") {
-    return runDiff(parsed.values, target);
-  }
+    if (command === "bom") {
+      return await runBom(parsed.values, target);
+    }
 
-  if (command === "ci-report") {
-    return runCiReport(parsed.values, target);
-  }
+    if (command === "diff") {
+      return await runDiff(parsed.values, target);
+    }
 
-  if (command === "graph") {
-    return runGraph(parsed.values, target);
-  }
+    if (command === "ci-report") {
+      return await runCiReport(parsed.values, target);
+    }
 
-  if (command === "trust-graph") {
-    return runTrustGraph(parsed.values, target);
-  }
+    if (command === "graph") {
+      return await runGraph(parsed.values, target);
+    }
 
-  if (command === "ownership") {
-    return runOwnership(parsed.values, target);
-  }
+    if (command === "trust-graph") {
+      return await runTrustGraph(parsed.values, target);
+    }
 
-  if (command === "readiness") {
-    return runReadiness(parsed.values, target);
-  }
+    if (command === "ownership") {
+      return await runOwnership(parsed.values, target);
+    }
 
-  return runScan(parsed.values, target);
+    if (command === "readiness") {
+      return await runReadiness(parsed.values, target);
+    }
+
+    return await runScan(parsed.values, target);
+  } catch (error) {
+    const message = expectedCommandError(command, target, error);
+    if (message) return usageError(command, message);
+    throw error;
+  }
 }
 
 async function runScaffold(
@@ -637,6 +693,73 @@ function usageError(command: CommandName, message: string): 2 {
   return 2;
 }
 
+function globalUsageError(message: string): 2 {
+  console.error(message);
+  console.error("Run `renma --help` for usage.");
+  return 2;
+}
+
+function validateCommandInvocation(
+  command: CommandName,
+  positionals: string[],
+  values: CliValues,
+): string | undefined {
+  const allowedOptions = new Set<CliOptionName>(commandOptionNames(command));
+  for (const option of Object.keys(values) as CliOptionName[]) {
+    if (option === "version" || allowedOptions.has(option)) continue;
+    return `${command} does not support --${option}.`;
+  }
+
+  const positionalCount = positionals.length === 0 ? 0 : positionals.length - 1;
+  const contract = COMMAND_CONTRACTS[command];
+  if (positionalCount < contract.minPositionals) {
+    return (
+      contract.missingPositionalsMessage ??
+      `${command} requires ${contract.minPositionals} positional argument(s).`
+    );
+  }
+  if (positionalCount > contract.maxPositionals) {
+    const unexpected = positionals[contract.maxPositionals + 1];
+    return `${command} received unexpected positional argument${
+      unexpected ? ` "${unexpected}"` : ""
+    }.`;
+  }
+  return undefined;
+}
+
+function expectedCommandError(
+  command: CommandName,
+  target: string,
+  error: unknown,
+): string | undefined {
+  if (command !== "inspect" && command !== "suggest-semantic-split") {
+    return undefined;
+  }
+  if (error instanceof Error && error.message.startsWith("--lines ")) {
+    return error.message;
+  }
+  const code = nodeErrorCode(error);
+  const label = command === "inspect" ? "inspect" : "semantic split";
+  if (code === "ENOENT") {
+    return `Could not read ${label} target ${target}: file does not exist.`;
+  }
+  if (code === "EISDIR") {
+    return `Could not read ${label} target ${target}: target is a directory.`;
+  }
+  if (code === "EACCES" || code === "EPERM") {
+    return `Could not read ${label} target ${target}: target is not readable.`;
+  }
+  return undefined;
+}
+
+function nodeErrorCode(error: unknown): string | undefined {
+  return error instanceof Error &&
+    "code" in error &&
+    typeof error.code === "string"
+    ? error.code
+    : undefined;
+}
+
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
@@ -672,8 +795,11 @@ function parseOptionalPositiveInt(
     return undefined;
   }
 
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
+  if (!/^[1-9]\d*$/.test(value)) {
+    throw new ConfigError(`${name} must be a positive integer.`);
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) {
     throw new ConfigError(`${name} must be a positive integer.`);
   }
   return parsed;

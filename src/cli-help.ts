@@ -688,6 +688,13 @@ export function isCommandName(value: string): value is CommandName {
   return COMMAND_MAP.has(value as CommandName);
 }
 
+/** Return the documented option names accepted by one command. */
+export function commandOptionNames(name: CommandName): CliOptionName[] {
+  const command = COMMAND_MAP.get(name);
+  if (!command) return [];
+  return [...new Set(command.options.map(commandOptionName))];
+}
+
 export function renderGlobalHelp(version: string): string {
   return [
     `renma ${version}`,

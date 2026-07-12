@@ -27,6 +27,12 @@
   "files": [
     "dist",
     "scripts",
+    "docs",
+    "examples",
+    "architecture.md",
+    "design.md",
+    "plan.md",
+    "plan-discovery.md",
     "CHANGELOG.md",
     "LICENSE",
     "README.md"
@@ -44,6 +50,7 @@
     "format:check": "prettier --check \"**/*.{ts,js,mjs,json}\"",
     "lint": "eslint \"{src,test}/**/*.ts\" \"{scripts,tools}/**/*.mjs\" \"eslint.config.js\"",
     "lint:fix": "eslint --fix \"{src,test}/**/*.ts\" \"{scripts,tools}/**/*.mjs\" \"eslint.config.js\"",
+    "verify:package": "npm run build && node scripts/verify-package.mjs",
     "split-reference": "node scripts/split-reference.mjs",
     "suggest-semantic-split": "node dist/index.js suggest-semantic-split"
   },

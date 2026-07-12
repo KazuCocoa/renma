@@ -1,5 +1,6 @@
 import { graph, type GraphEdge, type GraphReport } from "./graph.js";
 import { DIAGNOSTIC_IDS } from "../diagnostic-ids.js";
+import { classifyRepositorySkillEntrypointPath } from "../discovery.js";
 import {
   zeroContextLensSummary,
   type ContextLensSummary,
@@ -176,11 +177,11 @@ export function buildReadinessReport(
     ),
     findingCheck(
       "layout.disallowed_skill_assets",
-      "Disallowed skill-local assets",
+      "Skill-local support policy",
       findings,
       [DIAGNOSTIC_IDS.LAYOUT_DISALLOWED_SKILL_ASSET],
       "fail",
-      "No canonical references, profiles, examples, or scripts live under skills/**.",
+      "Valid Skill-local support is allowed; reusable knowledge is promoted only when deterministic evidence supports it.",
     ),
     findingCheck(
       "layout.context_root",
@@ -199,19 +200,18 @@ export function buildReadinessReport(
       findings,
       [DIAGNOSTIC_IDS.LAYOUT_HELPER_NON_TOOLS],
       "fail",
-      "Helper assets live under tools/**.",
+      "Shared helpers use tools/** and Skill-specific scripts may remain local.",
     ),
     findingCheck(
       "paths.helper_commands",
       "Helper command paths",
       findings,
       [
-        DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_SKILL_SCRIPTS,
         DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_NON_TOOLS,
         DIAGNOSTIC_IDS.PATH_HELPER_COMMAND_UNRESOLVED,
       ],
       "fail",
-      "Markdown helper commands resolve to tools/**.",
+      "Markdown helper commands resolve to tools/** or valid Skill-local scripts.",
     ),
     findingCheck(
       "docs.layout_consistency",
@@ -219,7 +219,7 @@ export function buildReadinessReport(
       findings,
       [DIAGNOSTIC_IDS.DOCS_LAYOUT_INCONSISTENT],
       "warn",
-      "Repository docs describe the strict three-root layout.",
+      "Repository docs describe canonical Skill roots, valid local support, governed Context Assets, and shared helpers consistently.",
     ),
   ];
 
@@ -1176,7 +1176,10 @@ function hasOwner(owner: string | undefined): boolean {
 }
 
 function isSkillEntrypointPath(path: string): boolean {
-  return /^skills\/[^/]+\/SKILL\.md$/.test(normalizeGraphPath(path));
+  return (
+    classifyRepositorySkillEntrypointPath(normalizeGraphPath(path))?.kind ===
+    "canonical"
+  );
 }
 
 function normalizeGraphPath(path: string): string {

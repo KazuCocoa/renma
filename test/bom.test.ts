@@ -786,7 +786,7 @@ async function helperCommandPathFixture(options: {
         "Verify by running the BOM command and checking readiness evidence.",
         "",
         "```bash",
-        "bash tools/testing/scripts/setup.sh",
+        "bash scripts/setup.sh",
         "```",
         "",
       ].join("\n"),
@@ -931,7 +931,14 @@ async function writeHelperScript(root: string): Promise<void> {
 }
 
 function helperScriptPath(root: string): string {
-  return path.join(root, "tools", "testing", "scripts", "setup.sh");
+  return path.join(
+    root,
+    "skills",
+    "testing",
+    "helper-review",
+    "scripts",
+    "setup.sh",
+  );
 }
 
 async function writeDeclaredDependencyTarget(root: string): Promise<void> {
@@ -998,7 +1005,7 @@ async function writeOptionalMissingSkill(root: string): Promise<void> {
     [
       "---",
       "name: optional-review",
-      "description: Use this skill for deterministic Repository Context BOM diagnostic tests. Use when optional dependency evidence needs review.",
+      "description: Use this skill for deterministic Repository Context BOM diagnostic tests when optional dependency evidence needs review; do not use it for runtime routing, prompt assembly, or automatic repository edits.",
       "metadata:",
       "  renma.id: skill.testing.optional-review",
       "  renma.owner: qa-platform",
@@ -1319,11 +1326,11 @@ function expectedBomContract(): BomReport {
         },
         {
           id: "layout.disallowed_skill_assets",
-          title: "Disallowed skill-local assets",
+          title: "Skill-local support policy",
           status: "pass",
           severity: "info",
           summary:
-            "No canonical references, profiles, examples, or scripts live under skills/**.",
+            "Valid Skill-local support is allowed; reusable knowledge is promoted only when deterministic evidence supports it.",
         },
         {
           id: "layout.context_root",
@@ -1338,21 +1345,24 @@ function expectedBomContract(): BomReport {
           title: "Canonical helper root",
           status: "pass",
           severity: "info",
-          summary: "Helper assets live under tools/**.",
+          summary:
+            "Shared helpers use tools/** and Skill-specific scripts may remain local.",
         },
         {
           id: "paths.helper_commands",
           title: "Helper command paths",
           status: "pass",
           severity: "info",
-          summary: "Markdown helper commands resolve to tools/**.",
+          summary:
+            "Markdown helper commands resolve to tools/** or valid Skill-local scripts.",
         },
         {
           id: "docs.layout_consistency",
           title: "Layout documentation consistency",
           status: "pass",
           severity: "info",
-          summary: "Repository docs describe the strict three-root layout.",
+          summary:
+            "Repository docs describe canonical Skill roots, valid local support, governed Context Assets, and shared helpers consistently.",
         },
       ],
       summary: {

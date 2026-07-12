@@ -3,21 +3,22 @@ id: lens.testing.spec-review.boundary-values
 type: context_lens
 owner: qa-platform
 status: experimental
+version: 1
+scope: context
 tags:
   - testing
   - spec-review
 purpose: spec_review
 applies_to:
   - context.testing.boundary-value-analysis
-focus:
-  - ambiguity
-  - missing boundary
-  - source of truth
-  - confirmation questions
-expected_outputs:
-  - unresolved questions
-  - risk notes
-  - spec clarification suggestions
+focus: ambiguity, missing boundary, source of truth, confirmation questions
+expected_outputs: unresolved questions, risk notes, spec clarification suggestions
+allowed_data:
+  - repo-local-files
+network_allowed: false
+external_upload_allowed: false
+secrets_allowed: false
+requires_human_approval: false
 ---
 # Spec Review Lens for Boundary Values
 

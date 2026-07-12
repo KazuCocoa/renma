@@ -213,10 +213,12 @@ as a compatibility alias. Files under either root are classified as the
 `context` artifact kind, not as `reference`. Experimental `context_lens` assets
 can live under `lenses/`, or context files can opt in with `type: context_lens`.
 
-Skill-local `profiles/`, `references/`, and `examples/` remain supported. They
-are useful for local routing variants, nearby examples, and skill-specific
-supporting text. When knowledge is reusable across skills, teams, tools, or
-agents, it should move into `contexts/` as an owned context asset.
+Skill-local `assets/`, `profiles/`, `references/`, `examples/`, and `scripts/`
+remain supported. They are useful for local routing variants, nearby examples,
+Skill-specific supporting text, fixtures, and helpers. When evidence shows that
+knowledge is reusable across Skills, teams, tools, or agents, it should move
+into `contexts/` as an owned Context Asset. Shared helper implementations may
+move to `tools/**`; location alone does not require either promotion.
 
 Renma can also flag large skill-local support files as shared-context candidates when they contain generic source-of-truth structure such as setup, decision logic, troubleshooting, validation, constraints, policy, or procedure guidance. This advisory does not decide semantic reuse itself. It surfaces structurally broad support files and asks the calling LLM or human to inspect the repository for similar concepts, overlapping guidance, and reuse opportunities before making a reviewable patch.
 

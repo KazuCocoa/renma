@@ -3,6 +3,7 @@ import { access, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { COMMAND_HELP } from "../src/cli-help.js";
+import { DEFAULT_CONFIG } from "../src/config.js";
 
 const COMMANDS = [
   "scan",
@@ -156,6 +157,20 @@ test("README preserves the Context Repository philosophy", async () => {
   );
   assert.match(readme, /reusable knowledge/);
   assert.match(readme, /https:\/\/kazucocoa\.blog\/context-repository\//);
+});
+
+test("User Manual default glob list matches DEFAULT_CONFIG", async () => {
+  const manual = await readRepoFile("docs/user-manual.md");
+  const start = manual.indexOf("Canonical Agent Skills entrypoints are:");
+  const end = manual.indexOf("## Where To Go Next", start);
+
+  assert.ok(start >= 0);
+  assert.ok(end > start);
+  const documented = [
+    ...manual.slice(start, end).matchAll(/^- `([^`]+)`$/gm),
+  ].map((match) => match[1] ?? "");
+
+  assert.deepEqual(documented.toSorted(), [...DEFAULT_CONFIG.globs].toSorted());
 });
 
 test("Skill path guidance distinguishes canonical and historical entrypoints", async () => {
