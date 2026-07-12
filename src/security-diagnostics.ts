@@ -890,6 +890,12 @@ function policyDetections(
   const detections: Detection[] = [];
   const defensiveAction = isDefensiveActionInstruction(line);
   const safeOrGuarded = isDefensiveOrGuardedActionInstruction(line);
+  const invalidNetworkAllowlist = policy.invalidDeclared.has(
+    "approvedNetworkDestinations",
+  );
+  const invalidUploadAllowlist = policy.invalidDeclared.has(
+    "approvedUploadDestinations",
+  );
 
   if (
     policy.networkAllowed === false &&
@@ -905,10 +911,15 @@ function policyDetections(
   }
 
   if (
-    policy.networkAllowed !== false &&
-    policy.approvedNetworkDestinations.length > 0
+    invalidNetworkAllowlist ||
+    (policy.networkAllowed !== false &&
+      policy.approvedNetworkDestinations.length > 0)
   ) {
-    for (const destination of unapprovedNetworkDestinations(line, policy)) {
+    for (const destination of unapprovedNetworkDestinations(
+      line,
+      policy,
+      invalidNetworkAllowlist,
+    )) {
       detections.push({
         metadata: RULES.unapprovedNetworkDestination,
         severity: "high",
@@ -933,20 +944,24 @@ function policyDetections(
   }
 
   if (
-    policy.externalUploadAllowed !== false &&
-    policy.approvedUploadDestinations.length > 0 &&
-    isUploadInstruction(line)
+    isUploadInstruction(line) &&
+    (invalidUploadAllowlist ||
+      (policy.externalUploadAllowed !== false &&
+        policy.approvedUploadDestinations.length > 0))
   ) {
     for (const destination of unapprovedDestinations(
       line,
       policy.approvedUploadDestinations,
+      invalidUploadAllowlist,
     )) {
       detections.push({
         metadata: RULES.unapprovedUploadDestination,
         severity: "high",
         startLine: lineNumber,
         snippet: line,
-        dedupeKey: destination.host + destination.path,
+        dedupeKey: invalidUploadAllowlist
+          ? `invalid-upload:${destination.host}${destination.path}`
+          : destination.host + destination.path,
       });
     }
   }
@@ -1521,14 +1536,23 @@ function lineSnippet(content: string, line: number): string | undefined {
 function unapprovedNetworkDestinations(
   line: string,
   policy: SecurityPolicy,
+  invalidAllowlist = false,
 ): NetworkDestination[] {
-  return unapprovedDestinations(line, policy.approvedNetworkDestinations);
+  return unapprovedDestinations(
+    line,
+    policy.approvedNetworkDestinations,
+    invalidAllowlist,
+  );
 }
 
 function unapprovedDestinations(
   line: string,
   approvedDestinations: string[],
+  invalidAllowlist = false,
 ): NetworkDestination[] {
+  const destinations = extractNetworkDestinations(line);
+  if (invalidAllowlist) return destinations;
+
   const approved = approvedDestinations
     .map((destination) => normalizeNetworkDestination(destination))
     .filter(
@@ -1539,7 +1563,7 @@ function unapprovedDestinations(
     return [];
   }
 
-  return extractNetworkDestinations(line).filter(
+  return destinations.filter(
     (destination) =>
       !approved.some((approvedDestination) =>
         networkDestinationMatches(destination, approvedDestination),

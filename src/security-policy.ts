@@ -377,42 +377,55 @@ export function applySecurityConfig(
   };
 
   const chain = securityProfileChain(policy.securityProfile, config);
+  setResolvedBoolean(
+    resolved,
+    "networkAllowed",
+    resolvePermissionBoolean(
+      policy.networkAllowed,
+      inheritedProfileBoolean(chain, "networkAllowed"),
+      policy.invalidDeclared.has("networkAllowed"),
+    ),
+  );
+  setResolvedBoolean(
+    resolved,
+    "externalUploadAllowed",
+    resolvePermissionBoolean(
+      policy.externalUploadAllowed,
+      inheritedProfileBoolean(chain, "externalUploadAllowed"),
+      policy.invalidDeclared.has("externalUploadAllowed"),
+    ),
+  );
+  setResolvedBoolean(
+    resolved,
+    "secretsAllowed",
+    resolvePermissionBoolean(
+      policy.secretsAllowed,
+      inheritedProfileBoolean(chain, "secretsAllowed"),
+      policy.invalidDeclared.has("secretsAllowed"),
+    ),
+  );
+  setResolvedBoolean(
+    resolved,
+    "humanApprovalRequired",
+    resolveRequiredBoolean(
+      policy.humanApprovalRequired,
+      inheritedProfileBoolean(chain, "humanApprovalRequired"),
+      policy.invalidDeclared.has("humanApprovalRequired"),
+    ),
+  );
+
   for (const item of chain.profiles) {
     const profile = item.profile;
     if (
-      mayInherit(policy, "networkAllowed") &&
-      profile.networkAllowed !== undefined
-    ) {
-      resolved.networkAllowed = profile.networkAllowed;
-    }
-    if (
-      mayInherit(policy, "externalUploadAllowed") &&
-      profile.externalUploadAllowed !== undefined
-    ) {
-      resolved.externalUploadAllowed = profile.externalUploadAllowed;
-    }
-    if (
-      mayInherit(policy, "secretsAllowed") &&
-      profile.secretsAllowed !== undefined
-    ) {
-      resolved.secretsAllowed = profile.secretsAllowed;
-    }
-    if (
-      mayInherit(policy, "humanApprovalRequired") &&
-      profile.humanApprovalRequired !== undefined
-    ) {
-      resolved.humanApprovalRequired = profile.humanApprovalRequired;
-    }
-    if (
-      mayInherit(policy, "allowedData") &&
+      mayInheritAllowedData(policy) &&
       profile.allowedDataClass !== undefined
     ) {
       resolved.allowedDataClass = profile.allowedDataClass;
     }
-    if (mayInherit(policy, "allowedData")) {
+    if (mayInheritAllowedData(policy)) {
       resolved.allowedData.push(...profile.allowedData);
     }
-    if (mayInherit(policy, "forbiddenInputs")) {
+    if (mayInheritForbiddenInputs(policy)) {
       resolved.forbiddenInputs.push(...profile.forbiddenInputs);
     }
     if (mayAccumulate(policy, "approvedNetworkDestinations")) {
@@ -544,11 +557,66 @@ function recordCanonicalPolicyField(
   );
 }
 
-function mayInherit(
+function resolvePermissionBoolean(
+  local: boolean | undefined,
+  inherited: boolean | undefined,
+  invalid: boolean,
+): boolean | undefined {
+  if (local !== undefined) return local;
+  if (invalid) return inherited === false ? false : undefined;
+  return inherited;
+}
+
+function setResolvedBoolean(
   policy: SecurityPolicy,
-  field: CanonicalSecurityOperationalField,
-): boolean {
-  return !policy.declared.has(field) && !policy.invalidDeclared.has(field);
+  field:
+    | "networkAllowed"
+    | "externalUploadAllowed"
+    | "secretsAllowed"
+    | "humanApprovalRequired",
+  value: boolean | undefined,
+): void {
+  if (value === undefined) {
+    delete policy[field];
+  } else {
+    policy[field] = value;
+  }
+}
+
+function resolveRequiredBoolean(
+  local: boolean | undefined,
+  inherited: boolean | undefined,
+  invalid: boolean,
+): boolean | undefined {
+  if (local !== undefined) return local;
+  if (invalid) return inherited === true ? true : undefined;
+  return inherited;
+}
+
+function inheritedProfileBoolean(
+  chain: SecurityProfileChain,
+  field:
+    | "networkAllowed"
+    | "externalUploadAllowed"
+    | "secretsAllowed"
+    | "humanApprovalRequired",
+): boolean | undefined {
+  let inherited: boolean | undefined;
+  for (const item of chain.profiles) {
+    if (item.profile[field] !== undefined) inherited = item.profile[field];
+  }
+  return inherited;
+}
+
+function mayInheritAllowedData(policy: SecurityPolicy): boolean {
+  return (
+    !policy.declared.has("allowedData") &&
+    !policy.invalidDeclared.has("allowedData")
+  );
+}
+
+function mayInheritForbiddenInputs(policy: SecurityPolicy): boolean {
+  return !policy.declared.has("forbiddenInputs");
 }
 
 function mayAccumulate(

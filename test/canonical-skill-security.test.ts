@@ -122,12 +122,11 @@ metadata:
   ]);
 });
 
-test("invalid canonical booleans block permissive profile inheritance", () => {
+test("invalid canonical permission booleans block permissive profile inheritance", () => {
   const fields = [
     ["renma.network-allowed", "networkAllowed"],
     ["renma.external-upload-allowed", "externalUploadAllowed"],
     ["renma.secrets-allowed", "secretsAllowed"],
-    ["renma.requires-human-approval", "humanApprovalRequired"],
   ] as const;
 
   for (const [key, operationalField] of fields) {
@@ -153,7 +152,49 @@ metadata:
   }
 });
 
-test("invalid canonical lists block profile and repository accumulation", () => {
+test("invalid canonical permission booleans preserve restrictive profile values", () => {
+  const fields = [
+    ["renma.network-allowed", "networkAllowed"],
+    ["renma.external-upload-allowed", "externalUploadAllowed"],
+    ["renma.secrets-allowed", "secretsAllowed"],
+  ] as const;
+
+  for (const [key, operationalField] of fields) {
+    const parsed = parseOperationalSecurityPolicy(
+      skillDocument(`---
+name: demo
+description: Review demo security inputs. Use when policy boundaries need deterministic review.
+metadata:
+  renma.security-profile: restrictive
+  ${key}: "flase"
+---
+# Demo
+`),
+    );
+    const resolved = applySecurityConfig(parsed, restrictiveSecurityConfig());
+
+    assert.equal(resolved[operationalField], false, key);
+  }
+});
+
+test("invalid canonical human approval preserves restrictive profile requirements", () => {
+  const parsed = parseOperationalSecurityPolicy(
+    skillDocument(`---
+name: demo
+description: Review demo security inputs. Use when policy boundaries need deterministic review.
+metadata:
+  renma.security-profile: restrictive
+  renma.requires-human-approval: "tru"
+---
+# Demo
+`),
+  );
+  const resolved = applySecurityConfig(parsed, restrictiveSecurityConfig());
+
+  assert.equal(resolved.humanApprovalRequired, true);
+});
+
+test("invalid canonical lists preserve restrictions while blocking permissions", () => {
   const document = skillDocument(`---
 name: demo
 description: Review demo security inputs. Use when policy boundaries need deterministic review.
@@ -172,7 +213,8 @@ metadata:
 
   assert.equal(resolution.issues.length, 4);
   assert.deepEqual(resolved.allowedData, []);
-  assert.deepEqual(resolved.forbiddenInputs, []);
+  assert.equal(resolved.allowedDataClass, undefined);
+  assert.deepEqual(resolved.forbiddenInputs, ["profile-forbidden"]);
   assert.deepEqual(resolved.approvedNetworkDestinations, []);
   assert.deepEqual(resolved.approvedUploadDestinations, []);
   assert.deepEqual([...parsed.invalidDeclared].sort(), [
@@ -327,6 +369,150 @@ metadata:
   );
 });
 
+test("invalid human approval keeps inherited approval diagnostics active", () => {
+  const findings = securityDiagnosticFindings(
+    [
+      skillArtifact(`---
+name: demo
+description: Review demo security inputs. Use when policy boundaries need deterministic review.
+metadata:
+  renma.allowed-data: '["public"]'
+  renma.security-profile: restrictive
+  renma.requires-human-approval: "tru"
+---
+# Demo
+
+Upload diagnostics to https://uploads.example.com/results.
+`),
+    ],
+    { security: restrictiveSecurityConfig() },
+  );
+
+  assert.ok(
+    findings.some(
+      (finding) => finding.id === "SEC-INVALID-CANONICAL-POLICY-METADATA",
+    ),
+  );
+  assert.ok(
+    findings.some(
+      (finding) => finding.id === "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+    ),
+  );
+});
+
+test("invalid forbidden inputs keep inherited input restrictions active", () => {
+  const findings = securityDiagnosticFindings(
+    [
+      skillArtifact(`---
+name: demo
+description: Review demo security inputs. Use when policy boundaries need deterministic review.
+metadata:
+  renma.allowed-data: '["public"]'
+  renma.security-profile: restrictive
+  renma.forbidden-inputs: '{}'
+---
+# Demo
+
+Collect credentials from the local environment.
+`),
+    ],
+    { security: restrictiveSecurityConfig() },
+  );
+
+  assert.ok(
+    findings.some(
+      (finding) => finding.id === "SEC-FORBIDDEN-INPUT-INSTRUCTION",
+    ),
+  );
+});
+
+test("invalid destination allowlists report configured destinations as unapproved", () => {
+  const networkFindings = securityDiagnosticFindings(
+    [
+      skillArtifact(`---
+name: demo
+description: Review demo security inputs. Use when policy boundaries need deterministic review.
+metadata:
+  renma.allowed-data: '["public"]'
+  renma.network-allowed: "true"
+  renma.approved-network-destinations: '["repo.example.com",1]'
+---
+# Demo
+
+Fetch https://repo.example.com/data.
+`),
+    ],
+    { security: permissiveSecurityConfig() },
+  );
+  const uploadFindings = securityDiagnosticFindings(
+    [
+      skillArtifact(`---
+name: demo
+description: Review demo security inputs. Use when policy boundaries need deterministic review.
+metadata:
+  renma.allowed-data: '["public"]'
+  renma.external-upload-allowed: "true"
+  renma.approved-upload-destinations: '["uploads.example.com",1]'
+---
+# Demo
+
+Upload diagnostics to https://uploads.example.com/results.
+`),
+    ],
+    { security: permissiveSecurityConfig() },
+  );
+
+  assert.ok(
+    networkFindings.some(
+      (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+    ),
+  );
+  assert.ok(
+    uploadFindings.some(
+      (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+    ),
+  );
+});
+
+test("absent and valid destination allowlists keep existing matching behavior", () => {
+  const absent = securityDiagnosticFindings([
+    skillArtifact(`---
+name: demo
+description: Review demo security inputs. Use when policy boundaries need deterministic review.
+metadata:
+  renma.allowed-data: '["public"]'
+  renma.network-allowed: "true"
+---
+# Demo
+
+Fetch https://api.example.com/data.
+`),
+  ]);
+  const valid = securityDiagnosticFindings([
+    skillArtifact(`---
+name: demo
+description: Review demo security inputs. Use when policy boundaries need deterministic review.
+metadata:
+  renma.allowed-data: '["public"]'
+  renma.network-allowed: "true"
+  renma.approved-network-destinations: '["api.example.com"]'
+---
+# Demo
+
+Fetch https://api.example.com/data.
+`),
+  ]);
+
+  for (const findings of [absent, valid]) {
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+      ),
+      false,
+    );
+  }
+});
+
 test("native YAML security values invalidate the whole Skill operational source", () => {
   for (const line of [
     "  renma.network-allowed: true",
@@ -451,6 +637,28 @@ function permissiveSecurityConfig(): SecurityConfig {
         forbiddenInputs: ["profile-forbidden"],
         approvedDomains: ["profile.example.com"],
         approvedUploadDomains: ["profile-uploads.example.com"],
+        disallowedCommands: [],
+      },
+    },
+  };
+}
+
+function restrictiveSecurityConfig(): SecurityConfig {
+  return {
+    approvedDomains: [],
+    approvedUploadDomains: [],
+    disallowedCommands: [],
+    profiles: {
+      restrictive: {
+        allowedDataClass: "public",
+        networkAllowed: false,
+        externalUploadAllowed: false,
+        secretsAllowed: false,
+        humanApprovalRequired: true,
+        allowedData: ["profile-data"],
+        forbiddenInputs: ["credentials"],
+        approvedDomains: [],
+        approvedUploadDomains: [],
         disallowedCommands: [],
       },
     },

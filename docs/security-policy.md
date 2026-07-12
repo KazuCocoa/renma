@@ -35,8 +35,11 @@ metadata:
 Canonical list fields also include
 `renma.approved-network-destinations` and
 `renma.approved-upload-destinations`. Invalid recognized canonical values fail
-closed: Renma reports their exact evidence and does not replace them with a
-more permissive profile or repository value.
+closed: Renma reports their exact evidence, preserves already-reviewed
+restrictive inherited policy when that is safer, and prevents permissive
+inheritance. Invalid allowed-data permissions remain unresolved, invalid
+forbidden-input declarations do not remove inherited restrictions, and invalid
+destination allowlists do not disable destination validation.
 
 Asset-local explicit denials remain stricter than inherited profile or
 repository allowances. For example, `renma.external-upload-allowed: "false"`

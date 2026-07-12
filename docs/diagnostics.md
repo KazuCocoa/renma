@@ -252,8 +252,11 @@ Canonical Skill keys are `renma.allowed-data`, `renma.network-allowed`,
 `renma.approved-upload-destinations`, and `renma.security-profile`. Skill
 booleans must be the exact strings `"true"` or `"false"`; Skill lists must be
 JSON-array strings containing strings only. Invalid recognized values emit
-`SEC-INVALID-CANONICAL-POLICY-METADATA` and block more permissive profile or
-repository inheritance.
+`SEC-INVALID-CANONICAL-POLICY-METADATA` and fail closed. Renma preserves
+already-reviewed restrictive inherited policy while preventing permissive
+inheritance: allowed-data permissions remain unresolved, inherited forbidden
+inputs remain active, and invalid destination allowlists continue reporting
+concrete destinations as unapproved.
 
 Non-Skill assets continue to use `allowed_data`, `network_allowed`,
 `external_upload_allowed`, `secrets_allowed`, `requires_human_approval`,
