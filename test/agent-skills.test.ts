@@ -660,6 +660,8 @@ function skill(filePath: string, content: string) {
     absolutePath: `/tmp/${filePath}`,
     kind: "skill",
     sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: true,
     content,
   } satisfies Artifact);
 }

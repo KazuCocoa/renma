@@ -1,6 +1,11 @@
 import { catalog } from "./catalog.js";
 import type { ConfigOverrides } from "../config.js";
-import type { Asset, AssetKind, AssetStatus } from "../model.js";
+import {
+  effectiveAssetOwner,
+  type Asset,
+  type AssetKind,
+  type AssetStatus,
+} from "../model.js";
 import type { Diagnostic } from "../types.js";
 
 export type OwnershipFormat = "json" | "markdown";
@@ -26,6 +31,8 @@ export interface OwnedAsset {
   kind: AssetKind;
   sourcePath: string;
   owner: string;
+  ownerSource?: "declared" | "inherited";
+  ownerInheritedFrom?: { id: string; sourcePath: string };
   status: AssetStatus | null;
   tags: string[];
 }
@@ -304,6 +311,10 @@ function toOwnerAsset(asset: OwnedAsset): Omit<OwnedAsset, "owner"> {
     id: asset.id,
     kind: asset.kind,
     sourcePath: asset.sourcePath,
+    ...(asset.ownerSource ? { ownerSource: asset.ownerSource } : {}),
+    ...(asset.ownerInheritedFrom
+      ? { ownerInheritedFrom: asset.ownerInheritedFrom }
+      : {}),
     status: asset.status,
     tags: asset.tags,
   };
@@ -342,20 +353,27 @@ function toUnownedAsset(asset: Asset): UnownedAsset {
 }
 
 function toOwnedAsset(asset: Asset): OwnedAsset {
+  const owner = effectiveAssetOwner(asset) ?? "";
   return {
     id: asset.id,
     kind: asset.kind,
     sourcePath: asset.sourcePath,
-    owner: asset.metadata.owner?.trim() ?? "",
+    owner,
+    ...(asset.ownership
+      ? {
+          ownerSource: asset.ownership.source,
+          ...(asset.ownership.source === "inherited"
+            ? { ownerInheritedFrom: asset.ownership.inheritedFrom }
+            : {}),
+        }
+      : {}),
     status: asset.metadata.status ?? null,
     tags: asset.metadata.tags,
   };
 }
 
 function hasOwner(asset: Asset): boolean {
-  return (
-    asset.metadata.owner !== undefined && asset.metadata.owner.trim().length > 0
-  );
+  return (effectiveAssetOwner(asset)?.trim().length ?? 0) > 0;
 }
 
 function percent(numerator: number, denominator: number): number {

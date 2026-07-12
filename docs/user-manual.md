@@ -79,6 +79,17 @@ Context Asset, or a helper shared across workflows to `tools/**`, only when
 repository evidence supports that change; Renma does not move files
 automatically.
 
+Skill-local support belongs only to the nearest Skill directory. When a local
+support artifact does not declare an owner, ownership, Readiness, graph, Trust
+Graph, and BOM reporting use the nearest Skill's owner as deterministic
+effective ownership and mark it as inherited. This does not invent ownership
+for shared Context Assets or unrelated repository files.
+
+Only files marked Markdown-parser eligible contribute frontmatter metadata,
+headings, links, code fences, and repeated-context evidence. Text scripts and
+data assets remain raw text for dedicated static path or security analysis;
+binary assets remain opaque.
+
 Avoid using reserved support directory names as skill names. Paths such as
 `skills/assets/SKILL.md`, `skills/examples/SKILL.md`,
 `skills/references/SKILL.md`, `skills/scripts/SKILL.md`, and
@@ -366,7 +377,9 @@ The JSON configuration supports the same names used by the implementation, inclu
 - `globs`: glob patterns to scan.
 - `exclude`: paths or path prefixes to skip.
 - `suppressions`: rule suppressions that remove matching findings from normal reports and failure thresholds.
-- `max_file_size_bytes`: largest file renma will read.
+- `max_file_size_bytes`: largest file renma will read for content analysis. A
+  larger discovered file remains repository existence evidence, so a valid
+  reference is not also reported as missing.
 - `max_depth`: maximum discovery depth.
 - `concurrency`: scan concurrency.
 - `fail_on`: scan exit threshold: `low`, `medium`, `high`, or `critical`.
@@ -387,6 +400,13 @@ relative traversal would escape the owning Skill boundary and checks existence
 against the collected repository snapshot. It validates the declared path but
 does not execute the command. Non-Skill documents do not receive an inferred
 Skill-relative base.
+
+Static support reachability accepts explicit Skill-relative paths, explicit
+basenames, Markdown link targets, quoted/code-form paths, and one additional
+hop through a directly referenced index/reference. Free-prose matches against
+generic filename stems such as `run`, `check`, or `logo` are not evidence.
+Extensionless executables and quoted or linked asset paths with spaces are
+valid; `..` traversal outside the Skill root remains invalid.
 
 Use `exclude` for files Renma should not scan. Use `suppressions` for audited exceptions where Renma should scan the file, detect matching findings internally, then omit those findings from normal reports and failure decisions. A suppression applies only when both `id` and `paths` match. Each suppression includes `id`, `paths`, required `reason`, and optional `expires`; the reason lives in config for auditability.
 
@@ -431,7 +451,7 @@ Other default scan glob families are:
 - New to Renma? Start with [Authoring Guide](authoring-guide.md).
 - Writing security-sensitive skills or context assets? Read [Security Policy Guide](security-policy.md).
 - Fixing scan findings? See [Diagnostics Reference](diagnostics.md).
-- Reviewing thresholds? See [Renma 0.18.0 Quality Profile](quality-profile.md).
+- Reviewing thresholds? See [Renma Quality Profile](quality-profile.md).
 - Trying a minimal clarify-before-act Skill interaction? Use
   [`examples/interactive-placeholder`](../examples/interactive-placeholder).
 - Trying richer repository-aware Skill, Context Lens, and Context Asset

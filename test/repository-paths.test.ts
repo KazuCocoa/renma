@@ -141,6 +141,8 @@ function artifactFixture(
     absolutePath: path.join(root, repositoryPath.replace(/\\/g, path.sep)),
     kind: "skill",
     sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: true,
     content,
   };
 }

@@ -219,6 +219,8 @@ lenses/
 This is an illustrative layout, not a required domain hierarchy. `contexts/`
 is preferred and `context/` remains supported. Skill-local `references/`,
 `assets/`, `scripts/`, `examples/`, and `profiles/` are valid support material.
+Local support without a declared owner inherits effective ownership from its
+nearest owning Skill; reports distinguish inherited ownership from declarations.
 When deterministic evidence shows that knowledge is reusable beyond one Skill,
 promote it to an owned Context Asset rather than moving it based on location
 alone.
@@ -265,7 +267,7 @@ canonical and migration rules.
 - [Authoring Guide](docs/authoring-guide.md)
 - [Agent Skills Compatibility and Migration](docs/agent-skills-compatibility.md)
 - [Diagnostics Reference](docs/diagnostics.md)
-- [Renma 0.18.0 Quality Profile](docs/quality-profile.md)
+- [Renma Quality Profile](docs/quality-profile.md)
 - [Security Policy Guide](docs/security-policy.md)
 - [Repository Context BOM contract](docs/repository-context-bom.md)
 - [Architecture](architecture.md)

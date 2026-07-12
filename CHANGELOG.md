@@ -10,8 +10,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
-- Added the internal `renma-quality@0.18.0` profile and canonical threshold
-  documentation with units, provenance, rationale, false-positive risks, and
+- Added the internal `renma-quality` profile family. The emitted profile
+  identifier is derived from the Renma package version as
+  `renma-quality@<package version>`. Added canonical threshold documentation
+  with units, provenance, rationale, false-positive risks, and
   future-configurability status.
 - Added one deterministic Unicode-aware `estimated_tokens` implementation for
   Skill, content-asset, reuse-candidate, and repeated-context analysis.
@@ -58,6 +60,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   undercounting unspaced Japanese as one token in repeated-context analysis.
 - Stopped decoding images, PDFs, fonts, and other opaque assets as UTF-8
   Markdown or exposing binary bytes in diagnostic snippets.
+- Stopped non-Markdown text scripts and assets from contributing frontmatter,
+  headings, links, fences, or repeated-context evidence.
+- Fixed nearest-Skill support ownership, nested Skill boundaries, explicit path
+  reachability, extensionless and spaced paths, and oversized-file existence
+  evidence.
+- Included explicitly policy-bearing text scripts and assets consistently in
+  security inventory and Trust Graph evidence while keeping binary data opaque.
 - Stopped treating a command, Procedure/Steps/Setup headings, ordered workflow
   wording, or 450/700-word counts as evidence of a bad Skill.
 - Stopped recommending Context Assets as the default destination for

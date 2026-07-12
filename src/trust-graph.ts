@@ -3,7 +3,12 @@ import {
   normalizeDependencyReference,
   resolveDependencyTarget,
 } from "./dependency-resolution.js";
-import type { Asset, Catalog, Dependency } from "./model.js";
+import {
+  effectiveAssetOwner,
+  type Asset,
+  type Catalog,
+  type Dependency,
+} from "./model.js";
 import type {
   EffectiveSecurityPolicyEvidence,
   SecurityPolicyAssetEvidence,
@@ -141,14 +146,33 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
 
   for (const asset of assets) {
     addNode(nodes, assetNode(asset));
-    if (asset.metadata.owner) {
-      const ownerNodeId = ownerNode(asset.metadata.owner).id;
-      addNode(nodes, ownerNode(asset.metadata.owner));
+    const owner = effectiveAssetOwner(asset);
+    if (owner) {
+      const ownerNodeId = ownerNode(owner).id;
+      addNode(nodes, ownerNode(owner));
+      const inheritedOwnerAsset =
+        asset.ownership?.source === "inherited"
+          ? assetsByPath.get(
+              normalizeDependencyReference(
+                asset.ownership.inheritedFrom.sourcePath,
+              ),
+            )
+          : undefined;
       addEdge(edges, {
         from: assetNodeId(asset),
         to: ownerNodeId,
         type: "owned_by",
-        evidence: metadataEvidence(asset, "owner"),
+        ...(asset.ownership?.source === "inherited"
+          ? {
+              properties: {
+                ownershipSource: "inherited",
+                inheritedFrom: asset.ownership.inheritedFrom,
+              },
+            }
+          : {}),
+        evidence: inheritedOwnerAsset
+          ? metadataEvidence(inheritedOwnerAsset, "owner")
+          : metadataEvidence(asset, "owner"),
       });
     }
     if (asset.metadata.status) {
@@ -274,6 +298,7 @@ function addPolicyEvidence(
 }
 
 function assetNode(asset: Asset): TrustGraphNode {
+  const owner = effectiveAssetOwner(asset);
   return {
     id: assetNodeId(asset),
     type: "asset",
@@ -287,7 +312,11 @@ function assetNode(asset: Asset): TrustGraphNode {
       contentClassification: asset.contentClassification ?? "text",
       markdownParserEligible: asset.markdownParserEligible ?? true,
       tags: asset.metadata.tags,
-      ...(asset.metadata.owner ? { owner: asset.metadata.owner } : {}),
+      ...(owner ? { owner } : {}),
+      ...(asset.ownership ? { ownerSource: asset.ownership.source } : {}),
+      ...(asset.ownership?.source === "inherited"
+        ? { ownerInheritedFrom: asset.ownership.inheritedFrom }
+        : {}),
       ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
     },
     evidence: [

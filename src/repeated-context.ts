@@ -92,33 +92,36 @@ const COMMON_CONTEXT_TOKENS = new Set([
 export function detectRepeatedContextPatterns(
   documents: ParsedDocument[],
 ): Finding[] {
+  const markdownDocuments = documents.filter(
+    (document) => document.artifact.markdownParserEligible === true,
+  );
   const findings = [
     ...groupsToFindings(
       DIAGNOSTIC_IDS.MAINT_REPEATED_SECTION,
       "Repeated section",
       "section_hash",
-      collectRepeatedSections(documents),
+      collectRepeatedSections(markdownDocuments),
       "Move the repeated section into an owned source-of-truth context or reference, then replace copies with explicit references where appropriate.",
     ),
     ...groupsToFindings(
       DIAGNOSTIC_IDS.MAINT_REPEATED_HEADING,
       "Repeated heading",
       "heading",
-      collectRepeatedHeadings(documents),
+      collectRepeatedHeadings(markdownDocuments),
       "Review whether these similarly named sections are intentional navigation or a sign that knowledge should be consolidated under one owned context.",
     ),
     ...groupsToFindings(
       DIAGNOSTIC_IDS.MAINT_REPEATED_CODE_BLOCK,
       "Repeated code block",
       "code_block",
-      collectRepeatedCodeBlocks(documents),
+      collectRepeatedCodeBlocks(markdownDocuments),
       "Move the repeated command or code sample into one maintained reference, then link to it from dependent skills or docs.",
     ),
     ...groupsToFindings(
       DIAGNOSTIC_IDS.MAINT_REPEATED_CONTEXT_PATTERN,
       "Repeated context pattern",
       "token_shingle",
-      collectRepeatedTokenShingles(documents),
+      collectRepeatedTokenShingles(markdownDocuments),
       "Use the repeated token sequence as evidence for a consolidation proposal, then have a human approve any reviewable patch.",
     ),
   ];

@@ -42,6 +42,20 @@ export interface AssetMetadata {
   optionalLens?: string[];
 }
 
+export type AssetOwnership =
+  | {
+      owner: string;
+      source: "declared";
+    }
+  | {
+      owner: string;
+      source: "inherited";
+      inheritedFrom: {
+        id: string;
+        sourcePath: string;
+      };
+    };
+
 /** Repository object Renma can catalog, validate, reference, or report on. */
 export interface Asset {
   id: string;
@@ -51,9 +65,16 @@ export interface Asset {
   sizeBytes?: number;
   contentClassification?: "text" | "binary";
   markdownParserEligible?: boolean;
+  /** Effective ownership plus whether it was declared locally or inherited. */
+  ownership?: AssetOwnership;
   metadata: AssetMetadata;
   metadataFields: Record<string, MetadataFieldEvidence>;
   metadataListItems: Record<string, MetadataFieldEvidence[]>;
+}
+
+/** Return the deterministic owner used by catalog consumers and Readiness. */
+export function effectiveAssetOwner(asset: Asset): string | undefined {
+  return asset.ownership?.owner ?? asset.metadata.owner;
 }
 
 export interface Skill extends Asset {

@@ -241,7 +241,11 @@ function classifySkillEntrypointAtRoot(
 export async function discoverArtifacts(
   root: string,
   config: ScanConfig,
-): Promise<{ artifacts: Artifact[]; diagnostics: Diagnostic[] }> {
+): Promise<{
+  artifacts: Artifact[];
+  diagnostics: Diagnostic[];
+  discoveredPaths: ReadonlySet<string>;
+}> {
   const diagnostics: Diagnostic[] = [];
   const paths = new Set<string>();
   diagnostics.push(...(await skillLikeLayoutDiagnostics(root, config)));
@@ -324,6 +328,7 @@ export async function discoverArtifacts(
       (artifact) => artifact !== undefined,
     ) as Artifact[],
     diagnostics,
+    discoveredPaths: new Set(candidates),
   };
 }
 
@@ -402,11 +407,13 @@ function classifyContent(
 ): "text" | "binary" {
   if (OPAQUE_EXTENSIONS.has(path.posix.extname(relativePath).toLowerCase()))
     return "binary";
-  const sample = bytes.subarray(0, Math.min(bytes.length, 8_192));
-  if (sample.includes(0)) return "binary";
-  const decoded = Buffer.from(sample).toString("utf8");
-  const replacements = [...decoded].filter((char) => char === "�").length;
-  return replacements > 0 ? "binary" : "text";
+  if (bytes.includes(0)) return "binary";
+  try {
+    new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return "text";
+  } catch {
+    return "binary";
+  }
 }
 
 async function skillLikeLayoutDiagnostics(

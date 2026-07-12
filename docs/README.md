@@ -21,7 +21,7 @@ Use this index to choose the smallest document that answers your question.
   snapshot, output, reproducibility, schema, and provenance contract.
 - [Diagnostics Reference](diagnostics.md): scan finding identifiers and repair
   guidance.
-- [Renma 0.18.0 Quality Profile](quality-profile.md): canonical thresholds,
+- [Renma Quality Profile](quality-profile.md): canonical thresholds,
   units, provenance, rationale, false-positive risks, and configuration status.
 
 ## Focused References

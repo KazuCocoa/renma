@@ -308,6 +308,10 @@ Runtime enforcement remains outside Renma.
 
 Renma can also summarize the effective static policy surface across discovered assets. The inventory is derived from asset-local policy metadata, selected security-profile chains, and repository-level `security` config.
 
+Text Skill-local scripts and assets participate when they explicitly declare
+valid local policy metadata. Their raw content remains outside Markdown parsing.
+Binary/opaque assets never contribute policy or instruction text.
+
 The inventory reports policy coverage, network/upload/secrets booleans, human approval requirements, approved destinations, forbidden inputs, disallowed commands, and profile resolution counts. It is reporting-only in v1 and does not enforce runtime behavior.
 
 `renma trust-graph` also includes effective policy evidence. Each effective policy node uses a deterministic fingerprint over normalized allowed data, forbidden inputs, network/upload/secrets booleans, human approval requirement, approved destinations, and disallowed commands. The graph links assets to selected security-profile values and to their effective policy fingerprint; it does not enforce the policy at runtime.

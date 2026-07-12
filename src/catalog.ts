@@ -1,14 +1,17 @@
 import { createHash } from "node:crypto";
+import path from "node:path";
 import { conflictDiagnostics } from "./catalog-conflicts.js";
 import { lifecycleDiagnostics } from "./catalog-lifecycle.js";
 import { contextBodyLanguageDiagnostics } from "./context-language-diagnostics.js";
 import type {
   AssetMetadata,
+  AssetOwnership,
   Catalog,
   CatalogEntry,
   Dependency,
   DependencyKind,
 } from "./model.js";
+import { classifyRepositorySkillPath } from "./discovery.js";
 import { parseAssetMetadata } from "./metadata.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import type { Diagnostic, Evidence, ParsedDocument } from "./types.js";
@@ -25,6 +28,21 @@ export function buildCatalog(documents: ParsedDocument[]): {
   diagnostics: Diagnostic[];
 } {
   const diagnostics: Diagnostic[] = [];
+  const skillOwners = new Map<
+    string,
+    { owner: string; id: string; sourcePath: string }
+  >();
+  for (const document of documents) {
+    if (document.artifact.kind !== "skill") continue;
+    const metadata = parseAssetMetadata(document).metadata;
+    const owner = metadata.owner?.trim();
+    if (!owner) continue;
+    skillOwners.set(path.posix.dirname(document.artifact.path), {
+      owner,
+      id: metadata.id ?? document.artifact.path,
+      sourcePath: document.artifact.path,
+    });
+  }
   const entries = documents
     .map((document): CatalogEntry | undefined => {
       const result = parseAssetMetadata(document);
@@ -46,6 +64,12 @@ export function buildCatalog(documents: ParsedDocument[]): {
 
       if (!kind) return undefined;
 
+      const ownership = resolveAssetOwnership(
+        document,
+        result.metadata,
+        skillOwners,
+      );
+
       const base = {
         id: result.metadata.id ?? document.artifact.path,
         sourcePath: document.artifact.path,
@@ -57,6 +81,7 @@ export function buildCatalog(documents: ParsedDocument[]): {
           document.artifact.contentClassification ?? "text",
         markdownParserEligible:
           document.artifact.markdownParserEligible ?? true,
+        ...(ownership ? { ownership } : {}),
         metadata: result.metadata,
         metadataFields: result.metadataFields,
         metadataListItems: result.metadataListItems,
@@ -106,6 +131,31 @@ export function buildCatalog(documents: ParsedDocument[]): {
       dependencies,
     },
     diagnostics,
+  };
+}
+
+function resolveAssetOwnership(
+  document: ParsedDocument,
+  metadata: AssetMetadata,
+  skillOwners: ReadonlyMap<
+    string,
+    { owner: string; id: string; sourcePath: string }
+  >,
+): AssetOwnership | undefined {
+  const declaredOwner = metadata.owner?.trim();
+  if (declaredOwner) return undefined;
+
+  const classified = classifyRepositorySkillPath(document.artifact.path);
+  if (classified?.kind !== "support") return undefined;
+  const owningSkill = skillOwners.get(classified.skillDirectory);
+  if (!owningSkill) return undefined;
+  return {
+    owner: owningSkill.owner,
+    source: "inherited",
+    inheritedFrom: {
+      id: owningSkill.id,
+      sourcePath: owningSkill.sourcePath,
+    },
   };
 }
 

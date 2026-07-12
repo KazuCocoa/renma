@@ -3,7 +3,7 @@
 This page documents diagnostics and finding identifiers emitted by the current renma implementation. It does not list planned diagnostics.
 
 Thresholds, units, provenance, and false-positive controls are canonical in the
-[Renma 0.18.0 Quality Profile](quality-profile.md). Agent Skills specification
+[Renma Quality Profile](quality-profile.md). Agent Skills specification
 errors are kept separate from Renma quality advisories.
 
 Agent Skills validation also reports authoring-only `RN-SKILL-*` warnings. In
@@ -180,7 +180,11 @@ These diagnostics are emitted while renma discovers files.
 
 These diagnostics are emitted after files are parsed into catalog entries. For shared-context wording details, see [Context Language Diagnostics](context-language-diagnostics.md).
 
-Owner absence is handled as ownership coverage information. Assets without `owner` are accepted and reported as unowned by `renma ownership`; Renma does not infer owners automatically.
+Owner absence is handled as ownership coverage information. Shared assets
+without `owner` are accepted and reported as unowned by `renma ownership`;
+Renma does not invent an owner. Skill-local support is the exception: it uses
+deterministic effective ownership inherited from its nearest owning Skill and
+reports that provenance separately from declared metadata.
 
 | Severity  | Message                                                                                           | Meaning                                                                                                                        | Fix                                                                                                             |
 | --------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
@@ -191,7 +195,7 @@ Owner absence is handled as ownership coverage information. Assets without `owne
 | `warning` | `Metadata dependency "<to>" from "<from>" does not match a catalog entry.`                        | A metadata dependency points at an asset renma did not discover.                                                               | Correct the reference, add the missing asset, or update include/exclude config.                                 |
 | `warning` | `Metadata dependency "<to>" from "<from>" targets a <status> asset.`                              | A dependency points at a deprecated or archived catalog target.                                                                | Retarget the dependency to a stable replacement or document the migration.                                      |
 | `warning` | `Asset is missing an id.`                                                                         | A cataloged asset has no stable ID.                                                                                            | Add an `id` metadata field.                                                                                     |
-| `warning` | `Asset is missing an owner.`                                                                      | A cataloged asset has no declared owner metadata. Missing owner is allowed and appears as unowned in ownership coverage; it is not converted into a scan finding by default. | If ownership matters for this repository, choose an `owner` through human review or team policy. Do not infer or invent an owner automatically. |
+| `warning` | `Asset is missing an owner.`                                                                      | A shared catalog asset has no declared owner metadata. Missing owner is allowed and appears as unowned in ownership coverage; nearest-Skill support inheritance does not apply to shared assets. | If ownership matters for this repository, choose an `owner` through human review or team policy. Do not invent one. |
 | `warning` | `Shared context asset is missing when_to_use metadata.`                                           | An active, owned shared context asset has no positive usage boundary.                                                          | Add compact `when_to_use` metadata that states when humans or agents should apply the context.                  |
 | `warning` | `Shared context asset is missing when_not_to_use metadata.`                                       | An active, owned shared context asset has no negative usage boundary.                                                          | Add compact `when_not_to_use` metadata so agents do not over-apply the context.                                 |
 | `warning` | `Shared context asset usage-boundary metadata contains placeholder values in <field>.`            | Usage-boundary metadata is present but still says TODO, TBD, unknown, none, or similar.                                        | Replace placeholders with reviewed scope boundaries, or remove the field until it can be completed.             |
@@ -276,6 +280,12 @@ Non-Skill assets continue to use `allowed_data`, `network_allowed`,
 `approved_upload_destinations`, and `security_profile`. Their existing scalar,
 inline-list, and block-list behavior is unchanged. Pre-0.16 top-level Skill
 security fields are migration input only.
+
+Text `script` and `asset` artifacts enter the security policy inventory and
+Trust Graph only when they contain explicit valid local policy metadata. Their
+raw text can be checked by the dedicated security scanner without becoming
+Markdown catalog metadata. Binary/opaque artifacts expose no instruction text,
+policy metadata, or diagnostic snippets.
 
 Security profiles in `renma.config.json` retain the existing JSON schema.
 Artifact-local explicit denials remain stricter than inherited profile or

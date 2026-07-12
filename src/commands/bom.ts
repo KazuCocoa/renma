@@ -13,6 +13,7 @@ import type {
   AssetStatus,
   DependencyKind,
 } from "../model.js";
+import { effectiveAssetOwner } from "../model.js";
 import {
   collectRepositorySnapshot,
   type RepositorySnapshot,
@@ -86,6 +87,8 @@ export interface BomAsset {
   contentClassification?: "text" | "binary";
   markdownParserEligible?: boolean;
   owner?: string;
+  ownerSource?: "declared" | "inherited";
+  ownerInheritedFrom?: { id: string; sourcePath: string };
   status?: AssetStatus;
   version?: string;
   tags: string[];
@@ -366,6 +369,7 @@ function toBomAsset(
   diagnostics: Diagnostic[],
 ): BomAsset {
   const lifecycle = assetLifecycle(asset);
+  const owner = effectiveAssetOwner(asset);
   return {
     id: asset.id,
     kind: asset.kind,
@@ -374,7 +378,15 @@ function toBomAsset(
     sizeBytes: asset.sizeBytes ?? 0,
     contentClassification: asset.contentClassification ?? "text",
     markdownParserEligible: asset.markdownParserEligible ?? true,
-    ...(asset.metadata.owner ? { owner: asset.metadata.owner } : {}),
+    ...(owner ? { owner } : {}),
+    ...(asset.ownership
+      ? {
+          ownerSource: asset.ownership.source,
+          ...(asset.ownership.source === "inherited"
+            ? { ownerInheritedFrom: asset.ownership.inheritedFrom }
+            : {}),
+        }
+      : {}),
     ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
     ...(asset.metadata.version ? { version: asset.metadata.version } : {}),
     tags: [...asset.metadata.tags].sort((left, right) =>

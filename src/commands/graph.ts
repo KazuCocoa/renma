@@ -12,6 +12,7 @@ import type {
   Dependency,
   DependencyKind,
 } from "../model.js";
+import { effectiveAssetOwner } from "../model.js";
 import { classifyRepositorySkillEntrypointPath } from "../discovery.js";
 import {
   collectRepositoryEvidence,
@@ -44,6 +45,8 @@ export interface GraphNode {
   contentClassification?: "text" | "binary";
   markdownParserEligible?: boolean;
   owner?: string;
+  ownerSource?: "declared" | "inherited";
+  ownerInheritedFrom?: { id: string; sourcePath: string };
   status?: AssetStatus;
   tags: string[];
   groupedCount?: number;
@@ -618,6 +621,7 @@ function singleLine(value: string): string {
 }
 
 function toNode(asset: Asset): GraphNode {
+  const owner = effectiveAssetOwner(asset);
   return {
     id: asset.id,
     kind: asset.kind,
@@ -626,7 +630,15 @@ function toNode(asset: Asset): GraphNode {
     sizeBytes: asset.sizeBytes ?? 0,
     contentClassification: asset.contentClassification ?? "text",
     markdownParserEligible: asset.markdownParserEligible ?? true,
-    ...(asset.metadata.owner ? { owner: asset.metadata.owner } : {}),
+    ...(owner ? { owner } : {}),
+    ...(asset.ownership
+      ? {
+          ownerSource: asset.ownership.source,
+          ...(asset.ownership.source === "inherited"
+            ? { ownerInheritedFrom: asset.ownership.inheritedFrom }
+            : {}),
+        }
+      : {}),
     ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
     tags: asset.metadata.tags,
   };

@@ -363,6 +363,8 @@ function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
     absolutePath: `/repo/${path}`,
     kind,
     sizeBytes: Buffer.byteLength(operationalContent),
+    contentClassification: "text",
+    markdownParserEligible: true,
     content: operationalContent,
   };
 }

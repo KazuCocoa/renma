@@ -171,7 +171,12 @@ Normalized asset kinds:
 Shared Markdown under `contexts/` or `context/` uses the dedicated `context`
 kind. Skill-local scripts and assets are first-class inventory. Repository files
 carry original-byte size and hash, text or binary classification, and Markdown
-parser eligibility. Opaque files are never decoded into diagnostic snippets.
+parser eligibility. Only artifacts explicitly eligible for Markdown parsing
+contribute frontmatter, headings, links, fences, or repeated-context evidence.
+Opaque files are never decoded into diagnostic snippets. Skill-local support
+inherits effective ownership from its nearest owning Skill when it has no local
+owner; catalog, graph, ownership, Readiness, Trust Graph, and BOM retain
+`inherited` provenance instead of presenting that owner as locally declared.
 
 ### Dependency
 

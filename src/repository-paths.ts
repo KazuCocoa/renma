@@ -19,10 +19,11 @@ export async function collectRepositoryPaths(
   artifacts: Artifact[],
   documents: ParsedDocument[],
   catalog: Catalog,
+  discoveredPaths: ReadonlySet<string> = new Set(),
 ): Promise<ReadonlySet<string>> {
   const paths = new Set<string>(
-    artifacts
-      .map((artifact) => normalizeRepositoryPath(artifact.path))
+    [...discoveredPaths, ...artifacts.map((artifact) => artifact.path)]
+      .map(normalizeRepositoryPath)
       .filter((candidate): candidate is string => candidate !== undefined),
   );
 

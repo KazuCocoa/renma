@@ -1,10 +1,12 @@
-# Renma 0.18.0 Quality Profile
+# Renma Quality Profile
 
-`renma-quality@0.18.0` is the canonical internal quality profile. The source is
-`src/quality-profile.ts`. Renma 0.18.0 does not expose quality overrides in
-`renma.config.json`; fixed defaults preserve comparable repository reports.
-The internal shape is versioned so later releases can add reviewed overrides
-without scattering constants across rules.
+`renma-quality` is Renma's internal quality-profile family. Reports identify
+the active profile as `renma-quality@<Renma package version>`, derived from
+`package.json` at build time. The source is `src/quality-profile.ts`. The current
+implementation does not expose quality overrides in `renma.config.json`; fixed
+defaults preserve comparable repository reports. The internal shape is
+versioned so later releases can add reviewed overrides without scattering
+constants across rules.
 
 `estimated_tokens` means Renma's deterministic, model-neutral estimate. Latin
 words, identifiers, URLs, and paths are lexical units; consecutive CJK text is
@@ -118,4 +120,4 @@ Structural guard proximity includes the same constraint or safety section, the
 same list item, a directly associated paragraph, or a parent Human Approval,
 Safety, or Constraints heading. Binary snippets are never exposed. Scan
 operational limits retain their existing public config fields; none of the
-quality or Readiness thresholds above are configurable in 0.18.0.
+quality or Readiness thresholds above are currently configurable.

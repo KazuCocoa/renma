@@ -15,7 +15,7 @@ import type {
   SecurityConfig,
 } from "./types.js";
 
-type InventoryArtifactKind = Exclude<ArtifactKind, "script" | "asset">;
+type InventoryArtifactKind = ArtifactKind;
 
 export interface PolicyBooleanCounts {
   true: number;
@@ -105,6 +105,8 @@ const ASSET_KINDS: InventoryArtifactKind[] = [
   "profile",
   "reference",
   "example",
+  "script",
+  "asset",
   "config",
   "unknown",
 ];
@@ -276,7 +278,8 @@ export function isPolicyInventoryArtifact(
     parseOperationalSecurityPolicy(artifact),
   ),
 ): boolean {
-  if (artifact.kind === "script" || artifact.kind === "asset") return false;
+  if (artifact.kind === "script" || artifact.kind === "asset")
+    return hasLocalMetadata;
   return POLICY_INVENTORY_KINDS.has(artifact.kind) || hasLocalMetadata;
 }
 

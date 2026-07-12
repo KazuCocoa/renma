@@ -38,12 +38,43 @@ npm test
   assert.match(document.codeFences[0]?.content ?? "", /npm test/);
 });
 
+test("parseDocument keeps raw lines but skips Markdown structure when ineligible", () => {
+  const content = `---
+id: hijacked
+owner: wrong-team
+---
+# Not a Markdown heading
+[not a link](references/guide.md)
+
+\`\`\`bash
+echo not-a-fence
+\`\`\`
+`;
+  const document = parseDocument({
+    path: "skills/demo/scripts/check.sh",
+    absolutePath: "/tmp/skills/demo/scripts/check.sh",
+    kind: "script",
+    sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: false,
+    content,
+  });
+
+  assert.ok(document.lines.length > 0);
+  assert.deepEqual(document.metadata, {});
+  assert.deepEqual(document.headings, []);
+  assert.deepEqual(document.links, []);
+  assert.deepEqual(document.codeFences, []);
+});
+
 function artifact(content: string): Artifact {
   return {
     path: "skills/demo/SKILL.md",
     absolutePath: "/tmp/skills/demo/SKILL.md",
     kind: "skill",
     sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: true,
     content,
   };
 }

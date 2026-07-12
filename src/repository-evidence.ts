@@ -56,8 +56,11 @@ export async function collectRepositorySnapshot(
 ): Promise<RepositorySnapshot> {
   const root = path.resolve(targetPath);
   const { config, configPath } = await loadConfig(root, overrides);
-  const { artifacts, diagnostics: discoveryDiagnostics } =
-    await discoverArtifacts(root, config);
+  const {
+    artifacts,
+    diagnostics: discoveryDiagnostics,
+    discoveredPaths,
+  } = await discoverArtifacts(root, config);
   const documents = artifacts.map(parseDocument);
   const built = buildCatalog(documents);
   const contextLens = summarizeContextLensGovernance(documents, built.catalog);
@@ -66,6 +69,7 @@ export async function collectRepositorySnapshot(
     artifacts,
     documents,
     built.catalog,
+    discoveredPaths,
   );
 
   return {

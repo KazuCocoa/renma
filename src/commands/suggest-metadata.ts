@@ -83,6 +83,8 @@ export async function buildMetadataSuggestion(
     absolutePath,
     kind: initialKind,
     sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: /\.mdx?$/i.test(outputPath),
     content,
   } satisfies Artifact);
   const { metadata } = parseAssetMetadata(document);

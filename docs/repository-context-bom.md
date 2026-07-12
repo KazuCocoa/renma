@@ -56,6 +56,12 @@ JSON is the authoritative BOM output. Markdown is a compact review projection fo
 
 Array ordering is deterministic and part of Renma's output contract. Asset `sourcePath` values remain repository-relative. `root` and `configPath` remain absolute paths from the current environment.
 
+Asset `owner` is the effective owner used by ownership and Readiness. Existing
+declared-owner output is unchanged. Skill-local support that inherits its
+nearest Skill's owner adds optional `ownerSource: "inherited"` and
+`ownerInheritedFrom` provenance. Ownership totals use this same effective-owner
+meaning.
+
 ## Reproducibility
 
 `--omit-generated-at` means only:

@@ -245,6 +245,10 @@ Catalog, graph, Trust Graph, and BOM output include script and asset inventory.
 Each cataloged asset records original-byte size and hash, text/binary
 classification, and Markdown-parser eligibility. Binary assets remain opaque;
 Renma does not decode them as UTF-8 or expose their bytes in snippets.
+Non-Markdown text remains available to dedicated path and security analysis but
+cannot declare catalog metadata or contribute Markdown structure. Skill-local
+support without a local owner inherits effective ownership from the nearest
+Skill, with inherited provenance exposed in normalized reports.
 
 The dedicated `context` kind is central to the product model. It lets catalog,
 graph, and validation output distinguish reusable team-owned knowledge from

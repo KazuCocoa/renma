@@ -311,6 +311,8 @@ function artifact(content: string): Artifact {
     absolutePath: "/repo/skills/appium/SKILL.md",
     kind: "skill",
     sizeBytes: Buffer.byteLength(operationalContent),
+    contentClassification: "text",
+    markdownParserEligible: true,
     content: operationalContent,
   };
 }

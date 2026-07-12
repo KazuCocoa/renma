@@ -659,6 +659,8 @@ test("repository release-prep is fully canonical with unchanged operational beha
     absolutePath,
     kind: "skill",
     sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: true,
     content,
   });
   const result = parseAssetMetadata(document);
@@ -833,6 +835,8 @@ function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
     absolutePath: `/tmp/${path}`,
     kind,
     sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: true,
     content,
   };
 }

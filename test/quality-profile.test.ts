@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import packageJson from "../package.json" with { type: "json" };
 
@@ -102,6 +103,28 @@ test("quality profile pins every package-version default", () => {
   });
 });
 
+test("quality-profile documentation uses the stable family name", async () => {
+  const paths = [
+    "docs/quality-profile.md",
+    "README.md",
+    "docs/README.md",
+    "docs/diagnostics.md",
+    "docs/user-manual.md",
+    "CHANGELOG.md",
+  ];
+  for (const path of paths) {
+    const content = await readFile(path, "utf8");
+    assert.doesNotMatch(content, /renma-quality@0\.18\.0/);
+    assert.doesNotMatch(content, /Renma 0\.18\.0 Quality Profile/);
+  }
+  const canonical = await readFile("docs/quality-profile.md", "utf8");
+  assert.match(
+    canonical,
+    /`renma-quality` is Renma's internal quality-profile family/,
+  );
+  assert.match(canonical, /renma-quality@<Renma package version>/);
+});
+
 test("token estimator is deterministic and Unicode-aware across repository text", () => {
   const cases = {
     english: "Review the requested files before applying changes.",
@@ -192,6 +215,8 @@ function findingsFor(kind: ArtifactKind, content: string) {
     absolutePath: `/${path}`,
     kind,
     sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: true,
     content,
   };
   return runRules([parseDocument(artifact)], DEFAULT_CONFIG);
