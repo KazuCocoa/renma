@@ -43,6 +43,12 @@ This context does not apply when:
 - Updating unrelated historical release notes.
 - Making general documentation edits outside a release-prep workflow.
 
+## Release Inputs
+
+- Target version or intended semantic-version increment.
+- Base ref for release comparison, selected from repository history.
+- Any known release theme, blockers, or user-facing changes.
+
 ## Workflow
 
 1. Inspect `package.json`, `package-lock.json`, `CHANGELOG.md`, and release-relevant docs.
@@ -66,3 +72,10 @@ This context does not apply when:
 ## Validation
 
 Run `node tools/release-prep.mjs`; use `--check-only` for metadata checks only, `--release-notes` for GitHub Release body generation, and `--finalize` for local commit/tag creation after validation.
+
+## Completion Criteria
+
+- Release metadata, changelog, docs, and release notes are consistent for the target version.
+- GitHub-ready release notes are generated from `CHANGELOG.md` and the intended comparison range.
+- Required Renma reports have been run, or any skipped report is explained.
+- The final handoff names blockers, residual risks, and the local commit and tag state.

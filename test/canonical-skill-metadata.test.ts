@@ -679,6 +679,7 @@ test("repository release-prep is fully canonical with unchanged operational beha
   assert.equal(validation.valid, true);
   assert.equal(validation.migrationRecommended, false);
   assert.deepEqual(validation.legacyFields, []);
+  assert.deepEqual(validation.issues, []);
   assert.equal(result.metadata.id, "skill.release-prep");
   assert.equal(result.metadata.title, "Release Prep");
   assert.equal(result.metadata.version, "0.1.0");
@@ -813,6 +814,10 @@ test("repository release-prep is fully canonical with unchanged operational beha
         finding.evidence.path === relativePath && finding.id.startsWith("SEC-"),
     ),
     false,
+  );
+  assert.deepEqual(
+    scan.findings.filter((finding) => finding.evidence.path === relativePath),
+    [],
   );
 });
 
