@@ -13,6 +13,28 @@ and team-local instructions. Renma gives that material stable repository
 identity, explicit relationships, deterministic validation, and CI-friendly
 reports without becoming an agent runtime.
 
+## Why A Context Repository?
+
+A Context Repository is a Git-reviewed source of truth for reusable knowledge
+that LLMs and agents can consume. Without that repository boundary, important
+guidance is copied across prompts and Skills, buried in one-off instructions,
+detached from an owner, difficult to review, and increasingly inconsistent as
+teams and workflows evolve. It also becomes hard to tell maintained guidance
+from obsolete or unofficial material.
+
+Reusable context should be treated as a maintainable software asset: identified,
+owned, versioned in Git, connected through explicit relationships, reviewed by
+humans, validated deterministically, and usable across more than one Skill or
+runtime. A Skill is an agent-facing entrypoint and workflow guide; the broader
+Context Repository preserves knowledge that can outlive or serve multiple
+Skills.
+
+Renma operationalizes this model through deterministic repository governance.
+It is not a prompt library, agent runtime, live Context selector, vector
+database, agent memory, replacement for RAG, or generic Markdown linter. See the
+[Context Repository notes](https://kazucocoa.blog/context-repository/) for the
+broader product framing.
+
 ## Agent Skills And Renma
 
 Use your platform's standard Skill authoring guidance for general Skill design,

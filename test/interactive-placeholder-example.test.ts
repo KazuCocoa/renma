@@ -14,10 +14,17 @@ const EXAMPLE_ROOT = path.join(
   "interactive-placeholder",
 );
 const TOOL_PATH = path.join(EXAMPLE_ROOT, "tools", "placeholder-demo.mjs");
+const TOOL_GUIDE_PATH = path.join(EXAMPLE_ROOT, "tools", "README.md");
+const SKILL_PATH = path.join(
+  EXAMPLE_ROOT,
+  "skills",
+  "replace-placeholder",
+  "SKILL.md",
+);
 const TEMPLATE_PATH = path.join(EXAMPLE_ROOT, "assets", "template.txt");
 const OUTPUT_PATH = path.join(EXAMPLE_ROOT, "workspace", "output.txt");
 
-test("interactive-placeholder is a valid, ready Agent Skill example", async () => {
+test("interactive-placeholder is a clean, ready thin Agent Skill example", async () => {
   const [scanResult, catalogResult, readinessReport] = await Promise.all([
     scan(EXAMPLE_ROOT),
     catalog(EXAMPLE_ROOT),
@@ -30,23 +37,22 @@ test("interactive-placeholder is a valid, ready Agent Skill example", async () =
   assert.equal(scanResult.agentSkills.invalidSkillCount, 0);
   assert.equal(scanResult.agentSkills.results[0]?.format, "agent-skills");
   assert.equal(scanResult.agentSkills.results[0]?.valid, true);
+  assert.equal(scanResult.agentSkills.warningCount, 0);
+  assert.deepEqual(scanResult.agentSkills.results[0]?.issues, []);
   assert.ok(
     catalogResult.catalog.assets.some(
       (asset) => asset.id === "skill.example.replace-placeholder",
     ),
   );
-  assert.equal(
-    scanResult.findings.some(
-      (finding) =>
-        finding.severity === "high" || finding.severity === "critical",
-    ),
-    false,
-  );
+  assert.deepEqual(scanResult.findings, []);
+  assert.equal(readinessReport.level, "ready");
+  assert.equal(readinessReport.score, 100);
 
   for (const checkId of [
     "workflow.clarity",
     "workflow.required_inputs",
     "workflow.completion_criteria",
+    "layout.skills_thin",
     "paths.helper_commands",
   ]) {
     assert.equal(
@@ -55,6 +61,16 @@ test("interactive-placeholder is a valid, ready Agent Skill example", async () =
       `${checkId} should pass for the interactive example.`,
     );
   }
+
+  assert.equal(
+    readinessReport.checks.every((check) => check.status === "pass"),
+    true,
+    "Every readiness check should pass for the onboarding example.",
+  );
+
+  const skill = await readFile(SKILL_PATH, "utf8");
+  assert.match(skill, /\[local tool guide\]\(\.\.\/\.\.\/tools\/README\.md\)/);
+  await assert.doesNotReject(access(TOOL_GUIDE_PATH));
 });
 
 test("placeholder CLI safely prepares, applies, inspects, and resets", async () => {
@@ -116,8 +132,18 @@ test("placeholder CLI safely prepares, applies, inspects, and resets", async () 
     assert.equal(reset.status, 0);
     assert.equal(await readFile(OUTPUT_PATH, "utf8"), originalTemplate);
     assert.equal(await readFile(TEMPLATE_PATH, "utf8"), originalTemplate);
+
+    const repeated = runTool("apply", "Repeat_17");
+    assert.equal(repeated.status, 0);
+    assert.equal(await readFile(OUTPUT_PATH, "utf8"), "Hello, Repeat_17!\n");
+
+    const secondReset = runTool("prepare");
+    assert.equal(secondReset.status, 0);
+    assert.equal(await readFile(OUTPUT_PATH, "utf8"), originalTemplate);
   } finally {
     await removeOutput();
+    assert.equal(await readFile(TEMPLATE_PATH, "utf8"), originalTemplate);
+    await assert.rejects(access(OUTPUT_PATH));
   }
 });
 

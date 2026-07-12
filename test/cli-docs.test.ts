@@ -140,6 +140,24 @@ test("README uses current inspect syntax", async () => {
   );
 });
 
+test("README preserves the Context Repository philosophy", async () => {
+  const readme = await readRepoFile("README.md");
+  const philosophyIndex = readme.indexOf("## Why A Context Repository?");
+  const agentSkillsIndex = readme.indexOf("## Agent Skills And Renma");
+
+  assert.ok(philosophyIndex >= 0);
+  assert.ok(
+    philosophyIndex < agentSkillsIndex,
+    "Context Repository philosophy should precede Agent Skills guidance.",
+  );
+  assert.match(
+    readme,
+    /A Context Repository is a Git-reviewed source of truth/,
+  );
+  assert.match(readme, /reusable knowledge/);
+  assert.match(readme, /https:\/\/kazucocoa\.blog\/context-repository\//);
+});
+
 test("Skill path guidance distinguishes canonical and historical entrypoints", async () => {
   const readme = await readRepoFile("README.md");
   const manual = await readRepoFile("docs/user-manual.md");
