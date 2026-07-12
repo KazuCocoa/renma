@@ -96,6 +96,11 @@ export interface AgentSkillValidationResult {
   issues: AgentSkillValidationIssue[];
 }
 
+export interface AgentSkillInspection {
+  frontmatter: ParsedYamlFrontmatter;
+  validation: AgentSkillValidationResult;
+}
+
 export interface AgentSkillMigrationCommand {
   command: "renma";
   args: ["suggest-metadata", string];
@@ -156,6 +161,34 @@ export function validateAgentSkill(
   document: ParsedDocument,
 ): AgentSkillValidationResult {
   const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
+  return validateAgentSkillFrontmatter(document, frontmatter);
+}
+
+/** Parse and validate a Skill once for canonical operational consumers. */
+export function inspectAgentSkill(
+  document: ParsedDocument,
+): AgentSkillInspection {
+  const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
+  return {
+    frontmatter,
+    validation: validateAgentSkillFrontmatter(document, frontmatter),
+  };
+}
+
+/** Resolve the YAML description value used by Skill quality rules. */
+export function resolvedAgentSkillDescription(
+  document: ParsedDocument,
+): string | undefined {
+  if (document.artifact.kind !== "skill") return undefined;
+  return nonEmptyString(
+    parseAgentSkillFrontmatter(document.artifact.content).values.description,
+  );
+}
+
+function validateAgentSkillFrontmatter(
+  document: ParsedDocument,
+  frontmatter: ParsedYamlFrontmatter,
+): AgentSkillValidationResult {
   const issues: AgentSkillValidationIssue[] = [];
   const name = nonEmptyString(frontmatter.values.name);
   const description = nonEmptyString(frontmatter.values.description);
@@ -268,12 +301,15 @@ export function validateAgentSkill(
   for (const unexpected of frontmatter.fields.filter(
     (field) => !ALLOWED_TOP_LEVEL_FIELDS.has(field.key),
   )) {
+    const legacyField = LEGACY_FIELDS.has(unexpected.key);
     issues.push(
       fieldIssue(
         document,
         unexpected,
         IDS.AS_UNEXPECTED_TOP_LEVEL_FIELD,
-        `Unexpected top-level Agent Skills field "${unexpected.key}". Renma extensions belong under metadata using renma.* string keys.`,
+        legacyField
+          ? `Pre-0.16 top-level Skill field "${unexpected.key}" is not operationally supported in Renma 0.16.0. Migrate the Skill to Agent Skills metadata.renma.* before catalog, ownership, graph, or security consumers trust this metadata.`
+          : `Unexpected top-level Agent Skills field "${unexpected.key}". Renma extensions belong under metadata using renma.* string keys.`,
       ),
     );
   }

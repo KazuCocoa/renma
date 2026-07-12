@@ -5,6 +5,7 @@ import { buildCatalog } from "../src/catalog.js";
 import { parseDocument } from "../src/markdown.js";
 import { parseAssetMetadata } from "../src/metadata.js";
 import type { Artifact, ArtifactKind } from "../src/types.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 test("parseAssetMetadata normalizes supported frontmatter", () => {
   const document = parseDocument(
@@ -311,14 +312,13 @@ conflicts: android
 ---
 # Demo
 `;
-  const { catalog } = buildCatalog([
-    parseDocument(artifact("skills/demo/SKILL.md", "skill", skillContent)),
-  ]);
+  const skillArtifact = artifact("skills/demo/SKILL.md", "skill", skillContent);
+  const { catalog } = buildCatalog([parseDocument(skillArtifact)]);
 
   assert.equal(catalog.assets, catalog.entries);
   assert.equal(
     catalog.entries[0]?.contentHash,
-    `sha256:${createHash("sha256").update(skillContent).digest("hex")}`,
+    `sha256:${createHash("sha256").update(skillArtifact.content).digest("hex")}`,
   );
   assert.deepEqual(
     catalog.dependencies.map((dependency) => ({
@@ -402,7 +402,7 @@ test("parseDocument records frontmatter field evidence", () => {
   const document = parseDocument(
     artifact(
       "skills/demo/SKILL.md",
-      "skill",
+      "context",
       `---
 id: skill.demo
 requires_context:
@@ -459,11 +459,11 @@ status: stable
     ),
   ]);
 
-  assert.equal(catalog.dependencies[0]?.evidence?.startLine, 4);
-  assert.equal(catalog.dependencies[0]?.evidence?.endLine, 4);
+  assert.equal(catalog.dependencies[0]?.evidence?.startLine, 6);
+  assert.equal(catalog.dependencies[0]?.evidence?.endLine, 6);
   assert.equal(
     catalog.dependencies[0]?.evidence?.snippet,
-    "  - context.demo.required",
+    `  renma.requires-context: '["context.demo.required"]'`,
   );
 });
 
@@ -501,14 +501,14 @@ status: deprecated
   const unknown = diagnostics.find((diagnostic) =>
     diagnostic.message.includes("does not match a catalog entry"),
   );
-  assert.equal(unknown?.evidence?.startLine, 4);
-  assert.equal(unknown?.evidence?.endLine, 4);
+  assert.equal(unknown?.evidence?.startLine, 6);
+  assert.equal(unknown?.evidence?.endLine, 6);
 
   const inactive = diagnostics.find((diagnostic) =>
     diagnostic.message.includes("targets a deprecated asset"),
   );
-  assert.equal(inactive?.evidence?.startLine, 5);
-  assert.equal(inactive?.evidence?.endLine, 5);
+  assert.equal(inactive?.evidence?.startLine, 6);
+  assert.equal(inactive?.evidence?.endLine, 6);
 });
 
 test("buildCatalog suppresses generic missing-target diagnostics for conflicts", () => {
@@ -571,11 +571,13 @@ conflicts:
 });
 
 function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
+  const operationalContent =
+    kind === "skill" ? canonicalSkillFixture(path, content) : content;
   return {
     path,
     absolutePath: `/tmp/${path}`,
     kind,
-    sizeBytes: Buffer.byteLength(content),
-    content,
+    sizeBytes: Buffer.byteLength(operationalContent),
+    content: operationalContent,
   };
 }

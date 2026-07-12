@@ -33,7 +33,9 @@ LLM proposes. Renma verifies. Human approves.
 
 ## Recommended Metadata
 
-Assets can use simple YAML-style metadata at the top of Markdown files. For shared context assets, start with a small, deterministic block like this:
+Contexts and other non-Skill assets continue to use simple YAML-style metadata
+at the top of Markdown files. For shared context assets, start with a small,
+deterministic block like this:
 
 ```yaml
 ---
@@ -56,7 +58,11 @@ optional_context:
 ---
 ```
 
-Use these fields consistently:
+Use these semantic fields consistently. The spellings below are the existing
+top-level form for non-Skill assets. Pre-0.16 Skills may contain them only as
+migration input. Operational Skills put their equivalents under `metadata` with
+a `renma.` prefix, hyphens instead of underscores, and JSON-array strings for
+lists.
 
 - `id`: stable catalog asset ID. It should be deterministic and should not change when the file moves unless the asset's identity changes.
 - `title`: human-readable title.
@@ -66,8 +72,8 @@ Use these fields consistently:
 - `type`: optional discriminator. Currently only `context_lens` has defined catalog meaning, and only for context files.
 - `tags`: searchable labels that help navigation, ownership review, and reporting.
 - `when_to_use` and `when_not_to_use`: scope guidance for humans and agents.
-- `requires_context` and `optional_context`: static graph relationships to other assets. They do not make renma select runtime context.
-- `requires_lens` and `optional_lens`: static graph relationships from a skill to context lens assets.
+- `requires_context` and `optional_context`: static graph relationships to other assets. Canonical Skills use `renma.requires-context` and `renma.optional-context`. They do not make renma select runtime context.
+- `requires_lens` and `optional_lens`: static graph relationships from a skill to context lens assets. Canonical Skills use `renma.requires-lens` and `renma.optional-lens`.
 - `applies_to`: required static graph relationship from a context lens to the context assets it interprets.
 - `purpose`, `focus`, and `expected_outputs`: compact lens metadata for deterministic Context Lens governance review.
 - `conflicts`: assets that should not be used together without review.
@@ -81,7 +87,14 @@ However, owner metadata is not globally required yet. Assets without an owner ar
 
 Renma does not infer owners automatically. If an asset is unowned, choose an owner through human review or team policy.
 
-The supported list-style metadata fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `requires_lens`, `optional_lens`, `applies_to`, `focus`, `expected_outputs`, `conflicts`, and `superseded_by`.
+For non-Skill assets, the supported list-style fields
+are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`,
+`optional_context`, `requires_lens`, `optional_lens`, `applies_to`, `focus`,
+`expected_outputs`, `conflicts`, and `superseded_by`. Canonical Skills use
+`renma.*` keys and JSON-array strings for `tags`, usage boundaries,
+context and lens dependencies, `conflicts`, and `superseded-by`.
+`applies_to`, `focus`, and `expected_outputs` remain top-level non-Skill lens
+metadata.
 
 Lens fields are graph, catalog, readiness, and inspect metadata. A valid 0.12.0 lens declares `id`, `owner`, `purpose`, and `applies_to`. Lens fields do not make Renma select runtime lenses, rank context, assemble prompts, or inject context into agents.
 
@@ -100,6 +113,40 @@ Skills are agent-facing entrypoints and routing contracts. They explain when a c
 Context assets are independently owned source-of-truth knowledge units. They should carry stronger ownership, lifecycle, usage-boundary, and dependency metadata because they are intended to outlive a single skill.
 
 Keep skills thin. A skill should reference context assets instead of embedding all reusable knowledge directly in `SKILL.md`.
+
+For a canonical Skill, put Renma governance and security values in flat,
+string-valued `metadata.renma.*` entries. Encode list values as JSON arrays of
+strings, including empty lists:
+
+```yaml
+---
+name: spec-review
+description: Review specifications before implementation. Use when a specification needs ambiguity and boundary analysis.
+metadata:
+  renma.id: skill.testing.spec-review
+  renma.title: Spec Review
+  renma.owner: qa-platform
+  renma.status: stable
+  renma.tags: '["testing","spec-review"]'
+  renma.requires-context: '["context.testing.boundary-value-analysis","context.testing.negative-testing"]'
+  renma.optional-context: '["context.domain.payment.idempotency"]'
+---
+```
+
+Do not use comma-separated canonical list values. Boolean security values use
+the exact strings `"true"` or `"false"`. Only a specification-valid Agent Skill
+contributes operational Skill metadata; Renma does not fall back to or merge
+top-level pre-0.16 equivalents. Pre-0.16 and hybrid Skills are migration input
+only, while contexts and other non-Skill assets keep the top-level syntax shown
+earlier.
+
+Canonical security keys are `renma.allowed-data`, `renma.network-allowed`,
+`renma.external-upload-allowed`, `renma.secrets-allowed`,
+`renma.requires-human-approval`, `renma.forbidden-inputs`,
+`renma.approved-network-destinations`, `renma.approved-upload-destinations`, and
+`renma.security-profile`. Lists are JSON-array strings. Native YAML booleans,
+alternate boolean spellings, and malformed lists are rejected rather than
+coerced.
 
 The following uses the pre-0.16 Renma Skill format and is a migration source for
 0.16.0, not the canonical target format. See the Agent Skills compatibility
@@ -136,6 +183,11 @@ renma scaffold skill skills/testing/spec-review/SKILL.md \
   --tags testing,spec-review
 ```
 
+The Skill scaffold writes canonical Agent Skills identity and
+`metadata.renma.*` fields directly. Replace its placeholder prose and fill in
+any required security policy before relying on it. Context and context-lens
+scaffolds keep their existing top-level metadata shape.
+
 If you want to hand the scaffold and authoring constraints to an external or local LLM before creating the file, emit a prompt instead:
 
 ```bash
@@ -166,7 +218,7 @@ For generated skills, the file is intentionally small. Treat it as a starting po
 - Purpose: the recurring task, decision, or workflow the skill guides.
 - Required Inputs: the evidence, files, issue links, specs, diffs, or user answers needed before work begins.
 - Instructions: the routing steps, preflight checks, decision points, and expected handoff.
-- Context References: the durable context assets listed in `requires_context` and `optional_context`.
+- Context References: the durable context assets listed in the scaffold's `renma.requires-context` and `renma.optional-context` metadata.
 - Constraints: safety, ownership, policy, and product-boundary rules the agent must preserve.
 - Validation: the checks that prove the result is ready to review.
 
@@ -223,13 +275,18 @@ renma suggest-metadata skills/testing/spec-review/SKILL.md --owner qa-platform -
 The command emits a deterministic prompt or JSON payload for a human or coding agent. It tells the agent to inspect the existing asset, preserve the Markdown body, preserve existing frontmatter values, add only missing metadata that is clearly supported, and rerun `renma scan .` and `renma ownership .` after editing.
 
 For a Skill target using the pre-0.16 Renma Skill format, `suggest-metadata`
-produces a one-way Agent Skills metadata migration proposal. Separately,
-`skill.md` and `*.skill.md` targets make any required entrypoint rename or move
-explicit, even when their frontmatter already uses Agent Skills fields. For a
-canonical Agent Skill, `--owner` may instead produce a
-`metadata.renma.owner` retrofit; it never causes reverse migration. Unsafe or
-ambiguous input blocks canonical frontmatter. See the normative compatibility
-document for the detailed migration contract.
+produces a one-way Agent Skills metadata migration proposal for all recognized
+governance and security fields. Separately, `skill.md` and `*.skill.md` targets make any required
+entrypoint rename or move explicit, even when their frontmatter already uses
+Agent Skills fields. For a canonical Agent Skill, `--owner` may instead produce
+a `metadata.renma.owner` retrofit; it never causes reverse migration. Unsafe or
+ambiguous input blocks canonical frontmatter.
+
+Pre-0.16 security booleans and lists are converted using the same strict
+canonical serialization rules. Unsafe or ambiguous values block an apply-ready
+proposal instead of being guessed. A specification-valid canonical Skill with
+no requested retrofit produces no migration or rewrite proposal. See the
+normative compatibility document for the detailed migration contract.
 
 Owner policy stays the same: `owner` is recommended governance metadata, not globally required. Renma accepts unowned assets and reports them in ownership coverage. Without `--owner`, the prompt says not to add owner unless one is already declared or a maintainer provides one. With `--owner <owner>`, the prompt may include that owner because it was explicitly provided. If an existing asset already declares an owner, `suggest-metadata` preserves it; a different `--owner` value is treated as a human-review ownership change, not an automatic metadata suggestion. Renma does not infer owners from Git history, file paths, prose, or authors.
 
@@ -271,11 +328,9 @@ Shared context:
 The skill can declare static repository relationships:
 
 ```yaml
-requires_context:
-  - context.testing.boundary-value-analysis
-  - context.testing.negative-testing
-optional_context:
-  - context.domain.payment.idempotency
+metadata:
+  renma.requires-context: '["context.testing.boundary-value-analysis","context.testing.negative-testing"]'
+  renma.optional-context: '["context.domain.payment.idempotency"]'
 ```
 
 Renma records and verifies these relationships in the repository catalog and graph. It does not select runtime context for a task.
@@ -325,9 +380,9 @@ Constraints:
 - do not duplicate reusable setup knowledge
 - move new durable setup guidance into context assets
 - keep the skill thin
-- use requires_context for always-needed context
-- use optional_context for conditional context
-- add conflicts only when two routers should not be used together without review
+- use metadata.renma.requires-context for always-needed context
+- use metadata.renma.optional-context for conditional context
+- use metadata.renma.conflicts only when two routers should not be used together without review
 - do not invent owners or facts
 ```
 
@@ -335,7 +390,7 @@ The LLM should produce a repository patch, not runtime behavior:
 
 - a new `skills/.../SKILL.md`
 - optionally new `contexts/.../*.md`
-- updated `requires_context` and `optional_context`
+- updated `metadata.renma.requires-context` and `metadata.renma.optional-context`
 - no runtime context selection logic
 - no prompt assembly
 - no external service calls
@@ -369,19 +424,16 @@ Example `skills/setup/appium-ios-simulator/SKILL.md` metadata:
 
 ```yaml
 ---
-id: skill.setup.appium-ios-simulator
-title: Appium iOS Simulator Setup
-owner: mobile-platform
-status: experimental
-tags:
-  - setup
-  - appium
-  - ios
-requires_context:
-  - context.tools.appium.setup-basics
-  - context.platform.ios.simulator-setup
-optional_context:
-  - context.tools.appium.capabilities
+name: appium-ios-simulator
+description: Prepare Appium for an iOS Simulator. Use for simulator-based iOS setup, not physical-device setup.
+metadata:
+  renma.id: skill.setup.appium-ios-simulator
+  renma.title: Appium iOS Simulator Setup
+  renma.owner: mobile-platform
+  renma.status: experimental
+  renma.tags: '["setup","appium","ios"]'
+  renma.requires-context: '["context.tools.appium.setup-basics","context.platform.ios.simulator-setup"]'
+  renma.optional-context: '["context.tools.appium.capabilities"]'
 ---
 ```
 
@@ -389,19 +441,16 @@ Example `skills/setup/appium-android-emulator/SKILL.md` metadata:
 
 ```yaml
 ---
-id: skill.setup.appium-android-emulator
-title: Appium Android Emulator Setup
-owner: mobile-platform
-status: experimental
-tags:
-  - setup
-  - appium
-  - android
-requires_context:
-  - context.tools.appium.setup-basics
-  - context.platform.android.emulator-setup
-optional_context:
-  - context.tools.appium.capabilities
+name: appium-android-emulator
+description: Prepare Appium for an Android emulator. Use for emulator-based Android setup, not physical-device setup.
+metadata:
+  renma.id: skill.setup.appium-android-emulator
+  renma.title: Appium Android Emulator Setup
+  renma.owner: mobile-platform
+  renma.status: experimental
+  renma.tags: '["setup","appium","android"]'
+  renma.requires-context: '["context.tools.appium.setup-basics","context.platform.android.emulator-setup"]'
+  renma.optional-context: '["context.tools.appium.capabilities"]'
 ---
 ```
 

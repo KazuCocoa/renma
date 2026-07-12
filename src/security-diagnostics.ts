@@ -5,8 +5,9 @@ import {
   effectiveAllowedDataClass,
   effectiveAllowedDataList,
   isSecurityPolicyLine,
-  parseSecurityPolicy,
+  resolveOperationalSecurityPolicy,
   securityProfileChain,
+  type CanonicalSecurityMetadataIssue,
   type SecurityPolicy,
   type SecurityProfileChain,
 } from "./security-policy.js";
@@ -50,7 +51,7 @@ const RULES = {
     whyItMatters:
       "LLM-facing security policy metadata gives humans and agents a deterministic contract for network, upload, and secret-handling instructions.",
     remediation:
-      "Add explicit security policy metadata such as network_allowed, external_upload_allowed, secrets_allowed, and any approved network destinations.",
+      "For Skills, add canonical metadata.renma.* string fields such as renma.network-allowed and renma.approved-network-destinations. For non-Skills, use the existing top-level policy fields.",
     constraints: [
       "Keep the policy deterministic and local to the artifact.",
       "Do not infer approval from prose alone.",
@@ -62,7 +63,7 @@ const RULES = {
       "Review the security-sensitive instruction against the declared policy.",
     ],
     llmHint:
-      "Add small frontmatter policy fields that describe whether network access, external uploads, and secret material are allowed for this artifact.",
+      "Add small policy fields that describe whether network access, external uploads, and secret material are allowed. Use canonical metadata.renma.* strings for Skills and top-level fields only for non-Skills.",
     confidence: "medium",
     riskClass: "advisory",
   },
@@ -84,6 +85,29 @@ const RULES = {
     ],
     llmHint:
       "Resolve the policy by choosing the stricter allowed behavior or by separating instructions into different assets with explicit metadata.",
+    confidence: "high",
+    riskClass: "violation",
+  },
+  invalidCanonicalPolicyMetadata: {
+    id: DIAGNOSTIC_IDS.SEC_INVALID_CANONICAL_POLICY_METADATA,
+    category: "safety",
+    title: "Canonical Skill security metadata has an invalid encoding",
+    whyItMatters:
+      "An invalid local policy declaration must fail closed instead of inheriting a more permissive profile or repository value.",
+    remediation:
+      "Replace the value only after confirming the intended policy. Do not infer a permissive value from an invalid declaration.",
+    constraints: [
+      "Do not guess the intended boolean, list, or profile value.",
+      "Keep canonical Agent Skills metadata values string-valued.",
+      "Preserve the local declaration as blocked until a human confirms the policy.",
+    ],
+    verificationSteps: [
+      "Run renma scan.",
+      "Confirm the canonical field uses the documented exact encoding.",
+      "Confirm inherited policy does not broaden the rejected local declaration.",
+    ],
+    llmHint:
+      "Inspect the exact metadata.renma.* evidence and ask for human confirmation of the intended policy before replacing it. Do not guess a permissive value.",
     confidence: "high",
     riskClass: "violation",
   },
@@ -671,14 +695,18 @@ function securityFindingsForArtifact(
   artifact: Artifact,
   securityConfig?: SecurityConfig,
 ): Finding[] {
-  const parsedPolicy = parseSecurityPolicy(artifact.content);
+  const policyResolution = resolveOperationalSecurityPolicy(artifact);
+  const parsedPolicy = policyResolution.policy;
   const policy = applySecurityConfig(parsedPolicy, securityConfig);
-  const detections: Detection[] = securityPolicyResolutionDetections(
-    parsedPolicy,
-    policy,
-    securityConfig,
-    artifact.content,
-  );
+  const detections: Detection[] = [
+    ...invalidCanonicalSecurityDetections(policyResolution.issues),
+    ...securityPolicyResolutionDetections(
+      parsedPolicy,
+      policy,
+      securityConfig,
+      artifact.content,
+    ),
+  ];
   const lines = artifact.content.split(/\r?\n/);
   const frontmatterEnd =
     lines[0]?.trim() === "---"
@@ -691,6 +719,7 @@ function securityFindingsForArtifact(
 
   if (
     (artifact.kind === "skill" || artifact.kind === "context") &&
+    !parsedPolicy.invalidDeclared.has("allowedData") &&
     effectiveAllowedDataClass(policy) === undefined &&
     effectiveAllowedDataList(policy).length === 0
   ) {
@@ -861,6 +890,12 @@ function policyDetections(
   const detections: Detection[] = [];
   const defensiveAction = isDefensiveActionInstruction(line);
   const safeOrGuarded = isDefensiveOrGuardedActionInstruction(line);
+  const invalidNetworkAllowlist = policy.invalidDeclared.has(
+    "approvedNetworkDestinations",
+  );
+  const invalidUploadAllowlist = policy.invalidDeclared.has(
+    "approvedUploadDestinations",
+  );
 
   if (
     policy.networkAllowed === false &&
@@ -876,10 +911,15 @@ function policyDetections(
   }
 
   if (
-    policy.networkAllowed !== false &&
-    policy.approvedNetworkDestinations.length > 0
+    invalidNetworkAllowlist ||
+    (policy.networkAllowed !== false &&
+      policy.approvedNetworkDestinations.length > 0)
   ) {
-    for (const destination of unapprovedNetworkDestinations(line, policy)) {
+    for (const destination of unapprovedNetworkDestinations(
+      line,
+      policy,
+      invalidNetworkAllowlist,
+    )) {
       detections.push({
         metadata: RULES.unapprovedNetworkDestination,
         severity: "high",
@@ -904,20 +944,24 @@ function policyDetections(
   }
 
   if (
-    policy.externalUploadAllowed !== false &&
-    policy.approvedUploadDestinations.length > 0 &&
-    isUploadInstruction(line)
+    isUploadInstruction(line) &&
+    (invalidUploadAllowlist ||
+      (policy.externalUploadAllowed !== false &&
+        policy.approvedUploadDestinations.length > 0))
   ) {
     for (const destination of unapprovedDestinations(
       line,
       policy.approvedUploadDestinations,
+      invalidUploadAllowlist,
     )) {
       detections.push({
         metadata: RULES.unapprovedUploadDestination,
         severity: "high",
         startLine: lineNumber,
         snippet: line,
-        dedupeKey: destination.host + destination.path,
+        dedupeKey: invalidUploadAllowlist
+          ? `invalid-upload:${destination.host}${destination.path}`
+          : destination.host + destination.path,
       });
     }
   }
@@ -1217,17 +1261,21 @@ function securityPolicyResolutionDetections(
   }
 
   const chain = securityProfileChain(parsedPolicy.securityProfile, config);
-  const profileLine = parsedPolicy.lineByField.get("securityProfile") ?? 1;
-  const profileSnippet =
-    lineSnippet(content, profileLine) ??
-    `security_profile: ${parsedPolicy.securityProfile}`;
+  const profileEvidence = policyFieldEvidence(
+    parsedPolicy,
+    "securityProfile",
+    content,
+    1,
+    `security_profile: ${parsedPolicy.securityProfile}`,
+  );
 
   if (chain.missingProfile !== undefined) {
     detections.push({
       metadata: RULES.policyProfileNotFound,
       severity: "high",
-      startLine: profileLine,
-      snippet: profileSnippet,
+      startLine: profileEvidence.startLine,
+      endLine: profileEvidence.endLine,
+      snippet: profileEvidence.snippet,
       dedupeKey: `profile-not-found:${chain.missingProfile}`,
     });
     return detections;
@@ -1237,8 +1285,9 @@ function securityPolicyResolutionDetections(
     detections.push({
       metadata: RULES.policyProfileCycle,
       severity: "high",
-      startLine: profileLine,
-      snippet: profileSnippet,
+      startLine: profileEvidence.startLine,
+      endLine: profileEvidence.endLine,
+      snippet: profileEvidence.snippet,
       dedupeKey: `profile-cycle:${chain.cycle.join(">")}`,
     });
     return detections;
@@ -1263,7 +1312,7 @@ function securityPolicyResolutionDetections(
     content,
     "networkAllowed",
     inheritedNetworkAllowed,
-    profileLine,
+    profileEvidence.startLine,
   );
   addScalarOverrideContradiction(
     detections,
@@ -1271,7 +1320,7 @@ function securityPolicyResolutionDetections(
     content,
     "externalUploadAllowed",
     inheritedUploadAllowed,
-    profileLine,
+    profileEvidence.startLine,
   );
   addScalarOverrideContradiction(
     detections,
@@ -1279,7 +1328,7 @@ function securityPolicyResolutionDetections(
     content,
     "secretsAllowed",
     inheritedSecretsAllowed,
-    profileLine,
+    profileEvidence.startLine,
   );
 
   if (
@@ -1293,12 +1342,13 @@ function securityPolicyResolutionDetections(
     detections.push({
       metadata: RULES.policyOverrideContradiction,
       severity: "high",
-      startLine: parsedPolicy.lineByField.get("networkAllowed") ?? profileLine,
-      snippet:
-        lineSnippet(
-          content,
-          parsedPolicy.lineByField.get("networkAllowed") ?? profileLine,
-        ) ?? "network_allowed: false",
+      ...policyFieldDetectionEvidence(
+        parsedPolicy,
+        "networkAllowed",
+        content,
+        profileEvidence.startLine,
+        "network_allowed: false",
+      ),
       dedupeKey: "override-contradiction:network",
     });
   }
@@ -1314,13 +1364,13 @@ function securityPolicyResolutionDetections(
     detections.push({
       metadata: RULES.policyOverrideContradiction,
       severity: "high",
-      startLine:
-        parsedPolicy.lineByField.get("externalUploadAllowed") ?? profileLine,
-      snippet:
-        lineSnippet(
-          content,
-          parsedPolicy.lineByField.get("externalUploadAllowed") ?? profileLine,
-        ) ?? "external_upload_allowed: false",
+      ...policyFieldDetectionEvidence(
+        parsedPolicy,
+        "externalUploadAllowed",
+        content,
+        profileEvidence.startLine,
+        "external_upload_allowed: false",
+      ),
       dedupeKey: "override-contradiction:upload",
     });
   }
@@ -1383,14 +1433,70 @@ function pushOverrideContradiction(
   field: "networkAllowed" | "externalUploadAllowed" | "secretsAllowed",
   fallbackLine: number,
 ): void {
-  const line = parsedPolicy.lineByField.get(field) ?? fallbackLine;
+  const evidence = policyFieldEvidence(
+    parsedPolicy,
+    field,
+    content,
+    fallbackLine,
+    field,
+  );
   detections.push({
     metadata: RULES.policyOverrideContradiction,
     severity: "high",
-    startLine: line,
-    snippet: lineSnippet(content, line) ?? field,
+    startLine: evidence.startLine,
+    endLine: evidence.endLine,
+    snippet: evidence.snippet,
     dedupeKey: `override-contradiction:${field}`,
   });
+}
+
+function invalidCanonicalSecurityDetections(
+  issues: CanonicalSecurityMetadataIssue[],
+): Detection[] {
+  return issues.map((issue) => ({
+    metadata: {
+      ...RULES.invalidCanonicalPolicyMetadata,
+      title: `Invalid metadata.${issue.key}: ${issue.reason}.`,
+    },
+    severity: "high",
+    startLine: issue.startLine,
+    endLine: issue.endLine,
+    snippet: issue.snippet,
+    dedupeKey: `invalid-canonical-policy:${issue.key}:${issue.startLine}`,
+  }));
+}
+
+function policyFieldEvidence(
+  policy: SecurityPolicy,
+  field: string,
+  content: string,
+  fallbackLine: number,
+  fallbackSnippet: string,
+): { startLine: number; endLine: number; snippet: string } {
+  const canonical = policy.evidenceByField.get(field);
+  if (canonical !== undefined) return canonical;
+  const startLine = policy.lineByField.get(field) ?? fallbackLine;
+  return {
+    startLine,
+    endLine: startLine,
+    snippet: lineSnippet(content, startLine) ?? fallbackSnippet,
+  };
+}
+
+function policyFieldDetectionEvidence(
+  policy: SecurityPolicy,
+  field: string,
+  content: string,
+  fallbackLine: number,
+  fallbackSnippet: string,
+): Pick<Detection, "startLine" | "endLine" | "snippet"> {
+  return policyFieldEvidence(
+    policy,
+    field,
+    content,
+    fallbackLine,
+    fallbackSnippet,
+  );
 }
 
 function forbiddenInputDetection(
@@ -1430,14 +1536,23 @@ function lineSnippet(content: string, line: number): string | undefined {
 function unapprovedNetworkDestinations(
   line: string,
   policy: SecurityPolicy,
+  invalidAllowlist = false,
 ): NetworkDestination[] {
-  return unapprovedDestinations(line, policy.approvedNetworkDestinations);
+  return unapprovedDestinations(
+    line,
+    policy.approvedNetworkDestinations,
+    invalidAllowlist,
+  );
 }
 
 function unapprovedDestinations(
   line: string,
   approvedDestinations: string[],
+  invalidAllowlist = false,
 ): NetworkDestination[] {
+  const destinations = extractNetworkDestinations(line);
+  if (invalidAllowlist) return destinations;
+
   const approved = approvedDestinations
     .map((destination) => normalizeNetworkDestination(destination))
     .filter(
@@ -1448,7 +1563,7 @@ function unapprovedDestinations(
     return [];
   }
 
-  return extractNetworkDestinations(line).filter(
+  return destinations.filter(
     (destination) =>
       !approved.some((approvedDestination) =>
         networkDestinationMatches(destination, approvedDestination),
@@ -1723,7 +1838,11 @@ function findingFromDetection(
       path: artifact.path,
       startLine: detection.startLine,
       endLine: detection.endLine ?? detection.startLine,
-      snippet: snippet(detection.snippet),
+      snippet:
+        detection.endLine !== undefined &&
+        detection.endLine > detection.startLine
+          ? detection.snippet.trim().slice(0, 1000)
+          : snippet(detection.snippet),
     },
     whyItMatters: detection.metadata.whyItMatters,
     remediation: detection.metadata.remediation,

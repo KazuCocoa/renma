@@ -167,6 +167,122 @@ test("structurally unsafe Skill migration never renders canonical frontmatter", 
   }
 });
 
+test("duplicate top-level metadata mappings select no structured canonical metadata", async () => {
+  const { target } = await skillFixture(
+    "demo",
+    `---
+name: demo
+description: Review demo inputs. Use when a demo needs review.
+id: skill.demo
+owner: legacy-team
+metadata:
+  renma.owner: first-team
+  other-client.priority: first
+metadata:
+  renma.owner: second-team
+  other-client.priority: second
+---
+# Demo
+`,
+  );
+
+  const suggestion = await buildMetadataSuggestion(target, {
+    owner: "explicit-team",
+  });
+
+  assert.equal(suggestion.agentSkills?.canonicalFrontmatter, undefined);
+  assert.ok(
+    suggestion.blockedMetadata.some((item) => item.field === "metadata"),
+  );
+  assert.deepEqual(suggestion.agentSkills?.candidateRenmaMetadata, {});
+  assert.deepEqual(suggestion.agentSkills?.preservedMetadata, {});
+});
+
+test("duplicated metadata child keys are absent from every structured metadata source", async () => {
+  const { target } = await skillFixture(
+    "demo",
+    `---
+name: demo
+description: Review demo inputs. Use when a demo needs review.
+id: skill.demo
+owner: legacy-team
+metadata:
+  renma.owner: first-team
+  renma.owner: second-team
+  renma.tags: '["demo"]'
+  other-client.priority: high
+---
+# Demo
+`,
+  );
+
+  const suggestion = await buildMetadataSuggestion(target, {
+    owner: "explicit-team",
+  });
+
+  assert.equal(suggestion.agentSkills?.canonicalFrontmatter, undefined);
+  assert.ok(
+    suggestion.blockedMetadata.some(
+      (item) => item.field === "metadata.renma.owner",
+    ),
+  );
+  assert.equal(
+    suggestion.agentSkills?.candidateRenmaMetadata["renma.owner"],
+    undefined,
+  );
+  assert.equal(
+    suggestion.agentSkills?.preservedMetadata["renma.owner"],
+    undefined,
+  );
+  assert.deepEqual(suggestion.agentSkills?.candidateRenmaMetadata, {
+    "renma.tags": '["demo"]',
+    "renma.id": "skill.demo",
+  });
+  assert.deepEqual(suggestion.agentSkills?.preservedMetadata, {
+    "renma.tags": '["demo"]',
+    "other-client.priority": "high",
+    "renma.id": "skill.demo",
+  });
+});
+
+test("canonical owner retrofit does not replace a duplicated owner", async () => {
+  const { target } = await skillFixture(
+    "demo",
+    `---
+name: demo
+description: Review demo inputs. Use when a demo needs review.
+metadata:
+  renma.owner: first-team
+  renma.owner: second-team
+---
+# Demo
+`,
+  );
+
+  const suggestion = await buildMetadataSuggestion(target, {
+    owner: "explicit-team",
+  });
+
+  assert.equal(
+    suggestion.agentSkills?.proposalKind,
+    "canonical-metadata-retrofit",
+  );
+  assert.equal(suggestion.agentSkills?.canonicalFrontmatter, undefined);
+  assert.ok(
+    suggestion.blockedMetadata.some(
+      (item) => item.field === "metadata.renma.owner",
+    ),
+  );
+  assert.equal(
+    suggestion.agentSkills?.candidateRenmaMetadata["renma.owner"],
+    undefined,
+  );
+  assert.equal(
+    suggestion.agentSkills?.preservedMetadata["renma.owner"],
+    undefined,
+  );
+});
+
 test("migration preserves unknown Renma and other-vendor metadata", async () => {
   const { target } = await skillFixture(
     "demo",
@@ -252,7 +368,6 @@ test("migration blocks arrays for scalar historical fields", async () => {
     ["owner", "qa-platform"],
     ["id", "skill.demo"],
     ["status", "stable"],
-    ["network_allowed", "true"],
   ] as const) {
     const { target } = await skillFixture(
       "demo",
@@ -275,25 +390,17 @@ Use this skill when reviewing demo inputs.
       undefined,
       field,
     );
-    assert.match(
-      block?.reason ?? "",
-      field === "network_allowed"
-        ? /must be a boolean or the string/
-        : /must be a YAML string/,
-      field,
-    );
+    assert.match(block?.reason ?? "", /must be a YAML string/, field);
   }
 });
 
-test("migration accepts arrays for established list fields", async () => {
+test("migration accepts arrays for canonical list fields", async () => {
   const { target } = await skillFixture(
     "demo",
     `---
 id: skill.demo
 tags: [demo, review]
 requires_context: [context.demo, context.review]
-allowed_data: [public, internal]
-forbidden_inputs: [secrets, credentials]
 ---
 # Demo
 
@@ -310,12 +417,184 @@ Use this skill when reviewing demo inputs.
     metadata?.["renma.requires-context"],
     '["context.demo","context.review"]',
   );
-  assert.equal(metadata?.["renma.allowed-data"], '["public","internal"]');
-  assert.equal(
-    metadata?.["renma.forbidden-inputs"],
-    '["secrets","credentials"]',
-  );
   assert.ok(suggestion.agentSkills?.canonicalFrontmatter);
+});
+
+test("migration serializes legacy boolean security policy as canonical strings", async () => {
+  const { target, original } = await skillFixture(
+    "demo",
+    `---
+id: skill.demo
+network_allowed: true
+---
+# Demo
+
+Use this skill when reviewing demo inputs.
+`,
+  );
+
+  const suggestion = await buildMetadataSuggestion(target);
+  assert.equal(await readFile(target, "utf8"), original);
+  assert.deepEqual(suggestion.blockedMetadata, []);
+  assert.equal(
+    suggestion.agentSkills?.candidateRenmaMetadata["renma.network-allowed"],
+    "true",
+  );
+  assert.match(
+    suggestion.agentSkills?.canonicalFrontmatter ?? "",
+    /renma\.network-allowed: "true"/,
+  );
+  assert.match(
+    suggestion.agentSkills?.reviewPrompt ?? "",
+    /Review the canonical frontmatter proposal/,
+  );
+});
+
+test("migration serializes legacy security lists as canonical JSON strings", async () => {
+  for (const fixture of [
+    {
+      field: "allowed_data",
+      canonicalKey: "renma.allowed-data",
+      value: "[public, internal]",
+      expected: '["public","internal"]',
+    },
+    {
+      field: "forbidden_inputs",
+      canonicalKey: "renma.forbidden-inputs",
+      value: "[secrets, credentials]",
+      expected: '["secrets","credentials"]',
+    },
+  ]) {
+    const { target, original } = await skillFixture(
+      "demo",
+      `---
+id: skill.demo
+${fixture.field}: ${fixture.value}
+---
+# Demo
+
+Use this skill when reviewing demo inputs.
+`,
+    );
+
+    const suggestion = await buildMetadataSuggestion(target);
+    assert.equal(await readFile(target, "utf8"), original, fixture.field);
+    assert.deepEqual(suggestion.blockedMetadata, [], fixture.field);
+    assert.equal(
+      suggestion.agentSkills?.candidateRenmaMetadata[fixture.canonicalKey],
+      fixture.expected,
+      fixture.field,
+    );
+    assert.ok(suggestion.agentSkills?.canonicalFrontmatter, fixture.field);
+  }
+});
+
+test("migration candidates reject invalid existing canonical security metadata", async () => {
+  for (const fixture of [
+    {
+      key: "renma.network-allowed",
+      value: '"yes"',
+      expected: /expected the exact string "true" or "false"/,
+    },
+    {
+      key: "renma.allowed-data",
+      value: "public,internal",
+      expected: /expected a JSON-array string containing strings only/,
+    },
+  ]) {
+    const { target } = await skillFixture(
+      "demo",
+      `---
+name: demo
+description: Review demo inputs. Use when demo inputs need review.
+owner: qa-platform
+metadata:
+  ${fixture.key}: ${fixture.value}
+---
+# Demo
+`,
+    );
+    const suggestion = await buildMetadataSuggestion(target);
+    const block = suggestion.blockedMetadata.find(
+      (item) => item.field === `metadata.${fixture.key}`,
+    );
+
+    assert.equal(suggestion.agentSkills?.canonicalFrontmatter, undefined);
+    assert.match(block?.reason ?? "", fixture.expected);
+  }
+});
+
+test("historical entrypoint migration validates preserved canonical security metadata", async () => {
+  const { target } = await skillEntrypointFixture(
+    "skills/demo/skill.md",
+    `---
+name: demo
+description: Review demo inputs. Use when demo inputs need review.
+metadata:
+  renma.network-allowed: "yes"
+---
+# Demo
+`,
+  );
+  const suggestion = await buildMetadataSuggestion(target);
+
+  assert.equal(suggestion.agentSkills?.canonicalFrontmatter, undefined);
+  assert.ok(
+    suggestion.blockedMetadata.some(
+      (item) => item.field === "metadata.renma.network-allowed",
+    ),
+  );
+});
+
+test("migration candidates preserve valid existing canonical security metadata", async () => {
+  const { target } = await skillFixture(
+    "demo",
+    `---
+name: demo
+description: Review demo inputs. Use when demo inputs need review.
+owner: qa-platform
+metadata:
+  renma.network-allowed: "false"
+  renma.allowed-data: '["public"]'
+---
+# Demo
+`,
+  );
+  const suggestion = await buildMetadataSuggestion(target);
+
+  assert.deepEqual(suggestion.blockedMetadata, []);
+  assert.match(
+    suggestion.agentSkills?.canonicalFrontmatter ?? "",
+    /renma\.network-allowed: "false"/,
+  );
+  assert.match(
+    suggestion.agentSkills?.canonicalFrontmatter ?? "",
+    /renma\.allowed-data: '\["public"\]'/,
+  );
+});
+
+test("canonical owner retrofit rejects invalid canonical security metadata", async () => {
+  const { target } = await skillFixture(
+    "demo",
+    `---
+name: demo
+description: Review demo inputs. Use when demo inputs need review.
+metadata:
+  renma.network-allowed: "flase"
+---
+# Demo
+`,
+  );
+  const suggestion = await buildMetadataSuggestion(target, {
+    owner: "qa-platform",
+  });
+
+  assert.equal(suggestion.agentSkills?.canonicalFrontmatter, undefined);
+  assert.ok(
+    suggestion.blockedMetadata.some(
+      (item) => item.field === "metadata.renma.network-allowed",
+    ),
+  );
 });
 
 test("migration recognizes established purpose and freshness fields", async () => {
@@ -469,16 +748,16 @@ test("migration blocks lossy native YAML values", async () => {
         /Pre-0\.16 Renma Skill field tags must contain string values only/,
     },
     {
-      field: "allowed_data",
-      yaml: "allowed_data: [true]",
-      message:
-        /Pre-0\.16 Renma Skill field allowed_data must contain string values only/,
-    },
-    {
       field: "network_allowed",
       yaml: "network_allowed: 1",
       message:
         /Pre-0\.16 Renma Skill field network_allowed must be a boolean or the string/,
+    },
+    {
+      field: "allowed_data",
+      yaml: "allowed_data: [true]",
+      message:
+        /Pre-0\.16 Renma Skill field allowed_data must contain string values only/,
     },
   ];
 
@@ -510,6 +789,7 @@ test("migration preserves quoted text, safe booleans, and string-only lists", as
     ["tags", `tags: '["1.0"]'`, '["1.0"]'],
     ["network-allowed", "network_allowed: false", "false"],
     ["network-allowed", 'network_allowed: "true"', "true"],
+    ["security-profile", "security_profile: strict-local", "strict-local"],
   ] as const;
 
   for (const [canonicalSuffix, yaml, expected] of cases) {

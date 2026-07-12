@@ -1,4 +1,13 @@
-import type { SecurityConfig } from "./types.js";
+import { inspectAgentSkill } from "./agent-skills.js";
+import { parseDocument } from "./markdown.js";
+import type { Artifact, ParsedDocument, SecurityConfig } from "./types.js";
+import type { YamlFrontmatterField } from "./yaml-frontmatter.js";
+
+export interface SecurityPolicyFieldEvidence {
+  startLine: number;
+  endLine: number;
+  snippet: string;
+}
 
 export interface SecurityPolicy {
   networkAllowed?: boolean;
@@ -13,7 +22,34 @@ export interface SecurityPolicy {
   approvedUploadDestinations: string[];
   disallowedCommands: string[];
   declared: Set<string>;
+  invalidDeclared: Set<string>;
   lineByField: Map<string, number>;
+  evidenceByField: Map<string, SecurityPolicyFieldEvidence>;
+}
+
+export type CanonicalSecurityOperationalField =
+  | "networkAllowed"
+  | "externalUploadAllowed"
+  | "secretsAllowed"
+  | "humanApprovalRequired"
+  | "allowedData"
+  | "forbiddenInputs"
+  | "approvedNetworkDestinations"
+  | "approvedUploadDestinations"
+  | "securityProfile";
+
+export interface CanonicalSecurityMetadataIssue {
+  key: string;
+  operationalField: CanonicalSecurityOperationalField;
+  reason: string;
+  startLine: number;
+  endLine: number;
+  snippet: string;
+}
+
+export interface CanonicalSecurityMetadataResult {
+  policy: SecurityPolicy;
+  issues: CanonicalSecurityMetadataIssue[];
 }
 
 export interface SecurityProfileChainItem {
@@ -43,21 +79,96 @@ const ALLOWED_DATA_POLICY_FIELDS = new Set(["allowed_data"]);
 const FORBIDDEN_INPUT_POLICY_FIELDS = new Set(["forbidden_inputs"]);
 const SECURITY_PROFILE_POLICY_FIELDS = new Set(["security_profile"]);
 
+type CanonicalSecurityFieldDefinition =
+  | {
+      key: string;
+      operationalField:
+        | "networkAllowed"
+        | "externalUploadAllowed"
+        | "secretsAllowed"
+        | "humanApprovalRequired";
+      encoding: "boolean";
+    }
+  | {
+      key: string;
+      operationalField:
+        | "allowedData"
+        | "forbiddenInputs"
+        | "approvedNetworkDestinations"
+        | "approvedUploadDestinations";
+      encoding: "list";
+    }
+  | {
+      key: string;
+      operationalField: "securityProfile";
+      encoding: "profile";
+    };
+
+const CANONICAL_SECURITY_FIELD_DEFINITIONS = [
+  {
+    key: "renma.network-allowed",
+    operationalField: "networkAllowed",
+    encoding: "boolean",
+  },
+  {
+    key: "renma.external-upload-allowed",
+    operationalField: "externalUploadAllowed",
+    encoding: "boolean",
+  },
+  {
+    key: "renma.secrets-allowed",
+    operationalField: "secretsAllowed",
+    encoding: "boolean",
+  },
+  {
+    key: "renma.requires-human-approval",
+    operationalField: "humanApprovalRequired",
+    encoding: "boolean",
+  },
+  {
+    key: "renma.allowed-data",
+    operationalField: "allowedData",
+    encoding: "list",
+  },
+  {
+    key: "renma.forbidden-inputs",
+    operationalField: "forbiddenInputs",
+    encoding: "list",
+  },
+  {
+    key: "renma.approved-network-destinations",
+    operationalField: "approvedNetworkDestinations",
+    encoding: "list",
+  },
+  {
+    key: "renma.approved-upload-destinations",
+    operationalField: "approvedUploadDestinations",
+    encoding: "list",
+  },
+  {
+    key: "renma.security-profile",
+    operationalField: "securityProfile",
+    encoding: "profile",
+  },
+] as const satisfies readonly CanonicalSecurityFieldDefinition[];
+
+const CANONICAL_SECURITY_FIELDS: ReadonlyMap<
+  string,
+  CanonicalSecurityFieldDefinition
+> = new Map(
+  CANONICAL_SECURITY_FIELD_DEFINITIONS.map((definition) => [
+    definition.key,
+    definition,
+  ]),
+);
+
 type ParsedBlockList = {
   values: string[];
   nextIndex: number;
 };
 
 export function parseSecurityPolicy(content: string): SecurityPolicy {
-  const policy: SecurityPolicy = {
-    allowedData: [],
-    forbiddenInputs: [],
-    approvedNetworkDestinations: [],
-    approvedUploadDestinations: [],
-    disallowedCommands: [],
-    declared: new Set(),
-    lineByField: new Map(),
-  };
+  const policy = emptySecurityPolicy();
 
   const lines = content.split(/\r?\n/);
   const frontmatterEnd =
@@ -139,6 +250,109 @@ export function parseSecurityPolicy(content: string): SecurityPolicy {
   return policy;
 }
 
+/** Resolve the operational security source for one repository artifact. */
+export function parseOperationalSecurityPolicy(
+  input: Artifact | ParsedDocument,
+): SecurityPolicy {
+  return resolveOperationalSecurityPolicy(input).policy;
+}
+
+/** Resolve operational policy together with canonical semantic issues. */
+export function resolveOperationalSecurityPolicy(
+  input: Artifact | ParsedDocument,
+): CanonicalSecurityMetadataResult {
+  const document = isParsedDocument(input) ? input : parseDocument(input);
+  if (document.artifact.kind !== "skill") {
+    return {
+      policy: parseSecurityPolicy(document.artifact.content),
+      issues: [],
+    };
+  }
+
+  const inspection = inspectAgentSkill(document);
+  const semantic = validateCanonicalSecurityMetadata(document);
+  if (inspection.validation.valid) return semantic;
+
+  const policy = emptySecurityPolicy();
+  for (const issue of semantic.issues) {
+    recordInvalidCanonicalPolicyField(policy, issue.operationalField, issue);
+  }
+  return { policy, issues: semantic.issues };
+}
+
+/** Parse and validate every recognized metadata.renma.* security field. */
+export function validateCanonicalSecurityMetadata(
+  document: ParsedDocument,
+): CanonicalSecurityMetadataResult {
+  const inspection = inspectAgentSkill(document);
+  const policy = emptySecurityPolicy();
+  const issues: CanonicalSecurityMetadataIssue[] = [];
+  for (const field of inspection.frontmatter.metadataFields) {
+    const definition = CANONICAL_SECURITY_FIELDS.get(field.key);
+    if (definition === undefined) continue;
+
+    if (definition.encoding === "boolean") {
+      if (field.value === "true" || field.value === "false") {
+        policy[definition.operationalField] = field.value === "true";
+        recordCanonicalPolicyField(
+          document,
+          policy,
+          definition.operationalField,
+          field,
+        );
+      } else {
+        recordCanonicalSecurityIssue(
+          document,
+          policy,
+          issues,
+          definition,
+          field,
+          'expected the exact string "true" or "false"',
+        );
+      }
+    } else if (definition.encoding === "list") {
+      const values = canonicalStringArray(field.value);
+      if (values === undefined) {
+        recordCanonicalSecurityIssue(
+          document,
+          policy,
+          issues,
+          definition,
+          field,
+          "expected a JSON-array string containing strings only",
+        );
+      } else {
+        policy[definition.operationalField].push(...values);
+        recordCanonicalPolicyField(
+          document,
+          policy,
+          definition.operationalField,
+          field,
+        );
+      }
+    } else if (typeof field.value !== "string" || !field.value.trim()) {
+      recordCanonicalSecurityIssue(
+        document,
+        policy,
+        issues,
+        definition,
+        field,
+        "expected a trimmed non-empty string",
+      );
+    } else {
+      policy.securityProfile = field.value.trim();
+      recordCanonicalPolicyField(
+        document,
+        policy,
+        definition.operationalField,
+        field,
+      );
+    }
+  }
+
+  return { policy, issues };
+}
+
 export function applySecurityConfig(
   policy: SecurityPolicy,
   config?: SecurityConfig,
@@ -146,7 +360,9 @@ export function applySecurityConfig(
   if (config === undefined) return policy;
 
   const declared = new Set(policy.declared);
+  const invalidDeclared = new Set(policy.invalidDeclared);
   const lineByField = new Map(policy.lineByField);
+  const evidenceByField = new Map(policy.evidenceByField);
   const resolved: SecurityPolicy = {
     ...policy,
     allowedData: [...policy.allowedData],
@@ -155,55 +371,80 @@ export function applySecurityConfig(
     approvedUploadDestinations: [...policy.approvedUploadDestinations],
     disallowedCommands: [...policy.disallowedCommands],
     declared,
+    invalidDeclared,
     lineByField,
+    evidenceByField,
   };
 
   const chain = securityProfileChain(policy.securityProfile, config);
+  setResolvedBoolean(
+    resolved,
+    "networkAllowed",
+    resolvePermissionBoolean(
+      policy.networkAllowed,
+      inheritedProfileBoolean(chain, "networkAllowed"),
+      policy.invalidDeclared.has("networkAllowed"),
+    ),
+  );
+  setResolvedBoolean(
+    resolved,
+    "externalUploadAllowed",
+    resolvePermissionBoolean(
+      policy.externalUploadAllowed,
+      inheritedProfileBoolean(chain, "externalUploadAllowed"),
+      policy.invalidDeclared.has("externalUploadAllowed"),
+    ),
+  );
+  setResolvedBoolean(
+    resolved,
+    "secretsAllowed",
+    resolvePermissionBoolean(
+      policy.secretsAllowed,
+      inheritedProfileBoolean(chain, "secretsAllowed"),
+      policy.invalidDeclared.has("secretsAllowed"),
+    ),
+  );
+  setResolvedBoolean(
+    resolved,
+    "humanApprovalRequired",
+    resolveRequiredBoolean(
+      policy.humanApprovalRequired,
+      inheritedProfileBoolean(chain, "humanApprovalRequired"),
+      policy.invalidDeclared.has("humanApprovalRequired"),
+    ),
+  );
+
   for (const item of chain.profiles) {
     const profile = item.profile;
     if (
-      !declared.has("networkAllowed") &&
-      profile.networkAllowed !== undefined
-    ) {
-      resolved.networkAllowed = profile.networkAllowed;
-    }
-    if (
-      !declared.has("externalUploadAllowed") &&
-      profile.externalUploadAllowed !== undefined
-    ) {
-      resolved.externalUploadAllowed = profile.externalUploadAllowed;
-    }
-    if (
-      !declared.has("secretsAllowed") &&
-      profile.secretsAllowed !== undefined
-    ) {
-      resolved.secretsAllowed = profile.secretsAllowed;
-    }
-    if (
-      !declared.has("humanApprovalRequired") &&
-      profile.humanApprovalRequired !== undefined
-    ) {
-      resolved.humanApprovalRequired = profile.humanApprovalRequired;
-    }
-    if (
-      !declared.has("allowedData") &&
+      mayInheritAllowedData(policy) &&
       profile.allowedDataClass !== undefined
     ) {
       resolved.allowedDataClass = profile.allowedDataClass;
     }
-    if (!declared.has("allowedData")) {
+    if (mayInheritAllowedData(policy)) {
       resolved.allowedData.push(...profile.allowedData);
     }
-    if (!declared.has("forbiddenInputs")) {
+    if (mayInheritForbiddenInputs(policy)) {
       resolved.forbiddenInputs.push(...profile.forbiddenInputs);
     }
-    resolved.approvedNetworkDestinations.push(...profile.approvedDomains);
-    resolved.approvedUploadDestinations.push(...profile.approvedUploadDomains);
+    if (mayAccumulate(policy, "approvedNetworkDestinations")) {
+      resolved.approvedNetworkDestinations.push(...profile.approvedDomains);
+    }
+    if (mayAccumulate(policy, "approvedUploadDestinations")) {
+      resolved.approvedUploadDestinations.push(
+        ...profile.approvedUploadDomains,
+      );
+    }
     resolved.disallowedCommands.push(...profile.disallowedCommands);
   }
 
-  resolved.approvedNetworkDestinations.push(...config.approvedDomains);
-  resolved.approvedUploadDestinations.push(...config.approvedUploadDomains);
+  if (mayAccumulate(policy, "approvedNetworkDestinations")) {
+    resolved.approvedNetworkDestinations.push(...config.approvedDomains);
+  }
+  if (mayAccumulate(policy, "approvedUploadDestinations")) {
+    resolved.approvedUploadDestinations.push(...config.approvedUploadDomains);
+  }
   resolved.disallowedCommands.push(...config.disallowedCommands);
   resolved.allowedData = uniqueStrings(resolved.allowedData);
   resolved.forbiddenInputs = uniqueStrings(resolved.forbiddenInputs);
@@ -216,6 +457,173 @@ export function applySecurityConfig(
   resolved.disallowedCommands = uniqueStrings(resolved.disallowedCommands);
 
   return resolved;
+}
+
+function emptySecurityPolicy(): SecurityPolicy {
+  return {
+    allowedData: [],
+    forbiddenInputs: [],
+    approvedNetworkDestinations: [],
+    approvedUploadDestinations: [],
+    disallowedCommands: [],
+    declared: new Set(),
+    invalidDeclared: new Set(),
+    lineByField: new Map(),
+    evidenceByField: new Map(),
+  };
+}
+
+function isParsedDocument(
+  input: Artifact | ParsedDocument,
+): input is ParsedDocument {
+  return "artifact" in input;
+}
+
+function canonicalStringArray(value: unknown): string[] | undefined {
+  if (typeof value !== "string") return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+  if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "string"))
+    return undefined;
+  return parsed.map((item) => item.trim()).filter(Boolean);
+}
+
+function recordCanonicalSecurityIssue(
+  document: ParsedDocument,
+  policy: SecurityPolicy,
+  issues: CanonicalSecurityMetadataIssue[],
+  definition: CanonicalSecurityFieldDefinition,
+  field: YamlFrontmatterField,
+  expectation: string,
+): void {
+  const evidence = canonicalFieldEvidence(document, field);
+  const issue: CanonicalSecurityMetadataIssue = {
+    key: definition.key,
+    operationalField: definition.operationalField,
+    reason: `${expectation}; rejected ${describeRejectedValue(field.value)}`,
+    ...evidence,
+  };
+  issues.push(issue);
+  recordInvalidCanonicalPolicyField(policy, definition.operationalField, issue);
+}
+
+function recordInvalidCanonicalPolicyField(
+  policy: SecurityPolicy,
+  operationalField: CanonicalSecurityOperationalField,
+  evidence: SecurityPolicyFieldEvidence,
+): void {
+  policy.invalidDeclared.add(operationalField);
+  policy.lineByField.set(operationalField, evidence.startLine);
+  policy.evidenceByField.set(operationalField, evidence);
+}
+
+function describeRejectedValue(value: unknown): string {
+  if (typeof value === "string") return JSON.stringify(value);
+  const serialized = JSON.stringify(value);
+  return serialized === undefined ? String(value) : serialized;
+}
+
+function canonicalFieldEvidence(
+  document: ParsedDocument,
+  field: Pick<YamlFrontmatterField, "startLine" | "endLine">,
+): SecurityPolicyFieldEvidence {
+  return {
+    startLine: field.startLine,
+    endLine: field.endLine,
+    snippet: document.lines
+      .slice(field.startLine - 1, field.endLine)
+      .join("\n"),
+  };
+}
+
+function recordCanonicalPolicyField(
+  document: ParsedDocument,
+  policy: SecurityPolicy,
+  operationalField: string,
+  field: {
+    startLine: number;
+    endLine: number;
+  },
+): void {
+  policy.declared.add(operationalField);
+  policy.lineByField.set(operationalField, field.startLine);
+  policy.evidenceByField.set(
+    operationalField,
+    canonicalFieldEvidence(document, field),
+  );
+}
+
+function resolvePermissionBoolean(
+  local: boolean | undefined,
+  inherited: boolean | undefined,
+  invalid: boolean,
+): boolean | undefined {
+  if (local !== undefined) return local;
+  if (invalid) return inherited === false ? false : undefined;
+  return inherited;
+}
+
+function setResolvedBoolean(
+  policy: SecurityPolicy,
+  field:
+    | "networkAllowed"
+    | "externalUploadAllowed"
+    | "secretsAllowed"
+    | "humanApprovalRequired",
+  value: boolean | undefined,
+): void {
+  if (value === undefined) {
+    delete policy[field];
+  } else {
+    policy[field] = value;
+  }
+}
+
+function resolveRequiredBoolean(
+  local: boolean | undefined,
+  inherited: boolean | undefined,
+  invalid: boolean,
+): boolean | undefined {
+  if (local !== undefined) return local;
+  if (invalid) return inherited === true ? true : undefined;
+  return inherited;
+}
+
+function inheritedProfileBoolean(
+  chain: SecurityProfileChain,
+  field:
+    | "networkAllowed"
+    | "externalUploadAllowed"
+    | "secretsAllowed"
+    | "humanApprovalRequired",
+): boolean | undefined {
+  let inherited: boolean | undefined;
+  for (const item of chain.profiles) {
+    if (item.profile[field] !== undefined) inherited = item.profile[field];
+  }
+  return inherited;
+}
+
+function mayInheritAllowedData(policy: SecurityPolicy): boolean {
+  return (
+    !policy.declared.has("allowedData") &&
+    !policy.invalidDeclared.has("allowedData")
+  );
+}
+
+function mayInheritForbiddenInputs(policy: SecurityPolicy): boolean {
+  return !policy.declared.has("forbiddenInputs");
+}
+
+function mayAccumulate(
+  policy: SecurityPolicy,
+  field: "approvedNetworkDestinations" | "approvedUploadDestinations",
+): boolean {
+  return !policy.invalidDeclared.has(field);
 }
 
 export function securityProfileChain(
@@ -263,10 +671,11 @@ export function effectiveAllowedDataList(policy: SecurityPolicy): string[] {
 }
 
 export function isSecurityPolicyLine(line: string): boolean {
-  const key = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*):/)?.[1];
+  const key = line.match(/^\s*([A-Za-z_][A-Za-z0-9_.-]*):/)?.[1];
   return (
     key !== undefined &&
-    (BOOLEAN_POLICY_FIELDS.has(key) ||
+    (CANONICAL_SECURITY_FIELDS.has(key) ||
+      BOOLEAN_POLICY_FIELDS.has(key) ||
       DESTINATION_POLICY_FIELDS.has(key) ||
       UPLOAD_DESTINATION_POLICY_FIELDS.has(key) ||
       ALLOWED_DATA_POLICY_FIELDS.has(key) ||

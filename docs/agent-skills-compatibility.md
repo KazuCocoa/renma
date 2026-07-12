@@ -70,6 +70,98 @@ Do not use unprefixed shared keys such as `metadata.owner`. Do not use a nested
 metadata remain valid metadata and are preserved during migration without
 interpretation.
 
+## Operational Renma Metadata
+
+Renma 0.16.0 makes these governance keys operational for specification-valid
+Agent Skills:
+
+```text
+renma.id
+renma.title
+renma.version
+renma.owner
+renma.status
+renma.purpose
+renma.last-reviewed-at
+renma.review-cycle
+renma.expires-at
+renma.tags
+renma.when-to-use
+renma.when-not-to-use
+renma.requires-context
+renma.optional-context
+renma.requires-lens
+renma.optional-lens
+renma.conflicts
+renma.superseded-by
+```
+
+Renma normalizes these values into the existing asset metadata model used by
+scan findings, inspect, catalog, ownership, graph and dependency resolution,
+readiness, BOM, Trust Graph, diff, and CI reporting. This is a serialization
+change, not a second governance model or a change to those consumers'
+semantics.
+
+Text values are trimmed strings, and `renma.status` retains the existing
+`experimental`, `stable`, `deprecated`, and `archived` lifecycle values. List
+values are JSON-array strings containing strings only:
+
+```yaml
+metadata:
+  renma.tags: '["testing","spec-review"]'
+  renma.requires-context: '["context.testing.boundaries"]'
+  renma.optional-context: '[]'
+```
+
+Canonical list metadata is not comma-separated. Malformed JSON, non-array
+JSON, and non-string array members are invalid rather than guessed. Diagnostics
+for canonical values retain evidence for the specific child key under
+`metadata`, not just the parent mapping.
+
+Empty text, invalid status, and invalid lifecycle or freshness values retain
+their existing operational diagnostic semantics and stable finding IDs where
+applicable.
+
+Operational source selection is explicit:
+
+```text
+specification-valid Agent Skill
+  -> governance and security metadata comes only from metadata.renma.*
+
+invalid, hybrid, or pre-0.16 Skill
+  -> no operational Skill metadata; suggest-metadata may use it as migration input
+
+non-Skill asset
+  -> existing top-level Renma metadata syntax
+```
+
+An Agent Skill must pass the Agent Skills specification checks before any Renma
+metadata becomes operational. Renma authoring warnings do not block operational
+metadata. A Skill never falls back to or merges top-level pre-0.16 equivalents.
+Contexts, context lenses, profiles, references, examples, agents,
+configuration files, and other non-Skill assets keep their existing metadata
+syntax and behavior.
+
+These security keys are also operational under `metadata`:
+
+```text
+renma.allowed-data
+renma.network-allowed
+renma.external-upload-allowed
+renma.secrets-allowed
+renma.requires-human-approval
+renma.forbidden-inputs
+renma.approved-network-destinations
+renma.approved-upload-destinations
+renma.security-profile
+```
+
+Boolean values must be the exact strings `"true"` or `"false"`. List values
+must be JSON-array strings containing strings only. Renma does not coerce YAML
+booleans, alternate boolean spellings, comma-separated lists, or non-string
+array members. Canonical child-key evidence is preserved for diagnostics,
+including multiline YAML values.
+
 ## Entrypoint Paths
 
 Canonical Agent Skills entrypoints use the exact filename:
@@ -158,7 +250,7 @@ YAML 1.2 mode. It validates:
 The validation profile is local. Renma does not fetch a schema or validation
 rules at runtime.
 
-This first stage does not add a separate validation command and does not change
+Agent Skills validation does not add a separate validation command or change
 the existing `scan` or `--fail-on` exit contract. Agent Skills results are
 visible in scan output but are not inserted into the existing finding threshold
 path.
@@ -181,10 +273,11 @@ unknown
   neither Agent Skills identity nor a recognized migration source
 ```
 
-Classification supports validation and migration guidance only in this stage.
-It does not create `agent-skills`-versus-`renma-legacy` fallback for catalog,
-ownership, graph, readiness, BOM, trust, lifecycle, context dependency, or
-security processing.
+Classification remains migration-oriented. Operational normalization is
+stricter: only a specification-valid `agent-skills` document contributes Skill
+metadata. `renma-legacy`, `hybrid`, `unknown`, and otherwise invalid documents
+remain visible to validation and migration diagnostics but contribute no
+operational Skill metadata.
 
 ## Selection Boundaries and Execution Constraints
 
@@ -269,16 +362,22 @@ renma scan .
 renma suggest-metadata skills/example/SKILL.md --format prompt
 renma suggest-metadata skills/example/skill.md --format json
 renma suggest-metadata skills/testing/spec-review.skill.md --format prompt
-# review and apply the proposed conversion
+# apply only an unblocked canonical frontmatter candidate
 renma scan .
 ```
 
 For Skill targets, `suggest-metadata` can preserve valid standard Agent Skills
 fields, use a valid immediate parent directory as `name`, preserve an existing
 valid description, conservatively extract description evidence from the body,
-move recognized pre-0.16 Renma Skill fields to `metadata.renma.*`, and render
-canonical frontmatter for human review. It never edits the file and never
-proposes a reverse conversion for a canonical Agent Skill.
+move recognized pre-0.16 Renma Skill fields to
+`metadata.renma.*`, and render canonical frontmatter for human review. It never
+edits the file and never proposes a reverse conversion for a canonical Agent
+Skill.
+
+Pre-0.16 security fields migrate in the same one-way proposal. Safe string
+values are preserved, boolean values serialize as exact `"true"` or `"false"`
+strings, and list values serialize as JSON-array strings. Unsafe or ambiguous
+values block canonical frontmatter generation for human review.
 
 Before presenting a non-canonical entrypoint migration, Renma renders the candidate
 frontmatter, combines it with the unchanged Markdown body at the target
@@ -298,23 +397,22 @@ not reverse migration.
 
 ## Pre-0.16 Value Serialization
 
-Migration never converts native YAML numbers or booleans into text when doing
-so could lose the original lexical value.
+Migration never converts native YAML numbers into text. Native YAML booleans
+are accepted only for recognized boolean security fields, where the meaning is
+unambiguous.
 
 - Text scalar fields (`id`, `title`, `version`, `owner`, `status`, `purpose`,
   `last_reviewed_at`, `review_cycle`, `expires_at`, and `security_profile`)
   require YAML strings.
-- Boolean policy fields (`network_allowed`, `external_upload_allowed`,
-  `secrets_allowed`, and `requires_human_approval`) accept YAML booleans or the
-  exact strings `"true"` and `"false"`, then serialize as those lowercase
-  strings. Numeric `0` and `1` are blocked.
 - String-list fields accept YAML arrays containing strings only, pre-0.16
   comma-separated strings, or JSON-array strings containing strings only.
   Numeric and boolean elements are blocked.
+- Boolean security fields accept YAML booleans or the exact strings `"true"`
+  and `"false"`, then serialize to exact canonical strings.
 
-For example, `version: "1.0"`, `tags: ["1.0"]`, and
-`network_allowed: false` are safe. `version: 1.0`, `tags: [1.0]`, and
-`network_allowed: 1` block canonical frontmatter generation.
+For example, `version: "1.0"` and `tags: ["1.0"]` are safe. `version: 1.0`
+and `tags: [1.0]` block canonical frontmatter generation. Likewise,
+`network_allowed: yes` is blocked rather than guessed.
 
 ## Unsafe Migration Blocking
 
@@ -329,7 +427,7 @@ or lossy. Blocking cases include:
 - conflicting Agent Skills and pre-0.16 Renma Skill values;
 - an unknown top-level field;
 - missing evidence for a usable description;
-- duplicate semantic list values or unsupported pre-0.16 value shapes.
+- duplicate semantic list values or unsupported pre-0.16 value shapes;
 - a candidate that remains invalid at its target `SKILL.md` path;
 - an existing distinct target entrypoint or an unverifiable target collision;
 
@@ -353,24 +451,20 @@ unknown top-level field
   block migration
 ```
 
-## Staged 0.16.0 Rollout
+## Renma 0.16.0 Boundary
 
-Stage 1, established here:
+Renma 0.16.0 completes the repository format migration:
 
-- Agent Skills validation in `scan`;
-- one-way migration suggestions in `suggest-metadata`;
-- this normative compatibility and migration document.
+- Skills must be specification-valid Agent Skills to contribute operational
+  metadata;
+- all Renma Skill governance and security metadata is read from flat
+  `metadata.renma.*` string entries;
+- pre-0.16 top-level Skill metadata is migration input only;
+- `suggest-metadata` converts recognized governance and security fields in one
+  reviewed proposal;
+- the repository-owned `release-prep` Skill and generated Skill scaffolds are
+  fully canonical;
+- non-Skill assets retain their existing top-level metadata behavior.
 
-Stage 1 validates and proposes migration but does not migrate repository-owned
-operational Skills yet. Dedicated fixtures cover canonical Agent Skills,
-pre-0.16 Renma, hybrid, and blocked migration behavior until operational
-metadata consumers are updated in a later stage.
-
-Later 0.16.0 stages will make `metadata.renma.*` operational across catalog,
-ownership, graph, readiness, BOM, trust, lifecycle, context dependency, and
-security processing. Until those focused stages land, this validation and
-migration code must not act as a fallback metadata reader for normal Renma
-operations.
-
-This stage does not add Skill discovery, runtime selection, prompt assembly,
-context injection, execution, or telemetry.
+This boundary does not add runtime Skill selection, prompt assembly, context
+injection, execution, or telemetry.

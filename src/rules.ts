@@ -1,4 +1,5 @@
 import path from "node:path";
+import { resolvedAgentSkillDescription } from "./agent-skills.js";
 import type { Catalog, CatalogEntry, Dependency } from "./model.js";
 import {
   addDaysIsoDate,
@@ -8,6 +9,7 @@ import {
 } from "./freshness.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import { helperScriptPath } from "./repository-paths.js";
+import { parseAssetMetadata } from "./metadata.js";
 import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import type {
   Evidence,
@@ -582,7 +584,7 @@ function orphanedContextLensFindings(
         whyItMatters:
           "Context lenses are easier to review when a skill declares how the purpose-oriented interpretation is used. An unreferenced active lens may be newly created, intentionally staged, or stale.",
         remediation:
-          "If the lens should be used, reference it from a skill with requires_lens or optional_lens. If it is not ready or no longer needed, update its lifecycle status after review.",
+          "If the lens should be used, reference it from a canonical Skill with metadata.renma.requires-lens or metadata.renma.optional-lens JSON-array metadata. Pre-0.16-only Skills use requires_lens or optional_lens only during migration. If the lens is not ready or no longer needed, update its lifecycle status after review.",
         constraints: [
           "Do not make Renma select runtime lenses.",
           "Do not rank or retrieve lenses semantically.",
@@ -594,7 +596,7 @@ function orphanedContextLensFindings(
           "Run renma catalog.",
           "Run renma graph focused on the lens or owning skill.",
         ],
-        llmHint: `Search for skills that should declare "${entry.id}" in requires_lens or optional_lens. Do not add runtime selection logic or prompt assembly.`,
+        llmHint: `Search for Skills that should declare "${entry.id}" as a required or optional lens. For canonical Skills, update metadata.renma.requires-lens or metadata.renma.optional-lens as a JSON-array string; use requires_lens or optional_lens only for pre-0.16 migration inputs. Do not add runtime selection logic or prompt assembly.`,
         details: {
           assetId: entry.id,
           sourcePath: entry.sourcePath,
@@ -866,7 +868,10 @@ function shapeFindings(document: ParsedDocument): Finding[] {
 
   const text = document.artifact.content.toLowerCase();
   const findings: Finding[] = [];
-  const description = document.metadata.description ?? "";
+  const description =
+    document.artifact.kind === "skill"
+      ? (resolvedAgentSkillDescription(document) ?? "")
+      : (document.metadata.description ?? "");
   const tokenCount = approximateTokenCount(document.artifact.content);
 
   if (!description) {
@@ -1360,9 +1365,8 @@ function skillContextReferenceNotDeclaredFindings(
 ): Finding[] {
   if (document.artifact.kind !== "skill") return [];
 
-  const declaredContexts = new Set(
-    listMetadataValue(document.metadata.requires_context),
-  );
+  const operationalMetadata = parseAssetMetadata(document).metadata;
+  const declaredContexts = new Set(operationalMetadata.requiresContext);
   const bodyLineIndexes = markdownBodyLineIndexes(document);
   const matches = new Map<string, { line: number; text: string }>();
 
@@ -1391,7 +1395,7 @@ function skillContextReferenceNotDeclaredFindings(
       whyItMatters:
         "Declared context references make skill/context relationships visible to catalog, graph, and validation reports. If a skill only mentions a context in prose, humans may see the dependency but repository tooling cannot validate it.",
       remediation:
-        "Add the referenced shared context asset to the skill metadata using requires_context, or remove the prose reference if it is no longer needed.",
+        "Add the referenced shared context asset to metadata.renma.requires-context as a JSON-array string, or remove the prose reference if it is no longer needed. Pre-0.16 requires_context is migration input only and is not operational in Renma 0.16.0.",
       constraints: [
         "Do not select runtime context.",
         "Do not assemble prompt packages.",
@@ -1403,9 +1407,9 @@ function skillContextReferenceNotDeclaredFindings(
         "Run renma catalog.",
         "Confirm the skill/context relationship appears in metadata and catalog output.",
       ],
-      llmHint: `Find context paths mentioned in the skill body and add them to requires_context using the metadata syntax currently supported by Renma. Missing declaration: ${referencedPath}`,
+      llmHint: `Find context paths mentioned in the Skill body and add the missing declaration using metadata.renma.requires-context as a JSON-array string. Pre-0.16 requires_context is accepted only by suggest-metadata and is not operational. Missing declaration: ${referencedPath}`,
       details: {
-        source: metadataText(document.metadata.id) ?? document.artifact.path,
+        source: operationalMetadata.id ?? document.artifact.path,
         target: referencedPath,
         referenceKind: "requires_context",
         sourcePath: document.artifact.path,
@@ -1437,6 +1441,7 @@ function skillReferencesSupersededAssetFindings(
 
     const skill = skillsByPath.get(skillPath);
     if (!skill) return [];
+    const skillMetadata = parseAssetMetadata(skill).metadata;
 
     const referencedFrom = skillReferenceLine(skill, document.artifact.path);
     if (!referencedFrom) return [];
@@ -1482,7 +1487,7 @@ function skillReferencesSupersededAssetFindings(
         llmHint:
           "Inspect the deprecated local support file and its superseded_by or canonical_context metadata. If the shared context asset is now canonical, update skill guidance and metadata to reference the shared context directly. Keep the local reference only if it contains truly local notes or is intentionally preserved as a compatibility shim.",
         details: {
-          source: metadataText(skill.metadata.id) ?? skill.artifact.path,
+          source: skillMetadata.id ?? skill.artifact.path,
           target: metadataText(document.metadata.id) ?? document.artifact.path,
           referenceKind: "body_reference",
           sourcePath: skill.artifact.path,
@@ -1503,8 +1508,9 @@ function isSkillLocalReference(document: ParsedDocument): boolean {
 }
 
 function sharedContextTargets(document: ParsedDocument): string[] {
+  const operationalMetadata = parseAssetMetadata(document).metadata;
   return [
-    ...listMetadataValue(document.metadata.superseded_by),
+    ...operationalMetadata.supersededBy,
     ...listMetadataValue(document.metadata.canonical_context),
   ].filter(
     (target, index, targets) =>
@@ -1540,14 +1546,18 @@ function assetReferencesSupersededAssetFindings(
   documents: ParsedDocument[],
 ): Finding[] {
   const supersededAssets = documents
-    .map((document) => ({
-      document,
-      canonicalTargets: sharedContextTargets(document),
-    }))
+    .map((document) => {
+      const metadata = parseAssetMetadata(document).metadata;
+      return {
+        document,
+        metadata,
+        canonicalTargets: sharedContextTargets(document),
+      };
+    })
     .filter(
-      ({ document, canonicalTargets }) =>
-        metadataText(document.metadata.status) === "deprecated" ||
-        metadataText(document.metadata.status) === "archived" ||
+      ({ metadata, canonicalTargets }) =>
+        metadata.status === "deprecated" ||
+        metadata.status === "archived" ||
         canonicalTargets.length > 0,
     )
     .filter(({ canonicalTargets }) => canonicalTargets.length > 0);
@@ -1555,72 +1565,74 @@ function assetReferencesSupersededAssetFindings(
   return documents.flatMap((referencingDocument) => {
     if (referencingDocument.artifact.kind === "skill") return [];
 
-    return supersededAssets.flatMap(({ document, canonicalTargets }) => {
-      if (document.artifact.path === referencingDocument.artifact.path) {
-        return [];
-      }
+    const referencingMetadata =
+      parseAssetMetadata(referencingDocument).metadata;
+    return supersededAssets.flatMap(
+      ({ document, metadata, canonicalTargets }) => {
+        if (document.artifact.path === referencingDocument.artifact.path) {
+          return [];
+        }
 
-      const reference = assetReferenceLine(
-        referencingDocument,
-        document.artifact.path,
-      );
-      if (!reference) return [];
+        const reference = assetReferenceLine(
+          referencingDocument,
+          document.artifact.path,
+        );
+        if (!reference) return [];
 
-      const canonicalTargetList = canonicalTargets
-        .map((target) => `- ${target}`)
-        .join("\n");
-      const snippet = [
-        `Referencing asset: ${referencingDocument.artifact.path}`,
-        `Referenced superseded asset: ${document.artifact.path}`,
-        "Superseded by:",
-        canonicalTargetList,
-        reference.text,
-      ].join("\n");
+        const canonicalTargetList = canonicalTargets
+          .map((target) => `- ${target}`)
+          .join("\n");
+        const snippet = [
+          `Referencing asset: ${referencingDocument.artifact.path}`,
+          `Referenced superseded asset: ${document.artifact.path}`,
+          "Superseded by:",
+          canonicalTargetList,
+          reference.text,
+        ].join("\n");
 
-      return [
-        {
-          id: DIAGNOSTIC_IDS.MAINT_ASSET_REFERENCES_SUPERSEDED_ASSET,
-          title: "Asset references a superseded support file",
-          category: "maintenance",
-          severity: "low",
-          confidence: "medium",
-          evidence: evidence(referencingDocument, reference.line, snippet),
-          whyItMatters:
-            "Deprecated or superseded support files may remain as compatibility shims, but assets that keep referencing them can hide the canonical shared context asset from humans and agents. Once reusable knowledge has been promoted to contexts/, repository assets should usually reference the canonical context directly.",
-          remediation:
-            "Update this asset to reference the canonical shared context asset directly, or keep the superseded reference only if it is intentionally needed as a compatibility shim. If the deprecated file still contains unique local guidance, preserve that local guidance and point reusable knowledge to the canonical context.",
-          constraints: [
-            "Do not introduce runtime context resolution.",
-            "Do not create prompt packages.",
-            "Do not make Renma call an LLM.",
-            "Do not automatically move or rewrite files during scan.",
-            "Preserve compatibility shims if they are intentionally needed.",
-            "Preserve unique local guidance not reusable shared context.",
-            "Update references through a reviewable human or calling-agent patch.",
-          ],
-          verificationSteps: [
-            "Run renma scan.",
-            "Run renma catalog.",
-            "Run project-specific validation checks that apply to this repository.",
-            "Confirm referencing asset now points to the canonical shared context asset, or documents why the superseded shim is still needed.",
-          ],
-          llmHint:
-            "Inspect the referenced deprecated asset and its superseded_by or canonical context metadata. If the canonical shared context is the intended source of truth, update this asset to reference that context directly. Keep the superseded file only when it serves a deliberate compatibility or migration role.",
-          details: {
-            source:
-              metadataText(referencingDocument.metadata.id) ??
-              referencingDocument.artifact.path,
-            target:
-              metadataText(document.metadata.id) ?? document.artifact.path,
-            referenceKind: "body_reference",
-            sourcePath: referencingDocument.artifact.path,
-            targetPath: document.artifact.path,
-            targetStatus: metadataText(document.metadata.status),
-            replacementTargets: canonicalTargets,
+        return [
+          {
+            id: DIAGNOSTIC_IDS.MAINT_ASSET_REFERENCES_SUPERSEDED_ASSET,
+            title: "Asset references a superseded support file",
+            category: "maintenance",
+            severity: "low",
+            confidence: "medium",
+            evidence: evidence(referencingDocument, reference.line, snippet),
+            whyItMatters:
+              "Deprecated or superseded support files may remain as compatibility shims, but assets that keep referencing them can hide the canonical shared context asset from humans and agents. Once reusable knowledge has been promoted to contexts/, repository assets should usually reference the canonical context directly.",
+            remediation:
+              "Update this asset to reference the canonical shared context asset directly, or keep the superseded reference only if it is intentionally needed as a compatibility shim. If the deprecated file still contains unique local guidance, preserve that local guidance and point reusable knowledge to the canonical context.",
+            constraints: [
+              "Do not introduce runtime context resolution.",
+              "Do not create prompt packages.",
+              "Do not make Renma call an LLM.",
+              "Do not automatically move or rewrite files during scan.",
+              "Preserve compatibility shims if they are intentionally needed.",
+              "Preserve unique local guidance not reusable shared context.",
+              "Update references through a reviewable human or calling-agent patch.",
+            ],
+            verificationSteps: [
+              "Run renma scan.",
+              "Run renma catalog.",
+              "Run project-specific validation checks that apply to this repository.",
+              "Confirm referencing asset now points to the canonical shared context asset, or documents why the superseded shim is still needed.",
+            ],
+            llmHint:
+              "Inspect the referenced deprecated asset and its superseded_by or canonical context metadata. If the canonical shared context is the intended source of truth, update this asset to reference that context directly. Keep the superseded file only when it serves a deliberate compatibility or migration role.",
+            details: {
+              source:
+                referencingMetadata.id ?? referencingDocument.artifact.path,
+              target: metadata.id ?? document.artifact.path,
+              referenceKind: "body_reference",
+              sourcePath: referencingDocument.artifact.path,
+              targetPath: document.artifact.path,
+              targetStatus: metadata.status,
+              replacementTargets: canonicalTargets,
+            },
           },
-        },
-      ];
-    });
+        ];
+      },
+    );
   });
 }
 
@@ -2015,7 +2027,7 @@ function thinSkillLayoutFindings(document: ParsedDocument): Finding[] {
             "Run renma readiness and check layout.skills_thin.",
           ],
           llmHint:
-            "Extract long procedure sections into contexts/**, add requires_context or optional_context references, and keep SKILL.md focused on when to use or not use the skill.",
+            "Extract long procedure sections into contexts/**, add metadata.renma.requires-context or metadata.renma.optional-context JSON-array strings, and keep SKILL.md focused on when to use or not use the Skill. Pre-0.16 top-level references are migration input only.",
         },
       ),
     );
@@ -2261,7 +2273,7 @@ function declaredDependencyLayoutFindings(
       whyItMatters:
         "Declared context references should resolve through canonical contexts/**, skills/**, or tools/** repo paths.",
       remediation:
-        "Rewrite declared requires_context or optional_context values to canonical repo-root paths.",
+        "Rewrite declared required or optional context dependency values to canonical repo-root paths without changing the Skill's operational metadata format.",
       verificationSteps: ["Run renma graph and confirm all edges resolve."],
       details: {
         source: dependency.from,

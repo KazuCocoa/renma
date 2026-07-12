@@ -1,16 +1,14 @@
 ---
-id: skill.testing.spec-review
-owner: qa-platform
-status: experimental
-tags:
-  - testing
-  - spec-review
-requires_context:
-  - context.testing.boundary-value-analysis
-requires_lens:
-  - lens.testing.spec-review.boundary-values
-optional_lens:
-  - lens.testing.test-design.boundary-values
+name: spec-review
+description: Review a specification through declared context and lenses. Use when implementation or test-design boundaries need focused analysis.
+metadata:
+  renma.id: skill.testing.spec-review
+  renma.owner: qa-platform
+  renma.status: experimental
+  renma.tags: '["testing","spec-review"]'
+  renma.requires-context: '["context.testing.boundary-value-analysis"]'
+  renma.requires-lens: '["lens.testing.spec-review.boundary-values"]'
+  renma.optional-lens: '["lens.testing.test-design.boundary-values"]'
 ---
 # Spec Review
 

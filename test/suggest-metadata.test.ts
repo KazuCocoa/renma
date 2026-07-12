@@ -117,6 +117,58 @@ test("suggest-metadata JSON exposes the Skill migration contract", async () => {
   );
 });
 
+test("suggest-metadata proposes no migration or rewrite for canonical release-prep", async () => {
+  const target = "skills/release-prep/SKILL.md";
+  const original = await readFile(target, "utf8");
+  const result = await withCapturedConsole(() =>
+    main(["suggest-metadata", target, "--format", "json"]),
+  );
+  const suggestion = JSON.parse(result.stdout) as {
+    instructions: string[];
+    blockedMetadata: Array<{ field: string; reason: string }>;
+    agentSkills: {
+      sourceFormat: string;
+      direction: string;
+      proposalKind: string;
+      canonicalFrontmatter?: string;
+      candidateRenmaMetadata: Record<string, string>;
+    };
+  };
+  const after = await readFile(target, "utf8");
+
+  assert.equal(result.code, 0);
+  assert.equal(suggestion.agentSkills.sourceFormat, "agent-skills");
+  assert.equal(suggestion.agentSkills.direction, "none");
+  assert.equal(suggestion.agentSkills.proposalKind, "none");
+  assert.deepEqual(suggestion.blockedMetadata, []);
+  assert.equal(
+    Object.hasOwn(suggestion.agentSkills, "canonicalFrontmatter"),
+    false,
+  );
+  assert.deepEqual(suggestion.agentSkills.candidateRenmaMetadata, {});
+  assert.equal(after, original);
+  assert.ok(
+    suggestion.instructions.includes(
+      "Do not propose reverse migration or an unnecessary frontmatter rewrite.",
+    ),
+  );
+
+  const promptResult = await withCapturedConsole(() =>
+    main(["suggest-metadata", target, "--format", "prompt"]),
+  );
+
+  assert.equal(promptResult.code, 0);
+  assert.match(
+    promptResult.stdout,
+    /Inspect Canonical Agent Skill \(No Migration Proposed\)/,
+  );
+  assert.doesNotMatch(
+    promptResult.stdout,
+    /Return (?:a|one) small reviewed (?:frontmatter )?patch/,
+  );
+  assert.equal(await readFile(target, "utf8"), original);
+});
+
 test("suggest-metadata JSON records explicit owner without unsafe output", async () => {
   const root = await fixture();
   const target = path.join(

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
 import type { Artifact, SecurityConfig } from "../src/types.js";
+import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 const baseSecurityConfig: SecurityConfig = {
   approvedDomains: [],
@@ -303,11 +304,13 @@ Exclude secrets from the report.`),
 });
 
 function artifact(content: string): Artifact {
+  const artifactPath = "skills/appium/SKILL.md";
+  const operationalContent = canonicalSkillFixture(artifactPath, content);
   return {
-    path: "skills/appium/SKILL.md",
+    path: artifactPath,
     absolutePath: "/repo/skills/appium/SKILL.md",
     kind: "skill",
-    sizeBytes: Buffer.byteLength(content),
-    content,
+    sizeBytes: Buffer.byteLength(operationalContent),
+    content: operationalContent,
   };
 }

@@ -13,6 +13,7 @@ import {
 } from "./agent-skills.js";
 import type { SkillEntrypointPath } from "./discovery.js";
 import { parseDocument } from "./markdown.js";
+import { validateCanonicalSecurityMetadata } from "./security-policy.js";
 import type { Artifact, ParsedDocument } from "./types.js";
 import { parseAgentSkillFrontmatter } from "./yaml-frontmatter.js";
 
@@ -109,11 +110,17 @@ export function buildAgentSkillMigrationSuggestion(
   const candidateRenmaMetadata: Record<string, string> = {};
   const preservedMetadata: Record<string, string> = {};
   collectStructuralBlocks(document, frontmatter, blocked);
-
+  const duplicateTopLevelMetadata = frontmatter.duplicateFields.some(
+    (field) => field.key === "metadata",
+  );
+  const duplicateMetadataKeys = new Set(
+    frontmatter.duplicateMetadataKeys.map((field) => field.key),
+  );
   const existingMetadata = frontmatter.values.metadata;
-  if (isStringRecord(existingMetadata)) {
-    Object.assign(preservedMetadata, existingMetadata);
+  if (!duplicateTopLevelMetadata && isStringRecord(existingMetadata)) {
     for (const [key, value] of Object.entries(existingMetadata)) {
+      if (duplicateMetadataKeys.has(key)) continue;
+      preservedMetadata[key] = value;
       if (key.startsWith("renma.")) candidateRenmaMetadata[key] = value;
     }
   }
@@ -162,7 +169,11 @@ export function buildAgentSkillMigrationSuggestion(
             "Canonical Agent Skills metadata retrofit requires the exact SKILL.md entrypoint.",
         });
       }
-    } else if (requestedOwner) {
+    } else if (
+      requestedOwner &&
+      !duplicateTopLevelMetadata &&
+      !duplicateMetadataKeys.has("renma.owner")
+    ) {
       const existingOwner = preservedMetadata["renma.owner"];
       if (existingOwner !== undefined && existingOwner !== requestedOwner) {
         blocked.push({
@@ -271,9 +282,11 @@ export function buildAgentSkillMigrationSuggestion(
   }
 
   for (const legacyField of LEGACY_RENMA_SKILL_FIELDS) {
+    if (duplicateTopLevelMetadata) continue;
     if (!(legacyField in frontmatter.values)) continue;
     const canonicalKey = legacyRenmaMetadataKey(legacyField);
     if (!canonicalKey) continue;
+    if (duplicateMetadataKeys.has(canonicalKey)) continue;
     const serialized = serializeLegacyValue(
       legacyField,
       frontmatter.values[legacyField],
@@ -301,7 +314,11 @@ export function buildAgentSkillMigrationSuggestion(
     candidateRenmaMetadata[canonicalKey] = retainedValue;
   }
 
-  if (requestedOwner) {
+  if (
+    requestedOwner &&
+    !duplicateTopLevelMetadata &&
+    !duplicateMetadataKeys.has("renma.owner")
+  ) {
     const existingOwner = preservedMetadata["renma.owner"];
     if (existingOwner !== undefined && existingOwner !== requestedOwner) {
       blocked.push({
@@ -395,6 +412,15 @@ function validateMigrationCandidate(
     blocked,
     "Resulting Agent Skills candidate",
   );
+  if (validation.valid) {
+    const security = validateCanonicalSecurityMetadata(candidate);
+    for (const issue of security.issues) {
+      blocked.push({
+        field: `metadata.${issue.key}`,
+        reason: `Resulting Agent Skills candidate has invalid canonical security metadata: ${issue.reason}.`,
+      });
+    }
+  }
   return blocked;
 }
 

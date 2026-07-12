@@ -1,26 +1,20 @@
 ---
 name: release-prep
 description: Prepare a Renma release by checking git history, changelog, package metadata, docs, release notes, and dogfooding Renma CLI reports before producing release-ready artifacts.
-id: skill.release-prep
-title: Release Prep
-version: 0.1.0
-owner: maintainers
-status: stable
-tags:
-  - release
-  - maintenance
-  - dogfooding
-requires_context:
-  - context.release.prep
-allowed_data: public
-network_allowed: true
-external_upload_allowed: false
-secrets_allowed: false
-requires_human_approval: true
-forbidden_inputs:
-  - secrets
-  - credentials
-  - tokens
+metadata:
+  renma.id: skill.release-prep
+  renma.title: Release Prep
+  renma.version: "0.1.0"
+  renma.owner: maintainers
+  renma.status: stable
+  renma.tags: '["release","maintenance","dogfooding"]'
+  renma.requires-context: '["context.release.prep"]'
+  renma.allowed-data: '["public"]'
+  renma.network-allowed: "true"
+  renma.external-upload-allowed: "false"
+  renma.secrets-allowed: "false"
+  renma.requires-human-approval: "true"
+  renma.forbidden-inputs: '["secrets","credentials","tokens"]'
 ---
 
 # Release Prep

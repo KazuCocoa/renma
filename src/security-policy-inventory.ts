@@ -3,7 +3,7 @@ import {
   applySecurityConfig,
   effectiveAllowedDataClass,
   effectiveAllowedDataList,
-  parseSecurityPolicy,
+  parseOperationalSecurityPolicy,
   securityProfileChain,
   type SecurityPolicy,
 } from "./security-policy.js";
@@ -131,7 +131,7 @@ export function summarizeSecurityPolicyInventory(
   const profileNames = new Map<string, number>();
 
   for (const artifact of artifacts) {
-    const parsedPolicy = parseSecurityPolicy(artifact.content);
+    const parsedPolicy = parseOperationalSecurityPolicy(artifact);
     const hasMetadata = hasLocalSecurityPolicyMetadata(parsedPolicy);
     if (!isPolicyInventoryArtifact(artifact, hasMetadata)) continue;
 
@@ -203,7 +203,7 @@ export function collectSecurityPolicyAssetEvidence(
 ): SecurityPolicyAssetEvidence[] {
   return artifacts
     .map((artifact): SecurityPolicyAssetEvidence | undefined => {
-      const parsedPolicy = parseSecurityPolicy(artifact.content);
+      const parsedPolicy = parseOperationalSecurityPolicy(artifact);
       const hasMetadata = hasLocalSecurityPolicyMetadata(parsedPolicy);
       if (!isPolicyInventoryArtifact(artifact, hasMetadata)) return undefined;
 
@@ -272,7 +272,7 @@ export function zeroSecurityPolicyInventorySummary(): SecurityPolicyInventorySum
 export function isPolicyInventoryArtifact(
   artifact: Artifact,
   hasLocalMetadata = hasLocalSecurityPolicyMetadata(
-    parseSecurityPolicy(artifact.content),
+    parseOperationalSecurityPolicy(artifact),
   ),
 ): boolean {
   return POLICY_INVENTORY_KINDS.has(artifact.kind) || hasLocalMetadata;
@@ -441,6 +441,13 @@ function policyFieldEvidence(
   policy: SecurityPolicy,
   field: string,
 ): Evidence | undefined {
+  const canonicalEvidence = policy.evidenceByField.get(field);
+  if (canonicalEvidence) {
+    return {
+      path: artifact.path,
+      ...canonicalEvidence,
+    };
+  }
   const startLine = policy.lineByField.get(field);
   if (startLine === undefined) return undefined;
   const line = artifact.content.split(/\r?\n/)[startLine - 1] ?? "";
