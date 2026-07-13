@@ -650,7 +650,7 @@ metadata:
   );
 });
 
-test("repository release-prep is fully canonical with unchanged operational behavior", async () => {
+test("repository release-prep is fully canonical with tag-trigger policy", async () => {
   const relativePath = "skills/release-prep/SKILL.md";
   const absolutePath = path.resolve(relativePath);
   const content = await readFile(absolutePath, "utf8");
@@ -709,7 +709,7 @@ test("repository release-prep is fully canonical with unchanged operational beha
   );
   assert.deepEqual(policy.allowedData, ["public"]);
   assert.equal(policy.networkAllowed, true);
-  assert.equal(policy.externalUploadAllowed, false);
+  assert.equal(policy.externalUploadAllowed, true);
   assert.equal(policy.secretsAllowed, false);
   assert.equal(policy.humanApprovalRequired, true);
   assert.deepEqual(policy.forbiddenInputs, [
@@ -799,8 +799,8 @@ test("repository release-prep is fully canonical with unchanged operational beha
     unspecified: 0,
   });
   assert.deepEqual(scan.securityPolicyInventory?.externalUploadAllowed, {
-    true: 0,
-    false: 2,
+    true: 2,
+    false: 0,
     unspecified: 0,
   });
   assert.deepEqual(scan.securityPolicyInventory?.secretsAllowed, {

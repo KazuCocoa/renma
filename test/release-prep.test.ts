@@ -9,9 +9,41 @@ test("release-prep routes release-notes-only requests without finalization", () 
 
   assert.match(skill, /generate or display GitHub Release notes/);
   assert.match(skill, /--release-notes --version <version>/);
-  assert.match(skill, /do not finalize, commit, tag, push, or publish/i);
+  assert.match(
+    skill,
+    /stop before finalization, commits, tags, remote pushes/i,
+  );
   assert.match(context, /For a release-notes-only request/);
   assert.match(context, /return the Markdown output directly/);
+});
+
+test("release-prep delegates npm publication to tag-triggered GitHub Actions", () => {
+  const skill = readFileSync("skills/release-prep/SKILL.md", "utf8");
+  const context = readFileSync("contexts/release/prep.md", "utf8");
+  const workflow = readFileSync(".github/workflows/npm-publish.yml", "utf8");
+
+  assert.match(skill, /GitHub Actions trusted-publishing workflow/);
+  assert.match(
+    skill,
+    /Keep the package release step inside.*trusted-publishing workflow/,
+  );
+  assert.match(context, /Ask for approval to push `origin\/main`/);
+  assert.match(context, /push only `main:main`/);
+  assert.match(context, /Ask separately for approval to push the tag/);
+  assert.match(context, /push only that tag to trigger the workflow/);
+  assert.match(context, /verify the version and integrity metadata/);
+  assert.match(context, /Wait for explicit content approval/);
+  assert.match(
+    context,
+    /ask separately for permission to write the approved content to GitHub/,
+  );
+  assert.match(
+    skill,
+    /One approval does not authorize the other|separate explicit approval/,
+  );
+  assert.match(workflow, /tags:\n {6}- "v\*\.\*\.\*"/);
+  assert.match(workflow, /Uses npm trusted publishing \(OIDC\)/);
+  assert.match(workflow, /run: npm publish/);
 });
 
 test("release-prep prints GitHub release notes from the target changelog section", () => {
