@@ -7,6 +7,7 @@ import type {
   Diagnostic,
   ScanConfig,
 } from "./types.js";
+import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import {
   safeRepositoryPath,
   walkRepositoryFiles,
@@ -279,6 +280,16 @@ export async function discoverArtifacts(
   });
   diagnostics.push(...skillLikeLayoutDiagnostics(walked.files));
   diagnostics.push(
+    ...walked.symlinks.map((symlinkPath) => ({
+      code: DIAGNOSTIC_IDS.SUPPORT_SYMLINK_PATH,
+      severity: "warning" as const,
+      path: symlinkPath,
+      message:
+        "Skipping symbolic link; repository discovery never follows symlink targets.",
+      details: { state: "symlink" },
+    })),
+  );
+  diagnostics.push(
     ...walked.unreadable.map(({ path: unreadablePath, error }) => ({
       severity: "error" as const,
       path: unreadablePath,
@@ -470,13 +481,6 @@ function skillLikeLayoutDiagnostics(walkedFiles: string[]): Diagnostic[] {
       )
     ) {
       paths.add(relativePath);
-      if (
-        !relativePath.includes("/") &&
-        relativePath.toLowerCase() === "skill.md"
-      ) {
-        paths.add("skill.md");
-        paths.add("SKILL.md");
-      }
     }
   }
 

@@ -164,6 +164,7 @@ export async function collectRepositoryPathStates(
       const inspected = await safeRepositoryPath(root, normalized);
       if (inspected.state === "symlink") {
         states.set(normalized, "symlink");
+        states.set(inspected.boundaryPath, "symlink");
       } else if (inspected.state === "outside") {
         states.set(normalized, "absent");
       } else if (inspected.state === "absent") {

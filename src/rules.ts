@@ -1865,6 +1865,7 @@ function skillLocalSupportReachabilityFindings(
 
     const reachabilityDepth = localSupportReachabilityDepth(
       skill,
+      skillDir,
       localSupportDocs,
       localSupportPaths,
     );
@@ -1929,6 +1930,7 @@ function skillLocalSupportReachabilityFindings(
       ),
     ];
     const reportedMissingPaths = new Set<string>();
+    const reportedSymlinkBoundaries = new Set<string>();
     for (const source of missingPathSources) {
       for (const reference of localSupportPathReferences(
         source,
@@ -1939,6 +1941,37 @@ function skillLocalSupportReachabilityFindings(
           reference.relative.startsWith("examples/") &&
           !path.posix.basename(reference.relative).includes(".")
         ) {
+          continue;
+        }
+        const symlinkBoundary = referencedSymlinkBoundary(
+          reference.target,
+          repositoryPathStates,
+        );
+        if (symlinkBoundary) {
+          const key = `${source.artifact.path}:${symlinkBoundary}`;
+          if (reportedSymlinkBoundaries.has(key)) continue;
+          reportedSymlinkBoundaries.add(key);
+          findings.push(
+            findingAt(
+              source,
+              DIAGNOSTIC_IDS.SUPPORT_SYMLINK_PATH,
+              "Skill-local resource path is an unusable symbolic link",
+              "structure",
+              "medium",
+              reference.line,
+              reference.raw,
+              `Replace ${reference.relative} with a regular repository file or directory; Renma never follows symbolic links.`,
+              {
+                details: {
+                  sourcePath: source.artifact.path,
+                  target: reference.target,
+                  state: "symlink",
+                  symlinkBoundary,
+                  profile: QUALITY.profile,
+                },
+              },
+            ),
+          );
           continue;
         }
         if (
@@ -1999,8 +2032,22 @@ function repositoryPathExists(
   return false;
 }
 
+function referencedSymlinkBoundary(
+  candidate: string,
+  repositoryPathStates?: ReadonlyMap<string, RepositoryPathState>,
+): string | undefined {
+  if (!repositoryPathStates) return undefined;
+  const segments = candidate.split("/");
+  for (let length = 1; length <= segments.length; length += 1) {
+    const prefix = segments.slice(0, length).join("/");
+    if (repositoryPathStates.get(prefix) === "symlink") return prefix;
+  }
+  return undefined;
+}
+
 function localSupportReachabilityDepth(
   skill: ParsedDocument,
+  skillDirectory: string,
   localSupportDocs: ParsedDocument[],
   candidatePaths: string[],
 ): Map<string, number> {
@@ -2009,11 +2056,9 @@ function localSupportReachabilityDepth(
     [skill, ...localSupportDocs].map((document) => [
       document.artifact.path,
       new Set(
-        staticSupportReferences(
-          document,
-          logicalSkillDirectory(skill.artifact.path) ?? "",
-          candidatePaths,
-        ).map((reference) => reference.targetPath),
+        staticSupportReferences(document, skillDirectory, candidatePaths).map(
+          (reference) => reference.targetPath,
+        ),
       ),
     ]),
   );

@@ -4,7 +4,8 @@ import path from "node:path";
 
 export type SafeRepositoryPathResult =
   | { state: "present"; path: string; absolutePath: string; stats: Stats }
-  | { state: "symlink" | "absent" | "unreadable" | "outside"; path: string };
+  | { state: "symlink"; path: string; boundaryPath: string }
+  | { state: "absent" | "unreadable" | "outside"; path: string };
 
 export interface RepositoryWalkResult {
   files: string[];
@@ -102,7 +103,11 @@ export async function safeRepositoryPath(
     try {
       const stats = await lstat(current);
       if (stats.isSymbolicLink()) {
-        return { state: "symlink", path: normalized };
+        return {
+          state: "symlink",
+          path: normalized,
+          boundaryPath: segments.slice(0, index + 1).join("/"),
+        };
       }
       if (index === segments.length - 1) {
         return {

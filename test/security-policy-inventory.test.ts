@@ -54,8 +54,145 @@ test("effective policy provenance lists every contributing source", () => {
   );
   assert.deepEqual(
     evidence.find((item) => item.kind === "script")?.policySources,
-    ["owning_skill", "security_profile", "repository_config"],
+    ["local", "security_profile", "repository_config", "owning_skill"],
   );
+});
+
+test("policy provenance follows effective override and accumulation semantics", () => {
+  const overridden = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "contexts/override.md",
+        "context",
+        policy({ networkAllowed: false, securityProfile: "permissive" }),
+      ),
+    ],
+    {
+      ...baseSecurityConfig(),
+      profiles: { permissive: profile({ networkAllowed: true }) },
+    },
+  )[0];
+  assert.deepEqual(overridden?.policySources, ["local"]);
+
+  const partial = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "contexts/partial.md",
+        "context",
+        policy({ networkAllowed: false, securityProfile: "mixed" }),
+      ),
+    ],
+    {
+      ...baseSecurityConfig(),
+      profiles: {
+        mixed: profile({ networkAllowed: true, forbiddenInputs: ["secret"] }),
+      },
+    },
+  )[0];
+  assert.deepEqual(partial?.policySources, ["local", "security_profile"]);
+
+  const accumulated = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "contexts/accumulated.md",
+        "context",
+        [
+          "---",
+          "network_allowed: true",
+          "approved_network_destinations: local.example.com",
+          "---",
+          "# Accumulated",
+        ].join("\n"),
+      ),
+    ],
+    {
+      ...baseSecurityConfig(),
+      approvedDomains: ["repo.example.com"],
+    },
+  )[0];
+  assert.deepEqual(accumulated?.policySources, ["local", "repository_config"]);
+  assert.deepEqual(accumulated?.effectivePolicy.approvedNetworkDestinations, [
+    "local.example.com",
+    "repo.example.com",
+  ]);
+
+  const chained = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "contexts/chained.md",
+        "context",
+        policy({ securityProfile: "child" }),
+      ),
+    ],
+    {
+      ...baseSecurityConfig(),
+      profiles: {
+        child: profile({ networkAllowed: true, securityProfile: "parent" }),
+        parent: profile({ networkAllowed: false }),
+      },
+    },
+  )[0];
+  assert.deepEqual(chained?.policySources, ["security_profile"]);
+  assert.equal(chained?.effectivePolicy.networkAllowed, true);
+});
+
+test("repository-only and local-only policies report one exact source", () => {
+  const localOnly = collectSecurityPolicyAssetEvidence([
+    artifact("contexts/local.md", "context", policy({ networkAllowed: false })),
+  ])[0];
+  const repositoryOnly = collectSecurityPolicyAssetEvidence(
+    [artifact("contexts/repository.md", "context", "# Repository\n")],
+    { ...baseSecurityConfig(), disallowedCommands: ["curl"] },
+  )[0];
+  assert.deepEqual(localOnly?.policySources, ["local"]);
+  assert.deepEqual(repositoryOnly?.policySources, ["repository_config"]);
+});
+
+test("duplicate policy values do not claim sources that leave the fingerprint unchanged", () => {
+  const evidence = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "contexts/duplicate.md",
+        "context",
+        [
+          "---",
+          "approved_network_destinations: shared.example.com",
+          "---",
+          "# Duplicate",
+        ].join("\n"),
+      ),
+    ],
+    {
+      ...baseSecurityConfig(),
+      approvedDomains: ["shared.example.com"],
+    },
+  )[0];
+  assert.deepEqual(evidence?.policySources, []);
+});
+
+test("invalid local destination metadata blocks repository accumulation provenance", () => {
+  const evidence = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "skills/demo/SKILL.md",
+        "skill",
+        [
+          "---",
+          "metadata:",
+          '  renma.network-allowed: "false"',
+          '  renma.approved-network-destinations: "not-json"',
+          "---",
+          "# Demo",
+        ].join("\n"),
+      ),
+    ],
+    {
+      ...baseSecurityConfig(),
+      approvedDomains: ["repo.example.com"],
+    },
+  )[0];
+  assert.deepEqual(evidence?.policySources, ["local"]);
+  assert.deepEqual(evidence?.effectivePolicy.approvedNetworkDestinations, []);
 });
 
 test("skill and context without policy metadata are counted as missing", () => {

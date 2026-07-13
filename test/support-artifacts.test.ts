@@ -479,6 +479,21 @@ Use assets/payload.txt.
     path.join(root, "skills", "internal-dir", "assets"),
   );
   await symlink(outside, path.join(root, "skills", "external-dir", "assets"));
+  await symlink(
+    path.join(outside, "external.txt"),
+    path.join(root, "unreferenced-link.txt"),
+  );
+  await writeFile(
+    path.join(root, "skills", "internal-dir", "SKILL.md"),
+    `---
+name: internal-dir
+description: Reject symbolic links. Use when repository boundaries need validation.
+---
+# internal-dir
+
+Use assets/payload.txt and assets/other.txt.
+`,
+  );
 
   const snapshot = await collectRepositorySnapshot(root);
   for (const supportPath of [
@@ -501,6 +516,38 @@ Use assets/payload.txt.
     JSON.stringify(report),
     /INTERNAL_SECRET|EXTERNAL_SECRET|internal\.txt|external\.txt/,
   );
+  const result = await scan(root);
+  const symlinkDiagnostics = result.diagnostics.filter(
+    (diagnostic) => diagnostic.code === "SUPPORT-SYMLINK-PATH",
+  );
+  assert.deepEqual(
+    symlinkDiagnostics.map((diagnostic) => diagnostic.path).sort(),
+    [
+      "skills/external-dir/assets",
+      "skills/internal-dir/assets",
+      "skills/leaf/assets/payload.txt",
+      "unreferenced-link.txt",
+    ],
+  );
+  const symlinkFindings = result.findings.filter(
+    (finding) => finding.id === "SUPPORT-SYMLINK-PATH",
+  );
+  assert.equal(symlinkFindings.length, 3);
+  assert.equal(
+    result.findings.some((finding) => finding.id === "SUPPORT-MISSING-PATH"),
+    false,
+  );
+  assert.ok(
+    symlinkFindings.every(
+      (finding) =>
+        finding.details?.state === "symlink" &&
+        typeof finding.details?.target === "string" &&
+        typeof finding.details?.sourcePath === "string",
+    ),
+  );
+  assert.match(JSON.stringify(result.diagnosticsV2), /SUPPORT-SYMLINK-PATH/);
+  assert.match(JSON.stringify(result.trustGraph), /SUPPORT-SYMLINK-PATH/);
+  assert.match(JSON.stringify(report.diagnostics), /SUPPORT-SYMLINK-PATH/);
 });
 
 test("reachability requires an explicit path or basename, never a common stem", async () => {
@@ -868,6 +915,7 @@ echo done
       edge.type === "has_effective_policy",
   );
   assert.deepEqual(effectivePolicy?.properties?.policySources, [
+    "local",
     "owning_skill",
   ]);
 });

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -250,16 +250,17 @@ test("top-level skill-like files are layout guidance only, not skill assets", as
     (diagnostic) =>
       diagnostic.code === "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR",
   );
+  const actualSkillLikePaths = (await readdir(root))
+    .filter(
+      (file) =>
+        file === "SKILL.md" ||
+        file === "skill.md" ||
+        file.endsWith(".skill.md"),
+    )
+    .sort((left, right) => left.localeCompare(right));
   assert.deepEqual(
-    guidanceDiagnostics.map((diagnostic) => [
-      diagnostic.severity,
-      diagnostic.path,
-    ]),
-    [
-      ["info", "foo.skill.md"],
-      ["info", "skill.md"],
-      ["info", "SKILL.md"],
-    ],
+    guidanceDiagnostics.map((diagnostic) => diagnostic.path),
+    actualSkillLikePaths,
   );
   const skillMdDiagnostic = guidanceDiagnostics.find(
     (diagnostic) => diagnostic.path === "skill.md",
@@ -285,6 +286,23 @@ test("top-level skill-like files are layout guidance only, not skill assets", as
   );
   assert.equal(skillMdV2?.repairConstraints, undefined);
   assert.equal(skillMdV2?.verificationSteps, undefined);
+});
+
+test("top-level layout diagnostics preserve exact walked filename casing", async () => {
+  for (const filename of ["SKILL.md", "skill.md", "foo.skill.md"]) {
+    const root = await fixture();
+    await writeFile(path.join(root, filename), "# Skill note\n");
+    const result = await scan(root);
+    assert.deepEqual(
+      result.diagnostics
+        .filter(
+          (diagnostic) =>
+            diagnostic.code === "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR",
+        )
+        .map((diagnostic) => diagnostic.path),
+      [filename],
+    );
+  }
 });
 
 test("skill-like files outside explicit skill directories are not classified as skills", async () => {

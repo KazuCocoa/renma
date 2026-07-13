@@ -401,56 +401,65 @@ function contributingPolicySources(
   config: SecurityConfig | undefined,
   inherited: boolean,
 ): SecurityPolicySource[] {
-  const sources: SecurityPolicySource[] = [];
-  const localFields = [...policy.declared].filter(
-    (field) => field !== "securityProfile",
+  const effective = normalizedEffectiveJson(
+    applySecurityConfig(policy, config),
   );
-  if (inherited) {
-    sources.push("owning_skill");
-  } else if (localFields.length > 0) {
+  const sources: SecurityPolicySource[] = [];
+  if (
+    effective !==
+    normalizedEffectiveJson(
+      applySecurityConfig(withoutLocalPolicy(policy), config),
+    )
+  ) {
     sources.push("local");
   }
-
-  const chain = securityProfileChain(policy.securityProfile, config);
   if (
-    chain.profiles.some(({ profile }) => securityProfileContributes(profile))
+    config?.profiles &&
+    effective !==
+      normalizedEffectiveJson(
+        applySecurityConfig(policy, { ...config, profiles: {} }),
+      )
   ) {
     sources.push("security_profile");
   }
-  if (config && repositoryConfigContributes(policy, config)) {
+  if (
+    config &&
+    effective !==
+      normalizedEffectiveJson(
+        applySecurityConfig(policy, {
+          ...config,
+          approvedDomains: [],
+          approvedUploadDomains: [],
+          disallowedCommands: [],
+        }),
+      )
+  ) {
     sources.push("repository_config");
   }
+  if (inherited) sources.push("owning_skill");
   return sources;
 }
 
-function securityProfileContributes(
-  profile: NonNullable<SecurityConfig["profiles"]>[string],
-): boolean {
-  return (
-    profile.networkAllowed !== undefined ||
-    profile.externalUploadAllowed !== undefined ||
-    profile.secretsAllowed !== undefined ||
-    profile.humanApprovalRequired !== undefined ||
-    profile.allowedDataClass !== undefined ||
-    profile.allowedData.length > 0 ||
-    profile.forbiddenInputs.length > 0 ||
-    profile.approvedDomains.length > 0 ||
-    profile.approvedUploadDomains.length > 0 ||
-    profile.disallowedCommands.length > 0
-  );
+function withoutLocalPolicy(policy: SecurityPolicy): SecurityPolicy {
+  const keepProfile = policy.securityProfile !== undefined;
+  return {
+    ...(keepProfile ? { securityProfile: policy.securityProfile } : {}),
+    allowedData: [],
+    forbiddenInputs: [],
+    approvedNetworkDestinations: [],
+    approvedUploadDestinations: [],
+    disallowedCommands: [],
+    declared: new Set(keepProfile ? ["securityProfile"] : []),
+    invalidDeclared: new Set(
+      policy.invalidDeclared.has("securityProfile") ? ["securityProfile"] : [],
+    ),
+    lineByField: new Map(),
+    evidenceByField: new Map(),
+  };
 }
 
-function repositoryConfigContributes(
-  policy: SecurityPolicy,
-  config: SecurityConfig,
-): boolean {
-  return (
-    config.disallowedCommands.length > 0 ||
-    (!policy.declared.has("approvedNetworkDestinations") &&
-      config.approvedDomains.length > 0) ||
-    (!policy.declared.has("approvedUploadDestinations") &&
-      config.approvedUploadDomains.length > 0)
-  );
+function normalizedEffectiveJson(policy: SecurityPolicy): string {
+  return JSON.stringify(normalizeEffectivePolicy(policy));
 }
 
 export function hasLocalSecurityPolicyMetadata(
