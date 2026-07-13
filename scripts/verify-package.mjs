@@ -23,7 +23,14 @@ try {
   }
   const files = new Set(report.files.map((file) => file.path));
 
-  for (const required of ["package.json", "README.md", "dist/index.js"]) {
+  for (const required of [
+    "package.json",
+    "README.md",
+    "dist/index.js",
+    "docs/trust-graph.md",
+    "docs/schemas/repository-context-bom-v2.schema.json",
+    "docs/schemas/trust-graph-v2.schema.json",
+  ]) {
     requirePackagedPath(files, required);
   }
 

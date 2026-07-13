@@ -57,6 +57,24 @@
       "items": { "$ref": "#/$defs/diagnostic" }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "outputMode": { "const": "default" } },
+        "required": ["outputMode"]
+      },
+      "then": { "required": ["generatedAt"] }
+    },
+    {
+      "if": {
+        "properties": {
+          "outputMode": { "const": "omit_generated_at" }
+        },
+        "required": ["outputMode"]
+      },
+      "then": { "not": { "required": ["generatedAt"] } }
+    }
+  ],
   "$defs": {
     "counts3": {
       "type": "object",

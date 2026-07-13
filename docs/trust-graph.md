@@ -5,19 +5,23 @@ Trust Graph contract. The authoritative machine-readable definition is the
 [Trust Graph v2 JSON Schema](schemas/trust-graph-v2.schema.json).
 
 The required top-level fields are `schemaVersion`, `summary`, `nodes`, `edges`,
-and `findings`. Node and edge `properties` and `evidence` are optional. Finding
-identity fields (`code`, `id`, `title`, `riskClass`, `path`, and `evidence`)
-appear only when supplied. Missing optional fields are omitted, not serialized
-as `null`.
+and `findings`. Node `properties` and node and edge `evidence` are optional.
+Edge `properties` are optional except where an edge-specific provenance rule
+requires them. Finding identity fields (`code`, `id`, `title`, `riskClass`,
+`path`, and `evidence`) appear only when supplied. Missing optional fields are
+omitted, not serialized as `null`.
 
 Nodes are ordered by type and stable ID; edges by source, type, target, and ID;
 findings by deterministic review order. Summary maps contain all enum members.
 Asset nodes include normalized ownership and first-class support evidence.
 Static support uses `owns_local_resource`, `statically_references`,
 `inherits_owner`, and `inherits_policy`. Every `owned_by` edge declares
-`ownershipSource`; inherited ownership retains `inheritedFrom`. Every
-`has_effective_policy` edge has a non-empty ordered `policySources` array and
-retains `inheritedFrom` for owning-Skill inheritance.
+`ownershipSource`; when its value is `inherited`, the edge also retains an
+`inheritedFrom` object with the owning asset ID and source path. Every
+`has_effective_policy` edge has a non-empty, duplicate-free `policySources`
+array. Its values are limited to `local`, `security_profile`,
+`repository_config`, and `owning_skill`, in that generated order. Effective
+policy inherited from an owning Skill retains `inheritedFrom`.
 
 Representative complete top-level document:
 

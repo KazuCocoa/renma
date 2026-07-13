@@ -1,166 +1,236 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import {
+  Ajv2020,
+  type AnySchemaObject,
+  type ValidateFunction,
+} from "ajv/dist/2020.js";
+import addFormats from "ajv-formats";
+
 import { bom } from "../src/commands/bom.js";
 import { trustGraph } from "../src/commands/trust-graph.js";
+import type { TrustGraph, TrustGraphEdgeType } from "../src/trust-graph.js";
 
-type JsonSchema = Record<string, unknown>;
+const BOM_SCHEMA_PATH = "docs/schemas/repository-context-bom-v2.schema.json";
+const TRUST_GRAPH_SCHEMA_PATH = "docs/schemas/trust-graph-v2.schema.json";
+const FIXED_GENERATED_AT = "2026-07-10T12:00:00.000Z";
 
-test("published v2 schemas validate representative generated reports", async () => {
+test("published Draft 2020-12 schemas validate representative generated reports", async () => {
+  const { validateBom, validateTrustGraph } = await validators();
   const target = path.resolve("examples/interactive-placeholder");
-  const bomSchema = await schema(
-    "docs/schemas/repository-context-bom-v2.schema.json",
-  );
-  const trustSchema = await schema("docs/schemas/trust-graph-v2.schema.json");
+  const defaultBom = await bom(target);
+  const omittedBom = await bom(target, {}, { omitGeneratedAt: true });
+  const graph = await representativeTrustGraph();
 
-  validate(await bom(target, {}, { omitGeneratedAt: true }), bomSchema);
-  validate(await trustGraph(target), trustSchema);
+  assertValid(validateBom, defaultBom);
+  assertValid(validateBom, omittedBom);
+  assert.equal(defaultBom.outputMode, "default");
+  assert.equal(typeof defaultBom.generatedAt, "string");
+  assert.equal(omittedBom.outputMode, "omit_generated_at");
+  assert.equal("generatedAt" in omittedBom, false);
+
+  const withoutConfigPath = structuredClone(defaultBom);
+  delete withoutConfigPath.configPath;
+  assertValid(validateBom, withoutConfigPath);
+
+  for (const type of [
+    "owned_by",
+    "owns_local_resource",
+    "statically_references",
+    "inherits_policy",
+    "has_effective_policy",
+  ] as const) {
+    assert.ok(
+      graph.edges.some((edge) => edge.type === type),
+      type,
+    );
+  }
+  assertValid(validateTrustGraph, graph);
 });
 
-test("published schemas pin the v2-only contract and provenance arrays", async () => {
-  const bomSchema = await schema(
-    "docs/schemas/repository-context-bom-v2.schema.json",
+test("BOM schema enforces output modes, timestamps, formats, and score bounds", async () => {
+  const { validateBom } = await validators();
+  const target = path.resolve("examples/interactive-placeholder");
+  const defaultBom = await bom(target);
+  const omittedBom = await bom(target, {}, { omitGeneratedAt: true });
+
+  const defaultWithoutTimestamp = structuredClone(defaultBom);
+  delete defaultWithoutTimestamp.generatedAt;
+  assertInvalid(validateBom, defaultWithoutTimestamp, "required");
+
+  const omittedWithTimestamp = structuredClone(omittedBom) as unknown as Record<
+    string,
+    unknown
+  >;
+  omittedWithTimestamp.generatedAt = FIXED_GENERATED_AT;
+  assertInvalid(validateBom, omittedWithTimestamp, "not");
+
+  const invalidTimestamp = structuredClone(defaultBom);
+  invalidTimestamp.generatedAt = "2026-07-10";
+  assertInvalid(validateBom, invalidTimestamp, "format");
+
+  const belowMinimum = structuredClone(defaultBom);
+  belowMinimum.summary.readinessScore = -1;
+  assertInvalid(validateBom, belowMinimum, "minimum");
+
+  const aboveMaximum = structuredClone(defaultBom);
+  aboveMaximum.readiness.score = 101;
+  assertInvalid(validateBom, aboveMaximum, "maximum");
+});
+
+test("Trust Graph schema rejects missing and invalid edge provenance", async () => {
+  const { validateTrustGraph } = await validators();
+  const graph = await representativeTrustGraph();
+  assertValid(validateTrustGraph, graph);
+
+  const ownershipWithoutSource = structuredClone(graph);
+  const ownedBy = requiredEdge(ownershipWithoutSource, "owned_by");
+  assert.ok(ownedBy.properties);
+  delete ownedBy.properties.ownershipSource;
+  assertInvalid(validateTrustGraph, ownershipWithoutSource, "required");
+
+  const inheritedOwnershipWithoutOrigin = structuredClone(graph);
+  const inheritedOwnedBy = inheritedOwnershipWithoutOrigin.edges.find(
+    (edge) =>
+      edge.type === "owned_by" &&
+      edge.properties?.ownershipSource === "inherited",
   );
-  const trustSchema = await schema("docs/schemas/trust-graph-v2.schema.json");
-  assert.equal(
-    property(bomSchema, "schemaVersion").const,
-    "renma.repository-context-bom.v2",
+  assert.ok(inheritedOwnedBy?.properties);
+  delete inheritedOwnedBy.properties.inheritedFrom;
+  assertInvalid(
+    validateTrustGraph,
+    inheritedOwnershipWithoutOrigin,
+    "required",
   );
-  assert.equal(
-    property(trustSchema, "schemaVersion").const,
-    "renma.trustGraph.v2",
+
+  const effectivePolicyWithoutSources = structuredClone(graph);
+  const effectivePolicy = requiredEdge(
+    effectivePolicyWithoutSources,
+    "has_effective_policy",
   );
-  const edge = definition(trustSchema, "edge");
-  const edgeProperties = property(edge, "properties");
-  const policySources = property(edgeProperties, "policySources");
-  assert.equal(policySources.minItems, 1);
-  assert.deepEqual((policySources.items as JsonSchema).enum, [
-    "local",
-    "security_profile",
-    "repository_config",
-    "owning_skill",
+  assert.ok(effectivePolicy.properties);
+  delete effectivePolicy.properties.policySources;
+  assertInvalid(validateTrustGraph, effectivePolicyWithoutSources, "required");
+
+  const emptyPolicySources = structuredClone(graph);
+  const emptyPolicyEdge = requiredEdge(
+    emptyPolicySources,
+    "has_effective_policy",
+  );
+  assert.ok(emptyPolicyEdge.properties);
+  emptyPolicyEdge.properties.policySources = [];
+  assertInvalid(validateTrustGraph, emptyPolicySources, "minItems");
+
+  const duplicatePolicySources = structuredClone(graph);
+  const duplicatePolicyEdge = requiredEdge(
+    duplicatePolicySources,
+    "has_effective_policy",
+  );
+  assert.ok(duplicatePolicyEdge.properties);
+  duplicatePolicyEdge.properties.policySources = ["local", "local"];
+  assertInvalid(validateTrustGraph, duplicatePolicySources, "uniqueItems");
+
+  const unknownPolicySource = structuredClone(graph);
+  const unknownPolicyEdge = requiredEdge(
+    unknownPolicySource,
+    "has_effective_policy",
+  );
+  assert.ok(unknownPolicyEdge.properties);
+  unknownPolicyEdge.properties.policySources = ["environment"];
+  assertInvalid(validateTrustGraph, unknownPolicySource, "enum");
+});
+
+async function validators(): Promise<{
+  validateBom: ValidateFunction;
+  validateTrustGraph: ValidateFunction;
+}> {
+  const ajv = new Ajv2020({
+    allErrors: true,
+    allowUnionTypes: true,
+    strict: true,
+    strictRequired: false,
+  });
+  addFormats.default(ajv);
+  const [bomSchema, trustGraphSchema] = await Promise.all([
+    schema(BOM_SCHEMA_PATH),
+    schema(TRUST_GRAPH_SCHEMA_PATH),
   ]);
-});
-
-async function schema(file: string): Promise<JsonSchema> {
-  return JSON.parse(await readFile(file, "utf8")) as JsonSchema;
+  return {
+    validateBom: ajv.compile(bomSchema),
+    validateTrustGraph: ajv.compile(trustGraphSchema),
+  };
 }
 
-function validate(value: unknown, root: JsonSchema): void {
-  const errors: string[] = [];
-  visit(value, root, root, "$", errors);
-  assert.deepEqual(errors, []);
+async function schema(file: string): Promise<AnySchemaObject> {
+  return JSON.parse(await readFile(file, "utf8")) as AnySchemaObject;
 }
 
-function visit(
+async function representativeTrustGraph(): Promise<TrustGraph> {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-schema-graph-"));
+  const skill = path.join(root, "skills", "demo");
+  try {
+    await mkdir(path.join(skill, "scripts"), { recursive: true });
+    await writeFile(
+      path.join(skill, "SKILL.md"),
+      `---
+name: demo
+description: Run a governed helper. Use when published schema validation needs support provenance.
+metadata:
+  renma.owner: qa-platform
+  renma.allowed-data: '["public"]'
+  renma.network-allowed: "false"
+  renma.external-upload-allowed: "false"
+  renma.secrets-allowed: "false"
+---
+# Demo
+
+Run scripts/run.sh.
+
+## Required Inputs
+A repository fixture.
+
+## Completion Criteria
+Complete after the helper is verified.
+
+## Verification
+Verify scripts/run.sh exits successfully.
+
+## Do Not Use For
+Do not use for unrelated work.
+`,
+    );
+    await writeFile(path.join(skill, "scripts", "run.sh"), "echo done\n");
+    return await trustGraph(root);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+function requiredEdge(
+  graph: TrustGraph,
+  type: TrustGraphEdgeType,
+): TrustGraph["edges"][number] {
+  const edge = graph.edges.find((candidate) => candidate.type === type);
+  assert.ok(edge, `missing ${type} edge`);
+  return edge;
+}
+
+function assertValid(validate: ValidateFunction, value: unknown): void {
+  assert.equal(validate(value), true, JSON.stringify(validate.errors, null, 2));
+}
+
+function assertInvalid(
+  validate: ValidateFunction,
   value: unknown,
-  schema: JsonSchema,
-  root: JsonSchema,
-  location: string,
-  errors: string[],
+  keyword: string,
 ): void {
-  if (typeof schema.$ref === "string") {
-    visit(value, resolveReference(root, schema.$ref), root, location, errors);
-    return;
-  }
-  if ("const" in schema && value !== schema.const)
-    errors.push(`${location}: expected const ${String(schema.const)}`);
-  if (Array.isArray(schema.enum) && !schema.enum.includes(value))
-    errors.push(`${location}: value is outside enum`);
-
-  const allowedTypes = Array.isArray(schema.type)
-    ? schema.type
-    : schema.type
-      ? [schema.type]
-      : [];
-  if (
-    allowedTypes.length > 0 &&
-    !allowedTypes.some(
-      (type) =>
-        jsonType(value) === type ||
-        (type === "number" && jsonType(value) === "integer"),
-    )
-  ) {
-    errors.push(`${location}: expected ${allowedTypes.join("|")}`);
-    return;
-  }
-
-  if (Array.isArray(value)) {
-    if (typeof schema.minItems === "number" && value.length < schema.minItems)
-      errors.push(`${location}: fewer than minItems`);
-    if (schema.items && typeof schema.items === "object")
-      value.forEach((item, index) =>
-        visit(
-          item,
-          schema.items as JsonSchema,
-          root,
-          `${location}[${index}]`,
-          errors,
-        ),
-      );
-    return;
-  }
-  if (!isRecord(value)) return;
-
-  const properties = isRecord(schema.properties) ? schema.properties : {};
-  for (const required of Array.isArray(schema.required)
-    ? schema.required
-    : []) {
-    if (typeof required === "string" && !(required in value))
-      errors.push(`${location}: missing ${required}`);
-  }
-  for (const [key, child] of Object.entries(value)) {
-    const childSchema = properties[key];
-    if (isRecord(childSchema)) {
-      visit(child, childSchema, root, `${location}.${key}`, errors);
-    } else if (schema.additionalProperties === false) {
-      errors.push(`${location}: unexpected ${key}`);
-    } else if (isRecord(schema.additionalProperties)) {
-      visit(
-        child,
-        schema.additionalProperties,
-        root,
-        `${location}.${key}`,
-        errors,
-      );
-    }
-  }
-}
-
-function resolveReference(root: JsonSchema, reference: string): JsonSchema {
-  assert.match(reference, /^#\//);
-  let current: unknown = root;
-  for (const segment of reference.slice(2).split("/")) {
-    assert.ok(isRecord(current));
-    current = current[segment.replaceAll("~1", "/").replaceAll("~0", "~")];
-  }
-  assert.ok(isRecord(current));
-  return current;
-}
-
-function property(schema: JsonSchema, name: string): JsonSchema {
-  assert.ok(isRecord(schema.properties));
-  const value = schema.properties[name];
-  assert.ok(isRecord(value));
-  return value;
-}
-
-function definition(schema: JsonSchema, name: string): JsonSchema {
-  assert.ok(isRecord(schema.$defs));
-  const value = schema.$defs[name];
-  assert.ok(isRecord(value));
-  return value;
-}
-
-function jsonType(value: unknown): string {
-  if (value === null) return "null";
-  if (Array.isArray(value)) return "array";
-  if (Number.isInteger(value)) return "integer";
-  return typeof value === "object" ? "object" : typeof value;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  assert.equal(validate(value), false, "expected schema validation to fail");
+  assert.ok(
+    validate.errors?.some((error) => error.keyword === keyword),
+    `expected ${keyword} error, received ${JSON.stringify(validate.errors, null, 2)}`,
+  );
 }

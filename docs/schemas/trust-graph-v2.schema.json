@@ -159,6 +159,36 @@
       },
       "additionalProperties": false
     },
+    "inheritedFrom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sourcePath"],
+      "properties": {
+        "id": { "type": "string" },
+        "sourcePath": { "type": "string" }
+      }
+    },
+    "edgeProperties": {
+      "type": "object",
+      "properties": {
+        "policySources": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "local",
+              "security_profile",
+              "repository_config",
+              "owning_skill"
+            ]
+          }
+        },
+        "ownershipSource": { "enum": ["declared", "inherited"] },
+        "inheritedFrom": { "$ref": "#/$defs/inheritedFrom" }
+      },
+      "additionalProperties": true
+    },
     "node": {
       "type": "object",
       "additionalProperties": false,
@@ -180,29 +210,58 @@
         "from": { "type": "string" },
         "to": { "type": "string" },
         "type": { "$ref": "#/$defs/edgeTypes" },
-        "properties": {
-          "type": "object",
-          "properties": {
-            "policySources": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "enum": [
-                  "local",
-                  "security_profile",
-                  "repository_config",
-                  "owning_skill"
+        "properties": { "$ref": "#/$defs/edgeProperties" },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "const": "owned_by" } },
+            "required": ["type"]
+          },
+          "then": {
+            "required": ["properties"],
+            "properties": {
+              "properties": {
+                "type": "object",
+                "required": ["ownershipSource"],
+                "allOf": [
+                  {
+                    "if": {
+                      "type": "object",
+                      "properties": {
+                        "ownershipSource": { "const": "inherited" }
+                      },
+                      "required": ["ownershipSource"]
+                    },
+                    "then": {
+                      "type": "object",
+                      "required": ["inheritedFrom"]
+                    }
+                  }
                 ]
               }
-            },
-            "ownershipSource": { "enum": ["declared", "inherited"] },
-            "inheritedFrom": { "type": "object" }
-          },
-          "additionalProperties": true
+            }
+          }
         },
-        "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
-      }
+        {
+          "if": {
+            "properties": {
+              "type": { "const": "has_effective_policy" }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "required": ["properties"],
+            "properties": {
+              "properties": {
+                "type": "object",
+                "required": ["policySources"]
+              }
+            }
+          }
+        }
+      ]
     },
     "finding": {
       "type": "object",

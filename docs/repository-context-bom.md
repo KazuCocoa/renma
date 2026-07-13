@@ -104,12 +104,13 @@ Treat `owns_local_resource`, `statically_references`, `inherits_owner`, and
 on `schemaVersion`; `generator.version` is provenance only.
 
 The published [BOM v2 JSON Schema](schemas/repository-context-bom-v2.schema.json)
-is the machine-readable contract. Every top-level field is required except
-`generatedAt` (omitted only by `--omit-generated-at`) and `configPath` (absent
-when no configuration file was loaded). Optional lifecycle, version, status,
-target-resolution, and inherited-ownership fields appear only when their
-evidence exists. Owner values are explicitly nullable; missing optional fields
-are omitted rather than serialized as `null`.
+is the machine-readable contract. `generatedAt` is required when `outputMode`
+is `default` and forbidden when `outputMode` is `omit_generated_at`.
+`configPath` remains optional and is absent when no configuration file was
+loaded. Every other top-level field is required. Optional lifecycle, version,
+status, target-resolution, and inherited-ownership fields appear only when
+their evidence exists. Owner values are explicitly nullable; missing optional
+fields are omitted rather than serialized as `null`.
 
 Arrays are deterministically ordered by their identity/path keys, and count
 maps contain every declared enum member, including zero counts. Policy source
