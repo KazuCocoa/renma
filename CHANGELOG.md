@@ -17,6 +17,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   `QUAL-INVALID-TOKEN-BUDGET-OVERRIDE` and never suppresses the default budget.
   Only Markdown-parser-eligible support assets can declare the bundle, and
   override limits must be positive safe integers represented exactly.
+- Added the blocking `CONTEXT-LENS-TARGET-NOT-CONTEXT` diagnostic.
+  Context Lens `applies_to` targets must now resolve specifically to Context
+  Assets; Skills, support assets, and other Context Lenses are rejected.
 
 ### Changed
 
