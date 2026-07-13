@@ -18,7 +18,10 @@ import {
   helperScriptPath,
   resolveHelperScriptPath,
 } from "./repository-paths.js";
-import { parseAssetMetadata } from "./metadata.js";
+import {
+  parseAssetMetadata,
+  parseSupportAssetTokenBudgetMetadata,
+} from "./metadata.js";
 import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { estimateTokens, markdownBody } from "./token-estimator.js";
@@ -1737,45 +1740,143 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
     return [];
   }
 
-  const limit = CONTEXT_TOKEN_LIMITS[document.artifact.kind];
-  const estimatedTokens = estimateTokens(document.artifact.content);
-  if (estimatedTokens <= limit) return [];
+  const defaultLimit = CONTEXT_TOKEN_LIMITS[document.artifact.kind];
+  const tokenBudget = parseSupportAssetTokenBudgetMetadata(document);
+  const overrideLimit =
+    typeof tokenBudget.overrideValue === "number" &&
+    Number.isInteger(tokenBudget.overrideValue)
+      ? tokenBudget.overrideValue
+      : undefined;
+  const tokenBudgetRationale =
+    typeof tokenBudget.rationaleValue === "string"
+      ? tokenBudget.rationaleValue.trim()
+      : undefined;
+  const invalidReasons: string[] = [];
 
-  return [
+  if (tokenBudget.overridePresent) {
+    if (
+      typeof tokenBudget.overrideValue !== "number" ||
+      !Number.isInteger(tokenBudget.overrideValue)
+    ) {
+      invalidReasons.push("token_budget_override must be an integer");
+    } else if (tokenBudget.overrideValue <= 0) {
+      invalidReasons.push("token_budget_override must be positive");
+    } else if (tokenBudget.overrideValue <= defaultLimit) {
+      invalidReasons.push(
+        `token_budget_override must be greater than the default limit of ${defaultLimit}`,
+      );
+    }
+    if (!tokenBudget.rationalePresent) {
+      invalidReasons.push(
+        "token_budget_rationale must be a non-empty string when an override is present",
+      );
+    }
+  }
+  if (tokenBudget.rationalePresent && !tokenBudgetRationale) {
+    invalidReasons.push("token_budget_rationale must be a non-empty string");
+  }
+  if (
+    tokenBudget.reviewedAtPresent &&
+    (typeof tokenBudget.reviewedAtValue !== "string" ||
+      !isIsoDate(tokenBudget.reviewedAtValue))
+  ) {
+    invalidReasons.push(
+      "token_budget_reviewed_at must be a valid YYYY-MM-DD date",
+    );
+  }
+
+  const overrideActive =
+    tokenBudget.overridePresent &&
+    invalidReasons.length === 0 &&
+    overrideLimit !== undefined &&
+    overrideLimit > defaultLimit &&
+    Boolean(tokenBudgetRationale);
+  const effectiveLimit = overrideActive ? overrideLimit : defaultLimit;
+  const estimatedTokens = estimateTokens(document.artifact.content);
+  const findings: Finding[] = [];
+
+  if (invalidReasons.length > 0) {
+    findings.push(
+      documentFinding(
+        document,
+        DIAGNOSTIC_IDS.QUAL_INVALID_TOKEN_BUDGET_OVERRIDE,
+        "Support asset has invalid token-budget override metadata",
+        "quality",
+        "low",
+        "Correct or remove the malformed token-budget decision metadata. An override is valid only after a human decides the asset should remain intentionally coherent or ordered; do not add or increase an override merely to make diagnostics pass.",
+        {
+          whyItMatters:
+            "Token-budget overrides record explicit human decisions. Malformed or incomplete metadata cannot safely replace the default advisory limit.",
+          constraints: [
+            "Do not automatically insert token-budget override metadata.",
+            "Do not treat the override as a general ignore mechanism.",
+            "Ask whether a meaningful split preserves coherence and execution order before proposing an override.",
+          ],
+          verificationSteps: ["Run renma scan."],
+          llmHint:
+            "Report the invalid fields to the user. First ask whether the asset can be split along meaningful boundaries without harming coherence or execution order. Only if the user confirms it should remain long should you repair explicit override metadata with their rationale.",
+          details: {
+            estimatedTokens,
+            defaultLimit,
+            ...(overrideLimit !== undefined ? { overrideLimit } : {}),
+            effectiveLimit,
+            overrideActive,
+            ...(tokenBudgetRationale ? { tokenBudgetRationale } : {}),
+            invalidReasons,
+            profile: QUALITY.profile,
+            measurement: "full_file",
+          },
+        },
+      ),
+    );
+  }
+
+  if (estimatedTokens <= effectiveLimit) return findings;
+
+  findings.push(
     documentFinding(
       document,
       DIAGNOSTIC_IDS.QUAL_SUPPORT_ASSET_TOKEN_BUDGET,
       "Support asset exceeds token guidance",
       "quality",
       "low",
-      `Review whether this ${document.artifact.kind} asset still has one coherent scope. Size alone does not require a split. Consider headings, read conditions, reference depth, mixed responsibilities, and maintained duplication before using \`renma suggest-semantic-split ${document.artifact.path}\`.`,
+      `Ask the user whether this ${document.artifact.kind} asset can be split along meaningful boundaries without harming coherence or execution order. Split it only after the user agrees. If the user confirms it should remain intentionally long, they may record an explicit token-budget override and rationale; do not recommend an override merely to make this diagnostic pass.`,
       {
         whyItMatters:
-          "Large content assets deserve a low-advisory coherence review, but an intentionally focused asset can remain intact above the threshold.",
+          "Large content assets deserve a low-advisory coherence review. A meaningful split is preferred when it preserves semantic boundaries, while an explicit human-reviewed override is appropriate for intentionally coherent or ordered long-form assets.",
         constraints: [
           "Do not introduce runtime context resolution.",
           "Do not create prompt packages.",
           "Do not split based on size alone.",
+          "Require the user's decision before splitting or treating the asset as intentionally long.",
+          "Do not automatically add or increase token-budget override metadata.",
           "Preserve concrete procedural steps losslessly if a semantic split is chosen.",
           "Keep static references from the parent file or SKILL.md to every split part.",
         ],
         verificationSteps: [
           "Run renma scan.",
           "Run the repository-specific validation or test command, if one exists.",
-          "Confirm the finding is resolved or reduced and every split part remains reachable.",
+          "Confirm every agreed split part remains reachable, or that an intentional-long decision uses valid reviewed metadata.",
         ],
         llmHint:
-          "Review scope, headings, read conditions, reference depth, responsibilities, and duplication. Propose a semantic split only when those signals justify it.",
+          "Ask the user whether the asset can be split along meaningful boundaries without harming coherence or execution order. Split only with agreement. If the user confirms it must remain intentionally long, use their explicit rationale for a valid override; never add one only to silence the finding.",
         details: {
+          estimatedTokens,
+          defaultLimit,
+          ...(overrideLimit !== undefined ? { overrideLimit } : {}),
+          effectiveLimit,
+          overrideActive,
+          ...(tokenBudgetRationale ? { tokenBudgetRationale } : {}),
           measured: estimatedTokens,
-          limit,
+          limit: effectiveLimit,
           unit: "estimated_tokens",
           profile: QUALITY.profile,
           measurement: "full_file",
         },
       },
     ),
-  ];
+  );
+  return findings;
 }
 
 function profileFindings(document: ParsedDocument): Finding[] {

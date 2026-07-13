@@ -1098,7 +1098,169 @@ Verify the result with a test.
   assert.ok(
     !contextBudgetFinding?.verificationSteps?.includes("Run npm test."),
   );
-  assert.match(contextBudgetFinding?.llmHint ?? "", /Review scope/);
+  assert.match(contextBudgetFinding?.remediation ?? "", /Ask the user/);
+  assert.match(
+    contextBudgetFinding?.remediation ?? "",
+    /Split it only after the user agrees/,
+  );
+  assert.match(
+    contextBudgetFinding?.llmHint ?? "",
+    /never add one only to silence the finding/,
+  );
+  assert.equal(contextBudgetFinding?.details?.defaultLimit, 5000);
+  assert.equal(contextBudgetFinding?.details?.effectiveLimit, 5000);
+  assert.equal(contextBudgetFinding?.details?.overrideActive, false);
+  assert.equal(contextBudgetFinding?.details?.measurement, "full_file");
+});
+
+test("support-asset token budgets honor only valid intentional overrides", async () => {
+  const root = await fixture();
+  const referenceDir = path.join(root, "skills", "demo", "references");
+  await mkdir(referenceDir, { recursive: true });
+
+  const cases = [
+    {
+      file: "valid.md",
+      metadata: `token_budget_override: 5200
+token_budget_rationale: "This is one ordered workflow and splitting would break execution order."
+token_budget_reviewed_at: "2026-07-12"`,
+      words: 5050,
+      invalid: false,
+      overBudget: false,
+    },
+    {
+      file: "missing-rationale.md",
+      metadata: "token_budget_override: 5200",
+      words: 5050,
+      invalid: true,
+      overBudget: true,
+    },
+    {
+      file: "non-integer.md",
+      metadata: `token_budget_override: "5200"
+token_budget_rationale: Intentionally coherent.`,
+      words: 5050,
+      invalid: true,
+      overBudget: true,
+    },
+    {
+      file: "at-default.md",
+      metadata: `token_budget_override: 5000
+token_budget_rationale: Intentionally coherent.`,
+      words: 5050,
+      invalid: true,
+      overBudget: true,
+    },
+    {
+      file: "below-default.md",
+      metadata: `token_budget_override: 4999
+token_budget_rationale: Intentionally coherent.`,
+      words: 5050,
+      invalid: true,
+      overBudget: true,
+    },
+    {
+      file: "not-positive.md",
+      metadata: `token_budget_override: 0
+token_budget_rationale: Intentionally coherent.`,
+      words: 5050,
+      invalid: true,
+      overBudget: true,
+    },
+    {
+      file: "invalid-date.md",
+      metadata: `token_budget_override: 5200
+token_budget_rationale: Intentionally coherent.
+token_budget_reviewed_at: "2026-02-30"`,
+      words: 5050,
+      invalid: true,
+      overBudget: true,
+    },
+    {
+      file: "over-override.md",
+      metadata: `token_budget_override: 5200
+token_budget_rationale: Intentionally coherent.`,
+      words: 5250,
+      invalid: false,
+      overBudget: true,
+    },
+  ];
+
+  for (const fixtureCase of cases) {
+    await writeFile(
+      path.join(referenceDir, fixtureCase.file),
+      `---\n${fixtureCase.metadata}\n---\n# Reference\n\n${repeatWords("context", fixtureCase.words)}\n`,
+    );
+  }
+
+  const result = await scan(root);
+  for (const fixtureCase of cases) {
+    const assetPath = `skills/demo/references/${fixtureCase.file}`;
+    const findings = result.findings.filter(
+      (finding) => finding.evidence.path === assetPath,
+    );
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "QUAL-INVALID-TOKEN-BUDGET-OVERRIDE",
+      ),
+      fixtureCase.invalid,
+      `${fixtureCase.file} invalid override`,
+    );
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "QUAL-SUPPORT-ASSET-TOKEN-BUDGET",
+      ),
+      fixtureCase.overBudget,
+      `${fixtureCase.file} effective budget`,
+    );
+  }
+
+  const overOverride = result.findings.find(
+    (finding) =>
+      finding.id === "QUAL-SUPPORT-ASSET-TOKEN-BUDGET" &&
+      finding.evidence.path.endsWith("over-override.md"),
+  );
+  assert.deepEqual(
+    {
+      defaultLimit: overOverride?.details?.defaultLimit,
+      overrideLimit: overOverride?.details?.overrideLimit,
+      effectiveLimit: overOverride?.details?.effectiveLimit,
+      overrideActive: overOverride?.details?.overrideActive,
+      tokenBudgetRationale: overOverride?.details?.tokenBudgetRationale,
+    },
+    {
+      defaultLimit: 5000,
+      overrideLimit: 5200,
+      effectiveLimit: 5200,
+      overrideActive: true,
+      tokenBudgetRationale: "Intentionally coherent.",
+    },
+  );
+});
+
+test("token-budget override metadata does not affect unsupported asset kinds", async () => {
+  const root = await fixture();
+  const scriptDir = path.join(root, "skills", "demo", "scripts");
+  await mkdir(scriptDir, { recursive: true });
+  await writeFile(
+    path.join(scriptDir, "large.md"),
+    `---
+token_budget_override: nope
+---
+${repeatWords("script", 6000)}
+`,
+  );
+
+  const result = await scan(root);
+  assert.equal(
+    result.findings.some(
+      (finding) =>
+        finding.evidence.path === "skills/demo/scripts/large.md" &&
+        (finding.id === "QUAL-SUPPORT-ASSET-TOKEN-BUDGET" ||
+          finding.id === "QUAL-INVALID-TOKEN-BUDGET-OVERRIDE"),
+    ),
+    false,
+  );
 });
 
 test("scan emits actionable guidance for oversized skills", async () => {

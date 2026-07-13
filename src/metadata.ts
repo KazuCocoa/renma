@@ -7,7 +7,10 @@ import type {
   ParsedDocument,
 } from "./types.js";
 import { isIsoDate, parseDayDuration } from "./freshness.js";
-import type { ParsedYamlFrontmatter } from "./yaml-frontmatter.js";
+import {
+  parseAgentSkillFrontmatter,
+  type ParsedYamlFrontmatter,
+} from "./yaml-frontmatter.js";
 
 const STATUSES: AssetStatus[] = [
   "experimental",
@@ -64,6 +67,45 @@ interface OperationalMetadataSource {
   canonicalSkill: boolean;
 }
 
+export interface SupportAssetTokenBudgetMetadata {
+  overridePresent: boolean;
+  overrideValue?: unknown;
+  rationalePresent: boolean;
+  rationaleValue?: unknown;
+  reviewedAtPresent: boolean;
+  reviewedAtValue?: unknown;
+}
+
+/** Read the opt-in support-asset budget decision fields with YAML scalar types intact. */
+export function parseSupportAssetTokenBudgetMetadata(
+  document: ParsedDocument,
+): SupportAssetTokenBudgetMetadata {
+  if (
+    document.artifact.kind !== "context" &&
+    document.artifact.kind !== "reference" &&
+    document.artifact.kind !== "profile" &&
+    document.artifact.kind !== "example"
+  ) {
+    return {
+      overridePresent: false,
+      rationalePresent: false,
+      reviewedAtPresent: false,
+    };
+  }
+  const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
+  const fields = new Map(
+    frontmatter.fields.map((field) => [field.key, field.value]),
+  );
+  return {
+    overridePresent: fields.has("token_budget_override"),
+    overrideValue: fields.get("token_budget_override"),
+    rationalePresent: fields.has("token_budget_rationale"),
+    rationaleValue: fields.get("token_budget_rationale"),
+    reviewedAtPresent: fields.has("token_budget_reviewed_at"),
+    reviewedAtValue: fields.get("token_budget_reviewed_at"),
+  };
+}
+
 /** Normalize parsed frontmatter into asset metadata plus validation diagnostics. */
 export function parseAssetMetadata(document: ParsedDocument): {
   metadata: AssetMetadata;
@@ -83,6 +125,7 @@ export function parseAssetMetadata(document: ParsedDocument): {
   );
   const reviewCycle = optionalText(metadataText(source.values.review_cycle));
   const expiresAt = optionalText(metadataText(source.values.expires_at));
+  const tokenBudget = parseSupportAssetTokenBudgetMetadata(document);
   const metadata: AssetMetadata = {
     tags: operationalListValue(document, source, "tags", diagnostics),
     whenToUse: operationalListValue(
@@ -160,6 +203,22 @@ export function parseAssetMetadata(document: ParsedDocument): {
   assignOptional(metadata, "lastReviewedAt", lastReviewedAt);
   assignOptional(metadata, "reviewCycle", reviewCycle);
   assignOptional(metadata, "expiresAt", expiresAt);
+  if (
+    typeof tokenBudget.overrideValue === "number" &&
+    Number.isInteger(tokenBudget.overrideValue)
+  ) {
+    metadata.tokenBudgetOverride = tokenBudget.overrideValue;
+  }
+  assignOptional(
+    metadata,
+    "tokenBudgetRationale",
+    optionalText(metadataText(tokenBudget.rationaleValue)),
+  );
+  assignOptional(
+    metadata,
+    "tokenBudgetReviewedAt",
+    optionalText(metadataText(tokenBudget.reviewedAtValue)),
+  );
   assignOptionalList(
     metadata,
     "appliesTo",

@@ -527,6 +527,9 @@ status: stable
 tags: testing, boundaries
 requires_context:
   - context.testing.base
+token_budget_override: 6000
+token_budget_rationale: "This is a single ordered workflow."
+token_budget_reviewed_at: "2026-07-12"
 metadata:
   renma.id: context.ignored
   renma.owner: ignored-team
@@ -545,6 +548,12 @@ metadata:
   assert.equal(result.metadata.status, "stable");
   assert.deepEqual(result.metadata.tags, ["testing", "boundaries"]);
   assert.deepEqual(result.metadata.requiresContext, ["context.testing.base"]);
+  assert.equal(result.metadata.tokenBudgetOverride, 6000);
+  assert.equal(
+    result.metadata.tokenBudgetRationale,
+    "This is a single ordered workflow.",
+  );
+  assert.equal(result.metadata.tokenBudgetReviewedAt, "2026-07-12");
   assert.equal(result.metadataFields.owner?.raw, "owner: context-team");
 });
 

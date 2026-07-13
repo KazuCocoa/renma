@@ -14,6 +14,17 @@ grouped in two-code-point units; other punctuation is grouped in units of up to
 three code points. It is not an exact token count for any model. Skill budgets
 measure Markdown after frontmatter. Content-asset budgets measure the full file.
 
+Contexts, references, profiles, and examples may record a human-reviewed
+effective limit with top-level `token_budget_override` and
+`token_budget_rationale` metadata. The override must be a positive integer
+greater than the asset kind's unchanged default. Optional
+`token_budget_reviewed_at` must be a real `YYYY-MM-DD` date. Renma does not add
+these fields automatically. When an asset exceeds its default, an agent should
+first ask whether it can be split along meaningful boundaries without harming
+coherence or execution order, and split only after the user agrees. An override
+is appropriate only when the user confirms the long-form asset is intentionally
+coherent or ordered; it is not a general ignore mechanism.
+
 ## Agent Skills requirements and recommendations
 
 | Field | Value | Unit and trigger | Severity | Source | Rationale and false-positive risk | Diagnostic | Reviewed | Configurable later |
@@ -39,10 +50,10 @@ and `assets/` directories are valid. See the official
 | `descriptionMinChars` | 0 | characters; disabled | none | Renma | Length does not establish selection clarity | `QUAL-SHORT-DESCRIPTION` removed from default behavior | 0.18.0 | possibly |
 | `skillTokenWarn` | 2,000 | `estimated_tokens`; body above | low | Renma | Early progressive-disclosure review; focused workflows may exceed it | `QUAL-SKILL-TOKEN-BUDGET` | 0.18.0 | possibly |
 | `skillTokenStrongWarn` | 5,000 | `estimated_tokens`; body above | medium | Agent Skills recommendation with Renma severity | Stronger review, not a required split | `QUAL-SKILL-TOKEN-BUDGET` | 0.18.0 | possibly |
-| `contentTokenWarn.context` | 4,000 | `estimated_tokens`; full file above | low | Renma | Review coherent scope; size alone is insufficient | `QUAL-SUPPORT-ASSET-TOKEN-BUDGET` | 0.18.0 | possibly |
-| `contentTokenWarn.reference` | 5,000 | same | low | Renma | Detailed local references may legitimately be long | same | 0.18.0 | possibly |
-| `contentTokenWarn.profile` | 2,000 | same | low | Renma | Profiles should remain reviewable overlays | same | 0.18.0 | possibly |
-| `contentTokenWarn.example` | 2,500 | same | low | Renma | Complete examples may legitimately be long | same | 0.18.0 | possibly |
+| `contentTokenWarn.context` | 4,000 | `estimated_tokens`; full file above effective limit | low | Renma | Prefer an agreed semantic split when coherence survives; intentionally coherent or ordered assets may use reviewed metadata | `QUAL-SUPPORT-ASSET-TOKEN-BUDGET` | 0.18.1 | metadata only after human decision |
+| `contentTokenWarn.reference` | 5,000 | same | low | Renma | Detailed local references may legitimately be long | same | 0.18.1 | same |
+| `contentTokenWarn.profile` | 2,000 | same | low | Renma | Profiles should remain reviewable overlays | same | 0.18.1 | same |
+| `contentTokenWarn.example` | 2,500 | same | low | Renma | Complete examples may legitimately be long | same | 0.18.1 | same |
 | `lowHeadingDensityMinTokens` | 400 | body `estimated_tokens`, with fewer than 2 headings | low | Renma | Long prose can still be intentionally linear | `QUAL-LOW-HEADING-DENSITY` | 0.18.0 | possibly |
 | `lowHeadingDensityMinHeadings` | 2 | headings | low | Renma | Navigation heuristic only | same | 0.18.0 | possibly |
 
