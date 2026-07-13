@@ -317,6 +317,11 @@ function addPolicyEvidence(
   }
 
   if (!policy.hasEffectivePolicy) return;
+  if (policy.policySources.length === 0) {
+    throw new Error(
+      `Effective security policy for ${policy.path} has no provenance source.`,
+    );
+  }
 
   for (let index = 1; index < policy.profileChain.length; index += 1) {
     const childProfile = policy.profileChain[index];

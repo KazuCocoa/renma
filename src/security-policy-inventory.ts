@@ -2,10 +2,10 @@ import { createHash } from "node:crypto";
 import { classifyRepositorySkillPath } from "./discovery.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import {
-  applySecurityConfig,
   effectiveAllowedDataClass,
   effectiveAllowedDataList,
   parseOperationalSecurityPolicy,
+  resolveSecurityConfig,
   securityProfileChain,
   type SecurityPolicy,
 } from "./security-policy.js";
@@ -159,7 +159,8 @@ export function summarizeSecurityPolicyInventory(
 
     const effectiveConfig =
       rawSupportArtifact && !policyArtifact ? undefined : config;
-    const policy = applySecurityConfig(parsedPolicy, effectiveConfig);
+    const resolved = resolveSecurityConfig(parsedPolicy, effectiveConfig);
+    const policy = resolved.policy;
     const localPolicyMetadata = !rawSupportArtifact && hasMetadata;
     const effectivePolicy = hasEffectiveSecurityPolicy(policy);
     const inheritedPolicy = policyArtifact !== undefined && effectivePolicy;
@@ -170,11 +171,12 @@ export function summarizeSecurityPolicyInventory(
     if (inheritedPolicy) summary.assetsWithInheritedPolicy += 1;
     if (effectivePolicy) {
       summary.assetsWithEffectivePolicy += 1;
-      for (const source of contributingPolicySources(
-        parsedPolicy,
-        effectiveConfig,
+      const sources = effectivePolicySources(
+        resolved.policySources,
         policyArtifact !== undefined,
-      )) {
+      );
+      assertEffectivePolicySources(sources, artifact.path);
+      for (const source of sources) {
         summary.policySources[source] += 1;
       }
     } else {
@@ -250,7 +252,8 @@ export function collectSecurityPolicyAssetEvidence(
 
       const effectiveConfig =
         rawSupportArtifact && !policyArtifact ? undefined : config;
-      const policy = applySecurityConfig(parsedPolicy, effectiveConfig);
+      const resolved = resolveSecurityConfig(parsedPolicy, effectiveConfig);
+      const policy = resolved.policy;
       const localPolicyMetadata = !rawSupportArtifact && hasMetadata;
       const effectivePolicy = hasEffectiveSecurityPolicy(policy);
       const chain = securityProfileChain(parsedPolicy.securityProfile, config);
@@ -266,9 +269,8 @@ export function collectSecurityPolicyAssetEvidence(
         hasLocalPolicyMetadata: localPolicyMetadata,
         hasEffectivePolicy: effectivePolicy,
         policySources: effectivePolicy
-          ? contributingPolicySources(
-              parsedPolicy,
-              effectiveConfig,
+          ? effectivePolicySources(
+              resolved.policySources,
               policyArtifact !== undefined,
             )
           : [],
@@ -291,6 +293,8 @@ export function collectSecurityPolicyAssetEvidence(
           policyFields: policyFieldEvidenceList(evidenceArtifact, parsedPolicy),
         },
       };
+      if (row.hasEffectivePolicy)
+        assertEffectivePolicySources(row.policySources, row.path);
       return row;
     })
     .filter((row): row is SecurityPolicyAssetEvidence => row !== undefined)
@@ -396,70 +400,24 @@ export function policyArtifactFor(
   return skills.get(classified.skillDirectory) ?? undefined;
 }
 
-function contributingPolicySources(
-  policy: SecurityPolicy,
-  config: SecurityConfig | undefined,
+function effectivePolicySources(
+  upstream: ReadonlyArray<Exclude<SecurityPolicySource, "owning_skill">>,
   inherited: boolean,
 ): SecurityPolicySource[] {
-  const effective = normalizedEffectiveJson(
-    applySecurityConfig(policy, config),
-  );
-  const sources: SecurityPolicySource[] = [];
-  if (
-    effective !==
-    normalizedEffectiveJson(
-      applySecurityConfig(withoutLocalPolicy(policy), config),
-    )
-  ) {
-    sources.push("local");
-  }
-  if (
-    config?.profiles &&
-    effective !==
-      normalizedEffectiveJson(
-        applySecurityConfig(policy, { ...config, profiles: {} }),
-      )
-  ) {
-    sources.push("security_profile");
-  }
-  if (
-    config &&
-    effective !==
-      normalizedEffectiveJson(
-        applySecurityConfig(policy, {
-          ...config,
-          approvedDomains: [],
-          approvedUploadDomains: [],
-          disallowedCommands: [],
-        }),
-      )
-  ) {
-    sources.push("repository_config");
-  }
+  const sources: SecurityPolicySource[] = [...upstream];
   if (inherited) sources.push("owning_skill");
   return sources;
 }
 
-function withoutLocalPolicy(policy: SecurityPolicy): SecurityPolicy {
-  const keepProfile = policy.securityProfile !== undefined;
-  return {
-    ...(keepProfile ? { securityProfile: policy.securityProfile } : {}),
-    allowedData: [],
-    forbiddenInputs: [],
-    approvedNetworkDestinations: [],
-    approvedUploadDestinations: [],
-    disallowedCommands: [],
-    declared: new Set(keepProfile ? ["securityProfile"] : []),
-    invalidDeclared: new Set(
-      policy.invalidDeclared.has("securityProfile") ? ["securityProfile"] : [],
-    ),
-    lineByField: new Map(),
-    evidenceByField: new Map(),
-  };
-}
-
-function normalizedEffectiveJson(policy: SecurityPolicy): string {
-  return JSON.stringify(normalizeEffectivePolicy(policy));
+function assertEffectivePolicySources(
+  sources: SecurityPolicySource[],
+  artifactPath: string,
+): void {
+  if (sources.length === 0) {
+    throw new Error(
+      `Effective security policy for ${artifactPath} has no provenance source.`,
+    );
+  }
 }
 
 export function hasLocalSecurityPolicyMetadata(

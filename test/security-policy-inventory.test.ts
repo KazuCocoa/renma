@@ -56,9 +56,51 @@ test("effective policy provenance lists every contributing source", () => {
     evidence.find((item) => item.kind === "script")?.policySources,
     ["local", "security_profile", "repository_config", "owning_skill"],
   );
+  assert.ok(
+    evidence
+      .filter((item) => item.hasEffectivePolicy)
+      .every((item) => item.policySources.length > 0),
+  );
+  const summary = summarizeSecurityPolicyInventory(
+    [
+      artifact(
+        "skills/demo/SKILL.md",
+        "skill",
+        policy({
+          allowedData: "public",
+          externalUploadAllowed: false,
+          securityProfile: "strict",
+        }),
+      ),
+      artifact("skills/demo/scripts/run.mjs", "script", "echo safe\n"),
+    ],
+    config,
+  );
+  assert.ok(
+    summary.assetsWithEffectivePolicy <=
+      Object.values(summary.policySources).reduce(
+        (total, count) => total + count,
+        0,
+      ),
+  );
 });
 
 test("policy provenance follows effective override and accumulation semantics", () => {
+  const sameScalar = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "contexts/same-scalar.md",
+        "context",
+        policy({ networkAllowed: false, securityProfile: "strict" }),
+      ),
+    ],
+    {
+      ...baseSecurityConfig(),
+      profiles: { strict: profile({ networkAllowed: false }) },
+    },
+  )[0];
+  assert.deepEqual(sameScalar?.policySources, ["local"]);
+
   const overridden = collectSecurityPolicyAssetEvidence(
     [
       artifact(
@@ -128,12 +170,69 @@ test("policy provenance follows effective override and accumulation semantics", 
       ...baseSecurityConfig(),
       profiles: {
         child: profile({ networkAllowed: true, securityProfile: "parent" }),
-        parent: profile({ networkAllowed: false }),
+        parent: profile({ networkAllowed: true }),
       },
     },
   )[0];
   assert.deepEqual(chained?.policySources, ["security_profile"]);
   assert.equal(chained?.effectivePolicy.networkAllowed, true);
+});
+
+test("duplicate profile and repository list values retain both suppliers", () => {
+  const config = {
+    ...baseSecurityConfig(),
+    approvedDomains: ["shared.example.com"],
+    disallowedCommands: ["curl"],
+    profiles: {
+      strict: profile({
+        approvedDomains: ["shared.example.com"],
+        disallowedCommands: ["curl"],
+      }),
+    },
+  } satisfies SecurityConfig;
+  const evidence = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "contexts/profile-repository.md",
+        "context",
+        policy({ securityProfile: "strict" }),
+      ),
+    ],
+    config,
+  )[0];
+  assert.deepEqual(evidence?.policySources, [
+    "security_profile",
+    "repository_config",
+  ]);
+  assert.deepEqual(evidence?.effectivePolicy.approvedNetworkDestinations, [
+    "shared.example.com",
+  ]);
+  assert.deepEqual(evidence?.effectivePolicy.disallowedCommands, ["curl"]);
+});
+
+test("explicit local empty allowed data blocks profile inheritance with provenance", () => {
+  const evidence = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "contexts/empty-data.md",
+        "context",
+        [
+          "---",
+          "allowed_data: []",
+          "network_allowed: false",
+          "security_profile: broad",
+          "---",
+          "# Empty data",
+        ].join("\n"),
+      ),
+    ],
+    {
+      ...baseSecurityConfig(),
+      profiles: { broad: profile({ allowedData: ["public"] }) },
+    },
+  )[0];
+  assert.deepEqual(evidence?.policySources, ["local"]);
+  assert.deepEqual(evidence?.effectivePolicy.allowedData, []);
 });
 
 test("repository-only and local-only policies report one exact source", () => {
@@ -148,7 +247,7 @@ test("repository-only and local-only policies report one exact source", () => {
   assert.deepEqual(repositoryOnly?.policySources, ["repository_config"]);
 });
 
-test("duplicate policy values do not claim sources that leave the fingerprint unchanged", () => {
+test("duplicate policy values retain every supplying source", () => {
   const evidence = collectSecurityPolicyAssetEvidence(
     [
       artifact(
@@ -167,7 +266,7 @@ test("duplicate policy values do not claim sources that leave the fingerprint un
       approvedDomains: ["shared.example.com"],
     },
   )[0];
-  assert.deepEqual(evidence?.policySources, []);
+  assert.deepEqual(evidence?.policySources, ["local", "repository_config"]);
 });
 
 test("invalid local destination metadata blocks repository accumulation provenance", () => {

@@ -319,12 +319,14 @@ The inventory reports local, inherited, effective, and missing-effective coverag
 
 `renma trust-graph` also includes effective policy evidence. Each effective policy node uses a deterministic fingerprint over normalized allowed data, forbidden inputs, network/upload/secrets booleans, human approval requirement, approved destinations, and disallowed commands. Every `has_effective_policy` edge carries a deterministic `policySources` array containing each source that contributed to the fingerprint: `local`, `security_profile`, `repository_config`, and/or `owning_skill`. Owning-Skill inheritance retains `inheritedFrom`, and selected-profile evidence retains the selected profile and profile chain. The graph does not enforce policy at runtime.
 
-Contribution is evaluated with the same merge rules as effective policy by
-removing each candidate source and comparing the normalized result. A blocked
-profile value is not a contribution; an accumulated repository value is. If
-two sources provide only the same deduplicated value, removing either one does
-not change the fingerprint, so neither is claimed for that value. Source order
-is always `local`, `security_profile`, `repository_config`, `owning_skill`.
+Contribution is recorded during effective-policy resolution with the same
+precedence, fail-closed, replacement, accumulation, and deduplication rules. A
+profile scalar overridden by local metadata is not a contribution. For
+accumulating lists, every source that supplies a value is retained even when
+another source supplies the same value and the effective list deduplicates it.
+Source order is always `local`, `security_profile`, `repository_config`,
+`owning_skill`. For inherited support, `local` refers to local metadata on the
+owning Skill, while `owning_skill` identifies the inheritance channel.
 
 ### Security-aware semantic diff
 
