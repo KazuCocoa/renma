@@ -11,6 +11,13 @@ when_to_use:
   - Reviewing payment write retry behavior or duplicate request handling
 when_not_to_use:
   - Reviewing non-payment retries or read-only request behavior
+allowed_data:
+  - repo-local-files
+  - disclosed-user-provided-data
+network_allowed: false
+external_upload_allowed: false
+secrets_allowed: false
+requires_human_approval: true
 ---
 
 # Payment Idempotency
