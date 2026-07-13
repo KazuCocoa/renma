@@ -1,0 +1,465 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/KazuCocoa/renma/blob/main/docs/schemas/repository-context-bom-v2.schema.json",
+  "title": "Renma Repository Context BOM v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "outputMode",
+    "generator",
+    "root",
+    "scope",
+    "summary",
+    "assets",
+    "dependencies",
+    "readiness",
+    "securityPosture",
+    "securityPolicyInventory",
+    "diagnostics"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "renma.repository-context-bom.v2" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "outputMode": { "enum": ["default", "omit_generated_at"] },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "renma" },
+        "version": { "type": "string" }
+      }
+    },
+    "root": { "type": "string" },
+    "configPath": { "type": "string" },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "runtimeUsage", "telemetryCollected"],
+      "properties": {
+        "type": { "const": "declared_repository_manifest" },
+        "runtimeUsage": { "const": false },
+        "telemetryCollected": { "const": false }
+      }
+    },
+    "summary": { "$ref": "#/$defs/summary" },
+    "assets": { "type": "array", "items": { "$ref": "#/$defs/asset" } },
+    "dependencies": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/dependency" }
+    },
+    "readiness": { "$ref": "#/$defs/readiness" },
+    "securityPosture": { "$ref": "#/$defs/securityPosture" },
+    "securityPolicyInventory": { "$ref": "#/$defs/policyInventory" },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/diagnostic" }
+    }
+  },
+  "$defs": {
+    "counts3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["error", "warning", "info"],
+      "properties": {
+        "error": { "type": "integer", "minimum": 0 },
+        "warning": { "type": "integer", "minimum": 0 },
+        "info": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scannedFileCount",
+        "assetCount",
+        "dependencyCount",
+        "resolvedDependencyCount",
+        "unresolvedDependencyCount",
+        "ownedAssetCount",
+        "unownedAssetCount",
+        "readinessScore",
+        "readinessLevel",
+        "diagnosticCounts"
+      ],
+      "properties": {
+        "scannedFileCount": { "type": "integer", "minimum": 0 },
+        "assetCount": { "type": "integer", "minimum": 0 },
+        "dependencyCount": { "type": "integer", "minimum": 0 },
+        "resolvedDependencyCount": { "type": "integer", "minimum": 0 },
+        "unresolvedDependencyCount": { "type": "integer", "minimum": 0 },
+        "ownedAssetCount": { "type": "integer", "minimum": 0 },
+        "unownedAssetCount": { "type": "integer", "minimum": 0 },
+        "readinessScore": { "type": "number", "minimum": 0, "maximum": 100 },
+        "readinessLevel": { "enum": ["not_ready", "needs_attention", "ready"] },
+        "diagnosticCounts": { "$ref": "#/$defs/counts3" }
+      }
+    },
+    "ownership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["declaredOwner", "effectiveOwner", "source"],
+      "properties": {
+        "declaredOwner": { "type": ["string", "null"] },
+        "effectiveOwner": { "type": ["string", "null"] },
+        "source": { "enum": ["declared", "inherited", "unowned"] },
+        "inheritedFrom": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "sourcePath"],
+          "properties": {
+            "id": { "type": "string" },
+            "sourcePath": { "type": "string" }
+          }
+        }
+      }
+    },
+    "assetReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "to", "resolved"],
+      "properties": {
+        "kind": { "type": "string" },
+        "to": { "type": "string" },
+        "resolved": { "type": "boolean" },
+        "targetId": { "type": "string" },
+        "targetKind": { "type": "string" },
+        "targetPath": { "type": "string" }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "sourcePath",
+        "contentHash",
+        "sizeBytes",
+        "contentClassification",
+        "markdownParserEligible",
+        "ownership",
+        "tags",
+        "dependencies",
+        "dependents",
+        "diagnostics"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": {
+          "enum": [
+            "skill",
+            "context",
+            "context_lens",
+            "profile",
+            "reference",
+            "example",
+            "script",
+            "asset"
+          ]
+        },
+        "sourcePath": { "type": "string" },
+        "contentHash": { "type": "string" },
+        "sizeBytes": { "type": "integer", "minimum": 0 },
+        "contentClassification": { "enum": ["text", "binary"] },
+        "markdownParserEligible": { "type": "boolean" },
+        "ownership": { "$ref": "#/$defs/ownership" },
+        "status": {
+          "enum": ["experimental", "stable", "deprecated", "archived"]
+        },
+        "version": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "lifecycle": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "enum": ["experimental", "stable", "deprecated", "archived"]
+            },
+            "lastReviewedAt": { "type": "string" },
+            "reviewCycle": { "type": "string" },
+            "expiresAt": { "type": "string" }
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assetReference" }
+        },
+        "dependents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "from", "sourcePath"],
+            "properties": {
+              "kind": { "type": "string" },
+              "from": { "type": "string" },
+              "sourcePath": { "type": "string" }
+            }
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/diagnostic" }
+        }
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "kind", "sourcePath", "resolved"],
+      "properties": {
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "kind": { "type": "string" },
+        "sourcePath": { "type": "string" },
+        "resolved": { "type": "boolean" },
+        "targetId": { "type": "string" },
+        "targetKind": { "type": "string" },
+        "targetPath": { "type": "string" }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "required": ["severity", "message"],
+      "properties": {
+        "code": { "type": "string" },
+        "severity": { "enum": ["error", "warning", "info"] },
+        "path": { "type": "string" },
+        "line": { "type": "integer" },
+        "message": { "type": "string" },
+        "llmHint": { "type": "string" },
+        "details": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "readiness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "level", "checks", "summary"],
+      "properties": {
+        "score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "level": { "enum": ["not_ready", "needs_attention", "ready"] },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "title", "status", "severity", "summary"],
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "status": { "enum": ["pass", "warn", "fail"] },
+              "severity": { "type": "string" },
+              "summary": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        },
+        "summary": {
+          "type": "object",
+          "required": [
+            "totalAssets",
+            "ownedAssets",
+            "unownedAssets",
+            "ownershipCoveragePercent",
+            "nodeCount",
+            "edgeCount",
+            "resolvedEdges",
+            "unresolvedEdges",
+            "graphResolutionPercent",
+            "diagnosticCounts",
+            "workflow",
+            "contextLens",
+            "securityPosture",
+            "securityPolicyInventory"
+          ],
+          "additionalProperties": true
+        }
+      }
+    },
+    "securityPosture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "totalSecurityFindings",
+        "riskClasses",
+        "severities",
+        "highOrCritical",
+        "topFindingIds"
+      ],
+      "properties": {
+        "totalSecurityFindings": { "type": "integer", "minimum": 0 },
+        "riskClasses": {
+          "type": "object",
+          "required": ["violation", "suspicious", "advisory", "unclassified"],
+          "additionalProperties": false,
+          "properties": {
+            "violation": { "type": "integer" },
+            "suspicious": { "type": "integer" },
+            "advisory": { "type": "integer" },
+            "unclassified": { "type": "integer" }
+          }
+        },
+        "severities": {
+          "type": "object",
+          "required": ["critical", "high", "medium", "low"],
+          "additionalProperties": false,
+          "properties": {
+            "critical": { "type": "integer" },
+            "high": { "type": "integer" },
+            "medium": { "type": "integer" },
+            "low": { "type": "integer" }
+          }
+        },
+        "highOrCritical": { "type": "integer" },
+        "topFindingIds": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "policyInventory": {
+      "type": "object",
+      "required": [
+        "totalPolicyAssets",
+        "assetsWithLocalPolicyMetadata",
+        "assetsWithInheritedPolicy",
+        "assetsWithEffectivePolicy",
+        "assetsWithoutEffectivePolicy",
+        "policySources",
+        "assetKinds",
+        "networkAllowed",
+        "externalUploadAllowed",
+        "secretsAllowed",
+        "humanApprovalRequired",
+        "approvedNetworkDestinationCount",
+        "approvedUploadDestinationCount",
+        "forbiddenInputCount",
+        "disallowedCommandCount",
+        "securityProfiles",
+        "topApprovedNetworkDestinations",
+        "topApprovedUploadDestinations",
+        "topForbiddenInputs",
+        "assetsWithoutEffectivePolicyList"
+      ],
+      "properties": {
+        "totalPolicyAssets": { "type": "integer" },
+        "assetsWithLocalPolicyMetadata": { "type": "integer" },
+        "assetsWithInheritedPolicy": { "type": "integer" },
+        "assetsWithEffectivePolicy": { "type": "integer" },
+        "assetsWithoutEffectivePolicy": { "type": "integer" },
+        "policySources": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "local",
+            "security_profile",
+            "repository_config",
+            "owning_skill"
+          ],
+          "properties": {
+            "local": { "type": "integer" },
+            "security_profile": { "type": "integer" },
+            "repository_config": { "type": "integer" },
+            "owning_skill": { "type": "integer" }
+          }
+        },
+        "assetKinds": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" }
+        },
+        "networkAllowed": { "$ref": "#/$defs/booleanCounts" },
+        "externalUploadAllowed": { "$ref": "#/$defs/booleanCounts" },
+        "secretsAllowed": { "$ref": "#/$defs/booleanCounts" },
+        "humanApprovalRequired": { "$ref": "#/$defs/booleanCounts" },
+        "approvedNetworkDestinationCount": { "type": "integer" },
+        "approvedUploadDestinationCount": { "type": "integer" },
+        "forbiddenInputCount": { "type": "integer" },
+        "disallowedCommandCount": { "type": "integer" },
+        "securityProfiles": {
+          "type": "object",
+          "required": [
+            "referenced",
+            "resolved",
+            "missing",
+            "cyclic",
+            "none",
+            "names"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "referenced": { "type": "integer" },
+            "resolved": { "type": "integer" },
+            "missing": { "type": "integer" },
+            "cyclic": { "type": "integer" },
+            "none": { "type": "integer" },
+            "names": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/nameCount" }
+            }
+          }
+        },
+        "topApprovedNetworkDestinations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/destinationCount" }
+        },
+        "topApprovedUploadDestinations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/destinationCount" }
+        },
+        "topForbiddenInputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/inputCount" }
+        },
+        "assetsWithoutEffectivePolicyList": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "kind"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string" },
+              "kind": { "type": "string" }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "booleanCounts": {
+      "type": "object",
+      "required": ["true", "false", "unspecified"],
+      "additionalProperties": false,
+      "properties": {
+        "true": { "type": "integer" },
+        "false": { "type": "integer" },
+        "unspecified": { "type": "integer" }
+      }
+    },
+    "nameCount": {
+      "type": "object",
+      "required": ["name", "count"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "count": { "type": "integer" }
+      }
+    },
+    "destinationCount": {
+      "type": "object",
+      "required": ["destination", "count"],
+      "additionalProperties": false,
+      "properties": {
+        "destination": { "type": "string" },
+        "count": { "type": "integer" }
+      }
+    },
+    "inputCount": {
+      "type": "object",
+      "required": ["input", "count"],
+      "additionalProperties": false,
+      "properties": {
+        "input": { "type": "string" },
+        "count": { "type": "integer" }
+      }
+    }
+  }
+}

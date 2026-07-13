@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/KazuCocoa/renma/blob/main/docs/schemas/trust-graph-v2.schema.json",
+  "title": "Renma Trust Graph v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "summary", "nodes", "edges", "findings"],
+  "properties": {
+    "schemaVersion": { "const": "renma.trustGraph.v2" },
+    "summary": { "$ref": "#/$defs/summary" },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+    "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+    "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } }
+  },
+  "$defs": {
+    "nodeTypes": {
+      "enum": [
+        "asset",
+        "owner",
+        "lifecycle_status",
+        "security_profile",
+        "effective_policy",
+        "diagnostic"
+      ]
+    },
+    "edgeTypes": {
+      "enum": [
+        "owned_by",
+        "has_lifecycle_status",
+        "declares_dependency",
+        "references",
+        "owns_local_resource",
+        "statically_references",
+        "inherits_owner",
+        "selects_security_profile",
+        "inherits_policy",
+        "has_effective_policy",
+        "has_diagnostic"
+      ]
+    },
+    "severity": {
+      "enum": ["critical", "high", "medium", "low", "error", "warning", "info"]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assetCount",
+        "nodeCount",
+        "edgeCount",
+        "findingCount",
+        "nodeTypeCounts",
+        "edgeTypeCounts",
+        "findingSeverityCounts",
+        "riskClassCounts"
+      ],
+      "properties": {
+        "assetCount": { "type": "integer", "minimum": 0 },
+        "nodeCount": { "type": "integer", "minimum": 0 },
+        "edgeCount": { "type": "integer", "minimum": 0 },
+        "findingCount": { "type": "integer", "minimum": 0 },
+        "nodeTypeCounts": { "$ref": "#/$defs/nodeCounts" },
+        "edgeTypeCounts": { "$ref": "#/$defs/edgeCounts" },
+        "findingSeverityCounts": { "$ref": "#/$defs/severityCounts" },
+        "riskClassCounts": { "$ref": "#/$defs/riskCounts" }
+      }
+    },
+    "nodeCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset",
+        "owner",
+        "lifecycle_status",
+        "security_profile",
+        "effective_policy",
+        "diagnostic"
+      ],
+      "properties": {
+        "asset": { "type": "integer" },
+        "owner": { "type": "integer" },
+        "lifecycle_status": { "type": "integer" },
+        "security_profile": { "type": "integer" },
+        "effective_policy": { "type": "integer" },
+        "diagnostic": { "type": "integer" }
+      }
+    },
+    "edgeCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owned_by",
+        "has_lifecycle_status",
+        "declares_dependency",
+        "references",
+        "owns_local_resource",
+        "statically_references",
+        "inherits_owner",
+        "selects_security_profile",
+        "inherits_policy",
+        "has_effective_policy",
+        "has_diagnostic"
+      ],
+      "properties": {
+        "owned_by": { "type": "integer" },
+        "has_lifecycle_status": { "type": "integer" },
+        "declares_dependency": { "type": "integer" },
+        "references": { "type": "integer" },
+        "owns_local_resource": { "type": "integer" },
+        "statically_references": { "type": "integer" },
+        "inherits_owner": { "type": "integer" },
+        "selects_security_profile": { "type": "integer" },
+        "inherits_policy": { "type": "integer" },
+        "has_effective_policy": { "type": "integer" },
+        "has_diagnostic": { "type": "integer" }
+      }
+    },
+    "severityCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "critical",
+        "high",
+        "medium",
+        "low",
+        "error",
+        "warning",
+        "info"
+      ],
+      "properties": {
+        "critical": { "type": "integer" },
+        "high": { "type": "integer" },
+        "medium": { "type": "integer" },
+        "low": { "type": "integer" },
+        "error": { "type": "integer" },
+        "warning": { "type": "integer" },
+        "info": { "type": "integer" }
+      }
+    },
+    "riskCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["violation", "suspicious", "advisory", "unclassified"],
+      "properties": {
+        "violation": { "type": "integer" },
+        "suspicious": { "type": "integer" },
+        "advisory": { "type": "integer" },
+        "unclassified": { "type": "integer" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["path", "startLine", "endLine", "snippet"],
+      "properties": {
+        "path": { "type": "string" },
+        "startLine": { "type": "integer" },
+        "endLine": { "type": "integer" },
+        "snippet": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "label"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "$ref": "#/$defs/nodeTypes" },
+        "label": { "type": "string" },
+        "properties": { "type": "object" },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to", "type"],
+      "properties": {
+        "id": { "type": "string" },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "type": { "$ref": "#/$defs/edgeTypes" },
+        "properties": {
+          "type": "object",
+          "properties": {
+            "policySources": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "local",
+                  "security_profile",
+                  "repository_config",
+                  "owning_skill"
+                ]
+              }
+            },
+            "ownershipSource": { "enum": ["declared", "inherited"] },
+            "inheritedFrom": { "type": "object" }
+          },
+          "additionalProperties": true
+        },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "severity", "message"],
+      "properties": {
+        "source": { "enum": ["finding", "diagnostic"] },
+        "severity": { "$ref": "#/$defs/severity" },
+        "message": { "type": "string" },
+        "path": { "type": "string" },
+        "code": { "type": "string" },
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "riskClass": { "enum": ["violation", "suspicious", "advisory"] },
+        "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    }
+  }
+}
