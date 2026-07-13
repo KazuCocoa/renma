@@ -313,10 +313,10 @@
           "required": ["violation", "suspicious", "advisory", "unclassified"],
           "additionalProperties": false,
           "properties": {
-            "violation": { "type": "integer" },
-            "suspicious": { "type": "integer" },
-            "advisory": { "type": "integer" },
-            "unclassified": { "type": "integer" }
+            "violation": { "type": "integer", "minimum": 0 },
+            "suspicious": { "type": "integer", "minimum": 0 },
+            "advisory": { "type": "integer", "minimum": 0 },
+            "unclassified": { "type": "integer", "minimum": 0 }
           }
         },
         "severities": {
@@ -324,13 +324,13 @@
           "required": ["critical", "high", "medium", "low"],
           "additionalProperties": false,
           "properties": {
-            "critical": { "type": "integer" },
-            "high": { "type": "integer" },
-            "medium": { "type": "integer" },
-            "low": { "type": "integer" }
+            "critical": { "type": "integer", "minimum": 0 },
+            "high": { "type": "integer", "minimum": 0 },
+            "medium": { "type": "integer", "minimum": 0 },
+            "low": { "type": "integer", "minimum": 0 }
           }
         },
-        "highOrCritical": { "type": "integer" },
+        "highOrCritical": { "type": "integer", "minimum": 0 },
         "topFindingIds": { "type": "array", "items": { "type": "object" } }
       }
     },
@@ -359,11 +359,17 @@
         "assetsWithoutEffectivePolicyList"
       ],
       "properties": {
-        "totalPolicyAssets": { "type": "integer" },
-        "assetsWithLocalPolicyMetadata": { "type": "integer" },
-        "assetsWithInheritedPolicy": { "type": "integer" },
-        "assetsWithEffectivePolicy": { "type": "integer" },
-        "assetsWithoutEffectivePolicy": { "type": "integer" },
+        "totalPolicyAssets": { "type": "integer", "minimum": 0 },
+        "assetsWithLocalPolicyMetadata": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "assetsWithInheritedPolicy": { "type": "integer", "minimum": 0 },
+        "assetsWithEffectivePolicy": { "type": "integer", "minimum": 0 },
+        "assetsWithoutEffectivePolicy": {
+          "type": "integer",
+          "minimum": 0
+        },
         "policySources": {
           "type": "object",
           "additionalProperties": false,
@@ -374,24 +380,30 @@
             "owning_skill"
           ],
           "properties": {
-            "local": { "type": "integer" },
-            "security_profile": { "type": "integer" },
-            "repository_config": { "type": "integer" },
-            "owning_skill": { "type": "integer" }
+            "local": { "type": "integer", "minimum": 0 },
+            "security_profile": { "type": "integer", "minimum": 0 },
+            "repository_config": { "type": "integer", "minimum": 0 },
+            "owning_skill": { "type": "integer", "minimum": 0 }
           }
         },
         "assetKinds": {
           "type": "object",
-          "additionalProperties": { "type": "integer" }
+          "additionalProperties": { "type": "integer", "minimum": 0 }
         },
         "networkAllowed": { "$ref": "#/$defs/booleanCounts" },
         "externalUploadAllowed": { "$ref": "#/$defs/booleanCounts" },
         "secretsAllowed": { "$ref": "#/$defs/booleanCounts" },
         "humanApprovalRequired": { "$ref": "#/$defs/booleanCounts" },
-        "approvedNetworkDestinationCount": { "type": "integer" },
-        "approvedUploadDestinationCount": { "type": "integer" },
-        "forbiddenInputCount": { "type": "integer" },
-        "disallowedCommandCount": { "type": "integer" },
+        "approvedNetworkDestinationCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "approvedUploadDestinationCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "forbiddenInputCount": { "type": "integer", "minimum": 0 },
+        "disallowedCommandCount": { "type": "integer", "minimum": 0 },
         "securityProfiles": {
           "type": "object",
           "required": [
@@ -404,11 +416,11 @@
           ],
           "additionalProperties": false,
           "properties": {
-            "referenced": { "type": "integer" },
-            "resolved": { "type": "integer" },
-            "missing": { "type": "integer" },
-            "cyclic": { "type": "integer" },
-            "none": { "type": "integer" },
+            "referenced": { "type": "integer", "minimum": 0 },
+            "resolved": { "type": "integer", "minimum": 0 },
+            "missing": { "type": "integer", "minimum": 0 },
+            "cyclic": { "type": "integer", "minimum": 0 },
+            "none": { "type": "integer", "minimum": 0 },
             "names": {
               "type": "array",
               "items": { "$ref": "#/$defs/nameCount" }
@@ -447,9 +459,9 @@
       "required": ["true", "false", "unspecified"],
       "additionalProperties": false,
       "properties": {
-        "true": { "type": "integer" },
-        "false": { "type": "integer" },
-        "unspecified": { "type": "integer" }
+        "true": { "type": "integer", "minimum": 0 },
+        "false": { "type": "integer", "minimum": 0 },
+        "unspecified": { "type": "integer", "minimum": 0 }
       }
     },
     "nameCount": {
@@ -458,7 +470,7 @@
       "additionalProperties": false,
       "properties": {
         "name": { "type": "string" },
-        "count": { "type": "integer" }
+        "count": { "type": "integer", "minimum": 0 }
       }
     },
     "destinationCount": {
@@ -467,7 +479,7 @@
       "additionalProperties": false,
       "properties": {
         "destination": { "type": "string" },
-        "count": { "type": "integer" }
+        "count": { "type": "integer", "minimum": 0 }
       }
     },
     "inputCount": {
@@ -476,7 +488,7 @@
       "additionalProperties": false,
       "properties": {
         "input": { "type": "string" },
-        "count": { "type": "integer" }
+        "count": { "type": "integer", "minimum": 0 }
       }
     }
   }

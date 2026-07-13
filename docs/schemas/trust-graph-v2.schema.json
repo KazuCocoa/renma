@@ -77,12 +77,12 @@
         "diagnostic"
       ],
       "properties": {
-        "asset": { "type": "integer" },
-        "owner": { "type": "integer" },
-        "lifecycle_status": { "type": "integer" },
-        "security_profile": { "type": "integer" },
-        "effective_policy": { "type": "integer" },
-        "diagnostic": { "type": "integer" }
+        "asset": { "type": "integer", "minimum": 0 },
+        "owner": { "type": "integer", "minimum": 0 },
+        "lifecycle_status": { "type": "integer", "minimum": 0 },
+        "security_profile": { "type": "integer", "minimum": 0 },
+        "effective_policy": { "type": "integer", "minimum": 0 },
+        "diagnostic": { "type": "integer", "minimum": 0 }
       }
     },
     "edgeCounts": {
@@ -102,17 +102,17 @@
         "has_diagnostic"
       ],
       "properties": {
-        "owned_by": { "type": "integer" },
-        "has_lifecycle_status": { "type": "integer" },
-        "declares_dependency": { "type": "integer" },
-        "references": { "type": "integer" },
-        "owns_local_resource": { "type": "integer" },
-        "statically_references": { "type": "integer" },
-        "inherits_owner": { "type": "integer" },
-        "selects_security_profile": { "type": "integer" },
-        "inherits_policy": { "type": "integer" },
-        "has_effective_policy": { "type": "integer" },
-        "has_diagnostic": { "type": "integer" }
+        "owned_by": { "type": "integer", "minimum": 0 },
+        "has_lifecycle_status": { "type": "integer", "minimum": 0 },
+        "declares_dependency": { "type": "integer", "minimum": 0 },
+        "references": { "type": "integer", "minimum": 0 },
+        "owns_local_resource": { "type": "integer", "minimum": 0 },
+        "statically_references": { "type": "integer", "minimum": 0 },
+        "inherits_owner": { "type": "integer", "minimum": 0 },
+        "selects_security_profile": { "type": "integer", "minimum": 0 },
+        "inherits_policy": { "type": "integer", "minimum": 0 },
+        "has_effective_policy": { "type": "integer", "minimum": 0 },
+        "has_diagnostic": { "type": "integer", "minimum": 0 }
       }
     },
     "severityCounts": {
@@ -128,13 +128,13 @@
         "info"
       ],
       "properties": {
-        "critical": { "type": "integer" },
-        "high": { "type": "integer" },
-        "medium": { "type": "integer" },
-        "low": { "type": "integer" },
-        "error": { "type": "integer" },
-        "warning": { "type": "integer" },
-        "info": { "type": "integer" }
+        "critical": { "type": "integer", "minimum": 0 },
+        "high": { "type": "integer", "minimum": 0 },
+        "medium": { "type": "integer", "minimum": 0 },
+        "low": { "type": "integer", "minimum": 0 },
+        "error": { "type": "integer", "minimum": 0 },
+        "warning": { "type": "integer", "minimum": 0 },
+        "info": { "type": "integer", "minimum": 0 }
       }
     },
     "riskCounts": {
@@ -142,10 +142,10 @@
       "additionalProperties": false,
       "required": ["violation", "suspicious", "advisory", "unclassified"],
       "properties": {
-        "violation": { "type": "integer" },
-        "suspicious": { "type": "integer" },
-        "advisory": { "type": "integer" },
-        "unclassified": { "type": "integer" }
+        "violation": { "type": "integer", "minimum": 0 },
+        "suspicious": { "type": "integer", "minimum": 0 },
+        "advisory": { "type": "integer", "minimum": 0 },
+        "unclassified": { "type": "integer", "minimum": 0 }
       }
     },
     "evidence": {
@@ -256,7 +256,25 @@
             "properties": {
               "properties": {
                 "type": "object",
-                "required": ["policySources"]
+                "required": ["policySources"],
+                "allOf": [
+                  {
+                    "if": {
+                      "type": "object",
+                      "properties": {
+                        "policySources": {
+                          "type": "array",
+                          "contains": { "const": "owning_skill" }
+                        }
+                      },
+                      "required": ["policySources"]
+                    },
+                    "then": {
+                      "type": "object",
+                      "required": ["inheritedFrom"]
+                    }
+                  }
+                ]
               }
             }
           }

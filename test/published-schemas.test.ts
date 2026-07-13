@@ -80,12 +80,24 @@ test("BOM schema enforces output modes, timestamps, formats, and score bounds", 
   const aboveMaximum = structuredClone(defaultBom);
   aboveMaximum.readiness.score = 101;
   assertInvalid(validateBom, aboveMaximum, "maximum");
+
+  const negativeSecurityCount = structuredClone(defaultBom);
+  negativeSecurityCount.securityPosture.riskClasses.violation = -1;
+  assertInvalid(validateBom, negativeSecurityCount, "minimum");
+
+  const negativePolicyCount = structuredClone(defaultBom);
+  negativePolicyCount.securityPolicyInventory.policySources.owning_skill = -1;
+  assertInvalid(validateBom, negativePolicyCount, "minimum");
 });
 
 test("Trust Graph schema rejects missing and invalid edge provenance", async () => {
   const { validateTrustGraph } = await validators();
   const graph = await representativeTrustGraph();
   assertValid(validateTrustGraph, graph);
+
+  const negativeSummaryCount = structuredClone(graph);
+  negativeSummaryCount.summary.nodeTypeCounts.asset = -1;
+  assertInvalid(validateTrustGraph, negativeSummaryCount, "minimum");
 
   const ownershipWithoutSource = structuredClone(graph);
   const ownedBy = requiredEdge(ownershipWithoutSource, "owned_by");
@@ -115,6 +127,28 @@ test("Trust Graph schema rejects missing and invalid edge provenance", async () 
   assert.ok(effectivePolicy.properties);
   delete effectivePolicy.properties.policySources;
   assertInvalid(validateTrustGraph, effectivePolicyWithoutSources, "required");
+
+  const localPolicy = graph.edges.find(
+    (edge) =>
+      edge.type === "has_effective_policy" &&
+      Array.isArray(edge.properties?.policySources) &&
+      edge.properties.policySources.length === 1 &&
+      edge.properties.policySources[0] === "local",
+  );
+  assert.ok(localPolicy?.properties);
+  assert.equal(localPolicy.properties.inheritedFrom, undefined);
+
+  const owningSkillPolicyWithoutOrigin = structuredClone(graph);
+  const owningSkillPolicy = owningSkillPolicyWithoutOrigin.edges.find(
+    (edge) =>
+      edge.type === "has_effective_policy" &&
+      Array.isArray(edge.properties?.policySources) &&
+      edge.properties.policySources.includes("owning_skill"),
+  );
+  assert.ok(owningSkillPolicy?.properties);
+  assert.ok(owningSkillPolicy.properties.inheritedFrom);
+  delete owningSkillPolicy.properties.inheritedFrom;
+  assertInvalid(validateTrustGraph, owningSkillPolicyWithoutOrigin, "required");
 
   const emptyPolicySources = structuredClone(graph);
   const emptyPolicyEdge = requiredEdge(

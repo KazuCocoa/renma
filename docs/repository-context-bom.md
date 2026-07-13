@@ -113,10 +113,11 @@ their evidence exists. Owner values are explicitly nullable; missing optional
 fields are omitted rather than serialized as `null`.
 
 Arrays are deterministically ordered by their identity/path keys, and count
-maps contain every declared enum member, including zero counts. Policy source
-ordering is `local`, `security_profile`, `repository_config`, `owning_skill`.
-Static support relationships use `owns_local_resource`,
-`statically_references`, `inherits_owner`, and `inherits_policy`.
+fields are non-negative integers. Count maps contain every declared enum
+member, including zero counts. Policy source ordering is `local`,
+`security_profile`, `repository_config`, `owning_skill`. Static support
+relationships use `owns_local_resource`, `statically_references`,
+`inherits_owner`, and `inherits_policy`.
 
 Representative top-level JSON (nested objects are shortened for readability;
 the schema defines every nested field):

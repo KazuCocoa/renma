@@ -12,8 +12,9 @@ requires them. Finding identity fields (`code`, `id`, `title`, `riskClass`,
 omitted, not serialized as `null`.
 
 Nodes are ordered by type and stable ID; edges by source, type, target, and ID;
-findings by deterministic review order. Summary maps contain all enum members.
-Asset nodes include normalized ownership and first-class support evidence.
+findings by deterministic review order. Summary maps contain all enum members
+with non-negative integer counts. Asset nodes include normalized ownership and
+first-class support evidence.
 Static support uses `owns_local_resource`, `statically_references`,
 `inherits_owner`, and `inherits_policy`. Every `owned_by` edge declares
 `ownershipSource`; when its value is `inherited`, the edge also retains an
