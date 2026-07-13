@@ -1,24 +1,22 @@
 # Context Lens Assets
 
-`context_lens` is a Renma asset type for purpose-oriented interpretation over reusable context assets.
+`context_lens` is Renma's asset kind for purpose-specific interpretation of one
+or more declared Context Assets. Use a Lens when the same reusable knowledge
+needs to be read with different questions, risks, evidence priorities, or
+output expectations for a particular purpose.
 
-It keeps the Renma core boundary intact:
+A Lens requires Context to interpret. Do not create a Context Lens when there
+is no Context Asset to put in `applies_to`.
 
-```text
-LLM proposes. Renma verifies. Human approves.
-```
-
-Renma catalogs and validates repository assets. Agents and tools decide what to do at runtime.
-
-Renma does not select lenses for a task, rank lenses, assemble prompts, inject context, or run an LLM to judge lens quality.
-
-## Model
+The governing model is:
 
 ```text
-references -> contexts -> context_lenses -> skills
+Skill = focused task and workflow
+Context Asset = durable reusable knowledge
+Context Lens = purpose-specific interpretation of Context
 ```
 
-The design principle is:
+The design principles remain:
 
 ```text
 Knowledge should be reusable.
@@ -26,21 +24,98 @@ Interpretation should be purpose-oriented.
 Execution should be skill-specific.
 ```
 
-Use this split when the same base context should be read differently for different purposes.
+A Lens should make an interpretation reproducible enough that another reviewer
+or LLM can identify the same questions, risks, evidence, and expected output.
+Renma can validate the declared structure and relationships, but it cannot
+deterministically prove that this semantic guidance is professionally sound.
 
-For example, a payment retry context can support:
+See [`examples/context-lens`](../examples/context-lens) for a runnable fixture
+with two valid Lenses, a complete focused workflow, and zero scan findings.
 
-- a spec review lens that focuses on ambiguity and source-of-truth gaps
-- a test design lens that focuses on boundary values and expected results
-- a failure analysis lens that focuses on observed symptoms and logs
+## The Problem A Lens Solves
 
-The base context remains reusable. The lens explains how that context should be interpreted for a purpose.
+A reusable Context Asset may support several purposes. For example, payment
+retry rules can be interpreted for:
 
-See [`examples/context-lens`](../examples/context-lens) for a runnable fixture with two valid lenses, readiness output, inspect output, and an invalid diagnostic example.
+- specification review, emphasizing ambiguity and missing sources of truth;
+- test design, emphasizing boundary values and expected results; or
+- failure analysis, emphasizing observed symptoms and logs.
 
-## Minimal Valid Lens
+The base facts should not be copied into three Skills. Each Lens records one
+purpose-specific way of reading the same facts, while each Skill retains its
+focused task and workflow.
 
-A minimal valid lens declares a stable ID, owner, purpose, and at least one `applies_to` target.
+Use a direct relationship when no separate interpretation is needed:
+
+```text
+Skill -> Context Asset
+```
+
+Use a Lens only when purpose-specific interpretation adds meaningful reusable
+structure:
+
+```text
+Skill -> Context Lens -> Context Asset
+```
+
+These are static repository relationships, not a runtime loading pipeline.
+
+## Placement Decision
+
+Before creating an asset, apply this sequence:
+
+1. Is this the task, workflow, or completion contract? Put it in the Skill.
+2. Is this durable, reusable, source-backed knowledge? Create or reuse a
+   Context Asset.
+3. Does declared Context need to be interpreted differently for a specific
+   purpose? Create a Context Lens.
+4. Is this a Skill-local overlay or execution variant? Use a Profile if the
+   current Profile semantics fit.
+5. Is this supporting detail used by only one Skill? Use a Reference.
+6. Is this a local fixture or demonstration? Use an Example.
+7. Is this only generic persona or tone framing? Usually keep it local; do not
+   create an asset solely for the persona.
+
+If review criteria apply only to one workflow and do not interpret reusable
+Context, keep them in the Skill body, a Skill-local Reference, or a Skill-local
+Profile when they genuinely form an overlay or variant.
+
+## Lens Fields And Body
+
+Prefer compact, flat frontmatter. Detailed interpretation belongs in the
+Markdown body rather than turning metadata into a prompt template.
+
+- `id`: required stable Lens ID. Prefer a `lens.<domain>.<purpose>` style.
+- `type`: recommended `context_lens` discriminator. It is optional under
+  `lenses/**` and required when a Lens is stored under `context/**` or
+  `contexts/**`.
+- `owner`: required accountable owner.
+- `status`: optional lifecycle state: `experimental`, `stable`, `deprecated`,
+  or `archived`.
+- `version`: optional schema version. The supported Lens schema version is `1`.
+- `scope`: optional scope. The supported value is `context`.
+- `purpose`: required short label for why the Context is being interpreted,
+  such as `spec_review`, `test_design`, or `failure_analysis`.
+- `applies_to`: required list of existing Context Asset IDs or
+  repository-relative paths. These are the assets the Lens interprets.
+- `focus`: optional compact list of questions, risks, checks, or evidence themes
+  to emphasize.
+- `expected_outputs`: optional compact list of outputs the interpretation should
+  shape.
+
+The Markdown body should explain how to apply those fields. It may provide a
+brief professional framing, then should define concrete interpretation
+questions, important risks, evidence expectations, prioritization rules, and
+the expected output. It should not copy the Context or take over the Skill's
+ordered workflow and completion contract.
+
+Deprecated aliases such as `target`, `targets`, `output`, and `outputs` produce
+warnings. Use `applies_to` and `expected_outputs`.
+
+## Minimal Structural Example
+
+A minimal valid Lens declares a stable ID, owner, purpose, and at least one real
+`applies_to` target:
 
 ```yaml
 ---
@@ -54,90 +129,165 @@ applies_to:
 ---
 # Spec Review Lens for Boundary Values
 
-Review the boundary value analysis context for ambiguity, missing limits, and unclear sources of truth.
+Review the boundary-value Context for ambiguity, missing limits, and unclear
+sources of truth. Cite the specification evidence behind each finding.
 ```
 
-`type: context_lens` is optional for files under `lenses/**`, but it is recommended because it makes the file's intent obvious in code review. It is required when a lens is stored under `context/**` or `contexts/**`.
+This is structurally valid only when the target resolves. It is useful only if
+the body makes the purpose-specific interpretation concrete enough for review.
 
-## Multiple Lenses
+## Persona Framing Is Not A Lens
 
-Multiple lenses can interpret the same base context for different review purposes:
+A persona may frame a Lens, but a persona alone does not define one.
+
+Do not create a Lens that says only “Act as a senior QA engineer.” Describe the
+concrete questions, risks, checks, evidence, and expected outputs that the
+professional perspective implies.
+
+### Insufficient Lens
+
+```markdown
+# Senior QA Engineer Lens
+
+Act as a senior QA engineer.
+```
+
+This is insufficient because it:
+
+- does not identify what Context is being interpreted;
+- does not define a useful purpose;
+- does not identify review questions or risks;
+- does not say what evidence should be emphasized;
+- does not define an expected output; and
+- can become generic prompt-role wording rather than a reusable interpretation
+  asset.
+
+### Better Lens
 
 ```yaml
 ---
-id: lens.testing.spec-review.boundary-values
+id: lens.testing.test-code-review.quality
 type: context_lens
 owner: qa-platform
 status: experimental
-purpose: spec_review
+purpose: test_code_review
 applies_to:
-  - context.testing.boundary-value-analysis
+  - context.testing.test-quality
 focus:
-  - ambiguity
-  - missing boundary
+  - requirement coverage
+  - false-positive and false-negative risk
+  - determinism
+  - test isolation
+  - failure diagnosability
 expected_outputs:
-  - unresolved questions
-  - risk notes
+  - prioritized findings
+  - evidence-backed rationale
+  - recommended corrections
 ---
+# Test Code Review Quality Lens
+
+Evaluate the applied test-quality Context from the perspective of an
+experienced QA engineer responsible for release confidence.
+
+## Interpretation Criteria
+
+- Determine whether each test verifies the intended requirement rather than
+  merely exercising code.
+- Identify assertions or missing checks that can produce false confidence,
+  false positives, or false negatives.
+- Examine whether timing and synchronization assumptions are deterministic.
+- Check whether tests are isolated from unrelated state and ordering.
+- Distinguish product defects from test implementation defects when analyzing
+  failures.
+- Prefer failure output that identifies the violated requirement and likely
+  underlying cause.
+
+## Evidence And Output
+
+Cite relevant code, requirements, repository guidance, or observed failure
+evidence. Produce prioritized findings with rationale and recommended
+corrections; keep unresolved assumptions explicit.
 ```
+
+The framing sentence is optional. The concrete criteria and evidence contract
+are what make the Lens useful.
+
+The important boundary is:
+
+```text
+Skill defines the review task.
+Lens defines what purpose-specific review judgment means when interpreting Context.
+```
+
+## How A Lens Differs From Adjacent Assets
+
+| Asset or responsibility | What it owns |
+| --- | --- |
+| Skill | Focused task or workflow: activation boundaries, inputs, ordered instructions, decisions, constraints, verification, output, and completion criteria |
+| Context Asset | Durable, reusable, source-backed knowledge with independent ownership and lifecycle |
+| Context Lens | Purpose-specific interpretation of one or more declared Context Assets |
+| Profile | Skill-local overlay or variant when current Profile semantics fit |
+| Reference | Supporting detail owned and loaded by one Skill |
+| Example | Skill-local example, fixture, or demonstration |
+| External agent or runtime | Live asset selection, loading or injection, prompt assembly, tool execution, and application of the finished workflow |
+
+A schema-valid Lens can still be semantically weak. Renma can prove that an ID,
+owner, purpose, and resolvable `applies_to` relationship exist. It cannot prove
+that vague focus words, generic persona language, or an underspecified body
+capture useful professional judgment. That quality remains an authoring and
+human-review responsibility; Renma does not call an LLM or add subjective Lens
+scores.
+
+## Canonical Skill Relationships
+
+A canonical Agent Skills `SKILL.md` declares Renma relationships as flat,
+string-valued `metadata.renma.*` fields. List values are JSON-array strings:
 
 ```yaml
 ---
-id: lens.testing.test-design.boundary-values
-type: context_lens
-owner: qa-platform
-status: experimental
-purpose: test_design
-applies_to:
-  - context.testing.boundary-value-analysis
-focus:
-  - inclusive limits
-  - zero and empty values
-  - overflow behavior
-expected_outputs:
-  - test cases
-  - edge-case checklist
+name: spec-review
+description: Review specifications for ambiguity and missing boundaries. Use when requirements need evidence-backed review before implementation.
+metadata:
+  renma.id: skill.testing.spec-review
+  renma.owner: qa-platform
+  renma.status: experimental
+  renma.requires-context: '["context.testing.boundary-value-analysis"]'
+  renma.requires-lens: '["lens.testing.spec-review.boundary-values"]'
+  renma.optional-lens: '[]'
 ---
 ```
 
-A skill declares static lens relationships with `requires_lens` or `optional_lens`:
+Do not use pre-0.16 top-level Skill metadata in current examples. The
+`metadata.renma.*` relationships create catalog and graph evidence; they do not
+make Renma select a Lens, load Context, or inject either into an agent.
 
-```yaml
----
-id: skill.testing.spec-review
-owner: qa-platform
-status: experimental
-requires_context:
-  - context.testing.boundary-value-analysis
-requires_lens:
-  - lens.testing.spec-review.boundary-values
----
+## Runtime Responsibility Boundary
+
+Renma catalogs and validates repository assets. An external agent or runtime:
+
+- selects relevant assets for a live task;
+- loads or injects Context and Lens content;
+- assembles prompts;
+- executes tools and the focused Skill workflow; and
+- applies or presents the result.
+
+Renma does not select or rank Lenses, assemble prompts, inject Context, execute
+a Skill, infer semantic intent, or use an LLM to judge Lens quality.
+
+```text
+LLM proposes. Renma verifies. Human approves.
 ```
 
-These fields create catalog and graph relationships. They do not make Renma choose runtime context or inject the lens into an agent.
+## Diagnostics, Readiness, And Inspect
 
-## Supported Fields
+Context Lens governance diagnostics use stable string codes in `scan` and
+`readiness`. Blocking `error` diagnostics include missing required fields,
+duplicate Lens IDs, and unresolved `applies_to` targets. Warnings are reported
+for review but do not fail readiness unless another policy makes the repository
+not ready.
 
-Prefer compact, flat metadata. Detailed interpretation guidance belongs in the Markdown body, not in frontmatter.
-
-- `id`: required stable lens ID. Prefer the `lens.<domain>.<purpose>` prefix style.
-- `type`: recommended `context_lens` discriminator.
-- `owner`: required accountable owner.
-- `status`: optional lifecycle status: `experimental`, `stable`, `deprecated`, or `archived`.
-- `version`: optional lens schema version. The supported schema version is `1`.
-- `scope`: optional lens scope. The supported scope is `context`.
-- `purpose`: required short purpose label such as `spec_review`, `test_design`, or `failure_analysis`.
-- `applies_to`: required context asset IDs or repository-relative paths this lens interprets.
-- `focus`: optional compact review focus terms.
-- `expected_outputs`: optional compact output expectations.
-
-Deprecated field aliases such as `target`, `targets`, `output`, and `outputs` produce warnings. Use `applies_to` and `expected_outputs`.
-
-## Diagnostics
-
-Context Lens governance diagnostics use stable string codes in JSON output. The detailed diagnostics appear in `scan` and `readiness`; concise summaries appear in `readiness` and `inspect`.
-
-Invalid example:
+For example, this invalid definition is missing `purpose`, uses a path that
+normalizes differently, and targets no cataloged asset:
 
 ```yaml
 ---
@@ -151,67 +301,20 @@ applies_to:
 
 Expected diagnostics include:
 
-- `CONTEXT-LENS-MISSING-REQUIRED-FIELD` because `purpose` is missing.
-- `CONTEXT-LENS-PATH-NORMALIZATION-MISMATCH` because `./contexts/testing/missing.md` normalizes to `contexts/testing/missing.md`.
-- `CONTEXT-LENS-TARGET-NOT-FOUND` because the target path does not resolve to a cataloged asset.
+- `CONTEXT-LENS-MISSING-REQUIRED-FIELD`;
+- `CONTEXT-LENS-PATH-NORMALIZATION-MISMATCH`; and
+- `CONTEXT-LENS-TARGET-NOT-FOUND`.
 
-Blocking Context Lens diagnostics are `error` diagnostics. Warnings are reported by default but do not fail readiness unless another policy makes the repository not ready.
+`renma readiness --json` exposes Lens counts and diagnostics under
+`summary.contextLens`; Markdown readiness includes a `Context Lens` section.
+`renma inspect <file> --format text` shows the definition paths, targets, and
+static graph neighborhood. These views report repository evidence, not runtime
+use.
 
-## Readiness And Inspect
+## Authoring And Verification
 
-`renma readiness --json` includes an additive `summary.contextLens` object:
-
-```json
-{
-  "summary": {
-    "contextLens": {
-      "enabled": true,
-      "detected": true,
-      "totalLensCount": 2,
-      "validLensCount": 2,
-      "invalidLensCount": 0,
-      "diagnosticCounts": {
-        "error": 0,
-        "warning": 0,
-        "info": 0
-      }
-    }
-  }
-}
-```
-
-Markdown readiness includes a `Context Lens` section with lens counts, diagnostic counts, a representative diagnostic code, definition paths, and target references.
-
-`renma inspect <file> --format text` includes a concise Context Lens summary:
-
-```text
-Context Lens:
-- Enabled: yes
-- Detected: yes
-- Lenses: 2/2 valid (0 invalid)
-- Diagnostics: error 0, warning 0, info 0
-- Representative diagnostic: (none)
-- Definition paths: lenses/testing/spec-review-boundary-values.md, lenses/testing/test-design-boundary-values.md
-- Target references: context.testing.boundary-value-analysis
-```
-
-`renma inspect <file> --format json` includes the same additive `contextLens` summary object.
-
-## CI Usage
-
-Use readiness in CI when Context Lens governance should block merges:
-
-```bash
-renma readiness . --json
-```
-
-The command exits `1` when readiness is not ready, including when blocking Context Lens diagnostics are present.
-
-For pull-request review artifacts, `renma ci-report` continues to report deterministic catalog, graph, readiness, finding, and security deltas. It does not call an LLM or make subjective lens-quality judgments.
-
-## Authoring Helpers
-
-Use `scaffold` to create a compact starter lens:
+Use `scaffold` for a starter, then replace every placeholder with
+repository-grounded values:
 
 ```bash
 renma scaffold context_lens lenses/testing/spec-review-boundary-values.md \
@@ -221,33 +324,58 @@ renma scaffold context_lens lenses/testing/spec-review-boundary-values.md \
   --tags testing,spec-review
 ```
 
-Use `inspect` on a lens to review its purpose metadata and declared graph neighborhood. Lens inspection shows inbound skill references, outbound `applies_to` context targets, and the static `skill -> lens -> context` chain.
+Before review:
 
-## Good Lens Boundaries
+1. Replace `purpose`, every `applies_to` target, `focus`, and
+   `expected_outputs`.
+2. Confirm that each target is an existing Context Asset and that the Lens adds
+   meaningful interpretation rather than copying it.
+3. Keep the focused workflow in the Skill and reusable knowledge in Context.
+4. Replace persona-only wording with concrete criteria, evidence expectations,
+   and outputs.
+5. Run:
 
-A lens should answer:
+```bash
+renma scan . --fail-on high
+renma catalog . --format markdown
+renma graph . --view layered --format mermaid
+renma readiness . --format markdown
+```
 
-- What purpose is this context being read for?
-- Which context assets does it apply to?
-- What questions, risks, checks, or evidence should be emphasized?
-- What output shape should the agent or human reviewer produce?
+The final semantic decision belongs to a human reviewer.
 
-A lens should not become:
+## Zero-Context Classification Self-Check
 
-- a copy of the base context
-- a long prompt template
-- a runtime routing rule
-- a QA-specific rule hardcoded into Renma core
-- a replacement for the skill entrypoint
+An unfamiliar author or LLM should classify these cases as follows:
 
-## Non-Goals For 0.12.0
+1. Payment retry rules and retry limits → **Context Asset**, because they are
+   durable domain knowledge that may support several workflows.
+2. Review a test implementation and produce prioritized findings → **Skill**,
+   because this is the focused task and output contract.
+3. Emphasize false-confidence risk, determinism, isolation, and diagnosability
+   while interpreting shared test-quality guidance → **Context Lens**, because
+   it defines purpose-specific interpretation of declared reusable Context.
+4. “Act as a senior QA engineer” → **insufficient by itself**; it may be brief
+   local framing, but it does not define concrete interpretation criteria.
+5. A strict Skill-local review variant → **Profile**, when the current Profile
+   overlay semantics fit.
+6. Detailed framework-specific notes used only by one review Skill →
+   **Reference**, because the detail is locally owned and loaded.
+7. Select the most relevant Lens dynamically for the current task → **external
+   agent or runtime**, because Renma core and Lens assets do not perform live
+   selection.
 
-Renma 0.12.0 intentionally does not implement:
+## Current Non-Goals
 
-- runtime selection
-- prompt assembly
-- context injection
-- automatic LLM judgment or subjective scoring
-- external signal imports from Codex, Claude, IDEs, or similar tools
+Renma does not implement:
 
-The release stabilizes deterministic Context Lens governance: summary output, diagnostics, readiness integration, inspect integration, docs, and examples.
+- runtime Lens or Context selection;
+- prompt assembly or Context injection;
+- Skill or tool execution;
+- automatic semantic inference;
+- automatic LLM judgment or subjective Lens scoring; or
+- external runtime signal imports from agents, IDEs, or similar tools.
+
+Context Lens support remains deterministic repository governance: discovery,
+metadata and relationship validation, diagnostics, readiness, inspect, graph,
+documentation, and examples.

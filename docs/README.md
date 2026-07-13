@@ -32,7 +32,8 @@ Use this index to choose the smallest document that answers your question.
 
 - [Advanced Skill Authoring](advanced-skill-authoring.md): deriving focused,
   bounded Skills from existing workflows while using progressive disclosure.
-- [Context Lens](context-lens.md)
+- [Context Lens](context-lens.md): canonical semantics, placement decisions,
+  persona guidance, fields, examples, and runtime boundaries.
 - [Context Lifecycle Diagnostics](context-lifecycle-diagnostics.md)
 - [Context Conflict Diagnostics](context-conflict-diagnostics.md)
 - [Context Language Diagnostics](context-language-diagnostics.md)

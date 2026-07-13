@@ -711,7 +711,9 @@ Renma does not infer owners automatically. If an asset is unowned, choose an own
 
 ### `scaffold`
 
-Creates a starter skill or context asset.
+Creates starter assets with distinct responsibilities: a Skill is a focused
+workflow entrypoint, Context is durable reusable knowledge, and a Context Lens
+is purpose-specific interpretation of one or more declared Context Assets.
 
 ```bash
 renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
@@ -720,7 +722,17 @@ renma scaffold context_lens lenses/testing/spec-review-boundary-values.md --owne
 renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform --format prompt
 ```
 
-`scaffold --format file` writes a starter file, `--format prompt` emits an authoring prompt, and `--format json` emits structured scaffold data. The generated content is intentionally minimal; fill in metadata, dependencies, and verification steps before depending on it in automation.
+`scaffold --format file` writes a starter file, `--format prompt` emits an
+authoring prompt, and `--format json` emits structured scaffold data. The
+generated content is intentionally minimal; fill in metadata, dependencies, and
+verification steps before depending on it in automation.
+
+For a Context Lens, replace every placeholder `purpose`, `applies_to`, `focus`,
+and `expected_outputs` value with repository-grounded content. Every
+`applies_to` target must resolve to a real Context Asset. Do not use a Lens as
+generic persona storage, a prompt template, or a runtime routing rule, and do
+not create one when there is no Context Asset to interpret. See the
+[Context Lens guide](context-lens.md) for the canonical decision model.
 
 For a Skill, use platform-native authoring guidance before and after scaffolding.
 File mode prints concise Skill-only next steps after the `Created` line. Prompt

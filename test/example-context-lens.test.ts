@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
@@ -9,10 +10,29 @@ import { scan } from "../src/scanner.js";
 const EXAMPLE_ROOT = path.join(process.cwd(), "examples", "context-lens");
 
 test("Context Lens example is clean, ready, and keeps its nested Skill relationships", async () => {
-  const [scanResult, readinessReport, graphReport] = await Promise.all([
+  const [
+    scanResult,
+    readinessReport,
+    graphReport,
+    skill,
+    specReviewLens,
+    testDesignLens,
+  ] = await Promise.all([
     scan(EXAMPLE_ROOT),
     readiness(EXAMPLE_ROOT),
     graph(EXAMPLE_ROOT),
+    readFile(
+      path.join(EXAMPLE_ROOT, "skills/testing/spec-review/SKILL.md"),
+      "utf8",
+    ),
+    readFile(
+      path.join(EXAMPLE_ROOT, "lenses/testing/spec-review-boundary-values.md"),
+      "utf8",
+    ),
+    readFile(
+      path.join(EXAMPLE_ROOT, "lenses/testing/test-design-boundary-values.md"),
+      "utf8",
+    ),
   ]);
 
   assert.equal(scanResult.diagnostics.length, 0);
@@ -58,4 +78,30 @@ test("Context Lens example is clean, ready, and keeps its nested Skill relations
     ),
     true,
   );
+
+  assert.doesNotMatch(skill, /stays thin|thin routing/i);
+  for (const heading of [
+    "Selection Boundaries",
+    "Required Inputs",
+    "Instructions",
+    "Expected Output",
+    "When Not To Use",
+    "Validation",
+    "Completion Criteria",
+  ]) {
+    assert.match(skill, new RegExp(`^## ${heading}$`, "m"));
+  }
+  assert.match(
+    skill,
+    /renma\.requires-context: '\["context\.testing\.boundary-value-analysis"\]'/,
+  );
+  assert.match(
+    skill,
+    /renma\.requires-lens: '\["lens\.testing\.spec-review\.boundary-values"\]'/,
+  );
+  for (const lens of [specReviewLens, testDesignLens]) {
+    assert.match(lens, /^## Interpretation Criteria$/m);
+    assert.match(lens, /^## Evidence And Output$/m);
+    assert.match(lens, /Cite|citations/);
+  }
 });

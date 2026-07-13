@@ -1428,6 +1428,14 @@ test("global help lists workflows, boundaries, and distinguishable commands", as
     help.stdout,
     /Renma does not automatically perform large semantic rewrites/,
   );
+  assert.match(help.stdout, /Skill: focused workflow/);
+  assert.match(help.stdout, /Context: durable reusable knowledge/);
+  assert.match(
+    help.stdout,
+    /Context Lens: purpose-specific interpretation of declared Context/,
+  );
+  assert.match(help.stdout, /docs\/authoring-guide\.md/);
+  assert.match(help.stdout, /docs\/context-lens\.md/);
   for (const command of COMMAND_HELP) {
     assert.match(
       help.stdout,
@@ -1705,6 +1713,15 @@ test("representative command help shows relevant boundaries and options", async 
         /refuses to overwrite existing files/,
         /starting structure, not a complete asset/,
         /platform's standard Skill authoring guidance/,
+        /Skill is a focused workflow entrypoint/,
+        /Context is durable reusable knowledge/,
+        /Context Lens is purpose-specific interpretation of declared Context/,
+        /generic persona storage, a prompt template, or a runtime routing rule/,
+        /no existing Context Asset needs purpose-specific interpretation/,
+        /replace every placeholder purpose, applies_to target, focus, and expected output/,
+        /applies_to must resolve to real Context Assets/,
+        /docs\/authoring-guide\.md/,
+        /docs\/context-lens\.md/,
         /renma scan \. --fail-on high/,
         /Domain knowledge must come from evidence or human input/,
         /Set owner metadata on the scaffold\. Required when --format file is used\./,
@@ -1913,16 +1930,34 @@ test("scaffold context_lens writes deterministic file output", async () => {
   assert.match(content, /^owner: qa-platform$/m);
   assert.match(content, /^status: experimental$/m);
   assert.match(content, /^tags:\n {2}- testing\n {2}- spec-review$/m);
-  assert.match(content, /^purpose: spec_review$/m);
-  assert.match(content, /^applies_to:\n {2}- context\.example\.replace-me$/m);
-  assert.match(content, /^focus:\n {2}- ambiguity\n {2}- missing boundary$/m);
+  assert.match(content, /^purpose: replace_with_repository_grounded_purpose$/m);
   assert.match(
     content,
-    /^expected_outputs:\n {2}- unresolved questions\n {2}- risk notes$/m,
+    /^applies_to:\n {2}- context\.example\.replace-with-existing-context$/m,
   );
-  assert.match(content, /purpose-oriented interpretation layer/);
+  assert.match(
+    content,
+    /^focus:\n {2}- replace with a concrete interpretation criterion$/m,
+  );
+  assert.match(
+    content,
+    /^expected_outputs:\n {2}- replace with a concrete expected output$/m,
+  );
+  assert.match(content, /frontmatter placeholder/);
+  assert.match(content, /not universal Lens recommendations/);
+  assert.match(content, /requires real Context Assets to interpret/);
+  assert.match(content, /persona-only wording is insufficient/);
+  assert.match(content, /focused task, ordered workflow/);
   assert.match(content, /Detailed domain knowledge belongs in context assets/);
   assert.match(content, /must not become a prompt template/);
+  assert.match(content, /questions to ask, risks and checks to emphasize/);
+  assert.match(content, /every `applies_to` target resolves/);
+  assert.match(content, /renma scan \. --fail-on high/);
+  assert.match(content, /renma catalog \. --format markdown/);
+  assert.match(
+    content,
+    /renma graph \. --focus lens\.testing\.spec-review\.boundary-values --format mermaid/,
+  );
   assert.doesNotMatch(content, /^version:/m);
 
   const catalogResult = await withCapturedConsole(() =>
@@ -2069,10 +2104,51 @@ test("scaffold context_lens can emit json", async () => {
   assert.equal(bundle.kind, "context_lens");
   assert.equal(bundle.id, "lens.testing.spec-review-boundary-values");
   assert.match(bundle.content, /^type: context_lens$/m);
-  assert.match(bundle.content, /^purpose: spec_review$/m);
+  assert.match(
+    bundle.content,
+    /^purpose: replace_with_repository_grounded_purpose$/m,
+  );
   assert.match(bundle.prompt, /Create a Renma context_lens asset/);
   assert.match(bundle.prompt, /use `applies_to`/);
   assert.match(bundle.prompt, /runtime selectors/);
+  assert.match(bundle.prompt, /placeholder, not a universal recommendation/);
+  assert.match(bundle.prompt, /existing Context Asset ID or path/);
+  assert.match(bundle.prompt, /If there is no Context Asset to interpret/);
+  assert.match(bundle.prompt, /persona-only wording is insufficient/);
+  assert.match(bundle.prompt, /focused task and workflow in the Skill/);
+  assert.match(bundle.prompt, /durable reusable knowledge in Context Assets/);
+});
+
+test("scaffold context_lens prompt requires repository-grounded semantics", async () => {
+  const result = await withCapturedConsole(() =>
+    main([
+      "scaffold",
+      "context_lens",
+      "lenses/testing/quality-review.md",
+      "--format",
+      "prompt",
+      "--owner",
+      "qa-platform",
+    ]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /Replace the scaffold `purpose`/);
+  assert.match(result.stdout, /Replace every `applies_to` placeholder/);
+  assert.match(result.stdout, /Replace all `focus` and `expected_outputs`/);
+  assert.match(result.stdout, /verify that each target resolves/);
+  assert.match(result.stdout, /persona may frame the Lens/);
+  assert.match(
+    result.stdout,
+    /Keep the focused task and workflow in the Skill/,
+  );
+  assert.match(result.stdout, /renma scan \. --fail-on high/);
+  assert.match(result.stdout, /renma catalog \. --format markdown/);
+  assert.match(
+    result.stdout,
+    /renma graph \. --focus lens\.testing\.quality-review --format mermaid/,
+  );
 });
 
 test("scaffold skill JSON keeps its field shape and includes the human-review boundary", async () => {

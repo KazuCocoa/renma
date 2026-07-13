@@ -1,7 +1,7 @@
 # Renma Authoring Guide
 
-This is the canonical guide for authoring and improving Skills and Context
-Assets in a Renma repository.
+This is the canonical guide for placing, authoring, and improving Skills,
+Context Assets, Context Lenses, and Skill-local support in a Renma repository.
 
 ## Responsibility Boundary
 
@@ -48,17 +48,21 @@ Use Agent Skills progressive disclosure deliberately:
 3. Resources: local files are read or executed only when the workflow calls
    for them.
 
-Choose placement by responsibility, not size alone:
+Choose placement by responsibility, ownership, and reuse—not size alone:
 
-| Content | Place it in | Ownership test |
-| --- | --- | --- |
-| Selection boundaries, ordered workflow, constraints, completion | `SKILL.md` | Required to perform this focused workflow |
-| Skill-specific detail, variants, edge cases | `references/` | Owned and loaded by one Skill |
-| Deterministic repeatedly executed implementation | `scripts/` | Code is safer and more repeatable than prose |
-| Templates, images, data, output resources | `assets/` | Consumed or copied as material, not instructions |
-| Shared knowledge | `contexts/` | Used by multiple Skills or needs independent ownership, lifecycle, or source-of-truth status |
-| Purpose-specific interpretation of Context | `lenses/` | A static governance view over Context Assets |
-| Provider-specific UI metadata | provider-owned files such as `agents/openai.yaml` | Optional interface metadata, not Renma core schema |
+| Content or responsibility | Correct placement | Ownership or reuse test | Common misuse |
+| --- | --- | --- | --- |
+| Review supplied test code and produce prioritized findings; define selection boundaries, inputs, ordered steps, decisions, constraints, verification, output, and completion | Skill in `SKILL.md` | Required to perform one focused workflow | Reducing the Skill to a thin redirect or moving its task contract into Context |
+| Shared rules for reliable automated tests or other durable, source-backed knowledge | Context Asset under `contexts/` | May outlive or serve multiple Skills, or needs independent ownership, lifecycle, or source-of-truth status | Storing one workflow's instructions or transient task state as shared knowledge |
+| Emphasize determinism, isolation, and false-confidence risk while interpreting declared test-quality Context | Context Lens under `lenses/` | The same Context benefits from reusable purpose-specific interpretation | Creating a Lens with no Context target, copying Context, or storing only a persona or runtime route |
+| A stricter review variant for one Skill | Skill-local Profile under `profiles/`, if current Profile semantics fit | An overlay or variant owned and loaded by one Skill | Treating Profiles as generic global personas or a substitute for shared Context |
+| Detailed framework-specific review notes used only by one Skill | Skill-local Reference under `references/` | Supporting detail owned and loaded by one Skill | Promoting local detail without evidence of independent reuse or ownership |
+| A representative good or bad test implementation | Skill-local Example under `examples/` | A fixture or demonstration owned by one Skill | Hiding required workflow instructions only in an example |
+| Deterministic, repeatedly executed implementation | Script under Skill-local `scripts/`, or shared helper under `tools/` | Code is safer and more repeatable than prose; use `tools/` when implementation is shared | Embedding a large executable implementation in prose or treating a script as knowledge |
+| Templates, images, data, fonts, PDFs, or output resources | Asset under Skill-local `assets/` | Consumed, copied, or transformed as material rather than read as instructions | Putting workflow or reusable knowledge in an opaque asset |
+| Provider-specific UI or presentation metadata | Provider-owned metadata such as `agents/openai.yaml` | Optional interface behavior owned by the consuming provider | Adding provider fields to Renma core metadata |
+| Dynamically select a Lens, load or inject Context, assemble prompts, execute tools, or apply the workflow | External agent or runtime | Depends on the live request or execution environment | Encoding runtime behavior in a Lens or claiming Renma performs it |
+| “Act as a senior QA engineer” with no concrete criteria | Usually keep as brief local framing; create no asset solely for it | Persona or tone alone has no reusable interpretation contract | Treating generic role wording as a Context Lens |
 
 The canonical defaults and their Agent Skills/Renma provenance are in the
 [Quality Profile](quality-profile.md).
@@ -332,6 +336,27 @@ Skill -> Context Asset
 
 These metadata relationships are static governance evidence. Renma does not
 select, load, or inject Context at runtime.
+
+Use this placement sequence before creating an asset:
+
+1. Is this the task, workflow, or completion contract? Put it in the Skill.
+2. Is this durable, reusable, source-backed knowledge? Create or reuse a Context
+   Asset.
+3. Does declared Context need a reusable purpose-specific interpretation?
+   Create a Context Lens. Do not create a Lens when there is no Context Asset to
+   interpret.
+4. Is this a Skill-local overlay or execution variant? Use a Profile only when
+   the current Profile semantics fit.
+5. Is this supporting detail used by only one Skill? Use a Reference.
+6. Is this a local fixture or demonstration? Use an Example.
+7. Is this only generic persona or tone framing? Usually keep it local and do
+   not create an asset solely for the persona.
+
+A Skill can reference a Context Asset directly when no separate interpretation
+layer adds value. A Lens is justified only when it adds meaningful, reusable
+structure to how declared Context is read for a purpose. See the
+[Context Lens guide](context-lens.md) for field semantics, persona guidance,
+examples, and a zero-context classification self-check.
 
 Context and Context Lens scaffolds keep their top-level Renma metadata syntax;
 the Agent Skills `metadata.renma.*` serialization boundary applies to Skills.

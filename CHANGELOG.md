@@ -24,6 +24,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   long user decision. Semantic splitting remains preferred when it preserves
   coherence and execution order; a valid declared decision provides an
   effective limit for intentionally coherent or ordered long-form assets.
+- Clarified Skill, Context Asset, Context Lens, Skill-local support, and
+  external runtime responsibilities across canonical documentation, CLI help,
+  scaffolds, and examples. Context Lens guidance now requires declared Context,
+  rejects persona-only authoring as insufficient, uses canonical Agent Skills
+  relationship metadata, and preserves focused workflows without changing
+  Renma's deterministic runtime boundary.
 
 ## [0.18.0] - 2026-07-12
 

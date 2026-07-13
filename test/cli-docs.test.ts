@@ -258,6 +258,53 @@ test("Skill authoring docs preserve the platform and Renma responsibility bounda
   assert.doesNotMatch(authoring, /current thin-Skill authoring/);
 });
 
+test("Context Lens docs use canonical Skill metadata and explicit semantic boundaries", async () => {
+  const lensGuide = await readRepoFile("docs/context-lens.md");
+  const authoring = await readRepoFile("docs/authoring-guide.md");
+
+  assert.match(
+    lensGuide,
+    /Do not create a Context Lens when there\s+is no Context Asset/s,
+  );
+  assert.match(
+    lensGuide,
+    /A persona may frame a Lens, but a persona alone does not define one/,
+  );
+  assert.match(lensGuide, /Act as a senior QA engineer/);
+  assert.match(lensGuide, /questions, risks, evidence, and expected output/);
+  assert.match(lensGuide, /name: spec-review/);
+  assert.match(
+    lensGuide,
+    /renma\.requires-context: '\["context\.testing\.boundary-value-analysis"\]'/,
+  );
+  assert.match(
+    lensGuide,
+    /renma\.requires-lens: '\["lens\.testing\.spec-review\.boundary-values"\]'/,
+  );
+  assert.match(lensGuide, /renma\.optional-lens: '\[\]'/);
+  assert.doesNotMatch(lensGuide, /^id: skill\./m);
+  assert.doesNotMatch(lensGuide, /^requires_lens:/m);
+  assert.match(lensGuide, /^## Current Non-Goals$/m);
+  assert.doesNotMatch(lensGuide, /Non-Goals For 0\.12\.0/);
+
+  for (const asset of [
+    "Skill",
+    "Context Asset",
+    "Context Lens",
+    "Profile",
+    "Reference",
+    "Example",
+    "Script",
+    "Asset",
+    "Provider-specific",
+    "External agent or runtime",
+  ]) {
+    assert.match(authoring, new RegExp(asset));
+  }
+  assert.match(authoring, /Dynamically select a Lens/);
+  assert.match(authoring, /create no asset solely for it/);
+});
+
 test("published current docs separate implemented discovery from deferred routing", async () => {
   const documents = [
     "README.md",
