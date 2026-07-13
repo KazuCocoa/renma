@@ -32,6 +32,9 @@ export interface AssetMetadata {
   lastReviewedAt?: string;
   reviewCycle?: string;
   expiresAt?: string;
+  tokenBudgetOverride?: number;
+  tokenBudgetRationale?: string;
+  tokenBudgetReviewedAt?: string;
   tags: string[];
   whenToUse: string[];
   whenNotToUse: string[];
