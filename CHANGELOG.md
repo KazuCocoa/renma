@@ -10,17 +10,18 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
-- Added explicit, human-reviewed `token_budget_override`,
-  `token_budget_rationale`, and optional `token_budget_reviewed_at` metadata for
-  contexts, references, profiles, and examples. Invalid metadata emits
+- Added `token_budget_override`, `token_budget_rationale`, and optional
+  `token_budget_reviewed_at` metadata for recording a declared human decision
+  that a support asset should remain intentionally long. Invalid, ambiguous,
+  incomplete, orphaned, or unnecessary decision metadata emits
   `QUAL-INVALID-TOKEN-BUDGET-OVERRIDE` and never suppresses the default budget.
 
 ### Changed
 
 - Changed support-asset token guidance to ask for a split-versus-intentionally-
   long user decision. Semantic splitting remains preferred when it preserves
-  coherence and execution order; valid reviewed overrides provide an effective
-  limit for intentionally coherent or ordered long-form assets.
+  coherence and execution order; a valid declared decision provides an
+  effective limit for intentionally coherent or ordered long-form assets.
 
 ## [0.18.0] - 2026-07-12
 

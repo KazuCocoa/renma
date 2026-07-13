@@ -2,14 +2,18 @@ import type { AssetMetadata, AssetStatus } from "./model.js";
 import { inspectAgentSkill } from "./agent-skills.js";
 import type {
   Diagnostic,
+  Evidence,
   MetadataFieldEvidence,
   MetadataValue,
   ParsedDocument,
 } from "./types.js";
 import { isIsoDate, parseDayDuration } from "./freshness.js";
+import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
+import { estimateTokens } from "./token-estimator.js";
 import {
   parseAgentSkillFrontmatter,
   type ParsedYamlFrontmatter,
+  type YamlFrontmatterField,
 } from "./yaml-frontmatter.js";
 
 const STATUSES: AssetStatus[] = [
@@ -67,48 +71,284 @@ interface OperationalMetadataSource {
   canonicalSkill: boolean;
 }
 
-export interface SupportAssetTokenBudgetMetadata {
-  overridePresent: boolean;
-  overrideValue?: unknown;
-  rationalePresent: boolean;
-  rationaleValue?: unknown;
-  reviewedAtPresent: boolean;
-  reviewedAtValue?: unknown;
+export interface SupportAssetTokenBudgetDecision {
+  status: "absent" | "invalid" | "active";
+  estimatedTokens?: number;
+  defaultLimit?: number;
+  overrideLimit?: number;
+  effectiveLimit?: number;
+  tokenBudgetRationale?: string;
+  tokenBudgetReviewedAt?: string;
+  invalidReasons: string[];
+  evidence?: Evidence;
 }
 
-/** Read the opt-in support-asset budget decision fields with YAML scalar types intact. */
-export function parseSupportAssetTokenBudgetMetadata(
+const TOKEN_BUDGET_KEYS = [
+  "token_budget_override",
+  "token_budget_rationale",
+  "token_budget_reviewed_at",
+] as const;
+
+type TokenBudgetKey = (typeof TOKEN_BUDGET_KEYS)[number];
+
+interface TokenBudgetDecisionIssue {
+  reason: string;
+  evidence: Evidence;
+}
+
+/** Validate one declared support-asset token-budget decision without selecting ambiguous values. */
+export function parseSupportAssetTokenBudgetDecision(
   document: ParsedDocument,
-): SupportAssetTokenBudgetMetadata {
+): SupportAssetTokenBudgetDecision {
   if (
     document.artifact.kind !== "context" &&
     document.artifact.kind !== "reference" &&
     document.artifact.kind !== "profile" &&
     document.artifact.kind !== "example"
   ) {
+    return { status: "absent", invalidReasons: [] };
+  }
+
+  const defaultLimit =
+    DEFAULT_QUALITY_PROFILE.contentTokenWarn[document.artifact.kind];
+  const estimatedTokens = estimateTokens(document.artifact.content);
+  const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
+  const parsedFields = frontmatter.fields.filter(isTokenBudgetField);
+  const rawFields = rawTokenBudgetFields(document);
+  if (parsedFields.length === 0 && rawFields.length === 0) {
     return {
-      overridePresent: false,
-      rationalePresent: false,
-      reviewedAtPresent: false,
+      status: "absent",
+      estimatedTokens,
+      defaultLimit,
+      effectiveLimit: defaultLimit,
+      invalidReasons: [],
     };
   }
-  const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
-  const fields = new Map(
-    frontmatter.fields.map((field) => [field.key, field.value]),
-  );
+
+  const issues: TokenBudgetDecisionIssue[] = [];
+  const firstDecisionEvidence =
+    (parsedFields[0] ? fieldEvidence(document, parsedFields[0]) : undefined) ??
+    rawFields[0]?.evidence ??
+    documentLineEvidence(document, 1);
+
+  if (!frontmatter.closed) {
+    issues.push({
+      reason: "token-budget decision frontmatter must be closed",
+      evidence: firstDecisionEvidence,
+    });
+  } else if (!frontmatter.mapping) {
+    issues.push({
+      reason: "token-budget decision frontmatter must be a YAML mapping",
+      evidence: firstDecisionEvidence,
+    });
+  }
+  for (const error of frontmatter.errors) {
+    issues.push({
+      reason: `token-budget decision metadata has invalid YAML (${error.code})`,
+      evidence: documentLineEvidence(document, error.line),
+    });
+  }
+  for (const duplicate of frontmatter.duplicateFields.filter(
+    isTokenBudgetField,
+  )) {
+    issues.push({
+      reason: `${duplicate.key} is declared more than once`,
+      evidence: fieldEvidence(document, duplicate),
+    });
+  }
+
+  const fieldsByKey = new Map<TokenBudgetKey, YamlFrontmatterField[]>();
+  for (const key of TOKEN_BUDGET_KEYS) {
+    fieldsByKey.set(
+      key,
+      parsedFields.filter((field) => field.key === key),
+    );
+  }
+  const uniqueField = (key: TokenBudgetKey) => {
+    const fields = fieldsByKey.get(key) ?? [];
+    return fields.length === 1 ? fields[0] : undefined;
+  };
+  const overrideField = uniqueField("token_budget_override");
+  const rationaleField = uniqueField("token_budget_rationale");
+  const reviewedAtField = uniqueField("token_budget_reviewed_at");
+  let overrideLimit: number | undefined;
+  let rationale: string | undefined;
+  let reviewedAt: string | undefined;
+
+  if (!overrideField) {
+    if (rationaleField) {
+      issues.push({
+        reason: "token_budget_rationale requires token_budget_override",
+        evidence: fieldEvidence(document, rationaleField),
+      });
+    }
+    if (reviewedAtField) {
+      issues.push({
+        reason: "token_budget_reviewed_at requires token_budget_override",
+        evidence: fieldEvidence(document, reviewedAtField),
+      });
+    }
+  } else {
+    if (
+      typeof overrideField.value !== "number" ||
+      !Number.isInteger(overrideField.value)
+    ) {
+      issues.push({
+        reason: "token_budget_override must be an integer",
+        evidence: fieldEvidence(document, overrideField),
+      });
+    } else {
+      overrideLimit = overrideField.value;
+      if (overrideLimit <= 0) {
+        issues.push({
+          reason: "token_budget_override must be positive",
+          evidence: fieldEvidence(document, overrideField),
+        });
+      } else if (overrideLimit <= defaultLimit) {
+        issues.push({
+          reason: `token_budget_override must be greater than the default limit of ${defaultLimit}`,
+          evidence: fieldEvidence(document, overrideField),
+        });
+      }
+    }
+
+    if (!rationaleField) {
+      issues.push({
+        reason:
+          "token_budget_rationale must be a non-empty string when an override is present",
+        evidence: fieldEvidence(document, overrideField),
+      });
+    } else if (
+      typeof rationaleField.value !== "string" ||
+      rationaleField.value.trim().length === 0
+    ) {
+      issues.push({
+        reason: "token_budget_rationale must be a non-empty string",
+        evidence: fieldEvidence(document, rationaleField),
+      });
+    } else {
+      rationale = rationaleField.value.trim();
+    }
+
+    if (reviewedAtField) {
+      if (
+        typeof reviewedAtField.value !== "string" ||
+        !isIsoDate(reviewedAtField.value)
+      ) {
+        issues.push({
+          reason: "token_budget_reviewed_at must be a valid YYYY-MM-DD date",
+          evidence: fieldEvidence(document, reviewedAtField),
+        });
+      } else {
+        reviewedAt = reviewedAtField.value;
+      }
+    }
+  }
+
+  if (issues.length === 0 && overrideField && estimatedTokens <= defaultLimit) {
+    issues.push({
+      reason: `token_budget_override is unnecessary because the asset is within the default limit of ${defaultLimit}`,
+      evidence: fieldEvidence(document, overrideField),
+    });
+  }
+
+  if (issues.length > 0) {
+    return {
+      status: "invalid",
+      estimatedTokens,
+      defaultLimit,
+      ...(overrideLimit !== undefined ? { overrideLimit } : {}),
+      effectiveLimit: defaultLimit,
+      ...(rationale ? { tokenBudgetRationale: rationale } : {}),
+      ...(reviewedAt ? { tokenBudgetReviewedAt: reviewedAt } : {}),
+      invalidReasons: issues.map((issue) => issue.reason),
+      evidence: issues[0]?.evidence ?? firstDecisionEvidence,
+    };
+  }
+
+  if (overrideLimit === undefined || rationale === undefined) {
+    return {
+      status: "invalid",
+      estimatedTokens,
+      defaultLimit,
+      effectiveLimit: defaultLimit,
+      invalidReasons: ["token-budget decision metadata is incomplete"],
+      evidence: firstDecisionEvidence,
+    };
+  }
+
   return {
-    overridePresent: fields.has("token_budget_override"),
-    overrideValue: fields.get("token_budget_override"),
-    rationalePresent: fields.has("token_budget_rationale"),
-    rationaleValue: fields.get("token_budget_rationale"),
-    reviewedAtPresent: fields.has("token_budget_reviewed_at"),
-    reviewedAtValue: fields.get("token_budget_reviewed_at"),
+    status: "active",
+    estimatedTokens,
+    defaultLimit,
+    overrideLimit,
+    effectiveLimit: overrideLimit,
+    tokenBudgetRationale: rationale,
+    ...(reviewedAt ? { tokenBudgetReviewedAt: reviewedAt } : {}),
+    invalidReasons: [],
+    evidence: fieldEvidence(document, overrideField),
+  };
+}
+
+function isTokenBudgetField(
+  field: YamlFrontmatterField,
+): field is YamlFrontmatterField & { key: TokenBudgetKey } {
+  return TOKEN_BUDGET_KEYS.includes(field.key as TokenBudgetKey);
+}
+
+function rawTokenBudgetFields(document: ParsedDocument): Array<{
+  key: TokenBudgetKey;
+  evidence: Evidence;
+}> {
+  if (document.lines[0]?.replace(/^\uFEFF/, "").trim() !== "---") return [];
+  const fields: Array<{ key: TokenBudgetKey; evidence: Evidence }> = [];
+  for (let index = 1; index < document.lines.length; index += 1) {
+    const line = document.lines[index] ?? "";
+    if (/^---\s*$/.test(line)) break;
+    const match = line.match(
+      /^(token_budget_override|token_budget_rationale|token_budget_reviewed_at)\s*:/,
+    );
+    if (!match) continue;
+    fields.push({
+      key: match[1] as TokenBudgetKey,
+      evidence: documentLineEvidence(document, index + 1),
+    });
+  }
+  return fields;
+}
+
+function fieldEvidence(
+  document: ParsedDocument,
+  field: YamlFrontmatterField | undefined,
+): Evidence {
+  if (!field) return documentLineEvidence(document, 1);
+  return {
+    path: document.artifact.path,
+    startLine: field.startLine,
+    endLine: field.endLine,
+    snippet: document.lines
+      .slice(field.startLine - 1, field.endLine)
+      .join("\n"),
+  };
+}
+
+function documentLineEvidence(
+  document: ParsedDocument,
+  requestedLine: number,
+): Evidence {
+  const line = Math.min(Math.max(requestedLine, 1), document.lines.length || 1);
+  return {
+    path: document.artifact.path,
+    startLine: line,
+    endLine: line,
+    snippet: document.lines[line - 1] ?? "",
   };
 }
 
 /** Normalize parsed frontmatter into asset metadata plus validation diagnostics. */
 export function parseAssetMetadata(document: ParsedDocument): {
   metadata: AssetMetadata;
+  tokenBudgetDecision: SupportAssetTokenBudgetDecision;
   metadataFields: Record<string, MetadataFieldEvidence>;
   metadataListItems: Record<string, MetadataFieldEvidence[]>;
   diagnostics: Diagnostic[];
@@ -125,7 +365,7 @@ export function parseAssetMetadata(document: ParsedDocument): {
   );
   const reviewCycle = optionalText(metadataText(source.values.review_cycle));
   const expiresAt = optionalText(metadataText(source.values.expires_at));
-  const tokenBudget = parseSupportAssetTokenBudgetMetadata(document);
+  const tokenBudget = parseSupportAssetTokenBudgetDecision(document);
   const metadata: AssetMetadata = {
     tags: operationalListValue(document, source, "tags", diagnostics),
     whenToUse: operationalListValue(
@@ -203,22 +443,19 @@ export function parseAssetMetadata(document: ParsedDocument): {
   assignOptional(metadata, "lastReviewedAt", lastReviewedAt);
   assignOptional(metadata, "reviewCycle", reviewCycle);
   assignOptional(metadata, "expiresAt", expiresAt);
-  if (
-    typeof tokenBudget.overrideValue === "number" &&
-    Number.isInteger(tokenBudget.overrideValue)
-  ) {
-    metadata.tokenBudgetOverride = tokenBudget.overrideValue;
+  if (tokenBudget.status === "active") {
+    assignOptional(metadata, "tokenBudgetOverride", tokenBudget.overrideLimit);
+    assignOptional(
+      metadata,
+      "tokenBudgetRationale",
+      tokenBudget.tokenBudgetRationale,
+    );
+    assignOptional(
+      metadata,
+      "tokenBudgetReviewedAt",
+      tokenBudget.tokenBudgetReviewedAt,
+    );
   }
-  assignOptional(
-    metadata,
-    "tokenBudgetRationale",
-    optionalText(metadataText(tokenBudget.rationaleValue)),
-  );
-  assignOptional(
-    metadata,
-    "tokenBudgetReviewedAt",
-    optionalText(metadataText(tokenBudget.reviewedAtValue)),
-  );
   assignOptionalList(
     metadata,
     "appliesTo",
@@ -283,6 +520,7 @@ export function parseAssetMetadata(document: ParsedDocument): {
 
   return {
     metadata,
+    tokenBudgetDecision: tokenBudget,
     metadataFields: source.fields,
     metadataListItems: source.listItems,
     diagnostics,

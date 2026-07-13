@@ -1263,6 +1263,129 @@ ${repeatWords("script", 6000)}
   );
 });
 
+test("support-asset token-budget decisions fail closed with exact metadata evidence", async () => {
+  const root = await fixture();
+  const referenceDir = path.join(root, "skills", "demo", "references");
+  await mkdir(referenceDir, { recursive: true });
+  const cases = [
+    {
+      file: "duplicate-override.md",
+      metadata: `token_budget_override: 5200
+token_budget_override: 5300
+token_budget_rationale: Intentionally coherent.`,
+      words: 5050,
+      evidenceLine: 3,
+      evidenceSnippet: "token_budget_override: 5300",
+      reason: "token_budget_override is declared more than once",
+      overBudget: true,
+    },
+    {
+      file: "duplicate-rationale.md",
+      metadata: `token_budget_override: 5200
+token_budget_rationale: First rationale.
+token_budget_rationale: Second rationale.`,
+      words: 5050,
+      evidenceLine: 4,
+      evidenceSnippet: "token_budget_rationale: Second rationale.",
+      reason: "token_budget_rationale is declared more than once",
+      overBudget: true,
+    },
+    {
+      file: "duplicate-reviewed-at.md",
+      metadata: `token_budget_override: 5200
+token_budget_rationale: Intentionally coherent.
+token_budget_reviewed_at: "2026-07-11"
+token_budget_reviewed_at: "2026-07-12"`,
+      words: 5050,
+      evidenceLine: 5,
+      evidenceSnippet: 'token_budget_reviewed_at: "2026-07-12"',
+      reason: "token_budget_reviewed_at is declared more than once",
+      overBudget: true,
+    },
+    {
+      file: "orphan-rationale.md",
+      metadata: "token_budget_rationale: Orphan rationale.",
+      words: 5050,
+      evidenceLine: 2,
+      evidenceSnippet: "token_budget_rationale: Orphan rationale.",
+      reason: "token_budget_rationale requires token_budget_override",
+      overBudget: true,
+    },
+    {
+      file: "orphan-reviewed-at.md",
+      metadata: 'token_budget_reviewed_at: "2026-07-12"',
+      words: 5050,
+      evidenceLine: 2,
+      evidenceSnippet: 'token_budget_reviewed_at: "2026-07-12"',
+      reason: "token_budget_reviewed_at requires token_budget_override",
+      overBudget: true,
+    },
+    {
+      file: "malformed-yaml.md",
+      metadata: `token_budget_override: 5200
+token_budget_rationale: "unterminated`,
+      words: 5050,
+      evidenceLine: 3,
+      evidenceSnippet: 'token_budget_rationale: "unterminated',
+      reason: "token-budget decision metadata has invalid YAML",
+      overBudget: true,
+    },
+    {
+      file: "unnecessary.md",
+      metadata: `token_budget_override: 5200
+token_budget_rationale: Intentionally coherent.`,
+      words: 100,
+      evidenceLine: 2,
+      evidenceSnippet: "token_budget_override: 5200",
+      reason:
+        "token_budget_override is unnecessary because the asset is within the default limit of 5000",
+      overBudget: false,
+    },
+  ];
+
+  for (const fixtureCase of cases) {
+    await writeFile(
+      path.join(referenceDir, fixtureCase.file),
+      `---\n${fixtureCase.metadata}\n---\n# Reference\n\n${repeatWords("context", fixtureCase.words)}\n`,
+    );
+  }
+
+  const result = await scan(root);
+  for (const fixtureCase of cases) {
+    const assetPath = `skills/demo/references/${fixtureCase.file}`;
+    const invalid = result.findings.find(
+      (finding) =>
+        finding.id === "QUAL-INVALID-TOKEN-BUDGET-OVERRIDE" &&
+        finding.evidence.path === assetPath,
+    );
+    assert.ok(invalid, `${fixtureCase.file} invalid decision finding`);
+    assert.equal(
+      invalid.evidence.startLine,
+      fixtureCase.evidenceLine,
+      `${fixtureCase.file} evidence line`,
+    );
+    assert.equal(invalid.evidence.endLine, fixtureCase.evidenceLine);
+    assert.equal(invalid.evidence.snippet, fixtureCase.evidenceSnippet);
+    assert.ok(
+      (invalid.details?.invalidReasons as string[]).some((reason) =>
+        reason.includes(fixtureCase.reason),
+      ),
+      `${fixtureCase.file} structured reason`,
+    );
+    assert.equal(invalid.details?.effectiveLimit, 5000);
+    assert.equal(invalid.details?.overrideActive, false);
+    assert.equal(
+      result.findings.some(
+        (finding) =>
+          finding.id === "QUAL-SUPPORT-ASSET-TOKEN-BUDGET" &&
+          finding.evidence.path === assetPath,
+      ),
+      fixtureCase.overBudget,
+      `${fixtureCase.file} default budget remains active`,
+    );
+  }
+});
+
 test("scan emits actionable guidance for oversized skills", async () => {
   const root = await fixture();
   const skillDir = path.join(root, "skills", "large");
