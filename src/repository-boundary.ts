@@ -1,10 +1,83 @@
 import type { Stats } from "node:fs";
-import { lstat } from "node:fs/promises";
+import { lstat, opendir } from "node:fs/promises";
 import path from "node:path";
 
 export type SafeRepositoryPathResult =
   | { state: "present"; path: string; absolutePath: string; stats: Stats }
   | { state: "symlink" | "absent" | "unreadable" | "outside"; path: string };
+
+export interface RepositoryWalkResult {
+  files: string[];
+  symlinks: string[];
+  unreadable: Array<{ path: string; error: string }>;
+}
+
+/** Walk repository files without ever following a symbolic link. */
+export async function walkRepositoryFiles(
+  root: string,
+  options: {
+    maxDepth: number;
+    excluded: (relativePath: string) => boolean;
+  },
+): Promise<RepositoryWalkResult> {
+  const result: RepositoryWalkResult = {
+    files: [],
+    symlinks: [],
+    unreadable: [],
+  };
+  const absoluteRoot = path.resolve(root);
+
+  async function walk(relativeDirectory: string, depth: number): Promise<void> {
+    let directory;
+    try {
+      directory = await opendir(
+        relativeDirectory
+          ? path.join(absoluteRoot, relativeDirectory)
+          : absoluteRoot,
+      );
+    } catch (error) {
+      result.unreadable.push({
+        path: relativeDirectory || ".",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+
+    const entries: Array<{
+      name: string;
+      isSymbolicLink: boolean;
+      isDirectory: boolean;
+      isFile: boolean;
+    }> = [];
+    for await (const entry of directory) {
+      entries.push({
+        name: entry.name,
+        isSymbolicLink: entry.isSymbolicLink(),
+        isDirectory: entry.isDirectory(),
+        isFile: entry.isFile(),
+      });
+    }
+    entries.sort((left, right) => left.name.localeCompare(right.name));
+    for (const entry of entries) {
+      const relativePath = relativeDirectory
+        ? `${relativeDirectory}/${entry.name}`
+        : entry.name;
+      if (options.excluded(relativePath)) continue;
+      const entryDepth = depth + 1;
+      if (entryDepth > options.maxDepth) continue;
+      if (entry.isSymbolicLink) {
+        result.symlinks.push(relativePath);
+      } else if (entry.isDirectory) {
+        await walk(relativePath, entryDepth);
+      } else if (entry.isFile) {
+        result.files.push(relativePath);
+      }
+    }
+  }
+
+  await walk("", 0);
+  return result;
+}
 
 /** Inspect every component with lstat, never following a repository symlink. */
 export async function safeRepositoryPath(

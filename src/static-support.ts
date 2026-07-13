@@ -1,6 +1,9 @@
 import path from "node:path";
 
-import { classifyRepositorySkillPath } from "./discovery.js";
+import {
+  classifyRepositorySkillPath,
+  logicalSkillDirectory,
+} from "./discovery.js";
 import type { CatalogEntry, Dependency } from "./model.js";
 import type { ParsedDocument } from "./types.js";
 
@@ -116,21 +119,15 @@ export function buildStaticSupportDependencies(
   const skillEntries = entries.filter((entry) => entry.kind === "skill");
   const skillCounts = new Map<string, number>();
   for (const skill of skillEntries) {
-    const classified = classifyRepositorySkillPath(skill.sourcePath);
-    const directory =
-      classified?.kind === "entrypoint"
-        ? classified.skillDirectory
-        : path.posix.dirname(skill.sourcePath);
+    const directory = logicalSkillDirectory(skill.sourcePath);
+    if (!directory) continue;
     skillCounts.set(directory, (skillCounts.get(directory) ?? 0) + 1);
   }
   const result: Dependency[] = [];
 
   for (const skill of skillEntries) {
-    const classifiedSkill = classifyRepositorySkillPath(skill.sourcePath);
-    const skillDirectory =
-      classifiedSkill?.kind === "entrypoint"
-        ? classifiedSkill.skillDirectory
-        : path.posix.dirname(skill.sourcePath);
+    const skillDirectory = logicalSkillDirectory(skill.sourcePath);
+    if (!skillDirectory) continue;
     if (skillCounts.get(skillDirectory) !== 1) continue;
     const localEntries = entries.filter((entry) => {
       const classified = classifyRepositorySkillPath(entry.sourcePath);

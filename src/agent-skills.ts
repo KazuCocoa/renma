@@ -1,4 +1,5 @@
 import path from "node:path";
+import { logicalSkillDirectory } from "./discovery.js";
 
 import {
   AGENT_SKILL_DIAGNOSTIC_IDS as IDS,
@@ -481,13 +482,17 @@ function validateName(
     );
   }
 
-  const parent = path.posix.basename(
-    path.posix.dirname(document.artifact.path),
-  );
-  const parentValidation = normalizeAgentSkillDirectoryName(parent);
+  const logicalDirectory = logicalSkillDirectory(document.artifact.path);
+  const parent = logicalDirectory
+    ? path.posix.basename(logicalDirectory)
+    : undefined;
+  const parentValidation = parent
+    ? normalizeAgentSkillDirectoryName(parent)
+    : undefined;
   if (
+    parent !== undefined &&
     nameValidation.normalized !== undefined &&
-    parentValidation.normalized !== nameValidation.normalized
+    parentValidation?.normalized !== nameValidation.normalized
   ) {
     issues.push({
       ...createIssue(

@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import path from "node:path";
 import { conflictDiagnostics } from "./catalog-conflicts.js";
 import { lifecycleDiagnostics } from "./catalog-lifecycle.js";
 import { contextBodyLanguageDiagnostics } from "./context-language-diagnostics.js";
@@ -11,7 +10,10 @@ import type {
   Dependency,
   DependencyKind,
 } from "./model.js";
-import { classifyRepositorySkillPath } from "./discovery.js";
+import {
+  classifyRepositorySkillPath,
+  logicalSkillDirectory,
+} from "./discovery.js";
 import { parseAssetMetadata } from "./metadata.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import type { Diagnostic, Evidence, ParsedDocument } from "./types.js";
@@ -41,11 +43,8 @@ export function buildCatalog(
   for (const document of documents) {
     if (document.artifact.kind !== "skill") continue;
     const metadata = parseAssetMetadata(document).metadata;
-    const classified = classifyRepositorySkillPath(document.artifact.path);
-    const skillDirectory =
-      classified?.kind === "entrypoint"
-        ? classified.skillDirectory
-        : path.posix.dirname(document.artifact.path);
+    const skillDirectory = logicalSkillDirectory(document.artifact.path);
+    if (!skillDirectory) continue;
     const candidates = skillOwners.get(skillDirectory) ?? [];
     candidates.push({
       owner: metadata.owner?.trim() || null,

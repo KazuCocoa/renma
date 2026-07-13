@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  collectSecurityPolicyAssetEvidence,
   summarizeSecurityPolicyInventory,
   zeroSecurityPolicyInventorySummary,
 } from "../src/security-policy-inventory.js";
@@ -13,6 +14,47 @@ test("empty policy inventory returns a zero summary", () => {
   assert.deepEqual(
     summarizeSecurityPolicyInventory([]),
     zeroSecurityPolicyInventorySummary(),
+  );
+});
+
+test("effective policy provenance lists every contributing source", () => {
+  const config = {
+    ...baseSecurityConfig(),
+    disallowedCommands: ["curl"],
+    profiles: {
+      strict: {
+        networkAllowed: false,
+        allowedData: [],
+        forbiddenInputs: [],
+        approvedDomains: [],
+        approvedUploadDomains: [],
+        disallowedCommands: [],
+      },
+    },
+  } satisfies SecurityConfig;
+  const evidence = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "skills/demo/SKILL.md",
+        "skill",
+        policy({
+          allowedData: "public",
+          externalUploadAllowed: false,
+          securityProfile: "strict",
+        }),
+      ),
+      artifact("skills/demo/scripts/run.mjs", "script", "echo safe\n"),
+    ],
+    config,
+  );
+
+  assert.deepEqual(
+    evidence.find((item) => item.kind === "skill")?.policySources,
+    ["local", "security_profile", "repository_config"],
+  );
+  assert.deepEqual(
+    evidence.find((item) => item.kind === "script")?.policySources,
+    ["owning_skill", "security_profile", "repository_config"],
   );
 });
 

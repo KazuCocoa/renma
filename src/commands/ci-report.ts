@@ -252,6 +252,10 @@ function formatSecurityChangesSection(
     `- Assets with inherited policy: ${formatDelta(policyInventory.assetsWithInheritedPolicy)}`,
     `- Assets with effective policy: ${formatDelta(policyInventory.assetsWithEffectivePolicy)}`,
     `- Assets without effective policy: ${formatDelta(policyInventory.assetsWithoutEffectivePolicy)}`,
+    `- Effective policy from local metadata: ${formatDelta(policyInventory.policySources.local)}`,
+    `- Effective policy from security profiles: ${formatDelta(policyInventory.policySources.security_profile)}`,
+    `- Effective policy from repository config: ${formatDelta(policyInventory.policySources.repository_config)}`,
+    `- Effective policy from owning Skills: ${formatDelta(policyInventory.policySources.owning_skill)}`,
     `- Missing security profiles: ${formatDelta(policyInventory.securityProfiles.missing)}`,
   ];
 }
@@ -294,6 +298,10 @@ function formatSecurityPolicyInventorySection(
     `- Target assets with inherited policy: ${target.assetsWithInheritedPolicy}`,
     `- Target assets with effective policy: ${target.assetsWithEffectivePolicy}`,
     `- Target assets without effective policy: ${target.assetsWithoutEffectivePolicy}`,
+    `- Target effective policy from local metadata: ${target.policySources.local}`,
+    `- Target effective policy from security profiles: ${target.policySources.security_profile}`,
+    `- Target effective policy from repository config: ${target.policySources.repository_config}`,
+    `- Target effective policy from owning Skills: ${target.policySources.owning_skill}`,
     `- Target referenced security profiles: ${target.securityProfiles.referenced}`,
     `- Target missing security profiles: ${target.securityProfiles.missing}`,
     `- Target approved network destinations: ${target.approvedNetworkDestinationCount}`,

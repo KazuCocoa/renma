@@ -353,6 +353,56 @@ metadata:
   );
 });
 
+test("flat Skill entrypoints resolve assets, scripts, and helper commands from their logical directory", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-flat-support-"));
+  await mkdir(path.join(root, "skills", "demo", "assets"), {
+    recursive: true,
+  });
+  await mkdir(path.join(root, "skills", "demo", "scripts"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "skills", "demo.skill.md"),
+    `---
+name: demo
+description: Resolve flat Skill support. Use when historical entrypoints need local resources.
+---
+# Demo
+
+Use assets/data.json and run scripts/run.mjs.
+
+\`\`\`sh
+node scripts/run.mjs
+\`\`\`
+`,
+  );
+  await writeFile(
+    path.join(root, "skills", "demo", "assets", "data.json"),
+    "{}\n",
+  );
+  await writeFile(
+    path.join(root, "skills", "demo", "scripts", "run.mjs"),
+    "console.log('ok');\n",
+  );
+
+  const result = await scan(root);
+  assert.equal(
+    result.findings.some(
+      (finding) =>
+        finding.id === "SUPPORT-MISSING-PATH" ||
+        finding.id === "SUPPORT-UNREACHABLE-ASSET" ||
+        finding.id === "SUPPORT-UNREACHABLE-SCRIPT" ||
+        finding.id === "HELPER-COMMAND-MISSING",
+    ),
+    false,
+  );
+  const resolvedTargets = result.trustGraph?.edges
+    .filter((edge) => edge.type === "statically_references")
+    .map((edge) => edge.properties?.declaredTarget);
+  assert.ok(resolvedTargets?.includes("skills/demo/assets/data.json"));
+  assert.ok(resolvedTargets?.includes("skills/demo/scripts/run.mjs"));
+});
+
 test("balanced Markdown paths and encoded filename characters resolve exactly", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-balanced-links-"));
   const skill = path.join(root, "skills", "demo");
@@ -444,7 +494,12 @@ Use assets/payload.txt.
   }
   assert.doesNotMatch(
     JSON.stringify(snapshot),
-    /INTERNAL_SECRET|EXTERNAL_SECRET/,
+    /INTERNAL_SECRET|EXTERNAL_SECRET|internal\.txt|external\.txt/,
+  );
+  const report = await bom(root, {}, { omitGeneratedAt: true });
+  assert.doesNotMatch(
+    JSON.stringify(report),
+    /INTERNAL_SECRET|EXTERNAL_SECRET|internal\.txt|external\.txt/,
   );
 });
 
@@ -812,7 +867,9 @@ echo done
       edge.from === "asset:skills/demo/scripts/run.sh" &&
       edge.type === "has_effective_policy",
   );
-  assert.equal(effectivePolicy?.properties?.policySource, "inherited");
+  assert.deepEqual(effectivePolicy?.properties?.policySources, [
+    "owning_skill",
+  ]);
 });
 
 test("orphan scripts have no unexplained repository-config policy", async () => {

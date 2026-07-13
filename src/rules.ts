@@ -11,6 +11,7 @@ import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import {
   classifyRepositorySkillEntrypointPath,
   classifyRepositorySkillPath,
+  logicalSkillDirectory,
   normalizeRepositoryRelativePath,
 } from "./discovery.js";
 import {
@@ -1571,7 +1572,8 @@ function skillReferenceLine(
   skill: ParsedDocument,
   referencePath: string,
 ): { line: number; text: string } | undefined {
-  const skillDir = path.posix.dirname(skill.artifact.path);
+  const skillDir = logicalSkillDirectory(skill.artifact.path);
+  if (!skillDir) return undefined;
   const relativePath = path.posix.relative(skillDir, referencePath);
   const referencedTokens = [referencePath, relativePath];
 
@@ -1801,7 +1803,8 @@ function skillLocalSupportReachabilityFindings(
     (document) => document.artifact.kind === "skill",
   );
   return skills.flatMap((skill) => {
-    const skillDir = path.posix.dirname(skill.artifact.path);
+    const skillDir = logicalSkillDirectory(skill.artifact.path);
+    if (!skillDir) return [];
     const localSupportDocs = documents.filter((document) => {
       if (
         !["profile", "reference", "example", "script", "asset"].includes(
@@ -2008,7 +2011,7 @@ function localSupportReachabilityDepth(
       new Set(
         staticSupportReferences(
           document,
-          path.posix.dirname(skill.artifact.path),
+          logicalSkillDirectory(skill.artifact.path) ?? "",
           candidatePaths,
         ).map((reference) => reference.targetPath),
       ),

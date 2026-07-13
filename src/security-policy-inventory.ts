@@ -30,6 +30,7 @@ export interface SecurityPolicyInventorySummary {
   assetsWithInheritedPolicy: number;
   assetsWithEffectivePolicy: number;
   assetsWithoutEffectivePolicy: number;
+  policySources: Record<SecurityPolicySource, number>;
   assetKinds: Record<InventoryArtifactKind, number>;
   networkAllowed: PolicyBooleanCounts;
   externalUploadAllowed: PolicyBooleanCounts;
@@ -80,7 +81,7 @@ export interface SecurityPolicyAssetEvidence {
   kind: ArtifactKind;
   hasLocalPolicyMetadata: boolean;
   hasEffectivePolicy: boolean;
-  policySource: "local" | "inherited" | "repository_config" | "none";
+  policySources: SecurityPolicySource[];
   inheritedFrom?: { id: string; sourcePath: string };
   selectedSecurityProfile?: string;
   profileResolution: SecurityProfileResolution;
@@ -91,6 +92,12 @@ export interface SecurityPolicyAssetEvidence {
     policyFields: Evidence[];
   };
 }
+
+export type SecurityPolicySource =
+  | "local"
+  | "security_profile"
+  | "repository_config"
+  | "owning_skill";
 
 const POLICY_INVENTORY_KINDS = new Set<ArtifactKind>([
   "skill",
@@ -163,6 +170,13 @@ export function summarizeSecurityPolicyInventory(
     if (inheritedPolicy) summary.assetsWithInheritedPolicy += 1;
     if (effectivePolicy) {
       summary.assetsWithEffectivePolicy += 1;
+      for (const source of contributingPolicySources(
+        parsedPolicy,
+        effectiveConfig,
+        policyArtifact !== undefined,
+      )) {
+        summary.policySources[source] += 1;
+      }
     } else {
       summary.assetsWithoutEffectivePolicy += 1;
       summary.assetsWithoutEffectivePolicyList.push({
@@ -251,14 +265,13 @@ export function collectSecurityPolicyAssetEvidence(
         kind: artifact.kind,
         hasLocalPolicyMetadata: localPolicyMetadata,
         hasEffectivePolicy: effectivePolicy,
-        policySource:
-          policyArtifact && effectivePolicy
-            ? "inherited"
-            : localPolicyMetadata
-              ? "local"
-              : effectivePolicy
-                ? "repository_config"
-                : "none",
+        policySources: effectivePolicy
+          ? contributingPolicySources(
+              parsedPolicy,
+              effectiveConfig,
+              policyArtifact !== undefined,
+            )
+          : [],
         ...(policyArtifact && effectivePolicy
           ? {
               inheritedFrom: {
@@ -295,6 +308,12 @@ export function zeroSecurityPolicyInventorySummary(): SecurityPolicyInventorySum
     assetsWithInheritedPolicy: 0,
     assetsWithEffectivePolicy: 0,
     assetsWithoutEffectivePolicy: 0,
+    policySources: {
+      local: 0,
+      security_profile: 0,
+      repository_config: 0,
+      owning_skill: 0,
+    },
     assetKinds: zeroAssetKinds(),
     networkAllowed: zeroPolicyBooleanCounts(),
     externalUploadAllowed: zeroPolicyBooleanCounts(),
@@ -375,6 +394,63 @@ export function policyArtifactFor(
   const classified = classifyRepositorySkillPath(artifact.path);
   if (classified?.kind !== "support") return undefined;
   return skills.get(classified.skillDirectory) ?? undefined;
+}
+
+function contributingPolicySources(
+  policy: SecurityPolicy,
+  config: SecurityConfig | undefined,
+  inherited: boolean,
+): SecurityPolicySource[] {
+  const sources: SecurityPolicySource[] = [];
+  const localFields = [...policy.declared].filter(
+    (field) => field !== "securityProfile",
+  );
+  if (inherited) {
+    sources.push("owning_skill");
+  } else if (localFields.length > 0) {
+    sources.push("local");
+  }
+
+  const chain = securityProfileChain(policy.securityProfile, config);
+  if (
+    chain.profiles.some(({ profile }) => securityProfileContributes(profile))
+  ) {
+    sources.push("security_profile");
+  }
+  if (config && repositoryConfigContributes(policy, config)) {
+    sources.push("repository_config");
+  }
+  return sources;
+}
+
+function securityProfileContributes(
+  profile: NonNullable<SecurityConfig["profiles"]>[string],
+): boolean {
+  return (
+    profile.networkAllowed !== undefined ||
+    profile.externalUploadAllowed !== undefined ||
+    profile.secretsAllowed !== undefined ||
+    profile.humanApprovalRequired !== undefined ||
+    profile.allowedDataClass !== undefined ||
+    profile.allowedData.length > 0 ||
+    profile.forbiddenInputs.length > 0 ||
+    profile.approvedDomains.length > 0 ||
+    profile.approvedUploadDomains.length > 0 ||
+    profile.disallowedCommands.length > 0
+  );
+}
+
+function repositoryConfigContributes(
+  policy: SecurityPolicy,
+  config: SecurityConfig,
+): boolean {
+  return (
+    config.disallowedCommands.length > 0 ||
+    (!policy.declared.has("approvedNetworkDestinations") &&
+      config.approvedDomains.length > 0) ||
+    (!policy.declared.has("approvedUploadDestinations") &&
+      config.approvedUploadDomains.length > 0)
+  );
 }
 
 export function hasLocalSecurityPolicyMetadata(

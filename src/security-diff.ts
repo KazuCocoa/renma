@@ -25,6 +25,10 @@ export interface SecurityPolicyInventoryDelta {
   assetsWithInheritedPolicy: number;
   assetsWithEffectivePolicy: number;
   assetsWithoutEffectivePolicy: number;
+  policySources: Record<
+    keyof SecurityPolicyInventorySummary["policySources"],
+    number
+  >;
   networkAllowed: PolicyBooleanDelta;
   externalUploadAllowed: PolicyBooleanDelta;
   secretsAllowed: PolicyBooleanDelta;
@@ -113,6 +117,12 @@ export function zeroSecurityPolicyInventoryDelta(): SecurityPolicyInventoryDelta
     assetsWithInheritedPolicy: 0,
     assetsWithEffectivePolicy: 0,
     assetsWithoutEffectivePolicy: 0,
+    policySources: {
+      local: 0,
+      security_profile: 0,
+      repository_config: 0,
+      owning_skill: 0,
+    },
     networkAllowed: zeroPolicyBooleanDelta(),
     externalUploadAllowed: zeroPolicyBooleanDelta(),
     secretsAllowed: zeroPolicyBooleanDelta(),
@@ -156,6 +166,21 @@ function deltaSecurityPolicyInventory(
       to.assetsWithoutEffectivePolicy,
       from.assetsWithoutEffectivePolicy,
     ),
+    policySources: {
+      local: deltaNumber(to.policySources.local, from.policySources.local),
+      security_profile: deltaNumber(
+        to.policySources.security_profile,
+        from.policySources.security_profile,
+      ),
+      repository_config: deltaNumber(
+        to.policySources.repository_config,
+        from.policySources.repository_config,
+      ),
+      owning_skill: deltaNumber(
+        to.policySources.owning_skill,
+        from.policySources.owning_skill,
+      ),
+    },
     networkAllowed: deltaPolicyBoolean(to.networkAllowed, from.networkAllowed),
     externalUploadAllowed: deltaPolicyBoolean(
       to.externalUploadAllowed,

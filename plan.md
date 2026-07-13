@@ -49,7 +49,7 @@ Renma does not own:
 - automatic semantic rewriting; or
 - automatic policy weakening or suppression creation.
 
-Repository Context BOM v1 remains a declared repository manifest, not a record
+Repository Context BOM v2 remains a declared repository manifest, not a record
 of what an LLM consumed. Trust Graph remains deterministic review evidence, not
 a subjective trust score or runtime enforcement system.
 
@@ -63,7 +63,7 @@ The shipped baseline includes:
 - repeated-context and workflow diagnostics;
 - security diagnostics, reusable policy profiles, posture summaries, and
   effective policy inventory;
-- Trust Graph evidence and Repository Context BOM v1;
+- Trust Graph v2 evidence and Repository Context BOM v2;
 - `inspect`, `scaffold`, `suggest-metadata`, and
   `suggest-semantic-split` authoring support;
 - LLM-actionable diagnostics v2 and review bundles; and

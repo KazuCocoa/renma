@@ -121,7 +121,7 @@ Renma does not automatically invoke Git or add Git commit, branch, tag, or dirty
 
 ## Consumed-Context Evidence
 
-Both BOM schemas describe declared repository state. Future consumed-context evidence must not redefine or mutate that meaning.
+The BOM v2 schema describes declared repository state. Future consumed-context evidence must not redefine or mutate that meaning.
 
 Runtime evidence should be a separate artifact or explicitly separate attachment. A future evidence record should relate back to a BOM using stable values such as a BOM digest or snapshot identity, asset ID, asset content hash, producer identity and version, and observation timestamp.
 

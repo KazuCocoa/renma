@@ -281,11 +281,15 @@ Non-Skill assets continue to use `allowed_data`, `network_allowed`,
 inline-list, and block-list behavior is unchanged. Pre-0.16 top-level Skill
 security fields are migration input only.
 
-Text `script` and `asset` artifacts enter the security policy inventory and
-Trust Graph only when they contain explicit valid local policy metadata. Their
-raw text can be checked by the dedicated security scanner without becoming
-Markdown catalog metadata. Binary/opaque artifacts expose no instruction text,
-policy metadata, or diagnostic snippets.
+Script and asset bytes never declare local policy. They participate in the
+security policy inventory even when they have no effective policy. Local
+support inherits policy only from one unambiguous owning Skill; text scripts
+may be scanned under that inherited policy from line 1. Ordinary assets and
+binary files do not contribute instruction text. Orphan scripts receive no
+policy-dependent repository-config evaluation without traceable ownership.
+The inventory distinguishes local metadata, inherited policy, effective policy,
+and no-effective-policy states. Trust Graph policy edges exist only for
+artifacts with effective policy and list every contributing policy source.
 
 Security profiles in `renma.config.json` retain the existing JSON schema.
 Artifact-local explicit denials remain stricter than inherited profile or

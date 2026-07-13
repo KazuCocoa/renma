@@ -2,6 +2,7 @@ import path from "node:path";
 import {
   classifyRepositorySkillPath,
   isExcluded,
+  logicalSkillDirectory,
   repositoryPathDepth,
 } from "./discovery.js";
 import type { Catalog } from "./model.js";
@@ -70,7 +71,8 @@ export function resolveHelperScriptPath(
   scriptPath: string,
 ): HelperScriptPathResolution {
   const rawPath = scriptPath.replace(/\\/g, "/");
-  const sourceSkill = owningSkillPath(sourcePath);
+  const skillDirectory = logicalSkillDirectory(sourcePath);
+  const sourceSkill = skillDirectory ? { skillDirectory } : undefined;
   const isSkillRelative = /^(?:\.\/)?scripts\//.test(rawPath);
   const hasTraversal = rawPath.split("/").includes("..");
 
@@ -210,20 +212,6 @@ function helperCommandPathCandidates(documents: ParsedDocument[]): string[] {
         .filter((candidate): candidate is string => candidate !== undefined),
     ),
   );
-}
-
-function owningSkillPath(
-  sourcePath: string,
-): { skillDirectory: string } | undefined {
-  const classified = classifyRepositorySkillPath(sourcePath);
-  if (classified?.kind === "support") return classified;
-  if (
-    classified?.kind === "entrypoint" &&
-    classified.entrypoint.kind === "canonical"
-  ) {
-    return classified;
-  }
-  return undefined;
 }
 
 function isWithinSkill(candidate: string, skillDirectory: string): boolean {

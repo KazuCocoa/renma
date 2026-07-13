@@ -295,6 +295,26 @@ test("relative Markdown links in current documentation resolve", async () => {
   }
 });
 
+test("authoritative current documentation describes only BOM and Trust Graph v2", async () => {
+  const documents = [
+    "architecture.md",
+    "design.md",
+    "plan.md",
+    "docs/repository-context-bom.md",
+    "docs/README.md",
+    "docs/user-manual.md",
+  ];
+  const staleContract =
+    /(?:Repository Context )?BOM v1|Trust Graph v1|Both BOM schemas|renma\.repository-context-bom\.v1|renma\.trustGraph\.v1/;
+  for (const documentPath of documents) {
+    assert.doesNotMatch(
+      await readRepoFile(documentPath),
+      staleContract,
+      `${documentPath} contains a stale current BOM/Trust Graph contract`,
+    );
+  }
+});
+
 test("Mermaid documentation blocks have supported GitHub entry directives", async () => {
   const documents = [
     "README.md",

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { glob, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type {
   Artifact,
@@ -7,7 +7,10 @@ import type {
   Diagnostic,
   ScanConfig,
 } from "./types.js";
-import { safeRepositoryPath } from "./repository-boundary.js";
+import {
+  safeRepositoryPath,
+  walkRepositoryFiles,
+} from "./repository-boundary.js";
 
 const SKILL_LIKE_FILE_OUTSIDE_SKILLS_DIR_CODE =
   "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR";
@@ -160,6 +163,16 @@ export function classifyRepositorySkillPath(
   };
 }
 
+/** Resolve the logical directory shared by every supported Skill path form. */
+export function logicalSkillDirectory(
+  relativePath: string,
+): string | undefined {
+  const classified = classifyRepositorySkillPath(relativePath);
+  return classified?.kind === "entrypoint" || classified?.kind === "support"
+    ? classified.skillDirectory
+    : undefined;
+}
+
 /** Classify a repository-relative Skill entrypoint only at an explicit root. */
 export function classifyRepositorySkillEntrypointPath(
   relativePath: string,
@@ -260,40 +273,31 @@ export async function discoverArtifacts(
   discoveredPaths: ReadonlySet<string>;
 }> {
   const diagnostics: Diagnostic[] = [];
-  const paths = new Set<string>();
-  diagnostics.push(...(await skillLikeLayoutDiagnostics(root, config)));
-
-  for (const pattern of config.globs) {
-    try {
-      for await (const match of glob(pattern, {
-        cwd: root,
-        withFileTypes: false,
-      })) {
-        if (typeof match === "string") paths.add(toPosix(match));
-      }
-    } catch (error) {
-      diagnostics.push({
-        severity: "error",
-        message: `Could not evaluate glob "${pattern}": ${errorMessage(error)}`,
-      });
-    }
-  }
-  const discoveredPaths = new Set(paths);
-  for (const pattern of SKILL_SUPPORT_EXISTENCE_GLOBS) {
-    try {
-      for await (const match of glob(pattern, {
-        cwd: root,
-        withFileTypes: false,
-      })) {
-        if (typeof match === "string") discoveredPaths.add(toPosix(match));
-      }
-    } catch (error) {
-      diagnostics.push({
-        severity: "error",
-        message: `Could not evaluate existence glob "${pattern}": ${errorMessage(error)}`,
-      });
-    }
-  }
+  const walked = await walkRepositoryFiles(root, {
+    maxDepth: config.maxDepth,
+    excluded: (relativePath) => isExcluded(relativePath, config.exclude),
+  });
+  diagnostics.push(...skillLikeLayoutDiagnostics(walked.files));
+  diagnostics.push(
+    ...walked.unreadable.map(({ path: unreadablePath, error }) => ({
+      severity: "error" as const,
+      path: unreadablePath,
+      message: `Could not safely enumerate repository path: ${error}`,
+    })),
+  );
+  const paths = new Set(
+    walked.files.filter((relativePath) =>
+      config.globs.some((pattern) => path.matchesGlob(relativePath, pattern)),
+    ),
+  );
+  const discoveredPaths = new Set([
+    ...paths,
+    ...walked.files.filter((relativePath) =>
+      SKILL_SUPPORT_EXISTENCE_GLOBS.some((pattern) =>
+        path.matchesGlob(relativePath, pattern),
+      ),
+    ),
+  ]);
 
   const candidates = [...paths]
     .filter((relativePath) => !isExcluded(relativePath, config.exclude))
@@ -456,41 +460,27 @@ function classifyContent(
   }
 }
 
-async function skillLikeLayoutDiagnostics(
-  root: string,
-  config: ScanConfig,
-): Promise<Diagnostic[]> {
+function skillLikeLayoutDiagnostics(walkedFiles: string[]): Diagnostic[] {
   const paths = new Set<string>();
   const diagnostics: Diagnostic[] = [];
-
-  for (const pattern of SKILL_LIKE_FILE_GLOBS) {
-    try {
-      for await (const match of glob(pattern, {
-        cwd: root,
-        exclude: globExcludes(config.exclude),
-        withFileTypes: false,
-      })) {
-        if (typeof match === "string") paths.add(toPosix(match));
+  for (const relativePath of walkedFiles) {
+    if (
+      SKILL_LIKE_FILE_GLOBS.some((pattern) =>
+        path.matchesGlob(relativePath, pattern),
+      )
+    ) {
+      paths.add(relativePath);
+      if (
+        !relativePath.includes("/") &&
+        relativePath.toLowerCase() === "skill.md"
+      ) {
+        paths.add("skill.md");
+        paths.add("SKILL.md");
       }
-    } catch (error) {
-      diagnostics.push({
-        severity: "error",
-        message: `Could not evaluate glob "${pattern}": ${errorMessage(error)}`,
-      });
     }
   }
 
   for (const relativePath of [...paths].sort((a, b) => a.localeCompare(b))) {
-    if (isExcluded(relativePath, config.exclude)) continue;
-    if (repositoryPathDepth(relativePath) > config.maxDepth) continue;
-
-    try {
-      const inspected = await safeRepositoryPath(root, relativePath);
-      if (inspected.state !== "present" || !inspected.stats.isFile()) continue;
-    } catch {
-      continue;
-    }
-
     const reservedSupportSegment = skillSupportPathSegment(relativePath);
     if (reservedSupportSegment !== undefined) {
       diagnostics.push({
@@ -603,15 +593,6 @@ export function isExcluded(relativePath: string, excludes: string[]): boolean {
       relativePath === exclude ||
       relativePath.startsWith(`${exclude}/`),
   );
-}
-
-function globExcludes(excludes: string[]): string[] {
-  return excludes.flatMap((exclude) => [
-    exclude,
-    `${exclude}/**`,
-    `**/${exclude}`,
-    `**/${exclude}/**`,
-  ]);
 }
 
 export function repositoryPathDepth(relativePath: string): number {

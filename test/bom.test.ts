@@ -1468,6 +1468,12 @@ function expectedBomContract(): BomReport {
           assetsWithInheritedPolicy: 0,
           assetsWithEffectivePolicy: 2,
           assetsWithoutEffectivePolicy: 0,
+          policySources: {
+            local: 2,
+            security_profile: 0,
+            repository_config: 0,
+            owning_skill: 0,
+          },
           assetKinds: {
             skill: 1,
             context: 1,
@@ -1543,6 +1549,12 @@ function expectedBomContract(): BomReport {
       assetsWithInheritedPolicy: 0,
       assetsWithEffectivePolicy: 2,
       assetsWithoutEffectivePolicy: 0,
+      policySources: {
+        local: 2,
+        security_profile: 0,
+        repository_config: 0,
+        owning_skill: 0,
+      },
       assetKinds: {
         skill: 1,
         context: 1,

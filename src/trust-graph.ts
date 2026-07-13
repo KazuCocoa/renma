@@ -341,7 +341,7 @@ function addPolicyEvidence(
     type: "has_effective_policy",
     properties: {
       hasLocalPolicyMetadata: policy.hasLocalPolicyMetadata,
-      policySource: policy.policySource,
+      policySources: policy.policySources,
       ...(policy.inheritedFrom ? { inheritedFrom: policy.inheritedFrom } : {}),
     },
     evidence: policy.evidence.policyFields,
