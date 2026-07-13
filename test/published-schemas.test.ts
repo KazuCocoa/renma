@@ -24,14 +24,17 @@ test("published Draft 2020-12 schemas validate representative generated reports"
   const target = path.resolve("examples/interactive-placeholder");
   const defaultBom = await bom(target);
   const omittedBom = await bom(target, {}, { omitGeneratedAt: true });
+  const contextLensBom = await bom(path.resolve("examples/context-lens"));
   const graph = await representativeTrustGraph();
 
   assertValid(validateBom, defaultBom);
   assertValid(validateBom, omittedBom);
+  assertValid(validateBom, contextLensBom);
   assert.equal(defaultBom.outputMode, "default");
   assert.equal(typeof defaultBom.generatedAt, "string");
   assert.equal(omittedBom.outputMode, "omit_generated_at");
   assert.equal("generatedAt" in omittedBom, false);
+  assert.ok(contextLensBom.readiness.summary.contextLens.totalLensCount > 0);
 
   const withoutConfigPath = structuredClone(defaultBom);
   delete withoutConfigPath.configPath;
@@ -88,6 +91,53 @@ test("BOM schema enforces output modes, timestamps, formats, and score bounds", 
   const negativePolicyCount = structuredClone(defaultBom);
   negativePolicyCount.securityPolicyInventory.policySources.owning_skill = -1;
   assertInvalid(validateBom, negativePolicyCount, "minimum");
+
+  const negativeReadinessCount = structuredClone(defaultBom);
+  negativeReadinessCount.readiness.summary.totalAssets = -1;
+  assertInvalid(validateBom, negativeReadinessCount, "minimum");
+
+  const nonNumericReadiness = structuredClone(defaultBom) as unknown as {
+    readiness: { summary: Record<string, unknown> };
+  };
+  nonNumericReadiness.readiness.summary.graphResolutionPercent = "100";
+  assertInvalid(validateBom, nonNumericReadiness, "type");
+
+  const malformedTopFinding = structuredClone(defaultBom) as unknown as {
+    securityPosture: { topFindingIds: unknown[] };
+  };
+  malformedTopFinding.securityPosture.topFindingIds = [
+    { id: "SEC-INVALID", count: 1 },
+  ];
+  assertInvalid(validateBom, malformedTopFinding, "required");
+
+  const extendedTopFinding = structuredClone(defaultBom) as unknown as {
+    securityPosture: { topFindingIds: unknown[] };
+  };
+  extendedTopFinding.securityPosture.topFindingIds = [
+    {
+      id: "SEC-INVALID",
+      count: 1,
+      maxSeverity: "high",
+      unexpected: true,
+    },
+  ];
+  assertInvalid(validateBom, extendedTopFinding, "additionalProperties");
+
+  const incompleteAssetKinds = structuredClone(defaultBom);
+  delete (
+    incompleteAssetKinds.securityPolicyInventory
+      .assetKinds as unknown as Record<string, number>
+  ).unknown;
+  assertInvalid(validateBom, incompleteAssetKinds, "required");
+
+  const extendedAssetKinds = structuredClone(defaultBom);
+  (
+    extendedAssetKinds.securityPolicyInventory.assetKinds as unknown as Record<
+      string,
+      number
+    >
+  ).future_kind = 0;
+  assertInvalid(validateBom, extendedAssetKinds, "additionalProperties");
 });
 
 test("Trust Graph schema rejects missing and invalid edge provenance", async () => {

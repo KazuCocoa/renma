@@ -274,26 +274,149 @@
             "additionalProperties": true
           }
         },
-        "summary": {
-          "type": "object",
-          "required": [
-            "totalAssets",
-            "ownedAssets",
-            "unownedAssets",
-            "ownershipCoveragePercent",
-            "nodeCount",
-            "edgeCount",
-            "resolvedEdges",
-            "unresolvedEdges",
-            "graphResolutionPercent",
-            "diagnosticCounts",
-            "workflow",
-            "contextLens",
-            "securityPosture",
-            "securityPolicyInventory"
-          ],
-          "additionalProperties": true
+        "summary": { "$ref": "#/$defs/readinessSummary" }
+      }
+    },
+    "nonNegativeInteger": { "type": "integer", "minimum": 0 },
+    "percentage": { "type": "number", "minimum": 0, "maximum": 100 },
+    "stringArray": { "type": "array", "items": { "type": "string" } },
+    "workflowReadinessSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "skillEntrypoints",
+        "checks",
+        "pass",
+        "warn",
+        "fail",
+        "readinessPercent"
+      ],
+      "properties": {
+        "skillEntrypoints": { "$ref": "#/$defs/nonNegativeInteger" },
+        "checks": { "$ref": "#/$defs/nonNegativeInteger" },
+        "pass": { "$ref": "#/$defs/nonNegativeInteger" },
+        "warn": { "$ref": "#/$defs/nonNegativeInteger" },
+        "fail": { "$ref": "#/$defs/nonNegativeInteger" },
+        "readinessPercent": { "$ref": "#/$defs/percentage" }
+      }
+    },
+    "contextLensScopeCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "count"],
+      "properties": {
+        "scope": { "type": "string" },
+        "count": { "$ref": "#/$defs/nonNegativeInteger" }
+      }
+    },
+    "contextLensItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "path",
+        "valid",
+        "scope",
+        "targets",
+        "targetPaths",
+        "diagnosticCounts",
+        "diagnosticCodes"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "path": { "type": "string" },
+        "valid": { "type": "boolean" },
+        "scope": { "type": "string" },
+        "targets": { "$ref": "#/$defs/stringArray" },
+        "targetPaths": { "$ref": "#/$defs/stringArray" },
+        "diagnosticCounts": { "$ref": "#/$defs/counts3" },
+        "diagnosticCodes": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "contextLensSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "detected",
+        "totalLensCount",
+        "validLensCount",
+        "invalidLensCount",
+        "diagnosticCounts",
+        "definitionPaths",
+        "targetReferences",
+        "targetPaths",
+        "unresolvedTargetReferences",
+        "scopeSummary",
+        "lenses"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "detected": { "type": "boolean" },
+        "totalLensCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "validLensCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "invalidLensCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "diagnosticCounts": { "$ref": "#/$defs/counts3" },
+        "representativeDiagnosticCode": { "type": "string" },
+        "definitionPaths": { "$ref": "#/$defs/stringArray" },
+        "targetReferences": { "$ref": "#/$defs/stringArray" },
+        "targetPaths": { "$ref": "#/$defs/stringArray" },
+        "unresolvedTargetReferences": { "$ref": "#/$defs/stringArray" },
+        "scopeSummary": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contextLensScopeCount" }
+        },
+        "lenses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contextLensItem" }
         }
+      }
+    },
+    "readinessSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "totalAssets",
+        "ownedAssets",
+        "unownedAssets",
+        "ownershipCoveragePercent",
+        "nodeCount",
+        "edgeCount",
+        "resolvedEdges",
+        "unresolvedEdges",
+        "graphResolutionPercent",
+        "diagnosticCounts",
+        "workflow",
+        "contextLens",
+        "securityPosture",
+        "securityPolicyInventory"
+      ],
+      "properties": {
+        "totalAssets": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ownedAssets": { "$ref": "#/$defs/nonNegativeInteger" },
+        "unownedAssets": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ownershipCoveragePercent": { "$ref": "#/$defs/percentage" },
+        "nodeCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "edgeCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "resolvedEdges": { "$ref": "#/$defs/nonNegativeInteger" },
+        "unresolvedEdges": { "$ref": "#/$defs/nonNegativeInteger" },
+        "graphResolutionPercent": { "$ref": "#/$defs/percentage" },
+        "diagnosticCounts": { "$ref": "#/$defs/counts3" },
+        "workflow": { "$ref": "#/$defs/workflowReadinessSummary" },
+        "contextLens": { "$ref": "#/$defs/contextLensSummary" },
+        "securityPosture": { "$ref": "#/$defs/securityPosture" },
+        "securityPolicyInventory": { "$ref": "#/$defs/policyInventory" }
+      }
+    },
+    "topFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "count", "maxSeverity"],
+      "properties": {
+        "id": { "type": "string" },
+        "count": { "$ref": "#/$defs/nonNegativeInteger" },
+        "maxSeverity": { "enum": ["critical", "high", "medium", "low"] },
+        "riskClass": { "enum": ["violation", "suspicious", "advisory"] }
       }
     },
     "securityPosture": {
@@ -331,7 +454,40 @@
           }
         },
         "highOrCritical": { "type": "integer", "minimum": 0 },
-        "topFindingIds": { "type": "array", "items": { "type": "object" } }
+        "topFindingIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/topFinding" }
+        }
+      }
+    },
+    "assetKindCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "skill",
+        "context",
+        "context_lens",
+        "agent",
+        "profile",
+        "reference",
+        "example",
+        "script",
+        "asset",
+        "config",
+        "unknown"
+      ],
+      "properties": {
+        "skill": { "$ref": "#/$defs/nonNegativeInteger" },
+        "context": { "$ref": "#/$defs/nonNegativeInteger" },
+        "context_lens": { "$ref": "#/$defs/nonNegativeInteger" },
+        "agent": { "$ref": "#/$defs/nonNegativeInteger" },
+        "profile": { "$ref": "#/$defs/nonNegativeInteger" },
+        "reference": { "$ref": "#/$defs/nonNegativeInteger" },
+        "example": { "$ref": "#/$defs/nonNegativeInteger" },
+        "script": { "$ref": "#/$defs/nonNegativeInteger" },
+        "asset": { "$ref": "#/$defs/nonNegativeInteger" },
+        "config": { "$ref": "#/$defs/nonNegativeInteger" },
+        "unknown": { "$ref": "#/$defs/nonNegativeInteger" }
       }
     },
     "policyInventory": {
@@ -386,10 +542,7 @@
             "owning_skill": { "type": "integer", "minimum": 0 }
           }
         },
-        "assetKinds": {
-          "type": "object",
-          "additionalProperties": { "type": "integer", "minimum": 0 }
-        },
+        "assetKinds": { "$ref": "#/$defs/assetKindCounts" },
         "networkAllowed": { "$ref": "#/$defs/booleanCounts" },
         "externalUploadAllowed": { "$ref": "#/$defs/booleanCounts" },
         "secretsAllowed": { "$ref": "#/$defs/booleanCounts" },

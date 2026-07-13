@@ -119,6 +119,13 @@ member, including zero counts. Policy source ordering is `local`,
 relationships use `owns_local_resource`, `statically_references`,
 `inherits_owner`, and `inherits_policy`.
 
+The Readiness summary is a closed contract for asset, ownership, graph,
+diagnostic, workflow, Context Lens, security posture, and security policy
+inventory evidence. Coverage and readiness percentages are constrained to
+`0..100`. Security posture top-finding entries require an ID, non-negative
+count, and maximum severity. Security policy `assetKinds` is a complete count
+map containing every generated artifact kind, including zero values.
+
 Representative top-level JSON (nested objects are shortened for readability;
 the schema defines every nested field):
 
