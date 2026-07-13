@@ -105,6 +105,11 @@ const OPTION_HELP = {
 
 export type CliOptionName = keyof typeof OPTION_HELP;
 
+const AUTHORING_GUIDE_URL =
+  "https://github.com/KazuCocoa/renma/blob/main/docs/authoring-guide.md";
+const CONTEXT_LENS_GUIDE_URL =
+  "https://github.com/KazuCocoa/renma/blob/main/docs/context-lens.md";
+
 export const COMMAND_HELP = [
   {
     name: "scan",
@@ -536,7 +541,7 @@ export const COMMAND_HELP = [
     usage: "renma scaffold <skill|context|context_lens> <path> [options]",
     question: "How can a new asset start from a deterministic structure?",
     purpose:
-      "Scaffold creates deterministic starter structures or authoring prompts for new Renma assets.",
+      "Scaffold creates deterministic starter structures or authoring prompts for three distinct assets: a Skill is a focused workflow entrypoint, Context is durable reusable knowledge, and a Context Lens is purpose-specific interpretation of declared Context.",
     useWhen: [
       "You are creating a new skill, context asset, or context lens.",
       "You want a starter file or prompt with expected metadata and sections.",
@@ -546,6 +551,8 @@ export const COMMAND_HELP = [
       "Generating a complete production-ready skill or context.",
       "Inventing domain knowledge merely to fill the template.",
       "Replacing author-provided purpose, routing boundaries, inputs, completion criteria, verification, or references.",
+      "Using context_lens as generic persona storage, a prompt template, or a runtime routing rule.",
+      "Creating a Context Lens when no existing Context Asset needs purpose-specific interpretation.",
     ],
     examples: [
       "renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform",
@@ -560,11 +567,13 @@ export const COMMAND_HELP = [
       "--resources creates only selected empty directories and never placeholder files.",
       "Generated scaffold content is a starting structure, not a complete asset.",
       "For Skills, use the platform's standard Skill authoring guidance to complete the description, instructions, workflow, constraints, and completion criteria.",
+      "For Context Lenses, replace every placeholder purpose, applies_to target, focus, and expected output with repository-grounded values; applies_to must resolve to real Context Assets.",
       "Domain knowledge must come from evidence or human input.",
     ],
     nextSteps: [
       "Review and complete the generated content with evidence-backed details.",
       "Run renma scan . --fail-on high, fix relevant diagnostics, and rerun the scan.",
+      `Use ${AUTHORING_GUIDE_URL} for placement decisions and ${CONTEXT_LENS_GUIDE_URL} for Lens semantics.`,
       "Have a human review meaningful semantic content before merging.",
     ],
     options: [
@@ -718,6 +727,13 @@ export function renderGlobalHelp(version: string): string {
     "- Renma does not execute agents.",
     "- Renma does not collect runtime telemetry.",
     "- Renma does not automatically perform large semantic rewrites.",
+    "",
+    "Asset boundaries:",
+    "- Skill: focused workflow.",
+    "- Context: durable reusable knowledge.",
+    "- Context Lens: purpose-specific interpretation of declared Context.",
+    `- Authoring Guide: ${AUTHORING_GUIDE_URL}`,
+    `- Context Lens guide: ${CONTEXT_LENS_GUIDE_URL}`,
     "",
     "Usage",
     "  renma <command> [args] [options]",

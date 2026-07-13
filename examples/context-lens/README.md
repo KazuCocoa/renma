@@ -15,9 +15,11 @@ It includes:
   [`SKILL.md`](skills/testing/spec-review/SKILL.md) with static required and
   optional Lens relationships.
 
-The Skill is a thin routing and workflow layer. The Context Asset owns reusable
-boundary-value knowledge. Each Lens explains how to apply that knowledge for a
-particular purpose without copying it into the Skill.
+The Skill is a complete focused workflow entrypoint: it defines selection
+boundaries, inputs, ordered review steps, output, validation, and completion.
+The Context Asset owns reusable boundary-value knowledge. Each Lens explains
+how to interpret that knowledge for a particular purpose without copying it
+into the Skill.
 
 ```text
 Skill -> Context Lens -> Context Asset
@@ -71,6 +73,9 @@ Review the boundary-value Context for ambiguity and missing limits.
 ```
 
 The supported Lens schema version is `1`; the supported scope is `context`.
+Structural validity is only the starting point. A useful Lens also defines
+concrete questions, risks, checks, evidence, and expected outputs. Persona-only
+wording such as “Act as a senior QA engineer” is not sufficient by itself.
 
 ## Diagnostic Illustration
 

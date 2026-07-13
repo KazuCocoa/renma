@@ -17,6 +17,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   `QUAL-INVALID-TOKEN-BUDGET-OVERRIDE` and never suppresses the default budget.
   Only Markdown-parser-eligible support assets can declare the bundle, and
   override limits must be positive safe integers represented exactly.
+- Added the blocking `CONTEXT-LENS-TARGET-NOT-CONTEXT` diagnostic.
+  Context Lens `applies_to` targets must now resolve specifically to Context
+  Assets; Skills, support assets, and other Context Lenses are rejected.
 
 ### Changed
 
@@ -24,6 +27,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   long user decision. Semantic splitting remains preferred when it preserves
   coherence and execution order; a valid declared decision provides an
   effective limit for intentionally coherent or ordered long-form assets.
+- Clarified Skill, Context Asset, Context Lens, Skill-local support, and
+  external runtime responsibilities across canonical documentation, CLI help,
+  scaffolds, and examples. Context Lens guidance now requires declared Context,
+  rejects persona-only authoring as insufficient, uses canonical Agent Skills
+  relationship metadata, and preserves focused workflows without changing
+  Renma's deterministic runtime boundary.
 
 ## [0.18.0] - 2026-07-12
 

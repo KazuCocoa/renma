@@ -18,6 +18,10 @@ requires_human_approval: false
 ---
 # Boundary Value Analysis
 
-Boundary value analysis is reusable testing knowledge. It should stay as a base context asset because it can support spec review, test design, regression planning, onboarding, and other skills.
+Boundary value analysis is reusable testing knowledge. It should stay as a base
+Context Asset because it can support spec review, test design, regression
+planning, onboarding, and other Skills.
 
-Keep task-specific interpretation in context lens assets instead of copying this content into each skill.
+When several workflows need reusable purpose-specific interpretation, keep that
+interpretation in Context Lenses instead of copying this knowledge into each
+Skill. A Skill may reference this Context directly when no Lens adds value.

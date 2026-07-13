@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -259,6 +259,29 @@ Run the workflow test command and confirm result.
     finding?.constraints?.includes("Do not make Renma select runtime context."),
   );
   assert.match(finding?.llmHint ?? "", /used across Skills/);
+
+  const design = await readFile(path.join(process.cwd(), "design.md"), "utf8");
+  const exampleSource = design.match(
+    /Example diagnostic shape[^:]*:\s*```json\n([\s\S]*?)\n```/,
+  )?.[1];
+  assert.ok(exampleSource, "design.md should include diagnostic example JSON");
+  const example = JSON.parse(exampleSource) as Record<string, unknown>;
+  const findingContract = finding as unknown as Record<string, unknown>;
+  for (const field of [
+    "id",
+    "title",
+    "category",
+    "severity",
+    "confidence",
+    "evidence",
+    "whyItMatters",
+    "remediation",
+    "constraints",
+    "verificationSteps",
+    "llmHint",
+  ]) {
+    assert.deepEqual(example[field], findingContract[field], field);
+  }
 });
 
 test("scan does not advise reusable context extraction for tiny skills", async () => {

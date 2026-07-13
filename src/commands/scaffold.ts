@@ -226,32 +226,42 @@ title: ${metadata.title}
 owner: ${metadata.owner}
 status: experimental
 ${renderTagBlock(metadata.tags)}
-purpose: spec_review
+# PLACEHOLDER: replace with this Lens's repository-grounded purpose.
+purpose: replace_with_repository_grounded_purpose
+# PLACEHOLDER: replace every target with an existing Context Asset ID or path.
 applies_to:
-  - context.example.replace-me
+  - context.example.replace-with-existing-context
+# PLACEHOLDER: replace every item with a concrete question, risk, check, or evidence emphasis.
 focus:
-  - ambiguity
-  - missing boundary
+  - replace with a concrete interpretation criterion
+# PLACEHOLDER: replace every item with the output this interpretation should shape.
 expected_outputs:
-  - unresolved questions
-  - risk notes
+  - replace with a concrete expected output
 ---
 
 # ${metadata.title}
 
 ## Purpose
 
-This context lens is a purpose-oriented interpretation layer for the context assets listed in \`applies_to\`.
+Replace this section and every frontmatter placeholder. Explain why the declared Context Assets need this purpose-specific interpretation. The scaffold values are not universal Lens recommendations.
 
 ## Boundary
 
+- A Context Lens requires real Context Assets to interpret. Do not create one when no Context Asset belongs in \`applies_to\`.
+- A persona may briefly frame the interpretation, but persona-only wording is insufficient. Define concrete questions, risks, checks, evidence, and expected outputs.
+- Keep the focused task, ordered workflow, decisions, validation, and completion criteria in the Skill.
 - Detailed domain knowledge belongs in context assets, not in this lens.
 - This file must not become a prompt template, runtime selector, or context injection rule.
-- Keep focus terms and expected outputs compact, deterministic, and reviewable.
+- Keep frontmatter compact and put detailed interpretation guidance in this Markdown body.
 
 ## Interpretation Notes
 
-- Replace this placeholder with review focus guidance grounded in the applied context assets.
+- Replace this placeholder with repository-grounded guidance that makes the interpretation reproducible: state the questions to ask, risks and checks to emphasize, evidence to cite, and expected output to produce.
+
+## Validation
+
+- Confirm that every \`applies_to\` target resolves to an existing Context Asset and that this Lens adds meaningful purpose-specific interpretation.
+- Run \`renma scan . --fail-on high\`, \`renma catalog . --format markdown\`, and \`renma graph . --focus ${metadata.id} --format mermaid\` after authoring.
 `;
 }
 
@@ -274,6 +284,17 @@ function renderPrompt(input: {
           "- Use `metadata.renma.requires-lens` or `metadata.renma.optional-lens` for static lens relationships, encoded as JSON-array strings.",
           "- State exactly when each local resource should be read or executed. Keep Skill-specific detail in references/, deterministic implementation in scripts/, and output material in assets/.",
           "- Use contexts/ only for knowledge shared across Skills with independent ownership, lifecycle, or source-of-truth status.",
+        ]
+      : [];
+  const contextLensGuidance =
+    input.kind === "context_lens"
+      ? [
+          "- Replace the scaffold `purpose`; it is a placeholder, not a universal recommendation.",
+          "- Replace every `applies_to` placeholder with an existing Context Asset ID or path, then verify that each target resolves.",
+          "- Replace all `focus` and `expected_outputs` placeholders with repository-grounded interpretation criteria and outputs.",
+          "- Confirm that the Lens actually interprets declared Context. If there is no Context Asset to interpret, do not create a Lens.",
+          "- A persona may frame the Lens, but persona-only wording is insufficient; define concrete questions, risks, checks, evidence, and expected outputs.",
+          "- Keep the focused task and workflow in the Skill, and keep durable reusable knowledge in Context Assets.",
         ]
       : [];
   return `Create a Renma ${input.kind} asset at \`${input.targetPath}\`.
@@ -303,6 +324,7 @@ ${
 - Use only supported statuses: experimental, stable, deprecated, archived.
 - Move durable domain, testing, platform, product, or tool knowledge into separately owned context assets under \`contexts/\`.
 ${skillGuidance.join("\n")}
+${contextLensGuidance.join("\n")}
 - For context lens assets, use \`applies_to\` for context assets the lens interprets.
 - Use simple supported metadata shapes only.
 - For context assets, keep content durable, reviewable, and source-backed.

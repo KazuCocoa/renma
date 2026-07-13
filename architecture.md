@@ -121,12 +121,13 @@ that local support should be promoted.
 
 ### Skill
 
-A Skill is an agent-facing entrypoint, routing contract, and usage guide. It
-tells a consuming agent when and how to use a capability, what preflight
-questions matter, which safety and verification steps apply, and which Context
-Assets or Context Lenses are relevant. Renma recognizes Agent Skills-compatible
-syntax as the portable authoring boundary without reducing its internal model
-to the Agent Skills data model.
+A Skill is a focused task or workflow entrypoint. It tells a consuming agent
+when the workflow applies, which inputs and preflight questions matter, what
+ordered instructions and decisions to follow, which safety and verification
+steps apply, what output completes the work, and which Context Assets or
+Context Lenses are relevant. Renma recognizes Agent Skills-compatible syntax as
+the portable authoring boundary without reducing its internal model to the
+Agent Skills data model.
 
 A skill should not be the only source of truth for reusable expert knowledge.
 

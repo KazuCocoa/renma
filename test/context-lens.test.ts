@@ -330,7 +330,148 @@ Review boundary context for ambiguity.
   assert.deepEqual(report.summary.targetPaths, [
     "contexts/testing/boundary-value-analysis.md",
   ]);
+  assert.equal(
+    report.diagnostics.some(
+      (diagnostic) =>
+        diagnostic.code === CONTEXT_LENS_DIAGNOSTIC_CODES.TARGET_NOT_CONTEXT,
+    ),
+    false,
+  );
   assert.deepEqual(report.diagnostics, []);
+});
+
+test("summarizeContextLensGovernance rejects resolved non-Context targets", () => {
+  const context = artifact(
+    "contexts/testing/test-quality.md",
+    "context",
+    `---
+id: context.testing.test-quality
+owner: qa-platform
+status: stable
+---
+# Test Quality
+`,
+  );
+  const cases = [
+    {
+      label: "skill",
+      target: "skill.testing.review-target",
+      expectedKind: "skill",
+      expectedPath: "skills/testing/review-target/SKILL.md",
+      artifact: artifact(
+        "skills/testing/review-target/SKILL.md",
+        "skill",
+        `---
+id: skill.testing.review-target
+owner: qa-platform
+status: experimental
+---
+# Review Target
+`,
+      ),
+    },
+    {
+      label: "reference",
+      target: "reference.testing.framework-notes",
+      expectedKind: "reference",
+      expectedPath:
+        "skills/testing/review-target/references/framework-notes.md",
+      artifact: artifact(
+        "skills/testing/review-target/references/framework-notes.md",
+        "reference",
+        `---
+id: reference.testing.framework-notes
+owner: qa-platform
+status: stable
+---
+# Framework Notes
+`,
+      ),
+    },
+    {
+      label: "context-lens",
+      target: "lens.testing.base-quality",
+      expectedKind: "context_lens",
+      expectedPath: "lenses/testing/base-quality.md",
+      artifact: artifact(
+        "lenses/testing/base-quality.md",
+        "context_lens",
+        `---
+id: lens.testing.base-quality
+owner: qa-platform
+status: experimental
+purpose: test_design
+applies_to:
+  - context.testing.test-quality
+---
+# Base Quality Lens
+`,
+      ),
+    },
+  ];
+
+  for (const fixture of cases) {
+    const lensPath = `lenses/testing/invalid-${fixture.label}.md`;
+    const documents = [
+      parseDocument(context),
+      parseDocument(fixture.artifact),
+      parseDocument(
+        artifact(
+          lensPath,
+          "context_lens",
+          `---
+id: lens.testing.invalid-${fixture.label}
+owner: qa-platform
+status: experimental
+purpose: spec_review
+applies_to:
+  - ${fixture.target}
+---
+# Invalid Target Lens
+`,
+        ),
+      ),
+    ];
+    const { catalog } = buildCatalog(documents);
+    const report = summarizeContextLensGovernance(documents, catalog);
+    const diagnostic = report.diagnostics.find(
+      (candidate) =>
+        candidate.path === lensPath &&
+        candidate.code === CONTEXT_LENS_DIAGNOSTIC_CODES.TARGET_NOT_CONTEXT,
+    );
+
+    assert.equal(diagnostic?.severity, "error", fixture.label);
+    assert.match(
+      diagnostic?.message ?? "",
+      /applies_to must reference a Context Asset/,
+      fixture.label,
+    );
+    assert.deepEqual(
+      diagnostic?.details,
+      {
+        sourcePath: lensPath,
+        target: fixture.target,
+        resolvedTargetPath: fixture.expectedPath,
+        resolvedTargetKind: fixture.expectedKind,
+        field: "applies_to",
+      },
+      fixture.label,
+    );
+    assert.equal(
+      report.diagnostics.some(
+        (candidate) =>
+          candidate.path === lensPath &&
+          candidate.code === CONTEXT_LENS_DIAGNOSTIC_CODES.TARGET_NOT_FOUND,
+      ),
+      false,
+      fixture.label,
+    );
+    assert.equal(
+      report.summary.lenses.find((lens) => lens.path === lensPath)?.valid,
+      false,
+      fixture.label,
+    );
+  }
 });
 
 test("summarizeContextLensGovernance errors on missing required fields", () => {
@@ -445,6 +586,13 @@ applies_to:
           CONTEXT_LENS_DIAGNOSTIC_CODES.PATH_NORMALIZATION_MISMATCH &&
         diagnostic.severity === "warning",
     ),
+  );
+  assert.equal(
+    report.diagnostics.some(
+      (diagnostic) =>
+        diagnostic.code === CONTEXT_LENS_DIAGNOSTIC_CODES.TARGET_NOT_CONTEXT,
+    ),
+    false,
   );
 });
 

@@ -23,7 +23,7 @@ what context an agent should load at task time.
 
 ```mermaid
 flowchart LR
-  Skill["Skill: agent-facing entrypoint, routing contract, usage guide"]
+  Skill["Skill: focused task and workflow"]
   Lens["Context Lens: purpose-oriented interpretation"]
   Asset["Context Asset: independently owned source-of-truth knowledge"]
   Skill -->|may reference| Lens
@@ -31,9 +31,10 @@ flowchart LR
   Lens -->|interprets| Asset
 ```
 
-Skills tell an agent when and how to use a capability. They can reference
-context assets, ask preflight questions, describe safety gates, and define
-verification expectations.
+Skills define a focused task or workflow. They can own activation boundaries,
+inputs, ordered instructions, decisions, constraints, short commands, examples,
+edge cases, verification, output, and completion criteria. They can also declare
+Context Asset and Context Lens relationships.
 
 Context assets hold reusable expertise. They should be maintainable outside a
 single skill, owned by the right team, versioned, reviewed, and reused across
@@ -104,34 +105,36 @@ Current diagnostics include evidence, `whyItMatters`, remediation, typed repair
 constraints, verification steps, and LLM-facing hints where applicable. These
 fields remain deterministic rule output, not LLM-generated validation.
 
-Example diagnostic shape:
+Example diagnostic shape (selected stable fields from a deterministic fixture;
+input-specific `details` omitted):
 
 ```json
 {
-  "id": "RMA-SKILL-TOO-MONOLITHIC",
-  "severity": "medium",
-  "category": "structure",
-  "title": "Skill mixes reusable knowledge with usage guidance",
+  "id": "QUAL-SKILL-MIXED-RESPONSIBILITY",
+  "severity": "low",
+  "category": "maintenance",
+  "confidence": "medium",
+  "title": "Skill may mix its workflow with reusable knowledge",
   "evidence": {
-    "path": "skills/testing/test-case-generation/SKILL.md",
-    "startLine": 42,
-    "endLine": 78,
-    "snippet": "boundary value analysis"
+    "path": "skills/mobile/SKILL.md",
+    "startLine": 11,
+    "endLine": 11,
+    "snippet": "Detected reusable-knowledge headings: Platform Facts - Known Issues - Domain Rules - Product Policy; Detected reusable-knowledge phrases: known issue"
   },
-  "whyItMatters": "Reusable QA and domain knowledge should be owned, reviewed, and reused as shared context assets instead of being buried in one skill.",
-  "remediation": "Split reusable knowledge into first-class shared context assets and keep the skill as an LLM-facing usage guide.",
+  "whyItMatters": "Reusable setup notes, troubleshooting, platform guidance, testing heuristics, or domain rules are easier to own, review, and reuse when they live in shared context assets instead of only inside one skill.",
+  "remediation": "Review the matched headings and phrases. Promote content to contexts/ only when it needs cross-Skill reuse, independent ownership, lifecycle, or source-of-truth status; otherwise keep Skill-specific detail in SKILL.md or references/.",
   "constraints": [
-    "Do not introduce task context selection.",
-    "Do not create prompt packages.",
-    "Keep the skill as a routing contract / usage guide.",
-    "Each context asset should have id, owner, status, and short scope."
+    "Do not make Renma select runtime context.",
+    "Do not assemble prompt packages.",
+    "Do not automatically rewrite or split skills.",
+    "Preserve SKILL.md as a focused workflow entrypoint.",
+    "Give extracted context assets stable metadata such as id, owner, and status."
   ],
   "verificationSteps": [
     "Run renma scan.",
-    "Run any project-specific validation checks that apply to this repository.",
-    "Ensure the skill no longer mixes reusable domain knowledge with usage guidance."
+    "Confirm the advisory is resolved or intentionally accepted after reusable knowledge is represented as shared context assets."
   ],
-  "llmHint": "Create shared context assets for reusable QA knowledge, update skill metadata, and preserve the skill as a concise usage guide."
+  "llmHint": "Check whether the matched knowledge is used across Skills or needs independent ownership. Use contexts/ only for shared knowledge; keep Skill-local procedures and edge cases in SKILL.md or references/."
 }
 ```
 
@@ -139,11 +142,12 @@ Central repair workflow:
 
 1. A single `SKILL.md` contains reusable domain knowledge, tool guidance, and
    QA heuristics.
-2. Renma emits structured findings explaining that the skill is too monolithic
-   and mixes usage guidance with reusable context.
+2. Renma detects reusable-knowledge signals and reports possible mixed
+   responsibility. The finding does not require every matched detail to move.
 3. Codex or Claude reads the diagnostics and proposes a patch that moves
-   reusable knowledge into first-class context assets under `contexts/`, keeps
-   the skill concise, adds metadata, and updates declared context references.
+   knowledge into `contexts/` only when it needs cross-Skill reuse, independent
+   ownership, lifecycle, or source-of-truth status. Skill-specific workflow and
+   detail remain in `SKILL.md` or Skill-local References.
 4. A human reviews the patch.
 5. Renma scans the repository again and confirms the skill/context separation is
    healthier.
@@ -214,11 +218,13 @@ as a compatibility alias. Files under either root are classified as the
 can live under `lenses/`, or context files can opt in with `type: context_lens`.
 
 Skill-local `assets/`, `profiles/`, `references/`, `examples/`, and `scripts/`
-remain supported. They are useful for local routing variants, nearby examples,
-Skill-specific supporting text, fixtures, and helpers. When evidence shows that
-knowledge is reusable across Skills, teams, tools, or agents, it should move
-into `contexts/` as an owned Context Asset. Shared helper implementations may
-move to `tools/**`; location alone does not require either promotion.
+remain supported. They are useful for local workflow variants, nearby examples,
+Skill-specific supporting text, fixtures, and helpers. Profiles represent
+Skill-local overlays or workflow variants; they are not generic global
+personas. When evidence shows that knowledge is reusable across Skills, teams,
+tools, or agents, it should move into `contexts/` as an owned Context Asset.
+Shared helper implementations may move to `tools/**`; location alone does not
+require either promotion.
 
 Renma can also flag large skill-local support files as shared-context candidates when they contain generic source-of-truth structure such as setup, decision logic, troubleshooting, validation, constraints, policy, or procedure guidance. This advisory does not decide semantic reuse itself. It surfaces structurally broad support files and asks the calling LLM or human to inspect the repository for similar concepts, overlapping guidance, and reuse opportunities before making a reviewable patch.
 
@@ -228,7 +234,8 @@ Shared context assets should be organized by semantic scope, not migration state
 
 Renma normalizes scanned files into asset kinds:
 
-- `skill`: LLM-facing entrypoint, routing contract, and usage guide
+- `skill`: focused task or workflow with activation boundaries, instructions,
+  verification, output, and completion criteria
 - `context`: shared source-of-truth knowledge asset under `contexts/` or
   `context/`
 - `context_lens`: purpose-oriented interpretation layer over context assets

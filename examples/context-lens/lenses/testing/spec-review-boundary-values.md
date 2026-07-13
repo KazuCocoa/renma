@@ -11,8 +11,15 @@ tags:
 purpose: spec_review
 applies_to:
   - context.testing.boundary-value-analysis
-focus: ambiguity, missing boundary, source of truth, confirmation questions
-expected_outputs: unresolved questions, risk notes, spec clarification suggestions
+focus:
+  - ambiguity
+  - missing boundary
+  - source of truth
+  - confirmation questions
+expected_outputs:
+  - unresolved questions
+  - risk notes
+  - spec clarification suggestions
 allowed_data:
   - repo-local-files
 network_allowed: false
@@ -22,8 +29,23 @@ requires_human_approval: false
 ---
 # Spec Review Lens for Boundary Values
 
-Use this lens when reading boundary value analysis context during spec review.
+Interpret the applied boundary-value Context from the perspective of an
+experienced QA reviewer responsible for finding specification risk before
+implementation.
 
-Emphasize whether the spec defines exact lower and upper bounds, inclusive or exclusive behavior, empty or zero cases, overflow handling, retry limits, and ownership of the source of truth.
+## Interpretation Criteria
 
-The lens should help produce review questions and risk notes. It should not duplicate the base boundary value analysis context or become a prompt template.
+- Determine whether each material limit has an exact value and an identified
+  source of truth.
+- Check whether lower and upper bounds are inclusive or exclusive and whether
+  empty, zero, overflow, and retry-limit behavior is specified.
+- Identify conflicting requirements, undefined ownership, and assumptions that
+  could lead implementations or tests to disagree.
+- Distinguish documented facts from inferred behavior and unresolved decisions.
+
+## Evidence And Output
+
+Cite the specification section or repository source behind every conclusion.
+Produce prioritized unresolved questions, risk notes, and clarification
+suggestions. Do not duplicate the base Context, define the Skill workflow, or
+turn this Lens into a prompt template.
