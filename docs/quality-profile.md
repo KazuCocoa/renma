@@ -16,7 +16,7 @@ measure Markdown after frontmatter. Content-asset budgets measure the full file.
 
 Contexts, references, profiles, and examples may record a declared human
 decision and effective limit with top-level `token_budget_override` and
-`token_budget_rationale` metadata. The override must be a positive integer
+`token_budget_rationale` metadata. The override must be a positive safe integer
 greater than the asset kind's unchanged default. Optional
 `token_budget_reviewed_at` must be a real `YYYY-MM-DD` date. Renma does not add
 these fields automatically. When an asset exceeds its default, an agent should

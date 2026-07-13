@@ -15,6 +15,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   that a support asset should remain intentionally long. Invalid, ambiguous,
   incomplete, orphaned, or unnecessary decision metadata emits
   `QUAL-INVALID-TOKEN-BUDGET-OVERRIDE` and never suppresses the default budget.
+  Only Markdown-parser-eligible support assets can declare the bundle, and
+  override limits must be positive safe integers represented exactly.
 
 ### Changed
 

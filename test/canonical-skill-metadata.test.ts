@@ -573,13 +573,41 @@ token_budget_rationale: "This is ambiguous."
 ${"context ".repeat(5050)}`,
     ),
   );
+  const maxSafe = parseDocument(
+    artifact(
+      "skills/demo/references/max-safe.md",
+      "reference",
+      `---
+token_budget_override: ${Number.MAX_SAFE_INTEGER}
+token_budget_rationale: "This is exactly representable."
+---
+${"context ".repeat(5050)}`,
+    ),
+  );
+  const unsafe = parseDocument(
+    artifact(
+      "skills/demo/references/unsafe.md",
+      "reference",
+      `---
+token_budget_override: 9007199254740993
+token_budget_rationale: "This would be rounded."
+---
+${"context ".repeat(5050)}`,
+    ),
+  );
 
-  const { catalog } = buildCatalog([valid, invalid]);
+  const { catalog } = buildCatalog([valid, invalid, maxSafe, unsafe]);
   const validMetadata = catalog.entries.find(
     (entry) => entry.sourcePath === "skills/demo/references/valid.md",
   )?.metadata;
   const invalidMetadata = catalog.entries.find(
     (entry) => entry.sourcePath === "skills/demo/references/invalid.md",
+  )?.metadata;
+  const maxSafeMetadata = catalog.entries.find(
+    (entry) => entry.sourcePath === "skills/demo/references/max-safe.md",
+  )?.metadata;
+  const unsafeMetadata = catalog.entries.find(
+    (entry) => entry.sourcePath === "skills/demo/references/unsafe.md",
   )?.metadata;
 
   assert.equal(validMetadata?.tokenBudgetOverride, 5200);
@@ -591,6 +619,10 @@ ${"context ".repeat(5050)}`,
   assert.equal(invalidMetadata?.tokenBudgetOverride, undefined);
   assert.equal(invalidMetadata?.tokenBudgetRationale, undefined);
   assert.equal(invalidMetadata?.tokenBudgetReviewedAt, undefined);
+  assert.equal(maxSafeMetadata?.tokenBudgetOverride, Number.MAX_SAFE_INTEGER);
+  assert.equal(unsafeMetadata?.tokenBudgetOverride, undefined);
+  assert.equal(unsafeMetadata?.tokenBudgetRationale, undefined);
+  assert.equal(unsafeMetadata?.tokenBudgetReviewedAt, undefined);
 });
 
 test("catalog and Trust Graph use canonical child evidence aliases", () => {
@@ -875,14 +907,19 @@ function skillDocument(content: string) {
   return parseDocument(artifact("skills/demo/SKILL.md", "skill", content));
 }
 
-function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
+function artifact(
+  path: string,
+  kind: ArtifactKind,
+  content: string,
+  markdownParserEligible = true,
+): Artifact {
   return {
     path,
     absolutePath: `/tmp/${path}`,
     kind,
     sizeBytes: Buffer.byteLength(content),
     contentClassification: "text",
-    markdownParserEligible: true,
+    markdownParserEligible,
     content,
   };
 }

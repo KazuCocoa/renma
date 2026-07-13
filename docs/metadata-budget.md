@@ -13,7 +13,7 @@ token_budget_rationale: "This is a single ordered workflow and splitting it woul
 token_budget_reviewed_at: "2026-07-12"
 ```
 
-`token_budget_override` must be a positive integer greater than the asset
+`token_budget_override` must be a positive safe integer greater than the asset
 kind's default content limit, and `token_budget_rationale` must be a non-empty
 string. `token_budget_reviewed_at` is optional and must be a real `YYYY-MM-DD`
 date when present. Invalid metadata does not replace the default limit.

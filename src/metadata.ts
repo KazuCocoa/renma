@@ -101,10 +101,11 @@ export function parseSupportAssetTokenBudgetDecision(
   document: ParsedDocument,
 ): SupportAssetTokenBudgetDecision {
   if (
-    document.artifact.kind !== "context" &&
-    document.artifact.kind !== "reference" &&
-    document.artifact.kind !== "profile" &&
-    document.artifact.kind !== "example"
+    document.artifact.markdownParserEligible !== true ||
+    (document.artifact.kind !== "context" &&
+      document.artifact.kind !== "reference" &&
+      document.artifact.kind !== "profile" &&
+      document.artifact.kind !== "example")
   ) {
     return { status: "absent", invalidReasons: [] };
   }
@@ -195,6 +196,11 @@ export function parseSupportAssetTokenBudgetDecision(
     ) {
       issues.push({
         reason: "token_budget_override must be an integer",
+        evidence: fieldEvidence(document, overrideField),
+      });
+    } else if (!Number.isSafeInteger(overrideField.value)) {
+      issues.push({
+        reason: "token_budget_override must be a safe integer",
         evidence: fieldEvidence(document, overrideField),
       });
     } else {
