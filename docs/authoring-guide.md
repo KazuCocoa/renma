@@ -336,11 +336,12 @@ select, load, or inject Context at runtime.
 Context and Context Lens scaffolds keep their top-level Renma metadata syntax;
 the Agent Skills `metadata.renma.*` serialization boundary applies to Skills.
 
-For current guidance on deriving several thin, bounded Skills from a broad
+For current guidance on deriving several focused, bounded workflows from a broad
 existing Skill—including focused `inspect`, graph, Context reuse, and Appium
 examples—see [Advanced Skill Authoring](advanced-skill-authoring.md). That guide
-keeps current thin-Skill authoring separate from proposed 0.18.0 Skill-to-Skill
-discovery.
+keeps current focused-workflow authoring separate from deferred Skill-to-Skill
+route and generated-index design. Repository and local support discovery are
+already implemented; `routes_to` and `skill-index` are not.
 
 ## Optional Codex Example
 

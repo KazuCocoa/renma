@@ -9,9 +9,10 @@ needs to execute well; it is not required to be a thin router. Renma validates
 repository structure and declared Context relationships but does not select a
 Skill at runtime.
 
-Proposed 0.18.0 Skill-to-Skill discovery from the earlier roadmap remains
-intentionally deferred: this release does not add route metadata, generated
-indexes, or runtime selection.
+Deferred Skill-to-Skill discovery from the earlier roadmap has no assigned
+release: 0.18.0 does not add route metadata, discovery aliases, generated
+indexes, or runtime selection. Repository file and Skill-local support-resource
+discovery are already implemented and are separate from that proposal.
 
 ## Derive A Focused Skill From An Existing Skill
 

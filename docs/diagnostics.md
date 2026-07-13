@@ -172,7 +172,7 @@ These diagnostics are emitted while renma discovers files.
 | Severity  | Message                                                    | Meaning                                             | Fix                                                                         |
 | --------- | ---------------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------- |
 | `error`   | `Could not evaluate glob "<pattern>": <error>`             | A configured discovery glob could not be evaluated. | Fix or remove the glob pattern in config or CLI input.                      |
-| `warning` | `Skipping symbolic link.`                                  | renma found a symlink and skipped it.               | Point config at the real file or directory if the target should be scanned. |
+| `warning` | `Skipping symbolic link; repository discovery never follows symlink targets.` | Renma found a leaf or directory symlink and skipped it without reading or enumerating its target. | Replace it with a regular repository file or directory. A referenced path at or below the symlink also emits `SUPPORT-SYMLINK-PATH`. |
 | `warning` | `Skipping file larger than max_file_size_bytes (<bytes>).` | A file exceeded the configured size limit.          | Raise `max_file_size_bytes`, exclude the file, or split the asset.          |
 | `error`   | `Could not read file: <error>`                             | The file matched discovery but could not be read.   | Fix permissions, remove the bad path, or exclude the file.                  |
 

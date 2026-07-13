@@ -273,7 +273,9 @@ canonical and migration rules.
 - [Architecture](architecture.md)
 - [Product Design](design.md)
 - [Current Roadmap](plan.md)
-- [Proposed 0.18.0 Skill Discovery](plan-discovery.md)
+- [Deferred Skill-to-Skill Discovery Design](plan-discovery.md): unassigned
+  exploratory route/index design, separate from implemented repository and
+  support-resource discovery.
 - [Interactive Placeholder Example](examples/interactive-placeholder): minimal
   hands-on clarify-before-act Skill interaction with a local tool.
 - [Example Context Repository](examples/context-repo): richer repository-aware

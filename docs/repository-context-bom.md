@@ -103,7 +103,42 @@ Treat `owns_local_resource`, `statically_references`, `inherits_owner`, and
 `inherits_policy` as static repository evidence, not runtime behavior. Branch
 on `schemaVersion`; `generator.version` is provenance only.
 
-Follow-up documentation task: publish complete JSON Schema files and field-by-field v2 examples for BOM and Trust Graph in a documentation-only pull request.
+The published [BOM v2 JSON Schema](schemas/repository-context-bom-v2.schema.json)
+is the machine-readable contract. Every top-level field is required except
+`generatedAt` (omitted only by `--omit-generated-at`) and `configPath` (absent
+when no configuration file was loaded). Optional lifecycle, version, status,
+target-resolution, and inherited-ownership fields appear only when their
+evidence exists. Owner values are explicitly nullable; missing optional fields
+are omitted rather than serialized as `null`.
+
+Arrays are deterministically ordered by their identity/path keys, and count
+maps contain every declared enum member, including zero counts. Policy source
+ordering is `local`, `security_profile`, `repository_config`, `owning_skill`.
+Static support relationships use `owns_local_resource`,
+`statically_references`, `inherits_owner`, and `inherits_policy`.
+
+Representative top-level JSON (nested objects are shortened for readability;
+the schema defines every nested field):
+
+```json
+{
+  "schemaVersion": "renma.repository-context-bom.v2",
+  "outputMode": "omit_generated_at",
+  "generator": { "name": "renma", "version": "0.18.0" },
+  "root": "/checkout/repository",
+  "scope": { "type": "declared_repository_manifest", "runtimeUsage": false, "telemetryCollected": false },
+  "summary": { "scannedFileCount": 0, "assetCount": 0, "dependencyCount": 0, "resolvedDependencyCount": 0, "unresolvedDependencyCount": 0, "ownedAssetCount": 0, "unownedAssetCount": 0, "readinessScore": 100, "readinessLevel": "ready", "diagnosticCounts": { "error": 0, "warning": 0, "info": 0 } },
+  "assets": [],
+  "dependencies": [],
+  "readiness": { "score": 100, "level": "ready", "checks": [], "summary": {} },
+  "securityPosture": { "totalSecurityFindings": 0, "riskClasses": { "violation": 0, "suspicious": 0, "advisory": 0, "unclassified": 0 }, "severities": { "critical": 0, "high": 0, "medium": 0, "low": 0 }, "highOrCritical": 0, "topFindingIds": [] },
+  "securityPolicyInventory": {},
+  "diagnostics": []
+}
+```
+
+Generated representative reports are validated against the published schema in
+the contract test suite.
 
 `--omit-generated-at` does not make the report a generic canonical JSON format or a portable artifact.
 

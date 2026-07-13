@@ -250,9 +250,46 @@ test("Skill authoring docs preserve the platform and Renma responsibility bounda
   assert.match(authoring, /Advanced Skill Authoring/);
   assert.match(docsIndex, /Advanced Skill Authoring/);
   assert.match(advanced, /current 0\.18\.0 authoring guidance/);
-  assert.match(advanced, /Proposed 0\.18\.0 Skill-to-Skill discovery/);
+  assert.match(advanced, /Deferred Skill-to-Skill discovery/);
+  assert.match(advanced, /no assigned\s+release/);
   assert.doesNotMatch(advanced, /`routes_to`|`skill-index`/);
-  assert.match(readme, /proposed 0\.18\.0 Skill Discovery/i);
+  assert.match(readme, /Deferred Skill-to-Skill Discovery Design/);
+  assert.match(authoring, /focused, bounded workflows/);
+  assert.doesNotMatch(authoring, /current thin-Skill authoring/);
+});
+
+test("published current docs separate implemented discovery from deferred routing", async () => {
+  const documents = [
+    "README.md",
+    "plan.md",
+    "plan-discovery.md",
+    "docs/README.md",
+    "docs/authoring-guide.md",
+    "docs/advanced-skill-authoring.md",
+    "docs/repository-context-bom.md",
+    "docs/trust-graph.md",
+  ];
+  const content = await Promise.all(documents.map(readRepoFile));
+  assert.ok(content.some((text) => /focused workflow/i.test(text)));
+  assert.ok(content.some((text) => /Deferred Skill-to-Skill/i.test(text)));
+  assert.ok(
+    content.some((text) =>
+      /repository.*support-resource\s+discovery.*implemented/is.test(text),
+    ),
+  );
+  for (const [index, text] of content.entries()) {
+    assert.doesNotMatch(
+      text,
+      /Proposed 0\.18\.0 Skill(?:-to-Skill)? Discovery/i,
+      `${documents[index]} assigns deferred discovery to 0.18.0`,
+    );
+    assert.doesNotMatch(text, /current thin-Skill|thin, bounded Skills/i);
+    assert.doesNotMatch(text, /renma-quality@0\.18\.0/);
+  }
+  const deferred = content[2] ?? "";
+  assert.match(deferred, /Target: unassigned/);
+  assert.match(deferred, /`routes_to`.*`skill-index`/s);
+  assert.match(deferred, /not Renma\s+0\.18\.0 behavior/);
 });
 
 test("relative Markdown links in current documentation resolve", async () => {
