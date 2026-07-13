@@ -40,3 +40,43 @@ test("release-prep prints GitHub release notes from the target changelog section
     /node dist\/index\.js diff \. --from v0\.5\.1 --to HEAD --format markdown/,
   );
 });
+
+test("release-prep preserves wrapped changelog bullets in release notes", () => {
+  const result = spawnSync(
+    "node",
+    ["tools/release-prep.mjs", "--release-notes", "--version", "0.18.0"],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8",
+    },
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(
+    result.stdout,
+    /^Renma v0\.18\.0 includes 37 changelog entries across added, changed, fixed, removed, compatibility, and migration\./,
+  );
+  assert.match(
+    result.stdout,
+    /- Added the internal `renma-quality` profile family\. The emitted profile\n {2}identifier is derived from the Renma package version as\n {2}`renma-quality@<package version>`\. Added canonical threshold documentation\n {2}with units, provenance, rationale, false-positive risks, and\n {2}future-configurability status\./,
+  );
+  assert.match(
+    result.stdout,
+    /- Added BOM and Trust Graph v2 as the first supported long-term schema\n {2}contracts\. Renma 0\.18\.0 does not provide a v1 compatibility mode; the\n {2}earlier experimental v1 surface was removed before broader adoption\./,
+  );
+
+  for (const heading of [
+    "## Highlights",
+    "### Added",
+    "### Changed",
+    "### Fixed",
+    "### Removed",
+    "### Compatibility",
+    "### Migration",
+    "## Upgrade",
+    "## Validation",
+    "## Summary",
+  ]) {
+    assert.ok(result.stdout.includes(heading), `missing heading: ${heading}`);
+  }
+});

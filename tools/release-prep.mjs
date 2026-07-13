@@ -356,10 +356,20 @@ function parseChangelogSection(section) {
   const parsed = [];
   let currentHeading;
   let currentItems = [];
+  let currentItemLines = [];
+  let pendingBlankLines = [];
+
+  const finishCurrentItem = () => {
+    if (currentItemLines.length === 0) return;
+    currentItems.push(currentItemLines.join("\n"));
+    currentItemLines = [];
+    pendingBlankLines = [];
+  };
 
   for (const line of section.split(/\r?\n/)) {
     const heading = line.match(/^### (.+)$/);
     if (heading) {
+      finishCurrentItem();
       if (currentHeading) parsed.push([currentHeading, currentItems]);
       currentHeading = heading[1] ?? "";
       currentItems = [];
@@ -367,10 +377,26 @@ function parseChangelogSection(section) {
     }
 
     if (line.startsWith("- ")) {
-      currentItems.push(line);
+      finishCurrentItem();
+      currentItemLines = [line];
+      continue;
     }
+
+    if (currentItemLines.length > 0 && line.trim() === "") {
+      pendingBlankLines.push(line);
+      continue;
+    }
+
+    if (currentItemLines.length > 0 && /^[\t ]+/.test(line)) {
+      currentItemLines.push(...pendingBlankLines, line);
+      pendingBlankLines = [];
+      continue;
+    }
+
+    finishCurrentItem();
   }
 
+  finishCurrentItem();
   if (currentHeading) parsed.push([currentHeading, currentItems]);
   if (parsed.length === 0) {
     throw new Error("CHANGELOG section does not contain release note entries.");
