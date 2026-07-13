@@ -40,20 +40,23 @@ export function staticSupportReferences(
     const line = document.lines[index] ?? "";
     const values: Array<{ raw: string; value: string }> = [];
 
-    for (const match of line.matchAll(/\[[^\]]*\]\(\s*(<[^>]+>|[^)]+)\)/g)) {
-      const body = match[1]?.trim() ?? "";
-      const destination = body.startsWith("<")
-        ? body.slice(1, body.indexOf(">"))
-        : (body.match(/^(\S+)/)?.[1] ?? "");
-      if (destination)
-        values.push({ raw: match[0], value: decodePath(destination) });
-    }
-    for (const match of line.matchAll(
+    const markdownLinks = markdownLinkDestinations(line);
+    values.push(...markdownLinks);
+    let unquotedLine = maskRawMatches(
+      line,
+      markdownLinks.map((link) => link.raw),
+    );
+    const quotedMatches: string[] = [];
+    for (const match of unquotedLine.matchAll(
       /([`'"])((?:\.\/)?(?:references|scripts|assets|profiles|examples)\/.*?)\1/g,
     )) {
-      if (match[2]) values.push({ raw: match[0], value: match[2] });
+      if (match[2]) {
+        values.push({ raw: match[0], value: match[2] });
+        quotedMatches.push(match[0]);
+      }
     }
-    for (const match of line.matchAll(
+    unquotedLine = maskRawMatches(unquotedLine, quotedMatches);
+    for (const match of unquotedLine.matchAll(
       /(?:^|[\s([])((?:\.\/)?(?:references|scripts|assets|profiles|examples)\/[^\s)`'"\],;]+)/g,
     )) {
       if (match[1]) values.push({ raw: match[0].trim(), value: match[1] });
@@ -91,6 +94,14 @@ export function staticSupportReferences(
   );
 }
 
+function maskRawMatches(line: string, matches: string[]): string {
+  let masked = line;
+  for (const match of matches) {
+    masked = masked.replace(match, " ".repeat(match.length));
+  }
+  return masked;
+}
+
 export function buildStaticSupportDependencies(
   documents: ParsedDocument[],
   entries: CatalogEntry[],
@@ -105,13 +116,21 @@ export function buildStaticSupportDependencies(
   const skillEntries = entries.filter((entry) => entry.kind === "skill");
   const skillCounts = new Map<string, number>();
   for (const skill of skillEntries) {
-    const directory = path.posix.dirname(skill.sourcePath);
+    const classified = classifyRepositorySkillPath(skill.sourcePath);
+    const directory =
+      classified?.kind === "entrypoint"
+        ? classified.skillDirectory
+        : path.posix.dirname(skill.sourcePath);
     skillCounts.set(directory, (skillCounts.get(directory) ?? 0) + 1);
   }
   const result: Dependency[] = [];
 
   for (const skill of skillEntries) {
-    const skillDirectory = path.posix.dirname(skill.sourcePath);
+    const classifiedSkill = classifyRepositorySkillPath(skill.sourcePath);
+    const skillDirectory =
+      classifiedSkill?.kind === "entrypoint"
+        ? classifiedSkill.skillDirectory
+        : path.posix.dirname(skill.sourcePath);
     if (skillCounts.get(skillDirectory) !== 1) continue;
     const localEntries = entries.filter((entry) => {
       const classified = classifyRepositorySkillPath(entry.sourcePath);
@@ -190,10 +209,8 @@ function normalizeStaticSupportReference(
   value: string,
   skillDirectory: string,
 ): { targetPath: string; relativePath: string } | undefined {
-  const cleaned = decodePath(value)
-    .trim()
+  const cleaned = decodePath(stripUriSuffix(value.trim()))
     .replace(/^<|>$/g, "")
-    .replace(/[?#].*$/, "")
     .replace(/[),.;:]+$/, "")
     .replace(/^\.\//, "");
   if (!cleaned || path.posix.isAbsolute(cleaned)) return undefined;
@@ -214,6 +231,91 @@ function normalizeStaticSupportReference(
     return undefined;
   }
   return { targetPath: normalized, relativePath };
+}
+
+function markdownLinkDestinations(
+  line: string,
+): Array<{ raw: string; value: string }> {
+  const destinations: Array<{ raw: string; value: string }> = [];
+  let searchFrom = 0;
+  while (searchFrom < line.length) {
+    const opener = line.indexOf("](", searchFrom);
+    if (opener < 0) break;
+    const rawStart = line.lastIndexOf("[", opener);
+    let cursor = opener + 2;
+    while (/\s/.test(line[cursor] ?? "")) cursor += 1;
+    const destinationStart = cursor;
+    let destination = "";
+
+    if (line[cursor] === "<") {
+      cursor += 1;
+      const valueStart = cursor;
+      while (cursor < line.length && line[cursor] !== ">") cursor += 1;
+      if (line[cursor] === ">") {
+        destination = line.slice(valueStart, cursor);
+        cursor += 1;
+      }
+    } else {
+      let nestedParentheses = 0;
+      while (cursor < line.length) {
+        const character = line[cursor] ?? "";
+        if (character === "\\" && cursor + 1 < line.length) {
+          cursor += 2;
+          continue;
+        }
+        if (character === "(") {
+          nestedParentheses += 1;
+        } else if (character === ")") {
+          if (nestedParentheses === 0) break;
+          nestedParentheses -= 1;
+        } else if (/\s/.test(character) && nestedParentheses === 0) {
+          break;
+        }
+        cursor += 1;
+      }
+      destination = line.slice(destinationStart, cursor);
+    }
+
+    let outerClose = cursor;
+    let titleParentheses = 0;
+    let quote: string | undefined;
+    while (outerClose < line.length) {
+      const character = line[outerClose] ?? "";
+      if (character === "\\") {
+        outerClose += 2;
+        continue;
+      }
+      if (quote) {
+        if (character === quote) quote = undefined;
+      } else if (character === '"' || character === "'") {
+        quote = character;
+      } else if (character === "(") {
+        titleParentheses += 1;
+      } else if (character === ")") {
+        if (titleParentheses === 0) break;
+        titleParentheses -= 1;
+      }
+      outerClose += 1;
+    }
+
+    if (destination && outerClose < line.length) {
+      destinations.push({
+        raw: line.slice(rawStart >= 0 ? rawStart : opener, outerClose + 1),
+        value: destination,
+      });
+    }
+    searchFrom = Math.max(outerClose + 1, opener + 2);
+  }
+  return destinations;
+}
+
+function stripUriSuffix(value: string): string {
+  const query = value.indexOf("?");
+  const fragment = value.indexOf("#");
+  const boundary = [query, fragment]
+    .filter((index) => index >= 0)
+    .sort((left, right) => left - right)[0];
+  return boundary === undefined ? value : value.slice(0, boundary);
 }
 
 function containsExactBasename(content: string, basename: string): boolean {

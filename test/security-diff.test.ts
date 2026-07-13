@@ -43,8 +43,8 @@ test("added and removed findings are summarized separately", () => {
 test("policy inventory deltas compute target minus base", () => {
   const from = inventory((summary) => {
     summary.totalPolicyAssets = 5;
-    summary.assetsWithPolicyMetadata = 3;
-    summary.assetsMissingPolicyMetadata = 2;
+    summary.assetsWithLocalPolicyMetadata = 3;
+    summary.assetsWithoutEffectivePolicy = 2;
     summary.approvedNetworkDestinationCount = 4;
     summary.approvedUploadDestinationCount = 2;
     summary.forbiddenInputCount = 1;
@@ -52,8 +52,8 @@ test("policy inventory deltas compute target minus base", () => {
   });
   const to = inventory((summary) => {
     summary.totalPolicyAssets = 7;
-    summary.assetsWithPolicyMetadata = 6;
-    summary.assetsMissingPolicyMetadata = 1;
+    summary.assetsWithLocalPolicyMetadata = 6;
+    summary.assetsWithoutEffectivePolicy = 1;
     summary.approvedNetworkDestinationCount = 5;
     summary.approvedUploadDestinationCount = 1;
     summary.forbiddenInputCount = 4;
@@ -68,8 +68,8 @@ test("policy inventory deltas compute target minus base", () => {
   });
 
   assert.equal(summary.policyInventory.totalPolicyAssets, 2);
-  assert.equal(summary.policyInventory.assetsWithPolicyMetadata, 3);
-  assert.equal(summary.policyInventory.assetsMissingPolicyMetadata, -1);
+  assert.equal(summary.policyInventory.assetsWithLocalPolicyMetadata, 3);
+  assert.equal(summary.policyInventory.assetsWithoutEffectivePolicy, -1);
   assert.equal(summary.policyInventory.approvedNetworkDestinationCount, 1);
   assert.equal(summary.policyInventory.approvedUploadDestinationCount, -1);
   assert.equal(summary.policyInventory.forbiddenInputCount, 3);
@@ -79,7 +79,7 @@ test("policy inventory deltas compute target minus base", () => {
 test("missing inventories are treated as zero", () => {
   const target = inventory((summary) => {
     summary.totalPolicyAssets = 2;
-    summary.assetsWithPolicyMetadata = 1;
+    summary.assetsWithLocalPolicyMetadata = 1;
     summary.securityProfiles.missing = 1;
   });
 
@@ -92,7 +92,7 @@ test("missing inventories are treated as zero", () => {
     {
       ...zeroSecurityPolicyInventoryDelta(),
       totalPolicyAssets: 2,
-      assetsWithPolicyMetadata: 1,
+      assetsWithLocalPolicyMetadata: 1,
       securityProfiles: {
         referenced: 0,
         resolved: 0,

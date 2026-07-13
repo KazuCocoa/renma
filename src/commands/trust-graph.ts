@@ -6,9 +6,7 @@ import type {
   TrustGraphFinding,
   TrustGraphFindingSeverity,
   TrustGraphNodeType,
-  TrustGraphSchema,
 } from "../trust-graph.js";
-import { projectTrustGraphV1 } from "../trust-graph.js";
 
 export type TrustGraphFormat = "json" | "markdown";
 
@@ -50,14 +48,9 @@ export async function runTrustGraphCommand(
   options: {
     format: TrustGraphFormat;
     overrides?: ConfigOverrides;
-    schema?: TrustGraphSchema;
   },
 ): Promise<number> {
-  const graph = await trustGraph(
-    targetPath,
-    options.overrides ?? {},
-    options.schema ?? "v2",
-  );
+  const graph = await trustGraph(targetPath, options.overrides ?? {});
   process.stdout.write(formatTrustGraph(graph, options.format));
   return 0;
 }
@@ -65,15 +58,12 @@ export async function runTrustGraphCommand(
 export async function trustGraph(
   targetPath: string,
   overrides: ConfigOverrides = {},
-  schema: TrustGraphSchema = "v2",
 ): Promise<TrustGraph> {
   const result = await scan(targetPath, overrides);
   if (!result.trustGraph) {
     throw new Error("scan did not produce Trust Graph evidence.");
   }
-  return schema === "v1"
-    ? projectTrustGraphV1(result.trustGraph)
-    : result.trustGraph;
+  return result.trustGraph;
 }
 
 export function formatTrustGraphJson(graph: TrustGraph): string {
@@ -111,6 +101,9 @@ export function formatTrustGraphMarkdown(graph: TrustGraph): string {
     `- Owned assets: ${graph.summary.edgeTypeCounts.owned_by}/${graph.summary.assetCount}`,
     `- Assets with lifecycle status: ${graph.summary.edgeTypeCounts.has_lifecycle_status}/${graph.summary.assetCount}`,
     `- Selected security profiles: ${graph.summary.edgeTypeCounts.selects_security_profile}`,
+    `- Assets with local effective policy: ${effectivePolicySourceCount(graph, "local")}`,
+    `- Assets with inherited effective policy: ${effectivePolicySourceCount(graph, "inherited")}`,
+    `- Assets with repository-config effective policy: ${effectivePolicySourceCount(graph, "repository_config")}`,
     `- Effective policy fingerprints: ${graph.summary.nodeTypeCounts.effective_policy}`,
     `- Diagnostics linked to assets: ${graph.summary.edgeTypeCounts.has_diagnostic}`,
     "",
@@ -156,6 +149,17 @@ export function formatTrustGraphMarkdown(graph: TrustGraph): string {
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+function effectivePolicySourceCount(
+  graph: TrustGraph,
+  source: "local" | "inherited" | "repository_config",
+): number {
+  return graph.edges.filter(
+    (edge) =>
+      edge.type === "has_effective_policy" &&
+      edge.properties?.policySource === source,
+  ).length;
 }
 
 function formatTrustGraph(graph: TrustGraph, format: TrustGraphFormat): string {

@@ -544,8 +544,8 @@ test("readiness JSON includes security policy inventory summary", async () => {
   const inventory = report.summary.securityPolicyInventory;
 
   assert.equal(inventory.totalPolicyAssets, 2);
-  assert.equal(inventory.assetsWithPolicyMetadata, 1);
-  assert.equal(inventory.assetsMissingPolicyMetadata, 1);
+  assert.equal(inventory.assetsWithLocalPolicyMetadata, 1);
+  assert.equal(inventory.assetsWithoutEffectivePolicy, 1);
   assert.deepEqual(inventory.networkAllowed, {
     true: 1,
     false: 0,
@@ -562,7 +562,7 @@ test("readiness JSON includes security policy inventory summary", async () => {
 
   const parsed = JSON.parse(formatReadinessJson(report)) as ReadinessReport;
   assert.equal(
-    parsed.summary.securityPolicyInventory.assetsMissingPolicyMetadata,
+    parsed.summary.securityPolicyInventory.assetsWithoutEffectivePolicy,
     1,
   );
 });
@@ -579,8 +579,8 @@ test("readiness markdown includes security policy inventory", async () => {
 
   assert.match(markdown, /^## Security Policy Inventory$/m);
   assert.match(markdown, /\| Policy assets \| 2 \|/);
-  assert.match(markdown, /\| Assets with policy metadata \| 1 \|/);
-  assert.match(markdown, /\| Assets missing policy metadata \| 1 \|/);
+  assert.match(markdown, /\| Assets with local policy metadata \| 1 \|/);
+  assert.match(markdown, /\| Assets without effective policy \| 1 \|/);
   assert.match(markdown, /\| Network allowed \| 1 \|/);
   assert.match(markdown, /\| Forbidden inputs \| 1 \|/);
   assert.match(markdown, /^### Top approved network destinations$/m);

@@ -792,7 +792,7 @@ test("repository release-prep is fully canonical with unchanged operational beha
   );
 
   assert.equal(scan.securityPolicyInventory?.totalPolicyAssets, 2);
-  assert.equal(scan.securityPolicyInventory?.assetsWithPolicyMetadata, 2);
+  assert.equal(scan.securityPolicyInventory?.assetsWithLocalPolicyMetadata, 2);
   assert.deepEqual(scan.securityPolicyInventory?.networkAllowed, {
     true: 2,
     false: 0,

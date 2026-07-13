@@ -248,8 +248,10 @@ function formatSecurityChangesSection(
     `- Added suspicious: ${posture.added.riskClasses.suspicious}`,
     `- Added advisory: ${posture.added.riskClasses.advisory}`,
     `- Policy assets: ${formatDelta(policyInventory.totalPolicyAssets)}`,
-    `- Assets with policy metadata: ${formatDelta(policyInventory.assetsWithPolicyMetadata)}`,
-    `- Assets missing policy metadata: ${formatDelta(policyInventory.assetsMissingPolicyMetadata)}`,
+    `- Assets with local policy metadata: ${formatDelta(policyInventory.assetsWithLocalPolicyMetadata)}`,
+    `- Assets with inherited policy: ${formatDelta(policyInventory.assetsWithInheritedPolicy)}`,
+    `- Assets with effective policy: ${formatDelta(policyInventory.assetsWithEffectivePolicy)}`,
+    `- Assets without effective policy: ${formatDelta(policyInventory.assetsWithoutEffectivePolicy)}`,
     `- Missing security profiles: ${formatDelta(policyInventory.securityProfiles.missing)}`,
   ];
 }
@@ -288,8 +290,10 @@ function formatSecurityPolicyInventorySection(
 ): string[] {
   const target = inventory ?? zeroSecurityPolicyInventorySummary();
   return [
-    `- Target assets with policy metadata: ${target.assetsWithPolicyMetadata}`,
-    `- Target assets missing policy metadata: ${target.assetsMissingPolicyMetadata}`,
+    `- Target assets with local policy metadata: ${target.assetsWithLocalPolicyMetadata}`,
+    `- Target assets with inherited policy: ${target.assetsWithInheritedPolicy}`,
+    `- Target assets with effective policy: ${target.assetsWithEffectivePolicy}`,
+    `- Target assets without effective policy: ${target.assetsWithoutEffectivePolicy}`,
     `- Target referenced security profiles: ${target.securityProfiles.referenced}`,
     `- Target missing security profiles: ${target.securityProfiles.missing}`,
     `- Target approved network destinations: ${target.approvedNetworkDestinationCount}`,

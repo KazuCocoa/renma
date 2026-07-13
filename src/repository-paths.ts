@@ -1,4 +1,3 @@
-import { access, lstat } from "node:fs/promises";
 import path from "node:path";
 import {
   classifyRepositorySkillPath,
@@ -8,6 +7,7 @@ import {
 import type { Catalog } from "./model.js";
 import { staticSupportReferences } from "./static-support.js";
 import type { Artifact, ParsedDocument, ScanConfig } from "./types.js";
+import { safeRepositoryPath } from "./repository-boundary.js";
 
 export type RepositoryPathState =
   | "parsed"
@@ -159,23 +159,33 @@ export async function collectRepositoryPathStates(
     const normalized = normalizeRepositoryPath(candidate);
     if (!normalized) continue;
     try {
-      const info = await lstat(path.join(root, normalized));
-      if (info.isSymbolicLink()) {
+      const inspected = await safeRepositoryPath(root, normalized);
+      if (inspected.state === "symlink") {
         states.set(normalized, "symlink");
-      } else if (isExcluded(normalized, config.exclude)) {
-        states.set(normalized, "excluded");
-      } else if (repositoryPathDepth(normalized) > config.maxDepth) {
-        states.set(normalized, "deep");
-      } else if (info.isFile() && info.size > config.maxFileSizeBytes) {
-        states.set(normalized, "oversize");
-      } else if (parsed.has(normalized)) {
-        states.set(normalized, "parsed");
-      } else {
-        states.set(normalized, "unsupported");
+      } else if (inspected.state === "outside") {
+        states.set(normalized, "absent");
+      } else if (inspected.state === "absent") {
+        states.set(normalized, "absent");
+      } else if (inspected.state === "unreadable") {
+        states.set(normalized, "unreadable");
+      } else if (inspected.state === "present") {
+        if (isExcluded(normalized, config.exclude)) {
+          states.set(normalized, "excluded");
+        } else if (repositoryPathDepth(normalized) > config.maxDepth) {
+          states.set(normalized, "deep");
+        } else if (
+          inspected.stats.isFile() &&
+          inspected.stats.size > config.maxFileSizeBytes
+        ) {
+          states.set(normalized, "oversize");
+        } else if (parsed.has(normalized)) {
+          states.set(normalized, "parsed");
+        } else {
+          states.set(normalized, "unsupported");
+        }
       }
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      states.set(normalized, code === "ENOENT" ? "absent" : "unreadable");
+    } catch {
+      states.set(normalized, "unreadable");
     }
   }
   return states;
@@ -242,12 +252,7 @@ async function repositoryPathExists(
   root: string,
   relativePath: string,
 ): Promise<boolean> {
-  try {
-    await access(path.join(root, relativePath));
-    return true;
-  } catch {
-    return false;
-  }
+  return (await safeRepositoryPath(root, relativePath)).state === "present";
 }
 
 function isRepoPathLike(value: string): boolean {

@@ -24,14 +24,14 @@ test("skill and context without policy metadata are counted as missing", () => {
   ]);
 
   assert.equal(summary.totalPolicyAssets, 3);
-  assert.equal(summary.assetsWithPolicyMetadata, 0);
-  assert.equal(summary.assetsMissingPolicyMetadata, 3);
+  assert.equal(summary.assetsWithLocalPolicyMetadata, 0);
+  assert.equal(summary.assetsWithoutEffectivePolicy, 3);
   assert.equal(summary.assetKinds.skill, 1);
   assert.equal(summary.assetKinds.context, 1);
   assert.equal(summary.assetKinds.context_lens, 1);
   assert.equal(summary.networkAllowed.unspecified, 3);
   assert.equal(summary.securityProfiles.none, 3);
-  assert.deepEqual(summary.missingPolicyAssets, [
+  assert.deepEqual(summary.assetsWithoutEffectivePolicyList, [
     { path: "contexts/testing/demo.md", kind: "context" },
     { path: "lenses/testing/demo.md", kind: "context_lens" },
     { path: "skills/demo/SKILL.md", kind: "skill" },
@@ -227,7 +227,7 @@ test("resolved security profiles count as referenced and contribute policy", () 
     false: 1,
     unspecified: 0,
   });
-  assert.equal(summary.assetsMissingPolicyMetadata, 0);
+  assert.equal(summary.assetsWithoutEffectivePolicy, 0);
   assert.equal(summary.forbiddenInputCount, 1);
   assert.equal(summary.approvedNetworkDestinationCount, 1);
   assert.equal(summary.approvedUploadDestinationCount, 1);
@@ -288,7 +288,7 @@ test("unknown artifacts are included only when they declare policy metadata", ()
 
   assert.equal(summary.totalPolicyAssets, 1);
   assert.equal(summary.assetKinds.unknown, 1);
-  assert.equal(summary.assetsWithPolicyMetadata, 1);
+  assert.equal(summary.assetsWithLocalPolicyMetadata, 1);
   assert.deepEqual(summary.networkAllowed, {
     true: 1,
     false: 0,

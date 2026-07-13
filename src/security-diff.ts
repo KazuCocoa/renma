@@ -21,8 +21,10 @@ export interface PolicyBooleanDelta {
 
 export interface SecurityPolicyInventoryDelta {
   totalPolicyAssets: number;
-  assetsWithPolicyMetadata: number;
-  assetsMissingPolicyMetadata: number;
+  assetsWithLocalPolicyMetadata: number;
+  assetsWithInheritedPolicy: number;
+  assetsWithEffectivePolicy: number;
+  assetsWithoutEffectivePolicy: number;
   networkAllowed: PolicyBooleanDelta;
   externalUploadAllowed: PolicyBooleanDelta;
   secretsAllowed: PolicyBooleanDelta;
@@ -107,8 +109,10 @@ export function deltaProfileCounts(
 export function zeroSecurityPolicyInventoryDelta(): SecurityPolicyInventoryDelta {
   return {
     totalPolicyAssets: 0,
-    assetsWithPolicyMetadata: 0,
-    assetsMissingPolicyMetadata: 0,
+    assetsWithLocalPolicyMetadata: 0,
+    assetsWithInheritedPolicy: 0,
+    assetsWithEffectivePolicy: 0,
+    assetsWithoutEffectivePolicy: 0,
     networkAllowed: zeroPolicyBooleanDelta(),
     externalUploadAllowed: zeroPolicyBooleanDelta(),
     secretsAllowed: zeroPolicyBooleanDelta(),
@@ -136,13 +140,21 @@ function deltaSecurityPolicyInventory(
       to.totalPolicyAssets,
       from.totalPolicyAssets,
     ),
-    assetsWithPolicyMetadata: deltaNumber(
-      to.assetsWithPolicyMetadata,
-      from.assetsWithPolicyMetadata,
+    assetsWithLocalPolicyMetadata: deltaNumber(
+      to.assetsWithLocalPolicyMetadata,
+      from.assetsWithLocalPolicyMetadata,
     ),
-    assetsMissingPolicyMetadata: deltaNumber(
-      to.assetsMissingPolicyMetadata,
-      from.assetsMissingPolicyMetadata,
+    assetsWithInheritedPolicy: deltaNumber(
+      to.assetsWithInheritedPolicy,
+      from.assetsWithInheritedPolicy,
+    ),
+    assetsWithEffectivePolicy: deltaNumber(
+      to.assetsWithEffectivePolicy,
+      from.assetsWithEffectivePolicy,
+    ),
+    assetsWithoutEffectivePolicy: deltaNumber(
+      to.assetsWithoutEffectivePolicy,
+      from.assetsWithoutEffectivePolicy,
     ),
     networkAllowed: deltaPolicyBoolean(to.networkAllowed, from.networkAllowed),
     externalUploadAllowed: deltaPolicyBoolean(

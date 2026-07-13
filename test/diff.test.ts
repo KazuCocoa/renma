@@ -65,8 +65,8 @@ test("buildDiffReport compares deterministic readiness snapshots", () => {
     ],
     securityPolicyInventory: policyInventory({
       totalPolicyAssets: 2,
-      assetsWithPolicyMetadata: 1,
-      assetsMissingPolicyMetadata: 1,
+      assetsWithLocalPolicyMetadata: 1,
+      assetsWithoutEffectivePolicy: 1,
       networkDenied: 1,
       uploadDenied: 1,
       secretsDenied: 1,
@@ -118,8 +118,8 @@ test("buildDiffReport compares deterministic readiness snapshots", () => {
     ],
     securityPolicyInventory: policyInventory({
       totalPolicyAssets: 4,
-      assetsWithPolicyMetadata: 3,
-      assetsMissingPolicyMetadata: 0,
+      assetsWithLocalPolicyMetadata: 3,
+      assetsWithoutEffectivePolicy: 0,
       networkAllowed: 1,
       networkDenied: 1,
       uploadDenied: 2,
@@ -191,8 +191,14 @@ test("buildDiffReport compares deterministic readiness snapshots", () => {
   assert.equal(report.security.posture.resolved.totalSecurityFindings, 1);
   assert.equal(report.security.posture.resolved.riskClasses.advisory, 1);
   assert.equal(report.security.policyInventory.totalPolicyAssets, 2);
-  assert.equal(report.security.policyInventory.assetsWithPolicyMetadata, 2);
-  assert.equal(report.security.policyInventory.assetsMissingPolicyMetadata, -1);
+  assert.equal(
+    report.security.policyInventory.assetsWithLocalPolicyMetadata,
+    2,
+  );
+  assert.equal(
+    report.security.policyInventory.assetsWithoutEffectivePolicy,
+    -1,
+  );
   assert.equal(report.security.policyInventory.networkAllowed.true, 1);
   assert.equal(report.security.policyInventory.securityProfiles.missing, 1);
   assert.equal(report.security.policyInventory.securityProfiles.cyclic, -1);
@@ -204,7 +210,7 @@ test("formatDiff renders markdown summaries", () => {
     snapshot("base", {
       securityPolicyInventory: policyInventory({
         totalPolicyAssets: 1,
-        assetsMissingPolicyMetadata: 1,
+        assetsWithoutEffectivePolicy: 1,
         networkDenied: 1,
       }),
     }),
@@ -227,8 +233,8 @@ test("formatDiff renders markdown summaries", () => {
       ],
       securityPolicyInventory: policyInventory({
         totalPolicyAssets: 3,
-        assetsWithPolicyMetadata: 2,
-        assetsMissingPolicyMetadata: 0,
+        assetsWithLocalPolicyMetadata: 2,
+        assetsWithoutEffectivePolicy: 0,
         networkAllowed: 1,
         networkDenied: 1,
         missingSecurityProfiles: 1,
@@ -251,8 +257,8 @@ test("formatDiff renders markdown summaries", () => {
   assert.match(markdown, /- Resolved security findings: 0/);
   assert.match(markdown, /- Added violations: 1/);
   assert.match(markdown, /- Policy assets: \+2/);
-  assert.match(markdown, /- Assets with policy metadata: \+2/);
-  assert.match(markdown, /- Assets missing policy metadata: -1/);
+  assert.match(markdown, /- Assets with local policy metadata: \+2/);
+  assert.match(markdown, /- Assets without effective policy: -1/);
   assert.match(markdown, /- Network allowed: \+1/);
   assert.match(markdown, /- Missing security profiles: \+1/);
   assert.ok(
@@ -406,8 +412,8 @@ interface SnapshotInput {
 
 interface PolicyInventoryInput {
   totalPolicyAssets?: number | undefined;
-  assetsWithPolicyMetadata?: number | undefined;
-  assetsMissingPolicyMetadata?: number | undefined;
+  assetsWithLocalPolicyMetadata?: number | undefined;
+  assetsWithoutEffectivePolicy?: number | undefined;
   networkAllowed?: number | undefined;
   networkDenied?: number | undefined;
   uploadAllowed?: number | undefined;
@@ -427,9 +433,10 @@ function policyInventory(
 ): SecurityPolicyInventorySummary {
   const inventory = zeroSecurityPolicyInventorySummary();
   inventory.totalPolicyAssets = input.totalPolicyAssets ?? 0;
-  inventory.assetsWithPolicyMetadata = input.assetsWithPolicyMetadata ?? 0;
-  inventory.assetsMissingPolicyMetadata =
-    input.assetsMissingPolicyMetadata ?? 0;
+  inventory.assetsWithLocalPolicyMetadata =
+    input.assetsWithLocalPolicyMetadata ?? 0;
+  inventory.assetsWithoutEffectivePolicy =
+    input.assetsWithoutEffectivePolicy ?? 0;
   inventory.networkAllowed.true = input.networkAllowed ?? 0;
   inventory.networkAllowed.false = input.networkDenied ?? 0;
   inventory.externalUploadAllowed.true = input.uploadAllowed ?? 0;

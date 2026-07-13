@@ -41,7 +41,11 @@ export function buildCatalog(
   for (const document of documents) {
     if (document.artifact.kind !== "skill") continue;
     const metadata = parseAssetMetadata(document).metadata;
-    const skillDirectory = path.posix.dirname(document.artifact.path);
+    const classified = classifyRepositorySkillPath(document.artifact.path);
+    const skillDirectory =
+      classified?.kind === "entrypoint"
+        ? classified.skillDirectory
+        : path.posix.dirname(document.artifact.path);
     const candidates = skillOwners.get(skillDirectory) ?? [];
     candidates.push({
       owner: metadata.owner?.trim() || null,

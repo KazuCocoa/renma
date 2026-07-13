@@ -26,8 +26,10 @@ export interface PolicyBooleanCounts {
 
 export interface SecurityPolicyInventorySummary {
   totalPolicyAssets: number;
-  assetsWithPolicyMetadata: number;
-  assetsMissingPolicyMetadata: number;
+  assetsWithLocalPolicyMetadata: number;
+  assetsWithInheritedPolicy: number;
+  assetsWithEffectivePolicy: number;
+  assetsWithoutEffectivePolicy: number;
   assetKinds: Record<InventoryArtifactKind, number>;
   networkAllowed: PolicyBooleanCounts;
   externalUploadAllowed: PolicyBooleanCounts;
@@ -48,7 +50,7 @@ export interface SecurityPolicyInventorySummary {
   topApprovedNetworkDestinations: Array<{ destination: string; count: number }>;
   topApprovedUploadDestinations: Array<{ destination: string; count: number }>;
   topForbiddenInputs: Array<{ input: string; count: number }>;
-  missingPolicyAssets: Array<{
+  assetsWithoutEffectivePolicyList: Array<{
     path: string;
     kind: ArtifactKind;
   }>;
@@ -77,7 +79,8 @@ export interface SecurityPolicyAssetEvidence {
   path: string;
   kind: ArtifactKind;
   hasLocalPolicyMetadata: boolean;
-  policySource: "local" | "inherited" | "none";
+  hasEffectivePolicy: boolean;
+  policySource: "local" | "inherited" | "repository_config" | "none";
   inheritedFrom?: { id: string; sourcePath: string };
   selectedSecurityProfile?: string;
   profileResolution: SecurityProfileResolution;
@@ -129,7 +132,6 @@ const LOCAL_POLICY_METADATA_FIELDS = new Set([
 export function summarizeSecurityPolicyInventory(
   artifacts: Artifact[],
   config?: SecurityConfig,
-  schema: "v1" | "v2" = "v2",
 ): SecurityPolicyInventorySummary {
   const summary = zeroSecurityPolicyInventorySummary();
   const networkDestinations = new Map<string, number>();
@@ -139,31 +141,31 @@ export function summarizeSecurityPolicyInventory(
   const owningSkills = skillArtifactsByDirectory(artifacts);
 
   for (const artifact of artifacts) {
-    if (
-      schema === "v1" &&
-      (artifact.kind === "script" || artifact.kind === "asset")
-    ) {
-      continue;
-    }
     const policyArtifact = policyArtifactFor(artifact, owningSkills);
-    if (isRawSupportArtifact(artifact) && !policyArtifact) continue;
-    const parsedPolicy = parseOperationalSecurityPolicy(
-      policyArtifact ?? artifact,
-    );
+    const rawSupportArtifact = isRawSupportArtifact(artifact);
+    const evidenceArtifact =
+      policyArtifact ??
+      (rawSupportArtifact ? { ...artifact, content: "" } : artifact);
+    const parsedPolicy = parseOperationalSecurityPolicy(evidenceArtifact);
     const hasMetadata = hasLocalSecurityPolicyMetadata(parsedPolicy);
-    if (!isPolicyInventoryArtifact(artifact, hasMetadata, policyArtifact))
-      continue;
+    if (!isPolicyInventoryArtifact(artifact, hasMetadata)) continue;
 
-    const policy = applySecurityConfig(parsedPolicy, config);
+    const effectiveConfig =
+      rawSupportArtifact && !policyArtifact ? undefined : config;
+    const policy = applySecurityConfig(parsedPolicy, effectiveConfig);
+    const localPolicyMetadata = !rawSupportArtifact && hasMetadata;
+    const effectivePolicy = hasEffectiveSecurityPolicy(policy);
+    const inheritedPolicy = policyArtifact !== undefined && effectivePolicy;
     summary.totalPolicyAssets += 1;
     summary.assetKinds[artifact.kind as InventoryArtifactKind] += 1;
 
-    if (hasMetadata) {
-      summary.assetsWithPolicyMetadata += 1;
-    }
-    if (isMissingPolicyMetadataAsset(artifact, parsedPolicy, policy)) {
-      summary.assetsMissingPolicyMetadata += 1;
-      summary.missingPolicyAssets.push({
+    if (localPolicyMetadata) summary.assetsWithLocalPolicyMetadata += 1;
+    if (inheritedPolicy) summary.assetsWithInheritedPolicy += 1;
+    if (effectivePolicy) {
+      summary.assetsWithEffectivePolicy += 1;
+    } else {
+      summary.assetsWithoutEffectivePolicy += 1;
+      summary.assetsWithoutEffectivePolicyList.push({
         path: artifact.path,
         kind: artifact.kind,
       });
@@ -209,7 +211,7 @@ export function summarizeSecurityPolicyInventory(
     "destination",
   );
   summary.topForbiddenInputs = topCounts(forbiddenInputs, "input");
-  summary.missingPolicyAssets.sort((left, right) =>
+  summary.assetsWithoutEffectivePolicyList.sort((left, right) =>
     left.path.localeCompare(right.path),
   );
 
@@ -224,14 +226,19 @@ export function collectSecurityPolicyAssetEvidence(
   return artifacts
     .map((artifact): SecurityPolicyAssetEvidence | undefined => {
       const policyArtifact = policyArtifactFor(artifact, owningSkills);
-      if (isRawSupportArtifact(artifact) && !policyArtifact) return undefined;
-      const evidenceArtifact = policyArtifact ?? artifact;
+      const rawSupportArtifact = isRawSupportArtifact(artifact);
+      const evidenceArtifact =
+        policyArtifact ??
+        (rawSupportArtifact ? { ...artifact, content: "" } : artifact);
       const parsedPolicy = parseOperationalSecurityPolicy(evidenceArtifact);
       const hasMetadata = hasLocalSecurityPolicyMetadata(parsedPolicy);
-      if (!isPolicyInventoryArtifact(artifact, hasMetadata, policyArtifact))
-        return undefined;
+      if (!isPolicyInventoryArtifact(artifact, hasMetadata)) return undefined;
 
-      const policy = applySecurityConfig(parsedPolicy, config);
+      const effectiveConfig =
+        rawSupportArtifact && !policyArtifact ? undefined : config;
+      const policy = applySecurityConfig(parsedPolicy, effectiveConfig);
+      const localPolicyMetadata = !rawSupportArtifact && hasMetadata;
+      const effectivePolicy = hasEffectiveSecurityPolicy(policy);
       const chain = securityProfileChain(parsedPolicy.securityProfile, config);
       const selectedSecurityProfile = parsedPolicy.securityProfile;
       const selectedSecurityProfileEvidence = policyFieldEvidence(
@@ -242,13 +249,17 @@ export function collectSecurityPolicyAssetEvidence(
       const row: SecurityPolicyAssetEvidence = {
         path: artifact.path,
         kind: artifact.kind,
-        hasLocalPolicyMetadata: !isRawSupportArtifact(artifact) && hasMetadata,
-        policySource: policyArtifact
-          ? "inherited"
-          : hasMetadata
-            ? "local"
-            : "none",
-        ...(policyArtifact
+        hasLocalPolicyMetadata: localPolicyMetadata,
+        hasEffectivePolicy: effectivePolicy,
+        policySource:
+          policyArtifact && effectivePolicy
+            ? "inherited"
+            : localPolicyMetadata
+              ? "local"
+              : effectivePolicy
+                ? "repository_config"
+                : "none",
+        ...(policyArtifact && effectivePolicy
           ? {
               inheritedFrom: {
                 id: policyArtifact.path,
@@ -280,8 +291,10 @@ export function collectSecurityPolicyAssetEvidence(
 export function zeroSecurityPolicyInventorySummary(): SecurityPolicyInventorySummary {
   return {
     totalPolicyAssets: 0,
-    assetsWithPolicyMetadata: 0,
-    assetsMissingPolicyMetadata: 0,
+    assetsWithLocalPolicyMetadata: 0,
+    assetsWithInheritedPolicy: 0,
+    assetsWithEffectivePolicy: 0,
+    assetsWithoutEffectivePolicy: 0,
     assetKinds: zeroAssetKinds(),
     networkAllowed: zeroPolicyBooleanCounts(),
     externalUploadAllowed: zeroPolicyBooleanCounts(),
@@ -302,7 +315,7 @@ export function zeroSecurityPolicyInventorySummary(): SecurityPolicyInventorySum
     topApprovedNetworkDestinations: [],
     topApprovedUploadDestinations: [],
     topForbiddenInputs: [],
-    missingPolicyAssets: [],
+    assetsWithoutEffectivePolicyList: [],
   };
 }
 
@@ -311,11 +324,24 @@ export function isPolicyInventoryArtifact(
   hasLocalMetadata = hasLocalSecurityPolicyMetadata(
     parseOperationalSecurityPolicy(artifact),
   ),
-  inheritedPolicyArtifact?: Artifact,
 ): boolean {
-  if (artifact.kind === "script" || artifact.kind === "asset")
-    return inheritedPolicyArtifact !== undefined;
+  if (artifact.kind === "script" || artifact.kind === "asset") return true;
   return POLICY_INVENTORY_KINDS.has(artifact.kind) || hasLocalMetadata;
+}
+
+function hasEffectiveSecurityPolicy(policy: SecurityPolicy): boolean {
+  return (
+    effectiveAllowedDataClass(policy) !== undefined ||
+    effectiveAllowedDataList(policy).length > 0 ||
+    policy.networkAllowed !== undefined ||
+    policy.externalUploadAllowed !== undefined ||
+    policy.secretsAllowed !== undefined ||
+    policy.humanApprovalRequired !== undefined ||
+    policy.forbiddenInputs.length > 0 ||
+    policy.approvedNetworkDestinations.length > 0 ||
+    policy.approvedUploadDestinations.length > 0 ||
+    policy.disallowedCommands.length > 0
+  );
 }
 
 function isRawSupportArtifact(artifact: Artifact): boolean {
@@ -330,9 +356,12 @@ export function skillArtifactsByDirectory(
     if (artifact.kind !== "skill") continue;
     const classified = classifyRepositorySkillPath(artifact.path);
     if (classified?.kind !== "entrypoint") continue;
+    const existing = skills.get(classified.skillDirectory);
     skills.set(
       classified.skillDirectory,
-      skills.has(classified.skillDirectory) ? null : artifact,
+      existing !== undefined || skills.has(classified.skillDirectory)
+        ? null
+        : artifact,
     );
   }
   return skills;
@@ -353,21 +382,6 @@ export function hasLocalSecurityPolicyMetadata(
 ): boolean {
   return [...LOCAL_POLICY_METADATA_FIELDS].some((field) =>
     policy.declared.has(field),
-  );
-}
-
-function isMissingPolicyMetadataAsset(
-  artifact: Artifact,
-  parsedPolicy: SecurityPolicy,
-  effectivePolicy: SecurityPolicy,
-): boolean {
-  return (
-    (artifact.kind === "skill" ||
-      artifact.kind === "context" ||
-      artifact.kind === "context_lens") &&
-    effectiveAllowedDataClass(effectivePolicy) === undefined &&
-    effectiveAllowedDataList(effectivePolicy).length === 0 &&
-    !hasLocalSecurityPolicyMetadata(parsedPolicy)
   );
 }
 

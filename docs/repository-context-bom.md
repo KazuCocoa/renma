@@ -1,6 +1,6 @@
 # Repository Context BOM
 
-`renma bom` emits a declared repository manifest for review and CI consumers. Schema v2 is the default; `--schema v1` selects the frozen compatibility projection.
+`renma bom` emits a declared repository manifest for review and CI consumers. Renma 0.18.0 supports only the v2 BOM and Trust Graph schemas. It does not provide a v1 compatibility mode. V2 is the first supported long-term contract; earlier v1 output was an experimental pre-contract surface removed before broader adoption.
 
 The BOM is not a runtime usage report. It does not describe what an LLM actually consumed, assemble prompts, choose task-specific context, inject context into agents, execute agents, call an LLM, import consumed-context evidence, or collect telemetry.
 
@@ -12,7 +12,7 @@ flowchart TD
   Diagnostics["Diagnostics and Readiness"]
   Governance["Lifecycle and ownership evidence"]
   Security["Security posture and policy inventory"]
-  Bom["Repository Context BOM v1 or v2"]
+  Bom["Repository Context BOM v2"]
   Json["Authoritative JSON"]
   Markdown["Markdown review projection"]
   Revision["Git, CI, or PR context supplies revision identity"]
@@ -56,10 +56,9 @@ JSON is the authoritative BOM output. Markdown is a compact review projection fo
 
 Array ordering is deterministic and part of Renma's output contract. Asset `sourcePath` values remain repository-relative. `root` and `configPath` remain absolute paths from the current environment.
 
-V2 assets use `ownership.declaredOwner`, `ownership.effectiveOwner`,
-`ownership.source`, and optional `ownership.inheritedFrom`. Readiness v2 uses
-the effective owner. V1 exposes only a flat declared `owner`; inherited support
-therefore remains unowned in v1.
+Assets use `ownership.declaredOwner`, `ownership.effectiveOwner`,
+`ownership.source`, and optional `ownership.inheritedFrom`. Readiness uses the
+effective owner.
 
 ## Reproducibility
 
@@ -82,15 +81,16 @@ Supported guarantee:
 
 > With the same checkout path, config path, repository contents, Renma version, and UTC evaluation date, repeated `--omit-generated-at` runs should produce byte-identical JSON.
 
-Freshness evaluation uses the UTC calendar date. Metadata dates remain part of the snapshot and must not be removed as timestamp noise. A real file move is a meaningful BOM change because `sourcePath` is repository evidence. Portable byte-for-byte output across different runners is not a v1 guarantee.
+Freshness evaluation uses the UTC calendar date. Metadata dates remain part of the snapshot and must not be removed as timestamp noise. A real file move is a meaningful BOM change because `sourcePath` is repository evidence. Portable byte-for-byte output across different runners is not a v2 guarantee.
 
 ## Schema Evolution
 
 `schemaVersion` represents the consumer-facing BOM schema. `generator.version` represents the Renma implementation version and is not the schema version.
 
-Both schemas are explicit contracts. V1 remains frozen for legacy consumers;
-v2 is the default contract for normalized ownership, first-class support
-assets, and static support relationships.
+V2 is the first supported long-term contract for normalized ownership,
+first-class support assets, and static support relationships. Consumers must
+inspect `schemaVersion` independently from `generator.version`. A future
+incompatible contract may intentionally introduce v3.
 
 Within a schema, changes should be backward-compatible and additive:
 
@@ -99,21 +99,17 @@ Within a schema, changes should be backward-compatible and additive:
 - enum additions are consumer-visible changes and must be documented;
 - a future breaking contract requires a new schema version rather than silently changing existing semantics.
 
-## Migration Notes
+Treat `owns_local_resource`, `statically_references`, `inherits_owner`, and
+`inherits_policy` as static repository evidence, not runtime behavior. Branch
+on `schemaVersion`; `generator.version` is provenance only.
 
-- Pin `--schema v1` while a consumer still reads flat `owner`.
-- Move v2 consumers to the normalized `ownership` object.
-- Treat `owns_local_resource`, `statically_references`, `inherits_owner`, and
-  `inherits_policy` as static repository evidence, not runtime behavior.
-- Branch on `schemaVersion`; `generator.version` is provenance only.
-
-Follow-up documentation task: publish complete JSON Schema files and field-by-field examples for both BOM and Trust Graph versions in a documentation-only pull request.
+Follow-up documentation task: publish complete JSON Schema files and field-by-field v2 examples for BOM and Trust Graph in a documentation-only pull request.
 
 `--omit-generated-at` does not make the report a generic canonical JSON format or a portable artifact.
 
 ## Source Provenance
 
-BOM provenance is deliberately repository-local in both schemas:
+BOM v2 provenance is deliberately repository-local:
 
 - repository-relative source paths;
 - per-asset content hashes;

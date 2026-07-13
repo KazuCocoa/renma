@@ -41,8 +41,11 @@ test("scan discovers default artifacts and emits deterministic findings", async 
   );
   assert.equal(result.securityPolicyInventory?.totalPolicyAssets, 1);
   assert.equal(result.securityPolicyInventory?.assetKinds.skill, 1);
-  assert.equal(result.securityPolicyInventory?.assetsWithPolicyMetadata, 0);
-  assert.equal(result.securityPolicyInventory?.assetsMissingPolicyMetadata, 1);
+  assert.equal(
+    result.securityPolicyInventory?.assetsWithLocalPolicyMetadata,
+    0,
+  );
+  assert.equal(result.securityPolicyInventory?.assetsWithoutEffectivePolicy, 1);
 });
 
 test("scan discovers skills/demo/skill.md entrypoint as a skill", async () => {
@@ -55,10 +58,9 @@ test("scan discovers skills/demo/skill.md entrypoint as a skill", async () => {
   assert.equal(result.scannedFileCount, 1);
   assert.equal(result.securityPolicyInventory?.assetKinds.skill, 1);
   assert.deepEqual(
-    result.securityPolicyInventory?.missingPolicyAssets.map((asset) => [
-      asset.path,
-      asset.kind,
-    ]),
+    result.securityPolicyInventory?.assetsWithoutEffectivePolicyList.map(
+      (asset) => [asset.path, asset.kind],
+    ),
     [["skills/demo/skill.md", "skill"]],
   );
   assert.equal(
@@ -83,10 +85,9 @@ test("scan discovers skills/demo/foo.skill.md entrypoint as a skill", async () =
   assert.equal(result.scannedFileCount, 1);
   assert.equal(result.securityPolicyInventory?.assetKinds.skill, 1);
   assert.deepEqual(
-    result.securityPolicyInventory?.missingPolicyAssets.map((asset) => [
-      asset.path,
-      asset.kind,
-    ]),
+    result.securityPolicyInventory?.assetsWithoutEffectivePolicyList.map(
+      (asset) => [asset.path, asset.kind],
+    ),
     [["skills/demo/foo.skill.md", "skill"]],
   );
 });
@@ -107,10 +108,9 @@ test(".agents/skills entrypoints are classified as skills before generic agent d
   assert.equal(result.securityPolicyInventory?.assetKinds.skill, 1);
   assert.equal(result.securityPolicyInventory?.assetKinds.agent, 0);
   assert.deepEqual(
-    result.securityPolicyInventory?.missingPolicyAssets.map((asset) => [
-      asset.path,
-      asset.kind,
-    ]),
+    result.securityPolicyInventory?.assetsWithoutEffectivePolicyList.map(
+      (asset) => [asset.path, asset.kind],
+    ),
     [[".agents/skills/demo/SKILL.md", "skill"]],
   );
   assert.ok(
@@ -161,7 +161,10 @@ test("reserved support directory names are not classified as skills", async () =
   assert.equal(result.scannedFileCount, 1);
   assert.equal(result.securityPolicyInventory?.assetKinds.skill, 0);
   assert.equal(result.securityPolicyInventory?.assetKinds.example, 1);
-  assert.equal(result.securityPolicyInventory?.missingPolicyAssets.length, 0);
+  assert.equal(
+    result.securityPolicyInventory?.assetsWithoutEffectivePolicyList.length,
+    1,
+  );
 
   const diagnostic = result.diagnostics.find(
     (item) =>
@@ -294,7 +297,10 @@ test("skill-like files outside explicit skill directories are not classified as 
   assert.equal(result.scannedFileCount, 1);
   assert.equal(result.securityPolicyInventory?.assetKinds.skill, 0);
   assert.equal(result.securityPolicyInventory?.assetKinds.agent, 1);
-  assert.equal(result.securityPolicyInventory?.missingPolicyAssets.length, 0);
+  assert.equal(
+    result.securityPolicyInventory?.assetsWithoutEffectivePolicyList.length,
+    1,
+  );
   assert.ok(
     result.diagnostics.some(
       (diagnostic) =>

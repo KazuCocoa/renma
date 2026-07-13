@@ -15,10 +15,7 @@ import type {
 } from "./security-policy-inventory.js";
 import type { Diagnostic, Evidence, Finding, RiskClass } from "./types.js";
 
-export type TrustGraphSchema = "v1" | "v2";
-export type TrustGraphSchemaVersion =
-  | "renma.trustGraph.v1"
-  | "renma.trustGraph.v2";
+export type TrustGraphSchemaVersion = "renma.trustGraph.v2";
 
 export type TrustGraphNodeType =
   | "asset"
@@ -141,10 +138,7 @@ const RISK_CLASSES: Array<RiskClass | "unclassified"> = [
   "unclassified",
 ];
 
-export function buildTrustGraph(
-  input: TrustGraphInput,
-  schema: TrustGraphSchema = "v2",
-): TrustGraph {
+export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
   const nodes = new Map<string, TrustGraphNode>();
   const edges = new Map<string, TrustGraphEdge>();
   const assets = stableAssets(input.catalog.assets);
@@ -174,15 +168,13 @@ export function buildTrustGraph(
         from: assetNodeId(asset),
         to: ownerNodeId,
         type: "owned_by",
-        ...(asset.ownership.source === "inherited" &&
-        asset.ownership.inheritedFrom
-          ? {
-              properties: {
-                ownershipSource: "inherited",
-                inheritedFrom: asset.ownership.inheritedFrom,
-              },
-            }
-          : {}),
+        properties: {
+          ownershipSource: asset.ownership.source,
+          ...(asset.ownership.source === "inherited" &&
+          asset.ownership.inheritedFrom
+            ? { inheritedFrom: asset.ownership.inheritedFrom }
+            : {}),
+        },
         evidence: inheritedOwnerAsset
           ? metadataEvidence(inheritedOwnerAsset, "owner")
           : metadataEvidence(asset, "owner"),
@@ -283,82 +275,7 @@ export function buildTrustGraph(
     edges: sortedEdges,
     findings,
   };
-  return schema === "v1" ? projectTrustGraphV1(graph) : graph;
-}
-
-/** Project v2 evidence to the frozen legacy surface without inherited owners. */
-export function projectTrustGraphV1(graph: TrustGraph): TrustGraph {
-  const supportAssetNodeIds = new Set(
-    graph.nodes
-      .filter(
-        (node) =>
-          node.type === "asset" &&
-          (node.properties?.kind === "script" ||
-            node.properties?.kind === "asset"),
-      )
-      .map((node) => node.id),
-  );
-  const nodes = graph.nodes
-    .filter((node) => !supportAssetNodeIds.has(node.id))
-    .map((node) => {
-      if (node.type !== "asset" || !node.properties) return node;
-      const properties = { ...node.properties };
-      const ownership = properties.ownership as
-        | { declaredOwner?: string | null }
-        | undefined;
-      delete properties.ownership;
-      if (ownership?.declaredOwner) properties.owner = ownership.declaredOwner;
-      return { ...node, properties };
-    });
-  const edges = graph.edges.filter((edge) => {
-    if (
-      supportAssetNodeIds.has(edge.from) ||
-      supportAssetNodeIds.has(edge.to)
-    ) {
-      return false;
-    }
-    if (
-      [
-        "owns_local_resource",
-        "statically_references",
-        "inherits_owner",
-      ].includes(edge.type)
-    ) {
-      return false;
-    }
-    if (
-      supportAssetNodeIds.has(edge.from) &&
-      [
-        "selects_security_profile",
-        "inherits_policy",
-        "has_effective_policy",
-      ].includes(edge.type)
-    ) {
-      return false;
-    }
-    return (
-      edge.type !== "owned_by" ||
-      edge.properties?.ownershipSource !== "inherited"
-    );
-  });
-  const referencedNodeIds = new Set(
-    edges.flatMap((edge) => [edge.from, edge.to]),
-  );
-  const projectedNodes = nodes.filter(
-    (node) => node.type !== "owner" || referencedNodeIds.has(node.id),
-  );
-  return {
-    schemaVersion: "renma.trustGraph.v1",
-    summary: summarizeTrustGraph(
-      projectedNodes.filter((node) => node.type === "asset").length,
-      projectedNodes,
-      edges,
-      graph.findings,
-    ),
-    nodes: projectedNodes,
-    edges,
-    findings: graph.findings,
-  };
+  return graph;
 }
 
 function trustEdgeTypeForDependency(
@@ -399,6 +316,8 @@ function addPolicyEvidence(
     });
   }
 
+  if (!policy.hasEffectivePolicy) return;
+
   for (let index = 1; index < policy.profileChain.length; index += 1) {
     const childProfile = policy.profileChain[index];
     const parentProfile = policy.profileChain[index - 1];
@@ -422,6 +341,8 @@ function addPolicyEvidence(
     type: "has_effective_policy",
     properties: {
       hasLocalPolicyMetadata: policy.hasLocalPolicyMetadata,
+      policySource: policy.policySource,
+      ...(policy.inheritedFrom ? { inheritedFrom: policy.inheritedFrom } : {}),
     },
     evidence: policy.evidence.policyFields,
   });
@@ -522,7 +443,7 @@ function diagnosticNode(finding: TrustGraphFinding): TrustGraphNode {
 }
 
 function assetNodeId(asset: Asset): string {
-  // Trust Graph v1 keeps asset IDs logical. Duplicate-id diagnostics preserve
+  // Trust Graph keeps asset IDs logical. Duplicate-id diagnostics preserve
   // per-source evidence when multiple catalog assets share the same id.
   return `asset:${asset.id}`;
 }

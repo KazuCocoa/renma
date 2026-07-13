@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { glob, lstat, readFile, stat } from "node:fs/promises";
+import { glob, readFile } from "node:fs/promises";
 import path from "node:path";
 import type {
   Artifact,
@@ -7,6 +7,7 @@ import type {
   Diagnostic,
   ScanConfig,
 } from "./types.js";
+import { safeRepositoryPath } from "./repository-boundary.js";
 
 const SKILL_LIKE_FILE_OUTSIDE_SKILLS_DIR_CODE =
   "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR";
@@ -307,16 +308,24 @@ export async function discoverArtifacts(
     async (relativePath) => {
       const absolutePath = path.join(root, relativePath);
       try {
-        const linkInfo = await lstat(absolutePath);
-        if (linkInfo.isSymbolicLink()) {
+        const inspected = await safeRepositoryPath(root, relativePath);
+        if (inspected.state === "symlink") {
           diagnostics.push({
             severity: "warning",
             path: relativePath,
-            message: "Skipping symbolic link.",
+            message: "Skipping path reached through a symbolic link.",
           });
           return undefined;
         }
-        const info = await stat(absolutePath);
+        if (inspected.state !== "present") {
+          diagnostics.push({
+            severity: "error",
+            path: relativePath,
+            message: `Could not safely inspect file (${inspected.state}).`,
+          });
+          return undefined;
+        }
+        const info = inspected.stats;
         if (!info.isFile()) return undefined;
         if (info.size > config.maxFileSizeBytes) {
           diagnostics.push({
@@ -476,7 +485,8 @@ async function skillLikeLayoutDiagnostics(
     if (repositoryPathDepth(relativePath) > config.maxDepth) continue;
 
     try {
-      if (!(await stat(path.join(root, relativePath))).isFile()) continue;
+      const inspected = await safeRepositoryPath(root, relativePath);
+      if (inspected.state !== "present" || !inspected.stats.isFile()) continue;
     } catch {
       continue;
     }

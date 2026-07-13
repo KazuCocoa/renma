@@ -26,8 +26,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Added `renma scaffold skill --resources references,scripts,assets`; file mode
   creates only selected empty directories, while prompt and JSON modes report
   the selected resource contract without writing files.
-- Added explicit BOM and Trust Graph v1/v2 schemas with v2 defaults and
-  `--schema v1|v2` selection.
+- Added BOM and Trust Graph v2 as the first supported long-term schema
+  contracts. Renma 0.18.0 does not provide a v1 compatibility mode; the
+  earlier experimental v1 surface was removed before broader adoption.
 - Added normalized ownership provenance and static local-resource relationship
   edges across catalog, graph, readiness, BOM, and Trust Graph output.
 
@@ -72,6 +73,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Prevented script and asset bytes from declaring policy. Skill-local scripts
   and assets inherit the nearest unambiguous Skill policy; text scripts may be
   scanned under it, while binary files and ordinary output assets stay opaque.
+- Rejected files reached through leaf or ancestor symbolic links, including
+  Skill-local directory links that point elsewhere inside or outside the
+  repository.
+- Scanned non-Markdown scripts from line 1 even when they begin with `---`, and
+  added explicit local, inherited, effective, and missing-effective policy
+  inventory provenance.
+- Added balanced-parenthesis Markdown destination parsing and single-pass
+  decoding for encoded filename characters.
 - Stopped treating a command, Procedure/Steps/Setup headings, ordered workflow
   wording, or 450/700-word counts as evidence of a bad Skill.
 - Stopped recommending Context Assets as the default destination for

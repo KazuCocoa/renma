@@ -1,10 +1,6 @@
 import { parseArgs } from "node:util";
 import packageJson from "../package.json" with { type: "json" };
-import {
-  runBomCommand,
-  type BomFormat,
-  type BomSchema,
-} from "./commands/bom.js";
+import { runBomCommand, type BomFormat } from "./commands/bom.js";
 import { runCatalogCommand, type CatalogFormat } from "./commands/catalog.js";
 import {
   runCiReportCommand,
@@ -116,7 +112,6 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         "omit-generated-at": { type: "boolean" },
         owner: { type: "string" },
         resources: { type: "string" },
-        schema: { type: "string" },
         tags: { type: "string", multiple: true },
         title: { type: "string" },
         to: { type: "string" },
@@ -373,10 +368,6 @@ async function runBom(values: CliValues, target: string): Promise<number> {
   if (format !== "json" && format !== "markdown") {
     return usageError("bom", "--format must be either json or markdown.");
   }
-  const schema = stringValue(values.schema) ?? "v2";
-  if (schema !== "v1" && schema !== "v2") {
-    return usageError("bom", "--schema must be either v1 or v2.");
-  }
 
   const configPath = stringValue(values.config);
   const overrides: ConfigOverrides = {
@@ -388,7 +379,6 @@ async function runBom(values: CliValues, target: string): Promise<number> {
       format: format as BomFormat,
       overrides,
       omitGeneratedAt: values["omit-generated-at"] === true,
-      schema: schema as BomSchema,
     });
   } catch (error) {
     console.error(
@@ -533,10 +523,6 @@ async function runTrustGraph(
       "--format must be either json or markdown.",
     );
   }
-  const schema = stringValue(values.schema) ?? "v2";
-  if (schema !== "v1" && schema !== "v2") {
-    return usageError("trust-graph", "--schema must be either v1 or v2.");
-  }
 
   const configPath = stringValue(values.config);
   const overrides: ConfigOverrides = {
@@ -546,7 +532,6 @@ async function runTrustGraph(
   try {
     return await runTrustGraphCommand(target, {
       format: format as TrustGraphFormat,
-      schema,
       overrides,
     });
   } catch (error) {

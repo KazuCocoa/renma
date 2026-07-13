@@ -17,7 +17,7 @@ Use this index to choose the smallest document that answers your question.
   canonical Skill format, pre-0.16 migration, conflicts, and blocked migration.
 - [Security Policy Guide](security-policy.md): security metadata semantics,
   profiles, diagnostics, and review boundaries.
-- [Repository Context BOM](repository-context-bom.md): authoritative BOM v1/v2
+- [Repository Context BOM](repository-context-bom.md): authoritative BOM v2
   snapshot, output, reproducibility, migration, and provenance contract.
 - [Diagnostics Reference](diagnostics.md): scan finding identifiers and repair
   guidance.

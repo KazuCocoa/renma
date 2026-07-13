@@ -294,7 +294,7 @@ Security findings may include `riskClass` so reviewers can distinguish clear vio
 
 Renma can summarize security posture from existing static security findings. The summary groups findings by `riskClass` (`violation`, `suspicious`, `advisory`, and `unclassified`) and by severity, and reports high/critical security finding counts.
 
-This is reporting-only in v1:
+This is reporting-only in the v2 contract:
 
 - it does not add new detectors
 - it does not change scan `fail_on`
@@ -306,13 +306,16 @@ Runtime enforcement remains outside Renma.
 
 ### Effective policy inventory
 
-Renma can also summarize the effective static policy surface across discovered assets. The inventory is derived from asset-local policy metadata, selected security-profile chains, and repository-level `security` config.
+Renma can also summarize the effective static policy surface across discovered assets. The inventory distinguishes assets with local metadata, inherited policy, effective policy, and no effective policy.
 
-Text Skill-local scripts and assets participate when they explicitly declare
-valid local policy metadata. Their raw content remains outside Markdown parsing.
-Binary/opaque assets never contribute policy or instruction text.
+Script and asset bytes never declare local policy. Skill-local scripts and
+assets inherit policy only from one unambiguous owning Skill. Text scripts may
+be scanned under that inherited policy from line 1; ordinary output assets and
+binary files never contribute instruction text. Orphan scripts do not receive
+policy-dependent evaluation from repository configuration without an owning
+Skill and traceable inheritance evidence.
 
-The inventory reports policy coverage, network/upload/secrets booleans, human approval requirements, approved destinations, forbidden inputs, disallowed commands, and profile resolution counts. It is reporting-only in v1 and does not enforce runtime behavior.
+The inventory reports local, inherited, effective, and missing-effective coverage; network/upload/secrets booleans; human approval requirements; approved destinations; forbidden inputs; disallowed commands; and profile resolution counts. It is reporting-only in v2 and does not enforce runtime behavior.
 
 `renma trust-graph` also includes effective policy evidence. Each effective policy node uses a deterministic fingerprint over normalized allowed data, forbidden inputs, network/upload/secrets booleans, human approval requirement, approved destinations, and disallowed commands. The graph links assets to selected security-profile values and to their effective policy fingerprint; it does not enforce the policy at runtime.
 
@@ -320,7 +323,7 @@ The inventory reports policy coverage, network/upload/secrets booleans, human ap
 
 `renma diff` and `renma ci-report` can summarize how security posture and effective security policy inventory changed between two revisions.
 
-The diff uses existing static findings and existing policy metadata/config summaries. It does not add new detectors, change runtime behavior, change scan `fail_on`, change readiness scoring, or change CI pass/warn/fail status in v1.
+The diff uses existing static findings and existing policy metadata/config summaries. It does not add new detectors, change runtime behavior, change scan `fail_on`, change readiness scoring, or change CI pass/warn/fail status.
 
 ## Common Security Diagnostics
 

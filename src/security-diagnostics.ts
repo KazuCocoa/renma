@@ -713,8 +713,12 @@ function securityFindingsForArtifact(
   const policyResolution = resolveOperationalSecurityPolicy(
     policyArtifact ?? { ...artifact, content: "" },
   );
+  const effectiveSecurityConfig =
+    artifact.kind === "script" && policyArtifact === undefined
+      ? undefined
+      : securityConfig;
   const parsedPolicy = policyResolution.policy;
-  const policy = applySecurityConfig(parsedPolicy, securityConfig);
+  const policy = applySecurityConfig(parsedPolicy, effectiveSecurityConfig);
   const detections: Detection[] = [
     ...(policyArtifact === artifact
       ? invalidCanonicalSecurityDetections(policyResolution.issues)
@@ -722,16 +726,16 @@ function securityFindingsForArtifact(
     ...securityPolicyResolutionDetections(
       parsedPolicy,
       policy,
-      securityConfig,
+      effectiveSecurityConfig,
       artifact.content,
+      artifact.markdownParserEligible,
     ),
   ];
   const lines = artifact.content.split(/\r?\n/);
-  const frontmatterEnd =
-    lines[0]?.trim() === "---"
-      ? lines.findIndex((line, index) => index > 0 && line.trim() === "---")
-      : -1;
-  const scanStart = frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
+  const scanStart = securityContentStart(
+    lines,
+    artifact.markdownParserEligible,
+  );
   let inFence = false;
   let recentHumanApprovalLine = 0;
   let recentRiskMitigationLine = 0;
@@ -751,7 +755,11 @@ function securityFindingsForArtifact(
   }
 
   detections.push(
-    ...bodyPolicyContradictionDetections(artifact.content, policy),
+    ...bodyPolicyContradictionDetections(
+      artifact.content,
+      policy,
+      artifact.markdownParserEligible,
+    ),
   );
 
   for (let index = scanStart; index < lines.length; index += 1) {
@@ -772,7 +780,7 @@ function securityFindingsForArtifact(
     if (shellComment) {
       continue;
     }
-    if (isPolicyLine(line)) {
+    if (artifact.markdownParserEligible && isPolicyLine(line)) {
       continue;
     }
     const hasHumanApprovalGuard =
@@ -852,14 +860,11 @@ function disallowedCommandDetections(
 function bodyPolicyContradictionDetections(
   content: string,
   policy: SecurityPolicy,
+  markdownParserEligible: boolean,
 ): Detection[] {
   const detections: Detection[] = [];
   const lines = content.split(/\r?\n/);
-  const frontmatterEnd =
-    lines[0]?.trim() === "---"
-      ? lines.findIndex((line, index) => index > 0 && line.trim() === "---")
-      : -1;
-  const scanStart = frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
+  const scanStart = securityContentStart(lines, markdownParserEligible);
   const emitted = new Set<string>();
   let inFence = false;
 
@@ -869,7 +874,7 @@ function bodyPolicyContradictionDetections(
       inFence = !inFence;
       continue;
     }
-    if (inFence || isPolicyLine(line)) continue;
+    if (inFence || (markdownParserEligible && isPolicyLine(line))) continue;
 
     const lineNumber = index + 1;
     const candidates: Array<[string, boolean]> = [
@@ -1276,10 +1281,16 @@ function securityPolicyResolutionDetections(
   resolvedPolicy: SecurityPolicy,
   config: SecurityConfig | undefined,
   content: string,
+  markdownParserEligible: boolean,
 ): Detection[] {
   const detections: Detection[] = [];
   if (parsedPolicy.securityProfile === undefined) {
-    addForbiddenInputDetections(detections, resolvedPolicy, content);
+    addForbiddenInputDetections(
+      detections,
+      resolvedPolicy,
+      content,
+      markdownParserEligible,
+    );
     return detections;
   }
 
@@ -1398,7 +1409,12 @@ function securityPolicyResolutionDetections(
     });
   }
 
-  addForbiddenInputDetections(detections, resolvedPolicy, content);
+  addForbiddenInputDetections(
+    detections,
+    resolvedPolicy,
+    content,
+    markdownParserEligible,
+  );
 
   return detections;
 }
@@ -1407,9 +1423,14 @@ function addForbiddenInputDetections(
   detections: Detection[],
   policy: SecurityPolicy,
   content: string,
+  markdownParserEligible: boolean,
 ): void {
   for (const forbiddenInput of policy.forbiddenInputs) {
-    const detection = forbiddenInputDetection(content, forbiddenInput);
+    const detection = forbiddenInputDetection(
+      content,
+      forbiddenInput,
+      markdownParserEligible,
+    );
     if (detection !== undefined) detections.push(detection);
   }
 }
@@ -1525,17 +1546,14 @@ function policyFieldDetectionEvidence(
 function forbiddenInputDetection(
   content: string,
   forbiddenInput: string,
+  markdownParserEligible: boolean,
 ): Detection | undefined {
   const needle = forbiddenInput.trim();
   if (needle.length === 0) return undefined;
 
   const pattern = new RegExp(`\\b${escapeRegExp(needle)}\\b`, "i");
   const lines = content.split(/\r?\n/);
-  const frontmatterEnd =
-    lines[0]?.trim() === "---"
-      ? lines.findIndex((line, index) => index > 0 && line.trim() === "---")
-      : -1;
-  const scanStart = frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
+  const scanStart = securityContentStart(lines, markdownParserEligible);
   for (let index = scanStart; index < lines.length; index += 1) {
     const line = lines[index] ?? "";
     if (!pattern.test(line)) continue;
@@ -1550,6 +1568,17 @@ function forbiddenInputDetection(
     };
   }
   return undefined;
+}
+
+function securityContentStart(
+  lines: string[],
+  markdownParserEligible: boolean,
+): number {
+  if (!markdownParserEligible || lines[0]?.trim() !== "---") return 0;
+  const frontmatterEnd = lines.findIndex(
+    (line, index) => index > 0 && line.trim() === "---",
+  );
+  return frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
 }
 
 function lineSnippet(content: string, line: number): string | undefined {

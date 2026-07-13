@@ -81,10 +81,6 @@ const OPTION_HELP = {
     description:
       "Create selected Skill-local directories: references,scripts,assets.",
   },
-  schema: {
-    flags: "--schema <v1|v2>",
-    description: "Select an explicit report schema. Defaults to v2.",
-  },
   tags: {
     flags: "--tags <tags>",
     description: "Set comma-separated or repeated scaffold tags.",
@@ -257,9 +253,9 @@ export const COMMAND_HELP = [
     examples: [
       "renma trust-graph . --format markdown",
       "renma trust-graph . --format json",
-      "renma trust-graph . --schema v1 --format json",
     ],
     interpretation: [
+      "Renma 0.18.0 emits only Trust Graph v2, the first supported long-term contract; there is no v1 compatibility mode.",
       "The report connects evidence; it does not decide trust for you.",
       "Missing owner, lifecycle, policy, or diagnostic evidence should be reviewed in context.",
       "JSON is the source of truth for downstream tooling; Markdown is for human review.",
@@ -276,7 +272,6 @@ export const COMMAND_HELP = [
         description: "Output format: json or markdown. Defaults to json.",
       },
       "json",
-      "schema",
       "help",
     ],
   },
@@ -339,10 +334,10 @@ export const COMMAND_HELP = [
     examples: [
       "renma bom . --format json",
       "renma bom . --format markdown",
-      "renma bom . --schema v1 --format json",
       "renma bom . --format json --omit-generated-at",
     ],
     interpretation: [
+      "Renma 0.18.0 emits only BOM v2, the first supported long-term contract; there is no v1 compatibility mode.",
       "The BOM is a declared repository manifest, not a runtime usage report or telemetry.",
       "--omit-generated-at only removes the run-time generation timestamp.",
       "With the same checkout path, config path, repository contents, Renma version, and UTC evaluation date, repeated --omit-generated-at JSON runs should be byte-identical.",
@@ -360,7 +355,6 @@ export const COMMAND_HELP = [
         description: "Output format: json or markdown. Defaults to json.",
       },
       "json",
-      "schema",
       "omit-generated-at",
       "help",
     ],

@@ -244,7 +244,7 @@ renma bom . --format markdown
 renma bom . --format json
 ```
 
-The BOM is a declared repository manifest. It combines catalog, graph, diagnostics, readiness, lifecycle, hash, and security posture evidence. It is not a record of actual LLM runtime usage. See the [Repository Context BOM contract](repository-context-bom.md) for v1/v2 boundaries.
+The BOM is a declared repository manifest. It combines catalog, graph, diagnostics, readiness, lifecycle, hash, and security posture evidence. It is not a record of actual LLM runtime usage. See the [Repository Context BOM contract](repository-context-bom.md) for v2 boundaries.
 
 ## User Story: Improve Existing Skills With Diagnostics
 
@@ -550,10 +550,9 @@ renma bom .
 renma bom . --format json
 renma bom . --format markdown
 renma bom . --format json --omit-generated-at
-renma bom . --schema v1 --format json
 ```
 
-Use the BOM when reviewers or CI consumers need one repository evidence manifest that combines existing Renma evidence. Schema v2 is the default and includes normalized declared/effective ownership plus static support relationships. `--schema v1` emits the frozen declared-owner-only compatibility projection. See the [Repository Context BOM contract](repository-context-bom.md).
+Use the BOM when reviewers or CI consumers need one repository evidence manifest that combines existing Renma evidence. Renma 0.18.0 supports only v2, the first supported long-term BOM contract. It does not provide a v1 compatibility mode. V2 includes normalized declared/effective ownership plus static support relationships. See the [Repository Context BOM contract](repository-context-bom.md).
 
 The BOM is not a record of actual LLM runtime usage. Renma does not collect telemetry, assemble prompts, choose task-specific context, inject context into agents, import consumed-context evidence, or claim what an LLM actually consumed.
 
@@ -618,7 +617,6 @@ Prints deterministic Trust Graph evidence derived from catalog, graph, scan, and
 ```bash
 renma trust-graph . --format markdown
 renma trust-graph . --format json
-renma trust-graph . --schema v1 --format json
 renma scan . --format json
 ```
 
@@ -626,9 +624,9 @@ Use this when a reviewer or downstream tool needs one stable evidence layer that
 
 Trust Graph is repository evidence. It does not compute a trust score, select or inject runtime context, assemble prompts, call an LLM, collect telemetry, or enforce policy at runtime.
 
-Schema v2 is the default. It includes normalized ownership and static `owns_local_resource`, `statically_references`, `inherits_owner`, and `inherits_policy` evidence. `--schema v1` omits those v2-only projections and reports declared owners only. JSON is the source of truth; Markdown is for human review. `scan --format json` includes v2 under `trustGraph`.
+Renma 0.18.0 supports only Trust Graph v2, the first supported long-term contract. It includes normalized ownership and static `owns_local_resource`, `statically_references`, `inherits_owner`, and `inherits_policy` evidence. JSON is the source of truth; Markdown is for human review. `scan --format json` includes the same v2 contract under `trustGraph`.
 
-Migration: consumers that read flat `owner` fields should either pin `--schema v1` or migrate to `ownership.declaredOwner`, `ownership.effectiveOwner`, and `ownership.source`. Consumers must branch on `schemaVersion`, not on the Renma package version.
+Consumers must branch on `schemaVersion`, not on the Renma package version. A future incompatible contract may intentionally introduce v3.
 
 Reviewers can use Trust Graph to find assets without owners, find assets without lifecycle status, inspect assets sharing the same effective policy fingerprint, and connect diagnostics back to asset evidence. `trust-graph` exits `0` when the report is generated successfully; use `scan --fail-on` when CI should fail on findings.
 
@@ -686,7 +684,7 @@ The report summarizes readiness deltas, graph-resolution changes, added and remo
 
 Output includes a CI status (`PASS`, `WARN`, or `FAIL`), a summary, readiness changes, graph changes, and review-focused finding changes.
 
-Repository Context BOM artifacts describe declared repository state, not prompt assembly, context injection, agent execution, actual LLM runtime usage, or telemetry. Use `renma bom . --format json` when CI needs a machine-readable manifest and `renma bom . --format markdown` for review comments or artifacts. For v1 compatibility and reproducibility details, see the [Repository Context BOM contract](repository-context-bom.md).
+Repository Context BOM artifacts describe declared repository state, not prompt assembly, context injection, agent execution, actual LLM runtime usage, or telemetry. Use `renma bom . --format json` when CI needs a machine-readable manifest and `renma bom . --format markdown` for review comments or artifacts. For v2 compatibility and reproducibility details, see the [Repository Context BOM contract](repository-context-bom.md).
 
 ### `ownership`
 
