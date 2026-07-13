@@ -105,34 +105,36 @@ Current diagnostics include evidence, `whyItMatters`, remediation, typed repair
 constraints, verification steps, and LLM-facing hints where applicable. These
 fields remain deterministic rule output, not LLM-generated validation.
 
-Example diagnostic shape:
+Example diagnostic shape (selected stable fields from a deterministic fixture;
+input-specific `details` omitted):
 
 ```json
 {
   "id": "QUAL-SKILL-MIXED-RESPONSIBILITY",
   "severity": "low",
-  "category": "quality",
-  "title": "Skill may mix workflow and reusable knowledge",
+  "category": "maintenance",
+  "confidence": "medium",
+  "title": "Skill may mix its workflow with reusable knowledge",
   "evidence": {
-    "path": "skills/testing/test-case-generation/SKILL.md",
-    "startLine": 42,
-    "endLine": 78,
-    "snippet": "boundary value analysis"
+    "path": "skills/mobile/SKILL.md",
+    "startLine": 11,
+    "endLine": 11,
+    "snippet": "Detected reusable-knowledge headings: Platform Facts - Known Issues - Domain Rules - Product Policy; Detected reusable-knowledge phrases: known issue"
   },
-  "whyItMatters": "Reusable QA and domain knowledge should be owned, reviewed, and reused as shared context assets instead of being buried in one skill.",
-  "remediation": "Split independently owned reusable knowledge into first-class shared context assets and keep the focused task and workflow in the Skill.",
+  "whyItMatters": "Reusable setup notes, troubleshooting, platform guidance, testing heuristics, or domain rules are easier to own, review, and reuse when they live in shared context assets instead of only inside one skill.",
+  "remediation": "Review the matched headings and phrases. Promote content to contexts/ only when it needs cross-Skill reuse, independent ownership, lifecycle, or source-of-truth status; otherwise keep Skill-specific detail in SKILL.md or references/.",
   "constraints": [
-    "Do not introduce task context selection.",
-    "Do not create prompt packages.",
-    "Keep activation boundaries, ordered workflow, verification, output, and completion criteria in the Skill.",
-    "Each context asset should have id, owner, status, and short scope."
+    "Do not make Renma select runtime context.",
+    "Do not assemble prompt packages.",
+    "Do not automatically rewrite or split skills.",
+    "Preserve SKILL.md as a focused workflow entrypoint.",
+    "Give extracted context assets stable metadata such as id, owner, and status."
   ],
   "verificationSteps": [
     "Run renma scan.",
-    "Run any project-specific validation checks that apply to this repository.",
-    "Ensure the skill no longer mixes reusable domain knowledge with usage guidance."
+    "Confirm the advisory is resolved or intentionally accepted after reusable knowledge is represented as shared context assets."
   ],
-  "llmHint": "Create shared context assets for independently reusable QA knowledge, update canonical Skill metadata, and preserve the focused workflow."
+  "llmHint": "Check whether the matched knowledge is used across Skills or needs independent ownership. Use contexts/ only for shared knowledge; keep Skill-local procedures and edge cases in SKILL.md or references/."
 }
 ```
 
@@ -140,12 +142,12 @@ Central repair workflow:
 
 1. A single `SKILL.md` contains reusable domain knowledge, tool guidance, and
    QA heuristics.
-2. Renma emits structured findings explaining that the skill is too monolithic
-   and mixes usage guidance with reusable context.
+2. Renma detects reusable-knowledge signals and reports possible mixed
+   responsibility. The finding does not require every matched detail to move.
 3. Codex or Claude reads the diagnostics and proposes a patch that moves
-   independently reusable knowledge into first-class context assets under
-   `contexts/`, keeps the focused workflow in the Skill, adds canonical
-   metadata, and updates declared context references.
+   knowledge into `contexts/` only when it needs cross-Skill reuse, independent
+   ownership, lifecycle, or source-of-truth status. Skill-specific workflow and
+   detail remain in `SKILL.md` or Skill-local References.
 4. A human reviews the patch.
 5. Renma scans the repository again and confirms the skill/context separation is
    healthier.

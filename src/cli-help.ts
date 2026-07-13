@@ -105,6 +105,11 @@ const OPTION_HELP = {
 
 export type CliOptionName = keyof typeof OPTION_HELP;
 
+const AUTHORING_GUIDE_URL =
+  "https://github.com/KazuCocoa/renma/blob/main/docs/authoring-guide.md";
+const CONTEXT_LENS_GUIDE_URL =
+  "https://github.com/KazuCocoa/renma/blob/main/docs/context-lens.md";
+
 export const COMMAND_HELP = [
   {
     name: "scan",
@@ -568,7 +573,7 @@ export const COMMAND_HELP = [
     nextSteps: [
       "Review and complete the generated content with evidence-backed details.",
       "Run renma scan . --fail-on high, fix relevant diagnostics, and rerun the scan.",
-      "Use docs/authoring-guide.md for placement decisions and docs/context-lens.md for Lens semantics.",
+      `Use ${AUTHORING_GUIDE_URL} for placement decisions and ${CONTEXT_LENS_GUIDE_URL} for Lens semantics.`,
       "Have a human review meaningful semantic content before merging.",
     ],
     options: [
@@ -727,7 +732,8 @@ export function renderGlobalHelp(version: string): string {
     "- Skill: focused workflow.",
     "- Context: durable reusable knowledge.",
     "- Context Lens: purpose-specific interpretation of declared Context.",
-    "- Authoring Guide: docs/authoring-guide.md; Context Lens guide: docs/context-lens.md.",
+    `- Authoring Guide: ${AUTHORING_GUIDE_URL}`,
+    `- Context Lens guide: ${CONTEXT_LENS_GUIDE_URL}`,
     "",
     "Usage",
     "  renma <command> [args] [options]",

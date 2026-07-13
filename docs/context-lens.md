@@ -133,8 +133,9 @@ Review the boundary-value Context for ambiguity, missing limits, and unclear
 sources of truth. Cite the specification evidence behind each finding.
 ```
 
-This is structurally valid only when the target resolves. It is useful only if
-the body makes the purpose-specific interpretation concrete enough for review.
+This is structurally valid only when the target resolves to a Context Asset. It
+is useful only if the body makes the purpose-specific interpretation concrete
+enough for review.
 
 ## Persona Framing Is Not A Lens
 
@@ -163,6 +164,43 @@ This is insufficient because it:
   asset.
 
 ### Better Lens
+
+The following Context Asset and Lens use repository-defined example IDs. They
+are not built into Renma. An author must create or identify the real Context
+Asset before declaring it in `applies_to`.
+
+The complete responsibility chain is:
+
+```text
+Context Asset -> reusable test-quality knowledge
+Context Lens  -> test-code-review interpretation criteria
+Skill         -> review task and output contract
+```
+
+#### Example Context Asset
+
+```yaml
+---
+id: context.testing.test-quality
+owner: qa-platform
+status: stable
+when_to_use:
+  - Reviewing automated test design or implementation quality
+when_not_to_use:
+  - Reviewing application behavior without test-quality concerns
+---
+# Test Quality
+
+Reliable automated tests trace assertions to intended requirements, avoid
+false confidence, behave deterministically, isolate unrelated state, and emit
+failure evidence that helps distinguish product defects from test defects.
+```
+
+This Context Asset owns the reusable test-quality knowledge. A Skill may use it
+directly, or use the following Lens when test-code-review interpretation adds
+reusable structure.
+
+#### Context Lens Over The Example Asset
 
 ```yaml
 ---
@@ -232,11 +270,11 @@ Lens defines what purpose-specific review judgment means when interpreting Conte
 | External agent or runtime | Live asset selection, loading or injection, prompt assembly, tool execution, and application of the finished workflow |
 
 A schema-valid Lens can still be semantically weak. Renma can prove that an ID,
-owner, purpose, and resolvable `applies_to` relationship exist. It cannot prove
-that vague focus words, generic persona language, or an underspecified body
-capture useful professional judgment. That quality remains an authoring and
-human-review responsibility; Renma does not call an LLM or add subjective Lens
-scores.
+owner, purpose, and `applies_to` relationship to a Context Asset exist. It
+cannot prove that vague focus words, generic persona language, or an
+underspecified body capture useful professional judgment. That quality remains
+an authoring and human-review responsibility; Renma does not call an LLM or add
+subjective Lens scores.
 
 ## Canonical Skill Relationships
 
@@ -282,9 +320,9 @@ LLM proposes. Renma verifies. Human approves.
 
 Context Lens governance diagnostics use stable string codes in `scan` and
 `readiness`. Blocking `error` diagnostics include missing required fields,
-duplicate Lens IDs, and unresolved `applies_to` targets. Warnings are reported
-for review but do not fail readiness unless another policy makes the repository
-not ready.
+duplicate Lens IDs, unresolved `applies_to` targets, and resolved targets that
+are not Context Assets. Warnings are reported for review but do not fail
+readiness unless another policy makes the repository not ready.
 
 For example, this invalid definition is missing `purpose`, uses a path that
 normalizes differently, and targets no cataloged asset:

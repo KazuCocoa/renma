@@ -1434,8 +1434,15 @@ test("global help lists workflows, boundaries, and distinguishable commands", as
     help.stdout,
     /Context Lens: purpose-specific interpretation of declared Context/,
   );
-  assert.match(help.stdout, /docs\/authoring-guide\.md/);
-  assert.match(help.stdout, /docs\/context-lens\.md/);
+  assert.match(
+    help.stdout,
+    /https:\/\/github\.com\/KazuCocoa\/renma\/blob\/main\/docs\/authoring-guide\.md/,
+  );
+  assert.match(
+    help.stdout,
+    /https:\/\/github\.com\/KazuCocoa\/renma\/blob\/main\/docs\/context-lens\.md/,
+  );
+  assert.doesNotMatch(help.stdout, /Authoring Guide: docs\//);
   for (const command of COMMAND_HELP) {
     assert.match(
       help.stdout,
@@ -1720,13 +1727,18 @@ test("representative command help shows relevant boundaries and options", async 
         /no existing Context Asset needs purpose-specific interpretation/,
         /replace every placeholder purpose, applies_to target, focus, and expected output/,
         /applies_to must resolve to real Context Assets/,
-        /docs\/authoring-guide\.md/,
-        /docs\/context-lens\.md/,
+        /https:\/\/github\.com\/KazuCocoa\/renma\/blob\/main\/docs\/authoring-guide\.md/,
+        /https:\/\/github\.com\/KazuCocoa\/renma\/blob\/main\/docs\/context-lens\.md/,
         /renma scan \. --fail-on high/,
         /Domain knowledge must come from evidence or human input/,
         /Set owner metadata on the scaffold\. Required when --format file is used\./,
       ],
-      excludes: [/--focus/, /--json/, /Filter ownership/],
+      excludes: [
+        /--focus/,
+        /--json/,
+        /Filter ownership/,
+        /Use docs\/authoring-guide\.md/,
+      ],
     },
     {
       name: "suggest-metadata",

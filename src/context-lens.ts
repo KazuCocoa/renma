@@ -9,6 +9,7 @@ export const CONTEXT_LENS_DIAGNOSTIC_CODES = {
   GOVERNANCE_MEANINGLESS: "CONTEXT-LENS-GOVERNANCE-MEANINGLESS",
   MISSING_REQUIRED_FIELD: "CONTEXT-LENS-MISSING-REQUIRED-FIELD",
   PATH_NORMALIZATION_MISMATCH: "CONTEXT-LENS-PATH-NORMALIZATION-MISMATCH",
+  TARGET_NOT_CONTEXT: "CONTEXT-LENS-TARGET-NOT-CONTEXT",
   TARGET_NOT_FOUND: "CONTEXT-LENS-TARGET-NOT-FOUND",
   UNPARSEABLE_FRONTMATTER: "CONTEXT-LENS-UNPARSEABLE-FRONTMATTER",
   UNSUPPORTED_KIND: "CONTEXT-LENS-UNSUPPORTED-KIND",
@@ -356,7 +357,8 @@ function targetDiagnostics(
       });
     }
 
-    if (!resolver.resolve(target)) {
+    const resolvedTarget = resolver.resolve(target);
+    if (!resolvedTarget) {
       diagnostics.push({
         code: CONTEXT_LENS_DIAGNOSTIC_CODES.TARGET_NOT_FOUND,
         severity: "error",
@@ -366,6 +368,21 @@ function targetDiagnostics(
         details: {
           sourcePath: document.artifact.path,
           target,
+          field: "applies_to",
+        },
+      });
+    } else if (resolvedTarget.kind !== "context") {
+      diagnostics.push({
+        code: CONTEXT_LENS_DIAGNOSTIC_CODES.TARGET_NOT_CONTEXT,
+        severity: "error",
+        path: document.artifact.path,
+        message: `Context lens target "${target}" resolves to ${resolvedTarget.kind} asset "${resolvedTarget.sourcePath}", but applies_to must reference a Context Asset. Update applies_to to use a Context Asset ID or path.`,
+        evidence: listItemEvidence(document, "applies_to", index),
+        details: {
+          sourcePath: document.artifact.path,
+          target,
+          resolvedTargetPath: resolvedTarget.sourcePath,
+          resolvedTargetKind: resolvedTarget.kind,
           field: "applies_to",
         },
       });

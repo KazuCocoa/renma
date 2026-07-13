@@ -261,6 +261,7 @@ test("Skill authoring docs preserve the platform and Renma responsibility bounda
 test("Context Lens docs use canonical Skill metadata and explicit semantic boundaries", async () => {
   const lensGuide = await readRepoFile("docs/context-lens.md");
   const authoring = await readRepoFile("docs/authoring-guide.md");
+  const diagnostics = await readRepoFile("docs/diagnostics.md");
 
   assert.match(
     lensGuide,
@@ -303,6 +304,8 @@ test("Context Lens docs use canonical Skill metadata and explicit semantic bound
   }
   assert.match(authoring, /Dynamically select a Lens/);
   assert.match(authoring, /create no asset solely for it/);
+  assert.match(diagnostics, /CONTEXT-LENS-TARGET-NOT-CONTEXT/);
+  assert.match(diagnostics, /must reference a Context Asset/);
 });
 
 test("published current docs separate implemented discovery from deferred routing", async () => {
