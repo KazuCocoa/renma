@@ -32,6 +32,15 @@ test("scan reports deterministic repeated context patterns", async () => {
       "",
       "Use the beta sandbox account.",
     ].join("\n"),
+    "skills/gamma/SKILL.md": [
+      "# Gamma Skill",
+      "",
+      paymentReviewSection(),
+      "",
+      "## Gamma Notes",
+      "",
+      "Use the gamma sandbox account.",
+    ].join("\n"),
     "contexts/payments/review.md": [
       "# Payment Review",
       "",
@@ -44,14 +53,13 @@ test("scan reports deterministic repeated context patterns", async () => {
   assert.ok(ids.has("MAINT-REPEATED-SECTION"));
   assert.ok(ids.has("MAINT-REPEATED-HEADING"));
   assert.ok(ids.has("MAINT-REPEATED-CODE-BLOCK"));
-  assert.ok(ids.has("MAINT-REPEATED-LINK"));
+  assert.equal(ids.has("MAINT-REPEATED-LINK"), false);
   assert.ok(ids.has("MAINT-REPEATED-CONTEXT-PATTERN"));
 
   assertConfidence(findings, "MAINT-REPEATED-SECTION", "high");
   assertConfidence(findings, "MAINT-REPEATED-CODE-BLOCK", "high");
   assertConfidence(findings, "MAINT-REPEATED-CONTEXT-PATTERN", "medium");
   assertConfidence(findings, "MAINT-REPEATED-HEADING", "low");
-  assertConfidence(findings, "MAINT-REPEATED-LINK", "low");
 
   for (const finding of findings) {
     assert.ok(finding.whyItMatters);
@@ -105,7 +113,7 @@ test("unique content emits no repeated-context findings", async () => {
   assert.equal(repeatedFindings(result).length, 0);
 });
 
-test("repeated local links normalize to the same repository target", async () => {
+test("repeated links to the same source are not maintenance findings", async () => {
   const result = await scanFixture({
     "skills/alpha/SKILL.md": [
       "# Alpha",
@@ -123,12 +131,7 @@ test("repeated local links normalize to the same repository target", async () =>
       "[Payment contract](./idempotency.md#contract)",
     ].join("\n"),
   });
-  const finding = repeatedFindings(result).find(
-    (candidate) => candidate.id === "MAINT-REPEATED-LINK",
-  );
-
-  assert.ok(finding);
-  assert.match(finding.llmHint ?? "", /contexts\/payments\/idempotency\.md/);
+  assertNoRepeatedId(result, "MAINT-REPEATED-LINK");
 });
 
 test("each repeated-context finding ID is capped independently", async () => {
@@ -138,7 +141,7 @@ test("each repeated-context finding ID is capped independently", async () => {
   assert.equal(counts.get("MAINT-REPEATED-SECTION"), 10);
   assert.equal(counts.get("MAINT-REPEATED-HEADING"), 10);
   assert.equal(counts.get("MAINT-REPEATED-CODE-BLOCK"), 10);
-  assert.equal(counts.get("MAINT-REPEATED-LINK"), 10);
+  assert.equal(counts.get("MAINT-REPEATED-LINK"), undefined);
   assert.equal(counts.get("MAINT-REPEATED-CONTEXT-PATTERN"), 10);
 });
 
@@ -158,10 +161,10 @@ test("token shingles do not suppress other repeated-context signal kinds", async
   assert.ok(ids.has("MAINT-REPEATED-SECTION"));
   assert.ok(ids.has("MAINT-REPEATED-HEADING"));
   assert.ok(ids.has("MAINT-REPEATED-CODE-BLOCK"));
-  assert.ok(ids.has("MAINT-REPEATED-LINK"));
+  assert.equal(ids.has("MAINT-REPEATED-LINK"), false);
 });
 
-test("token shingle candidates over cap still leave section code and link findings", async () => {
+test("token shingle candidates over cap still leave exact section and code findings", async () => {
   const result = await scanFixture(capFixtureFiles(14));
   const repeated = repeatedFindings(result);
   const tokenFindings = repeated.filter(
@@ -175,7 +178,10 @@ test("token shingle candidates over cap still leave section code and link findin
   assert.ok(
     repeated.some((finding) => finding.id === "MAINT-REPEATED-CODE-BLOCK"),
   );
-  assert.ok(repeated.some((finding) => finding.id === "MAINT-REPEATED-LINK"));
+  assert.equal(
+    repeated.some((finding) => finding.id === "MAINT-REPEATED-LINK"),
+    false,
+  );
 });
 
 test("readiness markdown output samples repeated-context IDs before token shingles dominate", async () => {
@@ -187,7 +193,7 @@ test("readiness markdown output samples repeated-context IDs before token shingl
   assert.match(markdown, /MAINT-REPEATED-SECTION/);
   assert.match(markdown, /MAINT-REPEATED-HEADING/);
   assert.match(markdown, /MAINT-REPEATED-CODE-BLOCK/);
-  assert.match(markdown, /MAINT-REPEATED-LINK/);
+  assert.doesNotMatch(markdown, /MAINT-REPEATED-LINK/);
 });
 
 test("overlapping token shingles from one paragraph collapse", async () => {
@@ -198,6 +204,7 @@ test("overlapping token shingles from one paragraph collapse", async () => {
   const result = await scanFixture({
     "skills/alpha/SKILL.md": `# Alpha\n\n## Payment Retry Evidence Window\n${paragraph}`,
     "skills/beta/SKILL.md": `# Beta\n\n## Payment Retry Evidence Window\n${paragraph}`,
+    "skills/gamma/SKILL.md": `# Gamma\n\n## Payment Retry Evidence Window\n${paragraph}`,
   });
   const tokenFindings = repeatedFindings(result).filter(
     (finding) => finding.id === "MAINT-REPEATED-CONTEXT-PATTERN",
@@ -315,12 +322,14 @@ function paymentReviewSection(): string {
 function capFixtureFiles(count: number): Record<string, string> {
   const alphaSections: string[] = ["# Alpha Cap Fixture"];
   const betaSections: string[] = ["# Beta Cap Fixture"];
+  const gammaSections: string[] = ["# Gamma Cap Fixture"];
   const referenceLinks: string[] = ["# Cap Reference Index"];
 
   for (let index = 0; index < count; index += 1) {
     const section = capSection(index);
     alphaSections.push(section);
     betaSections.push(section);
+    gammaSections.push(section);
     referenceLinks.push(
       `[Cap reference ${index}](./ref-${index}.md#source-of-truth)`,
     );
@@ -329,6 +338,7 @@ function capFixtureFiles(count: number): Record<string, string> {
   return {
     "skills/alpha/SKILL.md": alphaSections.join("\n\n"),
     "skills/beta/SKILL.md": betaSections.join("\n\n"),
+    "skills/gamma/SKILL.md": gammaSections.join("\n\n"),
     "contexts/cap/review.md": referenceLinks.join("\n\n"),
   };
 }

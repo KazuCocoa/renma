@@ -125,6 +125,11 @@ scaffold, or ask it to use `renma scaffold skill` as its starting point.
 The [Authoring Guide](docs/authoring-guide.md) is the canonical walkthrough for
 both workflows.
 
+Renma 0.18.0 uses focused workflows rather than a thin-router model. See the
+[canonical quality profile](docs/quality-profile.md) for every fixed threshold,
+unit, rationale, provenance, and diagnostic mapping. Quality thresholds are not
+configurable through `renma.config.json` in this release.
+
 ## Install And Quick Start
 
 Run Renma without installing it globally:
@@ -214,6 +219,8 @@ lenses/
 This is an illustrative layout, not a required domain hierarchy. `contexts/`
 is preferred and `context/` remains supported. Skill-local `references/`,
 `assets/`, `scripts/`, `examples/`, and `profiles/` are valid support material.
+Local support without a declared owner inherits effective ownership from its
+nearest owning Skill; reports distinguish inherited ownership from declarations.
 When deterministic evidence shows that knowledge is reusable beyond one Skill,
 promote it to an owned Context Asset rather than moving it based on location
 alone.
@@ -260,12 +267,15 @@ canonical and migration rules.
 - [Authoring Guide](docs/authoring-guide.md)
 - [Agent Skills Compatibility and Migration](docs/agent-skills-compatibility.md)
 - [Diagnostics Reference](docs/diagnostics.md)
+- [Renma Quality Profile](docs/quality-profile.md)
 - [Security Policy Guide](docs/security-policy.md)
 - [Repository Context BOM contract](docs/repository-context-bom.md)
 - [Architecture](architecture.md)
 - [Product Design](design.md)
 - [Current Roadmap](plan.md)
-- [Proposed 0.18.0 Skill Discovery](plan-discovery.md)
+- [Deferred Skill-to-Skill Discovery Design](plan-discovery.md): unassigned
+  exploratory route/index design, separate from implemented repository and
+  support-resource discovery.
 - [Interactive Placeholder Example](examples/interactive-placeholder): minimal
   hands-on clarify-before-act Skill interaction with a local tool.
 - [Example Context Repository](examples/context-repo): richer repository-aware

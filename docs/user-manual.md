@@ -79,6 +79,17 @@ Context Asset, or a helper shared across workflows to `tools/**`, only when
 repository evidence supports that change; Renma does not move files
 automatically.
 
+Skill-local support belongs only to the nearest Skill directory. When a local
+support artifact does not declare an owner, ownership, Readiness, graph, Trust
+Graph, and BOM reporting use the nearest Skill's owner as deterministic
+effective ownership and mark it as inherited. This does not invent ownership
+for shared Context Assets or unrelated repository files.
+
+Only files marked Markdown-parser eligible contribute frontmatter metadata,
+headings, links, code fences, and repeated-context evidence. Text scripts and
+data assets remain raw text for dedicated static path or security analysis;
+binary assets remain opaque.
+
 Avoid using reserved support directory names as skill names. Paths such as
 `skills/assets/SKILL.md`, `skills/examples/SKILL.md`,
 `skills/references/SKILL.md`, `skills/scripts/SKILL.md`, and
@@ -233,7 +244,7 @@ renma bom . --format markdown
 renma bom . --format json
 ```
 
-The BOM is a declared repository manifest. It combines catalog, graph, diagnostics, readiness, lifecycle, hash, and security posture evidence. It is not a record of actual LLM runtime usage. See the [Repository Context BOM contract](repository-context-bom.md) for the v1 boundaries.
+The BOM is a declared repository manifest. It combines catalog, graph, diagnostics, readiness, lifecycle, hash, and security posture evidence. It is not a record of actual LLM runtime usage. See the [Repository Context BOM contract](repository-context-bom.md) for v2 boundaries.
 
 ## User Story: Improve Existing Skills With Diagnostics
 
@@ -366,7 +377,9 @@ The JSON configuration supports the same names used by the implementation, inclu
 - `globs`: glob patterns to scan.
 - `exclude`: paths or path prefixes to skip.
 - `suppressions`: rule suppressions that remove matching findings from normal reports and failure thresholds.
-- `max_file_size_bytes`: largest file renma will read.
+- `max_file_size_bytes`: largest file renma will read for content analysis. A
+  larger discovered file remains repository existence evidence, so a valid
+  reference is not also reported as missing.
 - `max_depth`: maximum discovery depth.
 - `concurrency`: scan concurrency.
 - `fail_on`: scan exit threshold: `low`, `medium`, `high`, or `critical`.
@@ -387,6 +400,13 @@ relative traversal would escape the owning Skill boundary and checks existence
 against the collected repository snapshot. It validates the declared path but
 does not execute the command. Non-Skill documents do not receive an inferred
 Skill-relative base.
+
+Static support reachability accepts explicit Skill-relative paths, explicit
+basenames, Markdown link targets, quoted/code-form paths, and one additional
+hop through a directly referenced index/reference. Free-prose matches against
+generic filename stems such as `run`, `check`, or `logo` are not evidence.
+Extensionless executables and quoted or linked asset paths with spaces are
+valid; `..` traversal outside the Skill root remains invalid.
 
 Use `exclude` for files Renma should not scan. Use `suppressions` for audited exceptions where Renma should scan the file, detect matching findings internally, then omit those findings from normal reports and failure decisions. A suppression applies only when both `id` and `paths` match. Each suppression includes `id`, `paths`, required `reason`, and optional `expires`; the reason lives in config for auditability.
 
@@ -418,6 +438,12 @@ Other default scan glob families are:
 - `skills/**/references/**/*.md`
 - `skills/**/examples/**/*.md`
 - `skills/**/scripts/**/*`
+- `skills/**/assets/**/*`
+- `.agents/skills/**/profiles/**/*.md`
+- `.agents/skills/**/references/**/*`
+- `.agents/skills/**/examples/**/*.md`
+- `.agents/skills/**/scripts/**/*`
+- `.agents/skills/**/assets/**/*`
 - `tools/**/*`
 
 ## Where To Go Next
@@ -425,6 +451,7 @@ Other default scan glob families are:
 - New to Renma? Start with [Authoring Guide](authoring-guide.md).
 - Writing security-sensitive skills or context assets? Read [Security Policy Guide](security-policy.md).
 - Fixing scan findings? See [Diagnostics Reference](diagnostics.md).
+- Reviewing thresholds? See [Renma Quality Profile](quality-profile.md).
 - Trying a minimal clarify-before-act Skill interaction? Use
   [`examples/interactive-placeholder`](../examples/interactive-placeholder).
 - Trying richer repository-aware Skill, Context Lens, and Context Asset
@@ -525,7 +552,7 @@ renma bom . --format markdown
 renma bom . --format json --omit-generated-at
 ```
 
-Use the BOM when reviewers or CI consumers need one repository evidence manifest that combines existing Renma evidence: catalog asset inventory, repository-relative source paths, content hashes, owners, lifecycle metadata, tags, declared dependencies, graph resolution, diagnostics, readiness score and checks, workflow readiness, context lens summary, security posture, and security policy inventory. See the [Repository Context BOM contract](repository-context-bom.md) for the authoritative v1 schema, snapshot, reproducibility, provenance, and future consumed-context evidence boundaries.
+Use the BOM when reviewers or CI consumers need one repository evidence manifest that combines existing Renma evidence. Renma 0.18.0 supports only v2, the first supported long-term BOM contract. It does not provide a v1 compatibility mode. V2 includes normalized declared/effective ownership plus static support relationships. See the [Repository Context BOM contract](repository-context-bom.md).
 
 The BOM is not a record of actual LLM runtime usage. Renma does not collect telemetry, assemble prompts, choose task-specific context, inject context into agents, import consumed-context evidence, or claim what an LLM actually consumed.
 
@@ -597,7 +624,9 @@ Use this when a reviewer or downstream tool needs one stable evidence layer that
 
 Trust Graph is repository evidence. It does not compute a trust score, select or inject runtime context, assemble prompts, call an LLM, collect telemetry, or enforce policy at runtime.
 
-Output includes stable node IDs, stable edge IDs, source evidence where parser support exists, normalized effective policy fingerprints, diagnostic links, and compact summary counts. JSON is the source of truth for downstream tools; Markdown is for human review. `scan --format json` includes the same Trust Graph under `trustGraph` so CI consumers can read one scan report when they do not need a separate command.
+Renma 0.18.0 supports only Trust Graph v2, the first supported long-term contract. It includes normalized ownership and static `owns_local_resource`, `statically_references`, `inherits_owner`, and `inherits_policy` evidence. JSON is the source of truth; Markdown is for human review. `scan --format json` includes the same v2 contract under `trustGraph`.
+
+Consumers must branch on `schemaVersion`, not on the Renma package version. A future incompatible contract may intentionally introduce v3.
 
 Reviewers can use Trust Graph to find assets without owners, find assets without lifecycle status, inspect assets sharing the same effective policy fingerprint, and connect diagnostics back to asset evidence. `trust-graph` exits `0` when the report is generated successfully; use `scan --fail-on` when CI should fail on findings.
 
@@ -655,7 +684,7 @@ The report summarizes readiness deltas, graph-resolution changes, added and remo
 
 Output includes a CI status (`PASS`, `WARN`, or `FAIL`), a summary, readiness changes, graph changes, and review-focused finding changes.
 
-Repository Context BOM artifacts describe declared repository state, not prompt assembly, context injection, agent execution, actual LLM runtime usage, or telemetry. Use `renma bom . --format json` when CI needs a machine-readable manifest and `renma bom . --format markdown` for review comments or artifacts. For v1 compatibility and reproducibility details, see the [Repository Context BOM contract](repository-context-bom.md).
+Repository Context BOM artifacts describe declared repository state, not prompt assembly, context injection, agent execution, actual LLM runtime usage, or telemetry. Use `renma bom . --format json` when CI needs a machine-readable manifest and `renma bom . --format markdown` for review comments or artifacts. For v2 compatibility and reproducibility details, see the [Repository Context BOM contract](repository-context-bom.md).
 
 ### `ownership`
 

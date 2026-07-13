@@ -1,7 +1,12 @@
 import type { ConfigOverrides } from "../config.js";
 import type { ContextLensSummary } from "../context-lens.js";
 import { resolveDependencyTarget } from "../dependency-resolution.js";
-import type { Catalog, CatalogEntry, Dependency } from "../model.js";
+import {
+  effectiveAssetOwner,
+  type Catalog,
+  type CatalogEntry,
+  type Dependency,
+} from "../model.js";
 import { collectRepositoryEvidence } from "../repository-evidence.js";
 import type { Diagnostic } from "../types.js";
 
@@ -75,7 +80,18 @@ export function formatCatalogMarkdown(result: CatalogResult): string {
     lines.push(`- Kind: ${entry.kind}`);
     lines.push(`- Path: ${entry.sourcePath}`);
     lines.push(`- Hash: ${entry.contentHash}`);
-    lines.push(`- Owner: ${entry.metadata.owner ?? "(none)"}`);
+    const owner = effectiveAssetOwner(entry);
+    lines.push(
+      `- Owner: ${owner ?? "(none)"}${
+        entry.ownership.source === "inherited" && entry.ownership.inheritedFrom
+          ? ` (inherited from ${entry.ownership.inheritedFrom.sourcePath})`
+          : ""
+      }`,
+    );
+    lines.push(
+      `- Declared owner: ${entry.ownership.declaredOwner ?? "(none)"}`,
+    );
+    lines.push(`- Ownership source: ${entry.ownership.source}`);
     lines.push(`- Status: ${entry.metadata.status ?? "(unspecified)"}`);
     lines.push(
       `- Last reviewed: ${entry.metadata.lastReviewedAt ?? "(unspecified)"}`,

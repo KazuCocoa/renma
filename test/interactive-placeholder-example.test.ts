@@ -52,7 +52,7 @@ test("interactive-placeholder is a clean, ready thin Agent Skill example", async
     "workflow.clarity",
     "workflow.required_inputs",
     "workflow.completion_criteria",
-    "layout.skills_thin",
+    "workflow.skills_focused",
     "paths.helper_commands",
   ]) {
     assert.equal(

@@ -1,16 +1,18 @@
 # Advanced Skill Authoring
 
 Use this guide when one broad Skill has grown into several distinct workflows
-that should remain thin, reviewable, and backed by shared Context Assets.
+that should remain focused, reviewable, and backed by appropriate local
+resources or shared Context Assets.
 
-This is current 0.17.0 authoring guidance. Here, a “router Skill” means a Skill
-whose description and body direct a consuming platform toward a bounded
-workflow. Renma validates its repository structure and declared Context
-relationships; Renma does not select a Skill at runtime.
+This is current 0.18.0 authoring guidance. A focused Skill owns the workflow it
+needs to execute well; it is not required to be a thin router. Renma validates
+repository structure and declared Context relationships but does not select a
+Skill at runtime.
 
-Proposed 0.18.0 Skill-to-Skill discovery, route metadata, generated indexes,
-and routing diagnostics are outside this guide. See
-[Proposed 0.18.0 Skill Discovery](../plan-discovery.md).
+Deferred Skill-to-Skill discovery from the earlier roadmap has no assigned
+release: 0.18.0 does not add route metadata, discovery aliases, generated
+indexes, or runtime selection. Repository file and Skill-local support-resource
+discovery are already implemented and are separate from that proposal.
 
 ## Derive A Focused Skill From An Existing Skill
 
@@ -38,7 +40,7 @@ Use the evidence to answer:
 Do not invent a hierarchy merely to make the repository look organized. Create
 a new Skill only when its usage boundary and workflow are independently useful.
 
-## Keep Derived Skills Thin
+## Keep Derived Skills Focused
 
 A derived Skill should own:
 
@@ -51,6 +53,11 @@ A derived Skill should own:
 
 Reusable domain, product, testing, platform, and tool knowledge should remain in
 Context Assets where multiple Skills can depend on it.
+
+Skill-specific detailed procedures and variants belong in local references;
+deterministic implementation belongs in scripts; output resources belong in
+assets. Ordered workflow steps, read conditions, constraints, and completion
+criteria remain in `SKILL.md`.
 
 ```text
 skills/setup/appium-ios-simulator/SKILL.md

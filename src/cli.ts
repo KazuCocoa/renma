@@ -26,6 +26,7 @@ import {
   type ScaffoldFormat,
   type ScaffoldKind,
   type ScaffoldOptions,
+  type ScaffoldResource,
 } from "./commands/scaffold.js";
 import { runScanCommand } from "./commands/scan.js";
 import {
@@ -110,6 +111,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         lines: { type: "string" },
         "omit-generated-at": { type: "boolean" },
         owner: { type: "string" },
+        resources: { type: "string" },
         tags: { type: "string", multiple: true },
         title: { type: "string" },
         to: { type: "string" },
@@ -268,15 +270,38 @@ async function runScaffold(
     const id = stringValue(values.id);
     const title = stringValue(values.title);
     const tags = stringListValue(values.tags);
+    const resources = scaffoldResources(stringValue(values.resources));
     if (id) scaffoldOptions.id = id;
     if (title) scaffoldOptions.title = title;
     if (owner) scaffoldOptions.owner = owner;
     if (tags.length > 0) scaffoldOptions.tags = tags;
+    if (resources.length > 0) scaffoldOptions.resources = resources;
     return await runScaffoldCommand(scaffoldOptions);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     return 2;
   }
+}
+
+function scaffoldResources(value: string | undefined): ScaffoldResource[] {
+  if (!value) return [];
+  const resources = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const allowed = new Set<ScaffoldResource>([
+    "references",
+    "scripts",
+    "assets",
+  ]);
+  for (const resource of resources) {
+    if (!allowed.has(resource as ScaffoldResource)) {
+      throw new Error(
+        "--resources must be a comma-separated list of references,scripts,assets.",
+      );
+    }
+  }
+  return [...new Set(resources as ScaffoldResource[])];
 }
 
 async function runScan(values: CliValues, target: string): Promise<number> {

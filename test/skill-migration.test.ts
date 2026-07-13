@@ -1017,6 +1017,8 @@ ${body}`;
       absolutePath: targetPath,
       kind: "skill",
       sizeBytes: Buffer.byteLength(candidateContent),
+      contentClassification: "text",
+      markdownParserEligible: true,
       content: candidateContent,
     } satisfies Artifact);
 

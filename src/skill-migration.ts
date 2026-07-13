@@ -403,6 +403,8 @@ function validateMigrationCandidate(
     absolutePath: targetPath,
     kind: "skill",
     sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: true,
     content,
   } satisfies Artifact);
   const validation = validateAgentSkill(candidate);

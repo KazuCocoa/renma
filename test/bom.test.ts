@@ -28,7 +28,7 @@ import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 test("bom report declares Repository Context BOM schema and scope", async () => {
   const report = await bom(await bomFixture());
 
-  assert.equal(report.schemaVersion, "renma.repository-context-bom.v1");
+  assert.equal(report.schemaVersion, "renma.repository-context-bom.v2");
   assert.equal(report.outputMode, "default");
   assert.equal(report.generator.name, "renma");
   assert.equal(report.generator.version, packageJson.version);
@@ -45,13 +45,13 @@ test("bom report declares Repository Context BOM schema and scope", async () => 
   });
 
   const parsed = JSON.parse(formatBomJson(report)) as BomReport;
-  assert.equal(parsed.schemaVersion, "renma.repository-context-bom.v1");
+  assert.equal(parsed.schemaVersion, "renma.repository-context-bom.v2");
   assert.equal(parsed.outputMode, "default");
   assert.equal(parsed.scope.runtimeUsage, false);
   assert.equal(parsed.scope.telemetryCollected, false);
 });
 
-test("bom v1 normalized contract shape is stable", async () => {
+test("bom v2 normalized contract shape is stable", async () => {
   const report = buildBomReport(
     await collectRepositorySnapshot(await bomContractFixture()),
     {
@@ -73,10 +73,11 @@ test("bom assets include catalog metadata and lifecycle evidence", async () => {
   );
 
   assert.ok(asset);
+  assert.ok(asset.ownership);
   assert.equal(asset.kind, "context");
   assert.equal(asset.sourcePath, "contexts/testing/boundary-value-analysis.md");
   assert.match(asset.contentHash, /^sha256:[a-f0-9]{64}$/);
-  assert.equal(asset.owner, "qa-platform");
+  assert.equal(asset.ownership.effectiveOwner, "qa-platform");
   assert.equal(asset.status, "stable");
   assert.equal(asset.version, "1.0.0");
   assert.deepEqual(asset.tags, ["testing"]);
@@ -426,7 +427,7 @@ test("bom markdown is a compact human-review report", async () => {
   assert.match(markdown, /- Workflow readiness: /);
   assert.match(markdown, /^## Security Policy Inventory$/m);
   assert.match(markdown, /\| Policy assets \| 2 \|/);
-  assert.match(markdown, /\| Assets missing policy metadata \| 2 \|/);
+  assert.match(markdown, /\| Assets without effective policy \| 2 \|/);
   assert.match(markdown, /\| Network unspecified \| 2 \|/);
 });
 
@@ -466,7 +467,7 @@ test("bom CLI supports JSON and Markdown formats", async () => {
   assert.equal(defaultJson.code, 0);
   assert.equal(
     JSON.parse(defaultJson.stdout).schemaVersion,
-    "renma.repository-context-bom.v1",
+    "renma.repository-context-bom.v2",
   );
   assert.equal(explicitJson.code, 0);
   assert.equal(JSON.parse(explicitJson.stdout).scope.runtimeUsage, false);
@@ -627,6 +628,14 @@ test("bom CLI rejects unsupported format", async () => {
   assert.match(result.stderr, /--format must be either json or markdown/);
 });
 
+test("bom CLI has no schema selector", async () => {
+  const result = await withCapturedConsole(() =>
+    main(["bom", ".", "--schema", "v2"]),
+  );
+  assert.equal(result.code, 2);
+  assert.match(result.stderr, /Unknown option '--schema'/);
+});
+
 test("bom CLI exits 1 when generated report contains error diagnostics", async () => {
   const root = await fixture();
   await writeBrokenLens(root);
@@ -700,7 +709,7 @@ async function bomContractFixture(): Promise<string> {
         "Input: BOM fixture. Output: deterministic manifest evidence.",
         "",
         "## Completion criteria",
-        "The workflow is complete when BOM output contains the expected v1 contract shape.",
+        "The workflow is complete when BOM output contains the expected v2 contract shape.",
         "",
         "## Verification",
         "Verify by running the BOM command and checking JSON output.",
@@ -721,7 +730,7 @@ async function bomContractFixture(): Promise<string> {
       "last_reviewed_at: 2026-06-28",
       "review_cycle: P180D",
       "expires_at: 2026-12-31",
-      "when_to_use: Review BOM v1 contract shape in deterministic fixtures.",
+      "when_to_use: Review BOM v2 contract shape in deterministic fixtures.",
       "when_not_to_use: Do not use as runtime prompt assembly instructions.",
       "allowed_data: repository test fixtures only",
       "network_allowed: false",
@@ -1126,13 +1135,14 @@ function normalizeBomContract(report: BomReport): BomReport {
     assets: report.assets.map((asset) => ({
       ...asset,
       contentHash: "<sha256>",
+      sizeBytes: -1,
     })),
   };
 }
 
 function expectedBomContract(): BomReport {
   return {
-    schemaVersion: "renma.repository-context-bom.v1",
+    schemaVersion: "renma.repository-context-bom.v2",
     outputMode: "default",
     generatedAt: "2026-07-10T12:00:00.000Z",
     generator: {
@@ -1167,7 +1177,14 @@ function expectedBomContract(): BomReport {
         kind: "context",
         sourcePath: "contexts/testing/contract.md",
         contentHash: "<sha256>",
-        owner: "qa-platform",
+        sizeBytes: -1,
+        contentClassification: "text",
+        markdownParserEligible: true,
+        ownership: {
+          declaredOwner: "qa-platform",
+          effectiveOwner: "qa-platform",
+          source: "declared",
+        },
         status: "stable",
         version: "1.0.0",
         tags: ["testing"],
@@ -1192,7 +1209,14 @@ function expectedBomContract(): BomReport {
         kind: "skill",
         sourcePath: "skills/testing/contract-review/SKILL.md",
         contentHash: "<sha256>",
-        owner: "qa-platform",
+        sizeBytes: -1,
+        contentClassification: "text",
+        markdownParserEligible: true,
+        ownership: {
+          declaredOwner: "qa-platform",
+          effectiveOwner: "qa-platform",
+          source: "declared",
+        },
         status: "stable",
         tags: ["testing"],
         lifecycle: {
@@ -1236,11 +1260,25 @@ function expectedBomContract(): BomReport {
           summary: "No error diagnostics were reported.",
         },
         {
+          id: "specification.agent_skills",
+          title: "Agent Skills specification",
+          status: "pass",
+          severity: "info",
+          summary: "1/1 Skill entrypoints pass Agent Skills validation.",
+        },
+        {
+          id: "security.blocking",
+          title: "Blocking security findings",
+          status: "pass",
+          severity: "info",
+          summary: "No high or critical security findings were reported.",
+        },
+        {
           id: "ownership.coverage",
           title: "Ownership coverage",
           status: "pass",
           severity: "info",
-          summary: "All cataloged assets declare an owner.",
+          summary: "All cataloged assets have an effective owner.",
         },
         {
           id: "graph.unresolved_edges",
@@ -1318,11 +1356,12 @@ function expectedBomContract(): BomReport {
           summary: "2 cataloged assets found.",
         },
         {
-          id: "layout.skills_thin",
-          title: "Thin skill entrypoints",
+          id: "workflow.skills_focused",
+          title: "Focused skill workflows",
           status: "pass",
           severity: "info",
-          summary: "All skill entrypoints are thin routers.",
+          summary:
+            "Skill entrypoints are focused, discoverable workflows that use progressive disclosure appropriately.",
         },
         {
           id: "layout.disallowed_skill_assets",
@@ -1382,8 +1421,8 @@ function expectedBomContract(): BomReport {
         },
         workflow: {
           skillEntrypoints: 1,
-          checks: 5,
-          pass: 5,
+          checks: 6,
+          pass: 6,
           warn: 0,
           fail: 0,
           readinessPercent: 100,
@@ -1425,8 +1464,16 @@ function expectedBomContract(): BomReport {
         },
         securityPolicyInventory: {
           totalPolicyAssets: 2,
-          assetsWithPolicyMetadata: 2,
-          assetsMissingPolicyMetadata: 0,
+          assetsWithLocalPolicyMetadata: 2,
+          assetsWithInheritedPolicy: 0,
+          assetsWithEffectivePolicy: 2,
+          assetsWithoutEffectivePolicy: 0,
+          policySources: {
+            local: 2,
+            security_profile: 0,
+            repository_config: 0,
+            owning_skill: 0,
+          },
           assetKinds: {
             skill: 1,
             context: 1,
@@ -1435,6 +1482,8 @@ function expectedBomContract(): BomReport {
             profile: 0,
             reference: 0,
             example: 0,
+            script: 0,
+            asset: 0,
             config: 0,
             unknown: 0,
           },
@@ -1473,7 +1522,7 @@ function expectedBomContract(): BomReport {
           topApprovedNetworkDestinations: [],
           topApprovedUploadDestinations: [],
           topForbiddenInputs: [],
-          missingPolicyAssets: [],
+          assetsWithoutEffectivePolicyList: [],
         },
       },
     },
@@ -1496,8 +1545,16 @@ function expectedBomContract(): BomReport {
     },
     securityPolicyInventory: {
       totalPolicyAssets: 2,
-      assetsWithPolicyMetadata: 2,
-      assetsMissingPolicyMetadata: 0,
+      assetsWithLocalPolicyMetadata: 2,
+      assetsWithInheritedPolicy: 0,
+      assetsWithEffectivePolicy: 2,
+      assetsWithoutEffectivePolicy: 0,
+      policySources: {
+        local: 2,
+        security_profile: 0,
+        repository_config: 0,
+        owning_skill: 0,
+      },
       assetKinds: {
         skill: 1,
         context: 1,
@@ -1506,6 +1563,8 @@ function expectedBomContract(): BomReport {
         profile: 0,
         reference: 0,
         example: 0,
+        script: 0,
+        asset: 0,
         config: 0,
         unknown: 0,
       },
@@ -1544,7 +1603,7 @@ function expectedBomContract(): BomReport {
       topApprovedNetworkDestinations: [],
       topApprovedUploadDestinations: [],
       topForbiddenInputs: [],
-      missingPolicyAssets: [],
+      assetsWithoutEffectivePolicyList: [],
     },
     diagnostics: [],
   };

@@ -1,6 +1,6 @@
 # Repository Context BOM
 
-`renma bom` emits the Repository Context BOM: a declared repository manifest for review and CI consumers. It is generated from Renma's local repository evidence and keeps `schemaVersion` at `renma.repository-context-bom.v1`.
+`renma bom` emits a declared repository manifest for review and CI consumers. Renma 0.18.0 supports only the v2 BOM and Trust Graph schemas. It does not provide a v1 compatibility mode. V2 is the first supported long-term contract; earlier v1 output was an experimental pre-contract surface removed before broader adoption.
 
 The BOM is not a runtime usage report. It does not describe what an LLM actually consumed, assemble prompts, choose task-specific context, inject context into agents, execute agents, call an LLM, import consumed-context evidence, or collect telemetry.
 
@@ -12,7 +12,7 @@ flowchart TD
   Diagnostics["Diagnostics and Readiness"]
   Governance["Lifecycle and ownership evidence"]
   Security["Security posture and policy inventory"]
-  Bom["Repository Context BOM v1"]
+  Bom["Repository Context BOM v2"]
   Json["Authoritative JSON"]
   Markdown["Markdown review projection"]
   Revision["Git, CI, or PR context supplies revision identity"]
@@ -56,6 +56,10 @@ JSON is the authoritative BOM output. Markdown is a compact review projection fo
 
 Array ordering is deterministic and part of Renma's output contract. Asset `sourcePath` values remain repository-relative. `root` and `configPath` remain absolute paths from the current environment.
 
+Assets use `ownership.declaredOwner`, `ownership.effectiveOwner`,
+`ownership.source`, and optional `ownership.inheritedFrom`. Readiness uses the
+effective owner.
+
 ## Reproducibility
 
 `--omit-generated-at` means only:
@@ -77,24 +81,79 @@ Supported guarantee:
 
 > With the same checkout path, config path, repository contents, Renma version, and UTC evaluation date, repeated `--omit-generated-at` runs should produce byte-identical JSON.
 
-Freshness evaluation uses the UTC calendar date. Metadata dates remain part of the snapshot and must not be removed as timestamp noise. A real file move is a meaningful BOM change because `sourcePath` is repository evidence. Portable byte-for-byte output across different runners is not a v1 guarantee.
+Freshness evaluation uses the UTC calendar date. Metadata dates remain part of the snapshot and must not be removed as timestamp noise. A real file move is a meaningful BOM change because `sourcePath` is repository evidence. Portable byte-for-byte output across different runners is not a v2 guarantee.
 
 ## Schema Evolution
 
 `schemaVersion` represents the consumer-facing BOM schema. `generator.version` represents the Renma implementation version and is not the schema version.
 
-Within BOM v1, changes should be backward-compatible and additive:
+V2 is the first supported long-term contract for normalized ownership,
+first-class support assets, and static support relationships. Consumers must
+inspect `schemaVersion` independently from `generator.version`. A future
+incompatible contract may intentionally introduce v3.
+
+Within a schema, changes should be backward-compatible and additive:
 
 - existing fields must not be removed, renamed, or given incompatible types or meanings;
 - new optional fields may be added when a real consumer requires them;
 - enum additions are consumer-visible changes and must be documented;
-- a future breaking contract requires a new schema version rather than silently changing v1 semantics.
+- a future breaking contract requires a new schema version rather than silently changing existing semantics.
+
+Treat `owns_local_resource`, `statically_references`, `inherits_owner`, and
+`inherits_policy` as static repository evidence, not runtime behavior. Branch
+on `schemaVersion`; `generator.version` is provenance only.
+
+The published [BOM v2 JSON Schema](schemas/repository-context-bom-v2.schema.json)
+is the machine-readable contract. `generatedAt` is required when `outputMode`
+is `default` and forbidden when `outputMode` is `omit_generated_at`.
+`configPath` remains optional and is absent when no configuration file was
+loaded. Every other top-level field is required. Optional lifecycle, version,
+status, target-resolution, and inherited-ownership fields appear only when
+their evidence exists. Owner values are explicitly nullable; missing optional
+fields are omitted rather than serialized as `null`.
+
+Arrays are deterministically ordered by their identity/path keys, and count
+fields are non-negative integers. Count maps contain every declared enum
+member, including zero counts. Policy source ordering is `local`,
+`security_profile`, `repository_config`, `owning_skill`. Static support
+relationships use `owns_local_resource`, `statically_references`,
+`inherits_owner`, and `inherits_policy`.
+
+The Readiness summary is a closed contract for asset, ownership, graph,
+diagnostic, workflow, Context Lens, security posture, and security policy
+inventory evidence. Coverage and readiness percentages are constrained to
+`0..100`. Security posture top-finding entries require an ID, non-negative
+count, and maximum severity. Security policy `assetKinds` is a complete count
+map containing every generated artifact kind, including zero values.
+
+Representative top-level JSON (nested objects are shortened for readability;
+the schema defines every nested field):
+
+```json
+{
+  "schemaVersion": "renma.repository-context-bom.v2",
+  "outputMode": "omit_generated_at",
+  "generator": { "name": "renma", "version": "0.18.0" },
+  "root": "/checkout/repository",
+  "scope": { "type": "declared_repository_manifest", "runtimeUsage": false, "telemetryCollected": false },
+  "summary": { "scannedFileCount": 0, "assetCount": 0, "dependencyCount": 0, "resolvedDependencyCount": 0, "unresolvedDependencyCount": 0, "ownedAssetCount": 0, "unownedAssetCount": 0, "readinessScore": 100, "readinessLevel": "ready", "diagnosticCounts": { "error": 0, "warning": 0, "info": 0 } },
+  "assets": [],
+  "dependencies": [],
+  "readiness": { "score": 100, "level": "ready", "checks": [], "summary": {} },
+  "securityPosture": { "totalSecurityFindings": 0, "riskClasses": { "violation": 0, "suspicious": 0, "advisory": 0, "unclassified": 0 }, "severities": { "critical": 0, "high": 0, "medium": 0, "low": 0 }, "highOrCritical": 0, "topFindingIds": [] },
+  "securityPolicyInventory": {},
+  "diagnostics": []
+}
+```
+
+Generated representative reports are validated against the published schema in
+the contract test suite.
 
 `--omit-generated-at` does not make the report a generic canonical JSON format or a portable artifact.
 
 ## Source Provenance
 
-BOM v1 provenance is deliberately repository-local:
+BOM v2 provenance is deliberately repository-local:
 
 - repository-relative source paths;
 - per-asset content hashes;
@@ -102,11 +161,11 @@ BOM v1 provenance is deliberately repository-local:
 - current absolute `root` and `configPath` information when available;
 - lifecycle, dependency, diagnostic, readiness, security posture, and security policy inventory evidence.
 
-Renma does not automatically invoke Git or add Git commit, branch, tag, or dirty-state fields in BOM v1. Git revision identity is expected to come from the surrounding Git, CI, artifact, or pull-request context. Native Git provenance fields and a BOM digest may be considered later if external artifact storage or cross-run consumers require them.
+Renma does not automatically invoke Git or add Git commit, branch, tag, or dirty-state fields. Git revision identity is expected to come from the surrounding Git, CI, artifact, or pull-request context. Native Git provenance fields and a BOM digest may be considered later if external artifact storage or cross-run consumers require them.
 
 ## Consumed-Context Evidence
 
-BOM v1 describes declared repository state. Future consumed-context evidence must not redefine or mutate that meaning.
+The BOM v2 schema describes declared repository state. Future consumed-context evidence must not redefine or mutate that meaning.
 
 Runtime evidence should be a separate artifact or explicitly separate attachment. A future evidence record should relate back to a BOM using stable values such as a BOM digest or snapshot identity, asset ID, asset content hash, producer identity and version, and observation timestamp.
 

@@ -41,6 +41,7 @@ test("ownership report counts all assets owned", async () => {
           id: "beta",
           kind: "skill",
           sourcePath: "skills/beta/SKILL.md",
+          ownership: declaredOwnership("docs"),
           status: "stable",
           tags: [],
         },
@@ -55,6 +56,7 @@ test("ownership report counts all assets owned", async () => {
           id: "alpha",
           kind: "skill",
           sourcePath: "skills/alpha/SKILL.md",
+          ownership: declaredOwnership("platform"),
           status: null,
           tags: ["core"],
         },
@@ -82,6 +84,7 @@ test("ownership report lists mixed owned and unowned assets", async () => {
       id: "unowned",
       kind: "skill",
       sourcePath: "skills/unowned/SKILL.md",
+      ownership: unownedOwnership(),
       status: "experimental",
       tags: ["needs-owner", "mobile"],
     },
@@ -148,12 +151,12 @@ test("ownership markdown output includes summary", async () => {
   assert.match(markdown, /### platform/);
   assert.match(
     markdown,
-    /\| owned \| skill \| skills\/owned\/SKILL\.md \| {2}\| {2}\|/,
+    /\| owned \| skill \| skills\/owned\/SKILL\.md \| platform \(declared\) \| {2}\| {2}\|/,
   );
   assert.match(markdown, /## Unowned Assets/);
   assert.match(
     markdown,
-    /\| unowned \| skill \| skills\/unowned\/SKILL\.md \| {2}\| todo \|/,
+    /\| unowned \| skill \| skills\/unowned\/SKILL\.md \| \(unowned\) \| {2}\| todo \|/,
   );
 });
 
@@ -209,7 +212,7 @@ test("ownership --include-owned includes ownedAssetList in JSON", async () => {
       id: "owned",
       kind: "skill",
       sourcePath: "skills/owned/SKILL.md",
-      owner: "platform",
+      ownership: declaredOwnership("platform"),
       status: "stable",
       tags: ["core"],
     },
@@ -241,6 +244,7 @@ test("ownership report groups assets by owner and kind", async () => {
           id: "release-notes",
           kind: "skill",
           sourcePath: "skills/release-notes/SKILL.md",
+          ownership: declaredOwnership("docs"),
           status: null,
           tags: [],
         },
@@ -258,6 +262,7 @@ test("ownership report groups assets by owner and kind", async () => {
           id: "testing.boundary",
           kind: "context",
           sourcePath: "contexts/testing/boundary.md",
+          ownership: declaredOwnership("qa-platform"),
           status: null,
           tags: ["testing"],
         },
@@ -265,6 +270,7 @@ test("ownership report groups assets by owner and kind", async () => {
           id: "spec-review-basic",
           kind: "skill",
           sourcePath: "skills/spec-review-basic/SKILL.md",
+          ownership: declaredOwnership("qa-platform"),
           status: "stable",
           tags: ["testing", "spec-review"],
         },
@@ -314,7 +320,7 @@ test("ownership --owner filters owned assets in JSON", async () => {
       id: "testing.boundary",
       kind: "context",
       sourcePath: "contexts/testing/boundary.md",
-      owner: "qa-platform",
+      ownership: declaredOwnership("qa-platform"),
       status: null,
       tags: [],
     },
@@ -322,7 +328,7 @@ test("ownership --owner filters owned assets in JSON", async () => {
       id: "spec-review-basic",
       kind: "skill",
       sourcePath: "skills/spec-review-basic/SKILL.md",
-      owner: "qa-platform",
+      ownership: declaredOwnership("qa-platform"),
       status: "stable",
       tags: ["testing"],
     },
@@ -367,7 +373,7 @@ test("ownership --owner markdown shows owner-centric filtered section", async ()
   assert.match(result.stdout, /- Matched assets: 1/);
   assert.match(
     result.stdout,
-    /\| spec-review-basic \| skill \| skills\/spec-review-basic\/SKILL\.md \| stable \| testing \|/,
+    /\| spec-review-basic \| skill \| skills\/spec-review-basic\/SKILL\.md \| qa-platform \(declared\) \| stable \| testing \|/,
   );
   assert.equal(result.stdout.match(/\| spec-review-basic \|/g)?.length, 1);
   assert.doesNotMatch(result.stdout, /## Owned Assets/);
@@ -391,7 +397,7 @@ test("ownership --include-owned adds markdown Owned Assets section", async () =>
   assert.match(result.stdout, /## Owned Assets/);
   assert.match(
     result.stdout,
-    /\| owned \| skill \| skills\/owned\/SKILL\.md \| platform \| stable \| core \|/,
+    /\| owned \| skill \| skills\/owned\/SKILL\.md \| platform \(declared\) \| stable \| core \|/,
   );
 });
 
@@ -408,7 +414,7 @@ test("ownership report uses stable deterministic ordering for owned assets", asy
       asset.kind,
       asset.sourcePath,
       asset.id,
-      asset.owner,
+      asset.ownership.effectiveOwner,
     ]),
     [
       ["context", "contexts/testing/boundary.md", "testing.boundary", "qa"],
@@ -417,6 +423,22 @@ test("ownership report uses stable deterministic ordering for owned assets", asy
     ],
   );
 });
+
+function declaredOwnership(owner: string) {
+  return {
+    declaredOwner: owner,
+    effectiveOwner: owner,
+    source: "declared",
+  } as const;
+}
+
+function unownedOwnership() {
+  return {
+    declaredOwner: null,
+    effectiveOwner: null,
+    source: "unowned",
+  } as const;
+}
 
 async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-ownership-"));

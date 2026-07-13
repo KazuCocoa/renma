@@ -89,7 +89,10 @@ test("formatCiReport renders structured JSON", () => {
   assert.equal(parsed.diff.security.posture.added.totalSecurityFindings, 0);
   assert.equal(parsed.diff.security.policyInventory.totalPolicyAssets, 5);
   assert.equal(parsed.securityPosture.added.totalSecurityFindings, 0);
-  assert.equal(parsed.to.securityPolicyInventory?.assetsWithPolicyMetadata, 3);
+  assert.equal(
+    parsed.to.securityPolicyInventory?.assetsWithLocalPolicyMetadata,
+    3,
+  );
 });
 
 test("formatCiReport includes security posture summaries", () => {
@@ -126,14 +129,17 @@ test("formatCiReport includes target security policy inventory", () => {
   const parsed = JSON.parse(formatCiReport(report, "json")) as CiReport;
   const markdown = formatCiReport(report, "markdown");
 
-  assert.equal(parsed.to.securityPolicyInventory?.assetsWithPolicyMetadata, 3);
   assert.equal(
-    parsed.to.securityPolicyInventory?.assetsMissingPolicyMetadata,
+    parsed.to.securityPolicyInventory?.assetsWithLocalPolicyMetadata,
+    3,
+  );
+  assert.equal(
+    parsed.to.securityPolicyInventory?.assetsWithoutEffectivePolicy,
     1,
   );
   assert.match(markdown, /^## Security Policy Inventory$/m);
-  assert.match(markdown, /- Target assets with policy metadata: 3/);
-  assert.match(markdown, /- Target assets missing policy metadata: 1/);
+  assert.match(markdown, /- Target assets with local policy metadata: 3/);
+  assert.match(markdown, /- Target assets without effective policy: 1/);
   assert.match(markdown, /- Target referenced security profiles: 2/);
   assert.match(markdown, /- Target missing security profiles: 1/);
   assert.match(markdown, /- Target approved network destinations: 4/);
@@ -144,14 +150,14 @@ test("formatCiReport includes security changes from the semantic diff", () => {
   const report = sampleReport();
   const fromInventory = policyInventory({
     totalPolicyAssets: 3,
-    assetsWithPolicyMetadata: 2,
-    assetsMissingPolicyMetadata: 2,
+    assetsWithLocalPolicyMetadata: 2,
+    assetsWithoutEffectivePolicy: 2,
     missingSecurityProfiles: 0,
   });
   const toInventory = policyInventory({
     totalPolicyAssets: 5,
-    assetsWithPolicyMetadata: 4,
-    assetsMissingPolicyMetadata: 1,
+    assetsWithLocalPolicyMetadata: 4,
+    assetsWithoutEffectivePolicy: 1,
     missingSecurityProfiles: 1,
   });
   report.diff.findings.added = [
@@ -180,8 +186,8 @@ test("formatCiReport includes security changes from the semantic diff", () => {
   assert.match(markdown, /- Resolved security findings: 1/);
   assert.match(markdown, /- Added violations: 1/);
   assert.match(markdown, /- Policy assets: \+2/);
-  assert.match(markdown, /- Assets with policy metadata: \+2/);
-  assert.match(markdown, /- Assets missing policy metadata: -1/);
+  assert.match(markdown, /- Assets with local policy metadata: \+2/);
+  assert.match(markdown, /- Assets without effective policy: -1/);
   assert.match(markdown, /- Missing security profiles: \+1/);
 });
 
@@ -547,8 +553,8 @@ function sampleReport(): CiReport {
 function targetSecurityPolicyInventory(): SecurityPolicyInventorySummary {
   return policyInventory({
     totalPolicyAssets: 5,
-    assetsWithPolicyMetadata: 3,
-    assetsMissingPolicyMetadata: 1,
+    assetsWithLocalPolicyMetadata: 3,
+    assetsWithoutEffectivePolicy: 1,
     approvedNetworkDestinationCount: 4,
     approvedUploadDestinationCount: 2,
     referencedSecurityProfiles: 2,
@@ -558,8 +564,8 @@ function targetSecurityPolicyInventory(): SecurityPolicyInventorySummary {
 
 interface PolicyInventoryInput {
   totalPolicyAssets?: number | undefined;
-  assetsWithPolicyMetadata?: number | undefined;
-  assetsMissingPolicyMetadata?: number | undefined;
+  assetsWithLocalPolicyMetadata?: number | undefined;
+  assetsWithoutEffectivePolicy?: number | undefined;
   approvedNetworkDestinationCount?: number | undefined;
   approvedUploadDestinationCount?: number | undefined;
   referencedSecurityProfiles?: number | undefined;
@@ -571,9 +577,10 @@ function policyInventory(
 ): SecurityPolicyInventorySummary {
   const inventory = zeroSecurityPolicyInventorySummary();
   inventory.totalPolicyAssets = input.totalPolicyAssets ?? 0;
-  inventory.assetsWithPolicyMetadata = input.assetsWithPolicyMetadata ?? 0;
-  inventory.assetsMissingPolicyMetadata =
-    input.assetsMissingPolicyMetadata ?? 0;
+  inventory.assetsWithLocalPolicyMetadata =
+    input.assetsWithLocalPolicyMetadata ?? 0;
+  inventory.assetsWithoutEffectivePolicy =
+    input.assetsWithoutEffectivePolicy ?? 0;
   inventory.approvedNetworkDestinationCount =
     input.approvedNetworkDestinationCount ?? 0;
   inventory.approvedUploadDestinationCount =

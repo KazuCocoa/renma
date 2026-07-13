@@ -66,7 +66,7 @@ test("canonical Skill path model is equivalent across roots and nesting depths",
   }
 });
 
-test("nested canonical Skills participate in workflow and thin-Skill readiness checks", async () => {
+test("nested procedural Skills participate in focused-workflow readiness without thin-router warnings", async () => {
   for (const skillPath of CANONICAL_SKILL_PATHS) {
     const root = await fixture();
     await writeRepoFile(root, skillPath, incompleteProceduralSkill());
@@ -82,20 +82,19 @@ test("nested canonical Skills participate in workflow and thin-Skill readiness c
       "QUAL-MISSING-ROUTING-CLARITY",
       "QUAL-MISSING-REQUIRED-INPUTS",
       "QUAL-MISSING-COMPLETION-CRITERIA",
-      "LAYOUT-SKILL-NOT-THIN",
-      "LAYOUT-SKILL-EXECUTABLE-COMMAND",
     ]) {
       assert.equal(ids.has(expected), true, `${skillPath}: ${expected}`);
     }
+    assert.equal(ids.has("LAYOUT-SKILL-NOT-THIN"), false, skillPath);
+    assert.equal(ids.has("LAYOUT-SKILL-EXECUTABLE-COMMAND"), false, skillPath);
 
     const report = await readiness(root);
-    assert.equal(report.level, "not_ready", skillPath);
-    assert.equal(report.score, 55, skillPath);
+    assert.equal(report.level, "needs_attention", skillPath);
+    assert.equal(report.score, 75, skillPath);
     for (const checkId of [
       "workflow.clarity",
       "workflow.required_inputs",
       "workflow.completion_criteria",
-      "layout.skills_thin",
     ]) {
       assert.equal(
         report.checks.find((check) => check.id === checkId)?.status,
@@ -103,12 +102,18 @@ test("nested canonical Skills participate in workflow and thin-Skill readiness c
         `${skillPath}: ${checkId}`,
       );
     }
+    assert.equal(
+      report.checks.find((check) => check.id === "workflow.skills_focused")
+        ?.status,
+      "pass",
+      skillPath,
+    );
 
     const cli = await withCapturedOutput(() =>
       main(["readiness", root, "--json"]),
     );
     assert.equal(cli.code, 1, skillPath);
-    assert.equal(JSON.parse(cli.stdout).level, "not_ready", skillPath);
+    assert.equal(JSON.parse(cli.stdout).level, "needs_attention", skillPath);
   }
 });
 

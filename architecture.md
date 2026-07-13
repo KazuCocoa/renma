@@ -36,7 +36,7 @@ assemble prompts, or execute workflows. Agents and runtimes decide how to use
 repository assets for a task. Future evidence validation does not make Renma a
 runtime telemetry collector; signal production and collection remain external.
 
-Provenance remains repository-level. A Repository Context BOM is a manifest of declared assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence; it is not a report of actual LLM runtime usage. BOM v1 keeps Git revision identity in the surrounding Git/CI/PR artifact context and keeps any future consumed-context evidence separate from the declared repository manifest contract.
+Provenance remains repository-level. Repository Context BOM v2 is a manifest of declared assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence; it is not a report of actual LLM runtime usage. BOM v2 keeps Git revision identity in the surrounding Git/CI/PR artifact context and keeps any future consumed-context evidence separate from the declared repository manifest contract.
 
 ## Goals
 
@@ -162,11 +162,21 @@ Normalized asset kinds:
 - `profile`
 - `reference`
 - `example`
+- `script`
+- `asset`
 - `agent`
 - `config`
 - `unknown`
 
-Shared Markdown under `contexts/` or `context/` uses the dedicated `context` kind. Skill-local supporting material remains `reference`.
+Shared Markdown under `contexts/` or `context/` uses the dedicated `context`
+kind. Skill-local scripts and assets are first-class inventory. Repository files
+carry original-byte size and hash, text or binary classification, and Markdown
+parser eligibility. Only artifacts explicitly eligible for Markdown parsing
+contribute frontmatter, headings, links, fences, or repeated-context evidence.
+Opaque files are never decoded into diagnostic snippets. Skill-local support
+inherits effective ownership from its nearest owning Skill when it has no local
+owner; catalog, graph, ownership, Readiness, Trust Graph, and BOM retain
+`inherited` provenance instead of presenting that owner as locally declared.
 
 ### Dependency
 
@@ -457,7 +467,7 @@ Consumed-context evidence from external agents, editor integrations, prompt wrap
 
 The scanner, normalized asset model, graph-backed governance, ownership,
 Readiness, repeated-context evidence, semantic diff, security diagnostics,
-Trust Graph, and Repository Context BOM v1 are implemented architecture. New
+Trust Graph v2 and Repository Context BOM v2 are implemented architecture. New
 projections should reuse the shared repository-evidence snapshot and remain
 additive unless a separately versioned contract requires a breaking change.
 
@@ -507,7 +517,7 @@ Baseline now in place:
   references, profiles, and examples.
 - Security diagnostics, security posture summaries, and effective policy
   inventory for agent-facing repository content.
-- Trust Graph evidence and Repository Context BOM v1.
+- Trust Graph v2 evidence and Repository Context BOM v2.
 - CI integration examples and optional LLM-assisted review bundles.
 
 Future work may add imported external evidence after its contract is defined;

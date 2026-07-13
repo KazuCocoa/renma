@@ -24,6 +24,9 @@ const EDGE_TYPES: TrustGraphEdgeType[] = [
   "has_lifecycle_status",
   "declares_dependency",
   "references",
+  "owns_local_resource",
+  "statically_references",
+  "inherits_owner",
   "selects_security_profile",
   "inherits_policy",
   "has_effective_policy",
@@ -42,7 +45,10 @@ const REVIEW_SEVERITY_ORDER: TrustGraphFindingSeverity[] = [
 
 export async function runTrustGraphCommand(
   targetPath: string,
-  options: { format: TrustGraphFormat; overrides?: ConfigOverrides },
+  options: {
+    format: TrustGraphFormat;
+    overrides?: ConfigOverrides;
+  },
 ): Promise<number> {
   const graph = await trustGraph(targetPath, options.overrides ?? {});
   process.stdout.write(formatTrustGraph(graph, options.format));
@@ -95,6 +101,10 @@ export function formatTrustGraphMarkdown(graph: TrustGraph): string {
     `- Owned assets: ${graph.summary.edgeTypeCounts.owned_by}/${graph.summary.assetCount}`,
     `- Assets with lifecycle status: ${graph.summary.edgeTypeCounts.has_lifecycle_status}/${graph.summary.assetCount}`,
     `- Selected security profiles: ${graph.summary.edgeTypeCounts.selects_security_profile}`,
+    `- Assets with local effective policy: ${effectivePolicySourceCount(graph, "local")}`,
+    `- Assets with owning-Skill effective policy: ${effectivePolicySourceCount(graph, "owning_skill")}`,
+    `- Assets with security-profile effective policy: ${effectivePolicySourceCount(graph, "security_profile")}`,
+    `- Assets with repository-config effective policy: ${effectivePolicySourceCount(graph, "repository_config")}`,
     `- Effective policy fingerprints: ${graph.summary.nodeTypeCounts.effective_policy}`,
     `- Diagnostics linked to assets: ${graph.summary.edgeTypeCounts.has_diagnostic}`,
     "",
@@ -140,6 +150,18 @@ export function formatTrustGraphMarkdown(graph: TrustGraph): string {
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+function effectivePolicySourceCount(
+  graph: TrustGraph,
+  source: "local" | "security_profile" | "repository_config" | "owning_skill",
+): number {
+  return graph.edges.filter(
+    (edge) =>
+      edge.type === "has_effective_policy" &&
+      Array.isArray(edge.properties?.policySources) &&
+      edge.properties.policySources.includes(source),
+  ).length;
 }
 
 function formatTrustGraph(graph: TrustGraph, format: TrustGraphFormat): string {

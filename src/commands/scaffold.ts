@@ -4,6 +4,7 @@ import { normalizeAgentSkillDirectoryName } from "../agent-skills.js";
 
 export type ScaffoldKind = "skill" | "context" | "context_lens";
 export type ScaffoldFormat = "file" | "prompt" | "json";
+export type ScaffoldResource = "references" | "scripts" | "assets";
 
 export interface ScaffoldOptions {
   kind: ScaffoldKind;
@@ -13,6 +14,7 @@ export interface ScaffoldOptions {
   title?: string;
   owner?: string;
   tags?: string[];
+  resources?: ScaffoldResource[];
 }
 
 export interface ScaffoldBundle {
@@ -22,6 +24,7 @@ export interface ScaffoldBundle {
   title: string;
   owner: string;
   tags: string[];
+  resources: ScaffoldResource[];
   format: ScaffoldFormat;
   content: string;
   prompt: string;
@@ -44,6 +47,11 @@ export async function runScaffoldCommand(
 
   await mkdir(path.dirname(options.targetPath), { recursive: true });
   await writeFile(options.targetPath, bundle.content, { flag: "wx" });
+  for (const resource of bundle.resources) {
+    await mkdir(path.join(path.dirname(options.targetPath), resource), {
+      recursive: true,
+    });
+  }
   process.stdout.write(
     `Created ${options.targetPath}\n${
       options.kind === "skill" ? `\n${renderSkillNextSteps()}\n` : ""
@@ -58,6 +66,10 @@ export function buildScaffoldBundle(options: ScaffoldOptions): ScaffoldBundle {
   const owner = options.owner ?? "unowned";
   const tags =
     options.tags && options.tags.length > 0 ? options.tags : ["authoring"];
+  const resources = [...new Set(options.resources ?? [])].sort();
+  if (options.kind !== "skill" && resources.length > 0) {
+    throw new Error("--resources is supported only for skill scaffolds.");
+  }
   const content =
     options.kind === "skill"
       ? renderSkillScaffold({
@@ -78,6 +90,7 @@ export function buildScaffoldBundle(options: ScaffoldOptions): ScaffoldBundle {
     title,
     owner,
     tags,
+    resources,
     format: options.format,
     content,
     prompt: renderPrompt({
@@ -87,6 +100,7 @@ export function buildScaffoldBundle(options: ScaffoldOptions): ScaffoldBundle {
       title,
       owner,
       tags,
+      resources,
       content,
     }),
   };
@@ -248,6 +262,7 @@ function renderPrompt(input: {
   title: string;
   owner: string;
   tags: string[];
+  resources: ScaffoldResource[];
   content: string;
 }): string {
   const skillGuidance =
@@ -257,6 +272,8 @@ function renderPrompt(input: {
           "- Use `metadata.renma.requires-context` for context the skill normally depends on, encoded as a JSON-array string.",
           "- Use `metadata.renma.optional-context` for context useful only in some cases, encoded as a JSON-array string.",
           "- Use `metadata.renma.requires-lens` or `metadata.renma.optional-lens` for static lens relationships, encoded as JSON-array strings.",
+          "- State exactly when each local resource should be read or executed. Keep Skill-specific detail in references/, deterministic implementation in scripts/, and output material in assets/.",
+          "- Use contexts/ only for knowledge shared across Skills with independent ownership, lifecycle, or source-of-truth status.",
         ]
       : [];
   return `Create a Renma ${input.kind} asset at \`${input.targetPath}\`.
@@ -267,6 +284,7 @@ Use this metadata exactly:
 - title: \`${input.title}\`
 - owner: \`${input.owner}\`
 - tags: \`${input.tags.join(",")}\`
+- local resource directories: \`${input.resources.join(",") || "none"}\`
 - version: \`0.1.0\`
 - status: \`experimental\`
 

@@ -9,6 +9,123 @@ import {
   trustGraph,
 } from "../src/commands/trust-graph.js";
 import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
+import {
+  buildTrustGraph as buildTrustGraphContract,
+  type TrustGraph,
+} from "../src/trust-graph.js";
+import type { Catalog } from "../src/model.js";
+
+test("Trust Graph v2 complete JSON contract is frozen", () => {
+  const catalog = {
+    entries: [],
+    assets: [
+      {
+        id: "context.demo",
+        kind: "context",
+        sourcePath: "contexts/demo.md",
+        contentHash: "sha256:demo",
+        sizeBytes: 12,
+        contentClassification: "text",
+        markdownParserEligible: true,
+        ownership: {
+          declaredOwner: null,
+          effectiveOwner: null,
+          source: "unowned",
+        },
+        metadata: {
+          tags: [],
+          whenToUse: [],
+          whenNotToUse: [],
+          requiresContext: [],
+          optionalContext: [],
+          conflicts: [],
+          supersededBy: [],
+        },
+        metadataFields: {},
+        metadataListItems: {},
+      },
+    ],
+    dependencies: [],
+  } satisfies Catalog;
+
+  assert.deepEqual(buildTrustGraphContract({ catalog }), {
+    schemaVersion: "renma.trustGraph.v2",
+    summary: {
+      assetCount: 1,
+      nodeCount: 1,
+      edgeCount: 0,
+      findingCount: 0,
+      nodeTypeCounts: {
+        asset: 1,
+        owner: 0,
+        lifecycle_status: 0,
+        security_profile: 0,
+        effective_policy: 0,
+        diagnostic: 0,
+      },
+      edgeTypeCounts: {
+        owned_by: 0,
+        has_lifecycle_status: 0,
+        declares_dependency: 0,
+        references: 0,
+        owns_local_resource: 0,
+        statically_references: 0,
+        inherits_owner: 0,
+        selects_security_profile: 0,
+        inherits_policy: 0,
+        has_effective_policy: 0,
+        has_diagnostic: 0,
+      },
+      findingSeverityCounts: {
+        critical: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+        error: 0,
+        warning: 0,
+        info: 0,
+      },
+      riskClassCounts: {
+        violation: 0,
+        suspicious: 0,
+        advisory: 0,
+        unclassified: 0,
+      },
+    },
+    nodes: [
+      {
+        id: "asset:context.demo",
+        type: "asset",
+        label: "context.demo",
+        properties: {
+          assetId: "context.demo",
+          kind: "context",
+          sourcePath: "contexts/demo.md",
+          contentHash: "sha256:demo",
+          sizeBytes: 12,
+          contentClassification: "text",
+          markdownParserEligible: true,
+          tags: [],
+          ownership: {
+            declaredOwner: null,
+            effectiveOwner: null,
+            source: "unowned",
+          },
+        },
+        evidence: [
+          {
+            path: "contexts/demo.md",
+            startLine: 1,
+            endLine: 1,
+            snippet: "context.demo",
+          },
+        ],
+      },
+    ],
+    edges: [],
+    findings: [],
+  } satisfies TrustGraph);
+});
 
 test("Trust Graph JSON is deterministic and sorted", async () => {
   const root = await fixture();
@@ -76,6 +193,7 @@ test("Trust Graph includes owner and lifecycle evidence", async () => {
   );
 
   assert.equal(ownerEdge?.to, "owner:qa-platform");
+  assert.equal(ownerEdge?.properties?.ownershipSource, "declared");
   assert.equal(ownerEdge?.evidence?.[0]?.snippet, "owner: qa-platform");
   assert.equal(statusEdge?.to, "lifecycle_status:stable");
   assert.equal(statusEdge?.evidence?.[0]?.snippet, "status: stable");
@@ -301,7 +419,7 @@ test("Trust Graph command prints JSON and compact markdown", async () => {
     summary: { assetCount: number };
   };
   assert.equal(json.code, 0);
-  assert.equal(parsed.schemaVersion, "renma.trustGraph.v1");
+  assert.equal(parsed.schemaVersion, "renma.trustGraph.v2");
   assert.equal(parsed.summary.assetCount, 1);
 
   const markdown = await withCapturedConsole(() =>
@@ -311,6 +429,27 @@ test("Trust Graph command prints JSON and compact markdown", async () => {
   assert.match(markdown.stdout, /^# Renma Trust Graph/);
   assert.match(markdown.stdout, /## Trust Evidence Highlights/);
   assert.match(markdown.stdout, /Owned assets: 1\/1/);
+});
+
+test("Trust Graph v2 includes support nodes and static inheritance edges", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    id: "skill.demo",
+    owner: "platform",
+    status: "stable",
+  });
+  await mkdir(path.join(root, "skills", "demo", "scripts"), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(root, "skills", "demo", "scripts", "run.mjs"),
+    "console.log('ok');\n",
+  );
+
+  const v2 = await trustGraph(root);
+  assert.equal(v2.schemaVersion, "renma.trustGraph.v2");
+  assert.ok(v2.nodes.some((node) => node.properties?.kind === "script"));
+  assert.ok(v2.edges.some((edge) => edge.type === "inherits_owner"));
 });
 
 test("Trust Graph command exits 0 when generated graph includes diagnostic errors", async () => {

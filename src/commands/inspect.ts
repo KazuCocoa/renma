@@ -121,6 +121,8 @@ export async function buildInspectOutline(
     kind: "reference",
     path: absolutePath,
     sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: /\.mdx?$/i.test(absolutePath),
   };
   const document = parseDocument(artifact);
   const lineCount = document.lines.length;

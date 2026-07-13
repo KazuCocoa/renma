@@ -12,6 +12,11 @@ import {
   type SecurityProfileChain,
 } from "./security-policy.js";
 import type { Artifact, Finding, RiskClass, SecurityConfig } from "./types.js";
+import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
+import {
+  policyArtifactFor,
+  skillArtifactsByDirectory,
+} from "./security-policy-inventory.js";
 
 type SecurityCategory = "safety";
 
@@ -686,33 +691,51 @@ export function securityDiagnosticFindings(
   artifacts: Artifact[],
   config: SecurityDiagnosticsConfig = {},
 ): Finding[] {
+  const owningSkills = skillArtifactsByDirectory(artifacts);
   return artifacts.flatMap((artifact) =>
-    securityFindingsForArtifact(artifact, config.security),
+    securityFindingsForArtifact(
+      artifact,
+      config.security,
+      artifact.kind === "script" || artifact.kind === "asset"
+        ? policyArtifactFor(artifact, owningSkills)
+        : artifact,
+    ),
   );
 }
 
 function securityFindingsForArtifact(
   artifact: Artifact,
   securityConfig?: SecurityConfig,
+  policyArtifact?: Artifact,
 ): Finding[] {
-  const policyResolution = resolveOperationalSecurityPolicy(artifact);
+  if (artifact.kind === "asset" || artifact.contentClassification === "binary")
+    return [];
+  const policyResolution = resolveOperationalSecurityPolicy(
+    policyArtifact ?? { ...artifact, content: "" },
+  );
+  const effectiveSecurityConfig =
+    artifact.kind === "script" && policyArtifact === undefined
+      ? undefined
+      : securityConfig;
   const parsedPolicy = policyResolution.policy;
-  const policy = applySecurityConfig(parsedPolicy, securityConfig);
+  const policy = applySecurityConfig(parsedPolicy, effectiveSecurityConfig);
   const detections: Detection[] = [
-    ...invalidCanonicalSecurityDetections(policyResolution.issues),
+    ...(policyArtifact === artifact
+      ? invalidCanonicalSecurityDetections(policyResolution.issues)
+      : []),
     ...securityPolicyResolutionDetections(
       parsedPolicy,
       policy,
-      securityConfig,
+      effectiveSecurityConfig,
       artifact.content,
+      artifact.markdownParserEligible,
     ),
   ];
   const lines = artifact.content.split(/\r?\n/);
-  const frontmatterEnd =
-    lines[0]?.trim() === "---"
-      ? lines.findIndex((line, index) => index > 0 && line.trim() === "---")
-      : -1;
-  const scanStart = frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
+  const scanStart = securityContentStart(
+    lines,
+    artifact.markdownParserEligible,
+  );
   let inFence = false;
   let recentHumanApprovalLine = 0;
   let recentRiskMitigationLine = 0;
@@ -732,7 +755,11 @@ function securityFindingsForArtifact(
   }
 
   detections.push(
-    ...bodyPolicyContradictionDetections(artifact.content, policy),
+    ...bodyPolicyContradictionDetections(
+      artifact.content,
+      policy,
+      artifact.markdownParserEligible,
+    ),
   );
 
   for (let index = scanStart; index < lines.length; index += 1) {
@@ -753,18 +780,22 @@ function securityFindingsForArtifact(
     if (shellComment) {
       continue;
     }
-    if (isPolicyLine(line)) {
+    if (artifact.markdownParserEligible && isPolicyLine(line)) {
       continue;
     }
     const hasHumanApprovalGuard =
       hasExplicitHumanApprovalGuard(line) ||
       (recentHumanApprovalLine > 0 &&
-        lineNumber - recentHumanApprovalLine <= 2);
+        lineNumber - recentHumanApprovalLine <=
+          DEFAULT_QUALITY_PROFILE.security.precedingLineFastPath) ||
+      hasStructuredGuard(lines, index, hasExplicitHumanApprovalGuard);
     const hasCommandRiskGuard =
       hasHumanApprovalGuard ||
       hasLocalRiskMitigationGuard(line) ||
       (recentRiskMitigationLine > 0 &&
-        lineNumber - recentRiskMitigationLine <= 2);
+        lineNumber - recentRiskMitigationLine <=
+          DEFAULT_QUALITY_PROFILE.security.precedingLineFastPath) ||
+      hasStructuredGuard(lines, index, hasLocalRiskMitigationGuard);
     const commandLine =
       !shellComment &&
       (inFence ||
@@ -829,14 +860,11 @@ function disallowedCommandDetections(
 function bodyPolicyContradictionDetections(
   content: string,
   policy: SecurityPolicy,
+  markdownParserEligible: boolean,
 ): Detection[] {
   const detections: Detection[] = [];
   const lines = content.split(/\r?\n/);
-  const frontmatterEnd =
-    lines[0]?.trim() === "---"
-      ? lines.findIndex((line, index) => index > 0 && line.trim() === "---")
-      : -1;
-  const scanStart = frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
+  const scanStart = securityContentStart(lines, markdownParserEligible);
   const emitted = new Set<string>();
   let inFence = false;
 
@@ -846,7 +874,7 @@ function bodyPolicyContradictionDetections(
       inFence = !inFence;
       continue;
     }
-    if (inFence || isPolicyLine(line)) continue;
+    if (inFence || (markdownParserEligible && isPolicyLine(line))) continue;
 
     const lineNumber = index + 1;
     const candidates: Array<[string, boolean]> = [
@@ -1253,10 +1281,16 @@ function securityPolicyResolutionDetections(
   resolvedPolicy: SecurityPolicy,
   config: SecurityConfig | undefined,
   content: string,
+  markdownParserEligible: boolean,
 ): Detection[] {
   const detections: Detection[] = [];
   if (parsedPolicy.securityProfile === undefined) {
-    addForbiddenInputDetections(detections, resolvedPolicy, content);
+    addForbiddenInputDetections(
+      detections,
+      resolvedPolicy,
+      content,
+      markdownParserEligible,
+    );
     return detections;
   }
 
@@ -1375,7 +1409,12 @@ function securityPolicyResolutionDetections(
     });
   }
 
-  addForbiddenInputDetections(detections, resolvedPolicy, content);
+  addForbiddenInputDetections(
+    detections,
+    resolvedPolicy,
+    content,
+    markdownParserEligible,
+  );
 
   return detections;
 }
@@ -1384,9 +1423,14 @@ function addForbiddenInputDetections(
   detections: Detection[],
   policy: SecurityPolicy,
   content: string,
+  markdownParserEligible: boolean,
 ): void {
   for (const forbiddenInput of policy.forbiddenInputs) {
-    const detection = forbiddenInputDetection(content, forbiddenInput);
+    const detection = forbiddenInputDetection(
+      content,
+      forbiddenInput,
+      markdownParserEligible,
+    );
     if (detection !== undefined) detections.push(detection);
   }
 }
@@ -1502,17 +1546,14 @@ function policyFieldDetectionEvidence(
 function forbiddenInputDetection(
   content: string,
   forbiddenInput: string,
+  markdownParserEligible: boolean,
 ): Detection | undefined {
   const needle = forbiddenInput.trim();
   if (needle.length === 0) return undefined;
 
   const pattern = new RegExp(`\\b${escapeRegExp(needle)}\\b`, "i");
   const lines = content.split(/\r?\n/);
-  const frontmatterEnd =
-    lines[0]?.trim() === "---"
-      ? lines.findIndex((line, index) => index > 0 && line.trim() === "---")
-      : -1;
-  const scanStart = frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
+  const scanStart = securityContentStart(lines, markdownParserEligible);
   for (let index = scanStart; index < lines.length; index += 1) {
     const line = lines[index] ?? "";
     if (!pattern.test(line)) continue;
@@ -1527,6 +1568,17 @@ function forbiddenInputDetection(
     };
   }
   return undefined;
+}
+
+function securityContentStart(
+  lines: string[],
+  markdownParserEligible: boolean,
+): number {
+  if (!markdownParserEligible || lines[0]?.trim() !== "---") return 0;
+  const frontmatterEnd = lines.findIndex(
+    (line, index) => index > 0 && line.trim() === "---",
+  );
+  return frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
 }
 
 function lineSnippet(content: string, line: number): string | undefined {
@@ -1682,6 +1734,65 @@ function hasExplicitHumanApprovalGuard(line: string): boolean {
 
 function hasLocalRiskMitigationGuard(line: string): boolean {
   return RECOVERY_GUARD_RE.test(line);
+}
+
+function hasStructuredGuard(
+  lines: string[],
+  commandIndex: number,
+  guard: (line: string) => boolean,
+): boolean {
+  const command = lines[commandIndex] ?? "";
+  const commandIndent = command.match(/^\s*/)?.[0].length ?? 0;
+
+  // Same Markdown list item, including an indented fenced command.
+  if (commandIndent > 0) {
+    for (let index = commandIndex - 1; index >= 0; index -= 1) {
+      const line = lines[index] ?? "";
+      if (/^\s*#{1,6}\s+/.test(line) || line.trim() === "---") break;
+      if (/^\s*[-*+]\s+/.test(line)) return guard(line);
+      const indent = line.match(/^\s*/)?.[0].length ?? 0;
+      if (line.trim() && indent < commandIndent) break;
+    }
+  }
+
+  // Paragraph directly associated with the command or its opening fence.
+  let cursor = commandIndex - 1;
+  while (cursor >= 0 && /^\s*```/.test(lines[cursor] ?? "")) cursor -= 1;
+  while (cursor >= 0 && !(lines[cursor] ?? "").trim()) cursor -= 1;
+  const paragraph: string[] = [];
+  while (cursor >= 0) {
+    const line = lines[cursor] ?? "";
+    if (!line.trim() || line.trim() === "---" || /^\s*#{1,6}\s+/.test(line))
+      break;
+    paragraph.unshift(line);
+    cursor -= 1;
+  }
+  if (paragraph.some(guard)) return true;
+
+  // Explicit guard prose earlier in the same safety/constraint section is
+  // structurally associated without depending on a fixed distance.
+  const headingIndex = findParentSafetyHeading(lines, commandIndex);
+  return (
+    headingIndex >= 0 && lines.slice(headingIndex, commandIndex + 1).some(guard)
+  );
+}
+
+function findParentSafetyHeading(lines: string[], fromIndex: number): number {
+  let childDepth = 7;
+  for (let index = fromIndex - 1; index >= 0; index -= 1) {
+    const match = (lines[index] ?? "").match(/^\s*(#{1,6})\s+(.+)$/);
+    if (!match) continue;
+    const depth = match[1]?.length ?? 1;
+    if (depth >= childDepth) continue;
+    if (
+      /\b(human approval|safety|constraints?|guardrails?)\b/i.test(
+        match[2] ?? "",
+      )
+    )
+      return index;
+    childDepth = depth;
+  }
+  return -1;
 }
 
 function requiresHumanApprovalGuard(line: string): boolean {

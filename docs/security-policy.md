@@ -294,7 +294,7 @@ Security findings may include `riskClass` so reviewers can distinguish clear vio
 
 Renma can summarize security posture from existing static security findings. The summary groups findings by `riskClass` (`violation`, `suspicious`, `advisory`, and `unclassified`) and by severity, and reports high/critical security finding counts.
 
-This is reporting-only in v1:
+This is reporting-only in the v2 contract:
 
 - it does not add new detectors
 - it does not change scan `fail_on`
@@ -306,17 +306,33 @@ Runtime enforcement remains outside Renma.
 
 ### Effective policy inventory
 
-Renma can also summarize the effective static policy surface across discovered assets. The inventory is derived from asset-local policy metadata, selected security-profile chains, and repository-level `security` config.
+Renma can also summarize the effective static policy surface across discovered assets. The inventory distinguishes assets with local metadata, inherited policy, effective policy, and no effective policy.
 
-The inventory reports policy coverage, network/upload/secrets booleans, human approval requirements, approved destinations, forbidden inputs, disallowed commands, and profile resolution counts. It is reporting-only in v1 and does not enforce runtime behavior.
+Script and asset bytes never declare local policy. Skill-local scripts and
+assets inherit policy only from one unambiguous owning Skill. Text scripts may
+be scanned under that inherited policy from line 1; ordinary output assets and
+binary files never contribute instruction text. Orphan scripts do not receive
+policy-dependent evaluation from repository configuration without an owning
+Skill and traceable inheritance evidence.
 
-`renma trust-graph` also includes effective policy evidence. Each effective policy node uses a deterministic fingerprint over normalized allowed data, forbidden inputs, network/upload/secrets booleans, human approval requirement, approved destinations, and disallowed commands. The graph links assets to selected security-profile values and to their effective policy fingerprint; it does not enforce the policy at runtime.
+The inventory reports local, inherited, effective, and missing-effective coverage; network/upload/secrets booleans; human approval requirements; approved destinations; forbidden inputs; disallowed commands; and profile resolution counts. It is reporting-only in v2 and does not enforce runtime behavior.
+
+`renma trust-graph` also includes effective policy evidence. Each effective policy node uses a deterministic fingerprint over normalized allowed data, forbidden inputs, network/upload/secrets booleans, human approval requirement, approved destinations, and disallowed commands. Every `has_effective_policy` edge carries a deterministic `policySources` array containing each source that contributed to the fingerprint: `local`, `security_profile`, `repository_config`, and/or `owning_skill`. Owning-Skill inheritance retains `inheritedFrom`, and selected-profile evidence retains the selected profile and profile chain. The graph does not enforce policy at runtime.
+
+Contribution is recorded during effective-policy resolution with the same
+precedence, fail-closed, replacement, accumulation, and deduplication rules. A
+profile scalar overridden by local metadata is not a contribution. For
+accumulating lists, every source that supplies a value is retained even when
+another source supplies the same value and the effective list deduplicates it.
+Source order is always `local`, `security_profile`, `repository_config`,
+`owning_skill`. For inherited support, `local` refers to local metadata on the
+owning Skill, while `owning_skill` identifies the inheritance channel.
 
 ### Security-aware semantic diff
 
 `renma diff` and `renma ci-report` can summarize how security posture and effective security policy inventory changed between two revisions.
 
-The diff uses existing static findings and existing policy metadata/config summaries. It does not add new detectors, change runtime behavior, change scan `fail_on`, change readiness scoring, or change CI pass/warn/fail status in v1.
+The diff uses existing static findings and existing policy metadata/config summaries. It does not add new detectors, change runtime behavior, change scan `fail_on`, change readiness scoring, or change CI pass/warn/fail status.
 
 ## Common Security Diagnostics
 

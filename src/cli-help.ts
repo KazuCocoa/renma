@@ -76,6 +76,11 @@ const OPTION_HELP = {
     flags: "--owner <owner>",
     description: "Owner value for commands that accept --owner.",
   },
+  resources: {
+    flags: "--resources <directories>",
+    description:
+      "Create selected Skill-local directories: references,scripts,assets.",
+  },
   tags: {
     flags: "--tags <tags>",
     description: "Set comma-separated or repeated scaffold tags.",
@@ -250,6 +255,7 @@ export const COMMAND_HELP = [
       "renma trust-graph . --format json",
     ],
     interpretation: [
+      "Renma 0.18.0 emits only Trust Graph v2, the first supported long-term contract; there is no v1 compatibility mode.",
       "The report connects evidence; it does not decide trust for you.",
       "Missing owner, lifecycle, policy, or diagnostic evidence should be reviewed in context.",
       "JSON is the source of truth for downstream tooling; Markdown is for human review.",
@@ -331,6 +337,7 @@ export const COMMAND_HELP = [
       "renma bom . --format json --omit-generated-at",
     ],
     interpretation: [
+      "Renma 0.18.0 emits only BOM v2, the first supported long-term contract; there is no v1 compatibility mode.",
       "The BOM is a declared repository manifest, not a runtime usage report or telemetry.",
       "--omit-generated-at only removes the run-time generation timestamp.",
       "With the same checkout path, config path, repository contents, Renma version, and UTC evaluation date, repeated --omit-generated-at JSON runs should be byte-identical.",
@@ -545,10 +552,12 @@ export const COMMAND_HELP = [
       "renma scaffold context contexts/testing/boundary-value-analysis.md --owner qa-platform",
       "renma scaffold context_lens lenses/testing/spec-review-boundary-values.md --owner qa-platform",
       "renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform --format prompt",
+      "renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform --resources references,scripts,assets",
     ],
     interpretation: [
       "File mode creates the scaffold file at the target path and refuses to overwrite existing files.",
       "Prompt and JSON modes print to stdout instead of creating the scaffold file.",
+      "--resources creates only selected empty directories and never placeholder files.",
       "Generated scaffold content is a starting structure, not a complete asset.",
       "For Skills, use the platform's standard Skill authoring guidance to complete the description, instructions, workflow, constraints, and completion criteria.",
       "Domain knowledge must come from evidence or human input.",
@@ -572,6 +581,7 @@ export const COMMAND_HELP = [
       "id",
       "title",
       "tags",
+      "resources",
       "help",
     ],
   },

@@ -8,6 +8,7 @@ import {
 import type {
   Asset,
   AssetKind,
+  AssetOwnership,
   AssetStatus,
   Dependency,
   DependencyKind,
@@ -39,7 +40,11 @@ export interface GraphNode {
   id: string;
   kind: AssetKind;
   sourcePath: string;
-  owner?: string;
+  contentHash?: string;
+  sizeBytes?: number;
+  contentClassification?: "text" | "binary";
+  markdownParserEligible?: boolean;
+  ownership: AssetOwnership;
   status?: AssetStatus;
   tags: string[];
   groupedCount?: number;
@@ -323,7 +328,7 @@ export function formatGraphMarkdown(
   } else {
     for (const node of report.nodes) {
       lines.push(
-        `| ${node.id} | ${node.kind} | ${node.sourcePath} | ${node.owner ?? ""} | ${node.status ?? ""} | ${node.tags.join(", ")} |`,
+        `| ${node.id} | ${node.kind} | ${node.sourcePath} | ${formatOwnership(node.ownership)} | ${node.status ?? ""} | ${node.tags.join(", ")} |`,
       );
     }
   }
@@ -425,6 +430,7 @@ function graphViewReport(report: GraphReport, view: GraphView): GraphReport {
         id: to,
         kind: "context",
         sourcePath: to,
+        ownership: unownedOwnership(),
         tags: [],
         groupedCount: 1,
       });
@@ -466,6 +472,7 @@ function projectedNode(node: GraphNode, view: GraphView): GraphNode {
     id: groupId,
     kind: node.kind,
     sourcePath: groupId,
+    ownership: unownedOwnership(),
     tags: [],
     groupedCount: 0,
   };
@@ -618,10 +625,31 @@ function toNode(asset: Asset): GraphNode {
     id: asset.id,
     kind: asset.kind,
     sourcePath: asset.sourcePath,
-    ...(asset.metadata.owner ? { owner: asset.metadata.owner } : {}),
+    contentHash: asset.contentHash,
+    sizeBytes: asset.sizeBytes,
+    contentClassification: asset.contentClassification,
+    markdownParserEligible: asset.markdownParserEligible,
+    ownership: asset.ownership,
     ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
     tags: asset.metadata.tags,
   };
+}
+
+function unownedOwnership(): AssetOwnership {
+  return {
+    declaredOwner: null,
+    effectiveOwner: null,
+    source: "unowned",
+  };
+}
+
+function formatOwnership(ownership: AssetOwnership): string {
+  if (ownership.source === "unowned") return "(unowned)";
+  const provenance =
+    ownership.source === "inherited" && ownership.inheritedFrom
+      ? ` from ${ownership.inheritedFrom.sourcePath}`
+      : "";
+  return `${ownership.effectiveOwner ?? "(unowned)"} (${ownership.source}${provenance})`;
 }
 
 function toEdge(dependency: Dependency, assets: Asset[]): GraphEdge {

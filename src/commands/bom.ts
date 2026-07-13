@@ -10,6 +10,7 @@ import type { ConfigOverrides } from "../config.js";
 import type {
   Asset,
   AssetKind,
+  AssetOwnership,
   AssetStatus,
   DependencyKind,
 } from "../model.js";
@@ -34,7 +35,7 @@ interface BomBuildOptions extends BomOptions {
 }
 
 export interface BomReport {
-  schemaVersion: "renma.repository-context-bom.v1";
+  schemaVersion: "renma.repository-context-bom.v2";
   generatedAt?: string;
   outputMode: BomOutputMode;
   generator: {
@@ -82,7 +83,10 @@ export interface BomAsset {
   kind: AssetKind;
   sourcePath: string;
   contentHash: string;
-  owner?: string;
+  sizeBytes: number;
+  contentClassification: "text" | "binary";
+  markdownParserEligible: boolean;
+  ownership: AssetOwnership;
   status?: AssetStatus;
   version?: string;
   tags: string[];
@@ -176,6 +180,7 @@ export function buildBomReport(
     scanResult.diagnostics,
     scanResult.contextLens,
     scanResult.securityPolicyInventory,
+    scanResult.agentSkills,
   );
   const dependencies = stableEdges(graphReport.edges).map(toBomDependency);
   const diagnostics = stableDiagnostics(
@@ -189,7 +194,7 @@ export function buildBomReport(
   const omitGeneratedAt = options.omitGeneratedAt === true;
 
   return {
-    schemaVersion: "renma.repository-context-bom.v1",
+    schemaVersion: "renma.repository-context-bom.v2",
     outputMode: omitGeneratedAt ? "omit_generated_at" : "default",
     ...(omitGeneratedAt ? {} : { generatedAt: generatedAtIso(options) }),
     generator: {
@@ -205,7 +210,7 @@ export function buildBomReport(
     },
     summary: {
       scannedFileCount: snapshot.scannedFileCount,
-      assetCount: snapshot.catalog.assets.length,
+      assetCount: graphReport.nodes.length,
       dependencyCount: dependencies.length,
       resolvedDependencyCount: dependencies.filter(
         (dependency) => dependency.resolved,
@@ -282,7 +287,7 @@ export function formatBomMarkdown(report: BomReport): string {
         `| ${escapeTableCell(asset.id)} | ${escapeTableCell(asset.kind)} | ${escapeTableCell(
           asset.sourcePath,
         )} | ${shortHash(asset.contentHash)} | ${escapeTableCell(
-          asset.owner ?? "",
+          bomAssetOwner(asset),
         )} | ${escapeTableCell(asset.status ?? "")} | ${asset.dependencies.length} |`,
       );
     }
@@ -367,7 +372,10 @@ function toBomAsset(
     kind: asset.kind,
     sourcePath: asset.sourcePath,
     contentHash: asset.contentHash,
-    ...(asset.metadata.owner ? { owner: asset.metadata.owner } : {}),
+    sizeBytes: asset.sizeBytes,
+    contentClassification: asset.contentClassification,
+    markdownParserEligible: asset.markdownParserEligible,
+    ownership: asset.ownership,
     ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
     ...(asset.metadata.version ? { version: asset.metadata.version } : {}),
     tags: [...asset.metadata.tags].sort((left, right) =>
@@ -382,6 +390,19 @@ function toBomAsset(
       .map(toAssetDependent),
     diagnostics: diagnosticsForPath(diagnostics, asset.sourcePath),
   };
+}
+
+function formatOwnership(ownership: AssetOwnership): string {
+  if (ownership.source === "unowned") return "(unowned)";
+  const provenance =
+    ownership.source === "inherited" && ownership.inheritedFrom
+      ? ` from ${ownership.inheritedFrom.sourcePath}`
+      : "";
+  return `${ownership.effectiveOwner ?? "(unowned)"} (${ownership.source}${provenance})`;
+}
+
+function bomAssetOwner(asset: BomAsset): string {
+  return formatOwnership(asset.ownership);
 }
 
 function assetLifecycle(asset: Asset): BomAssetLifecycle | undefined {
@@ -582,8 +603,14 @@ function formatSecurityPolicyInventoryMarkdown(
     "| Metric | Value |",
     "| --- | ---: |",
     `| Policy assets | ${inventory.totalPolicyAssets} |`,
-    `| Assets with policy metadata | ${inventory.assetsWithPolicyMetadata} |`,
-    `| Assets missing policy metadata | ${inventory.assetsMissingPolicyMetadata} |`,
+    `| Assets with local policy metadata | ${inventory.assetsWithLocalPolicyMetadata} |`,
+    `| Assets with inherited policy | ${inventory.assetsWithInheritedPolicy} |`,
+    `| Assets with effective policy | ${inventory.assetsWithEffectivePolicy} |`,
+    `| Assets without effective policy | ${inventory.assetsWithoutEffectivePolicy} |`,
+    `| Effective policy from local metadata | ${inventory.policySources.local} |`,
+    `| Effective policy from security profiles | ${inventory.policySources.security_profile} |`,
+    `| Effective policy from repository config | ${inventory.policySources.repository_config} |`,
+    `| Effective policy from owning Skills | ${inventory.policySources.owning_skill} |`,
     `| Network allowed | ${inventory.networkAllowed.true} |`,
     `| Network denied | ${inventory.networkAllowed.false} |`,
     `| Network unspecified | ${inventory.networkAllowed.unspecified} |`,

@@ -12,6 +12,7 @@ import {
   type SecurityPolicyInventorySummary,
 } from "../security-policy-inventory.js";
 import type { ConfigOverrides } from "../config.js";
+import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 
 export type CiReportFormat = DiffFormat;
 export type CiReportStatus = "pass" | "warn" | "fail";
@@ -36,7 +37,7 @@ interface CiReportOptions {
   overrides?: ConfigOverrides;
 }
 
-const MAX_LIST_ITEMS = 10;
+const MAX_LIST_ITEMS = DEFAULT_QUALITY_PROFILE.presentation.topSummaryItemCap;
 
 interface ReportFinding {
   id: string;
@@ -247,8 +248,14 @@ function formatSecurityChangesSection(
     `- Added suspicious: ${posture.added.riskClasses.suspicious}`,
     `- Added advisory: ${posture.added.riskClasses.advisory}`,
     `- Policy assets: ${formatDelta(policyInventory.totalPolicyAssets)}`,
-    `- Assets with policy metadata: ${formatDelta(policyInventory.assetsWithPolicyMetadata)}`,
-    `- Assets missing policy metadata: ${formatDelta(policyInventory.assetsMissingPolicyMetadata)}`,
+    `- Assets with local policy metadata: ${formatDelta(policyInventory.assetsWithLocalPolicyMetadata)}`,
+    `- Assets with inherited policy: ${formatDelta(policyInventory.assetsWithInheritedPolicy)}`,
+    `- Assets with effective policy: ${formatDelta(policyInventory.assetsWithEffectivePolicy)}`,
+    `- Assets without effective policy: ${formatDelta(policyInventory.assetsWithoutEffectivePolicy)}`,
+    `- Effective policy from local metadata: ${formatDelta(policyInventory.policySources.local)}`,
+    `- Effective policy from security profiles: ${formatDelta(policyInventory.policySources.security_profile)}`,
+    `- Effective policy from repository config: ${formatDelta(policyInventory.policySources.repository_config)}`,
+    `- Effective policy from owning Skills: ${formatDelta(policyInventory.policySources.owning_skill)}`,
     `- Missing security profiles: ${formatDelta(policyInventory.securityProfiles.missing)}`,
   ];
 }
@@ -287,8 +294,14 @@ function formatSecurityPolicyInventorySection(
 ): string[] {
   const target = inventory ?? zeroSecurityPolicyInventorySummary();
   return [
-    `- Target assets with policy metadata: ${target.assetsWithPolicyMetadata}`,
-    `- Target assets missing policy metadata: ${target.assetsMissingPolicyMetadata}`,
+    `- Target assets with local policy metadata: ${target.assetsWithLocalPolicyMetadata}`,
+    `- Target assets with inherited policy: ${target.assetsWithInheritedPolicy}`,
+    `- Target assets with effective policy: ${target.assetsWithEffectivePolicy}`,
+    `- Target assets without effective policy: ${target.assetsWithoutEffectivePolicy}`,
+    `- Target effective policy from local metadata: ${target.policySources.local}`,
+    `- Target effective policy from security profiles: ${target.policySources.security_profile}`,
+    `- Target effective policy from repository config: ${target.policySources.repository_config}`,
+    `- Target effective policy from owning Skills: ${target.policySources.owning_skill}`,
     `- Target referenced security profiles: ${target.securityProfiles.referenced}`,
     `- Target missing security profiles: ${target.securityProfiles.missing}`,
     `- Target approved network destinations: ${target.approvedNetworkDestinationCount}`,

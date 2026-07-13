@@ -68,7 +68,7 @@ test("valid Skill-local support is not categorically disallowed", async () => {
   assert(!ids.includes("LAYOUT-DISALLOWED-SKILL-ASSET"));
   assert(!ids.includes("PATH-HELPER-COMMAND-SKILL-SCRIPTS"));
   assert(!ids.includes("LAYOUT-HELPER-NON_TOOLS"));
-  assert(ids.includes("LAYOUT-SKILL-EXECUTABLE-COMMAND"));
+  assert(!ids.includes("LAYOUT-SKILL-EXECUTABLE-COMMAND"));
   assert(ids.includes("DOCS-LAYOUT-INCONSISTENT"));
 
   const report = await readiness(root);
@@ -516,7 +516,7 @@ test("readiness markdown includes layout findings as a repair brief", async () =
   const markdown = formatReadiness(report, "markdown");
 
   assert.match(markdown, /## Findings/);
-  assert.match(markdown, /LAYOUT-SKILL-EXECUTABLE-COMMAND/);
+  assert.doesNotMatch(markdown, /LAYOUT-SKILL-EXECUTABLE-COMMAND/);
   assert.doesNotMatch(markdown, /LAYOUT-DISALLOWED-SKILL-ASSET/);
   assert.doesNotMatch(markdown, /PATH-HELPER-COMMAND-SKILL-SCRIPTS/);
 });

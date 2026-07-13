@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -41,8 +41,11 @@ test("scan discovers default artifacts and emits deterministic findings", async 
   );
   assert.equal(result.securityPolicyInventory?.totalPolicyAssets, 1);
   assert.equal(result.securityPolicyInventory?.assetKinds.skill, 1);
-  assert.equal(result.securityPolicyInventory?.assetsWithPolicyMetadata, 0);
-  assert.equal(result.securityPolicyInventory?.assetsMissingPolicyMetadata, 1);
+  assert.equal(
+    result.securityPolicyInventory?.assetsWithLocalPolicyMetadata,
+    0,
+  );
+  assert.equal(result.securityPolicyInventory?.assetsWithoutEffectivePolicy, 1);
 });
 
 test("scan discovers skills/demo/skill.md entrypoint as a skill", async () => {
@@ -55,10 +58,9 @@ test("scan discovers skills/demo/skill.md entrypoint as a skill", async () => {
   assert.equal(result.scannedFileCount, 1);
   assert.equal(result.securityPolicyInventory?.assetKinds.skill, 1);
   assert.deepEqual(
-    result.securityPolicyInventory?.missingPolicyAssets.map((asset) => [
-      asset.path,
-      asset.kind,
-    ]),
+    result.securityPolicyInventory?.assetsWithoutEffectivePolicyList.map(
+      (asset) => [asset.path, asset.kind],
+    ),
     [["skills/demo/skill.md", "skill"]],
   );
   assert.equal(
@@ -83,10 +85,9 @@ test("scan discovers skills/demo/foo.skill.md entrypoint as a skill", async () =
   assert.equal(result.scannedFileCount, 1);
   assert.equal(result.securityPolicyInventory?.assetKinds.skill, 1);
   assert.deepEqual(
-    result.securityPolicyInventory?.missingPolicyAssets.map((asset) => [
-      asset.path,
-      asset.kind,
-    ]),
+    result.securityPolicyInventory?.assetsWithoutEffectivePolicyList.map(
+      (asset) => [asset.path, asset.kind],
+    ),
     [["skills/demo/foo.skill.md", "skill"]],
   );
 });
@@ -107,10 +108,9 @@ test(".agents/skills entrypoints are classified as skills before generic agent d
   assert.equal(result.securityPolicyInventory?.assetKinds.skill, 1);
   assert.equal(result.securityPolicyInventory?.assetKinds.agent, 0);
   assert.deepEqual(
-    result.securityPolicyInventory?.missingPolicyAssets.map((asset) => [
-      asset.path,
-      asset.kind,
-    ]),
+    result.securityPolicyInventory?.assetsWithoutEffectivePolicyList.map(
+      (asset) => [asset.path, asset.kind],
+    ),
     [[".agents/skills/demo/SKILL.md", "skill"]],
   );
   assert.ok(
@@ -161,7 +161,10 @@ test("reserved support directory names are not classified as skills", async () =
   assert.equal(result.scannedFileCount, 1);
   assert.equal(result.securityPolicyInventory?.assetKinds.skill, 0);
   assert.equal(result.securityPolicyInventory?.assetKinds.example, 1);
-  assert.equal(result.securityPolicyInventory?.missingPolicyAssets.length, 0);
+  assert.equal(
+    result.securityPolicyInventory?.assetsWithoutEffectivePolicyList.length,
+    1,
+  );
 
   const diagnostic = result.diagnostics.find(
     (item) =>
@@ -247,16 +250,17 @@ test("top-level skill-like files are layout guidance only, not skill assets", as
     (diagnostic) =>
       diagnostic.code === "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR",
   );
+  const actualSkillLikePaths = (await readdir(root))
+    .filter(
+      (file) =>
+        file === "SKILL.md" ||
+        file === "skill.md" ||
+        file.endsWith(".skill.md"),
+    )
+    .sort((left, right) => left.localeCompare(right));
   assert.deepEqual(
-    guidanceDiagnostics.map((diagnostic) => [
-      diagnostic.severity,
-      diagnostic.path,
-    ]),
-    [
-      ["info", "foo.skill.md"],
-      ["info", "skill.md"],
-      ["info", "SKILL.md"],
-    ],
+    guidanceDiagnostics.map((diagnostic) => diagnostic.path),
+    actualSkillLikePaths,
   );
   const skillMdDiagnostic = guidanceDiagnostics.find(
     (diagnostic) => diagnostic.path === "skill.md",
@@ -284,6 +288,23 @@ test("top-level skill-like files are layout guidance only, not skill assets", as
   assert.equal(skillMdV2?.verificationSteps, undefined);
 });
 
+test("top-level layout diagnostics preserve exact walked filename casing", async () => {
+  for (const filename of ["SKILL.md", "skill.md", "foo.skill.md"]) {
+    const root = await fixture();
+    await writeFile(path.join(root, filename), "# Skill note\n");
+    const result = await scan(root);
+    assert.deepEqual(
+      result.diagnostics
+        .filter(
+          (diagnostic) =>
+            diagnostic.code === "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR",
+        )
+        .map((diagnostic) => diagnostic.path),
+      [filename],
+    );
+  }
+});
+
 test("skill-like files outside explicit skill directories are not classified as skills", async () => {
   const root = await fixture();
   await mkdir(path.join(root, ".agents"), { recursive: true });
@@ -294,7 +315,10 @@ test("skill-like files outside explicit skill directories are not classified as 
   assert.equal(result.scannedFileCount, 1);
   assert.equal(result.securityPolicyInventory?.assetKinds.skill, 0);
   assert.equal(result.securityPolicyInventory?.assetKinds.agent, 1);
-  assert.equal(result.securityPolicyInventory?.missingPolicyAssets.length, 0);
+  assert.equal(
+    result.securityPolicyInventory?.assetsWithoutEffectivePolicyList.length,
+    1,
+  );
   assert.ok(
     result.diagnostics.some(
       (diagnostic) =>
@@ -914,32 +938,44 @@ test("CLI prints catalog JSON and markdown", async () => {
     conflicts: [],
     supersededBy: [],
   });
-  assert.deepEqual(report.catalog.dependencies, [
-    {
-      from: "demo",
-      to: "demo.guide",
-      kind: "requires",
-      sourcePath: "skills/demo/SKILL.md",
-      evidence: {
-        path: "skills/demo/SKILL.md",
-        startLine: 12,
-        endLine: 12,
-        snippet: `  renma.requires-context: '["demo.guide","testing.boundary-value-analysis"]'`,
+  assert.deepEqual(
+    report.catalog.dependencies.filter(
+      (dependency) => dependency.kind === "requires",
+    ),
+    [
+      {
+        from: "demo",
+        to: "demo.guide",
+        kind: "requires",
+        sourcePath: "skills/demo/SKILL.md",
+        evidence: {
+          path: "skills/demo/SKILL.md",
+          startLine: 12,
+          endLine: 12,
+          snippet: `  renma.requires-context: '["demo.guide","testing.boundary-value-analysis"]'`,
+        },
       },
-    },
-    {
-      from: "demo",
-      to: "testing.boundary-value-analysis",
-      kind: "requires",
-      sourcePath: "skills/demo/SKILL.md",
-      evidence: {
-        path: "skills/demo/SKILL.md",
-        startLine: 12,
-        endLine: 12,
-        snippet: `  renma.requires-context: '["demo.guide","testing.boundary-value-analysis"]'`,
+      {
+        from: "demo",
+        to: "testing.boundary-value-analysis",
+        kind: "requires",
+        sourcePath: "skills/demo/SKILL.md",
+        evidence: {
+          path: "skills/demo/SKILL.md",
+          startLine: 12,
+          endLine: 12,
+          snippet: `  renma.requires-context: '["demo.guide","testing.boundary-value-analysis"]'`,
+        },
       },
-    },
-  ]);
+    ],
+  );
+  assert.ok(
+    report.catalog.dependencies.some(
+      (dependency) =>
+        dependency.kind === "owns_local_resource" &&
+        dependency.to === "demo.guide",
+    ),
+  );
 
   const markdown = await withCapturedConsole(() =>
     main(["catalog", root, "--format", "markdown"]),
@@ -1990,6 +2026,7 @@ test("scaffold context can emit json", async () => {
     "title",
     "owner",
     "tags",
+    "resources",
     "format",
     "content",
     "prompt",
@@ -2064,6 +2101,7 @@ test("scaffold skill JSON keeps its field shape and includes the human-review bo
     "title",
     "owner",
     "tags",
+    "resources",
     "format",
     "content",
     "prompt",

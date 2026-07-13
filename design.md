@@ -87,9 +87,9 @@ policy, security profile resolution, allowed data, forbidden inputs, approved
 network and upload destinations, human approval requirements, and high-risk
 findings without enforcing runtime behavior.
 
-Trust Graph v1 is a deterministic interpretation of existing catalog, graph, scan, and security evidence. It exposes stable asset, owner, lifecycle, dependency, security profile, effective policy, and diagnostic evidence, but it does not introduce subjective trust scores or a separate runtime system. `scan` lists concrete problems, `graph` shows structural relationships, `trust-graph` connects trust-relevant evidence, and `readiness` summarizes repository-level preparedness.
+Trust Graph v2 is a deterministic interpretation of existing catalog, graph, scan, and security evidence. It exposes stable asset, owner, lifecycle, dependency, security profile, compositional effective-policy provenance, and diagnostic evidence, but it does not introduce subjective trust scores or a separate runtime system. `scan` lists concrete problems, `graph` shows structural relationships, `trust-graph` connects trust-relevant evidence, and `readiness` summarizes repository-level preparedness.
 
-Repository Context BOM v1 is a declared repository evidence snapshot: assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence. Snapshot consistency comes from one in-memory repository snapshot per BOM execution, not output formatting flags. `--omit-generated-at` only removes run-time generation timestamp noise; it does not ignore repository metadata timestamps such as `lastReviewedAt` or `expiresAt`, suppress freshness diagnostics, normalize environment-dependent absolute paths such as `root` or `configPath`, hide file moves, or provide portable byte-for-byte output across runners. The BOM does not claim actual LLM runtime usage. Actual consumed-context evidence remains a future separate artifact or attachment that external agents or wrappers may produce and Renma may later validate against the repository model. See `docs/repository-context-bom.md` for the resolved v1 contract.
+Repository Context BOM v2 is a declared repository evidence snapshot: assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence. Snapshot consistency comes from one in-memory repository snapshot per BOM execution, not output formatting flags. `--omit-generated-at` only removes run-time generation timestamp noise; it does not ignore repository metadata timestamps such as `lastReviewedAt` or `expiresAt`, suppress freshness diagnostics, normalize environment-dependent absolute paths such as `root` or `configPath`, hide file moves, or provide portable byte-for-byte output across runners. The BOM does not claim actual LLM runtime usage. Actual consumed-context evidence remains a future separate artifact or attachment that external agents or wrappers may produce and Renma may later validate against the repository model. See `docs/repository-context-bom.md` for the v2 contract.
 
 Renma findings should be useful not only to humans, but also to LLM coding
 agents. A good Renma diagnostic should explain what is wrong, why it matters for
@@ -235,9 +235,20 @@ Renma normalizes scanned files into asset kinds:
 - `profile`: skill-local overlay or variant
 - `reference`: skill-local supporting material
 - `example`: skill-local example or fixture text
+- `script`: Skill-local deterministic executable implementation
+- `asset`: Skill-local template, image, data, font, PDF, or output resource
 - `agent`: repository or agent instruction file
 - `config`: Renma configuration
 - `unknown`: scanned file that does not match a known kind
+
+Catalog, graph, Trust Graph, and BOM output include script and asset inventory.
+Each cataloged asset records original-byte size and hash, text/binary
+classification, and Markdown-parser eligibility. Binary assets remain opaque;
+Renma does not decode them as UTF-8 or expose their bytes in snippets.
+Non-Markdown text remains available to dedicated path and security analysis but
+cannot declare catalog metadata or contribute Markdown structure. Skill-local
+support without a local owner inherits effective ownership from the nearest
+Skill, with inherited provenance exposed in normalized reports.
 
 The dedicated `context` kind is central to the product model. It lets catalog,
 graph, and validation output distinguish reusable team-owned knowledge from

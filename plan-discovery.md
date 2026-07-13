@@ -1,24 +1,26 @@
 # Renma Skill Discovery Plan
 
-Status: proposed
+Status: deferred exploratory design
 
-Target: 0.18.0
+Target: unassigned (post-0.18.0)
 
 Scope: optional, backward-compatible skill discovery for large single repositories
 
-Only **Current Baseline** describes implemented behavior. Route metadata,
-`skill-index`, discovery diagnostics, and the integrations proposed elsewhere in
-this document are not implemented in 0.17.0. This plan is intentionally outside
-the 0.17.0 usability and documentation-consolidation release.
+Only **Current Baseline** describes implemented behavior. `routes_to`,
+`skill-index`, discovery aliases, explicit routing entrypoints, generated
+indexes, and related diagnostics are deferred proposals. They are not Renma
+0.18.0 behavior and have no assigned release. Runtime Skill selection remains
+outside Renma.
 
 ## Summary
 
 Renma should add a static skill discovery projection for repositories that have grown beyond the point where an agent can reliably inspect every `SKILL.md` before choosing where to start.
 
-The implementation should preserve Renma's current model and boundaries:
+Any future implementation must be reconsidered against Renma's focused-workflow
+model and boundaries:
 
 ```text
-Skill = agent-facing entrypoint / routing contract / usage guide
+Skill = focused, bounded workflow entrypoint and usage guide
 Context Lens = purpose-oriented interpretation layer over context assets
 Context Asset = independently owned source-of-truth knowledge
 ```
@@ -43,23 +45,30 @@ LLM proposes. Renma verifies. Human approves.
 
 ## Current Baseline
 
-The current 0.16.0 product model provides most of the infrastructure needed for
-this work, and 0.17.0 improves the usability of that baseline without
-implementing discovery:
+The implemented 0.18.0 product provides infrastructure that a future design
+could reuse without implementing Skill-to-Skill routing:
 
-- Repository discovery for skills, context assets, context lenses, profiles, references, examples, agents, config, and supporting files.
+- Repository file discovery for Skills, Context Assets, Context Lenses,
+  profiles, references, examples, scripts, assets, agents, and config.
+- First-class Skill-local support discovery, static reachability and ownership
+  relationships, and no-follow symlink handling.
 - A normalized catalog model with deterministic IDs, paths, hashes, owners, lifecycle metadata, tags, and declared dependencies.
 - A shared `RepositoryEvidence` collection path used by catalog, graph, and Repository Context BOM work.
 - Static graph relationships for required and optional context, required and optional lenses, lens application, conflicts, supersession references, and coverage evidence.
 - Markdown, JSON, and Mermaid reports for human review, CI, and downstream tooling.
-- Readiness, semantic diff, ownership, Trust Graph, diagnostics v2, review bundles, scaffold, and metadata suggestions.
+- Readiness, semantic diff, ownership, Trust Graph v2, Repository Context BOM
+  v2, diagnostics v2, review bundles, scaffold, and metadata suggestions.
+- Effective security-policy provenance across local metadata, profiles,
+  repository configuration, and owning-Skill inheritance.
 - A compact metadata parser that supports scalar values and selected block-list fields while intentionally discouraging large nested frontmatter.
 
-Skill discovery should extend this baseline. It should not create a parallel scanner, a second catalog, a new runtime service, or a separate source of truth.
+Deferred Skill-to-Skill discovery is distinct from this implemented repository
+and support-resource discovery. Any future work must not create a parallel
+scanner, second catalog, runtime service, or separate source of truth.
 
 ## Decision Status
 
-Accepted constraints for 0.18.0 design are:
+Constraints for any future design are:
 
 - Renma remains a deterministic repository-governance layer, not a runtime
   selector.

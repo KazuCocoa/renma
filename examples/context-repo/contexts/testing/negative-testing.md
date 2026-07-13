@@ -10,6 +10,13 @@ when_to_use:
   - Designing validation, unsupported-state, or error-handling test cases
 when_not_to_use:
   - Designing accepted boundary-value cases for valid limits
+allowed_data:
+  - repo-local-files
+  - disclosed-user-provided-data
+network_allowed: false
+external_upload_allowed: false
+secrets_allowed: false
+requires_human_approval: true
 ---
 
 # Negative Testing

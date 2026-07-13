@@ -1,4 +1,5 @@
-import { glob, lstat, readFile, stat } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type {
   Artifact,
@@ -6,6 +7,11 @@ import type {
   Diagnostic,
   ScanConfig,
 } from "./types.js";
+import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
+import {
+  safeRepositoryPath,
+  walkRepositoryFiles,
+} from "./repository-boundary.js";
 
 const SKILL_LIKE_FILE_OUTSIDE_SKILLS_DIR_CODE =
   "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR";
@@ -30,6 +36,18 @@ const SKILL_LIKE_FILE_GLOBS = [
   ".agents/**/SKILL.md",
   ".agents/**/skill.md",
   ".agents/**/*.skill.md",
+];
+const SKILL_SUPPORT_EXISTENCE_GLOBS = [
+  "skills/**/profiles/**/*",
+  "skills/**/references/**/*",
+  "skills/**/examples/**/*",
+  "skills/**/scripts/**/*",
+  "skills/**/assets/**/*",
+  ".agents/skills/**/profiles/**/*",
+  ".agents/skills/**/references/**/*",
+  ".agents/skills/**/examples/**/*",
+  ".agents/skills/**/scripts/**/*",
+  ".agents/skills/**/assets/**/*",
 ];
 const SKILL_LIKE_FILE_LLM_HINT =
   "No action is required unless this file is intended to be a Renma skill. If it is intended to be a skill, move it under skills/** or .agents/skills/**.";
@@ -146,6 +164,16 @@ export function classifyRepositorySkillPath(
   };
 }
 
+/** Resolve the logical directory shared by every supported Skill path form. */
+export function logicalSkillDirectory(
+  relativePath: string,
+): string | undefined {
+  const classified = classifyRepositorySkillPath(relativePath);
+  return classified?.kind === "entrypoint" || classified?.kind === "support"
+    ? classified.skillDirectory
+    : undefined;
+}
+
 /** Classify a repository-relative Skill entrypoint only at an explicit root. */
 export function classifyRepositorySkillEntrypointPath(
   relativePath: string,
@@ -240,30 +268,53 @@ function classifySkillEntrypointAtRoot(
 export async function discoverArtifacts(
   root: string,
   config: ScanConfig,
-): Promise<{ artifacts: Artifact[]; diagnostics: Diagnostic[] }> {
+): Promise<{
+  artifacts: Artifact[];
+  diagnostics: Diagnostic[];
+  discoveredPaths: ReadonlySet<string>;
+}> {
   const diagnostics: Diagnostic[] = [];
-  const paths = new Set<string>();
-  diagnostics.push(...(await skillLikeLayoutDiagnostics(root, config)));
-
-  for (const pattern of config.globs) {
-    try {
-      for await (const match of glob(pattern, {
-        cwd: root,
-        withFileTypes: false,
-      })) {
-        if (typeof match === "string") paths.add(toPosix(match));
-      }
-    } catch (error) {
-      diagnostics.push({
-        severity: "error",
-        message: `Could not evaluate glob "${pattern}": ${errorMessage(error)}`,
-      });
-    }
-  }
+  const walked = await walkRepositoryFiles(root, {
+    maxDepth: config.maxDepth,
+    excluded: (relativePath) => isExcluded(relativePath, config.exclude),
+  });
+  diagnostics.push(...skillLikeLayoutDiagnostics(walked.files));
+  diagnostics.push(
+    ...walked.symlinks.map((symlinkPath) => ({
+      code: DIAGNOSTIC_IDS.SUPPORT_SYMLINK_PATH,
+      severity: "warning" as const,
+      path: symlinkPath,
+      message:
+        "Skipping symbolic link; repository discovery never follows symlink targets.",
+      details: { state: "symlink" },
+    })),
+  );
+  diagnostics.push(
+    ...walked.unreadable.map(({ path: unreadablePath, error }) => ({
+      severity: "error" as const,
+      path: unreadablePath,
+      message: `Could not safely enumerate repository path: ${error}`,
+    })),
+  );
+  const paths = new Set(
+    walked.files.filter((relativePath) =>
+      config.globs.some((pattern) => path.matchesGlob(relativePath, pattern)),
+    ),
+  );
+  const discoveredPaths = new Set([
+    ...paths,
+    ...walked.files.filter((relativePath) =>
+      SKILL_SUPPORT_EXISTENCE_GLOBS.some((pattern) =>
+        path.matchesGlob(relativePath, pattern),
+      ),
+    ),
+  ]);
 
   const candidates = [...paths]
     .filter((relativePath) => !isExcluded(relativePath, config.exclude))
-    .filter((relativePath) => depth(relativePath) <= config.maxDepth)
+    .filter(
+      (relativePath) => repositoryPathDepth(relativePath) <= config.maxDepth,
+    )
     .sort((a, b) => a.localeCompare(b));
 
   const artifacts = await mapLimit(
@@ -272,16 +323,24 @@ export async function discoverArtifacts(
     async (relativePath) => {
       const absolutePath = path.join(root, relativePath);
       try {
-        const linkInfo = await lstat(absolutePath);
-        if (linkInfo.isSymbolicLink()) {
+        const inspected = await safeRepositoryPath(root, relativePath);
+        if (inspected.state === "symlink") {
           diagnostics.push({
             severity: "warning",
             path: relativePath,
-            message: "Skipping symbolic link.",
+            message: "Skipping path reached through a symbolic link.",
           });
           return undefined;
         }
-        const info = await stat(absolutePath);
+        if (inspected.state !== "present") {
+          diagnostics.push({
+            severity: "error",
+            path: relativePath,
+            message: `Could not safely inspect file (${inspected.state}).`,
+          });
+          return undefined;
+        }
+        const info = inspected.stats;
         if (!info.isFile()) return undefined;
         if (info.size > config.maxFileSizeBytes) {
           diagnostics.push({
@@ -291,12 +350,20 @@ export async function discoverArtifacts(
           });
           return undefined;
         }
-        const content = await readFile(absolutePath, "utf8");
+        const bytes = await readFile(absolutePath);
+        const contentClassification = classifyContent(bytes, relativePath);
+        const content =
+          contentClassification === "text" ? bytes.toString("utf8") : "";
         return {
           path: relativePath,
           absolutePath,
           kind: classify(relativePath),
           sizeBytes: info.size,
+          contentHash: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
+          contentClassification,
+          markdownParserEligible:
+            contentClassification === "text" &&
+            /(?:^|\/)(?:[^/]+\.)?mdx?$/i.test(relativePath),
           content,
         } satisfies Artifact;
       } catch (error) {
@@ -312,9 +379,11 @@ export async function discoverArtifacts(
 
   return {
     artifacts: artifacts.filter(
-      (artifact): artifact is Artifact => artifact !== undefined,
-    ),
+      (artifact) => artifact !== undefined,
+    ) as Artifact[],
     diagnostics,
+    // Preserve existence evidence before exclusion/depth/content parsing.
+    discoveredPaths,
   };
 }
 
@@ -323,6 +392,8 @@ function classify(relativePath: string): ArtifactKind {
   const explicitSkillSupportKind =
     classifyExplicitSkillSupportPath(relativePath);
   if (explicitSkillSupportKind !== undefined) return explicitSkillSupportKind;
+  if (classifyRepositorySkillPath(relativePath)?.kind === "reserved-root")
+    return "unknown";
   if (relativePath === "AGENTS.md" || relativePath.startsWith(".agents/"))
     return "agent";
   if (relativePath.startsWith("lenses/")) return "context_lens";
@@ -353,52 +424,67 @@ function classifyExplicitSkillSupportPath(
       : undefined;
   switch (supportDirectory) {
     case "assets":
-      return "unknown";
+      return classified?.kind === "support" ? "asset" : undefined;
     case "profiles":
       return "profile";
     case "references":
       return "reference";
     case "examples":
       return "example";
+    case "scripts":
+      return classified?.kind === "support" ? "script" : undefined;
     default:
       return undefined;
   }
 }
 
-async function skillLikeLayoutDiagnostics(
-  root: string,
-  config: ScanConfig,
-): Promise<Diagnostic[]> {
+const OPAQUE_EXTENSIONS = new Set([
+  ".avif",
+  ".bmp",
+  ".eot",
+  ".gif",
+  ".ico",
+  ".jpeg",
+  ".jpg",
+  ".otf",
+  ".pdf",
+  ".png",
+  ".ttf",
+  ".webp",
+  ".woff",
+  ".woff2",
+  ".zip",
+]);
+
+function classifyContent(
+  bytes: Uint8Array,
+  relativePath: string,
+): "text" | "binary" {
+  if (OPAQUE_EXTENSIONS.has(path.posix.extname(relativePath).toLowerCase()))
+    return "binary";
+  if (bytes.includes(0)) return "binary";
+  try {
+    new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return "text";
+  } catch {
+    return "binary";
+  }
+}
+
+function skillLikeLayoutDiagnostics(walkedFiles: string[]): Diagnostic[] {
   const paths = new Set<string>();
   const diagnostics: Diagnostic[] = [];
-
-  for (const pattern of SKILL_LIKE_FILE_GLOBS) {
-    try {
-      for await (const match of glob(pattern, {
-        cwd: root,
-        exclude: globExcludes(config.exclude),
-        withFileTypes: false,
-      })) {
-        if (typeof match === "string") paths.add(toPosix(match));
-      }
-    } catch (error) {
-      diagnostics.push({
-        severity: "error",
-        message: `Could not evaluate glob "${pattern}": ${errorMessage(error)}`,
-      });
+  for (const relativePath of walkedFiles) {
+    if (
+      SKILL_LIKE_FILE_GLOBS.some((pattern) =>
+        path.matchesGlob(relativePath, pattern),
+      )
+    ) {
+      paths.add(relativePath);
     }
   }
 
   for (const relativePath of [...paths].sort((a, b) => a.localeCompare(b))) {
-    if (isExcluded(relativePath, config.exclude)) continue;
-    if (depth(relativePath) > config.maxDepth) continue;
-
-    try {
-      if (!(await stat(path.join(root, relativePath))).isFile()) continue;
-    } catch {
-      continue;
-    }
-
     const reservedSupportSegment = skillSupportPathSegment(relativePath);
     if (reservedSupportSegment !== undefined) {
       diagnostics.push({
@@ -503,7 +589,7 @@ async function mapLimit<T, R>(
   return results;
 }
 
-function isExcluded(relativePath: string, excludes: string[]): boolean {
+export function isExcluded(relativePath: string, excludes: string[]): boolean {
   const segments = relativePath.split("/");
   return excludes.some(
     (exclude) =>
@@ -513,16 +599,7 @@ function isExcluded(relativePath: string, excludes: string[]): boolean {
   );
 }
 
-function globExcludes(excludes: string[]): string[] {
-  return excludes.flatMap((exclude) => [
-    exclude,
-    `${exclude}/**`,
-    `**/${exclude}`,
-    `**/${exclude}/**`,
-  ]);
-}
-
-function depth(relativePath: string): number {
+export function repositoryPathDepth(relativePath: string): number {
   return relativePath.split("/").filter(Boolean).length;
 }
 

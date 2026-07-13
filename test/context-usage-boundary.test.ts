@@ -128,6 +128,8 @@ function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
     absolutePath: `/tmp/${path}`,
     kind,
     sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: true,
     content,
   };
 }

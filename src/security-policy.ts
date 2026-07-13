@@ -27,6 +27,16 @@ export interface SecurityPolicy {
   evidenceByField: Map<string, SecurityPolicyFieldEvidence>;
 }
 
+export type EffectivePolicySource =
+  | "local"
+  | "security_profile"
+  | "repository_config";
+
+export interface ResolvedSecurityPolicy {
+  policy: SecurityPolicy;
+  policySources: EffectivePolicySource[];
+}
+
 export type CanonicalSecurityOperationalField =
   | "networkAllowed"
   | "externalUploadAllowed"
@@ -357,7 +367,19 @@ export function applySecurityConfig(
   policy: SecurityPolicy,
   config?: SecurityConfig,
 ): SecurityPolicy {
-  if (config === undefined) return policy;
+  return resolveSecurityConfig(policy, config).policy;
+}
+
+/** Resolve effective policy and deterministic provenance with one merge pass. */
+export function resolveSecurityConfig(
+  policy: SecurityPolicy,
+  config?: SecurityConfig,
+): ResolvedSecurityPolicy {
+  const sources = new Set<EffectivePolicySource>();
+  recordLocalPolicyContributions(policy, sources);
+  if (config === undefined) {
+    return { policy, policySources: orderedPolicySources(sources) };
+  }
 
   const declared = new Set(policy.declared);
   const invalidDeclared = new Set(policy.invalidDeclared);
@@ -377,12 +399,22 @@ export function applySecurityConfig(
   };
 
   const chain = securityProfileChain(policy.securityProfile, config);
+  const inheritedNetwork = inheritedProfileBoolean(chain, "networkAllowed");
+  const inheritedUpload = inheritedProfileBoolean(
+    chain,
+    "externalUploadAllowed",
+  );
+  const inheritedSecrets = inheritedProfileBoolean(chain, "secretsAllowed");
+  const inheritedApproval = inheritedProfileBoolean(
+    chain,
+    "humanApprovalRequired",
+  );
   setResolvedBoolean(
     resolved,
     "networkAllowed",
     resolvePermissionBoolean(
       policy.networkAllowed,
-      inheritedProfileBoolean(chain, "networkAllowed"),
+      inheritedNetwork,
       policy.invalidDeclared.has("networkAllowed"),
     ),
   );
@@ -391,7 +423,7 @@ export function applySecurityConfig(
     "externalUploadAllowed",
     resolvePermissionBoolean(
       policy.externalUploadAllowed,
-      inheritedProfileBoolean(chain, "externalUploadAllowed"),
+      inheritedUpload,
       policy.invalidDeclared.has("externalUploadAllowed"),
     ),
   );
@@ -400,7 +432,7 @@ export function applySecurityConfig(
     "secretsAllowed",
     resolvePermissionBoolean(
       policy.secretsAllowed,
-      inheritedProfileBoolean(chain, "secretsAllowed"),
+      inheritedSecrets,
       policy.invalidDeclared.has("secretsAllowed"),
     ),
   );
@@ -409,10 +441,26 @@ export function applySecurityConfig(
     "humanApprovalRequired",
     resolveRequiredBoolean(
       policy.humanApprovalRequired,
-      inheritedProfileBoolean(chain, "humanApprovalRequired"),
+      inheritedApproval,
       policy.invalidDeclared.has("humanApprovalRequired"),
     ),
   );
+  if (
+    (policy.networkAllowed === undefined &&
+      resolved.networkAllowed !== undefined &&
+      inheritedNetwork !== undefined) ||
+    (policy.externalUploadAllowed === undefined &&
+      resolved.externalUploadAllowed !== undefined &&
+      inheritedUpload !== undefined) ||
+    (policy.secretsAllowed === undefined &&
+      resolved.secretsAllowed !== undefined &&
+      inheritedSecrets !== undefined) ||
+    (policy.humanApprovalRequired === undefined &&
+      resolved.humanApprovalRequired !== undefined &&
+      inheritedApproval !== undefined)
+  ) {
+    sources.add("security_profile");
+  }
 
   for (const item of chain.profiles) {
     const profile = item.profile;
@@ -421,31 +469,42 @@ export function applySecurityConfig(
       profile.allowedDataClass !== undefined
     ) {
       resolved.allowedDataClass = profile.allowedDataClass;
+      sources.add("security_profile");
     }
     if (mayInheritAllowedData(policy)) {
       resolved.allowedData.push(...profile.allowedData);
+      if (profile.allowedData.length > 0) sources.add("security_profile");
     }
     if (mayInheritForbiddenInputs(policy)) {
       resolved.forbiddenInputs.push(...profile.forbiddenInputs);
+      if (profile.forbiddenInputs.length > 0) sources.add("security_profile");
     }
     if (mayAccumulate(policy, "approvedNetworkDestinations")) {
       resolved.approvedNetworkDestinations.push(...profile.approvedDomains);
+      if (profile.approvedDomains.length > 0) sources.add("security_profile");
     }
     if (mayAccumulate(policy, "approvedUploadDestinations")) {
       resolved.approvedUploadDestinations.push(
         ...profile.approvedUploadDomains,
       );
+      if (profile.approvedUploadDomains.length > 0)
+        sources.add("security_profile");
     }
     resolved.disallowedCommands.push(...profile.disallowedCommands);
+    if (profile.disallowedCommands.length > 0) sources.add("security_profile");
   }
 
   if (mayAccumulate(policy, "approvedNetworkDestinations")) {
     resolved.approvedNetworkDestinations.push(...config.approvedDomains);
+    if (config.approvedDomains.length > 0) sources.add("repository_config");
   }
   if (mayAccumulate(policy, "approvedUploadDestinations")) {
     resolved.approvedUploadDestinations.push(...config.approvedUploadDomains);
+    if (config.approvedUploadDomains.length > 0)
+      sources.add("repository_config");
   }
   resolved.disallowedCommands.push(...config.disallowedCommands);
+  if (config.disallowedCommands.length > 0) sources.add("repository_config");
   resolved.allowedData = uniqueStrings(resolved.allowedData);
   resolved.forbiddenInputs = uniqueStrings(resolved.forbiddenInputs);
   resolved.approvedNetworkDestinations = uniqueStrings(
@@ -456,7 +515,42 @@ export function applySecurityConfig(
   );
   resolved.disallowedCommands = uniqueStrings(resolved.disallowedCommands);
 
-  return resolved;
+  return { policy: resolved, policySources: orderedPolicySources(sources) };
+}
+
+function recordLocalPolicyContributions(
+  policy: SecurityPolicy,
+  sources: Set<EffectivePolicySource>,
+): void {
+  const hasLocalScalar =
+    policy.networkAllowed !== undefined ||
+    policy.externalUploadAllowed !== undefined ||
+    policy.secretsAllowed !== undefined ||
+    policy.humanApprovalRequired !== undefined ||
+    policy.allowedDataClass !== undefined;
+  const hasLocalReplacedList =
+    policy.declared.has("allowedData") ||
+    policy.declared.has("forbiddenInputs");
+  const hasLocalAccumulatedValue =
+    policy.approvedNetworkDestinations.length > 0 ||
+    policy.approvedUploadDestinations.length > 0 ||
+    policy.disallowedCommands.length > 0;
+  if (
+    hasLocalScalar ||
+    hasLocalReplacedList ||
+    hasLocalAccumulatedValue ||
+    policy.invalidDeclared.size > 0
+  ) {
+    sources.add("local");
+  }
+}
+
+function orderedPolicySources(
+  sources: ReadonlySet<EffectivePolicySource>,
+): EffectivePolicySource[] {
+  return (["local", "security_profile", "repository_config"] as const).filter(
+    (source) => sources.has(source),
+  );
 }
 
 function emptySecurityPolicy(): SecurityPolicy {

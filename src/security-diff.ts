@@ -21,8 +21,14 @@ export interface PolicyBooleanDelta {
 
 export interface SecurityPolicyInventoryDelta {
   totalPolicyAssets: number;
-  assetsWithPolicyMetadata: number;
-  assetsMissingPolicyMetadata: number;
+  assetsWithLocalPolicyMetadata: number;
+  assetsWithInheritedPolicy: number;
+  assetsWithEffectivePolicy: number;
+  assetsWithoutEffectivePolicy: number;
+  policySources: Record<
+    keyof SecurityPolicyInventorySummary["policySources"],
+    number
+  >;
   networkAllowed: PolicyBooleanDelta;
   externalUploadAllowed: PolicyBooleanDelta;
   secretsAllowed: PolicyBooleanDelta;
@@ -107,8 +113,16 @@ export function deltaProfileCounts(
 export function zeroSecurityPolicyInventoryDelta(): SecurityPolicyInventoryDelta {
   return {
     totalPolicyAssets: 0,
-    assetsWithPolicyMetadata: 0,
-    assetsMissingPolicyMetadata: 0,
+    assetsWithLocalPolicyMetadata: 0,
+    assetsWithInheritedPolicy: 0,
+    assetsWithEffectivePolicy: 0,
+    assetsWithoutEffectivePolicy: 0,
+    policySources: {
+      local: 0,
+      security_profile: 0,
+      repository_config: 0,
+      owning_skill: 0,
+    },
     networkAllowed: zeroPolicyBooleanDelta(),
     externalUploadAllowed: zeroPolicyBooleanDelta(),
     secretsAllowed: zeroPolicyBooleanDelta(),
@@ -136,14 +150,37 @@ function deltaSecurityPolicyInventory(
       to.totalPolicyAssets,
       from.totalPolicyAssets,
     ),
-    assetsWithPolicyMetadata: deltaNumber(
-      to.assetsWithPolicyMetadata,
-      from.assetsWithPolicyMetadata,
+    assetsWithLocalPolicyMetadata: deltaNumber(
+      to.assetsWithLocalPolicyMetadata,
+      from.assetsWithLocalPolicyMetadata,
     ),
-    assetsMissingPolicyMetadata: deltaNumber(
-      to.assetsMissingPolicyMetadata,
-      from.assetsMissingPolicyMetadata,
+    assetsWithInheritedPolicy: deltaNumber(
+      to.assetsWithInheritedPolicy,
+      from.assetsWithInheritedPolicy,
     ),
+    assetsWithEffectivePolicy: deltaNumber(
+      to.assetsWithEffectivePolicy,
+      from.assetsWithEffectivePolicy,
+    ),
+    assetsWithoutEffectivePolicy: deltaNumber(
+      to.assetsWithoutEffectivePolicy,
+      from.assetsWithoutEffectivePolicy,
+    ),
+    policySources: {
+      local: deltaNumber(to.policySources.local, from.policySources.local),
+      security_profile: deltaNumber(
+        to.policySources.security_profile,
+        from.policySources.security_profile,
+      ),
+      repository_config: deltaNumber(
+        to.policySources.repository_config,
+        from.policySources.repository_config,
+      ),
+      owning_skill: deltaNumber(
+        to.policySources.owning_skill,
+        from.policySources.owning_skill,
+      ),
+    },
     networkAllowed: deltaPolicyBoolean(to.networkAllowed, from.networkAllowed),
     externalUploadAllowed: deltaPolicyBoolean(
       to.externalUploadAllowed,

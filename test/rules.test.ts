@@ -12,6 +12,10 @@ import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 test("Skill quality rules consume resolved Agent Skills YAML descriptions", async () => {
   const fixtures = [
     {
+      name: "short-clear",
+      description: 'description: "Review PDFs. Use when a PDF needs review."',
+    },
+    {
       name: "folded",
       description: `description: >-
   Review specifications before implementation with enough routing detail for deterministic quality checks. Use when detailed boundary analysis and evidence review are required.`,
@@ -200,25 +204,27 @@ description: Use this skill for workflow review tasks when routing requires setu
 ---
 # Workflow Review
 
+${repeatWords("detail", 810)}
+
 Use this skill when reviewing workflow behavior.
 
-## Setup
+## Platform Facts
 Install the project dependencies.
 Configure the local environment.
 Capture the workflow logs.
 Keep setup guidance current.
 
-## Decision Logic
+## Known Issues
 Workflow behavior can differ after a resumed review.
 Known issue: state refresh may retry slowly.
 Avoid assuming the first run is representative.
 
-## Troubleshooting
+## Domain Rules
 Environment state can be flaky in local fixtures.
 Retry only after collecting logs.
 Workflow-specific failures should keep their reproduction notes.
 
-## Testing Heuristics
+## Product Policy
 Best practice: include offline and resume cases.
 Edge case coverage should include missing-owner behavior.
 Risk: approval state may expire during review.
@@ -238,20 +244,20 @@ Run the workflow test command and confirm result.
 
   const result = await scan(root, {});
   const finding = result.findings.find(
-    (candidate) => candidate.id === "MAINT-SKILL-REUSABLE-CONTEXT-CANDIDATE",
+    (candidate) => candidate.id === "QUAL-SKILL-MIXED-RESPONSIBILITY",
   );
 
   assert.equal(finding?.severity, "low");
   assert.equal(finding?.category, "maintenance");
   assert.equal(finding?.confidence, "medium");
   assert.match(finding?.evidence.snippet ?? "", /Detected reusable-knowledge/);
-  assert.match(finding?.evidence.snippet ?? "", /Setup/);
-  assert.match(finding?.evidence.snippet ?? "", /Troubleshooting/);
+  assert.match(finding?.evidence.snippet ?? "", /Platform Facts/);
+  assert.match(finding?.evidence.snippet ?? "", /Domain Rules/);
   assert.match(finding?.evidence.snippet ?? "", /known issue/);
   assert.ok(
     finding?.constraints?.includes("Do not make Renma select runtime context."),
   );
-  assert.match(finding?.llmHint ?? "", /without adding runtime context/);
+  assert.match(finding?.llmHint ?? "", /used across Skills/);
 });
 
 test("scan does not advise reusable context extraction for tiny skills", async () => {
@@ -278,7 +284,7 @@ Verification result.
 
   assert.equal(
     result.findings.some(
-      (finding) => finding.id === "MAINT-SKILL-REUSABLE-CONTEXT-CANDIDATE",
+      (finding) => finding.id === "QUAL-SKILL-MIXED-RESPONSIBILITY",
     ),
     false,
   );
@@ -1062,7 +1068,7 @@ Verify the result with a test.
   );
   await writeFile(
     path.join(skillDir, "references", "large.md"),
-    `# Large Reference\n\n${repeatWords("context", 850)}\n`,
+    `# Large Reference\n\n${repeatWords("context", 5001)}\n`,
   );
 
   const result = await scan(root);
@@ -1075,10 +1081,10 @@ Verify the result with a test.
     "skills/demo/references/large.md",
   );
   assert.match(contextBudgetFinding?.title ?? "", /Support asset exceeds/);
-  assert.match(contextBudgetFinding?.whyItMatters ?? "", /modular enough/);
+  assert.match(contextBudgetFinding?.whyItMatters ?? "", /coherence review/);
   assert.ok(
     contextBudgetFinding?.constraints?.includes(
-      "Preserve concrete procedural steps losslessly.",
+      "Preserve concrete procedural steps losslessly if a semantic split is chosen.",
     ),
   );
   assert.ok(
@@ -1092,7 +1098,7 @@ Verify the result with a test.
   assert.ok(
     !contextBudgetFinding?.verificationSteps?.includes("Run npm test."),
   );
-  assert.match(contextBudgetFinding?.llmHint ?? "", /meaning-based ordered/);
+  assert.match(contextBudgetFinding?.llmHint ?? "", /Review scope/);
 });
 
 test("scan emits actionable guidance for oversized skills", async () => {
@@ -1113,7 +1119,7 @@ Do not use for runtime context selection.
 ## Preflight
 Collect the target repository path.
 ## Procedure
-${repeatWords("procedure", 560)}
+${repeatWords("procedure", 2001)}
 ## Verification
 Run npm test.
 `,
@@ -1125,7 +1131,7 @@ Run npm test.
   );
 
   assert.equal(skillBudgetFinding?.evidence.path, "skills/large/SKILL.md");
-  assert.match(skillBudgetFinding?.whyItMatters ?? "", /Large skills can mix/);
+  assert.match(skillBudgetFinding?.whyItMatters ?? "", /Long Skill bodies/);
   assert.ok(
     skillBudgetFinding?.constraints?.includes(
       "Do not make Renma responsible for selecting context.",
@@ -1138,7 +1144,7 @@ Run npm test.
     ),
   );
   assert.ok(!skillBudgetFinding?.verificationSteps?.includes("Run npm test."));
-  assert.match(skillBudgetFinding?.llmHint ?? "", /first-class context assets/);
+  assert.match(skillBudgetFinding?.llmHint ?? "", /progressive disclosure/);
 });
 
 test("scan does not advise tiny skill-local references as shared context candidates", async () => {
@@ -1311,17 +1317,21 @@ Run the workflow validation command.
     path.join(skillDir, "references", "operating-procedure.md"),
     `# Operating Procedure
 
-## Decision Logic
-Choose the review path based on the workflow owner, risk level, and rollback needs.
+${repeatWords("shared-guidance", 1201)}
 
-## Troubleshooting
+## Source of Truth
+Choose the review path based on the workflow owner, risk level, and rollback needs.
+This source of truth is used by multiple Skills.
+
+## Reusable Troubleshooting
 Known issue: stale local state can make a completed workflow appear incomplete.
 The reviewer should capture the first failing command before changing inputs.
 
-## Validation
+## Product Policy
 Validate the owner, expected output, and rollback note before marking the workflow ready.
+This shared policy has independent ownership and lifecycle.
 
-## Constraints
+## Compatibility
 Do not remove required approvals when promoting this guidance into shared context.
 Prefer stable procedure names over ad hoc local aliases.
 
@@ -1347,8 +1357,8 @@ Verify the workflow after each fix and record the checked command.
     finding?.evidence.path,
     "skills/workflow/references/operating-procedure.md",
   );
-  assert.match(finding?.evidence.snippet ?? "", /Decision Logic/);
-  assert.match(finding?.evidence.snippet ?? "", /Validation/);
+  assert.match(finding?.evidence.snippet ?? "", /Source of Truth/);
+  assert.match(finding?.evidence.snippet ?? "", /Compatibility/);
   assert.ok(finding?.constraints?.length);
   assert.ok(finding?.verificationSteps?.length);
   assert.match(finding?.llmHint ?? "", /Search the repository/);
@@ -1976,7 +1986,7 @@ test("text report calls out clean scans", () => {
     format: "text",
     agentSkills: {
       specification: "https://agentskills.io/specification",
-      profile: "agentskills.io/specification@2026-07-11",
+      profile: "agentskills.io/specification@2026-07-12",
       totalSkillCount: 0,
       validSkillCount: 0,
       invalidSkillCount: 0,

@@ -617,6 +617,8 @@ function skillArtifact(content: string): Artifact {
     absolutePath: "/repo/skills/demo/SKILL.md",
     kind: "skill",
     sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: true,
     content,
   };
 }

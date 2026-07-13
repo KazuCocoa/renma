@@ -11,6 +11,11 @@ metadata:
   renma.requires-context: '["contexts/testing/negative-testing.md"]'
   renma.optional-context: '["context.domain.payment.idempotency"]'
   renma.requires-lens: '["lens.testing.spec-review.boundary-values"]'
+  renma.allowed-data: '["repo-local-files","skill-bundled-context","disclosed-user-provided-data"]'
+  renma.network-allowed: "false"
+  renma.external-upload-allowed: "false"
+  renma.secrets-allowed: "false"
+  renma.requires-human-approval: "true"
 ---
 
 # Spec Review

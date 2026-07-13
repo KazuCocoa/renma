@@ -85,7 +85,7 @@ Run these commands from the renma repository root after building the CLI:
 
 ```bash
 npm run build
-node dist/index.js scan examples/context-repo
+node dist/index.js scan examples/context-repo --fail-on high
 node dist/index.js catalog examples/context-repo --format markdown
 node dist/index.js ownership examples/context-repo --format markdown
 node dist/index.js graph examples/context-repo --view layered --format mermaid
@@ -99,7 +99,7 @@ node dist/index.js inspect examples/context-repo/skills/testing/spec-review/SKIL
 With an installed CLI, replace `node dist/index.js` with `renma`:
 
 ```bash
-renma scan examples/context-repo
+renma scan examples/context-repo --fail-on high
 renma catalog examples/context-repo --format markdown
 renma ownership examples/context-repo --format markdown
 renma graph examples/context-repo --view layered --format mermaid
@@ -118,11 +118,10 @@ evidence into authoritative JSON or a Markdown review projection. `inspect`
 shows the structure of the workflow entrypoint.
 
 The example is structurally ready: its Skill and Lens validate, every declared
-relationship resolves, and every cataloged asset has an owner. `scan` also
-keeps advisory missing-security-policy findings visible for the fixture's
-Skill and Context Assets. The example does not invent security policy merely to
-produce an empty finding list; fixture owners would need to review and declare
-that policy.
+relationship resolves, and every cataloged asset has an owner. Its Skill and
+Context Assets declare a local-only security policy for repository files,
+explicitly disclosed user inputs, and the Context bundled with the Skill, so
+`scan` completes without diagnostics or security findings.
 
 ## Intentionally Not Demonstrated
 

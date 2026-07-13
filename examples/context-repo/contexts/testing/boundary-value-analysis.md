@@ -10,6 +10,13 @@ when_to_use:
   - Designing test cases around numeric, date, count, length, or pagination limits
 when_not_to_use:
   - Testing invalid inputs that are not tied to explicit boundary values
+allowed_data:
+  - repo-local-files
+  - disclosed-user-provided-data
+network_allowed: false
+external_upload_allowed: false
+secrets_allowed: false
+requires_human_approval: true
 ---
 
 # Boundary Value Analysis

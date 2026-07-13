@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  collectSecurityPolicyAssetEvidence,
   summarizeSecurityPolicyInventory,
   zeroSecurityPolicyInventorySummary,
 } from "../src/security-policy-inventory.js";
@@ -16,6 +17,283 @@ test("empty policy inventory returns a zero summary", () => {
   );
 });
 
+test("effective policy provenance lists every contributing source", () => {
+  const config = {
+    ...baseSecurityConfig(),
+    disallowedCommands: ["curl"],
+    profiles: {
+      strict: {
+        networkAllowed: false,
+        allowedData: [],
+        forbiddenInputs: [],
+        approvedDomains: [],
+        approvedUploadDomains: [],
+        disallowedCommands: [],
+      },
+    },
+  } satisfies SecurityConfig;
+  const evidence = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "skills/demo/SKILL.md",
+        "skill",
+        policy({
+          allowedData: "public",
+          externalUploadAllowed: false,
+          securityProfile: "strict",
+        }),
+      ),
+      artifact("skills/demo/scripts/run.mjs", "script", "echo safe\n"),
+    ],
+    config,
+  );
+
+  assert.deepEqual(
+    evidence.find((item) => item.kind === "skill")?.policySources,
+    ["local", "security_profile", "repository_config"],
+  );
+  assert.deepEqual(
+    evidence.find((item) => item.kind === "script")?.policySources,
+    ["local", "security_profile", "repository_config", "owning_skill"],
+  );
+  assert.ok(
+    evidence
+      .filter((item) => item.hasEffectivePolicy)
+      .every((item) => item.policySources.length > 0),
+  );
+  const summary = summarizeSecurityPolicyInventory(
+    [
+      artifact(
+        "skills/demo/SKILL.md",
+        "skill",
+        policy({
+          allowedData: "public",
+          externalUploadAllowed: false,
+          securityProfile: "strict",
+        }),
+      ),
+      artifact("skills/demo/scripts/run.mjs", "script", "echo safe\n"),
+    ],
+    config,
+  );
+  assert.ok(
+    summary.assetsWithEffectivePolicy <=
+      Object.values(summary.policySources).reduce(
+        (total, count) => total + count,
+        0,
+      ),
+  );
+});
+
+test("policy provenance follows effective override and accumulation semantics", () => {
+  const sameScalar = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "contexts/same-scalar.md",
+        "context",
+        policy({ networkAllowed: false, securityProfile: "strict" }),
+      ),
+    ],
+    {
+      ...baseSecurityConfig(),
+      profiles: { strict: profile({ networkAllowed: false }) },
+    },
+  )[0];
+  assert.deepEqual(sameScalar?.policySources, ["local"]);
+
+  const overridden = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "contexts/override.md",
+        "context",
+        policy({ networkAllowed: false, securityProfile: "permissive" }),
+      ),
+    ],
+    {
+      ...baseSecurityConfig(),
+      profiles: { permissive: profile({ networkAllowed: true }) },
+    },
+  )[0];
+  assert.deepEqual(overridden?.policySources, ["local"]);
+
+  const partial = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "contexts/partial.md",
+        "context",
+        policy({ networkAllowed: false, securityProfile: "mixed" }),
+      ),
+    ],
+    {
+      ...baseSecurityConfig(),
+      profiles: {
+        mixed: profile({ networkAllowed: true, forbiddenInputs: ["secret"] }),
+      },
+    },
+  )[0];
+  assert.deepEqual(partial?.policySources, ["local", "security_profile"]);
+
+  const accumulated = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "contexts/accumulated.md",
+        "context",
+        [
+          "---",
+          "network_allowed: true",
+          "approved_network_destinations: local.example.com",
+          "---",
+          "# Accumulated",
+        ].join("\n"),
+      ),
+    ],
+    {
+      ...baseSecurityConfig(),
+      approvedDomains: ["repo.example.com"],
+    },
+  )[0];
+  assert.deepEqual(accumulated?.policySources, ["local", "repository_config"]);
+  assert.deepEqual(accumulated?.effectivePolicy.approvedNetworkDestinations, [
+    "local.example.com",
+    "repo.example.com",
+  ]);
+
+  const chained = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "contexts/chained.md",
+        "context",
+        policy({ securityProfile: "child" }),
+      ),
+    ],
+    {
+      ...baseSecurityConfig(),
+      profiles: {
+        child: profile({ networkAllowed: true, securityProfile: "parent" }),
+        parent: profile({ networkAllowed: true }),
+      },
+    },
+  )[0];
+  assert.deepEqual(chained?.policySources, ["security_profile"]);
+  assert.equal(chained?.effectivePolicy.networkAllowed, true);
+});
+
+test("duplicate profile and repository list values retain both suppliers", () => {
+  const config = {
+    ...baseSecurityConfig(),
+    approvedDomains: ["shared.example.com"],
+    disallowedCommands: ["curl"],
+    profiles: {
+      strict: profile({
+        approvedDomains: ["shared.example.com"],
+        disallowedCommands: ["curl"],
+      }),
+    },
+  } satisfies SecurityConfig;
+  const evidence = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "contexts/profile-repository.md",
+        "context",
+        policy({ securityProfile: "strict" }),
+      ),
+    ],
+    config,
+  )[0];
+  assert.deepEqual(evidence?.policySources, [
+    "security_profile",
+    "repository_config",
+  ]);
+  assert.deepEqual(evidence?.effectivePolicy.approvedNetworkDestinations, [
+    "shared.example.com",
+  ]);
+  assert.deepEqual(evidence?.effectivePolicy.disallowedCommands, ["curl"]);
+});
+
+test("explicit local empty allowed data blocks profile inheritance with provenance", () => {
+  const evidence = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "contexts/empty-data.md",
+        "context",
+        [
+          "---",
+          "allowed_data: []",
+          "network_allowed: false",
+          "security_profile: broad",
+          "---",
+          "# Empty data",
+        ].join("\n"),
+      ),
+    ],
+    {
+      ...baseSecurityConfig(),
+      profiles: { broad: profile({ allowedData: ["public"] }) },
+    },
+  )[0];
+  assert.deepEqual(evidence?.policySources, ["local"]);
+  assert.deepEqual(evidence?.effectivePolicy.allowedData, []);
+});
+
+test("repository-only and local-only policies report one exact source", () => {
+  const localOnly = collectSecurityPolicyAssetEvidence([
+    artifact("contexts/local.md", "context", policy({ networkAllowed: false })),
+  ])[0];
+  const repositoryOnly = collectSecurityPolicyAssetEvidence(
+    [artifact("contexts/repository.md", "context", "# Repository\n")],
+    { ...baseSecurityConfig(), disallowedCommands: ["curl"] },
+  )[0];
+  assert.deepEqual(localOnly?.policySources, ["local"]);
+  assert.deepEqual(repositoryOnly?.policySources, ["repository_config"]);
+});
+
+test("duplicate policy values retain every supplying source", () => {
+  const evidence = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "contexts/duplicate.md",
+        "context",
+        [
+          "---",
+          "approved_network_destinations: shared.example.com",
+          "---",
+          "# Duplicate",
+        ].join("\n"),
+      ),
+    ],
+    {
+      ...baseSecurityConfig(),
+      approvedDomains: ["shared.example.com"],
+    },
+  )[0];
+  assert.deepEqual(evidence?.policySources, ["local", "repository_config"]);
+});
+
+test("invalid local destination metadata blocks repository accumulation provenance", () => {
+  const evidence = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "skills/demo/SKILL.md",
+        "skill",
+        [
+          "---",
+          "metadata:",
+          '  renma.network-allowed: "false"',
+          '  renma.approved-network-destinations: "not-json"',
+          "---",
+          "# Demo",
+        ].join("\n"),
+      ),
+    ],
+    {
+      ...baseSecurityConfig(),
+      approvedDomains: ["repo.example.com"],
+    },
+  )[0];
+  assert.deepEqual(evidence?.policySources, ["local"]);
+  assert.deepEqual(evidence?.effectivePolicy.approvedNetworkDestinations, []);
+});
+
 test("skill and context without policy metadata are counted as missing", () => {
   const summary = summarizeSecurityPolicyInventory([
     artifact("skills/demo/SKILL.md", "skill", "# Demo\n"),
@@ -24,14 +302,14 @@ test("skill and context without policy metadata are counted as missing", () => {
   ]);
 
   assert.equal(summary.totalPolicyAssets, 3);
-  assert.equal(summary.assetsWithPolicyMetadata, 0);
-  assert.equal(summary.assetsMissingPolicyMetadata, 3);
+  assert.equal(summary.assetsWithLocalPolicyMetadata, 0);
+  assert.equal(summary.assetsWithoutEffectivePolicy, 3);
   assert.equal(summary.assetKinds.skill, 1);
   assert.equal(summary.assetKinds.context, 1);
   assert.equal(summary.assetKinds.context_lens, 1);
   assert.equal(summary.networkAllowed.unspecified, 3);
   assert.equal(summary.securityProfiles.none, 3);
-  assert.deepEqual(summary.missingPolicyAssets, [
+  assert.deepEqual(summary.assetsWithoutEffectivePolicyList, [
     { path: "contexts/testing/demo.md", kind: "context" },
     { path: "lenses/testing/demo.md", kind: "context_lens" },
     { path: "skills/demo/SKILL.md", kind: "skill" },
@@ -227,7 +505,7 @@ test("resolved security profiles count as referenced and contribute policy", () 
     false: 1,
     unspecified: 0,
   });
-  assert.equal(summary.assetsMissingPolicyMetadata, 0);
+  assert.equal(summary.assetsWithoutEffectivePolicy, 0);
   assert.equal(summary.forbiddenInputCount, 1);
   assert.equal(summary.approvedNetworkDestinationCount, 1);
   assert.equal(summary.approvedUploadDestinationCount, 1);
@@ -288,7 +566,7 @@ test("unknown artifacts are included only when they declare policy metadata", ()
 
   assert.equal(summary.totalPolicyAssets, 1);
   assert.equal(summary.assetKinds.unknown, 1);
-  assert.equal(summary.assetsWithPolicyMetadata, 1);
+  assert.equal(summary.assetsWithLocalPolicyMetadata, 1);
   assert.deepEqual(summary.networkAllowed, {
     true: 1,
     false: 0,
@@ -363,6 +641,8 @@ function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
     absolutePath: `/repo/${path}`,
     kind,
     sizeBytes: Buffer.byteLength(operationalContent),
+    contentClassification: "text",
+    markdownParserEligible: true,
     content: operationalContent,
   };
 }

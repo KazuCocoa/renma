@@ -4,28 +4,70 @@ import { lifecycleDiagnostics } from "./catalog-lifecycle.js";
 import { contextBodyLanguageDiagnostics } from "./context-language-diagnostics.js";
 import type {
   AssetMetadata,
+  AssetOwnership,
   Catalog,
   CatalogEntry,
   Dependency,
   DependencyKind,
 } from "./model.js";
+import {
+  classifyRepositorySkillPath,
+  logicalSkillDirectory,
+} from "./discovery.js";
 import { parseAssetMetadata } from "./metadata.js";
+import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import type { Diagnostic, Evidence, ParsedDocument } from "./types.js";
+import { buildStaticSupportDependencies } from "./static-support.js";
 
-const FRONTMATTER_MAX_LINES = 24;
-const FRONTMATTER_MAX_CHARS = 1200;
-const METADATA_LIST_ITEM_MAX_CHARS = 140;
+const QUALITY = DEFAULT_QUALITY_PROFILE;
 const PLACEHOLDER_USAGE_BOUNDARY_PATTERN =
   /^(?:todo|tbd|tba|unknown|n\/?a|none|placeholder|to be defined)(?:[\s:-].*)?$/i;
 
 type CatalogedKind = CatalogEntry["kind"];
 
 /** Build a deterministic catalog of skill and context entries from parsed documents. */
-export function buildCatalog(documents: ParsedDocument[]): {
+export function buildCatalog(
+  documents: ParsedDocument[],
+  repositoryPaths: ReadonlySet<string> = new Set(
+    documents.map((document) => document.artifact.path),
+  ),
+): {
   catalog: Catalog;
   diagnostics: Diagnostic[];
 } {
   const diagnostics: Diagnostic[] = [];
+  const skillOwners = new Map<
+    string,
+    Array<{ owner: string | null; id: string; sourcePath: string }>
+  >();
+  for (const document of documents) {
+    if (document.artifact.kind !== "skill") continue;
+    const metadata = parseAssetMetadata(document).metadata;
+    const skillDirectory = logicalSkillDirectory(document.artifact.path);
+    if (!skillDirectory) continue;
+    const candidates = skillOwners.get(skillDirectory) ?? [];
+    candidates.push({
+      owner: metadata.owner?.trim() || null,
+      id: metadata.id ?? document.artifact.path,
+      sourcePath: document.artifact.path,
+    });
+    skillOwners.set(skillDirectory, candidates);
+  }
+  for (const [skillDirectory, candidates] of skillOwners) {
+    if (candidates.length <= 1) continue;
+    diagnostics.push({
+      severity: "warning",
+      path: skillDirectory,
+      message:
+        "Ambiguous owning Skill evidence; local support ownership remains unowned.",
+      details: {
+        skillDirectory,
+        candidatePaths: candidates
+          .map((candidate) => candidate.sourcePath)
+          .sort((left, right) => left.localeCompare(right)),
+      },
+    });
+  }
   const entries = documents
     .map((document): CatalogEntry | undefined => {
       const result = parseAssetMetadata(document);
@@ -47,10 +89,22 @@ export function buildCatalog(documents: ParsedDocument[]): {
 
       if (!kind) return undefined;
 
+      const ownership = resolveAssetOwnership(
+        document,
+        result.metadata,
+        skillOwners,
+      );
+
       const base = {
         id: result.metadata.id ?? document.artifact.path,
         sourcePath: document.artifact.path,
-        contentHash: contentHash(document.artifact.content),
+        contentHash:
+          document.artifact.contentHash ??
+          contentHash(document.artifact.content),
+        sizeBytes: document.artifact.sizeBytes,
+        contentClassification: document.artifact.contentClassification,
+        markdownParserEligible: document.artifact.markdownParserEligible,
+        ownership,
         metadata: result.metadata,
         metadataFields: result.metadataFields,
         metadataListItems: result.metadataListItems,
@@ -80,15 +134,16 @@ export function buildCatalog(documents: ParsedDocument[]): {
       return a.sourcePath.localeCompare(b.sourcePath);
     });
 
-  const dependencies = entries
-    .flatMap((entry) => dependenciesForEntry(entry))
-    .sort((a, b) => {
-      const byFrom = a.from.localeCompare(b.from);
-      if (byFrom !== 0) return byFrom;
-      const byKind = dependencyKindOrder(a.kind) - dependencyKindOrder(b.kind);
-      if (byKind !== 0) return byKind;
-      return a.to.localeCompare(b.to);
-    });
+  const dependencies = [
+    ...entries.flatMap((entry) => dependenciesForEntry(entry)),
+    ...buildStaticSupportDependencies(documents, entries, repositoryPaths),
+  ].sort((a, b) => {
+    const byFrom = a.from.localeCompare(b.from);
+    if (byFrom !== 0) return byFrom;
+    const byKind = dependencyKindOrder(a.kind) - dependencyKindOrder(b.kind);
+    if (byKind !== 0) return byKind;
+    return a.to.localeCompare(b.to);
+  });
   diagnostics.push(...dependencyDiagnostics(entries, dependencies));
   diagnostics.push(...lifecycleDiagnostics(entries));
   diagnostics.push(...conflictDiagnostics(entries));
@@ -100,6 +155,43 @@ export function buildCatalog(documents: ParsedDocument[]): {
       dependencies,
     },
     diagnostics,
+  };
+}
+
+function resolveAssetOwnership(
+  document: ParsedDocument,
+  metadata: AssetMetadata,
+  skillOwners: ReadonlyMap<
+    string,
+    Array<{ owner: string | null; id: string; sourcePath: string }>
+  >,
+): AssetOwnership {
+  const declaredOwner = metadata.owner?.trim() || null;
+  if (declaredOwner) {
+    return {
+      declaredOwner,
+      effectiveOwner: declaredOwner,
+      source: "declared",
+    };
+  }
+
+  const classified = classifyRepositorySkillPath(document.artifact.path);
+  if (classified?.kind !== "support") {
+    return { declaredOwner: null, effectiveOwner: null, source: "unowned" };
+  }
+  const owningSkills = skillOwners.get(classified.skillDirectory) ?? [];
+  if (owningSkills.length !== 1 || !owningSkills[0]?.owner) {
+    return { declaredOwner: null, effectiveOwner: null, source: "unowned" };
+  }
+  const owningSkill = owningSkills[0];
+  return {
+    declaredOwner: null,
+    effectiveOwner: owningSkill.owner,
+    source: "inherited",
+    inheritedFrom: {
+      id: owningSkill.id,
+      sourcePath: owningSkill.sourcePath,
+    },
   };
 }
 
@@ -119,7 +211,9 @@ function catalogedKind(
     document.artifact.kind === "context" ||
     document.artifact.kind === "profile" ||
     document.artifact.kind === "reference" ||
-    document.artifact.kind === "example"
+    document.artifact.kind === "example" ||
+    document.artifact.kind === "script" ||
+    document.artifact.kind === "asset"
   ) {
     return document.artifact.kind;
   }
@@ -142,7 +236,10 @@ function metadataBudgetDiagnostics(
   );
   const lineCount = frontmatterLines.length;
   const charCount = frontmatterLines.join("\n").length;
-  if (lineCount > FRONTMATTER_MAX_LINES || charCount > FRONTMATTER_MAX_CHARS) {
+  if (
+    lineCount > QUALITY.frontmatterMaxLines ||
+    charCount > QUALITY.frontmatterMaxChars
+  ) {
     diagnostics.push({
       severity: "warning",
       path: document.artifact.path,
@@ -153,13 +250,23 @@ function metadataBudgetDiagnostics(
         endLine: frontmatter.endLine,
         snippet: `frontmatter: ${lineCount} lines, ${charCount} characters`,
       },
+      details: {
+        measured: { lines: lineCount, chars: charCount },
+        limit: {
+          lines: QUALITY.frontmatterMaxLines,
+          chars: QUALITY.frontmatterMaxChars,
+        },
+        unit: "frontmatter_lines_and_characters",
+        profile: QUALITY.profile,
+      },
     });
   }
 
   for (const [key, items] of Object.entries(metadataListItems)) {
     for (const item of items) {
       const itemText = metadataListItemText(item.raw);
-      if (itemText.length <= METADATA_LIST_ITEM_MAX_CHARS) continue;
+      if (!shouldBudgetMetadataItem(key, itemText)) continue;
+      if (itemText.length <= QUALITY.metadataListItemMaxChars) continue;
 
       diagnostics.push({
         severity: "warning",
@@ -171,6 +278,13 @@ function metadataBudgetDiagnostics(
           endLine: item.endLine,
           snippet: item.raw,
         },
+        details: {
+          measured: itemText.length,
+          limit: QUALITY.metadataListItemMaxChars,
+          unit: "characters",
+          profile: QUALITY.profile,
+          field: key,
+        },
       });
     }
   }
@@ -179,7 +293,8 @@ function metadataBudgetDiagnostics(
     const field = metadataFields[key];
     if (!field?.key.startsWith("renma.")) continue;
     for (const value of values) {
-      if (value.length <= METADATA_LIST_ITEM_MAX_CHARS) continue;
+      if (!shouldBudgetMetadataItem(key, value)) continue;
+      if (value.length <= QUALITY.metadataListItemMaxChars) continue;
       diagnostics.push({
         severity: "warning",
         path: document.artifact.path,
@@ -189,6 +304,13 @@ function metadataBudgetDiagnostics(
           startLine: field.startLine,
           endLine: field.endLine,
           snippet: field.raw,
+        },
+        details: {
+          measured: value.length,
+          limit: QUALITY.metadataListItemMaxChars,
+          unit: "characters",
+          profile: QUALITY.profile,
+          field: key,
         },
       });
     }
@@ -226,6 +348,18 @@ function frontmatterRange(
 
 function metadataListItemText(raw: string): string {
   return raw.replace(/^\s*-\s*/, "").trim();
+}
+
+function shouldBudgetMetadataItem(key: string, value: string): boolean {
+  if (key === "tags") return true;
+  if (key === "when_to_use" || key === "when_not_to_use") return true;
+  // IDs, paths, and URLs are machine-facing relationship values and may need
+  // to exceed the prose advisory. Their structural validity is checked by the
+  // relevant schema and graph rules instead.
+  return !(
+    /^(?:https?:\/\/|[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.@%+~-]+)+)/.test(value) ||
+    /^[a-z][a-z0-9_.-]+$/i.test(value)
+  );
 }
 
 function dependencyDiagnostics(

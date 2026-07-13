@@ -17,16 +17,21 @@ Use this index to choose the smallest document that answers your question.
   canonical Skill format, pre-0.16 migration, conflicts, and blocked migration.
 - [Security Policy Guide](security-policy.md): security metadata semantics,
   profiles, diagnostics, and review boundaries.
-- [Repository Context BOM](repository-context-bom.md): authoritative BOM v1
-  snapshot, output, reproducibility, schema, and provenance contract.
+- [Repository Context BOM](repository-context-bom.md): authoritative BOM v2
+  snapshot, output, reproducibility, migration, and provenance contract.
+- [Trust Graph v2 Contract](trust-graph.md): authoritative node, edge,
+  provenance, ordering, and compatibility contract.
+- [Published JSON Schemas](schemas/): machine-readable BOM v2 and Trust Graph
+  v2 contracts included in the npm package.
 - [Diagnostics Reference](diagnostics.md): scan finding identifiers and repair
   guidance.
+- [Renma Quality Profile](quality-profile.md): canonical thresholds,
+  units, provenance, rationale, false-positive risks, and configuration status.
 
 ## Focused References
 
-- [Advanced Skill Authoring](advanced-skill-authoring.md): deriving thin,
-  bounded Skills from existing workflows while reusing Context Assets; does not
-  implement proposed 0.18.0 Skill discovery.
+- [Advanced Skill Authoring](advanced-skill-authoring.md): deriving focused,
+  bounded Skills from existing workflows while using progressive disclosure.
 - [Context Lens](context-lens.md)
 - [Context Lifecycle Diagnostics](context-lifecycle-diagnostics.md)
 - [Context Conflict Diagnostics](context-conflict-diagnostics.md)
@@ -40,8 +45,9 @@ Use this index to choose the smallest document that answers your question.
   boundaries.
 - [Current Roadmap](../plan.md): current definition, completed baseline, and
   planned release direction.
-- [Proposed 0.18.0 Skill Discovery](../plan-discovery.md): proposed static Skill
-  discovery design; it is not implemented behavior.
+- [Deferred Skill-to-Skill Discovery Design](../plan-discovery.md): exploratory
+  route/index design with no assigned release; repository and support-resource
+  discovery are already implemented.
 
 ## Examples
 

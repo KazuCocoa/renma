@@ -3,14 +3,19 @@ import {
   normalizeDependencyReference,
   resolveDependencyTarget,
 } from "./dependency-resolution.js";
-import type { Asset, Catalog, Dependency } from "./model.js";
+import {
+  effectiveAssetOwner,
+  type Asset,
+  type Catalog,
+  type Dependency,
+} from "./model.js";
 import type {
   EffectiveSecurityPolicyEvidence,
   SecurityPolicyAssetEvidence,
 } from "./security-policy-inventory.js";
 import type { Diagnostic, Evidence, Finding, RiskClass } from "./types.js";
 
-export type TrustGraphSchemaVersion = "renma.trustGraph.v1";
+export type TrustGraphSchemaVersion = "renma.trustGraph.v2";
 
 export type TrustGraphNodeType =
   | "asset"
@@ -25,6 +30,9 @@ export type TrustGraphEdgeType =
   | "has_lifecycle_status"
   | "declares_dependency"
   | "references"
+  | "owns_local_resource"
+  | "statically_references"
+  | "inherits_owner"
   | "selects_security_profile"
   | "inherits_policy"
   | "has_effective_policy"
@@ -104,6 +112,9 @@ const EDGE_TYPES: TrustGraphEdgeType[] = [
   "has_lifecycle_status",
   "declares_dependency",
   "references",
+  "owns_local_resource",
+  "statically_references",
+  "inherits_owner",
   "selects_security_profile",
   "inherits_policy",
   "has_effective_policy",
@@ -141,14 +152,32 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
 
   for (const asset of assets) {
     addNode(nodes, assetNode(asset));
-    if (asset.metadata.owner) {
-      const ownerNodeId = ownerNode(asset.metadata.owner).id;
-      addNode(nodes, ownerNode(asset.metadata.owner));
+    const owner = effectiveAssetOwner(asset);
+    if (owner) {
+      const ownerNodeId = ownerNode(owner).id;
+      addNode(nodes, ownerNode(owner));
+      const inheritedOwnerAsset =
+        asset.ownership.source === "inherited" && asset.ownership.inheritedFrom
+          ? assetsByPath.get(
+              normalizeDependencyReference(
+                asset.ownership.inheritedFrom.sourcePath,
+              ),
+            )
+          : undefined;
       addEdge(edges, {
         from: assetNodeId(asset),
         to: ownerNodeId,
         type: "owned_by",
-        evidence: metadataEvidence(asset, "owner"),
+        properties: {
+          ownershipSource: asset.ownership.source,
+          ...(asset.ownership.source === "inherited" &&
+          asset.ownership.inheritedFrom
+            ? { inheritedFrom: asset.ownership.inheritedFrom }
+            : {}),
+        },
+        evidence: inheritedOwnerAsset
+          ? metadataEvidence(inheritedOwnerAsset, "owner")
+          : metadataEvidence(asset, "owner"),
       });
     }
     if (asset.metadata.status) {
@@ -170,11 +199,19 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
     addEdge(edges, {
       from: assetNodeId(source),
       to: assetNodeId(target),
-      type:
-        dependency.kind === "references" ? "references" : "declares_dependency",
+      type: trustEdgeTypeForDependency(dependency),
       properties: {
         dependencyKind: dependency.kind,
         declaredTarget: dependency.to,
+        ...(dependency.kind === "inherits_owner" ||
+        dependency.kind === "inherits_policy"
+          ? {
+              inheritedFrom: {
+                id: target.id,
+                sourcePath: target.sourcePath,
+              },
+            }
+          : {}),
       },
       evidence: dependency.evidence ? [dependency.evidence] : [],
     });
@@ -183,7 +220,25 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
   for (const policy of input.securityPolicies ?? []) {
     const asset = assetsByPath.get(normalizeDependencyReference(policy.path));
     if (!asset) continue;
-    addPolicyEvidence(nodes, edges, asset, policy);
+    const inheritedAsset = policy.inheritedFrom
+      ? assetsByPath.get(
+          normalizeDependencyReference(policy.inheritedFrom.sourcePath),
+        )
+      : undefined;
+    addPolicyEvidence(
+      nodes,
+      edges,
+      asset,
+      inheritedAsset
+        ? {
+            ...policy,
+            inheritedFrom: {
+              id: inheritedAsset.id,
+              sourcePath: inheritedAsset.sourcePath,
+            },
+          }
+        : policy,
+    );
   }
 
   const findings = stableTrustGraphFindings(
@@ -208,8 +263,8 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
 
   const sortedNodes = [...nodes.values()].sort(compareNodes);
   const sortedEdges = [...edges.values()].sort(compareEdges);
-  return {
-    schemaVersion: "renma.trustGraph.v1",
+  const graph: TrustGraph = {
+    schemaVersion: "renma.trustGraph.v2",
     summary: summarizeTrustGraph(
       assets.length,
       sortedNodes,
@@ -220,6 +275,22 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
     edges: sortedEdges,
     findings,
   };
+  return graph;
+}
+
+function trustEdgeTypeForDependency(
+  dependency: Dependency,
+): TrustGraphEdgeType {
+  if (dependency.kind === "references") return "references";
+  if (
+    dependency.kind === "owns_local_resource" ||
+    dependency.kind === "statically_references" ||
+    dependency.kind === "inherits_owner" ||
+    dependency.kind === "inherits_policy"
+  ) {
+    return dependency.kind;
+  }
+  return "declares_dependency";
 }
 
 function addPolicyEvidence(
@@ -245,6 +316,13 @@ function addPolicyEvidence(
     });
   }
 
+  if (!policy.hasEffectivePolicy) return;
+  if (policy.policySources.length === 0) {
+    throw new Error(
+      `Effective security policy for ${policy.path} has no provenance source.`,
+    );
+  }
+
   for (let index = 1; index < policy.profileChain.length; index += 1) {
     const childProfile = policy.profileChain[index];
     const parentProfile = policy.profileChain[index - 1];
@@ -268,6 +346,8 @@ function addPolicyEvidence(
     type: "has_effective_policy",
     properties: {
       hasLocalPolicyMetadata: policy.hasLocalPolicyMetadata,
+      policySources: policy.policySources,
+      ...(policy.inheritedFrom ? { inheritedFrom: policy.inheritedFrom } : {}),
     },
     evidence: policy.evidence.policyFields,
   });
@@ -283,8 +363,11 @@ function assetNode(asset: Asset): TrustGraphNode {
       kind: asset.kind,
       sourcePath: asset.sourcePath,
       contentHash: asset.contentHash,
+      sizeBytes: asset.sizeBytes,
+      contentClassification: asset.contentClassification,
+      markdownParserEligible: asset.markdownParserEligible,
       tags: asset.metadata.tags,
-      ...(asset.metadata.owner ? { owner: asset.metadata.owner } : {}),
+      ownership: asset.ownership,
       ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
     },
     evidence: [
@@ -365,7 +448,7 @@ function diagnosticNode(finding: TrustGraphFinding): TrustGraphNode {
 }
 
 function assetNodeId(asset: Asset): string {
-  // Trust Graph v1 keeps asset IDs logical. Duplicate-id diagnostics preserve
+  // Trust Graph keeps asset IDs logical. Duplicate-id diagnostics preserve
   // per-source evidence when multiple catalog assets share the same id.
   return `asset:${asset.id}`;
 }
