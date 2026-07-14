@@ -3,15 +3,24 @@ import path from "node:path";
 import { parseDocument } from "../markdown.js";
 import { parseAssetMetadata } from "../metadata.js";
 import {
+  classifyAssetPath,
   classifyAbsoluteSkillEntrypointPath,
   classifyRepositorySkillEntrypointPath,
+  repositoryClassificationPath,
   type SkillEntrypointPath,
 } from "../discovery.js";
 import {
   buildAgentSkillMigrationSuggestion,
   type AgentSkillMigrationSuggestion,
 } from "../skill-migration.js";
-import type { Artifact, ArtifactKind, MetadataValue } from "../types.js";
+import type {
+  Artifact,
+  ArtifactKind,
+  AssetClassificationEvidence,
+  AssetDecisionEvidence,
+  DecisionStatus,
+  MetadataValue,
+} from "../types.js";
 
 export type SuggestMetadataFormat = "prompt" | "json";
 
@@ -31,11 +40,16 @@ export interface MetadataSuggestion {
   suggestedMode:
     | "metadata-retrofit"
     | "agent-skills-migration"
-    | "agent-skills-metadata-retrofit";
+    | "agent-skills-metadata-retrofit"
+    | "no-proposal";
+  decisionStatus: DecisionStatus;
+  decision: AssetDecisionEvidence;
+  classification: AssetClassificationEvidence;
   ownerProvided: boolean;
   instructions: string[];
   candidateMetadata: Record<string, string>;
   blockedMetadata: BlockedMetadata[];
+  nextActions: Array<{ kind: string; command: string }>;
   agentSkills?: AgentSkillMigrationSuggestion;
 }
 
@@ -76,8 +90,11 @@ export async function buildMetadataSuggestion(
     throw new SuggestMetadataTargetError(target, error);
   }
   const outputPath = toPosix(target);
+  const classificationPath =
+    repositoryClassificationPath(target)?.relativePath ?? outputPath;
   const entrypoint = classifySuggestionSkillEntrypointPath(outputPath);
-  const initialKind = classifyPath(outputPath, entrypoint);
+  const initialClassification = classifyAssetPath(classificationPath);
+  const initialKind = initialClassification.kind;
   const document = parseDocument({
     path: outputPath,
     absolutePath,
@@ -88,10 +105,10 @@ export async function buildMetadataSuggestion(
     content,
   } satisfies Artifact);
   const { metadata } = parseAssetMetadata(document);
-  const kind =
-    initialKind === "context" && metadata.type === "context_lens"
-      ? "context_lens"
-      : initialKind;
+  const classification = classifyAssetPath(classificationPath, {
+    ...(metadata.type ? { metadataType: metadata.type } : {}),
+  });
+  const kind = classification.kind;
   const explicitOwner = optionalText(options.owner);
   if (kind === "skill") {
     const collisionBlock = entrypoint
@@ -107,12 +124,18 @@ export async function buildMetadataSuggestion(
     const noMigrationProposed =
       agentSkills.proposalKind === "none" &&
       agentSkills.sourceFormat === "agent-skills";
+    const decision = skillDecision(agentSkills, metadataRetrofit);
     return {
       path: outputPath,
       kind,
-      suggestedMode: metadataRetrofit
-        ? "agent-skills-metadata-retrofit"
-        : "agent-skills-migration",
+      suggestedMode: noMigrationProposed
+        ? "no-proposal"
+        : metadataRetrofit
+          ? "agent-skills-metadata-retrofit"
+          : "agent-skills-migration",
+      decisionStatus: decision.status,
+      decision: decision.decision,
+      classification,
       ownerProvided: Boolean(explicitOwner),
       instructions: noMigrationProposed
         ? [
@@ -144,6 +167,7 @@ export async function buildMetadataSuggestion(
             ],
       candidateMetadata: {},
       blockedMetadata: agentSkills.blocked,
+      nextActions: suggestionNextActions(outputPath, classification),
       agentSkills,
     };
   }
@@ -153,8 +177,95 @@ export async function buildMetadataSuggestion(
   );
   const existingOwner = optionalText(metadata.owner);
   const candidateMetadata: Record<string, string> = {};
-  const candidateId = inferCandidateId(kind, outputPath);
+  const candidateId = inferCandidateId(kind, classificationPath);
   const candidateTitle = mainHeadingTitle(document.headings);
+
+  if (classification.scope === "skill-local") {
+    const blockedMetadata = conflictingOwnerEvidence(
+      existingOwner,
+      explicitOwner,
+    );
+    if (!existingOwner && explicitOwner)
+      candidateMetadata.owner = explicitOwner;
+    const hasOverride = Object.keys(candidateMetadata).length > 0;
+    return {
+      path: outputPath,
+      kind,
+      suggestedMode: hasOverride ? "metadata-retrofit" : "no-proposal",
+      decisionStatus:
+        blockedMetadata.length > 0
+          ? "blocked"
+          : hasOverride
+            ? "deterministic"
+            : "no-change-recommended",
+      decision:
+        blockedMetadata.length > 0
+          ? {
+              reasonCode: "conflicting-ownership-evidence",
+              summary:
+                "Renma cannot safely construct a local metadata override while declared and provided ownership evidence conflict.",
+            }
+          : hasOverride
+            ? {
+                reasonCode: "explicit-human-provided-override",
+                summary:
+                  "The candidate is an explicit human-provided Skill-local metadata override; it is not required for ordinary local support.",
+              }
+            : {
+                reasonCode: "skill-local-governance-inherited",
+                summary:
+                  "No independent metadata retrofit is required for this Skill-local support file.",
+              },
+      classification,
+      ownerProvided: Boolean(explicitOwner),
+      instructions: skillLocalInstructions(classification, hasOverride),
+      candidateMetadata,
+      blockedMetadata,
+      nextActions: suggestionNextActions(outputPath, classification),
+    };
+  }
+
+  if (
+    classification.matchedRule === "repository-tool" ||
+    classification.matchedRule === "unknown"
+  ) {
+    const unsafe =
+      classification.reasonCode === "outside-recognized-asset-boundary" &&
+      classificationPath === outputPath &&
+      isAbsoluteLike(outputPath);
+    return {
+      path: outputPath,
+      kind,
+      suggestedMode: "no-proposal",
+      decisionStatus: unsafe ? "blocked" : "no-change-recommended",
+      decision: unsafe
+        ? {
+            reasonCode: "repository-boundary-unresolved",
+            summary:
+              "Renma could not infer one safe repository-relative boundary for this absolute path.",
+          }
+        : {
+            reasonCode:
+              classification.matchedRule === "repository-tool"
+                ? "repository-tool-not-context"
+                : "outside-recognized-asset-boundary",
+            summary:
+              "No metadata proposal is generated because the target is not an independently governed Renma asset.",
+            question:
+              "Is this file intended to have independent ownership and lifecycle under a recognized asset root?",
+          },
+      classification,
+      ownerProvided: Boolean(explicitOwner),
+      instructions: [
+        "Preserve the existing file.",
+        "Do not infer that the target should become a Context Asset from its content or filename.",
+        "Do not move the file or add Renma metadata without a human repository-design decision.",
+      ],
+      candidateMetadata: {},
+      blockedMetadata: [],
+      nextActions: suggestionNextActions(outputPath, classification),
+    };
+  }
 
   if (!existingId && candidateId) {
     candidateMetadata.id = candidateId;
@@ -166,43 +277,110 @@ export async function buildMetadataSuggestion(
     candidateMetadata.owner = explicitOwner;
   }
 
-  const blockedMetadata: BlockedMetadata[] = [];
+  const blockedMetadata: BlockedMetadata[] = conflictingOwnerEvidence(
+    existingOwner,
+    explicitOwner,
+  );
   if (!existingOwner && !explicitOwner) {
     blockedMetadata.push({
       field: "owner",
       reason: "No owner was explicitly provided. Missing owner is allowed.",
     });
   }
-  if (existingOwner && explicitOwner && existingOwner !== explicitOwner) {
-    blockedMetadata.push({
-      field: "owner",
-      reason: `Existing owner "${existingOwner}" differs from explicitly provided owner "${explicitOwner}". Do not change ownership without human review.`,
-    });
-  }
+  const hasCandidate = Object.keys(candidateMetadata).length > 0;
+  const hasConflict = blockedMetadata.some((item) =>
+    item.reason.includes("differs from explicitly provided owner"),
+  );
 
   return {
     path: outputPath,
     kind,
-    suggestedMode: "metadata-retrofit",
+    suggestedMode: hasCandidate ? "metadata-retrofit" : "no-proposal",
+    decisionStatus: hasConflict
+      ? "blocked"
+      : hasCandidate
+        ? classification.scope === "independent"
+          ? "human-confirmation-required"
+          : "deterministic"
+        : "no-change-recommended",
+    decision: hasConflict
+      ? {
+          reasonCode: "conflicting-ownership-evidence",
+          summary: "Renma cannot safely construct a metadata proposal.",
+        }
+      : hasCandidate && classification.scope === "independent"
+        ? {
+            reasonCode: "independent-governance-intent-unconfirmed",
+            summary:
+              "Renma constructed only deterministic candidates; the intended owner, lifecycle, and source-of-truth evidence still require human confirmation.",
+            question:
+              "Confirm the intended owner, lifecycle, and source-of-truth evidence for this independent asset.",
+          }
+        : hasCandidate
+          ? {
+              reasonCode: "deterministic-metadata-candidate",
+              summary:
+                "The metadata candidate follows the classified repository boundary and explicit user evidence.",
+            }
+          : {
+              reasonCode: "metadata-already-sufficient",
+              summary: "Renma found no supported metadata change to propose.",
+            },
+    classification,
     ownerProvided: Boolean(explicitOwner),
     instructions: buildInstructions({ existingOwner, explicitOwner }),
     candidateMetadata,
     blockedMetadata,
+    nextActions: suggestionNextActions(outputPath, classification),
   };
 }
 
 export function renderMetadataPrompt(suggestion: MetadataSuggestion): string {
   if (suggestion.agentSkills)
     return renderAgentSkillMigrationPrompt(suggestion);
+  const noProposal = suggestion.suggestedMode === "no-proposal";
+  const skillLocal = suggestion.classification.scope === "skill-local";
   return `${[
-    "# Renma Task: Safely Retrofit Renma Metadata",
+    noProposal
+      ? "# Renma Result: No Metadata Proposal"
+      : "# Renma Task: Safely Retrofit Renma Metadata",
     "",
-    "Update this existing Renma asset metadata safely.",
+    noProposal
+      ? "No independent metadata retrofit is required."
+      : "Review this existing Renma asset metadata candidate safely.",
     "",
     "Asset:",
     `- Path: \`${suggestion.path}\``,
     `- Kind: \`${suggestion.kind}\``,
     `- Mode: \`${suggestion.suggestedMode}\``,
+    `- Decision status: \`${suggestion.decisionStatus}\``,
+    "",
+    "Classification:",
+    ...classificationPromptLines(suggestion.classification),
+    "",
+    "Observed repository fact:",
+    observedRepositoryFact(suggestion.classification),
+    "",
+    "Deterministic Renma interpretation:",
+    deterministicInterpretation(suggestion.classification),
+    "",
+    noProposal ? "Recommendation:" : "Remaining human decision:",
+    suggestion.decision.summary,
+    ...(suggestion.decision.question
+      ? ["", "Remaining human decision:", suggestion.decision.question]
+      : []),
+    ...(skillLocal
+      ? [
+          "",
+          `This file is Skill-local support governed by:`,
+          suggestion.classification.parentAssetPath ??
+            "(unresolved parent Skill)",
+          "",
+          "Its effective ownership and policy may be inherited from the parent Skill.",
+          "Preserve existing metadata if present.",
+          "Do not add an owner, move the file, or create a patch solely to manufacture work.",
+        ]
+      : []),
     "",
     "Rules:",
     ...suggestion.instructions.map((instruction) => `- ${instruction}`),
@@ -214,10 +392,16 @@ export function renderMetadataPrompt(suggestion: MetadataSuggestion): string {
     ...blockedMetadataLines(suggestion.blockedMetadata),
     "",
     "Verification:",
-    "- Run `renma scan .`.",
-    "- Run `renma ownership .`.",
+    ...(noProposal
+      ? ["- No verification change is required when no file change is made."]
+      : [
+          "- Run `renma scan . --fail-on high --format json`.",
+          "- Run `renma ownership .`.",
+        ]),
     "",
-    "Return a small reviewed patch. Do not rewrite the asset body.",
+    noProposal
+      ? "Stop without manufacturing work. Preserve the existing source."
+      : "Return a small reviewed patch. Do not rewrite the asset body.",
   ].join("\n")}\n`;
 }
 
@@ -260,6 +444,10 @@ function renderAgentSkillMigrationPrompt(
         : "# Renma Task: Review One-Way Agent Skills Migration",
     "",
     `Asset: \`${suggestion.path}\``,
+    `Decision status: \`${suggestion.decisionStatus}\``,
+    `Decision reason: \`${suggestion.decision.reasonCode}\``,
+    "Classification:",
+    ...classificationPromptLines(suggestion.classification),
     `Source format: \`${migration.sourceFormat}\``,
     `Direction: \`${migration.direction}\``,
     `Proposal: \`${migration.proposalKind}\``,
@@ -395,24 +583,166 @@ function blockedMetadataLines(blockedMetadata: BlockedMetadata[]): string[] {
   return blockedMetadata.map((item) => `- ${item.field}: ${item.reason}`);
 }
 
-function classifyPath(
-  filePath: string,
-  entrypoint: SkillEntrypointPath | undefined,
-): ArtifactKind {
-  if (entrypoint) return "skill";
-  const parts = pathParts(filePath);
-  const basename = parts.at(-1) ?? "";
-
-  if (parts.includes("lenses")) return "context_lens";
-  if (parts.includes("contexts") || parts.includes("context")) return "context";
-  if (parts.includes("profiles")) return "profile";
-  if (parts.includes("references")) return "reference";
-  if (parts.includes("examples")) return "example";
-  if (basename === "AGENTS.md" || parts.includes(".agents")) return "agent";
-  if (basename === "renma.config.json" || basename === ".renma.json") {
-    return "config";
+function skillDecision(
+  migration: AgentSkillMigrationSuggestion,
+  metadataRetrofit: boolean,
+): { status: DecisionStatus; decision: AssetDecisionEvidence } {
+  if (migration.blocked.length > 0) {
+    return {
+      status: "blocked",
+      decision: {
+        reasonCode: "conflicting-or-incomplete-skill-evidence",
+        summary:
+          "Renma cannot safely construct the Agent Skills proposal until the blocked evidence is resolved by a human.",
+      },
+    };
   }
-  return "unknown";
+  if (
+    migration.proposalKind === "none" &&
+    migration.sourceFormat === "agent-skills"
+  ) {
+    return {
+      status: "no-change-recommended",
+      decision: {
+        reasonCode: "canonical-agent-skill-no-change",
+        summary:
+          "The target is already a canonical Agent Skill and no metadata or migration change is recommended.",
+      },
+    };
+  }
+  if (metadataRetrofit) {
+    return {
+      status: "deterministic",
+      decision: {
+        reasonCode: "explicit-human-provided-override",
+        summary:
+          "The metadata candidate uses the owner explicitly supplied by the human; Renma inferred no owner.",
+      },
+    };
+  }
+  return {
+    status: "human-confirmation-required",
+    decision: {
+      reasonCode: "agent-skills-migration-review-required",
+      summary:
+        "Renma constructed a deterministic migration candidate, but a human must confirm the intended Skill semantics before applying it.",
+    },
+  };
+}
+
+function conflictingOwnerEvidence(
+  existingOwner: string | undefined,
+  explicitOwner: string | undefined,
+): BlockedMetadata[] {
+  if (!existingOwner || !explicitOwner || existingOwner === explicitOwner) {
+    return [];
+  }
+  return [
+    {
+      field: "owner",
+      reason: `Existing owner "${existingOwner}" differs from explicitly provided owner "${explicitOwner}". Do not change ownership without human review.`,
+    },
+  ];
+}
+
+function skillLocalInstructions(
+  classification: AssetClassificationEvidence,
+  hasOverride: boolean,
+): string[] {
+  return [
+    "Preserve the existing Skill-local file and any explicitly declared supported metadata.",
+    `Treat ${classification.parentAssetPath ?? "the parent Skill"} as the default governance source.`,
+    "Independent metadata is not required merely because this is a Skill-local file.",
+    hasOverride
+      ? "Apply only the explicit human-provided override; do not describe it as mandatory local metadata."
+      : "Do not add metadata, move the file, or create a patch solely to manufacture work.",
+    "Never infer owner from the path, prose, Git history, or author.",
+  ];
+}
+
+function suggestionNextActions(
+  targetPath: string,
+  classification: AssetClassificationEvidence,
+): Array<{ kind: string; command: string }> {
+  const actions: Array<{ kind: string; command: string }> = [];
+  if (classification.parentAssetPath) {
+    actions.push({
+      kind: "inspect-parent",
+      command: `renma inspect ${shellArgument(classification.parentAssetPath)} --format json`,
+    });
+  } else {
+    actions.push({
+      kind: "inspect-target",
+      command: `renma inspect ${shellArgument(targetPath)} --format json`,
+    });
+  }
+  actions.push({
+    kind: "verify",
+    command: "renma scan . --fail-on high --format json",
+  });
+  return actions;
+}
+
+function shellArgument(value: string): string {
+  return /^[A-Za-z0-9_./:@%+=,-]+$/.test(value)
+    ? value
+    : `'${value.replaceAll("'", `'"'"'`)}'`;
+}
+
+function classificationPromptLines(
+  classification: AssetClassificationEvidence,
+): string[] {
+  return [
+    `- kind: \`${classification.kind}\``,
+    `- scope: \`${classification.scope}\``,
+    `- matched rule: \`${classification.matchedRule}\``,
+    `- reason code: \`${classification.reasonCode}\``,
+    ...(classification.recognizedRoot
+      ? [`- recognized root: \`${classification.recognizedRoot}\``]
+      : []),
+    ...(classification.parentAssetPath
+      ? [`- parent asset: \`${classification.parentAssetPath}\``]
+      : []),
+    ...(classification.supportDirectory
+      ? [`- support directory: \`${classification.supportDirectory}\``]
+      : []),
+    ...(classification.ignoredNestedSegments?.length
+      ? [
+          `- ignored nested segments: ${classification.ignoredNestedSegments.map((segment) => `\`${segment}\``).join(", ")}`,
+        ]
+      : []),
+    `- reason: ${classification.reason}`,
+  ];
+}
+
+function observedRepositoryFact(
+  classification: AssetClassificationEvidence,
+): string {
+  if (classification.matchedRule === "skill-local-support") {
+    return `The target is under the ${classification.supportDirectory}/ directory of a recognized Skill.`;
+  }
+  if (
+    classification.matchedRule === "context-root" ||
+    classification.matchedRule === "context-root-legacy"
+  ) {
+    return `The target is under ${classification.recognizedRoot}/**.`;
+  }
+  return classification.reason;
+}
+
+function deterministicInterpretation(
+  classification: AssetClassificationEvidence,
+): string {
+  if (classification.scope === "skill-local") {
+    return `The target is Skill-local support governed by ${classification.parentAssetPath ?? "its parent Skill"}.`;
+  }
+  if (classification.scope === "independent") {
+    return `The target is an independently governed ${classification.kind} asset.`;
+  }
+  if (classification.scope === "repository-support") {
+    return "The target is repository support, not an independently governed Context Asset.";
+  }
+  return "Renma does not classify the target as an independently governed asset.";
 }
 
 function classifySuggestionSkillEntrypointPath(

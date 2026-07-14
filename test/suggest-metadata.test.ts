@@ -133,10 +133,14 @@ test("suggest-metadata JSON exposes the Skill migration contract", async () => {
     "path",
     "kind",
     "suggestedMode",
+    "decisionStatus",
+    "decision",
+    "classification",
     "ownerProvided",
     "instructions",
     "candidateMetadata",
     "blockedMetadata",
+    "nextActions",
     "agentSkills",
   ]);
   assert.equal("nextSteps" in suggestion, false);
@@ -169,10 +173,14 @@ test("suggest-metadata proposes no migration or rewrite for canonical release-pr
     "path",
     "kind",
     "suggestedMode",
+    "decisionStatus",
+    "decision",
+    "classification",
     "ownerProvided",
     "instructions",
     "candidateMetadata",
     "blockedMetadata",
+    "nextActions",
     "agentSkills",
   ]);
   assert.deepEqual(suggestion.blockedMetadata, []);
@@ -535,7 +543,7 @@ test("suggest-metadata works for context assets", async () => {
     promptResult.stdout,
     /platform's standard Skill authoring guidance/,
   );
-  assert.doesNotMatch(promptResult.stdout, /renma scan \. --fail-on high/);
+  assert.match(promptResult.stdout, /renma scan \. --fail-on high/);
 });
 
 test("scan commands execute historical Skill entrypoint migrations end to end", async () => {

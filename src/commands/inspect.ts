@@ -4,15 +4,26 @@ import {
   zeroContextLensSummary,
   type ContextLensSummary,
 } from "../context-lens.js";
+import {
+  classifyAssetPath,
+  repositoryClassificationPath,
+} from "../discovery.js";
 import { parseDocument } from "../markdown.js";
+import { parseAssetMetadata } from "../metadata.js";
 import type {
   AssetKind,
   AssetStatus,
   CatalogEntry,
   Dependency,
 } from "../model.js";
-import type { Artifact } from "../types.js";
-import { catalog } from "./catalog.js";
+import { collectRepositorySnapshot } from "../repository-evidence.js";
+import { collectSecurityPolicyAssetEvidence } from "../security-policy-inventory.js";
+import type {
+  Artifact,
+  AssetClassificationEvidence,
+  AssetGovernanceEvidence,
+  ParsedDocument,
+} from "../types.js";
 
 const DEFAULT_SECTION_PREVIEW_LINES = 3;
 
@@ -28,6 +39,8 @@ export interface InspectOutline {
   bytes: number;
   lineCount: number;
   frontmatterRange: null | string;
+  classification: AssetClassificationEvidence;
+  governance: AssetGovernanceEvidence | null;
   asset: InspectAssetSummary | null;
   contextLens: ContextLensSummary;
   headings: Array<{
@@ -115,18 +128,31 @@ export async function buildInspectOutline(
 ): Promise<InspectOutline> {
   const absolutePath = path.resolve(target);
   const content = await readFile(absolutePath, "utf8");
+  const classificationContext = repositoryClassificationPath(target);
+  const classificationPath =
+    classificationContext?.relativePath ?? target.replace(/\\/g, "/");
+  const initialClassification = classifyAssetPath(classificationPath);
   const artifact: Artifact = {
     absolutePath,
     content,
-    kind: "reference",
+    kind: initialClassification.kind,
     path: absolutePath,
     sizeBytes: Buffer.byteLength(content),
     contentClassification: "text",
     markdownParserEligible: /\.mdx?$/i.test(absolutePath),
   };
   const document = parseDocument(artifact);
+  const metadata = parseAssetMetadata(document).metadata;
+  const classification = classifyAssetPath(classificationPath, {
+    ...(metadata.type ? { metadataType: metadata.type } : {}),
+  });
   const lineCount = document.lines.length;
-  const repository = await inspectRepositoryForTarget(absolutePath);
+  const repository = await inspectRepositoryForTarget(
+    absolutePath,
+    classificationContext?.root,
+    document,
+    classification,
+  );
 
   return {
     bytes: artifact.sizeBytes,
@@ -138,6 +164,8 @@ export async function buildInspectOutline(
       startLine: fence.startLine,
     })),
     contextLens: repository.contextLens,
+    classification,
+    governance: repository.governance,
     frontmatterRange: frontmatterRange(document.lines),
     headings: document.headings.map((heading, index) => {
       const nextHeading = document.headings
@@ -161,32 +189,45 @@ export async function buildInspectOutline(
   };
 }
 
-async function inspectRepositoryForTarget(absolutePath: string): Promise<{
+async function inspectRepositoryForTarget(
+  absolutePath: string,
+  inferredRoot: string | undefined,
+  document: ParsedDocument,
+  classification: AssetClassificationEvidence,
+): Promise<{
   asset: InspectAssetSummary | null;
   contextLens: ContextLensSummary;
+  governance: AssetGovernanceEvidence | null;
 }> {
   try {
-    const root = inferCatalogRoot(absolutePath);
-    const result = await catalog(root);
-    const entry = result.catalog.entries.find(
+    const root = inferredRoot ?? inferCatalogRoot(absolutePath);
+    const snapshot = await collectRepositorySnapshot(root);
+    const entry = snapshot.catalog.entries.find(
       (candidate) => path.resolve(root, candidate.sourcePath) === absolutePath,
     );
     if (!entry) {
       return {
         asset: null,
-        contextLens: result.contextLens,
+        contextLens: snapshot.contextLens,
+        governance: null,
       };
     }
 
-    const resolver = createInspectRelationshipResolver(result.catalog.entries);
-    const inboundDependents = result.catalog.dependencies
+    const resolver = createInspectRelationshipResolver(
+      snapshot.catalog.entries,
+    );
+    const inboundDependents = snapshot.catalog.dependencies
       .filter((dependency) => resolver.matches(dependency.to, entry))
       .map((dependency) => inspectRelationship(dependency, resolver))
       .sort(compareInspectRelationships);
-    const outboundDependencies = result.catalog.dependencies
+    const outboundDependencies = snapshot.catalog.dependencies
       .filter((dependency) => resolver.matches(dependency.from, entry))
       .map((dependency) => inspectRelationship(dependency, resolver))
       .sort(compareInspectRelationships);
+    const policy = collectSecurityPolicyAssetEvidence(
+      snapshot.artifacts,
+      snapshot.config.security,
+    ).find((candidate) => candidate.path === entry.sourcePath);
 
     return {
       asset: {
@@ -207,14 +248,47 @@ async function inspectRepositoryForTarget(absolutePath: string): Promise<{
         ),
         tags: entry.metadata.tags,
       },
-      contextLens: result.contextLens,
+      contextLens: snapshot.contextLens,
+      governance: {
+        ownership: entry.ownership,
+        policySource: policySource(policy),
+        ...(policy?.inheritedFrom
+          ? { policyInheritedFrom: policy.inheritedFrom.sourcePath }
+          : {}),
+        metadataState: inspectMetadataState(document, classification),
+      },
     };
   } catch {
     return {
       asset: null,
       contextLens: zeroContextLensSummary(),
+      governance: null,
     };
   }
+}
+
+function policySource(
+  policy:
+    | ReturnType<typeof collectSecurityPolicyAssetEvidence>[number]
+    | undefined,
+): "declared" | "inherited" | "missing" {
+  if (!policy?.hasEffectivePolicy) return "missing";
+  if (policy.hasLocalPolicyMetadata) return "declared";
+  return "inherited";
+}
+
+function inspectMetadataState(
+  document: ParsedDocument,
+  classification: AssetClassificationEvidence,
+): "declared" | "partial" | "missing" | "not-required" {
+  const metadata = parseAssetMetadata(document).metadata;
+  const hasMetadata = Object.keys(document.metadata).length > 0;
+  if (classification.scope === "skill-local" && !hasMetadata) {
+    return "not-required";
+  }
+  if (!hasMetadata) return "missing";
+  if (metadata.id && metadata.owner) return "declared";
+  return "partial";
 }
 
 function inspectRelationship(
@@ -454,6 +528,12 @@ function renderTextOutline(outline: InspectOutline): string {
     `Lines: ${outline.lineCount}`,
     `Bytes: ${outline.bytes}`,
     `Frontmatter: ${outline.frontmatterRange ?? "none"}`,
+    "",
+    "Classification:",
+    ...renderClassification(outline.classification),
+    "",
+    "Governance:",
+    ...renderGovernance(outline.governance),
     ...(outline.asset
       ? ["", "Asset:", ...renderAssetSummary(outline.asset)]
       : []),
@@ -478,6 +558,56 @@ function renderTextOutline(outline: InspectOutline): string {
   ];
 
   return `${lines.join("\n")}\n`;
+}
+
+function renderClassification(
+  classification: AssetClassificationEvidence,
+): string[] {
+  return [
+    `- Kind: ${classification.kind}`,
+    `- Scope: ${classification.scope}`,
+    `- Matched rule: ${classification.matchedRule}`,
+    `- Reason code: ${classification.reasonCode}`,
+    ...(classification.recognizedRoot
+      ? [`- Recognized root: ${classification.recognizedRoot}`]
+      : []),
+    ...(classification.parentAssetPath
+      ? [`- Parent asset: ${classification.parentAssetPath}`]
+      : []),
+    ...(classification.supportDirectory
+      ? [`- Support directory: ${classification.supportDirectory}`]
+      : []),
+    ...(classification.ignoredNestedSegments?.length
+      ? [
+          `- Ignored nested segments: ${classification.ignoredNestedSegments.join(", ")}`,
+        ]
+      : []),
+    `- Reason: ${classification.reason}`,
+    ...(classification.competingRules?.flatMap((competing) => [
+      `- Competing rule: ${competing.rule} (${competing.reasonCode})`,
+      `  ${competing.reason}`,
+    ]) ?? []),
+  ];
+}
+
+function renderGovernance(
+  governance: AssetGovernanceEvidence | null,
+): string[] {
+  if (!governance) return ["- Unresolved: target is not a catalog entry."];
+  const inheritedOwner = governance.ownership.inheritedFrom?.sourcePath;
+  return [
+    `- Declared owner: ${governance.ownership.declaredOwner ?? "(none)"}`,
+    `- Effective owner: ${governance.ownership.effectiveOwner ?? "(unowned)"}`,
+    `- Ownership source: ${governance.ownership.source}`,
+    ...(inheritedOwner
+      ? [`- Ownership inherited from: ${inheritedOwner}`]
+      : []),
+    `- Policy source: ${governance.policySource ?? "missing"}`,
+    ...(governance.policyInheritedFrom
+      ? [`- Policy inherited from: ${governance.policyInheritedFrom}`]
+      : []),
+    `- Metadata state: ${governance.metadataState ?? "missing"}`,
+  ];
 }
 
 function renderContextLensSummary(contextLens: ContextLensSummary): string[] {

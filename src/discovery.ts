@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type {
   Artifact,
+  AssetClassificationEvidence,
   ArtifactKind,
   Diagnostic,
   ScanConfig,
@@ -227,6 +228,328 @@ export function normalizeRepositoryRelativePath(
   return normalizedRootEndIndex === rootEndIndex ? normalized : undefined;
 }
 
+/** Normalize any repository-relative path without permitting root traversal. */
+export function normalizeAssetRepositoryRelativePath(
+  filePath: string,
+): string | undefined {
+  const normalizedSeparators = toPosix(filePath);
+  if (isAbsoluteLike(normalizedSeparators)) return undefined;
+  if (normalizedSeparators.split("/").includes("..")) return undefined;
+  const resolved: string[] = [];
+  for (const segment of normalizedSeparators.split("/")) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") {
+      if (resolved.length === 0) return undefined;
+      resolved.pop();
+      continue;
+    }
+    resolved.push(segment);
+  }
+  return resolved.length > 0 ? resolved.join("/") : undefined;
+}
+
+/** Infer a repository root only from cwd containment or one explicit boundary. */
+export function repositoryClassificationPath(
+  filePath: string,
+  cwd = process.cwd(),
+): { root: string; relativePath: string } | undefined {
+  const absolutePath = path.resolve(filePath);
+  const absoluteCwd = path.resolve(cwd);
+  const relativeToCwd = path.relative(absoluteCwd, absolutePath);
+  if (
+    relativeToCwd &&
+    !relativeToCwd.startsWith("..") &&
+    !path.isAbsolute(relativeToCwd)
+  ) {
+    const relativePath = normalizeAssetRepositoryRelativePath(relativeToCwd);
+    return relativePath ? { root: absoluteCwd, relativePath } : undefined;
+  }
+
+  const posixAbsolute = toPosix(absolutePath);
+  const segments = posixAbsolute.split("/").filter(Boolean);
+  const boundaryIndexes: number[] = [];
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    if (segments[index] === ".agents" && segments[index + 1] === "skills") {
+      boundaryIndexes.push(index);
+      index += 1;
+      continue;
+    }
+    if (
+      segments[index] === "skills" ||
+      segments[index] === "contexts" ||
+      segments[index] === "context" ||
+      segments[index] === "lenses" ||
+      segments[index] === "tools"
+    ) {
+      boundaryIndexes.push(index);
+    }
+  }
+  if (boundaryIndexes.length !== 1) return undefined;
+  const boundaryIndex = boundaryIndexes[0]!;
+  const rootPrefix = posixAbsolute.startsWith("/") ? "/" : "";
+  const root = path.resolve(
+    `${rootPrefix}${segments.slice(0, boundaryIndex).join("/")}`,
+  );
+  const relativePath = normalizeAssetRepositoryRelativePath(
+    segments.slice(boundaryIndex).join("/"),
+  );
+  return relativePath ? { root, relativePath } : undefined;
+}
+
+/**
+ * Classify one normalized repository path using the documented precedence.
+ * Metadata may refine a Context Asset to Context Lens without changing the
+ * path rule that established its repository boundary.
+ */
+export function classifyAssetPath(
+  relativePath: string,
+  options: { metadataType?: string } = {},
+): AssetClassificationEvidence {
+  const currentPath = normalizeAssetRepositoryRelativePath(relativePath);
+  if (!currentPath) {
+    return classification(
+      "unknown",
+      "unknown",
+      "unknown",
+      "outside-recognized-asset-boundary",
+      "The path is absolute, empty, or escapes the repository boundary; repository-relative classification is unavailable.",
+    );
+  }
+
+  // 1. Explicit Skill entrypoint.
+  const skillPath = classifyRepositorySkillPath(currentPath);
+  if (skillPath?.kind === "entrypoint") {
+    return {
+      ...classification(
+        "skill",
+        "independent",
+        "skill-entrypoint",
+        "under-canonical-skill-root",
+        `The file is a Skill entrypoint under the recognized ${skillPath.root}/** root.`,
+      ),
+      recognizedRoot: skillPath.root,
+    };
+  }
+
+  // 2. Explicit Skill-local support inside a recognized Skill boundary.
+  if (skillPath?.kind === "support") {
+    return {
+      ...classification(
+        supportArtifactKind(skillPath.supportDirectory),
+        "skill-local",
+        "skill-local-support",
+        "under-skill-support-directory",
+        `The file is inside the ${skillPath.supportDirectory}/ directory of the containing Skill.`,
+      ),
+      recognizedRoot: skillPath.root,
+      parentAssetPath: `${skillPath.skillDirectory}/SKILL.md`,
+      supportDirectory: skillPath.supportDirectory,
+    };
+  }
+  if (skillPath?.kind === "reserved-root") {
+    const compatibleKind =
+      skillPath.supportDirectory === "assets" ||
+      skillPath.supportDirectory === "scripts"
+        ? "unknown"
+        : supportArtifactKind(skillPath.supportDirectory);
+    return {
+      ...classification(
+        compatibleKind,
+        "unknown",
+        compatibleKind === "unknown"
+          ? "unknown"
+          : `generic-${skillPath.supportDirectory.replace(/s$/, "")}`,
+        "outside-recognized-asset-boundary",
+        `The ${skillPath.supportDirectory}/ directory is reserved for support inside a containing Skill, but this path has no Skill parent.`,
+      ),
+      recognizedRoot: skillPath.root,
+      supportDirectory: skillPath.supportDirectory,
+    };
+  }
+
+  // Paths below a Skill root that did not match the canonical support set are
+  // repository files, not implicitly governed Skill-local resources.
+  if (isUnderSkillRoot(currentPath)) {
+    const segments = currentPath.split("/");
+    const rootEnd = repositorySkillRootEndIndex(segments) ?? 0;
+    const localSegments = segments.slice(rootEnd);
+    if (localSegments.includes("tools")) {
+      return {
+        ...classification(
+          "unknown",
+          "repository-support",
+          "unknown",
+          "unsupported-skill-local-directory",
+          "The tools/ directory is not a canonical Skill-local support directory; use scripts/ for Skill-local executable support.",
+        ),
+        recognizedRoot: repositorySkillRoot(segments),
+        competingRules: [
+          {
+            rule: "skill-local-support",
+            matched: false,
+            reasonCode: "unsupported-skill-local-directory",
+            reason:
+              "Canonical Skill-local support is limited to references, profiles, examples, scripts, and assets.",
+          },
+        ],
+      };
+    }
+  }
+
+  // 3. Recognized top-level asset roots.
+  const segments = currentPath.split("/");
+  const root = segments[0] ?? "";
+  if (root === "contexts" || root === "context") {
+    const ignoredNestedSegments = RESERVED_SKILL_SUPPORT_DIRS.filter(
+      (segment) => segments.slice(1).includes(segment),
+    );
+    const kind =
+      options.metadataType === "context_lens" ? "context_lens" : "context";
+    const result: AssetClassificationEvidence = {
+      ...classification(
+        kind,
+        "independent",
+        root === "contexts" ? "context-root" : "context-root-legacy",
+        root === "contexts"
+          ? "under-recognized-context-root"
+          : "under-legacy-context-root",
+        root === "contexts"
+          ? "The file is under the recognized contexts/** root."
+          : "The file is under the supported legacy context/** root.",
+      ),
+      recognizedRoot: root,
+    };
+    if (ignoredNestedSegments.length > 0) {
+      result.ignoredNestedSegments = ignoredNestedSegments;
+      result.competingRules = [
+        {
+          rule: "skill-local-support",
+          matched: false,
+          reasonCode: "outside-recognized-skill-boundary",
+          reason:
+            "The path is not inside skills/** or .agents/skills/**, so nested support-like names do not establish Skill-local governance.",
+        },
+      ];
+      result.reason += ` The nested ${ignoredNestedSegments.join(", ")}/ segment${ignoredNestedSegments.length === 1 ? " does" : "s do"} not change its classification.`;
+    }
+    return result;
+  }
+  if (root === "lenses") {
+    return {
+      ...classification(
+        "context_lens",
+        "independent",
+        "lens-root",
+        "under-recognized-lens-root",
+        "The file is under the recognized lenses/** root.",
+      ),
+      recognizedRoot: root,
+    };
+  }
+  if (currentPath === "AGENTS.md" || root === ".agents") {
+    return {
+      ...classification(
+        "agent",
+        "independent",
+        "agent-root",
+        "under-recognized-agent-root",
+        "The file is repository agent guidance under the recognized Agent boundary.",
+      ),
+      recognizedRoot: currentPath === "AGENTS.md" ? "AGENTS.md" : ".agents",
+    };
+  }
+
+  // 4. Recognized repository support and configuration.
+  if (root === "tools") {
+    return {
+      ...classification(
+        "unknown",
+        "repository-support",
+        "repository-tool",
+        "repository-tool-not-context",
+        "The tools/** root is repository implementation and is not a Context Asset root.",
+      ),
+      recognizedRoot: root,
+      competingRules: [
+        {
+          rule: "context-root",
+          matched: false,
+          reasonCode: "outside-recognized-context-root",
+          reason: "The path is not under contexts/** or context/**.",
+        },
+      ],
+    };
+  }
+  const basename = path.posix.basename(currentPath);
+  if (basename === "renma.config.json" || basename === ".renma.json") {
+    return classification(
+      "config",
+      "repository-support",
+      "config-file",
+      "recognized-config-file",
+      "The filename matches a supported Renma configuration file.",
+    );
+  }
+
+  // 5. Compatibility rules for nested generic support-like paths.
+  for (const [segment, kind, rule] of [
+    ["profiles", "profile", "generic-profile"],
+    ["references", "reference", "generic-reference"],
+    ["examples", "example", "generic-example"],
+  ] as const) {
+    if (segments.slice(1, -1).includes(segment)) {
+      return classification(
+        kind,
+        "unknown",
+        rule,
+        "under-generic-support-directory",
+        `The file is under a nested ${segment}/ directory outside a recognized independent or Skill-local asset boundary.`,
+      );
+    }
+  }
+
+  // 6. Unknown.
+  return classification(
+    "unknown",
+    "unknown",
+    "unknown",
+    "outside-recognized-asset-boundary",
+    "The file is outside Renma's recognized asset and repository-support boundaries.",
+  );
+}
+
+function classification(
+  kind: ArtifactKind,
+  scope: AssetClassificationEvidence["scope"],
+  matchedRule: string,
+  reasonCode: string,
+  reason: string,
+): AssetClassificationEvidence {
+  return { kind, scope, matchedRule, reasonCode, reason };
+}
+
+function supportArtifactKind(
+  directory: ReservedSkillSupportDirectory,
+): ArtifactKind {
+  switch (directory) {
+    case "assets":
+      return "asset";
+    case "examples":
+      return "example";
+    case "profiles":
+      return "profile";
+    case "references":
+      return "reference";
+    case "scripts":
+      return "script";
+  }
+}
+
+function isUnderSkillRoot(relativePath: string): boolean {
+  const segments = relativePath.split("/");
+  return repositorySkillRootEndIndex(segments) !== undefined;
+}
+
 function classifySkillEntrypointAtRoot(
   currentPath: string,
   segments: string[],
@@ -357,7 +680,7 @@ export async function discoverArtifacts(
         return {
           path: relativePath,
           absolutePath,
-          kind: classify(relativePath),
+          kind: classifyAssetPath(relativePath).kind,
           sizeBytes: info.size,
           contentHash: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
           contentClassification,
@@ -385,57 +708,6 @@ export async function discoverArtifacts(
     // Preserve existence evidence before exclusion/depth/content parsing.
     discoveredPaths,
   };
-}
-
-function classify(relativePath: string): ArtifactKind {
-  if (isExplicitSkillEntrypoint(relativePath)) return "skill";
-  const explicitSkillSupportKind =
-    classifyExplicitSkillSupportPath(relativePath);
-  if (explicitSkillSupportKind !== undefined) return explicitSkillSupportKind;
-  if (classifyRepositorySkillPath(relativePath)?.kind === "reserved-root")
-    return "unknown";
-  if (relativePath === "AGENTS.md" || relativePath.startsWith(".agents/"))
-    return "agent";
-  if (relativePath.startsWith("lenses/")) return "context_lens";
-  if (
-    relativePath.startsWith("context/") ||
-    relativePath.startsWith("contexts/")
-  )
-    return "context";
-  if (relativePath.includes("/profiles/")) return "profile";
-  if (relativePath.includes("/references/")) return "reference";
-  if (relativePath.includes("/examples/")) return "example";
-  if (
-    relativePath.endsWith("renma.config.json") ||
-    relativePath.endsWith(".renma.json")
-  ) {
-    return "config";
-  }
-  return "unknown";
-}
-
-function classifyExplicitSkillSupportPath(
-  relativePath: string,
-): ArtifactKind | undefined {
-  const classified = classifyRepositorySkillPath(relativePath);
-  const supportDirectory =
-    classified?.kind === "support" || classified?.kind === "reserved-root"
-      ? classified.supportDirectory
-      : undefined;
-  switch (supportDirectory) {
-    case "assets":
-      return classified?.kind === "support" ? "asset" : undefined;
-    case "profiles":
-      return "profile";
-    case "references":
-      return "reference";
-    case "examples":
-      return "example";
-    case "scripts":
-      return classified?.kind === "support" ? "script" : undefined;
-    default:
-      return undefined;
-  }
 }
 
 const OPAQUE_EXTENSIONS = new Set([
@@ -518,10 +790,6 @@ function skillLikeLayoutDiagnostics(walkedFiles: string[]): Diagnostic[] {
   }
 
   return diagnostics;
-}
-
-function isExplicitSkillEntrypoint(relativePath: string): boolean {
-  return classifyRepositorySkillEntrypointPath(relativePath) !== undefined;
 }
 
 function isExplicitSkillsPath(relativePath: string): boolean {

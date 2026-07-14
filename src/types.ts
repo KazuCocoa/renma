@@ -23,6 +23,61 @@ export type ArtifactKind =
   | "config"
   | "unknown";
 
+/** Repository governance boundary determined from a normalized asset path. */
+export type AssetScope =
+  | "independent"
+  | "skill-local"
+  | "repository-support"
+  | "unknown";
+
+/** Stable negative evidence for a nearby classification rule. */
+export interface AssetCompetingRuleEvidence {
+  rule: string;
+  matched: false;
+  reasonCode: string;
+  reason: string;
+}
+
+/** Deterministic, machine-readable evidence explaining one path classification. */
+export interface AssetClassificationEvidence {
+  kind: ArtifactKind;
+  scope: AssetScope;
+  matchedRule: string;
+  reasonCode: string;
+  reason: string;
+  recognizedRoot?: string;
+  parentAssetPath?: string;
+  supportDirectory?: string;
+  ignoredNestedSegments?: string[];
+  competingRules?: AssetCompetingRuleEvidence[];
+}
+
+/** Explicit outcome for commands that may recommend an authoring change. */
+export type DecisionStatus =
+  | "deterministic"
+  | "human-confirmation-required"
+  | "blocked"
+  | "no-change-recommended";
+
+export interface AssetDecisionEvidence {
+  reasonCode: string;
+  summary: string;
+  question?: string;
+}
+
+/** Governance provenance kept separate from path classification evidence. */
+export interface AssetGovernanceEvidence {
+  ownership: {
+    declaredOwner: string | null;
+    effectiveOwner: string | null;
+    source: "declared" | "inherited" | "unowned";
+    inheritedFrom?: { id: string; sourcePath: string };
+  };
+  policySource?: "declared" | "inherited" | "missing";
+  policyInheritedFrom?: string;
+  metadataState?: "declared" | "partial" | "missing" | "not-required";
+}
+
 /** Source location and snippet used to justify a finding. */
 export interface Evidence {
   path: string;

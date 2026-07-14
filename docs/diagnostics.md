@@ -57,6 +57,64 @@ Structured facts in `details` are the authoritative inputs for review tooling.
 `llmHint` is guidance only; changing hint wording should not change bundle
 grouping, affected files, affected assets, or repair decisions.
 
+## Classification Evidence
+
+`inspect`, `suggest-metadata`, and relevant scan finding or diagnostic
+`details` include additive `classification` evidence. Classification answers
+what repository boundary matched; governance separately answers whether owner,
+policy, or metadata is declared, inherited, missing, or not required. A file's
+kind never implies that it has an owner.
+
+The stable path-rule precedence is:
+
+1. `skill-entrypoint`.
+2. `skill-local-support` inside a recognized Skill boundary.
+3. Recognized asset roots: `context-root`, `context-root-legacy`, `lens-root`,
+   and `agent-root`.
+4. Repository support or configuration: `repository-tool` and `config-file`.
+5. Compatible nested rules: `generic-reference`, `generic-example`, and
+   `generic-profile`.
+6. `unknown`.
+
+Stable reason codes currently include
+`under-canonical-skill-root`, `under-skill-support-directory`,
+`under-recognized-context-root`, `under-legacy-context-root`,
+`under-recognized-lens-root`, `under-recognized-agent-root`,
+`repository-tool-not-context`, `recognized-config-file`,
+`under-generic-support-directory`, `unsupported-skill-local-directory`, and
+`outside-recognized-asset-boundary`. Concise `competingRules` may add negative
+evidence such as `outside-recognized-skill-boundary` or
+`outside-recognized-context-root`. Human-readable `reason` wording may improve;
+consumers should use `matchedRule` and `reasonCode` as the stable fields.
+
+Example additive details:
+
+```json
+{
+  "classification": {
+    "kind": "context",
+    "scope": "independent",
+    "matchedRule": "context-root",
+    "reasonCode": "under-recognized-context-root",
+    "recognizedRoot": "contexts",
+    "ignoredNestedSegments": ["references"],
+    "reason": "The file is under the recognized contexts/** root. The nested references/ segment does not change its classification."
+  }
+}
+```
+
+Adding classification evidence does not emit a finding for every file, change
+diagnostic severity, or change scan pass/fail behavior. Existing
+`requires_human_decision` repair constraints remain the mechanism for intent
+that Renma cannot infer.
+
+Commands that make recommendations use explicit `decisionStatus` values:
+`deterministic`, `human-confirmation-required`, `blocked`, and
+`no-change-recommended`. `suggestedMode: "no-proposal"` with
+`no-change-recommended` is a successful result, especially for ordinary
+Skill-local support that inherits governance. It is not an instruction to
+manufacture a patch.
+
 Example:
 
 ```json

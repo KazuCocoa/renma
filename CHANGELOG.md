@@ -6,6 +6,45 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.18.2] - 2026-07-13
+
+### Added
+
+- Added one deterministic asset-classification evidence model shared by
+  discovery, `inspect`, `suggest-metadata`, and relevant scan diagnostics. JSON
+  now separates stable `matchedRule` and `reasonCode` fields from human-readable
+  explanations, includes concise competing-rule evidence, and keeps
+  classification separate from ownership and policy governance.
+- Added explicit suggestion `decisionStatus`, structured decision evidence,
+  safe next actions, and the successful `no-proposal` mode.
+
+### Changed
+
+- `inspect` now reports classification for cataloged assets, files with missing
+  metadata, repository tools, and unknown files. When catalog evidence exists,
+  it reports declared or inherited ownership and policy separately.
+- `suggest-metadata` now uses the shared classifier. Ordinary Skill-local
+  support produces no independent retrofit proposal unless an explicit
+  supported override is supplied; existing local metadata remains supported.
+
+### Fixed
+
+- Prevented nested `references/`, `profiles/`, `examples/`, `scripts/`, or
+  `assets/` names from overriding the recognized `contexts/**` or legacy
+  `context/**` boundary.
+- Prevented `references/**`, `tools/**`, and `skills/**/tools/**` from being
+  misclassified as independently governed Context Assets or canonical local
+  support.
+
+### Compatibility
+
+- The `inspect` JSON outline adds `classification` and `governance`.
+  `suggest-metadata` JSON adds `classification`, `decisionStatus`, `decision`,
+  and `nextActions`, and may return `suggestedMode: "no-proposal"`. Relevant
+  diagnostic `details` may add `classification`. These changes are additive;
+  finding severity, scan thresholds, ownership inheritance, policy inheritance,
+  Agent Skills migration, and supported local metadata behavior are unchanged.
+
 ## [0.18.1] - 2026-07-13
 
 ### Added
