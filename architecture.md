@@ -472,6 +472,10 @@ Trust Graph v2 and Repository Context BOM v2 are implemented architecture. New
 projections should reuse the shared repository-evidence snapshot and remain
 additive unless a separately versioned contract requires a breaking change.
 
+Contributors changing collection, evidence, decisions, or command rendering
+should follow the [internal architecture boundaries](docs/internal-architecture.md),
+including the documented fail-closed and 0.18.2 compatibility seams.
+
 Release sequencing belongs in [plan.md](plan.md). Proposed Skill discovery is
 isolated in [plan-discovery.md](plan-discovery.md) and is not implemented by the
 current processing pipeline.

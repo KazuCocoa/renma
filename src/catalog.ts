@@ -137,12 +137,12 @@ export function buildCatalog(
   repositoryPaths: ReadonlySet<string> = new Set(
     documents.map((document) => document.artifact.path),
   ),
+  skillParents: SkillParentIndex = buildSkillParentIndex(documents),
 ): {
   catalog: Catalog;
   diagnostics: Diagnostic[];
 } {
   const diagnostics: Diagnostic[] = [];
-  const skillParents = buildSkillParentIndex(documents);
   for (const [skillDirectory, candidates] of skillParents) {
     if (candidates.length <= 1) continue;
     diagnostics.push({
@@ -253,6 +253,8 @@ function resolveAssetOwnership(
   metadata: AssetMetadata,
   skillParents: SkillParentIndex,
 ): AssetOwnership {
+  // Ownership is governance evidence, not a naming heuristic. Never derive it
+  // from the path, prose, Git author, or modification history.
   const declaredOwner = metadata.owner?.trim() || null;
   if (declaredOwner) {
     return {
@@ -266,6 +268,8 @@ function resolveAssetOwnership(
     document.artifact.path,
     skillParents,
   );
+  // Structural placement supplies only a candidate. Inheritance requires one
+  // and only one resolved parent Skill and an owner declared by that parent.
   if (resolution.state !== "resolved" || !resolution.parent.owner) {
     return { declaredOwner: null, effectiveOwner: null, source: "unowned" };
   }

@@ -10,11 +10,50 @@ import {
   formatReadinessJson,
   formatReadinessMarkdown,
   readiness,
+  readinessFromRepositorySnapshot,
   type ReadinessReport,
   type ReadinessCheckStatus,
 } from "../src/commands/readiness.js";
 import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
+import { collectRepositorySnapshot } from "../src/repository-evidence.js";
 import type { Finding } from "../src/types.js";
+
+test("readiness collects one repository snapshot for graph and scan evidence", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", { owner: "platform", status: "stable" });
+  const configPath = path.join(root, "renma.config.json");
+  await writeFile(configPath, "{}\n");
+  let snapshotLoadCount = 0;
+  // Each snapshot collection starts by resolving this override. A second read
+  // means graph and scan initiated independent repository collections.
+  const overrides = {
+    get configPath(): string {
+      snapshotLoadCount += 1;
+      return configPath;
+    },
+  };
+
+  const report = await readiness(root, overrides);
+
+  assert.equal(report.summary.totalAssets, 1);
+  assert.equal(snapshotLoadCount, 1);
+});
+
+test("readiness snapshot derivation does not rediscover repository files", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", { owner: "platform", status: "stable" });
+  const snapshot = await collectRepositorySnapshot(root);
+  const report = readinessFromRepositorySnapshot(snapshot);
+
+  await writeContext(root, "testing", "added-later", {
+    owner: "docs",
+    status: "stable",
+  });
+
+  assert.deepEqual(readinessFromRepositorySnapshot(snapshot), report);
+  assert.equal(report.summary.totalAssets, 1);
+  assert.equal((await readiness(root)).summary.totalAssets, 2);
+});
 
 test("readiness report marks fully owned resolved inventory ready", async () => {
   const root = await fixture();
