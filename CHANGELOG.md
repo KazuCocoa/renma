@@ -6,7 +6,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
-## [0.18.3] - 2026-07-13
+## [0.18.3] - 2026-07-14
 
 ### Added
 
@@ -615,7 +615,9 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.18.1...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.18.3...HEAD
+[0.18.3]: https://github.com/KazuCocoa/renma/compare/v0.18.2...v0.18.3
+[0.18.2]: https://github.com/KazuCocoa/renma/compare/v0.18.1...v0.18.2
 [0.18.1]: https://github.com/KazuCocoa/renma/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/KazuCocoa/renma/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/KazuCocoa/renma/compare/v0.16.0...v0.17.0
