@@ -68,11 +68,16 @@ implies that it has an owner. `inspect` additionally exposes
 when resolved or stable unresolved/ambiguous reason evidence and candidate
 roots when no safe boundary can be selected.
 
-For marker-free structural resolution, only `.agents`, `skills`, `contexts`,
-`context`, `lenses`, and `tools` can positively establish a boundary. The
-support-like names `profiles`, `references`, `examples`, `scripts`, and `assets`
-are guards only: they can block a later boundary-like segment or contribute
-ambiguity evidence, but never establish a repository root by themselves.
+For marker-free directory-segment inference, only `.agents`, `skills`,
+`contexts`, `context`, `lenses`, and `tools` can positively establish a
+structural boundary. Recognized root filenames are handled separately:
+`AGENTS.md` may establish its containing directory as the structural root when
+no stronger repository marker is available, while `renma.config.json` and
+`.renma.json` normally establish the boundary through repository-marker
+detection. The support-like names `profiles`, `references`, `examples`,
+`scripts`, and `assets` are guards only: they can block a later boundary-like
+segment or contribute ambiguity evidence, but never establish a repository root
+by themselves.
 
 > Classification describes how Renma interpreted repository structure. It does
 > not by itself prove ownership, policy, lifecycle, source-of-truth status, or
