@@ -1,26 +1,53 @@
-import { mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
-const cache = await mkdtemp(path.join(os.tmpdir(), "renma-npm-pack-"));
+const temporaryRoot = await mkdtemp(
+  path.join(os.tmpdir(), "renma package verification-"),
+);
+const packDirectory = path.join(temporaryRoot, "packed artifact");
+const consumerDirectory = path.join(temporaryRoot, "clean consumer");
+const cacheDirectory = path.join(temporaryRoot, "npm cache");
 
 try {
+  await mkdir(packDirectory, { recursive: true });
+  await mkdir(consumerDirectory, { recursive: true });
+  await mkdir(cacheDirectory, { recursive: true });
   const packed = spawnSync(
     "npm",
-    ["pack", "--json", "--cache", cache, "--pack-destination", cache],
+    [
+      "pack",
+      "--json",
+      "--cache",
+      cacheDirectory,
+      "--pack-destination",
+      packDirectory,
+    ],
     { cwd: process.cwd(), encoding: "utf8" },
   );
-  if (packed.error) throw packed.error;
+  if (packed.error) {
+    throw new Error(`npm pack failed: ${packed.error.message}`);
+  }
   if (packed.status !== 0) {
-    throw new Error(packed.stderr.trim() || "npm pack failed.");
+    throw new Error(
+      `npm pack failed: ${packed.stderr.trim() || `exit code ${packed.status}`}`,
+    );
   }
 
-  const reports = JSON.parse(packed.stdout);
+  let reports;
+  try {
+    reports = JSON.parse(packed.stdout);
+  } catch {
+    throw new Error("npm pack failed: npm returned invalid JSON output.");
+  }
   const report = reports[0];
   if (!report || !Array.isArray(report.files)) {
     throw new Error("npm pack returned no package file list.");
+  }
+  if (typeof report.filename !== "string" || report.filename.length === 0) {
+    throw new Error("npm pack returned no tarball filename.");
   }
   const files = new Set(report.files.map((file) => file.path));
 
@@ -74,7 +101,12 @@ try {
     }
   }
 
-  const packageRoot = await extractPackage(cache, report.filename);
+  const tarballPath = path.resolve(packDirectory, report.filename);
+  const packageRoot = await installInTemporaryConsumer(
+    consumerDirectory,
+    tarballPath,
+    cacheDirectory,
+  );
   await verifyInspectDeclarationCompatibility(packageRoot);
   for (const modulePath of [
     "dist/commands/inspect.js",
@@ -82,38 +114,73 @@ try {
     "dist/discovery.js",
     "dist/skill-migration.js",
   ]) {
-    await import(pathToFileURL(path.join(packageRoot, modulePath)).href);
+    try {
+      await import(pathToFileURL(path.join(packageRoot, modulePath)).href);
+    } catch (error) {
+      throw new Error(
+        `Deep import failed for ${modulePath}: ${errorMessage(error)}`,
+        { cause: error },
+      );
+    }
   }
 
   process.stdout.write(
     `Verified ${files.size} packaged files, deep imports, inspect declarations, and every README-relative target.\n`,
   );
 } finally {
-  await rm(cache, { recursive: true, force: true });
+  await rm(temporaryRoot, { recursive: true, force: true });
 }
 
-async function extractPackage(cache, filename) {
-  if (typeof filename !== "string" || filename.length === 0) {
-    throw new Error("npm pack returned no package filename.");
-  }
-  const unpacked = path.join(cache, "unpacked");
-  await mkdir(unpacked, { recursive: true });
-  const extracted = spawnSync(
-    "tar",
-    ["-xzf", path.join(cache, filename), "-C", unpacked],
-    { encoding: "utf8" },
+async function installInTemporaryConsumer(
+  consumerDirectory,
+  tarballPath,
+  cacheDirectory,
+) {
+  await writeFile(
+    path.join(consumerDirectory, "package.json"),
+    `${JSON.stringify(
+      {
+        name: "renma-package-verification",
+        private: true,
+        type: "module",
+      },
+      null,
+      2,
+    )}\n`,
   );
-  if (extracted.error) throw extracted.error;
-  if (extracted.status !== 0) {
+  const installed = spawnSync(
+    "npm",
+    [
+      "install",
+      "--ignore-scripts",
+      "--no-audit",
+      "--no-fund",
+      "--package-lock=false",
+      "--cache",
+      cacheDirectory,
+      tarballPath,
+    ],
+    { cwd: consumerDirectory, encoding: "utf8" },
+  );
+  if (installed.error) {
     throw new Error(
-      extracted.stderr.trim() || "Could not extract npm package.",
+      `Temporary consumer installation failed: ${installed.error.message}`,
     );
   }
-  const packageRoot = path.join(unpacked, "package");
-  await symlink(
-    path.resolve("node_modules"),
-    path.join(packageRoot, "node_modules"),
-  );
+  if (installed.status !== 0) {
+    throw new Error(
+      `Temporary consumer installation failed: ${installed.stderr.trim() || `npm exited with code ${installed.status}`}`,
+    );
+  }
+  const packageRoot = path.join(consumerDirectory, "node_modules", "renma");
+  try {
+    await readFile(path.join(packageRoot, "package.json"), "utf8");
+  } catch (error) {
+    throw new Error(
+      `Temporary consumer installation failed: installed renma package is missing (${errorMessage(error)}).`,
+      { cause: error },
+    );
+  }
   return packageRoot;
 }
 
@@ -141,6 +208,10 @@ async function verifyInspectDeclarationCompatibility(packageRoot) {
       );
     }
   }
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function requirePackagedPath(files, target) {
