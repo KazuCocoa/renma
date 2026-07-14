@@ -127,7 +127,7 @@ export type RepositoryClassificationPathResolution =
         | "repository-boundary-ambiguous";
       reason: string;
       absolutePath: string;
-      candidateRoots?: string[];
+      candidateRoots: string[];
     };
 
 /** Classify canonical, historical, and reserved support paths at explicit Skill roots. */
@@ -326,6 +326,16 @@ export function repositoryClassificationPath(
 
   const structural = structuralRepositoryBoundary(absolutePath);
   if (structural) {
+    if (structural.state === "ambiguous") {
+      return {
+        state: "unresolved",
+        reasonCode: "repository-boundary-ambiguous",
+        reason:
+          "Multiple structural repository roots remain plausible; supply an explicit root or add a repository marker.",
+        absolutePath,
+        candidateRoots: structural.candidateRoots,
+      };
+    }
     return {
       state: "resolved",
       source: "structural",
@@ -341,6 +351,7 @@ export function repositoryClassificationPath(
     reason:
       "No explicit root, repository marker, or unambiguous structural asset boundary was found.",
     absolutePath,
+    candidateRoots: [],
   };
 }
 
@@ -622,34 +633,66 @@ function nearestRepositoryMarker(startDirectory: string):
 
 function structuralRepositoryBoundary(
   absolutePath: string,
-): { root: string; relativePath: string } | undefined {
+):
+  | { state: "resolved"; root: string; relativePath: string }
+  | { state: "ambiguous"; candidateRoots: string[] }
+  | undefined {
   const parsed = path.parse(absolutePath);
   const relativeToFilesystemRoot = path.relative(parsed.root, absolutePath);
   const segments = relativeToFilesystemRoot.split(path.sep).filter(Boolean);
-  const structuralSegments = new Set([
+  const strongSegments = new Set([
     ".agents",
     "skills",
     "contexts",
     "context",
     "lenses",
     "tools",
-    // These guard names prevent nested boundary-like names from being
-    // reinterpreted as a stronger repository root.
+  ]);
+  const guardSegments = new Set([
     "profiles",
     "references",
     "examples",
     "scripts",
     "assets",
   ]);
-  const boundaryIndex = segments
-    .slice(0, -1)
-    .findIndex((segment) => structuralSegments.has(segment));
-  if (boundaryIndex >= 0) {
-    const root = path.join(parsed.root, ...segments.slice(0, boundaryIndex));
+  const candidates = segments.slice(0, -1).flatMap((segment, index) => {
+    const strength = strongSegments.has(segment)
+      ? "strong"
+      : guardSegments.has(segment)
+        ? "guard"
+        : undefined;
+    if (!strength) return [];
+    const root = path.join(parsed.root, ...segments.slice(0, index));
     const relativePath = normalizeAssetRepositoryRelativePath(
-      segments.slice(boundaryIndex).join("/"),
+      segments.slice(index).join("/"),
     );
-    if (relativePath) return { root, relativePath };
+    return relativePath ? [{ index, strength, root, relativePath }] : [];
+  });
+  const first = candidates[0];
+  if (first) {
+    const firstClassification = classifyAssetPath(first.relativePath);
+    const firstEstablishesBoundary =
+      firstClassification.matchedRule !== "unknown" ||
+      firstClassification.scope !== "unknown";
+    const immediateGuardBoundary =
+      first.strength === "guard" && candidates[1]?.index === first.index + 1;
+    if (
+      candidates.length === 1 ||
+      firstEstablishesBoundary ||
+      immediateGuardBoundary
+    ) {
+      return {
+        state: "resolved",
+        root: first.root,
+        relativePath: first.relativePath,
+      };
+    }
+    return {
+      state: "ambiguous",
+      candidateRoots: [
+        ...new Set(candidates.map((candidate) => candidate.root)),
+      ],
+    };
   }
 
   const basename = segments.at(-1);
@@ -660,7 +703,7 @@ function structuralRepositoryBoundary(
   ) {
     const root = path.dirname(absolutePath);
     const relativePath = normalizeAssetRepositoryRelativePath(basename);
-    if (relativePath) return { root, relativePath };
+    if (relativePath) return { state: "resolved", root, relativePath };
   }
   return undefined;
 }

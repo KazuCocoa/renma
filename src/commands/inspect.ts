@@ -12,6 +12,7 @@ import {
 import {
   classifyAssetPath,
   repositoryClassificationPath,
+  type RepositoryClassificationPathResolution,
 } from "../discovery.js";
 import { parseDocument } from "../markdown.js";
 import { parseAssetMetadata } from "../metadata.js";
@@ -44,6 +45,7 @@ export interface InspectOutline {
   bytes: number;
   lineCount: number;
   frontmatterRange: null | string;
+  repositoryBoundary: RepositoryClassificationPathResolution;
   classification: AssetClassificationEvidence;
   governance: AssetGovernanceEvidence | null;
   asset: InspectAssetSummary | null;
@@ -143,7 +145,7 @@ export async function buildInspectOutline(
     absolutePath,
     content,
     kind: initialClassification.kind,
-    path: absolutePath,
+    path: classificationPath || absolutePath,
     sizeBytes: Buffer.byteLength(content),
     contentClassification: "text",
     markdownParserEligible: /\.mdx?$/i.test(absolutePath),
@@ -196,6 +198,7 @@ export async function buildInspectOutline(
       target: link.target,
     })),
     path: absolutePath,
+    repositoryBoundary: classificationContext,
   };
 }
 
@@ -567,6 +570,9 @@ function renderTextOutline(outline: InspectOutline): string {
     `Bytes: ${outline.bytes}`,
     `Frontmatter: ${outline.frontmatterRange ?? "none"}`,
     "",
+    "Repository boundary:",
+    ...renderRepositoryBoundary(outline.repositoryBoundary),
+    "",
     "Classification:",
     ...renderClassification(outline.classification),
     "",
@@ -596,6 +602,25 @@ function renderTextOutline(outline: InspectOutline): string {
   ];
 
   return `${lines.join("\n")}\n`;
+}
+
+function renderRepositoryBoundary(
+  boundary: RepositoryClassificationPathResolution,
+): string[] {
+  if (boundary.state === "resolved") {
+    return [
+      `- State: ${boundary.state}`,
+      `- Source: ${boundary.source}`,
+      `- Root: ${boundary.root}`,
+      `- Relative path: ${boundary.relativePath}`,
+    ];
+  }
+  return [
+    `- State: ${boundary.state}`,
+    `- Reason code: ${boundary.reasonCode}`,
+    `- Reason: ${boundary.reason}`,
+    `- Candidate roots: ${boundary.candidateRoots.join(", ") || "(none)"}`,
+  ];
 }
 
 function renderClassification(

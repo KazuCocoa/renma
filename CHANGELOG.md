@@ -31,6 +31,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   nearest safe `.git` or Renma config marker, then an unambiguous structural
   boundary. Being below the current working directory is no longer treated as
   repository-root evidence.
+- Skill entrypoint classification and migration now use the resolved
+  repository-relative path consistently. Filesystem collision checks rebase
+  the repository-relative migration target against that resolved root, so
+  invoking Renma from a nested repository's parent behaves like invoking it
+  inside the repository.
 - Skill-local classification now records a structural parent candidate
   separately from catalog-backed `resolved`, `missing`, or `ambiguous` parent
   evidence. Missing and ambiguous parents block inheritance claims and metadata
@@ -44,10 +49,18 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Prevented `references/**`, `tools/**`, and `skills/**/tools/**` from being
   misclassified as independently governed Context Assets or canonical local
   support.
+- Repository paths with multiple plausible structural roots now fail closed as
+  `repository-boundary-ambiguous`; unresolved and ambiguous suggestions no
+  longer manufacture a `scan .` action against the caller's current directory.
+- An explicit owner equal to an existing canonical
+  `metadata.renma.owner` now returns `no-proposal` and
+  `no-change-recommended` without candidate metadata or frontmatter.
 
 ### Compatibility
 
-- The `inspect` JSON outline adds `classification` and `governance`.
+- The `inspect` JSON outline adds `repositoryBoundary`, `classification`, and
+  `governance`. `repositoryBoundary` preserves resolved or unresolved boundary
+  evidence, including ambiguity candidates when present.
   `suggest-metadata` JSON adds `classification`, `decisionStatus`, `decision`,
   and `nextActions`, and may return `suggestedMode: "no-proposal"`. Relevant
   diagnostic `details` may add `classification`. The new JSON fields are

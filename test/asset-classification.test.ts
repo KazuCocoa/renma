@@ -241,6 +241,8 @@ test("an explicit caller root resolves unstructured paths while target-only evid
 
   const unresolved = repositoryClassificationPath(target);
   assert.equal(unresolved.state, "unresolved");
+  if (unresolved.state !== "unresolved") return;
+  assert.deepEqual(unresolved.candidateRoots, []);
   const explicit = repositoryClassificationPath(target, {
     repositoryRoot: root,
   });
@@ -250,12 +252,26 @@ test("an explicit caller root resolves unstructured paths while target-only evid
   assert.equal(explicit.relativePath, "docs/note.md");
 
   const suggestion = await buildMetadataSuggestion(target);
+  const inspect = await buildInspectOutline(target);
   assert.equal(suggestion.decisionStatus, "blocked");
   assert.equal(
     suggestion.decision.reasonCode,
     "repository-boundary-unresolved",
   );
   assert.equal(suggestion.classification.kind, "unknown");
+  assert.deepEqual(suggestion.nextActions, []);
+  assert.equal(inspect.repositoryBoundary.state, "unresolved");
+  if (inspect.repositoryBoundary.state === "unresolved") {
+    assert.equal(
+      inspect.repositoryBoundary.reasonCode,
+      "repository-boundary-unresolved",
+    );
+    assert.deepEqual(inspect.repositoryBoundary.candidateRoots, []);
+  }
+  assert.equal(
+    JSON.stringify(suggestion.nextActions).includes("scan ."),
+    false,
+  );
 });
 
 test("absolute targets outside cwd retain deterministic structural boundaries", async () => {
@@ -329,6 +345,66 @@ test("structural fallback ignores nested boundary-like names after the outer bou
       expectedRule,
       relative,
     );
+  }
+});
+
+test("structural fallback fails closed when multiple repository roots remain plausible", async () => {
+  const base = await mkdtemp(
+    path.join(os.tmpdir(), "renma-ambiguous-structure-"),
+  );
+  const cases = [
+    [
+      "references/project/contexts/foo/policy.md",
+      [base, path.join(base, "references", "project")],
+    ],
+    [
+      "skills/project/contexts/foo/policy.md",
+      [base, path.join(base, "skills", "project")],
+    ],
+    [
+      "assets/project/tools/helper.mjs",
+      [base, path.join(base, "assets", "project")],
+    ],
+  ] as const;
+
+  for (const [relative, candidateRoots] of cases) {
+    const target = path.join(base, ...relative.split("/"));
+    const resolution = repositoryClassificationPath(target);
+    assert.equal(resolution.state, "unresolved", relative);
+    if (resolution.state !== "unresolved") continue;
+    assert.equal(
+      resolution.reasonCode,
+      "repository-boundary-ambiguous",
+      relative,
+    );
+    assert.deepEqual(resolution.candidateRoots, candidateRoots, relative);
+  }
+
+  const target = path.join(
+    base,
+    "references",
+    "project",
+    "contexts",
+    "foo",
+    "policy.md",
+  );
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(target, "# Policy\n");
+  const suggestion = await buildMetadataSuggestion(target);
+  const inspect = await buildInspectOutline(target);
+  assert.equal(suggestion.decisionStatus, "blocked");
+  assert.equal(suggestion.decision.reasonCode, "repository-boundary-ambiguous");
+  assert.deepEqual(suggestion.nextActions, []);
+  assert.equal(inspect.repositoryBoundary.state, "unresolved");
+  if (inspect.repositoryBoundary.state === "unresolved") {
+    assert.equal(
+      inspect.repositoryBoundary.reasonCode,
+      "repository-boundary-ambiguous",
+    );
+    assert.deepEqual(inspect.repositoryBoundary.candidateRoots, [
+      base,
+      path.join(base, "references", "project"),
+    ]);
   }
 });
 

@@ -61,9 +61,12 @@ grouping, affected files, affected assets, or repair decisions.
 
 `inspect`, `suggest-metadata`, and relevant scan finding or diagnostic
 `details` include additive `classification` evidence. Classification answers
-what repository boundary matched; governance separately answers whether owner,
-policy, or metadata is declared, inherited, missing, or not required. A file's
-kind never implies that it has an owner.
+what path rule matched; governance separately answers whether owner, policy, or
+metadata is declared, inherited, missing, or not required. A file's kind never
+implies that it has an owner. `inspect` additionally exposes
+`repositoryBoundary`, preserving resolution source and repository-relative path
+when resolved or stable unresolved/ambiguous reason evidence and candidate
+roots when no safe boundary can be selected.
 
 The stable path-rule precedence is:
 

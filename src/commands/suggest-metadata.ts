@@ -13,7 +13,6 @@ import { collectRepositorySnapshot } from "../repository-evidence.js";
 import { collectSecurityPolicyAssetEvidence } from "../security-policy-inventory.js";
 import {
   classifyAssetPath,
-  classifyAbsoluteSkillEntrypointPath,
   classifyRepositorySkillEntrypointPath,
   repositoryClassificationPath,
   type SkillEntrypointPath,
@@ -109,11 +108,13 @@ export async function buildMetadataSuggestion(
     classificationContext.state === "resolved"
       ? classificationContext.root
       : undefined;
-  const entrypoint = classifySuggestionSkillEntrypointPath(outputPath);
+  const entrypoint = classificationPath
+    ? classifyRepositorySkillEntrypointPath(classificationPath)
+    : undefined;
   const initialClassification = classifyAssetPath(classificationPath);
   const initialKind = initialClassification.kind;
   const document = parseDocument({
-    path: outputPath,
+    path: classificationPath || outputPath,
     absolutePath,
     kind: initialKind,
     sizeBytes: Buffer.byteLength(content),
@@ -128,20 +129,21 @@ export async function buildMetadataSuggestion(
   const kind = classification.kind;
   const explicitOwner = optionalText(options.owner);
   if (kind === "skill") {
-    const collisionBlock = entrypoint
-      ? await pathMigrationCollision(entrypoint, absolutePath)
-      : undefined;
+    const collisionBlock =
+      entrypoint && repositoryRoot
+        ? await pathMigrationCollision(entrypoint, absolutePath, repositoryRoot)
+        : undefined;
     const agentSkills = buildAgentSkillMigrationSuggestion(document, {
       ...(explicitOwner ? { explicitOwner } : {}),
       ...(entrypoint ? { entrypoint } : {}),
       ...(collisionBlock ? { additionalBlocks: [collisionBlock] } : {}),
     });
-    const metadataRetrofit =
-      agentSkills.proposalKind === "canonical-metadata-retrofit";
     const noMigrationProposed =
       agentSkills.proposalKind === "none" &&
       agentSkills.sourceFormat === "agent-skills";
-    const decision = skillDecision(agentSkills, metadataRetrofit);
+    const metadataRetrofit =
+      agentSkills.proposalKind === "canonical-metadata-retrofit";
+    const decision = skillDecision(agentSkills);
     return {
       path: outputPath,
       kind,
@@ -332,7 +334,7 @@ export async function buildMetadataSuggestion(
         ? {
             reasonCode: classificationContext.reasonCode,
             summary:
-              "Renma could not infer one safe repository-relative boundary for this absolute path.",
+              "Renma could not infer one safe repository-relative boundary for this target path.",
           }
         : {
             reasonCode:
@@ -509,10 +511,15 @@ export function renderMetadataPrompt(suggestion: MetadataSuggestion): string {
     "",
     "Verification:",
     ...(blocked
-      ? [
-          "- Resolve the blocked evidence and rerun `renma suggest-metadata`.",
-          "- Run the structured layout/scan action; do not apply a patch from this result.",
-        ]
+      ? suggestion.nextActions.length > 0
+        ? [
+            "- Resolve the blocked evidence and rerun `renma suggest-metadata`.",
+            "- Run only the structured safe action; do not apply a patch from this result.",
+          ]
+        : [
+            "- Establish the repository root with an explicit root or repository marker, then rerun `renma suggest-metadata`.",
+            "- No verification command is safe while the repository boundary is unresolved.",
+          ]
       : noChange
         ? ["- No verification change is required when no file change is made."]
         : [
@@ -743,10 +750,10 @@ function skillLocalGovernancePromptLines(
   }
 }
 
-function skillDecision(
-  migration: AgentSkillMigrationSuggestion,
-  metadataRetrofit: boolean,
-): { status: DecisionStatus; decision: AssetDecisionEvidence } {
+function skillDecision(migration: AgentSkillMigrationSuggestion): {
+  status: DecisionStatus;
+  decision: AssetDecisionEvidence;
+} {
   if (migration.blocked.length > 0) {
     return {
       status: "blocked",
@@ -770,7 +777,11 @@ function skillDecision(
       },
     };
   }
-  if (metadataRetrofit) {
+  if (
+    migration.proposalKind === "canonical-metadata-retrofit" &&
+    migration.canonicalFrontmatter !== undefined &&
+    Object.keys(migration.candidateRenmaMetadata).length > 0
+  ) {
     return {
       status: "deterministic",
       decision: {
@@ -831,8 +842,9 @@ function suggestionNextActions(
   classification: AssetClassificationEvidence,
   repositoryRoot: string | undefined,
 ): SuggestedNextAction[] {
+  if (!repositoryRoot) return [];
   const actions: SuggestedNextAction[] = [];
-  const scanTarget = repositoryRoot ?? ".";
+  const scanTarget = repositoryRoot;
   if (
     classification.parentResolution === "resolved" &&
     classification.parentAssetPath
@@ -841,9 +853,7 @@ function suggestionNextActions(
       kind: "inspect-parent",
       invocation: renmaCommand([
         "inspect",
-        repositoryRoot
-          ? path.join(repositoryRoot, classification.parentAssetPath)
-          : classification.parentAssetPath,
+        path.join(repositoryRoot, classification.parentAssetPath),
         "--format",
         "json",
       ]),
@@ -1009,20 +1019,16 @@ function deterministicInterpretation(
   return "Renma does not classify the target as an independently governed asset.";
 }
 
-function classifySuggestionSkillEntrypointPath(
-  filePath: string,
-): SkillEntrypointPath | undefined {
-  return isAbsoluteLike(filePath)
-    ? classifyAbsoluteSkillEntrypointPath(filePath)
-    : classifyRepositorySkillEntrypointPath(filePath);
-}
-
 async function pathMigrationCollision(
   entrypoint: SkillEntrypointPath,
   sourceAbsolutePath: string,
+  repositoryRoot: string,
 ): Promise<BlockedMetadata | undefined> {
   if (entrypoint.kind === "canonical") return undefined;
-  const targetAbsolutePath = path.resolve(entrypoint.targetPath);
+  const targetAbsolutePath = path.resolve(
+    repositoryRoot,
+    entrypoint.targetPath,
+  );
   try {
     await lstat(targetAbsolutePath);
   } catch (error) {
@@ -1057,10 +1063,6 @@ async function pathMigrationCollision(
       reason: `Could not safely verify migration target ${entrypoint.targetPath}: ${readErrorReason(error)} Human review is required before migration.`,
     };
   }
-}
-
-function isAbsoluteLike(filePath: string): boolean {
-  return path.isAbsolute(filePath) || /^[A-Za-z]:\//.test(filePath);
 }
 
 function isMissingFileError(error: unknown): boolean {

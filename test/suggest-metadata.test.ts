@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -355,54 +362,42 @@ test("suggest-metadata does not create owner candidate for same existing owner",
   const root = await fixture();
   const target = path.join(root, "skills", "qa", "foo", "SKILL.md");
   await mkdir(path.dirname(target), { recursive: true });
-  await writeFile(
-    target,
-    [
-      "---",
-      "id: skill.qa.foo",
-      "title: Foo",
-      "owner: qa-platform",
-      "---",
-      "# Foo",
-      "",
-    ].join("\n"),
-  );
+  await writeFile(target, canonicalSkill("foo", "qa-platform"));
 
   const result = await withCapturedConsole(() =>
     main(["suggest-metadata", target, "--owner", "qa-platform", "--json"]),
   );
   const suggestion = JSON.parse(result.stdout) as {
     candidateMetadata: Record<string, string>;
+    suggestedMode: string;
+    decisionStatus: string;
+    decision: { reasonCode: string };
     blockedMetadata: Array<{ field: string; reason: string }>;
     instructions: string[];
-    agentSkills: { candidateRenmaMetadata: Record<string, string> };
+    agentSkills: {
+      candidateRenmaMetadata: Record<string, string>;
+      canonicalFrontmatter?: string;
+    };
   };
 
   assert.equal(result.code, 0);
-  assert.equal("owner" in suggestion.candidateMetadata, false);
+  assert.equal(suggestion.suggestedMode, "no-proposal");
+  assert.equal(suggestion.decisionStatus, "no-change-recommended");
   assert.equal(
-    suggestion.agentSkills.candidateRenmaMetadata["renma.owner"],
-    "qa-platform",
+    suggestion.decision.reasonCode,
+    "canonical-agent-skill-no-change",
   );
-  assert.equal(suggestion.blockedMetadata[0]?.field, "description");
+  assert.deepEqual(suggestion.candidateMetadata, {});
+  assert.deepEqual(suggestion.agentSkills.candidateRenmaMetadata, {});
+  assert.equal("canonicalFrontmatter" in suggestion.agentSkills, false);
+  assert.deepEqual(suggestion.blockedMetadata, []);
 });
 
 test("suggest-metadata blocks different explicit owner from replacing existing owner", async () => {
   const root = await fixture();
   const target = path.join(root, "skills", "docs", "foo", "SKILL.md");
   await mkdir(path.dirname(target), { recursive: true });
-  await writeFile(
-    target,
-    [
-      "---",
-      "id: skill.docs.foo",
-      "title: Foo",
-      "owner: docs",
-      "---",
-      "# Foo",
-      "",
-    ].join("\n"),
-  );
+  await writeFile(target, canonicalSkill("foo", "docs"));
 
   const result = await withCapturedConsole(() =>
     main([
@@ -418,9 +413,12 @@ test("suggest-metadata blocks different explicit owner from replacing existing o
   assert.equal(result.code, 0);
   assert.match(
     result.stdout,
-    /owner: Existing owner "docs" differs from explicitly provided owner "qa-platform"\. Human review is required before migration\./,
+    /owner: Existing owner "docs" differs from explicitly provided owner "qa-platform"\. Human review is required before changing canonical Agent Skills metadata\./,
   );
-  assert.match(result.stdout, /renma\.owner: `docs`/);
+  assert.match(
+    result.stdout,
+    /Do not return or apply a frontmatter patch while the decision is blocked\./,
+  );
   assert.doesNotMatch(result.stdout, /renma\.owner: `qa-platform`/);
 });
 
@@ -428,18 +426,7 @@ test("suggest-metadata JSON represents blocked owner replacement", async () => {
   const root = await fixture();
   const target = path.join(root, "skills", "docs", "foo", "SKILL.md");
   await mkdir(path.dirname(target), { recursive: true });
-  await writeFile(
-    target,
-    [
-      "---",
-      "id: skill.docs.foo",
-      "title: Foo",
-      "owner: docs",
-      "---",
-      "# Foo",
-      "",
-    ].join("\n"),
-  );
+  await writeFile(target, canonicalSkill("foo", "docs"));
 
   const result = await withCapturedConsole(() =>
     main(["suggest-metadata", target, "--owner", "qa-platform", "--json"]),
@@ -448,19 +435,22 @@ test("suggest-metadata JSON represents blocked owner replacement", async () => {
     candidateMetadata: Record<string, string>;
     blockedMetadata: Array<{ field: string; reason: string }>;
     instructions: string[];
-    agentSkills: { candidateRenmaMetadata: Record<string, string> };
+    decisionStatus: string;
+    agentSkills: {
+      candidateRenmaMetadata: Record<string, string>;
+      canonicalFrontmatter?: string;
+    };
   };
 
   assert.equal(result.code, 0);
   assert.equal("owner" in suggestion.candidateMetadata, false);
+  assert.equal(suggestion.decisionStatus, "blocked");
   assert.deepEqual(
     suggestion.blockedMetadata.map((item) => item.field),
-    ["description", "owner"],
+    ["owner"],
   );
-  assert.equal(
-    suggestion.agentSkills.candidateRenmaMetadata["renma.owner"],
-    "docs",
-  );
+  assert.deepEqual(suggestion.agentSkills.candidateRenmaMetadata, {});
+  assert.equal("canonicalFrontmatter" in suggestion.agentSkills, false);
 });
 
 test("suggest-metadata rejects unsupported format", async () => {
@@ -642,16 +632,8 @@ test("scan commands execute historical Skill entrypoint migrations end to end", 
       "agent-skills-migration",
       entry.source,
     );
-    assert.equal(
-      suggestion.agentSkills.sourcePath,
-      absoluteSource,
-      entry.source,
-    );
-    assert.equal(
-      suggestion.agentSkills.targetPath,
-      path.join(root, ...entry.target.split("/")),
-      entry.source,
-    );
+    assert.equal(suggestion.agentSkills.sourcePath, entry.source, entry.source);
+    assert.equal(suggestion.agentSkills.targetPath, entry.target, entry.source);
     assert.equal(
       suggestion.agentSkills.entrypointMigration,
       entry.migration,
@@ -772,6 +754,193 @@ test("suggest-metadata does not infer a Skill from ambiguous absolute roots", as
   assert.equal(suggestion.agentSkills, undefined);
 });
 
+test("suggest-metadata uses one repository-relative Skill path from a nested repository parent", async () => {
+  const workspace = await fixture();
+  const repository = path.join(workspace, "repo");
+  await mkdir(path.join(repository, ".git"), { recursive: true });
+
+  const canonical = path.join(repository, "skills", "foo", "SKILL.md");
+  await mkdir(path.dirname(canonical), { recursive: true });
+  await writeFile(canonical, canonicalSkill("foo"));
+
+  const previousDirectory = process.cwd();
+  try {
+    process.chdir(workspace);
+    const ownerRetrofit = await jsonSuggestion([
+      "repo/skills/foo/SKILL.md",
+      "--owner",
+      "qa-platform",
+    ]);
+    assert.equal(ownerRetrofit.kind, "skill");
+    assert.equal(ownerRetrofit.suggestedMode, "agent-skills-metadata-retrofit");
+    assert.equal(ownerRetrofit.decisionStatus, "deterministic");
+    assert.equal(ownerRetrofit.agentSkills.sourcePath, "skills/foo/SKILL.md");
+    assert.equal(ownerRetrofit.agentSkills.targetPath, "skills/foo/SKILL.md");
+    assert.equal(
+      ownerRetrofit.agentSkills.candidateRenmaMetadata["renma.owner"],
+      "qa-platform",
+    );
+    const inspectResult = await withCapturedConsole(() =>
+      main(["inspect", "repo/skills/foo/SKILL.md", "--format", "json"]),
+    );
+    const inspected = JSON.parse(inspectResult.stdout) as {
+      classification: { kind: string; matchedRule: string };
+      repositoryBoundary: {
+        state: string;
+        root: string;
+        relativePath: string;
+      };
+    };
+    assert.equal(inspectResult.code, 0);
+    assert.equal(
+      inspected.classification.kind,
+      ownerRetrofit.classification.kind,
+    );
+    assert.equal(
+      inspected.classification.matchedRule,
+      ownerRetrofit.classification.matchedRule,
+    );
+    assert.equal(inspected.repositoryBoundary.state, "resolved");
+    assert.equal(inspected.repositoryBoundary.root, await realpath(repository));
+    assert.equal(
+      inspected.repositoryBoundary.relativePath,
+      "skills/foo/SKILL.md",
+    );
+
+    await writeFile(canonical, canonicalSkill("foo", "qa-platform"));
+    const sameOwner = await jsonSuggestion([
+      "repo/skills/foo/SKILL.md",
+      "--owner",
+      "qa-platform",
+    ]);
+    assert.equal(sameOwner.suggestedMode, "no-proposal");
+    assert.equal(sameOwner.decisionStatus, "no-change-recommended");
+    assert.equal(
+      sameOwner.decision.reasonCode,
+      "canonical-agent-skill-no-change",
+    );
+    assert.deepEqual(sameOwner.candidateMetadata, {});
+    assert.deepEqual(sameOwner.agentSkills.candidateRenmaMetadata, {});
+    assert.equal("canonicalFrontmatter" in sameOwner.agentSkills, false);
+    const sameOwnerPrompt = await withCapturedConsole(() =>
+      main([
+        "suggest-metadata",
+        "repo/skills/foo/SKILL.md",
+        "--owner",
+        "qa-platform",
+        "--format",
+        "prompt",
+      ]),
+    );
+    assert.doesNotMatch(
+      sameOwnerPrompt.stdout,
+      /Return (?:a|one) small reviewed/,
+    );
+
+    await rm(canonical);
+    const lowercase = path.join(repository, "skills", "foo", "skill.md");
+    await writeFile(lowercase, canonicalSkill("foo"));
+    const unrelatedParentCollision = path.join(
+      workspace,
+      "skills",
+      "foo",
+      "SKILL.md",
+    );
+    await mkdir(path.dirname(unrelatedParentCollision), { recursive: true });
+    await writeFile(unrelatedParentCollision, canonicalSkill("foo"));
+    const rename = await jsonSuggestion(["repo/skills/foo/skill.md"]);
+    assert.equal(rename.agentSkills.entrypointMigration, "rename");
+    assert.equal(rename.agentSkills.direction, "legacy-to-agent-skills");
+    assert.equal(rename.agentSkills.sourcePath, "skills/foo/skill.md");
+    assert.equal(rename.agentSkills.targetPath, "skills/foo/SKILL.md");
+    assert.equal(
+      rename.blockedMetadata.some(
+        (item: { field: string }) => item.field === "targetPath",
+      ),
+      false,
+    );
+
+    const flat = path.join(
+      repository,
+      "skills",
+      "testing",
+      "spec-review.skill.md",
+    );
+    await mkdir(path.dirname(flat), { recursive: true });
+    await writeFile(flat, canonicalSkill("spec-review"));
+    const unrelatedFlatCollision = path.join(
+      workspace,
+      "skills",
+      "testing",
+      "spec-review",
+      "SKILL.md",
+    );
+    await mkdir(path.dirname(unrelatedFlatCollision), { recursive: true });
+    await writeFile(unrelatedFlatCollision, canonicalSkill("spec-review"));
+    const move = await jsonSuggestion([
+      "repo/skills/testing/spec-review.skill.md",
+    ]);
+    assert.equal(move.agentSkills.entrypointMigration, "move-and-rename");
+    assert.equal(
+      move.agentSkills.sourcePath,
+      "skills/testing/spec-review.skill.md",
+    );
+    assert.equal(
+      move.agentSkills.targetPath,
+      "skills/testing/spec-review/SKILL.md",
+    );
+    assert.equal(
+      move.blockedMetadata.some(
+        (item: { field: string }) => item.field === "targetPath",
+      ),
+      false,
+    );
+
+    const agentCanonical = path.join(
+      repository,
+      ".agents",
+      "skills",
+      "foo",
+      "SKILL.md",
+    );
+    await mkdir(path.dirname(agentCanonical), { recursive: true });
+    await writeFile(agentCanonical, canonicalSkill("foo", "qa-platform"));
+    const agentNoChange = await jsonSuggestion([
+      "repo/.agents/skills/foo/SKILL.md",
+    ]);
+    assert.equal(agentNoChange.kind, "skill");
+    assert.equal(agentNoChange.suggestedMode, "no-proposal");
+    assert.equal(
+      agentNoChange.agentSkills.sourcePath,
+      ".agents/skills/foo/SKILL.md",
+    );
+
+    await rm(agentCanonical);
+    const agentLowercase = path.join(
+      repository,
+      ".agents",
+      "skills",
+      "foo",
+      "skill.md",
+    );
+    await writeFile(agentLowercase, canonicalSkill("foo"));
+    const agentRename = await jsonSuggestion([
+      "repo/.agents/skills/foo/skill.md",
+    ]);
+    assert.equal(agentRename.agentSkills.entrypointMigration, "rename");
+    assert.equal(
+      agentRename.agentSkills.sourcePath,
+      ".agents/skills/foo/skill.md",
+    );
+    assert.equal(
+      agentRename.agentSkills.targetPath,
+      ".agents/skills/foo/SKILL.md",
+    );
+  } finally {
+    process.chdir(previousDirectory);
+  }
+});
+
 test("suggest-metadata safely normalizes repository-relative dot segments", async () => {
   const root = await fixture();
   const source = path.join(root, "skills", "demo", "skill.md");
@@ -826,6 +995,45 @@ description: Review demo inputs. Use when demo inputs need review.
 
 async function fixture(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-suggest-metadata-"));
+}
+
+function canonicalSkill(name: string, owner?: string): string {
+  return [
+    "---",
+    `name: ${name}`,
+    `description: Review ${name}. Use when ${name} review is needed.`,
+    ...(owner ? ["metadata:", `  renma.owner: ${owner}`] : []),
+    "---",
+    `# ${name}`,
+    "",
+  ].join("\n");
+}
+
+interface JsonMetadataSuggestion {
+  kind: string;
+  suggestedMode: string;
+  decisionStatus: string;
+  decision: { reasonCode: string };
+  classification: { kind: string; matchedRule: string };
+  candidateMetadata: Record<string, string>;
+  blockedMetadata: Array<{ field: string; reason: string }>;
+  agentSkills: {
+    sourcePath: string;
+    targetPath: string;
+    direction: string;
+    entrypointMigration: string;
+    candidateRenmaMetadata: Record<string, string>;
+    canonicalFrontmatter?: string;
+  };
+}
+
+async function jsonSuggestion(args: string[]): Promise<JsonMetadataSuggestion> {
+  const result = await withCapturedConsole(() =>
+    main(["suggest-metadata", ...args, "--format", "json"]),
+  );
+  assert.equal(result.code, 0);
+  assert.equal(result.stderr, "");
+  return JSON.parse(result.stdout);
 }
 
 async function withCapturedConsole(

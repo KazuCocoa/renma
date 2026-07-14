@@ -694,6 +694,11 @@ renma inspect skills/testing/spec-review/SKILL.md --lines L10-L42
 
 Use this when editing one skill or context file and you want a deterministic outline without reading the whole repository catalog. Without `--lines`, output includes file size, line count, frontmatter range, headings, code fences, links, asset relationships, and a concise Context Lens governance summary when repository context can be inferred. It also always includes `classification` with `kind`, `scope`, `matchedRule`, `reasonCode`, root or parent evidence, and concise competing rules. A Skill-local path exposes `parentAssetCandidatePath`; `parentAssetPath` appears only when `parentResolution` is `resolved`, while `missing` and `ambiguous` remain explicit fail-closed states. `governance` is separate and reports ownership, policy, and metadata provenance only from repository evidence. Unknown files and repository tools still receive classification. Use `--lines <range>` for an exact source slice; ranges can look like `L10-L42` or `10-42`. `--lines` output itself is unchanged.
 
+JSON also includes `repositoryBoundary`. Resolved results record the root,
+repository-relative path, and resolution source. Unresolved results retain a
+stable reason code and `candidateRoots`; structural ambiguity uses
+`repository-boundary-ambiguous` instead of selecting a broad ancestor.
+
 For a file target, Renma resolves a repository root from an explicit caller root,
 the nearest safe `.git` file/directory or Renma config marker, or an unambiguous
 structural boundary, in that order. Current-working-directory containment alone
@@ -829,12 +834,19 @@ and safe `nextActions` to the existing suggestion fields. Each action has
 parsed as the machine contract, including on paths with spaces, quotes, or
 Windows separators.
 
+When no repository root resolves, `decisionStatus` is `blocked` and Renma does
+not emit an executable `scan .` action. Establish the repository root with an
+explicit root or repository marker before verification; the caller's current
+directory is not assumed to contain the target.
+
 For Skill targets using the pre-0.16 Renma Skill format, the 0.16.0 metadata
 migration path is one-way: recognized governance and security frontmatter
 becomes Agent Skills identity plus `metadata.renma.*`. Separately, `skill.md` and `*.skill.md` targets
 report any required entrypoint rename or move, even when their frontmatter
 already uses Agent Skills fields. For a canonical Agent Skill, `--owner` may
 instead propose an owner metadata retrofit; it never causes reverse migration.
+Skill migration `sourcePath` and `targetPath` values are repository-relative,
+including when the user invokes Renma from the parent of a nested repository.
 The normative behavior is documented in
 [Agent Skills Compatibility and Migration](agent-skills-compatibility.md).
 
@@ -855,6 +867,10 @@ owner because it was explicitly provided. If an existing asset already
 declares an owner, `suggest-metadata` preserves it; a different `--owner` value
 is treated as conflicting evidence and blocks a candidate. Renma does not infer
 owners from Git history, file paths, prose, or authors.
+If the explicit owner equals the existing canonical `metadata.renma.owner`, the
+result is `suggestedMode: "no-proposal"` with
+`decisionStatus: "no-change-recommended"`; no candidate metadata, canonical
+frontmatter, or patch instruction is emitted.
 
 Ordinary Skill-local support returns `suggestedMode: "no-proposal"` and
 `decisionStatus: "no-change-recommended"` when it can inherit governance from

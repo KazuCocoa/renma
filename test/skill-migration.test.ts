@@ -74,8 +74,8 @@ metadata:
 
   assert.equal(suggestion.agentSkills?.sourceFormat, "agent-skills");
   assert.equal(suggestion.agentSkills?.direction, "none");
-  assert.equal(suggestion.agentSkills?.sourcePath, target);
-  assert.equal(suggestion.agentSkills?.targetPath, target);
+  assert.equal(suggestion.agentSkills?.sourcePath, "skills/demo/SKILL.md");
+  assert.equal(suggestion.agentSkills?.targetPath, "skills/demo/SKILL.md");
   assert.equal(suggestion.agentSkills?.entrypointMigration, "none");
   assert.equal(suggestion.agentSkills?.canonicalFrontmatter, undefined);
 });
@@ -1010,11 +1010,11 @@ ${body}`;
     const suggestion = await buildMetadataSuggestion(source);
     const canonicalFrontmatter =
       suggestion.agentSkills?.canonicalFrontmatter ?? "";
-    const targetPath = path.join(root, ...fixture.target.split("/"));
+    const targetAbsolutePath = path.join(root, ...fixture.target.split("/"));
     const candidateContent = `${canonicalFrontmatter}\n${body}`;
     const candidate = parseDocument({
-      path: targetPath,
-      absolutePath: targetPath,
+      path: fixture.target,
+      absolutePath: targetAbsolutePath,
       kind: "skill",
       sizeBytes: Buffer.byteLength(candidateContent),
       contentClassification: "text",
@@ -1024,7 +1024,7 @@ ${body}`;
 
     assert.equal(suggestion.agentSkills?.sourceFormat, "agent-skills");
     assert.equal(suggestion.agentSkills?.direction, "legacy-to-agent-skills");
-    assert.equal(suggestion.agentSkills?.targetPath, targetPath);
+    assert.equal(suggestion.agentSkills?.targetPath, fixture.target);
     assert.equal(
       suggestion.agentSkills?.entrypointMigration,
       fixture.migration,
