@@ -52,6 +52,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Repository paths with multiple plausible structural roots now fail closed as
   `repository-boundary-ambiguous`; unresolved and ambiguous suggestions no
   longer manufacture a `scan .` action against the caller's current directory.
+- Marker-free structural fallback now treats `profiles`, `references`,
+  `examples`, `scripts`, and `assets` only as ambiguity guards. Those directory
+  names never establish a repository root without a strong boundary, explicit
+  root, or repository marker.
 - An explicit owner equal to an existing canonical
   `metadata.renma.owner` now returns `no-proposal` and
   `no-change-recommended` without candidate metadata or frontmatter.

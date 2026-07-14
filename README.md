@@ -219,8 +219,10 @@ lenses/
 This is an illustrative layout, not a required domain hierarchy. `contexts/`
 is preferred and `context/` remains supported. Skill-local `references/`,
 `assets/`, `scripts/`, `examples/`, and `profiles/` are valid support material.
-Local support without a declared owner inherits effective ownership from its
-nearest owning Skill; reports distinguish inherited ownership from declarations.
+Files under those canonical support directories are structurally Skill-local.
+When repository evidence resolves exactly one parent Skill, local support
+without a declared owner may inherit its effective ownership; reports
+distinguish inherited ownership from declarations.
 When deterministic evidence shows that knowledge is reusable beyond one Skill,
 promote it to an owned Context Asset rather than moving it based on location
 alone.
@@ -241,12 +243,16 @@ These are static governance relationships, not runtime Context selection.
 under either root, Renma classifies it deterministically from that root. A
 nested support-like directory name does not override the recognized root.
 
-Skill-local `references/`, `profiles/`, `examples/`, `scripts/`, and `assets/`
-belong to their nearest unambiguous Skill and may inherit its effective owner
-and policy. Explicit supported local metadata remains valid, but independent
-metadata is not mandatory. Top-level `references/**` is not a Context root,
-top-level `tools/**` is repository implementation, and `skills/**/tools/**` is
-not canonical Skill-local support; use local `scripts/` for executable support.
+Files under canonical Skill `references/`, `profiles/`, `examples/`, `scripts/`,
+and `assets/` directories are structurally Skill-local. Renma claims one parent
+and possible inherited governance only after repository evidence resolves
+exactly one Skill. Explicit supported local metadata remains valid, but
+independent metadata is not mandatory. Top-level `references/**` is not a
+Context root, top-level `tools/**` is repository implementation, and
+`skills/**/tools/**` is not canonical Skill-local support; use local `scripts/`
+for executable support. See
+[classification evidence](docs/diagnostics.md#how-to-read-classification-evidence)
+for the detailed contract.
 
 ```text
 contexts/foo/references/policy.md

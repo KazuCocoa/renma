@@ -68,6 +68,12 @@ implies that it has an owner. `inspect` additionally exposes
 when resolved or stable unresolved/ambiguous reason evidence and candidate
 roots when no safe boundary can be selected.
 
+For marker-free structural resolution, only `.agents`, `skills`, `contexts`,
+`context`, `lenses`, and `tools` can positively establish a boundary. The
+support-like names `profiles`, `references`, `examples`, `scripts`, and `assets`
+are guards only: they can block a later boundary-like segment or contribute
+ambiguity evidence, but never establish a repository root by themselves.
+
 > Classification describes how Renma interpreted repository structure. It does
 > not by itself prove ownership, policy, lifecycle, source-of-truth status, or
 > human intent.
@@ -351,6 +357,132 @@ edit shapes. `requires_human_decision` marks ambiguity that should not be guesse
 by automation. `risk` highlights security, data-handling, or destructive-action
 concerns.
 
+## Presenting Renma Evidence to a User
+
+Raw Renma JSON is evidence for an LLM or coding agent, not usually the best
+user-facing explanation. The consumer should translate the relevant fields into
+plain language while preserving the boundary between confirmed facts,
+recommendations, and unresolved human intent.
+
+The overall loop is:
+
+```text
+Renma emits deterministic evidence
+-> LLM summarizes the evidence
+-> user supplies missing intent
+-> LLM performs the smallest supported change
+-> Renma verifies the result
+-> LLM summarizes the new state
+```
+
+In practice, an LLM or coding agent should:
+
+1. Read Renma's deterministic evidence.
+2. Summarize the important facts in user-facing language.
+3. Separate confirmed facts from recommendations and unresolved intent.
+4. Ask only for human decisions that Renma cannot determine.
+5. Rerun the relevant Renma command after the user supplies new intent.
+6. Explain how the evidence or recommendation changed.
+7. Repeat until the intended repository state is explicit and Renma verifies
+   it.
+
+A useful summary normally contains:
+
+- **Confirmed repository facts:** paths, declarations, resolved relationships,
+  and other evidence Renma actually observed.
+- **Renma's deterministic interpretation:** the classification, governance,
+  and decision evidence without added assumptions.
+- **Current recommendation:** the smallest change Renma supports, or an
+  explicit successful no-change result.
+- **Unresolved human decisions:** only intent that repository evidence cannot
+  determine.
+- **Next safe verification step:** the relevant structured Renma command, or a
+  statement that no executable action is safe yet.
+
+For example:
+
+```text
+Renma classified this file as a Skill-local Reference.
+
+One parent Skill resolved at skills/foo/SKILL.md, and the effective owner is
+inherited from that Skill.
+
+No independent metadata change is currently recommended.
+
+A human decision is needed only if this knowledge is intended to be reused
+outside this Skill. If so, consider promoting it to contexts/** and then rerun
+Renma.
+```
+
+LLM consumers must follow these guardrails:
+
+- Do not expose raw diagnostics without summarizing their meaning when a
+  user-facing explanation is expected.
+- Do not ask the user to decide facts Renma already resolved.
+- Do not invent an owner, policy, lifecycle, reference, or source-of-truth
+  claim.
+- Do not convert `structural-candidate` into `resolved`.
+- Do not claim inheritance without `parentResolution: "resolved"` and matching
+  governance evidence.
+- Do not present `decisionStatus: "blocked"` as an applicable patch.
+- Do not assume every diagnostic requires an edit.
+- Do not hide unresolved human intent behind an automatic recommendation.
+- Treat `no-change-recommended` as a valid successful outcome.
+- After new user intent is provided, rerun Renma rather than relying on an old
+  result.
+
+### Iterative Example
+
+Initial Renma evidence:
+
+```text
+kind: reference
+scope: skill-local
+parentResolution: resolved
+decisionStatus: no-change-recommended
+```
+
+LLM summary:
+
+```text
+This file is local support for one Skill and already inherits its governance.
+No metadata change is needed. Should this knowledge remain local, or is it
+intended for reuse by other Skills?
+```
+
+User:
+
+```text
+It should be reusable by three Skills.
+```
+
+LLM response:
+
+```text
+That changes the repository-design intent. I will treat promotion to an
+independent Context Asset as the candidate direction, preserve the original
+meaning, and rerun Renma after the placement and references are updated.
+```
+
+After the intended patch, Renma verifies:
+
+```text
+kind: context
+scope: independent
+matchedRule: context-root
+```
+
+LLM summary:
+
+```text
+The knowledge is now an independent Context Asset under contexts/**. Renma
+verified the new classification. Ownership and references should now be
+reviewed as independent governance rather than inherited Skill-local state.
+```
+
+This example is conceptual. Renma does not automatically move files, invent
+references, or decide that local knowledge should be promoted.
+
 ## Review Bundles
 
 `renma scan --json` also includes `reviewBundles`, a deterministic grouping of
@@ -425,8 +557,9 @@ These diagnostics are emitted after files are parsed into catalog entries. For s
 Owner absence is handled as ownership coverage information. Shared assets
 without `owner` are accepted and reported as unowned by `renma ownership`;
 Renma does not invent an owner. Skill-local support is the exception: it uses
-deterministic effective ownership inherited from its nearest owning Skill and
-reports that provenance separately from declared metadata.
+deterministic effective ownership only after repository evidence resolves one
+parent Skill with an effective owner, and reports that inherited provenance
+separately from declared metadata.
 
 | Severity  | Message                                                                                           | Meaning                                                                                                                        | Fix                                                                                                             |
 | --------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |

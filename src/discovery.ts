@@ -655,42 +655,58 @@ function structuralRepositoryBoundary(
     "scripts",
     "assets",
   ]);
-  const candidates = segments.slice(0, -1).flatMap((segment, index) => {
-    const strength = strongSegments.has(segment)
-      ? "strong"
-      : guardSegments.has(segment)
-        ? "guard"
-        : undefined;
-    if (!strength) return [];
+  const boundaryCandidate = (index: number) => {
     const root = path.join(parsed.root, ...segments.slice(0, index));
     const relativePath = normalizeAssetRepositoryRelativePath(
       segments.slice(index).join("/"),
     );
-    return relativePath ? [{ index, strength, root, relativePath }] : [];
-  });
-  const first = candidates[0];
-  if (first) {
-    const firstClassification = classifyAssetPath(first.relativePath);
-    const firstEstablishesBoundary =
+    return relativePath ? { index, root, relativePath } : undefined;
+  };
+  const strongCandidates = segments
+    .slice(0, -1)
+    .flatMap((segment, index) =>
+      strongSegments.has(segment) ? [boundaryCandidate(index)] : [],
+    )
+    .filter((candidate) => candidate !== undefined);
+  const guardCandidates = segments
+    .slice(0, -1)
+    .flatMap((segment, index) =>
+      guardSegments.has(segment) ? [boundaryCandidate(index)] : [],
+    )
+    .filter((candidate) => candidate !== undefined);
+  const firstStrong = strongCandidates[0];
+  if (firstStrong) {
+    const earlierGuards = guardCandidates.filter(
+      (candidate) => candidate.index < firstStrong.index,
+    );
+    if (earlierGuards.length > 0) {
+      return {
+        state: "ambiguous",
+        candidateRoots: [
+          ...new Set(
+            [...earlierGuards, ...strongCandidates].map(
+              (candidate) => candidate.root,
+            ),
+          ),
+        ],
+      };
+    }
+
+    const firstClassification = classifyAssetPath(firstStrong.relativePath);
+    const firstStrongEstablishesBoundary =
       firstClassification.matchedRule !== "unknown" ||
       firstClassification.scope !== "unknown";
-    const immediateGuardBoundary =
-      first.strength === "guard" && candidates[1]?.index === first.index + 1;
-    if (
-      candidates.length === 1 ||
-      firstEstablishesBoundary ||
-      immediateGuardBoundary
-    ) {
+    if (strongCandidates.length === 1 || firstStrongEstablishesBoundary) {
       return {
         state: "resolved",
-        root: first.root,
-        relativePath: first.relativePath,
+        root: firstStrong.root,
+        relativePath: firstStrong.relativePath,
       };
     }
     return {
       state: "ambiguous",
       candidateRoots: [
-        ...new Set(candidates.map((candidate) => candidate.root)),
+        ...new Set(strongCandidates.map((candidate) => candidate.root)),
       ],
     };
   }

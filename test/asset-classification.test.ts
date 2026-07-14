@@ -326,20 +326,17 @@ test("absolute targets outside cwd retain deterministic structural boundaries", 
 test("structural fallback ignores nested boundary-like names after the outer boundary", () => {
   const root = path.join(os.tmpdir(), "renma-structural-boundary");
   const cases = [
-    [
-      "contexts/foo/tools/helper.md",
-      "contexts/foo/tools/helper.md",
-      "context-root",
-    ],
-    ["references/context/policy.md", "references/context/policy.md", "unknown"],
-    ["examples/skills/foo/SKILL.md", "examples/skills/foo/SKILL.md", "unknown"],
+    ["contexts/foo/tools/helper.md", "context-root"],
+    ["contexts/foo/references/context.md", "context-root"],
+    ["skills/foo/references/contexts.md", "skill-local-support"],
+    [".agents/skills/foo/references/tools.md", "skill-local-support"],
   ] as const;
-  for (const [relative, expectedRelative, expectedRule] of cases) {
+  for (const [relative, expectedRule] of cases) {
     const resolution = repositoryClassificationPath(path.join(root, relative));
     assert.equal(resolution.state, "resolved", relative);
     if (resolution.state !== "resolved") continue;
     assert.equal(resolution.root, root, relative);
-    assert.equal(resolution.relativePath, expectedRelative, relative);
+    assert.equal(resolution.relativePath, relative, relative);
     assert.equal(
       classifyAssetPath(resolution.relativePath).matchedRule,
       expectedRule,
@@ -348,64 +345,90 @@ test("structural fallback ignores nested boundary-like names after the outer bou
   }
 });
 
-test("structural fallback fails closed when multiple repository roots remain plausible", async () => {
-  const base = await mkdtemp(
-    path.join(os.tmpdir(), "renma-ambiguous-structure-"),
-  );
+test("guard directories never establish a structural repository boundary", async () => {
+  const base = await mkdtemp(path.join(os.tmpdir(), "renma-guard-structure-"));
   const cases = [
+    ["references/policy.md", "repository-boundary-unresolved", []],
     [
-      "references/project/contexts/foo/policy.md",
-      [base, path.join(base, "references", "project")],
+      "references/context/policy.md",
+      "repository-boundary-ambiguous",
+      [base, path.join(base, "references")],
     ],
     [
-      "skills/project/contexts/foo/policy.md",
-      [base, path.join(base, "skills", "project")],
+      "examples/skills/foo/SKILL.md",
+      "repository-boundary-ambiguous",
+      [base, path.join(base, "examples")],
     ],
     [
       "assets/project/tools/helper.mjs",
+      "repository-boundary-ambiguous",
       [base, path.join(base, "assets", "project")],
+    ],
+    [
+      "scripts/contexts/foo/policy.md",
+      "repository-boundary-ambiguous",
+      [base, path.join(base, "scripts")],
+    ],
+    [
+      "profiles/lenses/foo.md",
+      "repository-boundary-ambiguous",
+      [base, path.join(base, "profiles")],
     ],
   ] as const;
 
-  for (const [relative, candidateRoots] of cases) {
+  for (const [relative, reasonCode, candidateRoots] of cases) {
     const target = path.join(base, ...relative.split("/"));
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, "# Guard fixture\n");
     const resolution = repositoryClassificationPath(target);
     assert.equal(resolution.state, "unresolved", relative);
     if (resolution.state !== "unresolved") continue;
+    assert.equal(resolution.reasonCode, reasonCode, relative);
+    assert.deepEqual(resolution.candidateRoots, candidateRoots, relative);
+    const suggestion = await buildMetadataSuggestion(target);
+    const inspect = await buildInspectOutline(target);
+    assert.equal(suggestion.kind, "unknown", relative);
+    assert.equal(suggestion.classification.matchedRule, "unknown", relative);
+    assert.equal(suggestion.decisionStatus, "blocked", relative);
+    assert.equal(suggestion.decision.reasonCode, reasonCode, relative);
+    assert.deepEqual(suggestion.nextActions, [], relative);
+    assert.equal(inspect.classification.kind, "unknown", relative);
+    assert.equal(inspect.classification.matchedRule, "unknown", relative);
+    assert.equal(inspect.repositoryBoundary.state, "unresolved", relative);
+    if (inspect.repositoryBoundary.state === "unresolved") {
+      assert.equal(inspect.repositoryBoundary.reasonCode, reasonCode, relative);
+      assert.deepEqual(
+        inspect.repositoryBoundary.candidateRoots,
+        candidateRoots,
+        relative,
+      );
+    }
     assert.equal(
-      resolution.reasonCode,
-      "repository-boundary-ambiguous",
+      JSON.stringify(suggestion.nextActions).includes("scan"),
+      false,
       relative,
     );
-    assert.deepEqual(resolution.candidateRoots, candidateRoots, relative);
   }
+});
 
+test("competing strong structural roots remain ambiguous", () => {
+  const base = path.join(os.tmpdir(), "renma-competing-strong-boundaries");
   const target = path.join(
     base,
-    "references",
+    "skills",
     "project",
     "contexts",
     "foo",
     "policy.md",
   );
-  await mkdir(path.dirname(target), { recursive: true });
-  await writeFile(target, "# Policy\n");
-  const suggestion = await buildMetadataSuggestion(target);
-  const inspect = await buildInspectOutline(target);
-  assert.equal(suggestion.decisionStatus, "blocked");
-  assert.equal(suggestion.decision.reasonCode, "repository-boundary-ambiguous");
-  assert.deepEqual(suggestion.nextActions, []);
-  assert.equal(inspect.repositoryBoundary.state, "unresolved");
-  if (inspect.repositoryBoundary.state === "unresolved") {
-    assert.equal(
-      inspect.repositoryBoundary.reasonCode,
-      "repository-boundary-ambiguous",
-    );
-    assert.deepEqual(inspect.repositoryBoundary.candidateRoots, [
-      base,
-      path.join(base, "references", "project"),
-    ]);
-  }
+  const resolution = repositoryClassificationPath(target);
+  assert.equal(resolution.state, "unresolved");
+  if (resolution.state !== "unresolved") return;
+  assert.equal(resolution.reasonCode, "repository-boundary-ambiguous");
+  assert.deepEqual(resolution.candidateRoots, [
+    base,
+    path.join(base, "skills", "project"),
+  ]);
 });
 
 test("discovery and the shared classifier agree on Context-root precedence", async () => {

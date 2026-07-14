@@ -73,17 +73,20 @@ support paths:
 
 The same reserved names apply under `.agents/skills/**`.
 
-These Skill-local support directories are valid. Keep material local when it is
-specific to one Skill. Promote reusable source-of-truth knowledge to an owned
-Context Asset, or a helper shared across workflows to `tools/**`, only when
-repository evidence supports that change; Renma does not move files
+These valid support paths are structurally Skill-local. Keep material local when
+it is specific to one Skill. Promote reusable source-of-truth knowledge to an
+owned Context Asset, or a helper shared across workflows to `tools/**`, only
+when repository evidence supports that change; Renma does not move files
 automatically.
 
-Skill-local support belongs only to the nearest Skill directory. When a local
-support artifact does not declare an owner, ownership, Readiness, graph, Trust
-Graph, and BOM reporting use the nearest Skill's owner as deterministic
-effective ownership and mark it as inherited. This does not invent ownership
-for shared Context Assets or unrelated repository files.
+Renma claims a parent only after repository evidence resolves exactly one Skill
+entrypoint. When that resolved local support artifact does not declare an owner,
+ownership, Readiness, graph, Trust Graph, and BOM reporting may use the parent
+Skill's owner as deterministic effective ownership and mark it as inherited.
+Missing or ambiguous parents never inherit. See
+[classification evidence](diagnostics.md#how-to-read-classification-evidence)
+for the detailed contract. This does not invent ownership for shared Context
+Assets or unrelated repository files.
 
 Only files marked Markdown-parser eligible contribute frontmatter metadata,
 headings, links, code fences, and repeated-context evidence. Text scripts and
@@ -182,10 +185,13 @@ the initial preflight. Repository-wide work should normally start with `scan`.
 
 `contexts/**` is the preferred independent Context Asset root and `context/**`
 remains supported. Nested directory names never override a recognized root.
-Skill-local `references/`, `profiles/`, `examples/`, `scripts/`, and `assets/`
-are governed by the nearest unambiguous Skill under `skills/**` or
-`.agents/skills/**`. They may inherit ownership and policy; supported explicit
-local metadata remains valid but is not required.
+Files under canonical Skill `references/`, `profiles/`, `examples/`, `scripts/`,
+and `assets/` directories are structurally Skill-local. Renma claims one parent
+and possible inherited governance only after repository evidence resolves
+exactly one Skill under `skills/**` or `.agents/skills/**`. Supported explicit
+local metadata remains valid but is not required. See
+[classification evidence](diagnostics.md#how-to-read-classification-evidence)
+for the detailed contract.
 
 Top-level `references/**` is not a Context root. `tools/**` contains shared
 repository implementation, not Context knowledge, and `skills/**/tools/**` is

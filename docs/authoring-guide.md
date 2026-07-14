@@ -406,10 +406,10 @@ skills/foo/tools/helper.mjs
 Use `contexts/**` for preferred independent Context and `context/**` only for
 compatibility. Nested `references/`, `examples/`, `profiles/`, `scripts/`, or
 `assets/` does not override either Context root. The same names are Skill-local
-only inside `skills/**` or `.agents/skills/**`; their nearest unambiguous Skill
-governs them. Local metadata overrides remain supported where valid, but are
-not required. `tools/**` is shared repository implementation, and a Skill uses
-`scripts/`, not `tools/`, for canonical local executable support.
+only inside `skills/**` or `.agents/skills/**`, where they establish a structural
+parent candidate. Local metadata overrides remain supported where valid, but
+are not required. `tools/**` is shared repository implementation, and a Skill
+uses `scripts/`, not `tools/`, for canonical local executable support.
 
 The Skill-local path rule establishes only a structural parent candidate. The
 catalog must resolve exactly one parent entrypoint before Renma reports
