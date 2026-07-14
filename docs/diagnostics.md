@@ -86,6 +86,15 @@ Stable reason codes currently include
 evidence such as `outside-recognized-skill-boundary` or
 `outside-recognized-context-root`. Human-readable `reason` wording may improve;
 consumers should use `matchedRule` and `reasonCode` as the stable fields.
+The exported registries and string unions cover both matched and competing
+classification rules/reasons.
+
+For Skill-local support, path classification records
+`parentAssetCandidatePath` with `parentResolution: "structural-candidate"`.
+Repository commands then refine that state to `resolved`, `missing`, or
+`ambiguous`; only `resolved` adds `parentAssetPath` and permits an inheritance
+claim. Missing or ambiguous evidence remains structurally Skill-local without
+becoming independently governed metadata.
 
 Example additive details:
 
@@ -113,7 +122,12 @@ Commands that make recommendations use explicit `decisionStatus` values:
 `no-change-recommended`. `suggestedMode: "no-proposal"` with
 `no-change-recommended` is a successful result, especially for ordinary
 Skill-local support that inherits governance. It is not an instruction to
-manufacture a patch.
+manufacture a patch. `decisionStatus` is the authoritative application gate:
+blocked results never authorize a patch even if another payload field appears
+candidate-like. Suggestion consumers should handle unknown future
+`suggestedMode` values conservatively. These command-contract refinements do
+not change scan finding severity, scan pass/fail thresholds, or Readiness
+scoring.
 
 Example:
 

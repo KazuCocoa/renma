@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { lstatSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type {
@@ -101,6 +102,32 @@ export type RepositorySkillPath =
       currentPath: string;
       root: "skills" | ".agents/skills";
       supportDirectory: ReservedSkillSupportDirectory;
+    };
+
+export interface RepositoryClassificationPathOptions {
+  /** Explicit repository root supplied by a caller that already resolved it. */
+  repositoryRoot?: string;
+  /** Base directory used only to resolve a relative target path. */
+  cwd?: string;
+}
+
+export type RepositoryClassificationPathResolution =
+  | {
+      state: "resolved";
+      source: "explicit" | "marker" | "structural";
+      root: string;
+      relativePath: string;
+      absolutePath: string;
+      marker?: ".git" | "renma.config.json" | ".renma.json";
+    }
+  | {
+      state: "unresolved";
+      reasonCode:
+        | "repository-boundary-unresolved"
+        | "repository-boundary-ambiguous";
+      reason: string;
+      absolutePath: string;
+      candidateRoots?: string[];
     };
 
 /** Classify canonical, historical, and reserved support paths at explicit Skill roots. */
@@ -248,52 +275,73 @@ export function normalizeAssetRepositoryRelativePath(
   return resolved.length > 0 ? resolved.join("/") : undefined;
 }
 
-/** Infer a repository root only from cwd containment or one explicit boundary. */
+/** Resolve one repository boundary without treating cwd containment as proof. */
 export function repositoryClassificationPath(
   filePath: string,
-  cwd = process.cwd(),
-): { root: string; relativePath: string } | undefined {
-  const absolutePath = path.resolve(filePath);
-  const absoluteCwd = path.resolve(cwd);
-  const relativeToCwd = path.relative(absoluteCwd, absolutePath);
-  if (
-    relativeToCwd &&
-    !relativeToCwd.startsWith("..") &&
-    !path.isAbsolute(relativeToCwd)
-  ) {
-    const relativePath = normalizeAssetRepositoryRelativePath(relativeToCwd);
-    return relativePath ? { root: absoluteCwd, relativePath } : undefined;
+  options: RepositoryClassificationPathOptions | string = {},
+): RepositoryClassificationPathResolution {
+  const normalizedOptions =
+    typeof options === "string" ? { cwd: options } : options;
+  const cwd = path.resolve(normalizedOptions.cwd ?? process.cwd());
+  const absolutePath = path.resolve(cwd, filePath);
+
+  if (normalizedOptions.repositoryRoot) {
+    const root = path.resolve(cwd, normalizedOptions.repositoryRoot);
+    const relativePath = repositoryRelativePath(root, absolutePath);
+    return relativePath
+      ? {
+          state: "resolved",
+          source: "explicit",
+          root,
+          relativePath,
+          absolutePath,
+        }
+      : {
+          state: "unresolved",
+          reasonCode: "repository-boundary-unresolved",
+          reason:
+            "The target is outside the explicitly supplied repository root.",
+          absolutePath,
+          candidateRoots: [root],
+        };
   }
 
-  const posixAbsolute = toPosix(absolutePath);
-  const segments = posixAbsolute.split("/").filter(Boolean);
-  const boundaryIndexes: number[] = [];
-  for (let index = 0; index < segments.length - 1; index += 1) {
-    if (segments[index] === ".agents" && segments[index + 1] === "skills") {
-      boundaryIndexes.push(index);
-      index += 1;
-      continue;
-    }
-    if (
-      segments[index] === "skills" ||
-      segments[index] === "contexts" ||
-      segments[index] === "context" ||
-      segments[index] === "lenses" ||
-      segments[index] === "tools"
-    ) {
-      boundaryIndexes.push(index);
+  const markerBoundary = nearestRepositoryMarker(path.dirname(absolutePath));
+  if (markerBoundary) {
+    const relativePath = repositoryRelativePath(
+      markerBoundary.root,
+      absolutePath,
+    );
+    if (relativePath) {
+      return {
+        state: "resolved",
+        source: "marker",
+        root: markerBoundary.root,
+        relativePath,
+        absolutePath,
+        marker: markerBoundary.marker,
+      };
     }
   }
-  if (boundaryIndexes.length !== 1) return undefined;
-  const boundaryIndex = boundaryIndexes[0]!;
-  const rootPrefix = posixAbsolute.startsWith("/") ? "/" : "";
-  const root = path.resolve(
-    `${rootPrefix}${segments.slice(0, boundaryIndex).join("/")}`,
-  );
-  const relativePath = normalizeAssetRepositoryRelativePath(
-    segments.slice(boundaryIndex).join("/"),
-  );
-  return relativePath ? { root, relativePath } : undefined;
+
+  const structural = structuralRepositoryBoundary(absolutePath);
+  if (structural) {
+    return {
+      state: "resolved",
+      source: "structural",
+      root: structural.root,
+      relativePath: structural.relativePath,
+      absolutePath,
+    };
+  }
+
+  return {
+    state: "unresolved",
+    reasonCode: "repository-boundary-unresolved",
+    reason:
+      "No explicit root, repository marker, or unambiguous structural asset boundary was found.",
+    absolutePath,
+  };
 }
 
 /**
@@ -331,7 +379,7 @@ export function classifyAssetPath(
     };
   }
 
-  // 2. Explicit Skill-local support inside a recognized Skill boundary.
+  // 2. Structurally Skill-local support inside a recognized Skill path shape.
   if (skillPath?.kind === "support") {
     return {
       ...classification(
@@ -339,10 +387,11 @@ export function classifyAssetPath(
         "skill-local",
         "skill-local-support",
         "under-skill-support-directory",
-        `The file is inside the ${skillPath.supportDirectory}/ directory of the containing Skill.`,
+        `The file is inside a canonical ${skillPath.supportDirectory}/ support directory under a recognized Skill root; repository evidence must resolve the parent Skill.`,
       ),
       recognizedRoot: skillPath.root,
-      parentAssetPath: `${skillPath.skillDirectory}/SKILL.md`,
+      parentAssetCandidatePath: `${skillPath.skillDirectory}/SKILL.md`,
+      parentResolution: "structural-candidate",
       supportDirectory: skillPath.supportDirectory,
     };
   }
@@ -358,7 +407,7 @@ export function classifyAssetPath(
         "unknown",
         compatibleKind === "unknown"
           ? "unknown"
-          : `generic-${skillPath.supportDirectory.replace(/s$/, "")}`,
+          : genericSupportRule(skillPath.supportDirectory),
         "outside-recognized-asset-boundary",
         `The ${skillPath.supportDirectory}/ directory is reserved for support inside a containing Skill, but this path has no Skill parent.`,
       ),
@@ -521,11 +570,99 @@ export function classifyAssetPath(
 function classification(
   kind: ArtifactKind,
   scope: AssetClassificationEvidence["scope"],
-  matchedRule: string,
-  reasonCode: string,
+  matchedRule: AssetClassificationEvidence["matchedRule"],
+  reasonCode: AssetClassificationEvidence["reasonCode"],
   reason: string,
 ): AssetClassificationEvidence {
   return { kind, scope, matchedRule, reasonCode, reason };
+}
+
+function repositoryRelativePath(
+  root: string,
+  absolutePath: string,
+): string | undefined {
+  const relative = path.relative(root, absolutePath);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+    return undefined;
+  }
+  return normalizeAssetRepositoryRelativePath(relative);
+}
+
+function nearestRepositoryMarker(startDirectory: string):
+  | {
+      root: string;
+      marker: ".git" | "renma.config.json" | ".renma.json";
+    }
+  | undefined {
+  let directory = path.resolve(startDirectory);
+  while (true) {
+    for (const marker of [
+      ".git",
+      "renma.config.json",
+      ".renma.json",
+    ] as const) {
+      try {
+        const markerStats = lstatSync(path.join(directory, marker));
+        const validMarker =
+          marker === ".git"
+            ? markerStats.isFile() || markerStats.isDirectory()
+            : markerStats.isFile();
+        if (!markerStats.isSymbolicLink() && validMarker) {
+          return { root: directory, marker };
+        }
+      } catch {
+        // Missing or unreadable markers do not establish a safe boundary.
+      }
+    }
+    const parent = path.dirname(directory);
+    if (parent === directory) return undefined;
+    directory = parent;
+  }
+}
+
+function structuralRepositoryBoundary(
+  absolutePath: string,
+): { root: string; relativePath: string } | undefined {
+  const parsed = path.parse(absolutePath);
+  const relativeToFilesystemRoot = path.relative(parsed.root, absolutePath);
+  const segments = relativeToFilesystemRoot.split(path.sep).filter(Boolean);
+  const structuralSegments = new Set([
+    ".agents",
+    "skills",
+    "contexts",
+    "context",
+    "lenses",
+    "tools",
+    // These guard names prevent nested boundary-like names from being
+    // reinterpreted as a stronger repository root.
+    "profiles",
+    "references",
+    "examples",
+    "scripts",
+    "assets",
+  ]);
+  const boundaryIndex = segments
+    .slice(0, -1)
+    .findIndex((segment) => structuralSegments.has(segment));
+  if (boundaryIndex >= 0) {
+    const root = path.join(parsed.root, ...segments.slice(0, boundaryIndex));
+    const relativePath = normalizeAssetRepositoryRelativePath(
+      segments.slice(boundaryIndex).join("/"),
+    );
+    if (relativePath) return { root, relativePath };
+  }
+
+  const basename = segments.at(-1);
+  if (
+    basename === "AGENTS.md" ||
+    basename === "renma.config.json" ||
+    basename === ".renma.json"
+  ) {
+    const root = path.dirname(absolutePath);
+    const relativePath = normalizeAssetRepositoryRelativePath(basename);
+    if (relativePath) return { root, relativePath };
+  }
+  return undefined;
 }
 
 function supportArtifactKind(
@@ -542,6 +679,22 @@ function supportArtifactKind(
       return "reference";
     case "scripts":
       return "script";
+  }
+}
+
+function genericSupportRule(
+  directory: ReservedSkillSupportDirectory,
+): "generic-profile" | "generic-reference" | "generic-example" | "unknown" {
+  switch (directory) {
+    case "profiles":
+      return "generic-profile";
+    case "references":
+      return "generic-reference";
+    case "examples":
+      return "generic-example";
+    case "assets":
+    case "scripts":
+      return "unknown";
   }
 }
 

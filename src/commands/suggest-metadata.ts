@@ -1,7 +1,16 @@
 import { lstat, readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
+import {
+  buildSkillParentIndex,
+  resolveSkillSupportParent,
+  withResolvedSkillParent,
+  type SkillParentResolution,
+} from "../catalog.js";
+import { renmaCommand } from "../command-invocation.js";
 import { parseDocument } from "../markdown.js";
 import { parseAssetMetadata } from "../metadata.js";
+import { collectRepositorySnapshot } from "../repository-evidence.js";
+import { collectSecurityPolicyAssetEvidence } from "../security-policy-inventory.js";
 import {
   classifyAssetPath,
   classifyAbsoluteSkillEntrypointPath,
@@ -20,6 +29,7 @@ import type {
   AssetDecisionEvidence,
   DecisionStatus,
   MetadataValue,
+  SuggestedNextAction,
 } from "../types.js";
 
 export type SuggestMetadataFormat = "prompt" | "json";
@@ -49,7 +59,7 @@ export interface MetadataSuggestion {
   instructions: string[];
   candidateMetadata: Record<string, string>;
   blockedMetadata: BlockedMetadata[];
-  nextActions: Array<{ kind: string; command: string }>;
+  nextActions: SuggestedNextAction[];
   agentSkills?: AgentSkillMigrationSuggestion;
 }
 
@@ -90,8 +100,15 @@ export async function buildMetadataSuggestion(
     throw new SuggestMetadataTargetError(target, error);
   }
   const outputPath = toPosix(target);
+  const classificationContext = repositoryClassificationPath(target);
   const classificationPath =
-    repositoryClassificationPath(target)?.relativePath ?? outputPath;
+    classificationContext.state === "resolved"
+      ? classificationContext.relativePath
+      : "";
+  const repositoryRoot =
+    classificationContext.state === "resolved"
+      ? classificationContext.root
+      : undefined;
   const entrypoint = classifySuggestionSkillEntrypointPath(outputPath);
   const initialClassification = classifyAssetPath(classificationPath);
   const initialKind = initialClassification.kind;
@@ -105,7 +122,7 @@ export async function buildMetadataSuggestion(
     content,
   } satisfies Artifact);
   const { metadata } = parseAssetMetadata(document);
-  const classification = classifyAssetPath(classificationPath, {
+  let classification = classifyAssetPath(classificationPath, {
     ...(metadata.type ? { metadataType: metadata.type } : {}),
   });
   const kind = classification.kind;
@@ -167,7 +184,11 @@ export async function buildMetadataSuggestion(
             ],
       candidateMetadata: {},
       blockedMetadata: agentSkills.blocked,
-      nextActions: suggestionNextActions(outputPath, classification),
+      nextActions: suggestionNextActions(
+        outputPath,
+        classification,
+        repositoryRoot,
+      ),
       agentSkills,
     };
   }
@@ -181,6 +202,54 @@ export async function buildMetadataSuggestion(
   const candidateTitle = mainHeadingTitle(document.headings);
 
   if (classification.scope === "skill-local") {
+    const localContext = await resolveSkillLocalContext(
+      classification,
+      classificationPath,
+      classificationContext.state === "resolved"
+        ? classificationContext.root
+        : undefined,
+    );
+    classification = localContext.classification;
+    if (localContext.parent.state !== "resolved") {
+      const parentState =
+        localContext.parent.state === "not-applicable"
+          ? "structural-candidate"
+          : localContext.parent.state;
+      const blockedMetadata: BlockedMetadata[] = [
+        {
+          field: "parent_skill",
+          reason: `The structural parent Skill is ${parentState}; inheritance is not established. Review the repository layout before adding local metadata.`,
+        },
+      ];
+      return {
+        path: outputPath,
+        kind,
+        suggestedMode: "no-proposal",
+        decisionStatus: "blocked",
+        decision: {
+          reasonCode: "skill-local-parent-unresolved",
+          summary:
+            "Renma cannot confirm one parent Skill, so it cannot claim inherited governance or safely propose an independent local override.",
+          question:
+            "Resolve the missing or ambiguous parent Skill layout, then rerun this command.",
+        },
+        classification,
+        ownerProvided: Boolean(explicitOwner),
+        instructions: skillLocalInstructions(
+          classification,
+          false,
+          true,
+          false,
+        ),
+        candidateMetadata: {},
+        blockedMetadata,
+        nextActions: suggestionNextActions(
+          outputPath,
+          classification,
+          repositoryRoot,
+        ),
+      };
+    }
     const blockedMetadata = conflictingOwnerEvidence(
       existingOwner,
       explicitOwner,
@@ -188,6 +257,9 @@ export async function buildMetadataSuggestion(
     if (!existingOwner && explicitOwner)
       candidateMetadata.owner = explicitOwner;
     const hasOverride = Object.keys(candidateMetadata).length > 0;
+    const hasLocalGovernance =
+      Boolean(existingOwner) || localContext.hasLocalPolicyMetadata;
+    const inherited = localContext.ownershipSource === "inherited";
     return {
       path: outputPath,
       kind,
@@ -211,17 +283,38 @@ export async function buildMetadataSuggestion(
                 summary:
                   "The candidate is an explicit human-provided Skill-local metadata override; it is not required for ordinary local support.",
               }
-            : {
-                reasonCode: "skill-local-governance-inherited",
-                summary:
-                  "No independent metadata retrofit is required for this Skill-local support file.",
-              },
+            : hasLocalGovernance
+              ? {
+                  reasonCode: "skill-local-existing-metadata-preserved",
+                  summary:
+                    "Existing explicit local governance metadata is preserved; no inherited-governance claim or retrofit is needed.",
+                }
+              : inherited
+                ? {
+                    reasonCode: "skill-local-governance-inherited",
+                    summary:
+                      "One unambiguous parent Skill supplies effective governance, so no independent metadata retrofit is required.",
+                  }
+                : {
+                    reasonCode: "skill-local-unowned",
+                    summary:
+                      "The parent Skill is resolved, but neither the local file nor its parent declares an owner; missing ownership remains allowed.",
+                  },
       classification,
       ownerProvided: Boolean(explicitOwner),
-      instructions: skillLocalInstructions(classification, hasOverride),
+      instructions: skillLocalInstructions(
+        classification,
+        hasOverride,
+        false,
+        hasLocalGovernance,
+      ),
       candidateMetadata,
       blockedMetadata,
-      nextActions: suggestionNextActions(outputPath, classification),
+      nextActions: suggestionNextActions(
+        outputPath,
+        classification,
+        repositoryRoot,
+      ),
     };
   }
 
@@ -229,10 +322,7 @@ export async function buildMetadataSuggestion(
     classification.matchedRule === "repository-tool" ||
     classification.matchedRule === "unknown"
   ) {
-    const unsafe =
-      classification.reasonCode === "outside-recognized-asset-boundary" &&
-      classificationPath === outputPath &&
-      isAbsoluteLike(outputPath);
+    const unsafe = classificationContext.state === "unresolved";
     return {
       path: outputPath,
       kind,
@@ -240,7 +330,7 @@ export async function buildMetadataSuggestion(
       decisionStatus: unsafe ? "blocked" : "no-change-recommended",
       decision: unsafe
         ? {
-            reasonCode: "repository-boundary-unresolved",
+            reasonCode: classificationContext.reasonCode,
             summary:
               "Renma could not infer one safe repository-relative boundary for this absolute path.",
           }
@@ -263,7 +353,11 @@ export async function buildMetadataSuggestion(
       ],
       candidateMetadata: {},
       blockedMetadata: [],
-      nextActions: suggestionNextActions(outputPath, classification),
+      nextActions: suggestionNextActions(
+        outputPath,
+        classification,
+        repositoryRoot,
+      ),
     };
   }
 
@@ -295,7 +389,8 @@ export async function buildMetadataSuggestion(
   return {
     path: outputPath,
     kind,
-    suggestedMode: hasCandidate ? "metadata-retrofit" : "no-proposal",
+    suggestedMode:
+      hasConflict || !hasCandidate ? "no-proposal" : "metadata-retrofit",
     decisionStatus: hasConflict
       ? "blocked"
       : hasCandidate
@@ -329,25 +424,35 @@ export async function buildMetadataSuggestion(
     classification,
     ownerProvided: Boolean(explicitOwner),
     instructions: buildInstructions({ existingOwner, explicitOwner }),
-    candidateMetadata,
+    candidateMetadata: hasConflict ? {} : candidateMetadata,
     blockedMetadata,
-    nextActions: suggestionNextActions(outputPath, classification),
+    nextActions: suggestionNextActions(
+      outputPath,
+      classification,
+      repositoryRoot,
+    ),
   };
 }
 
 export function renderMetadataPrompt(suggestion: MetadataSuggestion): string {
   if (suggestion.agentSkills)
     return renderAgentSkillMigrationPrompt(suggestion);
-  const noProposal = suggestion.suggestedMode === "no-proposal";
+  const blocked = suggestion.decisionStatus === "blocked";
+  const noChange = suggestion.decisionStatus === "no-change-recommended";
+  const noProposal = blocked || noChange;
   const skillLocal = suggestion.classification.scope === "skill-local";
   return `${[
-    noProposal
-      ? "# Renma Result: No Metadata Proposal"
-      : "# Renma Task: Safely Retrofit Renma Metadata",
+    blocked
+      ? "# Renma Result: Metadata Proposal Blocked"
+      : noProposal
+        ? "# Renma Result: No Metadata Proposal"
+        : "# Renma Task: Safely Retrofit Renma Metadata",
     "",
-    noProposal
-      ? "No independent metadata retrofit is required."
-      : "Review this existing Renma asset metadata candidate safely.",
+    blocked
+      ? "Renma cannot safely produce an applicable metadata patch."
+      : noProposal
+        ? "No independent metadata retrofit is required."
+        : "Review this existing Renma asset metadata candidate safely.",
     "",
     "Asset:",
     `- Path: \`${suggestion.path}\``,
@@ -364,44 +469,64 @@ export function renderMetadataPrompt(suggestion: MetadataSuggestion): string {
     "Deterministic Renma interpretation:",
     deterministicInterpretation(suggestion.classification),
     "",
-    noProposal ? "Recommendation:" : "Remaining human decision:",
+    noProposal ? "Recommendation:" : "Decision:",
     suggestion.decision.summary,
     ...(suggestion.decision.question
       ? ["", "Remaining human decision:", suggestion.decision.question]
       : []),
     ...(skillLocal
-      ? [
-          "",
-          `This file is Skill-local support governed by:`,
-          suggestion.classification.parentAssetPath ??
-            "(unresolved parent Skill)",
-          "",
-          "Its effective ownership and policy may be inherited from the parent Skill.",
-          "Preserve existing metadata if present.",
-          "Do not add an owner, move the file, or create a patch solely to manufacture work.",
-        ]
+      ? suggestion.classification.parentResolution === "resolved"
+        ? [
+            "",
+            "This file is structurally Skill-local support with one resolved parent:",
+            suggestion.classification.parentAssetPath ??
+              "(resolved parent path unavailable)",
+            "",
+            ...skillLocalGovernancePromptLines(suggestion),
+            "Preserve existing metadata if present.",
+            "Do not add an owner, move the file, or create a patch solely to manufacture work.",
+          ]
+        : [
+            "",
+            "This file is structurally Skill-local support, but its parent governance is unresolved.",
+            `Parent resolution: ${suggestion.classification.parentResolution ?? "structural-candidate"}.`,
+            "Do not claim inheritance or add an independent local owner until the repository layout resolves to one parent Skill.",
+          ]
       : []),
     "",
     "Rules:",
     ...suggestion.instructions.map((instruction) => `- ${instruction}`),
     "",
-    "Candidate Metadata:",
-    ...metadataLines(suggestion.candidateMetadata),
+    blocked
+      ? "Candidate Metadata (not applicable while blocked):"
+      : "Candidate Metadata:",
+    ...(blocked
+      ? ["- (suppressed because the decision is blocked)"]
+      : metadataLines(suggestion.candidateMetadata)),
     "",
     "Blocked Metadata:",
     ...blockedMetadataLines(suggestion.blockedMetadata),
     "",
     "Verification:",
-    ...(noProposal
-      ? ["- No verification change is required when no file change is made."]
-      : [
-          "- Run `renma scan . --fail-on high --format json`.",
-          "- Run `renma ownership .`.",
-        ]),
+    ...(blocked
+      ? [
+          "- Resolve the blocked evidence and rerun `renma suggest-metadata`.",
+          "- Run the structured layout/scan action; do not apply a patch from this result.",
+        ]
+      : noChange
+        ? ["- No verification change is required when no file change is made."]
+        : [
+            "- Run `renma scan . --fail-on high --format json`.",
+            "- Run `renma ownership .`.",
+          ]),
     "",
-    noProposal
-      ? "Stop without manufacturing work. Preserve the existing source."
-      : "Return a small reviewed patch. Do not rewrite the asset body.",
+    blocked
+      ? "Do not return or apply a patch while the decision is blocked. Preserve the existing source."
+      : noChange
+        ? "Stop without manufacturing work. Preserve the existing source."
+        : suggestion.decisionStatus === "human-confirmation-required"
+          ? "After confirming the stated human decision, return only the reviewed candidate fields. Do not invent unresolved owner, lifecycle, or source-of-truth metadata, and do not rewrite the asset body."
+          : "Return a small reviewed patch containing only the deterministic candidate. Do not rewrite the asset body.",
   ].join("\n")}\n`;
 }
 
@@ -415,23 +540,24 @@ function renderAgentSkillMigrationPrompt(
   const noMigrationProposed =
     migration.proposalKind === "none" &&
     migration.sourceFormat === "agent-skills";
-  const candidate = migration.canonicalFrontmatter
-    ? [
-        "Canonical Frontmatter Candidate:",
-        "",
-        "```yaml",
-        migration.canonicalFrontmatter,
-        "```",
-      ]
-    : [
-        "Canonical Frontmatter Candidate:",
-        "",
-        "(not generated while migration is blocked or unnecessary)",
-      ];
+  const candidate =
+    suggestion.decisionStatus !== "blocked" && migration.canonicalFrontmatter
+      ? [
+          "Canonical Frontmatter Candidate:",
+          "",
+          "```yaml",
+          migration.canonicalFrontmatter,
+          "```",
+        ]
+      : [
+          "Canonical Frontmatter Candidate:",
+          "",
+          "(not generated while migration is blocked or unnecessary)",
+        ];
   const promptState: SkillSuggestionPromptState =
-    suggestion.blockedMetadata.length > 0
+    suggestion.decisionStatus === "blocked"
       ? "blocked"
-      : noMigrationProposed || !migration.canonicalFrontmatter
+      : suggestion.decisionStatus === "no-change-recommended"
         ? "no-proposal"
         : "candidate";
   const verification = renderSkillSuggestionVerification(promptState);
@@ -476,13 +602,20 @@ function renderAgentSkillMigrationPrompt(
     "",
     ...nextSteps,
     "",
-    migration.canonicalFrontmatter
-      ? migration.entrypointMigration === "none"
-        ? "Return a small reviewed frontmatter patch. Do not rewrite the Skill body."
-        : "Return one small reviewed patch containing both the entrypoint path migration and frontmatter migration. Do not rewrite the Skill body."
-      : migration.blocked.length > 0
-        ? "Do not return or apply a frontmatter patch while migration is blocked. Preserve the existing source until every blocked item is resolved with human review."
-        : "No frontmatter patch is proposed. Do not return or apply a frontmatter patch; preserve the existing source.",
+    promptState === "blocked"
+      ? "Do not return or apply a frontmatter patch while the decision is blocked. Preserve the existing source until every blocked item is resolved with human review."
+      : promptState === "no-proposal"
+        ? "No frontmatter patch is proposed. Do not return or apply a frontmatter patch; preserve the existing source."
+        : suggestion.decisionStatus === "human-confirmation-required" &&
+            migration.canonicalFrontmatter
+          ? migration.entrypointMigration === "none"
+            ? "After a human confirms the intended Skill semantics, return only the reviewed canonical frontmatter candidate. Do not invent unresolved fields or rewrite the Skill body."
+            : "After a human confirms the intended Skill semantics, return one reviewed patch containing only the entrypoint path migration and canonical frontmatter candidate. Do not invent unresolved fields or rewrite the Skill body."
+          : migration.canonicalFrontmatter
+            ? migration.entrypointMigration === "none"
+              ? "Return a small reviewed frontmatter patch. Do not rewrite the Skill body."
+              : "Return one small reviewed patch containing both the entrypoint path migration and frontmatter migration. Do not rewrite the Skill body."
+            : "Do not return a patch because no canonical candidate was generated.",
   ].join("\n")}\n`;
 }
 
@@ -583,6 +716,33 @@ function blockedMetadataLines(blockedMetadata: BlockedMetadata[]): string[] {
   return blockedMetadata.map((item) => `- ${item.field}: ${item.reason}`);
 }
 
+function skillLocalGovernancePromptLines(
+  suggestion: MetadataSuggestion,
+): string[] {
+  switch (suggestion.decision.reasonCode) {
+    case "skill-local-governance-inherited":
+      return [
+        "Effective governance is inherited from this one resolved parent Skill.",
+      ];
+    case "skill-local-existing-metadata-preserved":
+      return [
+        "Existing explicit local governance is preserved and is not relabeled as inherited.",
+      ];
+    case "skill-local-unowned":
+      return [
+        "The parent is resolved, but no effective owner is declared locally or by the parent.",
+      ];
+    case "explicit-human-provided-override":
+      return [
+        "The parent is resolved; the local candidate is an explicit human-provided override.",
+      ];
+    default:
+      return [
+        "Governance provenance remains separate from this structural parent resolution.",
+      ];
+  }
+}
+
 function skillDecision(
   migration: AgentSkillMigrationSuggestion,
   metadataRetrofit: boolean,
@@ -648,10 +808,16 @@ function conflictingOwnerEvidence(
 function skillLocalInstructions(
   classification: AssetClassificationEvidence,
   hasOverride: boolean,
+  parentBlocked: boolean,
+  hasLocalGovernance: boolean,
 ): string[] {
   return [
     "Preserve the existing Skill-local file and any explicitly declared supported metadata.",
-    `Treat ${classification.parentAssetPath ?? "the parent Skill"} as the default governance source.`,
+    parentBlocked
+      ? "Do not claim inherited governance until exactly one parent Skill resolves."
+      : hasLocalGovernance
+        ? "Keep existing explicit local governance separate from parent inheritance."
+        : `Treat ${classification.parentAssetPath ?? "the resolved parent Skill"} as the default governance source.`,
     "Independent metadata is not required merely because this is a Skill-local file.",
     hasOverride
       ? "Apply only the explicit human-provided override; do not describe it as mandatory local metadata."
@@ -663,30 +829,115 @@ function skillLocalInstructions(
 function suggestionNextActions(
   targetPath: string,
   classification: AssetClassificationEvidence,
-): Array<{ kind: string; command: string }> {
-  const actions: Array<{ kind: string; command: string }> = [];
-  if (classification.parentAssetPath) {
+  repositoryRoot: string | undefined,
+): SuggestedNextAction[] {
+  const actions: SuggestedNextAction[] = [];
+  const scanTarget = repositoryRoot ?? ".";
+  if (
+    classification.parentResolution === "resolved" &&
+    classification.parentAssetPath
+  ) {
     actions.push({
       kind: "inspect-parent",
-      command: `renma inspect ${shellArgument(classification.parentAssetPath)} --format json`,
+      invocation: renmaCommand([
+        "inspect",
+        repositoryRoot
+          ? path.join(repositoryRoot, classification.parentAssetPath)
+          : classification.parentAssetPath,
+        "--format",
+        "json",
+      ]),
     });
+  } else if (
+    classification.scope === "skill-local" &&
+    classification.parentResolution !== "resolved"
+  ) {
+    actions.push({
+      kind: "review-layout",
+      invocation: renmaCommand([
+        "scan",
+        scanTarget,
+        "--fail-on",
+        "high",
+        "--format",
+        "json",
+      ]),
+    });
+    return actions;
   } else {
     actions.push({
       kind: "inspect-target",
-      command: `renma inspect ${shellArgument(targetPath)} --format json`,
+      invocation: renmaCommand(["inspect", targetPath, "--format", "json"]),
     });
   }
   actions.push({
     kind: "verify",
-    command: "renma scan . --fail-on high --format json",
+    invocation: renmaCommand([
+      "scan",
+      scanTarget,
+      "--fail-on",
+      "high",
+      "--format",
+      "json",
+    ]),
   });
   return actions;
 }
 
-function shellArgument(value: string): string {
-  return /^[A-Za-z0-9_./:@%+=,-]+$/.test(value)
-    ? value
-    : `'${value.replaceAll("'", `'"'"'`)}'`;
+interface SkillLocalContext {
+  classification: AssetClassificationEvidence;
+  parent: SkillParentResolution;
+  ownershipSource: "declared" | "inherited" | "unowned";
+  hasLocalPolicyMetadata: boolean;
+}
+
+async function resolveSkillLocalContext(
+  classification: AssetClassificationEvidence,
+  relativePath: string,
+  repositoryRoot: string | undefined,
+): Promise<SkillLocalContext> {
+  if (!repositoryRoot) {
+    return {
+      classification,
+      parent: { state: "not-applicable" },
+      ownershipSource: "unowned",
+      hasLocalPolicyMetadata: false,
+    };
+  }
+  try {
+    const snapshot = await collectRepositorySnapshot(repositoryRoot);
+    const skillParents = buildSkillParentIndex(snapshot.documents);
+    const parent = resolveSkillSupportParent(relativePath, skillParents);
+    const resolvedClassification = withResolvedSkillParent(
+      classification,
+      relativePath,
+      skillParents,
+    );
+    const entry = snapshot.catalog.entries.find(
+      (candidate) => candidate.sourcePath === relativePath,
+    );
+    const policy = collectSecurityPolicyAssetEvidence(
+      snapshot.artifacts,
+      snapshot.config.security,
+    ).find((candidate) => candidate.path === relativePath);
+    return {
+      classification: resolvedClassification,
+      parent,
+      ownershipSource:
+        entry?.ownership.source ??
+        (parent.state === "resolved" && parent.parent.owner
+          ? "inherited"
+          : "unowned"),
+      hasLocalPolicyMetadata: policy?.hasLocalPolicyMetadata ?? false,
+    };
+  } catch {
+    return {
+      classification,
+      parent: { state: "not-applicable" },
+      ownershipSource: "unowned",
+      hasLocalPolicyMetadata: false,
+    };
+  }
 }
 
 function classificationPromptLines(
@@ -702,6 +953,17 @@ function classificationPromptLines(
       : []),
     ...(classification.parentAssetPath
       ? [`- parent asset: \`${classification.parentAssetPath}\``]
+      : []),
+    ...(classification.parentAssetCandidatePath
+      ? [
+          `- parent candidate: \`${classification.parentAssetCandidatePath}\``,
+          `- parent resolution: \`${classification.parentResolution ?? "structural-candidate"}\``,
+        ]
+      : []),
+    ...(classification.parentAssetCandidates?.length
+      ? [
+          `- parent candidates: ${classification.parentAssetCandidates.map((candidate) => `\`${candidate}\``).join(", ")}`,
+        ]
       : []),
     ...(classification.supportDirectory
       ? [`- support directory: \`${classification.supportDirectory}\``]
@@ -719,7 +981,7 @@ function observedRepositoryFact(
   classification: AssetClassificationEvidence,
 ): string {
   if (classification.matchedRule === "skill-local-support") {
-    return `The target is under the ${classification.supportDirectory}/ directory of a recognized Skill.`;
+    return `The target is under a canonical ${classification.supportDirectory}/ directory within a recognized Skill-root path shape.`;
   }
   if (
     classification.matchedRule === "context-root" ||
@@ -734,7 +996,9 @@ function deterministicInterpretation(
   classification: AssetClassificationEvidence,
 ): string {
   if (classification.scope === "skill-local") {
-    return `The target is Skill-local support governed by ${classification.parentAssetPath ?? "its parent Skill"}.`;
+    return classification.parentResolution === "resolved"
+      ? `The target is structurally Skill-local support and its parent resolves to ${classification.parentAssetPath}; governance provenance is evaluated separately.`
+      : "The target is structurally Skill-local support, but inherited governance is unresolved.";
   }
   if (classification.scope === "independent") {
     return `The target is an independently governed ${classification.kind} asset.`;

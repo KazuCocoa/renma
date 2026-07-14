@@ -171,6 +171,7 @@ Recommended evidence-first preflight:
 5. Prepare the smallest intended patch.
 6. Rerun `renma scan . --fail-on high --format json`.
 7. Stop without manufacturing work when `suggest-metadata` reports
+   `decisionStatus: "no-change-recommended"`; this currently uses
    `suggestedMode: "no-proposal"`.
 8. Report unresolved human decisions.
 
@@ -691,7 +692,14 @@ renma inspect contexts/testing/boundary-value-analysis.md --format json
 renma inspect skills/testing/spec-review/SKILL.md --lines L10-L42
 ```
 
-Use this when editing one skill or context file and you want a deterministic outline without reading the whole repository catalog. Without `--lines`, output includes file size, line count, frontmatter range, headings, code fences, links, asset relationships, and a concise Context Lens governance summary when repository context can be inferred. It also always includes `classification` with `kind`, `scope`, `matchedRule`, `reasonCode`, root or parent evidence, and concise competing rules. `governance` is separate and reports ownership, policy, and metadata provenance only when catalog evidence resolves. Unknown files and repository tools still receive classification. Use `--lines <range>` for an exact source slice; ranges can look like `L10-L42` or `10-42`. `--lines` output itself is unchanged.
+Use this when editing one skill or context file and you want a deterministic outline without reading the whole repository catalog. Without `--lines`, output includes file size, line count, frontmatter range, headings, code fences, links, asset relationships, and a concise Context Lens governance summary when repository context can be inferred. It also always includes `classification` with `kind`, `scope`, `matchedRule`, `reasonCode`, root or parent evidence, and concise competing rules. A Skill-local path exposes `parentAssetCandidatePath`; `parentAssetPath` appears only when `parentResolution` is `resolved`, while `missing` and `ambiguous` remain explicit fail-closed states. `governance` is separate and reports ownership, policy, and metadata provenance only from repository evidence. Unknown files and repository tools still receive classification. Use `--lines <range>` for an exact source slice; ranges can look like `L10-L42` or `10-42`. `--lines` output itself is unchanged.
+
+For a file target, Renma resolves a repository root from an explicit caller root,
+the nearest safe `.git` file/directory or Renma config marker, or an unambiguous
+structural boundary, in that order. Current-working-directory containment alone
+does not establish a repository. This keeps nested repositories and absolute
+targets outside the current directory deterministic without scanning an
+unrelated parent tree.
 
 ### `readiness`
 
@@ -815,7 +823,11 @@ apply only intended metadata or migration changes; run
 `renma scan . --fail-on high`; fix relevant diagnostics; and rerun the scan.
 Context Asset output does not receive this Skill-specific authoring guidance.
 JSON adds `classification`, `decisionStatus`, structured `decision` evidence,
-and safe `nextActions` to the existing suggestion fields.
+and safe `nextActions` to the existing suggestion fields. Each action has
+`kind` and `invocation`; execute `invocation.command` with the exact
+`invocation.args` array. `invocation.display` is for people and must not be
+parsed as the machine contract, including on paths with spaces, quotes, or
+Windows separators.
 
 For Skill targets using the pre-0.16 Renma Skill format, the 0.16.0 metadata
 migration path is one-way: recognized governance and security frontmatter
@@ -846,12 +858,22 @@ owners from Git history, file paths, prose, or authors.
 
 Ordinary Skill-local support returns `suggestedMode: "no-proposal"` and
 `decisionStatus: "no-change-recommended"` when it can inherit governance from
-its parent Skill. Its `candidateMetadata` is empty. Existing supported local
-metadata remains valid, and an explicit `--owner` can still request a supported
-intentional override. Prompt and JSON output both distinguish the observed
-path fact, deterministic interpretation, recommendation, and remaining human
-decision. Repository tools and unknown paths never receive fabricated Context
-metadata candidates.
+one resolved parent Skill. Its `candidateMetadata` is empty. A missing or
+ambiguous parent returns `decisionStatus: "blocked"`, leaves governance
+unowned or unresolved, and provides a scan/layout action instead of claiming
+inheritance. Existing explicit local owner or policy metadata is preserved
+under `skill-local-existing-metadata-preserved`; an explicit `--owner` can still
+request a supported intentional override after the parent resolves. Prompt and
+JSON output both distinguish the observed path fact, deterministic
+interpretation, recommendation, and remaining human decision. Repository tools
+and unknown paths never receive fabricated Context metadata candidates.
+
+`decisionStatus` is authoritative: `blocked` never authorizes a patch,
+`no-change-recommended` stops without a patch, `human-confirmation-required`
+identifies what must be confirmed before applying only the candidate fields,
+and `deterministic` permits the reviewed candidate. Consumers should include a
+conservative default for unknown future `suggestedMode` values rather than
+assuming every non-`no-proposal` value is applicable.
 
 ### `suggest-semantic-split`
 

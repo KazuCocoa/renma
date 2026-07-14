@@ -16,7 +16,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   explanations, includes concise competing-rule evidence, and keeps
   classification separate from ownership and policy governance.
 - Added explicit suggestion `decisionStatus`, structured decision evidence,
-  safe next actions, and the successful `no-proposal` mode.
+  cross-platform next actions with separate command/argv/display fields, and
+  the successful `no-proposal` mode.
 
 ### Changed
 
@@ -26,6 +27,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - `suggest-metadata` now uses the shared classifier. Ordinary Skill-local
   support produces no independent retrofit proposal unless an explicit
   supported override is supplied; existing local metadata remains supported.
+- Repository classification resolves an explicit caller root first, then the
+  nearest safe `.git` or Renma config marker, then an unambiguous structural
+  boundary. Being below the current working directory is no longer treated as
+  repository-root evidence.
+- Skill-local classification now records a structural parent candidate
+  separately from catalog-backed `resolved`, `missing`, or `ambiguous` parent
+  evidence. Missing and ambiguous parents block inheritance claims and metadata
+  proposals until the layout is reviewed.
 
 ### Fixed
 
@@ -41,9 +50,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - The `inspect` JSON outline adds `classification` and `governance`.
   `suggest-metadata` JSON adds `classification`, `decisionStatus`, `decision`,
   and `nextActions`, and may return `suggestedMode: "no-proposal"`. Relevant
-  diagnostic `details` may add `classification`. These changes are additive;
-  finding severity, scan thresholds, ownership inheritance, policy inheritance,
-  Agent Skills migration, and supported local metadata behavior are unchanged.
+  diagnostic `details` may add `classification`. The new JSON fields are
+  additive, but the command behavior is intentionally refined: targets that
+  previously represented a successful no-change result may now use
+  `suggestedMode: "no-proposal"`, and Skill-local inheritance is reported only
+  after one parent resolves. Consumers should branch on `decisionStatus`, treat
+  unknown future `suggestedMode` values conservatively, and execute
+  `nextActions[].invocation.command` with `invocation.args` rather than parsing
+  `display`. Finding severity, scan thresholds, Readiness scoring, Agent Skills
+  migration direction, and supported explicit local metadata remain unchanged.
 
 ## [0.18.1] - 2026-07-13
 

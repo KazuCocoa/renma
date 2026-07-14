@@ -6,7 +6,8 @@ import {
   type AgentSkillDiagnosticId,
 } from "./diagnostic-ids.js";
 import { classifyRepositorySkillEntrypointPath } from "./discovery.js";
-import type { ParsedDocument } from "./types.js";
+import type { CommandInvocation, ParsedDocument } from "./types.js";
+import { renmaCommand } from "./command-invocation.js";
 import {
   parseAgentSkillFrontmatter,
   type ParsedYamlFrontmatter,
@@ -104,11 +105,9 @@ export interface AgentSkillInspection {
   validation: AgentSkillValidationResult;
 }
 
-export interface AgentSkillMigrationCommand {
-  command: "renma";
-  args: ["suggest-metadata", string];
-  display: string;
-}
+export type AgentSkillMigrationCommand = CommandInvocation<
+  ["suggest-metadata", string]
+>;
 
 export interface AgentSkillsValidationSummary {
   specification: string;
@@ -360,16 +359,7 @@ function validateAgentSkillFrontmatter(
 }
 
 function migrationCommand(skillPath: string): AgentSkillMigrationCommand {
-  return {
-    command: "renma",
-    args: ["suggest-metadata", skillPath],
-    display: `renma suggest-metadata ${posixShellArgument(skillPath)}`,
-  };
-}
-
-function posixShellArgument(value: string): string {
-  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(value)) return value;
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
+  return renmaCommand(["suggest-metadata", skillPath]);
 }
 
 /** Normalize and validate an Agent Skills YAML name field. */

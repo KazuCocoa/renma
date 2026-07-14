@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 import { main } from "../src/cli.js";
+import { renmaCommand } from "../src/command-invocation.js";
 import { buildInspectOutline } from "../src/commands/inspect.js";
 import {
   buildMetadataSuggestion,
@@ -15,8 +16,10 @@ import {
   classifyAssetPath,
   discoverArtifacts,
   normalizeAssetRepositoryRelativePath,
+  repositoryClassificationPath,
 } from "../src/discovery.js";
 import { scan } from "../src/scanner.js";
+import type { MetadataSuggestion } from "../src/commands/suggest-metadata.js";
 
 test("shared asset classifier locks documented precedence and boundaries", () => {
   const cases = [
@@ -140,14 +143,22 @@ test("shared asset classifier locks documented precedence and boundaries", () =>
     scope,
     matchedRule,
     recognizedRoot,
-    parentAssetPath,
+    parentAssetCandidatePath,
   ] of cases) {
     const result = classifyAssetPath(input);
     assert.equal(result.kind, kind, input);
     assert.equal(result.scope, scope, input);
     assert.equal(result.matchedRule, matchedRule, input);
     assert.equal(result.recognizedRoot, recognizedRoot, input);
-    assert.equal(result.parentAssetPath, parentAssetPath, input);
+    assert.equal(
+      result.parentAssetCandidatePath,
+      parentAssetCandidatePath,
+      input,
+    );
+    if (parentAssetCandidatePath) {
+      assert.equal(result.parentAssetPath, undefined, input);
+      assert.equal(result.parentResolution, "structural-candidate", input);
+    }
   }
 
   assert.deepEqual(
@@ -186,6 +197,139 @@ test("classification normalization is stable and rejects traversal", () => {
     }).kind,
     "context_lens",
   );
+});
+
+test("repository boundaries prefer a nested repository marker over cwd containment", async () => {
+  const workspace = await mkdtemp(
+    path.join(os.tmpdir(), "renma-classify-workspace-"),
+  );
+  const repository = path.join(workspace, "repo");
+  const target = path.join(repository, "contexts", "foo", "policy.md");
+  await mkdir(path.join(repository, ".git"), { recursive: true });
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(target, "# Policy\n");
+
+  const resolution = repositoryClassificationPath(
+    "repo/contexts/foo/policy.md",
+    { cwd: workspace },
+  );
+  assert.equal(resolution.state, "resolved");
+  if (resolution.state !== "resolved") return;
+  assert.equal(resolution.source, "marker");
+  assert.equal(resolution.root, repository);
+  assert.equal(resolution.relativePath, "contexts/foo/policy.md");
+
+  const originalCwd = process.cwd();
+  try {
+    process.chdir(workspace);
+    const suggestion = await buildMetadataSuggestion(
+      "repo/contexts/foo/policy.md",
+    );
+    const inspect = await buildInspectOutline("repo/contexts/foo/policy.md");
+    assert.equal(suggestion.classification.matchedRule, "context-root");
+    assert.equal(inspect.classification.matchedRule, "context-root");
+  } finally {
+    process.chdir(originalCwd);
+  }
+});
+
+test("an explicit caller root resolves unstructured paths while target-only evidence fails closed", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-explicit-root-"));
+  const target = path.join(root, "docs", "note.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(target, "# Note\n");
+
+  const unresolved = repositoryClassificationPath(target);
+  assert.equal(unresolved.state, "unresolved");
+  const explicit = repositoryClassificationPath(target, {
+    repositoryRoot: root,
+  });
+  assert.equal(explicit.state, "resolved");
+  if (explicit.state !== "resolved") return;
+  assert.equal(explicit.source, "explicit");
+  assert.equal(explicit.relativePath, "docs/note.md");
+
+  const suggestion = await buildMetadataSuggestion(target);
+  assert.equal(suggestion.decisionStatus, "blocked");
+  assert.equal(
+    suggestion.decision.reasonCode,
+    "repository-boundary-unresolved",
+  );
+  assert.equal(suggestion.classification.kind, "unknown");
+});
+
+test("absolute targets outside cwd retain deterministic structural boundaries", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-external-assets-"));
+  const fixtures = [
+    ["AGENTS.md", "agent-root", "agent"],
+    ["renma.config.json", "config-file", "config"],
+    [".agents/provider.md", "agent-root", "agent"],
+    ["contexts/foo/references/tools/helper.md", "context-root", "context"],
+    ["tools/helper.md", "repository-tool", "unknown"],
+  ] as const;
+
+  for (const [relative, rule, kind] of fixtures) {
+    const target = path.join(root, ...relative.split("/"));
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(
+      target,
+      relative.endsWith(".json") ? "{}\n" : "# Fixture\n",
+    );
+    const resolution = repositoryClassificationPath(target);
+    assert.equal(resolution.state, "resolved", relative);
+    if (resolution.state !== "resolved") continue;
+    assert.equal(resolution.root, root, relative);
+    assert.equal(resolution.relativePath, relative, relative);
+    const classification = classifyAssetPath(resolution.relativePath);
+    assert.equal(classification.matchedRule, rule, relative);
+    assert.equal(classification.kind, kind, relative);
+    const suggestion = await buildMetadataSuggestion(target);
+    const inspect = await buildInspectOutline(target);
+    assert.equal(suggestion.classification.matchedRule, rule, relative);
+    assert.equal(inspect.classification.matchedRule, rule, relative);
+  }
+
+  const contextTarget = path.join(
+    root,
+    "contexts",
+    "foo",
+    "references",
+    "tools",
+    "helper.md",
+  );
+  assert.equal(
+    (await buildMetadataSuggestion(contextTarget)).classification.matchedRule,
+    "context-root",
+  );
+  assert.equal(
+    (await buildInspectOutline(contextTarget)).classification.matchedRule,
+    "context-root",
+  );
+});
+
+test("structural fallback ignores nested boundary-like names after the outer boundary", () => {
+  const root = path.join(os.tmpdir(), "renma-structural-boundary");
+  const cases = [
+    [
+      "contexts/foo/tools/helper.md",
+      "contexts/foo/tools/helper.md",
+      "context-root",
+    ],
+    ["references/context/policy.md", "references/context/policy.md", "unknown"],
+    ["examples/skills/foo/SKILL.md", "examples/skills/foo/SKILL.md", "unknown"],
+  ] as const;
+  for (const [relative, expectedRelative, expectedRule] of cases) {
+    const resolution = repositoryClassificationPath(path.join(root, relative));
+    assert.equal(resolution.state, "resolved", relative);
+    if (resolution.state !== "resolved") continue;
+    assert.equal(resolution.root, root, relative);
+    assert.equal(resolution.relativePath, expectedRelative, relative);
+    assert.equal(
+      classifyAssetPath(resolution.relativePath).matchedRule,
+      expectedRule,
+      relative,
+    );
+  }
 });
 
 test("discovery and the shared classifier agree on Context-root precedence", async () => {
@@ -235,6 +379,12 @@ test("suggest-metadata returns no-proposal for ordinary Skill-local support", as
     suggestion.classification.parentAssetPath,
     "skills/foo/SKILL.md",
   );
+  assert.deepEqual(suggestion.nextActions[0]?.invocation.args, [
+    "inspect",
+    path.join(root, "skills", "foo", "SKILL.md"),
+    "--format",
+    "json",
+  ]);
   const prompt = renderMetadataPrompt(suggestion);
   assert.match(prompt, /No independent metadata retrofit is required/);
   assert.match(prompt, /skills\/foo\/SKILL\.md/);
@@ -262,6 +412,180 @@ test("suggest-metadata preserves explicit Skill-local overrides", async () => {
     renderMetadataPrompt(suggestion),
     /explicit human-provided Skill-local metadata override/,
   );
+});
+
+test("missing Skill parent blocks inheritance and metadata suggestions", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-missing-parent-"));
+  const target = path.join(root, "skills", "foo", "references", "policy.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(target, "# Policy\n");
+
+  const suggestion = await buildMetadataSuggestion(target, {
+    owner: "local-owner",
+  });
+  const inspect = await buildInspectOutline(target);
+  assert.equal(suggestion.decisionStatus, "blocked");
+  assert.equal(suggestion.decision.reasonCode, "skill-local-parent-unresolved");
+  assert.equal(suggestion.classification.parentResolution, "missing");
+  assert.deepEqual(suggestion.candidateMetadata, {});
+  assert.equal(suggestion.nextActions[0]?.kind, "review-layout");
+  assert.equal(inspect.classification.parentResolution, "missing");
+  assert.equal(inspect.governance?.ownership.source, "unowned");
+  assert.doesNotMatch(renderMetadataPrompt(suggestion), /governed by:/);
+});
+
+test("ambiguous Skill parents fail closed in inspect and suggest-metadata", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-ambiguous-parent-"));
+  const skillDirectory = path.join(root, "skills", "foo");
+  const target = path.join(skillDirectory, "references", "policy.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  const skill = [
+    "---",
+    "name: foo",
+    "description: Review policy. Use when policy evidence needs review.",
+    "metadata:",
+    "  renma.owner: qa-platform",
+    "---",
+    "# Foo",
+    "",
+  ].join("\n");
+  await writeFile(path.join(skillDirectory, "SKILL.md"), skill);
+  await writeFile(path.join(root, "skills", "foo.skill.md"), skill);
+  await writeFile(target, "# Policy\n");
+
+  const suggestion = await buildMetadataSuggestion(target);
+  const inspect = await buildInspectOutline(target);
+  assert.equal(suggestion.decisionStatus, "blocked");
+  assert.equal(suggestion.classification.parentResolution, "ambiguous");
+  assert.deepEqual(suggestion.classification.parentAssetCandidates, [
+    "skills/foo.skill.md",
+    "skills/foo/SKILL.md",
+  ]);
+  assert.equal(inspect.classification.parentResolution, "ambiguous");
+  assert.equal(inspect.governance?.ownership.source, "unowned");
+});
+
+test("explicit local governance is preserved without an inheritance claim", async () => {
+  const root = await governedSkillFixture();
+  const target = path.join(root, "skills", "foo", "references", "policy.md");
+  await writeFile(
+    target,
+    "---\nowner: local-docs\n---\n# Policy\n\nLocal support.\n",
+  );
+  const suggestion = await buildMetadataSuggestion(target);
+  const inspect = await buildInspectOutline(target);
+
+  assert.equal(
+    suggestion.decision.reasonCode,
+    "skill-local-existing-metadata-preserved",
+  );
+  assert.equal(inspect.governance?.ownership.source, "declared");
+  assert.equal(inspect.governance?.ownership.effectiveOwner, "local-docs");
+});
+
+test("resolved Skill-local support remains explicitly unowned when its parent has no owner", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-unowned-parent-"));
+  const skillDirectory = path.join(root, "skills", "foo");
+  const target = path.join(skillDirectory, "references", "policy.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(
+    path.join(skillDirectory, "SKILL.md"),
+    [
+      "---",
+      "name: foo",
+      "description: Review policy. Use when policy evidence needs review.",
+      "---",
+      "# Foo",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(target, "# Policy\n");
+
+  const suggestion = await buildMetadataSuggestion(target);
+  assert.equal(suggestion.classification.parentResolution, "resolved");
+  assert.equal(suggestion.decision.reasonCode, "skill-local-unowned");
+  assert.equal(suggestion.decisionStatus, "no-change-recommended");
+});
+
+test("blocked independent ownership conflicts never produce patch guidance", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-owner-conflict-"));
+  const target = path.join(root, "contexts", "policy.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(
+    target,
+    "---\nid: context.policy\ntitle: Policy\nowner: docs\n---\n# Policy\n",
+  );
+  const suggestion = await buildMetadataSuggestion(target, { owner: "qa" });
+  const prompt = renderMetadataPrompt(suggestion);
+  assert.equal(suggestion.decisionStatus, "blocked");
+  assert.deepEqual(suggestion.candidateMetadata, {});
+  assert.match(prompt, /Do not return or apply a patch/);
+  assert.doesNotMatch(prompt, /Return a small reviewed patch/);
+  assert.doesNotMatch(prompt, /Candidate Metadata:\n- id:/);
+});
+
+test("decisionStatus is authoritative across prompt outcomes", () => {
+  const base = {
+    path: "contexts/policy.md",
+    kind: "context",
+    suggestedMode: "metadata-retrofit",
+    decision: {
+      reasonCode: "deterministic-metadata-candidate",
+      summary: "Fixture decision.",
+    },
+    classification: classifyAssetPath("contexts/policy.md"),
+    ownerProvided: false,
+    instructions: [],
+    candidateMetadata: { id: "context.policy" },
+    blockedMetadata: [],
+    nextActions: [],
+  } satisfies Omit<MetadataSuggestion, "decisionStatus">;
+
+  const blocked = renderMetadataPrompt({
+    ...base,
+    decisionStatus: "blocked",
+  });
+  assert.match(blocked, /suppressed because the decision is blocked/);
+  assert.match(blocked, /Do not return or apply a patch/);
+  const noChange = renderMetadataPrompt({
+    ...base,
+    decisionStatus: "no-change-recommended",
+  });
+  assert.match(noChange, /Stop without manufacturing work/);
+  const deterministic = renderMetadataPrompt({
+    ...base,
+    decisionStatus: "deterministic",
+  });
+  assert.match(deterministic, /deterministic candidate/);
+  const human = renderMetadataPrompt({
+    ...base,
+    decisionStatus: "human-confirmation-required",
+  });
+  assert.match(human, /After confirming the stated human decision/);
+  assert.match(human, /Do not invent unresolved owner/);
+});
+
+test("structured command invocations preserve POSIX and Windows argv", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma action's space-"));
+  const target = path.join(root, "contexts", "policy's file.md");
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(target, "# Policy\n");
+  const suggestion = await buildMetadataSuggestion(target);
+  const inspectAction = suggestion.nextActions.find(
+    (action) => action.kind === "inspect-target",
+  );
+  assert.deepEqual(inspectAction?.invocation.args, [
+    "inspect",
+    target,
+    "--format",
+    "json",
+  ]);
+  assert.match(inspectAction?.invocation.display ?? "", /'"'"'/);
+
+  const windowsPath = "C:\\Repo Name\\owner's file.md";
+  const windows = renmaCommand(["inspect", windowsPath, "--format", "json"]);
+  assert.deepEqual(windows.args, ["inspect", windowsPath, "--format", "json"]);
+  assert.equal(windows.command, "renma");
 });
 
 test("suggest-metadata and inspect expose the same Context classification", async () => {

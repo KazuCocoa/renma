@@ -270,6 +270,10 @@ about ownership, lifecycle, reuse, and source of truth. Renma never moves a
 file or infers that intent from content. `inspect` explains deterministic
 classification separately from governance. `suggest-metadata` returns the
 successful `no-proposal` mode when no safe metadata change is recommended.
+For Skill-local support, the path supplies only a parent candidate; Renma claims
+inheritance only after repository evidence resolves one parent Skill. A missing
+or ambiguous parent blocks a metadata proposal and directs the reviewer to the
+layout and scan evidence.
 
 For an LLM-assisted improvement, start with
 `renma scan . --fail-on high --format json`, inspect the target Skill and its

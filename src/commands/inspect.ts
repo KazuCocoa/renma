@@ -5,6 +5,11 @@ import {
   type ContextLensSummary,
 } from "../context-lens.js";
 import {
+  buildSkillParentIndex,
+  resolveSkillSupportParent,
+  withResolvedSkillParent,
+} from "../catalog.js";
+import {
   classifyAssetPath,
   repositoryClassificationPath,
 } from "../discovery.js";
@@ -130,7 +135,9 @@ export async function buildInspectOutline(
   const content = await readFile(absolutePath, "utf8");
   const classificationContext = repositoryClassificationPath(target);
   const classificationPath =
-    classificationContext?.relativePath ?? target.replace(/\\/g, "/");
+    classificationContext.state === "resolved"
+      ? classificationContext.relativePath
+      : "";
   const initialClassification = classifyAssetPath(classificationPath);
   const artifact: Artifact = {
     absolutePath,
@@ -149,9 +156,12 @@ export async function buildInspectOutline(
   const lineCount = document.lines.length;
   const repository = await inspectRepositoryForTarget(
     absolutePath,
-    classificationContext?.root,
+    classificationContext.state === "resolved"
+      ? classificationContext.root
+      : undefined,
     document,
     classification,
+    classificationPath,
   );
 
   return {
@@ -164,7 +174,7 @@ export async function buildInspectOutline(
       startLine: fence.startLine,
     })),
     contextLens: repository.contextLens,
-    classification,
+    classification: repository.classification,
     governance: repository.governance,
     frontmatterRange: frontmatterRange(document.lines),
     headings: document.headings.map((heading, index) => {
@@ -194,22 +204,76 @@ async function inspectRepositoryForTarget(
   inferredRoot: string | undefined,
   document: ParsedDocument,
   classification: AssetClassificationEvidence,
+  classificationPath: string,
 ): Promise<{
   asset: InspectAssetSummary | null;
   contextLens: ContextLensSummary;
   governance: AssetGovernanceEvidence | null;
+  classification: AssetClassificationEvidence;
 }> {
+  if (!inferredRoot) {
+    return {
+      asset: null,
+      contextLens: zeroContextLensSummary(),
+      governance: null,
+      classification,
+    };
+  }
   try {
-    const root = inferredRoot ?? inferCatalogRoot(absolutePath);
+    const root = inferredRoot;
     const snapshot = await collectRepositorySnapshot(root);
+    const skillParents = buildSkillParentIndex(snapshot.documents);
+    const resolvedClassification = withResolvedSkillParent(
+      classification,
+      classificationPath,
+      skillParents,
+    );
     const entry = snapshot.catalog.entries.find(
       (candidate) => path.resolve(root, candidate.sourcePath) === absolutePath,
     );
     if (!entry) {
+      const skillParent = resolveSkillSupportParent(
+        classificationPath,
+        skillParents,
+      );
+      const metadata = parseAssetMetadata(document).metadata;
+      const owner = metadata.owner?.trim();
+      const ownership = owner
+        ? {
+            declaredOwner: owner,
+            effectiveOwner: owner,
+            source: "declared" as const,
+          }
+        : skillParent.state === "resolved" && skillParent.parent.owner
+          ? {
+              declaredOwner: null,
+              effectiveOwner: skillParent.parent.owner,
+              source: "inherited" as const,
+              inheritedFrom: {
+                id: skillParent.parent.id,
+                sourcePath: skillParent.parent.sourcePath,
+              },
+            }
+          : {
+              declaredOwner: null,
+              effectiveOwner: null,
+              source: "unowned" as const,
+            };
       return {
         asset: null,
         contextLens: snapshot.contextLens,
-        governance: null,
+        governance:
+          resolvedClassification.scope === "skill-local"
+            ? {
+                ownership,
+                policySource: "missing",
+                metadataState: inspectMetadataState(
+                  document,
+                  resolvedClassification,
+                ),
+              }
+            : null,
+        classification: resolvedClassification,
       };
     }
 
@@ -257,12 +321,14 @@ async function inspectRepositoryForTarget(
           : {}),
         metadataState: inspectMetadataState(document, classification),
       },
+      classification: resolvedClassification,
     };
   } catch {
     return {
       asset: null,
       contextLens: zeroContextLensSummary(),
       governance: null,
+      classification,
     };
   }
 }
@@ -417,34 +483,6 @@ function compareInspectRelationships(
   return left.to.localeCompare(right.to);
 }
 
-function inferCatalogRoot(absolutePath: string): string {
-  const segments = absolutePath.split(path.sep);
-  for (let index = segments.length - 2; index >= 0; index -= 1) {
-    if (
-      segments[index] === "skills" ||
-      segments[index] === "context" ||
-      segments[index] === "contexts" ||
-      segments[index] === "lenses" ||
-      segments[index] === ".agents"
-    ) {
-      return (
-        segments.slice(0, index).join(path.sep) || path.parse(absolutePath).root
-      );
-    }
-  }
-
-  const cwd = path.resolve(process.cwd());
-  const relativeToCwd = path.relative(cwd, absolutePath);
-  if (
-    relativeToCwd &&
-    !relativeToCwd.startsWith("..") &&
-    !path.isAbsolute(relativeToCwd)
-  ) {
-    return cwd;
-  }
-  return path.dirname(absolutePath);
-}
-
 async function buildInspectSlice(
   target: string,
   requestedRange: string,
@@ -573,6 +611,17 @@ function renderClassification(
       : []),
     ...(classification.parentAssetPath
       ? [`- Parent asset: ${classification.parentAssetPath}`]
+      : []),
+    ...(classification.parentAssetCandidatePath
+      ? [
+          `- Parent candidate: ${classification.parentAssetCandidatePath}`,
+          `- Parent resolution: ${classification.parentResolution ?? "structural-candidate"}`,
+        ]
+      : []),
+    ...(classification.parentAssetCandidates?.length
+      ? [
+          `- Parent candidates: ${classification.parentAssetCandidates.join(", ")}`,
+        ]
       : []),
     ...(classification.supportDirectory
       ? [`- Support directory: ${classification.supportDirectory}`]

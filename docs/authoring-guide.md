@@ -411,6 +411,13 @@ governs them. Local metadata overrides remain supported where valid, but are
 not required. `tools/**` is shared repository implementation, and a Skill uses
 `scripts/`, not `tools/`, for canonical local executable support.
 
+The Skill-local path rule establishes only a structural parent candidate. The
+catalog must resolve exactly one parent entrypoint before Renma reports
+inherited governance. A missing or ambiguous parent remains structurally
+Skill-local but unowned or unresolved; `suggest-metadata` blocks instead of
+adding independent metadata automatically. Existing explicit local owner or
+policy metadata is preserved and is not described as inherited.
+
 Humans decide whether knowledge needs independent ownership, lifecycle, reuse,
 and source-of-truth status. Renma classifies the resulting placement but never
 promotes or moves content automatically. A `no-proposal` result is successful:
