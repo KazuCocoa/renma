@@ -6,6 +6,50 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.18.3] - 2026-07-13
+
+### Added
+
+- Added focused regression coverage for repository markers and guard
+  directories, cross-command classification evidence, historical and canonical
+  parent-Skill resolution, inherited governance provenance, structured command
+  displays, and snapshot reuse.
+- Added an internal architecture guide describing repository snapshots,
+  resolution and evidence stages, decisions, renderers, fail-closed boundaries,
+  and compatibility constraints.
+
+### Changed
+
+- Centralized target document and repository evidence used by `inspect` and
+  `suggest-metadata`, including boundary resolution, metadata-refined
+  classification, parent-Skill resolution, ownership, and policy provenance.
+- Made repository snapshots retain shared classification, parent-Skill, and
+  security-policy indexes so downstream commands do not reinterpret the same
+  files independently.
+- Changed Readiness to derive graph and scan results from one repository
+  snapshot instead of discovering and parsing the repository twice.
+- Separated metadata-suggestion decision types and typed owner-conflict logic
+  from human wording. Human prompt and inspect text rendering now live behind
+  focused renderer boundaries while legacy module exports remain available.
+- Added design comments for repository guards, outer-boundary precedence,
+  ownership non-inference, parent inheritance, application gates, and
+  repository-rooted migration collision checks.
+
+### Compatibility
+
+- CLI names, arguments, exit codes, JSON property names, enum values, finding
+  and diagnostic IDs, severity, scoring, migration direction, package entry
+  paths, and previously packaged deep-module entrypoints remain compatible with
+  0.18.2. The package adds only the new internal modules and architecture guide.
+- Scan diagnostics continue to expose structural parent candidates while
+  repository-aware commands may enrich the same classification to `resolved`,
+  `missing`, or `ambiguous`. This stage distinction avoids changing existing
+  diagnostic JSON.
+- Blocked historical Skill migrations continue to retain partial diagnostic
+  candidate maps for 0.18.2 JSON compatibility. `decisionStatus: "blocked"`
+  remains the authoritative hard stop, and no applicable canonical frontmatter
+  or patch instruction is emitted.
+
 ## [0.18.2] - 2026-07-13
 
 ### Added

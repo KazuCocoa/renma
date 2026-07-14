@@ -1,11 +1,15 @@
-import { graph, type GraphEdge, type GraphReport } from "./graph.js";
+import {
+  graphFromRepositorySnapshot,
+  type GraphEdge,
+  type GraphReport,
+} from "./graph.js";
 import { DIAGNOSTIC_IDS } from "../diagnostic-ids.js";
 import { classifyRepositorySkillEntrypointPath } from "../discovery.js";
 import {
   zeroContextLensSummary,
   type ContextLensSummary,
 } from "../context-lens.js";
-import { scan } from "../scanner.js";
+import { scanFromRepositorySnapshot } from "../scanner.js";
 import {
   summarizeSecurityPosture,
   type SecurityPostureSummary,
@@ -15,6 +19,10 @@ import {
   type SecurityPolicyInventorySummary,
 } from "../security-policy-inventory.js";
 import type { ConfigOverrides } from "../config.js";
+import {
+  collectRepositorySnapshot,
+  type RepositorySnapshot,
+} from "../repository-evidence.js";
 import type { Diagnostic, Finding } from "../types.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import type { AgentSkillsValidationSummary } from "../agent-skills.js";
@@ -110,10 +118,17 @@ export async function readiness(
   targetPath: string,
   overrides: ConfigOverrides = {},
 ): Promise<ReadinessReport> {
-  const [graphReport, scanResult] = await Promise.all([
-    graph(targetPath, overrides),
-    scan(targetPath, overrides),
-  ]);
+  return readinessFromRepositorySnapshot(
+    await collectRepositorySnapshot(targetPath, overrides),
+  );
+}
+
+/** Derive graph and scan inputs from the same repository evidence boundary. */
+export function readinessFromRepositorySnapshot(
+  snapshot: RepositorySnapshot,
+): ReadinessReport {
+  const graphReport = graphFromRepositorySnapshot(snapshot);
+  const scanResult = scanFromRepositorySnapshot(snapshot);
   return buildReadinessReport(
     graphReport,
     scanResult.findings,

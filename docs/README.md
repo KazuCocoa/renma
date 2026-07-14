@@ -44,6 +44,8 @@ Use this index to choose the smallest document that answers your question.
 - [Product Design](../design.md): asset semantics and relationships.
 - [Architecture](../architecture.md): processing architecture and product
   boundaries.
+- [Internal Architecture](internal-architecture.md): contributor-facing
+  snapshot, evidence, decision, rendering, and fail-closed boundaries.
 - [Current Roadmap](../plan.md): current definition, completed baseline, and
   planned release direction.
 - [Deferred Skill-to-Skill Discovery Design](../plan-discovery.md): exploratory

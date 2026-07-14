@@ -4,31 +4,23 @@ import {
   zeroContextLensSummary,
   type ContextLensSummary,
 } from "../context-lens.js";
+import { type RepositoryClassificationPathResolution } from "../discovery.js";
 import {
-  buildSkillParentIndex,
-  resolveSkillSupportParent,
-  withResolvedSkillParent,
-} from "../catalog.js";
-import {
-  classifyAssetPath,
-  repositoryClassificationPath,
-  type RepositoryClassificationPathResolution,
-} from "../discovery.js";
-import { parseDocument } from "../markdown.js";
-import { parseAssetMetadata } from "../metadata.js";
+  collectTargetDocumentEvidence,
+  collectTargetRepositoryEvidence,
+  type TargetDocumentEvidence,
+  type TargetRepositoryEvidence,
+} from "../evidence/target.js";
 import type {
   AssetKind,
   AssetStatus,
   CatalogEntry,
   Dependency,
 } from "../model.js";
-import { collectRepositorySnapshot } from "../repository-evidence.js";
-import { collectSecurityPolicyAssetEvidence } from "../security-policy-inventory.js";
+import { renderTextOutline } from "../renderers/inspect.js";
 import type {
-  Artifact,
   AssetClassificationEvidence,
   AssetGovernanceEvidence,
-  ParsedDocument,
 } from "../types.js";
 
 const DEFAULT_SECTION_PREVIEW_LINES = 3;
@@ -133,41 +125,20 @@ export async function runInspectCommand(
 export async function buildInspectOutline(
   target: string,
 ): Promise<InspectOutline> {
-  const absolutePath = path.resolve(target);
-  const content = await readFile(absolutePath, "utf8");
-  const classificationContext = repositoryClassificationPath(target);
-  const classificationPath =
-    classificationContext.state === "resolved"
-      ? classificationContext.relativePath
-      : "";
-  const initialClassification = classifyAssetPath(classificationPath);
-  const artifact: Artifact = {
-    absolutePath,
-    content,
-    kind: initialClassification.kind,
-    path: classificationPath || absolutePath,
-    sizeBytes: Buffer.byteLength(content),
-    contentClassification: "text",
-    markdownParserEligible: /\.mdx?$/i.test(absolutePath),
-  };
-  const document = parseDocument(artifact);
-  const metadata = parseAssetMetadata(document).metadata;
-  const classification = classifyAssetPath(classificationPath, {
-    ...(metadata.type ? { metadataType: metadata.type } : {}),
+  const targetEvidence = await collectTargetDocumentEvidence(target, {
+    unresolvedArtifactPath: "absolute",
   });
+  const repositoryEvidence =
+    await collectTargetRepositoryEvidence(targetEvidence);
+  const { absolutePath, content, document } = targetEvidence;
   const lineCount = document.lines.length;
-  const repository = await inspectRepositoryForTarget(
-    absolutePath,
-    classificationContext.state === "resolved"
-      ? classificationContext.root
-      : undefined,
-    document,
-    classification,
-    classificationPath,
+  const repository = inspectRepositoryForTarget(
+    targetEvidence,
+    repositoryEvidence,
   );
 
   return {
-    bytes: artifact.sizeBytes,
+    bytes: Buffer.byteLength(content),
     asset: repository.asset,
     codeFences: document.codeFences.map((fence) => ({
       endLine: fence.endLine,
@@ -198,166 +169,70 @@ export async function buildInspectOutline(
       target: link.target,
     })),
     path: absolutePath,
-    repositoryBoundary: classificationContext,
+    repositoryBoundary: targetEvidence.repositoryBoundary,
   };
 }
 
-async function inspectRepositoryForTarget(
-  absolutePath: string,
-  inferredRoot: string | undefined,
-  document: ParsedDocument,
-  classification: AssetClassificationEvidence,
-  classificationPath: string,
-): Promise<{
+function inspectRepositoryForTarget(
+  target: TargetDocumentEvidence,
+  repository: TargetRepositoryEvidence,
+): {
   asset: InspectAssetSummary | null;
   contextLens: ContextLensSummary;
   governance: AssetGovernanceEvidence | null;
   classification: AssetClassificationEvidence;
-}> {
-  if (!inferredRoot) {
+} {
+  if (repository.state === "unavailable") {
     return {
       asset: null,
       contextLens: zeroContextLensSummary(),
       governance: null,
-      classification,
+      classification: target.classification,
     };
   }
-  try {
-    const root = inferredRoot;
-    const snapshot = await collectRepositorySnapshot(root);
-    const skillParents = buildSkillParentIndex(snapshot.documents);
-    const resolvedClassification = withResolvedSkillParent(
-      classification,
-      classificationPath,
-      skillParents,
-    );
-    const entry = snapshot.catalog.entries.find(
-      (candidate) => path.resolve(root, candidate.sourcePath) === absolutePath,
-    );
-    if (!entry) {
-      const skillParent = resolveSkillSupportParent(
-        classificationPath,
-        skillParents,
-      );
-      const metadata = parseAssetMetadata(document).metadata;
-      const owner = metadata.owner?.trim();
-      const ownership = owner
-        ? {
-            declaredOwner: owner,
-            effectiveOwner: owner,
-            source: "declared" as const,
-          }
-        : skillParent.state === "resolved" && skillParent.parent.owner
-          ? {
-              declaredOwner: null,
-              effectiveOwner: skillParent.parent.owner,
-              source: "inherited" as const,
-              inheritedFrom: {
-                id: skillParent.parent.id,
-                sourcePath: skillParent.parent.sourcePath,
-              },
-            }
-          : {
-              declaredOwner: null,
-              effectiveOwner: null,
-              source: "unowned" as const,
-            };
-      return {
-        asset: null,
-        contextLens: snapshot.contextLens,
-        governance:
-          resolvedClassification.scope === "skill-local"
-            ? {
-                ownership,
-                policySource: "missing",
-                metadataState: inspectMetadataState(
-                  document,
-                  resolvedClassification,
-                ),
-              }
-            : null,
-        classification: resolvedClassification,
-      };
-    }
-
-    const resolver = createInspectRelationshipResolver(
-      snapshot.catalog.entries,
-    );
-    const inboundDependents = snapshot.catalog.dependencies
-      .filter((dependency) => resolver.matches(dependency.to, entry))
-      .map((dependency) => inspectRelationship(dependency, resolver))
-      .sort(compareInspectRelationships);
-    const outboundDependencies = snapshot.catalog.dependencies
-      .filter((dependency) => resolver.matches(dependency.from, entry))
-      .map((dependency) => inspectRelationship(dependency, resolver))
-      .sort(compareInspectRelationships);
-    const policy = collectSecurityPolicyAssetEvidence(
-      snapshot.artifacts,
-      snapshot.config.security,
-    ).find((candidate) => candidate.path === entry.sourcePath);
-
+  const { snapshot, entry } = repository;
+  if (!entry) {
     return {
-      asset: {
-        id: entry.id,
-        kind: entry.kind,
-        ...(entry.metadata.owner ? { owner: entry.metadata.owner } : {}),
-        ...(entry.metadata.status ? { status: entry.metadata.status } : {}),
-        ...(entry.metadata.purpose ? { purpose: entry.metadata.purpose } : {}),
-        appliesTo: entry.metadata.appliesTo ?? [],
-        focus: entry.metadata.focus ?? [],
-        expectedOutputs: entry.metadata.expectedOutputs ?? [],
+      asset: null,
+      contextLens: snapshot.contextLens,
+      governance: repository.governance,
+      classification: repository.classification,
+    };
+  }
+
+  const resolver = createInspectRelationshipResolver(snapshot.catalog.entries);
+  const inboundDependents = snapshot.catalog.dependencies
+    .filter((dependency) => resolver.matches(dependency.to, entry))
+    .map((dependency) => inspectRelationship(dependency, resolver))
+    .sort(compareInspectRelationships);
+  const outboundDependencies = snapshot.catalog.dependencies
+    .filter((dependency) => resolver.matches(dependency.from, entry))
+    .map((dependency) => inspectRelationship(dependency, resolver))
+    .sort(compareInspectRelationships);
+
+  return {
+    asset: {
+      id: entry.id,
+      kind: entry.kind,
+      ...(entry.metadata.owner ? { owner: entry.metadata.owner } : {}),
+      ...(entry.metadata.status ? { status: entry.metadata.status } : {}),
+      ...(entry.metadata.purpose ? { purpose: entry.metadata.purpose } : {}),
+      appliesTo: entry.metadata.appliesTo ?? [],
+      focus: entry.metadata.focus ?? [],
+      expectedOutputs: entry.metadata.expectedOutputs ?? [],
+      inboundDependents,
+      outboundDependencies,
+      relationshipChains: relationshipChains(
+        entry,
         inboundDependents,
         outboundDependencies,
-        relationshipChains: relationshipChains(
-          entry,
-          inboundDependents,
-          outboundDependencies,
-        ),
-        tags: entry.metadata.tags,
-      },
-      contextLens: snapshot.contextLens,
-      governance: {
-        ownership: entry.ownership,
-        policySource: policySource(policy),
-        ...(policy?.inheritedFrom
-          ? { policyInheritedFrom: policy.inheritedFrom.sourcePath }
-          : {}),
-        metadataState: inspectMetadataState(document, classification),
-      },
-      classification: resolvedClassification,
-    };
-  } catch {
-    return {
-      asset: null,
-      contextLens: zeroContextLensSummary(),
-      governance: null,
-      classification,
-    };
-  }
-}
-
-function policySource(
-  policy:
-    | ReturnType<typeof collectSecurityPolicyAssetEvidence>[number]
-    | undefined,
-): "declared" | "inherited" | "missing" {
-  if (!policy?.hasEffectivePolicy) return "missing";
-  if (policy.hasLocalPolicyMetadata) return "declared";
-  return "inherited";
-}
-
-function inspectMetadataState(
-  document: ParsedDocument,
-  classification: AssetClassificationEvidence,
-): "declared" | "partial" | "missing" | "not-required" {
-  const metadata = parseAssetMetadata(document).metadata;
-  const hasMetadata = Object.keys(document.metadata).length > 0;
-  if (classification.scope === "skill-local" && !hasMetadata) {
-    return "not-required";
-  }
-  if (!hasMetadata) return "missing";
-  if (metadata.id && metadata.owner) return "declared";
-  return "partial";
+      ),
+      tags: entry.metadata.tags,
+    },
+    contextLens: snapshot.contextLens,
+    governance: repository.governance,
+    classification: repository.classification,
+  };
 }
 
 function inspectRelationship(
@@ -561,184 +436,6 @@ function parseLineRange(
   }
 
   return { end, start };
-}
-
-function renderTextOutline(outline: InspectOutline): string {
-  const lines = [
-    `Path: ${outline.path}`,
-    `Lines: ${outline.lineCount}`,
-    `Bytes: ${outline.bytes}`,
-    `Frontmatter: ${outline.frontmatterRange ?? "none"}`,
-    "",
-    "Repository boundary:",
-    ...renderRepositoryBoundary(outline.repositoryBoundary),
-    "",
-    "Classification:",
-    ...renderClassification(outline.classification),
-    "",
-    "Governance:",
-    ...renderGovernance(outline.governance),
-    ...(outline.asset
-      ? ["", "Asset:", ...renderAssetSummary(outline.asset)]
-      : []),
-    "",
-    "Context Lens:",
-    ...renderContextLensSummary(outline.contextLens),
-    "",
-    "Headings:",
-    ...outline.headings.flatMap((heading) => [
-      `- ${"#".repeat(heading.depth)} ${heading.text} ${heading.range}`,
-      ...heading.preview.map((line) => `  ${line}`),
-    ]),
-    "",
-    "Code fences:",
-    ...outline.codeFences.map(
-      (fence) => `- ${fence.range} ${fence.language || "(no language)"}`,
-    ),
-    "",
-    "Links:",
-    ...outline.links.map((link) => `- L${link.line}: ${link.target}`),
-    "",
-  ];
-
-  return `${lines.join("\n")}\n`;
-}
-
-function renderRepositoryBoundary(
-  boundary: RepositoryClassificationPathResolution,
-): string[] {
-  if (boundary.state === "resolved") {
-    return [
-      `- State: ${boundary.state}`,
-      `- Source: ${boundary.source}`,
-      `- Root: ${boundary.root}`,
-      `- Relative path: ${boundary.relativePath}`,
-    ];
-  }
-  return [
-    `- State: ${boundary.state}`,
-    `- Reason code: ${boundary.reasonCode}`,
-    `- Reason: ${boundary.reason}`,
-    `- Candidate roots: ${boundary.candidateRoots.join(", ") || "(none)"}`,
-  ];
-}
-
-function renderClassification(
-  classification: AssetClassificationEvidence,
-): string[] {
-  return [
-    `- Kind: ${classification.kind}`,
-    `- Scope: ${classification.scope}`,
-    `- Matched rule: ${classification.matchedRule}`,
-    `- Reason code: ${classification.reasonCode}`,
-    ...(classification.recognizedRoot
-      ? [`- Recognized root: ${classification.recognizedRoot}`]
-      : []),
-    ...(classification.parentAssetPath
-      ? [`- Parent asset: ${classification.parentAssetPath}`]
-      : []),
-    ...(classification.parentAssetCandidatePath
-      ? [
-          `- Parent candidate: ${classification.parentAssetCandidatePath}`,
-          `- Parent resolution: ${classification.parentResolution ?? "structural-candidate"}`,
-        ]
-      : []),
-    ...(classification.parentAssetCandidates?.length
-      ? [
-          `- Parent candidates: ${classification.parentAssetCandidates.join(", ")}`,
-        ]
-      : []),
-    ...(classification.supportDirectory
-      ? [`- Support directory: ${classification.supportDirectory}`]
-      : []),
-    ...(classification.ignoredNestedSegments?.length
-      ? [
-          `- Ignored nested segments: ${classification.ignoredNestedSegments.join(", ")}`,
-        ]
-      : []),
-    `- Reason: ${classification.reason}`,
-    ...(classification.competingRules?.flatMap((competing) => [
-      `- Competing rule: ${competing.rule} (${competing.reasonCode})`,
-      `  ${competing.reason}`,
-    ]) ?? []),
-  ];
-}
-
-function renderGovernance(
-  governance: AssetGovernanceEvidence | null,
-): string[] {
-  if (!governance) return ["- Unresolved: target is not a catalog entry."];
-  const inheritedOwner = governance.ownership.inheritedFrom?.sourcePath;
-  return [
-    `- Declared owner: ${governance.ownership.declaredOwner ?? "(none)"}`,
-    `- Effective owner: ${governance.ownership.effectiveOwner ?? "(unowned)"}`,
-    `- Ownership source: ${governance.ownership.source}`,
-    ...(inheritedOwner
-      ? [`- Ownership inherited from: ${inheritedOwner}`]
-      : []),
-    `- Policy source: ${governance.policySource ?? "missing"}`,
-    ...(governance.policyInheritedFrom
-      ? [`- Policy inherited from: ${governance.policyInheritedFrom}`]
-      : []),
-    `- Metadata state: ${governance.metadataState ?? "missing"}`,
-  ];
-}
-
-function renderContextLensSummary(contextLens: ContextLensSummary): string[] {
-  return [
-    `- Enabled: ${contextLens.enabled ? "yes" : "no"}`,
-    `- Detected: ${contextLens.detected ? "yes" : "no"}`,
-    `- Lenses: ${contextLens.validLensCount}/${contextLens.totalLensCount} valid (${contextLens.invalidLensCount} invalid)`,
-    `- Diagnostics: error ${contextLens.diagnosticCounts.error}, warning ${contextLens.diagnosticCounts.warning}, info ${contextLens.diagnosticCounts.info}`,
-    `- Representative diagnostic: ${contextLens.representativeDiagnosticCode ?? "(none)"}`,
-    `- Definition paths: ${list(contextLens.definitionPaths)}`,
-    `- Target references: ${list(contextLens.targetReferences)}`,
-  ];
-}
-
-function renderAssetSummary(asset: InspectAssetSummary): string[] {
-  return [
-    `- ID: ${asset.id}`,
-    `- Kind: ${asset.kind}`,
-    ...(asset.owner ? [`- Owner: ${asset.owner}`] : []),
-    ...(asset.status ? [`- Status: ${asset.status}`] : []),
-    `- Tags: ${list(asset.tags)}`,
-    ...(asset.kind === "context_lens"
-      ? [
-          ...(asset.purpose ? [`- Purpose: ${asset.purpose}`] : []),
-          `- Applies to: ${list(asset.appliesTo)}`,
-          `- Focus: ${list(asset.focus)}`,
-          `- Expected outputs: ${list(asset.expectedOutputs)}`,
-        ]
-      : []),
-    "",
-    "Relationships:",
-    "- Inbound dependents:",
-    ...relationshipLines(asset.inboundDependents),
-    "- Outbound dependencies:",
-    ...relationshipLines(asset.outboundDependencies),
-    ...(asset.relationshipChains.length > 0
-      ? [
-          "- Relationship chains:",
-          ...asset.relationshipChains.map(
-            (chain) =>
-              `  - ${chain.skill} -> ${chain.lens} -> ${chain.context}`,
-          ),
-        ]
-      : []),
-  ];
-}
-
-function relationshipLines(relationships: InspectRelationship[]): string[] {
-  if (relationships.length === 0) return ["  - (none)"];
-  return relationships.map(
-    (relationship) =>
-      `  - ${relationship.from} ${relationship.kind} -> ${relationship.to}`,
-  );
-}
-
-function list(values: string[]): string {
-  return values.length > 0 ? values.join(", ") : "(none)";
 }
 
 function formatRange(start: number, end: number): string {

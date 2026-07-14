@@ -233,6 +233,48 @@ test("repository boundaries prefer a nested repository marker over cwd containme
   }
 });
 
+test("repository boundaries recognize every supported marker and prefer the nearest one", async () => {
+  for (const marker of [".git", "renma.config.json", ".renma.json"] as const) {
+    const workspace = await mkdtemp(
+      path.join(os.tmpdir(), `renma-${marker.replaceAll(".", "-")}-marker-`),
+    );
+    const repository = path.join(workspace, "repository");
+    const target = path.join(repository, "contexts", "policy.md");
+    await mkdir(path.dirname(target), { recursive: true });
+    if (marker === ".git") {
+      await mkdir(path.join(repository, marker));
+    } else {
+      await writeFile(path.join(repository, marker), "{}\n");
+    }
+    await writeFile(target, "# Policy\n");
+
+    const resolution = repositoryClassificationPath(target);
+    assert.equal(resolution.state, "resolved", marker);
+    if (resolution.state !== "resolved") continue;
+    assert.equal(resolution.source, "marker", marker);
+    assert.equal(resolution.marker, marker, marker);
+    assert.equal(resolution.root, repository, marker);
+    assert.equal(resolution.relativePath, "contexts/policy.md", marker);
+  }
+
+  const workspace = await mkdtemp(
+    path.join(os.tmpdir(), "renma-nearest-marker-"),
+  );
+  const outerRepository = path.join(workspace, "outer");
+  const nestedRepository = path.join(outerRepository, "nested");
+  const target = path.join(nestedRepository, "contexts", "policy.md");
+  await mkdir(path.join(outerRepository, ".git"), { recursive: true });
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(path.join(nestedRepository, "renma.config.json"), "{}\n");
+  await writeFile(target, "# Policy\n");
+
+  const nearest = repositoryClassificationPath(target);
+  assert.equal(nearest.state, "resolved");
+  if (nearest.state !== "resolved") return;
+  assert.equal(nearest.marker, "renma.config.json");
+  assert.equal(nearest.root, nestedRepository);
+});
+
 test("an explicit caller root resolves unstructured paths while target-only evidence fails closed", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-explicit-root-"));
   const target = path.join(root, "docs", "note.md");
@@ -408,6 +450,27 @@ test("guard directories never establish a structural repository boundary", async
       false,
       relative,
     );
+  }
+
+  for (const guard of [
+    "references",
+    "profiles",
+    "examples",
+    "scripts",
+    "assets",
+  ]) {
+    const target = path.join(base, guard, "note.md");
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, "# Guard-only fixture\n");
+    const resolution = repositoryClassificationPath(target);
+    assert.equal(resolution.state, "unresolved", guard);
+    if (resolution.state !== "unresolved") continue;
+    assert.equal(
+      resolution.reasonCode,
+      "repository-boundary-unresolved",
+      guard,
+    );
+    assert.deepEqual(resolution.candidateRoots, [], guard);
   }
 });
 
@@ -685,6 +748,10 @@ test("structured command invocations preserve POSIX and Windows argv", async () 
   const windows = renmaCommand(["inspect", windowsPath, "--format", "json"]);
   assert.deepEqual(windows.args, ["inspect", windowsPath, "--format", "json"]);
   assert.equal(windows.command, "renma");
+  assert.equal(
+    windows.display,
+    String.raw`renma inspect 'C:\Repo Name\owner'"'"'s file.md' --format json`,
+  );
 });
 
 test("suggest-metadata and inspect expose the same Context classification", async () => {
@@ -701,13 +768,45 @@ test("suggest-metadata and inspect expose the same Context classification", asyn
   assert.equal(suggestion.decisionStatus, "human-confirmation-required");
 });
 
+test("discovery, commands, and scan findings retain compatible classification evidence", async () => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "renma-classification-equivalence-"),
+  );
+  const relativePath = "contexts/foo/references/policy.md";
+  const target = path.join(root, ...relativePath.split("/"));
+  await mkdir(path.dirname(target), { recursive: true });
+  await writeFile(target, "# Policy\n\nReusable policy.\n");
+
+  const discovered = await discoverArtifacts(root, DEFAULT_CONFIG);
+  const artifact = discovered.artifacts.find(
+    (candidate) => candidate.path === relativePath,
+  );
+  const structural = classifyAssetPath(relativePath);
+  const suggestion = await buildMetadataSuggestion(target);
+  const inspect = await buildInspectOutline(target);
+  const result = await scan(root);
+  const finding = result.findings.find(
+    (candidate) =>
+      candidate.id === "META-MISSING-ID" &&
+      candidate.evidence.path === relativePath,
+  );
+  const findingClassification = finding?.details?.classification;
+
+  assert.equal(artifact?.kind, structural.kind);
+  assert.deepEqual(inspect.classification, structural);
+  assert.deepEqual(suggestion.classification, structural);
+  assert.deepEqual(findingClassification, structural);
+});
+
 test("inspect separates Skill-local classification from inherited governance", async () => {
   const root = await governedSkillFixture();
   const target = path.join(root, "skills", "foo", "references", "policy.md");
   const outline = await buildInspectOutline(target);
+  const suggestion = await buildMetadataSuggestion(target);
 
   assert.equal(outline.classification.kind, "reference");
   assert.equal(outline.classification.scope, "skill-local");
+  assert.deepEqual(outline.classification, suggestion.classification);
   assert.equal(outline.governance?.ownership.source, "inherited");
   assert.equal(outline.governance?.ownership.effectiveOwner, "qa-platform");
   assert.equal(
@@ -723,6 +822,223 @@ test("inspect separates Skill-local classification from inherited governance", a
   assert.match(text, /Matched rule: skill-local-support/);
   assert.match(text, /Governance:/);
   assert.match(text, /Ownership source: inherited/);
+});
+
+test("historical Skill parents resolve exactly once without operationalizing their metadata", async () => {
+  const cases = [
+    {
+      label: "skills lowercase entrypoint",
+      root: "skills",
+      skillName: "lowercase",
+      parentPath: "skills/lowercase/skill.md",
+    },
+    {
+      label: ".agents/skills lowercase entrypoint",
+      root: ".agents/skills",
+      skillName: "lowercase",
+      parentPath: ".agents/skills/lowercase/skill.md",
+    },
+    {
+      label: "skills flat entrypoint",
+      root: "skills",
+      skillName: "flat",
+      parentPath: "skills/flat.skill.md",
+    },
+    {
+      label: ".agents/skills flat entrypoint",
+      root: ".agents/skills",
+      skillName: "flat",
+      parentPath: ".agents/skills/flat.skill.md",
+    },
+  ] as const;
+
+  for (const fixture of cases) {
+    const repository = await mkdtemp(
+      path.join(os.tmpdir(), "renma-historical-parent-"),
+    );
+    const skillDirectory = `${fixture.root}/${fixture.skillName}`;
+    const supportPath = `${skillDirectory}/scripts/run.mjs`;
+    const structuralCandidatePath = `${skillDirectory}/SKILL.md`;
+    await mkdir(path.join(repository, ".git"));
+    await mkdir(path.dirname(path.join(repository, supportPath)), {
+      recursive: true,
+    });
+    await mkdir(path.dirname(path.join(repository, fixture.parentPath)), {
+      recursive: true,
+    });
+    await writeFile(
+      path.join(repository, fixture.parentPath),
+      [
+        "---",
+        `name: ${fixture.skillName}`,
+        `description: Review ${fixture.skillName} support. Use when historical parent resolution needs deterministic evidence.`,
+        "metadata:",
+        `  renma.id: skill.${fixture.skillName}`,
+        "  renma.owner: qa-platform",
+        '  renma.network-allowed: "false"',
+        "---",
+        `# ${fixture.skillName}`,
+        "",
+        "Run scripts/run.mjs.",
+        "",
+      ].join("\n"),
+    );
+    await writeFile(
+      path.join(repository, supportPath),
+      "console.log('safe');\n",
+    );
+
+    const structural = classifyAssetPath(supportPath);
+    assert.equal(structural.recognizedRoot, fixture.root, fixture.label);
+    assert.equal(
+      structural.parentAssetCandidatePath,
+      structuralCandidatePath,
+      fixture.label,
+    );
+    assert.equal(structural.parentAssetPath, undefined, fixture.label);
+    assert.equal(
+      structural.parentResolution,
+      "structural-candidate",
+      fixture.label,
+    );
+
+    const target = path.join(repository, supportPath);
+    const [inspect, suggestion] = await Promise.all([
+      buildInspectOutline(target),
+      buildMetadataSuggestion(target),
+    ]);
+    assert.deepEqual(
+      inspect.classification,
+      suggestion.classification,
+      fixture.label,
+    );
+    assert.equal(
+      inspect.classification.parentAssetCandidatePath,
+      structuralCandidatePath,
+      fixture.label,
+    );
+    assert.equal(
+      inspect.classification.parentAssetPath,
+      fixture.parentPath,
+      fixture.label,
+    );
+    assert.notEqual(
+      inspect.classification.parentAssetPath,
+      inspect.classification.parentAssetCandidatePath,
+      fixture.label,
+    );
+    assert.equal(
+      inspect.classification.parentResolution,
+      "resolved",
+      fixture.label,
+    );
+    assert.equal(
+      inspect.classification.recognizedRoot,
+      fixture.root,
+      fixture.label,
+    );
+    assert.equal(
+      inspect.classification.parentAssetCandidates,
+      undefined,
+      fixture.label,
+    );
+    assert.deepEqual(
+      inspect.governance?.ownership,
+      {
+        declaredOwner: null,
+        effectiveOwner: null,
+        source: "unowned",
+      },
+      fixture.label,
+    );
+    assert.equal(inspect.governance?.policySource, "missing", fixture.label);
+    assert.equal(
+      inspect.governance?.policyInheritedFrom,
+      undefined,
+      fixture.label,
+    );
+    assert.equal(
+      inspect.governance?.metadataState,
+      "not-required",
+      fixture.label,
+    );
+    assert.equal(
+      suggestion.decision.reasonCode,
+      "skill-local-unowned",
+      fixture.label,
+    );
+    assert.equal(
+      suggestion.decisionStatus,
+      "no-change-recommended",
+      fixture.label,
+    );
+    assert.deepEqual(
+      suggestion.nextActions[0]?.invocation.args,
+      [
+        "inspect",
+        path.join(repository, fixture.parentPath),
+        "--format",
+        "json",
+      ],
+      fixture.label,
+    );
+  }
+});
+
+test("one canonical Skill parent supplies inherited owner and policy provenance", async () => {
+  const repository = await mkdtemp(
+    path.join(os.tmpdir(), "renma-canonical-parent-governance-"),
+  );
+  const parentPath = ".agents/skills/canonical/SKILL.md";
+  const supportPath = ".agents/skills/canonical/scripts/run.mjs";
+  await mkdir(path.join(repository, ".git"));
+  await mkdir(path.dirname(path.join(repository, supportPath)), {
+    recursive: true,
+  });
+  await writeFile(
+    path.join(repository, parentPath),
+    [
+      "---",
+      "name: canonical",
+      "description: Run governed support. Use when inherited governance provenance needs deterministic review.",
+      "metadata:",
+      "  renma.id: skill.canonical",
+      "  renma.owner: qa-platform",
+      '  renma.network-allowed: "false"',
+      "---",
+      "# Canonical",
+      "",
+      "Run scripts/run.mjs.",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(path.join(repository, supportPath), "console.log('safe');\n");
+
+  const target = path.join(repository, supportPath);
+  const [inspect, suggestion] = await Promise.all([
+    buildInspectOutline(target),
+    buildMetadataSuggestion(target),
+  ]);
+  assert.deepEqual(inspect.classification, suggestion.classification);
+  assert.equal(inspect.classification.parentAssetCandidatePath, parentPath);
+  assert.equal(inspect.classification.parentAssetPath, parentPath);
+  assert.equal(inspect.classification.parentResolution, "resolved");
+  assert.deepEqual(inspect.governance?.ownership, {
+    declaredOwner: null,
+    effectiveOwner: "qa-platform",
+    source: "inherited",
+    inheritedFrom: {
+      id: "skill.canonical",
+      sourcePath: parentPath,
+    },
+  });
+  assert.equal(inspect.governance?.policySource, "inherited");
+  assert.equal(inspect.governance?.policyInheritedFrom, parentPath);
+  assert.equal(inspect.governance?.metadataState, "not-required");
+  assert.equal(
+    suggestion.decision.reasonCode,
+    "skill-local-governance-inherited",
+  );
 });
 
 test("repository tools receive classification but no fabricated governance", async () => {

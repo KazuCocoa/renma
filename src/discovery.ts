@@ -655,6 +655,8 @@ function structuralRepositoryBoundary(
     "scripts",
     "assets",
   ]);
+  // Guard names are negative evidence only. A references/ or assets/ folder
+  // can live in any workspace, so it must never establish a repository root.
   const boundaryCandidate = (index: number) => {
     const root = path.join(parsed.root, ...segments.slice(0, index));
     const relativePath = normalizeAssetRepositoryRelativePath(
@@ -697,6 +699,8 @@ function structuralRepositoryBoundary(
       firstClassification.matchedRule !== "unknown" ||
       firstClassification.scope !== "unknown";
     if (strongCandidates.length === 1 || firstStrongEstablishesBoundary) {
+      // Once the outer strong boundary produces a recognized interpretation,
+      // nested tools/, contexts/, or similar names belong to that repository.
       return {
         state: "resolved",
         root: firstStrong.root,

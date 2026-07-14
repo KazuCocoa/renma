@@ -2,8 +2,6 @@ import { validateAgentSkills } from "./agent-skills.js";
 import type { ConfigOverrides } from "./config.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import { createDiagnosticsV2, createReviewBundles } from "./diagnostics-v2.js";
-import { classifyAssetPath } from "./discovery.js";
-import { parseAssetMetadata } from "./metadata.js";
 import {
   collectRepositorySnapshot,
   type RepositorySnapshot,
@@ -11,10 +9,7 @@ import {
 import { detectRepeatedContextPatterns } from "./repeated-context.js";
 import { runRules } from "./rules.js";
 import { securityDiagnosticFindings } from "./security-diagnostics.js";
-import {
-  collectSecurityPolicyAssetEvidence,
-  summarizeSecurityPolicyInventory,
-} from "./security-policy-inventory.js";
+import { summarizeSecurityPolicyInventory } from "./security-policy-inventory.js";
 import { applySuppressions } from "./suppressions.js";
 import { buildTrustGraph } from "./trust-graph.js";
 import type {
@@ -46,10 +41,7 @@ export function scanFromRepositorySnapshot(
     snapshot.artifacts,
     snapshot.config.security,
   );
-  const securityPolicies = collectSecurityPolicyAssetEvidence(
-    snapshot.artifacts,
-    snapshot.config.security,
-  );
+  const securityPolicies = snapshot.securityPolicies;
   const ruleOptions =
     options.evaluationDate === undefined
       ? {
@@ -61,17 +53,7 @@ export function scanFromRepositorySnapshot(
           repositoryPaths: snapshot.repositoryPaths,
           repositoryPathStates: snapshot.repositoryPathStates,
         };
-  const classifications = new Map<string, AssetClassificationEvidence>(
-    snapshot.documents.map((document) => {
-      const metadata = parseAssetMetadata(document).metadata;
-      return [
-        document.artifact.path,
-        classifyAssetPath(document.artifact.path, {
-          ...(metadata.type ? { metadataType: metadata.type } : {}),
-        }),
-      ];
-    }),
-  );
+  const classifications = snapshot.classifications;
   const rawFindings = [
     ...runRules(
       snapshot.documents,

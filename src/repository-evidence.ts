@@ -1,11 +1,16 @@
 import path from "node:path";
-import { buildCatalog } from "./catalog.js";
+import {
+  buildCatalog,
+  buildSkillParentIndex,
+  type SkillParentIndex,
+} from "./catalog.js";
 import { loadConfig, type ConfigOverrides } from "./config.js";
 import {
   summarizeContextLensGovernance,
   type ContextLensSummary,
 } from "./context-lens.js";
 import { discoverArtifacts } from "./discovery.js";
+import { buildClassificationEvidenceIndex } from "./evidence/classification.js";
 import { parseDocument } from "./markdown.js";
 import type { Catalog } from "./model.js";
 import {
@@ -14,8 +19,13 @@ import {
   repositoryPathCandidates,
   type RepositoryPathState,
 } from "./repository-paths.js";
+import {
+  collectSecurityPolicyAssetEvidence,
+  type SecurityPolicyAssetEvidence,
+} from "./security-policy-inventory.js";
 import type {
   Artifact,
+  AssetClassificationEvidence,
   Diagnostic,
   ParsedDocument,
   ScanConfig,
@@ -36,6 +46,10 @@ export interface RepositorySnapshot extends RepositoryEvidence {
   documents: ParsedDocument[];
   repositoryPaths: ReadonlySet<string>;
   repositoryPathStates: ReadonlyMap<string, RepositoryPathState>;
+  /** Snapshot-scoped indexes reused by commands without reinterpreting files. */
+  classifications: ReadonlyMap<string, AssetClassificationEvidence>;
+  skillParents: SkillParentIndex;
+  securityPolicies: SecurityPolicyAssetEvidence[];
   discoveryDiagnostics: Diagnostic[];
   catalogDiagnostics: Diagnostic[];
   contextLensDiagnostics: Diagnostic[];
@@ -69,6 +83,12 @@ export async function collectRepositorySnapshot(
   } = await discoverArtifacts(root, config);
   const documents = artifacts.map(parseDocument);
   const built = buildCatalog(documents, discoveredPaths);
+  const classifications = buildClassificationEvidenceIndex(documents);
+  const skillParents = buildSkillParentIndex(documents);
+  const securityPolicies = collectSecurityPolicyAssetEvidence(
+    artifacts,
+    config.security,
+  );
   const contextLens = summarizeContextLensGovernance(documents, built.catalog);
   const repositoryPaths = await collectRepositoryPaths(
     root,
@@ -92,6 +112,9 @@ export async function collectRepositorySnapshot(
     documents,
     repositoryPaths,
     repositoryPathStates,
+    classifications,
+    skillParents,
+    securityPolicies,
     scannedFileCount: artifacts.length,
     catalog: built.catalog,
     contextLens: contextLens.summary,
