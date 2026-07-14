@@ -137,12 +137,12 @@ export function buildCatalog(
   repositoryPaths: ReadonlySet<string> = new Set(
     documents.map((document) => document.artifact.path),
   ),
+  skillParents: SkillParentIndex = buildSkillParentIndex(documents),
 ): {
   catalog: Catalog;
   diagnostics: Diagnostic[];
 } {
   const diagnostics: Diagnostic[] = [];
-  const skillParents = buildSkillParentIndex(documents);
   for (const [skillDirectory, candidates] of skillParents) {
     if (candidates.length <= 1) continue;
     diagnostics.push({

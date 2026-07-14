@@ -42,6 +42,26 @@ export interface OwnerConflictEvidence {
   blockedMetadata: BlockedMetadata[];
 }
 
+export interface SkillLocalSuggestionDecisionInput {
+  hasOwnerConflict: boolean;
+  hasOverride: boolean;
+  hasLocalGovernance: boolean;
+  inheritsGovernance: boolean;
+}
+
+export interface UnsupportedTargetSuggestionDecisionInput {
+  matchedRule: "repository-tool" | "unknown";
+  boundaryReasonCode?:
+    | "repository-boundary-unresolved"
+    | "repository-boundary-ambiguous";
+}
+
+export interface MetadataCandidateSuggestionDecisionInput {
+  hasOwnerConflict: boolean;
+  hasCandidate: boolean;
+  scope: AssetClassificationEvidence["scope"];
+}
+
 /**
  * Decide Skill migration applicability before rendering any candidate text.
  *
@@ -96,6 +116,143 @@ export function buildSkillSuggestionDecision(
       reasonCode: "agent-skills-migration-review-required",
       summary:
         "Renma constructed a deterministic migration candidate, but a human must confirm the intended Skill semantics before applying it.",
+    },
+  };
+}
+
+export function buildSkillLocalParentUnresolvedDecision(): SuggestionDecision {
+  return {
+    status: "blocked",
+    decision: {
+      reasonCode: "skill-local-parent-unresolved",
+      summary:
+        "Renma cannot confirm one parent Skill, so it cannot claim inherited governance or safely propose an independent local override.",
+      question:
+        "Resolve the missing or ambiguous parent Skill layout, then rerun this command.",
+    },
+  };
+}
+
+export function buildSkillLocalSuggestionDecision(
+  input: SkillLocalSuggestionDecisionInput,
+): SuggestionDecision {
+  if (input.hasOwnerConflict) {
+    return {
+      status: "blocked",
+      decision: {
+        reasonCode: "conflicting-ownership-evidence",
+        summary:
+          "Renma cannot safely construct a local metadata override while declared and provided ownership evidence conflict.",
+      },
+    };
+  }
+  if (input.hasOverride) {
+    return {
+      status: "deterministic",
+      decision: {
+        reasonCode: "explicit-human-provided-override",
+        summary:
+          "The candidate is an explicit human-provided Skill-local metadata override; it is not required for ordinary local support.",
+      },
+    };
+  }
+  if (input.hasLocalGovernance) {
+    return {
+      status: "no-change-recommended",
+      decision: {
+        reasonCode: "skill-local-existing-metadata-preserved",
+        summary:
+          "Existing explicit local governance metadata is preserved; no inherited-governance claim or retrofit is needed.",
+      },
+    };
+  }
+  if (input.inheritsGovernance) {
+    return {
+      status: "no-change-recommended",
+      decision: {
+        reasonCode: "skill-local-governance-inherited",
+        summary:
+          "One unambiguous parent Skill supplies effective governance, so no independent metadata retrofit is required.",
+      },
+    };
+  }
+  return {
+    status: "no-change-recommended",
+    decision: {
+      reasonCode: "skill-local-unowned",
+      summary:
+        "The parent Skill is resolved, but neither the local file nor its parent declares an owner; missing ownership remains allowed.",
+    },
+  };
+}
+
+export function buildUnsupportedTargetSuggestionDecision(
+  input: UnsupportedTargetSuggestionDecisionInput,
+): SuggestionDecision {
+  if (input.boundaryReasonCode) {
+    return {
+      status: "blocked",
+      decision: {
+        reasonCode: input.boundaryReasonCode,
+        summary:
+          "Renma could not infer one safe repository-relative boundary for this target path.",
+      },
+    };
+  }
+  return {
+    status: "no-change-recommended",
+    decision: {
+      reasonCode:
+        input.matchedRule === "repository-tool"
+          ? "repository-tool-not-context"
+          : "outside-recognized-asset-boundary",
+      summary:
+        "No metadata proposal is generated because the target is not an independently governed Renma asset.",
+      question:
+        "Is this file intended to have independent ownership and lifecycle under a recognized asset root?",
+    },
+  };
+}
+
+export function buildMetadataCandidateSuggestionDecision(
+  input: MetadataCandidateSuggestionDecisionInput,
+): SuggestionDecision {
+  if (input.hasOwnerConflict) {
+    return {
+      status: "blocked",
+      decision: {
+        reasonCode: "conflicting-ownership-evidence",
+        summary: "Renma cannot safely construct a metadata proposal.",
+      },
+    };
+  }
+  if (!input.hasCandidate) {
+    return {
+      status: "no-change-recommended",
+      decision: {
+        reasonCode: "metadata-already-sufficient",
+        summary: "Renma found no supported metadata change to propose.",
+      },
+    };
+  }
+  if (input.scope === "independent") {
+    return {
+      status: "human-confirmation-required",
+      decision: {
+        reasonCode: "independent-governance-intent-unconfirmed",
+        summary:
+          "Renma constructed only deterministic candidates; the intended owner, lifecycle, and source-of-truth evidence still require human confirmation.",
+        question:
+          "Confirm the intended owner, lifecycle, and source-of-truth evidence for this independent asset.",
+      },
+    };
+  }
+  return {
+    status: "deterministic",
+    decision: {
+      reasonCode: "deterministic-metadata-candidate",
+      summary:
+        "The metadata candidate follows the classified repository boundary and explicit user evidence.",
     },
   };
 }

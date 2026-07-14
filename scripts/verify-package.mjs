@@ -1,25 +1,26 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 
 const cache = await mkdtemp(path.join(os.tmpdir(), "renma-npm-pack-"));
 
 try {
   const packed = spawnSync(
     "npm",
-    ["pack", "--dry-run", "--json", "--cache", cache],
+    ["pack", "--json", "--cache", cache, "--pack-destination", cache],
     { cwd: process.cwd(), encoding: "utf8" },
   );
   if (packed.error) throw packed.error;
   if (packed.status !== 0) {
-    throw new Error(packed.stderr.trim() || "npm pack --dry-run failed.");
+    throw new Error(packed.stderr.trim() || "npm pack failed.");
   }
 
   const reports = JSON.parse(packed.stdout);
   const report = reports[0];
   if (!report || !Array.isArray(report.files)) {
-    throw new Error("npm pack --dry-run returned no package file list.");
+    throw new Error("npm pack returned no package file list.");
   }
   const files = new Set(report.files.map((file) => file.path));
 
@@ -73,11 +74,73 @@ try {
     }
   }
 
+  const packageRoot = await extractPackage(cache, report.filename);
+  await verifyInspectDeclarationCompatibility(packageRoot);
+  for (const modulePath of [
+    "dist/commands/inspect.js",
+    "dist/commands/suggest-metadata.js",
+    "dist/discovery.js",
+    "dist/skill-migration.js",
+  ]) {
+    await import(pathToFileURL(path.join(packageRoot, modulePath)).href);
+  }
+
   process.stdout.write(
-    `Verified ${files.size} packaged files and every README-relative target.\n`,
+    `Verified ${files.size} packaged files, deep imports, inspect declarations, and every README-relative target.\n`,
   );
 } finally {
   await rm(cache, { recursive: true, force: true });
+}
+
+async function extractPackage(cache, filename) {
+  if (typeof filename !== "string" || filename.length === 0) {
+    throw new Error("npm pack returned no package filename.");
+  }
+  const unpacked = path.join(cache, "unpacked");
+  await mkdir(unpacked, { recursive: true });
+  const extracted = spawnSync(
+    "tar",
+    ["-xzf", path.join(cache, filename), "-C", unpacked],
+    { encoding: "utf8" },
+  );
+  if (extracted.error) throw extracted.error;
+  if (extracted.status !== 0) {
+    throw new Error(
+      extracted.stderr.trim() || "Could not extract npm package.",
+    );
+  }
+  const packageRoot = path.join(unpacked, "package");
+  await symlink(
+    path.resolve("node_modules"),
+    path.join(packageRoot, "node_modules"),
+  );
+  return packageRoot;
+}
+
+async function verifyInspectDeclarationCompatibility(packageRoot) {
+  const declarations = await readFile(
+    path.join(packageRoot, "dist/commands/inspect.d.ts"),
+    "utf8",
+  );
+  for (const typeName of [
+    "InspectOutline",
+    "InspectAssetSummary",
+    "InspectRelationship",
+    "InspectRelationshipChain",
+    "InspectSlice",
+  ]) {
+    const declared = new RegExp(
+      `export\\s+(?:interface|type)\\s+${typeName}\\b`,
+    ).test(declarations);
+    const reexported = new RegExp(
+      `export\\s+type\\s*\\{[\\s\\S]*?\\b${typeName}\\b[\\s\\S]*?\\}\\s*from`,
+    ).test(declarations);
+    if (!declared && !reexported) {
+      throw new Error(
+        `dist/commands/inspect.d.ts no longer exports ${typeName}.`,
+      );
+    }
+  }
 }
 
 function requirePackagedPath(files, target) {

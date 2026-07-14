@@ -82,9 +82,9 @@ export async function collectRepositorySnapshot(
     discoveredPaths,
   } = await discoverArtifacts(root, config);
   const documents = artifacts.map(parseDocument);
-  const built = buildCatalog(documents, discoveredPaths);
-  const classifications = buildClassificationEvidenceIndex(documents);
   const skillParents = buildSkillParentIndex(documents);
+  const built = buildCatalog(documents, discoveredPaths, skillParents);
+  const classifications = buildClassificationEvidenceIndex(documents);
   const securityPolicies = collectSecurityPolicyAssetEvidence(
     artifacts,
     config.security,

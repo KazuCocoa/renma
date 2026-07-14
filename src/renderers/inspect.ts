@@ -4,7 +4,7 @@ import type {
   InspectAssetSummary,
   InspectOutline,
   InspectRelationship,
-} from "../commands/inspect.js";
+} from "../evidence/inspect.js";
 import type {
   AssetClassificationEvidence,
   AssetGovernanceEvidence,

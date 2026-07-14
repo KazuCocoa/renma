@@ -54,7 +54,10 @@ export type TargetRepositoryEvidence =
     }
   | {
       state: "unavailable";
-      reason: "repository-boundary-unresolved" | "snapshot-unavailable";
+      reason:
+        | "repository-boundary-unresolved"
+        | "repository-boundary-ambiguous"
+        | "snapshot-unavailable";
       classification: AssetClassificationEvidence;
     };
 
@@ -133,7 +136,10 @@ export async function collectTargetRepositoryEvidence(
   if (!target.repositoryRoot) {
     return {
       state: "unavailable",
-      reason: "repository-boundary-unresolved",
+      reason:
+        target.repositoryBoundary.state === "unresolved"
+          ? target.repositoryBoundary.reasonCode
+          : "repository-boundary-unresolved",
       classification: target.classification,
     };
   }

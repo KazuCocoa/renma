@@ -111,6 +111,13 @@ only when exactly one candidate exists; zero candidates are `missing`, and
 multiple candidates are `ambiguous`. `withResolvedSkillParent` attaches that
 result without changing the original structural kind or scope.
 
+Snapshot construction creates this parent index before catalog construction and
+passes the same instance into `buildCatalog`. Catalog ownership, target parent
+resolution, and governance enrichment therefore share one snapshot-scoped
+source rather than reconstructing equivalent indexes independently. The public
+`buildCatalog(documents, repositoryPaths)` call remains compatible and creates
+an index for standalone callers.
+
 Ownership, policy, catalog membership, and relationships also require
 repository evidence. None of them may be manufactured from path shape alone.
 
@@ -129,6 +136,10 @@ The two stages remain separate because a readable file does not guarantee a
 resolvable repository. When repository collection is unavailable, the target
 retains structural evidence but does not fall back to guessed catalog identity,
 parentage, ownership, or policy.
+
+Unavailable evidence preserves the exact boundary result:
+`repository-boundary-unresolved` and `repository-boundary-ambiguous` remain
+distinct, while a failure after a root resolves is `snapshot-unavailable`.
 
 ## Classification, Governance, And Decisions
 
@@ -158,6 +169,12 @@ Decision construction belongs in `src/decisions/`. A decision object carries
 the authoritative `decisionStatus`, stable reason code, summary, and any
 remaining human question. Candidate construction must honor that status before
 anything is presented as an applicable edit.
+
+Metadata suggestion uses pure builders in
+`src/decisions/metadata-suggestion.ts` for Skill migrations, Skill-local parent
+and governance states, unsupported targets, owner conflicts, and independent
+metadata candidates. The command retains filesystem collision checks,
+candidate assembly, next-action construction, and orchestration.
 
 Renderers in `src/renderers/` turn an already-decided result into human text.
 They may improve wording and layout, but they must not rediscover a parent,
@@ -189,6 +206,10 @@ intermediate target-resolution unions exist to keep implementation states
 explicit. They are not public JSON merely because they are TypeScript types.
 They may be narrowed or reorganized when behavior-focused tests prove that the
 serialized contract is unchanged.
+
+Inspect renderer DTOs live in `src/evidence/inspect.ts`, so renderers do not
+depend on command modules. `src/commands/inspect.ts` re-exports the established
+types to preserve existing TypeScript deep imports.
 
 Human-readable reasons and prompts may evolve unless a test intentionally
 protects exact wording. Stable branching must use typed fields such as

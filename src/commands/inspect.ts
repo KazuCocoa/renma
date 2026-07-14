@@ -4,19 +4,20 @@ import {
   zeroContextLensSummary,
   type ContextLensSummary,
 } from "../context-lens.js";
-import { type RepositoryClassificationPathResolution } from "../discovery.js";
+import type {
+  InspectAssetSummary,
+  InspectOutline,
+  InspectRelationship,
+  InspectRelationshipChain,
+  InspectSlice,
+} from "../evidence/inspect.js";
 import {
   collectTargetDocumentEvidence,
   collectTargetRepositoryEvidence,
   type TargetDocumentEvidence,
   type TargetRepositoryEvidence,
 } from "../evidence/target.js";
-import type {
-  AssetKind,
-  AssetStatus,
-  CatalogEntry,
-  Dependency,
-} from "../model.js";
+import type { CatalogEntry, Dependency } from "../model.js";
 import { renderTextOutline } from "../renderers/inspect.js";
 import type {
   AssetClassificationEvidence,
@@ -32,72 +33,15 @@ export interface InspectOptions {
   lines?: string;
 }
 
-export interface InspectOutline {
-  path: string;
-  bytes: number;
-  lineCount: number;
-  frontmatterRange: null | string;
-  repositoryBoundary: RepositoryClassificationPathResolution;
-  classification: AssetClassificationEvidence;
-  governance: AssetGovernanceEvidence | null;
-  asset: InspectAssetSummary | null;
-  contextLens: ContextLensSummary;
-  headings: Array<{
-    depth: number;
-    line: number;
-    range: string;
-    text: string;
-    preview: string[];
-  }>;
-  codeFences: Array<{
-    endLine: number;
-    language: string;
-    range: string;
-    startLine: number;
-  }>;
-  links: Array<{
-    line: number;
-    target: string;
-  }>;
-}
-
-export interface InspectAssetSummary {
-  id: string;
-  kind: AssetKind;
-  owner?: string;
-  status?: AssetStatus;
-  tags: string[];
-  purpose?: string;
-  appliesTo: string[];
-  focus: string[];
-  expectedOutputs: string[];
-  inboundDependents: InspectRelationship[];
-  outboundDependencies: InspectRelationship[];
-  relationshipChains: InspectRelationshipChain[];
-}
-
-export interface InspectRelationship {
-  from: string;
-  to: string;
-  kind: string;
-  sourcePath: string;
-  resolved: boolean;
-  targetId?: string;
-  targetKind?: AssetKind;
-  targetPath?: string;
-}
-
-export interface InspectRelationshipChain {
-  skill: string;
-  lens: string;
-  context: string;
-}
-
-export interface InspectSlice {
-  path: string;
-  range: string;
-  text: string;
-}
+// Keep the established deep-import type contract while the implementation DTO
+// lives below command orchestration and renderer dependencies.
+export type {
+  InspectAssetSummary,
+  InspectOutline,
+  InspectRelationship,
+  InspectRelationshipChain,
+  InspectSlice,
+} from "../evidence/inspect.js";
 
 export async function runInspectCommand(
   target: string,

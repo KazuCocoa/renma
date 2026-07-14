@@ -3,7 +3,11 @@ import path from "node:path";
 import type { SkillParentResolution } from "../catalog.js";
 import { renmaCommand } from "../command-invocation.js";
 import {
+  buildMetadataCandidateSuggestionDecision,
+  buildSkillLocalParentUnresolvedDecision,
+  buildSkillLocalSuggestionDecision,
   buildSkillSuggestionDecision,
+  buildUnsupportedTargetSuggestionDecision,
   evaluateOwnerConflict,
   type BlockedMetadata,
   type MetadataSuggestion,
@@ -175,18 +179,13 @@ export async function buildMetadataSuggestion(
           reason: `The structural parent Skill is ${parentState}; inheritance is not established. Review the repository layout before adding local metadata.`,
         },
       ];
+      const decision = buildSkillLocalParentUnresolvedDecision();
       return {
         path: outputPath,
         kind,
         suggestedMode: "no-proposal",
-        decisionStatus: "blocked",
-        decision: {
-          reasonCode: "skill-local-parent-unresolved",
-          summary:
-            "Renma cannot confirm one parent Skill, so it cannot claim inherited governance or safely propose an independent local override.",
-          question:
-            "Resolve the missing or ambiguous parent Skill layout, then rerun this command.",
-        },
+        decisionStatus: decision.status,
+        decision: decision.decision,
         classification,
         ownerProvided: Boolean(explicitOwner),
         instructions: skillLocalInstructions(
@@ -212,46 +211,18 @@ export async function buildMetadataSuggestion(
     const hasLocalGovernance =
       Boolean(existingOwner) || localContext.hasLocalPolicyMetadata;
     const inherited = localContext.ownershipSource === "inherited";
+    const decision = buildSkillLocalSuggestionDecision({
+      hasOwnerConflict: ownerConflict.hasConflict,
+      hasOverride,
+      hasLocalGovernance,
+      inheritsGovernance: inherited,
+    });
     return {
       path: outputPath,
       kind,
       suggestedMode: hasOverride ? "metadata-retrofit" : "no-proposal",
-      decisionStatus:
-        blockedMetadata.length > 0
-          ? "blocked"
-          : hasOverride
-            ? "deterministic"
-            : "no-change-recommended",
-      decision:
-        blockedMetadata.length > 0
-          ? {
-              reasonCode: "conflicting-ownership-evidence",
-              summary:
-                "Renma cannot safely construct a local metadata override while declared and provided ownership evidence conflict.",
-            }
-          : hasOverride
-            ? {
-                reasonCode: "explicit-human-provided-override",
-                summary:
-                  "The candidate is an explicit human-provided Skill-local metadata override; it is not required for ordinary local support.",
-              }
-            : hasLocalGovernance
-              ? {
-                  reasonCode: "skill-local-existing-metadata-preserved",
-                  summary:
-                    "Existing explicit local governance metadata is preserved; no inherited-governance claim or retrofit is needed.",
-                }
-              : inherited
-                ? {
-                    reasonCode: "skill-local-governance-inherited",
-                    summary:
-                      "One unambiguous parent Skill supplies effective governance, so no independent metadata retrofit is required.",
-                  }
-                : {
-                    reasonCode: "skill-local-unowned",
-                    summary:
-                      "The parent Skill is resolved, but neither the local file nor its parent declares an owner; missing ownership remains allowed.",
-                  },
+      decisionStatus: decision.status,
+      decision: decision.decision,
       classification,
       ownerProvided: Boolean(explicitOwner),
       instructions: skillLocalInstructions(
@@ -274,28 +245,18 @@ export async function buildMetadataSuggestion(
     classification.matchedRule === "repository-tool" ||
     classification.matchedRule === "unknown"
   ) {
-    const unsafe = classificationContext.state === "unresolved";
+    const decision = buildUnsupportedTargetSuggestionDecision({
+      matchedRule: classification.matchedRule,
+      ...(classificationContext.state === "unresolved"
+        ? { boundaryReasonCode: classificationContext.reasonCode }
+        : {}),
+    });
     return {
       path: outputPath,
       kind,
       suggestedMode: "no-proposal",
-      decisionStatus: unsafe ? "blocked" : "no-change-recommended",
-      decision: unsafe
-        ? {
-            reasonCode: classificationContext.reasonCode,
-            summary:
-              "Renma could not infer one safe repository-relative boundary for this target path.",
-          }
-        : {
-            reasonCode:
-              classification.matchedRule === "repository-tool"
-                ? "repository-tool-not-context"
-                : "outside-recognized-asset-boundary",
-            summary:
-              "No metadata proposal is generated because the target is not an independently governed Renma asset.",
-            question:
-              "Is this file intended to have independent ownership and lifecycle under a recognized asset root?",
-          },
+      decisionStatus: decision.status,
+      decision: decision.decision,
       classification,
       ownerProvided: Boolean(explicitOwner),
       instructions: [
@@ -333,42 +294,19 @@ export async function buildMetadataSuggestion(
   }
   const hasCandidate = Object.keys(candidateMetadata).length > 0;
   const hasConflict = ownerConflict.hasConflict;
+  const decision = buildMetadataCandidateSuggestionDecision({
+    hasOwnerConflict: hasConflict,
+    hasCandidate,
+    scope: classification.scope,
+  });
 
   return {
     path: outputPath,
     kind,
     suggestedMode:
       hasConflict || !hasCandidate ? "no-proposal" : "metadata-retrofit",
-    decisionStatus: hasConflict
-      ? "blocked"
-      : hasCandidate
-        ? classification.scope === "independent"
-          ? "human-confirmation-required"
-          : "deterministic"
-        : "no-change-recommended",
-    decision: hasConflict
-      ? {
-          reasonCode: "conflicting-ownership-evidence",
-          summary: "Renma cannot safely construct a metadata proposal.",
-        }
-      : hasCandidate && classification.scope === "independent"
-        ? {
-            reasonCode: "independent-governance-intent-unconfirmed",
-            summary:
-              "Renma constructed only deterministic candidates; the intended owner, lifecycle, and source-of-truth evidence still require human confirmation.",
-            question:
-              "Confirm the intended owner, lifecycle, and source-of-truth evidence for this independent asset.",
-          }
-        : hasCandidate
-          ? {
-              reasonCode: "deterministic-metadata-candidate",
-              summary:
-                "The metadata candidate follows the classified repository boundary and explicit user evidence.",
-            }
-          : {
-              reasonCode: "metadata-already-sufficient",
-              summary: "Renma found no supported metadata change to propose.",
-            },
+    decisionStatus: decision.status,
+    decision: decision.decision,
     classification,
     ownerProvided: Boolean(explicitOwner),
     instructions: buildInstructions({ existingOwner, explicitOwner }),

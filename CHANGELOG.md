@@ -34,6 +34,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Added design comments for repository guards, outer-boundary precedence,
   ownership non-inference, parent inheritance, application gates, and
   repository-rooted migration collision checks.
+- Removed the inspect command/renderer type cycle by placing their shared DTOs
+  in a neutral evidence module while preserving command-module type exports.
+- Reused one Skill parent index for snapshot catalog ownership, target parent
+  resolution, and governance enrichment; ambiguous and unresolved repository
+  boundary evidence now also remain distinct internally.
+- Moved the remaining pure metadata-suggestion decisions into the decision
+  layer without moving filesystem checks, next-action construction, or
+  rendering into it.
 
 ### Compatibility
 
