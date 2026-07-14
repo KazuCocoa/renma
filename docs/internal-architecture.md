@@ -34,6 +34,10 @@ evidence, then to decisions, renderers, and command orchestration. A lower-level
 module must not import a command renderer. Commands coordinate these layers;
 they should not independently reinterpret repository layout.
 
+The dependency direction is checked in CI. Type-only imports are treated as
+architectural dependencies, so lower layers must not import command or renderer
+modules even when the import is erased at runtime.
+
 ## RepositorySnapshot Is the Repository Evidence Source
 
 `collectRepositorySnapshot` in `src/repository-evidence.ts` performs one
