@@ -1,4 +1,11 @@
-import type { ArtifactKind, Evidence, MetadataFieldEvidence } from "./types.js";
+import type {
+  ArtifactKind,
+  AssetOwnership,
+  Evidence,
+  MetadataFieldEvidence,
+} from "./types.js";
+
+export type { AssetOwnership } from "./types.js";
 
 /** Lifecycle state for a skill or context asset. */
 export type AssetStatus = "experimental" | "stable" | "deprecated" | "archived";
@@ -47,16 +54,6 @@ export interface AssetMetadata {
   expectedOutputs?: string[];
   requiresLens?: string[];
   optionalLens?: string[];
-}
-
-export interface AssetOwnership {
-  declaredOwner: string | null;
-  effectiveOwner: string | null;
-  source: "declared" | "inherited" | "unowned";
-  inheritedFrom?: {
-    id: string;
-    sourcePath: string;
-  };
 }
 
 /** Repository object Renma can catalog, validate, reference, or report on. */

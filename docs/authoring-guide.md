@@ -258,6 +258,24 @@ Do not route an already canonical Skill through `suggest-metadata` as ceremony.
 Use it only for a metadata retrofit, explicit owner retrofit, recognized
 pre-0.16 one-way migration, or blocked migration review.
 
+### Evidence-first LLM preflight
+
+When an LLM is asked to improve one existing Skill:
+
+1. Run `renma scan . --fail-on high --format json`.
+2. Run `renma inspect <SKILL.md> --format json`.
+3. Inspect relevant local resources and referenced Context Assets.
+4. Use `renma suggest-metadata` only when metadata retrofit or migration
+   evidence exists.
+5. Prepare the smallest intended patch.
+6. Run `renma scan . --fail-on high --format json` again.
+7. Stop without manufacturing work when Renma returns `no-proposal`.
+8. Report unresolved human decisions.
+
+For a classification-only question, `renma inspect <target> --format json` may
+be the first command. `scan` remains the normal repository-level starting
+point.
+
 ### 4. Review before applying
 
 Treat the output as a candidate. Compare it with the source and apply only the
@@ -360,6 +378,50 @@ examples, and a zero-context classification self-check.
 
 Context and Context Lens scaffolds keep their top-level Renma metadata syntax;
 the Agent Skills `metadata.renma.*` serialization boundary applies to Skills.
+
+## Context Asset Discovery Boundary
+
+The classification precedence is: explicit Skill entrypoint, explicit local
+support inside a recognized Skill, recognized top-level asset root,
+repository-level support or configuration, compatible generic nested rules,
+then unknown. This makes the repository root authoritative:
+
+```text
+contexts/foo/references/policy.md
+  -> independent Context Asset
+
+skills/foo/references/policy.md
+  -> Skill-local Reference
+
+references/policy.md
+  -> outside the Context root
+
+tools/helper.mjs
+  -> repository implementation
+
+skills/foo/tools/helper.mjs
+  -> not canonical Skill-local support
+```
+
+Use `contexts/**` for preferred independent Context and `context/**` only for
+compatibility. Nested `references/`, `examples/`, `profiles/`, `scripts/`, or
+`assets/` does not override either Context root. The same names are Skill-local
+only inside `skills/**` or `.agents/skills/**`, where they establish a structural
+parent candidate. Local metadata overrides remain supported where valid, but
+are not required. `tools/**` is shared repository implementation, and a Skill
+uses `scripts/`, not `tools/`, for canonical local executable support.
+
+The Skill-local path rule establishes only a structural parent candidate. The
+catalog must resolve exactly one parent entrypoint before Renma reports
+inherited governance. A missing or ambiguous parent remains structurally
+Skill-local but unowned or unresolved; `suggest-metadata` blocks instead of
+adding independent metadata automatically. Existing explicit local owner or
+policy metadata is preserved and is not described as inherited.
+
+Humans decide whether knowledge needs independent ownership, lifecycle, reuse,
+and source-of-truth status. Renma classifies the resulting placement but never
+promotes or moves content automatically. A `no-proposal` result is successful:
+preserve the file and stop unless a separate intentional change is supported.
 
 For current guidance on deriving several focused, bounded workflows from a broad
 existing Skill—including focused `inspect`, graph, Context reuse, and Appium

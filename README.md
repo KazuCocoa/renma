@@ -219,8 +219,10 @@ lenses/
 This is an illustrative layout, not a required domain hierarchy. `contexts/`
 is preferred and `context/` remains supported. Skill-local `references/`,
 `assets/`, `scripts/`, `examples/`, and `profiles/` are valid support material.
-Local support without a declared owner inherits effective ownership from its
-nearest owning Skill; reports distinguish inherited ownership from declarations.
+Files under those canonical support directories are structurally Skill-local.
+When repository evidence resolves exactly one parent Skill, local support
+without a declared owner may inherit its effective ownership; reports
+distinguish inherited ownership from declarations.
 When deterministic evidence shows that knowledge is reusable beyond one Skill,
 promote it to an owned Context Asset rather than moving it based on location
 alone.
@@ -233,6 +235,62 @@ Skill -> Context Asset
 ```
 
 These are static governance relationships, not runtime Context selection.
+
+## Context Asset Discovery Boundary
+
+`contexts/**` is the preferred independently governed Context Asset root;
+`context/**` remains supported for compatibility. Once a human places a file
+under either root, Renma classifies it deterministically from that root. A
+nested support-like directory name does not override the recognized root.
+
+Files under canonical Skill `references/`, `profiles/`, `examples/`, `scripts/`,
+and `assets/` directories are structurally Skill-local. Renma claims one parent
+and possible inherited governance only after repository evidence resolves
+exactly one Skill. Explicit supported local metadata remains valid, but
+independent metadata is not mandatory. Top-level `references/**` is not a
+Context root, top-level `tools/**` is repository implementation, and
+`skills/**/tools/**` is not canonical Skill-local support; use local `scripts/`
+for executable support. See
+[classification evidence](docs/diagnostics.md#how-to-read-classification-evidence)
+for the detailed contract.
+
+```text
+contexts/foo/references/policy.md
+  -> independent Context Asset
+
+skills/foo/references/policy.md
+  -> Skill-local Reference
+
+references/policy.md
+  -> outside the Context root
+
+tools/helper.mjs
+  -> repository implementation
+
+skills/foo/tools/helper.mjs
+  -> not canonical Skill-local support
+```
+
+Promoting local knowledge to independent Context is a human design decision
+about ownership, lifecycle, reuse, and source of truth. Renma never moves a
+file or infers that intent from content. `inspect` explains deterministic
+classification separately from governance. `suggest-metadata` returns the
+successful `no-proposal` mode when no safe metadata change is recommended.
+`inspect --format json` also preserves `repositoryBoundary` evidence. If no
+single repository root can be resolved, suggestions fail closed and do not
+recommend scanning the caller's current directory.
+For Skill-local support, the path supplies only a parent candidate; Renma claims
+inheritance only after repository evidence resolves one parent Skill. A missing
+or ambiguous parent blocks a metadata proposal and directs the reviewer to the
+layout and scan evidence.
+
+For an LLM-assisted improvement, start with
+`renma scan . --fail-on high --format json`, inspect the target Skill and its
+relevant local or Context resources, and use `suggest-metadata` only when the
+evidence supports a retrofit or migration. Apply the smallest intended patch,
+rerun the scan, and stop without manufacturing work when Renma returns
+`no-proposal`. For a question about one path boundary, start with
+`renma inspect <target> --format json`.
 
 ## Canonical Skill Example
 

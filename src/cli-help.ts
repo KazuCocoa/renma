@@ -500,7 +500,7 @@ export const COMMAND_HELP = [
     usage: "renma inspect <file> [options]",
     question: "What is the outline or exact line slice of one file?",
     purpose:
-      "Inspect provides a compact outline or exact line slice of a single file.",
+      "Inspect provides deterministic classification plus a compact outline or exact line slice of a single file.",
     useWhen: [
       "You need to inspect one asset before editing without reading the whole repository.",
       "A coding agent needs a deterministic outline or exact line range.",
@@ -517,7 +517,7 @@ export const COMMAND_HELP = [
       "renma inspect contexts/testing/boundary-value-analysis.md --format json",
     ],
     interpretation: [
-      "Without --lines, output is a structured outline of one file.",
+      "Without --lines, output includes classification even when the file is not a catalog entry; governance remains a separate evidence section.",
       "With --lines, output is an exact source slice.",
       "Inspect is an inspection helper, not a runtime context selector or prompt assembler.",
     ],
@@ -600,7 +600,7 @@ export const COMMAND_HELP = [
     question:
       "How can a coding agent prepare a metadata retrofit or one-way Skill migration?",
     purpose:
-      "Suggest metadata emits a prompt or structured suggestion for one existing asset. Pre-0.16 Renma Skill targets use the one-way migration path to Agent Skills; non-canonical Skill filenames separately report any required entrypoint migration. Canonical Agent Skills support an explicit owner retrofit, never reverse migration.",
+      "Suggest metadata emits classification and an explicit decision for one existing target. Pre-0.16 Renma Skill targets use the one-way migration path to Agent Skills; canonical Agent Skills support an explicit owner retrofit; ordinary Skill-local support may return a successful no-proposal result.",
     useWhen: [
       "An asset lacks compact metadata and you want a reviewable metadata patch.",
       "A Skill with pre-0.16 Renma fields needs an Agent Skills plus metadata.renma.* conversion proposal.",
@@ -627,6 +627,8 @@ export const COMMAND_HELP = [
       "Historical skill.md and *.skill.md filename forms report the required rename or move in structured output.",
       "A path migration is blocked when the target exists separately or the rendered target Skill remains specification-invalid.",
       "For canonical Agent Skills, --owner can propose a metadata retrofit without reverse migration.",
+      "Skill-local support without explicit override evidence returns no-proposal and does not manufacture independent metadata.",
+      "Repository tools and unknown paths do not receive fabricated Context Asset candidates.",
       "Without --owner, do not add owner metadata unless the asset already declares one or a maintainer confirms it.",
       "Preserve existing Markdown body and semantics for a metadata-only retrofit.",
       "For Skills, metadata review is only one part of authoring review; use the platform's standard Skill guidance for the trigger description, instructions, workflow, constraints, and completion criteria.",

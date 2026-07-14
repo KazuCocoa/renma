@@ -216,7 +216,10 @@ requires a rename. A flat `*.skill.md` requires a move into the filename-derived
 directory plus a rename. Structured `suggest-metadata` output reports
 `sourcePath`, `targetPath`, and `entrypointMigration` (`none`, `rename`, or
 `move-and-rename`) so the path change cannot be mistaken for an apply-ready
-frontmatter-only result.
+frontmatter-only result. Both paths are normalized repository-relative paths.
+Renma uses that same identity for entrypoint classification and rebases the
+target against the resolved repository root only when checking the filesystem
+for collisions.
 
 Repository discovery recognizes these roots only at the beginning of a
 repository-relative path. A nested path such as `docs/skills/demo/SKILL.md` is
@@ -224,6 +227,10 @@ not a repository Skill, and a later `skills` segment cannot escape a reserved
 `references` or `examples` directory. For absolute `suggest-metadata` targets,
 Renma requires one unambiguous Skill root and rejects paths with multiple
 possible roots.
+When structural evidence leaves multiple repository roots plausible, Renma
+returns `repository-boundary-ambiguous` and does not recommend scanning the
+caller's current directory. Add a repository marker or supply an explicit root
+before retrying.
 
 Repository-relative classification normalizes leading and internal `.` segments
 and safe `..` segments before checking the root. A path is rejected if `..`

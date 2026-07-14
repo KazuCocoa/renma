@@ -57,6 +57,259 @@ Structured facts in `details` are the authoritative inputs for review tooling.
 `llmHint` is guidance only; changing hint wording should not change bundle
 grouping, affected files, affected assets, or repair decisions.
 
+## Classification Evidence
+
+`inspect`, `suggest-metadata`, and relevant scan finding or diagnostic
+`details` include additive `classification` evidence. Classification answers
+what path rule matched; governance separately answers whether owner, policy, or
+metadata is declared, inherited, missing, or not required. A file's kind never
+implies that it has an owner. `inspect` additionally exposes
+`repositoryBoundary`, preserving resolution source and repository-relative path
+when resolved or stable unresolved/ambiguous reason evidence and candidate
+roots when no safe boundary can be selected.
+
+For marker-free directory-segment inference, only `.agents`, `skills`,
+`contexts`, `context`, `lenses`, and `tools` can positively establish a
+structural boundary. Recognized root filenames are handled separately:
+`AGENTS.md` may establish its containing directory as the structural root when
+no stronger repository marker is available, while `renma.config.json` and
+`.renma.json` normally establish the boundary through repository-marker
+detection. The support-like names `profiles`, `references`, `examples`,
+`scripts`, and `assets` are guards only: they can block a later boundary-like
+segment or contribute ambiguity evidence, but never establish a repository root
+by themselves.
+
+> Classification describes how Renma interpreted repository structure. It does
+> not by itself prove ownership, policy, lifecycle, source-of-truth status, or
+> human intent.
+
+> Governance evidence describes what is actually declared or inherited.
+
+> Decision evidence describes whether Renma recommends a change, blocks one,
+> requires confirmation, or recommends no change.
+
+### How to Read Classification Evidence
+
+These fields answer different questions and must not be substituted for one
+another:
+
+| Field | What it indicates | What it does not indicate |
+| --- | --- | --- |
+| `kind` | The semantic parsing or inventory role Renma assigned to the file. | Governance scope, ownership, policy, lifecycle, validity, or human intent. |
+| `scope` | The structural governance boundary implied by the path. | That governance metadata exists, is valid, or may be inherited. |
+| `matchedRule` | The primary stable structural rule that classified the normalized repository-relative path. | That the resulting asset is owned, current, authoritative, or safe to change. |
+| `reasonCode` | A more specific deterministic reason for the rule result. | Governance or a repair decision by itself. |
+| `parentResolution` | How repository evidence resolved the parent implied by a Skill-local path. | The parent's owner or policy values. It is normally absent outside Skill-local classification. |
+| `governance` | Declared or inherited ownership, policy, and metadata provenance supported by repository evidence. | Human intent beyond the declarations Renma found. |
+| `decisionStatus` | The application gate for a command that can recommend a change. It is decision evidence, not classification evidence. | A different structural classification or permission to ignore blocked evidence. |
+
+`kind` is one of `skill`, `agent`, `context`, `context_lens`, `profile`,
+`reference`, `example`, `script`, `asset`, `config`, or `unknown`. It selects a
+semantic parsing or inventory role. It is not equivalent to `scope`: for
+example, a `reference` can be `skill-local`, while a repository tool currently
+has `kind: "unknown"` and `scope: "repository-support"`. Metadata can refine a
+file under a Context root from `context` to `context_lens` without changing the
+structural rule that matched.
+
+Optional classification fields add evidence without changing those core
+meanings:
+
+| Field | Meaning | Do not infer |
+| --- | --- | --- |
+| `reason` | Human-readable explanation of the current result. | A stable machine branch; wording may improve without a contract change. |
+| `recognizedRoot` | The repository-relative asset root or boundary recognized by the matched rule, such as `skills`, `.agents/skills`, or `contexts`. | The absolute filesystem repository root; use `repositoryBoundary` for that evidence. |
+| `parentAssetCandidatePath` | The parent Skill path implied by structure before repository resolution. | That the file exists or supplies governance. |
+| `parentAssetPath` | The one parent Skill source path selected by a `resolved` result. | That the parent declares an owner or policy. |
+| `parentAssetCandidates` | All plausible parent Skill paths retained by an `ambiguous` result. | That the first candidate is preferred or safe to select. |
+| `supportDirectory` | The support-like directory involved in classification, such as `references` or `scripts`. | That the directory is valid Skill-local support without the matching rule and parent evidence. |
+| `ignoredNestedSegments` | Nested support-like names that did not override a higher-priority recognized root. | That Renma ignored the file's content or omitted it from inventory. |
+| `competingRules` | Stable negative evidence explaining why a nearby alternative rule did not match. | An additional positive classification or permission to choose that rule. |
+
+#### Scope
+
+| `scope` | Meaning | Do not infer |
+| --- | --- | --- |
+| `independent` | The path establishes a recognized first-class asset or agent boundary rather than Skill-local or repository-support placement. | That owner, policy, lifecycle, or source-of-truth metadata exists or is valid. |
+| `skill-local` | The path is under a recognized canonical Skill support directory. | That a parent Skill exists or that inheritance is valid. Check `parentResolution` and `governance`. |
+| `repository-support` | The path is recognized as repository implementation or configuration support. | That it is an independently governed Context Asset. |
+| `unknown` | The path rule does not establish a known governance scope. | That the file is irrelevant, safe, unowned, or outside the repository. |
+
+#### Matched Rules
+
+`matchedRule` is the primary stable structural classification. Rules are applied
+in the precedence shown after this table, so a higher-priority match prevents a
+later, more generic interpretation.
+
+| `matchedRule` | Repository evidence matched | Indicates | Must not be inferred |
+| --- | --- | --- | --- |
+| `skill-entrypoint` | A recognized canonical or historical Skill entrypoint shape under `skills/**` or `.agents/skills/**`. | The file is classified as a Skill entrypoint with independent scope. | That Agent Skills frontmatter is valid, that governance is complete, or that no migration is needed. |
+| `skill-local-support` | A path inside `references/`, `profiles/`, `examples/`, `scripts/`, or `assets/` beneath a recognized Skill path shape. | The file has a structurally implied Skill parent candidate and Skill-local scope. | That the parent exists or inheritance is valid. Require `parentResolution: "resolved"` and governance evidence. |
+| `context-root` | A file under `contexts/**`. | The file is an independent Context Asset by structure; metadata may refine its `kind` to `context_lens`. | That owner, lifecycle, policy, or source-of-truth metadata is complete or valid. |
+| `context-root-legacy` | A file under the supported legacy `context/**` root. | The file is an independent Context Asset by the compatibility path rule. | That it is current, owned, authoritative, or should be moved automatically. |
+| `lens-root` | A file under `lenses/**`. | The file is an independent Context Lens by structure. | That Lens targets, governance, or policy declarations are valid. |
+| `agent-root` | `AGENTS.md` or a file under `.agents/**` after higher-priority Skill entrypoint rules. | The file is repository agent guidance with independent scope. | That it is an Agent Skill, that its instructions are valid, or that governance is complete. |
+| `repository-tool` | A file under top-level `tools/**`. | The file is repository implementation with repository-support scope. | That it is an independently governed Context Asset. |
+| `config-file` | A filename matching `renma.config.json` or `.renma.json` after higher-priority rules. | The file is recognized as Renma configuration support. | That its contents are valid, effective for a particular target, or proof of asset governance. |
+| `generic-reference` | A nested `references/` directory outside recognized independent and Skill-local asset boundaries. | The file receives the `reference` parsing or inventory role, but its scope remains unknown. | That it belongs to a Skill, may inherit governance, or is an independent Context Asset. |
+| `generic-example` | A nested `examples/` directory outside recognized independent and Skill-local asset boundaries. | The file receives the `example` parsing or inventory role, but its scope remains unknown. | That it belongs to a Skill, may inherit governance, or is independently governed. |
+| `generic-profile` | A nested `profiles/` directory outside recognized independent and Skill-local asset boundaries. | The file receives the `profile` parsing or inventory role, but its scope remains unknown. | That it is selected by a Skill, may inherit governance, or defines effective policy. |
+| `unknown` | No supported positive structural rule matched, or the path uses an unsupported reserved layout. | Renma has no more specific structural classification for the path. | That the file is irrelevant, harmless, unowned, safe to edit, or outside the resolved repository. |
+
+The stable path-rule precedence is:
+
+1. `skill-entrypoint`.
+2. `skill-local-support` inside a recognized Skill boundary.
+3. Recognized asset roots: `context-root`, `context-root-legacy`, `lens-root`,
+   and `agent-root`.
+4. Repository support or configuration: `repository-tool` and `config-file`.
+5. Compatible nested rules: `generic-reference`, `generic-example`, and
+   `generic-profile`.
+6. `unknown`.
+
+#### Parent Skill Resolution
+
+`parentResolution` is meaningful for `skill-local-support`. Only `resolved`
+permits Renma to claim one parent Skill, and even then consumers must inspect
+`governance` to learn whether that parent supplies an owner or policy.
+
+| `parentResolution` | Meaning | Consumer behavior |
+| --- | --- | --- |
+| `structural-candidate` | Path classification derived a possible `parentAssetCandidatePath`, but repository evidence has not resolved it. | Do not claim inheritance. Resolve the repository and parent evidence first. |
+| `resolved` | Repository evidence found exactly one parent Skill and exposes it as `parentAssetPath`. | Inheritance may be reported only as supported by the accompanying governance evidence. |
+| `missing` | No parent Skill exists at the structurally implied location. | Do not claim inheritance; treat a related change recommendation as blocked until the layout is reviewed. |
+| `ambiguous` | More than one parent Skill candidate remains plausible; candidates may appear in `parentAssetCandidates`. | Do not choose a parent or claim inheritance; require layout or human resolution. |
+
+For example, these two files have the same semantic role and structural scope,
+but only the first has one resolved parent:
+
+```json
+{
+  "classification": {
+    "kind": "reference",
+    "scope": "skill-local",
+    "matchedRule": "skill-local-support",
+    "parentResolution": "resolved",
+    "parentAssetPath": "skills/foo/SKILL.md"
+  },
+  "governance": {
+    "ownership": {
+      "declaredOwner": null,
+      "effectiveOwner": "docs",
+      "source": "inherited"
+    }
+  }
+}
+```
+
+```json
+{
+  "classification": {
+    "kind": "reference",
+    "scope": "skill-local",
+    "matchedRule": "skill-local-support",
+    "parentResolution": "missing"
+  },
+  "governance": {
+    "ownership": {
+      "declaredOwner": null,
+      "effectiveOwner": null,
+      "source": "unowned"
+    }
+  }
+}
+```
+
+The resolved example may inherit the owner shown by governance evidence. The
+missing example must not inherit merely because its scope remains
+`skill-local`.
+
+#### Reason Codes
+
+`reasonCode` narrows the primary structural result without replacing
+`matchedRule`. Representative groups are:
+
+- Skill boundary evidence: `under-canonical-skill-root`,
+  `under-skill-support-directory`, `unsupported-skill-local-directory`, and
+  `outside-recognized-skill-boundary`.
+- Independent asset roots: `under-recognized-context-root`,
+  `under-legacy-context-root`, `under-recognized-lens-root`, and
+  `under-recognized-agent-root`.
+- Repository support: `repository-tool-not-context` and
+  `recognized-config-file`.
+- Generic or negative boundary evidence: `under-generic-support-directory`,
+  `outside-recognized-context-root`, and
+  `outside-recognized-asset-boundary`.
+
+Some negative reason codes occur inside `competingRules`, where `matched: false`
+records why a nearby interpretation did not apply. Human-readable `reason`
+wording may improve over time. Machine consumers should branch on
+`matchedRule` and `reasonCode`, retain unfamiliar future values, and never infer
+governance from a reason code alone.
+
+#### Governance and Decision Evidence
+
+Governance is separate from classification. `ownership` reports declared and
+effective owners plus whether the source is `declared`, `inherited`, or
+`unowned`. When available, `policySource`, `policyInheritedFrom`, and
+`metadataState` report equivalent provenance for policy and metadata. A
+resolved parent can still be unowned or have missing policy, so classification
+alone is never enough to construct governance.
+
+Commands that make recommendations expose one of these `decisionStatus`
+values:
+
+| `decisionStatus` | Meaning | Consumer behavior |
+| --- | --- | --- |
+| `deterministic` | Renma has enough supported evidence to construct the reported change candidate. | Review and apply only the reported candidate; do not infer additional changes. |
+| `human-confirmation-required` | Renma constructed candidate evidence, but human intent or semantics must be confirmed before application. | Do not apply until the required human confirmation occurs. |
+| `blocked` | Conflicting, incomplete, unsafe, or unresolved evidence prevents a change recommendation. | Hard stop. Do not apply a patch even if another payload field looks candidate-like. |
+| `no-change-recommended` | Renma successfully determined that no edit is recommended. | Treat as a successful no-edit result; do not manufacture a patch. |
+
+`decisionStatus` is the authoritative application gate. The accompanying
+decision `reasonCode` and `summary` explain that outcome; neither changes the
+structural classification.
+
+#### Safe Consumer Rules
+
+1. Do not infer ownership from `kind`.
+2. Do not infer inheritance from `scope: "skill-local"`.
+3. Require `parentResolution: "resolved"` plus governance evidence before
+   claiming inheritance.
+4. Treat `decisionStatus: "blocked"` as a hard stop.
+5. Treat `decisionStatus: "no-change-recommended"` as a successful no-edit
+   result.
+6. Use `matchedRule` and `reasonCode` for machine branching, not the
+   human-readable `reason`.
+7. Preserve forward compatibility with unknown future enum values. Retain the
+   raw value and fail closed rather than guessing its meaning.
+
+Example additive details:
+
+```json
+{
+  "classification": {
+    "kind": "context",
+    "scope": "independent",
+    "matchedRule": "context-root",
+    "reasonCode": "under-recognized-context-root",
+    "recognizedRoot": "contexts",
+    "ignoredNestedSegments": ["references"],
+    "reason": "The file is under the recognized contexts/** root. The nested references/ segment does not change its classification."
+  }
+}
+```
+
+Adding classification evidence does not emit a finding for every file, change
+diagnostic severity, or change scan pass/fail behavior. Existing
+`requires_human_decision` repair constraints remain the mechanism for intent
+that Renma cannot infer.
+
+`suggestedMode: "no-proposal"` with `no-change-recommended` is a successful
+result, especially for ordinary Skill-local support that inherits governance.
+Suggestion consumers should also handle unknown future `suggestedMode` values
+conservatively. These command-contract refinements do not change scan finding
+severity, scan pass/fail thresholds, or Readiness scoring.
+
 Example:
 
 ```json
@@ -108,6 +361,132 @@ deleting orphaned context assets automatically. `allowed_change` describes safe
 edit shapes. `requires_human_decision` marks ambiguity that should not be guessed
 by automation. `risk` highlights security, data-handling, or destructive-action
 concerns.
+
+## Presenting Renma Evidence to a User
+
+Raw Renma JSON is evidence for an LLM or coding agent, not usually the best
+user-facing explanation. The consumer should translate the relevant fields into
+plain language while preserving the boundary between confirmed facts,
+recommendations, and unresolved human intent.
+
+The overall loop is:
+
+```text
+Renma emits deterministic evidence
+-> LLM summarizes the evidence
+-> user supplies missing intent
+-> LLM performs the smallest supported change
+-> Renma verifies the result
+-> LLM summarizes the new state
+```
+
+In practice, an LLM or coding agent should:
+
+1. Read Renma's deterministic evidence.
+2. Summarize the important facts in user-facing language.
+3. Separate confirmed facts from recommendations and unresolved intent.
+4. Ask only for human decisions that Renma cannot determine.
+5. Rerun the relevant Renma command after the user supplies new intent.
+6. Explain how the evidence or recommendation changed.
+7. Repeat until the intended repository state is explicit and Renma verifies
+   it.
+
+A useful summary normally contains:
+
+- **Confirmed repository facts:** paths, declarations, resolved relationships,
+  and other evidence Renma actually observed.
+- **Renma's deterministic interpretation:** the classification, governance,
+  and decision evidence without added assumptions.
+- **Current recommendation:** the smallest change Renma supports, or an
+  explicit successful no-change result.
+- **Unresolved human decisions:** only intent that repository evidence cannot
+  determine.
+- **Next safe verification step:** the relevant structured Renma command, or a
+  statement that no executable action is safe yet.
+
+For example:
+
+```text
+Renma classified this file as a Skill-local Reference.
+
+One parent Skill resolved at skills/foo/SKILL.md, and the effective owner is
+inherited from that Skill.
+
+No independent metadata change is currently recommended.
+
+A human decision is needed only if this knowledge is intended to be reused
+outside this Skill. If so, consider promoting it to contexts/** and then rerun
+Renma.
+```
+
+LLM consumers must follow these guardrails:
+
+- Do not expose raw diagnostics without summarizing their meaning when a
+  user-facing explanation is expected.
+- Do not ask the user to decide facts Renma already resolved.
+- Do not invent an owner, policy, lifecycle, reference, or source-of-truth
+  claim.
+- Do not convert `structural-candidate` into `resolved`.
+- Do not claim inheritance without `parentResolution: "resolved"` and matching
+  governance evidence.
+- Do not present `decisionStatus: "blocked"` as an applicable patch.
+- Do not assume every diagnostic requires an edit.
+- Do not hide unresolved human intent behind an automatic recommendation.
+- Treat `no-change-recommended` as a valid successful outcome.
+- After new user intent is provided, rerun Renma rather than relying on an old
+  result.
+
+### Iterative Example
+
+Initial Renma evidence:
+
+```text
+kind: reference
+scope: skill-local
+parentResolution: resolved
+decisionStatus: no-change-recommended
+```
+
+LLM summary:
+
+```text
+This file is local support for one Skill and already inherits its governance.
+No metadata change is needed. Should this knowledge remain local, or is it
+intended for reuse by other Skills?
+```
+
+User:
+
+```text
+It should be reusable by three Skills.
+```
+
+LLM response:
+
+```text
+That changes the repository-design intent. I will treat promotion to an
+independent Context Asset as the candidate direction, preserve the original
+meaning, and rerun Renma after the placement and references are updated.
+```
+
+After the intended patch, Renma verifies:
+
+```text
+kind: context
+scope: independent
+matchedRule: context-root
+```
+
+LLM summary:
+
+```text
+The knowledge is now an independent Context Asset under contexts/**. Renma
+verified the new classification. Ownership and references should now be
+reviewed as independent governance rather than inherited Skill-local state.
+```
+
+This example is conceptual. Renma does not automatically move files, invent
+references, or decide that local knowledge should be promoted.
 
 ## Review Bundles
 
@@ -183,8 +562,9 @@ These diagnostics are emitted after files are parsed into catalog entries. For s
 Owner absence is handled as ownership coverage information. Shared assets
 without `owner` are accepted and reported as unowned by `renma ownership`;
 Renma does not invent an owner. Skill-local support is the exception: it uses
-deterministic effective ownership inherited from its nearest owning Skill and
-reports that provenance separately from declared metadata.
+deterministic effective ownership only after repository evidence resolves one
+parent Skill with an effective owner, and reports that inherited provenance
+separately from declared metadata.
 
 | Severity  | Message                                                                                           | Meaning                                                                                                                        | Fix                                                                                                             |
 | --------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |

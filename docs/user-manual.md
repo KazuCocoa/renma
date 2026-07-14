@@ -73,17 +73,20 @@ support paths:
 
 The same reserved names apply under `.agents/skills/**`.
 
-These Skill-local support directories are valid. Keep material local when it is
-specific to one Skill. Promote reusable source-of-truth knowledge to an owned
-Context Asset, or a helper shared across workflows to `tools/**`, only when
-repository evidence supports that change; Renma does not move files
+These valid support paths are structurally Skill-local. Keep material local when
+it is specific to one Skill. Promote reusable source-of-truth knowledge to an
+owned Context Asset, or a helper shared across workflows to `tools/**`, only
+when repository evidence supports that change; Renma does not move files
 automatically.
 
-Skill-local support belongs only to the nearest Skill directory. When a local
-support artifact does not declare an owner, ownership, Readiness, graph, Trust
-Graph, and BOM reporting use the nearest Skill's owner as deterministic
-effective ownership and mark it as inherited. This does not invent ownership
-for shared Context Assets or unrelated repository files.
+Renma claims a parent only after repository evidence resolves exactly one Skill
+entrypoint. When that resolved local support artifact does not declare an owner,
+ownership, Readiness, graph, Trust Graph, and BOM reporting may use the parent
+Skill's owner as deterministic effective ownership and mark it as inherited.
+Missing or ambiguous parents never inherit. See
+[classification evidence](diagnostics.md#how-to-read-classification-evidence)
+for the detailed contract. This does not invent ownership for shared Context
+Assets or unrelated repository files.
 
 Only files marked Markdown-parser eligible contribute frontmatter metadata,
 headings, links, code fences, and repeated-context evidence. Text scripts and
@@ -161,6 +164,61 @@ Review the Skill with this platform's standard Skill authoring guidance, then us
 
 Start by running `renma --help` and use command-specific help to choose the appropriate workflow. Make only evidence-backed changes. Do not invent owners, references, product rules, or source-of-truth claims. Preserve existing semantics unless a diagnostic or explicit requirement supports a change. Run `renma scan . --fail-on high` after editing, fix relevant diagnostics, rerun it, and summarize both resolved and remaining findings.
 ```
+
+Recommended evidence-first preflight:
+
+1. Run `renma scan . --fail-on high --format json`.
+2. Run `renma inspect <SKILL.md> --format json`.
+3. Inspect relevant local resources and referenced Context Assets.
+4. Use `renma suggest-metadata` only when retrofit or migration evidence exists.
+5. Prepare the smallest intended patch.
+6. Rerun `renma scan . --fail-on high --format json`.
+7. Stop without manufacturing work when `suggest-metadata` reports
+   `decisionStatus: "no-change-recommended"`; this currently uses
+   `suggestedMode: "no-proposal"`.
+8. Report unresolved human decisions.
+
+For one classification question, `renma inspect <target> --format json` may be
+the initial preflight. Repository-wide work should normally start with `scan`.
+
+## Context Asset Discovery Boundary
+
+`contexts/**` is the preferred independent Context Asset root and `context/**`
+remains supported. Nested directory names never override a recognized root.
+Files under canonical Skill `references/`, `profiles/`, `examples/`, `scripts/`,
+and `assets/` directories are structurally Skill-local. Renma claims one parent
+and possible inherited governance only after repository evidence resolves
+exactly one Skill under `skills/**` or `.agents/skills/**`. Supported explicit
+local metadata remains valid but is not required. See
+[classification evidence](diagnostics.md#how-to-read-classification-evidence)
+for the detailed contract.
+
+Top-level `references/**` is not a Context root. `tools/**` contains shared
+repository implementation, not Context knowledge, and `skills/**/tools/**` is
+not a canonical local support directory. Skill-local executable support belongs
+under `scripts/`.
+
+```text
+contexts/foo/references/policy.md
+  -> independent Context Asset
+
+skills/foo/references/policy.md
+  -> Skill-local Reference
+
+references/policy.md
+  -> outside the Context root
+
+tools/helper.mjs
+  -> repository implementation
+
+skills/foo/tools/helper.mjs
+  -> not canonical Skill-local support
+```
+
+Placement as independent Context is a human decision about ownership,
+lifecycle, reuse, and source of truth. Classification after placement is
+deterministic. Renma never moves a file based on content. A successful
+`no-proposal` result means no edit should be manufactured.
 
 ## User Story: Create A New Skill With Scaffold
 
@@ -640,7 +698,19 @@ renma inspect contexts/testing/boundary-value-analysis.md --format json
 renma inspect skills/testing/spec-review/SKILL.md --lines L10-L42
 ```
 
-Use this when editing one skill or context file and you want a deterministic outline without reading the whole repository catalog. Without `--lines`, output includes file size, line count, frontmatter range, headings, code fences, links, asset relationships, and a concise Context Lens governance summary when repository context can be inferred. Use `--lines <range>` for an exact source slice; ranges can look like `L10-L42` or `10-42`.
+Use this when editing one skill or context file and you want a deterministic outline without reading the whole repository catalog. Without `--lines`, output includes file size, line count, frontmatter range, headings, code fences, links, asset relationships, and a concise Context Lens governance summary when repository context can be inferred. It also always includes `classification` with `kind`, `scope`, `matchedRule`, `reasonCode`, root or parent evidence, and concise competing rules. A Skill-local path exposes `parentAssetCandidatePath`; `parentAssetPath` appears only when `parentResolution` is `resolved`, while `missing` and `ambiguous` remain explicit fail-closed states. `governance` is separate and reports ownership, policy, and metadata provenance only from repository evidence. Unknown files and repository tools still receive classification. Use `--lines <range>` for an exact source slice; ranges can look like `L10-L42` or `10-42`. `--lines` output itself is unchanged.
+
+JSON also includes `repositoryBoundary`. Resolved results record the root,
+repository-relative path, and resolution source. Unresolved results retain a
+stable reason code and `candidateRoots`; structural ambiguity uses
+`repository-boundary-ambiguous` instead of selecting a broad ancestor.
+
+For a file target, Renma resolves a repository root from an explicit caller root,
+the nearest safe `.git` file/directory or Renma config marker, or an unambiguous
+structural boundary, in that order. Current-working-directory containment alone
+does not establish a repository. This keeps nested repositories and absolute
+targets outside the current directory deterministic without scanning an
+unrelated parent tree.
 
 ### `readiness`
 
@@ -763,7 +833,17 @@ workflow, constraints, and completion criteria with platform-native guidance;
 apply only intended metadata or migration changes; run
 `renma scan . --fail-on high`; fix relevant diagnostics; and rerun the scan.
 Context Asset output does not receive this Skill-specific authoring guidance.
-JSON retains the existing structured suggestion shape.
+JSON adds `classification`, `decisionStatus`, structured `decision` evidence,
+and safe `nextActions` to the existing suggestion fields. Each action has
+`kind` and `invocation`; execute `invocation.command` with the exact
+`invocation.args` array. `invocation.display` is for people and must not be
+parsed as the machine contract, including on paths with spaces, quotes, or
+Windows separators.
+
+When no repository root resolves, `decisionStatus` is `blocked` and Renma does
+not emit an executable `scan .` action. Establish the repository root with an
+explicit root or repository marker before verification; the caller's current
+directory is not assumed to contain the target.
 
 For Skill targets using the pre-0.16 Renma Skill format, the 0.16.0 metadata
 migration path is one-way: recognized governance and security frontmatter
@@ -771,6 +851,8 @@ becomes Agent Skills identity plus `metadata.renma.*`. Separately, `skill.md` an
 report any required entrypoint rename or move, even when their frontmatter
 already uses Agent Skills fields. For a canonical Agent Skill, `--owner` may
 instead propose an owner metadata retrofit; it never causes reverse migration.
+Skill migration `sourcePath` and `targetPath` values are repository-relative,
+including when the user invokes Renma from the parent of a nested repository.
 The normative behavior is documented in
 [Agent Skills Compatibility and Migration](agent-skills-compatibility.md).
 
@@ -785,7 +867,35 @@ invalid evidence, confirm the Skill's intent with platform-native authoring
 guidance, correct the source evidence, rerun `suggest-metadata`, then validate
 intended corrections with `renma scan . --fail-on high`.
 
-Owner metadata remains recommended but not required. Without `--owner`, `suggest-metadata` blocks owner as a suggested addition and says not to add one unless the asset already declares an owner or a maintainer provides one. With `--owner <owner>`, the command may include that owner because it was explicitly provided. If an existing asset already declares an owner, `suggest-metadata` preserves it; a different `--owner` value is treated as a human-review ownership change, not an automatic metadata suggestion. Renma does not infer owners from Git history, file paths, prose, or authors.
+Owner metadata remains recommended but not required. Without `--owner`, Renma
+does not invent an owner. With `--owner <owner>`, the command may include that
+owner because it was explicitly provided. If an existing asset already
+declares an owner, `suggest-metadata` preserves it; a different `--owner` value
+is treated as conflicting evidence and blocks a candidate. Renma does not infer
+owners from Git history, file paths, prose, or authors.
+If the explicit owner equals the existing canonical `metadata.renma.owner`, the
+result is `suggestedMode: "no-proposal"` with
+`decisionStatus: "no-change-recommended"`; no candidate metadata, canonical
+frontmatter, or patch instruction is emitted.
+
+Ordinary Skill-local support returns `suggestedMode: "no-proposal"` and
+`decisionStatus: "no-change-recommended"` when it can inherit governance from
+one resolved parent Skill. Its `candidateMetadata` is empty. A missing or
+ambiguous parent returns `decisionStatus: "blocked"`, leaves governance
+unowned or unresolved, and provides a scan/layout action instead of claiming
+inheritance. Existing explicit local owner or policy metadata is preserved
+under `skill-local-existing-metadata-preserved`; an explicit `--owner` can still
+request a supported intentional override after the parent resolves. Prompt and
+JSON output both distinguish the observed path fact, deterministic
+interpretation, recommendation, and remaining human decision. Repository tools
+and unknown paths never receive fabricated Context metadata candidates.
+
+`decisionStatus` is authoritative: `blocked` never authorizes a patch,
+`no-change-recommended` stops without a patch, `human-confirmation-required`
+identifies what must be confirmed before applying only the candidate fields,
+and `deterministic` permits the reviewed candidate. Consumers should include a
+conservative default for unknown future `suggestedMode` values rather than
+assuming every non-`no-proposal` value is applicable.
 
 ### `suggest-semantic-split`
 

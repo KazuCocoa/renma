@@ -6,6 +6,77 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.18.2] - 2026-07-13
+
+### Added
+
+- Added one deterministic asset-classification evidence model shared by
+  discovery, `inspect`, `suggest-metadata`, and relevant scan diagnostics. JSON
+  now separates stable `matchedRule` and `reasonCode` fields from human-readable
+  explanations, includes concise competing-rule evidence, and keeps
+  classification separate from ownership and policy governance.
+- Added explicit suggestion `decisionStatus`, structured decision evidence,
+  cross-platform next actions with separate command/argv/display fields, and
+  the successful `no-proposal` mode.
+
+### Changed
+
+- `inspect` now reports classification for cataloged assets, files with missing
+  metadata, repository tools, and unknown files. When catalog evidence exists,
+  it reports declared or inherited ownership and policy separately.
+- `suggest-metadata` now uses the shared classifier. Ordinary Skill-local
+  support produces no independent retrofit proposal unless an explicit
+  supported override is supplied; existing local metadata remains supported.
+- Repository classification resolves an explicit caller root first, then the
+  nearest safe `.git` or Renma config marker, then an unambiguous structural
+  boundary. Being below the current working directory is no longer treated as
+  repository-root evidence.
+- Skill entrypoint classification and migration now use the resolved
+  repository-relative path consistently. Filesystem collision checks rebase
+  the repository-relative migration target against that resolved root, so
+  invoking Renma from a nested repository's parent behaves like invoking it
+  inside the repository.
+- Skill-local classification now records a structural parent candidate
+  separately from catalog-backed `resolved`, `missing`, or `ambiguous` parent
+  evidence. Missing and ambiguous parents block inheritance claims and metadata
+  proposals until the layout is reviewed.
+
+### Fixed
+
+- Prevented nested `references/`, `profiles/`, `examples/`, `scripts/`, or
+  `assets/` names from overriding the recognized `contexts/**` or legacy
+  `context/**` boundary.
+- Prevented `references/**`, `tools/**`, and `skills/**/tools/**` from being
+  misclassified as independently governed Context Assets or canonical local
+  support.
+- Repository paths with multiple plausible structural roots now fail closed as
+  `repository-boundary-ambiguous`; unresolved and ambiguous suggestions no
+  longer manufacture a `scan .` action against the caller's current directory.
+- Marker-free structural fallback now treats `profiles`, `references`,
+  `examples`, `scripts`, and `assets` only as ambiguity guards. Those directory
+  names never establish a repository root without a strong boundary, explicit
+  root, or repository marker.
+- An explicit owner equal to an existing canonical
+  `metadata.renma.owner` now returns `no-proposal` and
+  `no-change-recommended` without candidate metadata or frontmatter.
+
+### Compatibility
+
+- The `inspect` JSON outline adds `repositoryBoundary`, `classification`, and
+  `governance`. `repositoryBoundary` preserves resolved or unresolved boundary
+  evidence, including ambiguity candidates when present.
+  `suggest-metadata` JSON adds `classification`, `decisionStatus`, `decision`,
+  and `nextActions`, and may return `suggestedMode: "no-proposal"`. Relevant
+  diagnostic `details` may add `classification`. The new JSON fields are
+  additive, but the command behavior is intentionally refined: targets that
+  previously represented a successful no-change result may now use
+  `suggestedMode: "no-proposal"`, and Skill-local inheritance is reported only
+  after one parent resolves. Consumers should branch on `decisionStatus`, treat
+  unknown future `suggestedMode` values conservatively, and execute
+  `nextActions[].invocation.command` with `invocation.args` rather than parsing
+  `display`. Finding severity, scan thresholds, Readiness scoring, Agent Skills
+  migration direction, and supported explicit local metadata remain unchanged.
+
 ## [0.18.1] - 2026-07-13
 
 ### Added

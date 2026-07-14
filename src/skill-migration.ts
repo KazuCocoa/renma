@@ -210,11 +210,17 @@ export function buildAgentSkillMigrationSuggestion(
         canonicalFrontmatter = undefined;
       }
     }
+    const actualProposalKind =
+      canonicalFrontmatter === undefined &&
+      blocked.length === 0 &&
+      Object.keys(candidateRenmaMetadata).length === 0
+        ? "none"
+        : proposalKind;
 
     return {
       sourceFormat: validation.format,
       direction,
-      proposalKind,
+      proposalKind: actualProposalKind,
       sourcePath,
       targetPath,
       entrypointMigration,

@@ -4,7 +4,6 @@ import { lifecycleDiagnostics } from "./catalog-lifecycle.js";
 import { contextBodyLanguageDiagnostics } from "./context-language-diagnostics.js";
 import type {
   AssetMetadata,
-  AssetOwnership,
   Catalog,
   CatalogEntry,
   Dependency,
@@ -16,7 +15,13 @@ import {
 } from "./discovery.js";
 import { parseAssetMetadata } from "./metadata.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
-import type { Diagnostic, Evidence, ParsedDocument } from "./types.js";
+import type {
+  AssetClassificationEvidence,
+  AssetOwnership,
+  Diagnostic,
+  Evidence,
+  ParsedDocument,
+} from "./types.js";
 import { buildStaticSupportDependencies } from "./static-support.js";
 
 const QUALITY = DEFAULT_QUALITY_PROFILE;
@@ -24,6 +29,107 @@ const PLACEHOLDER_USAGE_BOUNDARY_PATTERN =
   /^(?:todo|tbd|tba|unknown|n\/?a|none|placeholder|to be defined)(?:[\s:-].*)?$/i;
 
 type CatalogedKind = CatalogEntry["kind"];
+
+export interface SkillParentCandidate {
+  owner: string | null;
+  id: string;
+  sourcePath: string;
+}
+
+export type SkillParentIndex = ReadonlyMap<
+  string,
+  readonly SkillParentCandidate[]
+>;
+
+export type SkillParentResolution =
+  | { state: "not-applicable" }
+  | { state: "missing"; candidatePath: string }
+  | {
+      state: "ambiguous";
+      candidatePath: string;
+      candidates: readonly SkillParentCandidate[];
+    }
+  | {
+      state: "resolved";
+      candidatePath: string;
+      parent: SkillParentCandidate;
+    };
+
+/** Index possible owning Skills once for both catalog and command resolution. */
+export function buildSkillParentIndex(
+  documents: ParsedDocument[],
+): SkillParentIndex {
+  const skillParents = new Map<string, SkillParentCandidate[]>();
+  for (const document of documents) {
+    if (document.artifact.kind !== "skill") continue;
+    const metadata = parseAssetMetadata(document).metadata;
+    const skillDirectory = logicalSkillDirectory(document.artifact.path);
+    if (!skillDirectory) continue;
+    const candidates = skillParents.get(skillDirectory) ?? [];
+    candidates.push({
+      owner: metadata.owner?.trim() || null,
+      id: metadata.id ?? document.artifact.path,
+      sourcePath: document.artifact.path,
+    });
+    skillParents.set(skillDirectory, candidates);
+  }
+  return skillParents;
+}
+
+/** Resolve a Skill-local parent using the same fail-closed index as ownership. */
+export function resolveSkillSupportParent(
+  relativePath: string,
+  skillParents: SkillParentIndex,
+): SkillParentResolution {
+  const classified = classifyRepositorySkillPath(relativePath);
+  if (classified?.kind !== "support") return { state: "not-applicable" };
+  const candidatePath = `${classified.skillDirectory}/SKILL.md`;
+  const candidates = skillParents.get(classified.skillDirectory) ?? [];
+  if (candidates.length === 0) return { state: "missing", candidatePath };
+  if (candidates.length > 1) {
+    return {
+      state: "ambiguous",
+      candidatePath,
+      candidates: [...candidates].sort((left, right) =>
+        left.sourcePath.localeCompare(right.sourcePath),
+      ),
+    };
+  }
+  return { state: "resolved", candidatePath, parent: candidates[0]! };
+}
+
+/** Attach resolved parent evidence without changing structural classification. */
+export function withResolvedSkillParent(
+  classification: AssetClassificationEvidence,
+  relativePath: string,
+  skillParents: SkillParentIndex,
+): AssetClassificationEvidence {
+  const resolution = resolveSkillSupportParent(relativePath, skillParents);
+  if (resolution.state === "not-applicable") return classification;
+  if (resolution.state === "resolved") {
+    return {
+      ...classification,
+      parentAssetCandidatePath: resolution.candidatePath,
+      parentAssetPath: resolution.parent.sourcePath,
+      parentResolution: "resolved",
+    };
+  }
+  if (resolution.state === "ambiguous") {
+    return {
+      ...classification,
+      parentAssetCandidatePath: resolution.candidatePath,
+      parentResolution: "ambiguous",
+      parentAssetCandidates: resolution.candidates.map(
+        (candidate) => candidate.sourcePath,
+      ),
+    };
+  }
+  return {
+    ...classification,
+    parentAssetCandidatePath: resolution.candidatePath,
+    parentResolution: "missing",
+  };
+}
 
 /** Build a deterministic catalog of skill and context entries from parsed documents. */
 export function buildCatalog(
@@ -36,24 +142,8 @@ export function buildCatalog(
   diagnostics: Diagnostic[];
 } {
   const diagnostics: Diagnostic[] = [];
-  const skillOwners = new Map<
-    string,
-    Array<{ owner: string | null; id: string; sourcePath: string }>
-  >();
-  for (const document of documents) {
-    if (document.artifact.kind !== "skill") continue;
-    const metadata = parseAssetMetadata(document).metadata;
-    const skillDirectory = logicalSkillDirectory(document.artifact.path);
-    if (!skillDirectory) continue;
-    const candidates = skillOwners.get(skillDirectory) ?? [];
-    candidates.push({
-      owner: metadata.owner?.trim() || null,
-      id: metadata.id ?? document.artifact.path,
-      sourcePath: document.artifact.path,
-    });
-    skillOwners.set(skillDirectory, candidates);
-  }
-  for (const [skillDirectory, candidates] of skillOwners) {
+  const skillParents = buildSkillParentIndex(documents);
+  for (const [skillDirectory, candidates] of skillParents) {
     if (candidates.length <= 1) continue;
     diagnostics.push({
       severity: "warning",
@@ -92,7 +182,7 @@ export function buildCatalog(
       const ownership = resolveAssetOwnership(
         document,
         result.metadata,
-        skillOwners,
+        skillParents,
       );
 
       const base = {
@@ -161,10 +251,7 @@ export function buildCatalog(
 function resolveAssetOwnership(
   document: ParsedDocument,
   metadata: AssetMetadata,
-  skillOwners: ReadonlyMap<
-    string,
-    Array<{ owner: string | null; id: string; sourcePath: string }>
-  >,
+  skillParents: SkillParentIndex,
 ): AssetOwnership {
   const declaredOwner = metadata.owner?.trim() || null;
   if (declaredOwner) {
@@ -175,15 +262,14 @@ function resolveAssetOwnership(
     };
   }
 
-  const classified = classifyRepositorySkillPath(document.artifact.path);
-  if (classified?.kind !== "support") {
+  const resolution = resolveSkillSupportParent(
+    document.artifact.path,
+    skillParents,
+  );
+  if (resolution.state !== "resolved" || !resolution.parent.owner) {
     return { declaredOwner: null, effectiveOwner: null, source: "unowned" };
   }
-  const owningSkills = skillOwners.get(classified.skillDirectory) ?? [];
-  if (owningSkills.length !== 1 || !owningSkills[0]?.owner) {
-    return { declaredOwner: null, effectiveOwner: null, source: "unowned" };
-  }
-  const owningSkill = owningSkills[0];
+  const owningSkill = resolution.parent;
   return {
     declaredOwner: null,
     effectiveOwner: owningSkill.owner,
