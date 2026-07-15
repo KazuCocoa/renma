@@ -43,7 +43,8 @@ Run `renma guide skill` before generation. Its deterministic output tells the
 consuming LLM to clarify the recurring task and expected result, inspect
 applicable user-provided artifacts, repository evidence, and permitted
 authoritative source content, distinguish confirmed facts from proposals and
-unresolved human truth, and ask one to three focused questions. Repository
+unresolved human truth, separately classify progression, and ask one to three
+focused questions per batch while retaining every blocker. Repository
 evidence confirms facts only when it is applicable, effective, and unambiguous;
 source designation alone does not confirm source-content facts. Renma itself
 does not conduct the conversation. After blocking decisions are resolved, the
@@ -111,7 +112,8 @@ For a new Skill, establish the Renma contract before generation:
 renma guide skill
   -> consuming LLM clarifies human truth and inspects applicable evidence
   -> classify confirmed, proposed, and unresolved decisions
-  -> ask one to three focused questions
+  -> classify blocking, reversible-default, and deferred progression
+  -> ask one to three focused questions per batch and retain queued blockers
   -> pass the creation gate and define the smallest intended asset structure
   -> renma scaffold skill
   -> scaffold or reuse justified Context Assets
@@ -178,7 +180,25 @@ npx renma graph . --format markdown
 npx renma readiness . --format markdown
 ```
 
-Create and complete a new Skill:
+### Create a Skill interactively
+
+You do not need to prepare a complete Skill specification before starting.
+
+Ask your coding agent:
+
+```text
+I want to create a Skill with `renma guide skill`.
+```
+
+The agent should run the guide, clarify the highest-impact unknowns in small
+question batches, and create the smallest justified Renma asset structure after
+blocking decisions are resolved.
+
+Renma remains deterministic and non-interactive; the consuming LLM conducts the
+conversation. See the [Authoring Guide](docs/authoring-guide.md) for the complete
+protocol.
+
+After the clarification gate, scaffold and verify the new Skill:
 
 ```bash
 npx renma guide skill

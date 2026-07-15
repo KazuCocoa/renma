@@ -3,6 +3,7 @@ import type {
   SkillAuthoringExample,
   SkillAuthoringGuidance,
   SkillAuthoringInteraction,
+  SkillAuthoringProgressionSummary,
 } from "../guidance/skill-authoring.js";
 
 export function renderSkillGuidePrompt(
@@ -97,6 +98,11 @@ function renderInteraction(interaction: SkillAuthoringInteraction): string[] {
     `- Proposed: ${interaction.decisionClasses.proposed}`,
     `- Unresolved: ${interaction.decisionClasses.unresolved}`,
     "",
+    "Progression classes:",
+    `- Blocking: ${interaction.progressionClasses.blocking}`,
+    `- Reversible default: ${interaction.progressionClasses.reversibleDefault}`,
+    `- Deferred: ${interaction.progressionClasses.deferred}`,
+    "",
     "Question rules:",
     ...renderBullets(interaction.questionRules),
     "",
@@ -126,6 +132,16 @@ function renderInteraction(interaction: SkillAuthoringInteraction): string[] {
 function renderDecisionSummary(
   example: Omit<SkillAuthoringClarificationExample, "request">,
 ): string[] {
+  const progression = example.progression
+    ? [
+        "",
+        ...renderProgressionSummary(
+          example.progression,
+          example.questions.length,
+        ),
+      ]
+    : [];
+
   return [
     "Current understanding",
     "",
@@ -137,9 +153,36 @@ function renderDecisionSummary(
     "",
     "Unresolved",
     ...renderBullets(example.unresolved),
+    ...progression,
     "",
     example.questions.length === 1 ? "Question" : "Questions",
     ...renderNumbered(example.questions),
+  ];
+}
+
+function renderProgressionSummary(
+  progression: SkillAuthoringProgressionSummary,
+  questionCount: number,
+): string[] {
+  return [
+    "Current progression",
+    "",
+    `Blocking decisions: ${progression.blocking.length}`,
+    ...renderBullets(progression.blocking),
+    `- Asking now: ${questionCount} highest-impact question${questionCount === 1 ? "" : "s"} below.`,
+    ...(progression.queuedBlockers.length > 0
+      ? ["", "Queued blockers", ...renderBullets(progression.queuedBlockers)]
+      : []),
+    ...(progression.reversibleDefaults.length > 0
+      ? [
+          "",
+          "Proceeding with reversible defaults",
+          ...renderBullets(progression.reversibleDefaults),
+        ]
+      : []),
+    ...(progression.deferred.length > 0
+      ? ["", "Deferred", ...renderBullets(progression.deferred)]
+      : []),
   ];
 }
 

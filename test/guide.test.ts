@@ -121,6 +121,7 @@ test("guide skill JSON and --json are equivalent small structured projections", 
     "phases",
     "truthSources",
     "decisionClasses",
+    "progressionClasses",
     "questionRules",
     "creationGate",
     "postValidationActions",
@@ -136,6 +137,14 @@ test("guide skill JSON and --json are equivalent small structured projections", 
       ] as Record<string, unknown>,
     ),
     ["confirmed", "proposed", "unresolved"],
+  );
+  assert.deepEqual(
+    Object.keys(
+      (output.interaction as Record<string, unknown>)[
+        "progressionClasses"
+      ] as Record<string, unknown>,
+    ),
+    ["blocking", "reversibleDefault", "deferred"],
   );
   assert.deepEqual(Object.keys(output.example as Record<string, unknown>), [
     "request",
@@ -230,8 +239,114 @@ test("interactive protocol separates truth, proposals, and focused questions", (
   assert.match(questions, /one to three closely related questions/);
   assert.match(questions, /do not send a comprehensive questionnaire/i);
   assert.match(questions, /Do not require a plan-mode-quality specification/);
-  assert.match(questions, /delegates a reversible choice/);
-  assert.match(questions, /do not extend that delegation to unrelated facts/);
+  assert.match(questions, /use your judgment/);
+  assert.match(
+    questions,
+    /do not infer product behavior, source authority, ownership, security permission, or unrelated facts/,
+  );
+});
+
+test("epistemic support and authoring progression remain separate", () => {
+  const interaction = buildSkillAuthoringGuidance("test-version").interaction;
+  const epistemic = interaction.decisionClasses;
+  const progression = interaction.progressionClasses;
+
+  assert.deepEqual(Object.keys(epistemic), [
+    "confirmed",
+    "proposed",
+    "unresolved",
+  ]);
+  assert.deepEqual(Object.keys(progression), [
+    "blocking",
+    "reversibleDefault",
+    "deferred",
+  ]);
+  assert.match(progression.blocking, /current creation gate can pass/);
+  assert.match(progression.blocking, /Retain every Blocking decision/);
+  assert.match(progression.reversibleDefault, /A Proposed decision/);
+  assert.match(
+    progression.reversibleDefault,
+    /never changes it from Proposed to Confirmed/,
+  );
+  assert.match(
+    progression.deferred,
+    /not required for the current authoring stage/,
+  );
+  assert.match(
+    progression.deferred,
+    /material to correctness, security, completion, or asset boundaries[\s\S]*move it to Blocking/,
+  );
+});
+
+test("question batches retain the complete blocker set and define proceeding", () => {
+  const interaction = buildSkillAuthoringGuidance("test-version").interaction;
+  const questions = interaction.questionRules.join("\n");
+  const gate = interaction.creationGate.join("\n");
+
+  assert.match(
+    questions,
+    /complete current set of unresolved and proposed decisions/,
+  );
+  assert.match(
+    questions,
+    /one to three closely related questions applies to the current turn, not to the total number/,
+  );
+  assert.match(
+    questions,
+    /never impose an arbitrary maximum on that total set/,
+  );
+  assert.match(
+    questions,
+    /keep additional Blocking decisions visible as queued blockers/,
+  );
+  assert.match(
+    questions,
+    /continue with the next batch after the user answers/,
+  );
+  assert.match(
+    questions,
+    /Never relabel an unasked Blocking decision as Deferred merely because the batch limit was reached/,
+  );
+  assert.match(
+    questions,
+    /Blocking count, questions being asked, queued blockers/,
+  );
+  assert.match(
+    gate,
+    /Proceed when no Blocking decision remains\. Reversible defaults and Deferred decisions may remain/,
+  );
+  assert.match(
+    gate,
+    /identify the reversible defaults being used and meaningful Deferred decisions/,
+  );
+  assert.match(
+    gate,
+    /keep them Proposed or Unresolved rather than presenting them as Confirmed/,
+  );
+});
+
+test("delegation and branching blockers preserve decision boundaries", () => {
+  const interaction = buildSkillAuthoringGuidance("test-version").interaction;
+  const questions = interaction.questionRules.join("\n");
+
+  assert.match(questions, /use your judgment/);
+  assert.match(questions, /record the authority as Confirmed/);
+  assert.match(questions, /keep the selected default Proposed/);
+  assert.match(
+    questions,
+    /do not infer product behavior, source authority, ownership, security permission/,
+  );
+  assert.match(
+    questions,
+    /branching across materially different inputs, outputs, users, security policies, completion criteria, or workflows/,
+  );
+  assert.match(questions, /Propose a split or narrower first Skill/);
+  assert.match(questions, /keep the boundary Proposed/);
+  assert.match(questions, /re-enter the creation gate/);
+  assert.match(
+    questions,
+    /never split automatically because the question count is high/,
+  );
 });
 
 test("truth sources qualify artifacts, repository evidence, and external content", () => {
@@ -295,6 +410,7 @@ test("minimal trigger starts with clarification and no invented asset structure"
   assert.deepEqual(example.questions, [
     "What recurring task should the Skill perform, and what result should it produce?",
   ]);
+  assert.equal(example.progression, undefined);
   assert.match(
     example.proposed.join("\n"),
     /No asset structure is justified yet/,
@@ -492,6 +608,34 @@ test("Product A begins with source-access and fallback clarification", () => {
   );
   assert.match(clarification.unresolved.join("\n"), /Context owner/);
   assert.equal(clarification.questions.length, 3);
+  assert.ok(clarification.progression);
+  assert.equal(clarification.progression.blocking.length, 5);
+  assert.ok(
+    clarification.progression.blocking.length > clarification.questions.length,
+  );
+  assert.match(
+    clarification.progression.queuedBlockers.join("\n"),
+    /Context owner/,
+  );
+  for (const queued of clarification.progression.queuedBlockers) {
+    assert.ok(clarification.progression.blocking.includes(queued));
+  }
+  assert.doesNotMatch(
+    clarification.progression.deferred.join("\n"),
+    /Context owner/,
+  );
+  assert.match(
+    clarification.progression.reversibleDefaults.join("\n"),
+    /No script by default[\s\S]*No Context Lens by default/,
+  );
+  assert.match(
+    clarification.proposed.join("\n"),
+    /No script or Context Lens by default/,
+  );
+  assert.doesNotMatch(
+    clarification.confirmed.join("\n"),
+    /No script|No Context Lens/,
+  );
   assert.doesNotMatch(
     JSON.stringify(clarification),
     /approvedDomains|allow_network/,

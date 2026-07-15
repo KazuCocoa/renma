@@ -335,6 +335,37 @@ test("authoring docs qualify truth, source access, repairs, and gate re-entry", 
   assert.match(combined, /LLM proposes\. Renma verifies\. Human approves\./);
 });
 
+test("authoring docs separate progression and document batched clarification", async () => {
+  const readme = await readRepoFile("README.md");
+  const manual = await readRepoFile("docs/user-manual.md");
+  const authoring = await readRepoFile("docs/authoring-guide.md");
+  const architecture = await readRepoFile("docs/internal-architecture.md");
+  const cliSource = await readRepoFile("src/cli-help.ts");
+  const combined = [readme, manual, authoring, architecture, cliSource].join(
+    "\n",
+  );
+
+  assert.ok(
+    readme.includes("I want to create a Skill with `renma guide skill`."),
+  );
+  assert.match(readme, /Create a Skill interactively/);
+  assert.match(
+    authoring,
+    /Confirmed, Proposed, and Unresolved describe epistemic support/,
+  );
+  assert.match(
+    authoring,
+    /limit[\s\S]*one to three closely related questions applies only to the current turn, not[\s\S]*total set/,
+  );
+  assert.match(authoring, /Queued blocker: Context owner/);
+  assert.match(
+    authoring,
+    /Proceed when no Blocking decision remains[\s\S]*Reversible defaults and Deferred/,
+  );
+  assert.match(combined, /complete blocker set|complete Blocking set/);
+  assert.match(combined, /never an automatic split|Do not split automatically/);
+});
+
 test("authoring docs preserve Context and external-source security boundaries", async () => {
   const readme = await readRepoFile("README.md");
   const manual = await readRepoFile("docs/user-manual.md");

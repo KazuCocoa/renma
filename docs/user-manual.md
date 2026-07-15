@@ -14,7 +14,8 @@ Run `renma guide skill` before generation. It prints a deterministic protocol
 that tells the consuming LLM to clarify the request, inspect applicable
 user-provided artifacts, repository evidence, and permitted authoritative
 source content, separate confirmed facts from proposals and unresolved human
-truth, and ask one to three focused questions. Renma itself remains
+truth, classify progression separately, and ask one to three focused questions
+per batch while retaining the complete blocker set. Renma itself remains
 non-interactive. This elaborates the existing boundary: **LLM proposes. Renma
 verifies. Human approves.**
 
@@ -244,7 +245,7 @@ clarification gate.
 
 ```mermaid
 flowchart LR
-  Guide["Run renma guide skill"] --> Clarify["LLM clarifies human truth"]
+  Guide["Run renma guide skill"] --> Clarify["LLM clarifies truth and batches blockers"]
   Clarify --> Structure["Pass the gate and define the smallest asset structure"]
   Structure --> Scaffold["Run renma scaffold skill once"]
   Scaffold --> Context["Scaffold or reuse justified Context"]
@@ -262,17 +263,24 @@ finished Skill later according to its own runtime behavior.
 
 1. Run `renma guide skill`. The consuming LLM develops a provisional
    understanding, inspects only applicable truth sources, separates Confirmed,
-   Proposed, and Unresolved decisions, and asks one to three focused questions.
-   The user need not provide a plan-quality specification. Repository evidence
-   must be applicable, effective, and unambiguous; supplied artifacts need clear
-   provenance and applicability; source content must be successfully consulted
-   or supplied rather than recalled from model memory.
+   Proposed, and Unresolved decisions from Blocking, Reversible default, and
+   Deferred progression, and asks one to three focused questions per turn. The
+   complete Blocking set remains visible; additional blockers are queued for the
+   next batch rather than hidden or relabeled Deferred. The user need not provide
+   a plan-quality specification. Repository evidence must be applicable,
+   effective, and unambiguous; supplied artifacts need clear provenance and
+   applicability; source content must be successfully consulted or supplied
+   rather than recalled from model memory.
 
    Before creating files, establish the focused recurring task, expected result,
    meaningful completion or failure behavior, smallest justified structure,
    source authority, authoring-time consultation, finished-Skill runtime access,
    blocking security and domain decisions, and the file-mode owner. Wording,
    tags, examples, and speculative future extensions do not block creation.
+   Proceed when no Blocking decision remains; visible safe reversible defaults
+   and meaningful Deferred decisions may remain Proposed or Unresolved. See the
+   [Authoring Guide](authoring-guide.md#progression-and-question-batches) for the
+   complete batching and boundary-reconsideration protocol.
 
 2. Run the Renma generator once for the target path.
 
@@ -873,8 +881,10 @@ operations. Missing or unknown topics and unsupported arguments exit `2`; use
 The default prompt always includes the interactive authoring protocol. It tells
 the consuming LLM—not Renma—to develop a provisional understanding, inspect
 applicable truth sources, distinguish Confirmed, Proposed, and Unresolved
-decisions, ask one to three focused questions, pass the creation gate, classify
-findings conservatively, and re-enter the gate when asset boundaries may change.
+decisions, classify Blocking, Reversible default, and Deferred progression
+separately, ask one to three focused questions per batch without dropping queued
+blockers, pass the creation gate, classify findings conservatively, and re-enter
+the gate when asset boundaries may change.
 A short request is enough to begin; no `--interactive` option or upfront plan
 document is required.
 

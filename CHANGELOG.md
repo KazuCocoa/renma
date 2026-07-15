@@ -12,14 +12,17 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   structured `renma guide skill` source. The default prompt now tells the
   consuming LLM to investigate qualified user, artifact, repository, and
   authoritative-source evidence; distinguish confirmed facts from proposals and
-  unresolved human truth; separate authoring-time from runtime source access;
-  ask focused questions; pass and re-enter a creation gate; classify
+  unresolved human truth; separately classify Blocking, Reversible default, and
+  Deferred progression; separate authoring-time from runtime source access; ask
+  focused question batches while retaining queued blockers; pass and re-enter a
+  creation gate; classify
   post-validation actions conservatively; and persist only reviewed decisions.
 - Added minimal-trigger and Product A clarification examples plus focused
   regression coverage for prompt ordering, the additive JSON interaction
   projection, decision classes, question rules, creation gates, handoff,
   boundary-change re-entry, uniquely supported repairs, repeated-context
-  constraints, persistence, determinism, and non-editing behavior.
+  constraints, progression and question batching, persistence, determinism, and
+  non-editing behavior.
 
 ### Changed
 
@@ -37,6 +40,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Reduced duplicated prompt workflow and artifact prose so the interaction
   object remains the normative owner of truth, gate, validation, persistence,
   and handoff behavior.
+- Clarified that authoring proceeds when no Blocking decision remains, while
+  visible safe reversible defaults and Deferred decisions may remain without
+  becoming Confirmed. Unrelated branching blockers prompt a proposed boundary
+  reconsideration rather than an automatic Skill split.
 
 ### Compatibility
 

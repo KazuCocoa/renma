@@ -563,7 +563,8 @@ export const COMMAND_HELP = [
     ],
     interpretation: [
       "Prompt is the default format; prompt and JSON derive from the same structured guidance data.",
-      "The default prompt tells the consuming LLM to inspect applicable user-provided artifacts, repository evidence, and permitted authoritative source content; separate confirmed facts from proposals and unresolved decisions; and ask one to three focused questions before the creation gate.",
+      "The default prompt tells the consuming LLM to inspect applicable user-provided artifacts, repository evidence, and permitted authoritative source content; separate Confirmed, Proposed, and Unresolved support from Blocking, Reversible default, and Deferred progression; and ask one to three focused questions per batch before the creation gate.",
+      "The question limit applies to one turn, not the total unresolved set: retain and show queued blockers, continue batches, and proceed only when no Blocking decision remains.",
       "Output is deterministic for the installed Renma version and is written only to stdout.",
       "The command works without an existing repository and performs no filesystem or network operations.",
       "The guide establishes Renma boundaries; platform-native Skill authoring guidance may refine semantics only after the clarification gate and within the agreed structure.",
@@ -571,7 +572,7 @@ export const COMMAND_HELP = [
       "A deterministic finding is not automatically a deterministic repair; follow Diagnostics v2 constraints, investigate repeated context, and re-enter the creation gate before any newly justified asset-boundary change.",
     ],
     nextSteps: [
-      "Clarify the task, investigate relevant evidence, and retain unresolved human decisions instead of inventing answers.",
+      "Clarify the task, investigate relevant evidence, and retain the complete unresolved and Blocking sets instead of inventing or hiding answers.",
       "Pass the creation gate and define the smallest non-redundant asset graph.",
       "Run renma scaffold skill, then scaffold or reuse only justified Context Assets.",
       "Complete the focused workflow and run renma scan . --fail-on high.",

@@ -56,10 +56,10 @@ clarification instead of file creation:
 ```text
 understand
   -> investigate available evidence
-  -> classify current decisions
-  -> ask one to three focused questions
+  -> classify epistemic support and progression separately
+  -> ask one to three focused questions per batch and retain queued blockers
   -> propose the smallest asset structure
-  -> pass the creation gate
+  -> pass the creation gate when no blocker remains
   -> scaffold and author
   -> validate
   -> repair, investigate, ask again, or justify no change
@@ -89,6 +89,62 @@ Question
 A proposal never silently becomes confirmed. Explicit user delegation can
 confirm authority to choose one reversible default, but it does not establish
 unrelated domain facts.
+
+### Progression and question batches
+
+Confirmed, Proposed, and Unresolved describe epistemic support. A separate
+progression classification determines whether authoring can proceed:
+
+| Progression | Meaning | Examples |
+| --- | --- | --- |
+| Blocking | Must be resolved before the current creation gate passes | Unclear task or result, required source authority or product behavior, material security permission, unsafe failure behavior, unjustified Skill-versus-Context boundary, or a missing file-mode owner |
+| Reversible default | A safe, easily changed Proposed decision that invents no domain or governance truth and broadens no security permission | No script or Context Lens by default, a tentative directory name, or another minimal choice delegated by the user |
+| Deferred | Proposed or Unresolved but not needed at the current stage | Wording, optional examples, final tags, non-blocking edge cases, future reuse, or speculative features |
+
+A reversible default remains Proposed when used. A Deferred decision remains
+visible rather than becoming forgotten or implicitly resolved. If later
+evidence makes a Deferred decision material to correctness, security,
+completion, or asset boundaries, move it to Blocking and re-enter clarification.
+
+Keep the complete current set of unresolved and Blocking decisions. The limit
+of one to three closely related questions applies only to the current turn, not
+to the total set. Ask about the highest-impact blockers, show additional ones
+as queued, update the set after the user answers, and continue with the next
+batch without repeating unchanged decisions in full. Never relabel an unasked
+blocker as Deferred merely because the batch limit was reached. For example:
+
+```text
+Current progression
+
+Blocking decisions: 4
+- Asking now: 3 highest-impact questions
+- Queued blocker: Context owner
+
+Proceeding with reversible defaults
+- No script by default
+- No Context Lens by default
+
+Deferred
+- Final tags
+- Additional examples unless real ambiguity emerges
+```
+
+> Proceed when no Blocking decision remains. Reversible defaults and Deferred
+> decisions may remain, provided they are visible, safe, and do not conceal
+> missing domain or governance truth.
+
+When proceeding, identify the defaults and meaningful deferred items, do not
+present either as Confirmed, and do not ask for redundant confirmation after
+the user has authorized progress. “Use your judgment” delegates only identified
+reversible choices; explain the selected default and do not infer product
+behavior, source authority, ownership, security permission, or unrelated facts.
+
+If blockers continue to branch across materially different inputs, outputs,
+users, security policies, completion criteria, or workflows, reconsider whether
+the request describes one focused Skill. Propose a split or narrower first
+Skill, explain the independent responsibilities, keep the boundary Proposed,
+ask only if evidence cannot resolve it, and re-enter the gate after the decision.
+Do not split automatically because the question count is high.
 
 ### Truth sources
 
@@ -486,6 +542,28 @@ Unresolved
 - What happens when the source cannot be accessed.
 - The Context owner, unless repository evidence resolves it.
 
+Current progression
+
+Blocking decisions: 5
+- Product A schema, fields, constraints, and behavior from consulted or supplied
+  source content.
+- Authoring-time source access or an approved way to supply relevant content.
+- Finished-Skill runtime source-access intent.
+- Safe fallback behavior when the source is unavailable.
+- The Context owner when applicable repository evidence does not supply one.
+- Asking now: 3 highest-impact questions below.
+
+Queued blockers
+- The Context owner when applicable repository evidence does not supply one.
+
+Proceeding with reversible defaults
+- No script by default.
+- No Context Lens by default.
+
+Deferred
+- Final wording and tags.
+- Additional examples unless real ambiguity emerges.
+
 Questions
 1. If the current authoring environment cannot access the official URL, can you
    provide the relevant content through an approved process?
@@ -496,7 +574,10 @@ Questions
    JSON schema?
 ```
 
-It does not create files until blocking answers are available. It does not
+The five-item Blocking set remains visible even though the current batch asks
+only three questions; the owner is queued, not hidden or relabeled Deferred.
+The reversible defaults remain Proposed. It does not create files until
+blocking answers are available. It does not
 confirm source-dependent facts from memory, use future Skill metadata as
 authoring-time permission, or hard-code a fictional approved domain or
 permissive security metadata.
