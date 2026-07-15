@@ -51,9 +51,10 @@ test("suggest-metadata prompt reports blocked legacy Skill migration", async () 
   assert.match(result.stdout, /renma\.status: `experimental`/);
   assert.match(result.stdout, /description: No unambiguous, usable/);
   assert.match(result.stdout, /not generated while migration is blocked/);
+  assert.doesNotMatch(result.stdout, /renma guide skill/);
   assert.match(
     result.stdout,
-    /Run `renma guide skill` to re-establish repository boundaries, then confirm the Skill's intent using platform-native Skill guidance within them/,
+    /confirm the Skill's intent using platform-native Skill guidance/,
   );
   assert.match(
     result.stdout,
@@ -212,17 +213,14 @@ test("suggest-metadata proposes no migration or rewrite for canonical release-pr
     promptResult.stdout,
     /Inspect Canonical Agent Skill \(No Migration Proposed\)/,
   );
-  assert.match(
-    promptResult.stdout,
-    /Run `renma guide skill`, then review the Skill's trigger description, instructions, workflow, constraints, and completion criteria with platform-native guidance within the Renma boundaries/,
-  );
+  assert.doesNotMatch(promptResult.stdout, /renma guide skill/);
   assert.match(
     promptResult.stdout,
     /No metadata or migration change is proposed; preserve the existing source/,
   );
   assert.match(
     promptResult.stdout,
-    /If a separate, intentionally reviewed authoring change is made/,
+    /If a separate authoring change is intended/,
   );
   assert.match(
     promptResult.stdout,
@@ -230,7 +228,7 @@ test("suggest-metadata proposes no migration or rewrite for canonical release-pr
   );
   assert.match(
     promptResult.stdout,
-    /If no separate change is made, stop without manufacturing work/,
+    /If no separate change is intended, stop without manufacturing work/,
   );
   assert.match(
     promptResult.stdout,
@@ -288,6 +286,7 @@ test("suggest-metadata keeps candidate application guidance for a real owner ret
   );
   assert.match(result.stdout, /Run `renma scan \. --fail-on high`/);
   assert.match(result.stdout, /Return a small reviewed frontmatter patch/);
+  assert.doesNotMatch(result.stdout, /renma guide skill/);
   assert.doesNotMatch(
     result.stdout,
     /No metadata or migration change is proposed/,

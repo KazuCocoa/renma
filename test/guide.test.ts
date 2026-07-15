@@ -41,10 +41,40 @@ test("guide skill defaults to deterministic prompt output for the installed vers
   assert.match(defaultResult.stdout, /Source-of-truth status alone justifies/);
   assert.match(
     defaultResult.stdout,
+    /important to Skill correctness does not by itself require a Context Asset/,
+  );
+  assert.match(
+    defaultResult.stdout,
     /Do not create a script merely because the output is JSON/,
   );
   assert.match(defaultResult.stdout, /State each requirement once/);
   assert.match(defaultResult.stdout, /Do not copy the full external document/);
+  assert.match(
+    defaultResult.stdout,
+    /Markdown URL.*does not grant network permission/,
+  );
+  assert.match(
+    defaultResult.stdout,
+    /allowed data, network allowance, approved network destinations, external upload, secrets, and human approval/,
+  );
+  assert.match(
+    defaultResult.stdout,
+    /do not manufacture permissive policy values/,
+  );
+  assert.match(
+    defaultResult.stdout,
+    /Skill body, Context instructions, and effective security policy agree/,
+  );
+  assert.match(
+    defaultResult.stdout,
+    /Scaffold generation performs no network operations/,
+  );
+  assert.match(
+    defaultResult.stdout,
+    /name change.*canonical Skill directory\/name relationship.*intentional path and identity change/i,
+  );
+  assert.match(defaultResult.stdout, /not a Renma asset node or graph edge/);
+  assert.match(defaultResult.stdout, /clean scan or graph does not prove/);
   assert.match(defaultResult.stdout, /renma scan/);
   assert.match(defaultResult.stdout, /renma catalog/);
   assert.match(defaultResult.stdout, /renma graph/);
@@ -78,11 +108,43 @@ test("guide skill JSON and --json are equivalent small structured projections", 
   assert.ok((output.renmaVersion as string).length > 0);
   assert.deepEqual(Object.keys(output.example as Record<string, unknown>), [
     "request",
-    "assetGraph",
+    "initialStructure",
+    "externalSourceReference",
     "skillResponsibilities",
     "contextResponsibilities",
+    "securityReview",
     "notCreatedByDefault",
   ]);
+  const example = output.example as {
+    initialStructure: string[];
+    externalSourceReference: string;
+    securityReview: string[];
+  };
+  assert.deepEqual(example.initialStructure, [
+    "skills/build-product-a-json/SKILL.md",
+    "  -> requires",
+    "contexts/product-a-api.md",
+  ]);
+  assert.doesNotMatch(
+    example.initialStructure.join("\n"),
+    /official Product A URL/,
+  );
+  assert.match(
+    example.externalSourceReference,
+    /reviewed official Product A URL/,
+  );
+  assert.match(
+    example.externalSourceReference,
+    /not a Renma asset node or graph edge/,
+  );
+  assert.match(
+    example.securityReview.join("\n"),
+    /effective security policy for allowed data, network access, approved destinations, uploads, secrets, and human approval/,
+  );
+  assert.match(
+    example.securityReview.join("\n"),
+    /Do not treat the URL as permission and do not infer permissive policy values/,
+  );
 });
 
 test("guide renderers consume the same structured guidance data", () => {
@@ -99,9 +161,11 @@ test("guide renderers consume the same structured guidance data", () => {
     ...guidance.concisenessRules,
     ...guidance.metadataRules,
     guidance.example.request,
-    ...guidance.example.assetGraph,
+    ...guidance.example.initialStructure,
+    guidance.example.externalSourceReference,
     ...guidance.example.skillResponsibilities,
     ...guidance.example.contextResponsibilities,
+    ...guidance.example.securityReview,
     ...guidance.example.notCreatedByDefault,
     ...guidance.verification,
   ]) {
@@ -155,6 +219,54 @@ test("guide help and global help document the Skill topic", async () => {
     /guide\s+What is the smallest justified asset graph/,
   );
   assert.match(globalHelp.stdout, /Start here: new skill\s+renma guide skill/s);
+  const existingWorkflow = globalHelp.stdout.slice(
+    globalHelp.stdout.indexOf("Start here: existing repository"),
+    globalHelp.stdout.indexOf("Start here: new skill"),
+  );
+  assert.match(
+    existingWorkflow,
+    /existing repository\s+renma scan \. --fail-on high/s,
+  );
+  assert.match(
+    existingWorkflow,
+    /guide skill only when intentionally reconsidering asset boundaries/,
+  );
+  assert.ok(
+    existingWorkflow.indexOf("renma scan . --fail-on high") <
+      existingWorkflow.indexOf("renma guide skill"),
+  );
+});
+
+test("generic guide, help, and scaffold projections are platform-neutral", async () => {
+  const guidance = buildSkillAuthoringGuidance("test-version");
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-guide-neutral-"));
+  const target = path.join(root, "skills", "demo", "SKILL.md");
+  const outputs = [
+    JSON.stringify(guidance),
+    renderSkillGuidePrompt(guidance),
+    renderSkillGuideJson(guidance),
+    (await capture(() => main(["--help"]))).stdout,
+    (await capture(() => main(["guide", "--help"]))).stdout,
+    (await capture(() => main(["guide", "skill"]))).stdout,
+    (await capture(() => main(["guide", "skill", "--format", "json"]))).stdout,
+    (
+      await capture(() =>
+        main([
+          "scaffold",
+          "skill",
+          target,
+          "--owner",
+          "team",
+          "--format",
+          "prompt",
+        ]),
+      )
+    ).stdout,
+  ];
+
+  for (const output of outputs) {
+    assert.doesNotMatch(output, /\bCodex\b|skill-creator/i);
+  }
 });
 
 test("guide skill works in an empty directory and creates or edits no files", async () => {

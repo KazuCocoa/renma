@@ -22,7 +22,9 @@ review, regression planning, or test generation. As responsibilities diverge,
 prefer separate Skills with explicit selection boundaries over one large Skill
 that embeds every variant.
 
-Start by inspecting the existing Skill and its repository relationships:
+Because deriving focused Skills intentionally reconsiders asset boundaries,
+start by establishing the proposed structure and inspecting the existing Skill
+and its repository relationships:
 
 ```bash
 renma guide skill
@@ -55,7 +57,9 @@ A derived Skill should own:
 
 Domain, product, testing, platform, and tool knowledge should remain in Context
 Assets when it is reused across Skills or has an independent owner, lifecycle,
-maintenance boundary, source-of-truth role, or correctness responsibility.
+maintenance boundary, source-of-truth role, or another explicit reason for
+independent review and governance. Correctness importance alone is not an
+independent Context boundary.
 
 Skill-specific detailed procedures and variants belong in local references;
 deterministic implementation belongs in scripts; output resources belong in

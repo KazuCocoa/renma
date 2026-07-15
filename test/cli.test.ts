@@ -1408,7 +1408,6 @@ test("global help lists workflows, boundaries, and distinguishable commands", as
   );
   assert.match(help.stdout, /renma catalog \. --format markdown/);
   assert.match(help.stdout, /renma graph \. --format markdown/);
-  assert.match(help.stdout, /renma readiness \. --format markdown/);
   assert.match(help.stdout, /Start here: new skill/);
   assert.match(
     help.stdout,
@@ -1416,11 +1415,24 @@ test("global help lists workflows, boundaries, and distinguishable commands", as
   );
   assert.match(
     help.stdout,
-    /authoring review -> intended changes -> repository validation -> fix -> rerun -> human review/,
+    /scan -> inspect evidence -> smallest intended patch -> validate again -> human review/,
   );
   assert.match(
     help.stdout,
-    /platform-native Skill guidance to refine semantics within Renma boundaries/,
+    /complete the focused workflow; use platform-native guidance only within Renma boundaries/,
+  );
+  const existingWorkflow = help.stdout.slice(
+    help.stdout.indexOf("Start here: existing repository"),
+    help.stdout.indexOf("Start here: new skill"),
+  );
+  assert.match(existingWorkflow, /renma scan \. --fail-on high/);
+  assert.match(
+    existingWorkflow,
+    /use renma guide skill only when intentionally reconsidering asset boundaries/,
+  );
+  assert.ok(
+    existingWorkflow.indexOf("renma scan . --fail-on high") <
+      existingWorkflow.indexOf("renma guide skill"),
   );
   assert.match(help.stdout, /renma scan \. --fail-on high/);
   assert.match(help.stdout, /Renma does not call an LLM/);
@@ -1740,7 +1752,7 @@ test("representative command help shows relevant boundaries and options", async 
         /File mode creates the scaffold file at the target path/,
         /refuses to overwrite existing files/,
         /starting structure, not a complete asset/,
-        /renma guide skill to establish the smallest asset graph/,
+        /renma guide skill to establish the smallest asset structure/,
         /platform-native guidance only to refine semantics within those boundaries/,
         /Skill is a focused workflow entrypoint/,
         /Context is independently maintained knowledge/,
@@ -1773,11 +1785,11 @@ test("representative command help shows relevant boundaries and options", async 
         /Explicitly provide an owner candidate/,
         /Renma must not infer an owner when this option is absent/,
         /Preserve existing Markdown body and semantics/,
-        /after Renma establishes repository boundaries, use platform-native Skill guidance/,
+        /metadata review is only one part of authoring review; use platform-native Skill guidance/,
         /renma scan \. --fail-on high/,
         /Inferring an owner without evidence/,
       ],
-      excludes: [/--focus/, /--omit-generated-at/],
+      excludes: [/--focus/, /--omit-generated-at/, /renma guide skill/],
     },
     {
       name: "suggest-semantic-split",
@@ -1883,7 +1895,10 @@ test("scaffold skill writes deterministic file output", async () => {
   assert.equal(result.stderr, "");
   assert.match(result.stdout, /^Created .+SKILL\.md\n\nNext steps:/);
   assert.match(result.stdout, /renma guide skill/);
-  assert.match(result.stdout, /smallest non-redundant intended asset graph/);
+  assert.match(
+    result.stdout,
+    /smallest non-redundant intended asset structure/,
+  );
   assert.match(result.stdout, /renma scan \. --fail-on high/);
   assert.match(
     result.stdout,
@@ -2254,7 +2269,18 @@ test("scaffold prompt emits platform-neutral authoring instructions", async () =
   assert.match(result.stdout, /Move knowledge into a Context Asset/);
   assert.match(result.stdout, /Do not choose runtime task context/);
   assert.match(result.stdout, /Do not assemble prompts for live model calls/);
-  assert.match(result.stdout, /Do not call external services/);
+  assert.doesNotMatch(result.stdout, /Do not call external services/);
+  assert.match(
+    result.stdout,
+    /Scaffold generation performs no network operations/,
+  );
+  assert.match(
+    result.stdout,
+    /finished Skill may access a reviewed external source only when its authored workflow and effective security policy explicitly permit it/,
+  );
+  assert.match(result.stdout, /Markdown URL does not grant network permission/);
+  assert.match(result.stdout, /Do not infer permissive values/);
+  assert.match(result.stdout, /Correctness importance alone is not sufficient/);
   assert.match(
     result.stdout,
     /renma graph \. --focus testing\.spec-review --format mermaid/,

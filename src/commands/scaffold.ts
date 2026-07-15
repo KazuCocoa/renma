@@ -152,7 +152,7 @@ Describe the recurring task, decision, or workflow this skill should guide.
 
 Use \`metadata.renma.requires-context\` and \`metadata.renma.optional-context\` JSON-array strings to reference durable context assets.
 
-Move domain, testing, platform, product, or tool knowledge into a Context Asset under \`contexts/\` when it is reused across Skills or has an independent owner, lifecycle, maintenance boundary, source-of-truth role, or correctness responsibility. Source-of-truth status alone is sufficient.
+Move knowledge into a Context Asset under \`contexts/\` only when it has an independent maintenance or governance reason, such as cross-Skill reuse, independent ownership or lifecycle, separate maintenance, or an authoritative source-of-truth role. Keep task-specific knowledge with no independent boundary in this Skill or justified Skill-local support.
 
 ## Constraints
 
@@ -160,7 +160,7 @@ Move domain, testing, platform, product, or tool knowledge into a Context Asset 
 - Do not invent domain facts, policies, owners, dependencies, or product behavior.
 - Do not choose runtime task context beyond this skill's declared scope.
 - Do not assemble prompts for live model calls.
-- Do not call external services unless the surrounding workflow explicitly allows it.
+- Access an external service only when this Skill's reviewed workflow requires it and effective security policy explicitly permits it; a Markdown link alone is not permission.
 
 ## Validation
 
@@ -207,7 +207,7 @@ This context does not apply when:
 ## Constraints
 
 - Do not put task-specific prompt instructions in this context asset.
-- Keep this asset focused on independently maintained knowledge that is reused, source-authoritative, or required for Skill correctness.
+- Keep this asset focused on knowledge with an independent maintenance or governance reason, such as reuse, independent ownership or lifecycle, separate maintenance, or source authority.
 - Do not duplicate large source material when a reference is enough.
 - Do not invent domain facts, policies, owners, dependencies, or product behavior.
 
@@ -287,7 +287,9 @@ function renderPrompt(input: {
           "- Use `metadata.renma.optional-context` for context useful only in some cases, encoded as a JSON-array string.",
           "- Use `metadata.renma.requires-lens` or `metadata.renma.optional-lens` for static lens relationships, encoded as JSON-array strings.",
           "- State exactly when each local resource should be read or executed. Keep Skill-specific detail in references/, deterministic implementation in scripts/, and output material in assets/.",
-          "- Use contexts/ when knowledge is reused across Skills or has an independent owner, lifecycle, maintenance boundary, source-of-truth role, or correctness responsibility. Source-of-truth status alone is sufficient.",
+          "- Use contexts/ only for knowledge with an independent maintenance or governance reason, such as cross-Skill reuse, independent ownership or lifecycle, separate maintenance, or source authority. Correctness importance alone is not sufficient.",
+          "- For an external source, decide whether execution accesses it or expects approved supplied content. A Markdown URL does not grant network permission.",
+          "- When runtime access is intended, review the supported effective security policy and derive approved destinations only from the reviewed URL or repository policy. Do not infer permissive values.",
         ]
       : [];
   const contextLensGuidance =
@@ -326,7 +328,7 @@ ${
 
 - Preserve the YAML frontmatter shape unless the repository already requires a stricter local convention.
 - Use only supported statuses: experimental, stable, deprecated, archived.
-- Move knowledge into a Context Asset under \`contexts/\` when it is reused across Skills or has an independent owner, lifecycle, maintenance boundary, source-of-truth role, or correctness responsibility.
+- Move knowledge into a Context Asset under \`contexts/\` only when it has an independent maintenance or governance reason. Keep task-specific knowledge in the Skill or justified Skill-local support.
 ${skillGuidance.join("\n")}
 ${contextLensGuidance.join("\n")}
 - For context lens assets, use \`applies_to\` for context assets the lens interprets.
@@ -338,7 +340,7 @@ ${contextLensGuidance.join("\n")}
 - Do not invent owners, dependencies, policies, or domain facts.
 - Do not choose runtime task context.
 - Do not assemble prompts for live model calls.
-- Do not call external services.
+- Scaffold generation performs no network operations. A finished Skill may access a reviewed external source only when its authored workflow and effective security policy explicitly permit it.
 - Keep the asset LLM-facing and Renma-verifiable.
 - After creating files, run \`renma scan .\`, \`renma catalog . --format json\`, and \`renma graph . --focus ${input.id} --format mermaid\`.
 `;
@@ -347,9 +349,9 @@ ${contextLensGuidance.join("\n")}
 function renderSkillNextSteps(): string {
   return [
     "Next steps:",
-    "1. Run `renma guide skill` and confirm this is the smallest non-redundant intended asset graph.",
-    "2. Scaffold or reuse only justified Context Assets and declare required or optional relationships.",
-    "3. Complete the focused workflow; use platform-native guidance only to refine semantics within Renma boundaries.",
+    "1. Run `renma guide skill` and confirm this is the smallest non-redundant intended asset structure.",
+    "2. Scaffold or reuse only Context Assets justified by an independent maintenance or governance boundary.",
+    "3. Complete the focused workflow and any evidence-backed security policy; use platform-native guidance only to refine semantics within Renma boundaries.",
     "4. Run `renma scan . --fail-on high` and inspect catalog and graph evidence.",
     "5. Fix relevant findings and rerun validation.",
     "6. Have a human review meaningful semantic changes and unresolved decisions before merging.",

@@ -51,10 +51,13 @@ been activated. Generic Agent Skills clients may not send arbitrary metadata
 to a model. Renma metadata therefore does not guarantee model compliance and
 must not replace behavior-critical instructions.
 
-Use `renma guide skill` to establish Renma repository asset, metadata, Context,
-and file boundaries first. Then use platform-native Skill guidance for the name,
-trigger description, instructions, workflow, constraints, completion criteria,
-and ambiguity-resolving examples within those boundaries. The
+For a new Skill, or when intentionally redesigning asset boundaries, use
+`renma guide skill` to establish Renma repository asset, metadata, Context, and
+file boundaries. Then use platform-native Skill guidance for the name, trigger
+description, instructions, workflow, constraints, completion criteria, and
+ambiguity-resolving examples within those boundaries. A name change that alters
+the canonical Skill directory/name relationship is an intentional path and
+identity change that requires validation, not an ordinary semantic rewrite. The
 [Authoring Guide](authoring-guide.md) owns the general new-Skill and
 existing-Skill workflows; this document owns the canonical format and migration
 contract.
@@ -430,12 +433,11 @@ owner blocks the proposal for human review. Without `--owner`, Renma does not
 invent owner metadata or emit a meaningless canonical rewrite. This retrofit is
 not reverse migration.
 
-After generating a suggestion, re-establish the boundaries with
-`renma guide skill`, then review the Skill's trigger description, instructions,
-workflow, constraints, and completion criteria using platform-native authoring
-guidance within those boundaries. Review the candidate, apply only intended
+After generating a suggestion, review the candidate, apply only intended
 metadata or migration changes, run `renma scan . --fail-on high`, fix relevant
-diagnostics, and rerun validation before human approval.
+diagnostics, and rerun validation before human approval. Conduct any requested
+semantic review separately using platform-native authoring guidance within the
+repository's established boundaries.
 
 ## Pre-0.16 Value Serialization
 

@@ -27,8 +27,9 @@ identified, owned, versioned in Git, connected through explicit relationships,
 reviewed by humans, and validated deterministically. Cross-Skill reuse is one
 reason for a Context Asset, but an independent lifecycle or source-of-truth role
 is also sufficient. A Skill is an agent-facing entrypoint and workflow guide;
-the broader Context Repository preserves knowledge that can outlive a Skill or
-govern its correctness.
+the broader Context Repository preserves knowledge with an independent reason
+to outlive and be governed separately from one Skill. Task-specific knowledge
+does not become Context merely because it matters to correctness.
 
 Renma operationalizes this model through deterministic repository governance.
 It is not a prompt library, agent runtime, live Context selector, vector
@@ -97,7 +98,7 @@ For a new Skill, establish the Renma contract before generation:
 
 ```text
 renma guide skill
-  -> define the smallest intended asset graph
+  -> define the smallest intended asset structure
   -> renma scaffold skill
   -> scaffold or reuse justified Context Assets
   -> complete the focused workflow
@@ -110,12 +111,10 @@ renma guide skill
 For an existing Skill:
 
 ```text
-renma guide skill
-  -> renma scan . --fail-on high
+renma scan . --fail-on high
   -> inspect relevant diagnostics and repository evidence
   -> use suggest-metadata only for metadata or migration work
-  -> refine Skill semantics within the established Renma boundaries
-  -> prepare and review intended changes
+  -> prepare the smallest intended patch
   -> renma scan . --fail-on high
   -> fix relevant diagnostics
   -> rerun validation
@@ -127,6 +126,18 @@ metadata, and do not run two independent generators against the same target
 file. If a platform-native tool can generate Skills, ask it to refine semantics
 inside the existing Renma scaffold and asset graph. `suggest-metadata` never
 edits the target and does not improve the Skill body.
+
+For existing-Skill maintenance, use `renma guide skill` only when the work
+intentionally reconsiders Skill-versus-Context responsibility, file or resource
+boundaries, source-of-truth placement, scripts, support files, or the asset
+graph. Ordinary maintenance starts with `scan`.
+
+An external URL in a Context Asset records authority; it does not grant network
+permission. Decide whether execution reads the URL or uses content supplied by
+an approved process. Runtime access requires an evidence-backed effective
+security-policy decision, including reviewed data, network, destination,
+upload, secrets, and human-approval semantics where applicable. Do not infer
+permissive values from the URL.
 
 The [Authoring Guide](docs/authoring-guide.md) is the canonical walkthrough for
 both workflows.

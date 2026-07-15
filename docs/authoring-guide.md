@@ -5,7 +5,8 @@ Context Assets, Context Lenses, and Skill-local support in a Renma repository.
 
 ## Responsibility Boundary
 
-Start with `renma guide skill`. Renma first establishes:
+For a new Skill, or when intentionally redesigning asset boundaries, start with
+`renma guide skill`. Renma first establishes:
 
 - the smallest non-redundant asset graph;
 - Skill, Context, Context Lens, Reference, Script, and Example responsibilities;
@@ -24,6 +25,11 @@ instructions, workflow, constraints, completion criteria, and examples that
 resolve real ambiguity. It is not the authority for Renma metadata, Context
 placement, repository asset boundaries, file count, source-of-truth
 representation, or whether scripts and support files should exist.
+
+A name change that affects the canonical Skill directory/name relationship is
+an intentional path and identity change, not an ordinary semantic rewrite.
+Review the move or rename and rerun Agent Skills and Renma validation. Ordinary
+maintenance of an existing Skill starts with `renma scan . --fail-on high`.
 
 Renma does not generate domain intent or automatically improve a Skill body.
 Human judgment remains required for semantics, ownership, policy, dependencies,
@@ -55,7 +61,7 @@ Choose placement by responsibility, ownership, and reuse—not size alone:
 | Content or responsibility | Correct placement | Ownership or reuse test | Common misuse |
 | --- | --- | --- | --- |
 | Review supplied test code and produce prioritized findings; define selection boundaries, inputs, ordered steps, decisions, constraints, verification, output, and completion | Skill in `SKILL.md` | Required to perform one focused workflow | Reducing the Skill to a thin redirect or moving its task contract into Context |
-| Shared rules for reliable automated tests or other durable, source-backed knowledge | Context Asset under `contexts/` | May serve multiple Skills or has an independent owner, lifecycle, maintenance boundary, source-of-truth role, or correctness responsibility; source-of-truth status alone is sufficient | Storing one workflow's instructions or transient task state as Context, or duplicating independently maintained Context in a local Reference |
+| Shared rules for reliable automated tests or other durable, source-backed knowledge | Context Asset under `contexts/` | May serve multiple Skills or has an independent owner, lifecycle, separate maintenance, source-of-truth role, or another explicit reason for independent review and governance; source-of-truth status alone is sufficient | Extracting task-specific knowledge merely because it matters to correctness, storing one workflow's transient state as Context, or duplicating independently maintained Context in a local Reference |
 | Emphasize determinism, isolation, and false-confidence risk while interpreting declared test-quality Context | Context Lens under `lenses/` | The same Context benefits from reusable purpose-specific interpretation | Creating a Lens with no Context target, copying Context, or storing only a persona or runtime route |
 | A stricter review variant for one Skill | Skill-local Profile under `profiles/`, if current Profile semantics fit | An overlay or variant owned and loaded by one Skill | Treating Profiles as generic global personas or a substitute for shared Context |
 | Detailed framework-specific review notes used only by one Skill | Skill-local Reference under `references/` | Supporting detail owned and loaded by one Skill | Promoting local detail without evidence of independent reuse or ownership |
@@ -75,7 +81,7 @@ Use this sequence for a new Skill:
 
 ```text
 renma guide skill
-  -> define the smallest intended asset graph
+  -> define the smallest intended asset structure
   -> renma scaffold skill
   -> scaffold or reuse justified Context Assets
   -> complete the focused workflow
@@ -119,13 +125,34 @@ create a generic Skill first and enrich it afterward with Renma-like metadata.
 Construct the Skill and related assets directly within the Renma authoring
 contract.
 
-When a Skill depends on an external authoritative URL for correctness, normally
-create a concise Context Asset even if no other Skill reuses it. Record what the
-source governs, its authoritative URL, when it must be consulted, and necessary
-scope or fallback behavior. Do not copy the full external document unless an
-intentional reviewed snapshot is required. Declare the Context as required when
-the workflow cannot validly complete without it; use optional Context only when
-it truly can.
+When a Skill depends on an external authoritative URL, its source-of-truth role
+normally justifies a concise Context Asset even if no other Skill reuses it.
+Record what the source governs, its authoritative URL, when it must be
+consulted, and necessary scope or fallback behavior. Do not copy the full
+external document unless an intentional reviewed snapshot is required. Declare
+the Context as required when the workflow cannot validly complete without it;
+use optional Context only when it truly can.
+
+The source-of-truth role supplies the independent authority and maintenance
+boundary; correctness dependency by itself would not. Task-specific knowledge
+with no independent maintenance or governance reason stays in `SKILL.md` or
+justified Skill-local support. After a Context Asset is independently justified,
+correctness dependency determines `requires-context` versus `optional-context`.
+
+Decide whether the finished Skill reads the external URL during execution or
+expects relevant source content from the user or another approved process. A
+Markdown URL does not grant network permission. When runtime access is intended,
+review and declare the supported effective policy for allowed data, network
+allowance, approved destinations, external upload, secrets, and human approval
+where applicable. Public documentation commonly uses the documented
+`public-docs` category, but do not manufacture permissive policy values. Derive
+an approved destination only from the reviewed URL or repository policy, ensure
+the Skill body, Context instructions, and effective policy agree, and preserve
+unresolved access intent or policy for human decision.
+
+Scaffold generation performs no network operations. The finished Skill may
+access the reviewed external source only when its authored workflow and the
+effective security policy permit that access.
 
 Do not create a Context Lens merely because the Context exists. Do not create a
 script merely because the output is JSON, YAML, XML, or another structured
@@ -171,10 +198,9 @@ safe approaches:
 2. Ask the platform tool to use `renma scaffold skill` as the starting point
    instead of independently generating the same target.
 
-In a Codex workflow, use Renma as the one generator, then ask Codex's
-`skill-creator` only to refine semantics inside the established Renma asset and
-metadata boundaries. Do not ask both generators to independently create the
-same target.
+Use Renma as the one generator, then use platform-native authoring guidance only
+to refine semantics inside the established asset and metadata boundaries. Do
+not ask two generators to independently create the same target.
 
 `--format prompt` prints the deterministic scaffold and constraints without
 writing the file. `--format json` prints the existing structured bundle. These
@@ -194,8 +220,10 @@ Within the Renma boundaries, use platform-native guidance to complete:
 
 Preserve the repository's intended behavior. Use a Context Asset when knowledge
 is reusable across Skills, has independent ownership or lifecycle, is maintained
-separately, is an authoritative source of truth, or is required for Skill
-correctness. Any one of those reasons is sufficient.
+separately, is an authoritative source of truth, or has another explicit reason
+for independent review and governance. Correctness importance alone is not
+sufficient; keep task-specific knowledge in the Skill or justified local
+support.
 
 Preserve Agent Skills optional fields, unknown `metadata.renma.*` values, and
 other vendors' string metadata. Provider-specific `agents/openai.yaml` is
@@ -241,14 +269,28 @@ The official Product A URL is the source of truth.
 Improve the Skill with Renma.
 ```
 
-the initial graph is:
+the initial Renma asset structure is:
 
 ```text
 skills/build-product-a-json/SKILL.md
   -> requires
 contexts/product-a-api.md
-  -> refers to the official Product A URL
 ```
+
+The external source reference is separate from that structure:
+
+```text
+contexts/product-a-api.md contains the reviewed official Product A URL
+```
+
+The URL is body content, not a Renma asset node or graph edge. Decide whether
+the finished Skill fetches it at runtime or expects approved supplied content.
+If it fetches at runtime, review the supported allowed-data, network,
+destination, external-upload, secrets, and approval policy; do not hardcode an
+unreviewed host or infer permissive values merely because the URL is public.
+The Renma graph validates only the Skill-to-Context relationship. Neither a
+clean scan nor a valid graph proves that the URL is authoritative or accessible
+at runtime.
 
 The Skill determines the requested operation, consults the declared Context,
 collects missing required inputs, constructs only documented JSON fields,
@@ -263,29 +305,26 @@ by default.
 
 ## Existing Skill Workflow
 
-Use this sequence for an existing Skill:
+Use this sequence for ordinary maintenance of an existing Skill:
 
 ```text
-renma guide skill
-  -> renma scan . --fail-on high
+renma scan . --fail-on high
   -> inspect relevant diagnostics and repository evidence
   -> use suggest-metadata only for metadata or migration work
-  -> refine semantics within the established Renma boundaries
-  -> prepare and review intended changes
+  -> prepare the smallest intended patch
   -> renma scan . --fail-on high
   -> fix relevant diagnostics
   -> rerun validation
   -> human review
 ```
 
-### 1. Review the whole Skill
+Use `renma guide skill` only when the work intentionally reconsiders Skill and
+Context boundaries, file or resource placement, source representation, scripts
+or other support, or the asset graph. Platform-native authoring guidance may
+refine Skill semantics within the resulting Renma boundaries;
+`suggest-metadata` does not perform that review.
 
-Use `renma guide skill` to re-establish the repository boundaries, then use
-platform-native authoring guidance to review the trigger description,
-instructions, workflow, constraints, examples, and completion criteria within
-them. This is semantic authoring review; `suggest-metadata` does not perform it.
-
-### 2. Scan and inspect repository evidence
+### 1. Scan and inspect repository evidence
 
 ```bash
 renma scan . --fail-on high
@@ -297,7 +336,7 @@ renma inspect skills/testing/spec-review/SKILL.md
 commands answers a specific evidence question. Renma reports structural and
 governance evidence; it does not perform the whole-Skill semantic review.
 
-### 3. Generate a metadata or migration suggestion when needed
+### 2. Generate a metadata or migration suggestion when needed
 
 ```bash
 renma suggest-metadata skills/testing/spec-review/SKILL.md
@@ -350,7 +389,7 @@ For a classification-only question, `renma inspect <target> --format json` may
 be the first command. `scan` remains the normal repository-level starting
 point.
 
-### 4. Review before applying
+### 3. Review before applying
 
 Treat the output as a candidate. Compare it with the source and apply only the
 intended metadata, path migration, or migration changes. Preserve the Markdown
@@ -409,8 +448,9 @@ metadata without a requirement.
 
 Create a Context Asset when knowledge is reusable across Skills, has independent
 ownership or lifecycle, is maintained separately, is an authoritative source
-of truth, or is required for Skill correctness. Cross-Skill reuse is not
-mandatory:
+of truth, or has another explicit reason for independent review and governance.
+Source-of-truth status alone is sufficient; importance to one Skill's
+correctness is not. Cross-Skill reuse is not mandatory:
 
 ```bash
 renma scaffold context contexts/testing/boundary-value-analysis.md \
@@ -445,8 +485,11 @@ Use this placement sequence before creating an asset:
 
 1. Is this the task, workflow, or completion contract? Put it in the Skill.
 2. Is this durable, source-backed knowledge with reuse, independent ownership or
-   lifecycle, separate maintenance, source-of-truth, or correctness
-   responsibility? Create or reuse a Context Asset. Any one reason is enough.
+   lifecycle, separate maintenance, source-of-truth status, or another explicit
+   independent governance boundary? Create or reuse a Context Asset. Any one of
+   those independent reasons is enough; correctness importance alone is not.
+   After Context is independently justified, use correctness dependency to
+   select a required versus optional relationship.
 3. Does declared Context need a reusable purpose-specific interpretation?
    Create a Context Lens. Do not create a Lens when there is no Context Asset to
    interpret.
