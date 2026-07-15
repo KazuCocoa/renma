@@ -19,6 +19,11 @@ per batch while retaining the complete blocker set. Renma itself remains
 non-interactive. This elaborates the existing boundary: **LLM proposes. Renma
 verifies. Human approves.**
 
+Before applying progression, distinguish decisions needed to author the Skill
+contract from runtime task unknowns the finished Skill should detect, report,
+request, or handle safely. Runtime task unknowns do not automatically block
+creation, and “do not guess” does not mean stop on every unknown.
+
 After blocking creation-gate decisions are resolved, platform-native Skill
 authoring guidance may refine trigger descriptions, instructions, workflows,
 constraints, completion criteria, and ambiguity-resolving examples only within
@@ -271,6 +276,12 @@ finished Skill later according to its own runtime behavior.
    effective, and unambiguous; supplied artifacts need clear provenance and
    applicability; source content must be successfully consulted or supplied
    rather than recalled from model memory.
+
+   Classify unknown scope before progression. Ask now or queue only authoring
+   decision themes that block the current stage; use safe Proposed defaults,
+   Defer non-material items, and make evidence-backed runtime unknowns findings
+   in the finished Skill's output. Group related raw gaps into themes and
+   reassess them only at meaningful workflow stage transitions.
 
    Before creating files, establish the focused recurring task, expected result,
    meaningful completion or failure behavior, smallest justified structure,
@@ -884,7 +895,11 @@ applicable truth sources, distinguish Confirmed, Proposed, and Unresolved
 decisions, classify Blocking, Reversible default, and Deferred progression
 separately, ask one to three focused questions per batch without dropping queued
 blockers, pass the creation gate, classify findings conservatively, and re-enter
-the gate when asset boundaries may change.
+the gate when asset boundaries may change. It also distinguishes authoring
+decisions from runtime task unknowns and gives unresolved items an action:
+Ask now, Queue as blocker, Proceed with reversible default, Defer, or Report as
+finding. These working classifications are not repository metadata or stored
+conversation state.
 A short request is enough to begin; no `--interactive` option or upfront plan
 document is required.
 

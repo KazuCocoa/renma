@@ -201,9 +201,9 @@ guide. The guidance source may import canonical metadata definitions; metadata
 and renderers must not import command modules.
 
 The 0.19.1 follow-up adds one `interaction` object to that same guidance source.
-It owns the opening rule, progressive phases, truth-source, decision, and
-progression classes, question rules, creation gate, post-validation actions,
-persistence rules,
+It owns the opening rule, progressive phases, truth-source and epistemic classes,
+unknown scopes, progression classes, unresolved-item dispositions, question
+rules, creation gate, post-validation actions, persistence rules,
 platform-native Skill authoring guidance handoff, and minimal and Product A
 clarification examples. The prompt renderer places this protocol immediately
 after the central principle; JSON serializes the same object directly. This is
@@ -223,6 +223,13 @@ contract requires the LLM to retain the complete blocker set while asking at
 most three closely related questions per turn, then pass the gate only when no
 Blocking decision remains. These are prompt instructions and JSON guidance, not
 stored Renma workflow state.
+
+Unknown scope and disposition remain separate from both axes. An authoring
+decision defines repository structure or Skill behavior and may block the gate;
+a runtime task unknown belongs to material the finished Skill processes and can
+be reported as an evidence-backed finding. Ask now, Queue as blocker, Proceed
+with reversible default, Defer, and Report as finding are temporary actions over
+those items, not additional progression classes.
 
 Truth-source evidence remains outside Renma's runtime state. A consuming LLM
 may use explicit user statements, clearly applicable supplied artifacts,
@@ -258,8 +265,9 @@ text, ask questions, retain history, interpret answers, create files, call an
 LLM, or repair assets. Confirmed / Proposed / Unresolved summaries remain
 ephemeral conversation state and must not become new Renma metadata.
 Progression summaries, queued blockers, reversible defaults, and Deferred items
-are likewise ephemeral and create no command state, metadata field, or automatic
-Skill split.
+are likewise ephemeral. So are unknown scopes, raw-gap themes, stage-dependent
+dispositions, and runtime findings during authoring. They create no command
+state, metadata field, or automatic Skill split.
 
 A `no-change-recommended` decision is a successful result. It means Renma
 completed the analysis and found no supported change. The command must not

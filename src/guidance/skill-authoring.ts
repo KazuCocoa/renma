@@ -12,6 +12,19 @@ export interface SkillAuthoringProgressionClasses {
   deferred: string;
 }
 
+export interface SkillAuthoringUnknownScopes {
+  authoringDecision: string;
+  runtimeTaskUnknown: string;
+}
+
+export interface SkillAuthoringUnresolvedItemDispositions {
+  askNow: string;
+  queueAsBlocker: string;
+  proceedWithReversibleDefault: string;
+  defer: string;
+  reportAsFinding: string;
+}
+
 export interface SkillAuthoringProgressionSummary {
   blocking: string[];
   reversibleDefaults: string[];
@@ -26,6 +39,7 @@ export interface SkillAuthoringClarificationExample {
   unresolved: string[];
   questions: string[];
   progression?: SkillAuthoringProgressionSummary;
+  runtimeTaskUnknowns?: string[];
 }
 
 export interface SkillAuthoringInteraction {
@@ -37,18 +51,22 @@ export interface SkillAuthoringInteraction {
     proposed: string;
     unresolved: string;
   };
+  unknownScopes: SkillAuthoringUnknownScopes;
   progressionClasses: SkillAuthoringProgressionClasses;
+  unresolvedItemDispositions: SkillAuthoringUnresolvedItemDispositions;
   questionRules: string[];
   creationGate: string[];
   postValidationActions: string[];
   persistenceRules: string[];
   handoffRules: string[];
   minimalTriggerExample: SkillAuthoringClarificationExample;
+  reviewSkillIllustration: string[];
   productAInitialClarification: Omit<
     SkillAuthoringClarificationExample,
     "request"
   > & {
     progression: SkillAuthoringProgressionSummary;
+    runtimeTaskUnknowns: string[];
   };
 }
 
@@ -94,8 +112,10 @@ export function buildSkillAuthoringGuidance(
       phases: [
         "Understand the provisional recurring task and expected result; do not require a complete upfront specification.",
         "Investigate only the applicable evidence needed for current decisions.",
+        "Before treating an unknown as a creation-gate decision, classify it as an authoring decision or a runtime task unknown.",
         "Classify the current understanding as Confirmed, Proposed, and Unresolved.",
-        "Separately classify each pending decision as Blocking, a Reversible default, or Deferred.",
+        "Separately classify each pending authoring decision as Blocking, a Reversible default, or Deferred, and choose an unresolved-item disposition.",
+        "Group related raw unknowns into decision themes while preserving their underlying evidence.",
         "Ask one to three focused questions about the highest-impact Blocking decisions in the current batch while retaining the complete blocker set.",
         "Propose the smallest justified Skill, Context, and support-file structure.",
         "Continue focused question batches and pass the creation gate when no Blocking decision remains.",
@@ -124,6 +144,12 @@ export function buildSkillAuthoringGuidance(
         unresolved:
           "Human truth or missing applicable evidence that must not be invented, such as the recurring task, inaccessible source-dependent facts, source authority, ownership, product behavior, authoring-time or runtime source access, fallback behavior, external-action permission, required-versus-optional Context, executable implementation intent, or domain completion criteria.",
       },
+      unknownScopes: {
+        authoringDecision:
+          "A decision needed to define the Skill contract, such as the recurring workflow, expected output, usage boundaries, required inputs, completion or failure contract, source authority, Skill-versus-Context placement, runtime source-access policy, evidence-backed security policy, or another choice that changes repository structure or Skill behavior. An unresolved authoring decision may be Blocking.",
+        runtimeTaskUnknown:
+          "A fact expected to vary or be missing in material the finished Skill processes, such as ambiguity in a reviewed specification, an unspecified timeout, retry or rollback behavior, permissions, acceptance criteria, expected results, or a currently unavailable schema. It does not automatically block Skill creation; define how execution preserves and reports it, continues independent analysis, asks the runtime user only when the current execution stage depends on it, or stops safely rather than inventing truth. Do not ask the author to resolve task-instance unknowns merely because the finished Skill may encounter them.",
+      },
       progressionClasses: {
         blocking:
           "A decision that must be resolved before the current creation gate can pass, such as an unclear recurring task or expected result, required but unresolved source authority or product behavior, security permission that materially affects the workflow, unsafe or ambiguous failure behavior, an unjustified Skill-versus-Context boundary, or a missing owner required by file-mode scaffold. Retain every Blocking decision even when the current question batch cannot ask about all of them.",
@@ -132,26 +158,43 @@ export function buildSkillAuthoringGuidance(
         deferred:
           "An Unresolved or Proposed decision that is not required for the current authoring stage, such as wording, optional examples, final tags, non-blocking edge cases, possible future reuse, or speculative features. Keep it visible rather than treating it as forgotten or resolved; if later evidence makes it material to correctness, security, completion, or asset boundaries, move it to Blocking and re-enter clarification.",
       },
+      unresolvedItemDispositions: {
+        askNow:
+          "Select a current-stage Blocking decision theme for this question batch.",
+        queueAsBlocker:
+          "Keep a Blocking theme visible in the complete blocker set when it is not addressed by the current question batch.",
+        proceedWithReversibleDefault:
+          "Use a safe Proposed choice that invents no domain or governance truth and broadens no permission.",
+        defer:
+          "Keep a Proposed or Unresolved item visible when the current stage does not depend on it.",
+        reportAsFinding:
+          "Preserve an evidence-backed runtime task unknown in the finished Skill's output with its impact or risk instead of requiring it to be resolved during authoring or execution.",
+      },
       questionRules: [
         "Before asking, check whether an applicable truth source above answers the question and whether a Renma rule supplies a safe structural default; ask only when human truth or unavailable source content is still required.",
         "In an existing repository, use only commands that answer the current question, such as `renma scan . --fail-on high --format json`, `renma catalog . --format json`, `renma inspect <relevant-file> --format json`, or `renma graph . --focus <relevant-id-or-path> --format json`; do not make every command mandatory ceremony.",
         "Look for an existing Skill that owns the workflow, reusable Context Assets, naming and ownership evidence, security profiles, nearby validated examples, and conflicting or unhealthy conventions before asking questions those sources can answer.",
+        "Preserve raw unknowns and their evidence, group related items by the decision they depend on, prioritize themes by risk and downstream impact, ask only about Blocking themes, keep non-blocking themes as findings or Deferred items, and expand an individual item only when the distinction materially changes the result. For example, timeout, retry count, partial success, and rollback normally form one Failure and recovery behavior theme rather than four default questions.",
         "Maintain the complete current set of unresolved and proposed decisions with separate progression classifications. The limit of one to three closely related questions applies to the current turn, not to the total number of unresolved or Blocking decisions; never impose an arbitrary maximum on that total set.",
         "Prioritize the highest-impact Blocking decisions, ask at most three closely related questions in the current batch, keep additional Blocking decisions visible as queued blockers, and continue with the next batch after the user answers. Never relabel an unasked Blocking decision as Deferred merely because the batch limit was reached.",
         "When more unresolved items exist than can be asked about now, use a compact Current progression summary with the Blocking count, questions being asked, queued blockers, reversible defaults, and meaningful Deferred decisions; later report only material changes instead of repeating the unchanged set in full.",
-        "Ask only about decisions that materially affect responsibility, usage boundaries, inputs, output, completion or failure behavior, placement, Context necessity, source authority, security policy, or support-file justification; do not send a comprehensive questionnaire.",
+        "Do not guess does not mean stop and ask about every unknown: never present missing truth as Confirmed, continue work that does not depend on it, preserve the unknown with evidence, report assumptions and uncertainty, ask only when it blocks the current stage, and never manufacture expected behavior merely to complete an output.",
+        "Ask the author only about authoring decisions that materially affect responsibility, usage boundaries, inputs, output, completion or failure behavior, placement, Context necessity, source authority, security policy, or support-file justification; do not send a comprehensive questionnaire. Do not ask the author to resolve runtime task unknowns that the finished Skill should detect, report, request, or handle safely.",
+        "At each meaningful stage transition, when the workflow actually has stages, reassess unresolved decision themes: move a reportable or Deferred theme to Blocking when the next stage depends on it, move a blocker to Report as finding when the requested output does not require resolution, and ask only about the highest-impact current-stage blockers.",
         "Do not require a plan-mode-quality specification, ask the user to choose metadata syntax, repeat supplied facts, request unneeded future extensions, or block on wording, tags, examples, or formatting that can be refined later.",
         "On the first meaningful response, present a compact Current understanding with Confirmed, Proposed, Unresolved, and Question sections plus progression status when useful; never write this temporary summary as a Renma asset.",
         "If the user does not know, retain domain or governance truth as unresolved, continue with other decisions when possible, and stop before creation only when it is blocking.",
         "If the user says to use your judgment, treat that as delegation only for identified reversible choices: record the authority as Confirmed, keep the selected default Proposed, explain the smallest safe choice, and do not infer product behavior, source authority, ownership, security permission, or unrelated facts.",
-        "When Blocking decisions keep branching across materially different inputs, outputs, users, security policies, completion criteria, or workflows, reconsider whether the request describes one focused Skill. Propose a split or narrower first Skill, explain the independent responsibilities, keep the boundary Proposed, ask only if evidence cannot resolve it, and re-enter the creation gate after the decision; never split automatically because the question count is high.",
+        "A high number of raw unknowns or themes alone does not imply a Skill split; for review Skills, many unknowns may be the expected output. Reconsider the boundary only when Blocking themes reveal materially independent tasks, inputs, outputs, users, security contracts, completion criteria, or workflows. Then propose a split or narrower first Skill, explain the independent responsibilities, keep the boundary Proposed, ask only if evidence cannot resolve it, and re-enter the creation gate after the decision.",
       ],
       creationGate: [
         "Before file creation, establish the focused recurring task, expected result, and meaningful completion or failure behavior.",
         "Establish the smallest justified Skill, Context, and support-file structure, including source authority and required-versus-optional Context semantics when relevant.",
         "Resolve authoring-time source consultation, finished-Skill runtime source-access intent, blocking security-policy decisions, and product or domain rules that cannot safely be inferred when they affect the workflow.",
+        "Treat authoritative source content as an authoring blocker only when source-specific instructions, transformations, embedded examples, or validation behavior cannot be defined without consulting it; otherwise define a safe runtime consultation and fallback contract without requiring the full specification during authoring.",
         "Resolve the owner required by file-mode scaffold unless repository evidence already provides it.",
         "Do not create files while any blocking decision remains unresolved, merely because a generic generator is available, or to make progress appear complete.",
+        "Do not block creation on task-instance unknowns when the Skill contract can safely detect and report them with evidence, continue unaffected work, request runtime input only when needed, and stop without inventing truth when the requested output cannot be produced.",
         "Do not block creation on a complete plan, every edge case, final prose, all examples, finalized tags, speculative future capabilities, or perfect certainty about non-blocking details.",
         "Proceed when no Blocking decision remains. Reversible defaults and Deferred decisions may remain when they are visible and safe and do not conceal missing domain or governance truth.",
         "When proceeding, identify the reversible defaults being used and meaningful Deferred decisions, keep them Proposed or Unresolved rather than presenting them as Confirmed, do not ask for redundant confirmation after the user has authorized progress, and re-enter clarification if later evidence changes their impact.",
@@ -200,6 +243,12 @@ export function buildSkillAuthoringGuidance(
           "What recurring task should the Skill perform, and what result should it produce?",
         ],
       },
+      reviewSkillIllustration: [
+        "A specification review finds 20 raw gaps across authorization, failure recovery, validation boundaries, and observability.",
+        "The review can continue because the gaps are runtime task unknowns and valuable findings rather than failed authoring clarification.",
+        "Preserve the underlying evidence and report four decision themes with their impact or risk.",
+        "Ask only about a theme that blocks the requested output; keep other themes as findings.",
+      ],
       productAInitialClarification: {
         confirmed: [
           "The workflow builds a Product A JSON body.",
@@ -213,37 +262,46 @@ export function buildSkillAuthoringGuidance(
           "No script or Context Lens by default.",
         ],
         unresolved: [
-          "The Product A schema, fields, constraints, and behavior until the source content is successfully consulted or supplied through another approved process.",
-          "Whether the current authoring environment is permitted and able to access the URL.",
           "Whether the finished Skill accesses the URL at execution time.",
           "What happens when the source cannot be accessed.",
+          "Whether the Product A Context is required or optional for correct execution.",
           "The Context owner, unless repository evidence resolves it.",
+          "Whether source-specific instructions, transformations, embedded examples, or validation behavior must be authored now.",
+          "Whether authoring-time consultation is needed for any source-specific authoring decision.",
+          "The current Product A schema, fields, constraints, and operation-specific behavior until the finished Skill consults the source or receives approved supplied content.",
         ],
         questions: [
-          "If the current authoring environment cannot access the official URL, can you provide the relevant source content through an approved process?",
-          "Separately, should the finished Skill access the official URL during execution, or should its future consumer receive the relevant documentation through another approved process?",
-          "When the source is unavailable, should the Skill stop rather than infer the JSON schema?",
+          "Should the finished Skill access the official URL during execution, or should its runtime consumer provide the relevant documentation through another approved process?",
+          "When the source is unavailable, should the Skill stop or request approved supplied content rather than infer the JSON schema?",
+          "Must the Skill embed any source-specific instructions, transformations, examples, or validation behavior now, or can it consult the current source during execution?",
         ],
         progression: {
           blocking: [
-            "The Product A schema, fields, constraints, and behavior must be established from successfully consulted or supplied source content.",
-            "Authoring-time access to the source or an approved way to supply its relevant content.",
             "Finished-Skill runtime source-access intent.",
             "Safe fallback behavior when the source is unavailable.",
+            "Whether the Product A Context is required or optional for correct execution.",
             "The Context owner when applicable repository evidence does not supply one.",
+            "Any source-specific instructions, transformations, examples, or validation behavior that must be embedded during authoring.",
           ],
           reversibleDefaults: [
             "No script by default.",
             "No Context Lens by default.",
           ],
           deferred: [
+            "Authoring-time source consultation when no source-specific authoring decision depends on it.",
             "Final wording and tags.",
             "Additional examples unless real ambiguity emerges.",
           ],
           queuedBlockers: [
+            "Whether the Product A Context is required or optional for correct execution.",
             "The Context owner when applicable repository evidence does not supply one.",
           ],
         },
+        runtimeTaskUnknowns: [
+          "The current Product A schema.",
+          "The current documented fields and constraints.",
+          "Operation-specific behavior read from the authoritative source.",
+        ],
       },
     },
     workflow: [

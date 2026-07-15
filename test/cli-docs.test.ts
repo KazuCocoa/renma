@@ -357,13 +357,50 @@ test("authoring docs separate progression and document batched clarification", a
     authoring,
     /limit[\s\S]*one to three closely related questions applies only to the current turn, not[\s\S]*total set/,
   );
-  assert.match(authoring, /Queued blocker: Context owner/);
+  assert.match(
+    authoring,
+    /Queued from the complete blocker list above \(not additional\)/,
+  );
   assert.match(
     authoring,
     /Proceed when no Blocking decision remains[\s\S]*Reversible defaults and Deferred/,
   );
   assert.match(combined, /complete blocker set|complete Blocking set/);
   assert.match(combined, /never an automatic split|Do not split automatically/);
+});
+
+test("authoring docs separate runtime unknowns and stage-dependent dispositions", async () => {
+  const readme = await readRepoFile("README.md");
+  const manual = await readRepoFile("docs/user-manual.md");
+  const authoring = await readRepoFile("docs/authoring-guide.md");
+  const architecture = await readRepoFile("docs/internal-architecture.md");
+  const plan = await readRepoFile("plan.md");
+  const combined = [readme, manual, authoring, architecture, plan].join("\n");
+
+  assert.match(
+    authoring,
+    /authoring decision[\s\S]*runtime task unknown[\s\S]*does not automatically block creation/i,
+  );
+  assert.match(
+    authoring,
+    /Do not ask the author to resolve task-instance unknowns/,
+  );
+  assert.match(
+    authoring,
+    /Do not guess does not mean stop and ask about every unknown/,
+  );
+  assert.match(authoring, /Failure and recovery behavior/);
+  assert.match(authoring, /Report as finding/);
+  assert.match(authoring, /meaningful stages[\s\S]*reassess themes/);
+  assert.match(authoring, /20 raw gaps/);
+  assert.match(
+    authoring,
+    /Current schema, fields, constraints, and operation-specific behavior are runtime[\s\S]*source-dependent knowledge/,
+  );
+  assert.match(
+    combined,
+    /not repository metadata|not additional progression classes/,
+  );
 });
 
 test("authoring docs preserve Context and external-source security boundaries", async () => {

@@ -56,7 +56,7 @@ clarification instead of file creation:
 ```text
 understand
   -> investigate available evidence
-  -> classify epistemic support and progression separately
+  -> classify scope, epistemic support, progression, and disposition separately
   -> ask one to three focused questions per batch and retain queued blockers
   -> propose the smallest asset structure
   -> pass the creation gate when no blocker remains
@@ -90,6 +90,26 @@ A proposal never silently becomes confirmed. Explicit user delegation can
 confirm authority to choose one reversible default, but it does not establish
 unrelated domain facts.
 
+### Unknown scope
+
+Before applying progression, classify the unknown's scope:
+
+- An **authoring decision** defines the Skill contract: its workflow, output,
+  usage boundary, required inputs, completion or failure behavior, source
+  authority, Skill-versus-Context placement, runtime access or security policy,
+  repository structure, or authored behavior. An unresolved authoring decision
+  may be Blocking.
+- A **runtime task unknown** is expected to vary or be missing in material the
+  finished Skill processes. It may be an ambiguous specification rule, timeout,
+  retry or rollback behavior, permission, acceptance criterion, expected result,
+  or current schema. It does not automatically block creation. Define how the
+  Skill reports it with evidence and impact, continues independent work, asks
+  the runtime user only when the current execution stage depends on it, or stops
+  safely without inventing truth.
+
+Do not ask the author to resolve task-instance unknowns merely because the
+finished Skill may encounter them.
+
 ### Progression and question batches
 
 Confirmed, Proposed, and Unresolved describe epistemic support. A separate
@@ -100,6 +120,16 @@ progression classification determines whether authoring can proceed:
 | Blocking | Must be resolved before the current creation gate passes | Unclear task or result, required source authority or product behavior, material security permission, unsafe failure behavior, unjustified Skill-versus-Context boundary, or a missing file-mode owner |
 | Reversible default | A safe, easily changed Proposed decision that invents no domain or governance truth and broadens no security permission | No script or Context Lens by default, a tentative directory name, or another minimal choice delegated by the user |
 | Deferred | Proposed or Unresolved but not needed at the current stage | Wording, optional examples, final tags, non-blocking edge cases, future reuse, or speculative features |
+
+Keep disposition separate from epistemic support, scope, and progression:
+
+| Disposition | Action |
+| --- | --- |
+| Ask now | Select a current-stage Blocking theme for this batch |
+| Queue as blocker | Keep an unasked Blocking theme visible in the complete set |
+| Proceed with reversible default | Use a safe Proposed choice that invents no truth or permission |
+| Defer | Keep an item visible when the current stage does not depend on it |
+| Report as finding | Preserve an evidence-backed runtime unknown in the Skill's output with impact or risk |
 
 A reversible default remains Proposed when used. A Deferred decision remains
 visible rather than becoming forgotten or implicitly resolved. If later
@@ -117,10 +147,15 @@ blocker as Deferred merely because the batch limit was reached. For example:
 Current progression
 
 Blocking decisions: 4
-- Asking now: 3 highest-impact questions
-- Queued blocker: Context owner
+- Failure and recovery contract
+- Required input boundary
+- Runtime source-access policy
+- Context owner
+- Asking now: 3 highest-impact questions below
 
-Proceeding with reversible defaults
+Queued from the complete blocker list above (not additional): 4
+
+Proposed reversible defaults
 - No script by default
 - No Context Lens by default
 
@@ -133,18 +168,43 @@ Deferred
 > decisions may remain, provided they are visible, safe, and do not conceal
 > missing domain or governance truth.
 
+Do not guess does not mean stop and ask about every unknown. Never present
+missing truth as Confirmed; continue work that does not depend on it; preserve
+it with evidence; report assumptions and uncertainty; ask only when it blocks
+the current stage; and never manufacture expected behavior merely to finish an
+output.
+
+Before asking, preserve the raw evidence and group related unknowns by the
+decision they depend on. Timeout, retry count, partial success, and rollback
+usually form one **Failure and recovery behavior** theme rather than four
+questions. Prioritize themes by risk and downstream impact, and expand an item
+only when its distinction changes the result. There is no fixed maximum for raw
+unknowns or themes.
+
+When a workflow has meaningful stages, reassess themes at each transition. A
+specification ambiguity can be Report as finding during review, remain
+non-blocking while designing coverage for unaffected behavior, then become
+Blocking when concrete expected-result generation depends on it. Move a blocker
+back to Report as finding when the requested output does not require resolution.
+
 When proceeding, identify the defaults and meaningful deferred items, do not
 present either as Confirmed, and do not ask for redundant confirmation after
 the user has authorized progress. “Use your judgment” delegates only identified
 reversible choices; explain the selected default and do not infer product
 behavior, source authority, ownership, security permission, or unrelated facts.
 
-If blockers continue to branch across materially different inputs, outputs,
-users, security policies, completion criteria, or workflows, reconsider whether
-the request describes one focused Skill. Propose a split or narrower first
-Skill, explain the independent responsibilities, keep the boundary Proposed,
-ask only if evidence cannot resolve it, and re-enter the gate after the decision.
-Do not split automatically because the question count is high.
+Many raw unknowns may be the expected output of a review Skill. Reconsider the
+Skill boundary only when Blocking themes reveal materially independent tasks,
+inputs, outputs, users, security contracts, completion criteria, or workflows.
+Propose a split or narrower first Skill, explain the responsibilities, keep the
+boundary Proposed, ask only if evidence cannot resolve it, and re-enter the gate
+after the decision. Do not split automatically because the count is high.
+
+Compact review-Skill illustration: a specification review finds 20 raw gaps
+across authorization, failure recovery, validation boundaries, and
+observability. The review continues, preserves the evidence, and reports four
+decision themes with impact. It asks only about a theme that blocks the requested
+output; the other unknowns remain valuable findings, not failed clarification.
 
 ### Truth sources
 
@@ -207,6 +267,11 @@ source authority, authoring-time consultation, finished-Skill runtime access,
 blocking security and domain decisions, and the owner required by file-mode
 scaffold unless repository evidence already supplies it. Pause while a
 blocking human decision remains unresolved.
+
+Do not block creation on runtime task unknowns when the Skill contract can
+detect and report them with evidence, continue unaffected work, request runtime
+input only when needed, and stop safely if the requested output would otherwise
+require invented truth.
 
 The gate does not require a complete plan, every edge case, final prose, all
 examples, finalized tags, future capabilities, or perfect certainty about
@@ -534,53 +599,74 @@ Proposed
 - No script or Context Lens by default.
 
 Unresolved
-- The Product A schema, fields, constraints, and behavior until source content
-  is successfully consulted or supplied through another approved process.
-- Whether the current authoring environment is permitted and able to access the
-  URL.
 - Whether the finished Skill accesses the URL at execution time.
 - What happens when the source cannot be accessed.
+- Whether the Product A Context is required or optional for correct execution.
 - The Context owner, unless repository evidence resolves it.
+- Whether source-specific instructions, transformations, examples, or validation
+  behavior must be authored now.
+- Whether authoring-time consultation is needed for a source-specific authoring
+  decision.
+- The current Product A schema, fields, constraints, and operation-specific
+  behavior until runtime source consultation or approved supplied content.
+
+Runtime task unknowns handled by the finished Skill
+- The current Product A schema.
+- The current documented fields and constraints.
+- Operation-specific behavior read from the authoritative source.
 
 Current progression
 
 Blocking decisions: 5
-- Product A schema, fields, constraints, and behavior from consulted or supplied
-  source content.
-- Authoring-time source access or an approved way to supply relevant content.
 - Finished-Skill runtime source-access intent.
 - Safe fallback behavior when the source is unavailable.
+- Whether the Product A Context is required or optional for correct execution.
 - The Context owner when applicable repository evidence does not supply one.
+- Any source-specific instructions, transformations, examples, or validation
+  behavior that must be embedded during authoring.
 - Asking now: 3 highest-impact questions below.
 
-Queued blockers
-- The Context owner when applicable repository evidence does not supply one.
+Queued from the complete blocker list above (not additional): 3, 4.
 
-Proceeding with reversible defaults
+Proposed reversible defaults
 - No script by default.
 - No Context Lens by default.
 
 Deferred
+- Authoring-time source consultation when no source-specific authoring decision
+  depends on it.
 - Final wording and tags.
 - Additional examples unless real ambiguity emerges.
 
 Questions
-1. If the current authoring environment cannot access the official URL, can you
-   provide the relevant content through an approved process?
-2. Separately, should the finished Skill access the URL during execution, or
-   should its future consumer receive the documentation through another
-   approved process?
-3. When the source is unavailable, should the Skill stop rather than infer the
-   JSON schema?
+1. Should the finished Skill access the URL during execution, or should its
+   runtime consumer provide the documentation through another approved process?
+2. When the source is unavailable, should the Skill stop or request approved
+   supplied content rather than infer the JSON schema?
+3. Must the Skill embed any source-specific instructions, transformations,
+   examples, or validation behavior now, or can it consult the current source
+   during execution?
 ```
 
 The five-item Blocking set remains visible even though the current batch asks
-only three questions; the owner is queued, not hidden or relabeled Deferred.
-The reversible defaults remain Proposed. It does not create files until
-blocking answers are available. It does not
-confirm source-dependent facts from memory, use future Skill metadata as
-authoring-time permission, or hard-code a fictional approved domain or
-permissive security metadata.
+only three questions; required-versus-optional Context and owner are queued by
+their positions in that set, not counted again. The reversible defaults remain
+Proposed.
+
+Current schema, fields, constraints, and operation-specific behavior are runtime
+source-dependent knowledge when the safe contract is to consult the declared
+Context, use only documented fields, request missing task inputs, report
+ambiguity, and stop or request approved supplied content when the source is
+unavailable. They become authoring blockers only when source-specific
+instructions, transformations, embedded examples, or validation behavior must
+be defined in the Skill. Do not require the user to paste the full specification
+when those current facts can safely remain runtime-scoped. Authoring-time
+consultation remains useful and may be required for source-specific authoring;
+it is not universally a creation-gate blocker.
+
+The LLM does not confirm source-dependent facts from memory, use future Skill
+metadata as authoring-time permission, or hard-code a fictional approved domain
+or permissive security metadata.
 
 After the creation gate, the smallest proposed Renma asset structure is:
 

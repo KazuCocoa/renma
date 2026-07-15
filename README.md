@@ -48,7 +48,9 @@ focused questions per batch while retaining every blocker. Repository
 evidence confirms facts only when it is applicable, effective, and unambiguous;
 source designation alone does not confirm source-content facts. Renma itself
 does not conduct the conversation. After blocking decisions are resolved, the
-deterministic scaffold is the repository-compatible starting point.
+deterministic scaffold is the repository-compatible starting point. A runtime
+task unknown that the finished Skill can detect and report with evidence does
+not automatically block authoring.
 
 Platform-native Skill authoring guidance may then refine trigger descriptions,
 ordered instructions, positive and negative usage boundaries, inputs,
@@ -111,6 +113,7 @@ For a new Skill, establish the Renma contract before generation:
 ```text
 renma guide skill
   -> consuming LLM clarifies human truth and inspects applicable evidence
+  -> separate authoring decisions from runtime task unknowns
   -> classify confirmed, proposed, and unresolved decisions
   -> classify blocking, reversible-default, and deferred progression
   -> ask one to three focused questions per batch and retain queued blockers

@@ -13,16 +13,17 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   consuming LLM to investigate qualified user, artifact, repository, and
   authoritative-source evidence; distinguish confirmed facts from proposals and
   unresolved human truth; separately classify Blocking, Reversible default, and
-  Deferred progression; separate authoring-time from runtime source access; ask
-  focused question batches while retaining queued blockers; pass and re-enter a
-  creation gate; classify
+  Deferred progression; distinguish authoring decisions from runtime task
+  unknowns; separate authoring-time from runtime source access; ask focused
+  question batches while retaining queued blockers; pass and re-enter a creation
+  gate; classify
   post-validation actions conservatively; and persist only reviewed decisions.
 - Added minimal-trigger and Product A clarification examples plus focused
   regression coverage for prompt ordering, the additive JSON interaction
   projection, decision classes, question rules, creation gates, handoff,
   boundary-change re-entry, uniquely supported repairs, repeated-context
-  constraints, progression and question batching, persistence, determinism, and
-  non-editing behavior.
+  constraints, unknown scope and disposition, progression and question batching,
+  stage-dependent blockers, persistence, determinism, and non-editing behavior.
 
 ### Changed
 
@@ -44,6 +45,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   visible safe reversible defaults and Deferred decisions may remain without
   becoming Confirmed. Unrelated branching blockers prompt a proposed boundary
   reconsideration rather than an automatic Skill split.
+- Clarified that runtime task unknowns are findings rather than automatic
+  authoring blockers, “do not guess” still permits independent analysis, related
+  raw gaps should be clustered into decision themes, and progression is
+  reassessed only at meaningful workflow stage boundaries.
 
 ### Compatibility
 

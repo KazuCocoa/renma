@@ -98,13 +98,27 @@ function renderInteraction(interaction: SkillAuthoringInteraction): string[] {
     `- Proposed: ${interaction.decisionClasses.proposed}`,
     `- Unresolved: ${interaction.decisionClasses.unresolved}`,
     "",
+    "Unknown scopes:",
+    `- Authoring decision: ${interaction.unknownScopes.authoringDecision}`,
+    `- Runtime task unknown: ${interaction.unknownScopes.runtimeTaskUnknown}`,
+    "",
     "Progression classes:",
     `- Blocking: ${interaction.progressionClasses.blocking}`,
     `- Reversible default: ${interaction.progressionClasses.reversibleDefault}`,
     `- Deferred: ${interaction.progressionClasses.deferred}`,
     "",
+    "Unresolved-item dispositions:",
+    `- Ask now: ${interaction.unresolvedItemDispositions.askNow}`,
+    `- Queue as blocker: ${interaction.unresolvedItemDispositions.queueAsBlocker}`,
+    `- Proceed with reversible default: ${interaction.unresolvedItemDispositions.proceedWithReversibleDefault}`,
+    `- Defer: ${interaction.unresolvedItemDispositions.defer}`,
+    `- Report as finding: ${interaction.unresolvedItemDispositions.reportAsFinding}`,
+    "",
     "Question rules:",
     ...renderBullets(interaction.questionRules),
+    "",
+    "Review-Skill illustration:",
+    ...renderBullets(interaction.reviewSkillIllustration),
     "",
     "Creation gate:",
     ...renderBullets(interaction.creationGate),
@@ -141,6 +155,13 @@ function renderDecisionSummary(
         ),
       ]
     : [];
+  const runtimeTaskUnknowns = example.runtimeTaskUnknowns
+    ? [
+        "",
+        "Runtime task unknowns handled by the finished Skill",
+        ...renderBullets(example.runtimeTaskUnknowns),
+      ]
+    : [];
 
   return [
     "Current understanding",
@@ -153,6 +174,7 @@ function renderDecisionSummary(
     "",
     "Unresolved",
     ...renderBullets(example.unresolved),
+    ...runtimeTaskUnknowns,
     ...progression,
     "",
     example.questions.length === 1 ? "Question" : "Questions",
@@ -164,19 +186,34 @@ function renderProgressionSummary(
   progression: SkillAuthoringProgressionSummary,
   questionCount: number,
 ): string[] {
+  const queuedBlockerNumbers = progression.queuedBlockers.map(
+    (blocker) => progression.blocking.indexOf(blocker) + 1,
+  );
+  const reversibleDefaultsHeading =
+    progression.blocking.length === 0
+      ? "Proceeding with reversible defaults"
+      : "Proposed reversible defaults";
+
   return [
     "Current progression",
     "",
     `Blocking decisions: ${progression.blocking.length}`,
     ...renderBullets(progression.blocking),
-    `- Asking now: ${questionCount} highest-impact question${questionCount === 1 ? "" : "s"} below.`,
+    ...(questionCount > 0
+      ? [
+          `- Asking now: ${questionCount} highest-impact question${questionCount === 1 ? "" : "s"} below.`,
+        ]
+      : []),
     ...(progression.queuedBlockers.length > 0
-      ? ["", "Queued blockers", ...renderBullets(progression.queuedBlockers)]
+      ? [
+          "",
+          `Queued from the complete blocker list above (not additional): ${queuedBlockerNumbers.join(", ")}.`,
+        ]
       : []),
     ...(progression.reversibleDefaults.length > 0
       ? [
           "",
-          "Proceeding with reversible defaults",
+          reversibleDefaultsHeading,
           ...renderBullets(progression.reversibleDefaults),
         ]
       : []),

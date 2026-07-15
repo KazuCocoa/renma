@@ -88,8 +88,10 @@ interactive and does not add a command or option:
 ```text
 renma guide skill
   -> consuming LLM clarifies the task and investigates applicable evidence
+  -> separate authoring decisions from runtime task unknowns
   -> separate confirmed facts, proposals, and unresolved human truth
   -> separately classify blocking, reversible-default, and deferred progression
+  -> cluster raw gaps into decision themes and choose dispositions
   -> ask one to three focused questions per batch and retain queued blockers
   -> pass the creation gate when no blocker remains
   -> scaffold and author the smallest justified structure
@@ -117,6 +119,13 @@ proceeds with visible safe reversible defaults or Deferred items only after no
 Blocking decision remains, and promotes a Deferred item back to Blocking when
 later evidence makes it material. Branching across unrelated responsibilities
 prompts a Proposed Skill-boundary reconsideration, never an automatic split.
+
+Task-instance unknowns that the finished Skill should detect and report do not
+automatically block creation. The protocol keeps unknown scope and disposition
+separate from epistemic and progression axes, groups raw gaps into risk-oriented
+decision themes, and reassesses Blocking versus Report as finding only across
+meaningful workflow stages. Many findings are expected output for review Skills;
+only materially independent tasks and contracts signal a possible Skill split.
 
 This elaborates the stable operating boundary: `LLM proposes. Renma verifies.
 Human approves.` Deterministic detection does not imply deterministic repair,

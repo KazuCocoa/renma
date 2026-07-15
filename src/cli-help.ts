@@ -565,6 +565,8 @@ export const COMMAND_HELP = [
       "Prompt is the default format; prompt and JSON derive from the same structured guidance data.",
       "The default prompt tells the consuming LLM to inspect applicable user-provided artifacts, repository evidence, and permitted authoritative source content; separate Confirmed, Proposed, and Unresolved support from Blocking, Reversible default, and Deferred progression; and ask one to three focused questions per batch before the creation gate.",
       "The question limit applies to one turn, not the total unresolved set: retain and show queued blockers, continue batches, and proceed only when no Blocking decision remains.",
+      "Classify unknown scope before progression: authoring decisions may block the gate, while runtime task unknowns should be detected, reported with evidence and impact, requested only when the current execution stage depends on them, or handled by stopping safely without inventing truth.",
+      "Group related raw unknowns into decision themes and use an explicit disposition: ask now, queue as blocker, proceed with a reversible default, defer, or report as a finding.",
       "Output is deterministic for the installed Renma version and is written only to stdout.",
       "The command works without an existing repository and performs no filesystem or network operations.",
       "The guide establishes Renma boundaries; platform-native Skill authoring guidance may refine semantics only after the clarification gate and within the agreed structure.",
