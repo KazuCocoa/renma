@@ -1,4 +1,4 @@
-# Renma
+# Renma - 練磨 in Japanese
 
 [![NPM version](http://img.shields.io/npm/v/renma.svg)](https://npmjs.org/package/renma)
 [![Downloads](http://img.shields.io/npm/dm/renma.svg)](https://npmjs.org/package/renma)
