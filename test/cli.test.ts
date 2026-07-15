@@ -1419,7 +1419,7 @@ test("global help lists workflows, boundaries, and distinguishable commands", as
   );
   assert.match(
     help.stdout,
-    /complete the focused workflow; use platform-native guidance only within Renma boundaries/,
+    /complete the focused workflow; use platform-native Skill authoring guidance only within Renma boundaries/,
   );
   const existingWorkflow = help.stdout.slice(
     help.stdout.indexOf("Start here: existing repository"),
@@ -1753,7 +1753,7 @@ test("representative command help shows relevant boundaries and options", async 
         /refuses to overwrite existing files/,
         /starting structure, not a complete asset/,
         /renma guide skill to establish the smallest asset structure/,
-        /platform-native guidance only to refine semantics within those boundaries/,
+        /platform-native Skill authoring guidance only to refine semantics within those boundaries/,
         /Skill is a focused workflow entrypoint/,
         /Context is independently maintained knowledge/,
         /Context Lens is purpose-specific interpretation of declared Context/,
@@ -1785,7 +1785,7 @@ test("representative command help shows relevant boundaries and options", async 
         /Explicitly provide an owner candidate/,
         /Renma must not infer an owner when this option is absent/,
         /Preserve existing Markdown body and semantics/,
-        /metadata review is only one part of authoring review; use platform-native Skill guidance/,
+        /metadata review is only one part of authoring review; use platform-native Skill authoring guidance/,
         /renma scan \. --fail-on high/,
         /Inferring an owner without evidence/,
       ],
@@ -2289,7 +2289,10 @@ test("scaffold prompt emits platform-neutral authoring instructions", async () =
   assert.match(result.stdout, /Do not invent owners/);
   assert.match(result.stdout, /renma guide skill/);
   assert.match(result.stdout, /smallest non-redundant Renma asset graph/);
-  assert.match(result.stdout, /platform-native guidance only to refine/);
+  assert.match(
+    result.stdout,
+    /platform-native Skill authoring guidance only to refine/,
+  );
   assert.match(
     result.stdout,
     /trigger description, instructions, workflow, constraints, completion criteria/,

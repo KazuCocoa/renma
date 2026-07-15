@@ -19,12 +19,13 @@ For a new Skill, or when intentionally redesigning asset boundaries, start with
 - workflow clarity diagnostics; and
 - repository-wide scan and readiness evidence.
 
-After those boundaries are established, platform-native Skill guidance may
-refine the name and trigger description, usage and exclusion boundaries,
-instructions, workflow, constraints, completion criteria, and examples that
-resolve real ambiguity. It is not the authority for Renma metadata, Context
-placement, repository asset boundaries, file count, source-of-truth
-representation, or whether scripts and support files should exist.
+After the clarification gate and those boundaries are established,
+platform-native Skill authoring guidance may refine the name and trigger
+description, usage and exclusion boundaries, instructions, workflow,
+constraints, completion criteria, and examples that resolve real ambiguity. It
+is not the authority for Renma metadata, Context placement, repository asset
+boundaries, file count, source-of-truth representation, or whether scripts and
+support files should exist.
 
 A name change that affects the canonical Skill directory/name relationship is
 an intentional path and identity change, not an ordinary semantic rewrite.
@@ -37,6 +38,324 @@ and source authority. The central principle is:
 
 > Create the smallest non-redundant Renma asset graph that preserves execution
 > clarity and traceability.
+
+## Interactive Clarification Protocol
+
+`renma guide skill` remains deterministic and non-interactive. It prints the
+protocol; the consuming LLM conducts the conversation and investigates
+applicable evidence, the user supplies domain and governance truth, Renma
+supplies deterministic rules and repository evidence, and a human approves
+meaningful decisions. This elaborates—not replaces—the product boundary:
+**LLM proposes. Renma verifies. Human approves.** Renma does not accept task
+text, ask questions, retain conversation state, interpret answers, or create
+assets.
+
+When the user asks to create a Skill, the consuming LLM starts with
+clarification instead of file creation:
+
+```text
+understand
+  -> investigate available evidence
+  -> classify scope, epistemic support, progression, and disposition separately
+  -> ask one to three focused questions per batch and retain queued blockers
+  -> propose the smallest asset structure
+  -> pass the creation gate when no blocker remains
+  -> scaffold and author
+  -> validate
+  -> repair, investigate, ask again, or justify no change
+  -> re-enter the creation gate if asset boundaries may change
+  -> human review
+```
+
+The user does not need to supply a plan-quality specification before this loop
+begins. On the first meaningful response, keep the working state compact:
+
+```text
+Current understanding
+
+Confirmed
+- Facts supported by an applicable truth source.
+
+Proposed
+- Reversible structural defaults or justified design suggestions.
+
+Unresolved
+- Human truth or missing applicable evidence that must not be invented.
+
+Question
+- One to three closely related questions about the highest-impact gap.
+```
+
+A proposal never silently becomes confirmed. Explicit user delegation can
+confirm authority to choose one reversible default, but it does not establish
+unrelated domain facts.
+
+### Unknown scope
+
+Before applying progression, classify the unknown's scope:
+
+- An **authoring decision** defines the Skill contract: its workflow, output,
+  usage boundary, required inputs, completion or failure behavior, source
+  authority, Skill-versus-Context placement, runtime access or security policy,
+  repository structure, or authored behavior. An unresolved authoring decision
+  may be Blocking.
+- A **runtime task unknown** is expected to vary or be missing in material the
+  finished Skill processes. It may be an ambiguous specification rule, timeout,
+  retry or rollback behavior, permission, acceptance criterion, expected result,
+  or current schema. It does not automatically block creation. Define how the
+  Skill reports it with evidence and impact, continues independent work, asks
+  the runtime user only when the current execution stage depends on it, or stops
+  safely without inventing truth.
+
+Do not ask the author to resolve task-instance unknowns merely because the
+finished Skill may encounter them.
+
+A runtime-stage blocker is execution behavior that the authored Skill must
+handle. It does not enter the authoring creation-gate blocker set merely because
+a future task instance may encounter it. Only an unresolved authoring decision
+about whether the Skill should ask, report, defer, or stop in that situation may
+block Skill creation.
+
+```text
+Runtime task unknown:
+- The reviewed specification does not define the expected result.
+
+Runtime-stage behavior:
+- Specification review reports it as a finding.
+- Test-case generation asks for clarification or stops before inventing an
+  expected result.
+
+Possible authoring blocker:
+- It is not yet decided whether the Skill should ask, report, defer, or stop in
+  that situation.
+```
+
+### Progression and question batches
+
+Confirmed, Proposed, and Unresolved describe epistemic support. A separate
+progression classification determines whether authoring can proceed:
+
+| Progression | Meaning | Examples |
+| --- | --- | --- |
+| Blocking | Must be resolved before the current creation gate passes | Unclear task or result, required source authority or product behavior, material security permission, unsafe failure behavior, unjustified Skill-versus-Context boundary, or a missing file-mode owner |
+| Reversible default | A safe, easily changed Proposed decision that invents no domain or governance truth and broadens no security permission | No script or Context Lens by default, a tentative directory name, or another minimal choice delegated by the user |
+| Deferred | Proposed or Unresolved but not needed at the current stage | Wording, optional examples, final tags, non-blocking edge cases, future reuse, or speculative features |
+
+Keep disposition separate from epistemic support, scope, and progression:
+
+| Disposition | Action |
+| --- | --- |
+| Ask now | Select a current-stage Blocking theme for this batch |
+| Queue as blocker | Keep an unasked Blocking theme visible in the complete set |
+| Proceed with reversible default | Use a safe Proposed choice that invents no truth or permission |
+| Defer | Keep an item visible when the current stage does not depend on it |
+| Report as finding | Preserve an evidence-backed runtime unknown in the Skill's output with impact or risk |
+
+A reversible default remains Proposed when used. A Deferred decision remains
+visible rather than becoming forgotten or implicitly resolved. If later
+evidence makes a Deferred decision material to correctness, security,
+completion, or asset boundaries, move it to Blocking and re-enter clarification.
+
+Keep the complete current set of unresolved and Blocking decisions. The limit
+of one to three closely related questions applies only to the current turn, not
+to the total set. Ask about the highest-impact blockers, show additional ones
+as queued, update the set after the user answers, and continue with the next
+batch without repeating unchanged decisions in full. Never relabel an unasked
+blocker as Deferred merely because the batch limit was reached. For example:
+
+```text
+Current progression
+
+Blocking decisions: 4
+- Failure and recovery contract
+- Required input boundary
+- Runtime source-access policy
+- Context owner
+- Asking now: 3 highest-impact questions below
+
+Queued from the complete blocker list above (not additional): 4
+
+Proposed reversible defaults
+- No script by default
+- No Context Lens by default
+
+Deferred
+- Final tags
+- Additional examples unless real ambiguity emerges
+```
+
+> Proceed when no Blocking decision remains. Reversible defaults and Deferred
+> decisions may remain, provided they are visible, safe, and do not conceal
+> missing domain or governance truth.
+
+Do not guess does not mean stop and ask about every unknown. Never present
+missing truth as Confirmed; continue work that does not depend on it; preserve
+it with evidence; report assumptions and uncertainty; ask only when it blocks
+the current stage; and never manufacture expected behavior merely to finish an
+output.
+
+Before asking, preserve the raw evidence and group related unknowns by the
+decision they depend on. Timeout, retry count, partial success, and rollback
+usually form one **Failure and recovery behavior** theme rather than four
+questions. Prioritize themes by risk and downstream impact, and expand an item
+only when its distinction changes the result. There is no fixed maximum for raw
+unknowns or themes.
+
+When a workflow has meaningful stages, reassess themes at each transition. A
+specification ambiguity can be Report as finding during review and remain
+non-blocking while designing coverage for unaffected behavior. Treat it as a
+runtime-stage blocker when concrete expected-result generation depends on it,
+then follow the Skill's authored ask, report, defer, or stop policy. Do not add
+the task-instance fact to the authoring creation-gate blocker set. Re-enter
+authoring clarification only when the Skill's handling policy or asset boundary
+itself is unresolved; return the fact to Report as finding when a later requested
+output does not require resolution.
+
+When proceeding, identify the defaults and meaningful deferred items, do not
+present either as Confirmed, and do not ask for redundant confirmation after
+the user has authorized progress. “Use your judgment” delegates only identified
+reversible choices; explain the selected default and do not infer product
+behavior, source authority, ownership, security permission, or unrelated facts.
+
+Many raw unknowns may be the expected output of a review Skill. Reconsider the
+Skill boundary only when Blocking themes reveal materially independent tasks,
+inputs, outputs, users, security contracts, completion criteria, or workflows.
+Propose a split or narrower first Skill, explain the responsibilities, keep the
+boundary Proposed, ask only if evidence cannot resolve it, and re-enter the gate
+after the decision. Do not split automatically because the count is high.
+
+Compact review-Skill illustration: a specification review finds 20 raw gaps
+across authorization, failure recovery, validation boundaries, and
+observability. The review continues, preserves the evidence, and reports four
+decision themes with impact. It asks only about a theme that blocks the requested
+output; the other unknowns remain valuable findings, not failed clarification.
+
+### Truth sources
+
+| Evidence source | May confirm | Required qualification |
+| --- | --- | --- |
+| Explicit user statements | Intent, governance decisions, source designation, fallback, and other decisions the user has authority to make | Designating a specification does not prove its contents |
+| User-provided artifacts | Facts in supplied documents, specifications, examples, logs, or schemas | Provenance and applicability must be clear; identify the artifact |
+| Repository evidence | Applicable and effective repository facts | Evidence must be unambiguous; deprecated, archived, stale, conflicting, unresolved, or diagnostic-blocked evidence is not Confirmed merely because it exists; identify the file, metadata, lifecycle evidence, or command result |
+| Reviewed authoritative external source content | Domain facts governed by a user-designated source | The authoring environment must be permitted and able to consult it successfully; identify the source and relevant section or evidence |
+| Renma structural rules | Structural constraints and proposed defaults | They do not establish product or domain truth |
+
+A user can confirm that a URL is intended to be authoritative. Its schema,
+fields, constraints, and behavior become Confirmed only after the source content
+is successfully consulted or supplied through another approved process. A known
+URL and model memory are not source-content evidence.
+
+Authoring-time access is separate from finished-Skill runtime access.
+Authoring-time consultation depends on the current request, tools, and
+environment. Future runtime access instructions must agree with the finished
+Skill's effective Renma security policy. Future metadata never retroactively
+authorizes the authoring agent. If authoring-time access is unavailable, ask
+for the relevant content through an approved process or keep source-dependent
+facts Unresolved; do not fill them from memory or plausible assumptions.
+
+Before asking the user, inspect applicable evidence that can answer the current
+question. Use only the relevant commands rather than treating every view as
+ceremony:
+
+```bash
+renma scan . --fail-on high --format json
+renma catalog . --format json
+renma inspect <relevant-file> --format json
+renma graph . --focus <relevant-id-or-path> --format json
+```
+
+Ask only about decisions that materially affect the task, inputs, output,
+completion or failure behavior, usage boundaries, placement, source authority,
+Context necessity, external access, security policy, or support-file
+justification. Do not ask the user to choose metadata syntax, repeat known
+facts, complete a large questionnaire, or define speculative future features.
+Wording, tags, examples, and formatting can be refined later.
+
+For the minimal request:
+
+```text
+I want to create a Skill with `renma guide skill`.
+```
+
+the expected first response says it ran the guide, confirms only that the user
+wants a new Skill under the Renma contract, proposes that no asset structure is
+yet justified, leaves the recurring task and expected result unresolved, and
+asks what recurring task the Skill should perform and what result it should
+produce. It does not invent an owner, Context, script, or metadata.
+
+### Creation gate
+
+Before creating files, establish the focused recurring task, expected result,
+meaningful completion or failure behavior, smallest justified asset structure,
+source authority, authoring-time consultation, finished-Skill runtime access,
+blocking security and domain decisions, and the owner required by file-mode
+scaffold unless repository evidence already supplies it. Pause while a
+blocking human decision remains unresolved.
+
+Do not block creation on runtime task unknowns when the Skill contract can
+detect and report them with evidence, continue unaffected work, request runtime
+input only when needed, and stop safely if the requested output would otherwise
+require invented truth.
+
+The gate does not require a complete plan, every edge case, final prose, all
+examples, finalized tags, future capabilities, or perfect certainty about
+non-blocking details. Once the gate passes, present the smallest proposed
+structure, identify remaining non-blocking proposals, and ask for confirmation
+only when a meaningful discretionary boundary remains uncertain. Do not add a
+redundant confirmation after the user has already authorized creation.
+
+### Post-validation decisions
+
+Classify each relevant finding before acting:
+
+- **Deterministic repair:** make a bounded correction supported by the
+  diagnostic and evidence only when the constraints uniquely determine the
+  patch, then rerun relevant validation. Deterministic detection alone is not
+  enough.
+- **Repository investigation:** inspect ambiguous targets, parents, owners,
+  possible Context reuse, or conflicting conventions before asking the user.
+- **Human decision required:** ask a focused question when ownership, source
+  authority, behavior, permissions, fallback semantics, Context necessity, or
+  deliberate script use depends on human truth.
+- **No change justified:** explain why the evidence does not support a repair
+  or why an advisory reflects reviewed intentional design.
+
+An invalid encoding is deterministic only when its intended supported value is
+explicit and unambiguous. A path or ID typo is deterministic only when exactly
+one intended existing target is proven. Remove an unsupported field
+automatically only when doing so provably loses no intended meaning; otherwise
+investigate whether the information belongs in the Skill body, supported
+metadata, a Context Asset, or nowhere.
+
+Repeated-context findings are evidence, not automatic consolidation patches.
+Do not delete or rewrite content solely because a repeated section, code block,
+or context pattern exists. Inspect all occurrences, determine ownership and the
+source-of-truth boundary, prepare a consolidation proposal, and require human
+review before choosing an authoritative copy, owning asset, Context placement,
+or replacement references.
+
+Follow Diagnostics v2 repair constraints and verification steps. Preserve any
+explicit prohibition on automatic semantic changes.
+
+If semantic refinement, source review, real usage, or validation reveals a
+possible asset-boundary change, stop the structural edit. Record the need as
+Proposed or Unresolved, inspect relevant evidence, ask only when human truth
+remains necessary, and re-enter the creation gate. Change the agreed files,
+metadata, Context relationships, scripts, examples, or support assets only
+after the gate passes, then continue authoring and validation.
+
+Never add a suppression automatically, weaken security policy, manufacture
+metadata, rewrite semantics merely to clear a finding, or turn a human decision
+into a model assumption.
+
+### Reviewed-decision persistence
+
+Persist durable reviewed workflow, boundary, input, output, completion,
+Context, authority, fallback, metadata, and security decisions. Do not persist
+the conversation transcript, private reasoning, temporary Confirmed / Proposed
+/ Unresolved headings, rejected proposals, unanswered questions, speculative
+work, or invented decision-state metadata. Report non-blocking uncertainty to
+the user instead of hiding it in authoritative prose.
 
 ## Focused Workflow Model
 
@@ -81,13 +400,15 @@ Use this sequence for a new Skill:
 
 ```text
 renma guide skill
-  -> define the smallest intended asset structure
+  -> clarify human truth and inspect applicable evidence
+  -> pass the creation gate and define the smallest intended asset structure
   -> renma scaffold skill
   -> scaffold or reuse justified Context Assets
   -> complete the focused workflow
   -> renma scan . --fail-on high
-  -> inspect catalog and graph evidence
-  -> fix and rerun
+  -> classify findings and inspect relevant evidence
+  -> re-enter the creation gate if asset boundaries may change
+  -> apply uniquely supported repairs and rerun
   -> human review
 ```
 
@@ -110,11 +431,13 @@ Use its deterministic prompt to define:
 - every independently maintained Context dependency; and
 - the smallest set of files with distinct responsibilities.
 
-Write concrete positive and near-miss negative trigger examples before
-scaffolding. Define the expected output and completion criteria early. Match
-implementation freedom to fragility: use prose when judgment is central, a
-parameterized script when a stable operation needs flexible inputs, and a fixed
-script when ordering or exact behavior is safety-critical.
+The consuming LLM develops this understanding progressively; the user does not
+need to supply every section, field, edge case, or file up front. Define the
+expected output and completion criteria early. Trigger wording and examples can
+be refined after the creation gate unless a usage boundary is itself blocking.
+Match implementation freedom to fragility: use prose when judgment is central,
+a parameterized script when a stable operation needs flexible inputs, and a
+fixed script when ordering or exact behavior is safety-critical.
 
 Do not guess missing owners, policies, dependencies, product behavior, domain
 rules, or source-of-truth documents. Record gaps for a human to resolve.
@@ -125,9 +448,11 @@ create a generic Skill first and enrich it afterward with Renma-like metadata.
 Construct the Skill and related assets directly within the Renma authoring
 contract.
 
-When a Skill depends on an external authoritative URL, its source-of-truth role
-normally justifies a concise Context Asset even if no other Skill reuses it.
-Record what the source governs, its authoritative URL, when it must be
+Apply the truth-source and access distinctions above whenever a Skill depends
+on an external authoritative URL. The user-designated source-of-truth role
+normally justifies a concise Context Asset even if no other Skill reuses it,
+but source-dependent domain facts stay Unresolved until content is successfully
+consulted or supplied. Record what the source governs, its URL, when it must be
 consulted, and necessary scope or fallback behavior. Do not copy the full
 external document unless an intentional reviewed snapshot is required. Declare
 the Context as required when the workflow cannot validly complete without it;
@@ -139,16 +464,15 @@ with no independent maintenance or governance reason stays in `SKILL.md` or
 justified Skill-local support. After a Context Asset is independently justified,
 correctness dependency determines `requires-context` versus `optional-context`.
 
-Decide whether the finished Skill reads the external URL during execution or
-expects relevant source content from the user or another approved process. A
-Markdown URL does not grant network permission. When runtime access is intended,
-review and declare the supported effective policy for allowed data, network
-allowance, approved destinations, external upload, secrets, and human approval
-where applicable. Public documentation commonly uses the documented
-`public-docs` category, but do not manufacture permissive policy values. Derive
-an approved destination only from the reviewed URL or repository policy, ensure
-the Skill body, Context instructions, and effective policy agree, and preserve
-unresolved access intent or policy for human decision.
+Separately decide whether the finished Skill reads the URL during execution or
+expects source content from the user or another approved process. A Markdown
+URL does not grant runtime network permission. When runtime access is intended,
+review the supported effective policy for allowed data, network allowance,
+approved destinations, external upload, secrets, and human approval.
+
+Do not manufacture permissive policy values. Ensure the Skill body, Context
+instructions, and effective policy agree, and preserve unresolved access intent
+for human review.
 
 Scaffold generation performs no network operations. The finished Skill may
 access the reviewed external source only when its authored workflow and the
@@ -189,18 +513,20 @@ It creates requested empty directories and no placeholder files. In the
 completed Skill, state when each reference should be read, each script should be
 run, and each asset should be used.
 
-Do not run two independent generators against the same target file. Some
-platform-native authoring tools create files themselves, so choose one of these
-safe approaches:
+Do not run two independent generators against the same target file. Some tools
+that provide platform-native Skill authoring guidance create files themselves,
+so choose one of these safe approaches after the clarification gate:
 
 1. Run `renma scaffold skill`, then ask the platform tool to review and refine
    that existing file.
 2. Ask the platform tool to use `renma scaffold skill` as the starting point
    instead of independently generating the same target.
 
-Use Renma as the one generator, then use platform-native authoring guidance only
-to refine semantics inside the established asset and metadata boundaries. Do
-not ask two generators to independently create the same target.
+Use Renma as the one generator, then use platform-native Skill authoring
+guidance only to refine semantics inside the established asset and metadata
+boundaries. It must work from the Renma scaffold and agreed structure, must not
+add metadata or assets outside that structure, and must not create a second
+target.
 
 `--format prompt` prints the deterministic scaffold and constraints without
 writing the file. `--format json` prints the existing structured bundle. These
@@ -208,7 +534,8 @@ modes do not reserve or create the target path.
 
 ### 3. Review and complete the scaffold
 
-Within the Renma boundaries, use platform-native guidance to complete:
+Within the Renma boundaries, use platform-native Skill authoring guidance to
+complete:
 
 - `description`, including positive and negative trigger boundaries;
 - required inputs and preflight evidence;
@@ -217,6 +544,11 @@ Within the Renma boundaries, use platform-native guidance to complete:
 - completion criteria and validation; and
 - the Skill semantics that rely on intended Renma metadata and Context
   relationships without changing those boundaries independently.
+
+If refinement or real usage reveals a justified boundary change, stop and
+return that need to the clarification protocol as Proposed or Unresolved.
+Inspect evidence and re-enter the creation gate before changing the agreed
+structure.
 
 Preserve the repository's intended behavior. Use a Context Asset when knowledge
 is reusable across Skills, has independent ownership or lifecycle, is maintained
@@ -242,9 +574,12 @@ Start with the release gate:
 renma scan . --fail-on high
 ```
 
-Review every relevant diagnostic, correct the underlying wording, metadata, or
-relationship, and rerun the same scan. Do not weaken security policy or add a
-suppression merely to make validation pass.
+Review every relevant diagnostic and use the normative post-validation rules
+above. Apply a repair only when evidence uniquely determines it, investigate
+repeated-context or boundary evidence before semantic change, ask the human
+when truth is missing, or explain why no change is justified. Follow
+Diagnostics v2 constraints and verification steps, rerun after repairs, and do
+not weaken security policy or add a suppression merely to pass.
 
 Use other deterministic views when they answer a specific review question:
 
@@ -259,28 +594,124 @@ renma readiness . --format markdown
 The final step is human review of the Skill's intent, workflow, policy,
 relationships, and remaining uncertainty.
 
-### Canonical Product A example
+### Canonical fictional external API example: Example Product API
+
+Example Product API is a fictional external API used only to illustrate
+authoritative-source handling. It is not a Renma concept or a real product.
 
 For this request:
 
 ```text
-Create a Skill that builds a JSON body for Product A.
-The official Product A URL is the source of truth.
+Create a Skill that builds a JSON request body for the fictional Example Product
+API.
+The Example Product API documentation URL is the source of truth.
 Improve the Skill with Renma.
 ```
 
-the initial Renma asset structure is:
+the consuming LLM first reports:
 
 ```text
-skills/build-product-a-json/SKILL.md
+Current understanding
+
+Confirmed
+- The workflow builds a JSON request body for the fictional Example Product API.
+- The user designates the Example Product API documentation URL as the intended
+  authoritative external source.
+- The request expresses authoring-time intent to consult that URL, subject to
+  the current tools and authoring environment permitting access.
+
+Proposed
+- One focused Skill.
+- One concise source-of-truth Context Asset.
+- The Context is likely required.
+- No script or Context Lens by default.
+
+Unresolved
+- Whether the finished Skill accesses the URL at execution time.
+- What happens when the source cannot be accessed.
+- Whether the Example Product API Context is required or optional for correct
+  execution.
+- The Context owner, unless repository evidence resolves it.
+- Whether source-specific instructions, transformations, examples, or validation
+  behavior must be authored now.
+- Whether authoring-time consultation is needed for a source-specific authoring
+  decision.
+
+Epistemically unresolved source-dependent runtime task knowledge handled by the
+finished Skill
+- The current Example Product API schema.
+- The current documented fields and constraints.
+- Operation-specific behavior read from the authoritative source.
+
+Current progression
+
+Blocking decisions: 5
+- Finished-Skill runtime source-access intent.
+- Safe fallback behavior when the source is unavailable.
+- Whether the Example Product API Context is required or optional for correct
+  execution.
+- The Context owner when applicable repository evidence does not supply one.
+- Any source-specific instructions, transformations, examples, or validation
+  behavior that must be embedded during authoring.
+- Asking now: 3 highest-impact questions below.
+
+Queued from the complete blocker list above (not additional): 3, 4.
+
+Proposed reversible defaults
+- No script by default.
+- No Context Lens by default.
+
+Deferred
+- Authoring-time source consultation when no source-specific authoring decision
+  depends on it.
+- Final wording and tags.
+- Additional examples unless real ambiguity emerges.
+
+Questions
+1. Should the finished Skill access the URL during execution, or should its
+   runtime consumer provide the documentation through another approved process?
+2. When the source is unavailable, should the Skill stop or request approved
+   supplied content rather than infer the JSON schema?
+3. Must the Skill embed any source-specific instructions, transformations,
+   examples, or validation behavior now, or can it consult the current source
+   during execution?
+```
+
+The five-item Blocking set remains visible even though the current batch asks
+only three questions; required-versus-optional Context and owner are queued by
+their positions in that set, not counted again. The reversible defaults remain
+Proposed.
+
+Current schema, fields, constraints, and operation-specific behavior are
+epistemically unresolved, source-dependent runtime knowledge. They are listed
+only in the runtime task-unknown section rather than repeated in generic
+Unresolved. The safe contract is to consult the declared Context, use only
+documented fields, request missing task inputs, report ambiguity, and stop or
+request approved supplied content when the source is unavailable. They become
+authoring blockers only when source-specific instructions, transformations,
+embedded examples, or validation behavior must be defined in the Skill. Do not
+require the user to paste the full specification when those current facts can
+safely remain runtime-scoped. Authoring-time consultation remains useful and may
+be required for source-specific authoring; it is not universally a creation-gate
+blocker.
+
+The LLM does not confirm source-dependent facts from memory, use future Skill
+metadata as authoring-time permission, or hard-code a fictional approved domain
+or permissive security metadata.
+
+After the creation gate, the smallest proposed Renma asset structure is:
+
+```text
+skills/build-example-product-json/SKILL.md
   -> requires
-contexts/product-a-api.md
+contexts/example-product-api.md
 ```
 
 The external source reference is separate from that structure:
 
 ```text
-contexts/product-a-api.md contains the reviewed official Product A URL
+contexts/example-product-api.md contains the reviewed Example Product API
+documentation URL
 ```
 
 The URL is body content, not a Renma asset node or graph edge. Decide whether
@@ -399,8 +830,8 @@ requires otherwise.
 If migration is blocked:
 
 1. Review the reported conflicts or invalid evidence.
-2. Confirm the Skill's intent using platform-native authoring guidance within
-   the established Renma boundaries.
+2. Confirm the Skill's intent using platform-native Skill authoring guidance
+   within the established Renma boundaries.
 3. Do not apply a candidate while Renma cannot generate it safely.
 4. Correct the source evidence.
 5. Rerun `renma suggest-metadata <SKILL.md>`.
@@ -562,22 +993,40 @@ already implemented; `routes_to` and `skill-index` are not.
 
 ## Optional Codex Example
 
-Codex `skill-creator` is one example of platform-native authoring guidance. It
-is not a Renma dependency or the authority for Renma metadata, Context
-placement, repository asset boundaries, file count, source-of-truth
-representation, or scripts and support files.
-
-After creating the Renma scaffold, a safe request is:
+Codex may activate `skill-creator` when asked to create a Skill. It is one
+example of platform-native Skill authoring guidance, not a Renma dependency or
+the authority for Renma metadata, Context placement, repository asset
+boundaries, file count, source-of-truth representation, or scripts and support
+files. The expected sequence is:
 
 ```text
-First run `renma guide skill` and establish the smallest intended asset graph.
-Create `skills/testing/spec-review/SKILL.md` with `renma scaffold skill`. Then
-use skill-creator only to refine its trigger description, ordered instructions,
+run renma guide skill
+  -> conduct Renma clarification
+  -> pass the creation gate
+  -> create the Renma scaffold
+  -> use skill-creator only for semantic refinement
+```
+
+If `skill-creator` is available or activates automatically, do not let it
+independently create files before the Renma clarification gate is satisfied.
+If semantic refinement reveals a justified asset-boundary change,
+`skill-creator` must return that need to the Renma clarification protocol rather
+than silently changing the repository structure.
+
+After passing the gate, a safe request is:
+
+```text
+First run `renma guide skill`, conduct focused clarification, and resolve the
+blocking creation-gate decisions. Create
+`skills/testing/spec-review/SKILL.md` with `renma scaffold skill`. Then use
+skill-creator only to refine its trigger description, ordered instructions,
 usage boundaries, required inputs, constraints, completion criteria, and
 ambiguity-resolving examples. Preserve its Renma metadata, Context placement,
 file boundaries, and repository behavior. Do not independently generate a
 second target file or invent owners, policy, dependencies, domain rules, or
-source-of-truth claims. After the reviewed edits, run
+source-of-truth claims. If refinement reveals that the agreed asset boundary
+must change, stop, report it as Proposed or Unresolved, and re-enter the Renma
+creation gate before changing structure. After the reviewed edits, run
 `renma scan . --fail-on high`, fix relevant diagnostics, and rerun the scan.
 ```
 

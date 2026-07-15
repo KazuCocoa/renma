@@ -234,6 +234,18 @@ test("Skill authoring docs establish Renma boundaries before platform semantic r
   assert.match(authoring, /skill-creator/);
   assert.match(
     authoring,
+    /run renma guide skill[\s\S]*conduct Renma clarification[\s\S]*pass the creation gate[\s\S]*create the Renma scaffold[\s\S]*use skill-creator only for semantic refinement/,
+  );
+  assert.match(
+    authoring,
+    /If `skill-creator` is available or activates automatically, do not let it[\s\S]*create files before the Renma clarification gate is satisfied/,
+  );
+  assert.match(
+    authoring,
+    /If semantic refinement reveals a justified asset-boundary change,[\s\S]*`skill-creator` must return that need to the Renma clarification protocol/,
+  );
+  assert.match(
+    authoring,
     /skill-creator[\s\S]*not[\s\S]*authority for Renma metadata/,
   );
   assert.doesNotMatch(cliSource, /skill-creator/);
@@ -270,6 +282,10 @@ test("Skill authoring docs establish Renma boundaries before platform semantic r
   assert.match(readme, /Deferred Skill-to-Skill Discovery Design/);
   assert.match(authoring, /focused, bounded workflows/);
   assert.doesNotMatch(authoring, /current thin-Skill authoring/);
+  for (const document of [readme, manual, authoring, docsIndex]) {
+    assert.match(document, /consuming LLM/);
+    assert.match(document, /non-interactive|does not conduct the conversation/);
+  }
 
   const optionalExampleIndex = authoring.indexOf("## Optional Codex Example");
   assert.ok(optionalExampleIndex >= 0);
@@ -290,6 +306,124 @@ test("Skill authoring docs establish Renma boundaries before platform semantic r
 
   const changelog = await readRepoFile("CHANGELOG.md");
   assert.match(changelog, /optional Codex `skill-creator` example/);
+});
+
+test("authoring docs qualify truth, source access, repairs, and gate re-entry", async () => {
+  const readme = await readRepoFile("README.md");
+  const manual = await readRepoFile("docs/user-manual.md");
+  const authoring = await readRepoFile("docs/authoring-guide.md");
+  const architecture = await readRepoFile("docs/internal-architecture.md");
+  const combined = [readme, manual, authoring, architecture].join("\n");
+
+  assert.match(authoring, /User-provided artifacts/);
+  assert.match(authoring, /Reviewed authoritative external source content/);
+  assert.match(
+    authoring,
+    /deprecated, archived, stale, conflicting, unresolved, or diagnostic-blocked evidence is not Confirmed/,
+  );
+  assert.match(
+    combined,
+    /Authoring-time access is separate from finished-Skill runtime access|Authoring-time source access comes from the current/,
+  );
+  assert.match(combined, /never retroactively authorizes/);
+  assert.match(
+    combined,
+    /Deterministic detection alone is not enough|deterministic detection does not imply deterministic repair/i,
+  );
+  assert.match(authoring, /Repeated-context findings are evidence/);
+  assert.match(authoring, /re-enter the creation gate/);
+  assert.match(combined, /LLM proposes\. Renma verifies\. Human approves\./);
+});
+
+test("authoring docs separate progression and document batched clarification", async () => {
+  const readme = await readRepoFile("README.md");
+  const manual = await readRepoFile("docs/user-manual.md");
+  const authoring = await readRepoFile("docs/authoring-guide.md");
+  const architecture = await readRepoFile("docs/internal-architecture.md");
+  const cliSource = await readRepoFile("src/cli-help.ts");
+  const combined = [readme, manual, authoring, architecture, cliSource].join(
+    "\n",
+  );
+
+  assert.ok(
+    readme.includes("I want to create a Skill with `renma guide skill`."),
+  );
+  assert.match(readme, /Create a Skill interactively/);
+  assert.match(
+    authoring,
+    /Confirmed, Proposed, and Unresolved describe epistemic support/,
+  );
+  assert.match(
+    authoring,
+    /limit[\s\S]*one to three closely related questions applies only to the current turn, not[\s\S]*total set/,
+  );
+  assert.match(
+    authoring,
+    /Queued from the complete blocker list above \(not additional\)/,
+  );
+  assert.match(
+    authoring,
+    /Proceed when no Blocking decision remains[\s\S]*Reversible defaults and Deferred/,
+  );
+  assert.match(combined, /complete blocker set|complete Blocking set/);
+  assert.match(combined, /never an automatic split|Do not split automatically/);
+});
+
+test("authoring docs separate runtime unknowns and stage-dependent dispositions", async () => {
+  const readme = await readRepoFile("README.md");
+  const manual = await readRepoFile("docs/user-manual.md");
+  const authoring = await readRepoFile("docs/authoring-guide.md");
+  const architecture = await readRepoFile("docs/internal-architecture.md");
+  const plan = await readRepoFile("plan.md");
+  const combined = [readme, manual, authoring, architecture, plan].join("\n");
+
+  assert.match(
+    authoring,
+    /authoring decision[\s\S]*runtime task unknown[\s\S]*does not automatically block creation/i,
+  );
+  assert.match(
+    authoring,
+    /Do not ask the author to resolve task-instance unknowns/,
+  );
+  assert.match(
+    authoring,
+    /Do not guess does not mean stop and ask about every unknown/,
+  );
+  assert.match(authoring, /Failure and recovery behavior/);
+  assert.match(authoring, /Report as finding/);
+  assert.match(
+    authoring,
+    /runtime-stage blocker is execution behavior that the authored Skill must\s+handle/i,
+  );
+  assert.match(
+    authoring,
+    /Do not add\s+the task-instance fact to the authoring creation-gate blocker set/,
+  );
+  assert.match(
+    authoring,
+    /Re-enter\s+authoring clarification only when the Skill's handling policy or asset boundary\s+itself is unresolved/,
+  );
+  assert.match(authoring, /20 raw gaps/);
+  assert.match(
+    authoring,
+    /Current schema, fields, constraints, and operation-specific behavior are[\s\S]*epistemically unresolved, source-dependent runtime knowledge/,
+  );
+  assert.match(
+    authoring,
+    /listed\s+only in the runtime task-unknown section rather than repeated in generic\s+Unresolved/,
+  );
+  assert.match(
+    authoring,
+    /Example Product API is a fictional external API[\s\S]*not a Renma concept or a real product/,
+  );
+  assert.match(
+    authoring,
+    /skills\/build-example-product-json\/SKILL\.md[\s\S]*contexts\/example-product-api\.md/,
+  );
+  assert.match(
+    combined,
+    /not repository metadata|not additional progression classes/,
+  );
 });
 
 test("authoring docs preserve Context and external-source security boundaries", async () => {

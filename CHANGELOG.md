@@ -6,6 +6,60 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added an interactive, truth-seeking authoring protocol to the existing
+  structured `renma guide skill` source. The default prompt now tells the
+  consuming LLM to investigate qualified user, artifact, repository, and
+  authoritative-source evidence; distinguish confirmed facts from proposals and
+  unresolved human truth; separately classify Blocking, Reversible default, and
+  Deferred progression; distinguish authoring decisions from runtime task
+  unknowns; separate authoring-time from runtime source access; ask focused
+  question batches while retaining queued blockers; pass and re-enter a creation
+  gate; classify
+  post-validation actions conservatively; and persist only reviewed decisions.
+- Added minimal-trigger and fictional Example Product API clarification examples
+  plus focused regression coverage for prompt ordering, the additive JSON
+  interaction projection, decision classes, question rules, creation gates,
+  handoff, boundary-change re-entry, uniquely supported repairs,
+  repeated-context constraints, unknown scope and disposition, progression and
+  question batching, stage-dependent blockers, persistence, determinism, and
+  non-editing behavior.
+
+### Changed
+
+- Clarified the authoring boundary: Renma prints a deterministic protocol while
+  the consuming LLM conducts the conversation, the user supplies domain and
+  governance truth, and a human approves meaningful decisions.
+- Delayed platform-native Skill authoring guidance until after the Renma
+  clarification gate and limited it to semantic refinement within the agreed
+  scaffold and asset structure. Newly discovered boundary changes return to the
+  clarification gate instead of silently changing repository structure.
+- Clarified that deterministic findings are not automatically deterministic
+  repairs. Repeated-context consolidation and unsupported-field meaning require
+  investigation or human review unless evidence uniquely determines a safe
+  patch.
+- Reduced duplicated prompt workflow and artifact prose so the interaction
+  object remains the normative owner of truth, gate, validation, persistence,
+  and handoff behavior.
+- Clarified that authoring proceeds when no Blocking decision remains, while
+  visible safe reversible defaults and Deferred decisions may remain without
+  becoming Confirmed. Unrelated branching blockers prompt a proposed boundary
+  reconsideration rather than an automatic Skill split.
+- Clarified that runtime task unknowns are findings rather than automatic
+  authoring blockers, runtime-stage blocking follows the authored handling policy
+  without adding task-instance facts to the creation gate, “do not guess” still
+  permits independent analysis, related raw gaps should be clustered into
+  decision themes, and Example Product API runtime knowledge is rendered once.
+
+### Compatibility
+
+- Existing `guide` commands, options, exit codes, stdout-only behavior, and
+  prompt/JSON derivation remain unchanged. The JSON projection adds only the
+  `interaction` object and still has no separately versioned schema.
+- Renma remains non-interactive and adds no task input, session state, LLM call,
+  automatic creation, repair, runtime selection, or decision-state metadata.
+
 ## [0.19.0] - 2026-07-14
 
 ### Added
@@ -16,7 +70,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   filesystem, network, or LLM operations.
 - Added focused guide regression coverage for formats, determinism, version
   reporting, non-editing behavior, help, argument validation, load-bearing
-  authoring invariants, and the compact Product A Skill-plus-Context example.
+  authoring invariants, and the compact fictional Example Product API
+  Skill-plus-Context example.
 
 ### Changed
 

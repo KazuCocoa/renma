@@ -53,7 +53,7 @@ must not replace behavior-critical instructions.
 
 For a new Skill, or when intentionally redesigning asset boundaries, use
 `renma guide skill` to establish Renma repository asset, metadata, Context, and
-file boundaries. Then use platform-native Skill guidance for the name, trigger
+file boundaries. Then use platform-native Skill authoring guidance for the name, trigger
 description, instructions, workflow, constraints, completion criteria, and
 ambiguity-resolving examples within those boundaries. A name change that alters
 the canonical Skill directory/name relationship is an intentional path and
@@ -436,7 +436,7 @@ not reverse migration.
 After generating a suggestion, review the candidate, apply only intended
 metadata or migration changes, run `renma scan . --fail-on high`, fix relevant
 diagnostics, and rerun validation before human approval. Conduct any requested
-semantic review separately using platform-native authoring guidance within the
+semantic review separately using platform-native Skill authoring guidance within the
 repository's established boundaries.
 
 ## Pre-0.16 Value Serialization
@@ -480,7 +480,7 @@ selects the last duplicate value, silently deletes an unknown field, or assigns
 an unknown top-level field to a vendor namespace.
 
 When blocked, do not apply a candidate. Review the conflict or invalid evidence,
-confirm the Skill's intent using platform-native authoring guidance within the
+confirm the Skill's intent using platform-native Skill authoring guidance within the
 Renma boundaries, correct the source evidence, and rerun `suggest-metadata`.
 After intended corrections,
 run `renma scan . --fail-on high`, fix relevant diagnostics, and rerun the scan.

@@ -322,7 +322,7 @@ ${input.content}\`\`\`
 
 ${
   input.kind === "skill"
-    ? `Apply the authoring contract from \`renma guide skill\`. ${SKILL_AUTHORING_PRINCIPLE} ${RENMA_FIRST_AUTHORING_BOUNDARY} Do not create a generic Skill first and enrich it afterward with Renma-like metadata. Use platform-native guidance only to refine the generated Skill's trigger description, instructions, workflow, constraints, completion criteria, and examples that resolve real ambiguity. Preserve the repository's intended behavior, and do not invent owners, policies, dependencies, domain rules, or source-of-truth claims. After editing, run \`renma scan . --fail-on high\`, inspect catalog and graph evidence, address relevant findings, and rerun validation. Do not weaken security policy or add suppressions merely to make validation pass. Have a human review meaningful semantic changes before merging.\n\n`
+    ? `Apply the authoring contract from \`renma guide skill\`. ${SKILL_AUTHORING_PRINCIPLE} ${RENMA_FIRST_AUTHORING_BOUNDARY} Do not create a generic Skill first and enrich it afterward with Renma-like metadata. Use platform-native Skill authoring guidance only to refine the generated Skill's trigger description, instructions, workflow, constraints, completion criteria, and examples that resolve real ambiguity. Preserve the repository's intended behavior, and do not invent owners, policies, dependencies, domain rules, or source-of-truth claims. After editing, run \`renma scan . --fail-on high\`, inspect catalog and graph evidence, address relevant findings, and rerun validation. Do not weaken security policy or add suppressions merely to make validation pass. Have a human review meaningful semantic changes before merging.\n\n`
     : ""
 }Constraints:
 
@@ -351,7 +351,7 @@ function renderSkillNextSteps(): string {
     "Next steps:",
     "1. Run `renma guide skill` and confirm this is the smallest non-redundant intended asset structure.",
     "2. Scaffold or reuse only Context Assets justified by an independent maintenance or governance boundary.",
-    "3. Complete the focused workflow and any evidence-backed security policy; use platform-native guidance only to refine semantics within Renma boundaries.",
+    "3. Complete the focused workflow and any evidence-backed security policy; use platform-native Skill authoring guidance only to refine semantics within Renma boundaries.",
     "4. Run `renma scan . --fail-on high` and inspect catalog and graph evidence.",
     "5. Fix relevant findings and rerun validation.",
     "6. Have a human review meaningful semantic changes and unresolved decisions before merging.",

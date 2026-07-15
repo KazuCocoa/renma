@@ -2,7 +2,7 @@
 
 ## Current Product Definition
 
-Renma 0.18.x is the current shipped baseline, with 0.18.3 as the latest package:
+Renma 0.19.0 is the current shipped baseline:
 a Git-native context repository and deterministic governance CLI for
 agent-consumable Skills, Context Lenses, Context Assets, local support
 resources, policies, ownership, lifecycle, dependencies, and review evidence.
@@ -49,7 +49,7 @@ Historical release detail belongs in [CHANGELOG.md](CHANGELOG.md). Contract
 details live in [architecture.md](architecture.md), [design.md](design.md), and
 the focused documents under [docs/](docs/README.md).
 
-## Planned 0.19.0 Authoring Guidance (Implemented On `main`, Unreleased)
+## Shipped 0.19.0 Authoring Guidance
 
 The 0.19.0 authoring flow begins with the deterministic, stdout-only
 `renma guide skill` contract:
@@ -77,8 +77,64 @@ own current responsibility.
 URLs, select runtime Context, infer governance or domain facts, or perform
 semantic rewriting. Human or LLM authors create the intended assets; existing
 scan, catalog, and graph behavior validates and exposes deterministic repository
-evidence. The shipped package baseline remains 0.18.x until the normal release
-workflow publishes 0.19.0.
+evidence.
+
+## Planned 0.19.1 Interactive Authoring Protocol
+
+The 0.19.1 follow-up extends the same structured `renma guide skill` source with
+an interactive protocol for the consuming LLM. It does not make Renma itself
+interactive and does not add a command or option:
+
+```text
+renma guide skill
+  -> consuming LLM clarifies the task and investigates applicable evidence
+  -> separate authoring decisions from runtime task unknowns
+  -> separate confirmed facts, proposals, and unresolved human truth
+  -> separately classify blocking, reversible-default, and deferred progression
+  -> cluster raw gaps into decision themes and choose dispositions
+  -> ask one to three focused questions per batch and retain queued blockers
+  -> pass the creation gate when no blocker remains
+  -> scaffold and author the smallest justified structure
+  -> validate
+  -> repair only uniquely supported corrections, investigate, ask, or justify no change
+  -> re-enter the creation gate if asset boundaries may change
+  -> persist reviewed durable decisions
+  -> human review
+```
+
+The protocol adds interactive clarification; qualified truth-source separation
+across user statements, supplied artifacts, applicable repository evidence,
+reviewed external source content, and Renma structural rules; separate
+authoring-time and runtime access decisions; creation-gate re-entry; conservative
+post-scan repair classification; and reviewed-decision persistence. Temporary
+conversation summaries, rejected proposals, and unanswered questions do not
+become repository metadata or assets. Platform-native Skill authoring guidance
+may refine semantics only after the gate and only within the agreed Renma
+structure; discovered boundary changes return to clarification instead of being
+applied silently.
+
+The protocol keeps epistemic support separate from authoring progression. The
+consuming LLM retains the complete blocker set, asks small question batches,
+proceeds with visible safe reversible defaults or Deferred items only after no
+Blocking decision remains, and promotes a Deferred item back to Blocking when
+later evidence makes it material. Branching across unrelated responsibilities
+prompts a Proposed Skill-boundary reconsideration, never an automatic split.
+
+Task-instance unknowns that the finished Skill should detect and report do not
+automatically block creation. The protocol keeps unknown scope and disposition
+separate from epistemic and progression axes, groups raw gaps into risk-oriented
+decision themes, and reassesses Blocking versus Report as finding only across
+meaningful workflow stages. Many findings are expected output for review Skills;
+only materially independent tasks and contracts signal a possible Skill split.
+
+This elaborates the stable operating boundary: `LLM proposes. Renma verifies.
+Human approves.` Deterministic detection does not imply deterministic repair,
+and repeated-context consolidation remains a reviewed semantic decision.
+
+This section describes planned 0.19.1 behavior on `main`; 0.19.1 is not shipped
+until the normal release workflow publishes it. Existing CLI arguments, exit
+codes, deterministic output, non-editing behavior, and repository contracts
+remain unchanged.
 
 ## Stable Product Boundaries
 

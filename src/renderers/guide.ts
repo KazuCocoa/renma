@@ -1,6 +1,9 @@
 import type {
+  SkillAuthoringClarificationExample,
   SkillAuthoringExample,
   SkillAuthoringGuidance,
+  SkillAuthoringInteraction,
+  SkillAuthoringProgressionSummary,
 } from "../guidance/skill-authoring.js";
 
 export function renderSkillGuidePrompt(
@@ -11,6 +14,9 @@ export function renderSkillGuidePrompt(
     "",
     "Principle",
     guidance.principle,
+    "",
+    "Interactive authoring protocol",
+    ...renderInteraction(guidance.interaction),
     "",
     "Authoring workflow",
     ...renderNumbered(guidance.workflow),
@@ -27,13 +33,16 @@ export function renderSkillGuidePrompt(
     "Metadata rules",
     ...renderBullets(guidance.metadataRules),
     "",
-    "Product A example",
-    ...renderExample(guidance.example),
+    "Fictional external API example: Example Product API",
+    ...renderExample(
+      guidance.example,
+      guidance.interaction.exampleProductApiInitialClarification,
+    ),
     "",
     "Verification",
     ...renderNumbered(guidance.verification),
     "",
-    "Boundary: LLM proposes. Renma verifies. Human approves.",
+    "Boundary: LLM proposes. Renma verifies. Human approves. During authoring, the consuming LLM investigates, proposes, asks, and edits; the user supplies domain and governance truth; Renma provides deterministic rules and repository evidence.",
   ].join("\n");
 }
 
@@ -41,10 +50,16 @@ export function renderSkillGuideJson(guidance: SkillAuthoringGuidance): string {
   return JSON.stringify(guidance, null, 2);
 }
 
-function renderExample(example: SkillAuthoringExample): string[] {
+function renderExample(
+  example: SkillAuthoringExample,
+  clarification: Omit<SkillAuthoringClarificationExample, "request">,
+): string[] {
   return [
     "Input request:",
     example.request,
+    "",
+    "Expected first clarification turn:",
+    ...renderDecisionSummary(clarification),
     "",
     "Expected initial Renma asset structure:",
     "```text",
@@ -65,6 +80,146 @@ function renderExample(example: SkillAuthoringExample): string[] {
     "",
     "Not created by default:",
     ...renderBullets(example.notCreatedByDefault),
+  ];
+}
+
+function renderInteraction(interaction: SkillAuthoringInteraction): string[] {
+  return [
+    interaction.openingRule,
+    "",
+    "Progressive phases:",
+    ...renderNumbered(interaction.phases),
+    "",
+    "Truth sources:",
+    ...renderBullets(interaction.truthSources),
+    "",
+    "Decision classes:",
+    `- Confirmed: ${interaction.decisionClasses.confirmed}`,
+    `- Proposed: ${interaction.decisionClasses.proposed}`,
+    `- Unresolved: ${interaction.decisionClasses.unresolved}`,
+    "",
+    "Unknown scopes:",
+    `- Authoring decision: ${interaction.unknownScopes.authoringDecision}`,
+    `- Runtime task unknown: ${interaction.unknownScopes.runtimeTaskUnknown}`,
+    "",
+    "Progression classes:",
+    `- Blocking: ${interaction.progressionClasses.blocking}`,
+    `- Reversible default: ${interaction.progressionClasses.reversibleDefault}`,
+    `- Deferred: ${interaction.progressionClasses.deferred}`,
+    "",
+    "Unresolved-item dispositions:",
+    `- Ask now: ${interaction.unresolvedItemDispositions.askNow}`,
+    `- Queue as blocker: ${interaction.unresolvedItemDispositions.queueAsBlocker}`,
+    `- Proceed with reversible default: ${interaction.unresolvedItemDispositions.proceedWithReversibleDefault}`,
+    `- Defer: ${interaction.unresolvedItemDispositions.defer}`,
+    `- Report as finding: ${interaction.unresolvedItemDispositions.reportAsFinding}`,
+    "",
+    "Question rules:",
+    ...renderBullets(interaction.questionRules),
+    "",
+    "Review-Skill illustration:",
+    ...renderBullets(interaction.reviewSkillIllustration),
+    "",
+    "Creation gate:",
+    ...renderBullets(interaction.creationGate),
+    "",
+    "Post-validation actions:",
+    ...renderBullets(interaction.postValidationActions),
+    "",
+    "Persistence rules:",
+    ...renderBullets(interaction.persistenceRules),
+    "",
+    "Platform-native Skill authoring guidance handoff:",
+    ...renderBullets(interaction.handoffRules),
+    "",
+    "Minimal-trigger example:",
+    "Input request:",
+    interaction.minimalTriggerExample.request,
+    "",
+    "Expected first response after running `renma guide skill`:",
+    "I ran `renma guide skill`.",
+    "",
+    ...renderDecisionSummary(interaction.minimalTriggerExample),
+  ];
+}
+
+function renderDecisionSummary(
+  example: Omit<SkillAuthoringClarificationExample, "request">,
+): string[] {
+  const progression = example.progression
+    ? [
+        "",
+        ...renderProgressionSummary(
+          example.progression,
+          example.questions.length,
+        ),
+      ]
+    : [];
+  const runtimeTaskUnknowns = example.runtimeTaskUnknowns
+    ? [
+        "",
+        "Epistemically unresolved source-dependent runtime task knowledge handled by the finished Skill",
+        ...renderBullets(example.runtimeTaskUnknowns),
+      ]
+    : [];
+
+  return [
+    "Current understanding",
+    "",
+    "Confirmed",
+    ...renderBullets(example.confirmed),
+    "",
+    "Proposed",
+    ...renderBullets(example.proposed),
+    "",
+    "Unresolved",
+    ...renderBullets(example.unresolved),
+    ...runtimeTaskUnknowns,
+    ...progression,
+    "",
+    example.questions.length === 1 ? "Question" : "Questions",
+    ...renderNumbered(example.questions),
+  ];
+}
+
+function renderProgressionSummary(
+  progression: SkillAuthoringProgressionSummary,
+  questionCount: number,
+): string[] {
+  const queuedBlockerNumbers = progression.queuedBlockers.map(
+    (blocker) => progression.blocking.indexOf(blocker) + 1,
+  );
+  const reversibleDefaultsHeading =
+    progression.blocking.length === 0
+      ? "Proceeding with reversible defaults"
+      : "Proposed reversible defaults";
+
+  return [
+    "Current progression",
+    "",
+    `Blocking decisions: ${progression.blocking.length}`,
+    ...renderBullets(progression.blocking),
+    ...(questionCount > 0
+      ? [
+          `- Asking now: ${questionCount} highest-impact question${questionCount === 1 ? "" : "s"} below.`,
+        ]
+      : []),
+    ...(progression.queuedBlockers.length > 0
+      ? [
+          "",
+          `Queued from the complete blocker list above (not additional): ${queuedBlockerNumbers.join(", ")}.`,
+        ]
+      : []),
+    ...(progression.reversibleDefaults.length > 0
+      ? [
+          "",
+          reversibleDefaultsHeading,
+          ...renderBullets(progression.reversibleDefaults),
+        ]
+      : []),
+    ...(progression.deferred.length > 0
+      ? ["", "Deferred", ...renderBullets(progression.deferred)]
+      : []),
   ];
 }
 

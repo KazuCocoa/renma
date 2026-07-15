@@ -1,7 +1,7 @@
 # Renma Internal Architecture
 
-This document describes the 0.19.0 maintainability architecture, including the
-additive `guide` command.
+This document describes the 0.19.x maintainability architecture, including the
+additive `guide` command and its unreleased interactive authoring protocol.
 It is contributor guidance, not a new versioned JSON schema. Renma 0.18.2
 remains the compatibility baseline for existing commands: public fields,
 classifications, diagnostics, severities, exit behavior, and migration direction
@@ -200,6 +200,81 @@ may reuse small exported authoring invariants, but must not duplicate the full
 guide. The guidance source may import canonical metadata definitions; metadata
 and renderers must not import command modules.
 
+The 0.19.1 follow-up adds one `interaction` object to that same guidance source.
+It owns the opening rule, progressive phases, truth-source and epistemic classes,
+unknown scopes, progression classes, unresolved-item dispositions, question
+rules, creation gate, post-validation actions, persistence rules,
+platform-native Skill authoring guidance handoff, and minimal and fictional
+Example Product API clarification examples. The prompt renderer places this
+protocol immediately after the central principle; JSON serializes the same
+object directly. This is an additive projection, not a separately versioned
+schema.
+
+`interaction` is normative for truth qualification, question behavior, gate
+entry and re-entry, finding classification, persistence, and semantic handoff.
+The legacy `workflow` projection is only a short top-level summary, while
+placement, artifact, metadata, and conciseness sections retain rules they
+uniquely own. Renderers add headings and list formatting; they do not recreate
+protocol decisions.
+
+Epistemic and progression classifications are independent. Confirmed, Proposed,
+and Unresolved describe support for a decision; Blocking, Reversible default,
+and Deferred describe whether the consuming LLM may proceed. The interaction
+contract requires the LLM to retain the complete blocker set while asking at
+most three closely related questions per turn, then pass the gate only when no
+Blocking decision remains. These are prompt instructions and JSON guidance, not
+stored Renma workflow state.
+
+Unknown scope and disposition remain separate from both axes. An authoring
+decision defines repository structure or Skill behavior and may block the gate;
+a runtime task unknown belongs to material the finished Skill processes and can
+be reported as an evidence-backed finding. Ask now, Queue as blocker, Proceed
+with reversible default, Defer, and Report as finding are temporary actions over
+those items, not additional progression classes.
+
+A runtime task unknown may block a later execution stage, but that task-instance
+fact never enters the authoring creation-gate blocker set. The finished Skill
+follows its authored ask, report, defer, or stop policy. Only uncertainty about
+that handling policy or the asset boundary returns to authoring clarification.
+
+Truth-source evidence remains outside Renma's runtime state. A consuming LLM
+may use explicit user statements, clearly applicable supplied artifacts,
+applicable and effective repository evidence, or successfully consulted
+authoritative source content. Renma structural rules constrain placement but do
+not establish domain truth. Authoring-time source access comes from the current
+request, tools, and environment; future Skill policy is not retroactive
+authorization.
+
+Likewise, deterministic detection does not imply deterministic repair. The
+protocol permits automatic correction only when evidence and Diagnostics v2
+constraints uniquely determine a patch. Repeated-context evidence remains a
+consolidation input requiring repository investigation and human review.
+
+The interaction model is an instruction contract for the consuming LLM, not a
+Renma state machine:
+
+```text
+renma guide skill -> deterministic protocol on stdout
+consuming LLM     -> investigates evidence, proposes, asks, and edits
+user              -> supplies domain and governance truth
+Renma commands    -> provide deterministic rules and repository evidence
+human             -> approves meaningful decisions
+```
+
+This remains an elaboration of `LLM proposes. Renma verifies. Human approves.`
+If source review, semantic refinement, usage, or validation suggests a boundary
+change, the consuming LLM records it as Proposed or Unresolved and re-enters the
+creation gate. Renma stores no gate or conversation state.
+
+No interaction state crosses the command boundary. `guide` does not accept task
+text, ask questions, retain history, interpret answers, create files, call an
+LLM, or repair assets. Confirmed / Proposed / Unresolved summaries remain
+ephemeral conversation state and must not become new Renma metadata.
+Progression summaries, queued blockers, reversible defaults, and Deferred items
+are likewise ephemeral. So are unknown scopes, raw-gap themes, stage-dependent
+dispositions, and runtime findings during authoring. They create no command
+state, metadata field, or automatic Skill split.
+
 A `no-change-recommended` decision is a successful result. It means Renma
 completed the analysis and found no supported change. The command must not
 manufacture metadata, a migration, or verification work merely to return an
@@ -230,7 +305,7 @@ protects exact wording. Stable branching must use typed fields such as
 
 ## Intentional 0.18.2 Compatibility Seams
 
-Two parallel-looking paths remain intentional in 0.19.0.
+Two parallel-looking paths remain intentional in 0.19.x.
 
 ### Scan keeps structural parent evidence
 
