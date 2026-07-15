@@ -413,6 +413,14 @@ test("authoring docs separate runtime unknowns and stage-dependent dispositions"
     /listed\s+only in the runtime task-unknown section rather than repeated in generic\s+Unresolved/,
   );
   assert.match(
+    authoring,
+    /Example Product API is a fictional external API[\s\S]*not a Renma concept or a real product/,
+  );
+  assert.match(
+    authoring,
+    /skills\/build-example-product-json\/SKILL\.md[\s\S]*contexts\/example-product-api\.md/,
+  );
+  assert.match(
     combined,
     /not repository metadata|not additional progression classes/,
   );

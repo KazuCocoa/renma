@@ -33,10 +33,10 @@ export function renderSkillGuidePrompt(
     "Metadata rules",
     ...renderBullets(guidance.metadataRules),
     "",
-    "Product A example",
+    "Fictional external API example: Example Product API",
     ...renderExample(
       guidance.example,
-      guidance.interaction.productAInitialClarification,
+      guidance.interaction.exampleProductApiInitialClarification,
     ),
     "",
     "Verification",

@@ -131,7 +131,7 @@ test("guide skill JSON and --json are equivalent small structured projections", 
     "handoffRules",
     "minimalTriggerExample",
     "reviewSkillIllustration",
-    "productAInitialClarification",
+    "exampleProductApiInitialClarification",
   ]);
   assert.deepEqual(
     Object.keys(
@@ -186,17 +186,17 @@ test("guide skill JSON and --json are equivalent small structured projections", 
     securityReview: string[];
   };
   assert.deepEqual(example.initialStructure, [
-    "skills/build-product-a-json/SKILL.md",
+    "skills/build-example-product-json/SKILL.md",
     "  -> requires",
-    "contexts/product-a-api.md",
+    "contexts/example-product-api.md",
   ]);
   assert.doesNotMatch(
     example.initialStructure.join("\n"),
-    /official Product A URL/,
+    /Example Product API documentation URL/,
   );
   assert.match(
     example.externalSourceReference,
-    /user-designated official Product A URL/,
+    /user-designated Example Product API documentation URL/,
   );
   assert.match(
     example.externalSourceReference,
@@ -218,6 +218,7 @@ test("guide renderers consume the same structured guidance data", () => {
   const json = JSON.parse(renderSkillGuideJson(guidance)) as typeof guidance;
 
   assert.deepEqual(json, guidance);
+  assert.match(prompt, /Fictional external API example: Example Product API/);
   for (const value of collectStrings(guidance)) {
     assert.ok(prompt.includes(value), value);
   }
@@ -719,20 +720,21 @@ test("asset-boundary discoveries re-enter clarification and the creation gate", 
   }
 });
 
-test("Product A separates authoring blockers from runtime source knowledge", () => {
+test("Example Product API separates authoring blockers from runtime source knowledge", () => {
   const guidance = buildSkillAuthoringGuidance("test-version");
-  const clarification = guidance.interaction.productAInitialClarification;
+  const clarification =
+    guidance.interaction.exampleProductApiInitialClarification;
   const prompt = renderSkillGuidePrompt(guidance);
   const unresolved = clarification.unresolved.join("\n");
   const blockers = clarification.progression.blocking.join("\n");
 
   assert.match(
     clarification.confirmed.join("\n"),
-    /builds a Product A JSON body/,
+    /builds a JSON request body for the fictional Example Product API/,
   );
   assert.match(
     clarification.confirmed.join("\n"),
-    /official Product A URL as the intended authoritative source/,
+    /Example Product API documentation URL as the intended authoritative external source/,
   );
   assert.match(
     clarification.confirmed.join("\n"),
@@ -753,11 +755,11 @@ test("Product A separates authoring blockers from runtime source knowledge", () 
   assert.match(unresolved, /Context owner/);
   assert.match(
     clarification.runtimeTaskUnknowns.join("\n"),
-    /current Product A schema[\s\S]*documented fields and constraints[\s\S]*Operation-specific behavior/,
+    /current Example Product API schema[\s\S]*documented fields and constraints[\s\S]*Operation-specific behavior/,
   );
   assert.doesNotMatch(
     unresolved,
-    /current Product A schema|current documented fields and constraints|Operation-specific behavior/,
+    /current Example Product API schema|current documented fields and constraints|Operation-specific behavior/,
   );
   assert.match(
     prompt,
@@ -790,12 +792,12 @@ test("Product A separates authoring blockers from runtime source knowledge", () 
   );
   assert.doesNotMatch(
     blockers,
-    /current Product A schema|current documented fields|Authoring-time access/,
+    /current Example Product API schema|current documented fields|Authoring-time access/,
   );
   for (const authoringDecision of [
     /Finished-Skill runtime source-access intent/,
     /Safe fallback behavior when the source is unavailable/,
-    /Product A Context is required or optional/,
+    /Example Product API Context is required or optional/,
     /Context owner/,
     /source-specific instructions, transformations, examples, or validation behavior/,
   ]) {
@@ -845,7 +847,8 @@ test("progression rendering distinguishes proposed defaults and queued subsets",
 
 test("progression rendering says proceeding only when no blocker remains", () => {
   const guidance = buildSkillAuthoringGuidance("test-version");
-  const clarification = guidance.interaction.productAInitialClarification;
+  const clarification =
+    guidance.interaction.exampleProductApiInitialClarification;
   clarification.progression.blocking = [];
   clarification.progression.queuedBlockers = [];
   clarification.questions = [];

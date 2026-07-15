@@ -18,12 +18,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   question batches while retaining queued blockers; pass and re-enter a creation
   gate; classify
   post-validation actions conservatively; and persist only reviewed decisions.
-- Added minimal-trigger and Product A clarification examples plus focused
-  regression coverage for prompt ordering, the additive JSON interaction
-  projection, decision classes, question rules, creation gates, handoff,
-  boundary-change re-entry, uniquely supported repairs, repeated-context
-  constraints, unknown scope and disposition, progression and question batching,
-  stage-dependent blockers, persistence, determinism, and non-editing behavior.
+- Added minimal-trigger and fictional Example Product API clarification examples
+  plus focused regression coverage for prompt ordering, the additive JSON
+  interaction projection, decision classes, question rules, creation gates,
+  handoff, boundary-change re-entry, uniquely supported repairs,
+  repeated-context constraints, unknown scope and disposition, progression and
+  question batching, stage-dependent blockers, persistence, determinism, and
+  non-editing behavior.
 
 ### Changed
 
@@ -49,7 +50,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   authoring blockers, runtime-stage blocking follows the authored handling policy
   without adding task-instance facts to the creation gate, “do not guess” still
   permits independent analysis, related raw gaps should be clustered into
-  decision themes, and Product A runtime knowledge is rendered once.
+  decision themes, and Example Product API runtime knowledge is rendered once.
 
 ### Compatibility
 
@@ -69,7 +70,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   filesystem, network, or LLM operations.
 - Added focused guide regression coverage for formats, determinism, version
   reporting, non-editing behavior, help, argument validation, load-bearing
-  authoring invariants, and the compact Product A Skill-plus-Context example.
+  authoring invariants, and the compact fictional Example Product API
+  Skill-plus-Context example.
 
 ### Changed
 

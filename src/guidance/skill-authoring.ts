@@ -61,7 +61,7 @@ export interface SkillAuthoringInteraction {
   handoffRules: string[];
   minimalTriggerExample: SkillAuthoringClarificationExample;
   reviewSkillIllustration: string[];
-  productAInitialClarification: Omit<
+  exampleProductApiInitialClarification: Omit<
     SkillAuthoringClarificationExample,
     "request"
   > & {
@@ -168,7 +168,7 @@ export function buildSkillAuthoringGuidance(
         defer:
           "Keep a Proposed or Unresolved item visible when the current stage does not depend on it.",
         reportAsFinding:
-          "Preserve an evidence-backed runtime task unknown in the finished Skill's output with its impact or risk instead of requiring it to be resolved during authoring or execution.",
+          "Preserve an evidence-backed runtime task unknown in the finished Skill's current-stage output with its impact or risk instead of requiring immediate resolution. Reassess it at meaningful stage transitions.",
       },
       questionRules: [
         "Before asking, check whether an applicable truth source above answers the question and whether a Renma rule supplies a safe structural default; ask only when human truth or unavailable source content is still required.",
@@ -250,10 +250,10 @@ export function buildSkillAuthoringGuidance(
         "Preserve the underlying evidence and report four decision themes with their impact or risk.",
         "Ask only about a theme that blocks the requested output; keep other themes as findings.",
       ],
-      productAInitialClarification: {
+      exampleProductApiInitialClarification: {
         confirmed: [
-          "The workflow builds a Product A JSON body.",
-          "The user designates the official Product A URL as the intended authoritative source.",
+          "The workflow builds a JSON request body for the fictional Example Product API.",
+          "The user designates the Example Product API documentation URL as the intended authoritative external source.",
           "The request expresses authoring-time intent to consult that URL, subject to the current tools and authoring environment permitting access.",
         ],
         proposed: [
@@ -265,7 +265,7 @@ export function buildSkillAuthoringGuidance(
         unresolved: [
           "Whether the finished Skill accesses the URL at execution time.",
           "What happens when the source cannot be accessed.",
-          "Whether the Product A Context is required or optional for correct execution.",
+          "Whether the Example Product API Context is required or optional for correct execution.",
           "The Context owner, unless repository evidence resolves it.",
           "Whether source-specific instructions, transformations, embedded examples, or validation behavior must be authored now.",
           "Whether authoring-time consultation is needed for any source-specific authoring decision.",
@@ -279,7 +279,7 @@ export function buildSkillAuthoringGuidance(
           blocking: [
             "Finished-Skill runtime source-access intent.",
             "Safe fallback behavior when the source is unavailable.",
-            "Whether the Product A Context is required or optional for correct execution.",
+            "Whether the Example Product API Context is required or optional for correct execution.",
             "The Context owner when applicable repository evidence does not supply one.",
             "Any source-specific instructions, transformations, examples, or validation behavior that must be embedded during authoring.",
           ],
@@ -293,12 +293,12 @@ export function buildSkillAuthoringGuidance(
             "Additional examples unless real ambiguity emerges.",
           ],
           queuedBlockers: [
-            "Whether the Product A Context is required or optional for correct execution.",
+            "Whether the Example Product API Context is required or optional for correct execution.",
             "The Context owner when applicable repository evidence does not supply one.",
           ],
         },
         runtimeTaskUnknowns: [
-          "The current Product A schema.",
+          "The current Example Product API schema.",
           "The current documented fields and constraints.",
           "Operation-specific behavior read from the authoritative source.",
         ],
@@ -356,24 +356,24 @@ export function buildSkillAuthoringGuidance(
     ],
     example: {
       request:
-        "Create a Skill that builds a JSON body for Product A. The official Product A URL is the source of truth. Improve the Skill with Renma.",
+        "Create a Skill that builds a JSON request body for the fictional Example Product API. The Example Product API documentation URL is the source of truth. Improve the Skill with Renma.",
       initialStructure: [
-        "skills/build-product-a-json/SKILL.md",
+        "skills/build-example-product-json/SKILL.md",
         "  -> requires",
-        "contexts/product-a-api.md",
+        "contexts/example-product-api.md",
       ],
       externalSourceReference:
-        "`contexts/product-a-api.md` contains the user-designated official Product A URL. The URL is not a Renma asset node or graph edge; source-dependent facts require successfully consulted or supplied content with the relevant section identified.",
+        "`contexts/example-product-api.md` contains the user-designated Example Product API documentation URL for this fictional external API. The URL is not a Renma asset node or graph edge; source-dependent facts require successfully consulted or supplied content with the relevant section identified.",
       skillResponsibilities: [
-        "Determine the requested Product A operation.",
-        "Consult the declared Product A Context.",
+        "Determine the requested Example Product API operation.",
+        "Consult the declared Example Product API Context.",
         "Collect missing required inputs.",
         "Construct only documented JSON fields; do not invent fields or values.",
         "Report assumptions or unresolved ambiguity.",
         "Define the expected JSON output and completion criteria.",
       ],
       contextResponsibilities: [
-        "Identify the Product A specification governed by the Context.",
+        "Identify the Example Product API specification governed by the Context.",
         "Preserve the official URL as the user-designated authoritative external source.",
         "Require current supported fields and constraints to be read from that source.",
         "Define behavior when the source cannot be accessed.",

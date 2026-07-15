@@ -204,10 +204,11 @@ The 0.19.1 follow-up adds one `interaction` object to that same guidance source.
 It owns the opening rule, progressive phases, truth-source and epistemic classes,
 unknown scopes, progression classes, unresolved-item dispositions, question
 rules, creation gate, post-validation actions, persistence rules,
-platform-native Skill authoring guidance handoff, and minimal and Product A
-clarification examples. The prompt renderer places this protocol immediately
-after the central principle; JSON serializes the same object directly. This is
-an additive projection, not a separately versioned schema.
+platform-native Skill authoring guidance handoff, and minimal and fictional
+Example Product API clarification examples. The prompt renderer places this
+protocol immediately after the central principle; JSON serializes the same
+object directly. This is an additive projection, not a separately versioned
+schema.
 
 `interaction` is normative for truth qualification, question behavior, gate
 entry and re-entry, finding classification, persistence, and semantic handoff.

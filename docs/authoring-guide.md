@@ -594,13 +594,17 @@ renma readiness . --format markdown
 The final step is human review of the Skill's intent, workflow, policy,
 relationships, and remaining uncertainty.
 
-### Canonical Product A example
+### Canonical fictional external API example: Example Product API
+
+Example Product API is a fictional external API used only to illustrate
+authoritative-source handling. It is not a Renma concept or a real product.
 
 For this request:
 
 ```text
-Create a Skill that builds a JSON body for Product A.
-The official Product A URL is the source of truth.
+Create a Skill that builds a JSON request body for the fictional Example Product
+API.
+The Example Product API documentation URL is the source of truth.
 Improve the Skill with Renma.
 ```
 
@@ -610,9 +614,9 @@ the consuming LLM first reports:
 Current understanding
 
 Confirmed
-- The workflow builds a Product A JSON body.
-- The user designates the official Product A URL as the intended authoritative
-  source.
+- The workflow builds a JSON request body for the fictional Example Product API.
+- The user designates the Example Product API documentation URL as the intended
+  authoritative external source.
 - The request expresses authoring-time intent to consult that URL, subject to
   the current tools and authoring environment permitting access.
 
@@ -625,7 +629,8 @@ Proposed
 Unresolved
 - Whether the finished Skill accesses the URL at execution time.
 - What happens when the source cannot be accessed.
-- Whether the Product A Context is required or optional for correct execution.
+- Whether the Example Product API Context is required or optional for correct
+  execution.
 - The Context owner, unless repository evidence resolves it.
 - Whether source-specific instructions, transformations, examples, or validation
   behavior must be authored now.
@@ -634,7 +639,7 @@ Unresolved
 
 Epistemically unresolved source-dependent runtime task knowledge handled by the
 finished Skill
-- The current Product A schema.
+- The current Example Product API schema.
 - The current documented fields and constraints.
 - Operation-specific behavior read from the authoritative source.
 
@@ -643,7 +648,8 @@ Current progression
 Blocking decisions: 5
 - Finished-Skill runtime source-access intent.
 - Safe fallback behavior when the source is unavailable.
-- Whether the Product A Context is required or optional for correct execution.
+- Whether the Example Product API Context is required or optional for correct
+  execution.
 - The Context owner when applicable repository evidence does not supply one.
 - Any source-specific instructions, transformations, examples, or validation
   behavior that must be embedded during authoring.
@@ -696,15 +702,16 @@ or permissive security metadata.
 After the creation gate, the smallest proposed Renma asset structure is:
 
 ```text
-skills/build-product-a-json/SKILL.md
+skills/build-example-product-json/SKILL.md
   -> requires
-contexts/product-a-api.md
+contexts/example-product-api.md
 ```
 
 The external source reference is separate from that structure:
 
 ```text
-contexts/product-a-api.md contains the reviewed official Product A URL
+contexts/example-product-api.md contains the reviewed Example Product API
+documentation URL
 ```
 
 The URL is body content, not a Renma asset node or graph edge. Decide whether
