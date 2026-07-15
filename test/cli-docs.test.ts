@@ -284,10 +284,12 @@ test("Skill authoring docs establish Renma boundaries before platform semantic r
     docsIndex,
     advanced,
     await readRepoFile("design.md"),
-    await readRepoFile("CHANGELOG.md"),
   ]) {
     assert.doesNotMatch(document, /\bCodex\b|skill-creator/);
   }
+
+  const changelog = await readRepoFile("CHANGELOG.md");
+  assert.match(changelog, /optional Codex `skill-creator` example/);
 });
 
 test("authoring docs preserve Context and external-source security boundaries", async () => {

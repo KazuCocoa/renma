@@ -319,7 +319,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 - Clarified that platform-native guidance owns general Skill design while Renma complements it with repository-specific governance and validation.
 - Consolidated the README around product identity, boundaries, primary workflows, quick start, command orientation, a canonical example, and documentation navigation.
-- Made the authoring guide the canonical new-Skill and existing-Skill workflow, including safe generator boundaries and an optional platform-native authoring example.
+- Made the authoring guide the canonical new-Skill and existing-Skill workflow, including safe generator boundaries and an optional Codex `skill-creator` example.
 - Reworked the user manual and compatibility guide around actual CLI behavior, review responsibilities, scan/fix/rerun validation, and blocked migration recovery.
 - Rewrote the roadmap around the shipped 0.16.0 baseline, the 0.17.0 usability release, and proposed 0.18.0 graph-based Skill discovery; removed stale release sequencing from architecture and design.
 - Made canonical nested Skills under both `skills/**` and `.agents/skills/**` participate consistently in Readiness, thin-Skill, graph, support, and parent-Skill checks.
