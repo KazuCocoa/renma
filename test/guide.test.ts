@@ -339,7 +339,7 @@ test("authoring decisions and runtime task unknowns have separate scope and disp
   );
 });
 
-test("unknown handling clusters themes and reassesses stage-dependent blockers", () => {
+test("runtime-stage blockers stay outside the authoring creation gate", () => {
   const interaction = buildSkillAuthoringGuidance("test-version").interaction;
   const questions = interaction.questionRules.join("\n");
   const gate = interaction.creationGate.join("\n");
@@ -357,9 +357,39 @@ test("unknown handling clusters themes and reassesses stage-dependent blockers",
     /timeout, retry count, partial success, and rollback[\s\S]*Failure and recovery behavior theme/,
   );
   assert.match(questions, /prioritize themes by risk and downstream impact/);
+  assert.match(
+    questions,
+    /A runtime-stage blocker is execution behavior that the authored Skill must handle/,
+  );
+  assert.match(
+    questions,
+    /does not enter the authoring creation-gate blocker set merely because a future task instance may encounter it/,
+  );
+  assert.match(
+    questions,
+    /Only an unresolved authoring decision about whether the Skill should ask, report, defer, or stop[\s\S]*may block Skill creation/,
+  );
   assert.match(questions, /At each meaningful stage transition/);
-  assert.match(questions, /move a reportable or Deferred theme to Blocking/);
-  assert.match(questions, /move a blocker to Report as finding/);
+  assert.match(
+    questions,
+    /Treat a runtime task unknown as a runtime-stage blocker when the next execution stage depends on it/,
+  );
+  assert.match(
+    questions,
+    /follow the Skill's authored ask, report, defer, or stop policy/,
+  );
+  assert.match(
+    questions,
+    /Do not add the task-instance fact to the authoring creation-gate blocker set/,
+  );
+  assert.match(
+    questions,
+    /re-enter authoring clarification only when the Skill's handling policy or asset boundary itself is unresolved/,
+  );
+  assert.doesNotMatch(
+    questions,
+    /move a reportable or Deferred theme to Blocking/,
+  );
   assert.match(
     gate,
     /Do not block creation on task-instance unknowns[\s\S]*continue unaffected work/,
@@ -690,9 +720,11 @@ test("asset-boundary discoveries re-enter clarification and the creation gate", 
 });
 
 test("Product A separates authoring blockers from runtime source knowledge", () => {
-  const clarification =
-    buildSkillAuthoringGuidance("test-version").interaction
-      .productAInitialClarification;
+  const guidance = buildSkillAuthoringGuidance("test-version");
+  const clarification = guidance.interaction.productAInitialClarification;
+  const prompt = renderSkillGuidePrompt(guidance);
+  const unresolved = clarification.unresolved.join("\n");
+  const blockers = clarification.progression.blocking.join("\n");
 
   assert.match(
     clarification.confirmed.join("\n"),
@@ -711,23 +743,31 @@ test("Product A separates authoring blockers from runtime source knowledge", () 
     clarification.proposed.join("\n"),
     /No script or Context Lens by default/,
   );
+  assert.match(unresolved, /accesses the URL at execution time/);
+  assert.match(unresolved, /Context is required or optional/);
   assert.match(
-    clarification.unresolved.join("\n"),
-    /accesses the URL at execution time/,
-  );
-  assert.match(
-    clarification.unresolved.join("\n"),
-    /Context is required or optional/,
-  );
-  assert.match(
-    clarification.unresolved.join("\n"),
+    unresolved,
     /source-specific instructions, transformations, embedded examples, or validation behavior/,
   );
-  assert.match(clarification.unresolved.join("\n"), /Context owner/);
+  assert.match(unresolved, /source cannot be accessed/);
+  assert.match(unresolved, /Context owner/);
   assert.match(
     clarification.runtimeTaskUnknowns.join("\n"),
     /current Product A schema[\s\S]*documented fields and constraints[\s\S]*Operation-specific behavior/,
   );
+  assert.doesNotMatch(
+    unresolved,
+    /current Product A schema|current documented fields and constraints|Operation-specific behavior/,
+  );
+  assert.match(
+    prompt,
+    /Epistemically unresolved source-dependent runtime task knowledge handled by the finished Skill/,
+  );
+  for (const runtimeUnknown of clarification.runtimeTaskUnknowns) {
+    assert.ok(!clarification.unresolved.includes(runtimeUnknown));
+    assert.ok(!clarification.progression.blocking.includes(runtimeUnknown));
+    assert.equal(countOccurrences(prompt, runtimeUnknown), 1, runtimeUnknown);
+  }
   assert.equal(clarification.questions.length, 3);
   assert.equal(clarification.progression.blocking.length, 5);
   assert.ok(
@@ -749,9 +789,18 @@ test("Product A separates authoring blockers from runtime source knowledge", () 
     /Authoring-time source consultation when no source-specific authoring decision depends on it/,
   );
   assert.doesNotMatch(
-    clarification.progression.blocking.join("\n"),
+    blockers,
     /current Product A schema|current documented fields|Authoring-time access/,
   );
+  for (const authoringDecision of [
+    /Finished-Skill runtime source-access intent/,
+    /Safe fallback behavior when the source is unavailable/,
+    /Product A Context is required or optional/,
+    /Context owner/,
+    /source-specific instructions, transformations, examples, or validation behavior/,
+  ]) {
+    assert.match(blockers, authoringDecision);
+  }
   assert.match(
     clarification.progression.reversibleDefaults.join("\n"),
     /No script by default[\s\S]*No Context Lens by default/,

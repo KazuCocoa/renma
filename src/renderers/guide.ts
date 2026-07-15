@@ -158,7 +158,7 @@ function renderDecisionSummary(
   const runtimeTaskUnknowns = example.runtimeTaskUnknowns
     ? [
         "",
-        "Runtime task unknowns handled by the finished Skill",
+        "Epistemically unresolved source-dependent runtime task knowledge handled by the finished Skill",
         ...renderBullets(example.runtimeTaskUnknowns),
       ]
     : [];

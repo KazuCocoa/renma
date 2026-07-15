@@ -231,6 +231,11 @@ be reported as an evidence-backed finding. Ask now, Queue as blocker, Proceed
 with reversible default, Defer, and Report as finding are temporary actions over
 those items, not additional progression classes.
 
+A runtime task unknown may block a later execution stage, but that task-instance
+fact never enters the authoring creation-gate blocker set. The finished Skill
+follows its authored ask, report, defer, or stop policy. Only uncertainty about
+that handling policy or the asset boundary returns to authoring clarification.
+
 Truth-source evidence remains outside Renma's runtime state. A consuming LLM
 may use explicit user statements, clearly applicable supplied artifacts,
 applicable and effective repository evidence, or successfully consulted

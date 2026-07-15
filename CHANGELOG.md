@@ -46,9 +46,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   becoming Confirmed. Unrelated branching blockers prompt a proposed boundary
   reconsideration rather than an automatic Skill split.
 - Clarified that runtime task unknowns are findings rather than automatic
-  authoring blockers, “do not guess” still permits independent analysis, related
-  raw gaps should be clustered into decision themes, and progression is
-  reassessed only at meaningful workflow stage boundaries.
+  authoring blockers, runtime-stage blocking follows the authored handling policy
+  without adding task-instance facts to the creation gate, “do not guess” still
+  permits independent analysis, related raw gaps should be clustered into
+  decision themes, and Product A runtime knowledge is rendered once.
 
 ### Compatibility
 

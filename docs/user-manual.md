@@ -281,7 +281,12 @@ finished Skill later according to its own runtime behavior.
    decision themes that block the current stage; use safe Proposed defaults,
    Defer non-material items, and make evidence-backed runtime unknowns findings
    in the finished Skill's output. Group related raw gaps into themes and
-   reassess them only at meaningful workflow stage transitions.
+   reassess them only at meaningful workflow stage transitions. When the next
+   execution stage depends on a runtime task unknown, treat it as a runtime-stage
+   blocker and follow the Skill's authored ask, report, defer, or stop policy;
+   do not add the task-instance fact to the authoring creation-gate blocker set.
+   Return to authoring clarification only when that policy or an asset boundary
+   is unresolved.
 
    Before creating files, establish the focused recurring task, expected result,
    meaningful completion or failure behavior, smallest justified structure,

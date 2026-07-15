@@ -391,11 +391,26 @@ test("authoring docs separate runtime unknowns and stage-dependent dispositions"
   );
   assert.match(authoring, /Failure and recovery behavior/);
   assert.match(authoring, /Report as finding/);
-  assert.match(authoring, /meaningful stages[\s\S]*reassess themes/);
+  assert.match(
+    authoring,
+    /runtime-stage blocker is execution behavior that the authored Skill must\s+handle/i,
+  );
+  assert.match(
+    authoring,
+    /Do not add\s+the task-instance fact to the authoring creation-gate blocker set/,
+  );
+  assert.match(
+    authoring,
+    /Re-enter\s+authoring clarification only when the Skill's handling policy or asset boundary\s+itself is unresolved/,
+  );
   assert.match(authoring, /20 raw gaps/);
   assert.match(
     authoring,
-    /Current schema, fields, constraints, and operation-specific behavior are runtime[\s\S]*source-dependent knowledge/,
+    /Current schema, fields, constraints, and operation-specific behavior are[\s\S]*epistemically unresolved, source-dependent runtime knowledge/,
+  );
+  assert.match(
+    authoring,
+    /listed\s+only in the runtime task-unknown section rather than repeated in generic\s+Unresolved/,
   );
   assert.match(
     combined,

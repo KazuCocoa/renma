@@ -110,6 +110,26 @@ Before applying progression, classify the unknown's scope:
 Do not ask the author to resolve task-instance unknowns merely because the
 finished Skill may encounter them.
 
+A runtime-stage blocker is execution behavior that the authored Skill must
+handle. It does not enter the authoring creation-gate blocker set merely because
+a future task instance may encounter it. Only an unresolved authoring decision
+about whether the Skill should ask, report, defer, or stop in that situation may
+block Skill creation.
+
+```text
+Runtime task unknown:
+- The reviewed specification does not define the expected result.
+
+Runtime-stage behavior:
+- Specification review reports it as a finding.
+- Test-case generation asks for clarification or stops before inventing an
+  expected result.
+
+Possible authoring blocker:
+- It is not yet decided whether the Skill should ask, report, defer, or stop in
+  that situation.
+```
+
 ### Progression and question batches
 
 Confirmed, Proposed, and Unresolved describe epistemic support. A separate
@@ -182,10 +202,14 @@ only when its distinction changes the result. There is no fixed maximum for raw
 unknowns or themes.
 
 When a workflow has meaningful stages, reassess themes at each transition. A
-specification ambiguity can be Report as finding during review, remain
-non-blocking while designing coverage for unaffected behavior, then become
-Blocking when concrete expected-result generation depends on it. Move a blocker
-back to Report as finding when the requested output does not require resolution.
+specification ambiguity can be Report as finding during review and remain
+non-blocking while designing coverage for unaffected behavior. Treat it as a
+runtime-stage blocker when concrete expected-result generation depends on it,
+then follow the Skill's authored ask, report, defer, or stop policy. Do not add
+the task-instance fact to the authoring creation-gate blocker set. Re-enter
+authoring clarification only when the Skill's handling policy or asset boundary
+itself is unresolved; return the fact to Report as finding when a later requested
+output does not require resolution.
 
 When proceeding, identify the defaults and meaningful deferred items, do not
 present either as Confirmed, and do not ask for redundant confirmation after
@@ -607,10 +631,9 @@ Unresolved
   behavior must be authored now.
 - Whether authoring-time consultation is needed for a source-specific authoring
   decision.
-- The current Product A schema, fields, constraints, and operation-specific
-  behavior until runtime source consultation or approved supplied content.
 
-Runtime task unknowns handled by the finished Skill
+Epistemically unresolved source-dependent runtime task knowledge handled by the
+finished Skill
 - The current Product A schema.
 - The current documented fields and constraints.
 - Operation-specific behavior read from the authoritative source.
@@ -653,16 +676,18 @@ only three questions; required-versus-optional Context and owner are queued by
 their positions in that set, not counted again. The reversible defaults remain
 Proposed.
 
-Current schema, fields, constraints, and operation-specific behavior are runtime
-source-dependent knowledge when the safe contract is to consult the declared
-Context, use only documented fields, request missing task inputs, report
-ambiguity, and stop or request approved supplied content when the source is
-unavailable. They become authoring blockers only when source-specific
-instructions, transformations, embedded examples, or validation behavior must
-be defined in the Skill. Do not require the user to paste the full specification
-when those current facts can safely remain runtime-scoped. Authoring-time
-consultation remains useful and may be required for source-specific authoring;
-it is not universally a creation-gate blocker.
+Current schema, fields, constraints, and operation-specific behavior are
+epistemically unresolved, source-dependent runtime knowledge. They are listed
+only in the runtime task-unknown section rather than repeated in generic
+Unresolved. The safe contract is to consult the declared Context, use only
+documented fields, request missing task inputs, report ambiguity, and stop or
+request approved supplied content when the source is unavailable. They become
+authoring blockers only when source-specific instructions, transformations,
+embedded examples, or validation behavior must be defined in the Skill. Do not
+require the user to paste the full specification when those current facts can
+safely remain runtime-scoped. Authoring-time consultation remains useful and may
+be required for source-specific authoring; it is not universally a creation-gate
+blocker.
 
 The LLM does not confirm source-dependent facts from memory, use future Skill
 metadata as authoring-time permission, or hard-code a fictional approved domain
