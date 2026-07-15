@@ -53,7 +53,7 @@ test("suggest-metadata prompt reports blocked legacy Skill migration", async () 
   assert.match(result.stdout, /not generated while migration is blocked/);
   assert.match(
     result.stdout,
-    /confirm the Skill's intent using your platform's standard Skill authoring guidance/,
+    /Run `renma guide skill` to re-establish repository boundaries, then confirm the Skill's intent using platform-native Skill guidance within them/,
   );
   assert.match(
     result.stdout,
@@ -214,7 +214,7 @@ test("suggest-metadata proposes no migration or rewrite for canonical release-pr
   );
   assert.match(
     promptResult.stdout,
-    /Review the Skill's trigger description, instructions, workflow, constraints, and completion criteria using your platform's standard Skill authoring guidance/,
+    /Run `renma guide skill`, then review the Skill's trigger description, instructions, workflow, constraints, and completion criteria with platform-native guidance within the Renma boundaries/,
   );
   assert.match(
     promptResult.stdout,
@@ -533,6 +533,7 @@ test("suggest-metadata works for context assets", async () => {
     promptResult.stdout,
     /platform's standard Skill authoring guidance/,
   );
+  assert.doesNotMatch(promptResult.stdout, /renma guide skill/);
   assert.match(promptResult.stdout, /renma scan \. --fail-on high/);
 });
 

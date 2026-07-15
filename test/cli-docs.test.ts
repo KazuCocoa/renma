@@ -15,6 +15,7 @@ const COMMANDS = [
   "trust-graph",
   "ownership",
   "readiness",
+  "guide",
   "scaffold",
   "suggest-metadata",
   "suggest-semantic-split",
@@ -32,6 +33,7 @@ const EXPECTED_FORMATS = new Map<string, string[]>([
   ["graph", ["json", "markdown", "mermaid"]],
   ["trust-graph", ["json", "markdown"]],
   ["inspect", ["text", "json"]],
+  ["guide", ["prompt", "json"]],
   ["scaffold", ["file", "prompt", "json"]],
   ["suggest-metadata", ["prompt", "json"]],
   ["suggest-semantic-split", ["prompt", "json"]],
@@ -195,7 +197,7 @@ test("Skill path guidance distinguishes canonical and historical entrypoints", a
   }
 });
 
-test("Skill authoring docs preserve the platform and Renma responsibility boundary", async () => {
+test("Skill authoring docs establish Renma boundaries before platform semantic refinement", async () => {
   const readme = await readRepoFile("README.md");
   const manual = await readRepoFile("docs/user-manual.md");
   const authoring = await readRepoFile("docs/authoring-guide.md");
@@ -205,8 +207,13 @@ test("Skill authoring docs preserve the platform and Renma responsibility bounda
   const cliSource = await readRepoFile("src/cli-help.ts");
 
   for (const document of [readme, manual, authoring, compatibility]) {
-    assert.match(document, /platform(?:'s|-native).*Skill authoring guidance/i);
+    assert.match(document, /renma guide skill/i);
+    assert.match(document, /platform-native.*guidance/i);
     assert.match(document, /renma scan \. --fail-on high/);
+    assert.doesNotMatch(
+      document,
+      /use (?:your )?platform(?:'s|-native).*guidance first,? then use Renma/i,
+    );
   }
 
   for (const document of [readme, manual, authoring]) {
@@ -224,6 +231,10 @@ test("Skill authoring docs preserve the platform and Renma responsibility bounda
   assert.match(authoring, /Do not run two independent generators/);
   assert.match(authoring, /Optional Codex Example/);
   assert.match(authoring, /skill-creator/);
+  assert.match(
+    authoring,
+    /skill-creator[\s\S]*not[\s\S]*authority for Renma metadata/,
+  );
   assert.doesNotMatch(cliSource, /skill-creator/);
   assert.doesNotMatch(await readRepoFile("src/commands/scaffold.ts"), /Codex/);
   assert.doesNotMatch(
@@ -249,7 +260,8 @@ test("Skill authoring docs preserve the platform and Renma responsibility bounda
   const advanced = await readRepoFile("docs/advanced-skill-authoring.md");
   assert.match(authoring, /Advanced Skill Authoring/);
   assert.match(docsIndex, /Advanced Skill Authoring/);
-  assert.match(advanced, /current 0\.18\.0 authoring guidance/);
+  assert.match(advanced, /focused-workflow model introduced in 0\.18\.0/);
+  assert.match(advanced, /0\.19\.0 authoring contract/);
   assert.match(advanced, /Deferred Skill-to-Skill discovery/);
   assert.match(advanced, /no assigned\s+release/);
   assert.doesNotMatch(advanced, /`routes_to`|`skill-index`/);

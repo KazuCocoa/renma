@@ -2,10 +2,10 @@
 
 ## Current Product Definition
 
-Renma 0.18.0 is the current shipped baseline: a Git-native context repository
-and deterministic governance CLI for agent-consumable Skills, Context Lenses,
-Context Assets, local support resources, policies, ownership, lifecycle,
-dependencies, and review evidence.
+Renma 0.18.x is the current shipped baseline, with 0.18.3 as the latest package:
+a Git-native context repository and deterministic governance CLI for
+agent-consumable Skills, Context Lenses, Context Assets, local support
+resources, policies, ownership, lifecycle, dependencies, and review evidence.
 
 ```text
 Skill = focused, bounded workflow entrypoint
@@ -13,14 +13,13 @@ Context Lens = purpose-oriented interpretation over Context Assets
 Context Asset = independently owned source-of-truth knowledge
 ```
 
-Use platform-native guidance for general Skill authoring, then use Renma for
-repository-specific governance. Renma follows the deterministic boundary:
+Renma follows the deterministic boundary:
 
 ```text
 LLM proposes. Renma verifies. Human approves.
 ```
 
-## Implemented 0.18.0 Baseline
+## Implemented 0.18.x Baseline
 
 The shipped baseline includes:
 
@@ -49,6 +48,37 @@ subjective score or runtime enforcement system.
 Historical release detail belongs in [CHANGELOG.md](CHANGELOG.md). Contract
 details live in [architecture.md](architecture.md), [design.md](design.md), and
 the focused documents under [docs/](docs/README.md).
+
+## Planned 0.19.0 Authoring Guidance (Implemented On `main`, Unreleased)
+
+The 0.19.0 authoring flow begins with the deterministic, stdout-only
+`renma guide skill` contract:
+
+```text
+renma guide skill
+  -> define the smallest intended asset graph
+  -> renma scaffold skill
+  -> scaffold or reuse justified Context Assets
+  -> complete the focused workflow
+  -> renma scan . --fail-on high
+  -> inspect catalog and graph evidence
+  -> fix and rerun
+  -> human review
+```
+
+Renma establishes repository asset, metadata, placement, source-of-truth, and
+file-responsibility boundaries before generation. Platform-native Skill
+guidance may refine semantics only within those boundaries. A source-of-truth
+role alone can justify a concise Context Asset; reuse across multiple Skills is
+not required. Scripts, Context Lenses, examples, and support files require their
+own current responsibility.
+
+`guide` does not call an LLM, accept task text, create or edit files, fetch
+URLs, select runtime Context, infer governance or domain facts, or perform
+semantic rewriting. Human or LLM authors create the intended assets; existing
+scan, catalog, and graph behavior validates and exposes deterministic repository
+evidence. The shipped package baseline remains 0.18.x until the normal release
+workflow publishes 0.19.0.
 
 ## Stable Product Boundaries
 

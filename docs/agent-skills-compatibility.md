@@ -51,9 +51,10 @@ been activated. Generic Agent Skills clients may not send arbitrary metadata
 to a model. Renma metadata therefore does not guarantee model compliance and
 must not replace behavior-critical instructions.
 
-Use your platform's standard Skill authoring guidance for the name, trigger
-description, instructions, workflow, constraints, examples, and completion
-criteria. Use Renma for repository-specific governance and validation. The
+Use `renma guide skill` to establish Renma repository asset, metadata, Context,
+and file boundaries first. Then use platform-native Skill guidance for the name,
+trigger description, instructions, workflow, constraints, completion criteria,
+and ambiguity-resolving examples within those boundaries. The
 [Authoring Guide](authoring-guide.md) owns the general new-Skill and
 existing-Skill workflows; this document owns the canonical format and migration
 contract.
@@ -429,9 +430,10 @@ owner blocks the proposal for human review. Without `--owner`, Renma does not
 invent owner metadata or emit a meaningless canonical rewrite. This retrofit is
 not reverse migration.
 
-After generating a suggestion, review the Skill's trigger description,
-instructions, workflow, constraints, and completion criteria using
-platform-native authoring guidance. Review the candidate, apply only intended
+After generating a suggestion, re-establish the boundaries with
+`renma guide skill`, then review the Skill's trigger description, instructions,
+workflow, constraints, and completion criteria using platform-native authoring
+guidance within those boundaries. Review the candidate, apply only intended
 metadata or migration changes, run `renma scan . --fail-on high`, fix relevant
 diagnostics, and rerun validation before human approval.
 
@@ -476,8 +478,9 @@ selects the last duplicate value, silently deletes an unknown field, or assigns
 an unknown top-level field to a vendor namespace.
 
 When blocked, do not apply a candidate. Review the conflict or invalid evidence,
-confirm the Skill's intent using platform-native authoring guidance, correct
-the source evidence, and rerun `suggest-metadata`. After intended corrections,
+confirm the Skill's intent using platform-native authoring guidance within the
+Renma boundaries, correct the source evidence, and rerun `suggest-metadata`.
+After intended corrections,
 run `renma scan . --fail-on high`, fix relevant diagnostics, and rerun the scan.
 
 Within a valid `metadata` mapping, Renma distinguishes:

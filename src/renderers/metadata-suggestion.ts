@@ -215,7 +215,7 @@ function renderSkillSuggestionNextSteps(
   if (state === "blocked") {
     return [
       "Next steps:",
-      "1. Review the conflicts or invalid evidence and confirm the Skill's intent using your platform's standard Skill authoring guidance.",
+      "1. Run `renma guide skill` to re-establish repository boundaries, then confirm the Skill's intent using platform-native Skill guidance within them.",
       "2. Do not apply a candidate while Renma cannot generate it safely.",
       "3. Correct the source evidence, then rerun `renma suggest-metadata <SKILL.md>`.",
       "4. After intended corrections, run `renma scan . --fail-on high`, fix relevant diagnostics, and rerun the scan.",
@@ -225,7 +225,7 @@ function renderSkillSuggestionNextSteps(
   if (state === "no-proposal") {
     return [
       "Next steps:",
-      "1. Review the Skill's trigger description, instructions, workflow, constraints, and completion criteria using your platform's standard Skill authoring guidance.",
+      "1. Run `renma guide skill`, then review the Skill's trigger description, instructions, workflow, constraints, and completion criteria with platform-native guidance within the Renma boundaries.",
       "2. No metadata or migration change is proposed; preserve the existing source.",
       "3. If a separate, intentionally reviewed authoring change is made, run `renma scan . --fail-on high`, fix relevant diagnostics, and rerun the scan.",
       "4. If no separate change is made, stop without manufacturing work.",
@@ -235,7 +235,7 @@ function renderSkillSuggestionNextSteps(
   return [
     "Next steps:",
     "1. Review the suggestion; Renma does not edit the Skill automatically.",
-    "2. Review the Skill's trigger description, instructions, workflow, constraints, and completion criteria using your platform's standard Skill authoring guidance.",
+    "2. Run `renma guide skill`, then review the Skill's trigger description, instructions, workflow, constraints, and completion criteria with platform-native guidance within the Renma boundaries.",
     "3. Apply only the intended metadata or migration changes.",
     "4. Run `renma scan . --fail-on high`.",
     "5. Fix relevant diagnostics and rerun the scan.",

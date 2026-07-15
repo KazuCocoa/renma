@@ -6,6 +6,34 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added deterministic `renma guide skill` prompt and JSON authoring guidance
+  derived from one structured rule source. The command includes the installed
+  version, requires no repository, writes only to stdout, and performs no
+  filesystem, network, or LLM operations.
+- Added focused guide regression coverage for formats, determinism, version
+  reporting, non-editing behavior, help, argument validation, load-bearing
+  authoring invariants, and the compact Product A Skill-plus-Context example.
+
+### Changed
+
+- Changed new-Skill authoring priority to establish Renma asset, metadata,
+  Context, source-of-truth, and file-responsibility boundaries before using
+  platform-native guidance to refine Skill semantics.
+- Updated Skill scaffold prompts and next steps to direct authors through
+  `renma guide skill`, justified Context decisions, scan, catalog and graph
+  evidence, reruns, and human review.
+- Clarified that source-of-truth status alone can justify a Context Asset,
+  structured output alone does not justify a script, and every support file
+  needs a distinct current responsibility.
+
+### Compatibility
+
+- Existing commands and JSON contracts remain unchanged. `guide` is additive
+  and intentionally has no separately versioned public JSON schema in this
+  release.
+
 ## [0.18.3] - 2026-07-14
 
 ### Added

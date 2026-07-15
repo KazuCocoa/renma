@@ -9,7 +9,9 @@ Use this index to choose the smallest document that answers your question.
 - [User Manual](user-manual.md): operational workflows, command behavior,
   output formats, and CI usage.
 - [Authoring Guide](authoring-guide.md): canonical new-Skill and existing-Skill
-  authoring workflows, including platform-native guidance and human review.
+  authoring workflows, starting with `renma guide skill`, Renma asset and
+  metadata boundaries, scoped platform-native semantic refinement, and human
+  review.
 
 ## Format And Governance Contracts
 

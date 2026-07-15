@@ -5,30 +5,32 @@ Context Assets, Context Lenses, and Skill-local support in a Renma repository.
 
 ## Responsibility Boundary
 
-Use your platform's standard Skill authoring guidance for general Skill design,
-then use Renma for repository-specific governance and validation.
+Start with `renma guide skill`. Renma first establishes:
 
-Platform-native authoring guidance owns:
-
-- name and trigger description;
-- usage and exclusion boundaries;
-- instructions and workflow;
-- constraints and safety behavior;
-- examples; and
-- completion criteria.
-
-Renma complements that guidance with:
-
+- the smallest non-redundant asset graph;
+- Skill, Context, Context Lens, Reference, Script, and Example responsibilities;
 - canonical metadata and Agent Skills compatibility;
+- Context placement and source-of-truth representation;
+- file and resource boundaries;
 - dependency and graph validation;
 - ownership and lifecycle governance;
 - security policy validation;
 - workflow clarity diagnostics; and
 - repository-wide scan and readiness evidence.
 
-Renma does not replace platform-native authoring guidance, generate domain
-intent, or automatically improve a Skill body. Human judgment remains required
-for semantics, ownership, policy, dependencies, and source-of-truth claims.
+After those boundaries are established, platform-native Skill guidance may
+refine the name and trigger description, usage and exclusion boundaries,
+instructions, workflow, constraints, completion criteria, and examples that
+resolve real ambiguity. It is not the authority for Renma metadata, Context
+placement, repository asset boundaries, file count, source-of-truth
+representation, or whether scripts and support files should exist.
+
+Renma does not generate domain intent or automatically improve a Skill body.
+Human judgment remains required for semantics, ownership, policy, dependencies,
+and source authority. The central principle is:
+
+> Create the smallest non-redundant Renma asset graph that preserves execution
+> clarity and traceability.
 
 ## Focused Workflow Model
 
@@ -53,7 +55,7 @@ Choose placement by responsibility, ownership, and reuse—not size alone:
 | Content or responsibility | Correct placement | Ownership or reuse test | Common misuse |
 | --- | --- | --- | --- |
 | Review supplied test code and produce prioritized findings; define selection boundaries, inputs, ordered steps, decisions, constraints, verification, output, and completion | Skill in `SKILL.md` | Required to perform one focused workflow | Reducing the Skill to a thin redirect or moving its task contract into Context |
-| Shared rules for reliable automated tests or other durable, source-backed knowledge | Context Asset under `contexts/` | May outlive or serve multiple Skills, or needs independent ownership, lifecycle, or source-of-truth status | Storing one workflow's instructions or transient task state as shared knowledge |
+| Shared rules for reliable automated tests or other durable, source-backed knowledge | Context Asset under `contexts/` | May serve multiple Skills or has an independent owner, lifecycle, maintenance boundary, source-of-truth role, or correctness responsibility; source-of-truth status alone is sufficient | Storing one workflow's instructions or transient task state as Context, or duplicating independently maintained Context in a local Reference |
 | Emphasize determinism, isolation, and false-confidence risk while interpreting declared test-quality Context | Context Lens under `lenses/` | The same Context benefits from reusable purpose-specific interpretation | Creating a Lens with no Context target, copying Context, or storing only a persona or runtime route |
 | A stricter review variant for one Skill | Skill-local Profile under `profiles/`, if current Profile semantics fit | An overlay or variant owned and loaded by one Skill | Treating Profiles as generic global personas or a substitute for shared Context |
 | Detailed framework-specific review notes used only by one Skill | Skill-local Reference under `references/` | Supporting detail owned and loaded by one Skill | Promoting local detail without evidence of independent reuse or ownership |
@@ -72,25 +74,35 @@ The canonical defaults and their Agent Skills/Renma provenance are in the
 Use this sequence for a new Skill:
 
 ```text
-platform-native Skill authoring guidance
+renma guide skill
+  -> define the smallest intended asset graph
   -> renma scaffold skill
-  -> review and complete the generated Skill
+  -> scaffold or reuse justified Context Assets
+  -> complete the focused workflow
   -> renma scan . --fail-on high
-  -> fix relevant diagnostics
-  -> rerun validation
+  -> inspect catalog and graph evidence
+  -> fix and rerun
   -> human review
 ```
 
-### 1. Design the Skill
+### 1. Establish the authoring contract
 
-Before generating a file, use the standard guidance for your platform to define:
+Before generating files, run:
+
+```bash
+renma guide skill
+```
+
+Use its deterministic prompt to define:
 
 - the recurring task or decision;
 - the trigger and nearby cases that should not use the Skill;
 - required inputs and evidence;
 - the ordered workflow and decision points;
 - safety and repository constraints; and
-- the output and completion criteria.
+- the output and completion criteria;
+- every independently maintained Context dependency; and
+- the smallest set of files with distinct responsibilities.
 
 Write concrete positive and near-miss negative trigger examples before
 scaffolding. Define the expected output and completion criteria early. Match
@@ -101,6 +113,33 @@ script when ordering or exact behavior is safety-critical.
 Do not guess missing owners, policies, dependencies, product behavior, domain
 rules, or source-of-truth documents. Record gaps for a human to resolve.
 
+“Improve with Renma” does not mean adding metadata, files, scripts, copied
+specifications, or every recommendation from a generic Skill system. Do not
+create a generic Skill first and enrich it afterward with Renma-like metadata.
+Construct the Skill and related assets directly within the Renma authoring
+contract.
+
+When a Skill depends on an external authoritative URL for correctness, normally
+create a concise Context Asset even if no other Skill reuses it. Record what the
+source governs, its authoritative URL, when it must be consulted, and necessary
+scope or fallback behavior. Do not copy the full external document unless an
+intentional reviewed snapshot is required. Declare the Context as required when
+the workflow cannot validly complete without it; use optional Context only when
+it truly can.
+
+Do not create a Context Lens merely because the Context exists. Do not create a
+script merely because the output is JSON, YAML, XML, or another structured
+format. Add a script only when exact repeated behavior, material safety,
+safety-critical ordering, meaningful tests, or an explicit executable request
+justifies it. Add examples only when they resolve real ambiguity. Every file
+must have a distinct, reviewable responsibility.
+
+Write only information that changes execution, interpretation, validation, or
+review. State each requirement once in the asset that owns it, preserve required
+inputs, exceptions, failure behavior, safety constraints, completion criteria,
+and unresolved uncertainty, and remove generic introductions, conclusions, and
+boilerplate. Concise does not mean omitting important decisions.
+
 ### 2. Generate one repository-compatible starting point
 
 Run the Renma generator once:
@@ -110,8 +149,7 @@ renma scaffold skill skills/testing/spec-review/SKILL.md \
   --id skill.testing.spec-review \
   --title "Spec Review" \
   --owner qa-platform \
-  --tags testing,spec-review \
-  --resources references,scripts,assets
+  --tags testing,spec-review
 ```
 
 The target must be a canonical `SKILL.md` under `skills/**` or
@@ -119,9 +157,10 @@ The target must be a canonical `SKILL.md` under `skills/**` or
 requires an explicit owner. The output is a deterministic starting point, not
 a finished Skill.
 
-`--resources` creates only the requested empty directories and no placeholder
-files. In the completed Skill, state when each reference should be read, each
-script should be run, and each asset should be used.
+Use `--resources` only for directories with a current, justified responsibility.
+It creates requested empty directories and no placeholder files. In the
+completed Skill, state when each reference should be read, each script should be
+run, and each asset should be used.
 
 Do not run two independent generators against the same target file. Some
 platform-native authoring tools create files themselves, so choose one of these
@@ -133,8 +172,9 @@ safe approaches:
    instead of independently generating the same target.
 
 In a Codex workflow, use Renma as the one generator, then ask Codex's
-`skill-creator` to semantically review the existing scaffold. Do not ask both
-generators to independently create the same target.
+`skill-creator` only to refine semantics inside the established Renma asset and
+metadata boundaries. Do not ask both generators to independently create the
+same target.
 
 `--format prompt` prints the deterministic scaffold and constraints without
 writing the file. `--format json` prints the existing structured bundle. These
@@ -142,18 +182,20 @@ modes do not reserve or create the target path.
 
 ### 3. Review and complete the scaffold
 
-Use platform-native guidance to complete:
+Within the Renma boundaries, use platform-native guidance to complete:
 
 - `description`, including positive and negative trigger boundaries;
 - required inputs and preflight evidence;
 - instructions, decisions, and workflow;
 - constraints and security behavior;
 - completion criteria and validation; and
-- intended Renma metadata and Context relationships.
+- the Skill semantics that rely on intended Renma metadata and Context
+  relationships without changing those boundaries independently.
 
-Preserve the repository's intended behavior. Keep reusable domain, testing,
-product, platform, or tool knowledge in independently owned Context Assets when
-it should outlive one Skill.
+Preserve the repository's intended behavior. Use a Context Asset when knowledge
+is reusable across Skills, has independent ownership or lifecycle, is maintained
+separately, is an authoritative source of truth, or is required for Skill
+correctness. Any one of those reasons is sufficient.
 
 Preserve Agent Skills optional fields, unknown `metadata.renma.*` values, and
 other vendors' string metadata. Provider-specific `agents/openai.yaml` is
@@ -189,15 +231,46 @@ renma readiness . --format markdown
 The final step is human review of the Skill's intent, workflow, policy,
 relationships, and remaining uncertainty.
 
+### Canonical Product A example
+
+For this request:
+
+```text
+Create a Skill that builds a JSON body for Product A.
+The official Product A URL is the source of truth.
+Improve the Skill with Renma.
+```
+
+the initial graph is:
+
+```text
+skills/build-product-a-json/SKILL.md
+  -> requires
+contexts/product-a-api.md
+  -> refers to the official Product A URL
+```
+
+The Skill determines the requested operation, consults the declared Context,
+collects missing required inputs, constructs only documented JSON fields,
+reports assumptions or unresolved ambiguity, and defines output and completion
+criteria. The Context identifies the governed specification and authoritative
+URL, says when it must be consulted and what happens when unavailable, and does
+not copy the full specification.
+
+Do not create a JSON-generation script, second explanatory guide, Context Lens,
+duplicated URL declarations, speculative metadata, or copied API documentation
+by default.
+
 ## Existing Skill Workflow
 
 Use this sequence for an existing Skill:
 
 ```text
-review with platform-native Skill authoring guidance
+renma guide skill
   -> renma scan . --fail-on high
   -> inspect relevant diagnostics and repository evidence
   -> use suggest-metadata only for metadata or migration work
+  -> refine semantics within the established Renma boundaries
   -> prepare and review intended changes
   -> renma scan . --fail-on high
   -> fix relevant diagnostics
@@ -207,9 +280,10 @@ review with platform-native Skill authoring guidance
 
 ### 1. Review the whole Skill
 
-Use platform-native authoring guidance to review the trigger description,
-instructions, workflow, constraints, examples, and completion criteria. This is
-semantic authoring review; `suggest-metadata` does not perform it.
+Use `renma guide skill` to re-establish the repository boundaries, then use
+platform-native authoring guidance to review the trigger description,
+instructions, workflow, constraints, examples, and completion criteria within
+them. This is semantic authoring review; `suggest-metadata` does not perform it.
 
 ### 2. Scan and inspect repository evidence
 
@@ -286,7 +360,8 @@ requires otherwise.
 If migration is blocked:
 
 1. Review the reported conflicts or invalid evidence.
-2. Confirm the Skill's intent using platform-native authoring guidance.
+2. Confirm the Skill's intent using platform-native authoring guidance within
+   the established Renma boundaries.
 3. Do not apply a candidate while Renma cannot generate it safely.
 4. Correct the source evidence.
 5. Rerun `renma suggest-metadata <SKILL.md>`.
@@ -321,10 +396,21 @@ Do not use a nested `metadata.renma` mapping, native YAML booleans for canonical
 security fields, or comma-separated canonical lists. See the compatibility and
 security guides for the complete contracts.
 
+Start from the installed Renma scaffold and use only fields defined by that
+Renma version or the supported Agent Skills format. Do not infer future fields,
+add every optional field, or invent `source_of_truth`, `trust_level`,
+`refresh_policy`, `product`, or similar metadata. Represent external authority
+through the supported Context relationship plus a normal Markdown link. Keep
+metadata compact and put detailed instructions in the body. Preserve unknown
+existing vendor metadata during review, but do not manufacture provider-specific
+metadata without a requirement.
+
 ## Context Asset And Context Lens Authoring
 
-Create a Context Asset when knowledge should be reusable and independently
-owned:
+Create a Context Asset when knowledge is reusable across Skills, has independent
+ownership or lifecycle, is maintained separately, is an authoritative source
+of truth, or is required for Skill correctness. Cross-Skill reuse is not
+mandatory:
 
 ```bash
 renma scaffold context contexts/testing/boundary-value-analysis.md \
@@ -332,9 +418,9 @@ renma scaffold context contexts/testing/boundary-value-analysis.md \
 ```
 
 A Context Asset should contain durable, source-backed domain knowledge,
-testing heuristics, tool constraints, platform facts, or reviewed policy. Keep
-task-specific prompt instructions and runtime selection rules out of shared
-Context.
+testing heuristics, tool constraints, platform facts, reviewed policy, or a
+concise external source-of-truth contract. Keep task-specific prompt
+instructions and runtime selection rules out of Context.
 
 Create a Context Lens when one purpose needs a focused interpretation of one or
 more Context Assets:
@@ -358,8 +444,9 @@ select, load, or inject Context at runtime.
 Use this placement sequence before creating an asset:
 
 1. Is this the task, workflow, or completion contract? Put it in the Skill.
-2. Is this durable, reusable, source-backed knowledge? Create or reuse a Context
-   Asset.
+2. Is this durable, source-backed knowledge with reuse, independent ownership or
+   lifecycle, separate maintenance, source-of-truth, or correctness
+   responsibility? Create or reuse a Context Asset. Any one reason is enough.
 3. Does declared Context need a reusable purpose-specific interpretation?
    Create a Context Lens. Do not create a Lens when there is no Context Asset to
    interpret.
@@ -432,22 +519,27 @@ already implemented; `routes_to` and `skill-index` are not.
 
 ## Optional Codex Example
 
-Codex `skill-creator` is one example of platform-native authoring guidance; it
-is not a Renma dependency and is not named in generic CLI output.
+Codex `skill-creator` is one example of platform-native authoring guidance. It
+is not a Renma dependency or the authority for Renma metadata, Context
+placement, repository asset boundaries, file count, source-of-truth
+representation, or scripts and support files.
 
 After creating the Renma scaffold, a safe request is:
 
 ```text
-Use skill-creator to review and refine the existing
-skills/testing/spec-review/SKILL.md scaffold. Preserve its intended Renma
-metadata and repository behavior. Do not independently generate a second target
-file. Do not invent owners, policy, dependencies, domain rules, or
+First run `renma guide skill` and establish the smallest intended asset graph.
+Create `skills/testing/spec-review/SKILL.md` with `renma scaffold skill`. Then
+use skill-creator only to refine its trigger description, ordered instructions,
+usage boundaries, required inputs, constraints, completion criteria, and
+ambiguity-resolving examples. Preserve its Renma metadata, Context placement,
+file boundaries, and repository behavior. Do not independently generate a
+second target file or invent owners, policy, dependencies, domain rules, or
 source-of-truth claims. After the reviewed edits, run
 `renma scan . --fail-on high`, fix relevant diagnostics, and rerun the scan.
 ```
 
-Alternatively, ask `skill-creator` to use `renma scaffold skill` as its
-starting point. In both cases, only one generator creates the target file.
+Do not ask `skill-creator` to design a generic Skill first for later Renma
+enrichment. The Renma scaffold and graph are the starting point.
 
 ## Review Checklist
 
@@ -456,7 +548,8 @@ Before human approval, confirm that:
 - the description says when the Skill should and should not be selected;
 - instructions, constraints, and completion criteria are explicit;
 - owners, policies, dependencies, and domain claims are evidence-backed;
-- reusable knowledge has an appropriate Context boundary;
+- reusable or independently maintained source-of-truth knowledge has an
+  appropriate Context boundary;
 - generated or suggested changes were reviewed rather than applied blindly;
 - blocked migration evidence was resolved instead of bypassed;
 - `renma scan . --fail-on high` was rerun after fixes; and

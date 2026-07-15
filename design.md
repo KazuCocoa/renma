@@ -5,8 +5,8 @@ repositories that hold LLM-facing knowledge.
 
 Current product surface includes `scan`, `catalog`, `ownership`, `graph`,
 focused graph views, `trust-graph`, `readiness`, Repository Context BOM reports,
-repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`,
-`suggest-metadata`, `suggest-semantic-split`, Agent Skills validation, and
+repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `guide`,
+`scaffold`, `suggest-metadata`, `suggest-semantic-split`, Agent Skills validation, and
 security diagnostics for agent-facing operational instructions.
 
 Focused graph views are inspection tools; they do not choose, inject, or load runtime context for an agent.
@@ -36,9 +36,11 @@ inputs, ordered instructions, decisions, constraints, short commands, examples,
 edge cases, verification, output, and completion criteria. They can also declare
 Context Asset and Context Lens relationships.
 
-Context assets hold reusable expertise. They should be maintainable outside a
-single skill, owned by the right team, versioned, reviewed, and reused across
-skills, agents, tools, and future agent runtimes.
+Context assets hold independently maintained knowledge. Cross-Skill reuse is
+one reason for a Context Asset, but independent ownership or lifecycle,
+separate maintenance, source-of-truth status, or Skill correctness is also
+sufficient. They should be maintainable outside a single Skill, owned by the
+right team, versioned, and reviewed.
 
 Context Lenses describe how one or more Context Assets should be interpreted for
 a purpose. They are repository governance metadata, not runtime lens selection

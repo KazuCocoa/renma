@@ -1,6 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { normalizeAgentSkillDirectoryName } from "../agent-skills.js";
+import {
+  RENMA_FIRST_AUTHORING_BOUNDARY,
+  SKILL_AUTHORING_PRINCIPLE,
+} from "../guidance/skill-authoring.js";
 
 export type ScaffoldKind = "skill" | "context" | "context_lens";
 export type ScaffoldFormat = "file" | "prompt" | "json";
@@ -148,7 +152,7 @@ Describe the recurring task, decision, or workflow this skill should guide.
 
 Use \`metadata.renma.requires-context\` and \`metadata.renma.optional-context\` JSON-array strings to reference durable context assets.
 
-Move reusable domain, testing, platform, product, or tool knowledge into separately owned context assets under \`contexts/\`.
+Move domain, testing, platform, product, or tool knowledge into a Context Asset under \`contexts/\` when it is reused across Skills or has an independent owner, lifecycle, maintenance boundary, source-of-truth role, or correctness responsibility. Source-of-truth status alone is sufficient.
 
 ## Constraints
 
@@ -203,7 +207,7 @@ This context does not apply when:
 ## Constraints
 
 - Do not put task-specific prompt instructions in this context asset.
-- Keep this asset focused on reusable knowledge that can be referenced by skills.
+- Keep this asset focused on independently maintained knowledge that is reused, source-authoritative, or required for Skill correctness.
 - Do not duplicate large source material when a reference is enough.
 - Do not invent domain facts, policies, owners, dependencies, or product behavior.
 
@@ -283,7 +287,7 @@ function renderPrompt(input: {
           "- Use `metadata.renma.optional-context` for context useful only in some cases, encoded as a JSON-array string.",
           "- Use `metadata.renma.requires-lens` or `metadata.renma.optional-lens` for static lens relationships, encoded as JSON-array strings.",
           "- State exactly when each local resource should be read or executed. Keep Skill-specific detail in references/, deterministic implementation in scripts/, and output material in assets/.",
-          "- Use contexts/ only for knowledge shared across Skills with independent ownership, lifecycle, or source-of-truth status.",
+          "- Use contexts/ when knowledge is reused across Skills or has an independent owner, lifecycle, maintenance boundary, source-of-truth role, or correctness responsibility. Source-of-truth status alone is sufficient.",
         ]
       : [];
   const contextLensGuidance =
@@ -294,7 +298,7 @@ function renderPrompt(input: {
           "- Replace all `focus` and `expected_outputs` placeholders with repository-grounded interpretation criteria and outputs.",
           "- Confirm that the Lens actually interprets declared Context. If there is no Context Asset to interpret, do not create a Lens.",
           "- A persona may frame the Lens, but persona-only wording is insufficient; define concrete questions, risks, checks, evidence, and expected outputs.",
-          "- Keep the focused task and workflow in the Skill, and keep durable reusable knowledge in Context Assets.",
+          "- Keep the focused task and workflow in the Skill, and keep independently maintained or source-authoritative knowledge in Context Assets.",
         ]
       : [];
   return `Create a Renma ${input.kind} asset at \`${input.targetPath}\`.
@@ -316,13 +320,13 @@ ${input.content}\`\`\`
 
 ${
   input.kind === "skill"
-    ? `Use your platform's standard Skill authoring guidance to refine the generated Skill's description, instructions, workflow, constraints, and completion criteria. Treat the scaffold as a starting point, preserve the repository's intended behavior, and do not invent owners, policies, dependencies, domain rules, or source-of-truth claims. After editing, run \`renma scan . --fail-on high\`, address relevant diagnostics, and rerun the scan. Do not weaken security policy or add suppressions merely to make validation pass. Have a human review meaningful semantic changes before merging.\n\n`
+    ? `Apply the authoring contract from \`renma guide skill\`. ${SKILL_AUTHORING_PRINCIPLE} ${RENMA_FIRST_AUTHORING_BOUNDARY} Do not create a generic Skill first and enrich it afterward with Renma-like metadata. Use platform-native guidance only to refine the generated Skill's trigger description, instructions, workflow, constraints, completion criteria, and examples that resolve real ambiguity. Preserve the repository's intended behavior, and do not invent owners, policies, dependencies, domain rules, or source-of-truth claims. After editing, run \`renma scan . --fail-on high\`, inspect catalog and graph evidence, address relevant findings, and rerun validation. Do not weaken security policy or add suppressions merely to make validation pass. Have a human review meaningful semantic changes before merging.\n\n`
     : ""
 }Constraints:
 
 - Preserve the YAML frontmatter shape unless the repository already requires a stricter local convention.
 - Use only supported statuses: experimental, stable, deprecated, archived.
-- Move durable domain, testing, platform, product, or tool knowledge into separately owned context assets under \`contexts/\`.
+- Move knowledge into a Context Asset under \`contexts/\` when it is reused across Skills or has an independent owner, lifecycle, maintenance boundary, source-of-truth role, or correctness responsibility.
 ${skillGuidance.join("\n")}
 ${contextLensGuidance.join("\n")}
 - For context lens assets, use \`applies_to\` for context assets the lens interprets.
@@ -343,11 +347,12 @@ ${contextLensGuidance.join("\n")}
 function renderSkillNextSteps(): string {
   return [
     "Next steps:",
-    "1. Review the generated Skill using your platform's standard Skill authoring guidance.",
-    "2. Complete the description, instructions, workflow, constraints, completion criteria, and intended metadata.",
-    "3. Run `renma scan . --fail-on high`.",
-    "4. Fix relevant diagnostics and rerun the scan.",
-    "5. Have a human review meaningful semantic changes before merging.",
+    "1. Run `renma guide skill` and confirm this is the smallest non-redundant intended asset graph.",
+    "2. Scaffold or reuse only justified Context Assets and declare required or optional relationships.",
+    "3. Complete the focused workflow; use platform-native guidance only to refine semantics within Renma boundaries.",
+    "4. Run `renma scan . --fail-on high` and inspect catalog and graph evidence.",
+    "5. Fix relevant findings and rerun validation.",
+    "6. Have a human review meaningful semantic changes and unresolved decisions before merging.",
   ].join("\n");
 }
 

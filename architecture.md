@@ -7,8 +7,8 @@ maintainable software assets.
 
 The current CLI surface covers `scan`, `catalog`, `ownership`, `graph`, focused
 graph views, `trust-graph`, `readiness`, Repository Context BOM reports,
-repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`,
-`suggest-metadata`, and `suggest-semantic-split`. Agent Skills validation and
+repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `guide`,
+`scaffold`, `suggest-metadata`, and `suggest-semantic-split`. Agent Skills validation and
 security diagnostics are deterministic repository checks; they do not execute
 commands or call external services.
 
@@ -495,10 +495,16 @@ renma readiness [path]
 renma diff [path] --from <ref> --to <ref>
 renma ci-report [path] --from <ref> --to <ref>
 renma inspect <file>
+renma guide skill
 renma scaffold <skill|context|context_lens> <path>
 renma suggest-metadata <file>
 renma suggest-semantic-split <file>
 ```
+
+`renma guide skill` is a pure authoring projection over installed structured
+guidance. It reads no repository, writes only stdout, and establishes asset and
+metadata boundaries before scaffolding. It does not call an LLM, accept task
+text, fetch external sources, create assets, or claim semantic correctness.
 
 `renma readiness` summarizes static repository health for human and external-agent review. It composes the graph/catalog model into deterministic score, level, metric, check, and diagnostic output; it does not call LLMs, select runtime context, assemble prompts, or repair files.
 
