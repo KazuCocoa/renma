@@ -142,10 +142,10 @@ permissive values from the URL.
 The [Authoring Guide](docs/authoring-guide.md) is the canonical walkthrough for
 both workflows.
 
-Renma 0.18.x uses focused workflows rather than a thin-router model. See the
-[canonical quality profile](docs/quality-profile.md) for every fixed threshold,
-unit, rationale, provenance, and diagnostic mapping. Quality thresholds are not
-configurable through `renma.config.json` in this release.
+Renma 0.19.x continues to use focused workflows rather than a thin-router
+model. See the [canonical quality profile](docs/quality-profile.md) for every
+fixed threshold, unit, rationale, provenance, and diagnostic mapping. Quality
+thresholds are not configurable through `renma.config.json` in this release.
 
 ## Install And Quick Start
 

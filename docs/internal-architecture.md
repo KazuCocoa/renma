@@ -1,7 +1,7 @@
 # Renma Internal Architecture
 
-This document describes the 0.18.3 maintainability architecture plus the
-additive `guide` command implemented on `main` for the unreleased 0.19.0 line.
+This document describes the 0.19.0 maintainability architecture, including the
+additive `guide` command.
 It is contributor guidance, not a new versioned JSON schema. Renma 0.18.2
 remains the compatibility baseline for existing commands: public fields,
 classifications, diagnostics, severities, exit behavior, and migration direction
@@ -230,7 +230,7 @@ protects exact wording. Stable branching must use typed fields such as
 
 ## Intentional 0.18.2 Compatibility Seams
 
-Two parallel-looking paths remain intentional in 0.18.3.
+Two parallel-looking paths remain intentional in 0.19.0.
 
 ### Scan keeps structural parent evidence
 
