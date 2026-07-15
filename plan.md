@@ -87,23 +87,32 @@ interactive and does not add a command or option:
 
 ```text
 renma guide skill
-  -> consuming LLM clarifies the task and investigates relevant evidence
+  -> consuming LLM clarifies the task and investigates applicable evidence
   -> separate confirmed facts, proposals, and unresolved human truth
   -> ask one to three focused questions
   -> pass the creation gate
   -> scaffold and author the smallest justified structure
   -> validate
-  -> repair deterministically, investigate, ask again, or justify no change
+  -> repair only uniquely supported corrections, investigate, ask, or justify no change
+  -> re-enter the creation gate if asset boundaries may change
   -> persist reviewed durable decisions
   -> human review
 ```
 
-The protocol adds interactive clarification, truth-source separation, creation
-gates, post-scan question loops, and reviewed-decision persistence. Temporary
+The protocol adds interactive clarification; qualified truth-source separation
+across user statements, supplied artifacts, applicable repository evidence,
+reviewed external source content, and Renma structural rules; separate
+authoring-time and runtime access decisions; creation-gate re-entry; conservative
+post-scan repair classification; and reviewed-decision persistence. Temporary
 conversation summaries, rejected proposals, and unanswered questions do not
 become repository metadata or assets. Platform-native Skill authoring guidance
 may refine semantics only after the gate and only within the agreed Renma
-structure.
+structure; discovered boundary changes return to clarification instead of being
+applied silently.
+
+This elaborates the stable operating boundary: `LLM proposes. Renma verifies.
+Human approves.` Deterministic detection does not imply deterministic repair,
+and repeated-context consolidation remains a reviewed semantic decision.
 
 This section describes planned 0.19.1 behavior on `main`; 0.19.1 is not shipped
 until the normal release workflow publishes it. Existing CLI arguments, exit

@@ -10,14 +10,16 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 - Added an interactive, truth-seeking authoring protocol to the existing
   structured `renma guide skill` source. The default prompt now tells the
-  consuming LLM to investigate relevant evidence, distinguish confirmed facts
-  from proposals and unresolved human truth, ask focused questions, pass a
-  creation gate, classify post-validation actions, and persist only reviewed
-  durable decisions.
+  consuming LLM to investigate qualified user, artifact, repository, and
+  authoritative-source evidence; distinguish confirmed facts from proposals and
+  unresolved human truth; separate authoring-time from runtime source access;
+  ask focused questions; pass and re-enter a creation gate; classify
+  post-validation actions conservatively; and persist only reviewed decisions.
 - Added minimal-trigger and Product A clarification examples plus focused
   regression coverage for prompt ordering, the additive JSON interaction
   projection, decision classes, question rules, creation gates, handoff,
-  validation loops, persistence, determinism, and non-editing behavior.
+  boundary-change re-entry, uniquely supported repairs, repeated-context
+  constraints, persistence, determinism, and non-editing behavior.
 
 ### Changed
 
@@ -26,7 +28,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   governance truth, and a human approves meaningful decisions.
 - Delayed platform-native Skill authoring guidance until after the Renma
   clarification gate and limited it to semantic refinement within the agreed
-  scaffold and asset structure.
+  scaffold and asset structure. Newly discovered boundary changes return to the
+  clarification gate instead of silently changing repository structure.
+- Clarified that deterministic findings are not automatically deterministic
+  repairs. Repeated-context consolidation and unsupported-field meaning require
+  investigation or human review unless evidence uniquely determines a safe
+  patch.
+- Reduced duplicated prompt workflow and artifact prose so the interaction
+  object remains the normative owner of truth, gate, validation, persistence,
+  and handoff behavior.
 
 ### Compatibility
 

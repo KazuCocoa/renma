@@ -162,7 +162,7 @@ test("guide skill JSON and --json are equivalent small structured projections", 
   );
   assert.match(
     example.externalSourceReference,
-    /reviewed official Product A URL/,
+    /user-designated official Product A URL/,
   );
   assert.match(
     example.externalSourceReference,
@@ -216,10 +216,12 @@ test("interactive protocol separates truth, proposals, and focused questions", (
 
   assert.match(decisions, /Never present a model assumption as confirmed/);
   assert.match(decisions, /proposal must not silently become confirmed/i);
-  assert.match(truth, /explicit user statement/);
-  assert.match(truth, /Unambiguous repository evidence/);
-  assert.match(truth, /safe default remains proposed/);
-  assert.match(questions, /repository evidence answers the question/);
+  assert.match(truth, /Explicit user statements/);
+  assert.match(truth, /User-provided artifacts/);
+  assert.match(truth, /Repository evidence/);
+  assert.match(truth, /Reviewed authoritative external source content/);
+  assert.match(truth, /Renma structural rules/);
+  assert.match(questions, /applicable truth source above answers the question/);
   assert.match(questions, /Renma rule supplies a safe structural default/);
   assert.match(questions, /existing Skill that owns the workflow/);
   assert.match(questions, /security profiles/);
@@ -230,6 +232,51 @@ test("interactive protocol separates truth, proposals, and focused questions", (
   assert.match(questions, /Do not require a plan-mode-quality specification/);
   assert.match(questions, /delegates a reversible choice/);
   assert.match(questions, /do not extend that delegation to unrelated facts/);
+});
+
+test("truth sources qualify artifacts, repository evidence, and external content", () => {
+  const interaction = buildSkillAuthoringGuidance("test-version").interaction;
+  const truth = interaction.truthSources.join("\n");
+  const decisions = Object.values(interaction.decisionClasses).join("\n");
+
+  assert.match(
+    truth,
+    /documents, specifications, examples, logs, schemas[\s\S]*provenance and applicability are clear/,
+  );
+  assert.match(truth, /cite or identify the artifact/);
+  assert.match(
+    truth,
+    /applicable, effective, and unambiguous[\s\S]*deprecated, archived, stale, conflicting, unresolved, or diagnostic-blocked/,
+  );
+  assert.match(
+    truth,
+    /successfully consulted content can confirm the domain facts it governs/,
+  );
+  assert.match(truth, /identify the source and relevant section or evidence/);
+  assert.match(
+    truth,
+    /user can confirm that a URL is intended to be authoritative[\s\S]*remain unresolved until the source content is successfully consulted or supplied/,
+  );
+  assert.match(decisions, /source designation alone/);
+  assert.match(decisions, /stale or conflicting evidence/);
+});
+
+test("authoring-time source access remains separate from finished-Skill runtime access", () => {
+  const interaction = buildSkillAuthoringGuidance("test-version").interaction;
+  const truth = interaction.truthSources.join("\n");
+  const gate = interaction.creationGate.join("\n");
+
+  assert.match(
+    truth,
+    /Authoring-time access and finished-Skill runtime access are separate/,
+  );
+  assert.match(truth, /future metadata never retroactively authorizes/);
+  assert.match(
+    truth,
+    /authoring-time access is unavailable[\s\S]*ask the user for the relevant source content[\s\S]*preserve source-dependent facts as Unresolved/,
+  );
+  assert.match(gate, /authoring-time source consultation/);
+  assert.match(gate, /finished-Skill runtime source-access intent/);
 });
 
 test("minimal trigger starts with clarification and no invented asset structure", () => {
@@ -319,6 +366,12 @@ test("post-validation and persistence rules preserve human truth", () => {
     assert.match(actions, new RegExp(escapeRegExp(category)));
   }
   assert.match(actions, /Never add a suppression automatically/);
+  assert.match(
+    actions,
+    /A finding is not a deterministic repair merely because its detection is deterministic/,
+  );
+  assert.match(actions, /evidence uniquely determines the patch/);
+  assert.match(actions, /Diagnostics v2/);
   assert.match(persistence, /Persist only durable reviewed decisions/);
   assert.match(persistence, /conversation transcript/);
   assert.match(
@@ -326,6 +379,81 @@ test("post-validation and persistence rules preserve human truth", () => {
     /temporary Confirmed, Proposed, or Unresolved summaries/,
   );
   assert.match(persistence, /metadata invented to store conversation state/);
+});
+
+test("repeated-context findings require investigation and reviewed consolidation", () => {
+  const actions =
+    buildSkillAuthoringGuidance(
+      "test-version",
+    ).interaction.postValidationActions.join("\n");
+
+  assert.match(
+    actions,
+    /do not delete or rewrite content solely because a repeated section, code block, or context-pattern finding exists/i,
+  );
+  assert.match(actions, /Inspect all occurrences/);
+  assert.match(actions, /intended ownership and source-of-truth boundaries/);
+  assert.match(actions, /prepare a consolidation proposal/);
+  assert.match(
+    actions,
+    /require human review before any semantic consolidation/,
+  );
+  assert.match(actions, /is not an automatic repair/);
+  assert.doesNotMatch(
+    actions,
+    /Deterministic repair:[^\n]*(?:exact duplicated passage|repeated-context)/i,
+  );
+});
+
+test("unsupported fields are deterministic only when removal preserves meaning", () => {
+  const actions =
+    buildSkillAuthoringGuidance(
+      "test-version",
+    ).interaction.postValidationActions.join("\n");
+
+  assert.match(
+    actions,
+    /remove it deterministically only when evidence proves that removal loses no intended meaning/,
+  );
+  assert.match(
+    actions,
+    /Skill body, supported metadata, a Context Asset, or nowhere/,
+  );
+});
+
+test("asset-boundary discoveries re-enter clarification and the creation gate", () => {
+  const interaction = buildSkillAuthoringGuidance("test-version").interaction;
+  const phases = interaction.phases.join("\n");
+  const actions = interaction.postValidationActions.join("\n");
+  const handoff = interaction.handoffRules.join("\n");
+  const combined = [phases, actions, handoff].join("\n");
+
+  assert.match(
+    combined,
+    /stop the current structural edit|stop structural edits/,
+  );
+  assert.match(combined, /Proposed or Unresolved/);
+  assert.match(combined, /inspect relevant evidence|investigate/);
+  assert.match(
+    combined,
+    /ask only when human truth remains necessary|ask if needed/,
+  );
+  assert.match(combined, /re-enter the creation gate/);
+  assert.match(combined, /update the agreed structure after it passes/);
+  assert.match(
+    handoff,
+    /instead of silently changing files, metadata, Context relationships, scripts, examples, or support assets/,
+  );
+  for (const example of [
+    "requires a script",
+    "proposed Context is task-local",
+    "existing Context should be reused",
+    "security policy needs change",
+    "required-versus-optional Context semantics are wrong",
+    "example is needed to resolve real ambiguity",
+  ]) {
+    assert.match(actions, new RegExp(escapeRegExp(example)));
+  }
 });
 
 test("Product A begins with source-access and fallback clarification", () => {
@@ -339,7 +467,11 @@ test("Product A begins with source-access and fallback clarification", () => {
   );
   assert.match(
     clarification.confirmed.join("\n"),
-    /documentation is authoritative/,
+    /official Product A URL as the intended authoritative source/,
+  );
+  assert.match(
+    clarification.confirmed.join("\n"),
+    /authoring-time intent to consult that URL[\s\S]*tools and authoring environment permitting access/,
   );
   assert.match(clarification.proposed.join("\n"), /One focused Skill/);
   assert.match(
@@ -348,14 +480,40 @@ test("Product A begins with source-access and fallback clarification", () => {
   );
   assert.match(
     clarification.unresolved.join("\n"),
+    /schema, fields, constraints, and behavior until the source content is successfully consulted or supplied/,
+  );
+  assert.match(
+    clarification.unresolved.join("\n"),
+    /current authoring environment is permitted and able to access/,
+  );
+  assert.match(
+    clarification.unresolved.join("\n"),
     /accesses the URL at execution time/,
   );
   assert.match(clarification.unresolved.join("\n"), /Context owner/);
-  assert.equal(clarification.questions.length, 2);
+  assert.equal(clarification.questions.length, 3);
   assert.doesNotMatch(
     JSON.stringify(clarification),
     /approvedDomains|allow_network/,
   );
+});
+
+test("workflow summary cross-references interaction rules without duplicating them", () => {
+  const guidance = buildSkillAuthoringGuidance("test-version");
+  const prompt = renderSkillGuidePrompt(guidance);
+
+  assert.equal(guidance.workflow.length, 2);
+  assert.match(
+    guidance.workflow.join("\n"),
+    /normative interactive phases above/,
+  );
+  for (const rule of [
+    "A finding is not a deterministic repair merely because its detection is deterministic.",
+    "When authoring-time access is unavailable",
+    "If semantic refinement reveals a justified asset-boundary change",
+  ]) {
+    assert.equal(countOccurrences(prompt, rule), 1, rule);
+  }
 });
 
 test("guide rejects missing and unknown topics, unsupported options, and extra arguments", async () => {
@@ -517,4 +675,8 @@ function collectStrings(value: unknown): string[] {
     return Object.values(value).flatMap(collectStrings);
   }
   return [];
+}
+
+function countOccurrences(value: string, search: string): number {
+  return value.split(search).length - 1;
 }

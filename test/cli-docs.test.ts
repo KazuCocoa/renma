@@ -242,6 +242,10 @@ test("Skill authoring docs establish Renma boundaries before platform semantic r
   );
   assert.match(
     authoring,
+    /If semantic refinement reveals a justified asset-boundary change,[\s\S]*`skill-creator` must return that need to the Renma clarification protocol/,
+  );
+  assert.match(
+    authoring,
     /skill-creator[\s\S]*not[\s\S]*authority for Renma metadata/,
   );
   assert.doesNotMatch(cliSource, /skill-creator/);
@@ -302,6 +306,33 @@ test("Skill authoring docs establish Renma boundaries before platform semantic r
 
   const changelog = await readRepoFile("CHANGELOG.md");
   assert.match(changelog, /optional Codex `skill-creator` example/);
+});
+
+test("authoring docs qualify truth, source access, repairs, and gate re-entry", async () => {
+  const readme = await readRepoFile("README.md");
+  const manual = await readRepoFile("docs/user-manual.md");
+  const authoring = await readRepoFile("docs/authoring-guide.md");
+  const architecture = await readRepoFile("docs/internal-architecture.md");
+  const combined = [readme, manual, authoring, architecture].join("\n");
+
+  assert.match(authoring, /User-provided artifacts/);
+  assert.match(authoring, /Reviewed authoritative external source content/);
+  assert.match(
+    authoring,
+    /deprecated, archived, stale, conflicting, unresolved, or diagnostic-blocked evidence is not Confirmed/,
+  );
+  assert.match(
+    combined,
+    /Authoring-time access is separate from finished-Skill runtime access|Authoring-time source access comes from the current/,
+  );
+  assert.match(combined, /never retroactively authorizes/);
+  assert.match(
+    combined,
+    /Deterministic detection alone is not enough|deterministic detection does not imply deterministic repair/i,
+  );
+  assert.match(authoring, /Repeated-context findings are evidence/);
+  assert.match(authoring, /re-enter the creation gate/);
+  assert.match(combined, /LLM proposes\. Renma verifies\. Human approves\./);
 });
 
 test("authoring docs preserve Context and external-source security boundaries", async () => {

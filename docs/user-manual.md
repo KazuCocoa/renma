@@ -11,10 +11,12 @@ questions, retain session state, choose runtime context, assemble prompts,
 inject context, execute agents, or collect telemetry.
 
 Run `renma guide skill` before generation. It prints a deterministic protocol
-that tells the consuming LLM to clarify the request, inspect relevant
-repository evidence, separate confirmed facts from proposals and unresolved
-human truth, and ask one to three focused questions. Renma itself remains
-non-interactive.
+that tells the consuming LLM to clarify the request, inspect applicable
+user-provided artifacts, repository evidence, and permitted authoritative
+source content, separate confirmed facts from proposals and unresolved human
+truth, and ask one to three focused questions. Renma itself remains
+non-interactive. This elaborates the existing boundary: **LLM proposes. Renma
+verifies. Human approves.**
 
 After blocking creation-gate decisions are resolved, platform-native Skill
 authoring guidance may refine trigger descriptions, instructions, workflows,
@@ -248,8 +250,10 @@ flowchart LR
   Scaffold --> Context["Scaffold or reuse justified Context"]
   Context --> Complete["Complete the focused workflow"]
   Complete --> Validate["Run renma scan . --fail-on high"]
-  Validate --> Evidence["Inspect catalog and graph evidence"]
-  Evidence --> Fix["Fix and rerun"]
+  Validate --> Evidence["Classify findings and inspect evidence"]
+  Evidence --> Boundary{"Asset boundary change?"}
+  Boundary -- Yes --> Clarify
+  Boundary -- No --> Fix["Apply uniquely supported repairs and rerun"]
   Fix --> Review["Human review"]
 ```
 
@@ -257,15 +261,18 @@ Renma creates and validates repository assets; the consuming agent follows the
 finished Skill later according to its own runtime behavior.
 
 1. Run `renma guide skill`. The consuming LLM develops a provisional
-   understanding, inspects only relevant repository evidence, separates
-   Confirmed, Proposed, and Unresolved decisions, and asks one to three focused
-   questions. The user need not provide a plan-quality specification.
+   understanding, inspects only applicable truth sources, separates Confirmed,
+   Proposed, and Unresolved decisions, and asks one to three focused questions.
+   The user need not provide a plan-quality specification. Repository evidence
+   must be applicable, effective, and unambiguous; supplied artifacts need clear
+   provenance and applicability; source content must be successfully consulted
+   or supplied rather than recalled from model memory.
 
    Before creating files, establish the focused recurring task, expected result,
    meaningful completion or failure behavior, smallest justified structure,
-   source authority and runtime access intent when relevant, blocking security
-   and domain decisions, and the file-mode owner. Wording, tags, examples, and
-   speculative future extensions do not block creation.
+   source authority, authoring-time consultation, finished-Skill runtime access,
+   blocking security and domain decisions, and the file-mode owner. Wording,
+   tags, examples, and speculative future extensions do not block creation.
 
 2. Run the Renma generator once for the target path.
 
@@ -292,6 +299,9 @@ independent generator against the same target. A tool that provides
 platform-native Skill authoring guidance must not generate before the gate, add
 assets outside the agreed structure, or create a second target; after the gate,
 ask it only to refine semantics inside the existing Renma scaffold and graph.
+If refinement reveals a justified asset-boundary change, stop structural edits,
+record it as Proposed or Unresolved, inspect evidence, and re-enter the creation
+gate before changing the structure.
 
 4. Add a Context Asset when knowledge is reusable across Skills, has independent
    ownership or lifecycle, is maintained separately, is an authoritative source
@@ -304,20 +314,22 @@ renma scaffold context contexts/testing/boundary-value-analysis.md --owner qa-pl
 ```
 
 Cross-Skill reuse is not required. An external authoritative URL normally
-justifies a concise Context Asset through its source-of-truth role. The Context
-records the governed source, URL, consultation rule, scope, and fallback
-behavior without copying the full external document. After Context is
+justifies a concise Context Asset through its user-designated source-of-truth
+role. The designation does not confirm the source's schema, fields, constraints,
+or behavior; those facts require successfully consulted or supplied content.
+The Context records the governed source, URL, consultation rule, scope, and
+fallback behavior without copying the full external document. After Context is
 independently justified, use correctness dependency to choose a required versus
 optional relationship.
 
-Decide whether execution fetches the URL or expects approved supplied content.
-A Markdown URL does not grant network permission. For runtime access, review
-the supported allowed-data, network, approved-destination, external-upload,
-secrets, and human-approval policy. Public documentation commonly uses the
-documented `public-docs` category, but never infer permissive policy values or
-an approved host without evidence. Keep the Skill body, Context instructions,
-and effective policy aligned; leave unresolved access or policy decisions for a
-human. Scaffolding itself performs no network operations.
+Authoring-time consultation depends on the current request, tools, and
+environment. If it is unavailable, request supplied content or keep dependent
+facts Unresolved. Separately decide whether future execution fetches the URL or
+expects approved supplied content. A Markdown URL does not grant runtime network
+permission, and future Skill metadata never retroactively authorizes the
+authoring agent. For runtime access, review the supported allowed-data, network,
+approved-destination, external-upload, secrets, and human-approval policy. Keep
+the Skill body, Context instructions, and effective policy aligned.
 
 5. Connect the Skill to Context Assets.
 
@@ -341,10 +353,13 @@ Use `scan` for concrete problems, `catalog` for discovered assets and metadata,
 `graph` for Skill-to-Context relationships, and `readiness` for repository-level
 health. Classify each finding as a deterministic repair, repository
 investigation, human decision required, or no change justified. Inspect before
-asking when repository evidence may resolve the issue, ask again when human
-truth is required, and rerun relevant validation after deterministic repairs.
-Do not weaken security policy, manufacture metadata, or add suppressions merely
-to pass. After fixes, rerun `renma scan . --fail-on high` and complete human
+asking when repository evidence may resolve the issue. A finding is not an
+automatic repair merely because detection is deterministic: follow Diagnostics
+v2 constraints, require a uniquely determined patch, and treat repeated-context
+consolidation as investigation plus human review. If validation reveals a
+possible boundary change, re-enter clarification and the creation gate. Do not
+weaken security policy, manufacture metadata, or add suppressions merely to
+pass. Rerun relevant validation after supported repairs and complete human
 review.
 Neither a clean scan nor a valid graph proves the external source is
 authoritative or accessible at runtime.
@@ -857,10 +872,11 @@ operations. Missing or unknown topics and unsupported arguments exit `2`; use
 
 The default prompt always includes the interactive authoring protocol. It tells
 the consuming LLM—not Renma—to develop a provisional understanding, inspect
-relevant evidence, distinguish Confirmed, Proposed, and Unresolved decisions,
-ask one to three focused questions, pass the creation gate, validate, and ask
-again when a result depends on human truth. A short request is enough to begin;
-no `--interactive` option or upfront plan document is required.
+applicable truth sources, distinguish Confirmed, Proposed, and Unresolved
+decisions, ask one to three focused questions, pass the creation gate, classify
+findings conservatively, and re-enter the gate when asset boundaries may change.
+A short request is enough to begin; no `--interactive` option or upfront plan
+document is required.
 
 Use it before generation, or when intentionally redesigning asset boundaries,
 to identify the smallest non-redundant asset graph, source-of-truth Context,

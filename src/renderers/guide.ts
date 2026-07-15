@@ -41,7 +41,7 @@ export function renderSkillGuidePrompt(
     "Verification",
     ...renderNumbered(guidance.verification),
     "",
-    "Boundary: LLM investigates, proposes, asks, and edits. User supplies domain and governance truth. Renma provides deterministic authoring rules and repository evidence. Human approves meaningful decisions.",
+    "Boundary: LLM proposes. Renma verifies. Human approves. During authoring, the consuming LLM investigates, proposes, asks, and edits; the user supplies domain and governance truth; Renma provides deterministic rules and repository evidence.",
   ].join("\n");
 }
 

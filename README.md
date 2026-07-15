@@ -41,8 +41,11 @@ broader product framing.
 
 Run `renma guide skill` before generation. Its deterministic output tells the
 consuming LLM to clarify the recurring task and expected result, inspect
-relevant repository evidence, distinguish confirmed facts from proposals and
-unresolved human truth, and ask one to three focused questions. Renma itself
+applicable user-provided artifacts, repository evidence, and permitted
+authoritative source content, distinguish confirmed facts from proposals and
+unresolved human truth, and ask one to three focused questions. Repository
+evidence confirms facts only when it is applicable, effective, and unambiguous;
+source designation alone does not confirm source-content facts. Renma itself
 does not conduct the conversation. After blocking decisions are resolved, the
 deterministic scaffold is the repository-compatible starting point.
 
@@ -53,6 +56,9 @@ within the agreed boundaries. It is not the authority for Renma metadata,
 Context placement, repository asset boundaries, file count, source-of-truth
 representation, or whether support files and scripts should exist. Renma does
 not replace semantic authoring judgment, and human review remains required.
+
+The expanded authoring loop elaborates the existing boundary: **LLM proposes.
+Renma verifies. Human approves.**
 
 Renma is **Agent Skills-compatible, but not Agent Skills-defined**. Canonical Agent Skills entrypoints
 are discovered under `skills/**/SKILL.md` and
@@ -103,7 +109,7 @@ For a new Skill, establish the Renma contract before generation:
 
 ```text
 renma guide skill
-  -> consuming LLM clarifies human truth and inspects relevant evidence
+  -> consuming LLM clarifies human truth and inspects applicable evidence
   -> classify confirmed, proposed, and unresolved decisions
   -> ask one to three focused questions
   -> pass the creation gate and define the smallest intended asset structure
@@ -111,8 +117,9 @@ renma guide skill
   -> scaffold or reuse justified Context Assets
   -> complete the focused workflow
   -> renma scan . --fail-on high
-  -> inspect catalog and graph evidence
-  -> fix and rerun
+  -> classify findings and inspect relevant evidence
+  -> re-enter the creation gate if asset boundaries may change
+  -> apply uniquely supported repairs and rerun
   -> human review
 ```
 
@@ -141,12 +148,16 @@ intentionally reconsiders Skill-versus-Context responsibility, file or resource
 boundaries, source-of-truth placement, scripts, support files, or the asset
 graph. Ordinary maintenance starts with `scan`.
 
-An external URL in a Context Asset records authority; it does not grant network
-permission. Decide whether execution reads the URL or uses content supplied by
-an approved process. Runtime access requires an evidence-backed effective
-security-policy decision, including reviewed data, network, destination,
-upload, secrets, and human-approval semantics where applicable. Do not infer
-permissive values from the URL.
+An external URL in a Context Asset records user-designated authority; it does
+not prove the source's schema or behavior.
+
+A Markdown URL does not grant network permission. Authoring-time consultation
+depends on the current request, tools, and environment. Finished-Skill runtime
+access is a separate decision that must agree with the effective security policy,
+including reviewed data, network, destination, upload, secrets, and human-approval
+semantics where applicable. Future Skill metadata never retroactively authorizes
+the authoring agent. When source content cannot be consulted, request it through
+an approved process or leave source-dependent facts unresolved.
 
 The [Authoring Guide](docs/authoring-guide.md) is the canonical walkthrough for
 both workflows.

@@ -208,16 +208,41 @@ clarification examples. The prompt renderer places this protocol immediately
 after the central principle; JSON serializes the same object directly. This is
 an additive projection, not a separately versioned schema.
 
+`interaction` is normative for truth qualification, question behavior, gate
+entry and re-entry, finding classification, persistence, and semantic handoff.
+The legacy `workflow` projection is only a short top-level summary, while
+placement, artifact, metadata, and conciseness sections retain rules they
+uniquely own. Renderers add headings and list formatting; they do not recreate
+protocol decisions.
+
+Truth-source evidence remains outside Renma's runtime state. A consuming LLM
+may use explicit user statements, clearly applicable supplied artifacts,
+applicable and effective repository evidence, or successfully consulted
+authoritative source content. Renma structural rules constrain placement but do
+not establish domain truth. Authoring-time source access comes from the current
+request, tools, and environment; future Skill policy is not retroactive
+authorization.
+
+Likewise, deterministic detection does not imply deterministic repair. The
+protocol permits automatic correction only when evidence and Diagnostics v2
+constraints uniquely determine a patch. Repeated-context evidence remains a
+consolidation input requiring repository investigation and human review.
+
 The interaction model is an instruction contract for the consuming LLM, not a
 Renma state machine:
 
 ```text
 renma guide skill -> deterministic protocol on stdout
-consuming LLM     -> investigates, proposes, asks, and edits
+consuming LLM     -> investigates evidence, proposes, asks, and edits
 user              -> supplies domain and governance truth
 Renma commands    -> provide deterministic rules and repository evidence
 human             -> approves meaningful decisions
 ```
+
+This remains an elaboration of `LLM proposes. Renma verifies. Human approves.`
+If source review, semantic refinement, usage, or validation suggests a boundary
+change, the consuming LLM records it as Proposed or Unresolved and re-enters the
+creation gate. Renma stores no gate or conversation state.
 
 No interaction state crosses the command boundary. `guide` does not accept task
 text, ask questions, retain history, interpret answers, create files, call an

@@ -563,18 +563,19 @@ export const COMMAND_HELP = [
     ],
     interpretation: [
       "Prompt is the default format; prompt and JSON derive from the same structured guidance data.",
-      "The default prompt tells the consuming LLM to inspect relevant evidence, separate confirmed facts from proposals and unresolved decisions, and ask one to three focused questions before the creation gate.",
+      "The default prompt tells the consuming LLM to inspect applicable user-provided artifacts, repository evidence, and permitted authoritative source content; separate confirmed facts from proposals and unresolved decisions; and ask one to three focused questions before the creation gate.",
       "Output is deterministic for the installed Renma version and is written only to stdout.",
       "The command works without an existing repository and performs no filesystem or network operations.",
       "The guide establishes Renma boundaries; platform-native Skill authoring guidance may refine semantics only after the clarification gate and within the agreed structure.",
-      "An external Markdown URL records a source reference but never grants network permission; runtime access requires an explicit evidence-backed effective security-policy decision.",
+      "A user-designated URL confirms intended authority, not source-content facts; authoring-time consultation depends on the current request, tools, and environment, while finished-Skill runtime access requires an evidence-backed effective security-policy decision.",
+      "A deterministic finding is not automatically a deterministic repair; follow Diagnostics v2 constraints, investigate repeated context, and re-enter the creation gate before any newly justified asset-boundary change.",
     ],
     nextSteps: [
       "Clarify the task, investigate relevant evidence, and retain unresolved human decisions instead of inventing answers.",
       "Pass the creation gate and define the smallest non-redundant asset graph.",
       "Run renma scaffold skill, then scaffold or reuse only justified Context Assets.",
       "Complete the focused workflow and run renma scan . --fail-on high.",
-      "Inspect catalog and graph evidence, fix relevant findings, rerun, and require human review.",
+      "Classify findings, inspect applicable evidence, re-enter the gate for boundary changes, apply only uniquely supported repairs, rerun, and require human review.",
     ],
     options: [
       {

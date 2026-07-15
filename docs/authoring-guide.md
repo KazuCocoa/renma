@@ -42,10 +42,13 @@ and source authority. The central principle is:
 ## Interactive Clarification Protocol
 
 `renma guide skill` remains deterministic and non-interactive. It prints the
-protocol; the consuming LLM conducts the conversation, the user supplies domain
-and governance truth, Renma supplies authoring rules and repository evidence,
-and a human approves meaningful decisions. Renma does not accept task text,
-ask questions, retain conversation state, interpret answers, or create assets.
+protocol; the consuming LLM conducts the conversation and investigates
+applicable evidence, the user supplies domain and governance truth, Renma
+supplies deterministic rules and repository evidence, and a human approves
+meaningful decisions. This elaborates—not replaces—the product boundary:
+**LLM proposes. Renma verifies. Human approves.** Renma does not accept task
+text, ask questions, retain conversation state, interpret answers, or create
+assets.
 
 When the user asks to create a Skill, the consuming LLM starts with
 clarification instead of file creation:
@@ -60,6 +63,7 @@ understand
   -> scaffold and author
   -> validate
   -> repair, investigate, ask again, or justify no change
+  -> re-enter the creation gate if asset boundaries may change
   -> human review
 ```
 
@@ -70,13 +74,13 @@ begins. On the first meaningful response, keep the working state compact:
 Current understanding
 
 Confirmed
-- Facts stated by the user or supported by unambiguous repository evidence.
+- Facts supported by an applicable truth source.
 
 Proposed
 - Reversible structural defaults or justified design suggestions.
 
 Unresolved
-- Human truth or missing repository evidence that must not be invented.
+- Human truth or missing applicable evidence that must not be invented.
 
 Question
 - One to three closely related questions about the highest-impact gap.
@@ -84,11 +88,34 @@ Question
 
 A proposal never silently becomes confirmed. Explicit user delegation can
 confirm authority to choose one reversible default, but it does not establish
-unrelated domain facts. When repository evidence confirms a fact, cite the
-relevant file, metadata, or command result in the explanation.
+unrelated domain facts.
 
-Before asking the user, inspect evidence that can answer the current question.
-Use only the relevant commands rather than treating every view as ceremony:
+### Truth sources
+
+| Evidence source | May confirm | Required qualification |
+| --- | --- | --- |
+| Explicit user statements | Intent, governance decisions, source designation, fallback, and other decisions the user has authority to make | Designating a specification does not prove its contents |
+| User-provided artifacts | Facts in supplied documents, specifications, examples, logs, or schemas | Provenance and applicability must be clear; identify the artifact |
+| Repository evidence | Applicable and effective repository facts | Evidence must be unambiguous; deprecated, archived, stale, conflicting, unresolved, or diagnostic-blocked evidence is not Confirmed merely because it exists; identify the file, metadata, lifecycle evidence, or command result |
+| Reviewed authoritative external source content | Domain facts governed by a user-designated source | The authoring environment must be permitted and able to consult it successfully; identify the source and relevant section or evidence |
+| Renma structural rules | Structural constraints and proposed defaults | They do not establish product or domain truth |
+
+A user can confirm that a URL is intended to be authoritative. Its schema,
+fields, constraints, and behavior become Confirmed only after the source content
+is successfully consulted or supplied through another approved process. A known
+URL and model memory are not source-content evidence.
+
+Authoring-time access is separate from finished-Skill runtime access.
+Authoring-time consultation depends on the current request, tools, and
+environment. Future runtime access instructions must agree with the finished
+Skill's effective Renma security policy. Future metadata never retroactively
+authorizes the authoring agent. If authoring-time access is unavailable, ask
+for the relevant content through an approved process or keep source-dependent
+facts Unresolved; do not fill them from memory or plausible assumptions.
+
+Before asking the user, inspect applicable evidence that can answer the current
+question. Use only the relevant commands rather than treating every view as
+ceremony:
 
 ```bash
 renma scan . --fail-on high --format json
@@ -120,10 +147,10 @@ produce. It does not invent an owner, Context, script, or metadata.
 
 Before creating files, establish the focused recurring task, expected result,
 meaningful completion or failure behavior, smallest justified asset structure,
-source authority and runtime source-access intent when relevant, blocking
-security and domain decisions, and the owner required by file-mode scaffold
-unless repository evidence already supplies it. Pause while a blocking human
-decision remains unresolved.
+source authority, authoring-time consultation, finished-Skill runtime access,
+blocking security and domain decisions, and the owner required by file-mode
+scaffold unless repository evidence already supplies it. Pause while a
+blocking human decision remains unresolved.
 
 The gate does not require a complete plan, every edge case, final prose, all
 examples, finalized tags, future capabilities, or perfect certainty about
@@ -137,7 +164,9 @@ redundant confirmation after the user has already authorized creation.
 Classify each relevant finding before acting:
 
 - **Deterministic repair:** make a bounded correction supported by the
-  diagnostic and repository evidence, then rerun relevant validation.
+  diagnostic and evidence only when the constraints uniquely determine the
+  patch, then rerun relevant validation. Deterministic detection alone is not
+  enough.
 - **Repository investigation:** inspect ambiguous targets, parents, owners,
   possible Context reuse, or conflicting conventions before asking the user.
 - **Human decision required:** ask a focused question when ownership, source
@@ -145,6 +174,30 @@ Classify each relevant finding before acting:
   deliberate script use depends on human truth.
 - **No change justified:** explain why the evidence does not support a repair
   or why an advisory reflects reviewed intentional design.
+
+An invalid encoding is deterministic only when its intended supported value is
+explicit and unambiguous. A path or ID typo is deterministic only when exactly
+one intended existing target is proven. Remove an unsupported field
+automatically only when doing so provably loses no intended meaning; otherwise
+investigate whether the information belongs in the Skill body, supported
+metadata, a Context Asset, or nowhere.
+
+Repeated-context findings are evidence, not automatic consolidation patches.
+Do not delete or rewrite content solely because a repeated section, code block,
+or context pattern exists. Inspect all occurrences, determine ownership and the
+source-of-truth boundary, prepare a consolidation proposal, and require human
+review before choosing an authoritative copy, owning asset, Context placement,
+or replacement references.
+
+Follow Diagnostics v2 repair constraints and verification steps. Preserve any
+explicit prohibition on automatic semantic changes.
+
+If semantic refinement, source review, real usage, or validation reveals a
+possible asset-boundary change, stop the structural edit. Record the need as
+Proposed or Unresolved, inspect relevant evidence, ask only when human truth
+remains necessary, and re-enter the creation gate. Change the agreed files,
+metadata, Context relationships, scripts, examples, or support assets only
+after the gate passes, then continue authoring and validation.
 
 Never add a suppression automatically, weaken security policy, manufacture
 metadata, rewrite semantics merely to clear a finding, or turn a human decision
@@ -202,14 +255,15 @@ Use this sequence for a new Skill:
 
 ```text
 renma guide skill
-  -> clarify human truth and inspect relevant evidence
+  -> clarify human truth and inspect applicable evidence
   -> pass the creation gate and define the smallest intended asset structure
   -> renma scaffold skill
   -> scaffold or reuse justified Context Assets
   -> complete the focused workflow
   -> renma scan . --fail-on high
-  -> inspect catalog and graph evidence
-  -> fix and rerun
+  -> classify findings and inspect relevant evidence
+  -> re-enter the creation gate if asset boundaries may change
+  -> apply uniquely supported repairs and rerun
   -> human review
 ```
 
@@ -249,9 +303,11 @@ create a generic Skill first and enrich it afterward with Renma-like metadata.
 Construct the Skill and related assets directly within the Renma authoring
 contract.
 
-When a Skill depends on an external authoritative URL, its source-of-truth role
-normally justifies a concise Context Asset even if no other Skill reuses it.
-Record what the source governs, its authoritative URL, when it must be
+Apply the truth-source and access distinctions above whenever a Skill depends
+on an external authoritative URL. The user-designated source-of-truth role
+normally justifies a concise Context Asset even if no other Skill reuses it,
+but source-dependent domain facts stay Unresolved until content is successfully
+consulted or supplied. Record what the source governs, its URL, when it must be
 consulted, and necessary scope or fallback behavior. Do not copy the full
 external document unless an intentional reviewed snapshot is required. Declare
 the Context as required when the workflow cannot validly complete without it;
@@ -263,16 +319,15 @@ with no independent maintenance or governance reason stays in `SKILL.md` or
 justified Skill-local support. After a Context Asset is independently justified,
 correctness dependency determines `requires-context` versus `optional-context`.
 
-Decide whether the finished Skill reads the external URL during execution or
-expects relevant source content from the user or another approved process. A
-Markdown URL does not grant network permission. When runtime access is intended,
-review and declare the supported effective policy for allowed data, network
-allowance, approved destinations, external upload, secrets, and human approval
-where applicable. Public documentation commonly uses the documented
-`public-docs` category, but do not manufacture permissive policy values. Derive
-an approved destination only from the reviewed URL or repository policy, ensure
-the Skill body, Context instructions, and effective policy agree, and preserve
-unresolved access intent or policy for human decision.
+Separately decide whether the finished Skill reads the URL during execution or
+expects source content from the user or another approved process. A Markdown
+URL does not grant runtime network permission. When runtime access is intended,
+review the supported effective policy for allowed data, network allowance,
+approved destinations, external upload, secrets, and human approval.
+
+Do not manufacture permissive policy values. Ensure the Skill body, Context
+instructions, and effective policy agree, and preserve unresolved access intent
+for human review.
 
 Scaffold generation performs no network operations. The finished Skill may
 access the reviewed external source only when its authored workflow and the
@@ -345,6 +400,11 @@ complete:
 - the Skill semantics that rely on intended Renma metadata and Context
   relationships without changing those boundaries independently.
 
+If refinement or real usage reveals a justified boundary change, stop and
+return that need to the clarification protocol as Proposed or Unresolved.
+Inspect evidence and re-enter the creation gate before changing the agreed
+structure.
+
 Preserve the repository's intended behavior. Use a Context Asset when knowledge
 is reusable across Skills, has independent ownership or lifecycle, is maintained
 separately, is an authoritative source of truth, or has another explicit reason
@@ -369,12 +429,12 @@ Start with the release gate:
 renma scan . --fail-on high
 ```
 
-Review every relevant diagnostic, correct the underlying wording, metadata, or
-relationship, and rerun the same scan. Do not weaken security policy or add a
-suppression merely to make validation pass. Use the post-validation decision
-classes above: perform a bounded deterministic repair, investigate more
-repository evidence, ask the human when truth is missing, or explain why no
-change is justified.
+Review every relevant diagnostic and use the normative post-validation rules
+above. Apply a repair only when evidence uniquely determines it, investigate
+repeated-context or boundary evidence before semantic change, ask the human
+when truth is missing, or explain why no change is justified. Follow
+Diagnostics v2 constraints and verification steps, rerun after repairs, and do
+not weaken security policy or add a suppression merely to pass.
 
 Use other deterministic views when they answer a specific review question:
 
@@ -406,7 +466,10 @@ Current understanding
 
 Confirmed
 - The workflow builds a Product A JSON body.
-- The official Product A documentation is authoritative.
+- The user designates the official Product A URL as the intended authoritative
+  source.
+- The request expresses authoring-time intent to consult that URL, subject to
+  the current tools and authoring environment permitting access.
 
 Proposed
 - One focused Skill.
@@ -415,19 +478,28 @@ Proposed
 - No script or Context Lens by default.
 
 Unresolved
+- The Product A schema, fields, constraints, and behavior until source content
+  is successfully consulted or supplied through another approved process.
+- Whether the current authoring environment is permitted and able to access the
+  URL.
 - Whether the finished Skill accesses the URL at execution time.
 - What happens when the source cannot be accessed.
 - The Context owner, unless repository evidence resolves it.
 
 Questions
-1. Should the Skill access the official URL during execution, or should the
-   relevant documentation be supplied through another approved process?
-2. When the source is unavailable, should the Skill stop rather than infer the
+1. If the current authoring environment cannot access the official URL, can you
+   provide the relevant content through an approved process?
+2. Separately, should the finished Skill access the URL during execution, or
+   should its future consumer receive the documentation through another
+   approved process?
+3. When the source is unavailable, should the Skill stop rather than infer the
    JSON schema?
 ```
 
 It does not create files until blocking answers are available. It does not
-hard-code a fictional approved domain or permissive security metadata.
+confirm source-dependent facts from memory, use future Skill metadata as
+authoring-time permission, or hard-code a fictional approved domain or
+permissive security metadata.
 
 After the creation gate, the smallest proposed Renma asset structure is:
 
@@ -738,6 +810,9 @@ run renma guide skill
 
 If `skill-creator` is available or activates automatically, do not let it
 independently create files before the Renma clarification gate is satisfied.
+If semantic refinement reveals a justified asset-boundary change,
+`skill-creator` must return that need to the Renma clarification protocol rather
+than silently changing the repository structure.
 
 After passing the gate, a safe request is:
 
@@ -750,7 +825,9 @@ usage boundaries, required inputs, constraints, completion criteria, and
 ambiguity-resolving examples. Preserve its Renma metadata, Context placement,
 file boundaries, and repository behavior. Do not independently generate a
 second target file or invent owners, policy, dependencies, domain rules, or
-source-of-truth claims. After the reviewed edits, run
+source-of-truth claims. If refinement reveals that the agreed asset boundary
+must change, stop, report it as Proposed or Unresolved, and re-enter the Renma
+creation gate before changing structure. After the reviewed edits, run
 `renma scan . --fail-on high`, fix relevant diagnostics, and rerun the scan.
 ```
 
