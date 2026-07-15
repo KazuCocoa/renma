@@ -1400,6 +1400,7 @@ test("global help lists workflows, boundaries, and distinguishable commands", as
   assert.equal(help.stdout, repeated.stdout);
   assert.match(help.stdout, /Usage\n {2}renma <command> \[args\] \[options\]/);
   assert.match(help.stdout, /Start here: existing repository/);
+  assert.match(help.stdout, /renma guide skill/);
   assert.match(help.stdout, /renma scan \. --fail-on high/);
   assert.match(
     help.stdout,
@@ -1407,7 +1408,6 @@ test("global help lists workflows, boundaries, and distinguishable commands", as
   );
   assert.match(help.stdout, /renma catalog \. --format markdown/);
   assert.match(help.stdout, /renma graph \. --format markdown/);
-  assert.match(help.stdout, /renma readiness \. --format markdown/);
   assert.match(help.stdout, /Start here: new skill/);
   assert.match(
     help.stdout,
@@ -1415,9 +1415,25 @@ test("global help lists workflows, boundaries, and distinguishable commands", as
   );
   assert.match(
     help.stdout,
-    /authoring review -> intended changes -> repository validation -> fix -> rerun -> human review/,
+    /scan -> inspect evidence -> smallest intended patch -> validate again -> human review/,
   );
-  assert.match(help.stdout, /platform's standard Skill authoring guidance/);
+  assert.match(
+    help.stdout,
+    /complete the focused workflow; use platform-native guidance only within Renma boundaries/,
+  );
+  const existingWorkflow = help.stdout.slice(
+    help.stdout.indexOf("Start here: existing repository"),
+    help.stdout.indexOf("Start here: new skill"),
+  );
+  assert.match(existingWorkflow, /renma scan \. --fail-on high/);
+  assert.match(
+    existingWorkflow,
+    /use renma guide skill only when intentionally reconsidering asset boundaries/,
+  );
+  assert.ok(
+    existingWorkflow.indexOf("renma scan . --fail-on high") <
+      existingWorkflow.indexOf("renma guide skill"),
+  );
   assert.match(help.stdout, /renma scan \. --fail-on high/);
   assert.match(help.stdout, /Renma does not call an LLM/);
   assert.match(help.stdout, /Renma does not select runtime context/);
@@ -1429,7 +1445,10 @@ test("global help lists workflows, boundaries, and distinguishable commands", as
     /Renma does not automatically perform large semantic rewrites/,
   );
   assert.match(help.stdout, /Skill: focused workflow/);
-  assert.match(help.stdout, /Context: durable reusable knowledge/);
+  assert.match(
+    help.stdout,
+    /Context: independently maintained knowledge, including authoritative sources of truth/,
+  );
   assert.match(
     help.stdout,
     /Context Lens: purpose-specific interpretation of declared Context/,
@@ -1493,6 +1512,7 @@ test("command contracts reject unrelated options and invalid positional arity", 
     Record<(typeof COMMAND_HELP)[number]["name"], string[]>
   > = {
     inspect: ["README.md"],
+    guide: ["skill"],
     scaffold: ["context", "contexts/demo.md"],
     "suggest-metadata": ["README.md"],
     "suggest-semantic-split": ["README.md"],
@@ -1705,6 +1725,19 @@ test("representative command help shows relevant boundaries and options", async 
       excludes: [/--focus/, /--fail-on/, /--config/],
     },
     {
+      name: "guide",
+      argv: ["guide", "--help"],
+      includes: [
+        /renma guide <topic> \[options\]/,
+        /skill is the only supported topic/i,
+        /Output format: prompt or json\. Defaults to prompt\./,
+        /written only to stdout/,
+        /performs no filesystem or network operations/,
+        /renma guide skill --format json/,
+      ],
+      excludes: [/--owner/, /--config/, /--focus/],
+    },
+    {
       name: "scaffold",
       argv: ["scaffold", "--help"],
       includes: [
@@ -1719,9 +1752,10 @@ test("representative command help shows relevant boundaries and options", async 
         /File mode creates the scaffold file at the target path/,
         /refuses to overwrite existing files/,
         /starting structure, not a complete asset/,
-        /platform's standard Skill authoring guidance/,
+        /renma guide skill to establish the smallest asset structure/,
+        /platform-native guidance only to refine semantics within those boundaries/,
         /Skill is a focused workflow entrypoint/,
-        /Context is durable reusable knowledge/,
+        /Context is independently maintained knowledge/,
         /Context Lens is purpose-specific interpretation of declared Context/,
         /generic persona storage, a prompt template, or a runtime routing rule/,
         /no existing Context Asset needs purpose-specific interpretation/,
@@ -1751,11 +1785,11 @@ test("representative command help shows relevant boundaries and options", async 
         /Explicitly provide an owner candidate/,
         /Renma must not infer an owner when this option is absent/,
         /Preserve existing Markdown body and semantics/,
-        /platform's standard Skill guidance/,
+        /metadata review is only one part of authoring review; use platform-native Skill guidance/,
         /renma scan \. --fail-on high/,
         /Inferring an owner without evidence/,
       ],
-      excludes: [/--focus/, /--omit-generated-at/],
+      excludes: [/--focus/, /--omit-generated-at/, /renma guide skill/],
     },
     {
       name: "suggest-semantic-split",
@@ -1860,11 +1894,15 @@ test("scaffold skill writes deterministic file output", async () => {
   assert.equal(result.code, 0);
   assert.equal(result.stderr, "");
   assert.match(result.stdout, /^Created .+SKILL\.md\n\nNext steps:/);
-  assert.match(result.stdout, /platform's standard Skill authoring guidance/);
+  assert.match(result.stdout, /renma guide skill/);
+  assert.match(
+    result.stdout,
+    /smallest non-redundant intended asset structure/,
+  );
   assert.match(result.stdout, /renma scan \. --fail-on high/);
   assert.match(
     result.stdout,
-    /5\. Have a human review meaningful semantic changes before merging\.\n$/,
+    /6\. Have a human review meaningful semantic changes and unresolved decisions before merging\.\n$/,
   );
   const content = await readFile(target, "utf8");
   assert.match(content, /^name: spec-review$/m);
@@ -2128,7 +2166,10 @@ test("scaffold context_lens can emit json", async () => {
   assert.match(bundle.prompt, /If there is no Context Asset to interpret/);
   assert.match(bundle.prompt, /persona-only wording is insufficient/);
   assert.match(bundle.prompt, /focused task and workflow in the Skill/);
-  assert.match(bundle.prompt, /durable reusable knowledge in Context Assets/);
+  assert.match(
+    bundle.prompt,
+    /independently maintained or source-authoritative knowledge in Context Assets/,
+  );
 });
 
 test("scaffold context_lens prompt requires repository-grounded semantics", async () => {
@@ -2225,24 +2266,33 @@ test("scaffold prompt emits platform-neutral authoring instructions", async () =
   assert.equal(result.code, 0);
   assert.match(result.stdout, /Create a Renma skill asset/);
   assert.match(result.stdout, /id: `testing.spec-review`/);
-  assert.match(
-    result.stdout,
-    /Move durable domain, testing, platform, product, or tool knowledge/,
-  );
+  assert.match(result.stdout, /Move knowledge into a Context Asset/);
   assert.match(result.stdout, /Do not choose runtime task context/);
   assert.match(result.stdout, /Do not assemble prompts for live model calls/);
-  assert.match(result.stdout, /Do not call external services/);
+  assert.doesNotMatch(result.stdout, /Do not call external services/);
+  assert.match(
+    result.stdout,
+    /Scaffold generation performs no network operations/,
+  );
+  assert.match(
+    result.stdout,
+    /finished Skill may access a reviewed external source only when its authored workflow and effective security policy explicitly permit it/,
+  );
+  assert.match(result.stdout, /Markdown URL does not grant network permission/);
+  assert.match(result.stdout, /Do not infer permissive values/);
+  assert.match(result.stdout, /Correctness importance alone is not sufficient/);
   assert.match(
     result.stdout,
     /renma graph \. --focus testing\.spec-review --format mermaid/,
   );
   assert.doesNotMatch(result.stdout, /does\.not\.exist/);
   assert.match(result.stdout, /Do not invent owners/);
-  assert.match(result.stdout, /platform's standard Skill authoring guidance/);
-  assert.match(result.stdout, /starting point/);
+  assert.match(result.stdout, /renma guide skill/);
+  assert.match(result.stdout, /smallest non-redundant Renma asset graph/);
+  assert.match(result.stdout, /platform-native guidance only to refine/);
   assert.match(
     result.stdout,
-    /description, instructions, workflow, constraints, and completion criteria/,
+    /trigger description, instructions, workflow, constraints, completion criteria/,
   );
   assert.match(result.stdout, /renma scan \. --fail-on high/);
   assert.match(

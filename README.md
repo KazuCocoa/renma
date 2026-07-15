@@ -22,12 +22,14 @@ detached from an owner, difficult to review, and increasingly inconsistent as
 teams and workflows evolve. It also becomes hard to tell maintained guidance
 from obsolete or unofficial material.
 
-Reusable context should be treated as a maintainable software asset: identified,
-owned, versioned in Git, connected through explicit relationships, reviewed by
-humans, validated deterministically, and usable across more than one Skill or
-runtime. A Skill is an agent-facing entrypoint and workflow guide; the broader
-Context Repository preserves knowledge that can outlive or serve multiple
-Skills.
+Independently maintained context should be treated as a software asset:
+identified, owned, versioned in Git, connected through explicit relationships,
+reviewed by humans, and validated deterministically. Cross-Skill reuse is one
+reason for a Context Asset, but an independent lifecycle or source-of-truth role
+is also sufficient. A Skill is an agent-facing entrypoint and workflow guide;
+the broader Context Repository preserves knowledge with an independent reason
+to outlive and be governed separately from one Skill. Task-specific knowledge
+does not become Context merely because it matters to correctness.
 
 Renma operationalizes this model through deterministic repository governance.
 It is not a prompt library, agent runtime, live Context selector, vector
@@ -37,15 +39,17 @@ broader product framing.
 
 ## Agent Skills And Renma
 
-Use your platform's standard Skill authoring guidance for general Skill design,
-then use Renma for repository-specific governance and validation.
+Run `renma guide skill` before generation. Renma establishes repository asset,
+metadata, placement, and responsibility boundaries first; the deterministic
+scaffold is the repository-compatible starting point. Platform-native Skill
+guidance may then refine trigger descriptions, ordered instructions, positive
+and negative usage boundaries, inputs, constraints, completion criteria, and
+examples that resolve real ambiguity within those boundaries.
 
-Platform-native guidance owns the Skill's name, trigger description,
-instructions, workflow, constraints, examples, and completion criteria. Renma
-complements it with canonical metadata, Agent Skills compatibility, dependency
-and graph validation, ownership and lifecycle governance, security policy
-validation, workflow diagnostics, repository-wide scan, and readiness views.
-Renma does not replace general Skill authoring guidance.
+Platform-native guidance is not the authority for Renma metadata, Context
+placement, repository asset boundaries, file count, source-of-truth
+representation, or whether support files and scripts should exist. Renma does
+not replace semantic authoring judgment, and human review remains required.
 
 Renma is **Agent Skills-compatible, but not Agent Skills-defined**. Canonical Agent Skills entrypoints
 are discovered under `skills/**/SKILL.md` and
@@ -90,37 +94,50 @@ flowchart TD
 
 ## Primary Skill Workflows
 
-For a new Skill, use platform-native guidance to design the workflow, then run
-one generator for the target file:
+For a new Skill, establish the Renma contract before generation:
 
 ```text
-platform-native Skill authoring guidance
+renma guide skill
+  -> define the smallest intended asset structure
   -> renma scaffold skill
-  -> review and complete the generated Skill
+  -> scaffold or reuse justified Context Assets
+  -> complete the focused workflow
   -> renma scan . --fail-on high
-  -> fix relevant diagnostics
-  -> rerun validation
+  -> inspect catalog and graph evidence
+  -> fix and rerun
   -> human review
 ```
 
 For an existing Skill:
 
 ```text
-review with platform-native Skill authoring guidance
-  -> renma scan . --fail-on high
+renma scan . --fail-on high
   -> inspect relevant diagnostics and repository evidence
   -> use suggest-metadata only for metadata or migration work
-  -> prepare and review intended changes
+  -> prepare the smallest intended patch
   -> renma scan . --fail-on high
   -> fix relevant diagnostics
   -> rerun validation
   -> human review
 ```
 
-Do not run two independent generators against the same target file. If a
-platform-native tool can generate Skills, ask it to review or refine the Renma
-scaffold, or ask it to use `renma scaffold skill` as its starting point.
-`suggest-metadata` never edits the target and does not improve the Skill body.
+Do not create a generic Skill first and enrich it afterward with Renma-like
+metadata, and do not run two independent generators against the same target
+file. If a platform-native tool can generate Skills, ask it to refine semantics
+inside the existing Renma scaffold and asset graph. `suggest-metadata` never
+edits the target and does not improve the Skill body.
+
+For existing-Skill maintenance, use `renma guide skill` only when the work
+intentionally reconsiders Skill-versus-Context responsibility, file or resource
+boundaries, source-of-truth placement, scripts, support files, or the asset
+graph. Ordinary maintenance starts with `scan`.
+
+An external URL in a Context Asset records authority; it does not grant network
+permission. Decide whether execution reads the URL or uses content supplied by
+an approved process. Runtime access requires an evidence-backed effective
+security-policy decision, including reviewed data, network, destination,
+upload, secrets, and human-approval semantics where applicable. Do not infer
+permissive values from the URL.
 
 The [Authoring Guide](docs/authoring-guide.md) is the canonical walkthrough for
 both workflows.
@@ -144,9 +161,12 @@ npx renma readiness . --format markdown
 Create and complete a new Skill:
 
 ```bash
+npx renma guide skill
 npx renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
-# Review the file with your platform's standard Skill authoring guidance.
+# Refine semantics within the Renma asset and metadata boundaries.
 npx renma scan . --fail-on high
+npx renma catalog . --format markdown
+npx renma graph . --format markdown
 ```
 
 Review an existing Skill without editing it automatically. Start with `scan`;
@@ -189,6 +209,7 @@ node dist/index.js scan . --fail-on high
 | `diff` | What deterministic evidence changed between Git refs? |
 | `ci-report` | What should a CI or pull-request reviewer inspect? |
 | `inspect` | What is the outline or exact line slice of one file? |
+| `guide` | What is the smallest justified asset graph for a new Skill? |
 | `scaffold` | How can a new asset start from a deterministic structure? |
 | `suggest-metadata` | What metadata retrofit or one-way Skill migration is safe to review? |
 | `suggest-semantic-split` | How can a mixed-purpose asset be split reviewably? |

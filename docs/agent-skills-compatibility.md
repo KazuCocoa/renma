@@ -51,9 +51,13 @@ been activated. Generic Agent Skills clients may not send arbitrary metadata
 to a model. Renma metadata therefore does not guarantee model compliance and
 must not replace behavior-critical instructions.
 
-Use your platform's standard Skill authoring guidance for the name, trigger
-description, instructions, workflow, constraints, examples, and completion
-criteria. Use Renma for repository-specific governance and validation. The
+For a new Skill, or when intentionally redesigning asset boundaries, use
+`renma guide skill` to establish Renma repository asset, metadata, Context, and
+file boundaries. Then use platform-native Skill guidance for the name, trigger
+description, instructions, workflow, constraints, completion criteria, and
+ambiguity-resolving examples within those boundaries. A name change that alters
+the canonical Skill directory/name relationship is an intentional path and
+identity change that requires validation, not an ordinary semantic rewrite. The
 [Authoring Guide](authoring-guide.md) owns the general new-Skill and
 existing-Skill workflows; this document owns the canonical format and migration
 contract.
@@ -429,11 +433,11 @@ owner blocks the proposal for human review. Without `--owner`, Renma does not
 invent owner metadata or emit a meaningless canonical rewrite. This retrofit is
 not reverse migration.
 
-After generating a suggestion, review the Skill's trigger description,
-instructions, workflow, constraints, and completion criteria using
-platform-native authoring guidance. Review the candidate, apply only intended
+After generating a suggestion, review the candidate, apply only intended
 metadata or migration changes, run `renma scan . --fail-on high`, fix relevant
-diagnostics, and rerun validation before human approval.
+diagnostics, and rerun validation before human approval. Conduct any requested
+semantic review separately using platform-native authoring guidance within the
+repository's established boundaries.
 
 ## Pre-0.16 Value Serialization
 
@@ -476,8 +480,9 @@ selects the last duplicate value, silently deletes an unknown field, or assigns
 an unknown top-level field to a vendor namespace.
 
 When blocked, do not apply a candidate. Review the conflict or invalid evidence,
-confirm the Skill's intent using platform-native authoring guidance, correct
-the source evidence, and rerun `suggest-metadata`. After intended corrections,
+confirm the Skill's intent using platform-native authoring guidance within the
+Renma boundaries, correct the source evidence, and rerun `suggest-metadata`.
+After intended corrections,
 run `renma scan . --fail-on high`, fix relevant diagnostics, and rerun the scan.
 
 Within a valid `metadata` mapping, Renma distinguishes:

@@ -15,6 +15,7 @@ const COMMANDS = [
   "trust-graph",
   "ownership",
   "readiness",
+  "guide",
   "scaffold",
   "suggest-metadata",
   "suggest-semantic-split",
@@ -32,6 +33,7 @@ const EXPECTED_FORMATS = new Map<string, string[]>([
   ["graph", ["json", "markdown", "mermaid"]],
   ["trust-graph", ["json", "markdown"]],
   ["inspect", ["text", "json"]],
+  ["guide", ["prompt", "json"]],
   ["scaffold", ["file", "prompt", "json"]],
   ["suggest-metadata", ["prompt", "json"]],
   ["suggest-semantic-split", ["prompt", "json"]],
@@ -195,7 +197,7 @@ test("Skill path guidance distinguishes canonical and historical entrypoints", a
   }
 });
 
-test("Skill authoring docs preserve the platform and Renma responsibility boundary", async () => {
+test("Skill authoring docs establish Renma boundaries before platform semantic refinement", async () => {
   const readme = await readRepoFile("README.md");
   const manual = await readRepoFile("docs/user-manual.md");
   const authoring = await readRepoFile("docs/authoring-guide.md");
@@ -203,10 +205,16 @@ test("Skill authoring docs preserve the platform and Renma responsibility bounda
     "docs/agent-skills-compatibility.md",
   );
   const cliSource = await readRepoFile("src/cli-help.ts");
+  const guidanceSource = await readRepoFile("src/guidance/skill-authoring.ts");
 
   for (const document of [readme, manual, authoring, compatibility]) {
-    assert.match(document, /platform(?:'s|-native).*Skill authoring guidance/i);
+    assert.match(document, /renma guide skill/i);
+    assert.match(document, /platform-native.*guidance/i);
     assert.match(document, /renma scan \. --fail-on high/);
+    assert.doesNotMatch(
+      document,
+      /use (?:your )?platform(?:'s|-native).*guidance first,? then use Renma/i,
+    );
   }
 
   for (const document of [readme, manual, authoring]) {
@@ -224,7 +232,12 @@ test("Skill authoring docs preserve the platform and Renma responsibility bounda
   assert.match(authoring, /Do not run two independent generators/);
   assert.match(authoring, /Optional Codex Example/);
   assert.match(authoring, /skill-creator/);
+  assert.match(
+    authoring,
+    /skill-creator[\s\S]*not[\s\S]*authority for Renma metadata/,
+  );
   assert.doesNotMatch(cliSource, /skill-creator/);
+  assert.doesNotMatch(guidanceSource, /\bCodex\b|skill-creator/);
   assert.doesNotMatch(await readRepoFile("src/commands/scaffold.ts"), /Codex/);
   assert.doesNotMatch(
     await readRepoFile("src/commands/suggest-metadata.ts"),
@@ -249,13 +262,106 @@ test("Skill authoring docs preserve the platform and Renma responsibility bounda
   const advanced = await readRepoFile("docs/advanced-skill-authoring.md");
   assert.match(authoring, /Advanced Skill Authoring/);
   assert.match(docsIndex, /Advanced Skill Authoring/);
-  assert.match(advanced, /current 0\.18\.0 authoring guidance/);
+  assert.match(advanced, /focused-workflow model introduced in 0\.18\.0/);
+  assert.match(advanced, /0\.19\.0 authoring contract/);
   assert.match(advanced, /Deferred Skill-to-Skill discovery/);
   assert.match(advanced, /no assigned\s+release/);
   assert.doesNotMatch(advanced, /`routes_to`|`skill-index`/);
   assert.match(readme, /Deferred Skill-to-Skill Discovery Design/);
   assert.match(authoring, /focused, bounded workflows/);
   assert.doesNotMatch(authoring, /current thin-Skill authoring/);
+
+  const optionalExampleIndex = authoring.indexOf("## Optional Codex Example");
+  assert.ok(optionalExampleIndex >= 0);
+  assert.doesNotMatch(
+    authoring.slice(0, optionalExampleIndex),
+    /\bCodex\b|skill-creator/,
+  );
+  for (const document of [
+    readme,
+    manual,
+    compatibility,
+    docsIndex,
+    advanced,
+    await readRepoFile("design.md"),
+  ]) {
+    assert.doesNotMatch(document, /\bCodex\b|skill-creator/);
+  }
+
+  const changelog = await readRepoFile("CHANGELOG.md");
+  assert.match(changelog, /optional Codex `skill-creator` example/);
+});
+
+test("authoring docs preserve Context and external-source security boundaries", async () => {
+  const readme = await readRepoFile("README.md");
+  const manual = await readRepoFile("docs/user-manual.md");
+  const authoring = await readRepoFile("docs/authoring-guide.md");
+  const design = await readRepoFile("design.md");
+  const combined = [readme, manual, authoring, design].join("\n");
+
+  assert.match(
+    combined,
+    /correctness (?:importance )?alone (?:does not|is not)/i,
+  );
+  assert.match(combined, /source-of-truth status alone is sufficient/i);
+  assert.match(
+    authoring,
+    /correctness dependency determines `requires-context` versus `optional-context`/,
+  );
+  assert.match(combined, /Markdown URL does not grant network permission/i);
+  assert.match(combined, /allowed[- ]data/i);
+  assert.match(combined, /approved[- ]destination/i);
+  assert.match(combined, /external[- ]upload/i);
+  assert.match(combined, /secrets/i);
+  assert.match(combined, /human[- ]approval/i);
+  assert.match(
+    combined,
+    /do not (?:manufacture|infer) permissive policy values/i,
+  );
+  assert.match(
+    authoring,
+    /URL is body content, not a Renma asset node or graph edge/,
+  );
+  assert.match(authoring, /Neither a\s+clean scan nor a valid graph proves/i);
+});
+
+test("ordinary existing-Skill workflows start with scan and keep guide conditional", async () => {
+  const readme = await readRepoFile("README.md");
+  const manual = await readRepoFile("docs/user-manual.md");
+  const authoring = await readRepoFile("docs/authoring-guide.md");
+  const sections = [
+    readme.slice(
+      readme.indexOf("For an existing Skill:"),
+      readme.indexOf("The [Authoring Guide]"),
+    ),
+    manual.slice(
+      manual.indexOf("## User Story: Improve Existing Skills With Diagnostics"),
+      manual.indexOf("## Configuration"),
+    ),
+    authoring.slice(
+      authoring.indexOf("## Existing Skill Workflow"),
+      authoring.indexOf("## Canonical Skill Metadata"),
+    ),
+  ];
+
+  for (const section of sections) {
+    assert.match(section, /renma scan \. --fail-on high/);
+    const scanIndex = section.indexOf("renma scan . --fail-on high");
+    const guideIndex = section.indexOf("renma guide skill");
+    assert.ok(guideIndex === -1 || scanIndex < guideIndex);
+  }
+  assert.match(
+    readme,
+    /guide skill` only when the work\s+intentionally reconsiders/,
+  );
+  assert.match(
+    manual,
+    /guide skill` during existing-Skill work only when intentionally/,
+  );
+  assert.match(
+    authoring,
+    /guide skill` only when the work intentionally reconsiders/,
+  );
 });
 
 test("Context Lens docs use canonical Skill metadata and explicit semantic boundaries", async () => {

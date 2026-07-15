@@ -12,6 +12,11 @@ import {
   type GraphFormat,
   type GraphView,
 } from "./commands/graph.js";
+import {
+  runGuideCommand,
+  type GuideFormat,
+  type GuideTopic,
+} from "./commands/guide.js";
 import { runInspectCommand, type InspectFormat } from "./commands/inspect.js";
 import {
   runOwnershipCommand,
@@ -75,6 +80,12 @@ const COMMAND_CONTRACTS: Record<CommandName, CommandContract> = {
     minPositionals: 1,
     maxPositionals: 1,
     missingPositionalsMessage: "inspect requires a target file.",
+  },
+  guide: {
+    minPositionals: 1,
+    maxPositionals: 1,
+    missingPositionalsMessage:
+      "guide requires a topic. The only supported topic is skill.",
   },
   scaffold: {
     minPositionals: 2,
@@ -181,6 +192,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       return await runScaffold(parsed.values, target, parsed.positionals[2]);
     }
 
+    if (command === "guide") {
+      return runGuide(parsed.values, target);
+    }
+
     if (command === "inspect") {
       return await runInspect(parsed.values, target);
     }
@@ -223,6 +238,28 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     if (message) return usageError(command, message);
     throw error;
   }
+}
+
+function runGuide(values: CliValues, topicValue: string): number {
+  if (topicValue !== "skill") {
+    return usageError(
+      "guide",
+      `Unknown guide topic "${topicValue}". The only supported topic is skill.`,
+    );
+  }
+
+  const format = values.json
+    ? "json"
+    : (stringValue(values.format) ?? "prompt");
+  if (format !== "prompt" && format !== "json") {
+    return usageError("guide", "--format must be either prompt or json.");
+  }
+
+  return runGuideCommand({
+    topic: topicValue as GuideTopic,
+    format: format as GuideFormat,
+    renmaVersion: packageJson.version,
+  });
 }
 
 async function runScaffold(

@@ -5,8 +5,8 @@ repositories that hold LLM-facing knowledge.
 
 Current product surface includes `scan`, `catalog`, `ownership`, `graph`,
 focused graph views, `trust-graph`, `readiness`, Repository Context BOM reports,
-repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `scaffold`,
-`suggest-metadata`, `suggest-semantic-split`, Agent Skills validation, and
+repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `guide`,
+`scaffold`, `suggest-metadata`, `suggest-semantic-split`, Agent Skills validation, and
 security diagnostics for agent-facing operational instructions.
 
 Focused graph views are inspection tools; they do not choose, inject, or load runtime context for an agent.
@@ -36,9 +36,18 @@ inputs, ordered instructions, decisions, constraints, short commands, examples,
 edge cases, verification, output, and completion criteria. They can also declare
 Context Asset and Context Lens relationships.
 
-Context assets hold reusable expertise. They should be maintainable outside a
-single skill, owned by the right team, versioned, reviewed, and reused across
-skills, agents, tools, and future agent runtimes.
+Context assets hold independently maintained knowledge. Cross-Skill reuse is
+one reason for a Context Asset, but independent ownership or lifecycle,
+separate maintenance, source-of-truth status, or another explicit independent
+governance reason is also sufficient. Information important only to one
+workflow's correctness remains in the Skill or justified Skill-local support;
+correctness importance alone does not create a Context boundary.
+
+An external URL preserved in a Context body is a source reference, not a
+catalog asset or Renma graph node. Runtime access to that URL is a separate,
+evidence-backed security-policy decision. A Markdown link does not grant network
+permission, and Renma must not infer permissive policy or an approved destination
+from unreviewed text.
 
 Context Lenses describe how one or more Context Assets should be interpreted for
 a purpose. They are repository governance metadata, not runtime lens selection
@@ -98,8 +107,8 @@ repository governance, where the evidence is, what direction a safe fix should
 take, what constraints must be preserved, and how to verify the fix.
 
 Renma should not apply large semantic rewrites by itself. It should produce
-structured diagnostics that can be pasted into Codex, Claude, Cursor, or another
-agent to guide a reviewable repository patch.
+structured diagnostics that can be provided to a coding agent to guide a
+reviewable repository patch.
 
 Current diagnostics include evidence, `whyItMatters`, remediation, typed repair
 constraints, verification steps, and LLM-facing hints where applicable. These
@@ -144,7 +153,7 @@ Central repair workflow:
    QA heuristics.
 2. Renma detects reusable-knowledge signals and reports possible mixed
    responsibility. The finding does not require every matched detail to move.
-3. Codex or Claude reads the diagnostics and proposes a patch that moves
+3. A coding agent reads the diagnostics and proposes a patch that moves
    knowledge into `contexts/` only when it needs cross-Skill reuse, independent
    ownership, lifecycle, or source-of-truth status. Skill-specific workflow and
    detail remain in `SKILL.md` or Skill-local References.

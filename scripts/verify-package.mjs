@@ -61,6 +61,12 @@ try {
     "dist/discovery.d.ts",
     "dist/commands/inspect.js",
     "dist/commands/inspect.d.ts",
+    "dist/commands/guide.js",
+    "dist/commands/guide.d.ts",
+    "dist/guidance/skill-authoring.js",
+    "dist/guidance/skill-authoring.d.ts",
+    "dist/renderers/guide.js",
+    "dist/renderers/guide.d.ts",
     "dist/commands/suggest-metadata.js",
     "dist/commands/suggest-metadata.d.ts",
     "dist/skill-migration.js",
@@ -109,6 +115,7 @@ try {
   );
   await verifyInspectDeclarationCompatibility(packageRoot);
   for (const modulePath of [
+    "dist/commands/guide.js",
     "dist/commands/inspect.js",
     "dist/commands/suggest-metadata.js",
     "dist/discovery.js",

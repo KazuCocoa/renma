@@ -1,11 +1,11 @@
 # Renma Internal Architecture
 
-This document describes the implemented internal architecture for the 0.18.3
-maintainability release. It is contributor guidance, not a new CLI or JSON
-contract. Renma 0.18.2 remains the behavioral baseline: internal types and
-module boundaries may become clearer, but public fields, classifications,
-diagnostics, severities, exit behavior, and migration direction must not change
-as a side effect.
+This document describes the 0.18.3 maintainability architecture plus the
+additive `guide` command implemented on `main` for the unreleased 0.19.0 line.
+It is contributor guidance, not a new versioned JSON schema. Renma 0.18.2
+remains the compatibility baseline for existing commands: public fields,
+classifications, diagnostics, severities, exit behavior, and migration direction
+must not change as a side effect.
 
 The high-level product boundary remains in [Architecture](../architecture.md).
 Stable classification and decision fields are documented in the
@@ -191,6 +191,14 @@ Command modules should stay orchestration-oriented:
 ```text
 collect context -> build evidence -> decide -> render or serialize
 ```
+
+`guide` is intentionally outside the repository-evidence pipeline because it
+must work without a repository. `src/guidance/skill-authoring.ts` owns one typed
+rule object, `src/renderers/guide.ts` projects that object as prompt or JSON, and
+`src/commands/guide.ts` only selects the projection and writes stdout. Scaffold
+may reuse small exported authoring invariants, but must not duplicate the full
+guide. The guidance source may import canonical metadata definitions; metadata
+and renderers must not import command modules.
 
 A `no-change-recommended` decision is a successful result. It means Renma
 completed the analysis and found no supported change. The command must not

@@ -23,7 +23,8 @@ const STATUSES: AssetStatus[] = [
   "archived",
 ];
 
-const CANONICAL_SKILL_METADATA_KEYS = {
+/** Canonical Agent Skills metadata keys understood by the installed Renma version. */
+export const CANONICAL_SKILL_METADATA_KEYS = {
   id: "renma.id",
   title: "renma.title",
   version: "renma.version",

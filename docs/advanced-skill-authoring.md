@@ -4,10 +4,11 @@ Use this guide when one broad Skill has grown into several distinct workflows
 that should remain focused, reviewable, and backed by appropriate local
 resources or shared Context Assets.
 
-This is current 0.18.0 authoring guidance. A focused Skill owns the workflow it
-needs to execute well; it is not required to be a thin router. Renma validates
-repository structure and declared Context relationships but does not select a
-Skill at runtime.
+This guide builds on the focused-workflow model introduced in 0.18.0. For the
+0.19.0 authoring contract, run `renma guide skill` before generating new files.
+A focused Skill owns the workflow it needs to execute well; it is not required
+to be a thin router. Renma validates repository structure and declared Context
+relationships but does not select a Skill at runtime.
 
 Deferred Skill-to-Skill discovery from the earlier roadmap has no assigned
 release: 0.18.0 does not add route metadata, discovery aliases, generated
@@ -21,9 +22,12 @@ review, regression planning, or test generation. As responsibilities diverge,
 prefer separate Skills with explicit selection boundaries over one large Skill
 that embeds every variant.
 
-Start by inspecting the existing Skill and its repository relationships:
+Because deriving focused Skills intentionally reconsiders asset boundaries,
+start by establishing the proposed structure and inspecting the existing Skill
+and its repository relationships:
 
 ```bash
+renma guide skill
 renma inspect skills/setup/appium/SKILL.md
 renma graph . --focus skill.setup.appium --format mermaid
 renma catalog . --format json
@@ -51,8 +55,11 @@ A derived Skill should own:
 - Context relationships; and
 - completion and verification criteria.
 
-Reusable domain, product, testing, platform, and tool knowledge should remain in
-Context Assets where multiple Skills can depend on it.
+Domain, product, testing, platform, and tool knowledge should remain in Context
+Assets when it is reused across Skills or has an independent owner, lifecycle,
+maintenance boundary, source-of-truth role, or another explicit reason for
+independent review and governance. Correctness importance alone is not an
+independent Context boundary.
 
 Skill-specific detailed procedures and variants belong in local references;
 deterministic implementation belongs in scripts; output resources belong in
@@ -71,15 +78,17 @@ contexts/platform/android/emulator-setup.md
 contexts/mobile/real-device-risk.md
 ```
 
-Generate each new target once:
+Use `renma guide skill` to define the smallest graph, then generate each new
+target once:
 
 ```bash
 renma scaffold skill skills/setup/appium-ios-simulator/SKILL.md \
   --owner mobile-platform
 ```
 
-Then review and complete it using platform-native Skill authoring guidance. Do
-not run another independent generator against the same file.
+Then review and complete its semantics using platform-native Skill authoring
+guidance within the established Renma boundaries. Do not run another independent
+generator against the same file.
 
 ## Declare Current Repository Relationships
 
