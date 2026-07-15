@@ -10,8 +10,10 @@ Use this index to choose the smallest document that answers your question.
   output formats, and CI usage.
 - [Authoring Guide](authoring-guide.md): canonical new-Skill and existing-Skill
   authoring workflows. New Skill generation and intentional boundary redesign
-  start with `renma guide skill`; ordinary existing-Skill maintenance starts
-  with `scan`.
+  start with the interactive clarification protocol printed by
+  `renma guide skill`; the consuming LLM conducts the conversation while Renma
+  remains deterministic and non-interactive. Ordinary existing-Skill
+  maintenance starts with `scan`.
 
 ## Format And Governance Contracts
 

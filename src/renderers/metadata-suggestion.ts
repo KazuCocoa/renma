@@ -215,7 +215,7 @@ function renderSkillSuggestionNextSteps(
   if (state === "blocked") {
     return [
       "Next steps:",
-      "1. Review the conflicts or invalid evidence and confirm the Skill's intent using platform-native Skill guidance.",
+      "1. Review the conflicts or invalid evidence and confirm the Skill's intent using platform-native Skill authoring guidance.",
       "2. Do not apply a candidate while Renma cannot generate it safely.",
       "3. Correct the source evidence, then rerun `renma suggest-metadata <SKILL.md>`.",
       "4. After intended corrections, run `renma scan . --fail-on high`, fix relevant diagnostics, and rerun the scan.",
@@ -226,7 +226,7 @@ function renderSkillSuggestionNextSteps(
     return [
       "Next steps:",
       "1. No metadata or migration change is proposed; preserve the existing source.",
-      "2. If a separate authoring change is intended, review the Skill semantics with platform-native guidance and keep the patch evidence-backed.",
+      "2. If a separate authoring change is intended, review the Skill semantics with platform-native Skill authoring guidance and keep the patch evidence-backed.",
       "3. After a separate, intentionally reviewed authoring change, run `renma scan . --fail-on high`, fix relevant diagnostics, and rerun the scan.",
       "4. If no separate change is intended, stop without manufacturing work.",
     ];
@@ -235,7 +235,7 @@ function renderSkillSuggestionNextSteps(
   return [
     "Next steps:",
     "1. Review the suggestion; Renma does not edit the Skill automatically.",
-    "2. Review the Skill's trigger description, instructions, workflow, constraints, and completion criteria with platform-native guidance.",
+    "2. Review the Skill's trigger description, instructions, workflow, constraints, and completion criteria with platform-native Skill authoring guidance.",
     "3. Apply only the intended metadata or migration changes.",
     "4. Run `renma scan . --fail-on high`.",
     "5. Fix relevant diagnostics and rerun the scan.",

@@ -38,6 +38,15 @@ test("guide skill defaults to deterministic prompt output for the installed vers
     defaultResult.stdout,
     /smallest non-redundant Renma asset graph/,
   );
+  assert.match(
+    defaultResult.stdout,
+    /begin with interactive clarification\. Do not create files immediately/,
+  );
+  assert.match(defaultResult.stdout, /one to three focused questions/);
+  assert.match(
+    defaultResult.stdout,
+    /Confirmed:[\s\S]*Proposed:[\s\S]*Unresolved:/,
+  );
   assert.match(defaultResult.stdout, /Source-of-truth status alone justifies/);
   assert.match(
     defaultResult.stdout,
@@ -95,6 +104,7 @@ test("guide skill JSON and --json are equivalent small structured projections", 
     "topic",
     "renmaVersion",
     "principle",
+    "interaction",
     "workflow",
     "placementRules",
     "artifactRules",
@@ -106,6 +116,27 @@ test("guide skill JSON and --json are equivalent small structured projections", 
   assert.equal(output.topic, "skill");
   assert.equal(typeof output.renmaVersion, "string");
   assert.ok((output.renmaVersion as string).length > 0);
+  assert.deepEqual(Object.keys(output.interaction as Record<string, unknown>), [
+    "openingRule",
+    "phases",
+    "truthSources",
+    "decisionClasses",
+    "questionRules",
+    "creationGate",
+    "postValidationActions",
+    "persistenceRules",
+    "handoffRules",
+    "minimalTriggerExample",
+    "productAInitialClarification",
+  ]);
+  assert.deepEqual(
+    Object.keys(
+      (output.interaction as Record<string, unknown>)[
+        "decisionClasses"
+      ] as Record<string, unknown>,
+    ),
+    ["confirmed", "proposed", "unresolved"],
+  );
   assert.deepEqual(Object.keys(output.example as Record<string, unknown>), [
     "request",
     "initialStructure",
@@ -153,24 +184,178 @@ test("guide renderers consume the same structured guidance data", () => {
   const json = JSON.parse(renderSkillGuideJson(guidance)) as typeof guidance;
 
   assert.deepEqual(json, guidance);
-  for (const value of [
-    guidance.principle,
-    ...guidance.workflow,
-    ...guidance.placementRules,
-    ...guidance.artifactRules,
-    ...guidance.concisenessRules,
-    ...guidance.metadataRules,
-    guidance.example.request,
-    ...guidance.example.initialStructure,
-    guidance.example.externalSourceReference,
-    ...guidance.example.skillResponsibilities,
-    ...guidance.example.contextResponsibilities,
-    ...guidance.example.securityReview,
-    ...guidance.example.notCreatedByDefault,
-    ...guidance.verification,
-  ]) {
+  for (const value of collectStrings(guidance)) {
     assert.ok(prompt.includes(value), value);
   }
+});
+
+test("interactive protocol is the prompt entrypoint before placement and artifact rules", () => {
+  const prompt = renderSkillGuidePrompt(
+    buildSkillAuthoringGuidance("test-version"),
+  );
+  const principleIndex = prompt.indexOf("Principle");
+  const interactionIndex = prompt.indexOf("Interactive authoring protocol");
+  const openingIndex = prompt.indexOf(
+    "begin with interactive clarification. Do not create files immediately.",
+  );
+  const placementIndex = prompt.indexOf("Placement rules");
+  const artifactIndex = prompt.indexOf("Artifact rules");
+
+  assert.ok(principleIndex >= 0);
+  assert.ok(interactionIndex > principleIndex);
+  assert.ok(openingIndex > interactionIndex);
+  assert.ok(placementIndex > openingIndex);
+  assert.ok(artifactIndex > placementIndex);
+});
+
+test("interactive protocol separates truth, proposals, and focused questions", () => {
+  const interaction = buildSkillAuthoringGuidance("test-version").interaction;
+  const truth = interaction.truthSources.join("\n");
+  const questions = interaction.questionRules.join("\n");
+  const decisions = Object.values(interaction.decisionClasses).join("\n");
+
+  assert.match(decisions, /Never present a model assumption as confirmed/);
+  assert.match(decisions, /proposal must not silently become confirmed/i);
+  assert.match(truth, /explicit user statement/);
+  assert.match(truth, /Unambiguous repository evidence/);
+  assert.match(truth, /safe default remains proposed/);
+  assert.match(questions, /repository evidence answers the question/);
+  assert.match(questions, /Renma rule supplies a safe structural default/);
+  assert.match(questions, /existing Skill that owns the workflow/);
+  assert.match(questions, /security profiles/);
+  assert.match(questions, /nearby validated examples/);
+  assert.match(questions, /conflicting or unhealthy conventions/);
+  assert.match(questions, /one to three closely related questions/);
+  assert.match(questions, /do not send a comprehensive questionnaire/i);
+  assert.match(questions, /Do not require a plan-mode-quality specification/);
+  assert.match(questions, /delegates a reversible choice/);
+  assert.match(questions, /do not extend that delegation to unrelated facts/);
+});
+
+test("minimal trigger starts with clarification and no invented asset structure", () => {
+  const example =
+    buildSkillAuthoringGuidance("test-version").interaction
+      .minimalTriggerExample;
+
+  assert.equal(
+    example.request,
+    "I want to create a Skill with `renma guide skill`.",
+  );
+  assert.deepEqual(example.unresolved, [
+    "The recurring task.",
+    "The expected result.",
+  ]);
+  assert.deepEqual(example.questions, [
+    "What recurring task should the Skill perform, and what result should it produce?",
+  ]);
+  assert.match(
+    example.proposed.join("\n"),
+    /No asset structure is justified yet/,
+  );
+  assert.doesNotMatch(
+    JSON.stringify(example),
+    /owner|Context Asset|script|metadata/i,
+  );
+});
+
+test("creation gate distinguishes blocking truth from refinable details", () => {
+  const gate =
+    buildSkillAuthoringGuidance("test-version").interaction.creationGate.join(
+      "\n",
+    );
+
+  for (const value of [
+    "focused recurring task",
+    "expected result",
+    "completion or failure behavior",
+    "smallest justified Skill, Context, and support-file structure",
+    "source authority",
+    "runtime source-access intent",
+    "blocking security-policy decisions",
+    "owner required by file-mode scaffold",
+  ]) {
+    assert.match(gate, new RegExp(escapeRegExp(value), "i"));
+  }
+  assert.match(
+    gate,
+    /Do not create files while any blocking decision remains unresolved/,
+  );
+  assert.match(
+    gate,
+    /Do not block creation on a complete plan, every edge case, final prose, all examples, finalized tags, speculative future capabilities/,
+  );
+});
+
+test("platform-native handoff occurs only after the Renma clarification gate", () => {
+  const handoff =
+    buildSkillAuthoringGuidance("test-version").interaction.handoffRules.join(
+      "\n",
+    );
+
+  assert.match(
+    handoff,
+    /must not independently generate.*before the Renma clarification gate/,
+  );
+  assert.match(handoff, /After the gate/);
+  assert.match(handoff, /from the Renma scaffold and agreed structure/);
+  assert.match(
+    handoff,
+    /must not independently add metadata, Context Assets, scripts, examples, or support files/,
+  );
+  assert.match(handoff, /must not create a second target file/);
+});
+
+test("post-validation and persistence rules preserve human truth", () => {
+  const interaction = buildSkillAuthoringGuidance("test-version").interaction;
+  const actions = interaction.postValidationActions.join("\n");
+  const persistence = interaction.persistenceRules.join("\n");
+
+  for (const category of [
+    "Deterministic repair",
+    "Repository investigation",
+    "Human decision required",
+    "No change justified",
+  ]) {
+    assert.match(actions, new RegExp(escapeRegExp(category)));
+  }
+  assert.match(actions, /Never add a suppression automatically/);
+  assert.match(persistence, /Persist only durable reviewed decisions/);
+  assert.match(persistence, /conversation transcript/);
+  assert.match(
+    persistence,
+    /temporary Confirmed, Proposed, or Unresolved summaries/,
+  );
+  assert.match(persistence, /metadata invented to store conversation state/);
+});
+
+test("Product A begins with source-access and fallback clarification", () => {
+  const clarification =
+    buildSkillAuthoringGuidance("test-version").interaction
+      .productAInitialClarification;
+
+  assert.match(
+    clarification.confirmed.join("\n"),
+    /builds a Product A JSON body/,
+  );
+  assert.match(
+    clarification.confirmed.join("\n"),
+    /documentation is authoritative/,
+  );
+  assert.match(clarification.proposed.join("\n"), /One focused Skill/);
+  assert.match(
+    clarification.proposed.join("\n"),
+    /No script or Context Lens by default/,
+  );
+  assert.match(
+    clarification.unresolved.join("\n"),
+    /accesses the URL at execution time/,
+  );
+  assert.match(clarification.unresolved.join("\n"), /Context owner/);
+  assert.equal(clarification.questions.length, 2);
+  assert.doesNotMatch(
+    JSON.stringify(clarification),
+    /approvedDomains|allow_network/,
+  );
 });
 
 test("guide rejects missing and unknown topics, unsupported options, and extra arguments", async () => {
@@ -195,6 +380,10 @@ test("guide rejects missing and unknown topics, unsupported options, and extra a
       argv: ["guide", "skill", "--format", "markdown"],
       message: /--format must be either prompt or json/,
     },
+    {
+      argv: ["guide", "skill", "--interactive"],
+      message: /Unknown option '--interactive'/,
+    },
   ];
 
   for (const fixture of cases) {
@@ -214,6 +403,7 @@ test("guide help and global help document the Skill topic", async () => {
   assert.match(commandHelp.stdout, /renma guide <topic>/);
   assert.match(commandHelp.stdout, /renma guide skill --format json/);
   assert.match(commandHelp.stdout, /skill is the only supported topic/i);
+  assert.doesNotMatch(commandHelp.stdout, /--interactive/);
   assert.match(
     globalHelp.stdout,
     /guide\s+What is the smallest justified asset graph/,
@@ -314,4 +504,17 @@ async function capture(
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function collectStrings(value: unknown): string[] {
+  if (typeof value === "string") {
+    return [value];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap(collectStrings);
+  }
+  if (value && typeof value === "object") {
+    return Object.values(value).flatMap(collectStrings);
+  }
+  return [];
 }

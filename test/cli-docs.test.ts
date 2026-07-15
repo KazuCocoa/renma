@@ -234,6 +234,14 @@ test("Skill authoring docs establish Renma boundaries before platform semantic r
   assert.match(authoring, /skill-creator/);
   assert.match(
     authoring,
+    /run renma guide skill[\s\S]*conduct Renma clarification[\s\S]*pass the creation gate[\s\S]*create the Renma scaffold[\s\S]*use skill-creator only for semantic refinement/,
+  );
+  assert.match(
+    authoring,
+    /If `skill-creator` is available or activates automatically, do not let it[\s\S]*create files before the Renma clarification gate is satisfied/,
+  );
+  assert.match(
+    authoring,
     /skill-creator[\s\S]*not[\s\S]*authority for Renma metadata/,
   );
   assert.doesNotMatch(cliSource, /skill-creator/);
@@ -270,6 +278,10 @@ test("Skill authoring docs establish Renma boundaries before platform semantic r
   assert.match(readme, /Deferred Skill-to-Skill Discovery Design/);
   assert.match(authoring, /focused, bounded workflows/);
   assert.doesNotMatch(authoring, /current thin-Skill authoring/);
+  for (const document of [readme, manual, authoring, docsIndex]) {
+    assert.match(document, /consuming LLM/);
+    assert.match(document, /non-interactive|does not conduct the conversation/);
+  }
 
   const optionalExampleIndex = authoring.indexOf("## Optional Codex Example");
   assert.ok(optionalExampleIndex >= 0);

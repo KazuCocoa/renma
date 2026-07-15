@@ -2,7 +2,7 @@
 
 ## Current Product Definition
 
-Renma 0.18.x is the current shipped baseline, with 0.18.3 as the latest package:
+Renma 0.19.0 is the current shipped baseline:
 a Git-native context repository and deterministic governance CLI for
 agent-consumable Skills, Context Lenses, Context Assets, local support
 resources, policies, ownership, lifecycle, dependencies, and review evidence.
@@ -49,7 +49,7 @@ Historical release detail belongs in [CHANGELOG.md](CHANGELOG.md). Contract
 details live in [architecture.md](architecture.md), [design.md](design.md), and
 the focused documents under [docs/](docs/README.md).
 
-## Planned 0.19.0 Authoring Guidance (Implemented On `main`, Unreleased)
+## Shipped 0.19.0 Authoring Guidance
 
 The 0.19.0 authoring flow begins with the deterministic, stdout-only
 `renma guide skill` contract:
@@ -77,8 +77,38 @@ own current responsibility.
 URLs, select runtime Context, infer governance or domain facts, or perform
 semantic rewriting. Human or LLM authors create the intended assets; existing
 scan, catalog, and graph behavior validates and exposes deterministic repository
-evidence. The shipped package baseline remains 0.18.x until the normal release
-workflow publishes 0.19.0.
+evidence.
+
+## Planned 0.19.1 Interactive Authoring Protocol
+
+The 0.19.1 follow-up extends the same structured `renma guide skill` source with
+an interactive protocol for the consuming LLM. It does not make Renma itself
+interactive and does not add a command or option:
+
+```text
+renma guide skill
+  -> consuming LLM clarifies the task and investigates relevant evidence
+  -> separate confirmed facts, proposals, and unresolved human truth
+  -> ask one to three focused questions
+  -> pass the creation gate
+  -> scaffold and author the smallest justified structure
+  -> validate
+  -> repair deterministically, investigate, ask again, or justify no change
+  -> persist reviewed durable decisions
+  -> human review
+```
+
+The protocol adds interactive clarification, truth-source separation, creation
+gates, post-scan question loops, and reviewed-decision persistence. Temporary
+conversation summaries, rejected proposals, and unanswered questions do not
+become repository metadata or assets. Platform-native Skill authoring guidance
+may refine semantics only after the gate and only within the agreed Renma
+structure.
+
+This section describes planned 0.19.1 behavior on `main`; 0.19.1 is not shipped
+until the normal release workflow publishes it. Existing CLI arguments, exit
+codes, deterministic output, non-editing behavior, and repository contracts
+remain unchanged.
 
 ## Stable Product Boundaries
 

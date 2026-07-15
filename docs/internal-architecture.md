@@ -1,7 +1,7 @@
 # Renma Internal Architecture
 
-This document describes the 0.19.0 maintainability architecture, including the
-additive `guide` command.
+This document describes the 0.19.x maintainability architecture, including the
+additive `guide` command and its unreleased interactive authoring protocol.
 It is contributor guidance, not a new versioned JSON schema. Renma 0.18.2
 remains the compatibility baseline for existing commands: public fields,
 classifications, diagnostics, severities, exit behavior, and migration direction
@@ -200,6 +200,30 @@ may reuse small exported authoring invariants, but must not duplicate the full
 guide. The guidance source may import canonical metadata definitions; metadata
 and renderers must not import command modules.
 
+The 0.19.1 follow-up adds one `interaction` object to that same guidance source.
+It owns the opening rule, progressive phases, truth-source and decision classes,
+question rules, creation gate, post-validation actions, persistence rules,
+platform-native Skill authoring guidance handoff, and minimal and Product A
+clarification examples. The prompt renderer places this protocol immediately
+after the central principle; JSON serializes the same object directly. This is
+an additive projection, not a separately versioned schema.
+
+The interaction model is an instruction contract for the consuming LLM, not a
+Renma state machine:
+
+```text
+renma guide skill -> deterministic protocol on stdout
+consuming LLM     -> investigates, proposes, asks, and edits
+user              -> supplies domain and governance truth
+Renma commands    -> provide deterministic rules and repository evidence
+human             -> approves meaningful decisions
+```
+
+No interaction state crosses the command boundary. `guide` does not accept task
+text, ask questions, retain history, interpret answers, create files, call an
+LLM, or repair assets. Confirmed / Proposed / Unresolved summaries remain
+ephemeral conversation state and must not become new Renma metadata.
+
 A `no-change-recommended` decision is a successful result. It means Renma
 completed the analysis and found no supported change. The command must not
 manufacture metadata, a migration, or verification work merely to return an
@@ -230,7 +254,7 @@ protects exact wording. Stable branching must use typed fields such as
 
 ## Intentional 0.18.2 Compatibility Seams
 
-Two parallel-looking paths remain intentional in 0.19.0.
+Two parallel-looking paths remain intentional in 0.19.x.
 
 ### Scan keeps structural parent evidence
 

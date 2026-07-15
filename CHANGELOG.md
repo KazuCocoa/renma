@@ -6,6 +6,36 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added an interactive, truth-seeking authoring protocol to the existing
+  structured `renma guide skill` source. The default prompt now tells the
+  consuming LLM to investigate relevant evidence, distinguish confirmed facts
+  from proposals and unresolved human truth, ask focused questions, pass a
+  creation gate, classify post-validation actions, and persist only reviewed
+  durable decisions.
+- Added minimal-trigger and Product A clarification examples plus focused
+  regression coverage for prompt ordering, the additive JSON interaction
+  projection, decision classes, question rules, creation gates, handoff,
+  validation loops, persistence, determinism, and non-editing behavior.
+
+### Changed
+
+- Clarified the authoring boundary: Renma prints a deterministic protocol while
+  the consuming LLM conducts the conversation, the user supplies domain and
+  governance truth, and a human approves meaningful decisions.
+- Delayed platform-native Skill authoring guidance until after the Renma
+  clarification gate and limited it to semantic refinement within the agreed
+  scaffold and asset structure.
+
+### Compatibility
+
+- Existing `guide` commands, options, exit codes, stdout-only behavior, and
+  prompt/JSON derivation remain unchanged. The JSON projection adds only the
+  `interaction` object and still has no separately versioned schema.
+- Renma remains non-interactive and adds no task input, session state, LLM call,
+  automatic creation, repair, runtime selection, or decision-state metadata.
+
 ## [0.19.0] - 2026-07-14
 
 ### Added

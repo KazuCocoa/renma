@@ -54,7 +54,7 @@ test("suggest-metadata prompt reports blocked legacy Skill migration", async () 
   assert.doesNotMatch(result.stdout, /renma guide skill/);
   assert.match(
     result.stdout,
-    /confirm the Skill's intent using platform-native Skill guidance/,
+    /confirm the Skill's intent using platform-native Skill authoring guidance/,
   );
   assert.match(
     result.stdout,

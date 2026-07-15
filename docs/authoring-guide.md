@@ -19,12 +19,13 @@ For a new Skill, or when intentionally redesigning asset boundaries, start with
 - workflow clarity diagnostics; and
 - repository-wide scan and readiness evidence.
 
-After those boundaries are established, platform-native Skill guidance may
-refine the name and trigger description, usage and exclusion boundaries,
-instructions, workflow, constraints, completion criteria, and examples that
-resolve real ambiguity. It is not the authority for Renma metadata, Context
-placement, repository asset boundaries, file count, source-of-truth
-representation, or whether scripts and support files should exist.
+After the clarification gate and those boundaries are established,
+platform-native Skill authoring guidance may refine the name and trigger
+description, usage and exclusion boundaries, instructions, workflow,
+constraints, completion criteria, and examples that resolve real ambiguity. It
+is not the authority for Renma metadata, Context placement, repository asset
+boundaries, file count, source-of-truth representation, or whether scripts and
+support files should exist.
 
 A name change that affects the canonical Skill directory/name relationship is
 an intentional path and identity change, not an ordinary semantic rewrite.
@@ -37,6 +38,126 @@ and source authority. The central principle is:
 
 > Create the smallest non-redundant Renma asset graph that preserves execution
 > clarity and traceability.
+
+## Interactive Clarification Protocol
+
+`renma guide skill` remains deterministic and non-interactive. It prints the
+protocol; the consuming LLM conducts the conversation, the user supplies domain
+and governance truth, Renma supplies authoring rules and repository evidence,
+and a human approves meaningful decisions. Renma does not accept task text,
+ask questions, retain conversation state, interpret answers, or create assets.
+
+When the user asks to create a Skill, the consuming LLM starts with
+clarification instead of file creation:
+
+```text
+understand
+  -> investigate available evidence
+  -> classify current decisions
+  -> ask one to three focused questions
+  -> propose the smallest asset structure
+  -> pass the creation gate
+  -> scaffold and author
+  -> validate
+  -> repair, investigate, ask again, or justify no change
+  -> human review
+```
+
+The user does not need to supply a plan-quality specification before this loop
+begins. On the first meaningful response, keep the working state compact:
+
+```text
+Current understanding
+
+Confirmed
+- Facts stated by the user or supported by unambiguous repository evidence.
+
+Proposed
+- Reversible structural defaults or justified design suggestions.
+
+Unresolved
+- Human truth or missing repository evidence that must not be invented.
+
+Question
+- One to three closely related questions about the highest-impact gap.
+```
+
+A proposal never silently becomes confirmed. Explicit user delegation can
+confirm authority to choose one reversible default, but it does not establish
+unrelated domain facts. When repository evidence confirms a fact, cite the
+relevant file, metadata, or command result in the explanation.
+
+Before asking the user, inspect evidence that can answer the current question.
+Use only the relevant commands rather than treating every view as ceremony:
+
+```bash
+renma scan . --fail-on high --format json
+renma catalog . --format json
+renma inspect <relevant-file> --format json
+renma graph . --focus <relevant-id-or-path> --format json
+```
+
+Ask only about decisions that materially affect the task, inputs, output,
+completion or failure behavior, usage boundaries, placement, source authority,
+Context necessity, external access, security policy, or support-file
+justification. Do not ask the user to choose metadata syntax, repeat known
+facts, complete a large questionnaire, or define speculative future features.
+Wording, tags, examples, and formatting can be refined later.
+
+For the minimal request:
+
+```text
+I want to create a Skill with `renma guide skill`.
+```
+
+the expected first response says it ran the guide, confirms only that the user
+wants a new Skill under the Renma contract, proposes that no asset structure is
+yet justified, leaves the recurring task and expected result unresolved, and
+asks what recurring task the Skill should perform and what result it should
+produce. It does not invent an owner, Context, script, or metadata.
+
+### Creation gate
+
+Before creating files, establish the focused recurring task, expected result,
+meaningful completion or failure behavior, smallest justified asset structure,
+source authority and runtime source-access intent when relevant, blocking
+security and domain decisions, and the owner required by file-mode scaffold
+unless repository evidence already supplies it. Pause while a blocking human
+decision remains unresolved.
+
+The gate does not require a complete plan, every edge case, final prose, all
+examples, finalized tags, future capabilities, or perfect certainty about
+non-blocking details. Once the gate passes, present the smallest proposed
+structure, identify remaining non-blocking proposals, and ask for confirmation
+only when a meaningful discretionary boundary remains uncertain. Do not add a
+redundant confirmation after the user has already authorized creation.
+
+### Post-validation decisions
+
+Classify each relevant finding before acting:
+
+- **Deterministic repair:** make a bounded correction supported by the
+  diagnostic and repository evidence, then rerun relevant validation.
+- **Repository investigation:** inspect ambiguous targets, parents, owners,
+  possible Context reuse, or conflicting conventions before asking the user.
+- **Human decision required:** ask a focused question when ownership, source
+  authority, behavior, permissions, fallback semantics, Context necessity, or
+  deliberate script use depends on human truth.
+- **No change justified:** explain why the evidence does not support a repair
+  or why an advisory reflects reviewed intentional design.
+
+Never add a suppression automatically, weaken security policy, manufacture
+metadata, rewrite semantics merely to clear a finding, or turn a human decision
+into a model assumption.
+
+### Reviewed-decision persistence
+
+Persist durable reviewed workflow, boundary, input, output, completion,
+Context, authority, fallback, metadata, and security decisions. Do not persist
+the conversation transcript, private reasoning, temporary Confirmed / Proposed
+/ Unresolved headings, rejected proposals, unanswered questions, speculative
+work, or invented decision-state metadata. Report non-blocking uncertainty to
+the user instead of hiding it in authoritative prose.
 
 ## Focused Workflow Model
 
@@ -81,7 +202,8 @@ Use this sequence for a new Skill:
 
 ```text
 renma guide skill
-  -> define the smallest intended asset structure
+  -> clarify human truth and inspect relevant evidence
+  -> pass the creation gate and define the smallest intended asset structure
   -> renma scaffold skill
   -> scaffold or reuse justified Context Assets
   -> complete the focused workflow
@@ -110,11 +232,13 @@ Use its deterministic prompt to define:
 - every independently maintained Context dependency; and
 - the smallest set of files with distinct responsibilities.
 
-Write concrete positive and near-miss negative trigger examples before
-scaffolding. Define the expected output and completion criteria early. Match
-implementation freedom to fragility: use prose when judgment is central, a
-parameterized script when a stable operation needs flexible inputs, and a fixed
-script when ordering or exact behavior is safety-critical.
+The consuming LLM develops this understanding progressively; the user does not
+need to supply every section, field, edge case, or file up front. Define the
+expected output and completion criteria early. Trigger wording and examples can
+be refined after the creation gate unless a usage boundary is itself blocking.
+Match implementation freedom to fragility: use prose when judgment is central,
+a parameterized script when a stable operation needs flexible inputs, and a
+fixed script when ordering or exact behavior is safety-critical.
 
 Do not guess missing owners, policies, dependencies, product behavior, domain
 rules, or source-of-truth documents. Record gaps for a human to resolve.
@@ -189,18 +313,20 @@ It creates requested empty directories and no placeholder files. In the
 completed Skill, state when each reference should be read, each script should be
 run, and each asset should be used.
 
-Do not run two independent generators against the same target file. Some
-platform-native authoring tools create files themselves, so choose one of these
-safe approaches:
+Do not run two independent generators against the same target file. Some tools
+that provide platform-native Skill authoring guidance create files themselves,
+so choose one of these safe approaches after the clarification gate:
 
 1. Run `renma scaffold skill`, then ask the platform tool to review and refine
    that existing file.
 2. Ask the platform tool to use `renma scaffold skill` as the starting point
    instead of independently generating the same target.
 
-Use Renma as the one generator, then use platform-native authoring guidance only
-to refine semantics inside the established asset and metadata boundaries. Do
-not ask two generators to independently create the same target.
+Use Renma as the one generator, then use platform-native Skill authoring
+guidance only to refine semantics inside the established asset and metadata
+boundaries. It must work from the Renma scaffold and agreed structure, must not
+add metadata or assets outside that structure, and must not create a second
+target.
 
 `--format prompt` prints the deterministic scaffold and constraints without
 writing the file. `--format json` prints the existing structured bundle. These
@@ -208,7 +334,8 @@ modes do not reserve or create the target path.
 
 ### 3. Review and complete the scaffold
 
-Within the Renma boundaries, use platform-native guidance to complete:
+Within the Renma boundaries, use platform-native Skill authoring guidance to
+complete:
 
 - `description`, including positive and negative trigger boundaries;
 - required inputs and preflight evidence;
@@ -244,7 +371,10 @@ renma scan . --fail-on high
 
 Review every relevant diagnostic, correct the underlying wording, metadata, or
 relationship, and rerun the same scan. Do not weaken security policy or add a
-suppression merely to make validation pass.
+suppression merely to make validation pass. Use the post-validation decision
+classes above: perform a bounded deterministic repair, investigate more
+repository evidence, ask the human when truth is missing, or explain why no
+change is justified.
 
 Use other deterministic views when they answer a specific review question:
 
@@ -269,7 +399,37 @@ The official Product A URL is the source of truth.
 Improve the Skill with Renma.
 ```
 
-the initial Renma asset structure is:
+the consuming LLM first reports:
+
+```text
+Current understanding
+
+Confirmed
+- The workflow builds a Product A JSON body.
+- The official Product A documentation is authoritative.
+
+Proposed
+- One focused Skill.
+- One concise source-of-truth Context Asset.
+- The Context is likely required.
+- No script or Context Lens by default.
+
+Unresolved
+- Whether the finished Skill accesses the URL at execution time.
+- What happens when the source cannot be accessed.
+- The Context owner, unless repository evidence resolves it.
+
+Questions
+1. Should the Skill access the official URL during execution, or should the
+   relevant documentation be supplied through another approved process?
+2. When the source is unavailable, should the Skill stop rather than infer the
+   JSON schema?
+```
+
+It does not create files until blocking answers are available. It does not
+hard-code a fictional approved domain or permissive security metadata.
+
+After the creation gate, the smallest proposed Renma asset structure is:
 
 ```text
 skills/build-product-a-json/SKILL.md
@@ -399,8 +559,8 @@ requires otherwise.
 If migration is blocked:
 
 1. Review the reported conflicts or invalid evidence.
-2. Confirm the Skill's intent using platform-native authoring guidance within
-   the established Renma boundaries.
+2. Confirm the Skill's intent using platform-native Skill authoring guidance
+   within the established Renma boundaries.
 3. Do not apply a candidate while Renma cannot generate it safely.
 4. Correct the source evidence.
 5. Rerun `renma suggest-metadata <SKILL.md>`.
@@ -562,17 +722,30 @@ already implemented; `routes_to` and `skill-index` are not.
 
 ## Optional Codex Example
 
-Codex `skill-creator` is one example of platform-native authoring guidance. It
-is not a Renma dependency or the authority for Renma metadata, Context
-placement, repository asset boundaries, file count, source-of-truth
-representation, or scripts and support files.
-
-After creating the Renma scaffold, a safe request is:
+Codex may activate `skill-creator` when asked to create a Skill. It is one
+example of platform-native Skill authoring guidance, not a Renma dependency or
+the authority for Renma metadata, Context placement, repository asset
+boundaries, file count, source-of-truth representation, or scripts and support
+files. The expected sequence is:
 
 ```text
-First run `renma guide skill` and establish the smallest intended asset graph.
-Create `skills/testing/spec-review/SKILL.md` with `renma scaffold skill`. Then
-use skill-creator only to refine its trigger description, ordered instructions,
+run renma guide skill
+  -> conduct Renma clarification
+  -> pass the creation gate
+  -> create the Renma scaffold
+  -> use skill-creator only for semantic refinement
+```
+
+If `skill-creator` is available or activates automatically, do not let it
+independently create files before the Renma clarification gate is satisfied.
+
+After passing the gate, a safe request is:
+
+```text
+First run `renma guide skill`, conduct focused clarification, and resolve the
+blocking creation-gate decisions. Create
+`skills/testing/spec-review/SKILL.md` with `renma scaffold skill`. Then use
+skill-creator only to refine its trigger description, ordered instructions,
 usage boundaries, required inputs, constraints, completion criteria, and
 ambiguity-resolving examples. Preserve its Renma metadata, Context placement,
 file boundaries, and repository behavior. Do not independently generate a

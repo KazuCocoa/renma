@@ -1,6 +1,8 @@
 import type {
+  SkillAuthoringClarificationExample,
   SkillAuthoringExample,
   SkillAuthoringGuidance,
+  SkillAuthoringInteraction,
 } from "../guidance/skill-authoring.js";
 
 export function renderSkillGuidePrompt(
@@ -11,6 +13,9 @@ export function renderSkillGuidePrompt(
     "",
     "Principle",
     guidance.principle,
+    "",
+    "Interactive authoring protocol",
+    ...renderInteraction(guidance.interaction),
     "",
     "Authoring workflow",
     ...renderNumbered(guidance.workflow),
@@ -28,12 +33,15 @@ export function renderSkillGuidePrompt(
     ...renderBullets(guidance.metadataRules),
     "",
     "Product A example",
-    ...renderExample(guidance.example),
+    ...renderExample(
+      guidance.example,
+      guidance.interaction.productAInitialClarification,
+    ),
     "",
     "Verification",
     ...renderNumbered(guidance.verification),
     "",
-    "Boundary: LLM proposes. Renma verifies. Human approves.",
+    "Boundary: LLM investigates, proposes, asks, and edits. User supplies domain and governance truth. Renma provides deterministic authoring rules and repository evidence. Human approves meaningful decisions.",
   ].join("\n");
 }
 
@@ -41,10 +49,16 @@ export function renderSkillGuideJson(guidance: SkillAuthoringGuidance): string {
   return JSON.stringify(guidance, null, 2);
 }
 
-function renderExample(example: SkillAuthoringExample): string[] {
+function renderExample(
+  example: SkillAuthoringExample,
+  clarification: Omit<SkillAuthoringClarificationExample, "request">,
+): string[] {
   return [
     "Input request:",
     example.request,
+    "",
+    "Expected first clarification turn:",
+    ...renderDecisionSummary(clarification),
     "",
     "Expected initial Renma asset structure:",
     "```text",
@@ -65,6 +79,67 @@ function renderExample(example: SkillAuthoringExample): string[] {
     "",
     "Not created by default:",
     ...renderBullets(example.notCreatedByDefault),
+  ];
+}
+
+function renderInteraction(interaction: SkillAuthoringInteraction): string[] {
+  return [
+    interaction.openingRule,
+    "",
+    "Progressive phases:",
+    ...renderNumbered(interaction.phases),
+    "",
+    "Truth sources:",
+    ...renderBullets(interaction.truthSources),
+    "",
+    "Decision classes:",
+    `- Confirmed: ${interaction.decisionClasses.confirmed}`,
+    `- Proposed: ${interaction.decisionClasses.proposed}`,
+    `- Unresolved: ${interaction.decisionClasses.unresolved}`,
+    "",
+    "Question rules:",
+    ...renderBullets(interaction.questionRules),
+    "",
+    "Creation gate:",
+    ...renderBullets(interaction.creationGate),
+    "",
+    "Post-validation actions:",
+    ...renderBullets(interaction.postValidationActions),
+    "",
+    "Persistence rules:",
+    ...renderBullets(interaction.persistenceRules),
+    "",
+    "Platform-native Skill authoring guidance handoff:",
+    ...renderBullets(interaction.handoffRules),
+    "",
+    "Minimal-trigger example:",
+    "Input request:",
+    interaction.minimalTriggerExample.request,
+    "",
+    "Expected first response after running `renma guide skill`:",
+    "I ran `renma guide skill`.",
+    "",
+    ...renderDecisionSummary(interaction.minimalTriggerExample),
+  ];
+}
+
+function renderDecisionSummary(
+  example: Omit<SkillAuthoringClarificationExample, "request">,
+): string[] {
+  return [
+    "Current understanding",
+    "",
+    "Confirmed",
+    ...renderBullets(example.confirmed),
+    "",
+    "Proposed",
+    ...renderBullets(example.proposed),
+    "",
+    "Unresolved",
+    ...renderBullets(example.unresolved),
+    "",
+    example.questions.length === 1 ? "Question" : "Questions",
+    ...renderNumbered(example.questions),
   ];
 }
 

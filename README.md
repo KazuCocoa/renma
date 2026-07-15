@@ -39,15 +39,18 @@ broader product framing.
 
 ## Agent Skills And Renma
 
-Run `renma guide skill` before generation. Renma establishes repository asset,
-metadata, placement, and responsibility boundaries first; the deterministic
-scaffold is the repository-compatible starting point. Platform-native Skill
-guidance may then refine trigger descriptions, ordered instructions, positive
-and negative usage boundaries, inputs, constraints, completion criteria, and
-examples that resolve real ambiguity within those boundaries.
+Run `renma guide skill` before generation. Its deterministic output tells the
+consuming LLM to clarify the recurring task and expected result, inspect
+relevant repository evidence, distinguish confirmed facts from proposals and
+unresolved human truth, and ask one to three focused questions. Renma itself
+does not conduct the conversation. After blocking decisions are resolved, the
+deterministic scaffold is the repository-compatible starting point.
 
-Platform-native guidance is not the authority for Renma metadata, Context
-placement, repository asset boundaries, file count, source-of-truth
+Platform-native Skill authoring guidance may then refine trigger descriptions,
+ordered instructions, positive and negative usage boundaries, inputs,
+constraints, completion criteria, and examples that resolve real ambiguity
+within the agreed boundaries. It is not the authority for Renma metadata,
+Context placement, repository asset boundaries, file count, source-of-truth
 representation, or whether support files and scripts should exist. Renma does
 not replace semantic authoring judgment, and human review remains required.
 
@@ -67,6 +70,8 @@ for the exact format and one-way migration contract.
 Renma discovers, parses, normalizes, and validates repository assets. It does
 not:
 
+- conduct an authoring conversation, ask the user questions, or retain session
+  state;
 - select a Skill or Context for a live task;
 - assemble or inject prompts;
 - execute Skills, agents, or tools;
@@ -98,7 +103,10 @@ For a new Skill, establish the Renma contract before generation:
 
 ```text
 renma guide skill
-  -> define the smallest intended asset structure
+  -> consuming LLM clarifies human truth and inspects relevant evidence
+  -> classify confirmed, proposed, and unresolved decisions
+  -> ask one to three focused questions
+  -> pass the creation gate and define the smallest intended asset structure
   -> renma scaffold skill
   -> scaffold or reuse justified Context Assets
   -> complete the focused workflow
@@ -123,9 +131,10 @@ renma scan . --fail-on high
 
 Do not create a generic Skill first and enrich it afterward with Renma-like
 metadata, and do not run two independent generators against the same target
-file. If a platform-native tool can generate Skills, ask it to refine semantics
-inside the existing Renma scaffold and asset graph. `suggest-metadata` never
-edits the target and does not improve the Skill body.
+file. Use platform-native Skill authoring guidance only after the clarification
+gate and only to refine semantics inside the existing Renma scaffold and asset
+graph.
+`suggest-metadata` never edits the target and does not improve the Skill body.
 
 For existing-Skill maintenance, use `renma guide skill` only when the work
 intentionally reconsiders Skill-versus-Context responsibility, file or resource
@@ -162,8 +171,9 @@ Create and complete a new Skill:
 
 ```bash
 npx renma guide skill
+# The consuming LLM clarifies blocking human decisions before file creation.
 npx renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
-# Refine semantics within the Renma asset and metadata boundaries.
+# Use platform-native Skill authoring guidance within the agreed boundaries.
 npx renma scan . --fail-on high
 npx renma catalog . --format markdown
 npx renma graph . --format markdown
