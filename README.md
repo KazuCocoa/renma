@@ -52,6 +52,14 @@ deterministic scaffold is the repository-compatible starting point. A runtime
 task unknown that the finished Skill can detect and report with evidence does
 not automatically block authoring.
 
+The protocol is domain-neutral and structurally separate from its optional,
+non-normative illustrations. Renma does not classify a Skill request by matching
+it to a built-in example. The consuming LLM applies the normative protocol to
+the current request and evidence; illustrations may clarify individual
+decisions, may be combined or ignored, and must not be copied as templates. A
+report-first pattern and a fictional source-backed Product API pattern remain
+concrete only to demonstrate particular authoring tensions.
+
 Platform-native Skill authoring guidance may then refine trigger descriptions,
 ordered instructions, positive and negative usage boundaries, inputs,
 constraints, completion criteria, and examples that resolve real ambiguity

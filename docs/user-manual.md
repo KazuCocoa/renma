@@ -908,6 +908,20 @@ conversation state.
 A short request is enough to begin; no `--interactive` option or upfront plan
 document is required.
 
+The protocol is domain-neutral and structurally separate from its optional
+illustrations. Renma does not classify a request by matching it to a built-in
+example or ask the LLM to choose the closest one. The consuming LLM applies the
+normative protocol to current evidence. It may ignore illustrations or combine
+individual decision patterns, but must not copy their workflows, structures,
+questions, completion criteria, security policies, unresolved items, or domain
+assumptions as templates. Future illustrations can be added without changing
+the normative interaction protocol.
+
+The default prompt keeps illustrations compact to reduce anchoring. JSON retains
+their useful optional structures and source-specific review details. Both
+projections derive from the same structured guidance source; they are not
+required to render every field identically.
+
 Use it before generation, or when intentionally redesigning asset boundaries,
 to identify the smallest non-redundant asset graph, source-of-truth Context,
 focused Skill workflow, justified support files, metadata discipline,

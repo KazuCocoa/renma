@@ -6,6 +6,44 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.19.2] - 2026-07-15
+
+### Changed
+
+- Structurally separated the normative 0.19.1 authoring protocol from a
+  deterministic top-level collection of non-normative, intentionally incomplete
+  illustrations. `interaction` now contains protocol rules only; the previous
+  example fields and special top-level API object have no compatibility aliases
+  in the independently unversioned guide JSON projection.
+- Added normative illustration-usage rules: apply the protocol directly to the
+  current request and evidence, never choose or copy the closest illustration,
+  ignore illustrations when useful, and combine individual decision patterns
+  only when their conditions are independently present. Renma adds no
+  illustration classifier, selector, similarity matcher, or Skill-type template.
+- Consolidated the minimal-clarification, report-first-progression, and
+  source-backed-boundary patterns under one illustration type. The fictional
+  Product API remains fully contained in one source-backed illustration; its
+  API, schema, timeout, retry, and response details are not universal Skill
+  requirements.
+- Reinforced that Context Assets, Context Lenses, scripts, support files,
+  external sources, runtime network access, and Skill splits each require
+  independent justification. Future review findings remain runtime task
+  unknowns rather than automatic authoring blockers.
+- Made top-level verification domain-neutral and conditional, while retaining
+  Context, URL, access, fallback, and security checks inside the source-backed
+  illustration. The default prompt now renders compact illustration decisions;
+  JSON retains detailed optional structures for external consumers.
+
+### Compatibility
+
+- Existing command syntax, formats, exit codes, deterministic stdout-only
+  behavior, repository independence, and non-editing/non-network/non-LLM
+  boundaries remain unchanged. The additive guide JSON projection still has no
+  independently versioned schema, so removed example fields have no
+  compatibility-only duplicates inside the normative interaction object.
+- The 0.19.1 creation gate, question batching, queued blockers, conservative
+  repairs, re-entry, and persistence semantics are unchanged.
+
 ## [0.19.1] - 2026-07-15
 
 ### Added
@@ -702,7 +740,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.19.1...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.19.2...HEAD
+[0.19.2]: https://github.com/KazuCocoa/renma/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/KazuCocoa/renma/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/KazuCocoa/renma/compare/v0.18.3...v0.19.0
 [0.18.3]: https://github.com/KazuCocoa/renma/compare/v0.18.2...v0.18.3

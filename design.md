@@ -79,6 +79,19 @@ Renma does not own runtime behavior:
 - No provider gateway or agent coordination layer
 - No telemetry collection responsibility
 
+## Authoring Guidance Boundary
+
+`renma guide skill` projects one structured source with two explicit layers.
+The normative interaction protocol applies to every current request. A separate
+ordered illustration collection contains optional, intentionally incomplete
+demonstrations of individual decision patterns.
+
+Renma does not match a request to a built-in example, select the closest
+illustration, or define Skill-type templates. The consuming LLM reasons from the
+current request and evidence, may ignore all illustrations, and may combine
+lessons from several when their underlying conditions independently apply.
+Illustrations can evolve without changing the normative protocol.
+
 Any future import of external signals from CI, IDE wrappers, agent plugins, or
 other integrations must treat those signals as separately produced offline
 review evidence. Renma itself is not telemetry-responsible.

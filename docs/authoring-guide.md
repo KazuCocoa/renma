@@ -224,11 +224,9 @@ Propose a split or narrower first Skill, explain the responsibilities, keep the
 boundary Proposed, ask only if evidence cannot resolve it, and re-enter the gate
 after the decision. Do not split automatically because the count is high.
 
-Compact review-Skill illustration: a specification review finds 20 raw gaps
-across authorization, failure recovery, validation boundaries, and
-observability. The review continues, preserves the evidence, and reports four
-decision themes with impact. It asks only about a theme that blocks the requested
-output; the other unknowns remain valuable findings, not failed clarification.
+Concrete demonstrations are intentionally separated into the non-normative
+illustration section below. They do not define request categories or add rules
+to this protocol.
 
 ### Truth sources
 
@@ -270,18 +268,6 @@ Context necessity, external access, security policy, or support-file
 justification. Do not ask the user to choose metadata syntax, repeat known
 facts, complete a large questionnaire, or define speculative future features.
 Wording, tags, examples, and formatting can be refined later.
-
-For the minimal request:
-
-```text
-I want to create a Skill with `renma guide skill`.
-```
-
-the expected first response says it ran the guide, confirms only that the user
-wants a new Skill under the Renma contract, proposes that no asset structure is
-yet justified, leaves the recurring task and expected result unresolved, and
-asks what recurring task the Skill should perform and what result it should
-produce. It does not invent an owner, Context, script, or metadata.
 
 ### Creation gate
 
@@ -568,7 +554,8 @@ agents. Renma remains deterministic; runtime evaluation stays external.
 
 ### 4. Validate, fix, and rerun
 
-Start with the release gate:
+Run the validation commands relevant to the authored or changed structure. The
+usual release gate is:
 
 ```bash
 renma scan . --fail-on high
@@ -581,7 +568,8 @@ when truth is missing, or explain why no change is justified. Follow
 Diagnostics v2 constraints and verification steps, rerun after repairs, and do
 not weaken security policy or add a suppression merely to pass.
 
-Use other deterministic views when they answer a specific review question:
+Use other deterministic views only when they answer a specific structural or
+governance question; do not run every command as ceremony:
 
 ```bash
 renma inspect skills/testing/spec-review/SKILL.md
@@ -591,13 +579,68 @@ renma ownership . --format markdown
 renma readiness . --format markdown
 ```
 
-The final step is human review of the Skill's intent, workflow, policy,
-relationships, and remaining uncertainty.
+Inspect every created or reused asset and relationship. When optional Context,
+Lens, source, script, or security structures exist, perform the additional
+verification appropriate to them. The final step is human review of semantic
+correctness, meaningful decisions, applicable authority, and remaining
+uncertainty. Clean deterministic output does not prove semantic correctness.
 
-### Canonical fictional external API example: Example Product API
+### How to use non-normative illustrations
+
+Renma does not classify a Skill request by matching it to a built-in example.
+The consuming LLM applies the normative protocol to the current request and
+evidence. Illustrations may clarify individual decisions, but may be ignored
+and must not be copied as templates.
+
+Do not copy an illustration's workflow, asset structure, questions, completion
+criteria, security policy, unresolved items, or domain assumptions. Reuse a
+decision pattern only when its conditions are independently present. Multiple
+illustrations may inform different decisions, and none needs to match the whole
+Skill. The normative protocol and current evidence always control.
+
+### Illustration: Minimal blocking clarification
+
+For “I want to create a Skill with `renma guide skill`,” no asset structure is
+yet justified. Confirm only the request to create a Skill, leave the recurring
+task and expected result unresolved, and ask for that smallest Blocking
+information without demanding a complete plan. This is an optional decision
+pattern, not a required first-turn template.
+
+### Illustration: Report-first progression with runtime findings
+
+For “Create a Skill that reviews whether repository documentation still matches
+the implementation,” the recurring task is review and the intended output may
+be an evidence-backed report rather than a patch. Only the recurring task is
+Confirmed by that request. Using current repository implementation and tests as
+evidence when applicable and unambiguous, producing a report without automatic
+patching, and starting with one Skill are safe Proposed reversible defaults. No
+Context Asset, Context Lens, script, support file, or external source is
+required by default.
+
+The initial creation gate can pass with no blockers and no mandatory questions:
+compare the named artifacts, report evidence, mismatches, risks, and unresolved
+questions, do not decide intended behavior without authority, and do not modify
+documentation or implementation automatically. Future repository mismatches,
+missing tests, unresolved authority, and other reportable findings are runtime
+task unknowns. Their number does not imply a Skill split, and the author should
+not be asked to resolve them in advance. Authority or completion policy becomes
+Blocking only if later evidence shows that the Skill must adjudicate mismatches
+rather than safely report them.
+
+### Illustration: Source-backed authority and access boundary
 
 Example Product API is a fictional external API used only to illustrate
 authoritative-source handling. It is not a Renma concept or a real product.
+
+This fictional API example illustrates one source-backed workflow. Its API,
+schema, timeout, retry, and response-behavior details are example-specific and
+are not default requirements for unrelated Skills.
+
+General authoring lessons are the separation of source designation from source
+content, authoring-time from runtime access, authoring blockers from runtime
+findings, and reviewed durable decisions from temporary conversation state.
+Example-specific domain details include JSON construction, API fields,
+operation behavior, and source-unavailability handling.
 
 For this request:
 
@@ -637,8 +680,7 @@ Unresolved
 - Whether authoring-time consultation is needed for a source-specific authoring
   decision.
 
-Epistemically unresolved source-dependent runtime task knowledge handled by the
-finished Skill
+Epistemically unresolved runtime task knowledge handled by the finished Skill
 - The current Example Product API schema.
 - The current documented fields and constraints.
 - Operation-specific behavior read from the authoritative source.
