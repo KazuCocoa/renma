@@ -254,38 +254,38 @@ export function buildSkillAuthoringGuidance(
         request:
           "Create a Skill that reviews whether repository documentation still matches the implementation.",
         confirmed: [
-          "The recurring task is a review of repository documentation against implementation evidence.",
-          "Repository implementation and tests may provide applicable evidence.",
-          "The expected output can be an evidence-backed report rather than an automatic patch.",
+          "The recurring task is to review whether repository documentation still matches the implementation.",
         ],
         proposed: [
+          "Compare the named repository documentation with the implementation.",
+          "Use current repository implementation and tests as evidence when they are applicable and unambiguous.",
+          "Produce an evidence-backed report rather than automatically patching documentation or implementation.",
           "One focused Skill only is the smallest justified initial structure.",
           "No Context Asset, Context Lens, script, support file, or external source by default.",
         ],
-        unresolved: [
-          "Which documentation is authoritative when implementation and tests cannot resolve intended product behavior.",
-          "The acceptance criteria for declaring the review complete if repository evidence does not establish them.",
-        ],
-        questions: [
-          "When implementation and tests cannot resolve a mismatch, which documentation or product authority should govern the report?",
-          "What evidence and report contents are required for the review to be complete?",
-        ],
+        unresolved: [],
+        questions: [],
         progression: {
-          blocking: [
-            "Documentation authority when repository evidence cannot resolve intended product behavior.",
-            "Review completion criteria when repository evidence does not establish them.",
-          ],
+          blocking: [],
           reversibleDefaults: [
             "One Skill only.",
-            "Report findings without automatically patching documentation or implementation.",
+            "Compare the named repository documentation with the implementation.",
+            "Use implementation and tests as evidence only when applicable and unambiguous.",
+            "Produce an evidence-backed report rather than automatically patching documentation or implementation.",
+            "Report unresolved authority instead of deciding intended behavior without evidence.",
+            "Complete the review by reporting compared artifacts, evidence, mismatches, risks, and unresolved questions.",
             "No Context Asset, Context Lens, script, support file, or external source by default.",
           ],
-          deferred: ["Final report wording and optional examples."],
+          deferred: [
+            "Repository-specific report wording and optional examples.",
+            "A stronger authority or completion policy if later evidence shows that the Skill must adjudicate mismatches rather than report them.",
+          ],
           queuedBlockers: [],
         },
         runtimeTaskUnknowns: [
           "Future mismatches between repository documentation and implementation.",
           "Missing or inconclusive tests encountered during a future review.",
+          "Unresolved documentation or product authority encountered during a future review.",
           "Other evidence-backed findings the finished review Skill is expected to report.",
         ],
       },

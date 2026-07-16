@@ -598,16 +598,22 @@ relationships, and remaining uncertainty.
 
 For “Create a Skill that reviews whether repository documentation still matches
 the implementation,” the recurring task is review and the intended output may
-be an evidence-backed report rather than a patch. Repository implementation and
-tests are applicable evidence when current and unambiguous. The smallest
-reversible initial structure is one Skill only: no Context Asset, Context Lens,
-script, support file, or external source is required by default.
+be an evidence-backed report rather than a patch. Only the recurring task is
+Confirmed by that request. Using current repository implementation and tests as
+evidence when applicable and unambiguous, producing a report without automatic
+patching, and starting with one Skill are safe Proposed reversible defaults. No
+Context Asset, Context Lens, script, support file, or external source is
+required by default.
 
-Future repository mismatches, missing tests, and other reportable findings are
-runtime task unknowns. Their number does not imply a Skill split, and the author
-should not be asked to resolve them in advance. Documentation authority,
-intended product behavior, or review acceptance criteria can still become
-authoring blockers when repository evidence cannot resolve them.
+The initial creation gate can pass with no blockers and no mandatory questions:
+compare the named artifacts, report evidence, mismatches, risks, and unresolved
+questions, do not decide intended behavior without authority, and do not modify
+documentation or implementation automatically. Future repository mismatches,
+missing tests, unresolved authority, and other reportable findings are runtime
+task unknowns. Their number does not imply a Skill split, and the author should
+not be asked to resolve them in advance. Authority or completion policy becomes
+Blocking only if later evidence shows that the Skill must adjudicate mismatches
+rather than safely report them.
 
 ### Canonical fictional external API example: Example Product API
 

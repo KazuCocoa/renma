@@ -437,22 +437,32 @@ test("runtime-stage blockers stay outside the authoring creation gate", () => {
 });
 
 test("review workflow is a first-class non-API clarification example", () => {
-  const example =
-    buildSkillAuthoringGuidance("test-version").interaction
-      .reviewWorkflowExample;
+  const guidance = buildSkillAuthoringGuidance("test-version");
+  const example = guidance.interaction.reviewWorkflowExample;
+  const prompt = renderSkillGuidePrompt(guidance);
+  const reviewStart = prompt.indexOf("Review-oriented clarification example:");
+  const reviewEnd = prompt.indexOf("Creation gate:", reviewStart);
+  const renderedReview = prompt.slice(reviewStart, reviewEnd);
   const serialized = JSON.stringify(example);
 
   assert.match(
     example.request,
     /reviews whether repository documentation still matches/,
   );
+  assert.deepEqual(example.confirmed, [
+    "The recurring task is to review whether repository documentation still matches the implementation.",
+  ]);
   assert.match(
-    example.confirmed.join("\n"),
-    /implementation and tests may provide applicable evidence/,
+    guidance.interaction.decisionClasses.confirmed,
+    /supported by an applicable truth source/,
   );
   assert.match(
-    example.confirmed.join("\n"),
-    /report rather than an automatic patch/,
+    example.proposed.join("\n"),
+    /implementation and tests as evidence when they are applicable and unambiguous/,
+  );
+  assert.match(
+    example.proposed.join("\n"),
+    /evidence-backed report rather than automatically patching/,
   );
   assert.match(example.proposed.join("\n"), /One focused Skill only/);
   assert.match(
@@ -460,12 +470,30 @@ test("review workflow is a first-class non-API clarification example", () => {
     /No Context Asset, Context Lens, script, support file, or external source by default/,
   );
   assert.match(example.runtimeTaskUnknowns.join("\n"), /Future mismatches/);
-  assert.match(example.runtimeTaskUnknowns.join("\n"), /expected to report/);
   assert.match(
-    example.progression.blocking.join("\n"),
-    /Documentation authority/,
+    example.runtimeTaskUnknowns.join("\n"),
+    /Unresolved documentation or product authority/,
   );
-  assert.match(example.progression.blocking.join("\n"), /completion criteria/);
+  assert.match(example.runtimeTaskUnknowns.join("\n"), /expected to report/);
+  assert.deepEqual(example.unresolved, []);
+  assert.deepEqual(example.questions, []);
+  assert.deepEqual(example.progression.blocking, []);
+  assert.deepEqual(example.progression.queuedBlockers, []);
+  assert.match(
+    example.progression.reversibleDefaults.join("\n"),
+    /Report unresolved authority instead of deciding intended behavior without evidence/,
+  );
+  assert.match(
+    example.progression.reversibleDefaults.join("\n"),
+    /Complete the review by reporting compared artifacts, evidence, mismatches, risks, and unresolved questions/,
+  );
+  assert.match(
+    example.progression.deferred.join("\n"),
+    /stronger authority or completion policy[\s\S]*adjudicate mismatches rather than report them/,
+  );
+  assert.match(renderedReview, /Blocking decisions: 0/);
+  assert.match(renderedReview, /Proceeding with reversible defaults/);
+  assert.doesNotMatch(renderedReview, /\nQuestions?\n/);
   assert.doesNotMatch(serialized, /API|schema|timeout|retry/);
 });
 
@@ -894,25 +922,19 @@ test("progression rendering distinguishes proposed defaults and queued subsets",
   assert.equal(countOccurrences(progression, owner), 1);
 });
 
-test("progression rendering says proceeding only when no blocker remains", () => {
+test("review progression renders safe proceeding without mandatory questions", () => {
   const guidance = buildSkillAuthoringGuidance("test-version");
-  const clarification = guidance.interaction.detailedClarificationExample;
-  clarification.progression.blocking = [];
-  clarification.progression.queuedBlockers = [];
-  clarification.questions = [];
-
   const prompt = renderSkillGuidePrompt(guidance);
-  const exampleStart = prompt.indexOf(
-    "Fictional external API example: Example Product API",
-  );
+  const exampleStart = prompt.indexOf("Review-oriented clarification example:");
   const start = prompt.indexOf("Current progression", exampleStart);
-  const end = prompt.indexOf("Expected initial Renma asset structure", start);
+  const end = prompt.indexOf("Creation gate:", start);
   const progression = prompt.slice(start, end);
 
   assert.match(progression, /Blocking decisions: 0/);
   assert.match(progression, /Proceeding with reversible defaults/);
   assert.doesNotMatch(progression, /Proposed reversible defaults/);
   assert.doesNotMatch(progression, /Asking now: 0/);
+  assert.doesNotMatch(progression, /\nQuestions?\n/);
 });
 
 test("workflow summary cross-references interaction rules without duplicating them", () => {

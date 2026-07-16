@@ -173,6 +173,14 @@ function renderDecisionSummary(
         ...renderBullets(example.runtimeTaskUnknowns),
       ]
     : [];
+  const questions =
+    example.questions.length > 0
+      ? [
+          "",
+          example.questions.length === 1 ? "Question" : "Questions",
+          ...renderNumbered(example.questions),
+        ]
+      : [];
 
   return [
     "Current understanding",
@@ -187,9 +195,7 @@ function renderDecisionSummary(
     ...renderBullets(example.unresolved),
     ...runtimeTaskUnknowns,
     ...progression,
-    "",
-    example.questions.length === 1 ? "Question" : "Questions",
-    ...renderNumbered(example.questions),
+    ...questions,
   ];
 }
 
