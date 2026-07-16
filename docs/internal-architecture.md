@@ -216,6 +216,13 @@ before the non-normative collection. JSON serializes the same source directly.
 Future illustrations can be added without modifying the normative interaction
 contract.
 
+Prompt and JSON are intentionally different projections of that source. The
+prompt renders each illustration's title, demonstrated tensions, notice,
+request, and compact clarification. JSON also retains optional structure,
+responsibility, source-reference, additional-review, verification, and
+not-created-by-default fields. Renderer tests verify this focused projection;
+they do not require every JSON string to appear in the prompt.
+
 `interaction` is normative for truth qualification, question behavior, gate
 entry and re-entry, finding classification, persistence, and semantic handoff.
 The legacy `workflow` projection is only a short top-level summary, while

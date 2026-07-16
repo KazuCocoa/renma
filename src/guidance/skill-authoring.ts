@@ -75,6 +75,7 @@ export interface SkillAuthoringIllustration {
   };
   sourceReference?: string;
   additionalReview?: string[];
+  verification?: string[];
   notCreatedByDefault?: string[];
 }
 
@@ -467,6 +468,13 @@ export function buildSkillAuthoringGuidance(
           "Do not treat the URL as permission and do not infer permissive policy values; preserve unresolved access intent or policy for human review.",
           "Persist only reviewed durable decisions and apply post-validation repairs conservatively.",
         ],
+        verification: [
+          "Inspect the Context body to confirm that it preserves the reviewed external source reference and agrees with the Skill workflow.",
+          "Inspect the declared Skill-to-Context relationship; the Renma graph does not model the external URL as an asset node.",
+          "Verify authoring-time consultation separately from finished-Skill runtime access intent.",
+          "When runtime access is required, confirm successful access and the effective network and security policy without inferring permission from the URL.",
+          "Confirm the approved fallback behavior when the source cannot be accessed.",
+        ],
         notCreatedByDefault: [
           "JSON-generation script",
           "second explanatory Markdown guide",
@@ -478,13 +486,13 @@ export function buildSkillAuthoringGuidance(
       },
     ],
     verification: [
-      "Run `renma scan . --fail-on high` to validate supported metadata, placement, relationships, workflow quality, repeated content, mixed responsibility, and security policy.",
-      "Run `renma catalog . --format markdown` to inspect the assets and normalized metadata Renma discovered.",
-      "Run `renma graph . --format markdown` or a focused graph view to inspect required, optional, orphaned, and unresolved repository-asset relationships. It validates the Skill-to-Context relationship but does not model the external URL as an asset node.",
-      "Inspect the Context body to confirm that it preserves the reviewed external source reference and agrees with the Skill workflow and effective security policy.",
-      "Classify relevant findings with the interaction protocol, follow Diagnostics v2 repair constraints and verification steps, and rerun the same commands after uniquely supported repairs.",
-      "Have a human review source authority, successful URL access, semantic correctness, meaningful design decisions, and unresolved uncertainty; a clean scan or graph does not prove them.",
-      "Renma scan validates and exposes repository evidence; it does not automatically create Context Assets or authorize semantic consolidation of repeated content.",
+      "Run the Renma validation commands relevant to the authored or changed repository structure.",
+      "Use `renma scan . --fail-on high` to validate supported metadata, placement, relationships, workflow quality, repeated content, mixed responsibility, and security policy when those checks apply.",
+      "Use catalog, inspect, graph, readiness, or other available projections only when they answer a current structural or governance question; do not require every command as ceremony.",
+      "Inspect every created or reused asset and declared relationship to confirm that its responsibility, ownership, lifecycle, dependency semantics, and evidence agree with the reviewed authoring decisions.",
+      "When a Context Asset, Context Lens, external source, script, security policy, or other optional structure exists, perform the additional verification appropriate to that structure.",
+      "Classify findings with the interaction protocol, apply only uniquely supported repairs, and rerun the relevant validation after changes.",
+      "Have a human review semantic correctness, meaningful design decisions, authoritative evidence when applicable, and unresolved uncertainty. Clean deterministic output does not prove semantic correctness.",
     ],
   };
 }

@@ -29,6 +29,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   external sources, runtime network access, and Skill splits each require
   independent justification. Future review findings remain runtime task
   unknowns rather than automatic authoring blockers.
+- Made top-level verification domain-neutral and conditional, while retaining
+  Context, URL, access, fallback, and security checks inside the source-backed
+  illustration. The default prompt now renders compact illustration decisions;
+  JSON retains detailed optional structures for external consumers.
 
 ### Compatibility
 

@@ -82,8 +82,14 @@ test("guide skill defaults to deterministic prompt output for the installed vers
     defaultResult.stdout,
     /name change.*canonical Skill directory\/name relationship.*intentional path and identity change/i,
   );
-  assert.match(defaultResult.stdout, /not a Renma asset node or graph edge/);
-  assert.match(defaultResult.stdout, /clean scan or graph does not prove/);
+  assert.doesNotMatch(
+    defaultResult.stdout,
+    /not a Renma asset node or graph edge/,
+  );
+  assert.match(
+    defaultResult.stdout,
+    /Clean deterministic output does not prove semantic correctness/,
+  );
   assert.match(defaultResult.stdout, /renma scan/);
   assert.match(defaultResult.stdout, /renma catalog/);
   assert.match(defaultResult.stdout, /renma graph/);
@@ -195,6 +201,7 @@ test("guide skill JSON and --json are equivalent small structured projections", 
     initialStructure: string[];
     sourceReference: string;
     additionalReview: string[];
+    verification: string[];
   };
   assert.deepEqual(sourceBacked.initialStructure, [
     "skills/build-example-product-json/SKILL.md",
@@ -221,23 +228,68 @@ test("guide skill JSON and --json are equivalent small structured projections", 
     sourceBacked.additionalReview.join("\n"),
     /Do not treat the URL as permission and do not infer permissive policy values/,
   );
+  assert.match(
+    sourceBacked.verification.join("\n"),
+    /Inspect the Context body[\s\S]*successful access[\s\S]*fallback behavior/,
+  );
 });
 
-test("guide renderers consume the same structured guidance data", () => {
+test("guide renderers derive focused prompt and complete JSON from one source", () => {
   const guidance = buildSkillAuthoringGuidance("test-version");
   const prompt = renderSkillGuidePrompt(guidance);
   const json = JSON.parse(renderSkillGuideJson(guidance)) as typeof guidance;
 
   assert.deepEqual(json, guidance);
-  assert.match(prompt, /Non-normative authoring illustrations/);
-  for (const value of collectStrings(guidance)) {
-    if (
-      guidance.illustrations.some((illustration) => illustration.id === value)
-    ) {
-      continue;
-    }
+  for (const heading of [
+    "Interactive authoring protocol",
+    "Authoring workflow",
+    "Placement rules",
+    "Artifact rules",
+    "Conciseness rules",
+    "Metadata rules",
+    "How to use illustrations",
+    "Non-normative authoring illustrations",
+    "Verification",
+  ]) {
+    assert.match(prompt, new RegExp(escapeRegExp(heading)));
+  }
+  for (const value of collectStrings({
+    principle: guidance.principle,
+    interaction: guidance.interaction,
+    workflow: guidance.workflow,
+    placementRules: guidance.placementRules,
+    artifactRules: guidance.artifactRules,
+    concisenessRules: guidance.concisenessRules,
+    metadataRules: guidance.metadataRules,
+    illustrationRules: guidance.illustrationRules,
+    verification: guidance.verification,
+  })) {
     assert.ok(prompt.includes(value), value);
   }
+  for (const illustration of guidance.illustrations) {
+    assert.match(
+      prompt,
+      new RegExp(`Illustration: ${escapeRegExp(illustration.title)}`),
+    );
+    for (const value of collectStrings({
+      demonstrates: illustration.demonstrates,
+      notice: illustration.notice,
+      request: illustration.request,
+      clarification: illustration.clarification,
+    })) {
+      assert.ok(prompt.includes(value), value);
+    }
+  }
+  const sourceBacked = getIllustration(guidance, "source-backed-boundary");
+  assert.ok(sourceBacked.initialStructure);
+  assert.ok(sourceBacked.sourceReference);
+  assert.ok(sourceBacked.responsibilities);
+  assert.ok(sourceBacked.additionalReview);
+  assert.ok(sourceBacked.verification);
+  assert.ok(sourceBacked.notCreatedByDefault);
+  assert.doesNotMatch(prompt, /skills\/build-example-product-json\/SKILL\.md/);
+  assert.doesNotMatch(prompt, /Optional illustration-specific structure/);
+  assert.doesNotMatch(prompt, /Inspect the Context body/);
 });
 
 test("illustration rules prohibit template selection and preserve normative control", () => {
@@ -264,15 +316,19 @@ test("illustration rules prohibit template selection and preserve normative cont
   assert.doesNotMatch(rules, /select the best|similarity|route the request/i);
   assert.deepEqual(json.illustrations, guidance.illustrations);
   assert.ok(!("example" in json));
-  const universalRules = [
-    gate,
-    Object.values(guidance.interaction.decisionClasses).join("\n"),
-    Object.values(guidance.interaction.progressionClasses).join("\n"),
-    guidance.placementRules.join("\n"),
-  ].join("\n");
+  const universalRules = collectStrings({
+    interaction: guidance.interaction,
+    workflow: guidance.workflow,
+    placementRules: guidance.placementRules,
+    artifactRules: guidance.artifactRules,
+    concisenessRules: guidance.concisenessRules,
+    metadataRules: guidance.metadataRules,
+    illustrationRules: guidance.illustrationRules,
+    verification: guidance.verification,
+  }).join("\n");
   assert.doesNotMatch(
     universalRules,
-    /Example Product API|JSON request body|build-example-product-json/,
+    /Example Product API|build-example-product-json|JSON request body|successful URL access|inspect the Context body|the declared Example Product API Context/i,
   );
   assert.doesNotMatch(gate, /repository documentation still matches/);
   assert.match(

@@ -56,48 +56,6 @@ export function renderSkillGuideJson(guidance: SkillAuthoringGuidance): string {
 function renderIllustration(
   illustration: SkillAuthoringIllustration,
 ): string[] {
-  const supportingDetails = [
-    ...(illustration.initialStructure
-      ? [
-          "Initial Renma asset structure:",
-          "```text",
-          ...illustration.initialStructure,
-          "```",
-          "",
-        ]
-      : []),
-    ...(illustration.sourceReference
-      ? ["Source reference:", illustration.sourceReference, ""]
-      : []),
-    ...(illustration.responsibilities?.skill
-      ? [
-          "SKILL.md responsibilities:",
-          ...renderBullets(illustration.responsibilities.skill),
-          "",
-        ]
-      : []),
-    ...(illustration.responsibilities?.context
-      ? [
-          "Context Asset responsibilities:",
-          ...renderBullets(illustration.responsibilities.context),
-          "",
-        ]
-      : []),
-    ...(illustration.additionalReview
-      ? [
-          "Additional review:",
-          ...renderBullets(illustration.additionalReview),
-          "",
-        ]
-      : []),
-    ...(illustration.notCreatedByDefault
-      ? [
-          "Not created by default:",
-          ...renderBullets(illustration.notCreatedByDefault),
-        ]
-      : []),
-  ];
-
   return [
     `Illustration: ${illustration.title}`,
     "",
@@ -111,13 +69,6 @@ function renderIllustration(
     illustration.request,
     "",
     ...renderDecisionSummary(illustration.clarification),
-    ...(supportingDetails.length > 0
-      ? [
-          "",
-          "Optional illustration-specific structure and supporting details:",
-          ...supportingDetails,
-        ]
-      : []),
   ];
 }
 

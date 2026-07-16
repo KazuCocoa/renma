@@ -917,6 +917,11 @@ questions, completion criteria, security policies, unresolved items, or domain
 assumptions as templates. Future illustrations can be added without changing
 the normative interaction protocol.
 
+The default prompt keeps illustrations compact to reduce anchoring. JSON retains
+their useful optional structures and source-specific review details. Both
+projections derive from the same structured guidance source; they are not
+required to render every field identically.
+
 Use it before generation, or when intentionally redesigning asset boundaries,
 to identify the smallest non-redundant asset graph, source-of-truth Context,
 focused Skill workflow, justified support files, metadata discipline,

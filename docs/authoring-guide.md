@@ -554,7 +554,8 @@ agents. Renma remains deterministic; runtime evaluation stays external.
 
 ### 4. Validate, fix, and rerun
 
-Start with the release gate:
+Run the validation commands relevant to the authored or changed structure. The
+usual release gate is:
 
 ```bash
 renma scan . --fail-on high
@@ -567,7 +568,8 @@ when truth is missing, or explain why no change is justified. Follow
 Diagnostics v2 constraints and verification steps, rerun after repairs, and do
 not weaken security policy or add a suppression merely to pass.
 
-Use other deterministic views when they answer a specific review question:
+Use other deterministic views only when they answer a specific structural or
+governance question; do not run every command as ceremony:
 
 ```bash
 renma inspect skills/testing/spec-review/SKILL.md
@@ -577,8 +579,11 @@ renma ownership . --format markdown
 renma readiness . --format markdown
 ```
 
-The final step is human review of the Skill's intent, workflow, policy,
-relationships, and remaining uncertainty.
+Inspect every created or reused asset and relationship. When optional Context,
+Lens, source, script, or security structures exist, perform the additional
+verification appropriate to them. The final step is human review of semantic
+correctness, meaningful decisions, applicable authority, and remaining
+uncertainty. Clean deterministic output does not prove semantic correctness.
 
 ### How to use non-normative illustrations
 
