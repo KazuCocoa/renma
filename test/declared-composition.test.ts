@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  analyzeDeclaredCompositionFindings,
   declaredCompositionFindings,
   resolveDeclaredComposition,
 } from "../src/declared-composition.js";
@@ -67,6 +68,97 @@ test("declared composition propagates required and optional membership through l
   assert.equal(report.requiredComplete, true);
   assert.equal(report.optionalComplete, true);
   assert.equal(report.cycleFree, true);
+});
+
+test("declaration transitions are recorded once per resulting membership", () => {
+  const report = resolveDeclaredComposition(
+    makeCatalog(
+      [
+        asset("skill.root", "skill"),
+        asset("context.a", "context"),
+        asset("context.b", "context"),
+        asset("context.c", "context"),
+        asset("context.wrong-lens", "context"),
+      ],
+      [
+        dependency("skill.root", "context.a", "requires_context", 1),
+        dependency("skill.root", "context.a", "optional_context", 2),
+        dependency("context.a", "context.b", "optional_context", 3),
+        dependency("context.a", "missing.context", "optional_context", 4),
+        dependency("context.a", "context.wrong-lens", "optional_lens", 5),
+        dependency("context.a", "context.c", "requires_context", 6),
+      ],
+    ),
+    "skill.root",
+    { evaluationDate: "2026-07-15" },
+  );
+
+  assert.deepEqual(
+    report.provenanceEdges
+      .filter((edge) => edge.from === "context.a")
+      .map((edge) => [edge.to, edge.membership, edge.declarationIndex]),
+    [
+      ["context.b", "optional", 3],
+      ["context.c", "optional", 6],
+      ["context.c", "required", 6],
+    ],
+  );
+  assert.deepEqual(
+    report.unresolvedOptional.map((issue) => [
+      issue.declaredTarget,
+      issue.membership,
+      issue.declarationIndex,
+    ]),
+    [["missing.context", "optional", 4]],
+  );
+  assert.deepEqual(
+    report.kindMismatches.map((mismatch) => [
+      mismatch.declaredTarget,
+      mismatch.membership,
+      mismatch.declarationIndex,
+    ]),
+    [["context.wrong-lens", "optional", 5]],
+  );
+  assert.equal(report.requiredComplete, true);
+  assert.equal(report.optionalComplete, false);
+});
+
+test("distinct duplicate metadata declarations retain one transition each", () => {
+  const catalog = makeCatalog(
+    [
+      asset("skill.root", "skill"),
+      asset("context.a", "context"),
+      asset("context.b", "context"),
+    ],
+    [
+      dependency("skill.root", "context.a", "requires_context", 1),
+      dependency("skill.root", "context.a", "optional_context", 2),
+      dependency("context.a", "context.b", "optional_context", 3),
+      dependency("context.a", "context.b", "optional_context", 4),
+    ],
+  );
+  const report = resolveDeclaredComposition(catalog, "skill.root", {
+    evaluationDate: "2026-07-15",
+  });
+
+  assert.deepEqual(
+    report.provenanceEdges
+      .filter((edge) => edge.from === "context.a" && edge.to === "context.b")
+      .map((edge) => edge.declarationIndex),
+    [3, 4],
+  );
+  const duplicate = declaredCompositionFindings(catalog, "2026-07-15").find(
+    (finding) =>
+      finding.id === DIAGNOSTIC_IDS.META_DUPLICATE_DECLARED_DEPENDENCY,
+  );
+  assert.deepEqual(
+    (
+      duplicate?.details?.occurrences as Array<{
+        declarationIndex: number;
+      }>
+    ).map((occurrence) => occurrence.declarationIndex),
+    [3, 4],
+  );
 });
 
 test("declared composition separates unknown and wrong-kind required and optional declarations", () => {
@@ -456,7 +548,7 @@ test("composition summarizes Context Lens freshness with deterministic dates", (
   );
 });
 
-test("scan prepares repository composition indexes once for many disconnected assets", () => {
+test("scan prepares one index and retains at most one root report", () => {
   const assets = Array.from({ length: 250 }, (_, index) =>
     asset(
       `context.disconnected-${index.toString().padStart(3, "0")}`,
@@ -476,12 +568,16 @@ test("scan prepares repository composition indexes once for many disconnected as
     },
   });
 
-  const findings = declaredCompositionFindings(
+  const analysis = analyzeDeclaredCompositionFindings(
     makeCatalog(trackedAssets, []),
     "2026-07-15",
   );
 
-  assert.deepEqual(findings, []);
+  assert.deepEqual(analysis.findings, []);
+  assert.deepEqual(analysis.stats, {
+    rootsAnalyzed: 250,
+    peakRetainedRootReports: 1,
+  });
   assert.equal(fullAssetIterations, 2);
 });
 

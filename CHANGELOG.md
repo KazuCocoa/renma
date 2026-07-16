@@ -24,7 +24,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   JSON, compact Markdown, and required-versus-optional Mermaid projections.
   Dependency graph edges now retain additive declaration form, declaration
   index, and line-level source evidence.
-- Added scan findings `META-DEPENDENCY-TARGET-KIND-MISMATCH`,
+- Added scan findings `META-DEPENDENCY-SOURCE-KIND-MISMATCH`,
+  `META-DEPENDENCY-TARGET-KIND-MISMATCH`,
   `META-DUPLICATE-DECLARED-DEPENDENCY`, `COMPOSITION-REQUIRED-CYCLE`,
   `COMPOSITION-OPTIONAL-CYCLE`, `COMPOSITION-DECLARED-CONFLICT`, and
   `COMPOSITION-OPTIONAL-CONFLICT`, with actionable diagnostics v2 guidance.
@@ -38,10 +39,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 - Extended the existing freshness rules and diagnostic IDs to Context Lenses.
 - Reused one prepared Declared Composition index across scan roots, limited
-  per-root governance work to reached assets, promoted shared SCC diagnostics
-  to required whenever any root requires them while retaining optional roots,
-  and rendered SCC members with actual declaration edges instead of a
-  fabricated sorted path.
+  per-root governance work to reached assets, consumed complete root reports
+  incrementally, deduplicated declaration transitions per resulting
+  membership, promoted shared SCC diagnostics to required whenever any root
+  requires them while retaining optional roots, and rendered SCC members with
+  actual declaration edges instead of a fabricated sorted path.
 - Documented that Renma models explicit composition rather than
   natural-language inheritance, declaration order has no precedence, stable IDs
   resolve once while all declaration evidence remains, cycles terminate

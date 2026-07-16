@@ -83,6 +83,11 @@ normalized-path, sorted-asset, and dependency-by-source lookups for every root.
 Per-root member and governance projections are built from reached IDs, so
 disconnected assets are not rescanned for each closure.
 
+Scan resolves roots incrementally and immediately aggregates only compact SCC
+classification and Skill conflict findings. It retains at most one complete
+root report instead of materializing every root's asset lists, provenance
+closure, governance findings, resolution issues, and mismatches at once.
+
 Traversal state is `(asset ID, membership)` where membership is required or
 optional. Both states may be processed once for the same ID so required and
 optional provenance remains complete; final member classification gives

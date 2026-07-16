@@ -95,6 +95,11 @@ test("scan emits actionable declared-composition diagnostics and Lens freshness 
     1,
   );
   assert.equal(
+    findingsById.get(DIAGNOSTIC_IDS.META_DEPENDENCY_SOURCE_KIND_MISMATCH)
+      ?.length ?? 0,
+    0,
+  );
+  assert.equal(
     findingsById.get(DIAGNOSTIC_IDS.META_DUPLICATE_DECLARED_DEPENDENCY)?.length,
     1,
   );
@@ -177,43 +182,63 @@ test("scan reports invalid applies_to sources even when targets are unresolved",
     await collectRepositorySnapshot(root),
     { evaluationDate: "2026-07-15" },
   );
-  const mismatches = result.findings.filter(
+  const sourceMismatches = result.findings.filter(
     (finding) =>
-      finding.id === DIAGNOSTIC_IDS.META_DEPENDENCY_TARGET_KIND_MISMATCH,
+      finding.id === DIAGNOSTIC_IDS.META_DEPENDENCY_SOURCE_KIND_MISMATCH,
   );
-  const mismatchesBySource = new Map(
-    mismatches.map((finding) => [finding.details?.sourceId, finding]),
+  const sourceMismatchesBySource = new Map(
+    sourceMismatches.map((finding) => [finding.details?.sourceId, finding]),
   );
 
-  assert.deepEqual([...mismatchesBySource.keys()].sort(), [
+  assert.deepEqual([...sourceMismatchesBySource.keys()].sort(), [
     "context.wrong-missing",
     "context.wrong-target",
     "context.wrong-valid",
   ]);
-  const unresolvedSource = mismatchesBySource.get("context.wrong-missing");
+  const unresolvedSource = sourceMismatchesBySource.get(
+    "context.wrong-missing",
+  );
   assert.equal(unresolvedSource?.details?.expectedSourceKind, "context_lens");
   assert.equal(unresolvedSource?.details?.targetId, undefined);
   assert.equal(unresolvedSource?.details?.actualTargetKind, undefined);
+  assert.match(unresolvedSource?.title ?? "", /originates from the wrong/);
+  assert.equal(unresolvedSource?.evidence.path, "contexts/wrong-missing.md");
+  assert.ok(unresolvedSource?.llmHint);
+  assert.ok(unresolvedSource?.constraints?.length);
+  assert.ok(unresolvedSource?.verificationSteps?.length);
 
-  const validTarget = mismatchesBySource.get("context.wrong-valid");
+  const validTarget = sourceMismatchesBySource.get("context.wrong-valid");
   assert.equal(validTarget?.details?.expectedSourceKind, "context_lens");
   assert.equal(validTarget?.details?.expectedTargetKind, undefined);
 
-  const wrongSourceAndTarget = mismatchesBySource.get("context.wrong-target");
-  assert.equal(
-    wrongSourceAndTarget?.details?.expectedSourceKind,
-    "context_lens",
+  const wrongSource = sourceMismatchesBySource.get("context.wrong-target");
+  assert.equal(wrongSource?.details?.expectedSourceKind, "context_lens");
+  assert.equal(wrongSource?.details?.expectedTargetKind, undefined);
+
+  const targetMismatches = result.findings.filter(
+    (finding) =>
+      finding.id === DIAGNOSTIC_IDS.META_DEPENDENCY_TARGET_KIND_MISMATCH,
   );
-  assert.equal(wrongSourceAndTarget?.details?.expectedTargetKind, "context");
-  assert.equal(wrongSourceAndTarget?.details?.actualTargetKind, "context_lens");
-  assert.equal(wrongSourceAndTarget?.details?.targetId, "lens.actual");
+  assert.equal(targetMismatches.length, 1);
+  const wrongTarget = targetMismatches[0];
+  assert.equal(wrongTarget?.details?.sourceId, "context.wrong-target");
+  assert.equal(wrongTarget?.details?.expectedSourceKind, undefined);
+  assert.equal(wrongTarget?.details?.actualSourceKind, undefined);
+  assert.equal(wrongTarget?.details?.expectedTargetKind, "context");
+  assert.equal(wrongTarget?.details?.actualTargetKind, "context_lens");
+  assert.equal(wrongTarget?.details?.targetId, "lens.actual");
+  assert.match(wrongTarget?.title ?? "", /targets the wrong/);
+  assert.equal(wrongTarget?.evidence.path, "contexts/wrong-target.md");
+  assert.ok(wrongTarget?.llmHint);
+  assert.ok(wrongTarget?.constraints?.length);
+  assert.ok(wrongTarget?.verificationSteps?.length);
 
   const unknownSources = result.findings
     .filter((finding) => finding.id === DIAGNOSTIC_IDS.META_UNKNOWN_REFERENCE)
     .map((finding) => finding.details?.source);
   assert.ok(unknownSources.includes("context.wrong-missing"));
   assert.ok(unknownSources.includes("lens.correct-missing"));
-  assert.equal(mismatchesBySource.has("lens.correct-missing"), false);
+  assert.equal(sourceMismatchesBySource.has("lens.correct-missing"), false);
 });
 
 function contextDocument(id: string, metadata: string[]): string {

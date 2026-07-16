@@ -407,6 +407,8 @@ visible.
 One-off resolution prepares repository lookup indexes internally. Scan prepares
 the same index once and reuses it across roots; reached IDs drive member,
 lifecycle, freshness, and conflict work without repeated full-catalog filters.
+Root reports are consumed one at a time, with only compact cycle groups and
+Skill conflict findings retained across iterations.
 
 The existing `graph --view composition --focus <asset-id-or-path>` projection
 owns JSON, Markdown, and Mermaid rendering. There is no second scanner,

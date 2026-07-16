@@ -134,17 +134,21 @@ interface TraversalState {
   membership: CompositionMembership;
 }
 
-interface CompositionRootAnalysis {
-  root: Asset;
-  report: DeclaredCompositionReport;
-}
-
 interface CompositionCycleGroup {
-  assetIds: string[];
   requiredRoots: Set<string>;
   optionalRoots: Set<string>;
   requiredCycle?: CompositionCycle;
   optionalCycle?: CompositionCycle;
+}
+
+export interface DeclaredCompositionScanStats {
+  rootsAnalyzed: number;
+  peakRetainedRootReports: number;
+}
+
+export interface DeclaredCompositionFindingAnalysis {
+  findings: Finding[];
+  stats: DeclaredCompositionScanStats;
 }
 
 /**
@@ -202,6 +206,7 @@ export function resolveDeclaredCompositionFromIndex(
   const unresolvedRequired: CompositionResolutionIssue[] = [];
   const unresolvedOptional: CompositionResolutionIssue[] = [];
   const kindMismatches: CompositionKindMismatch[] = [];
+  const recordedTransitions = new Set<string>();
   reached.set(root.id, new Set(["required"]));
 
   for (let cursor = 0; cursor < queue.length; cursor += 1) {
@@ -220,6 +225,14 @@ export function resolveDeclaredCompositionFromIndex(
         dependency,
         relationship,
       );
+      const transitionKey = declarationTransitionKey(
+        state.asset,
+        dependency,
+        relationship,
+        membership,
+      );
+      if (recordedTransitions.has(transitionKey)) continue;
+      recordedTransitions.add(transitionKey);
       const target = resolveIndexedTarget(dependency, index);
       const mismatch = compositionKindMismatch(
         state.asset,
@@ -351,26 +364,53 @@ export function declaredCompositionFindings(
   catalog: Catalog,
   evaluationDate: string,
 ): Finding[] {
+  return analyzeDeclaredCompositionFindings(catalog, evaluationDate).findings;
+}
+
+/** Aggregate scan findings while retaining at most one complete root report. */
+export function analyzeDeclaredCompositionFindings(
+  catalog: Catalog,
+  evaluationDate: string,
+): DeclaredCompositionFindingAnalysis {
   const index = prepareDeclaredCompositionIndex(catalog);
-  const analyses = index.sortedAssets.map(
-    (root): CompositionRootAnalysis => ({
-      root,
-      report: resolveDeclaredCompositionFromIndex(index, root.id, {
-        evaluationDate,
-      }),
-    }),
-  );
-  return [
+  const cycleGroups = new Map<string, CompositionCycleGroup>();
+  const conflicts: Finding[] = [];
+  let retainedRootReports = 0;
+  let peakRetainedRootReports = 0;
+  let rootsAnalyzed = 0;
+
+  for (const root of index.sortedAssets) {
+    const report = resolveDeclaredCompositionFromIndex(index, root.id, {
+      evaluationDate,
+    });
+    retainedRootReports += 1;
+    peakRetainedRootReports = Math.max(
+      peakRetainedRootReports,
+      retainedRootReports,
+    );
+    rootsAnalyzed += 1;
+    aggregateCycles(cycleGroups, root, report);
+    if (root.kind === "skill") {
+      appendConflictFindings(conflicts, root, report);
+    }
+    retainedRootReports -= 1;
+  }
+
+  const findings = [
     ...relationshipKindFindings(index),
     ...duplicateDeclarationFindings(index.sortedDependencies),
-    ...cycleFindings(analyses),
-    ...conflictFindings(analyses),
+    ...cycleFindings(cycleGroups),
+    ...conflicts,
   ].sort(
     (left, right) =>
       left.evidence.path.localeCompare(right.evidence.path) ||
       left.evidence.startLine - right.evidence.startLine ||
       left.id.localeCompare(right.id),
   );
+  return {
+    findings,
+    stats: { rootsAnalyzed, peakRetainedRootReports },
+  };
 }
 
 function relationshipKindFindings(index: DeclaredCompositionIndex): Finding[] {
@@ -408,51 +448,120 @@ function relationshipKindFindings(index: DeclaredCompositionIndex): Finding[] {
     if (!sourceMismatch && !targetMismatch) continue;
 
     const declaration = dependency.declaration ?? dependency.kind;
-    findings.push({
-      id: DIAGNOSTIC_IDS.META_DEPENDENCY_TARGET_KIND_MISMATCH,
-      title: "Declared dependency uses an invalid asset kind",
-      category: "structure",
-      severity: "medium",
-      confidence: "high",
-      evidence: dependency.evidence ?? fallbackEvidence(dependency),
-      whyItMatters:
-        "Relationship kinds define reviewable repository structure. An invalid source or resolved target kind cannot satisfy the declared composition contract.",
-      remediation:
-        "Move or change the declaration so its source kind is valid, and point it at an existing asset of the expected kind when the target is resolved.",
-      constraints: [
-        "Do not create a placeholder asset only to satisfy validation.",
-        "Do not infer composition from prose, paths, names, or similarity.",
-        "Preserve supported Context-to-Context dependency semantics.",
-        "Do not introduce runtime Context selection or loading.",
-      ],
-      verificationSteps: [
-        "Inspect the source declaration and the resolved target kind when available.",
-        "Run renma scan.",
-        "Run renma graph with the affected asset as focus.",
-      ],
-      llmHint: `Review ${dependency.sourcePath} and preserve its intended ${declaration} relationship. The source is ${source.kind}${expectedSourceKind ? ` and the declaration expects ${expectedSourceKind}` : ""}; target ${dependency.to}${target ? ` resolves to ${target.kind}` : " is unresolved"}${targetMismatch ? ` while the declaration expects ${unsupportedConflictTarget ? "a Skill, Context Asset, or Context Lens" : expectedTargetKind}` : ""}. Ask for human review if the intended source or target is ambiguous.`,
-      details: {
-        sourceId: source.id,
-        sourceKind: source.kind,
-        sourcePath: source.sourcePath,
-        relationshipKind: declaration,
-        declaredTarget: dependency.to,
-        ...(sourceMismatch && expectedSourceKind ? { expectedSourceKind } : {}),
-        actualSourceKind: source.kind,
-        ...(targetMismatch
-          ? {
-              expectedTargetKind: unsupportedConflictTarget
-                ? "skill, context, or context_lens"
-                : expectedTargetKind,
-              actualTargetKind: target?.kind,
-              targetId: target?.id,
-              targetPath: target?.sourcePath,
-            }
-          : {}),
-      },
-    });
+    if (sourceMismatch && expectedSourceKind) {
+      findings.push(
+        sourceKindMismatchFinding(
+          source,
+          dependency,
+          declaration,
+          relationship,
+          expectedSourceKind,
+        ),
+      );
+    }
+    if (targetMismatch && target) {
+      findings.push(
+        targetKindMismatchFinding(
+          source,
+          target,
+          dependency,
+          declaration,
+          relationship,
+          unsupportedConflictTarget
+            ? "skill, context, or context_lens"
+            : (expectedTargetKind ?? "supported asset"),
+        ),
+      );
+    }
   }
   return findings;
+}
+
+function sourceKindMismatchFinding(
+  source: Asset,
+  dependency: Dependency,
+  declaration: string,
+  relationship: CompositionRelationship | undefined,
+  expectedSourceKind: AssetKind,
+): Finding {
+  return {
+    id: DIAGNOSTIC_IDS.META_DEPENDENCY_SOURCE_KIND_MISMATCH,
+    title: "Declared dependency originates from the wrong asset kind",
+    category: "structure",
+    severity: "medium",
+    confidence: "high",
+    evidence: dependency.evidence ?? fallbackEvidence(dependency),
+    whyItMatters:
+      "Relationship source kinds are part of the declared composition contract. An applies_to declaration outside a Context Lens is invalid independently of whether its target resolves.",
+    remediation:
+      "Move applies_to to the intended Context Lens, or change or remove the declaration only when reviewed repository intent supports that correction.",
+    constraints: [
+      "Do not change or create a target merely to hide a source-kind violation.",
+      "Do not infer a Context Lens from prose, paths, names, or similarity.",
+      "Keep unresolved and target-kind problems independently visible.",
+      "Do not introduce runtime Context selection or loading.",
+    ],
+    verificationSteps: [
+      "Inspect the kind of the asset that declares applies_to.",
+      "Confirm applies_to originates from a Context Lens.",
+      "Run renma scan and the focused composition graph.",
+    ],
+    llmHint: `Review ${dependency.sourcePath}: ${declaration} may originate only from ${expectedSourceKind}, but ${source.id} is ${source.kind}. Correct the declaring asset or relationship from repository evidence; preserve any separate unresolved-target or target-kind finding.`,
+    details: {
+      sourceId: source.id,
+      sourcePath: source.sourcePath,
+      relationshipKind: declaration,
+      ...(relationship ? { normalizedRelationship: relationship } : {}),
+      declaredTarget: dependency.to,
+      expectedSourceKind,
+      actualSourceKind: source.kind,
+    },
+  };
+}
+
+function targetKindMismatchFinding(
+  source: Asset,
+  target: Asset,
+  dependency: Dependency,
+  declaration: string,
+  relationship: CompositionRelationship | undefined,
+  expectedTargetKind: string,
+): Finding {
+  return {
+    id: DIAGNOSTIC_IDS.META_DEPENDENCY_TARGET_KIND_MISMATCH,
+    title: "Declared dependency targets the wrong asset kind",
+    category: "structure",
+    severity: "medium",
+    confidence: "high",
+    evidence: dependency.evidence ?? fallbackEvidence(dependency),
+    whyItMatters:
+      "Relationship target kinds are part of the declared composition contract. A resolved target with the wrong kind cannot satisfy the declared relationship.",
+    remediation:
+      "Point the declaration at an existing asset of the expected target kind, or change the declaration only when reviewed repository intent supports a different relationship.",
+    constraints: [
+      "Do not create a placeholder asset only to satisfy validation.",
+      "Do not infer composition from prose, paths, names, or similarity.",
+      "Preserve supported Context-to-Context dependency semantics.",
+      "Do not introduce runtime Context selection or loading.",
+    ],
+    verificationSteps: [
+      "Inspect the resolved target and its cataloged asset kind.",
+      "Confirm the declaration points to the intended target kind.",
+      "Run renma scan and the focused composition graph.",
+    ],
+    llmHint: `Review ${dependency.sourcePath} and preserve its intended ${declaration} relationship. Target ${dependency.to} resolves to ${target.kind}, but the declaration expects ${expectedTargetKind}. Correct the target or relationship from repository evidence and preserve any separate source-kind finding.`,
+    details: {
+      sourceId: source.id,
+      sourcePath: source.sourcePath,
+      relationshipKind: declaration,
+      ...(relationship ? { normalizedRelationship: relationship } : {}),
+      declaredTarget: dependency.to,
+      expectedTargetKind,
+      actualTargetKind: target.kind,
+      targetId: target.id,
+      targetPath: target.sourcePath,
+    },
+  };
 }
 
 function duplicateDeclarationFindings(dependencies: Dependency[]): Finding[] {
@@ -511,17 +620,20 @@ function duplicateDeclarationFindings(dependencies: Dependency[]): Finding[] {
   return findings;
 }
 
-function cycleFindings(analyses: CompositionRootAnalysis[]): Finding[] {
-  const grouped = new Map<string, CompositionCycleGroup>();
-  for (const { root, report } of analyses) {
-    for (const cycle of report.requiredCycles) {
-      addCycle(grouped, cycle, root.id);
-    }
-    for (const cycle of report.optionalCycles) {
-      addCycle(grouped, cycle, root.id);
-    }
+function aggregateCycles(
+  grouped: Map<string, CompositionCycleGroup>,
+  root: Asset,
+  report: DeclaredCompositionReport,
+): void {
+  for (const cycle of report.requiredCycles) {
+    addCycle(grouped, cycle, root.id);
   }
+  for (const cycle of report.optionalCycles) {
+    addCycle(grouped, cycle, root.id);
+  }
+}
 
+function cycleFindings(grouped: Map<string, CompositionCycleGroup>): Finding[] {
   return [...grouped.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([, group]): Finding => {
@@ -597,7 +709,6 @@ function addCycle(
   const key = cycle.assetIds.join("\0");
   const existing = grouped.get(key);
   const group = existing ?? {
-    assetIds: cycle.assetIds,
     requiredRoots: new Set<string>(),
     optionalRoots: new Set<string>(),
   };
@@ -611,19 +722,17 @@ function addCycle(
   grouped.set(key, group);
 }
 
-function conflictFindings(analyses: CompositionRootAnalysis[]): Finding[] {
-  const findings: Finding[] = [];
-  for (const { root, report } of analyses.filter(
-    ({ root }) => root.kind === "skill",
-  )) {
-    for (const conflict of report.requiredConflicts) {
-      findings.push(conflictFinding(root, conflict, true));
-    }
-    for (const conflict of report.optionalConflictCandidates) {
-      findings.push(conflictFinding(root, conflict, false));
-    }
+function appendConflictFindings(
+  findings: Finding[],
+  root: Asset,
+  report: DeclaredCompositionReport,
+): void {
+  for (const conflict of report.requiredConflicts) {
+    findings.push(conflictFinding(root, conflict, true));
   }
-  return findings;
+  for (const conflict of report.optionalConflictCandidates) {
+    findings.push(conflictFinding(root, conflict, false));
+  }
 }
 
 function conflictFinding(
@@ -767,6 +876,23 @@ function propagatedMembership(
     return "optional";
   }
   return "required";
+}
+
+function declarationTransitionKey(
+  source: Asset,
+  dependency: Dependency,
+  relationship: CompositionRelationship,
+  membership: CompositionMembership,
+): string {
+  return JSON.stringify([
+    source.id,
+    dependency.sourcePath,
+    dependency.declaration ?? dependency.kind,
+    dependency.declarationIndex ?? null,
+    dependency.to,
+    relationship,
+    membership,
+  ]);
 }
 
 function compositionKindMismatch(

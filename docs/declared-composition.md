@@ -71,6 +71,12 @@ This preserves multiple parents, duplicate declaration evidence, optional and
 required routes, and cycle-forming declarations while keeping storage
 proportional to assets and declarations instead of possible paths.
 
+If required and optional traversal states produce the same resulting
+membership for one declaration, Renma records that declaration transition once.
+The transition identity includes source ID and path, declaration form and
+index, declared target, normalized relationship, and resulting membership.
+Distinct metadata entries retain distinct declaration indexes and evidence.
+
 ## Completeness, Cycles, And Conflicts
 
 `requiredComplete` is false when a required composition declaration is
@@ -126,6 +132,7 @@ execution.
 
 Composition analysis supplies these stable scan identifiers:
 
+- `META-DEPENDENCY-SOURCE-KIND-MISMATCH`
 - `META-DEPENDENCY-TARGET-KIND-MISMATCH`
 - `META-DUPLICATE-DECLARED-DEPENDENCY`
 - `COMPOSITION-REQUIRED-CYCLE`
