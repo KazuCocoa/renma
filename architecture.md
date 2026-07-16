@@ -197,6 +197,30 @@ Edges should carry source evidence: source path, line range, declaration form, a
 
 Declared reference validation is deterministic. Renma resolves references by exact asset ID or repository-relative path, with only a leading `./` normalized away for path compatibility. Unknown declared references, duplicate asset IDs, references to deprecated or archived assets, and orphaned first-class shared context assets are reported as repository-governance findings. Renma does not use fuzzy matching, semantic search, LLM inference, or runtime context selection for these checks.
 
+### Declared Composition
+
+Renma models explicit composition, not general natural-language inheritance.
+The pure Declared Composition resolver operates over the existing catalog. It
+expands `requires_context`, `optional_context`, `requires_lens`,
+`optional_lens`, and Lens `applies_to` declarations only. It does not expand
+references, conflicts, lifecycle, ownership, policy, static-support, or
+`extends` relationships.
+
+Traversal uses `(stable asset ID, required-or-optional membership)` state, so
+cycles terminate without recursion-driven repetition. Required membership
+dominates optional membership in the asset lists, while predecessor edges keep
+both route classes and every declaration's path, line range, snippet, and form.
+This edge representation avoids exponential path enumeration.
+
+Composition order is deterministic for review and never defines precedence,
+override, or prose merging. `extends` retains its overlay/profile meaning only
+inside dedicated typed resolvers with defined merge semantics.
+
+The report keeps `requiredComplete`, `optionalComplete`, and `cycleFree`
+separate. A complete closure can still contain a cycle. Declared conflicts are
+reported as normalized asset-ID pairs with inclusion provenance; no winner is
+selected. See the [Declared Composition contract](docs/declared-composition.md).
+
 ## Architecture
 
 ```mermaid
@@ -342,9 +366,12 @@ Current commands:
 renma graph . --format json
 renma graph . --format markdown
 renma graph . --format mermaid
+renma graph . --view composition --focus <asset-id-or-path> --format json
 ```
 
-The graph is not a runtime selection engine. It is repository evidence.
+The composition view is a focused transitive projection over the same graph and
+catalog. The graph is not a runtime selection engine. It is repository
+evidence.
 
 ## Validation
 

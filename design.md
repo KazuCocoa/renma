@@ -366,6 +366,42 @@ form, and enough snippet text for review.
 
 The graph is repository evidence. It must not become a task-specific context selector.
 
+## Declared Composition Model
+
+Renma models explicit composition, not general natural-language inheritance.
+The pure composition resolver consumes the existing catalog and expands only
+`requires_context`, `optional_context`, `requires_lens`, `optional_lens`, and
+Lens `applies_to` declarations. It does not expand references, conflicts,
+lifecycle, ownership, policy, static-support, or `extends` edges.
+
+Traversal tracks `(stable asset ID, required-or-optional membership)`. Each
+state is processed once. A required route dominates the final classification,
+but optional and required predecessor edges are both retained. Once a route
+crosses an optional edge, descendants on that route stay optional. The root is
+reported separately even when a cycle reaches it again.
+
+Provenance storage is edge-based rather than a list of every root-to-node path.
+Stable declaration edges retain source path, line range, snippet, declaration
+form, and route membership. This keeps storage proportional to assets and
+declarations even when the number of possible paths is exponential.
+
+Strongly connected components detect required and optional composition cycles.
+Completeness and cycle freedom remain separate; a fully resolved cyclic closure
+has `requiredComplete: true` and `cycleFree: false`. Conflict pairs are
+normalized by stable ID with inclusion provenance, and no winner is selected.
+
+Target-kind validation keeps currently supported Context-to-Context
+dependencies while requiring Context fields to target Context, Lens fields to
+target Lenses, and Lens `applies_to` to originate from a Lens and target
+Context. Unknown and wrong-kind required/optional targets affect their own
+completeness flags.
+
+The existing `graph --view composition --focus <asset-id-or-path>` projection
+owns JSON, Markdown, and Mermaid rendering. There is no second scanner,
+catalog, repository model, graph command, runtime bundle, or prompt assembler.
+`extends` remains limited to typed overlay/profile resolvers with explicit
+merge semantics.
+
 ## Core Workflow
 
 Renma should keep the deterministic path boring and reliable:
@@ -394,6 +430,10 @@ Implemented deterministic rules focus on repository health:
 - Invalid lifecycle status
 - Duplicate asset IDs
 - Unknown declared references
+- Wrong declared relationship target kind
+- Duplicate values in one dependency field
+- Required and optional composition cycles
+- Transitive required and optional declared conflicts
 - Declared dependency on deprecated or archived context
 - Orphaned shared context asset
 - Superseded local support asset reference advisories

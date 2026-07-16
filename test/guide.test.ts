@@ -116,6 +116,7 @@ test("guide skill JSON and --json are equivalent small structured projections", 
     "artifactRules",
     "concisenessRules",
     "metadataRules",
+    "externalTraversalRules",
     "illustrationRules",
     "illustrations",
     "verification",
@@ -247,6 +248,7 @@ test("guide renderers derive focused prompt and complete JSON from one source", 
     "Artifact rules",
     "Conciseness rules",
     "Metadata rules",
+    "External reference traversal rules",
     "How to use illustrations",
     "Non-normative authoring illustrations",
     "Verification",
@@ -261,6 +263,7 @@ test("guide renderers derive focused prompt and complete JSON from one source", 
     artifactRules: guidance.artifactRules,
     concisenessRules: guidance.concisenessRules,
     metadataRules: guidance.metadataRules,
+    externalTraversalRules: guidance.externalTraversalRules,
     illustrationRules: guidance.illustrationRules,
     verification: guidance.verification,
   })) {
@@ -323,6 +326,7 @@ test("illustration rules prohibit template selection and preserve normative cont
     artifactRules: guidance.artifactRules,
     concisenessRules: guidance.concisenessRules,
     metadataRules: guidance.metadataRules,
+    externalTraversalRules: guidance.externalTraversalRules,
     illustrationRules: guidance.illustrationRules,
     verification: guidance.verification,
   }).join("\n");
@@ -334,6 +338,79 @@ test("illustration rules prohibit template selection and preserve normative cont
   assert.match(
     guidance.placementRules.join("\n"),
     /Do not enable runtime network access[\s\S]*require authoring-time external consultation[\s\S]*resolve future task findings[\s\S]*split a Skill merely because those choices appear in an example/,
+  );
+});
+
+test("conditional external traversal guidance defines finite authored behavior without crawling", () => {
+  const guidance = buildSkillAuthoringGuidance("test-version");
+  const prompt = renderSkillGuidePrompt(guidance);
+  const rules = guidance.externalTraversalRules.join("\n");
+
+  assert.match(rules, /Apply this section only when[\s\S]*recursively follow/);
+  assert.match(
+    rules,
+    /explicitly named external sources[\s\S]*does not by itself require a recursive traversal contract/,
+  );
+  for (const contractPart of [
+    "approved source boundary",
+    "logical-source identity",
+    "visited-source registry",
+    "repeated-source behavior",
+    "relevance criteria",
+    "termination condition",
+    "page-count and depth safety caps",
+    "cycle behavior",
+    "ambiguous identity behavior",
+    "inaccessible-source behavior",
+    "unresolved-reference reporting",
+  ]) {
+    assert.match(rules, new RegExp(escapeRegExp(contractPart)));
+  }
+  assert.match(
+    rules,
+    /provider-specific immutable resource ID[\s\S]*provider-returned canonical URL[\s\S]*normalized URL without fragments and tracking parameters[\s\S]*exact URL as a fallback/,
+  );
+  assert.match(
+    rules,
+    /process each logical source once[\s\S]*additional reference path as provenance/,
+  );
+  assert.match(
+    rules,
+    /incomplete prior read, changed content, or a precise evidence check/,
+  );
+  assert.match(rules, /Stop when no new relevant source remains/);
+  assert.match(rules, /Renma defines no universal fixed value/);
+  assert.match(
+    rules,
+    /stop and report the unresolved boundary, remaining scope/,
+  );
+  assert.match(rules, /Traversal order defines neither authority nor override/);
+  assert.match(rules, /Report contradictory sources/);
+  assert.match(rules, /Do not create a hidden runtime prompt package/);
+  assert.match(
+    rules,
+    /Renma does not fetch, open, normalize, or crawl external sources/,
+  );
+  assert.doesNotMatch(rules, /never reread under any circumstance/i);
+  assert.doesNotMatch(
+    rules,
+    /maximum (?:of )?\d+|depth (?:of )?\d+|\d+ pages/i,
+  );
+  assert.deepEqual(
+    guidance.illustrations.map((illustration) => illustration.id),
+    [
+      "minimal-clarification",
+      "report-first-progression",
+      "source-backed-boundary",
+    ],
+  );
+  assert.ok(
+    prompt.indexOf("External reference traversal rules") <
+      prompt.indexOf("How to use illustrations"),
+  );
+  assert.doesNotMatch(
+    prompt,
+    /Confluence|source graph|URL normalization example/i,
   );
 });
 
@@ -349,6 +426,9 @@ test("interactive protocol is the prompt entrypoint before placement and artifac
   const placementIndex = prompt.indexOf("Placement rules");
   const artifactIndex = prompt.indexOf("Artifact rules");
   const metadataIndex = prompt.indexOf("Metadata rules");
+  const externalTraversalIndex = prompt.indexOf(
+    "External reference traversal rules",
+  );
   const usageIndex = prompt.indexOf("How to use illustrations");
   const illustrationsIndex = prompt.indexOf(
     "Non-normative authoring illustrations",
@@ -361,7 +441,8 @@ test("interactive protocol is the prompt entrypoint before placement and artifac
   assert.ok(placementIndex > openingIndex);
   assert.ok(artifactIndex > placementIndex);
   assert.ok(metadataIndex > artifactIndex);
-  assert.ok(usageIndex > metadataIndex);
+  assert.ok(externalTraversalIndex > metadataIndex);
+  assert.ok(usageIndex > externalTraversalIndex);
   assert.ok(illustrationsIndex > usageIndex);
   assert.ok(verificationIndex > illustrationsIndex);
   assert.doesNotMatch(

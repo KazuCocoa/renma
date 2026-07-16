@@ -99,6 +99,10 @@ export interface Dependency {
   /** Asset ID or declared target named by the relationship. */
   to: string;
   kind: DependencyKind;
+  /** Metadata field or other repository declaration that produced the edge. */
+  declaration?: string;
+  /** Zero-based position within the declaration, retained for duplicate evidence. */
+  declarationIndex?: number;
   sourcePath: string;
   evidence?: Evidence;
 }

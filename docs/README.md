@@ -29,6 +29,8 @@ Use this index to choose the smallest document that answers your question.
   v2 contracts included in the npm package.
 - [Diagnostics Reference](diagnostics.md): scan finding identifiers and repair
   guidance.
+- [Declared Composition](declared-composition.md): required and optional
+  closure, provenance, completeness, cycle, conflict, and graph-view contract.
 - [Renma Quality Profile](quality-profile.md): canonical thresholds,
   units, provenance, rationale, false-positive risks, and configuration status.
 

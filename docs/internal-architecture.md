@@ -1,7 +1,8 @@
 # Renma Internal Architecture
 
-This document describes the 0.19.x maintainability architecture, including the
-additive `guide` command and its shipped interactive authoring protocol.
+This document describes the 0.20.x maintainability architecture, including the
+additive `guide` command, its shipped interactive authoring protocol, and
+Declared Composition analysis.
 It is contributor guidance, not a new versioned JSON schema. Renma 0.18.2
 remains the compatibility baseline for existing commands: public fields,
 classifications, diagnostics, severities, exit behavior, and migration direction
@@ -67,6 +68,31 @@ independently recollected repository states.
 `collectRepositoryEvidence` is a narrower compatibility projection for
 consumers such as catalog and graph. It deliberately omits parsed documents,
 sets, maps, and indexes that are implementation details.
+
+## Declared Composition Is Pure Catalog Analysis
+
+`src/declared-composition.ts` accepts the existing normalized `Catalog` and a
+root stable ID or source path. It does not scan files, read the filesystem,
+render CLI output, fetch external sources, or build a second repository model.
+Graph command orchestration collects repository evidence once and passes that
+catalog to the resolver.
+
+Traversal state is `(asset ID, membership)` where membership is required or
+optional. Both states may be processed once for the same ID so required and
+optional provenance remains complete; final member classification gives
+required membership precedence. Expansion is limited to the retained metadata
+declaration forms for Context, Lens, and `applies_to` composition.
+
+The resolver stores declaration predecessor edges, not all possible paths.
+Line evidence and declaration indexes distinguish repeated declarations.
+Strongly connected components operate on those finite edges, and conflict
+analysis normalizes unordered ID pairs. Scan rules and the composition graph
+view call the same resolver; renderers do not re-resolve composition.
+
+The graph report adds a composition section only for `--view composition`.
+Existing graph views keep their meanings. JSON preserves all predecessor edge
+data, while Markdown and Mermaid are bounded review projections over the same
+report.
 
 ## Structural And Repository-Backed Resolution
 
@@ -215,6 +241,14 @@ instruction exists. The prompt renders all protocol and illustration-usage rules
 before the non-normative collection. JSON serializes the same source directly.
 Future illustrations can be added without modifying the normative interaction
 contract.
+
+In 0.20.0, `externalTraversalRules` is another top-level normative collection,
+rendered after metadata rules and before illustration usage. It is conditional
+on recursive discovery inside external sources. It defines what an authored
+Skill and its consuming runtime must specify; it neither authorizes nor causes
+Renma to fetch, normalize, identify, or crawl external sources. It adds no
+illustration selector, traversal state metadata, hidden prompt package, or live
+visited registry.
 
 Prompt and JSON are intentionally different projections of that source. The
 prompt renders each illustration's title, demonstrated tensions, notice,

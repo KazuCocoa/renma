@@ -726,6 +726,7 @@ renma graph . --view summary
 renma graph . --view workflow --format markdown
 renma graph . --view full --format mermaid
 renma graph . --view layered --format mermaid
+renma graph . --view composition --focus skill.testing.spec-review --format json
 ```
 
 Views are:
@@ -734,8 +735,24 @@ Views are:
 - `workflow`: workflow-oriented relationships.
 - `full`: all known graph edges.
 - `layered`: Mermaid-focused graph grouped by asset kind so skill-to-lens-to-context paths are easier to read. `lens` is accepted as an alias.
+- `composition`: the focused root's complete explicit required and optional
+  Context/Lens closure. This view requires `--focus`.
 
 Layered Mermaid output groups skills, context lenses, contexts, support assets, and unresolved targets into separate subgraphs. JSON and Markdown keep the same node and edge detail while reporting the selected view.
+
+The composition view expands only `requires_context`, `optional_context`,
+`requires_lens`, `optional_lens`, and Lens `applies_to`. It reports the root,
+required and optional members, line-level declaration provenance, unknown and
+wrong-kind targets, required and optional cycles, declared conflicts, lifecycle
+and freshness concerns, and separate `requiredComplete`, `optionalComplete`,
+and `cycleFree` flags. It does not expand `references`, `conflicts`,
+`superseded_by`, ownership, policy, static support, or `extends`.
+
+Renma models explicit composition, not general natural-language inheritance.
+Declaration order does not define precedence, overriding, or conflict winners.
+The same stable asset ID appears once while all declaration provenance remains.
+A composition may be complete and still cyclic. See the
+[Declared Composition contract](declared-composition.md).
 
 #### Focusing The Graph
 
@@ -753,17 +770,30 @@ Examples:
 ```bash
 renma graph . --focus context.testing.boundary-value-analysis
 renma graph . --focus contexts/testing/boundary-value-analysis.md --view full
+renma graph . --focus skill.testing.spec-review --view composition --format markdown
 ```
 
 `--focus` accepts one value. The value must match either a catalog asset ID, a repository-relative source path such as `contexts/testing/boundary-value-analysis.md`, or an absolute source path. It does not match projected `summary` view node IDs such as `contexts/testing/*`.
 
-When `--focus` is provided, renma keeps the matched asset, its directly connected incoming and outgoing graph edges, and the assets at the other ends of those edges. In other words, it filters graph contents to the focused asset's one-hop neighborhood; it does not only highlight or rearrange the full graph. If the focus value does not match an asset ID or source path, the command exits with usage code `2` and reports that `graph --focus did not match any asset id or source path`.
+For summary, workflow, full, and layered views, `--focus` keeps the matched
+asset, its directly connected incoming and outgoing graph edges, and the assets
+at the other ends of those edges. The composition view instead uses the focus
+as the root of its transitive declared closure. If the focus value does not
+match an asset ID or source path, the command exits with usage code `2` and
+reports that `graph --focus did not match any asset id or source path`.
 
-`--focus` runs before `--view` projection. For example, `--view summary --focus <asset>` first selects the focused neighborhood and then groups that smaller graph into the summary view. There is no separate depth option in the current graph command, and repeated `--focus` flags are not a multi-focus API.
+For non-composition projections, `--focus` runs before view grouping. For
+example, `--view summary --focus <asset>` selects the focused neighborhood and
+then groups that smaller graph. Composition has no depth option because it
+resolves the finite explicit closure; repeated `--focus` flags are not a
+multi-focus API.
 
 Note: this graph `focus` argument is a CLI option. It is not a metadata field on an asset.
 
-Output includes graph nodes, relationship edges, unresolved targets, and diagnostics. Mermaid output renders the same graph as a diagram definition.
+Output includes graph nodes, relationship edges, declaration form and evidence,
+unresolved targets, and diagnostics. Composition JSON adds the complete
+composition-specific report. Mermaid output renders the selected repository
+graph as a diagram definition, never runtime execution flow.
 
 ### `trust-graph`
 

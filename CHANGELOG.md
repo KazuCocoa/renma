@@ -6,6 +6,58 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-07-15
+
+### Added
+
+- Added a pure Declared Composition resolver over the existing catalog. It
+  expands explicit required/optional Context and Lens declarations plus Lens
+  `applies_to`, propagates optional membership, deduplicates by stable asset ID,
+  retains required and optional predecessor-edge provenance, and keeps storage
+  proportional to declarations instead of possible paths.
+- Added separate required and optional unresolved declarations, target-kind
+  mismatches, completeness flags, strongly connected required and optional
+  cycles, normalized transitive conflicts, lifecycle findings, and freshness
+  summaries. A fully resolved cycle remains complete while `cycleFree` is
+  false; conflicts never select a winner.
+- Added `graph --view composition --focus <asset-id-or-path>` with deterministic
+  JSON, compact Markdown, and required-versus-optional Mermaid projections.
+  Dependency graph edges now retain additive declaration form, declaration
+  index, and line-level source evidence.
+- Added scan findings `META-DEPENDENCY-TARGET-KIND-MISMATCH`,
+  `META-DUPLICATE-DECLARED-DEPENDENCY`, `COMPOSITION-REQUIRED-CYCLE`,
+  `COMPOSITION-OPTIONAL-CYCLE`, `COMPOSITION-DECLARED-CONFLICT`, and
+  `COMPOSITION-OPTIONAL-CONFLICT`, with actionable diagnostics v2 guidance.
+- Added top-level conditional normative `externalTraversalRules` to the Skill
+  authoring source. The rules distinguish named source reading from recursive
+  traversal and require bounded logical-identity, visited-source, relevance,
+  termination, safety-cap, cycle, access-failure, and unresolved-boundary
+  behavior in authored Skills when recursion is possible.
+
+### Changed
+
+- Extended the existing freshness rules and diagnostic IDs to Context Lenses.
+- Documented that Renma models explicit composition rather than
+  natural-language inheritance, declaration order has no precedence, stable IDs
+  resolve once while all declaration evidence remains, cycles terminate
+  finitely, and `extends` stays limited to typed overlay/profile contracts.
+- Rendered external traversal rules after metadata rules and before
+  illustration usage, preserving the 0.19.2 separation of normative protocol,
+  conditional normative guidance, illustration rules, non-normative
+  illustrations, compact prompt, and complete JSON projections.
+
+### Compatibility
+
+- Existing commands, graph views, output fields, lifecycle semantics, Security
+  Profile `extends` resolution, Trust Graph v2, Repository Context BOM v2,
+  Readiness, deterministic stdout, and read-only/non-network/non-LLM boundaries
+  remain intact. New graph fields, the composition view, authoring field, and
+  diagnostics are additive.
+- Renma still does not select or execute Skills, select or load runtime Context,
+  assemble prompts, coordinate Workflows, fetch or crawl external sources,
+  call an LLM, infer undeclared composition, resolve conflicts automatically,
+  or rewrite repository assets.
+
 ## [0.19.2] - 2026-07-15
 
 ### Changed
@@ -740,7 +792,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.19.2...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/KazuCocoa/renma/compare/v0.19.2...v0.20.0
 [0.19.2]: https://github.com/KazuCocoa/renma/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/KazuCocoa/renma/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/KazuCocoa/renma/compare/v0.18.3...v0.19.0

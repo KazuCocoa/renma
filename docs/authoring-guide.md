@@ -585,6 +585,52 @@ verification appropriate to them. The final step is human review of semantic
 correctness, meaningful decisions, applicable authority, and remaining
 uncertainty. Clean deterministic output does not prove semantic correctness.
 
+### Conditional external reference traversal rules
+
+Named external source reading means the finished Skill reads one or more
+explicitly named sources. Recursive external source traversal means it follows
+references discovered inside a source and may discover further sources. Named
+reading alone does not require a recursive traversal contract.
+
+When recursion is possible, persist an explicit contract in the Skill body or
+justified Skill-local support owned by that Skill. Define:
+
+- the approved source boundary and relevance criteria;
+- the strongest available logical-source identity and a visited-source
+  registry;
+- repeated-source, cycle, ambiguous-identity, and inaccessible-source behavior;
+- a termination condition plus explicit page-count and depth safety caps; and
+- unresolved-reference, limit-reached, remaining-scope, and provenance
+  reporting.
+
+Prefer identity in this order: provider-specific immutable resource ID,
+provider-returned canonical URL, normalized URL without fragments and tracking
+parameters, then exact URL. The authored Skill and its permitted runtime own
+this behavior; Renma does not compute identities, fetch pages, open URLs,
+normalize external sources, or crawl reference graphs.
+
+Process each logical source once per traversal when possible. If another
+reference reaches an already visited source, retain the additional path as
+provenance without reopening or reprocessing it by default. A justified
+incomplete prior read, content change, or precise evidence check may require a
+reread; do not encode an absolute never-reread rule.
+
+Follow only relevant in-boundary references and stop when no new relevant
+source remains. Safety caps are visible Reversible defaults, not silent claims
+of completeness. Renma defines no universal page or depth value. A human should
+review limits that materially affect completeness or safety.
+
+On a cycle, ambiguous identity, access failure, unresolved reference, or safety
+limit, stop and report the unresolved boundary and remaining scope rather than
+continuing or guessing. Traversal order defines no authority or override;
+report contradictory sources with evidence instead of resolving them by visit
+order.
+
+Do not create hidden runtime prompt packages, live repository visited
+registries, or metadata solely for traversal state. Recursive traversal safety
+is conditional normative authoring guidance, not repository composition or a
+new illustration category.
+
 ### How to use non-normative illustrations
 
 Renma does not classify a Skill request by matching it to a built-in example.

@@ -1,10 +1,10 @@
 import path from "node:path";
 import { resolvedAgentSkillDescription } from "./agent-skills.js";
+import { declaredCompositionFindings } from "./declared-composition.js";
 import type { Catalog, CatalogEntry, Dependency } from "./model.js";
 import {
-  addDaysIsoDate,
+  evaluateAssetFreshness,
   isIsoDate,
-  parseDayDuration,
   todayIsoDate,
 } from "./freshness.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
@@ -247,6 +247,7 @@ function catalogDeclaredReferenceGovernanceFindings(
 
   const resolver = createCatalogReferenceResolver(catalog.entries);
   const findings: Finding[] = [
+    ...declaredCompositionFindings(catalog, today),
     ...duplicateAssetIdFindings(catalog.entries),
     ...unknownReferenceFindings(catalog.dependencies, resolver),
     ...referenceDeprecatedAssetFindings(catalog.dependencies, resolver),
@@ -271,7 +272,12 @@ function freshnessGovernanceFindings(
   today = todayIsoDate(),
 ): Finding[] {
   return entries
-    .filter((entry) => entry.kind === "context" || entry.kind === "skill")
+    .filter(
+      (entry) =>
+        entry.kind === "context" ||
+        entry.kind === "context_lens" ||
+        entry.kind === "skill",
+    )
     .flatMap((entry) => [
       ...expiredAssetFindings(entry, today),
       ...reviewOverdueAssetFindings(entry, today),
@@ -280,7 +286,9 @@ function freshnessGovernanceFindings(
 
 function expiredAssetFindings(entry: CatalogEntry, today: string): Finding[] {
   const expiresAt = entry.metadata.expiresAt;
-  if (!expiresAt || !isIsoDate(expiresAt) || expiresAt >= today) return [];
+  if (!expiresAt || !evaluateAssetFreshness(entry.metadata, today).expired) {
+    return [];
+  }
 
   return [
     {
@@ -320,12 +328,9 @@ function reviewOverdueAssetFindings(
   const lastReviewedAt = entry.metadata.lastReviewedAt;
   const reviewCycle = entry.metadata.reviewCycle;
   if (!lastReviewedAt || !reviewCycle) return [];
-  if (!isIsoDate(lastReviewedAt)) return [];
-  const cycleDays = parseDayDuration(reviewCycle);
-  if (cycleDays === undefined) return [];
-
-  const dueAt = addDaysIsoDate(lastReviewedAt, cycleDays);
-  if (dueAt >= today) return [];
+  const freshness = evaluateAssetFreshness(entry.metadata, today);
+  if (!freshness.reviewOverdue || !freshness.reviewDueAt) return [];
+  const dueAt = freshness.reviewDueAt;
 
   return [
     {

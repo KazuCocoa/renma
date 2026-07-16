@@ -2,7 +2,7 @@
 
 ## Current Product Definition
 
-Renma 0.19.2 is the current shipped baseline:
+Renma 0.20.0 is the current shipped baseline:
 a Git-native context repository and deterministic governance CLI for
 agent-consumable Skills, Context Lenses, Context Assets, local support
 resources, policies, ownership, lifecycle, dependencies, and review evidence.
@@ -150,6 +150,33 @@ modifying `interaction`. `guide` remains deterministic, stdout-only,
 non-editing, non-networked, and non-interactive; it neither calls an LLM nor
 performs illustration classification or runtime selection.
 
+## Shipped 0.20.0 Declared Composition Foundation
+
+Renma 0.20.0 adds deterministic Declared Composition analysis over the existing
+catalog and repository evidence. A focused root resolves explicit required and
+optional Context/Lens membership, Lens-applied Context, stable-ID deduplication,
+complete declaration-edge provenance, separate completeness flags, required and
+optional cycles, transitive declared conflicts, lifecycle concerns, and
+freshness evidence.
+
+The existing graph command adds `--view composition` with required `--focus`
+and JSON, Markdown, and Mermaid projections. Scan adds target-kind, duplicate
+declaration, cycle, and conflict findings; existing freshness governance now
+also covers Context Lenses. Declaration order defines no precedence, conflict
+winner, or merge behavior. `extends` remains a typed overlay/profile
+relationship outside the general composition closure.
+
+The same structured authoring source adds conditional normative recursive
+external-reference traversal safety before illustrations. It tells an authored
+Skill and consuming runtime to define source and relevance boundaries,
+logical identity, visited handling, termination and safety caps, cycle and
+failure behavior, and unresolved-scope reporting. Renma does not crawl external
+sources and adds no traversal state or runtime prompt package.
+
+This release preserves the 0.19.2 separation between normative interaction,
+conditional normative guidance, illustration usage rules, non-normative
+illustrations, compact prompt projection, and complete JSON projection.
+
 ## Stable Product Boundaries
 
 Renma owns repository discovery and parsing, normalized static evidence,
@@ -160,7 +187,7 @@ policy weakening.
 
 ## Deferred Skill-to-Skill Discovery Design
 
-Graph-based Skill-to-Skill route discovery is not a 0.18.0 feature and has no
+Graph-based Skill-to-Skill route discovery is not a 0.20.0 feature and has no
 assigned release. The exploratory design in
 [plan-discovery.md](plan-discovery.md) discusses possible `routes_to` metadata,
 discovery aliases, generated routing indexes, and a `skill-index` projection.
@@ -168,8 +195,8 @@ None is an implemented contract.
 
 Any future proposal must be reconsidered against the focused-workflow model
 introduced in 0.18.0. It must remain deterministic and static, avoid runtime
-selection, preserve source Skills, and receive an explicit version and contract
-decision before implementation.
+selection, preserve source Skills, reuse the same `RepositoryEvidence`, and
+receive an explicit version and contract decision before implementation.
 
 ## Later Candidates
 

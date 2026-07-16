@@ -30,7 +30,8 @@ const OPTION_HELP = {
   },
   focus: {
     flags: "--focus <asset-id-or-path>",
-    description: "Keep one matched asset and its one-hop graph neighborhood.",
+    description:
+      "Focus one asset by stable ID or path; required by the composition view.",
   },
   format: {
     flags: "--format <format>",
@@ -99,7 +100,8 @@ const OPTION_HELP = {
   },
   view: {
     flags: "--view <view>",
-    description: "Graph view: summary, workflow, full, layered, or lens.",
+    description:
+      "Graph view: summary, workflow, full, layered, lens, or composition.",
   },
 } as const;
 
@@ -215,11 +217,13 @@ export const COMMAND_HELP = [
       "renma graph . --format markdown",
       "renma graph . --view layered --format mermaid",
       "renma graph . --focus contexts/testing/boundary-value-analysis.md --view full",
+      "renma graph . --focus skill.testing.spec-review --view composition --format json",
     ],
     interpretation: [
       "Edges represent declared relationships Renma can resolve or report as unresolved.",
       "Unexpected isolation is evidence to review, not automatic permission to delete an asset.",
       "Focused output filters to the matched asset and directly connected neighbors.",
+      "The composition view resolves the complete explicit required and optional closure and requires --focus.",
     ],
     nextSteps: [
       "Use catalog to inspect the assets behind graph nodes.",

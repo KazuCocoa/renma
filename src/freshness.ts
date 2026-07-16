@@ -1,6 +1,19 @@
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_DURATION_PATTERN = /^P([1-9]\d*)D$/;
 
+export interface FreshnessMetadata {
+  lastReviewedAt?: string;
+  reviewCycle?: string;
+  expiresAt?: string;
+}
+
+export interface AssetFreshnessEvaluation {
+  expired: boolean;
+  reviewOverdue: boolean;
+  expiresAt?: string;
+  reviewDueAt?: string;
+}
+
 /** Return today's date as a UTC ISO date string for deterministic comparisons. */
 export function todayIsoDate(now = new Date()): string {
   return now.toISOString().slice(0, 10);
@@ -27,4 +40,31 @@ export function addDaysIsoDate(value: string, days: number): string {
   const date = new Date(`${value}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+/** Evaluate supported explicit freshness metadata against one ISO date. */
+export function evaluateAssetFreshness(
+  metadata: FreshnessMetadata,
+  today: string,
+): AssetFreshnessEvaluation {
+  const expiresAt =
+    metadata.expiresAt && isIsoDate(metadata.expiresAt)
+      ? metadata.expiresAt
+      : undefined;
+  const cycleDays = metadata.reviewCycle
+    ? parseDayDuration(metadata.reviewCycle)
+    : undefined;
+  const reviewDueAt =
+    metadata.lastReviewedAt &&
+    isIsoDate(metadata.lastReviewedAt) &&
+    cycleDays !== undefined
+      ? addDaysIsoDate(metadata.lastReviewedAt, cycleDays)
+      : undefined;
+
+  return {
+    expired: expiresAt !== undefined && expiresAt < today,
+    reviewOverdue: reviewDueAt !== undefined && reviewDueAt < today,
+    ...(expiresAt ? { expiresAt } : {}),
+    ...(reviewDueAt ? { reviewDueAt } : {}),
+  };
 }

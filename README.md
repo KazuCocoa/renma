@@ -60,6 +60,13 @@ decisions, may be combined or ignored, and must not be copied as templates. A
 report-first pattern and a fictional source-backed Product API pattern remain
 concrete only to demonstrate particular authoring tensions.
 
+When a finished Skill may recursively follow references found inside external
+sources, the normative guide requires an explicit bounded traversal contract:
+logical-source identity, visited-source handling, relevance and source
+boundaries, termination and safety caps, cycle/access/ambiguity behavior, and
+unresolved-scope reporting. Named source reading alone does not trigger that
+contract. Renma itself does not fetch, normalize, or crawl external sources.
+
 Platform-native Skill authoring guidance may then refine trigger descriptions,
 ordered instructions, positive and negative usage boundaries, inputs,
 constraints, completion criteria, and examples that resolve real ambiguity
@@ -175,7 +182,7 @@ an approved process or leave source-dependent facts unresolved.
 The [Authoring Guide](docs/authoring-guide.md) is the canonical walkthrough for
 both workflows.
 
-Renma 0.19.x continues to use focused workflows rather than a thin-router
+Renma 0.20.x continues to use focused workflows rather than a thin-router
 model. See the [canonical quality profile](docs/quality-profile.md) for every
 fixed threshold, unit, rationale, provenance, and diagnostic mapping. Quality
 thresholds are not configurable through `renma.config.json` in this release.
@@ -188,6 +195,7 @@ Run Renma without installing it globally:
 npx renma scan . --fail-on high
 npx renma catalog . --format markdown
 npx renma graph . --format markdown
+npx renma graph . --view composition --focus <asset-id-or-path> --format markdown
 npx renma readiness . --format markdown
 ```
 
@@ -308,6 +316,31 @@ Skill -> Context Asset
 ```
 
 These are static governance relationships, not runtime Context selection.
+
+## Declared Composition
+
+Renma models explicit composition, not general natural-language inheritance.
+For one resolved Skill, Lens, or Context root, the composition view follows
+only explicit `requires_context`, `optional_context`, `requires_lens`,
+`optional_lens`, and Lens `applies_to` declarations:
+
+```bash
+renma graph . --view composition \
+  --focus skill.testing.spec-review \
+  --format json
+```
+
+An all-required route produces required membership. After an optional edge,
+descendants on that route remain optional. If both routes reach the same stable
+asset ID, Renma lists it once as required while preserving both declarations'
+line-level provenance. Declaration order never defines precedence or
+overriding.
+
+Reports separate required and optional resolution completeness from cycle
+freedom, so a fully resolved cyclic closure can be complete while still
+requiring design review. Declared conflicts are reported without a winner.
+`extends` remains an overlay/profile relationship and is not general
+composition. See the [Declared Composition contract](docs/declared-composition.md).
 
 ## Context Asset Discovery Boundary
 

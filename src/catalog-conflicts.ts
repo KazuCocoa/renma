@@ -1,4 +1,5 @@
 import type { CatalogEntry } from "./model.js";
+import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import type { Diagnostic, Evidence } from "./types.js";
 
 export function conflictDiagnostics(entries: CatalogEntry[]): Diagnostic[] {
@@ -63,6 +64,7 @@ function requiredConflictDiagnostics(
         if (!conflictPairs.has(pairKey(left, right))) continue;
 
         diagnostics.push({
+          code: DIAGNOSTIC_IDS.COMPOSITION_DECLARED_CONFLICT,
           severity: "warning",
           path: entry.sourcePath,
           message: `Skill requires conflicting context assets "${left}" and "${right}".`,
