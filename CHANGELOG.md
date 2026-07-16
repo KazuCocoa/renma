@@ -6,7 +6,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
-## [0.20.0] - 2026-07-15
+## [0.20.0] - 2026-07-16
 
 ### Added
 
