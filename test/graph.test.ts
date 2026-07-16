@@ -68,6 +68,216 @@ test("graph JSON includes nodes and metadata dependency edges", async () => {
   );
 });
 
+test("graph composition view resolves required and optional closure with provenance", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    requiresLens: ["lens.testing.review"],
+    optionalContext: ["testing.optional"],
+  });
+  await writeContextLens(root, "testing", "review", {
+    id: "lens.testing.review",
+    appliesTo: ["testing.required"],
+  });
+  await writeContext(root, "testing", "required", {
+    requiresContext: ["testing.child"],
+  });
+  await writeContext(root, "testing", "child", {});
+  await writeContext(root, "testing", "optional", {});
+
+  const result = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "composition",
+      "--focus",
+      "demo",
+      "--format",
+      "json",
+    ]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.equal(result.stderr, "");
+  const output = JSON.parse(result.stdout) as {
+    view: string;
+    composition: {
+      root: { id: string };
+      requiredAssets: Array<{ id: string }>;
+      optionalAssets: Array<{ id: string }>;
+      provenanceEdges: Array<{
+        relationship: string;
+        evidence?: { path: string; startLine: number; snippet: string };
+      }>;
+      requiredComplete: boolean;
+      optionalComplete: boolean;
+      cycleFree: boolean;
+    };
+  };
+  assert.equal(output.view, "composition");
+  assert.equal(output.composition.root.id, "demo");
+  assert.deepEqual(
+    output.composition.requiredAssets.map((asset) => asset.id),
+    ["lens.testing.review", "testing.child", "testing.required"],
+  );
+  assert.deepEqual(
+    output.composition.optionalAssets.map((asset) => asset.id),
+    ["testing.optional"],
+  );
+  assert.ok(
+    output.composition.provenanceEdges.every(
+      (edge) =>
+        edge.evidence?.path &&
+        edge.evidence.startLine > 0 &&
+        edge.evidence.snippet.length > 0,
+    ),
+  );
+  assert.deepEqual(
+    output.composition.provenanceEdges.map((edge) => edge.relationship),
+    ["requires_lens", "optional_context", "applies_to", "requires_context"],
+  );
+  assert.equal(output.composition.requiredComplete, true);
+  assert.equal(output.composition.optionalComplete, true);
+  assert.equal(output.composition.cycleFree, true);
+});
+
+test("graph composition Markdown and Mermaid focus by repository-relative path", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {
+    requiresContext: ["testing.required"],
+    optionalContext: ["testing.optional"],
+  });
+  await writeContext(root, "testing", "required", {});
+  await writeContext(root, "testing", "optional", {});
+
+  const markdown = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "composition",
+      "--focus",
+      "skills/demo/SKILL.md",
+      "--format",
+      "markdown",
+    ]),
+  );
+  const mermaid = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "composition",
+      "--focus",
+      "skills/demo/SKILL.md",
+      "--format",
+      "mermaid",
+    ]),
+  );
+
+  assert.equal(markdown.code, 0);
+  assert.match(markdown.stdout, /^# Renma Declared Composition/);
+  assert.match(markdown.stdout, /## Declaration provenance/);
+  assert.match(markdown.stdout, /Required complete: yes/);
+  assert.match(markdown.stdout, /optional_context/);
+  assert.equal(mermaid.code, 0);
+  assert.match(mermaid.stdout, /^graph TD/);
+  assert.match(mermaid.stdout, /requires_context required/);
+  assert.match(mermaid.stdout, /optional_context optional/);
+  assert.match(
+    mermaid.stdout,
+    /Solid edges are required; dotted edges are optional/,
+  );
+});
+
+test("composition Markdown renders SCC members and actual edges without fabricating a cycle path", async () => {
+  const root = await fixture();
+  await writeContext(root, "cycle", "a", {
+    requiresContext: ["cycle.c"],
+  });
+  await writeContext(root, "cycle", "b", {
+    requiresContext: ["cycle.a"],
+  });
+  await writeContext(root, "cycle", "c", {
+    requiresContext: ["cycle.b"],
+  });
+
+  const markdown = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "composition",
+      "--focus",
+      "cycle.a",
+      "--format",
+      "markdown",
+    ]),
+  );
+  const json = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "composition",
+      "--focus",
+      "cycle.a",
+      "--format",
+      "json",
+    ]),
+  );
+
+  assert.equal(markdown.code, 0);
+  assert.match(
+    markdown.stdout,
+    /Strongly connected assets: cycle\.a, cycle\.b, cycle\.c\./,
+  );
+  assert.match(markdown.stdout, /cycle\.a requires_context cycle\.c/);
+  assert.match(markdown.stdout, /cycle\.b requires_context cycle\.a/);
+  assert.match(markdown.stdout, /cycle\.c requires_context cycle\.b/);
+  assert.doesNotMatch(markdown.stdout, /cycle\.a -> cycle\.b/);
+
+  assert.equal(json.code, 0);
+  const report = JSON.parse(json.stdout) as {
+    composition: {
+      requiredCycles: Array<{
+        assetIds: string[];
+        edges: Array<{ from: string; to: string }>;
+      }>;
+    };
+  };
+  assert.deepEqual(
+    report.composition.requiredCycles.map((cycle) => ({
+      assetIds: cycle.assetIds,
+      edges: cycle.edges.map((edge) => [edge.from, edge.to]),
+    })),
+    [
+      {
+        assetIds: ["cycle.a", "cycle.b", "cycle.c"],
+        edges: [
+          ["cycle.a", "cycle.c"],
+          ["cycle.b", "cycle.a"],
+          ["cycle.c", "cycle.b"],
+        ],
+      },
+    ],
+  );
+});
+
+test("graph composition view requires a focus target", async () => {
+  const root = await fixture();
+  const result = await withCapturedConsole(() =>
+    main(["graph", root, "--view", "composition", "--format", "json"]),
+  );
+
+  assert.equal(result.code, 2);
+  assert.equal(result.stdout, "");
+  assert.match(
+    result.stderr,
+    /graph --view composition requires --focus <asset-id-or-path>/,
+  );
+});
+
 test("graph resolves requires_context by asset id", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", { requiresContext: ["testing.boundary"] });
@@ -105,7 +315,15 @@ test("graph keeps unknown dependencies as unresolved edges", async () => {
     from: "demo",
     to: "missing.asset",
     kind: "requires",
+    declaration: "requires_context",
+    declarationIndex: 0,
     sourcePath: "skills/demo/SKILL.md",
+    evidence: {
+      path: "skills/demo/SKILL.md",
+      startLine: 6,
+      endLine: 6,
+      snippet: `  renma.requires-context: '["missing.asset"]'`,
+    },
     resolved: false,
   });
 });
@@ -420,7 +638,7 @@ test("graph CLI rejects unsupported view", async () => {
   assert.equal(result.stdout, "");
   assert.match(
     result.stderr,
-    /--view must be one of: summary, workflow, full, layered, lens\./,
+    /--view must be one of: summary, workflow, full, layered, lens, composition\./,
   );
 });
 
@@ -643,6 +861,7 @@ async function writeSkill(
     status?: string;
     tags?: string[];
     requiresContext?: string[];
+    optionalContext?: string[];
     requiresLens?: string[];
     optionalLens?: string[];
   },
@@ -663,7 +882,12 @@ async function writeContext(
   root: string,
   group: string,
   id: string,
-  metadata: { owner?: string; status?: string; tags?: string[] },
+  metadata: {
+    owner?: string;
+    status?: string;
+    tags?: string[];
+    requiresContext?: string[];
+  },
 ): Promise<void> {
   await mkdir(path.join(root, "contexts", group), { recursive: true });
   await writeFile(
@@ -710,6 +934,7 @@ function markdown(metadata: {
   purpose?: string;
   tags?: string[];
   requiresContext?: string[];
+  optionalContext?: string[];
   requiresLens?: string[];
   optionalLens?: string[];
   appliesTo?: string[];
@@ -731,6 +956,11 @@ function markdown(metadata: {
       ...(metadata.requiresContext
         ? [
             `  renma.requires-context: '${JSON.stringify(metadata.requiresContext)}'`,
+          ]
+        : []),
+      ...(metadata.optionalContext
+        ? [
+            `  renma.optional-context: '${JSON.stringify(metadata.optionalContext)}'`,
           ]
         : []),
       ...(metadata.requiresLens
@@ -755,6 +985,9 @@ function markdown(metadata: {
     ...(metadata.tags ? [`tags: ${metadata.tags.join(", ")}`] : []),
     ...(metadata.requiresContext
       ? [`requires_context: ${metadata.requiresContext.join(", ")}`]
+      : []),
+    ...(metadata.optionalContext
+      ? [`optional_context: ${metadata.optionalContext.join(", ")}`]
       : []),
     ...(metadata.requiresLens
       ? [`requires_lens: ${metadata.requiresLens.join(", ")}`]

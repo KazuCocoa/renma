@@ -349,6 +349,26 @@ Expected diagnostics include:
 static graph neighborhood. These views report repository evidence, not runtime
 use.
 
+Context Lenses support the same explicit freshness metadata as Skills and
+Context Assets: `last_reviewed_at`, `review_cycle`, and `expires_at`. Scan uses
+the existing `MAINT-ASSET-REVIEW-OVERDUE` and `MAINT-ASSET-EXPIRED` identifiers;
+missing optional freshness metadata is not itself a finding.
+
+A focused Declared Composition view follows a required or optional Lens to its
+`applies_to` Context. The Context is required when the Lens route is required
+and optional when the route is optional. Wrong-kind `applies_to` targets are
+separate from unknown targets and make that route's composition incomplete.
+
+```bash
+renma graph . --view composition \
+  --focus skill.testing.spec-review \
+  --format markdown
+```
+
+This projection retains each Lens and Context stable ID plus line-level
+declaration provenance. It does not select a Lens, load Context, or assemble a
+runtime prompt.
+
 ## Authoring And Verification
 
 Use `scaffold` for a starter, then replace every placeholder with

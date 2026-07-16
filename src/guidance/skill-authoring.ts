@@ -89,6 +89,7 @@ export interface SkillAuthoringGuidance {
   artifactRules: string[];
   concisenessRules: string[];
   metadataRules: string[];
+  externalTraversalRules: string[];
   illustrationRules: string[];
   illustrations: SkillAuthoringIllustration[];
   verification: string[];
@@ -282,6 +283,18 @@ export function buildSkillAuthoringGuidance(
       "Represent an external source of truth through supported asset relationships and normal Markdown references, not an invented metadata schema.",
       "Preserve unknown existing vendor metadata when reviewing an existing Skill, but do not manufacture new provider-specific metadata without a requirement.",
       "Platform-native Skill authoring guidance is not the authority for Renma metadata, Context placement, repository asset boundaries, file count, source-of-truth representation, or whether scripts and support files should exist.",
+    ],
+    externalTraversalRules: [
+      "Apply this section only when the finished Skill may recursively follow references discovered inside an external source. Reading one or more explicitly named external sources is named source reading and does not by itself require a recursive traversal contract.",
+      "When recursive external traversal is possible, define an explicit contract in the Skill body or justified Skill-local support owned by that Skill. Cover the approved source boundary, logical-source identity, visited-source registry, repeated-source behavior, relevance criteria, termination condition, page-count and depth safety caps, cycle behavior, ambiguous identity behavior, inaccessible-source behavior, and unresolved-reference reporting.",
+      "Use the strongest available logical-source identity in this order: provider-specific immutable resource ID, provider-returned canonical URL, normalized URL without fragments and tracking parameters, then exact URL as a fallback. This is authored runtime guidance; Renma does not compute external identities.",
+      "Track visited external sources by logical identity when possible and process each logical source once per traversal. When another reference reaches an already visited source, retain the additional reference path as provenance without reopening or reprocessing it by default.",
+      "Reopen an already visited source only for a stated reason such as an incomplete prior read, changed content, or a precise evidence check; do not impose an absolute never-reread rule.",
+      "Follow only references relevant to the current objective and inside the approved source boundary. Stop when no new relevant source remains.",
+      "Use explicit page-count and depth limits as visible safety caps, not as silent completeness claims. The consuming LLM may propose task- and provider-appropriate values as Reversible defaults, and a human should review limits that materially affect completeness or safety; Renma defines no universal fixed value.",
+      "When a cycle, ambiguous identity, inaccessible source, unresolved reference, or safety limit prevents completion, stop and report the unresolved boundary, remaining scope, and relevant provenance instead of continuing indefinitely or guessing.",
+      "Traversal order defines neither authority nor override. Report contradictory sources with their evidence rather than resolving them from visit order.",
+      "Do not create a hidden runtime prompt package, a live repository visited registry, or new metadata solely for traversal state. Renma does not fetch, open, normalize, or crawl external sources; the authored Skill and its permitted consuming runtime own that behavior.",
     ],
     illustrationRules: [
       "Illustrations are non-normative, intentionally incomplete demonstrations of selected authoring decisions and may be ignored.",

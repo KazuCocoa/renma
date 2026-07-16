@@ -947,6 +947,8 @@ test("CLI prints catalog JSON and markdown", async () => {
         from: "demo",
         to: "demo.guide",
         kind: "requires",
+        declaration: "requires_context",
+        declarationIndex: 0,
         sourcePath: "skills/demo/SKILL.md",
         evidence: {
           path: "skills/demo/SKILL.md",
@@ -959,6 +961,8 @@ test("CLI prints catalog JSON and markdown", async () => {
         from: "demo",
         to: "testing.boundary-value-analysis",
         kind: "requires",
+        declaration: "requires_context",
+        declarationIndex: 1,
         sourcePath: "skills/demo/SKILL.md",
         evidence: {
           path: "skills/demo/SKILL.md",

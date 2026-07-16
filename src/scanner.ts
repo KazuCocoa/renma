@@ -176,7 +176,9 @@ function classificationLlmHint(
 
 function catalogDiagnosticFindings(diagnostics: Diagnostic[]): Finding[] {
   const findingDiagnostics = diagnostics.filter(
-    (diagnostic) => !/missing an owner/i.test(diagnostic.message),
+    (diagnostic) =>
+      !/missing an owner/i.test(diagnostic.message) &&
+      diagnostic.code !== DIAGNOSTIC_IDS.COMPOSITION_DECLARED_CONFLICT,
   );
   return findingDiagnostics.map((diagnostic) => {
     const path = diagnostic.path ?? "(catalog)";

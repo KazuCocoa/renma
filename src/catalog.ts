@@ -792,6 +792,8 @@ function metadataDependencies(
       from: entry.id,
       to: target,
       kind,
+      declaration: fieldKey,
+      declarationIndex: index,
       sourcePath: entry.sourcePath,
       evidence: metadataEvidence(entry.sourcePath, field),
     };

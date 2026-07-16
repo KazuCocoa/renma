@@ -2,6 +2,13 @@ import path from "node:path";
 
 import type { ConfigOverrides } from "../config.js";
 import {
+  resolveDeclaredComposition,
+  type CompositionConflict,
+  type CompositionProvenanceEdge,
+  type CompositionResolutionIssue,
+  type DeclaredCompositionReport,
+} from "../declared-composition.js";
+import {
   normalizeDependencyReference,
   resolveDependencyTarget,
 } from "../dependency-resolution.js";
@@ -22,7 +29,12 @@ import {
 import type { Diagnostic } from "../types.js";
 
 export type GraphFormat = "json" | "markdown" | "mermaid";
-export type GraphView = "summary" | "workflow" | "full" | "layered";
+export type GraphView =
+  | "summary"
+  | "workflow"
+  | "full"
+  | "layered"
+  | "composition";
 
 export interface GraphReport {
   root: string;
@@ -33,6 +45,7 @@ export interface GraphReport {
   edgeCount: number;
   nodes: GraphNode[];
   edges: GraphEdge[];
+  composition?: DeclaredCompositionReport;
   diagnostics?: Diagnostic[];
 }
 
@@ -54,7 +67,11 @@ export interface GraphEdge {
   from: string;
   to: string;
   kind: DependencyKind;
+  declaration?: string;
+  declarationIndex?: number;
   sourcePath: string;
+  evidence?: Diagnostic["evidence"];
+  membership?: "required" | "optional";
   resolved: boolean;
   targetId?: string;
   targetKind?: AssetKind;
@@ -70,11 +87,28 @@ export async function runGraphCommand(
     overrides?: ConfigOverrides;
   },
 ): Promise<number> {
-  const report = focusGraph(
-    await graph(targetPath, options.overrides ?? {}),
-    options.focus,
-  );
   const view = options.view ?? defaultGraphView(options.format);
+  const evidence = await collectRepositoryEvidence(
+    targetPath,
+    options.overrides ?? {},
+  );
+  const fullReport = graphFromRepositoryEvidence(evidence);
+  let report: GraphReport;
+  if (view === "composition") {
+    if (!options.focus) {
+      throw new Error(
+        "graph --view composition requires --focus <asset-id-or-path>.",
+      );
+    }
+    const focusNode = resolveFocusNode(fullReport, options.focus);
+    const composition = resolveDeclaredComposition(
+      evidence.catalog,
+      focusNode.id,
+    );
+    report = compositionGraphReport(fullReport, composition);
+  } else {
+    report = focusGraph(fullReport, options.focus);
+  }
   process.stdout.write(formatGraph(report, options.format, view));
   return report.diagnostics?.some(
     (diagnostic) => diagnostic.severity === "error",
@@ -130,14 +164,7 @@ function focusGraph(report: GraphReport, focus?: string): GraphReport {
     return report;
   }
 
-  const node = report.nodes.find((candidate) =>
-    matchesFocus(candidate, report.root, focus),
-  );
-  if (!node) {
-    throw new Error(
-      `graph --focus did not match any asset id or source path: ${focus}`,
-    );
-  }
+  const node = resolveFocusNode(report, focus);
 
   const edges = report.edges.filter(
     (edge) =>
@@ -159,6 +186,60 @@ function focusGraph(report: GraphReport, focus?: string): GraphReport {
   };
 }
 
+function resolveFocusNode(report: GraphReport, focus: string): GraphNode {
+  const node = report.nodes.find((candidate) =>
+    matchesFocus(candidate, report.root, focus),
+  );
+  if (!node) {
+    throw new Error(
+      `graph --focus did not match any asset id or source path: ${focus}`,
+    );
+  }
+  return node;
+}
+
+function compositionGraphReport(
+  report: GraphReport,
+  composition: DeclaredCompositionReport,
+): GraphReport {
+  const nodeIds = new Set([
+    composition.root.id,
+    ...composition.requiredAssets.map((asset) => asset.id),
+    ...composition.optionalAssets.map((asset) => asset.id),
+  ]);
+  const nodes = report.nodes.filter((node) => nodeIds.has(node.id));
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+  const edges = composition.provenanceEdges.map((edge): GraphEdge => {
+    const target = nodesById.get(edge.to);
+    return {
+      from: edge.from,
+      to: edge.declaredTarget,
+      kind: edge.kind,
+      declaration: edge.relationship,
+      ...(edge.declarationIndex !== undefined
+        ? { declarationIndex: edge.declarationIndex }
+        : {}),
+      sourcePath: edge.sourcePath,
+      ...(edge.evidence ? { evidence: edge.evidence } : {}),
+      membership: edge.membership,
+      resolved: true,
+      targetId: edge.to,
+      ...(target
+        ? { targetKind: target.kind, targetPath: target.sourcePath }
+        : {}),
+    };
+  });
+  return {
+    ...report,
+    view: "composition",
+    nodeCount: nodes.length,
+    edgeCount: edges.length,
+    nodes,
+    edges,
+    composition,
+  };
+}
+
 function matchesFocus(node: GraphNode, root: string, focus: string): boolean {
   const normalizedFocus = normalizePath(focus);
   return (
@@ -176,6 +257,7 @@ export function formatGraphMermaid(
   report: GraphReport,
   view: GraphView = "summary",
 ): string {
+  if (view === "composition") return formatCompositionMermaid(report);
   report = graphViewReport(report, view);
   if (view === "layered") return formatLayeredGraphMermaid(report);
 
@@ -306,6 +388,7 @@ export function formatGraphMarkdown(
   report: GraphReport,
   view: GraphView = "summary",
 ): string {
+  if (view === "composition") return formatCompositionMarkdown(report);
   report = graphViewReport(report, view);
   const lines = [
     "# Renma Graph",
@@ -362,6 +445,346 @@ export function formatGraphMarkdown(
   return `${lines.join("\n")}\n`;
 }
 
+function formatCompositionMarkdown(report: GraphReport): string {
+  const composition = requiredCompositionReport(report);
+  const lines = [
+    "# Renma Declared Composition",
+    "",
+    `- Repository: ${report.root}`,
+    `- Root: ${composition.root.id} (${composition.root.kind}, ${composition.root.sourcePath})`,
+    `- Required assets: ${composition.requiredAssets.length}`,
+    `- Optional assets: ${composition.optionalAssets.length}`,
+    `- Required complete: ${yesNo(composition.requiredComplete)}`,
+    `- Optional complete: ${yesNo(composition.optionalComplete)}`,
+    `- Cycle free: ${yesNo(composition.cycleFree)}`,
+    "",
+    "Declaration order does not define precedence or overriding. Optional membership records declared optional composition; Renma does not make a runtime selection.",
+  ];
+
+  lines.push("", "## Required assets", "");
+  renderCompositionAssetTable(
+    lines,
+    composition.requiredAssets,
+    composition.provenanceEdges,
+  );
+  lines.push("", "## Optional assets", "");
+  renderCompositionAssetTable(
+    lines,
+    composition.optionalAssets,
+    composition.provenanceEdges,
+  );
+
+  lines.push(
+    "",
+    "## Declaration provenance",
+    "",
+    "| From | Relationship | Membership | To | Declaration | Evidence |",
+    "| --- | --- | --- | --- | --- | --- |",
+  );
+  if (composition.provenanceEdges.length === 0) {
+    lines.push("| (none) |  |  |  |  |  |");
+  } else {
+    for (const edge of composition.provenanceEdges) {
+      lines.push(
+        `| ${tableText(edge.from)} | ${edge.relationship} | ${edge.membership} | ${tableText(edge.to)} | ${tableText(edge.declaredTarget)} | ${tableText(evidenceLabel(edge.evidence, edge.sourcePath))} |`,
+      );
+    }
+  }
+
+  const multipleParents = [
+    ...composition.requiredAssets,
+    ...composition.optionalAssets,
+  ]
+    .map((asset) => ({
+      asset,
+      parents: composition.provenanceEdges.filter(
+        (edge) => edge.to === asset.id,
+      ),
+    }))
+    .filter(({ parents }) => parents.length > 1);
+  lines.push("", "## Multiple declarations", "");
+  if (multipleParents.length === 0) {
+    lines.push("- None.");
+  } else {
+    for (const { asset, parents } of multipleParents) {
+      lines.push(
+        `- ${asset.id}: ${parents.length} retained declaration routes from ${[...new Set(parents.map((edge) => edge.from))].sort().join(", ")}.`,
+      );
+    }
+  }
+
+  lines.push("", "## Resolution problems", "");
+  renderResolutionIssues(
+    lines,
+    "Unresolved required",
+    composition.unresolvedRequired,
+  );
+  renderResolutionIssues(
+    lines,
+    "Unresolved optional",
+    composition.unresolvedOptional,
+  );
+  lines.push("", "### Invalid source or target kinds", "");
+  if (composition.kindMismatches.length === 0) {
+    lines.push("- None.");
+  } else {
+    for (const mismatch of composition.kindMismatches) {
+      const kindProblems = [
+        ...(mismatch.expectedSourceKind
+          ? [
+              `source kind ${mismatch.actualSourceKind}, expected ${mismatch.expectedSourceKind}`,
+            ]
+          : []),
+        ...(mismatch.expectedTargetKind && mismatch.actualTargetKind
+          ? [
+              `target ${mismatch.targetId ?? mismatch.declaredTarget} kind ${mismatch.actualTargetKind}, expected ${mismatch.expectedTargetKind}`,
+            ]
+          : []),
+      ];
+      lines.push(
+        `- ${mismatch.membership}: ${mismatch.sourceId} ${mismatch.relationship} ${mismatch.declaredTarget}; ${kindProblems.join("; ")} (${evidenceLabel(mismatch.evidence, mismatch.sourcePath)}).`,
+      );
+    }
+  }
+
+  lines.push("", "## Cycles", "");
+  renderCycles(lines, "Required", composition.requiredCycles);
+  renderCycles(lines, "Optional", composition.optionalCycles);
+  lines.push("", "## Declared conflicts", "");
+  renderConflicts(lines, "Required", composition.requiredConflicts);
+  renderConflicts(
+    lines,
+    "Optional candidates",
+    composition.optionalConflictCandidates,
+  );
+
+  lines.push("", "## Lifecycle and freshness", "");
+  if (
+    composition.lifecycleFindings.length === 0 &&
+    composition.freshnessFindings.length === 0
+  ) {
+    lines.push("- None.");
+  } else {
+    for (const finding of composition.lifecycleFindings) {
+      lines.push(
+        `- ${finding.membership}: ${finding.assetId} is ${finding.status}${finding.isRoot ? " (root)" : ""}.`,
+      );
+    }
+    for (const finding of composition.freshnessFindings) {
+      lines.push(
+        `- ${finding.membership}: ${finding.assetId} is ${finding.kind.replace("_", " ")} at ${finding.date}${finding.isRoot ? " (root)" : ""} (${evidenceLabel(finding.evidence, finding.sourcePath)}).`,
+      );
+    }
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+function renderCompositionAssetTable(
+  lines: string[],
+  assets: DeclaredCompositionReport["requiredAssets"],
+  provenance: CompositionProvenanceEdge[],
+): void {
+  lines.push(
+    "| ID | Kind | Source | Direct | Parent relationships |",
+    "| --- | --- | --- | --- | --- |",
+  );
+  if (assets.length === 0) {
+    lines.push("| (none) |  |  |  |  |");
+    return;
+  }
+  for (const asset of assets) {
+    const parents = provenance
+      .filter((edge) => edge.to === asset.id)
+      .map(
+        (edge) =>
+          `${edge.from} (${edge.relationship}, ${edge.membership}, ${evidenceLabel(edge.evidence, edge.sourcePath)})`,
+      );
+    lines.push(
+      `| ${tableText(asset.id)} | ${asset.kind} | ${tableText(asset.sourcePath)} | ${yesNo(asset.direct === true)} | ${tableText(parents.join("; "))} |`,
+    );
+  }
+}
+
+function renderResolutionIssues(
+  lines: string[],
+  heading: string,
+  issues: CompositionResolutionIssue[],
+): void {
+  lines.push("", `### ${heading}`, "");
+  if (issues.length === 0) {
+    lines.push("- None.");
+    return;
+  }
+  for (const issue of issues) {
+    lines.push(
+      `- ${issue.sourceId} ${issue.relationship} ${issue.declaredTarget} (${evidenceLabel(issue.evidence, issue.sourcePath)}).`,
+    );
+  }
+}
+
+function renderCycles(
+  lines: string[],
+  label: string,
+  cycles: DeclaredCompositionReport["requiredCycles"],
+): void {
+  lines.push("", `### ${label}`, "");
+  if (cycles.length === 0) {
+    lines.push("- None.");
+    return;
+  }
+  for (const cycle of cycles) {
+    lines.push(`- Strongly connected assets: ${cycle.assetIds.join(", ")}.`);
+    for (const edge of cycle.edges) {
+      lines.push(
+        `  - ${edge.from} ${edge.relationship} ${edge.to} (${edge.membership}; ${evidenceLabel(edge.evidence, edge.sourcePath)}).`,
+      );
+    }
+  }
+}
+
+function renderConflicts(
+  lines: string[],
+  label: string,
+  conflicts: CompositionConflict[],
+): void {
+  lines.push("", `### ${label}`, "");
+  if (conflicts.length === 0) {
+    lines.push("- None.");
+    return;
+  }
+  for (const conflict of conflicts) {
+    const declarations = conflict.declarations
+      .map((item) => evidenceLabel(item.evidence, item.sourcePath))
+      .join(", ");
+    lines.push(
+      `- ${conflict.left} conflicts with ${conflict.right}; no winner selected (${declarations}).`,
+    );
+  }
+}
+
+function formatCompositionMermaid(report: GraphReport): string {
+  const composition = requiredCompositionReport(report);
+  const nodeIds = new Map<string, string>();
+  const lines = ["graph TD"];
+  report.nodes.forEach((node, index) => {
+    const id = `node_${index}`;
+    nodeIds.set(node.id, id);
+    const root = node.id === composition.root.id ? "root " : "";
+    lines.push(
+      `  ${id}["${escapeMermaidLabel(`${root}${node.kind}: ${node.id}`)}"]`,
+    );
+  });
+
+  const cycleEdges = new Set(
+    [...composition.requiredCycles, ...composition.optionalCycles].flatMap(
+      (cycle) => cycle.edges.map(compositionEdgeKey),
+    ),
+  );
+  for (const edge of composition.provenanceEdges) {
+    const source = nodeIds.get(edge.from);
+    const target = nodeIds.get(edge.to);
+    if (!source || !target) continue;
+    const arrow = edge.membership === "required" ? "-->" : "-.->";
+    const cycle = cycleEdges.has(compositionEdgeKey(edge)) ? " cycle" : "";
+    lines.push(
+      `  ${source} ${arrow}|${escapeMermaidLabel(`${edge.relationship} ${edge.membership}${cycle}`)}| ${target}`,
+    );
+  }
+
+  const unresolved = [
+    ...composition.unresolvedRequired,
+    ...composition.unresolvedOptional,
+  ];
+  unresolved.forEach((issue, index) => {
+    const missing = `missing_${index}`;
+    lines.push(
+      `  ${missing}["${escapeMermaidLabel(`unresolved: ${issue.declaredTarget}`)}"]`,
+    );
+    const source = nodeIds.get(issue.sourceId);
+    if (source) {
+      const arrow = issue.membership === "required" ? "-->" : "-.->";
+      lines.push(
+        `  ${source} ${arrow}|${escapeMermaidLabel(`${issue.relationship} ${issue.membership} unresolved`)}| ${missing}`,
+      );
+    }
+  });
+
+  composition.kindMismatches.forEach((mismatch, index) => {
+    const wrong = `wrong_kind_${index}`;
+    const label =
+      mismatch.expectedTargetKind && mismatch.actualTargetKind
+        ? `wrong target kind: ${mismatch.targetId ?? mismatch.declaredTarget} (${mismatch.actualTargetKind}, expected ${mismatch.expectedTargetKind})`
+        : `wrong source kind: ${mismatch.sourceId} (${mismatch.actualSourceKind}, expected ${mismatch.expectedSourceKind})`;
+    lines.push(`  ${wrong}["${escapeMermaidLabel(label)}"]`);
+    const source = nodeIds.get(mismatch.sourceId);
+    if (source) {
+      const arrow = mismatch.membership === "required" ? "-->" : "-.->";
+      lines.push(
+        `  ${source} ${arrow}|${escapeMermaidLabel(`${mismatch.relationship} invalid kind`)}| ${wrong}`,
+      );
+    }
+  });
+
+  for (const conflict of [
+    ...composition.requiredConflicts,
+    ...composition.optionalConflictCandidates,
+  ]) {
+    const left = nodeIds.get(conflict.left);
+    const right = nodeIds.get(conflict.right);
+    if (left && right) {
+      lines.push(
+        `  ${left} <-.->|${escapeMermaidLabel(`declared conflict ${conflict.membership}`)}| ${right}`,
+      );
+    }
+  }
+
+  const rootNode = nodeIds.get(composition.root.id);
+  if (rootNode) {
+    lines.push("  classDef compositionRoot stroke-width:3px");
+    lines.push(`  class ${rootNode} compositionRoot`);
+  }
+  lines.push(
+    "  %% Solid edges are required; dotted edges are optional. This is declared composition, not runtime execution.",
+  );
+  return `${lines.join("\n")}\n`;
+}
+
+function compositionEdgeKey(edge: CompositionProvenanceEdge): string {
+  return [edge.from, edge.to, edge.relationship, edge.membership].join("\0");
+}
+
+function requiredCompositionReport(
+  report: GraphReport,
+): DeclaredCompositionReport {
+  if (!report.composition) {
+    throw new Error(
+      "Composition graph formatting requires a resolved composition report.",
+    );
+  }
+  return report.composition;
+}
+
+function evidenceLabel(
+  evidence: Diagnostic["evidence"],
+  fallbackPath: string,
+): string {
+  if (!evidence) return fallbackPath;
+  const lines =
+    evidence.startLine === evidence.endLine
+      ? `L${evidence.startLine}`
+      : `L${evidence.startLine}-L${evidence.endLine}`;
+  return `${evidence.path}:${lines}`;
+}
+
+function tableText(value: string): string {
+  return value.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}
+
+function yesNo(value: boolean): string {
+  return value ? "yes" : "no";
+}
+
 function formatGraph(
   report: GraphReport,
   format: GraphFormat,
@@ -386,6 +809,11 @@ function defaultGraphView(format: GraphFormat): GraphView {
 
 function graphViewReport(report: GraphReport, view: GraphView): GraphReport {
   if (report.view === view) return report;
+  if (view === "composition") {
+    throw new Error(
+      "Composition graph formatting requires a resolved composition report.",
+    );
+  }
   if (view === "full" || view === "layered") return { ...report, view };
 
   const nodeMap = new Map<string, GraphNode>();
@@ -443,7 +871,12 @@ function graphViewReport(report: GraphReport, view: GraphView): GraphReport {
         from,
         to,
         kind: edge.kind,
+        ...(edge.declaration ? { declaration: edge.declaration } : {}),
+        ...(edge.declarationIndex !== undefined
+          ? { declarationIndex: edge.declarationIndex }
+          : {}),
         sourcePath: edge.sourcePath,
+        ...(edge.evidence ? { evidence: edge.evidence } : {}),
         resolved: edge.resolved,
         ...(targetId ? { targetId } : {}),
         ...(edge.targetKind ? { targetKind: edge.targetKind } : {}),
@@ -658,7 +1091,12 @@ function toEdge(dependency: Dependency, assets: Asset[]): GraphEdge {
     from: dependency.from,
     to: dependency.to,
     kind: dependency.kind,
+    ...(dependency.declaration ? { declaration: dependency.declaration } : {}),
+    ...(dependency.declarationIndex !== undefined
+      ? { declarationIndex: dependency.declarationIndex }
+      : {}),
     sourcePath: dependency.sourcePath,
+    ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
     resolved: target !== undefined,
     ...(target
       ? {
@@ -695,6 +1133,8 @@ function stableDependencies(dependencies: Dependency[]): Dependency[] {
     if (byKind !== 0) return byKind;
     const byTo = left.to.localeCompare(right.to);
     if (byTo !== 0) return byTo;
-    return left.sourcePath.localeCompare(right.sourcePath);
+    const byPath = left.sourcePath.localeCompare(right.sourcePath);
+    if (byPath !== 0) return byPath;
+    return (left.declarationIndex ?? -1) - (right.declarationIndex ?? -1);
   });
 }
