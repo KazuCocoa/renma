@@ -908,12 +908,14 @@ conversation state.
 A short request is enough to begin; no `--interactive` option or upfront plan
 document is required.
 
-The protocol is domain-neutral. Its structured repository-review example uses
-one Skill and a report with no Context Asset, Context Lens, script, support
-file, or external source by default. Its fictional Product API example is one
-source-backed illustration, not a universal asset model. Review and analysis
-Skills may intentionally report unresolved runtime findings; every additional
-asset and source must be independently justified.
+The protocol is domain-neutral and structurally separate from its optional
+illustrations. Renma does not classify a request by matching it to a built-in
+example or ask the LLM to choose the closest one. The consuming LLM applies the
+normative protocol to current evidence. It may ignore illustrations or combine
+individual decision patterns, but must not copy their workflows, structures,
+questions, completion criteria, security policies, unresolved items, or domain
+assumptions as templates. Future illustrations can be added without changing
+the normative interaction protocol.
 
 Use it before generation, or when intentionally redesigning asset boundaries,
 to identify the smallest non-redundant asset graph, source-of-truth Context,

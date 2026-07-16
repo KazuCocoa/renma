@@ -1,7 +1,7 @@
 import type {
   SkillAuthoringClarificationExample,
-  SkillAuthoringExample,
   SkillAuthoringGuidance,
+  SkillAuthoringIllustration,
   SkillAuthoringInteraction,
   SkillAuthoringProgressionSummary,
 } from "../guidance/skill-authoring.js";
@@ -33,11 +33,14 @@ export function renderSkillGuidePrompt(
     "Metadata rules",
     ...renderBullets(guidance.metadataRules),
     "",
-    "Fictional external API example: Example Product API",
-    ...renderExample(
-      guidance.example,
-      guidance.interaction.detailedClarificationExample,
-    ),
+    "How to use illustrations",
+    ...renderBullets(guidance.illustrationRules),
+    "",
+    "Non-normative authoring illustrations",
+    ...guidance.illustrations.flatMap((illustration, index) => [
+      ...(index > 0 ? [""] : []),
+      ...renderIllustration(illustration),
+    ]),
     "",
     "Verification",
     ...renderNumbered(guidance.verification),
@@ -50,44 +53,71 @@ export function renderSkillGuideJson(guidance: SkillAuthoringGuidance): string {
   return JSON.stringify(guidance, null, 2);
 }
 
-function renderExample(
-  example: SkillAuthoringExample,
-  clarification: Omit<SkillAuthoringClarificationExample, "request">,
+function renderIllustration(
+  illustration: SkillAuthoringIllustration,
 ): string[] {
+  const supportingDetails = [
+    ...(illustration.initialStructure
+      ? [
+          "Initial Renma asset structure:",
+          "```text",
+          ...illustration.initialStructure,
+          "```",
+          "",
+        ]
+      : []),
+    ...(illustration.sourceReference
+      ? ["Source reference:", illustration.sourceReference, ""]
+      : []),
+    ...(illustration.responsibilities?.skill
+      ? [
+          "SKILL.md responsibilities:",
+          ...renderBullets(illustration.responsibilities.skill),
+          "",
+        ]
+      : []),
+    ...(illustration.responsibilities?.context
+      ? [
+          "Context Asset responsibilities:",
+          ...renderBullets(illustration.responsibilities.context),
+          "",
+        ]
+      : []),
+    ...(illustration.additionalReview
+      ? [
+          "Additional review:",
+          ...renderBullets(illustration.additionalReview),
+          "",
+        ]
+      : []),
+    ...(illustration.notCreatedByDefault
+      ? [
+          "Not created by default:",
+          ...renderBullets(illustration.notCreatedByDefault),
+        ]
+      : []),
+  ];
+
   return [
-    example.illustrationNotice,
+    `Illustration: ${illustration.title}`,
     "",
-    "General authoring lessons:",
-    ...renderBullets(example.generalAuthoringLessons),
+    "Demonstrates:",
+    ...renderBullets(illustration.demonstrates),
     "",
-    "Example-specific domain details:",
-    ...renderBullets(example.exampleSpecificDomainDetails),
+    "Notice:",
+    illustration.notice,
     "",
     "Input request:",
-    example.request,
+    illustration.request,
     "",
-    "Expected first clarification turn:",
-    ...renderDecisionSummary(clarification),
-    "",
-    "Expected initial Renma asset structure:",
-    "```text",
-    ...example.initialStructure,
-    "```",
-    "",
-    "External source reference:",
-    example.externalSourceReference,
-    "",
-    "SKILL.md responsibilities:",
-    ...renderBullets(example.skillResponsibilities),
-    "",
-    "Context Asset responsibilities:",
-    ...renderBullets(example.contextResponsibilities),
-    "",
-    "External source security review:",
-    ...renderBullets(example.securityReview),
-    "",
-    "Not created by default:",
-    ...renderBullets(example.notCreatedByDefault),
+    ...renderDecisionSummary(illustration.clarification),
+    ...(supportingDetails.length > 0
+      ? [
+          "",
+          "Optional illustration-specific structure and supporting details:",
+          ...supportingDetails,
+        ]
+      : []),
   ];
 }
 
@@ -125,12 +155,6 @@ function renderInteraction(interaction: SkillAuthoringInteraction): string[] {
     "Question rules:",
     ...renderBullets(interaction.questionRules),
     "",
-    "Review-oriented clarification example:",
-    "Input request:",
-    interaction.reviewWorkflowExample.request,
-    "",
-    ...renderDecisionSummary(interaction.reviewWorkflowExample),
-    "",
     "Creation gate:",
     ...renderBullets(interaction.creationGate),
     "",
@@ -142,43 +166,34 @@ function renderInteraction(interaction: SkillAuthoringInteraction): string[] {
     "",
     "Platform-native Skill authoring guidance handoff:",
     ...renderBullets(interaction.handoffRules),
-    "",
-    "Minimal-trigger example:",
-    "Input request:",
-    interaction.minimalTriggerExample.request,
-    "",
-    "Expected first response after running `renma guide skill`:",
-    "I ran `renma guide skill`.",
-    "",
-    ...renderDecisionSummary(interaction.minimalTriggerExample),
   ];
 }
 
 function renderDecisionSummary(
-  example: Omit<SkillAuthoringClarificationExample, "request">,
+  clarification: Omit<SkillAuthoringClarificationExample, "request">,
 ): string[] {
-  const progression = example.progression
+  const progression = clarification.progression
     ? [
         "",
         ...renderProgressionSummary(
-          example.progression,
-          example.questions.length,
+          clarification.progression,
+          clarification.questions.length,
         ),
       ]
     : [];
-  const runtimeTaskUnknowns = example.runtimeTaskUnknowns
+  const runtimeTaskUnknowns = clarification.runtimeTaskUnknowns
     ? [
         "",
         "Epistemically unresolved runtime task knowledge handled by the finished Skill",
-        ...renderBullets(example.runtimeTaskUnknowns),
+        ...renderBullets(clarification.runtimeTaskUnknowns),
       ]
     : [];
   const questions =
-    example.questions.length > 0
+    clarification.questions.length > 0
       ? [
           "",
-          example.questions.length === 1 ? "Question" : "Questions",
-          ...renderNumbered(example.questions),
+          clarification.questions.length === 1 ? "Question" : "Questions",
+          ...renderNumbered(clarification.questions),
         ]
       : [];
 
@@ -186,13 +201,13 @@ function renderDecisionSummary(
     "Current understanding",
     "",
     "Confirmed",
-    ...renderBullets(example.confirmed),
+    ...renderBullets(clarification.confirmed),
     "",
     "Proposed",
-    ...renderBullets(example.proposed),
+    ...renderBullets(clarification.proposed),
     "",
     "Unresolved",
-    ...renderBullets(example.unresolved),
+    ...renderBullets(clarification.unresolved),
     ...runtimeTaskUnknowns,
     ...progression,
     ...questions,

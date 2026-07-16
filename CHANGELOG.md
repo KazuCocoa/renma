@@ -10,15 +10,21 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
-- Generalized the 0.19.1 Skill authoring protocol across review, analysis,
-  documentation, coding, operational, research, and source-backed workflows.
-  The fictional Product API remains one explicitly labeled source-backed
-  illustration; its API, schema, timeout, retry, and response details are not
-  universal Skill requirements.
-- Renamed the unversioned additive interaction field
-  `exampleProductApiInitialClarification` to the domain-neutral
-  `detailedClarificationExample` and promoted a structured
-  `reviewWorkflowExample` with one-Skill-only, report-first defaults.
+- Structurally separated the normative 0.19.1 authoring protocol from a
+  deterministic top-level collection of non-normative, intentionally incomplete
+  illustrations. `interaction` now contains protocol rules only; the previous
+  example fields and special top-level API object have no compatibility aliases
+  in the independently unversioned guide JSON projection.
+- Added normative illustration-usage rules: apply the protocol directly to the
+  current request and evidence, never choose or copy the closest illustration,
+  ignore illustrations when useful, and combine individual decision patterns
+  only when their conditions are independently present. Renma adds no
+  illustration classifier, selector, similarity matcher, or Skill-type template.
+- Consolidated the minimal-clarification, report-first-progression, and
+  source-backed-boundary patterns under one illustration type. The fictional
+  Product API remains fully contained in one source-backed illustration; its
+  API, schema, timeout, retry, and response details are not universal Skill
+  requirements.
 - Reinforced that Context Assets, Context Lenses, scripts, support files,
   external sources, runtime network access, and Skill splits each require
   independent justification. Future review findings remain runtime task
@@ -28,9 +34,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 - Existing command syntax, formats, exit codes, deterministic stdout-only
   behavior, repository independence, and non-editing/non-network/non-LLM
-  boundaries remain unchanged. The additive `interaction` projection still has
-  no independently versioned schema, so the field was cleanly renamed without
-  a compatibility-only duplicate.
+  boundaries remain unchanged. The additive guide JSON projection still has no
+  independently versioned schema, so removed example fields have no
+  compatibility-only duplicates inside the normative interaction object.
 - The 0.19.1 creation gate, question batching, queued blockers, conservative
   repairs, re-entry, and persistence semantics are unchanged.
 

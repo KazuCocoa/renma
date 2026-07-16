@@ -201,24 +201,20 @@ guide. The guidance source may import canonical metadata definitions; metadata
 and renderers must not import command modules.
 
 The 0.19.1 follow-up adds one `interaction` object to that same guidance source.
-It owns the opening rule, progressive phases, truth-source and epistemic classes,
-unknown scopes, progression classes, unresolved-item dispositions, question
-rules, creation gate, post-validation actions, persistence rules,
-platform-native Skill authoring guidance handoff, a minimal trigger, a
-structured review workflow, and one detailed fictional Product API clarification
-example. In 0.19.2 the domain-neutral `detailedClarificationExample` and
-`reviewWorkflowExample` names replace the domain-coupled field; no alias is
-retained because this additive projection has no independently versioned schema.
-The prompt renderer places this
-protocol immediately after the central principle; JSON serializes the same
-object directly. This is an additive projection, not a separately versioned
-schema.
+It owns only normative opening, phase, truth-source, epistemic, unknown-scope,
+progression, disposition, question, gate, validation, persistence, and handoff
+rules. In 0.19.2, `illustrationRules` and the ordered top-level `illustrations`
+array are structurally separate. The previous interaction example fields and
+special top-level API object have no aliases because this additive projection
+has no independently versioned schema.
 
-Examples illustrate the normative protocol but do not own it. The review
-workflow proves that one Skill and a report may be sufficient without a Context
-Asset, Context Lens, script, support file, or external source. The Product API
-example demonstrates source designation, access, fallback, and persistence;
-its domain details are not creation-gate requirements for unrelated Skills.
+Illustrations share one `SkillAuthoringIllustration` type and demonstrate
+authoring tensions rather than Skill categories. They may be ignored or used
+partially; no selector, similarity matcher, request classifier, or closest-example
+instruction exists. The prompt renders all protocol and illustration-usage rules
+before the non-normative collection. JSON serializes the same source directly.
+Future illustrations can be added without modifying the normative interaction
+contract.
 
 `interaction` is normative for truth qualification, question behavior, gate
 entry and re-entry, finding classification, persistence, and semantic handoff.

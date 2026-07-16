@@ -505,10 +505,12 @@ renma suggest-semantic-split <file>
 guidance. It reads no repository, writes only stdout, and establishes asset and
 metadata boundaries before scaffolding. It does not call an LLM, accept task
 text, fetch external sources, create assets, or claim semantic correctness.
-The guidance is domain-neutral: review and analysis Skills may produce reports
-of unresolved runtime findings, while Context Assets, Context Lenses, scripts,
-support files, and external sources require independent justification. Concrete
-examples illustrate this protocol and do not define universal creation gates.
+The guidance type structurally separates normative interaction rules from a
+top-level ordered collection of non-normative illustrations. Renma does not
+classify requests, choose a closest example, or provide Skill-type templates.
+The consuming LLM applies the protocol to current evidence and may ignore or
+partially combine illustrated decision patterns. Future illustrations can be
+added without modifying the normative interaction contract.
 
 `renma readiness` summarizes static repository health for human and external-agent review. It composes the graph/catalog model into deterministic score, level, metric, check, and diagnostic output; it does not call LLMs, select runtime context, assemble prompts, or repair files.
 

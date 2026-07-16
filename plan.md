@@ -136,19 +136,19 @@ and repository contracts remain unchanged.
 
 ## Shipped 0.19.2 Domain-Neutral Authoring Refinement
 
-Renma 0.19.2 preserves the complete 0.19.1 truth-seeking authoring protocol
-while balancing its illustrations. A structured repository-documentation review
-example demonstrates that a report can be the intended output, future
-mismatches are runtime findings, and one Skill with no Context Asset, Context
-Lens, script, support file, or external source is often the smallest reversible
-default.
+Renma 0.19.2 preserves the complete 0.19.1 truth-seeking authoring protocol and
+structurally separates it from an ordered top-level illustration collection.
+Illustrations are optional, non-normative demonstrations of authoring tensions,
+not Skill categories or templates. The consuming LLM applies the protocol to
+the current request and evidence; it may ignore illustrations or combine
+individual lessons without selecting a closest example.
 
-The fictional Product API remains one source-backed illustration, not the
-default shape of a Skill. Its domain details are example-specific. Every extra
-asset, external source, runtime network permission, or Skill split requires an
-independent responsibility. `guide` remains deterministic, stdout-only,
+The report-first and fictional source-backed Product API patterns retain their
+corrected semantics, while every extra asset, source, permission, or Skill split
+still requires independent evidence. Future illustrations may be added without
+modifying `interaction`. `guide` remains deterministic, stdout-only,
 non-editing, non-networked, and non-interactive; it neither calls an LLM nor
-performs runtime selection.
+performs illustration classification or runtime selection.
 
 ## Stable Product Boundaries
 
