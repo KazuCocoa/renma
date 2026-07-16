@@ -2,7 +2,7 @@
 
 ## Current Product Definition
 
-Renma 0.19.0 is the current shipped baseline:
+Renma 0.19.2 is the current shipped baseline:
 a Git-native context repository and deterministic governance CLI for
 agent-consumable Skills, Context Lenses, Context Assets, local support
 resources, policies, ownership, lifecycle, dependencies, and review evidence.
@@ -79,9 +79,9 @@ semantic rewriting. Human or LLM authors create the intended assets; existing
 scan, catalog, and graph behavior validates and exposes deterministic repository
 evidence.
 
-## Planned 0.19.1 Interactive Authoring Protocol
+## Shipped 0.19.1 Interactive Authoring Protocol
 
-The 0.19.1 follow-up extends the same structured `renma guide skill` source with
+The shipped 0.19.1 follow-up extends the same structured `renma guide skill` source with
 an interactive protocol for the consuming LLM. It does not make Renma itself
 interactive and does not add a command or option:
 
@@ -131,10 +131,24 @@ This elaborates the stable operating boundary: `LLM proposes. Renma verifies.
 Human approves.` Deterministic detection does not imply deterministic repair,
 and repeated-context consolidation remains a reviewed semantic decision.
 
-This section describes planned 0.19.1 behavior on `main`; 0.19.1 is not shipped
-until the normal release workflow publishes it. Existing CLI arguments, exit
-codes, deterministic output, non-editing behavior, and repository contracts
-remain unchanged.
+Existing CLI arguments, exit codes, deterministic output, non-editing behavior,
+and repository contracts remain unchanged.
+
+## Shipped 0.19.2 Domain-Neutral Authoring Refinement
+
+Renma 0.19.2 preserves the complete 0.19.1 truth-seeking authoring protocol
+while balancing its illustrations. A structured repository-documentation review
+example demonstrates that a report can be the intended output, future
+mismatches are runtime findings, and one Skill with no Context Asset, Context
+Lens, script, support file, or external source is often the smallest reversible
+default.
+
+The fictional Product API remains one source-backed illustration, not the
+default shape of a Skill. Its domain details are example-specific. Every extra
+asset, external source, runtime network permission, or Skill split requires an
+independent responsibility. `guide` remains deterministic, stdout-only,
+non-editing, non-networked, and non-interactive; it neither calls an LLM nor
+performs runtime selection.
 
 ## Stable Product Boundaries
 

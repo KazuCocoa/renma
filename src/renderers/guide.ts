@@ -36,7 +36,7 @@ export function renderSkillGuidePrompt(
     "Fictional external API example: Example Product API",
     ...renderExample(
       guidance.example,
-      guidance.interaction.exampleProductApiInitialClarification,
+      guidance.interaction.detailedClarificationExample,
     ),
     "",
     "Verification",
@@ -55,6 +55,14 @@ function renderExample(
   clarification: Omit<SkillAuthoringClarificationExample, "request">,
 ): string[] {
   return [
+    example.illustrationNotice,
+    "",
+    "General authoring lessons:",
+    ...renderBullets(example.generalAuthoringLessons),
+    "",
+    "Example-specific domain details:",
+    ...renderBullets(example.exampleSpecificDomainDetails),
+    "",
     "Input request:",
     example.request,
     "",
@@ -117,8 +125,11 @@ function renderInteraction(interaction: SkillAuthoringInteraction): string[] {
     "Question rules:",
     ...renderBullets(interaction.questionRules),
     "",
-    "Review-Skill illustration:",
-    ...renderBullets(interaction.reviewSkillIllustration),
+    "Review-oriented clarification example:",
+    "Input request:",
+    interaction.reviewWorkflowExample.request,
+    "",
+    ...renderDecisionSummary(interaction.reviewWorkflowExample),
     "",
     "Creation gate:",
     ...renderBullets(interaction.creationGate),
@@ -158,7 +169,7 @@ function renderDecisionSummary(
   const runtimeTaskUnknowns = example.runtimeTaskUnknowns
     ? [
         "",
-        "Epistemically unresolved source-dependent runtime task knowledge handled by the finished Skill",
+        "Epistemically unresolved runtime task knowledge handled by the finished Skill",
         ...renderBullets(example.runtimeTaskUnknowns),
       ]
     : [];

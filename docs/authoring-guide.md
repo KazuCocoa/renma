@@ -594,10 +594,35 @@ renma readiness . --format markdown
 The final step is human review of the Skill's intent, workflow, policy,
 relationships, and remaining uncertainty.
 
+### Contrasting review-oriented example
+
+For “Create a Skill that reviews whether repository documentation still matches
+the implementation,” the recurring task is review and the intended output may
+be an evidence-backed report rather than a patch. Repository implementation and
+tests are applicable evidence when current and unambiguous. The smallest
+reversible initial structure is one Skill only: no Context Asset, Context Lens,
+script, support file, or external source is required by default.
+
+Future repository mismatches, missing tests, and other reportable findings are
+runtime task unknowns. Their number does not imply a Skill split, and the author
+should not be asked to resolve them in advance. Documentation authority,
+intended product behavior, or review acceptance criteria can still become
+authoring blockers when repository evidence cannot resolve them.
+
 ### Canonical fictional external API example: Example Product API
 
 Example Product API is a fictional external API used only to illustrate
 authoritative-source handling. It is not a Renma concept or a real product.
+
+This fictional API example illustrates one source-backed workflow. Its API,
+schema, timeout, retry, and response-behavior details are example-specific and
+are not default requirements for unrelated Skills.
+
+General authoring lessons are the separation of source designation from source
+content, authoring-time from runtime access, authoring blockers from runtime
+findings, and reviewed durable decisions from temporary conversation state.
+Example-specific domain details include JSON construction, API fields,
+operation behavior, and source-unavailability handling.
 
 For this request:
 
@@ -637,8 +662,7 @@ Unresolved
 - Whether authoring-time consultation is needed for a source-specific authoring
   decision.
 
-Epistemically unresolved source-dependent runtime task knowledge handled by the
-finished Skill
+Epistemically unresolved runtime task knowledge handled by the finished Skill
 - The current Example Product API schema.
 - The current documented fields and constraints.
 - Operation-specific behavior read from the authoritative source.

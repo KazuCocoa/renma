@@ -52,6 +52,11 @@ deterministic scaffold is the repository-compatible starting point. A runtime
 task unknown that the finished Skill can detect and report with evidence does
 not automatically block authoring.
 
+The protocol is domain-neutral. A review Skill may use repository evidence and
+produce a report from one Skill without a Context Asset, Context Lens, script,
+support file, or external source by default. The fictional Product API is one
+source-backed illustration; its domain details are not universal requirements.
+
 Platform-native Skill authoring guidance may then refine trigger descriptions,
 ordered instructions, positive and negative usage boundaries, inputs,
 constraints, completion criteria, and examples that resolve real ambiguity

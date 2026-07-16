@@ -130,8 +130,8 @@ test("guide skill JSON and --json are equivalent small structured projections", 
     "persistenceRules",
     "handoffRules",
     "minimalTriggerExample",
-    "reviewSkillIllustration",
-    "exampleProductApiInitialClarification",
+    "reviewWorkflowExample",
+    "detailedClarificationExample",
   ]);
   assert.deepEqual(
     Object.keys(
@@ -172,6 +172,9 @@ test("guide skill JSON and --json are equivalent small structured projections", 
     ],
   );
   assert.deepEqual(Object.keys(output.example as Record<string, unknown>), [
+    "illustrationNotice",
+    "generalAuthoringLessons",
+    "exampleSpecificDomainDetails",
     "request",
     "initialStructure",
     "externalSourceReference",
@@ -222,6 +225,34 @@ test("guide renderers consume the same structured guidance data", () => {
   for (const value of collectStrings(guidance)) {
     assert.ok(prompt.includes(value), value);
   }
+});
+
+test("examples illustrate the protocol without defining universal API requirements", () => {
+  const guidance = buildSkillAuthoringGuidance("test-version");
+  const prompt = renderSkillGuidePrompt(guidance);
+  const json = JSON.parse(renderSkillGuideJson(guidance)) as typeof guidance;
+  const gate = guidance.interaction.creationGate.join("\n");
+
+  assert.match(
+    guidance.example.illustrationNotice,
+    /one source-backed workflow[\s\S]*example-specific[\s\S]*not default requirements/,
+  );
+  assert.match(prompt, /General authoring lessons:/);
+  assert.match(prompt, /Example-specific domain details:/);
+  assert.deepEqual(
+    json.interaction.reviewWorkflowExample,
+    guidance.interaction.reviewWorkflowExample,
+  );
+  assert.deepEqual(
+    json.interaction.detailedClarificationExample,
+    guidance.interaction.detailedClarificationExample,
+  );
+  assert.ok(!("exampleProductApiInitialClarification" in json.interaction));
+  assert.doesNotMatch(gate, /Example Product API|JSON request body/);
+  assert.match(
+    guidance.placementRules.join("\n"),
+    /Do not enable runtime network access[\s\S]*require authoring-time external consultation[\s\S]*resolve future task findings[\s\S]*split a Skill merely because those choices appear in an example/,
+  );
 });
 
 test("interactive protocol is the prompt entrypoint before placement and artifact rules", () => {
@@ -355,7 +386,11 @@ test("runtime-stage blockers stay outside the authoring creation gate", () => {
   assert.match(questions, /group related items by the decision they depend on/);
   assert.match(
     questions,
-    /timeout, retry count, partial success, and rollback[\s\S]*Failure and recovery behavior theme/,
+    /service workflow[\s\S]*timeout, retry, partial success, and rollback[\s\S]*failure-handling theme/,
+  );
+  assert.match(
+    questions,
+    /review workflow[\s\S]*unclear authority, missing evidence, and unresolved acceptance criteria[\s\S]*decision theme/,
   );
   assert.match(questions, /prioritize themes by risk and downstream impact/);
   assert.match(
@@ -401,25 +436,37 @@ test("runtime-stage blockers stay outside the authoring creation gate", () => {
   );
 });
 
-test("review Skill illustration treats many unknowns as valuable findings", () => {
-  const illustration =
-    buildSkillAuthoringGuidance(
-      "test-version",
-    ).interaction.reviewSkillIllustration.join("\n");
+test("review workflow is a first-class non-API clarification example", () => {
+  const example =
+    buildSkillAuthoringGuidance("test-version").interaction
+      .reviewWorkflowExample;
+  const serialized = JSON.stringify(example);
 
-  assert.match(illustration, /20 raw gaps/);
   assert.match(
-    illustration,
-    /authorization, failure recovery, validation boundaries, and observability/,
+    example.request,
+    /reviews whether repository documentation still matches/,
   );
-  assert.match(illustration, /The review can continue/);
-  assert.match(illustration, /report four decision themes/);
-  assert.match(illustration, /evidence[\s\S]*impact or risk/);
   assert.match(
-    illustration,
-    /Ask only about a theme that blocks the requested output/,
+    example.confirmed.join("\n"),
+    /implementation and tests may provide applicable evidence/,
   );
-  assert.match(illustration, /keep other themes as findings/);
+  assert.match(
+    example.confirmed.join("\n"),
+    /report rather than an automatic patch/,
+  );
+  assert.match(example.proposed.join("\n"), /One focused Skill only/);
+  assert.match(
+    example.proposed.join("\n"),
+    /No Context Asset, Context Lens, script, support file, or external source by default/,
+  );
+  assert.match(example.runtimeTaskUnknowns.join("\n"), /Future mismatches/);
+  assert.match(example.runtimeTaskUnknowns.join("\n"), /expected to report/);
+  assert.match(
+    example.progression.blocking.join("\n"),
+    /Documentation authority/,
+  );
+  assert.match(example.progression.blocking.join("\n"), /completion criteria/);
+  assert.doesNotMatch(serialized, /API|schema|timeout|retry/);
 });
 
 test("question batches retain the complete blocker set and define proceeding", () => {
@@ -722,8 +769,7 @@ test("asset-boundary discoveries re-enter clarification and the creation gate", 
 
 test("Example Product API separates authoring blockers from runtime source knowledge", () => {
   const guidance = buildSkillAuthoringGuidance("test-version");
-  const clarification =
-    guidance.interaction.exampleProductApiInitialClarification;
+  const clarification = guidance.interaction.detailedClarificationExample;
   const prompt = renderSkillGuidePrompt(guidance);
   const unresolved = clarification.unresolved.join("\n");
   const blockers = clarification.progression.blocking.join("\n");
@@ -763,7 +809,7 @@ test("Example Product API separates authoring blockers from runtime source knowl
   );
   assert.match(
     prompt,
-    /Epistemically unresolved source-dependent runtime task knowledge handled by the finished Skill/,
+    /Epistemically unresolved runtime task knowledge handled by the finished Skill/,
   );
   for (const runtimeUnknown of clarification.runtimeTaskUnknowns) {
     assert.ok(!clarification.unresolved.includes(runtimeUnknown));
@@ -829,7 +875,10 @@ test("progression rendering distinguishes proposed defaults and queued subsets",
   const prompt = renderSkillGuidePrompt(
     buildSkillAuthoringGuidance("test-version"),
   );
-  const start = prompt.indexOf("Current progression");
+  const exampleStart = prompt.indexOf(
+    "Fictional external API example: Example Product API",
+  );
+  const start = prompt.indexOf("Current progression", exampleStart);
   const end = prompt.indexOf("Questions", start);
   const progression = prompt.slice(start, end);
   const owner =
@@ -847,14 +896,16 @@ test("progression rendering distinguishes proposed defaults and queued subsets",
 
 test("progression rendering says proceeding only when no blocker remains", () => {
   const guidance = buildSkillAuthoringGuidance("test-version");
-  const clarification =
-    guidance.interaction.exampleProductApiInitialClarification;
+  const clarification = guidance.interaction.detailedClarificationExample;
   clarification.progression.blocking = [];
   clarification.progression.queuedBlockers = [];
   clarification.questions = [];
 
   const prompt = renderSkillGuidePrompt(guidance);
-  const start = prompt.indexOf("Current progression");
+  const exampleStart = prompt.indexOf(
+    "Fictional external API example: Example Product API",
+  );
+  const start = prompt.indexOf("Current progression", exampleStart);
   const end = prompt.indexOf("Expected initial Renma asset structure", start);
   const progression = prompt.slice(start, end);
 

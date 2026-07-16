@@ -1,7 +1,7 @@
 # Renma Internal Architecture
 
 This document describes the 0.19.x maintainability architecture, including the
-additive `guide` command and its unreleased interactive authoring protocol.
+additive `guide` command and its shipped interactive authoring protocol.
 It is contributor guidance, not a new versioned JSON schema. Renma 0.18.2
 remains the compatibility baseline for existing commands: public fields,
 classifications, diagnostics, severities, exit behavior, and migration direction
@@ -204,11 +204,21 @@ The 0.19.1 follow-up adds one `interaction` object to that same guidance source.
 It owns the opening rule, progressive phases, truth-source and epistemic classes,
 unknown scopes, progression classes, unresolved-item dispositions, question
 rules, creation gate, post-validation actions, persistence rules,
-platform-native Skill authoring guidance handoff, and minimal and fictional
-Example Product API clarification examples. The prompt renderer places this
+platform-native Skill authoring guidance handoff, a minimal trigger, a
+structured review workflow, and one detailed fictional Product API clarification
+example. In 0.19.2 the domain-neutral `detailedClarificationExample` and
+`reviewWorkflowExample` names replace the domain-coupled field; no alias is
+retained because this additive projection has no independently versioned schema.
+The prompt renderer places this
 protocol immediately after the central principle; JSON serializes the same
 object directly. This is an additive projection, not a separately versioned
 schema.
+
+Examples illustrate the normative protocol but do not own it. The review
+workflow proves that one Skill and a report may be sufficient without a Context
+Asset, Context Lens, script, support file, or external source. The Product API
+example demonstrates source designation, access, fallback, and persistence;
+its domain details are not creation-gate requirements for unrelated Skills.
 
 `interaction` is normative for truth qualification, question behavior, gate
 entry and re-entry, finding classification, persistence, and semantic handoff.

@@ -6,6 +6,34 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.19.2] - 2026-07-15
+
+### Changed
+
+- Generalized the 0.19.1 Skill authoring protocol across review, analysis,
+  documentation, coding, operational, research, and source-backed workflows.
+  The fictional Product API remains one explicitly labeled source-backed
+  illustration; its API, schema, timeout, retry, and response details are not
+  universal Skill requirements.
+- Renamed the unversioned additive interaction field
+  `exampleProductApiInitialClarification` to the domain-neutral
+  `detailedClarificationExample` and promoted a structured
+  `reviewWorkflowExample` with one-Skill-only, report-first defaults.
+- Reinforced that Context Assets, Context Lenses, scripts, support files,
+  external sources, runtime network access, and Skill splits each require
+  independent justification. Future review findings remain runtime task
+  unknowns rather than automatic authoring blockers.
+
+### Compatibility
+
+- Existing command syntax, formats, exit codes, deterministic stdout-only
+  behavior, repository independence, and non-editing/non-network/non-LLM
+  boundaries remain unchanged. The additive `interaction` projection still has
+  no independently versioned schema, so the field was cleanly renamed without
+  a compatibility-only duplicate.
+- The 0.19.1 creation gate, question batching, queued blockers, conservative
+  repairs, re-entry, and persistence semantics are unchanged.
+
 ## [0.19.1] - 2026-07-15
 
 ### Added
@@ -702,7 +730,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.19.1...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.19.2...HEAD
+[0.19.2]: https://github.com/KazuCocoa/renma/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/KazuCocoa/renma/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/KazuCocoa/renma/compare/v0.18.3...v0.19.0
 [0.18.3]: https://github.com/KazuCocoa/renma/compare/v0.18.2...v0.18.3

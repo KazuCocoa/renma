@@ -60,8 +60,11 @@ export interface SkillAuthoringInteraction {
   persistenceRules: string[];
   handoffRules: string[];
   minimalTriggerExample: SkillAuthoringClarificationExample;
-  reviewSkillIllustration: string[];
-  exampleProductApiInitialClarification: Omit<
+  reviewWorkflowExample: SkillAuthoringClarificationExample & {
+    progression: SkillAuthoringProgressionSummary;
+    runtimeTaskUnknowns: string[];
+  };
+  detailedClarificationExample: Omit<
     SkillAuthoringClarificationExample,
     "request"
   > & {
@@ -71,6 +74,9 @@ export interface SkillAuthoringInteraction {
 }
 
 export interface SkillAuthoringExample {
+  illustrationNotice: string;
+  generalAuthoringLessons: string[];
+  exampleSpecificDomainDetails: string[];
   request: string;
   initialStructure: string[];
   externalSourceReference: string;
@@ -140,7 +146,7 @@ export function buildSkillAuthoringGuidance(
         confirmed:
           "A fact supported by an applicable truth source above, or authority to choose one reversible implementation decision through explicit user delegation. Never present a model assumption as confirmed domain truth; this includes model memory, source designation alone, and stale or conflicting evidence.",
         proposed:
-          "A justified but unconfirmed Renma structural default or reversible design suggestion, such as one Skill plus one source-of-truth Context, no script or Context Lens by default, a directory name, or required-versus-optional Context pending clarification. A proposal must not silently become confirmed.",
+          "A justified but unconfirmed Renma structural default or reversible design suggestion, such as one Skill only, no Context Asset, Context Lens, script, external source, or support file by default, a directory name, or a separately justified Context pending clarification. A proposal must not silently become confirmed.",
         unresolved:
           "Human truth or missing applicable evidence that must not be invented, such as the recurring task, inaccessible source-dependent facts, source authority, ownership, product behavior, authoring-time or runtime source access, fallback behavior, external-action permission, required-versus-optional Context, executable implementation intent, or domain completion criteria.",
       },
@@ -148,7 +154,7 @@ export function buildSkillAuthoringGuidance(
         authoringDecision:
           "A decision needed to define the Skill contract, such as the recurring workflow, expected output, usage boundaries, required inputs, completion or failure contract, source authority, Skill-versus-Context placement, runtime source-access policy, evidence-backed security policy, or another choice that changes repository structure or Skill behavior. An unresolved authoring decision may be Blocking.",
         runtimeTaskUnknown:
-          "A fact expected to vary or be missing in material the finished Skill processes, such as ambiguity in a reviewed specification, an unspecified timeout, retry or rollback behavior, permissions, acceptance criteria, expected results, or a currently unavailable schema. It does not automatically block Skill creation; define how execution preserves and reports it, continues independent analysis, asks the runtime user only when the current execution stage depends on it, or stops safely rather than inventing truth. Do not ask the author to resolve task-instance unknowns merely because the finished Skill may encounter them.",
+          "A fact expected to vary or be missing in material the finished Skill processes, such as an ambiguous UI transition, a repository mismatch, an unavailable schema, an unspecified timeout, an unresolved approval condition, a missing acceptance criterion, an inaccessible source section, an unknown test result, or a finding the finished review Skill is expected to report. It does not automatically block Skill creation; define how execution preserves and reports it, continues independent analysis, asks the runtime user only when the current execution stage depends on it, or stops safely rather than inventing truth. Do not ask the author to resolve task-instance unknowns merely because the finished Skill may encounter them.",
       },
       progressionClasses: {
         blocking:
@@ -174,12 +180,12 @@ export function buildSkillAuthoringGuidance(
         "Before asking, check whether an applicable truth source above answers the question and whether a Renma rule supplies a safe structural default; ask only when human truth or unavailable source content is still required.",
         "In an existing repository, use only commands that answer the current question, such as `renma scan . --fail-on high --format json`, `renma catalog . --format json`, `renma inspect <relevant-file> --format json`, or `renma graph . --focus <relevant-id-or-path> --format json`; do not make every command mandatory ceremony.",
         "Look for an existing Skill that owns the workflow, reusable Context Assets, naming and ownership evidence, security profiles, nearby validated examples, and conflicting or unhealthy conventions before asking questions those sources can answer.",
-        "Preserve raw unknowns and their evidence, group related items by the decision they depend on, prioritize themes by risk and downstream impact, ask only about Blocking themes, keep non-blocking themes as findings or Deferred items, and expand an individual item only when the distinction materially changes the result. For example, timeout, retry count, partial success, and rollback normally form one Failure and recovery behavior theme rather than four default questions.",
+        "Preserve raw unknowns and their evidence, group related items by the decision they depend on, prioritize themes by risk and downstream impact, ask only about Blocking themes, keep non-blocking themes as findings or Deferred items, and expand an individual item only when the distinction materially changes the result. For a service workflow, timeout, retry, partial success, and rollback may form one failure-handling theme. For a review workflow, unclear authority, missing evidence, and unresolved acceptance criteria may form one decision theme.",
         "Maintain the complete current set of unresolved and proposed decisions with separate progression classifications. The limit of one to three closely related questions applies to the current turn, not to the total number of unresolved or Blocking decisions; never impose an arbitrary maximum on that total set.",
         "Prioritize the highest-impact Blocking decisions, ask at most three closely related questions in the current batch, keep additional Blocking decisions visible as queued blockers, and continue with the next batch after the user answers. Never relabel an unasked Blocking decision as Deferred merely because the batch limit was reached.",
         "When more unresolved items exist than can be asked about now, use a compact Current progression summary with the Blocking count, questions being asked, queued blockers, reversible defaults, and meaningful Deferred decisions; later report only material changes instead of repeating the unchanged set in full.",
         "Do not guess does not mean stop and ask about every unknown: never present missing truth as Confirmed, continue work that does not depend on it, preserve the unknown with evidence, report assumptions and uncertainty, ask only when it blocks the current stage, and never manufacture expected behavior merely to complete an output.",
-        "Ask the author only about authoring decisions that materially affect responsibility, usage boundaries, inputs, output, completion or failure behavior, placement, Context necessity, source authority, security policy, or support-file justification; do not send a comprehensive questionnaire. Do not ask the author to resolve runtime task unknowns that the finished Skill should detect, report, request, or handle safely.",
+        "Ask the author only about authoring decisions that materially affect responsibility, usage boundaries, inputs, output, completion or failure behavior, placement, Context necessity, source authority, security policy, or support-file justification; do not send a comprehensive questionnaire. Do not ask the author to resolve future repository mismatches or other runtime task unknowns that the finished Skill should detect, report, request, or handle safely.",
         "A runtime-stage blocker is execution behavior that the authored Skill must handle. It does not enter the authoring creation-gate blocker set merely because a future task instance may encounter it. Only an unresolved authoring decision about whether the Skill should ask, report, defer, or stop for that runtime blocker may block Skill creation.",
         "At each meaningful stage transition, when the workflow actually has stages, reassess unresolved decision themes. Treat a runtime task unknown as a runtime-stage blocker when the next execution stage depends on it, follow the Skill's authored ask, report, defer, or stop policy, and return it to Report as finding when a later requested output does not require resolution. Do not add the task-instance fact to the authoring creation-gate blocker set; re-enter authoring clarification only when the Skill's handling policy or asset boundary itself is unresolved.",
         "Do not require a plan-mode-quality specification, ask the user to choose metadata syntax, repeat supplied facts, request unneeded future extensions, or block on wording, tags, examples, or formatting that can be refined later.",
@@ -244,13 +250,46 @@ export function buildSkillAuthoringGuidance(
           "What recurring task should the Skill perform, and what result should it produce?",
         ],
       },
-      reviewSkillIllustration: [
-        "A specification review finds 20 raw gaps across authorization, failure recovery, validation boundaries, and observability.",
-        "The review can continue because the gaps are runtime task unknowns and valuable findings rather than failed authoring clarification.",
-        "Preserve the underlying evidence and report four decision themes with their impact or risk.",
-        "Ask only about a theme that blocks the requested output; keep other themes as findings.",
-      ],
-      exampleProductApiInitialClarification: {
+      reviewWorkflowExample: {
+        request:
+          "Create a Skill that reviews whether repository documentation still matches the implementation.",
+        confirmed: [
+          "The recurring task is a review of repository documentation against implementation evidence.",
+          "Repository implementation and tests may provide applicable evidence.",
+          "The expected output can be an evidence-backed report rather than an automatic patch.",
+        ],
+        proposed: [
+          "One focused Skill only is the smallest justified initial structure.",
+          "No Context Asset, Context Lens, script, support file, or external source by default.",
+        ],
+        unresolved: [
+          "Which documentation is authoritative when implementation and tests cannot resolve intended product behavior.",
+          "The acceptance criteria for declaring the review complete if repository evidence does not establish them.",
+        ],
+        questions: [
+          "When implementation and tests cannot resolve a mismatch, which documentation or product authority should govern the report?",
+          "What evidence and report contents are required for the review to be complete?",
+        ],
+        progression: {
+          blocking: [
+            "Documentation authority when repository evidence cannot resolve intended product behavior.",
+            "Review completion criteria when repository evidence does not establish them.",
+          ],
+          reversibleDefaults: [
+            "One Skill only.",
+            "Report findings without automatically patching documentation or implementation.",
+            "No Context Asset, Context Lens, script, support file, or external source by default.",
+          ],
+          deferred: ["Final report wording and optional examples."],
+          queuedBlockers: [],
+        },
+        runtimeTaskUnknowns: [
+          "Future mismatches between repository documentation and implementation.",
+          "Missing or inconclusive tests encountered during a future review.",
+          "Other evidence-backed findings the finished review Skill is expected to report.",
+        ],
+      },
+      detailedClarificationExample: {
         confirmed: [
           "The workflow builds a JSON request body for the fictional Example Product API.",
           "The user designates the Example Product API documentation URL as the intended authoritative external source.",
@@ -319,6 +358,8 @@ export function buildSkillAuthoringGuidance(
       "After a Context Asset is independently justified, use `metadata.renma.requires-context` when Skill correctness depends on it; use `metadata.renma.optional-context` only when the workflow can validly complete without it.",
       "Context Lens: create one only when the same declared Context needs a meaningful, reusable, purpose-specific interpretation; a Context Asset does not require a Lens by itself.",
       "Skill-local Reference: use one for detailed supporting information owned by one Skill, never as a duplicate of independently maintained source-of-truth Context.",
+      "A Context Asset, Context Lens, script, support file, or external source must be independently justified by its actual responsibility; none is a default merely because an illustration uses it.",
+      "Do not enable runtime network access, require authoring-time external consultation, ask the author to resolve future task findings, or split a Skill merely because those choices appear in an example; each requires evidence from the actual workflow.",
     ],
     artifactRules: [
       "Create a script only when deterministic implementation is materially safer than model judgment, an exact repeated transformation or validation is required, ordering or behavior is safety-critical, the implementation is meaningfully tested, or the user explicitly requests executable implementation.",
@@ -355,6 +396,18 @@ export function buildSkillAuthoringGuidance(
       "Platform-native Skill authoring guidance is not the authority for Renma metadata, Context placement, repository asset boundaries, file count, source-of-truth representation, or whether scripts and support files should exist.",
     ],
     example: {
+      illustrationNotice:
+        "This fictional API example illustrates one source-backed workflow. Its API, schema, timeout, retry, and response-behavior details are example-specific and are not default requirements for unrelated Skills.",
+      generalAuthoringLessons: [
+        "Separate source designation from source-content truth.",
+        "Separate authoring-time source access from finished-Skill runtime access.",
+        "Classify authoring blockers separately from runtime findings.",
+        "Persist only reviewed durable decisions and apply post-validation repairs conservatively.",
+      ],
+      exampleSpecificDomainDetails: [
+        "The JSON request body, API schema, fields, operation behavior, timeout, retry, and response concerns belong only to this fictional workflow.",
+        "The Context Asset shown here is justified by this workflow's declared external source-of-truth boundary; it is not a universal Skill requirement.",
+      ],
       request:
         "Create a Skill that builds a JSON request body for the fictional Example Product API. The Example Product API documentation URL is the source of truth. Improve the Skill with Renma.",
       initialStructure: [

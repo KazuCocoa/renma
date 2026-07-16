@@ -908,6 +908,13 @@ conversation state.
 A short request is enough to begin; no `--interactive` option or upfront plan
 document is required.
 
+The protocol is domain-neutral. Its structured repository-review example uses
+one Skill and a report with no Context Asset, Context Lens, script, support
+file, or external source by default. Its fictional Product API example is one
+source-backed illustration, not a universal asset model. Review and analysis
+Skills may intentionally report unresolved runtime findings; every additional
+asset and source must be independently justified.
+
 Use it before generation, or when intentionally redesigning asset boundaries,
 to identify the smallest non-redundant asset graph, source-of-truth Context,
 focused Skill workflow, justified support files, metadata discipline,
