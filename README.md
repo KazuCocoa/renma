@@ -3,24 +3,22 @@
 [![NPM version](http://img.shields.io/npm/v/renma.svg)](https://npmjs.org/package/renma)
 [![Downloads](http://img.shields.io/npm/dm/renma.svg)](https://npmjs.org/package/renma)
 
-Renma is a Git-native context repository and deterministic governance CLI for
-LLM-facing knowledge. It keeps Skills, Context Lenses, Context Assets,
-references, ownership, lifecycle, dependencies, security policy, and evidence
-reviewable as maintainable software assets.
+Renma is a Git-native context repository and deterministic governance CLI for LLM-facing knowledge. It keeps Skills, Context Lenses, Context Assets, references, ownership, lifecycle, dependencies, security policy, and evidence reviewable as maintainable software assets.
 
-Agent-facing knowledge tends to spread across copied prompts, one-off Markdown,
-and team-local instructions. Renma gives that material stable repository
-identity, explicit relationships, deterministic validation, and CI-friendly
-reports without becoming an agent runtime.
+Agent-facing knowledge tends to spread across copied prompts, one-off Markdown, and team-local instructions. Renma gives that material stable repository identity, explicit relationships, deterministic validation, and CI-friendly reports without becoming an agent runtime.
+
+### You May Need Renma When
+
+- The same guidance is copied across multiple Skills, prompts, or repository instructions.
+- Nobody can confidently identify which version is authoritative.
+- Skills or Context Assets reference files that have moved, disappeared, or become outdated.
+- Ownership, lifecycle status, or review history is unclear.
+- A shared knowledge change may affect multiple Skills, teams, or workflows.
+- Pull-request reviewers cannot easily determine what agent-facing knowledge changed.
 
 ## Why A Context Repository?
 
-A Context Repository is a Git-reviewed source of truth for reusable knowledge
-that LLMs and agents can consume. Without that repository boundary, important
-guidance is copied across prompts and Skills, buried in one-off instructions,
-detached from an owner, difficult to review, and increasingly inconsistent as
-teams and workflows evolve. It also becomes hard to tell maintained guidance
-from obsolete or unofficial material.
+A Context Repository is a Git-reviewed source of truth for reusable knowledge that LLMs and agents can consume. Without that repository boundary, important guidance is copied across prompts and Skills, buried in one-off instructions, detached from an owner, difficult to review, and increasingly inconsistent as teams and workflows evolve. It also becomes hard to tell maintained guidance from obsolete or unofficial material.
 
 Independently maintained context should be treated as a software asset:
 identified, owned, versioned in Git, connected through explicit relationships,
