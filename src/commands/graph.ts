@@ -524,16 +524,25 @@ function formatCompositionMarkdown(report: GraphReport): string {
     "Unresolved optional",
     composition.unresolvedOptional,
   );
-  lines.push("", "### Wrong target kinds", "");
+  lines.push("", "### Invalid source or target kinds", "");
   if (composition.kindMismatches.length === 0) {
     lines.push("- None.");
   } else {
     for (const mismatch of composition.kindMismatches) {
-      const source = mismatch.expectedSourceKind
-        ? `; source ${mismatch.actualSourceKind}, expected ${mismatch.expectedSourceKind}`
-        : "";
+      const kindProblems = [
+        ...(mismatch.expectedSourceKind
+          ? [
+              `source kind ${mismatch.actualSourceKind}, expected ${mismatch.expectedSourceKind}`,
+            ]
+          : []),
+        ...(mismatch.expectedTargetKind && mismatch.actualTargetKind
+          ? [
+              `target ${mismatch.targetId ?? mismatch.declaredTarget} kind ${mismatch.actualTargetKind}, expected ${mismatch.expectedTargetKind}`,
+            ]
+          : []),
+      ];
       lines.push(
-        `- ${mismatch.membership}: ${mismatch.sourceId} ${mismatch.relationship} ${mismatch.declaredTarget} resolved to ${mismatch.actualTargetKind}, expected ${mismatch.expectedTargetKind}${source} (${evidenceLabel(mismatch.evidence, mismatch.sourcePath)}).`,
+        `- ${mismatch.membership}: ${mismatch.sourceId} ${mismatch.relationship} ${mismatch.declaredTarget}; ${kindProblems.join("; ")} (${evidenceLabel(mismatch.evidence, mismatch.sourcePath)}).`,
       );
     }
   }
@@ -625,7 +634,12 @@ function renderCycles(
     return;
   }
   for (const cycle of cycles) {
-    lines.push(`- ${cycle.assetIds.join(" -> ")} -> ${cycle.assetIds[0]}`);
+    lines.push(`- Strongly connected assets: ${cycle.assetIds.join(", ")}.`);
+    for (const edge of cycle.edges) {
+      lines.push(
+        `  - ${edge.from} ${edge.relationship} ${edge.to} (${edge.membership}; ${evidenceLabel(edge.evidence, edge.sourcePath)}).`,
+      );
+    }
   }
 }
 
@@ -698,14 +712,16 @@ function formatCompositionMermaid(report: GraphReport): string {
 
   composition.kindMismatches.forEach((mismatch, index) => {
     const wrong = `wrong_kind_${index}`;
-    lines.push(
-      `  ${wrong}["${escapeMermaidLabel(`wrong kind: ${mismatch.targetId} (${mismatch.actualTargetKind})`)}"]`,
-    );
+    const label =
+      mismatch.expectedTargetKind && mismatch.actualTargetKind
+        ? `wrong target kind: ${mismatch.targetId ?? mismatch.declaredTarget} (${mismatch.actualTargetKind}, expected ${mismatch.expectedTargetKind})`
+        : `wrong source kind: ${mismatch.sourceId} (${mismatch.actualSourceKind}, expected ${mismatch.expectedSourceKind})`;
+    lines.push(`  ${wrong}["${escapeMermaidLabel(label)}"]`);
     const source = nodeIds.get(mismatch.sourceId);
     if (source) {
       const arrow = mismatch.membership === "required" ? "-->" : "-.->";
       lines.push(
-        `  ${source} ${arrow}|${escapeMermaidLabel(`${mismatch.relationship} expected ${mismatch.expectedTargetKind}`)}| ${wrong}`,
+        `  ${source} ${arrow}|${escapeMermaidLabel(`${mismatch.relationship} invalid kind`)}| ${wrong}`,
       );
     }
   });

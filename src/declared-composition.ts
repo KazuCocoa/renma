@@ -1,7 +1,4 @@
-import {
-  normalizeDependencyReference,
-  resolveDependencyTarget,
-} from "./dependency-resolution.js";
+import { normalizeDependencyReference } from "./dependency-resolution.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import { evaluateAssetFreshness, todayIsoDate } from "./freshness.js";
 import type {
@@ -57,10 +54,10 @@ export interface CompositionResolutionIssue {
 export interface CompositionKindMismatch extends CompositionResolutionIssue {
   expectedSourceKind?: AssetKind;
   actualSourceKind: AssetKind;
-  expectedTargetKind: AssetKind;
-  actualTargetKind: AssetKind;
-  targetId: string;
-  targetPath: string;
+  expectedTargetKind?: AssetKind;
+  actualTargetKind?: AssetKind;
+  targetId?: string;
+  targetPath?: string;
 }
 
 export interface CompositionCycle {
@@ -123,6 +120,15 @@ export interface DeclaredCompositionReport {
   cycleFree: boolean;
 }
 
+/** Reusable repository-wide lookups for declared-composition analysis. */
+export interface DeclaredCompositionIndex {
+  assetsById: ReadonlyMap<string, Asset>;
+  assetsByPath: ReadonlyMap<string, Asset>;
+  dependenciesBySource: ReadonlyMap<string, Dependency[]>;
+  sortedAssets: Asset[];
+  sortedDependencies: Dependency[];
+}
+
 interface TraversalState {
   asset: Asset;
   membership: CompositionMembership;
@@ -131,6 +137,14 @@ interface TraversalState {
 interface CompositionRootAnalysis {
   root: Asset;
   report: DeclaredCompositionReport;
+}
+
+interface CompositionCycleGroup {
+  assetIds: string[];
+  requiredRoots: Set<string>;
+  optionalRoots: Set<string>;
+  requiredCycle?: CompositionCycle;
+  optionalCycle?: CompositionCycle;
 }
 
 /**
@@ -143,8 +157,44 @@ export function resolveDeclaredComposition(
   rootReference: string,
   options: { evaluationDate?: string | Date } = {},
 ): DeclaredCompositionReport {
-  const root = resolveRoot(catalog, rootReference);
-  const dependenciesBySource = dependenciesBySourceId(catalog.dependencies);
+  return resolveDeclaredCompositionFromIndex(
+    prepareDeclaredCompositionIndex(catalog),
+    rootReference,
+    options,
+  );
+}
+
+/** Build repository-wide lookup tables once for one or many root analyses. */
+export function prepareDeclaredCompositionIndex(
+  catalog: Catalog,
+): DeclaredCompositionIndex {
+  const assetsById = new Map<string, Asset>();
+  const assetsByPath = new Map<string, Asset>();
+  for (const asset of catalog.assets) {
+    if (!assetsById.has(asset.id)) assetsById.set(asset.id, asset);
+    const normalizedPath = normalizeDependencyReference(asset.sourcePath);
+    if (!assetsByPath.has(normalizedPath)) {
+      assetsByPath.set(normalizedPath, asset);
+    }
+  }
+  return {
+    assetsById,
+    assetsByPath,
+    dependenciesBySource: dependenciesBySourceId(catalog.dependencies),
+    sortedAssets: [...catalog.assets].sort(compareAssets),
+    sortedDependencies: [...catalog.dependencies].sort(
+      compareDependenciesBySource,
+    ),
+  };
+}
+
+/** Resolve one root while reusing a prepared repository-wide index. */
+export function resolveDeclaredCompositionFromIndex(
+  index: DeclaredCompositionIndex,
+  rootReference: string,
+  options: { evaluationDate?: string | Date } = {},
+): DeclaredCompositionReport {
+  const root = resolveRoot(index, rootReference);
   const reached = new Map<string, Set<CompositionMembership>>();
   const processed = new Set<string>();
   const queue: TraversalState[] = [{ asset: root, membership: "required" }];
@@ -161,15 +211,23 @@ export function resolveDeclaredComposition(
     if (processed.has(stateKey)) continue;
     processed.add(stateKey);
 
-    for (const dependency of dependenciesBySource.get(state.asset.id) ?? []) {
-      const relationship = compositionRelationship(dependency, catalog.assets);
+    for (const dependency of index.dependenciesBySource.get(state.asset.id) ??
+      []) {
+      const relationship = compositionRelationship(dependency, index);
       if (!relationship) continue;
       const membership = propagatedMembership(
         state.membership,
         dependency,
         relationship,
       );
-      const target = resolveDependencyTarget(dependency, catalog.assets);
+      const target = resolveIndexedTarget(dependency, index);
+      const mismatch = compositionKindMismatch(
+        state.asset,
+        target,
+        dependency,
+        relationship,
+        membership,
+      );
       if (!target) {
         const issue = resolutionIssue(
           state.asset,
@@ -181,16 +239,10 @@ export function resolveDeclaredComposition(
           ? unresolvedRequired
           : unresolvedOptional
         ).push(issue);
+        if (mismatch) kindMismatches.push(mismatch);
         continue;
       }
 
-      const mismatch = compositionKindMismatch(
-        state.asset,
-        target,
-        dependency,
-        relationship,
-        membership,
-      );
       if (mismatch) {
         kindMismatches.push(mismatch);
         continue;
@@ -224,19 +276,28 @@ export function resolveDeclaredComposition(
   const directIds = new Set(
     stableProvenance.filter((edge) => edge.direct).map((edge) => edge.to),
   );
-  const requiredAssets = catalog.assets
+  const requiredAssets = [...reached]
     .filter(
-      (asset) => asset.id !== root.id && reached.get(asset.id)?.has("required"),
+      ([assetId, memberships]) =>
+        assetId !== root.id && memberships.has("required"),
     )
-    .map((asset) => compositionAsset(asset, directIds.has(asset.id)))
-    .sort(compareCompositionAssets);
-  const optionalAssets = catalog.assets
-    .filter((asset) => {
-      if (asset.id === root.id) return false;
-      const memberships = reached.get(asset.id);
-      return memberships?.has("optional") && !memberships.has("required");
+    .flatMap(([assetId]) => {
+      const asset = index.assetsById.get(assetId);
+      return asset ? [compositionAsset(asset, directIds.has(asset.id))] : [];
     })
-    .map((asset) => compositionAsset(asset, directIds.has(asset.id)))
+    .sort(compareCompositionAssets);
+  const optionalAssets = [...reached]
+    .filter(([assetId, memberships]) => {
+      return (
+        assetId !== root.id &&
+        memberships.has("optional") &&
+        !memberships.has("required")
+      );
+    })
+    .flatMap(([assetId]) => {
+      const asset = index.assetsById.get(assetId);
+      return asset ? [compositionAsset(asset, directIds.has(asset.id))] : [];
+    })
     .sort(compareCompositionAssets);
   const requiredCycles = compositionCycles(stableProvenance, "required");
   const requiredCycleKeys = new Set(
@@ -246,14 +307,14 @@ export function resolveDeclaredComposition(
     (cycle) => !requiredCycleKeys.has(cycle.assetIds.join("\0")),
   );
   const conflicts = compositionConflicts(
-    catalog,
+    index,
     root,
     reached,
     stableProvenance,
   );
   const evaluationDate = evaluationIsoDate(options.evaluationDate);
   const governance = compositionGovernanceFindings(
-    catalog.assets,
+    index,
     root,
     reached,
     evaluationDate,
@@ -290,15 +351,18 @@ export function declaredCompositionFindings(
   catalog: Catalog,
   evaluationDate: string,
 ): Finding[] {
-  const analyses = catalog.assets.map(
+  const index = prepareDeclaredCompositionIndex(catalog);
+  const analyses = index.sortedAssets.map(
     (root): CompositionRootAnalysis => ({
       root,
-      report: resolveDeclaredComposition(catalog, root.id, { evaluationDate }),
+      report: resolveDeclaredCompositionFromIndex(index, root.id, {
+        evaluationDate,
+      }),
     }),
   );
   return [
-    ...relationshipKindFindings(catalog),
-    ...duplicateDeclarationFindings(catalog),
+    ...relationshipKindFindings(index),
+    ...duplicateDeclarationFindings(index.sortedDependencies),
     ...cycleFindings(analyses),
     ...conflictFindings(analyses),
   ].sort(
@@ -309,14 +373,13 @@ export function declaredCompositionFindings(
   );
 }
 
-function relationshipKindFindings(catalog: Catalog): Finding[] {
-  const assetsById = new Map(catalog.assets.map((asset) => [asset.id, asset]));
+function relationshipKindFindings(index: DeclaredCompositionIndex): Finding[] {
   const findings: Finding[] = [];
-  for (const dependency of catalog.dependencies) {
-    const source = assetsById.get(dependency.from);
-    const target = resolveDependencyTarget(dependency, catalog.assets);
-    if (!source || !target) continue;
-    const relationship = compositionRelationship(dependency, catalog.assets);
+  for (const dependency of index.sortedDependencies) {
+    const source = index.assetsById.get(dependency.from);
+    if (!source) continue;
+    const target = resolveIndexedTarget(dependency, index);
+    const relationship = compositionRelationship(dependency, index);
     let expectedTargetKind: AssetKind | undefined;
     let expectedSourceKind: AssetKind | undefined;
     let unsupportedConflictTarget = false;
@@ -329,6 +392,7 @@ function relationshipKindFindings(catalog: Catalog): Finding[] {
         expectedSourceKind = "context_lens";
       }
     } else if (
+      target &&
       dependency.kind === "conflicts" &&
       !["skill", "context", "context_lens"].includes(target.kind)
     ) {
@@ -338,21 +402,23 @@ function relationshipKindFindings(catalog: Catalog): Finding[] {
       expectedSourceKind !== undefined && source.kind !== expectedSourceKind;
     const targetMismatch =
       unsupportedConflictTarget ||
-      (expectedTargetKind !== undefined && target.kind !== expectedTargetKind);
+      (expectedTargetKind !== undefined &&
+        target !== undefined &&
+        target.kind !== expectedTargetKind);
     if (!sourceMismatch && !targetMismatch) continue;
 
     const declaration = dependency.declaration ?? dependency.kind;
     findings.push({
       id: DIAGNOSTIC_IDS.META_DEPENDENCY_TARGET_KIND_MISMATCH,
-      title: "Declared dependency targets the wrong asset kind",
+      title: "Declared dependency uses an invalid asset kind",
       category: "structure",
       severity: "medium",
       confidence: "high",
       evidence: dependency.evidence ?? fallbackEvidence(dependency),
       whyItMatters:
-        "Relationship kinds define reviewable repository structure. A resolved target with the wrong kind cannot satisfy the declared composition contract.",
+        "Relationship kinds define reviewable repository structure. An invalid source or resolved target kind cannot satisfy the declared composition contract.",
       remediation:
-        "Point the declaration at an existing asset of the expected kind, or change the declaration only when repository intent supports a different relationship.",
+        "Move or change the declaration so its source kind is valid, and point it at an existing asset of the expected kind when the target is resolved.",
       constraints: [
         "Do not create a placeholder asset only to satisfy validation.",
         "Do not infer composition from prose, paths, names, or similarity.",
@@ -360,34 +426,38 @@ function relationshipKindFindings(catalog: Catalog): Finding[] {
         "Do not introduce runtime Context selection or loading.",
       ],
       verificationSteps: [
-        "Inspect the source declaration and resolved target kind.",
+        "Inspect the source declaration and the resolved target kind when available.",
         "Run renma scan.",
         "Run renma graph with the affected asset as focus.",
       ],
-      llmHint: `Review ${dependency.sourcePath} and preserve its intended ${declaration} relationship. The source is ${source.kind}; target ${dependency.to} resolves to ${target.kind}, while the declaration expects ${unsupportedConflictTarget ? "a Skill, Context Asset, or Context Lens" : expectedTargetKind}. Ask for human review if the intended target is ambiguous.`,
+      llmHint: `Review ${dependency.sourcePath} and preserve its intended ${declaration} relationship. The source is ${source.kind}${expectedSourceKind ? ` and the declaration expects ${expectedSourceKind}` : ""}; target ${dependency.to}${target ? ` resolves to ${target.kind}` : " is unresolved"}${targetMismatch ? ` while the declaration expects ${unsupportedConflictTarget ? "a Skill, Context Asset, or Context Lens" : expectedTargetKind}` : ""}. Ask for human review if the intended source or target is ambiguous.`,
       details: {
         sourceId: source.id,
         sourceKind: source.kind,
         sourcePath: source.sourcePath,
         relationshipKind: declaration,
         declaredTarget: dependency.to,
-        ...(expectedSourceKind ? { expectedSourceKind } : {}),
+        ...(sourceMismatch && expectedSourceKind ? { expectedSourceKind } : {}),
         actualSourceKind: source.kind,
-        expectedTargetKind: unsupportedConflictTarget
-          ? "skill, context, or context_lens"
-          : expectedTargetKind,
-        actualTargetKind: target.kind,
-        targetId: target.id,
-        targetPath: target.sourcePath,
+        ...(targetMismatch
+          ? {
+              expectedTargetKind: unsupportedConflictTarget
+                ? "skill, context, or context_lens"
+                : expectedTargetKind,
+              actualTargetKind: target?.kind,
+              targetId: target?.id,
+              targetPath: target?.sourcePath,
+            }
+          : {}),
       },
     });
   }
   return findings;
 }
 
-function duplicateDeclarationFindings(catalog: Catalog): Finding[] {
+function duplicateDeclarationFindings(dependencies: Dependency[]): Finding[] {
   const groups = new Map<string, Dependency[]>();
-  for (const dependency of catalog.dependencies) {
+  for (const dependency of dependencies) {
     if (!dependency.declaration) continue;
     const key = [
       dependency.from,
@@ -442,37 +512,32 @@ function duplicateDeclarationFindings(catalog: Catalog): Finding[] {
 }
 
 function cycleFindings(analyses: CompositionRootAnalysis[]): Finding[] {
-  const skillReports = analyses.filter(({ root }) => root.kind === "skill");
-  const grouped = new Map<
-    string,
-    { cycle: CompositionCycle; roots: Set<string> }
-  >();
-  const skillCycleSignatures = new Set<string>();
-
-  for (const { root, report } of skillReports) {
-    for (const cycle of [...report.requiredCycles, ...report.optionalCycles]) {
-      skillCycleSignatures.add(cycle.assetIds.join("\0"));
+  const grouped = new Map<string, CompositionCycleGroup>();
+  for (const { root, report } of analyses) {
+    for (const cycle of report.requiredCycles) {
+      addCycle(grouped, cycle, root.id);
+    }
+    for (const cycle of report.optionalCycles) {
       addCycle(grouped, cycle, root.id);
     }
   }
 
-  for (const { root, report } of analyses.filter(
-    ({ root }) => root.kind !== "skill",
-  )) {
-    for (const cycle of [...report.requiredCycles, ...report.optionalCycles]) {
-      if (skillCycleSignatures.has(cycle.assetIds.join("\0"))) continue;
-      addCycle(grouped, cycle, root.id);
-    }
-  }
-
-  return [...grouped.values()]
-    .map(({ cycle, roots }): Finding => {
-      const required = cycle.membership === "required";
+  return [...grouped.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([, group]): Finding => {
+      const required = group.requiredRoots.size > 0;
+      const cycle = required ? group.requiredCycle : group.optionalCycle;
+      if (!cycle) {
+        throw new Error("Composition cycle group has no representative cycle.");
+      }
+      const requiredRoots = [...group.requiredRoots].sort();
+      const optionalRoots = [...group.optionalRoots].sort();
+      const roots = [...new Set([...requiredRoots, ...optionalRoots])].sort();
       const evidence = cycle.edges[0]?.evidence ?? {
         path: cycle.edges[0]?.sourcePath ?? "(composition)",
         startLine: 1,
         endLine: 1,
-        snippet: cycle.assetIds.join(" -> "),
+        snippet: `Strongly connected assets: ${cycle.assetIds.join(", ")}`,
       };
       return {
         id: required
@@ -485,8 +550,7 @@ function cycleFindings(analyses: CompositionRootAnalysis[]): Finding[] {
         severity: required ? "medium" : "low",
         confidence: "high",
         evidence,
-        whyItMatters:
-          "The closure resolves finitely by stable asset ID, but a cycle may indicate unclear responsibility boundaries. It defines neither precedence nor repeated runtime loading.",
+        whyItMatters: `The closure resolves finitely by stable asset ID, but a cycle may indicate unclear responsibility boundaries. It is required from ${requiredRoots.length > 0 ? requiredRoots.join(", ") : "no roots"} and optional from ${optionalRoots.length > 0 ? optionalRoots.join(", ") : "no roots"}; it defines neither precedence nor repeated runtime loading.`,
         remediation:
           "Review whether the assets should be split, consolidated, or related without a composition cycle.",
         constraints: [
@@ -500,32 +564,51 @@ function cycleFindings(analyses: CompositionRootAnalysis[]): Finding[] {
           "Run renma graph --view composition for an affected root.",
           "Confirm that requiredComplete and cycleFree are reviewed separately.",
         ],
-        llmHint: `Review the ${cycle.membership} composition cycle containing ${cycle.assetIds.join(", ")}. Preserve valid knowledge while clarifying asset responsibilities; do not invent precedence or remove an edge solely to silence the finding.`,
+        llmHint: `Review the ${required ? "required" : "optional"} composition cycle containing ${cycle.assetIds.join(", ")}. Required roots: ${requiredRoots.join(", ") || "none"}. Optional roots: ${optionalRoots.join(", ") || "none"}. Preserve valid knowledge while clarifying asset responsibilities; do not invent precedence or remove an edge solely to silence the finding.`,
         details: {
-          membership: cycle.membership,
+          membership: required ? "required" : "optional",
           assetIds: cycle.assetIds,
-          roots: [...roots].sort(),
+          roots,
+          requiredRoots,
+          optionalRoots,
+          rootMemberships: [
+            ...requiredRoots.map((rootId) => ({
+              rootId,
+              membership: "required",
+            })),
+            ...optionalRoots.map((rootId) => ({
+              rootId,
+              membership: "optional",
+            })),
+          ],
           edges: cycle.edges,
           closureResolvedFinitely: true,
           precedenceDefined: false,
         },
       };
-    })
-    .sort((left, right) => left.id.localeCompare(right.id));
+    });
 }
 
 function addCycle(
-  grouped: Map<string, { cycle: CompositionCycle; roots: Set<string> }>,
+  grouped: Map<string, CompositionCycleGroup>,
   cycle: CompositionCycle,
   root: string,
 ): void {
-  const key = `${cycle.membership}\0${cycle.assetIds.join("\0")}`;
+  const key = cycle.assetIds.join("\0");
   const existing = grouped.get(key);
-  if (existing) {
-    existing.roots.add(root);
+  const group = existing ?? {
+    assetIds: cycle.assetIds,
+    requiredRoots: new Set<string>(),
+    optionalRoots: new Set<string>(),
+  };
+  if (cycle.membership === "required") {
+    group.requiredRoots.add(root);
+    group.requiredCycle ??= cycle;
   } else {
-    grouped.set(key, { cycle, roots: new Set([root]) });
+    group.optionalRoots.add(root);
+    group.optionalCycle ??= cycle;
   }
+  grouped.set(key, group);
 }
 
 function conflictFindings(analyses: CompositionRootAnalysis[]): Finding[] {
@@ -604,13 +687,13 @@ function fallbackEvidence(dependency: Dependency): Evidence {
   };
 }
 
-function resolveRoot(catalog: Catalog, reference: string): Asset {
+function resolveRoot(
+  index: DeclaredCompositionIndex,
+  reference: string,
+): Asset {
   const normalized = normalizeDependencyReference(reference);
-  const root = catalog.assets.find(
-    (asset) =>
-      asset.id === reference ||
-      normalizeDependencyReference(asset.sourcePath) === normalized,
-  );
+  const root =
+    index.assetsById.get(reference) ?? index.assetsByPath.get(normalized);
   if (!root) {
     throw new Error(
       `Declared composition root did not match any asset id or source path: ${reference}`,
@@ -637,7 +720,7 @@ function dependenciesBySourceId(
 
 function compositionRelationship(
   dependency: Dependency,
-  assets: Asset[],
+  index: DeclaredCompositionIndex,
 ): CompositionRelationship | undefined {
   if (isCompositionRelationship(dependency.declaration)) {
     return dependency.declaration;
@@ -647,7 +730,7 @@ function compositionRelationship(
     return undefined;
   }
 
-  const target = resolveDependencyTarget(dependency, assets);
+  const target = resolveIndexedTarget(dependency, index);
   const lens =
     target?.kind === "context_lens" ||
     dependency.to.startsWith("lens.") ||
@@ -688,7 +771,7 @@ function propagatedMembership(
 
 function compositionKindMismatch(
   source: Asset,
-  target: Asset,
+  target: Asset | undefined,
   dependency: Dependency,
   relationship: CompositionRelationship,
   membership: CompositionMembership,
@@ -699,19 +782,33 @@ function compositionKindMismatch(
       : "context";
   const wrongSource =
     relationship === "applies_to" && source.kind !== "context_lens";
-  if (!wrongSource && target.kind === expectedTargetKind) return undefined;
+  const wrongTarget =
+    target !== undefined && target.kind !== expectedTargetKind;
+  if (!wrongSource && !wrongTarget) return undefined;
 
   return {
     ...resolutionIssue(source, dependency, relationship, membership),
-    ...(relationship === "applies_to"
-      ? { expectedSourceKind: "context_lens" as const }
-      : {}),
+    ...(wrongSource ? { expectedSourceKind: "context_lens" as const } : {}),
     actualSourceKind: source.kind,
-    expectedTargetKind,
-    actualTargetKind: target.kind,
-    targetId: target.id,
-    targetPath: target.sourcePath,
+    ...(wrongTarget
+      ? {
+          expectedTargetKind,
+          actualTargetKind: target.kind,
+          targetId: target.id,
+          targetPath: target.sourcePath,
+        }
+      : {}),
   };
+}
+
+function resolveIndexedTarget(
+  dependency: Dependency,
+  index: DeclaredCompositionIndex,
+): Asset | undefined {
+  return (
+    index.assetsById.get(dependency.to) ??
+    index.assetsByPath.get(normalizeDependencyReference(dependency.to))
+  );
 }
 
 function resolutionIssue(
@@ -830,7 +927,7 @@ function stronglyConnectedComponents(
 }
 
 function compositionConflicts(
-  catalog: Catalog,
+  index: DeclaredCompositionIndex,
   root: Asset,
   reached: Map<string, Set<CompositionMembership>>,
   provenanceEdges: CompositionProvenanceEdge[],
@@ -841,27 +938,31 @@ function compositionConflicts(
     CompositionConflictDeclaration[]
   >();
 
-  for (const dependency of catalog.dependencies) {
-    if (dependency.kind !== "conflicts" || !included.has(dependency.from)) {
-      continue;
+  for (const sourceId of [...included].sort()) {
+    for (const dependency of index.dependenciesBySource.get(sourceId) ?? []) {
+      if (dependency.kind !== "conflicts") continue;
+      const target = resolveIndexedTarget(dependency, index);
+      if (
+        !target ||
+        !included.has(target.id) ||
+        dependency.from === target.id
+      ) {
+        continue;
+      }
+      const key = normalizedPairKey(dependency.from, target.id);
+      declarationsByPair.set(key, [
+        ...(declarationsByPair.get(key) ?? []),
+        {
+          from: dependency.from,
+          to: target.id,
+          sourcePath: dependency.sourcePath,
+          ...(dependency.declarationIndex !== undefined
+            ? { declarationIndex: dependency.declarationIndex }
+            : {}),
+          ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
+        },
+      ]);
     }
-    const target = resolveDependencyTarget(dependency, catalog.assets);
-    if (!target || !included.has(target.id) || dependency.from === target.id) {
-      continue;
-    }
-    const key = normalizedPairKey(dependency.from, target.id);
-    declarationsByPair.set(key, [
-      ...(declarationsByPair.get(key) ?? []),
-      {
-        from: dependency.from,
-        to: target.id,
-        sourcePath: dependency.sourcePath,
-        ...(dependency.declarationIndex !== undefined
-          ? { declarationIndex: dependency.declarationIndex }
-          : {}),
-        ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
-      },
-    ]);
   }
 
   const required: CompositionConflict[] = [];
@@ -906,7 +1007,7 @@ function assetMembership(
 }
 
 function compositionGovernanceFindings(
-  assets: Asset[],
+  index: DeclaredCompositionIndex,
   root: Asset,
   reached: Map<string, Set<CompositionMembership>>,
   today: string,
@@ -916,8 +1017,10 @@ function compositionGovernanceFindings(
 } {
   const freshness: CompositionFreshnessFinding[] = [];
   const lifecycle: CompositionLifecycleFinding[] = [];
-  for (const asset of assets) {
-    if (asset.id !== root.id && !reached.has(asset.id)) continue;
+  const governedIds = new Set([root.id, ...reached.keys()]);
+  for (const assetId of [...governedIds].sort()) {
+    const asset = index.assetsById.get(assetId);
+    if (!asset) continue;
     const membership = assetMembership(asset.id, root, reached);
     const isRoot = asset.id === root.id;
     const evaluation = evaluateAssetFreshness(asset.metadata, today);
@@ -1005,6 +1108,22 @@ function compareDependencies(left: Dependency, right: Dependency): number {
     left.sourcePath.localeCompare(right.sourcePath) ||
     (left.evidence?.startLine ?? 0) - (right.evidence?.startLine ?? 0) ||
     (left.declarationIndex ?? -1) - (right.declarationIndex ?? -1)
+  );
+}
+
+function compareDependenciesBySource(
+  left: Dependency,
+  right: Dependency,
+): number {
+  return (
+    left.from.localeCompare(right.from) || compareDependencies(left, right)
+  );
+}
+
+function compareAssets(left: Asset, right: Asset): number {
+  return (
+    left.id.localeCompare(right.id) ||
+    left.sourcePath.localeCompare(right.sourcePath)
   );
 }
 

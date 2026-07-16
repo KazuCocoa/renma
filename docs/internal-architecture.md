@@ -77,6 +77,12 @@ render CLI output, fetch external sources, or build a second repository model.
 Graph command orchestration collects repository evidence once and passes that
 catalog to the resolver.
 
+The public one-off wrapper prepares a `DeclaredCompositionIndex` and resolves
+one root. Scan prepares that index once and reuses its asset-ID,
+normalized-path, sorted-asset, and dependency-by-source lookups for every root.
+Per-root member and governance projections are built from reached IDs, so
+disconnected assets are not rescanned for each closure.
+
 Traversal state is `(asset ID, membership)` where membership is required or
 optional. Both states may be processed once for the same ID so required and
 optional provenance remains complete; final member classification gives
@@ -86,8 +92,11 @@ declaration forms for Context, Lens, and `applies_to` composition.
 The resolver stores declaration predecessor edges, not all possible paths.
 Line evidence and declaration indexes distinguish repeated declarations.
 Strongly connected components operate on those finite edges, and conflict
-analysis normalizes unordered ID pairs. Scan rules and the composition graph
-view call the same resolver; renderers do not re-resolve composition.
+analysis normalizes unordered ID pairs. Scan aggregation preserves each root's
+required or optional SCC classification and promotes the diagnostic to
+required when any root requires that SCC. Scan rules and the composition graph
+view call the same resolver; renderers do not re-resolve composition or infer a
+cycle path from sorted SCC members.
 
 The graph report adds a composition section only for `--view composition`.
 Existing graph views keep their meanings. JSON preserves all predecessor edge

@@ -100,11 +100,11 @@ test("scan emits actionable declared-composition diagnostics and Lens freshness 
   );
   assert.equal(
     findingsById.get(DIAGNOSTIC_IDS.COMPOSITION_REQUIRED_CYCLE)?.length,
-    1,
+    2,
   );
   assert.equal(
-    findingsById.get(DIAGNOSTIC_IDS.COMPOSITION_OPTIONAL_CYCLE)?.length,
-    1,
+    findingsById.get(DIAGNOSTIC_IDS.COMPOSITION_OPTIONAL_CYCLE)?.length ?? 0,
+    0,
   );
   assert.equal(
     findingsById.get(DIAGNOSTIC_IDS.COMPOSITION_DECLARED_CONFLICT)?.length,
@@ -141,6 +141,79 @@ test("scan emits actionable declared-composition diagnostics and Lens freshness 
     ).map((occurrence) => occurrence.evidence.startLine),
     [8, 9],
   );
+});
+
+test("scan reports invalid applies_to sources even when targets are unresolved", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-applies-to-scan-"));
+  await mkdir(path.join(root, "contexts"), { recursive: true });
+  await mkdir(path.join(root, "lenses"), { recursive: true });
+
+  await writeFile(
+    path.join(root, "contexts", "target.md"),
+    contextDocument("context.target", []),
+  );
+  await writeFile(
+    path.join(root, "contexts", "wrong-valid.md"),
+    contextDocument("context.wrong-valid", ["applies_to: context.target"]),
+  );
+  await writeFile(
+    path.join(root, "contexts", "wrong-missing.md"),
+    contextDocument("context.wrong-missing", ["applies_to: missing.context"]),
+  );
+  await writeFile(
+    path.join(root, "contexts", "wrong-target.md"),
+    contextDocument("context.wrong-target", ["applies_to: lens.actual"]),
+  );
+  await writeFile(
+    path.join(root, "lenses", "actual.md"),
+    lensDocument("lens.actual", "context.target", []),
+  );
+  await writeFile(
+    path.join(root, "lenses", "correct-missing.md"),
+    lensDocument("lens.correct-missing", "missing.context", []),
+  );
+
+  const result = scanFromRepositorySnapshot(
+    await collectRepositorySnapshot(root),
+    { evaluationDate: "2026-07-15" },
+  );
+  const mismatches = result.findings.filter(
+    (finding) =>
+      finding.id === DIAGNOSTIC_IDS.META_DEPENDENCY_TARGET_KIND_MISMATCH,
+  );
+  const mismatchesBySource = new Map(
+    mismatches.map((finding) => [finding.details?.sourceId, finding]),
+  );
+
+  assert.deepEqual([...mismatchesBySource.keys()].sort(), [
+    "context.wrong-missing",
+    "context.wrong-target",
+    "context.wrong-valid",
+  ]);
+  const unresolvedSource = mismatchesBySource.get("context.wrong-missing");
+  assert.equal(unresolvedSource?.details?.expectedSourceKind, "context_lens");
+  assert.equal(unresolvedSource?.details?.targetId, undefined);
+  assert.equal(unresolvedSource?.details?.actualTargetKind, undefined);
+
+  const validTarget = mismatchesBySource.get("context.wrong-valid");
+  assert.equal(validTarget?.details?.expectedSourceKind, "context_lens");
+  assert.equal(validTarget?.details?.expectedTargetKind, undefined);
+
+  const wrongSourceAndTarget = mismatchesBySource.get("context.wrong-target");
+  assert.equal(
+    wrongSourceAndTarget?.details?.expectedSourceKind,
+    "context_lens",
+  );
+  assert.equal(wrongSourceAndTarget?.details?.expectedTargetKind, "context");
+  assert.equal(wrongSourceAndTarget?.details?.actualTargetKind, "context_lens");
+  assert.equal(wrongSourceAndTarget?.details?.targetId, "lens.actual");
+
+  const unknownSources = result.findings
+    .filter((finding) => finding.id === DIAGNOSTIC_IDS.META_UNKNOWN_REFERENCE)
+    .map((finding) => finding.details?.source);
+  assert.ok(unknownSources.includes("context.wrong-missing"));
+  assert.ok(unknownSources.includes("lens.correct-missing"));
+  assert.equal(mismatchesBySource.has("lens.correct-missing"), false);
 });
 
 function contextDocument(id: string, metadata: string[]): string {

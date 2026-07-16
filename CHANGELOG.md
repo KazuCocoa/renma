@@ -15,11 +15,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   `applies_to`, propagates optional membership, deduplicates by stable asset ID,
   retains required and optional predecessor-edge provenance, and keeps storage
   proportional to declarations instead of possible paths.
-- Added separate required and optional unresolved declarations, target-kind
-  mismatches, completeness flags, strongly connected required and optional
-  cycles, normalized transitive conflicts, lifecycle findings, and freshness
-  summaries. A fully resolved cycle remains complete while `cycleFree` is
-  false; conflicts never select a winner.
+- Added separate required and optional unresolved declarations, independent
+  source- and target-kind mismatches, completeness flags, strongly connected
+  required and optional cycles, normalized transitive conflicts, lifecycle
+  findings, and freshness summaries. A fully resolved cycle remains complete
+  while `cycleFree` is false; conflicts never select a winner.
 - Added `graph --view composition --focus <asset-id-or-path>` with deterministic
   JSON, compact Markdown, and required-versus-optional Mermaid projections.
   Dependency graph edges now retain additive declaration form, declaration
@@ -37,6 +37,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 ### Changed
 
 - Extended the existing freshness rules and diagnostic IDs to Context Lenses.
+- Reused one prepared Declared Composition index across scan roots, limited
+  per-root governance work to reached assets, promoted shared SCC diagnostics
+  to required whenever any root requires them while retaining optional roots,
+  and rendered SCC members with actual declaration edges instead of a
+  fabricated sorted path.
 - Documented that Renma models explicit composition rather than
   natural-language inheritance, declaration order has no precedence, stable IDs
   resolve once while all declaration evidence remains, cycles terminate

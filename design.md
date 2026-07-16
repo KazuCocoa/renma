@@ -390,11 +390,23 @@ Completeness and cycle freedom remain separate; a fully resolved cyclic closure
 has `requiredComplete: true` and `cycleFree: false`. Conflict pairs are
 normalized by stable ID with inclusion provenance, and no winner is selected.
 
+Focused cycle membership is root-relative. Repository scan aggregation groups
+the same SCC across roots, retains deterministic required and optional root
+lists, and emits the stronger required diagnostic when either classification is
+present. Sorted SCC members are never presented as an edge path; renderers use
+the actual retained cycle subgraph.
+
 Target-kind validation keeps currently supported Context-to-Context
 dependencies while requiring Context fields to target Context, Lens fields to
 target Lenses, and Lens `applies_to` to originate from a Lens and target
 Context. Unknown and wrong-kind required/optional targets affect their own
-completeness flags.
+completeness flags. The `applies_to` source-kind check runs before target
+resolution so an invalid source and unresolved target remain independently
+visible.
+
+One-off resolution prepares repository lookup indexes internally. Scan prepares
+the same index once and reuses it across roots; reached IDs drive member,
+lifecycle, freshness, and conflict work without repeated full-catalog filters.
 
 The existing `graph --view composition --focus <asset-id-or-path>` projection
 owns JSON, Markdown, and Mermaid rendering. There is no second scanner,

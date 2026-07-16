@@ -190,6 +190,80 @@ test("graph composition Markdown and Mermaid focus by repository-relative path",
   );
 });
 
+test("composition Markdown renders SCC members and actual edges without fabricating a cycle path", async () => {
+  const root = await fixture();
+  await writeContext(root, "cycle", "a", {
+    requiresContext: ["cycle.c"],
+  });
+  await writeContext(root, "cycle", "b", {
+    requiresContext: ["cycle.a"],
+  });
+  await writeContext(root, "cycle", "c", {
+    requiresContext: ["cycle.b"],
+  });
+
+  const markdown = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "composition",
+      "--focus",
+      "cycle.a",
+      "--format",
+      "markdown",
+    ]),
+  );
+  const json = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "composition",
+      "--focus",
+      "cycle.a",
+      "--format",
+      "json",
+    ]),
+  );
+
+  assert.equal(markdown.code, 0);
+  assert.match(
+    markdown.stdout,
+    /Strongly connected assets: cycle\.a, cycle\.b, cycle\.c\./,
+  );
+  assert.match(markdown.stdout, /cycle\.a requires_context cycle\.c/);
+  assert.match(markdown.stdout, /cycle\.b requires_context cycle\.a/);
+  assert.match(markdown.stdout, /cycle\.c requires_context cycle\.b/);
+  assert.doesNotMatch(markdown.stdout, /cycle\.a -> cycle\.b/);
+
+  assert.equal(json.code, 0);
+  const report = JSON.parse(json.stdout) as {
+    composition: {
+      requiredCycles: Array<{
+        assetIds: string[];
+        edges: Array<{ from: string; to: string }>;
+      }>;
+    };
+  };
+  assert.deepEqual(
+    report.composition.requiredCycles.map((cycle) => ({
+      assetIds: cycle.assetIds,
+      edges: cycle.edges.map((edge) => [edge.from, edge.to]),
+    })),
+    [
+      {
+        assetIds: ["cycle.a", "cycle.b", "cycle.c"],
+        edges: [
+          ["cycle.a", "cycle.c"],
+          ["cycle.b", "cycle.a"],
+          ["cycle.c", "cycle.b"],
+        ],
+      },
+    ],
+  );
+});
+
 test("graph composition view requires a focus target", async () => {
   const root = await fixture();
   const result = await withCapturedConsole(() =>

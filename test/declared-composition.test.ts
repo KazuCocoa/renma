@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { resolveDeclaredComposition } from "../src/declared-composition.js";
+import {
+  declaredCompositionFindings,
+  resolveDeclaredComposition,
+} from "../src/declared-composition.js";
+import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
 import type { Asset, AssetKind, Catalog, Dependency } from "../src/model.js";
 
 test("declared composition propagates required and optional membership through lenses and contexts", () => {
@@ -108,6 +112,120 @@ test("declared composition separates unknown and wrong-kind required and optiona
   assert.equal(report.optionalComplete, false);
 });
 
+test("applies_to source validation is independent from target resolution", () => {
+  const catalog = makeCatalog(
+    [
+      asset("skill.optional", "skill"),
+      asset("context.valid", "context"),
+      asset("context.wrong-valid", "context"),
+      asset("context.wrong-missing", "context"),
+      asset("context.wrong-target", "context"),
+      asset("lens.correct-missing", "context_lens"),
+      asset("lens.wrong-target", "context_lens"),
+    ],
+    [
+      dependency("context.wrong-valid", "context.valid", "applies_to", 1),
+      dependency("context.wrong-missing", "missing.context", "applies_to", 2),
+      dependency("lens.correct-missing", "missing.context", "applies_to", 3),
+      dependency("context.wrong-target", "lens.wrong-target", "applies_to", 4),
+      dependency(
+        "skill.optional",
+        "context.wrong-missing",
+        "optional_context",
+        5,
+      ),
+    ],
+  );
+
+  const validTarget = resolveDeclaredComposition(
+    catalog,
+    "context.wrong-valid",
+    {
+      evaluationDate: "2026-07-15",
+    },
+  );
+  assert.equal(validTarget.kindMismatches.length, 1);
+  assert.deepEqual(
+    {
+      sourceId: validTarget.kindMismatches[0]?.sourceId,
+      declaredTarget: validTarget.kindMismatches[0]?.declaredTarget,
+      expectedSourceKind: validTarget.kindMismatches[0]?.expectedSourceKind,
+      targetId: validTarget.kindMismatches[0]?.targetId,
+    },
+    {
+      sourceId: "context.wrong-valid",
+      declaredTarget: "context.valid",
+      expectedSourceKind: "context_lens",
+      targetId: undefined,
+    },
+  );
+  assert.equal(validTarget.unresolvedRequired.length, 0);
+  assert.equal(validTarget.requiredComplete, false);
+  assert.equal(validTarget.optionalComplete, true);
+
+  const unresolvedTarget = resolveDeclaredComposition(
+    catalog,
+    "context.wrong-missing",
+    { evaluationDate: "2026-07-15" },
+  );
+  assert.equal(unresolvedTarget.kindMismatches.length, 1);
+  assert.equal(
+    unresolvedTarget.kindMismatches[0]?.expectedSourceKind,
+    "context_lens",
+  );
+  assert.equal(unresolvedTarget.kindMismatches[0]?.targetId, undefined);
+  assert.deepEqual(
+    unresolvedTarget.unresolvedRequired.map((issue) => issue.declaredTarget),
+    ["missing.context"],
+  );
+  assert.equal(unresolvedTarget.requiredComplete, false);
+  assert.equal(unresolvedTarget.optionalComplete, true);
+
+  const correctSource = resolveDeclaredComposition(
+    catalog,
+    "lens.correct-missing",
+    { evaluationDate: "2026-07-15" },
+  );
+  assert.equal(correctSource.kindMismatches.length, 0);
+  assert.equal(correctSource.unresolvedRequired.length, 1);
+  assert.equal(correctSource.requiredComplete, false);
+  assert.equal(correctSource.optionalComplete, true);
+
+  const wrongSourceAndTarget = resolveDeclaredComposition(
+    catalog,
+    "context.wrong-target",
+    { evaluationDate: "2026-07-15" },
+  );
+  assert.equal(wrongSourceAndTarget.kindMismatches.length, 1);
+  assert.deepEqual(
+    {
+      expectedSourceKind:
+        wrongSourceAndTarget.kindMismatches[0]?.expectedSourceKind,
+      expectedTargetKind:
+        wrongSourceAndTarget.kindMismatches[0]?.expectedTargetKind,
+      actualTargetKind:
+        wrongSourceAndTarget.kindMismatches[0]?.actualTargetKind,
+      targetId: wrongSourceAndTarget.kindMismatches[0]?.targetId,
+    },
+    {
+      expectedSourceKind: "context_lens",
+      expectedTargetKind: "context",
+      actualTargetKind: "context_lens",
+      targetId: "lens.wrong-target",
+    },
+  );
+  assert.equal(wrongSourceAndTarget.unresolvedRequired.length, 0);
+  assert.equal(wrongSourceAndTarget.requiredComplete, false);
+
+  const optionalRoute = resolveDeclaredComposition(catalog, "skill.optional", {
+    evaluationDate: "2026-07-15",
+  });
+  assert.equal(optionalRoute.requiredComplete, true);
+  assert.equal(optionalRoute.optionalComplete, false);
+  assert.equal(optionalRoute.unresolvedOptional.length, 1);
+  assert.equal(optionalRoute.kindMismatches[0]?.membership, "optional");
+});
+
 test("complete required cycles terminate, retain cycle-forming evidence, and keep completeness separate", () => {
   const catalog = makeCatalog(
     [asset("context.a", "context"), asset("context.b", "context")],
@@ -163,6 +281,76 @@ test("optional cycles remain optional after the first optional edge", () => {
   assert.deepEqual(
     report.optionalCycles.map((cycle) => cycle.assetIds),
     [["context.a", "context.b"]],
+  );
+});
+
+test("scan cycle aggregation preserves required and optional root classifications", () => {
+  const assets = [
+    asset("skill.optional", "skill"),
+    asset("skill.required", "skill"),
+    asset("context.a", "context"),
+    asset("context.b", "context"),
+    asset("context.x", "context"),
+    asset("context.y", "context"),
+  ];
+  const dependencies = [
+    dependency("skill.optional", "context.a", "optional_context", 1),
+    dependency("skill.required", "context.a", "requires_context", 2),
+    dependency("context.a", "context.b", "requires_context", 3),
+    dependency("context.b", "context.a", "requires_context", 4),
+    dependency("context.x", "context.y", "optional_context", 5),
+    dependency("context.y", "context.x", "requires_context", 6),
+  ];
+
+  const findings = declaredCompositionFindings(
+    makeCatalog(assets, dependencies),
+    "2026-07-15",
+  ).filter(
+    (finding) =>
+      finding.id === DIAGNOSTIC_IDS.COMPOSITION_REQUIRED_CYCLE ||
+      finding.id === DIAGNOSTIC_IDS.COMPOSITION_OPTIONAL_CYCLE,
+  );
+  const repeated = declaredCompositionFindings(
+    makeCatalog([...assets].reverse(), [...dependencies].reverse()),
+    "2026-07-15",
+  ).filter(
+    (finding) =>
+      finding.id === DIAGNOSTIC_IDS.COMPOSITION_REQUIRED_CYCLE ||
+      finding.id === DIAGNOSTIC_IDS.COMPOSITION_OPTIONAL_CYCLE,
+  );
+
+  assert.deepEqual(findings, repeated);
+  assert.equal(findings.length, 2);
+  const required = findings.find(
+    (finding) => finding.id === DIAGNOSTIC_IDS.COMPOSITION_REQUIRED_CYCLE,
+  );
+  assert.deepEqual(required?.details?.assetIds, ["context.a", "context.b"]);
+  assert.deepEqual(required?.details?.requiredRoots, [
+    "context.a",
+    "context.b",
+    "skill.required",
+  ]);
+  assert.deepEqual(required?.details?.optionalRoots, ["skill.optional"]);
+  assert.deepEqual(required?.details?.rootMemberships, [
+    { rootId: "context.a", membership: "required" },
+    { rootId: "context.b", membership: "required" },
+    { rootId: "skill.required", membership: "required" },
+    { rootId: "skill.optional", membership: "optional" },
+  ]);
+
+  const optional = findings.find(
+    (finding) => finding.id === DIAGNOSTIC_IDS.COMPOSITION_OPTIONAL_CYCLE,
+  );
+  assert.deepEqual(optional?.details?.assetIds, ["context.x", "context.y"]);
+  assert.deepEqual(optional?.details?.requiredRoots, []);
+  assert.deepEqual(optional?.details?.optionalRoots, [
+    "context.x",
+    "context.y",
+  ]);
+  assert.ok(
+    (optional?.details?.edges as Array<{ relationship: string }>).some(
+      (edge) => edge.relationship === "optional_context",
+    ),
   );
 });
 
@@ -266,6 +454,35 @@ test("composition summarizes Context Lens freshness with deterministic dates", (
       ["lens.stale", "review_overdue", "2026-01-31", 8],
     ],
   );
+});
+
+test("scan prepares repository composition indexes once for many disconnected assets", () => {
+  const assets = Array.from({ length: 250 }, (_, index) =>
+    asset(
+      `context.disconnected-${index.toString().padStart(3, "0")}`,
+      "context",
+    ),
+  );
+  let fullAssetIterations = 0;
+  const trackedAssets = new Proxy(assets, {
+    get(target, property, receiver) {
+      if (property === Symbol.iterator) {
+        return function iterator() {
+          fullAssetIterations += 1;
+          return target[Symbol.iterator]();
+        };
+      }
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
+  const findings = declaredCompositionFindings(
+    makeCatalog(trackedAssets, []),
+    "2026-07-15",
+  );
+
+  assert.deepEqual(findings, []);
+  assert.equal(fullAssetIterations, 2);
 });
 
 function makeCatalog(assets: Asset[], dependencies: Dependency[]): Catalog {

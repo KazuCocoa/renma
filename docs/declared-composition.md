@@ -59,6 +59,11 @@ ID in required and optional traversal states. Each state is processed at most
 once. A later required route upgrades final membership without discarding the
 optional state or its evidence.
 
+One-off callers use the public resolver wrapper. Repository scans prepare the
+asset-ID, normalized-path, and dependency-by-source indexes once, then reuse
+them across roots. Member lists and governance checks visit only the root and
+reached IDs rather than filtering every catalog asset for every root.
+
 Renma retains predecessor declaration edges rather than eagerly enumerating
 every root-to-node path. Each edge records source and target IDs, declared
 target, declaration form, membership, source path, line range, and raw snippet.
@@ -69,8 +74,11 @@ proportional to assets and declarations instead of possible paths.
 ## Completeness, Cycles, And Conflicts
 
 `requiredComplete` is false when a required composition declaration is
-unresolved or resolves to the wrong asset kind. Equivalent optional failures
-make `optionalComplete` false without changing required completeness.
+unresolved, originates from an invalid source kind, or resolves to the wrong
+target kind. Equivalent optional failures make `optionalComplete` false
+without changing required completeness. Source-kind validation is independent
+from target resolution, so an invalid `applies_to` source with an unresolved
+target retains both facts.
 
 `cycleFree` is independent. A complete cycle such as Context A requiring
 Context B and Context B requiring Context A resolves to a finite closure:
@@ -80,8 +88,13 @@ requiredComplete: true
 cycleFree: false
 ```
 
-Required and optional cycles are reported separately. Cycles define no
-precedence and do not instruct a runtime to load an asset repeatedly.
+Focused reports retain their root-relative required and optional cycles. Scan
+findings group the same strongly connected component across roots and use the
+required diagnostic whenever any root reaches it as required, while preserving
+optional roots in structured details. Cycle asset IDs are a sorted member set,
+not an inferred path; Markdown lists the actual retained declarations instead.
+Cycles define no precedence and do not instruct a runtime to load an asset
+repeatedly.
 
 Conflicts are normalized as stable unordered asset-ID pairs. A conflict where
 both members are required is stronger than a candidate involving an optional
@@ -103,10 +116,11 @@ The focus accepts the existing stable-ID and source-path forms. Omitting
 `--focus` is an argument error.
 
 JSON contains the root, required and optional assets, complete provenance
-edges, unresolved declarations, target-kind mismatches, cycles, conflicts,
-freshness and lifecycle findings, and completeness flags. Markdown is a compact
-review report. Mermaid uses labeled solid required edges and labeled dotted
-optional edges; it depicts repository composition, not runtime execution.
+edges, unresolved declarations, source- and target-kind mismatches, cycles,
+conflicts, freshness and lifecycle findings, and completeness flags. Markdown
+is a compact review report. Mermaid uses labeled solid required edges and
+labeled dotted optional edges; it depicts repository composition, not runtime
+execution.
 
 ## Scan Findings
 
