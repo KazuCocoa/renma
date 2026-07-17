@@ -120,11 +120,28 @@ export interface DeclaredCompositionReport {
   cycleFree: boolean;
 }
 
+/** One resolved explicit composition declaration retained for reverse queries. */
+export interface ResolvedCompositionDeclaration {
+  source: Asset;
+  target: Asset;
+  dependency: Dependency;
+  relationship: CompositionRelationship;
+  declarationForm: string;
+  declarationIndex?: number;
+  sourcePath: string;
+  evidence?: Evidence;
+  kindMismatch?: CompositionKindMismatch;
+}
+
 /** Reusable repository-wide lookups for declared-composition analysis. */
 export interface DeclaredCompositionIndex {
   assetsById: ReadonlyMap<string, Asset>;
   assetsByPath: ReadonlyMap<string, Asset>;
   dependenciesBySource: ReadonlyMap<string, Dependency[]>;
+  incomingByTargetId: ReadonlyMap<
+    string,
+    readonly ResolvedCompositionDeclaration[]
+  >;
   sortedAssets: Asset[];
   sortedDependencies: Dependency[];
 }
@@ -181,14 +198,19 @@ export function prepareDeclaredCompositionIndex(
       assetsByPath.set(normalizedPath, asset);
     }
   }
-  return {
+  const index: DeclaredCompositionIndex = {
     assetsById,
     assetsByPath,
     dependenciesBySource: dependenciesBySourceId(catalog.dependencies),
+    incomingByTargetId: new Map(),
     sortedAssets: [...catalog.assets].sort(compareAssets),
     sortedDependencies: [...catalog.dependencies].sort(
       compareDependenciesBySource,
     ),
+  };
+  return {
+    ...index,
+    incomingByTargetId: incomingCompositionDeclarations(index),
   };
 }
 
@@ -825,6 +847,61 @@ function dependenciesBySourceId(
     dependenciesForSource.sort(compareDependencies);
   }
   return result;
+}
+
+function incomingCompositionDeclarations(
+  index: DeclaredCompositionIndex,
+): Map<string, readonly ResolvedCompositionDeclaration[]> {
+  const result = new Map<string, ResolvedCompositionDeclaration[]>();
+  for (const dependency of index.sortedDependencies) {
+    const source = index.assetsById.get(dependency.from);
+    if (!source) continue;
+    const relationship = compositionRelationship(dependency, index);
+    if (!relationship) continue;
+    const target = resolveIndexedTarget(dependency, index);
+    if (!target) continue;
+    const membership = propagatedMembership(
+      "required",
+      dependency,
+      relationship,
+    );
+    const kindMismatch = compositionKindMismatch(
+      source,
+      target,
+      dependency,
+      relationship,
+      membership,
+    );
+    const declaration: ResolvedCompositionDeclaration = {
+      source,
+      target,
+      dependency,
+      relationship,
+      declarationForm: dependency.declaration ?? dependency.kind,
+      ...(dependency.declarationIndex !== undefined
+        ? { declarationIndex: dependency.declarationIndex }
+        : {}),
+      sourcePath: dependency.sourcePath,
+      ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
+      ...(kindMismatch ? { kindMismatch } : {}),
+    };
+    result.set(target.id, [...(result.get(target.id) ?? []), declaration]);
+  }
+  for (const declarations of result.values()) {
+    declarations.sort(compareIncomingDeclarations);
+  }
+  return result;
+}
+
+function compareIncomingDeclarations(
+  left: ResolvedCompositionDeclaration,
+  right: ResolvedCompositionDeclaration,
+): number {
+  return (
+    left.source.id.localeCompare(right.source.id) ||
+    left.target.id.localeCompare(right.target.id) ||
+    compareDependencies(left.dependency, right.dependency)
+  );
 }
 
 function compositionRelationship(

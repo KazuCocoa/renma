@@ -2,7 +2,7 @@
 
 ## Current Product Definition
 
-Renma 0.20.0 is the current shipped baseline:
+Renma 0.20.1 is the current shipped baseline:
 a Git-native context repository and deterministic governance CLI for
 agent-consumable Skills, Context Lenses, Context Assets, local support
 resources, policies, ownership, lifecycle, dependencies, and review evidence.
@@ -177,6 +177,27 @@ This release preserves the 0.19.2 separation between normative interaction,
 conditional normative guidance, illustration usage rules, non-normative
 illustrations, compact prompt projection, and complete JSON projection.
 
+## Shipped 0.20.1 Declared Impact Analysis
+
+Renma 0.20.1 adds the deterministic reverse question over the 0.20.0 Declared
+Composition foundation. A focused Context Asset, Context Lens, Skill, or other
+catalog asset can be traced backward through valid explicit required and
+optional composition declarations to its declared dependent assets and Skills.
+
+The prepared composition index now retains incoming resolved declarations.
+Reverse traversal propagates required and optional membership, gives required
+membership final classification precedence while retaining both route classes,
+distinguishes direct from transitive dependents, preserves line-level evidence,
+terminates through cycles, and stores declaration edges rather than every
+possible complete path.
+
+The existing graph command adds `--view impact` with required `--focus` and
+JSON, Markdown, and Mermaid projections. Impact is declared change-review
+scope. It does not predict actual breakage, runtime loading, optional selection,
+test requirements, file changes, or semantic relevance. It adds no scan
+finding, ranking, centrality score, Git-diff workflow, automatic test selection,
+or Skill-to-Skill relationship.
+
 ## Stable Product Boundaries
 
 Renma owns repository discovery and parsing, normalized static evidence,
@@ -187,7 +208,7 @@ policy weakening.
 
 ## Deferred Skill-to-Skill Discovery Design
 
-Graph-based Skill-to-Skill route discovery is not a 0.20.0 feature and has no
+Graph-based Skill-to-Skill route discovery is not a 0.20.1 feature and has no
 assigned release. The exploratory design in
 [plan-discovery.md](plan-discovery.md) discusses possible `routes_to` metadata,
 discovery aliases, generated routing indexes, and a `skill-index` projection.
@@ -200,10 +221,11 @@ receive an explicit version and contract decision before implementation.
 
 ## Later Candidates
 
-Future product decisions may consider imported external consumed-context
-evidence, additive projections over stable evidence, optional semantic-review
-helpers, multi-repository workflows, or review visualizations. These are not
-commitments and have no assigned version.
+Future product decisions may consider richer composition/impact review
+workflows, static Skill-to-Skill discovery after a separate contract decision,
+imported external consumed-context evidence, additive projections over stable
+evidence, optional semantic-review helpers, multi-repository workflows, or
+review visualizations. These are not commitments and have no assigned version.
 
 ## Explicitly Out Of Scope
 

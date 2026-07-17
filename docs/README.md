@@ -31,6 +31,9 @@ Use this index to choose the smallest document that answers your question.
   guidance.
 - [Declared Composition](declared-composition.md): required and optional
   closure, provenance, completeness, cycle, conflict, and graph-view contract.
+- [Declared Impact](declared-impact.md): reverse required and optional
+  composition closure, dependent Skill summaries, provenance, and change-review
+  boundary.
 - [Renma Quality Profile](quality-profile.md): canonical thresholds,
   units, provenance, rationale, false-positive risks, and configuration status.
 

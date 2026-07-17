@@ -278,6 +278,197 @@ test("graph composition view requires a focus target", async () => {
   );
 });
 
+test("graph impact JSON resolves required and optional reverse composition with Skill summaries", async () => {
+  const root = await fixture();
+  await writeContext(root, "shared", "api", {});
+  await writeContext(root, "shared", "optional-parent", {
+    optionalContext: ["shared.api"],
+  });
+  await writeContextLens(root, "shared", "review", {
+    id: "lens.shared.review",
+    appliesTo: ["shared.api"],
+  });
+  await writeSkill(root, "required-review", {
+    requiresLens: ["lens.shared.review"],
+  });
+  await writeSkill(root, "optional-review", {
+    requiresContext: ["shared.optional-parent"],
+  });
+
+  const result = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "impact",
+      "--focus",
+      "shared.api",
+      "--format",
+      "json",
+    ]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.equal(result.stderr, "");
+  const output = JSON.parse(result.stdout) as {
+    view: string;
+    nodeCount: number;
+    edgeCount: number;
+    composition?: unknown;
+    impact: {
+      focus: { id: string };
+      requiredDependents: Array<{ id: string; direct: boolean }>;
+      optionalDependents: Array<{ id: string; direct: boolean }>;
+      requiredSkills: Array<{ id: string }>;
+      optionalSkills: Array<{ id: string }>;
+      provenanceEdges: Array<{
+        from: string;
+        to: string;
+        dependentMembership: string;
+        evidence?: { path: string; startLine: number; snippet: string };
+      }>;
+    };
+  };
+  assert.equal(output.view, "impact");
+  assert.equal(output.composition, undefined);
+  assert.equal(output.impact.focus.id, "shared.api");
+  assert.deepEqual(
+    output.impact.requiredDependents.map((asset) => [asset.id, asset.direct]),
+    [
+      ["lens.shared.review", true],
+      ["required-review", false],
+    ],
+  );
+  assert.deepEqual(
+    output.impact.optionalDependents.map((asset) => [asset.id, asset.direct]),
+    [
+      ["optional-review", false],
+      ["shared.optional-parent", true],
+    ],
+  );
+  assert.deepEqual(
+    output.impact.requiredSkills.map((asset) => asset.id),
+    ["required-review"],
+  );
+  assert.deepEqual(
+    output.impact.optionalSkills.map((asset) => asset.id),
+    ["optional-review"],
+  );
+  assert.ok(
+    output.impact.provenanceEdges.every(
+      (edge) =>
+        edge.evidence?.path &&
+        edge.evidence.startLine > 0 &&
+        edge.evidence.snippet.length > 0,
+    ),
+  );
+  assert.equal(output.nodeCount, 5);
+  assert.equal(output.edgeCount, output.impact.provenanceEdges.length);
+});
+
+test("graph impact Markdown and Mermaid preserve declaration direction and focus by path", async () => {
+  const root = await fixture();
+  await writeContext(root, "shared", "api", {});
+  await writeContextLens(root, "shared", "review", {
+    id: "lens.shared.review",
+    appliesTo: ["shared.api"],
+  });
+  await writeSkill(root, "review", {
+    optionalLens: ["lens.shared.review"],
+  });
+
+  const markdown = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "impact",
+      "--focus",
+      "contexts/shared/api.md",
+      "--format",
+      "markdown",
+    ]),
+  );
+  const mermaid = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "impact",
+      "--focus",
+      path.join(root, "contexts/shared/api.md"),
+      "--format",
+      "mermaid",
+    ]),
+  );
+
+  assert.equal(markdown.code, 0);
+  assert.match(markdown.stdout, /^# Renma Declared Impact/);
+  assert.match(markdown.stdout, /## Skills with optional declared impact/);
+  assert.match(markdown.stdout, /review.*optional_lens lens\.shared\.review/s);
+  assert.match(
+    markdown.stdout,
+    /This is declared repository impact, not runtime usage or breakage prediction/,
+  );
+  assert.equal(mermaid.code, 0);
+  const skill = mermaidNodeId(mermaid.stdout, "skill: review");
+  const lens = mermaidNodeId(
+    mermaid.stdout,
+    "context_lens: lens.shared.review",
+  );
+  const focus = mermaidNodeId(mermaid.stdout, "focus context: shared.api");
+  assert.match(
+    mermaid.stdout,
+    new RegExp(`${skill} -\\.->\\|optional_lens optional\\| ${lens}`),
+  );
+  assert.match(
+    mermaid.stdout,
+    new RegExp(`${lens} -->\\|applies_to required\\| ${focus}`),
+  );
+  assert.doesNotMatch(mermaid.stdout, new RegExp(`${focus} .* ${lens}`));
+});
+
+test("graph impact requires focus and accepts an empty reverse closure", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {});
+
+  const missingFocus = await withCapturedConsole(() =>
+    main(["graph", root, "--view", "impact", "--format", "json"]),
+  );
+  const empty = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "impact",
+      "--focus",
+      "demo",
+      "--format",
+      "json",
+    ]),
+  );
+
+  assert.equal(missingFocus.code, 2);
+  assert.equal(missingFocus.stdout, "");
+  assert.match(
+    missingFocus.stderr,
+    /graph --view impact requires --focus <asset-id-or-path>/,
+  );
+  assert.equal(empty.code, 0);
+  const report = JSON.parse(empty.stdout) as {
+    nodeCount: number;
+    edgeCount: number;
+    impact: {
+      requiredDependents: unknown[];
+      optionalDependents: unknown[];
+    };
+  };
+  assert.equal(report.nodeCount, 1);
+  assert.equal(report.edgeCount, 0);
+  assert.deepEqual(report.impact.requiredDependents, []);
+  assert.deepEqual(report.impact.optionalDependents, []);
+});
+
 test("graph resolves requires_context by asset id", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", { requiresContext: ["testing.boundary"] });
@@ -638,7 +829,7 @@ test("graph CLI rejects unsupported view", async () => {
   assert.equal(result.stdout, "");
   assert.match(
     result.stderr,
-    /--view must be one of: summary, workflow, full, layered, lens, composition\./,
+    /--view must be one of: summary, workflow, full, layered, lens, composition, impact\./,
   );
 });
 
@@ -887,6 +1078,10 @@ async function writeContext(
     status?: string;
     tags?: string[];
     requiresContext?: string[];
+    optionalContext?: string[];
+    requiresLens?: string[];
+    optionalLens?: string[];
+    appliesTo?: string[];
   },
 ): Promise<void> {
   await mkdir(path.join(root, "contexts", group), { recursive: true });

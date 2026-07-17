@@ -31,7 +31,7 @@ const OPTION_HELP = {
   focus: {
     flags: "--focus <asset-id-or-path>",
     description:
-      "Focus one asset by stable ID or path; required by the composition view.",
+      "Focus one asset by stable ID or path; required by the composition and impact views.",
   },
   format: {
     flags: "--format <format>",
@@ -101,7 +101,7 @@ const OPTION_HELP = {
   view: {
     flags: "--view <view>",
     description:
-      "Graph view: summary, workflow, full, layered, lens, or composition.",
+      "Graph view: summary, workflow, full, layered, lens, composition, or impact.",
   },
 } as const;
 
@@ -218,12 +218,14 @@ export const COMMAND_HELP = [
       "renma graph . --view layered --format mermaid",
       "renma graph . --focus contexts/testing/boundary-value-analysis.md --view full",
       "renma graph . --focus skill.testing.spec-review --view composition --format json",
+      "renma graph . --focus context.shared-api --view impact --format markdown",
     ],
     interpretation: [
       "Edges represent declared relationships Renma can resolve or report as unresolved.",
       "Unexpected isolation is evidence to review, not automatic permission to delete an asset.",
       "Focused output filters to the matched asset and directly connected neighbors.",
       "The composition view resolves the complete explicit required and optional closure and requires --focus.",
+      "The impact view resolves reverse explicit composition to required and optional declared dependents; it reports neither runtime usage nor breakage and requires --focus.",
     ],
     nextSteps: [
       "Use catalog to inspect the assets behind graph nodes.",
