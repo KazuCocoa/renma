@@ -650,9 +650,12 @@ permission fallback, or execute automatically after no user response. The safe
 repair is to keep the existing safeguard, stop and report missing authority,
 and rerun `renma scan` without relaxing policy or adding suppression. Direct
 prohibitions such as “Do not bypass human approval,” quoted examples,
-comment-only lines, and fenced prose examples are excluded from this semantic
-prose rule. A defensive sentence does not protect a separate contradictory
-bypass instruction.
+HTML-comment content, and fenced prose clearly bounded as an unsafe or negative
+example are excluded from this semantic prose rule. Visible text before or
+after an HTML comment span remains scannable. A fenced `text` or `markdown`
+payload explicitly routed by surrounding prose, an instruction label, or an
+operational instruction heading is scanned as an instruction. A defensive
+sentence does not protect a separate contradictory bypass instruction.
 
 `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION` reports guidance that makes an external
 page, issue body, log, tool output, attachment, downloaded document, or fetched
@@ -662,6 +665,13 @@ validated fact extraction are outside the rule. Repair the instruction by
 treating source content as untrusted data, preserving provenance, validating
 task-relevant facts, and keeping execution authority in reviewed repository
 guidance or explicit human approval.
+
+Semantic windows remain within one Markdown list item: sibling bullet or
+numbered items and nested child items establish new instruction boundaries,
+while indented continuation lines stay associated with their owning item.
+Ordinary adjacent prose lines can still form one bounded instruction. A review
+guard applies to the action or sentence it governs, so defensive source wording
+does not suppress a later contradictory execution instruction.
 
 `SEC-UNBOUNDED-EXTERNAL-SOURCE-TRAVERSAL` is an advisory for explicit recursive
 link, issue, attachment, page, or source traversal when the same bounded

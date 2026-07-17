@@ -23,9 +23,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 ### Changed
 
 - Strengthened Security Diagnostics with bounded Markdown section handling for
-  approval proximity, defensive/example/comment exclusions, and deterministic
-  evidence for agent-facing Skills, Context, `AGENTS.md`, local references,
-  profiles, examples, and Markdown tool guidance.
+  approval proximity, action-local defensive guards, list-item and HTML-comment
+  spans, operational fenced instruction routing, and deterministic evidence for
+  agent-facing Skills, Context, `AGENTS.md`, local references, profiles,
+  examples, and Markdown tool guidance.
 - Refined the existing bulk sharing, overbroad context, redaction, secret
   material, and upload rules to distinguish local reads, prompt/context
   attachment, stdout/log output, and external upload. `process.env.NAME` is no

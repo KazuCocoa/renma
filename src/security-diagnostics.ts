@@ -740,6 +740,14 @@ const CREDENTIAL_HEADER_RE =
 const PREDICTABLE_TEMP_RE = /\/tmp\/[A-Za-z0-9._/-]+/;
 const PREDICTABLE_TEMP_GLOBAL_RE = /\/tmp\/[A-Za-z0-9._/-]+/g;
 const MARKDOWN_FENCE_RE = /^\s*(?:```|~~~)/;
+const MARKDOWN_SEMANTIC_PROSE_FENCE_RE =
+  /^\s*(?:`{3,}|~{3,})\s*(?:(?:text|markdown|md)\s*)?$/i;
+const OPERATIONAL_FENCE_ROUTING_RE =
+  /\b(use|follow|apply|execute|run|perform|carry out)\b.{0,60}\b(following|below|these)\b.{0,40}\b(instructions?|steps?|procedure|workflow|payload)\b|\b(following|below)\b.{0,40}\b(instructions?|steps?|procedure|workflow|payload)\b.{0,40}\b(exactly|verbatim|as written)\b/i;
+const OPERATIONAL_FENCE_LABEL_RE =
+  /^\s*(?:(?:operational|execution)\s+)?(?:instructions?|steps?|procedure|workflow|payload)\s*:\s*$/i;
+const OPERATIONAL_FENCE_HEADING_RE =
+  /\b(instructions?|operational instructions?|execution instructions?|procedure|runbook)\b/i;
 
 const SAFEGUARD_BYPASS_PATTERNS = [
   /\b(ignore|bypass|circumvent|skip|omit|disabl(?:e|ing)|deactivat(?:e|ing)|turn off|suppress(?:ed|ing)?)\b.{0,100}\b(security checks?|security policy|security profile|safeguards?|guardrails?|human approval|approval|confirmation|authorization|security warnings?|warnings?|diagnostics?|verification|validation)\b/i,
@@ -758,7 +766,7 @@ const UNTRUSTED_CONTENT_SOURCE_RE =
 const UNTRUSTED_CONTENT_EXECUTION_RE =
   /\b(execute|run|apply|follow|obey|adopt)\b.{0,80}\b(every command|all commands?|instructions?|steps?|verbatim|exactly|without review)\b|\b(treat|regard|accept)\b.{0,80}\b(authoritative|trusted instructions?|commands?|executable guidance)\b|\b(follow|obey|execute|run|apply)\b.{0,50}\b(it|them|the content|the instructions?)\b.{0,40}\b(verbatim|exactly|without review)\b/i;
 const UNTRUSTED_CONTENT_REVIEW_GUARD_RE =
-  /\b(treat|handle|regard)\b.{0,50}\b(untrusted|data|non-authoritative)\b|\b(review|validate|verify|inspect)\b.{0,80}\b(before|prior to)\b.{0,60}\b(execute|run|apply|follow|adopt)\b|\bdo not\b.{0,50}\b(execute|run|follow|obey|apply)\b.{0,60}\b(embedded|external|downloaded|fetched|tool|log|attachment)\b/i;
+  /\b(review|validate|verify|inspect)\b.{0,80}\b(before|prior to)\b.{0,60}\b(execute|run|apply|follow|adopt)\b|\bdo not\b.{0,50}\b(execute|run|follow|obey|apply)\b.{0,60}\b(embedded|external|downloaded|fetched|tool|log|attachment)\b/i;
 const RECURSIVE_EXTERNAL_TRAVERSAL_RE =
   /\b(recursive|recursively)\b.{0,100}\b(follow|traverse|crawl|visit|open|fetch|read|inspect)\b.{0,100}\b(external links?|links?|related issues?|attachments?|pages?|sources?|documents?)\b|\b(follow|traverse|crawl|visit|open|fetch|read|inspect)\b.{0,80}\b(external links?|links?|related issues?|attachments?|pages?|sources?|documents?)\b.{0,80}\b(recursive|recursively|repeat|until (?:none|no more|exhausted))\b|\bkeep\b.{0,30}\b(following|traversing|opening|visiting)\b.{0,60}\b(external links?|links?|related issues?|attachments?|pages?|sources?)\b/i;
 const TRAVERSAL_BOUNDARY_PATTERNS = [
@@ -835,13 +843,16 @@ function securityFindingsForArtifact(
       artifact.markdownParserEligible,
     ),
   ];
-  const lines = artifact.content.split(/\r?\n/);
+  const sourceLines = artifact.content.split(/\r?\n/);
+  const lines = artifact.markdownParserEligible
+    ? stripHtmlCommentSpans(sourceLines)
+    : sourceLines;
   const scanStart = securityContentStart(
-    lines,
+    sourceLines,
     artifact.markdownParserEligible,
   );
   let inFence = false;
-  let inHtmlComment = false;
+  let operationalSemanticFence = false;
   let recentHumanApprovalLine = 0;
   let recentRiskMitigationLine = 0;
 
@@ -870,14 +881,15 @@ function securityFindingsForArtifact(
   for (let index = scanStart; index < lines.length; index += 1) {
     const lineNumber = index + 1;
     const line = lines[index] ?? "";
-    if (MARKDOWN_FENCE_RE.test(line)) {
-      inFence = !inFence;
-    }
-    const insideHtmlComment = inHtmlComment || line.includes("<!--");
-    if (line.includes("-->")) {
-      inHtmlComment = false;
-    } else if (line.includes("<!--")) {
-      inHtmlComment = true;
+    const fenceMarker = MARKDOWN_FENCE_RE.test(line);
+    if (fenceMarker) {
+      if (inFence) {
+        inFence = false;
+        operationalSemanticFence = false;
+      } else {
+        inFence = true;
+        operationalSemanticFence = isOperationalSemanticFence(lines, index);
+      }
     }
 
     const strippedComment = line.replace(/^\s*(#|\/\/)\s*/, "");
@@ -926,7 +938,7 @@ function securityFindingsForArtifact(
         CREDENTIAL_ARG_ANY_RE.test(line) ||
         CREDENTIAL_HEADER_RE.test(line));
 
-    if (!quotedProse && !insideHtmlComment) {
+    if (!quotedProse) {
       detections.push(
         ...policyDetections(line, lineNumber, policy, hasHumanApprovalGuard),
       );
@@ -949,33 +961,24 @@ function securityFindingsForArtifact(
 
     if (
       artifact.markdownParserEligible &&
-      !inFence &&
-      !MARKDOWN_FENCE_RE.test(line) &&
+      (!inFence || operationalSemanticFence) &&
+      !fenceMarker &&
       !quotedProse &&
-      !insideHtmlComment &&
       !isNonOperationalExampleLine(lines, index)
     ) {
       detections.push(...semanticInstructionDetections(lines, index));
     }
 
-    if (commandLine && !quotedProse && !insideHtmlComment) {
+    if (commandLine && !quotedProse) {
       detections.push(
         ...commandDetections(line, lineNumber, hasCommandRiskGuard),
       );
     }
 
-    if (
-      !quotedProse &&
-      !insideHtmlComment &&
-      hasExplicitHumanApprovalGuard(line)
-    ) {
+    if (!quotedProse && hasExplicitHumanApprovalGuard(line)) {
       recentHumanApprovalLine = lineNumber;
     }
-    if (
-      !quotedProse &&
-      !insideHtmlComment &&
-      hasLocalRiskMitigationGuard(line)
-    ) {
+    if (!quotedProse && hasLocalRiskMitigationGuard(line)) {
       recentRiskMitigationLine = lineNumber;
     }
   }
@@ -1013,8 +1016,11 @@ function bodyPolicyContradictionDetections(
   markdownParserEligible: boolean,
 ): Detection[] {
   const detections: Detection[] = [];
-  const lines = content.split(/\r?\n/);
-  const scanStart = securityContentStart(lines, markdownParserEligible);
+  const sourceLines = content.split(/\r?\n/);
+  const lines = markdownParserEligible
+    ? stripHtmlCommentSpans(sourceLines)
+    : sourceLines;
+  const scanStart = securityContentStart(sourceLines, markdownParserEligible);
   const emitted = new Set<string>();
   let inFence = false;
 
@@ -1736,6 +1742,36 @@ function securityContentStart(
   return frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
 }
 
+function stripHtmlCommentSpans(lines: string[]): string[] {
+  let inComment = false;
+  return lines.map((line) => {
+    let cursor = 0;
+    let visible = "";
+
+    while (cursor < line.length) {
+      if (inComment) {
+        const commentEnd = line.indexOf("-->", cursor);
+        if (commentEnd < 0) return visible;
+        cursor = commentEnd + 3;
+        inComment = false;
+        continue;
+      }
+
+      const commentStart = line.indexOf("<!--", cursor);
+      if (commentStart < 0) {
+        visible += line.slice(cursor);
+        break;
+      }
+      visible += line.slice(cursor, commentStart);
+      if (visible.length > 0 && !/\s$/.test(visible)) visible += " ";
+      cursor = commentStart + 4;
+      inComment = true;
+    }
+
+    return visible;
+  });
+}
+
 function lineSnippet(content: string, line: number): string | undefined {
   return content.split(/\r?\n/)[line - 1]?.trim();
 }
@@ -1847,8 +1883,9 @@ function semanticInstructionDetections(
   const untrustedContentAlreadyMatched =
     UNTRUSTED_CONTENT_SOURCE_RE.test(priorInstructionText) &&
     UNTRUSTED_CONTENT_EXECUTION_RE.test(priorInstructionText);
-  const untrustedReviewGuard =
-    UNTRUSTED_CONTENT_REVIEW_GUARD_RE.test(instructionText);
+  const untrustedReviewGuard = UNTRUSTED_CONTENT_REVIEW_GUARD_RE.test(
+    actionLocalInstructionText(window.lines),
+  );
   if (
     untrustedContentInstruction &&
     !untrustedContentAlreadyMatched &&
@@ -1903,6 +1940,7 @@ function semanticInstructionWindow(
   lineIndex: number,
 ): { startIndex: number; lines: string[] } {
   let startIndex = lineIndex;
+  const listItemOwner = markdownListItemOwner(lines, lineIndex);
   while (startIndex > 0 && lineIndex - startIndex < 2) {
     const candidate = lines[startIndex - 1] ?? "";
     if (
@@ -1912,6 +1950,7 @@ function semanticInstructionWindow(
     ) {
       break;
     }
+    if (markdownListItemOwner(lines, startIndex - 1) !== listItemOwner) break;
     startIndex -= 1;
   }
   return {
@@ -1920,26 +1959,73 @@ function semanticInstructionWindow(
   };
 }
 
+function actionLocalInstructionText(lines: string[]): string {
+  const text = lines.join(" ");
+  const sentenceBoundary = [...text.matchAll(/[.!?]\s+/g)].at(-1);
+  return sentenceBoundary === undefined
+    ? text
+    : text.slice((sentenceBoundary.index ?? 0) + sentenceBoundary[0].length);
+}
+
+function markdownListItem(line: string): { indent: number } | undefined {
+  const match = line.match(/^(\s*)(?:[-*+]|\d+[.)])\s+/);
+  if (match === null) return undefined;
+  return { indent: markdownIndent(match[1] ?? "") };
+}
+
+function markdownListItemOwner(
+  lines: string[],
+  lineIndex: number,
+): number | undefined {
+  const line = lines[lineIndex] ?? "";
+  if (markdownListItem(line) !== undefined) return lineIndex;
+
+  const indent = markdownIndent(line);
+  if (indent === 0) return undefined;
+  for (let index = lineIndex - 1; index >= 0; index -= 1) {
+    const candidate = lines[index] ?? "";
+    if (
+      !candidate.trim() ||
+      candidate.trim() === "---" ||
+      /^\s*(?:#{1,6}\s+|```|~~~|>)/.test(candidate)
+    ) {
+      break;
+    }
+    const listItem = markdownListItem(candidate);
+    if (listItem !== undefined) {
+      return indent > listItem.indent ? index : undefined;
+    }
+  }
+  return undefined;
+}
+
+function markdownIndent(line: string): number {
+  const whitespace = line.match(/^\s*/)?.[0] ?? "";
+  return [...whitespace].reduce(
+    (width, character) => width + (character === "\t" ? 4 : 1),
+    0,
+  );
+}
+
 function boundedInstructionText(lines: string[], lineIndex: number): string {
   const range = boundedInstructionRange(lines, lineIndex);
   const prose: string[] = [];
   let inFence = false;
-  let inHtmlComment = false;
+  let operationalSemanticFence = false;
   for (let index = range.start; index < range.end; index += 1) {
     const line = lines[index] ?? "";
     if (MARKDOWN_FENCE_RE.test(line)) {
-      inFence = !inFence;
+      if (inFence) {
+        inFence = false;
+        operationalSemanticFence = false;
+      } else {
+        inFence = true;
+        operationalSemanticFence = isOperationalSemanticFence(lines, index);
+      }
       continue;
     }
-    const insideHtmlComment = inHtmlComment || line.includes("<!--");
-    if (line.includes("-->")) {
-      inHtmlComment = false;
-    } else if (line.includes("<!--")) {
-      inHtmlComment = true;
-    }
     if (
-      inFence ||
-      insideHtmlComment ||
+      (inFence && !operationalSemanticFence) ||
       /^\s*>/.test(line) ||
       isNonOperationalExampleLine(lines, index)
     ) {
@@ -1948,6 +2034,37 @@ function boundedInstructionText(lines: string[], lineIndex: number): string {
     prose.push(line);
   }
   return prose.join("\n");
+}
+
+function isOperationalSemanticFence(
+  lines: string[],
+  openingFenceIndex: number,
+): boolean {
+  if (!MARKDOWN_SEMANTIC_PROSE_FENCE_RE.test(lines[openingFenceIndex] ?? "")) {
+    return false;
+  }
+  if (isNonOperationalExampleLine(lines, openingFenceIndex)) return false;
+
+  let previous = openingFenceIndex - 1;
+  while (previous >= 0 && !(lines[previous] ?? "").trim()) previous -= 1;
+  if (
+    previous >= 0 &&
+    (OPERATIONAL_FENCE_ROUTING_RE.test(lines[previous] ?? "") ||
+      OPERATIONAL_FENCE_LABEL_RE.test(lines[previous] ?? ""))
+  ) {
+    return true;
+  }
+
+  let childDepth = 7;
+  for (let index = openingFenceIndex - 1; index >= 0; index -= 1) {
+    const match = (lines[index] ?? "").match(/^\s*(#{1,6})\s+(.+)$/);
+    if (match === null) continue;
+    const depth = match[1]?.length ?? 1;
+    if (depth >= childDepth) continue;
+    if (OPERATIONAL_FENCE_HEADING_RE.test(match[2] ?? "")) return true;
+    childDepth = depth;
+  }
+  return false;
 }
 
 function boundedInstructionRange(
