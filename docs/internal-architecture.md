@@ -119,9 +119,9 @@ dependency, normalized relationship, declaration form and index, source path,
 line evidence, and any source- or target-kind mismatch. Unresolved declarations
 are absent because Renma has no evidence assigning them to a focused target.
 
-Incoming buckets are appended to mutably during preparation and sorted only
-after construction; their exposed map and arrays are read-only. This keeps a
-high-fan-in shared Context linear in its incoming declaration count. Forward
+Incoming bucket accumulation is linear, followed by deterministic per-bucket
+sorting. Their exposed map and arrays are read-only. This avoids the previous
+quadratic bucket-copying behavior for high-fan-in shared Contexts. Forward
 composition and scan never prepare these buckets.
 
 Impact traversal starts the focus in required state and follows incoming valid
