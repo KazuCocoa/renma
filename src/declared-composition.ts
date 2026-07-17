@@ -138,10 +138,6 @@ export interface DeclaredCompositionIndex {
   assetsById: ReadonlyMap<string, Asset>;
   assetsByPath: ReadonlyMap<string, Asset>;
   dependenciesBySource: ReadonlyMap<string, Dependency[]>;
-  incomingByTargetId: ReadonlyMap<
-    string,
-    readonly ResolvedCompositionDeclaration[]
-  >;
   sortedAssets: Asset[];
   sortedDependencies: Dependency[];
 }
@@ -198,19 +194,14 @@ export function prepareDeclaredCompositionIndex(
       assetsByPath.set(normalizedPath, asset);
     }
   }
-  const index: DeclaredCompositionIndex = {
+  return {
     assetsById,
     assetsByPath,
     dependenciesBySource: dependenciesBySourceId(catalog.dependencies),
-    incomingByTargetId: new Map(),
     sortedAssets: [...catalog.assets].sort(compareAssets),
     sortedDependencies: [...catalog.dependencies].sort(
       compareDependenciesBySource,
     ),
-  };
-  return {
-    ...index,
-    incomingByTargetId: incomingCompositionDeclarations(index),
   };
 }
 
@@ -849,59 +840,38 @@ function dependenciesBySourceId(
   return result;
 }
 
-function incomingCompositionDeclarations(
+/** Resolve one explicit composition declaration for impact index preparation. */
+export function resolveCompositionDeclaration(
   index: DeclaredCompositionIndex,
-): Map<string, readonly ResolvedCompositionDeclaration[]> {
-  const result = new Map<string, ResolvedCompositionDeclaration[]>();
-  for (const dependency of index.sortedDependencies) {
-    const source = index.assetsById.get(dependency.from);
-    if (!source) continue;
-    const relationship = compositionRelationship(dependency, index);
-    if (!relationship) continue;
-    const target = resolveIndexedTarget(dependency, index);
-    if (!target) continue;
-    const membership = propagatedMembership(
-      "required",
-      dependency,
-      relationship,
-    );
-    const kindMismatch = compositionKindMismatch(
-      source,
-      target,
-      dependency,
-      relationship,
-      membership,
-    );
-    const declaration: ResolvedCompositionDeclaration = {
-      source,
-      target,
-      dependency,
-      relationship,
-      declarationForm: dependency.declaration ?? dependency.kind,
-      ...(dependency.declarationIndex !== undefined
-        ? { declarationIndex: dependency.declarationIndex }
-        : {}),
-      sourcePath: dependency.sourcePath,
-      ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
-      ...(kindMismatch ? { kindMismatch } : {}),
-    };
-    result.set(target.id, [...(result.get(target.id) ?? []), declaration]);
-  }
-  for (const declarations of result.values()) {
-    declarations.sort(compareIncomingDeclarations);
-  }
-  return result;
-}
-
-function compareIncomingDeclarations(
-  left: ResolvedCompositionDeclaration,
-  right: ResolvedCompositionDeclaration,
-): number {
-  return (
-    left.source.id.localeCompare(right.source.id) ||
-    left.target.id.localeCompare(right.target.id) ||
-    compareDependencies(left.dependency, right.dependency)
+  dependency: Dependency,
+): ResolvedCompositionDeclaration | undefined {
+  const source = index.assetsById.get(dependency.from);
+  if (!source) return undefined;
+  const relationship = compositionRelationship(dependency, index);
+  if (!relationship) return undefined;
+  const target = resolveIndexedTarget(dependency, index);
+  if (!target) return undefined;
+  const membership = propagatedMembership("required", dependency, relationship);
+  const kindMismatch = compositionKindMismatch(
+    source,
+    target,
+    dependency,
+    relationship,
+    membership,
   );
+  return {
+    source,
+    target,
+    dependency,
+    relationship,
+    declarationForm: dependency.declaration ?? dependency.kind,
+    ...(dependency.declarationIndex !== undefined
+      ? { declarationIndex: dependency.declarationIndex }
+      : {}),
+    sourcePath: dependency.sourcePath,
+    ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
+    ...(kindMismatch ? { kindMismatch } : {}),
+  };
 }
 
 function compositionRelationship(

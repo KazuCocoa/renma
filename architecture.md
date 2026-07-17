@@ -224,11 +224,13 @@ selected. See the [Declared Composition contract](docs/declared-composition.md).
 ### Declared Impact
 
 Declared Impact is the reverse transitive closure of the same valid explicit
-composition relationships. The prepared composition index retains incoming
-resolved declarations once, including invalid source- or target-kind evidence.
-The pure impact resolver then traverses incoming declarations from one focused
-asset without scanning files, rebuilding the catalog, resolving forward
-composition for every possible root, or enumerating every complete path.
+composition relationships. An impact-specific index extends the unchanged
+forward composition index and retains incoming resolved declarations once,
+including invalid source- or target-kind evidence. The pure impact resolver
+then traverses incoming declarations from one focused asset without scanning
+files, rebuilding the catalog, resolving forward composition for every
+possible root, or enumerating every complete path. Forward composition and scan
+do not build the incoming index.
 
 Reverse traversal also uses `(stable asset ID, required-or-optional
 membership)` state. An all-required dependent-to-focus route produces required

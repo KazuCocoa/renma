@@ -419,11 +419,12 @@ merge semantics.
 ## Declared Impact Model
 
 Declared Impact answers the reverse composition question for one resolved
-focus: which cataloged assets and Skills explicitly include it? It reuses the
-prepared `DeclaredCompositionIndex`, whose incoming declaration lookup retains
-resolved source and target assets, raw dependencies, normalized composition
-relationships, declaration form and index, source path, line evidence, and
-kind mismatches.
+focus: which cataloged assets and Skills explicitly include it? Its prepared
+`DeclaredImpactIndex` extends the unchanged forward `DeclaredCompositionIndex`
+with an incoming declaration lookup retaining resolved source and target
+assets, raw dependencies, normalized composition relationships, declaration
+form and index, source path, line evidence, and kind mismatches. Composition and
+scan prepare only the forward index.
 
 Reverse expansion is limited to incoming `requires_context`,
 `optional_context`, `requires_lens`, `optional_lens`, and Lens `applies_to`.

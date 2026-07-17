@@ -428,6 +428,54 @@ test("graph impact Markdown and Mermaid preserve declaration direction and focus
   assert.doesNotMatch(mermaid.stdout, new RegExp(`${focus} .* ${lens}`));
 });
 
+test("impact Mermaid reuses one synthetic node for repeated invalid source declarations", async () => {
+  const root = await fixture();
+  await writeContext(root, "shared", "api", {});
+  await writeContext(root, "shared", "invalid", {
+    appliesTo: ["shared.api", "shared.api"],
+  });
+  await writeContextLens(root, "shared", "valid", {
+    id: "lens.shared.valid",
+    appliesTo: ["shared.api"],
+  });
+
+  const result = await withCapturedConsole(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "impact",
+      "--focus",
+      "shared.api",
+      "--format",
+      "mermaid",
+    ]),
+  );
+
+  const focus = mermaidNodeId(result.stdout, "focus context: shared.api");
+  const valid = mermaidNodeId(result.stdout, "context_lens: lens.shared.valid");
+  assert.equal(
+    result.stdout.match(
+      /invalid_source_0\["invalid source: shared\.invalid"\]/g,
+    )?.length,
+    1,
+  );
+  assert.doesNotMatch(result.stdout, /invalid_source_1\[/);
+  assert.equal(
+    result.stdout.match(
+      new RegExp(
+        `invalid_source_0 -\\.->\\|applies_to invalid kind\\| ${focus}`,
+        "g",
+      ),
+    )?.length,
+    2,
+  );
+  assert.match(
+    result.stdout,
+    new RegExp(`${valid} -->\\|applies_to required\\| ${focus}`),
+  );
+});
+
 test("graph impact requires focus and accepts an empty reverse closure", async () => {
   const root = await fixture();
   await writeSkill(root, "demo", {});

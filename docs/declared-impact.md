@@ -109,10 +109,12 @@ the impact report does not create new scan findings.
 
 ## Determinism And Cycles
 
-The prepared `DeclaredCompositionIndex` builds incoming resolved declarations
-once. Reverse traversal processes `(stable asset ID, membership)` states, so
-cycles terminate and each stable ID appears once in the final classification.
-Distinct declarations and declaration indexes retain distinct evidence.
+The impact-specific `DeclaredImpactIndex` extends the unchanged forward
+`DeclaredCompositionIndex` and builds incoming resolved declarations once.
+Forward composition and scan do not pay that preparation cost. Reverse
+traversal processes `(stable asset ID, membership)` states, so cycles terminate
+and each stable ID appears once in the final classification. Distinct
+declarations and declaration indexes retain distinct evidence.
 
 Provenance storage is proportional to reachable declarations, not the number
 of possible complete dependent-to-focus paths. JSON retains the complete edge

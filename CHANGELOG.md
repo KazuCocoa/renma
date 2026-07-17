@@ -15,11 +15,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   explicit required/optional Context and Lens declarations plus Lens
   `applies_to`, with stable-ID deduplication, direct/transitive status, and
   required/optional affected Skill summaries.
-- Added an incoming resolved-declaration index with source asset, target asset,
-  raw dependency, normalized relationship, declaration form and index, source
-  path, line evidence, and kind-mismatch retention. Reverse traversal uses
-  `(asset ID, membership)` state and edge provenance rather than enumerating
-  every dependent-to-focus path.
+- Added a `DeclaredImpactIndex` with incoming resolved declarations layered over
+  the unchanged forward `DeclaredCompositionIndex`. Incoming entries retain
+  source asset, target asset, raw dependency, normalized relationship,
+  declaration form and index, source path, line evidence, and kind mismatches.
+  Reverse traversal uses `(asset ID, membership)` state and edge provenance
+  rather than enumerating every dependent-to-focus path.
 - Added `graph --view impact --focus <asset-id-or-path>` with complete JSON,
   change-review-oriented Markdown, and original-declaration-direction Mermaid
   output. Invalid incoming declarations remain visible without establishing a
@@ -30,19 +31,22 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
-- Extended `DeclaredCompositionIndex` additively with incoming resolved
-  declarations and reused one prepared index for focused composition or impact
-  graph resolution.
+- Added separate composition and impact index preparation so composition and
+  scan do not build reverse incoming declarations. Impact construction appends
+  to mutable target buckets internally, then exposes deterministically sorted
+  read-only collections.
 - Updated graph help and documentation to distinguish the repository-wide full
   graph, direct focused neighborhood, forward Declared Composition, and reverse
   Declared Impact.
 
 ### Compatibility
 
-- Existing commands, graph views and fields, composition reports and
-  diagnostics, Lens freshness, authoring projections, BOM, Trust Graph,
-  Readiness, and Security Profile `extends` semantics remain unchanged. The
-  `impact` view, report field, and graph edge membership field are additive.
+- Existing CLI behavior, graph views and documented JSON fields, composition
+  reports and diagnostics, Lens freshness, authoring projections, BOM, Trust
+  Graph, Readiness, and Security Profile `extends` semantics remain unchanged.
+  The exported `DeclaredCompositionIndex` keeps its 0.20.0 field shape; the
+  `DeclaredImpactIndex`, `impact` view and report, and impact graph edge
+  membership field are separate additions.
 - Declared Impact does not claim runtime usage, actual breakage, required file
   changes, optional selection, test requirements, or semantic relevance. Renma
   performs no network access, LLM call, runtime selection, prompt assembly,

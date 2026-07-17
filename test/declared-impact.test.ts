@@ -2,13 +2,35 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   prepareDeclaredCompositionIndex,
+  resolveDeclaredCompositionFromIndex,
   type CompositionRelationship,
+  type DeclaredCompositionIndex,
 } from "../src/declared-composition.js";
 import {
+  prepareDeclaredImpactIndex,
   resolveDeclaredImpact,
   resolveDeclaredImpactFromIndex,
 } from "../src/declared-impact.js";
 import type { Asset, AssetKind, Catalog, Dependency } from "../src/model.js";
+
+test("declared composition index preserves its forward-only constructible shape", () => {
+  const catalog = makeCatalog([asset("context.focus", "context")], []);
+  const prepared = prepareDeclaredCompositionIndex(catalog);
+  const compatibleIndex: DeclaredCompositionIndex = {
+    assetsById: prepared.assetsById,
+    assetsByPath: prepared.assetsByPath,
+    dependenciesBySource: prepared.dependenciesBySource,
+    sortedAssets: prepared.sortedAssets,
+    sortedDependencies: prepared.sortedDependencies,
+  };
+
+  assert.equal("incomingByTargetId" in prepared, false);
+  assert.equal(
+    resolveDeclaredCompositionFromIndex(compatibleIndex, "context.focus").root
+      .id,
+    "context.focus",
+  );
+});
 
 test("declared impact propagates reverse required and optional membership with Skill summaries", () => {
   const catalog = makeCatalog(
@@ -230,7 +252,7 @@ test("incoming index retains invalid resolved declarations without traversing th
       ),
     ],
   );
-  const index = prepareDeclaredCompositionIndex(catalog);
+  const index = prepareDeclaredImpactIndex(catalog);
 
   assert.equal(index.incomingByTargetId.get("context.focus")?.length, 3);
   assert.equal(
@@ -353,6 +375,52 @@ test("reverse high-path-count DAG stores declaration edges instead of complete p
   assert.equal(report.requiredDependents.length, 20);
   assert.equal(report.provenanceEdges.length, dependencies.length);
   assert.ok(report.provenanceEdges.length < 50);
+});
+
+test("high fan-in impact indexing retains every declaration once with deterministic order", () => {
+  const declarationCount = 2_500;
+  const focus = asset("context.focus", "context");
+  const sources = Array.from({ length: declarationCount }, (_, index) =>
+    asset(`context.source-${index.toString().padStart(4, "0")}`, "context"),
+  );
+  const dependencies = sources.map((source, index) =>
+    dependency(source.id, "context.focus", "requires_context", index + 1),
+  );
+  const forwardIndex = prepareDeclaredImpactIndex(
+    makeCatalog([focus, ...sources], dependencies),
+  );
+  const reversedIndex = prepareDeclaredImpactIndex(
+    makeCatalog([focus, ...sources].reverse(), [...dependencies].reverse()),
+  );
+  const forwardIncoming =
+    forwardIndex.incomingByTargetId.get("context.focus") ?? [];
+  const reversedIncoming =
+    reversedIndex.incomingByTargetId.get("context.focus") ?? [];
+
+  assert.equal(forwardIncoming.length, declarationCount);
+  assert.deepEqual(
+    forwardIncoming.map((declaration) => [
+      declaration.source.id,
+      declaration.declarationIndex,
+    ]),
+    reversedIncoming.map((declaration) => [
+      declaration.source.id,
+      declaration.declarationIndex,
+    ]),
+  );
+  assert.equal(
+    new Set(
+      forwardIncoming.map(
+        (declaration) =>
+          `${declaration.source.id}\0${declaration.declarationIndex}`,
+      ),
+    ).size,
+    declarationCount,
+  );
+
+  const report = resolveDeclaredImpactFromIndex(forwardIndex, "context.focus");
+  assert.equal(report.requiredDependents.length, declarationCount);
+  assert.equal(report.provenanceEdges.length, declarationCount);
 });
 
 test("declared impact output is deterministic across catalog input order", () => {

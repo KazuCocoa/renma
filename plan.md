@@ -184,12 +184,13 @@ Composition foundation. A focused Context Asset, Context Lens, Skill, or other
 catalog asset can be traced backward through valid explicit required and
 optional composition declarations to its declared dependent assets and Skills.
 
-The prepared composition index now retains incoming resolved declarations.
-Reverse traversal propagates required and optional membership, gives required
-membership final classification precedence while retaining both route classes,
-distinguishes direct from transitive dependents, preserves line-level evidence,
-terminates through cycles, and stores declaration edges rather than every
-possible complete path.
+An impact-specific index now extends the unchanged forward composition index
+with incoming resolved declarations, so composition and scan avoid reverse
+index preparation. Reverse traversal propagates required and optional
+membership, gives required membership final classification precedence while
+retaining both route classes, distinguishes direct from transitive dependents,
+preserves line-level evidence, terminates through cycles, and stores declaration
+edges rather than every possible complete path.
 
 The existing graph command adds `--view impact` with required `--focus` and
 JSON, Markdown, and Mermaid projections. Impact is declared change-review

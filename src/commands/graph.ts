@@ -10,6 +10,7 @@ import {
   type DeclaredCompositionReport,
 } from "../declared-composition.js";
 import {
+  prepareDeclaredImpactIndex,
   resolveDeclaredImpactFromIndex,
   type DeclaredImpactReport,
   type ImpactAsset,
@@ -111,14 +112,15 @@ export async function runGraphCommand(
       );
     }
     const focusNode = resolveFocusNode(fullReport, options.focus);
-    const index = prepareDeclaredCompositionIndex(evidence.catalog);
     if (view === "composition") {
+      const index = prepareDeclaredCompositionIndex(evidence.catalog);
       const composition = resolveDeclaredCompositionFromIndex(
         index,
         focusNode.id,
       );
       report = compositionGraphReport(fullReport, composition);
     } else {
+      const index = prepareDeclaredImpactIndex(evidence.catalog);
       const impact = resolveDeclaredImpactFromIndex(index, focusNode.id);
       report = impactGraphReport(fullReport, impact);
     }
@@ -855,6 +857,7 @@ function formatImpactMermaid(report: GraphReport): string {
     let source = nodeIds.get(mismatch.sourceId);
     if (!source) {
       source = `invalid_source_${index}`;
+      nodeIds.set(mismatch.sourceId, source);
       lines.push(
         `  ${source}["${escapeMermaidLabel(`invalid source: ${mismatch.sourceId}`)}"]`,
       );

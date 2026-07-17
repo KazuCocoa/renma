@@ -6,7 +6,10 @@ import type {
   DeclaredCompositionIndex,
   ResolvedCompositionDeclaration,
 } from "./declared-composition.js";
-import { prepareDeclaredCompositionIndex } from "./declared-composition.js";
+import {
+  prepareDeclaredCompositionIndex,
+  resolveCompositionDeclaration,
+} from "./declared-composition.js";
 import type {
   Asset,
   AssetKind,
@@ -53,6 +56,13 @@ export interface ImpactInvalidIncomingDeclaration extends CompositionKindMismatc
   dependentMembership: CompositionMembership;
 }
 
+export interface DeclaredImpactIndex extends DeclaredCompositionIndex {
+  incomingByTargetId: ReadonlyMap<
+    string,
+    readonly ResolvedCompositionDeclaration[]
+  >;
+}
+
 interface ImpactTraversalState {
   asset: Asset;
   membership: CompositionMembership;
@@ -64,14 +74,25 @@ export function resolveDeclaredImpact(
   focusReference: string,
 ): DeclaredImpactReport {
   return resolveDeclaredImpactFromIndex(
-    prepareDeclaredCompositionIndex(catalog),
+    prepareDeclaredImpactIndex(catalog),
     focusReference,
   );
 }
 
+/** Build forward composition lookups plus incoming declarations for impact. */
+export function prepareDeclaredImpactIndex(
+  catalog: Catalog,
+): DeclaredImpactIndex {
+  const compositionIndex = prepareDeclaredCompositionIndex(catalog);
+  return {
+    ...compositionIndex,
+    incomingByTargetId: incomingCompositionDeclarations(compositionIndex),
+  };
+}
+
 /** Resolve one reverse closure while reusing a prepared composition index. */
 export function resolveDeclaredImpactFromIndex(
-  index: DeclaredCompositionIndex,
+  index: DeclaredImpactIndex,
   focusReference: string,
 ): DeclaredImpactReport {
   const focus = resolveFocus(index, focusReference);
@@ -170,6 +191,26 @@ export function resolveDeclaredImpactFromIndex(
   };
 }
 
+function incomingCompositionDeclarations(
+  index: DeclaredCompositionIndex,
+): ReadonlyMap<string, readonly ResolvedCompositionDeclaration[]> {
+  const result = new Map<string, ResolvedCompositionDeclaration[]>();
+  for (const dependency of index.sortedDependencies) {
+    const declaration = resolveCompositionDeclaration(index, dependency);
+    if (!declaration) continue;
+    const declarations = result.get(declaration.target.id);
+    if (declarations) {
+      declarations.push(declaration);
+    } else {
+      result.set(declaration.target.id, [declaration]);
+    }
+  }
+  for (const declarations of result.values()) {
+    declarations.sort(compareIncomingDeclarations);
+  }
+  return result;
+}
+
 function resolveFocus(
   index: DeclaredCompositionIndex,
   reference: string,
@@ -249,6 +290,27 @@ function compareImpactAssets(left: ImpactAsset, right: ImpactAsset): number {
   return (
     left.id.localeCompare(right.id) ||
     left.sourcePath.localeCompare(right.sourcePath)
+  );
+}
+
+function compareIncomingDeclarations(
+  left: ResolvedCompositionDeclaration,
+  right: ResolvedCompositionDeclaration,
+): number {
+  const leftDependency = left.dependency;
+  const rightDependency = right.dependency;
+  return (
+    left.source.id.localeCompare(right.source.id) ||
+    left.target.id.localeCompare(right.target.id) ||
+    (leftDependency.declaration ?? leftDependency.kind).localeCompare(
+      rightDependency.declaration ?? rightDependency.kind,
+    ) ||
+    leftDependency.to.localeCompare(rightDependency.to) ||
+    leftDependency.sourcePath.localeCompare(rightDependency.sourcePath) ||
+    (leftDependency.evidence?.startLine ?? 0) -
+      (rightDependency.evidence?.startLine ?? 0) ||
+    (leftDependency.declarationIndex ?? -1) -
+      (rightDependency.declarationIndex ?? -1)
   );
 }
 
