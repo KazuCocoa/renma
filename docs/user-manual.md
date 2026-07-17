@@ -727,6 +727,7 @@ renma graph . --view workflow --format markdown
 renma graph . --view full --format mermaid
 renma graph . --view layered --format mermaid
 renma graph . --view composition --focus skill.testing.spec-review --format json
+renma graph . --view impact --focus context.shared-api --format markdown
 ```
 
 Views are:
@@ -737,6 +738,9 @@ Views are:
 - `layered`: Mermaid-focused graph grouped by asset kind so skill-to-lens-to-context paths are easier to read. `lens` is accepted as an alias.
 - `composition`: the focused root's complete explicit required and optional
   Context/Lens closure. This view requires `--focus`.
+- `impact`: the focused asset's complete reverse explicit required and optional
+  Context/Lens closure, including declared dependent Skills. This view requires
+  `--focus`.
 
 Layered Mermaid output groups skills, context lenses, contexts, support assets, and unresolved targets into separate subgraphs. JSON and Markdown keep the same node and edge detail while reporting the selected view.
 
@@ -753,6 +757,30 @@ Declaration order does not define precedence, overriding, or conflict winners.
 The same stable asset ID appears once while all declaration provenance remains.
 A composition may be complete and still cyclic. See the
 [Declared Composition contract](declared-composition.md).
+
+The impact view traverses incoming forms of the same five composition
+relationships. It reports required and optional dependents, required and
+optional affected Skills, direct versus transitive status, original-direction
+declaration provenance, and invalid resolved incoming declarations. An
+all-required dependent-to-focus route is required impact; any optional
+declaration keeps that route optional upstream. Required classification wins
+when both route classes reach the same stable ID, while both provenance classes
+remain visible.
+
+Impact does not expand general references, conflicts, `superseded_by`,
+ownership, policy, static support, lifecycle, or `extends`. It does not infer an
+unresolved declaration's target or invent Skill-to-Skill composition. A
+resolved asset with no incoming composition declarations returns a successful
+empty report. See the [Declared Impact contract](declared-impact.md).
+
+The graph forms answer distinct questions:
+
+| Form | Question |
+| --- | --- |
+| `full` without focus | What is in the whole catalog graph? |
+| `full` with focus | What is the direct incoming and outgoing neighborhood? |
+| `composition` with focus | What is in the transitive outgoing composition closure? |
+| `impact` with focus | What is in the transitive incoming composition closure? |
 
 #### Focusing The Graph
 
@@ -771,6 +799,7 @@ Examples:
 renma graph . --focus context.testing.boundary-value-analysis
 renma graph . --focus contexts/testing/boundary-value-analysis.md --view full
 renma graph . --focus skill.testing.spec-review --view composition --format markdown
+renma graph . --focus context.shared-api --view impact --format markdown
 ```
 
 `--focus` accepts one value. The value must match either a catalog asset ID, a repository-relative source path such as `contexts/testing/boundary-value-analysis.md`, or an absolute source path. It does not match projected `summary` view node IDs such as `contexts/testing/*`.
@@ -778,22 +807,26 @@ renma graph . --focus skill.testing.spec-review --view composition --format mark
 For summary, workflow, full, and layered views, `--focus` keeps the matched
 asset, its directly connected incoming and outgoing graph edges, and the assets
 at the other ends of those edges. The composition view instead uses the focus
-as the root of its transitive declared closure. If the focus value does not
-match an asset ID or source path, the command exits with usage code `2` and
-reports that `graph --focus did not match any asset id or source path`.
+as the root of its transitive outgoing declared closure. The impact view uses
+the focus as the target of its transitive incoming declared closure. If the
+focus value does not match an asset ID or source path, the command exits with
+usage code `2` and reports that `graph --focus did not match any asset id or
+source path`.
 
-For non-composition projections, `--focus` runs before view grouping. For
+For non-transitive projections, `--focus` runs before view grouping. For
 example, `--view summary --focus <asset>` selects the focused neighborhood and
-then groups that smaller graph. Composition has no depth option because it
-resolves the finite explicit closure; repeated `--focus` flags are not a
-multi-focus API.
+then groups that smaller graph. Composition and impact have no depth option
+because each resolves a finite explicit closure; repeated `--focus` flags are
+not a multi-focus API.
 
 Note: this graph `focus` argument is a CLI option. It is not a metadata field on an asset.
 
 Output includes graph nodes, relationship edges, declaration form and evidence,
 unresolved targets, and diagnostics. Composition JSON adds the complete
-composition-specific report. Mermaid output renders the selected repository
-graph as a diagram definition, never runtime execution flow.
+composition-specific report; impact JSON adds the complete impact-specific
+report. Mermaid output renders the selected repository graph as a diagram
+definition, never runtime execution flow. Declared Impact is change-review
+scope evidence, not actual runtime usage or guaranteed breakage.
 
 ### `trust-graph`
 

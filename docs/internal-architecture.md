@@ -2,7 +2,7 @@
 
 This document describes the 0.20.x maintainability architecture, including the
 additive `guide` command, its shipped interactive authoring protocol, and
-Declared Composition analysis.
+Declared Composition and Declared Impact analysis.
 It is contributor guidance, not a new versioned JSON schema. Renma 0.18.2
 remains the compatibility baseline for existing commands: public fields,
 classifications, diagnostics, severities, exit behavior, and migration direction
@@ -78,7 +78,7 @@ Graph command orchestration collects repository evidence once and passes that
 catalog to the resolver.
 
 The public one-off wrapper prepares a `DeclaredCompositionIndex` and resolves
-one root. Scan prepares that index once and reuses its asset-ID,
+one root. Scan prepares that forward-only index once and reuses its asset-ID,
 normalized-path, sorted-asset, and dependency-by-source lookups for every root.
 Per-root member and governance projections are built from reached IDs, so
 disconnected assets are not rescanned for each closure.
@@ -107,6 +107,44 @@ The graph report adds a composition section only for `--view composition`.
 Existing graph views keep their meanings. JSON preserves all predecessor edge
 data, while Markdown and Mermaid are bounded review projections over the same
 report.
+
+## Declared Impact Uses An Impact-Specific Index
+
+`src/declared-impact.ts` is pure catalog analysis over `DeclaredImpactIndex`,
+which extends the unchanged forward `DeclaredCompositionIndex` with
+`incomingByTargetId`. `prepareDeclaredImpactIndex` first prepares the shared
+forward lookups, then builds incoming buckets once from resolved explicit
+composition declarations. Each entry retains source and target assets, raw
+dependency, normalized relationship, declaration form and index, source path,
+line evidence, and any source- or target-kind mismatch. Unresolved declarations
+are absent because Renma has no evidence assigning them to a focused target.
+
+Incoming bucket accumulation is linear, followed by deterministic per-bucket
+sorting. Their exposed map and arrays are read-only. This avoids the previous
+quadratic bucket-copying behavior for high-fan-in shared Contexts. Forward
+composition and scan never prepare these buckets.
+
+Impact traversal starts the focus in required state and follows incoming valid
+declarations. State is `(asset ID, membership)`, so cycles terminate and each
+declaration transition is retained at most once for each resulting membership.
+An optional declaration turns that route optional upstream; an already optional
+route stays optional through required declarations and Lens `applies_to`.
+Required final classification dominates optional classification without
+discarding optional edge provenance.
+
+The resolver stores original-direction declaration edges, not reverse arrows or
+complete paths. Work and storage are proportional to the reverse reachable
+subgraph and its declarations. Invalid incoming declarations are returned for
+review but do not expand traversal. Required and optional Skill subsets are
+materialized in the report so callers need not reconstruct them by filtering
+all dependents.
+
+The graph command collects repository evidence once, then prepares the index
+required by the selected view: forward-only for composition and impact-specific
+for impact. `--view impact` adds an `impact` report only, and its node and edge
+lists are the focus plus valid dependents and retained valid declarations. JSON
+is complete; Markdown and Mermaid are review projections and do not infer
+runtime use, breakage, path ranking, or semantic importance.
 
 ## Structural And Repository-Backed Resolution
 

@@ -6,6 +6,52 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-07-16
+
+### Added
+
+- Added pure Declared Impact resolution over the prepared Declared Composition
+  index. A focused asset now resolves its reverse transitive closure through
+  explicit required/optional Context and Lens declarations plus Lens
+  `applies_to`, with stable-ID deduplication, direct/transitive status, and
+  required/optional affected Skill summaries.
+- Added a `DeclaredImpactIndex` with incoming resolved declarations layered over
+  the unchanged forward `DeclaredCompositionIndex`. Incoming entries retain
+  source asset, target asset, raw dependency, normalized relationship,
+  declaration form and index, source path, line evidence, and kind mismatches.
+  Reverse traversal uses `(asset ID, membership)` state and edge provenance
+  rather than enumerating every dependent-to-focus path.
+- Added `graph --view impact --focus <asset-id-or-path>` with complete JSON,
+  change-review-oriented Markdown, and original-declaration-direction Mermaid
+  output. Invalid incoming declarations remain visible without establishing a
+  valid impact route.
+- Added the focused [Declared Impact contract](docs/declared-impact.md), graph
+  view comparison, practical change-review guidance, and resolver, graph, CLI,
+  renderer, cycle, invalid-declaration, and high-path-count DAG tests.
+
+### Changed
+
+- Added separate composition and impact index preparation so composition and
+  scan do not build reverse incoming declarations. Impact construction appends
+  to mutable target buckets internally, then exposes deterministically sorted
+  read-only collections.
+- Updated graph help and documentation to distinguish the repository-wide full
+  graph, direct focused neighborhood, forward Declared Composition, and reverse
+  Declared Impact.
+
+### Compatibility
+
+- Existing CLI behavior, graph views and documented JSON fields, composition
+  reports and diagnostics, Lens freshness, authoring projections, BOM, Trust
+  Graph, Readiness, and Security Profile `extends` semantics remain unchanged.
+  The exported `DeclaredCompositionIndex` keeps its 0.20.0 field shape; the
+  `DeclaredImpactIndex`, `impact` view and report, and impact graph edge
+  membership field are separate additions.
+- Declared Impact does not claim runtime usage, actual breakage, required file
+  changes, optional selection, test requirements, or semantic relevance. Renma
+  performs no network access, LLM call, runtime selection, prompt assembly,
+  telemetry collection, or repository rewrite for this query.
+
 ## [0.20.0] - 2026-07-16
 
 ### Added
@@ -799,7 +845,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.20.1...HEAD
+[0.20.1]: https://github.com/KazuCocoa/renma/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/KazuCocoa/renma/compare/v0.19.2...v0.20.0
 [0.19.2]: https://github.com/KazuCocoa/renma/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/KazuCocoa/renma/compare/v0.19.0...v0.19.1

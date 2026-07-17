@@ -416,6 +416,38 @@ catalog, repository model, graph command, runtime bundle, or prompt assembler.
 `extends` remains limited to typed overlay/profile resolvers with explicit
 merge semantics.
 
+## Declared Impact Model
+
+Declared Impact answers the reverse composition question for one resolved
+focus: which cataloged assets and Skills explicitly include it? Its prepared
+`DeclaredImpactIndex` extends the unchanged forward `DeclaredCompositionIndex`
+with an incoming declaration lookup retaining resolved source and target
+assets, raw dependencies, normalized composition relationships, declaration
+form and index, source path, line evidence, and kind mismatches. Composition and
+scan prepare only the forward index.
+
+Reverse expansion is limited to incoming `requires_context`,
+`optional_context`, `requires_lens`, `optional_lens`, and Lens `applies_to`.
+An all-required route produces required impact. After any optional declaration,
+every upstream dependent on that route remains optional. Required membership
+dominates an asset's final classification without discarding optional
+provenance. Stable IDs are deduplicated; titles, paths, content similarity,
+popularity, and model inference are not identity signals.
+
+The report exposes required and optional dependents, required and optional
+Skill subsets, direct status, retained declaration edges, and invalid incoming
+declarations. Edges point in their original declaration direction toward the
+focus. Traversal terminates through `(asset ID, membership)` state, including
+cycles, and storage remains proportional to reachable declarations rather than
+possible complete paths.
+
+`graph --view impact --focus <asset-id-or-path>` is an additive projection with
+JSON, Markdown, and Mermaid output. It does not add scan findings, ranking,
+centrality, Git-diff inference, runtime consumer tracking, automatic test
+selection, or Skill-to-Skill discovery. Required declared impact is review
+scope evidence, not a claim of actual breakage or a mandate to change a file.
+See the [Declared Impact contract](docs/declared-impact.md).
+
 ## Core Workflow
 
 Renma should keep the deterministic path boring and reliable:

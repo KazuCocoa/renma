@@ -194,6 +194,7 @@ npx renma scan . --fail-on high
 npx renma catalog . --format markdown
 npx renma graph . --format markdown
 npx renma graph . --view composition --focus <asset-id-or-path> --format markdown
+npx renma graph . --view impact --focus <asset-id-or-path> --format markdown
 npx renma readiness . --format markdown
 ```
 
@@ -339,6 +340,31 @@ freedom, so a fully resolved cyclic closure can be complete while still
 requiring design review. Declared conflicts are reported without a winner.
 `extends` remains an overlay/profile relationship and is not general
 composition. See the [Declared Composition contract](docs/declared-composition.md).
+
+## Declared Impact
+
+Renma 0.20.1 adds the reverse change-review question: which repository assets
+and Skills explicitly include a focused asset through valid Declared
+Composition routes?
+
+```bash
+renma graph . --view impact \
+  --focus context.shared-api \
+  --format markdown
+```
+
+The impact report distinguishes required and optional declared dependents,
+direct and transitive impact, and required and optional affected Skills. It
+preserves original declaration direction and line-level evidence through
+intermediate Context Assets and Context Lenses. If an asset is reached through
+both route classes, required membership wins while both provenance classes
+remain visible.
+
+Impact expands the same explicit relationships as composition and does not
+expand general references, conflicts, ownership, policy, lifecycle, static
+support, or `extends`. It reports declared repository impact, not actual runtime
+consumers, optional selection, required tests, guaranteed breakage, or files
+that must change. See the [Declared Impact contract](docs/declared-impact.md).
 
 ## Context Asset Discovery Boundary
 

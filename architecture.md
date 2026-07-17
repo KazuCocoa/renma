@@ -221,6 +221,32 @@ separate. A complete closure can still contain a cycle. Declared conflicts are
 reported as normalized asset-ID pairs with inclusion provenance; no winner is
 selected. See the [Declared Composition contract](docs/declared-composition.md).
 
+### Declared Impact
+
+Declared Impact is the reverse transitive closure of the same valid explicit
+composition relationships. An impact-specific index extends the unchanged
+forward composition index and retains incoming resolved declarations once,
+including invalid source- or target-kind evidence. The pure impact resolver
+then traverses incoming declarations from one focused asset without scanning
+files, rebuilding the catalog, resolving forward composition for every
+possible root, or enumerating every complete path. Forward composition and scan
+do not build the incoming index.
+
+Reverse traversal also uses `(stable asset ID, required-or-optional
+membership)` state. An all-required dependent-to-focus route produces required
+declared impact; any optional declaration makes that route optional upstream.
+Required membership dominates final stable-ID classification while both route
+classes retain declaration provenance. The focus is separate, affected Skills
+are exposed directly, and a dependent is direct only when a valid declaration
+targets the focus itself.
+
+Impact preserves original repository declaration direction in its edge data:
+`dependent -> intermediate -> focus`. Invalid resolved incoming declarations
+remain reviewable but never expand the closure. References, conflicts,
+ownership, lifecycle, policy, static support, `extends`, and inferred
+Skill-to-Skill relationships do not create impact. See the
+[Declared Impact contract](docs/declared-impact.md).
+
 ## Architecture
 
 ```mermaid
@@ -367,11 +393,12 @@ renma graph . --format json
 renma graph . --format markdown
 renma graph . --format mermaid
 renma graph . --view composition --focus <asset-id-or-path> --format json
+renma graph . --view impact --focus <asset-id-or-path> --format json
 ```
 
-The composition view is a focused transitive projection over the same graph and
-catalog. The graph is not a runtime selection engine. It is repository
-evidence.
+The composition and impact views are focused forward and reverse transitive
+projections over the same graph and catalog. The graph is not a runtime
+selection engine or breakage predictor. It is repository evidence.
 
 ## Validation
 

@@ -120,6 +120,19 @@ export interface DeclaredCompositionReport {
   cycleFree: boolean;
 }
 
+/** One resolved explicit composition declaration retained for reverse queries. */
+export interface ResolvedCompositionDeclaration {
+  source: Asset;
+  target: Asset;
+  dependency: Dependency;
+  relationship: CompositionRelationship;
+  declarationForm: string;
+  declarationIndex?: number;
+  sourcePath: string;
+  evidence?: Evidence;
+  kindMismatch?: CompositionKindMismatch;
+}
+
 /** Reusable repository-wide lookups for declared-composition analysis. */
 export interface DeclaredCompositionIndex {
   assetsById: ReadonlyMap<string, Asset>;
@@ -825,6 +838,40 @@ function dependenciesBySourceId(
     dependenciesForSource.sort(compareDependencies);
   }
   return result;
+}
+
+/** Resolve one explicit composition declaration for impact index preparation. */
+export function resolveCompositionDeclaration(
+  index: DeclaredCompositionIndex,
+  dependency: Dependency,
+): ResolvedCompositionDeclaration | undefined {
+  const source = index.assetsById.get(dependency.from);
+  if (!source) return undefined;
+  const relationship = compositionRelationship(dependency, index);
+  if (!relationship) return undefined;
+  const target = resolveIndexedTarget(dependency, index);
+  if (!target) return undefined;
+  const membership = propagatedMembership("required", dependency, relationship);
+  const kindMismatch = compositionKindMismatch(
+    source,
+    target,
+    dependency,
+    relationship,
+    membership,
+  );
+  return {
+    source,
+    target,
+    dependency,
+    relationship,
+    declarationForm: dependency.declaration ?? dependency.kind,
+    ...(dependency.declarationIndex !== undefined
+      ? { declarationIndex: dependency.declarationIndex }
+      : {}),
+    sourcePath: dependency.sourcePath,
+    ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
+    ...(kindMismatch ? { kindMismatch } : {}),
+  };
 }
 
 function compositionRelationship(
