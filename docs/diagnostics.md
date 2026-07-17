@@ -633,7 +633,59 @@ Finding identifiers are useful when you want to group, filter, document, or auto
 
 The identifiers below are part of the current scan output. The current implementation does not declare them as a permanent public API, so integrations should avoid assuming stronger stability than the project documents. If renma adopts long-term stability guarantees later, identifier changes should come with documented migrations.
 
-Security diagnostics focus on high-signal heuristics for agent-facing or context-bearing artifacts Renma already discovers, such as skills, contexts, `AGENTS.md`, references, profiles, examples, and tool guidance. Defensive wording and nearby human approval, dry-run, backup, or rollback guidance may reduce or avoid command-risk findings when they are local to the risky instruction. When the effective human-approval policy is true, dry-run, backup, rollback, or restore guidance does not replace explicit human approval. Renma does not scan `package.json`, GitHub Actions workflows, Dockerfiles, or repository-wide supply-chain metadata by default.
+Security diagnostics focus on high-signal heuristics for agent-facing or context-bearing artifacts Renma already discovers, such as skills, contexts, `AGENTS.md`, references, profiles, examples, and Markdown tool guidance. Defensive wording and nearby human approval, dry-run, backup, or rollback guidance may reduce or avoid command-risk findings when they are local to the risky instruction. When the effective human-approval policy is true, dry-run, backup, rollback, or restore guidance does not replace explicit human approval. Renma does not scan `package.json`, GitHub Actions workflows, Dockerfiles, dependency manifests, or repository-wide supply-chain metadata by default.
+
+These checks inspect repository knowledge and operational instructions. They are
+not language-specific SAST, dependency scanning, a safety proof, runtime
+monitoring, sandboxing, permission enforcement, or telemetry collection. A scan
+with no findings means only that the enabled deterministic checks found no
+matching evidence; it does not establish that an agent workflow is safe.
+
+### Instruction-integrity boundaries
+
+`SEC-SAFEGUARD-BYPASS-INSTRUCTION` reports explicit guidance to disable or
+circumvent security checks, weaken policy to pass diagnostics, suppress
+warnings, replace approval with post-hoc review, choose a more dangerous
+permission fallback, or execute automatically after no user response. The safe
+repair is to keep the existing safeguard, stop and report missing authority,
+and rerun `renma scan` without relaxing policy or adding suppression. Direct
+prohibitions such as “Do not bypass human approval,” quoted examples,
+comment-only lines, and fenced prose examples are excluded from this semantic
+prose rule. A defensive sentence does not protect a separate contradictory
+bypass instruction.
+
+`SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION` reports guidance that makes an external
+page, issue body, log, tool output, attachment, downloaded document, or fetched
+Markdown authoritative or executes its embedded commands without review. Safe
+reading, quoting, summarizing, provenance capture, and locally reviewed or
+validated fact extraction are outside the rule. Repair the instruction by
+treating source content as untrusted data, preserving provenance, validating
+task-relevant facts, and keeping execution authority in reviewed repository
+guidance or explicit human approval.
+
+`SEC-UNBOUNDED-EXTERNAL-SOURCE-TRAVERSAL` is an advisory for explicit recursive
+link, issue, attachment, page, or source traversal when the same bounded
+Markdown section states none of the expected scope, relevance, visited/cycle,
+depth/count/time, failure-stop, or unresolved-scope boundaries. A single named
+source read is not recursive traversal. A boundary in an unrelated peer section
+does not apply. The finding is normally low/advisory; it becomes
+medium/suspicious, not high, when the same local section also directs sensitive
+data disclosure or upload. Renma reports the missing governance but never
+crawls the sources itself.
+
+### Data-sharing source and sink boundaries
+
+The existing bulk-data, overbroad-context, no-redaction, secret-material, and
+upload diagnostics now distinguish broad sources from disclosure sinks. A
+local read of a whole repository may still be an overbroad context-collection
+advisory, but it is not bulk sharing without a prompt/context attachment,
+stdout/log output, or upload/share sink. Full logs, all environment variables,
+whole repositories, and credential directories become bulk-sharing evidence
+when instructions attach, print, log, paste, send, or upload them. Minimal
+task-relevant sanitized snippets and explicit defensive redaction wording are
+excluded. `process.env.NAME` is environment API access, not a `.env` file path;
+an actual `.env` reference remains sensitive-file evidence, while a local read
+alone is not secret disclosure.
 
 ### Security Policy Metadata
 
@@ -780,12 +832,15 @@ examples by asset kind.
 | `SEC-POLICY-PROFILE-NOT-FOUND`                   | Referenced policy profile is missing.                | Metadata names a profile renma cannot resolve.                                                     | Add the profile or correct the reference.                                                              |
 | `SEC-PREDICTABLE-TEMP-PATH`                      | Command uses a predictable temp path.                | Examples write to fixed `/tmp` paths or similar locations.                                         | Use a unique temporary directory or safe temp-file helper.                                             |
 | `SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD`           | Privileged command lacks guardrails.                 | Content runs `sudo` or equivalent privileged actions without checks.                               | Add prerequisites, confirmation, and rollback guidance.                                                |
+| `SEC-SAFEGUARD-BYPASS-INSTRUCTION`               | Instructions explicitly bypass a security safeguard. | Content disables checks, weakens policy, skips approval, suppresses warnings, or uses a riskier fallback. | Preserve the safeguard, stop and report missing authority, and verify again without policy relaxation. |
 | `SEC-SECRET-MATERIAL-INSTRUCTION`                | Instructions expose or request secret material.      | Content includes or asks for private keys, tokens, or credentials.                                 | Remove secret material and describe secure handling instead.                                           |
 | `SEC-SENSITIVE-FILE-REFERENCE`                   | Instructions reference sensitive files.              | Content points at credentials, keys, or local secret paths.                                        | Replace with safe examples or redacted placeholders.                                                   |
+| `SEC-UNBOUNDED-EXTERNAL-SOURCE-TRAVERSAL`        | Recursive external traversal has no local boundary.  | Content recursively follows links, issues, pages, or attachments without any stated scope or termination control. | Add source, relevance, visited/cycle, cap, failure-stop, and unresolved-scope guidance in the same section. |
 | `SEC-UNAPPROVED-NETWORK-DESTINATION`             | Network destination is not approved.                 | Instructions contact a host outside the allowed list.                                              | Enumerate the actual required domains in approved network destinations after review.                   |
 | `SEC-UNAPPROVED-UPLOAD-DESTINATION`              | Upload destination is not approved.                  | Instructions upload data to an unapproved service or host.                                         | Use an approved destination or update policy intentionally.                                            |
 | `SEC-UNPINNED-DEPENDENCY-INSTALL`                | Dependency install is not pinned.                    | Examples install packages without exact versions or digests.                                       | Pin package versions or use a reproducible install source.                                             |
 | `SEC-UNPINNED-REMOTE-SCRIPT`                     | Remote script execution is unpinned.                 | Commands pipe or execute remote scripts without an immutable reference.                            | Pin the script source and verify it before execution.                                                  |
+| `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION`           | Untrusted source content becomes executable guidance. | Content follows fetched, downloaded, attached, logged, or tool-produced instructions as authority without review. | Treat the content as data, preserve provenance, validate facts, and use reviewed local authority for actions. |
 
 ## How To Fix Results
 

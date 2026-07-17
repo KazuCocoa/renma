@@ -6,6 +6,40 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added `SEC-SAFEGUARD-BYPASS-INSTRUCTION` for explicit guidance that disables
+  checks, weakens policy to pass diagnostics, suppresses warnings, bypasses or
+  defers approval, selects a riskier permission fallback, or auto-executes after
+  no user response.
+- Added `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION` for instructions that make
+  external pages, issue bodies, logs, tool output, attachments, or downloaded
+  content executable authority without review.
+- Added `SEC-UNBOUNDED-EXTERNAL-SOURCE-TRAVERSAL` for explicit recursive
+  external-source walks with no local scope or termination boundary. The
+  finding is low/advisory by default and medium/suspicious when combined with a
+  local upload or sensitive-disclosure instruction.
+
+### Changed
+
+- Strengthened Security Diagnostics with bounded Markdown section handling for
+  approval proximity, defensive/example/comment exclusions, and deterministic
+  evidence for agent-facing Skills, Context, `AGENTS.md`, local references,
+  profiles, examples, and Markdown tool guidance.
+- Refined the existing bulk sharing, overbroad context, redaction, secret
+  material, and upload rules to distinguish local reads, prompt/context
+  attachment, stdout/log output, and external upload. `process.env.NAME` is no
+  longer treated as a `.env` file reference, while actual `.env` paths remain
+  detectable.
+
+### Compatibility
+
+- Security diagnostics remain repository-governance checks over already
+  discovered agent-facing instructions. This change adds no language-specific
+  SAST, dependency or workflow scanning, runtime enforcement, command or
+  network execution, LLM call, telemetry, automatic repair, suppression, or
+  policy relaxation. Passing a scan is not a safety proof.
+
 ## [0.20.1] - 2026-07-16
 
 ### Added
