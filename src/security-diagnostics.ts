@@ -764,9 +764,13 @@ const DIRECT_DEFENSIVE_SEMANTIC_RE =
 const UNTRUSTED_CONTENT_SOURCE_RE =
   /\b(external (?:page|site|document|source|content|instructions?)|issue body|issue description|logs?|tool output|command output|attachment|downloaded (?:file|markdown|document|instructions?)|fetched (?:page|markdown|document|content|instructions?)|retrieved (?:page|document|content|instructions?))\b/i;
 const UNTRUSTED_CONTENT_EXECUTION_RE =
-  /\b(execute|run|apply|follow|obey|adopt)\b.{0,80}\b(every command|all commands?|instructions?|steps?|verbatim|exactly|without review)\b|\b(treat|regard|accept)\b.{0,80}\b(authoritative|trusted instructions?|commands?|executable guidance)\b|\b(follow|obey|execute|run|apply)\b.{0,50}\b(it|them|the content|the instructions?)\b.{0,40}\b(verbatim|exactly|without review)\b/i;
+  /\b(execute|run|apply|follow|obey|adopt)\b.{0,80}?\b(every command|all commands?|instructions?|steps?|verbatim|exactly|without review)\b|\b(treat|regard|accept)\b.{0,80}?\b(authoritative|trusted instructions?|commands?|executable guidance)\b|\b(follow|obey|execute|run|apply)\b.{0,50}?\b(it|them|the content|the instructions?)\b.{0,40}?\b(verbatim|exactly|without review)\b/i;
 const UNTRUSTED_CONTENT_REVIEW_GUARD_RE =
-  /\b(review|validate|verify|inspect)\b.{0,80}\b(before|prior to)\b.{0,60}\b(execute|run|apply|follow|adopt)\b|\bdo not\b.{0,50}\b(execute|run|follow|obey|apply)\b.{0,60}\b(embedded|external|downloaded|fetched|tool|log|attachment)\b/i;
+  /\b(review|validate|verify|inspect)\b.{0,80}?\b(before|prior to)\b.{0,60}?\b(execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting)\b/i;
+const BROAD_REVIEW_GUARD_SCOPE_RE =
+  /\b(all|each|every)\b.{0,40}\b(proposed\s+)?(actions?|instructions?|steps?)\b|\bproposed actions?\b/i;
+const DIRECT_DEFENSIVE_ACTION_PREFIX_RE =
+  /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,24}$/i;
 const RECURSIVE_EXTERNAL_TRAVERSAL_RE =
   /\b(recursive|recursively)\b.{0,100}\b(follow|traverse|crawl|visit|open|fetch|read|inspect)\b.{0,100}\b(external links?|links?|related issues?|attachments?|pages?|sources?|documents?)\b|\b(follow|traverse|crawl|visit|open|fetch|read|inspect)\b.{0,80}\b(external links?|links?|related issues?|attachments?|pages?|sources?|documents?)\b.{0,80}\b(recursive|recursively|repeat|until (?:none|no more|exhausted))\b|\bkeep\b.{0,30}\b(following|traversing|opening|visiting)\b.{0,60}\b(external links?|links?|related issues?|attachments?|pages?|sources?)\b/i;
 const TRAVERSAL_BOUNDARY_PATTERNS = [
@@ -1744,7 +1748,20 @@ function securityContentStart(
 
 function stripHtmlCommentSpans(lines: string[]): string[] {
   let inComment = false;
+  let fence: MarkdownFence | undefined;
   return lines.map((line) => {
+    if (fence !== undefined) {
+      if (isMarkdownFenceClosing(line, fence)) fence = undefined;
+      return line;
+    }
+    if (!inComment) {
+      const openingFence = markdownFenceOpening(line);
+      if (openingFence !== undefined) {
+        fence = openingFence;
+        return line;
+      }
+    }
+
     let cursor = 0;
     let visible = "";
 
@@ -1770,6 +1787,26 @@ function stripHtmlCommentSpans(lines: string[]): string[] {
 
     return visible;
   });
+}
+
+type MarkdownFence = {
+  marker: "`" | "~";
+  length: number;
+};
+
+function markdownFenceOpening(line: string): MarkdownFence | undefined {
+  const match = line.match(/^ {0,3}(`{3,}|~{3,})/);
+  if (match === null) return undefined;
+  const fence = match[1] ?? "";
+  const marker = fence[0];
+  if (marker !== "`" && marker !== "~") return undefined;
+  return { marker, length: fence.length };
+}
+
+function isMarkdownFenceClosing(line: string, fence: MarkdownFence): boolean {
+  const match = line.match(/^ {0,3}(`{3,}|~{3,})\s*$/);
+  const candidate = match?.[1] ?? "";
+  return candidate[0] === fence.marker && candidate.length >= fence.length;
 }
 
 function lineSnippet(content: string, line: number): string | undefined {
@@ -1874,29 +1911,28 @@ function semanticInstructionDetections(
     });
   }
 
-  const untrustedContentOnLine =
-    UNTRUSTED_CONTENT_SOURCE_RE.test(line) &&
-    UNTRUSTED_CONTENT_EXECUTION_RE.test(line);
-  const untrustedContentInstruction =
-    UNTRUSTED_CONTENT_SOURCE_RE.test(instructionText) &&
-    UNTRUSTED_CONTENT_EXECUTION_RE.test(instructionText);
-  const untrustedContentAlreadyMatched =
-    UNTRUSTED_CONTENT_SOURCE_RE.test(priorInstructionText) &&
-    UNTRUSTED_CONTENT_EXECUTION_RE.test(priorInstructionText);
-  const untrustedReviewGuard = UNTRUSTED_CONTENT_REVIEW_GUARD_RE.test(
-    actionLocalInstructionText(window.lines),
+  const currentLineStart = window.lines
+    .slice(0, -1)
+    .reduce((offset, item) => offset + item.length + 1, 0);
+  const sentences = semanticSentenceSpans(instructionText);
+  const untrustedAction = untrustedExecutionActions(sentences).find(
+    (action) =>
+      action.end > currentLineStart &&
+      UNTRUSTED_CONTENT_SOURCE_RE.test(instructionText.slice(0, action.end)) &&
+      !isDefensiveUntrustedAction(sentences, action) &&
+      !hasPrecedingReviewGuard(sentences, action),
   );
-  if (
-    untrustedContentInstruction &&
-    !untrustedContentAlreadyMatched &&
-    !DIRECT_DEFENSIVE_SEMANTIC_RE.test(line) &&
-    !untrustedReviewGuard
-  ) {
+  if (untrustedAction !== undefined) {
+    const untrustedContentOnLine =
+      untrustedAction.start >= currentLineStart &&
+      UNTRUSTED_CONTENT_SOURCE_RE.test(
+        instructionText.slice(currentLineStart, untrustedAction.end),
+      );
     detections.push({
       metadata: RULES.untrustedContentAsInstruction,
       severity: "high",
       ...(untrustedContentOnLine ? lineEvidence : windowEvidence),
-      dedupeKey: `${RULES.untrustedContentAsInstruction.id}:${lineIndex + 1}`,
+      dedupeKey: `${RULES.untrustedContentAsInstruction.id}:${window.startIndex + 1}:${untrustedAction.start}:${untrustedAction.end}`,
     });
   }
 
@@ -1959,12 +1995,185 @@ function semanticInstructionWindow(
   };
 }
 
-function actionLocalInstructionText(lines: string[]): string {
-  const text = lines.join(" ");
-  const sentenceBoundary = [...text.matchAll(/[.!?]\s+/g)].at(-1);
-  return sentenceBoundary === undefined
-    ? text
-    : text.slice((sentenceBoundary.index ?? 0) + sentenceBoundary[0].length);
+type SemanticTextSpan = {
+  text: string;
+  start: number;
+  end: number;
+};
+
+type UntrustedActionVerb =
+  | "execute"
+  | "run"
+  | "apply"
+  | "follow"
+  | "obey"
+  | "adopt"
+  | "treat"
+  | "regard"
+  | "accept";
+
+type UntrustedExecutionAction = SemanticTextSpan & {
+  sentenceIndex: number;
+  verb: UntrustedActionVerb;
+};
+
+function semanticSentenceSpans(text: string): SemanticTextSpan[] {
+  const sentences: SemanticTextSpan[] = [];
+  let start = 0;
+  for (const boundary of text.matchAll(/[.!?]+(?=\s+|$)/g)) {
+    const end = (boundary.index ?? 0) + boundary[0].length;
+    appendTrimmedSemanticSpan(sentences, text, start, end);
+    start = end;
+  }
+  appendTrimmedSemanticSpan(sentences, text, start, text.length);
+  return sentences;
+}
+
+function appendTrimmedSemanticSpan(
+  spans: SemanticTextSpan[],
+  text: string,
+  start: number,
+  end: number,
+): void {
+  while (start < end && /\s/.test(text[start] ?? "")) start += 1;
+  while (end > start && /\s/.test(text[end - 1] ?? "")) end -= 1;
+  if (start < end) spans.push({ text: text.slice(start, end), start, end });
+}
+
+function untrustedExecutionActions(
+  sentences: SemanticTextSpan[],
+): UntrustedExecutionAction[] {
+  const actions: UntrustedExecutionAction[] = [];
+  for (const [sentenceIndex, sentence] of sentences.entries()) {
+    const pattern = new RegExp(
+      UNTRUSTED_CONTENT_EXECUTION_RE.source,
+      `${UNTRUSTED_CONTENT_EXECUTION_RE.flags}g`,
+    );
+    for (const match of sentence.text.matchAll(pattern)) {
+      const text = match[0] ?? "";
+      const verb = untrustedActionVerb(text);
+      if (verb === undefined) continue;
+      const start = sentence.start + (match.index ?? 0);
+      actions.push({
+        text,
+        start,
+        end: start + text.length,
+        sentenceIndex,
+        verb,
+      });
+    }
+  }
+  return actions;
+}
+
+function untrustedActionVerb(text: string): UntrustedActionVerb | undefined {
+  const match = text.match(
+    /\b(execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting|treat|regard|accept)\b/i,
+  );
+  const verb = match?.[1]?.toLowerCase() ?? "";
+  if (verb.startsWith("execut")) return "execute";
+  if (verb.startsWith("run")) return "run";
+  if (verb.startsWith("appl")) return "apply";
+  if (verb.startsWith("follow")) return "follow";
+  if (verb.startsWith("obey")) return "obey";
+  if (verb.startsWith("adopt")) return "adopt";
+  if (verb === "treat" || verb === "regard" || verb === "accept") return verb;
+  return undefined;
+}
+
+function isDefensiveUntrustedAction(
+  sentences: SemanticTextSpan[],
+  action: UntrustedExecutionAction,
+): boolean {
+  const sentence = sentences[action.sentenceIndex];
+  if (sentence === undefined) return false;
+  const actionStart = action.start - sentence.start;
+  return DIRECT_DEFENSIVE_ACTION_PREFIX_RE.test(
+    sentence.text.slice(0, actionStart),
+  );
+}
+
+function hasPrecedingReviewGuard(
+  sentences: SemanticTextSpan[],
+  action: UntrustedExecutionAction,
+): boolean {
+  const sentence = sentences[action.sentenceIndex];
+  if (sentence === undefined) return false;
+
+  const sameSentenceGuards = reviewGuardActions(sentence);
+  if (
+    sameSentenceGuards.some(
+      (guard) =>
+        guard.start < action.start &&
+        guard.targetStart === action.start &&
+        guard.verb === action.verb,
+    )
+  ) {
+    return true;
+  }
+
+  const precedingSentence = sentences[action.sentenceIndex - 1];
+  return (
+    precedingSentence !== undefined &&
+    reviewGuardActions(precedingSentence).some(
+      (guard) =>
+        guard.verb === action.verb &&
+        reviewGuardScopeCovers(precedingSentence.text, sentence.text),
+    )
+  );
+}
+
+function reviewGuardScopeCovers(
+  guardSentence: string,
+  actionSentence: string,
+): boolean {
+  if (BROAD_REVIEW_GUARD_SCOPE_RE.test(guardSentence)) return true;
+  const actionSources = untrustedSourceSpans(actionSentence);
+  if (actionSources.length === 0) return false;
+  const guardSources = new Set(untrustedSourceSpans(guardSentence));
+  return actionSources.some((source) => guardSources.has(source));
+}
+
+function untrustedSourceSpans(text: string): string[] {
+  const pattern = new RegExp(
+    UNTRUSTED_CONTENT_SOURCE_RE.source,
+    `${UNTRUSTED_CONTENT_SOURCE_RE.flags}g`,
+  );
+  return [...text.matchAll(pattern)].map((match) =>
+    (match[0] ?? "").toLowerCase(),
+  );
+}
+
+function reviewGuardActions(
+  sentence: SemanticTextSpan,
+): Array<{ start: number; targetStart: number; verb: UntrustedActionVerb }> {
+  const guards: Array<{
+    start: number;
+    targetStart: number;
+    verb: UntrustedActionVerb;
+  }> = [];
+  const pattern = new RegExp(
+    UNTRUSTED_CONTENT_REVIEW_GUARD_RE.source,
+    `${UNTRUSTED_CONTENT_REVIEW_GUARD_RE.flags}g`,
+  );
+  for (const match of sentence.text.matchAll(pattern)) {
+    const text = match[0] ?? "";
+    const before = text.search(/\b(before|prior to)\b/i);
+    if (before < 0) continue;
+    const targetText = text.slice(before);
+    const target = targetText.match(
+      /\b(execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting)\b/i,
+    );
+    const verb = untrustedActionVerb(target?.[0] ?? "");
+    if (target === null || verb === undefined) continue;
+    const start = sentence.start + (match.index ?? 0);
+    guards.push({
+      start,
+      targetStart: start + before + (target.index ?? 0),
+      verb,
+    });
+  }
+  return guards;
 }
 
 function markdownListItem(line: string): { indent: number } | undefined {

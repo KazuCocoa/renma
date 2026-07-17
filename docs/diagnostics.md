@@ -656,6 +656,8 @@ after an HTML comment span remains scannable. A fenced `text` or `markdown`
 payload explicitly routed by surrounding prose, an instruction label, or an
 operational instruction heading is scanned as an instruction. A defensive
 sentence does not protect a separate contradictory bypass instruction.
+Comment-like `<!--` and `-->` text inside any fenced code block is literal
+fence content and never opens or closes an HTML comment for subsequent lines.
 
 `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION` reports guidance that makes an external
 page, issue body, log, tool output, attachment, downloaded document, or fetched
@@ -670,8 +672,11 @@ Semantic windows remain within one Markdown list item: sibling bullet or
 numbered items and nested child items establish new instruction boundaries,
 while indented continuation lines stay associated with their owning item.
 Ordinary adjacent prose lines can still form one bounded instruction. A review
-guard applies to the action or sentence it governs, so defensive source wording
-does not suppress a later contradictory execution instruction.
+guard applies only when it precedes and names the same execution action, so a
+later defensive sentence cannot retroactively suppress an unsafe action and a
+guard for `apply` does not cover a later `execute`. Multiline matches are
+deduplicated only after an emitted action span is selected; a guarded raw regex
+match does not suppress a later contradictory action.
 
 `SEC-UNBOUNDED-EXTERNAL-SOURCE-TRAVERSAL` is an advisory for explicit recursive
 link, issue, attachment, page, or source traversal when the same bounded
