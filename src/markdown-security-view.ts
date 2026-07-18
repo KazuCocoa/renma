@@ -12,6 +12,12 @@ import type {
 } from "mdast";
 import type { Position } from "unist";
 
+import {
+  projectVisibleLines,
+  type SourceColumnRange,
+  type VisibleLineProjection,
+} from "./markdown-source-projection.js";
+
 type MarkdownSourceRange = {
   startLine: number;
   endLine: number;
@@ -37,13 +43,7 @@ type HeadingRecord = MarkdownSourceRange & {
   text: string;
 };
 
-type SourceColumnRange = MarkdownSourceRange & {
-  startColumn: number;
-  endColumn: number;
-};
-
 type SemanticOffsetRange = { start: number; end: number };
-type RemovedRange = { start: number; end: number };
 
 type SemanticCandidate = {
   unit: MarkdownSemanticUnit;
@@ -88,16 +88,7 @@ export class MarkdownSecurityView {
     this.sourceLines = content.split(/\r?\n/);
     this.bodyStart = bodyStart;
     const body = this.sourceLines.slice(bodyStart).join("\n");
-    let tree: Root;
-    try {
-      tree = fromMarkdown(body);
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `Unable to parse Markdown for security diagnostics: ${detail}`,
-        { cause: error },
-      );
-    }
+    const tree = parseMarkdown(body);
 
     this.records = collectNodeRecords(tree);
     const headings: HeadingRecord[] = [];
@@ -141,7 +132,11 @@ export class MarkdownSecurityView {
     const commentRanges = htmlRecords.flatMap(({ node }) =>
       htmlCommentSourceRanges(node, bodyStart),
     );
-    this.visibleLines = stripCommentRanges(this.sourceLines, commentRanges);
+    const visibleLineProjections = projectVisibleLines(
+      this.sourceLines,
+      commentRanges,
+    );
+    this.visibleLines = visibleLineProjections.map(({ text }) => text);
 
     const paragraphCandidates = paragraphRecords.map((record) =>
       this.paragraphCandidate(record),
@@ -180,7 +175,11 @@ export class MarkdownSecurityView {
     for (const unit of this.semanticUnits) {
       this.inlineCodeByUnit.set(
         unit,
-        semanticInlineCodeRanges(unit, this.sourceLines, inlineCodeRanges),
+        semanticInlineCodeRanges(
+          unit,
+          visibleLineProjections,
+          inlineCodeRanges,
+        ),
       );
     }
   }
@@ -468,6 +467,18 @@ function collectNodeRecords(root: Root): NodeRecord[] {
   return records;
 }
 
+function parseMarkdown(content: string): Root {
+  try {
+    return fromMarkdown(content);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Unable to parse Markdown for security diagnostics: ${detail}`,
+      { cause: error },
+    );
+  }
+}
+
 function isSecurityRecordType(type: string): boolean {
   return /^(?:blockquote|code|heading|html|inlineCode|paragraph|thematicBreak)$/.test(
     type,
@@ -517,7 +528,7 @@ function nodeText(node: RootContent | Parent): string {
 
 function semanticInlineCodeRanges(
   unit: MarkdownSemanticUnit,
-  sourceLines: string[],
+  visibleLines: VisibleLineProjection[],
   inlineCodeRanges: SourceColumnRange[],
 ): SemanticOffsetRange[] {
   if (unit.kind === "code") return [];
@@ -530,15 +541,22 @@ function semanticInlineCodeRanges(
   const semanticOffset = (line: number, column: number): number => {
     const lineIndex = line - unit.startLine;
     const semanticLine = unit.lines[lineIndex] ?? "";
-    const sourceLine = sourceLines[line - 1] ?? "";
-    const leadingWhitespace = sourceLine.length - sourceLine.trimStart().length;
+    const visibleLine = visibleLines[line - 1];
+    if (visibleLine === undefined) return lineOffsets[lineIndex] ?? 0;
+    const leadingWhitespace =
+      visibleLine.text.length - visibleLine.text.trimStart().length;
+    const sourceOffset = Math.max(
+      0,
+      Math.min(visibleLine.sourceToVisibleOffsets.length - 1, column - 1),
+    );
+    const visibleOffset = visibleLine.sourceToVisibleOffsets[sourceOffset] ?? 0;
     const columnOffset = Math.max(
       0,
-      Math.min(semanticLine.length, column - 1 - leadingWhitespace),
+      Math.min(semanticLine.length, visibleOffset - leadingWhitespace),
     );
     return (lineOffsets[lineIndex] ?? 0) + columnOffset;
   };
-  return inlineCodeRanges
+  const sourceRanges = inlineCodeRanges
     .filter(
       (range) =>
         range.startLine >= unit.startLine && range.endLine <= unit.endLine,
@@ -547,41 +565,26 @@ function semanticInlineCodeRanges(
       start: semanticOffset(range.startLine, range.startColumn),
       end: semanticOffset(range.endLine, range.endColumn),
     }));
-}
-
-function stripCommentRanges(
-  lines: string[],
-  comments: SourceColumnRange[],
-): string[] {
-  const removals = new Map<number, RemovedRange[]>();
-  for (const comment of comments) {
-    const startLine = comment.startLine - 1;
-    const endLine = comment.endLine - 1;
-    for (let line = startLine; line <= endLine; line += 1) {
-      const source = lines[line] ?? "";
-      const range = {
-        start: line === startLine ? comment.startColumn - 1 : 0,
-        end: line === endLine ? comment.endColumn - 1 : source.length,
-      };
-      const existing = removals.get(line) ?? [];
-      existing.push(range);
-      removals.set(line, existing);
-    }
+  if (
+    sourceRanges.length > 0 ||
+    !unit.lines.some((line) => line.includes("`"))
+  ) {
+    return sourceRanges;
   }
-  return lines.map((line, index) => {
-    const ranges = removals.get(index);
-    if (ranges === undefined) return line;
-    let cursor = 0;
-    let result = "";
-    for (const range of ranges.sort(
-      (left, right) => left.start - right.start,
-    )) {
-      result += line.slice(cursor, range.start);
-      cursor = Math.max(cursor, range.end);
-      if (result.length > 0 && !/\s$/.test(result)) result += " ";
-    }
-    return result + line.slice(cursor);
-  });
+
+  return collectNodeRecords(parseMarkdown(unit.lines.join("\n")))
+    .filter(({ node }) => node.type === "inlineCode")
+    .map(({ node }) => {
+      const position = requiredPosition(node);
+      return {
+        start:
+          (lineOffsets[position.start.line - 1] ?? 0) +
+          position.start.column -
+          1,
+        end:
+          (lineOffsets[position.end.line - 1] ?? 0) + position.end.column - 1,
+      };
+    });
 }
 
 function htmlCommentSourceRanges(

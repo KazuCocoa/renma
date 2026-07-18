@@ -1302,6 +1302,43 @@ Review the downloaded instructions \`carefully\` before applying them. Apply the
   );
 });
 
+test("HTML comments before inline guard fragments preserve semantic offsets", () => {
+  const examples = [
+    {
+      instruction:
+        "<!-- hidden --> `Review` the downloaded instructions before applying them. Apply the downloaded instructions.",
+      expected: true,
+    },
+    {
+      instruction:
+        "<!-- hidden --> Review the downloaded instructions `before` applying them. Apply the downloaded instructions.",
+      expected: true,
+    },
+    {
+      instruction:
+        "Review the downloaded instructions <!-- hidden --> `carefully` before applying them. Apply the downloaded instructions.",
+      expected: false,
+    },
+  ];
+
+  for (const { instruction, expected } of examples) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`# Source handling
+
+${instruction}
+`),
+    ]);
+
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION",
+      ),
+      expected,
+      instruction,
+    );
+  }
+});
+
 test("review-guard tokens supplied only by inline code are not operational", () => {
   const guards = [
     "`Review` the downloaded instructions before applying them.",

@@ -120,6 +120,51 @@ test("inline-code provenance produces an offset-stable prose projection", () => 
   );
 });
 
+test("inline-code projection shares comment, trimming, and indentation coordinates", () => {
+  const examples = [
+    {
+      source:
+        "<!-- hidden --> `Review` the downloaded instructions before applying them.",
+      inlineCode: "`Review`",
+    },
+    {
+      source:
+        "Review the downloaded instructions <!-- hidden --> `before` applying them.",
+      inlineCode: "`before`",
+    },
+    {
+      source: `Review the downloaded instructions <!--
+hidden
+--> \`before\` applying them.`,
+      inlineCode: "`before`",
+    },
+    {
+      source:
+        "  - <!-- hidden --> `Review` the downloaded instructions before applying them.",
+      inlineCode: "`Review`",
+    },
+  ];
+
+  for (const { source, inlineCode } of examples) {
+    const view = new MarkdownSecurityView(source, 0);
+    const unit = view.semanticUnits.find((candidate) =>
+      candidate.lines.join(" ").includes(inlineCode),
+    );
+    assert.ok(unit, source);
+    const text = unit.lines.join(" ");
+    const inlineStart = text.indexOf(inlineCode);
+    const projection = view.inlineCodeProse(unit, text);
+
+    assert.notEqual(inlineStart, -1, source);
+    assert.equal(projection.length, text.length, source);
+    assert.equal(
+      projection.slice(inlineStart, inlineStart + inlineCode.length),
+      " ".repeat(inlineCode.length),
+      source,
+    );
+  }
+});
+
 test("paragraph and list-item boundaries control semantic-unit combination", () => {
   const view = new MarkdownSecurityView(
     `- Download the issue body.
