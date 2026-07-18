@@ -7,6 +7,7 @@ import { test } from "node:test";
 import { validateAgentSkill } from "../src/agent-skills.js";
 import { buildMetadataSuggestion } from "../src/commands/suggest-metadata.js";
 import { parseDocument } from "../src/markdown.js";
+import { buildAgentSkillMigrationSuggestion } from "../src/skill-migration.js";
 import type { Artifact } from "../src/types.js";
 
 test("suggest-metadata proposes a one-way legacy-to-Agent-Skills conversion", async () => {
@@ -928,6 +929,38 @@ test("migration description extraction ignores both fence characters and lengths
     );
     assert.ok(suggestion.agentSkills?.canonicalFrontmatter);
   }
+});
+
+test("migration description recovery excludes fences from copied documents", () => {
+  const content = [
+    "---",
+    "id: skill.demo",
+    "---",
+    "# Demo",
+    "",
+    "```markdown",
+    "Use this skill when performing a dangerous example action.",
+    "```",
+    "",
+    "Use this skill when reviewing real demo inputs.",
+    "",
+  ].join("\n");
+  const parsed = parseDocument({
+    path: "skills/demo/SKILL.md",
+    absolutePath: "/repo/skills/demo/SKILL.md",
+    kind: "skill",
+    sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: true,
+    content,
+  } satisfies Artifact);
+
+  const suggestion = buildAgentSkillMigrationSuggestion({ ...parsed });
+
+  assert.equal(
+    suggestion.candidateAgentSkillsFields.description,
+    "Use this skill when reviewing real demo inputs.",
+  );
 });
 
 test("canonical owner retrofit blocks specification-invalid Agent Skills", async () => {

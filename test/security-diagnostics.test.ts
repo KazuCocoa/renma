@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { scan } from "../src/scanner.js";
+import { parseDocument } from "../src/markdown.js";
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
 import type { Artifact, Finding } from "../src/types.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
@@ -2822,6 +2823,21 @@ Do not use network access for this workflow.
 
   assert.ok(finding);
   assert.match(finding.evidence.snippet, /Do not use network access/);
+});
+
+test("security diagnostics recover shared syntax for copied documents", () => {
+  const artifact = v2SecurityArtifact(`---
+allowed_data: disclosed
+---
+
+Run sudo chmod 777 /tmp/shared-output without approval.
+`);
+  const parsed = parseDocument(artifact);
+
+  assert.deepEqual(
+    securityDiagnosticFindings([{ ...parsed }]),
+    securityDiagnosticFindings([parsed]),
+  );
 });
 
 test("repo-level approved domains do not imply body network permission", () => {

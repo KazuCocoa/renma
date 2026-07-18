@@ -21,8 +21,8 @@ import type {
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { parseDocument } from "./markdown.js";
 import {
+  ensureMarkdownSyntaxForDocument,
   markdownBodyStartLine,
-  markdownSyntaxForDocument,
 } from "./markdown-syntax.js";
 import {
   MarkdownSecurityView,
@@ -841,7 +841,7 @@ function securityFindingsForDocument(
     sourceLines,
     artifact.markdownParserEligible,
   );
-  const syntax = markdownSyntaxForDocument(document);
+  const syntax = ensureMarkdownSyntaxForDocument(document);
   if (syntax === undefined) {
     throw new Error(
       "Eligible Markdown document is missing its primary syntax parse",

@@ -22,6 +22,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Adopted one shared CommonMark AST for general Markdown headings, links,
+  images, and code-block structure. Normal repository scans reuse one primary
+  parse per eligible Markdown artifact while preserving public JSON shapes and
+  original-file line provenance. This reduces false positives from fenced and
+  indented code, inline code, HTML comments, and malformed Markdown-like text;
+  recognizes Setext and formatted headings plus tilde and longer fences; and
+  keeps established inline image destinations in the existing link projection.
 - Limited security content analysis to LLM-facing Markdown instructions and
   metadata. Scripts retain discovery, catalog, ownership, inherited-policy,
   Trust Graph, and BOM evidence, but executable contents require independent

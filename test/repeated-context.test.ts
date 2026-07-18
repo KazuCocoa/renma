@@ -84,6 +84,27 @@ test("whitespace-normalized repeated section still matches", async () => {
   assertRepeatedId(result, "MAINT-REPEATED-SECTION");
 });
 
+test("top-level and nested fenced code share normalized repetition identity", async () => {
+  const command =
+    "node scripts/payments/check-idempotency.mjs --customer test-customer --request-key fixed-review-key --expect-single-ledger-entry";
+  const result = await scanFixture({
+    "skills/alpha/SKILL.md": ["# Alpha", "", "```bash", command, "```"].join(
+      "\n",
+    ),
+    "skills/beta/SKILL.md": [
+      "# Beta",
+      "",
+      "- Verification",
+      "",
+      "  ```bash",
+      `  ${command}`,
+      "  ```",
+    ].join("\n"),
+  });
+
+  assertRepeatedId(result, "MAINT-REPEATED-CODE-BLOCK");
+});
+
 test("very short repeated sections are ignored", async () => {
   const result = await scanFixture({
     "skills/alpha/SKILL.md": "# Alpha\n\n## Tiny Repeat\nSame short note.",

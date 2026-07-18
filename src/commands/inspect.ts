@@ -25,8 +25,8 @@ import type {
   ParsedDocument,
 } from "../types.js";
 import {
+  ensureMarkdownSyntaxForDocument,
   markdownCodeLineNumbers,
-  markdownSyntaxForDocument,
 } from "../markdown-syntax.js";
 
 const DEFAULT_SECTION_PREVIEW_LINES = 3;
@@ -345,7 +345,7 @@ function sectionPreview(
   end: number,
 ): string[] {
   const preview: string[] = [];
-  const syntax = markdownSyntaxForDocument(document);
+  const syntax = ensureMarkdownSyntaxForDocument(document);
   const codeLines =
     syntax === undefined ? new Set<number>() : markdownCodeLineNumbers(syntax);
 

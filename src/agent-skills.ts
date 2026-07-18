@@ -15,8 +15,8 @@ import {
 } from "./yaml-frontmatter.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import {
+  ensureMarkdownSyntaxForDocument,
   markdownCodeLineNumbers,
-  markdownSyntaxForDocument,
 } from "./markdown-syntax.js";
 
 export const AGENT_SKILLS_SPECIFICATION =
@@ -811,7 +811,7 @@ function collectBodyLines(
 
 /** Return all original-file line numbers occupied by fenced code blocks. */
 export function agentSkillFenceLines(document: ParsedDocument): Set<number> {
-  const syntax = markdownSyntaxForDocument(document);
+  const syntax = ensureMarkdownSyntaxForDocument(document);
   if (syntax === undefined) return new Set<number>();
   return markdownCodeLineNumbers(syntax, "fenced");
 }

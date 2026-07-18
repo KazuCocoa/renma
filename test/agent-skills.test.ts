@@ -483,6 +483,32 @@ test("authoring inspection ignores backtick and tilde fenced examples", () => {
   }
 });
 
+test("authoring inspection recovers fenced ranges for copied documents", () => {
+  const parsed = skill(
+    "skills/demo/SKILL.md",
+    `---
+name: demo
+description: Review demo inputs. Use when demo inputs need review.
+---
+# Demo
+
+\`\`\`markdown
+Never upload production data.
+\`\`\`
+
+Review the real input and return a summary.
+`,
+  );
+  const validation = validateAgentSkill({ ...parsed });
+
+  assert.equal(
+    validation.issues.some((issue) =>
+      issue.code.startsWith("RN-SKILL-EXECUTION-CONSTRAINT"),
+    ),
+    false,
+  );
+});
+
 test("frontmatter fence-like text does not hide body authoring constraints", () => {
   const validation = validateAgentSkill(
     skill(

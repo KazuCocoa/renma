@@ -3,6 +3,7 @@ import type {
   Code,
   Heading as MdastHeading,
   Html,
+  Image as MdastImage,
   InlineCode,
   Link as MdastLink,
   Nodes,
@@ -41,10 +42,20 @@ export interface MarkdownHeadingRecord extends MarkdownSourceRange {
 }
 
 export interface MarkdownLinkRecord extends MarkdownSourceRange {
+  kind: "link";
   node: MdastLink;
   text: string;
   target: string;
 }
+
+export interface MarkdownImageRecord extends MarkdownSourceRange {
+  kind: "image";
+  node: MdastImage;
+  text: string;
+  target: string;
+}
+
+export type MarkdownLinkTargetRecord = MarkdownLinkRecord | MarkdownImageRecord;
 
 export interface MarkdownCodeBlockRecord extends MarkdownSourceRange {
   node: Code;
@@ -69,6 +80,8 @@ export interface MarkdownSyntax {
   records: MarkdownNodeRecord[];
   headings: MarkdownHeadingRecord[];
   links: MarkdownLinkRecord[];
+  images: MarkdownImageRecord[];
+  linkTargets: MarkdownLinkTargetRecord[];
   codeBlocks: MarkdownCodeBlockRecord[];
 }
 
@@ -114,17 +127,37 @@ export function parseMarkdownSyntax(
       },
     ];
   });
-  const links = records.flatMap((record): MarkdownLinkRecord[] => {
-    if (record.node.type !== "link") return [];
-    return [
-      {
-        node: record.node,
-        ...markdownSourceRange(record.node, resolvedBodyStartLine),
-        text: markdownNodeText(record.node),
-        target: record.node.url,
-      },
-    ];
+  const linkTargets = records.flatMap((record): MarkdownLinkTargetRecord[] => {
+    if (record.node.type === "link") {
+      return [
+        {
+          kind: "link",
+          node: record.node,
+          ...markdownSourceRange(record.node, resolvedBodyStartLine),
+          text: markdownNodeText(record.node),
+          target: record.node.url,
+        },
+      ];
+    }
+    if (record.node.type === "image") {
+      return [
+        {
+          kind: "image",
+          node: record.node,
+          ...markdownSourceRange(record.node, resolvedBodyStartLine),
+          text: record.node.alt ?? "",
+          target: record.node.url,
+        },
+      ];
+    }
+    return [];
   });
+  const links = linkTargets.filter(
+    (target): target is MarkdownLinkRecord => target.kind === "link",
+  );
+  const images = linkTargets.filter(
+    (target): target is MarkdownImageRecord => target.kind === "image",
+  );
   const codeBlocks = records.flatMap((record): MarkdownCodeBlockRecord[] => {
     if (record.node.type !== "code") return [];
     return [codeBlockRecord(record.node, sourceLines, resolvedBodyStartLine)];
@@ -137,6 +170,8 @@ export function parseMarkdownSyntax(
     records,
     headings,
     links,
+    images,
+    linkTargets,
     codeBlocks,
   };
 }
@@ -154,6 +189,27 @@ export function markdownSyntaxForDocument(
   document: ParsedDocument,
 ): MarkdownSyntax | undefined {
   return syntaxByDocument.get(document);
+}
+
+/**
+ * Return cached syntax or recover it for an independently constructed copy.
+ * Normal repository snapshots take the cached branch because `parseDocument`
+ * attaches their primary parse before any syntax consumer runs.
+ */
+export function ensureMarkdownSyntaxForDocument(
+  document: ParsedDocument,
+): MarkdownSyntax | undefined {
+  const attached = markdownSyntaxForDocument(document);
+  if (attached !== undefined) return attached;
+  if (
+    document.artifact.contentClassification === "binary" ||
+    document.artifact.markdownParserEligible !== true
+  ) {
+    return undefined;
+  }
+  const syntax = parseMarkdownSyntax(document.artifact.content);
+  attachMarkdownSyntax(document, syntax);
+  return syntax;
 }
 
 /** Require an mdast source position so parser failures remain fail-closed. */
@@ -255,6 +311,8 @@ function codeBlockRecord(
     fenced &&
     range.endLine > range.startLine &&
     isClosingFence(
+      node,
+      range,
       sourceLines[range.endLine - 1] ?? "",
       openingCharacter,
       openingLength,
@@ -289,15 +347,26 @@ function repeatedCharacterLength(
 }
 
 function isClosingFence(
+  node: Code,
+  range: MarkdownSourceRange,
   line: string,
   character: string,
   openingLength: number,
 ): boolean {
-  const markerStart = line.length - line.trimStart().length;
-  const markerLength = repeatedCharacterLength(line, markerStart, character);
+  const meaningfulEnd = line.trimEnd().length;
+  let markerStart = meaningfulEnd;
+  while (markerStart > 0 && line[markerStart - 1] === character) {
+    markerStart -= 1;
+  }
+  const markerLength = meaningfulEnd - markerStart;
+  const sourceSpanLineCount = range.endLine - range.startLine + 1;
+  const valueLineCount = node.value === "" ? 0 : node.value.split("\n").length;
+  // mdast already decided whether container prefixes and indentation form a
+  // code node. A closing token occupies an additional source line beyond the
+  // opening plus every value line. This avoids applying the top-level
+  // three-space rule to raw list or blockquote prefixes, while distinguishing
+  // a shorter or marker-looking final content line retained in `node.value`.
   return (
-    markerStart <= 3 &&
-    markerLength >= openingLength &&
-    line.slice(markerStart + markerLength).trim() === ""
+    markerLength >= openingLength && sourceSpanLineCount >= valueLineCount + 2
   );
 }

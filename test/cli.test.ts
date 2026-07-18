@@ -1172,6 +1172,7 @@ test("CLI inspect command prints compact outlines and exact slices", async () =>
       "\n",
       "## macOS/Linux\n",
       "Use a shell export.\n",
+      "![Environment diagram](assets/environment.png)\n",
     ].join(""),
   );
 
@@ -1183,6 +1184,7 @@ test("CLI inspect command prints compact outlines and exact slices", async () =>
     codeFences: Array<{ range: string }>;
     frontmatterRange: string;
     headings: Array<{ preview: string[]; range: string; text: string }>;
+    links: Array<{ line: number; target: string }>;
   };
   assert.equal(outline.frontmatterRange, "L1-L3");
   assert.deepEqual(
@@ -1191,6 +1193,9 @@ test("CLI inspect command prints compact outlines and exact slices", async () =>
   );
   assert.equal(outline.codeFences[0]?.range, "L11-L13");
   assert.deepEqual(outline.headings[1]?.preview, ["L0009: Use PowerShell."]);
+  assert.deepEqual(outline.links, [
+    { line: 17, target: "assets/environment.png" },
+  ]);
 
   const sliceResult = await withCapturedConsole(() =>
     main(["inspect", source, "--lines", "L8-L9", "--format", "text"]),

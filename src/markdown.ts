@@ -51,10 +51,10 @@ export function parseDocument(artifact: Artifact): ParsedDocument {
         startLine: block.startLine,
         endLine: block.endLine,
       })),
-    links: syntax.links.map((link) => ({
-      text: link.text,
-      target: link.target,
-      line: link.startLine,
+    links: syntax.linkTargets.map((target) => ({
+      text: target.text,
+      target: target.target,
+      line: target.startLine,
     })),
     metadata: metadata.values,
     metadataFields: metadata.fields,

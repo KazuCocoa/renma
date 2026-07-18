@@ -1,14 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { parseDocument } from "../src/markdown.js";
-import { markdownSyntaxForDocument } from "../src/markdown-syntax.js";
-import type { Artifact } from "../src/types.js";
+import {
+  ensureMarkdownSyntaxForDocument,
+  markdownSyntaxForDocument,
+} from "../src/markdown-syntax.js";
+import type { Artifact, ParsedDocument } from "../src/types.js";
 
-test("parseDocument extracts frontmatter, headings, links, and code fences", () => {
+test("parseDocument preserves the complete established Markdown projection", () => {
   const document = parseDocument(
     artifact(`---
 id: demo-skill
 owner: qa-platform
+tags:
+  - parser
+  - stable
 ---
 # Demo Skill
 
@@ -20,23 +26,83 @@ npm test
 `),
   );
 
+  assert.deepEqual(document.lines, [
+    "---",
+    "id: demo-skill",
+    "owner: qa-platform",
+    "tags:",
+    "  - parser",
+    "  - stable",
+    "---",
+    "# Demo Skill",
+    "",
+    "Read [the guide](references/guide.md).",
+    "",
+    "```bash",
+    "npm test",
+    "```",
+    "",
+  ]);
+  assert.deepEqual(document.headings, [
+    { depth: 1, text: "Demo Skill", line: 8 },
+  ]);
+  assert.deepEqual(document.links, [
+    { text: "the guide", target: "references/guide.md", line: 10 },
+  ]);
+  assert.deepEqual(document.codeFences, [
+    {
+      language: "bash",
+      content: "npm test",
+      startLine: 12,
+      endLine: 14,
+    },
+  ]);
   assert.deepEqual(document.metadata, {
     id: "demo-skill",
     owner: "qa-platform",
+    tags: ["parser", "stable"],
   });
+  assert.deepEqual(document.metadataFields, {
+    id: fieldEvidence("id", 2, 2, "id: demo-skill"),
+    owner: fieldEvidence("owner", 3, 3, "owner: qa-platform"),
+    tags: fieldEvidence("tags", 4, 6, "tags:\n  - parser\n  - stable"),
+  });
+  assert.deepEqual(document.metadataListItems, {
+    tags: [
+      fieldEvidence("tags", 5, 5, "  - parser"),
+      fieldEvidence("tags", 6, 6, "  - stable"),
+    ],
+  });
+});
+
+test("syntax recovery supports original, copied, and reconstructed documents", () => {
+  const parsed = parseDocument(artifact("# Demo\n\n```text\nexample\n```\n"));
+  const attached = markdownSyntaxForDocument(parsed);
+  assert.ok(attached);
+  assert.equal(ensureMarkdownSyntaxForDocument(parsed), attached);
+
+  const copied: ParsedDocument = { ...parsed };
+  assert.equal(markdownSyntaxForDocument(copied), undefined);
+  const copiedSyntax = ensureMarkdownSyntaxForDocument(copied);
+  assert.ok(copiedSyntax);
+  assert.equal(ensureMarkdownSyntaxForDocument(copied), copiedSyntax);
+
+  const reconstructed: ParsedDocument = {
+    artifact: parsed.artifact,
+    lines: [...parsed.lines],
+    headings: [...parsed.headings],
+    codeFences: [...parsed.codeFences],
+    links: [...parsed.links],
+    metadata: { ...parsed.metadata },
+    metadataFields: { ...parsed.metadataFields },
+    metadataListItems: { ...parsed.metadataListItems },
+  };
+  const reconstructedSyntax = ensureMarkdownSyntaxForDocument(reconstructed);
+  assert.ok(reconstructedSyntax);
   assert.deepEqual(
-    document.headings.map((heading) => heading.text),
-    ["Demo Skill"],
+    reconstructedSyntax.codeBlocks.map((block) => block.kind),
+    ["fenced"],
   );
-  assert.deepEqual(
-    document.links.map((link) => link.target),
-    ["references/guide.md"],
-  );
-  assert.deepEqual(
-    document.codeFences.map((fence) => fence.language),
-    ["bash"],
-  );
-  assert.match(document.codeFences[0]?.content ?? "", /npm test/);
 });
 
 test("parseDocument keeps raw lines but skips Markdown structure when ineligible", () => {
@@ -66,6 +132,7 @@ echo not-a-fence
   assert.deepEqual(document.headings, []);
   assert.deepEqual(document.links, []);
   assert.deepEqual(document.codeFences, []);
+  assert.equal(ensureMarkdownSyntaxForDocument(document), undefined);
 });
 
 test("CommonMark structure ignores Markdown-looking text in code and comments", () => {
@@ -121,6 +188,51 @@ Setext *heading*
   assert.deepEqual(document.links, [
     { text: "guide", target: "docs/a_(b).md", line: 1 },
   ]);
+});
+
+test("links retain image targets while mdast keeps node kinds distinct", () => {
+  const document = parseDocument(
+    artifact(`![diagram](assets/flow.png) then [guide](docs/guide.md).
+
+\`![inline](assets/inline.png)\`
+
+    ![indented](assets/indented.png)
+
+\`\`\`markdown
+![fenced](assets/fenced.png)
+\`\`\`
+
+<!-- ![comment](assets/comment.png) -->
+!\\[escaped](assets/escaped.png)
+![malformed](assets/malformed.png
+`),
+  );
+  const syntax = ensureMarkdownSyntaxForDocument(document);
+
+  assert.deepEqual(document.links, [
+    { text: "diagram", target: "assets/flow.png", line: 1 },
+    { text: "guide", target: "docs/guide.md", line: 1 },
+  ]);
+  assert.deepEqual(
+    syntax?.linkTargets.map((target) => [target.kind, target.target]),
+    [
+      ["image", "assets/flow.png"],
+      ["link", "docs/guide.md"],
+    ],
+  );
+  assert.equal(syntax?.images[0]?.text, "diagram");
+});
+
+test("reference-style target resolution remains intentionally deferred", () => {
+  const document = parseDocument(
+    artifact(`[guide][guide-ref] and ![diagram][diagram-ref]
+
+[guide-ref]: docs/guide.md
+[diagram-ref]: assets/flow.png
+`),
+  );
+
+  assert.deepEqual(document.links, []);
 });
 
 test("outline headings remain top-level and exclude quoted container headings", () => {
@@ -216,6 +328,7 @@ test("binary artifacts preserve fail-closed empty projections", () => {
   assert.deepEqual(document.links, []);
   assert.deepEqual(document.codeFences, []);
   assert.equal(markdownSyntaxForDocument(document), undefined);
+  assert.equal(ensureMarkdownSyntaxForDocument(document), undefined);
 });
 
 function artifact(content: string): Artifact {
@@ -227,5 +340,20 @@ function artifact(content: string): Artifact {
     contentClassification: "text",
     markdownParserEligible: true,
     content,
+  };
+}
+
+function fieldEvidence(
+  key: string,
+  startLine: number,
+  endLine: number,
+  raw: string,
+) {
+  return {
+    path: "skills/demo/SKILL.md",
+    key,
+    startLine,
+    endLine,
+    raw,
   };
 }
