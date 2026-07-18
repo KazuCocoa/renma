@@ -14,10 +14,6 @@ import {
 import type { Artifact, Finding, RiskClass, SecurityConfig } from "./types.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import {
-  policyArtifactFor,
-  skillArtifactsByDirectory,
-} from "./security-policy-inventory.js";
-import {
   MarkdownSecurityView,
   type MarkdownSemanticUnit,
 } from "./markdown-security-view.js";
@@ -808,22 +804,14 @@ export function securityDiagnosticFindings(
   artifacts: Artifact[],
   config: SecurityDiagnosticsConfig = {},
 ): Finding[] {
-  const owningSkills = skillArtifactsByDirectory(artifacts);
   return artifacts.flatMap((artifact) =>
-    securityFindingsForArtifact(
-      artifact,
-      config.security,
-      artifact.kind === "script" || artifact.kind === "asset"
-        ? policyArtifactFor(artifact, owningSkills)
-        : artifact,
-    ),
+    securityFindingsForArtifact(artifact, config.security),
   );
 }
 
 function securityFindingsForArtifact(
   artifact: Artifact,
   securityConfig?: SecurityConfig,
-  policyArtifact?: Artifact,
 ): Finding[] {
   if (
     artifact.kind === "script" ||
@@ -832,36 +820,27 @@ function securityFindingsForArtifact(
     !artifact.markdownParserEligible
   )
     return [];
-  const policyResolution = resolveOperationalSecurityPolicy(
-    policyArtifact ?? { ...artifact, content: "" },
-  );
-  const effectiveSecurityConfig = securityConfig;
+  const policyResolution = resolveOperationalSecurityPolicy(artifact);
   const parsedPolicy = policyResolution.policy;
-  const policy = applySecurityConfig(parsedPolicy, effectiveSecurityConfig);
+  const policy = applySecurityConfig(parsedPolicy, securityConfig);
   const sourceLines = artifact.content.split(/\r?\n/);
   const scanStart = securityContentStart(
     sourceLines,
     artifact.markdownParserEligible,
   );
-  const markdownView = artifact.markdownParserEligible
-    ? new MarkdownSecurityView(artifact.content, scanStart)
-    : undefined;
+  const markdownView = new MarkdownSecurityView(artifact.content, scanStart);
   const detections: Detection[] = [
-    ...(policyArtifact === artifact
-      ? invalidCanonicalSecurityDetections(policyResolution.issues)
-      : []),
+    ...invalidCanonicalSecurityDetections(policyResolution.issues),
     ...securityPolicyResolutionDetections(
       parsedPolicy,
       policy,
-      effectiveSecurityConfig,
+      securityConfig,
       artifact.content,
       artifact.markdownParserEligible,
       markdownView,
     ),
   ];
-  const lines = markdownView
-    ? sourceLines.map((_, index) => markdownView.visibleLine(index))
-    : sourceLines;
+  const lines = sourceLines.map((_, index) => markdownView.visibleLine(index));
   let recentHumanApprovalLine = 0;
   let recentRiskMitigationLine = 0;
 
