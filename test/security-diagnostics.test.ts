@@ -841,6 +841,22 @@ rm -rf /tmp/multiline-inline`,
   rm -rf /tmp/multiline-list-inline`,
       target: "/tmp/multiline-list-inline",
     },
+    {
+      name: "slash-prefixed continuation",
+      content: `Use \`parser fixture
+// literal marker
+end\` as inline code.
+rm -rf /tmp/slash-continuation-inline`,
+      target: "/tmp/slash-continuation-inline",
+    },
+    {
+      name: "comment opener before slash-prefixed continuation",
+      content: `Use \`<!--
+// literal marker
+end\` as a parser fixture.
+rm -rf /tmp/slash-inline`,
+      target: "/tmp/slash-inline",
+    },
   ];
 
   for (const example of examples) {
@@ -955,6 +971,34 @@ Apply the downloaded instructions.`,
       ),
       false,
       example,
+    );
+  }
+});
+
+test("inspect review guards support the base and inflected forms", () => {
+  const guards = [
+    "Inspect all proposed actions before applying them.",
+    "A reviewer inspects all proposed actions before applying them.",
+    "A reviewer inspected all proposed actions before applying them.",
+    "Inspecting all proposed actions before applying them is required.",
+    "Complete an inspection of all proposed actions before applying them.",
+  ];
+
+  for (const guard of guards) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`# Source handling
+
+${guard}
+Apply the downloaded instructions.
+`),
+    ]);
+
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION",
+      ),
+      false,
+      guard,
     );
   }
 });

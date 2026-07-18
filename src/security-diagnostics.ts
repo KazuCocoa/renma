@@ -765,7 +765,7 @@ const UNTRUSTED_CONTENT_SOURCE_RE =
   /\b(external (?:page|site|document|source|content|instructions?)|issue body|issue description|logs?|tool output|command output|attachment|downloaded (?:file|markdown|document|instructions?)|fetched (?:page|markdown|document|content|instructions?)|retrieved (?:page|document|content|instructions?))\b/i;
 const UNTRUSTED_CONTENT_EXECUTION_RE =
   /\b(execute|run|apply|follow|obey|adopt)\b.{0,80}?\b(every command|all commands?|instructions?|steps?|verbatim|exactly|without review)\b|\b(treat|regard|accept)\b.{0,80}?\b(authoritative|trusted instructions?|commands?|executable guidance)\b|\b(follow|obey|execute|run|apply)\b.{0,50}?\b(it|them|the content|the instructions?)\b.{0,40}?\b(verbatim|exactly|without review)\b/i;
-const REVIEW_VOCABULARY_SOURCE = String.raw`(?:review(?:s|ed|ing|ers?)?|validat(?:e|es|ed|ing|ion)|verif(?:y|ies|ied|ying|ication)|inspect(?:s|ed|ing|ion)|check(?:s|ed|ing)?)`;
+const REVIEW_VOCABULARY_SOURCE = String.raw`(?:review(?:s|ed|ing|ers?)?|validat(?:e|es|ed|ing|ion)|verif(?:y|ies|ied|ying|ication)|inspect(?:s|ed|ing|ion)?|check(?:s|ed|ing)?)`;
 const UNTRUSTED_CONTENT_REVIEW_GUARD_RE = new RegExp(
   String.raw`\b${REVIEW_VOCABULARY_SOURCE}\b.{0,80}?\b(before|prior to)\b.{0,60}?\b(execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting)\b`,
   "i",
@@ -1851,7 +1851,7 @@ function isInlineMarkdownBlockBoundary(
   const line = lines[lineIndex] ?? "";
   if (
     !line.trim() ||
-    /^\s*(?:#{1,6}\s+|```|~~~|>|<!--|\/\/)/.test(line) ||
+    /^\s*(?:#{1,6}\s+|```|~~~|>|<!--)/.test(line) ||
     line.trim() === "---"
   ) {
     return true;
