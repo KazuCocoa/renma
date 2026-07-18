@@ -2331,24 +2331,38 @@ function markdownListItemOwner(
 ): number | undefined {
   const line = lines[lineIndex] ?? "";
   if (markdownListItem(line) !== undefined) return lineIndex;
-
-  const indent = markdownIndent(line);
-  if (indent === 0) return undefined;
   for (let index = lineIndex - 1; index >= 0; index -= 1) {
     const candidate = lines[index] ?? "";
-    if (
-      !candidate.trim() ||
-      candidate.trim() === "---" ||
-      /^\s*(?:#{1,6}\s+|```|~~~|>)/.test(candidate)
-    ) {
-      break;
-    }
+    if (!candidate.trim()) return undefined;
     const listItem = markdownListItem(candidate);
     if (listItem !== undefined) {
-      return indent > listItem.indent ? index : undefined;
+      return listItemParagraphContinuesThrough(
+        lines,
+        index,
+        lineIndex,
+        listItem,
+      )
+        ? index
+        : undefined;
     }
   }
   return undefined;
+}
+
+function listItemParagraphContinuesThrough(
+  lines: string[],
+  listItemOwner: number,
+  lineIndex: number,
+  listItem: { contentColumn: number },
+): boolean {
+  for (let index = listItemOwner + 1; index <= lineIndex; index += 1) {
+    const line = lines[index] ?? "";
+    if (!line.trim() || markdownListItem(line) !== undefined) return false;
+    const relativeLine =
+      stripMarkdownIndentColumns(line, listItem.contentColumn) ?? line;
+    if (isMarkdownInlineBlockBoundaryLine(relativeLine)) return false;
+  }
+  return true;
 }
 
 function markdownIndent(line: string): number {

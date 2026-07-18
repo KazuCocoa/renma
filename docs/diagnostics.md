@@ -668,9 +668,11 @@ CDATA, and recognized block-level tags, also end lookup; arbitrary inline HTML
 such as `<span>` does not. Valid multiline spans within that block remain
 supported. Within a list item, boundary parsing first removes the owning
 marker's actual content indentation, including multi-digit ordered markers and
-valid wider bullet padding; nested items retain their own container boundary.
-Comment and fence state starts fresh after YAML frontmatter, so frontmatter
-scalar or block values cannot affect body scanning or evidence line numbers.
+valid wider bullet padding. Fully or partially unindented CommonMark lazy
+paragraph continuations retain that owner, while blank lines, interrupting
+blocks, sibling items, and nested items close or replace it. Comment and fence
+state starts fresh after YAML frontmatter, so frontmatter scalar or block values
+cannot affect body scanning or evidence line numbers.
 
 `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION` reports guidance that makes an external
 page, issue body, log, tool output, attachment, downloaded document, or fetched
