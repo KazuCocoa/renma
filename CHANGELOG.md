@@ -23,11 +23,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 ### Changed
 
 - Strengthened Security Diagnostics with one CommonMark AST parse per eligible
-  Markdown artifact. Positioned paragraph, list ancestry, heading, block quote,
-  HTML-comment, inline-code, and code-block ranges now drive approval proximity,
-  action-span guards, emitted-action deduplication, operational fence routing,
-  and deterministic original-line evidence for agent-facing Skills, Context,
-  `AGENTS.md`, local references, profiles, examples, and Markdown tool guidance.
+  Markdown artifact. Positioned paragraph and list-item boundaries prevent
+  sibling or nested instructions from being combined, while heading, block
+  quote, HTML-comment, inline-code, and code-block ranges drive approval
+  proximity, action-span guards, emitted-action deduplication, operational fence
+  routing, and deterministic original-line evidence for agent-facing artifacts.
 - Refined the existing bulk sharing, overbroad context, redaction, secret
   material, and upload rules to distinguish local reads, prompt/context
   attachment, stdout/log output, and external upload. `process.env.NAME` is no

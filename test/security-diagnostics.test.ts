@@ -1270,6 +1270,22 @@ Apply the downloaded instructions.`,
   }
 });
 
+test("unrelated inline code does not make a prose review guard non-operational", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`# Source handling
+
+\`note\` Review the downloaded instructions before applying them. Apply the downloaded instructions.
+`),
+  ]);
+
+  assert.equal(
+    findings.some(
+      (finding) => finding.id === "SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION",
+    ),
+    false,
+  );
+});
+
 test("inspect review guards support the base and inflected forms", () => {
   const guards = [
     "Inspect all proposed actions before applying them.",

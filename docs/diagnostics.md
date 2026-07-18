@@ -661,9 +661,10 @@ fence content and never opens or closes an HTML comment for subsequent lines.
 Matched Markdown inline-code spans use the same literal treatment, including
 variable-length and multiline backtick delimiters. Eligible Markdown is parsed
 once with a CommonMark-compatible parser after YAML frontmatter. Renma derives
-paragraphs, list ancestry, headings and sections, block quotes, thematic
-breaks, HTML, inline code, and fenced or indented code from the resulting
-structural ranges instead of reconstructing delimiter or container state.
+positioned paragraphs and list-item boundaries, headings and sections, block
+quotes, thematic breaks, HTML, inline code, and fenced or indented code from the
+resulting structural ranges instead of reconstructing delimiter or container
+state.
 Default CommonMark ownership therefore determines blank-paragraph, ATX and
 Setext heading, thematic-break, HTML-block, fence, sibling-item, nested-item,
 padding, tab, ordered-marker, and lazy-continuation boundaries. Frontmatter is
@@ -681,9 +682,9 @@ guidance or explicit human approval.
 
 Semantic windows use CommonMark paragraph ranges. Source and action text in one
 paragraph, including valid indented or lazy list-item continuations, can form
-one bounded instruction; sibling or nested list items produce distinct
-paragraph and ancestry ranges and are not combined. Ordinary adjacent prose
-lines in one paragraph remain eligible for multiline matching. A review
+one bounded instruction; positioned paragraph and list-item boundaries prevent
+sibling or nested items from being combined. Ordinary adjacent prose lines in
+one paragraph remain eligible for multiline matching. A review
 guard applies only when it precedes and names the same execution action, so a
 later defensive sentence cannot retroactively suppress an unsafe action and a
 guard for `apply` does not cover a later `execute`. Multiline matches are

@@ -1,11 +1,9 @@
 import { fromMarkdown } from "mdast-util-from-markdown";
 import type {
-  BlockContent,
   Code,
   Heading,
   Html,
   InlineCode,
-  List,
   Paragraph,
   Parent,
   Root,
@@ -14,44 +12,18 @@ import type {
 } from "mdast";
 import type { Position } from "unist";
 
-export type MarkdownSourceRange = {
+type MarkdownSourceRange = {
   startLine: number;
   endLine: number;
 };
 
-export type MarkdownListItemAncestry = MarkdownSourceRange & {
-  depth: number;
-  ordered: boolean;
-  start: number | undefined;
-};
-
-export type MarkdownParagraphView = MarkdownSourceRange & {
-  kind: "paragraph";
+export type MarkdownSemanticUnit = MarkdownSourceRange & {
+  kind: "paragraph" | "code";
   lines: string[];
-  text: string;
-  listItemAncestry: MarkdownListItemAncestry[];
-  blockQuoted: boolean;
-  operational: boolean;
+  contentStartLine?: number;
 };
 
-export type MarkdownCodeBlockView = MarkdownSourceRange & {
-  kind: "code";
-  contentStartLine: number;
-  contentEndLine: number;
-  lines: string[];
-  text: string;
-  language: string | undefined;
-  fenced: boolean;
-  listItemAncestry: MarkdownListItemAncestry[];
-  blockQuoted: boolean;
-  operational: boolean;
-};
-
-export type MarkdownSemanticUnit =
-  | MarkdownParagraphView
-  | MarkdownCodeBlockView;
-
-type PositionedNode = RootContent | BlockContent;
+type PositionedNode = RootContent;
 
 type NodeRecord = {
   node: PositionedNode;
@@ -65,11 +37,21 @@ type HeadingRecord = MarkdownSourceRange & {
   text: string;
 };
 
-type RemovedRange = { start: number; end: number };
-
-type HtmlCommentSourceRange = MarkdownSourceRange & {
+type SourceColumnRange = MarkdownSourceRange & {
   startColumn: number;
   endColumn: number;
+};
+
+type SemanticOffsetRange = { start: number; end: number };
+type RemovedRange = { start: number; end: number };
+
+type SemanticCandidate = {
+  unit: MarkdownSemanticUnit;
+  operational: boolean;
+};
+
+type CodeBlockCandidate = SemanticCandidate & {
+  contentEndLine: number;
 };
 
 const EXAMPLE_BOUNDARY_RE =
@@ -86,28 +68,26 @@ const SAFETY_HEADING_RE =
   /\b(human approval|safety|constraints?|guardrails?)\b/i;
 
 export class MarkdownSecurityView {
-  readonly lines: string[];
-  readonly bodyStart: number;
-  readonly paragraphs: MarkdownParagraphView[];
-  readonly codeBlocks: MarkdownCodeBlockView[];
-  readonly inlineCodeRanges: MarkdownSourceRange[];
-  readonly htmlRanges: MarkdownSourceRange[];
-  readonly htmlCommentRanges: MarkdownSourceRange[];
-  readonly thematicBreakRanges: MarkdownSourceRange[];
   readonly semanticUnits: MarkdownSemanticUnit[];
 
-  private readonly visibleLines: string[];
-  readonly headings: HeadingRecord[];
-  private readonly blockQuoteLines = new Set<number>();
-  private readonly codeByLine = new Map<number, MarkdownCodeBlockView>();
-  private readonly fenceMarkerLines = new Set<number>();
+  private readonly sourceLines: string[];
+  private readonly bodyStart: number;
   private readonly records: NodeRecord[];
+  private readonly visibleLines: string[];
+  private readonly headings: HeadingRecord[];
+  private readonly thematicBreaks: MarkdownSourceRange[];
+  private readonly blockQuoteLines = new Set<number>();
+  private readonly codeBlockLines = new Set<number>();
+  private readonly codeContentLines = new Set<number>();
+  private readonly inlineCodeByUnit = new WeakMap<
+    MarkdownSemanticUnit,
+    SemanticOffsetRange[]
+  >();
 
   constructor(content: string, bodyStart: number) {
-    this.lines = content.split(/\r?\n/);
+    this.sourceLines = content.split(/\r?\n/);
     this.bodyStart = bodyStart;
-    const bodyOffset = lineStartOffset(content, bodyStart);
-    const body = content.slice(bodyOffset);
+    const body = this.sourceLines.slice(bodyStart).join("\n");
     let tree: Root;
     try {
       tree = fromMarkdown(body);
@@ -120,89 +100,87 @@ export class MarkdownSecurityView {
     }
 
     this.records = collectNodeRecords(tree);
-    this.headings = this.records
-      .filter(
-        (record): record is NodeRecord & { node: Heading } =>
-          record.node.type === "heading",
-      )
-      .map(({ node }) => ({
-        ...sourceRange(node, bodyStart),
-        depth: node.depth,
-        text: nodeText(node),
-      }));
-    this.inlineCodeRanges = this.records
-      .filter(
-        (record): record is NodeRecord & { node: InlineCode } =>
-          record.node.type === "inlineCode",
-      )
-      .map(({ node }) => sourceRange(node, bodyStart));
-    this.htmlRanges = this.records
-      .filter(
-        (record): record is NodeRecord & { node: Html } =>
-          record.node.type === "html",
-      )
-      .map(({ node }) => sourceRange(node, bodyStart));
-    const htmlRecords = this.records.filter(
-      (record): record is NodeRecord & { node: Html } =>
-        record.node.type === "html",
-    );
+    const headings: HeadingRecord[] = [];
+    const thematicBreaks: MarkdownSourceRange[] = [];
+    const inlineCodeRanges: SourceColumnRange[] = [];
+    const htmlRecords: Array<NodeRecord & { node: Html }> = [];
+    const paragraphRecords: Array<NodeRecord & { node: Paragraph }> = [];
+    const codeRecords: Array<NodeRecord & { node: Code }> = [];
+    for (const record of this.records) {
+      switch (record.node.type) {
+        case "heading": {
+          const node = record.node as Heading;
+          headings.push({
+            ...sourceRange(node, bodyStart),
+            depth: node.depth,
+            text: nodeText(node),
+          });
+          break;
+        }
+        case "thematicBreak":
+          thematicBreaks.push(sourceRange(record.node, bodyStart));
+          break;
+        case "inlineCode":
+          inlineCodeRanges.push(sourceColumnRange(record.node, bodyStart));
+          break;
+        case "html":
+          htmlRecords.push(record as NodeRecord & { node: Html });
+          break;
+        case "paragraph":
+          paragraphRecords.push(record as NodeRecord & { node: Paragraph });
+          break;
+        case "code":
+          codeRecords.push(record as NodeRecord & { node: Code });
+      }
+    }
+    this.headings = headings;
+    this.thematicBreaks = thematicBreaks;
     const commentRanges = htmlRecords.flatMap(({ node }) =>
       htmlCommentSourceRanges(node, bodyStart),
     );
-    this.htmlCommentRanges = commentRanges.map(({ startLine, endLine }) => ({
-      startLine,
-      endLine,
-    }));
-    this.thematicBreakRanges = this.records
-      .filter(({ node }) => node.type === "thematicBreak")
-      .map(({ node }) => sourceRange(node, bodyStart));
-    this.visibleLines = stripCommentNodes(this.lines, commentRanges);
+    this.visibleLines = stripCommentRanges(this.sourceLines, commentRanges);
 
     for (const { node, ancestors } of this.records) {
       if (
         node.type === "blockquote" ||
         ancestors.some((ancestor) => ancestor.type === "blockquote")
       ) {
-        const range = sourceRange(node, bodyStart);
-        for (let line = range.startLine; line <= range.endLine; line += 1) {
-          this.blockQuoteLines.add(line - 1);
-        }
+        addLines(this.blockQuoteLines, sourceRange(node, bodyStart));
       }
     }
 
-    this.paragraphs = this.records
-      .filter(
-        (record): record is NodeRecord & { node: Paragraph } =>
-          record.node.type === "paragraph",
-      )
-      .map((record) => this.paragraphView(record, bodyStart));
-    this.paragraphs.push(
-      ...htmlRecords.flatMap((record) =>
-        this.htmlProseViews(record, bodyStart),
-      ),
+    const paragraphCandidates = paragraphRecords.map((record) =>
+      this.paragraphCandidate(record),
     );
-    this.paragraphs.sort((left, right) => left.startLine - right.startLine);
-    this.codeBlocks = this.records
-      .filter(
-        (record): record is NodeRecord & { node: Code } =>
-          record.node.type === "code",
-      )
-      .map((record) => this.codeBlockView(record, bodyStart));
-    for (const code of this.codeBlocks) {
-      for (let line = code.startLine; line <= code.endLine; line += 1) {
-        this.codeByLine.set(line - 1, code);
-      }
-      if (code.fenced) {
-        this.fenceMarkerLines.add(code.startLine - 1);
-        if (code.contentEndLine < code.endLine) {
-          this.fenceMarkerLines.add(code.endLine - 1);
-        }
+    paragraphCandidates.push(
+      ...htmlRecords.flatMap((record) => this.htmlProseCandidates(record)),
+    );
+
+    const codeBlocks = codeRecords.map((record) =>
+      this.codeBlockCandidate(record),
+    );
+    for (const code of codeBlocks) {
+      addLines(this.codeBlockLines, code.unit);
+      const contentStartLine = code.unit.contentStartLine;
+      if (contentStartLine === undefined) continue;
+      if (code.contentEndLine >= contentStartLine) {
+        addLines(this.codeContentLines, {
+          startLine: contentStartLine,
+          endLine: code.contentEndLine,
+        });
       }
     }
-    this.semanticUnits = [
-      ...this.paragraphs.filter((paragraph) => paragraph.operational),
-      ...this.codeBlocks.filter((code) => code.operational),
-    ].sort((left, right) => left.startLine - right.startLine);
+
+    this.semanticUnits = [...paragraphCandidates, ...codeBlocks]
+      .filter((candidate) => candidate.operational)
+      .map((candidate) => candidate.unit)
+      .sort((left, right) => left.startLine - right.startLine);
+    for (const unit of this.semanticUnits) {
+      this.inlineCodeByUnit.set(
+        unit,
+        semanticInlineCodeRanges(unit, this.sourceLines, inlineCodeRanges),
+      );
+    }
   }
 
   visibleLine(lineIndex: number): string {
@@ -213,23 +191,21 @@ export class MarkdownSecurityView {
     return this.blockQuoteLines.has(lineIndex);
   }
 
-  codeBlockAtLine(lineIndex: number): MarkdownCodeBlockView | undefined {
-    return this.codeByLine.get(lineIndex);
+  isCodeBlockLine(lineIndex: number): boolean {
+    return this.codeBlockLines.has(lineIndex);
   }
 
   isCodeContentLine(lineIndex: number): boolean {
-    return (
-      this.codeByLine.has(lineIndex) && !this.fenceMarkerLines.has(lineIndex)
-    );
+    return this.codeContentLines.has(lineIndex);
   }
 
-  isFenceMarkerLine(lineIndex: number): boolean {
-    return this.fenceMarkerLines.has(lineIndex);
-  }
-
-  isInlineCodeLine(line: number): boolean {
-    return this.inlineCodeRanges.some(
-      (range) => range.startLine <= line && range.endLine >= line,
+  isInlineCodeSemanticSpan(
+    unit: MarkdownSemanticUnit,
+    start: number,
+    end: number,
+  ): boolean {
+    return (this.inlineCodeByUnit.get(unit) ?? []).some(
+      (range) => range.start < end && start < range.end,
     );
   }
 
@@ -239,7 +215,7 @@ export class MarkdownSecurityView {
   ): boolean {
     const startLine = firstLineIndex + 1;
     const endLine = lastLineIndex + 1;
-    return ![...this.headings, ...this.thematicBreakRanges].some(
+    return ![...this.headings, ...this.thematicBreaks].some(
       (boundary) =>
         boundary.startLine > startLine && boundary.startLine <= endLine,
     );
@@ -255,34 +231,22 @@ export class MarkdownSecurityView {
       .find((ancestor) => ancestor.type === "listItem");
     if (listItem !== undefined) {
       const range = sourceRange(listItem, this.bodyStart);
-      for (let current = range.startLine; current <= line; current += 1) {
-        candidates.add(current - 1);
-      }
+      addLines(candidates, { ...range, endLine: line });
     }
 
     const previous = record.parent.children[record.index - 1];
     if (previous?.type === "paragraph") {
-      const range = sourceRange(previous, this.bodyStart);
-      for (
-        let current = range.startLine;
-        current <= range.endLine;
-        current += 1
-      ) {
-        candidates.add(current - 1);
-      }
+      addLines(candidates, sourceRange(previous, this.bodyStart));
     }
 
     const safetyHeading = [...this.headingChainAt(line)]
       .reverse()
       .find((heading) => SAFETY_HEADING_RE.test(heading.text));
     if (safetyHeading !== undefined) {
-      for (
-        let current = safetyHeading.endLine + 1;
-        current <= line;
-        current += 1
-      ) {
-        candidates.add(current - 1);
-      }
+      addLines(candidates, {
+        startLine: safetyHeading.endLine + 1,
+        endLine: line,
+      });
     }
     candidates.delete(lineIndex);
     return [...candidates]
@@ -301,11 +265,10 @@ export class MarkdownSecurityView {
       .join("\n");
   }
 
-  private paragraphView(
+  private paragraphCandidate(
     record: NodeRecord & { node: Paragraph },
-    bodyStart: number,
-  ): MarkdownParagraphView {
-    const range = sourceRange(record.node, bodyStart);
+  ): SemanticCandidate {
+    const range = sourceRange(record.node, this.bodyStart);
     const lines = this.visibleLines
       .slice(range.startLine - 1, range.endLine)
       .map((line) => line.trim());
@@ -313,12 +276,7 @@ export class MarkdownSecurityView {
       (ancestor) => ancestor.type === "blockquote",
     );
     return {
-      kind: "paragraph",
-      ...range,
-      lines,
-      text: lines.join(" ").trim(),
-      listItemAncestry: listAncestry(record.ancestors, bodyStart),
-      blockQuoted,
+      unit: { kind: "paragraph", ...range, lines },
       operational:
         !blockQuoted &&
         !lines.every((line) => /^\s*\/\//.test(line)) &&
@@ -326,46 +284,38 @@ export class MarkdownSecurityView {
     };
   }
 
-  private codeBlockView(
+  private codeBlockCandidate(
     record: NodeRecord & { node: Code },
-    bodyStart: number,
-  ): MarkdownCodeBlockView {
-    const range = sourceRange(record.node, bodyStart);
-    const opening = this.lines[range.startLine - 1]?.slice(
+  ): CodeBlockCandidate {
+    const range = sourceRange(record.node, this.bodyStart);
+    const opening = this.sourceLines[range.startLine - 1]?.slice(
       (record.node.position?.start.column ?? 1) - 1,
     );
     const fenced = /^(?:`{3,}|~{3,})/.test(opening ?? "");
-    const closing =
+    const closed =
       fenced &&
       range.endLine > range.startLine &&
-      /^(?:`{3,}|~{3,})\s*$/.test(this.lines[range.endLine - 1]?.trim() ?? "");
+      /^(?:`{3,}|~{3,})\s*$/.test(
+        this.sourceLines[range.endLine - 1]?.trim() ?? "",
+      );
     const contentStartLine = fenced ? range.startLine + 1 : range.startLine;
-    const contentEndLine =
-      fenced && closing ? range.endLine - 1 : range.endLine;
+    const contentEndLine = fenced && closed ? range.endLine - 1 : range.endLine;
     const lines =
       contentEndLine < contentStartLine
         ? []
-        : this.lines.slice(contentStartLine - 1, contentEndLine);
-    const blockQuoted = record.ancestors.some(
-      (ancestor) => ancestor.type === "blockquote",
-    );
+        : this.sourceLines.slice(contentStartLine - 1, contentEndLine);
     const language = record.node.lang?.toLowerCase();
     const semanticLanguage =
       language === undefined ||
       language === "text" ||
       language === "markdown" ||
       language === "md";
+    const blockQuoted = record.ancestors.some(
+      (ancestor) => ancestor.type === "blockquote",
+    );
     return {
-      kind: "code",
-      ...range,
-      contentStartLine,
+      unit: { kind: "code", ...range, contentStartLine, lines },
       contentEndLine,
-      lines,
-      text: record.node.value,
-      language,
-      fenced,
-      listItemAncestry: listAncestry(record.ancestors, bodyStart),
-      blockQuoted,
       operational:
         fenced &&
         semanticLanguage &&
@@ -375,56 +325,38 @@ export class MarkdownSecurityView {
     };
   }
 
-  private isOperationalFence(record: NodeRecord, line: number): boolean {
-    const previous = record.parent.children[record.index - 1];
-    const previousText = previous === undefined ? "" : nodeText(previous);
-    return (
-      OPERATIONAL_FENCE_ROUTING_RE.test(previousText) ||
-      OPERATIONAL_FENCE_LABEL_RE.test(previousText) ||
-      this.headingChainAt(line).some((heading) =>
-        OPERATIONAL_FENCE_HEADING_RE.test(heading.text),
-      )
-    );
-  }
-
-  private htmlProseViews(
+  private htmlProseCandidates(
     record: NodeRecord & { node: Html },
-    bodyStart: number,
-  ): MarkdownParagraphView[] {
+  ): SemanticCandidate[] {
     if (
       /^\s*<(?:script|pre|style|textarea)(?=[\s>])/i.test(record.node.value)
     ) {
       return [];
     }
-    const range = sourceRange(record.node, bodyStart);
+    const range = sourceRange(record.node, this.bodyStart);
     const visible = this.visibleLines.slice(range.startLine - 1, range.endLine);
-    const views: MarkdownParagraphView[] = [];
+    const candidates: SemanticCandidate[] = [];
     let runStart = -1;
     let runLines: string[] = [];
     const flush = (): void => {
       if (runStart < 0 || runLines.length === 0) return;
       const startLine = range.startLine + runStart;
-      const endLine = startLine + runLines.length - 1;
-      const text = runLines
-        .map((line) => line.trim())
-        .join(" ")
-        .trim();
-      if (text.length > 0) {
+      const lines = runLines.map((line) => line.trim());
+      if (lines.join(" ").trim().length > 0) {
         const blockQuoted = record.ancestors.some(
           (ancestor) => ancestor.type === "blockquote",
         );
-        views.push({
-          kind: "paragraph",
-          startLine,
-          endLine,
-          lines: runLines.map((line) => line.trim()),
-          text,
-          listItemAncestry: listAncestry(record.ancestors, bodyStart),
-          blockQuoted,
+        candidates.push({
+          unit: {
+            kind: "paragraph",
+            startLine,
+            endLine: startLine + lines.length - 1,
+            lines,
+          },
           operational:
             !blockQuoted &&
             !this.isNonOperationalExample(record, startLine) &&
-            !runLines.every((line) => /^\s*\/\//.test(line)),
+            !lines.every((line) => /^\s*\/\//.test(line)),
         });
       }
       runStart = -1;
@@ -446,7 +378,19 @@ export class MarkdownSecurityView {
       runLines.push(line);
     });
     flush();
-    return views;
+    return candidates;
+  }
+
+  private isOperationalFence(record: NodeRecord, line: number): boolean {
+    const previous = record.parent.children[record.index - 1];
+    const previousText = previous === undefined ? "" : nodeText(previous);
+    return (
+      OPERATIONAL_FENCE_ROUTING_RE.test(previousText) ||
+      OPERATIONAL_FENCE_LABEL_RE.test(previousText) ||
+      this.headingChainAt(line).some((heading) =>
+        OPERATIONAL_FENCE_HEADING_RE.test(heading.text),
+      )
+    );
   }
 
   private isNonOperationalExample(record: NodeRecord, line: number): boolean {
@@ -477,7 +421,7 @@ export class MarkdownSecurityView {
     if (heading === undefined) {
       return {
         startLine: Math.max(this.bodyStart + 1, line - 6),
-        endLine: Math.min(this.lines.length, line + 6),
+        endLine: Math.min(this.sourceLines.length, line + 6),
       };
     }
     const next = this.headings.find(
@@ -487,34 +431,17 @@ export class MarkdownSecurityView {
     );
     return {
       startLine: heading.endLine + 1,
-      endLine: (next?.startLine ?? this.lines.length + 1) - 1,
+      endLine: (next?.startLine ?? this.sourceLines.length + 1) - 1,
     };
   }
 
   private smallestBlockRecordAtLine(line: number): NodeRecord | undefined {
-    return this.records
-      .filter(({ node }) => {
-        if (!isBlockNode(node)) return false;
-        const range = sourceRange(node, this.bodyStart);
-        return range.startLine <= line && range.endLine >= line;
-      })
-      .sort((left, right) => {
-        const leftRange = sourceRange(left.node, this.bodyStart);
-        const rightRange = sourceRange(right.node, this.bodyStart);
-        return (
-          leftRange.endLine -
-          leftRange.startLine -
-          (rightRange.endLine - rightRange.startLine)
-        );
-      })[0];
+    return this.records.findLast(({ node }) => {
+      if (!isBlockNode(node)) return false;
+      const range = sourceRange(node, this.bodyStart);
+      return range.startLine <= line && range.endLine >= line;
+    });
   }
-}
-
-export function createMarkdownSecurityView(
-  content: string,
-  bodyStart: number,
-): MarkdownSecurityView {
-  return new MarkdownSecurityView(content, bodyStart);
 }
 
 function collectNodeRecords(root: Root): NodeRecord[] {
@@ -538,37 +465,29 @@ function sourceRange(
   node: { position?: Position | undefined },
   bodyStart: number,
 ): MarkdownSourceRange {
-  const position = node.position;
-  if (position === undefined) {
-    throw new Error(
-      "Markdown parser returned a node without a source position",
-    );
-  }
+  const position = requiredPosition(node);
   return {
     startLine: bodyStart + position.start.line,
     endLine: bodyStart + position.end.line,
   };
 }
 
-function listAncestry(
-  ancestors: Parent[],
+function sourceColumnRange(
+  node: { position?: Position | undefined },
   bodyStart: number,
-): MarkdownListItemAncestry[] {
-  const ancestry: MarkdownListItemAncestry[] = [];
-  for (let index = 0; index < ancestors.length; index += 1) {
-    const node = ancestors[index];
-    if (node === undefined || node.type !== "listItem") continue;
-    const list = [...ancestors.slice(0, index)]
-      .reverse()
-      .find((ancestor): ancestor is List => ancestor.type === "list");
-    ancestry.push({
-      ...sourceRange(node, bodyStart),
-      depth: ancestry.length + 1,
-      ordered: list?.ordered ?? false,
-      start: list?.start ?? undefined,
-    });
-  }
-  return ancestry;
+): SourceColumnRange {
+  const position = requiredPosition(node);
+  return {
+    startLine: bodyStart + position.start.line,
+    endLine: bodyStart + position.end.line,
+    startColumn: position.start.column,
+    endColumn: position.end.column,
+  };
+}
+
+function requiredPosition(node: { position?: Position | undefined }): Position {
+  if (node.position !== undefined) return node.position;
+  throw new Error("Markdown parser returned a node without a source position");
 }
 
 function nodeText(node: RootContent | Parent): string {
@@ -583,9 +502,43 @@ function nodeText(node: RootContent | Parent): string {
   return "";
 }
 
-function stripCommentNodes(
+function semanticInlineCodeRanges(
+  unit: MarkdownSemanticUnit,
+  sourceLines: string[],
+  inlineCodeRanges: SourceColumnRange[],
+): SemanticOffsetRange[] {
+  if (unit.kind === "code") return [];
+  const lineOffsets: number[] = [];
+  let offset = 0;
+  for (const line of unit.lines) {
+    lineOffsets.push(offset);
+    offset += line.length + 1;
+  }
+  const semanticOffset = (line: number, column: number): number => {
+    const lineIndex = line - unit.startLine;
+    const semanticLine = unit.lines[lineIndex] ?? "";
+    const sourceLine = sourceLines[line - 1] ?? "";
+    const leadingWhitespace = sourceLine.length - sourceLine.trimStart().length;
+    const columnOffset = Math.max(
+      0,
+      Math.min(semanticLine.length, column - 1 - leadingWhitespace),
+    );
+    return (lineOffsets[lineIndex] ?? 0) + columnOffset;
+  };
+  return inlineCodeRanges
+    .filter(
+      (range) =>
+        range.startLine >= unit.startLine && range.endLine <= unit.endLine,
+    )
+    .map((range) => ({
+      start: semanticOffset(range.startLine, range.startColumn),
+      end: semanticOffset(range.endLine, range.endColumn),
+    }));
+}
+
+function stripCommentRanges(
   lines: string[],
-  comments: HtmlCommentSourceRange[],
+  comments: SourceColumnRange[],
 ): string[] {
   const removals = new Map<number, RemovedRange[]>();
   for (const comment of comments) {
@@ -602,19 +555,32 @@ function stripCommentNodes(
       removals.set(line, existing);
     }
   }
-  return lines.map((line, index) => removeRanges(line, removals.get(index)));
+  return lines.map((line, index) => {
+    const ranges = removals.get(index);
+    if (ranges === undefined) return line;
+    let cursor = 0;
+    let result = "";
+    for (const range of ranges.sort(
+      (left, right) => left.start - right.start,
+    )) {
+      result += line.slice(cursor, range.start);
+      cursor = Math.max(cursor, range.end);
+      if (result.length > 0 && !/\s$/.test(result)) result += " ";
+    }
+    return result + line.slice(cursor);
+  });
 }
 
 function htmlCommentSourceRanges(
   node: Html,
   bodyStart: number,
-): HtmlCommentSourceRange[] {
+): SourceColumnRange[] {
   if (/^\s*<(?:script|pre|style|textarea)(?=[\s>])/i.test(node.value)) {
     return [];
   }
   const position = node.position;
   if (position === undefined) return [];
-  const ranges: HtmlCommentSourceRange[] = [];
+  const ranges: SourceColumnRange[] = [];
   let cursor = 0;
   while (cursor < node.value.length) {
     const start = node.value.indexOf("<!--", cursor);
@@ -659,31 +625,10 @@ function relativeSourcePoint(
   };
 }
 
-function removeRanges(
-  line: string,
-  ranges: RemovedRange[] | undefined,
-): string {
-  if (ranges === undefined || ranges.length === 0) return line;
-  let cursor = 0;
-  let result = "";
-  for (const range of ranges.sort((left, right) => left.start - right.start)) {
-    const visible = line.slice(cursor, range.start);
-    result += visible;
-    cursor = Math.max(cursor, range.end);
-    if (result.length > 0 && !/\s$/.test(result)) result += " ";
+function addLines(target: Set<number>, range: MarkdownSourceRange): void {
+  for (let line = range.startLine; line <= range.endLine; line += 1) {
+    target.add(line - 1);
   }
-  result += line.slice(cursor);
-  return result;
-}
-
-function lineStartOffset(content: string, lineIndex: number): number {
-  let offset = 0;
-  for (let line = 0; line < lineIndex; line += 1) {
-    const next = content.indexOf("\n", offset);
-    if (next < 0) return content.length;
-    offset = next + 1;
-  }
-  return offset;
 }
 
 function isBlockNode(node: PositionedNode): boolean {

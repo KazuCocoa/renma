@@ -18,8 +18,7 @@ import {
   skillArtifactsByDirectory,
 } from "./security-policy-inventory.js";
 import {
-  createMarkdownSecurityView,
-  type MarkdownSecurityView,
+  MarkdownSecurityView,
   type MarkdownSemanticUnit,
 } from "./markdown-security-view.js";
 
@@ -843,7 +842,7 @@ function securityFindingsForArtifact(
     artifact.markdownParserEligible,
   );
   const markdownView = artifact.markdownParserEligible
-    ? createMarkdownSecurityView(artifact.content, scanStart)
+    ? new MarkdownSecurityView(artifact.content, scanStart)
     : undefined;
   const detections: Detection[] = [
     ...(policyArtifact === artifact
@@ -890,7 +889,7 @@ function securityFindingsForArtifact(
   for (let index = scanStart; index < lines.length; index += 1) {
     const lineNumber = index + 1;
     const line = lines[index] ?? "";
-    const inCode = markdownView?.codeBlockAtLine(index) !== undefined;
+    const inCode = markdownView?.isCodeBlockLine(index) ?? false;
 
     const strippedComment = line.replace(/^\s*(#|\/\/)\s*/, "");
     const shellComment =
@@ -1035,7 +1034,7 @@ function bodyPolicyContradictionDetections(
   for (let index = scanStart; index < lines.length; index += 1) {
     const line = lines[index] ?? "";
     if (
-      markdownView?.codeBlockAtLine(index) !== undefined ||
+      (markdownView?.isCodeBlockLine(index) ?? false) ||
       (markdownParserEligible && isPolicyLine(line))
     )
       continue;
@@ -1820,7 +1819,9 @@ function semanticInstructionDetections(
 ): Detection[] {
   const detections: Detection[] = [];
   const firstLine =
-    unit.kind === "code" ? unit.contentStartLine : unit.startLine;
+    unit.kind === "code"
+      ? (unit.contentStartLine ?? unit.startLine)
+      : unit.startLine;
   const instructionLines = unit.lines.map((line) => line.trim());
   const instructionText = instructionLines.join(" ");
   if (!instructionText.trim()) return detections;
@@ -1868,13 +1869,12 @@ function semanticInstructionDetections(
     (action) =>
       UNTRUSTED_CONTENT_SOURCE_RE.test(instructionText.slice(0, action.end)) &&
       !isDefensiveUntrustedAction(sentences, action) &&
-      !hasPrecedingReviewGuard(sentences, action, (sentence) => {
-        const sentenceLineIndex = semanticLineIndexAtOffset(
-          lineOffsets,
-          sentence.start,
-        );
-        return !markdownView.isInlineCodeLine(firstLine + sentenceLineIndex);
-      }),
+      !hasPrecedingReviewGuard(
+        sentences,
+        action,
+        (guard) =>
+          !markdownView.isInlineCodeSemanticSpan(unit, guard.start, guard.end),
+      ),
   );
   if (untrustedAction !== undefined) {
     const actionLineIndex = semanticLineIndexAtOffset(
@@ -2066,18 +2066,17 @@ function isDefensiveUntrustedAction(
 function hasPrecedingReviewGuard(
   sentences: SemanticTextSpan[],
   action: UntrustedExecutionAction,
-  guardIsOperational: (sentence: SemanticTextSpan) => boolean = () => true,
+  guardIsOperational: (guard: SemanticTextSpan) => boolean = () => true,
 ): boolean {
   const sentence = sentences[action.sentenceIndex];
   if (sentence === undefined) return false;
   if (CONTRADICTORY_REVIEW_ACTION_RE.test(sentence.text)) return false;
 
-  const sameSentenceGuards = guardIsOperational(sentence)
-    ? reviewGuardActions(sentence)
-    : [];
+  const sameSentenceGuards = reviewGuardActions(sentence);
   if (
     sameSentenceGuards.some(
       (guard) =>
+        guardIsOperational(guard) &&
         guard.start < action.start &&
         guard.targetStart === action.start &&
         guard.verb === action.verb,
@@ -2089,9 +2088,9 @@ function hasPrecedingReviewGuard(
   const precedingSentence = sentences[action.sentenceIndex - 1];
   return (
     precedingSentence !== undefined &&
-    guardIsOperational(precedingSentence) &&
     reviewGuardActions(precedingSentence).some(
       (guard) =>
+        guardIsOperational(guard) &&
         guard.verb === action.verb &&
         reviewGuardScopeCovers(precedingSentence.text, sentence.text),
     )
@@ -2121,9 +2120,13 @@ function untrustedSourceSpans(text: string): string[] {
 
 function reviewGuardActions(
   sentence: SemanticTextSpan,
-): Array<{ start: number; targetStart: number; verb: UntrustedActionVerb }> {
+): Array<
+  SemanticTextSpan & { targetStart: number; verb: UntrustedActionVerb }
+> {
   const guards: Array<{
+    text: string;
     start: number;
+    end: number;
     targetStart: number;
     verb: UntrustedActionVerb;
   }> = [];
@@ -2143,7 +2146,9 @@ function reviewGuardActions(
     if (target === null || verb === undefined) continue;
     const start = sentence.start + (match.index ?? 0);
     guards.push({
+      text,
       start,
+      end: start + text.length,
       targetStart: start + before + (target.index ?? 0),
       verb,
     });

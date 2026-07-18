@@ -312,14 +312,14 @@ approval when policy requires it. Inside any fenced code block, `<!--` and
 `-->` are literal content and do not change HTML-comment state outside the
 fence. They are also literal inside matched variable-length backtick code spans.
 Eligible Markdown is parsed once with a CommonMark-compatible parser. Renma
-uses its positioned paragraph, list and list-item ancestry, heading, thematic
-break, block quote, raw HTML, inline-code, and fenced or indented code nodes as
-the authoritative structural boundaries. This preserves CommonMark behavior
+uses positioned paragraph and list-item boundaries, headings, thematic breaks,
+block quotes, raw HTML, inline code, and fenced or indented code as the
+authoritative structure. The paragraph and list-item boundaries prevent sibling
+or nested instructions from being combined. This preserves CommonMark behavior
 for multiline code spans, HTML blocks, inline HTML, ordered-marker lengths,
 container-relative indentation and padding, tabs, nesting, sibling items, and
-lazy paragraph continuations without a separate delimiter or list-owner parser.
-Parser state begins at the Markdown body after YAML frontmatter, and positioned
-body ranges are mapped back to original artifact line numbers.
+lazy continuations without a separate delimiter or list-owner parser. Parser
+state begins after frontmatter, and body ranges map back to original lines.
 
 ### Untrusted content and external traversal
 
@@ -356,8 +356,9 @@ matching share the review, validation, verification, inspection, and checking
 vocabulary, including their inflected forms.
 Semantic windows follow positioned CommonMark paragraphs. Valid indented or
 lazy continuations remain part of their parsed paragraph, while sibling and
-nested list items have distinct ancestry and are not combined. Ordinary
-adjacent prose in one paragraph remains eligible for bounded multiline matching.
+nested list items are separated by their AST boundaries and are not combined.
+Ordinary adjacent prose in one paragraph remains eligible for bounded multiline
+matching.
 
 If a workflow explicitly traverses external sources recursively, put its source
 and destination scope, relevance test, logical visited identity and cycle
