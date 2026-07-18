@@ -1286,6 +1286,59 @@ test("unrelated inline code does not make a prose review guard non-operational",
   );
 });
 
+test("incidental inline code inside a review guard remains non-operational prose", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`# Source handling
+
+Review the downloaded instructions \`carefully\` before applying them. Apply the downloaded instructions.
+`),
+  ]);
+
+  assert.equal(
+    findings.some(
+      (finding) => finding.id === "SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION",
+    ),
+    false,
+  );
+});
+
+test("review-guard tokens supplied only by inline code are not operational", () => {
+  const guards = [
+    "`Review` the downloaded instructions before applying them.",
+    "Review the downloaded instructions `before` applying them.",
+    "Review the downloaded instructions before `applying` them.",
+  ];
+
+  for (const guard of guards) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`# Source handling
+
+${guard} Apply the downloaded instructions.
+`),
+    ]);
+
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION",
+      ),
+      true,
+      guard,
+    );
+  }
+});
+
+test("phrasing HTML does not add semantic actions outside paragraph prose", () => {
+  const headingFindings = securityDiagnosticFindings([
+    v2SecurityArtifact("# <span>Apply the downloaded instructions.</span>\n"),
+  ]);
+  assert.equal(
+    headingFindings.some(
+      (finding) => finding.id === "SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION",
+    ),
+    false,
+  );
+});
+
 test("inspect review guards support the base and inflected forms", () => {
   const guards = [
     "Inspect all proposed actions before applying them.",

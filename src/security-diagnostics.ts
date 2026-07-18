@@ -1865,16 +1865,12 @@ function semanticInstructionDetections(
   }
 
   const sentences = semanticSentenceSpans(instructionText);
+  const reviewGuardText = markdownView.inlineCodeProse(unit, instructionText);
   const untrustedAction = untrustedExecutionActions(sentences).find(
     (action) =>
       UNTRUSTED_CONTENT_SOURCE_RE.test(instructionText.slice(0, action.end)) &&
       !isDefensiveUntrustedAction(sentences, action) &&
-      !hasPrecedingReviewGuard(
-        sentences,
-        action,
-        (guard) =>
-          !markdownView.isInlineCodeSemanticSpan(unit, guard.start, guard.end),
-      ),
+      !hasPrecedingReviewGuard(sentences, action, reviewGuardText),
   );
   if (untrustedAction !== undefined) {
     const actionLineIndex = semanticLineIndexAtOffset(
@@ -2066,17 +2062,23 @@ function isDefensiveUntrustedAction(
 function hasPrecedingReviewGuard(
   sentences: SemanticTextSpan[],
   action: UntrustedExecutionAction,
-  guardIsOperational: (guard: SemanticTextSpan) => boolean = () => true,
+  guardText: string,
 ): boolean {
   const sentence = sentences[action.sentenceIndex];
   if (sentence === undefined) return false;
   if (CONTRADICTORY_REVIEW_ACTION_RE.test(sentence.text)) return false;
 
-  const sameSentenceGuards = reviewGuardActions(sentence);
+  const guardSentences = semanticSentenceSpans(guardText);
+  const guardActionSentence = guardSentences.find(
+    (candidate) =>
+      candidate.start <= action.start && action.start < candidate.end,
+  );
+  if (guardActionSentence === undefined) return false;
+
+  const sameSentenceGuards = reviewGuardActions(guardActionSentence);
   if (
     sameSentenceGuards.some(
       (guard) =>
-        guardIsOperational(guard) &&
         guard.start < action.start &&
         guard.targetStart === action.start &&
         guard.verb === action.verb,
@@ -2085,12 +2087,13 @@ function hasPrecedingReviewGuard(
     return true;
   }
 
-  const precedingSentence = sentences[action.sentenceIndex - 1];
+  const precedingSentence = guardSentences.findLast(
+    (candidate) => candidate.end <= guardActionSentence.start,
+  );
   return (
     precedingSentence !== undefined &&
     reviewGuardActions(precedingSentence).some(
       (guard) =>
-        guardIsOperational(guard) &&
         guard.verb === action.verb &&
         reviewGuardScopeCovers(precedingSentence.text, sentence.text),
     )

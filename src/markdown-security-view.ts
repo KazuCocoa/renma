@@ -120,6 +120,9 @@ export class MarkdownSecurityView {
         case "thematicBreak":
           thematicBreaks.push(sourceRange(record.node, bodyStart));
           break;
+        case "blockquote":
+          addLines(this.blockQuoteLines, sourceRange(record.node, bodyStart));
+          break;
         case "inlineCode":
           inlineCodeRanges.push(sourceColumnRange(record.node, bodyStart));
           break;
@@ -140,20 +143,19 @@ export class MarkdownSecurityView {
     );
     this.visibleLines = stripCommentRanges(this.sourceLines, commentRanges);
 
-    for (const { node, ancestors } of this.records) {
-      if (
-        node.type === "blockquote" ||
-        ancestors.some((ancestor) => ancestor.type === "blockquote")
-      ) {
-        addLines(this.blockQuoteLines, sourceRange(node, bodyStart));
-      }
-    }
-
     const paragraphCandidates = paragraphRecords.map((record) =>
       this.paragraphCandidate(record),
     );
     paragraphCandidates.push(
-      ...htmlRecords.flatMap((record) => this.htmlProseCandidates(record)),
+      ...htmlRecords
+        .filter(
+          (record) =>
+            !record.ancestors.some(
+              (ancestor) =>
+                ancestor.type === "paragraph" || ancestor.type === "heading",
+            ),
+        )
+        .flatMap((record) => this.htmlProseCandidates(record)),
     );
 
     const codeBlocks = codeRecords.map((record) =>
@@ -199,14 +201,17 @@ export class MarkdownSecurityView {
     return this.codeContentLines.has(lineIndex);
   }
 
-  isInlineCodeSemanticSpan(
-    unit: MarkdownSemanticUnit,
-    start: number,
-    end: number,
-  ): boolean {
-    return (this.inlineCodeByUnit.get(unit) ?? []).some(
-      (range) => range.start < end && start < range.end,
-    );
+  inlineCodeProse(unit: MarkdownSemanticUnit, text: string): string {
+    let projection = text;
+    for (const range of this.inlineCodeByUnit.get(unit) ?? []) {
+      const start = Math.max(0, Math.min(projection.length, range.start));
+      const end = Math.max(start, Math.min(projection.length, range.end));
+      projection =
+        projection.slice(0, start) +
+        " ".repeat(end - start) +
+        projection.slice(end);
+    }
+    return projection;
   }
 
   sameStructuralSection(
@@ -448,17 +453,25 @@ function collectNodeRecords(root: Root): NodeRecord[] {
   const records: NodeRecord[] = [];
   const visit = (parent: Parent, ancestors: Parent[]): void => {
     parent.children.forEach((node, index) => {
-      records.push({
-        node: node as PositionedNode,
-        parent,
-        index,
-        ancestors,
-      });
+      if (isSecurityRecordType(node.type)) {
+        records.push({
+          node: node as PositionedNode,
+          parent,
+          index,
+          ancestors,
+        });
+      }
       if ("children" in node) visit(node, [...ancestors, node]);
     });
   };
   visit(root, [root]);
   return records;
+}
+
+function isSecurityRecordType(type: string): boolean {
+  return /^(?:blockquote|code|heading|html|inlineCode|paragraph|thematicBreak)$/.test(
+    type,
+  );
 }
 
 function sourceRange(
