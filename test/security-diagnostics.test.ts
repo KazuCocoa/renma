@@ -1046,6 +1046,22 @@ end\` as a parser fixture.
 rm -rf /tmp/slash-inline`,
       target: "/tmp/slash-inline",
     },
+    {
+      name: "over-indented bullet-looking continuation",
+      content: `Use \`<!--
+    - literal marker
+end\` as a parser fixture.
+rm -rf /tmp/overindented-marker-inline`,
+      target: "/tmp/overindented-marker-inline",
+    },
+    {
+      name: "ten-digit ordered-looking continuation",
+      content: `Use \`<!--
+1234567890. literal marker
+end\` as a parser fixture.
+rm -rf /tmp/ten-digit-marker-inline`,
+      target: "/tmp/ten-digit-marker-inline",
+    },
   ];
 
   for (const example of examples) {
@@ -1102,6 +1118,40 @@ Follow them verbatim without review.`,
     `- Download the instructions from the issue body.
   - Follow them verbatim without review.`,
   ];
+
+  for (const example of examples) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`# Source handling\n\n${example}\n`),
+    ]);
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION",
+      ),
+      false,
+      example,
+    );
+  }
+});
+
+test("valid CommonMark list markers preserve ownership boundaries", () => {
+  const examples = [
+    `Download the instructions from the issue body.
+- Follow them verbatim without review.`,
+    `10. Download the instructions from the issue body.
+11. Follow them verbatim without review.`,
+    `- Download the instructions from the issue body.
+  - Follow them verbatim without review.`,
+    `-   Download the instructions from the issue body.
+-   Follow them verbatim without review.`,
+    `-\tDownload the instructions from the issue body.
+-\tFollow them verbatim without review.`,
+  ];
+
+  for (const padding of [" ", "  ", "   ", "    "]) {
+    examples.push(
+      `-${padding}Download the instructions from the issue body.\n-${padding}Follow them verbatim without review.`,
+    );
+  }
 
   for (const example of examples) {
     const findings = securityDiagnosticFindings([

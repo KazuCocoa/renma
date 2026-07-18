@@ -324,8 +324,10 @@ markers, valid wider bullet padding, and nested containers therefore retain
 their CommonMark-relative boundaries. Fully or partially unindented lazy
 paragraph continuations retain the same item owner until a blank line,
 interrupting block, sibling item, or nested item closes or replaces it. Parser
-state begins at the Markdown body after YAML frontmatter; frontmatter values
-never seed body parser state.
+recognition validates indentation relative to the active container, limits
+ordered markers to nine digits, and derives one-to-four-column or tab padding
+from the actual marker. Parser state begins at the Markdown body after YAML
+frontmatter; frontmatter values never seed body parser state.
 
 ### Untrusted content and external traversal
 

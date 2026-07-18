@@ -2302,15 +2302,90 @@ function reviewGuardActions(
   return guards;
 }
 
+type MarkdownListItem = {
+  indent: number;
+  contentColumn: number;
+  orderedStart?: number;
+};
+
 function markdownListItem(
-  line: string,
-): { indent: number; contentColumn: number } | undefined {
-  const match = line.match(/^([ \t]*)(?:[-*+]|\d+[.)])[ \t]+/);
+  lines: string[],
+  lineIndex: number,
+): MarkdownListItem | undefined {
+  const listItem = markdownListMarker(lines[lineIndex] ?? "");
+  if (listItem === undefined) return undefined;
+  const validContainerIndent = markdownActiveListContentColumnsBefore(
+    lines,
+    lineIndex,
+  ).some(
+    (contentColumn) =>
+      listItem.indent >= contentColumn && listItem.indent - contentColumn <= 3,
+  );
+  if (!validContainerIndent) return undefined;
+  if (
+    listItem.orderedStart !== undefined &&
+    listItem.orderedStart !== 1 &&
+    unownedMarkdownParagraphOpenBefore(lines, lineIndex)
+  ) {
+    return undefined;
+  }
+  return listItem;
+}
+
+function markdownListMarker(line: string): MarkdownListItem | undefined {
+  const match = line.match(/^([ \t]*)(?:([-*+])|(\d{1,9})[.)])([ \t]*)(.*)$/);
   if (match === null) return undefined;
+  const padding = match[4] ?? "";
+  const content = match[5] ?? "";
+  if (!padding && content) return undefined;
+  const marker = match[2] ?? `${match[3] ?? ""}.`;
+  const markerEndColumn = markdownColumn(`${match[1] ?? ""}${marker}`);
+  const paddingEndColumn = markdownColumn(
+    `${match[1] ?? ""}${marker}${padding}`,
+  );
+  const paddingColumns = paddingEndColumn - markerEndColumn;
   return {
     indent: markdownIndent(match[1] ?? ""),
-    contentColumn: markdownColumn(match[0]),
+    contentColumn:
+      paddingColumns >= 1 && paddingColumns <= 4
+        ? paddingEndColumn
+        : markerEndColumn + 1,
+    ...(match[3] === undefined
+      ? {}
+      : { orderedStart: Number.parseInt(match[3], 10) }),
   };
+}
+
+function markdownActiveListContentColumnsBefore(
+  lines: string[],
+  lineIndex: number,
+): number[] {
+  const contentColumns = [0];
+  const seenOwners = new Set<number>();
+  let probe = lineIndex - 1;
+  while (probe >= 0) {
+    const owner = markdownListItemOwner(lines, probe);
+    if (owner === undefined || seenOwners.has(owner)) break;
+    seenOwners.add(owner);
+    const listItem = markdownListItem(lines, owner);
+    if (listItem === undefined) break;
+    contentColumns.push(listItem.contentColumn);
+    probe = owner - 1;
+  }
+  return contentColumns;
+}
+
+function unownedMarkdownParagraphOpenBefore(
+  lines: string[],
+  lineIndex: number,
+): boolean {
+  if (lineIndex <= 0) return false;
+  const previousLine = lines[lineIndex - 1] ?? "";
+  return (
+    !!previousLine.trim() &&
+    !isMarkdownInlineBlockBoundaryLine(previousLine) &&
+    markdownListItemOwner(lines, lineIndex - 1) === undefined
+  );
 }
 
 function markdownListContainerRelativeLine(
@@ -2320,7 +2395,7 @@ function markdownListContainerRelativeLine(
 ): string {
   const line = lines[lineIndex] ?? "";
   if (listItemOwner === undefined) return line;
-  const listItem = markdownListItem(lines[listItemOwner] ?? "");
+  const listItem = markdownListItem(lines, listItemOwner);
   if (listItem === undefined) return line;
   return stripMarkdownIndentColumns(line, listItem.contentColumn) ?? line;
 }
@@ -2329,12 +2404,11 @@ function markdownListItemOwner(
   lines: string[],
   lineIndex: number,
 ): number | undefined {
-  const line = lines[lineIndex] ?? "";
-  if (markdownListItem(line) !== undefined) return lineIndex;
+  if (markdownListItem(lines, lineIndex) !== undefined) return lineIndex;
   for (let index = lineIndex - 1; index >= 0; index -= 1) {
     const candidate = lines[index] ?? "";
     if (!candidate.trim()) return undefined;
-    const listItem = markdownListItem(candidate);
+    const listItem = markdownListItem(lines, index);
     if (listItem !== undefined) {
       return listItemParagraphContinuesThrough(
         lines,
@@ -2357,7 +2431,9 @@ function listItemParagraphContinuesThrough(
 ): boolean {
   for (let index = listItemOwner + 1; index <= lineIndex; index += 1) {
     const line = lines[index] ?? "";
-    if (!line.trim() || markdownListItem(line) !== undefined) return false;
+    if (!line.trim() || markdownListItem(lines, index) !== undefined) {
+      return false;
+    }
     const relativeLine =
       stripMarkdownIndentColumns(line, listItem.contentColumn) ?? line;
     if (isMarkdownInlineBlockBoundaryLine(relativeLine)) return false;

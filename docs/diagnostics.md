@@ -670,9 +670,12 @@ supported. Within a list item, boundary parsing first removes the owning
 marker's actual content indentation, including multi-digit ordered markers and
 valid wider bullet padding. Fully or partially unindented CommonMark lazy
 paragraph continuations retain that owner, while blank lines, interrupting
-blocks, sibling items, and nested items close or replace it. Comment and fence
-state starts fresh after YAML frontmatter, so frontmatter scalar or block values
-cannot affect body scanning or evidence line numbers.
+blocks, sibling items, and nested items close or replace it. Candidate markers
+are validated relative to the active container: indentation is limited to three
+columns, ordered markers to nine digits, and one-to-four-column or tab padding
+uses the marker-derived content column. Comment and fence state starts fresh
+after YAML frontmatter, so frontmatter scalar or block values cannot affect body
+scanning or evidence line numbers.
 
 `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION` reports guidance that makes an external
 page, issue body, log, tool output, attachment, downloaded document, or fetched
