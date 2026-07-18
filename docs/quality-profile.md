@@ -130,6 +130,8 @@ archived assets have no existence penalty.
 
 Structural guard proximity includes the same constraint or safety section, the
 same list item, a directly associated paragraph, or a parent Human Approval,
-Safety, or Constraints heading. Binary snippets are never exposed. Scan
-operational limits retain their existing public config fields; none of the
-quality or Readiness thresholds above are currently configurable.
+Safety, or Constraints heading. The two-line fast path does not cross a
+Markdown heading or frontmatter boundary, so a guard in an unrelated peer
+section cannot authorize a later action. Binary snippets are never exposed.
+Scan operational limits retain their existing public config fields; none of
+the quality or Readiness thresholds above are currently configurable.
