@@ -60,7 +60,7 @@ export class MarkdownSecurityView {
   readonly semanticUnits: MarkdownSemanticUnit[];
 
   private readonly sourceLines: string[];
-  private readonly bodyStartLine: number;
+  readonly bodyStartLine: number;
   private readonly records: NodeRecord[];
   private readonly visibleLines: string[];
   private readonly headings: HeadingRecord[];

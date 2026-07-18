@@ -2,6 +2,10 @@ import {
   attachMarkdownSyntax,
   parseMarkdownSyntax,
 } from "./markdown-syntax.js";
+import {
+  markdownBodyStartLineForArtifact,
+  renmaFrontmatterEnvelope,
+} from "./frontmatter-envelope.js";
 import type {
   Artifact,
   MetadataFieldEvidence,
@@ -30,7 +34,11 @@ export function parseDocument(artifact: Artifact): ParsedDocument {
       metadataListItems: {},
     };
   }
-  const syntax = parseMarkdownSyntax(artifact.content);
+  const sourceLines = artifact.content.split(/\r?\n/);
+  const syntax = parseMarkdownSyntax(
+    artifact.content,
+    markdownBodyStartLineForArtifact(artifact, sourceLines),
+  );
   const lines = syntax.sourceLines;
   const metadata = parseFrontmatter(artifact.path, lines);
   const document: ParsedDocument = {
@@ -83,13 +91,14 @@ function parseFrontmatter(path: string, lines: string[]): ParsedMetadata {
   const values: Record<string, MetadataValue> = {};
   const fields: Record<string, MetadataFieldEvidence> = {};
   const listItems: Record<string, MetadataFieldEvidence[]> = {};
-  if (lines[0] !== "---") return { values, fields, listItems };
+  const envelope = renmaFrontmatterEnvelope(lines);
+  if (!envelope.present) return { values, fields, listItems };
 
   let activeListKey: string | undefined;
   let activeListStartLine: number | undefined;
   for (let index = 1; index < lines.length; index += 1) {
     const line = lines[index];
-    if (line === "---") break;
+    if (index === envelope.closingIndex) break;
     const listItem = line?.match(/^\s+-\s+(.+)$/);
     if (activeListKey && listItem) {
       const current = values[activeListKey];

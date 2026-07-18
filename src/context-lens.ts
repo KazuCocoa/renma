@@ -1,4 +1,5 @@
 import path from "node:path";
+import { frontmatterRangeForArtifact } from "./frontmatter-envelope.js";
 import type { Catalog, CatalogEntry } from "./model.js";
 import type { Diagnostic, Evidence, ParsedDocument } from "./types.js";
 
@@ -640,12 +641,7 @@ function missingFieldEvidence(
 function frontmatterRange(
   document: ParsedDocument,
 ): { startLine: number; endLine: number } | undefined {
-  if (document.lines[0]?.trim() !== "---") return undefined;
-  const endIndex = document.lines.findIndex(
-    (line, index) => index > 0 && line.trim() === "---",
-  );
-  if (endIndex < 0) return undefined;
-  return { startLine: 1, endLine: endIndex + 1 };
+  return frontmatterRangeForArtifact(document.artifact, document.lines);
 }
 
 function bodyLines(document: ParsedDocument): string[] {

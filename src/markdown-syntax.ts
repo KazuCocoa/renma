@@ -13,8 +13,11 @@ import type {
 } from "mdast";
 import type { Position } from "unist";
 
+import {
+  markdownBodyStartLineForArtifact,
+  renmaFrontmatterEnvelope,
+} from "./frontmatter-envelope.js";
 import type { ParsedDocument } from "./types.js";
-import { agentSkillFrontmatterEnvelope } from "./yaml-frontmatter.js";
 
 /** One-based, inclusive range in the original Markdown file. */
 export interface MarkdownSourceRange {
@@ -88,13 +91,17 @@ export interface MarkdownSyntax {
 
 const syntaxByDocument = new WeakMap<ParsedDocument, MarkdownSyntax>();
 
-/** Find the first Markdown body line after a closed YAML frontmatter envelope. */
+/** Find the body line under the exact general Renma frontmatter contract. */
 export function markdownBodyStartLine(sourceLines: string[]): number {
-  const envelope = agentSkillFrontmatterEnvelope(sourceLines);
+  const envelope = renmaFrontmatterEnvelope(sourceLines);
   return envelope.closingIndex === undefined ? 1 : envelope.closingIndex + 2;
 }
 
-/** Parse one Markdown body while retaining original-file source provenance. */
+/**
+ * Parse one Markdown body while retaining original-file source provenance.
+ * Artifact-aware callers pass their selected body start explicitly; the
+ * default is the exact general Renma contract.
+ */
 export function parseMarkdownSyntax(
   content: string,
   bodyStartLine?: number,
@@ -205,7 +212,11 @@ export function ensureMarkdownSyntaxForDocument(
   ) {
     return undefined;
   }
-  const syntax = parseMarkdownSyntax(document.artifact.content);
+  const sourceLines = document.artifact.content.split(/\r?\n/);
+  const syntax = parseMarkdownSyntax(
+    document.artifact.content,
+    markdownBodyStartLineForArtifact(document.artifact, sourceLines),
+  );
   attachMarkdownSyntax(document, syntax);
   return syntax;
 }

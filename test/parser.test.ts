@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { markdownBodyStartLineForArtifact } from "../src/frontmatter-envelope.js";
 import { parseDocument } from "../src/markdown.js";
 import {
   ensureMarkdownSyntaxForDocument,
@@ -362,14 +363,83 @@ echo body
 });
 
 test("frontmatter boundaries preserve BOM, trailing whitespace, and unclosed behavior", () => {
+  const content = "\uFEFF --- \nname: demo\n--- \t\n# Body";
+  const document = parseDocument(artifact(content));
+  const lines = content.split("\n");
+
+  assert.equal(markdownBodyStartLine(lines), 1);
+  assert.equal(markdownBodyStartLineForArtifact(document.artifact, lines), 4);
+  assert.equal(markdownSyntaxForDocument(document)?.bodyStartLine, 4);
+  assert.deepEqual(document.headings, [{ depth: 1, text: "Body", line: 4 }]);
+
+  const unclosed = "---\nname: demo\n# Still frontmatter";
   assert.equal(
-    markdownBodyStartLine("\uFEFF---\nname: demo\n--- \t\n# Body".split("\n")),
-    4,
-  );
-  assert.equal(
-    markdownBodyStartLine("---\nname: demo\n# Still frontmatter".split("\n")),
+    markdownBodyStartLineForArtifact(artifact(unclosed), unclosed.split("\n")),
     1,
   );
+});
+
+test("general Markdown keeps whitespace thematic breaks in its syntax projection", () => {
+  const fixtures: Array<{
+    firstLine: string;
+    kind: Artifact["kind"];
+    path: string;
+  }> = [
+    {
+      firstLine: " ---",
+      kind: "context",
+      path: "contexts/release/prep.md",
+    },
+    {
+      firstLine: "--- ",
+      kind: "reference",
+      path: "references/release.md",
+    },
+  ];
+
+  for (const fixture of fixtures) {
+    const content = `${fixture.firstLine}
+# Visible heading
+
+[visible guide](docs/visible.md)
+
+---
+# Another heading
+`;
+    const document = parseDocument(
+      markdownArtifact(content, fixture.path, fixture.kind),
+    );
+    const syntax = markdownSyntaxForDocument(document);
+    const copiedSyntax = ensureMarkdownSyntaxForDocument({ ...document });
+
+    assert.deepEqual(document.metadata, {}, fixture.firstLine);
+    assert.equal(syntax?.bodyStartLine, 1, fixture.firstLine);
+    assert.equal(copiedSyntax?.bodyStartLine, 1, fixture.firstLine);
+    assert.deepEqual(
+      document.headings,
+      [
+        { depth: 1, text: "Visible heading", line: 2 },
+        { depth: 1, text: "Another heading", line: 7 },
+      ],
+      fixture.firstLine,
+    );
+    assert.deepEqual(
+      document.links,
+      [{ text: "visible guide", target: "docs/visible.md", line: 4 }],
+      fixture.firstLine,
+    );
+    assert.deepEqual(
+      copiedSyntax?.headings.map((heading) => [
+        heading.text,
+        heading.startLine,
+      ]),
+      [
+        ["Visible heading", 2],
+        ["Another heading", 7],
+      ],
+      fixture.firstLine,
+    );
+  }
 });
 
 test("binary artifacts preserve fail-closed empty projections", () => {
@@ -391,6 +461,22 @@ function artifact(content: string): Artifact {
     path: "skills/demo/SKILL.md",
     absolutePath: "/tmp/skills/demo/SKILL.md",
     kind: "skill",
+    sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: true,
+    content,
+  };
+}
+
+function markdownArtifact(
+  content: string,
+  path: string,
+  kind: Artifact["kind"],
+): Artifact {
+  return {
+    path,
+    absolutePath: `/tmp/${path}`,
+    kind,
     sizeBytes: Buffer.byteLength(content),
     contentClassification: "text",
     markdownParserEligible: true,

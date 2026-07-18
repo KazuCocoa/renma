@@ -14,6 +14,7 @@ import {
   logicalSkillDirectory,
 } from "./discovery.js";
 import { parseAssetMetadata } from "./metadata.js";
+import { frontmatterRangeForArtifact } from "./frontmatter-envelope.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import type {
   AssetClassificationEvidence,
@@ -428,12 +429,7 @@ function operationalMetadataLists(
 function frontmatterRange(
   document: ParsedDocument,
 ): { startLine: number; endLine: number } | undefined {
-  if (document.lines[0]?.trim() !== "---") return undefined;
-  const endIndex = document.lines.findIndex(
-    (line, index) => index > 0 && line.trim() === "---",
-  );
-  if (endIndex < 0) return undefined;
-  return { startLine: 1, endLine: endIndex + 1 };
+  return frontmatterRangeForArtifact(document.artifact, document.lines);
 }
 
 function metadataListItemText(raw: string): string {

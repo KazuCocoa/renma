@@ -20,10 +20,7 @@ import type {
 } from "./types.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { parseDocument } from "./markdown.js";
-import {
-  ensureMarkdownSyntaxForDocument,
-  markdownBodyStartLine,
-} from "./markdown-syntax.js";
+import { ensureMarkdownSyntaxForDocument } from "./markdown-syntax.js";
 import {
   MarkdownSecurityView,
   type MarkdownSemanticUnit,
@@ -837,10 +834,6 @@ function securityFindingsForDocument(
   const parsedPolicy = policyResolution.policy;
   const policy = applySecurityConfig(parsedPolicy, securityConfig);
   const sourceLines = artifact.content.split(/\r?\n/);
-  const scanStart = securityContentStart(
-    sourceLines,
-    artifact.markdownParserEligible,
-  );
   const syntax = ensureMarkdownSyntaxForDocument(document);
   if (syntax === undefined) {
     throw new Error(
@@ -848,6 +841,7 @@ function securityFindingsForDocument(
     );
   }
   const markdownView = new MarkdownSecurityView(syntax);
+  const scanStart = syntax.bodyStartLine - 1;
   const detections: Detection[] = [
     ...invalidCanonicalSecurityDetections(policyResolution.issues),
     ...securityPolicyResolutionDetections(
@@ -1025,7 +1019,7 @@ function bodyPolicyContradictionDetections(
 ): Detection[] {
   const detections: Detection[] = [];
   const sourceLines = content.split(/\r?\n/);
-  const scanStart = securityContentStart(sourceLines, markdownParserEligible);
+  const scanStart = securityContentStart(markdownParserEligible, markdownView);
   const lines = markdownView
     ? sourceLines.map((_, index) => markdownView.visibleLine(index))
     : sourceLines;
@@ -1730,7 +1724,7 @@ function forbiddenInputDetection(
   const lines = markdownView
     ? sourceLines.map((_, index) => markdownView.visibleLine(index))
     : sourceLines;
-  const scanStart = securityContentStart(lines, markdownParserEligible);
+  const scanStart = securityContentStart(markdownParserEligible, markdownView);
   for (let index = scanStart; index < lines.length; index += 1) {
     const line = lines[index] ?? "";
     if (!pattern.test(line)) continue;
@@ -1748,10 +1742,16 @@ function forbiddenInputDetection(
 }
 
 function securityContentStart(
-  lines: string[],
   markdownParserEligible: boolean,
+  markdownView: MarkdownSecurityView | undefined,
 ): number {
-  return markdownParserEligible ? markdownBodyStartLine(lines) - 1 : 0;
+  if (!markdownParserEligible) return 0;
+  if (markdownView === undefined) {
+    throw new Error(
+      "Eligible Markdown security analysis requires syntax state",
+    );
+  }
+  return markdownView.bodyStartLine - 1;
 }
 
 function lineSnippet(content: string, line: number): string | undefined {

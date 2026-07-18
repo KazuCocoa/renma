@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { main } from "../src/cli.js";
 import { COMMAND_HELP, commandOptionNames } from "../src/cli-help.js";
+import { buildInspectOutline } from "../src/commands/inspect.js";
 import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
 import { scan } from "../src/scanner.js";
 
@@ -1203,6 +1204,74 @@ test("CLI inspect command prints compact outlines and exact slices", async () =>
   assert.equal(sliceResult.code, 0);
   assert.match(sliceResult.stdout, /L0008: ## Windows/);
   assert.match(sliceResult.stdout, /L0009: Use PowerShell\./);
+});
+
+test("inspect does not report whitespace thematic breaks as frontmatter", async () => {
+  const root = await fixture();
+  const directory = path.join(root, "contexts", "release");
+  await mkdir(directory, { recursive: true });
+
+  for (const [filename, firstLine] of [
+    ["indented.md", " ---"],
+    ["trailing.md", "--- "],
+  ] as const) {
+    const source = path.join(directory, filename);
+    await writeFile(
+      source,
+      `${firstLine}
+# Visible heading
+
+[visible guide](docs/visible.md)
+
+---
+# Another heading
+`,
+    );
+    const outline = await buildInspectOutline(source);
+
+    assert.equal(outline.classification.kind, "context", firstLine);
+    assert.equal(outline.frontmatterRange, null, firstLine);
+    assert.deepEqual(
+      outline.headings.map((heading) => [heading.text, heading.line]),
+      [
+        ["Visible heading", 2],
+        ["Another heading", 7],
+      ],
+      firstLine,
+    );
+    assert.deepEqual(
+      outline.links,
+      [{ line: 4, target: "docs/visible.md" }],
+      firstLine,
+    );
+  }
+});
+
+test("inspect uses the Agent Skills frontmatter contract for canonical entrypoints", async () => {
+  const root = await fixture();
+  const directory = path.join(root, "skills", "demo");
+  const source = path.join(directory, "SKILL.md");
+  await mkdir(directory, { recursive: true });
+  await writeFile(
+    source,
+    [
+      "\uFEFF --- ",
+      "name: demo",
+      "description: Use when reviewing demo inputs.",
+      "--- \t",
+      "# Agent body",
+      "",
+    ].join("\n"),
+  );
+
+  const outline = await buildInspectOutline(source);
+
+  assert.equal(outline.classification.kind, "skill");
+  assert.equal(outline.frontmatterRange, "L1-L4");
+  assert.deepEqual(
+    outline.headings.map((heading) => [heading.text, heading.line]),
+    [["Agent body", 5]],
+  );
 });
 
 test("CLI inspect command prints context lens metadata and relationships", async () => {

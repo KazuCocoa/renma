@@ -28,6 +28,7 @@ import {
   ensureMarkdownSyntaxForDocument,
   markdownCodeLineNumbers,
 } from "../markdown-syntax.js";
+import { frontmatterRangeForArtifact } from "../frontmatter-envelope.js";
 
 const DEFAULT_SECTION_PREVIEW_LINES = 3;
 
@@ -98,7 +99,7 @@ export async function buildInspectOutline(
     contextLens: repository.contextLens,
     classification: repository.classification,
     governance: repository.governance,
-    frontmatterRange: frontmatterRange(document.lines),
+    frontmatterRange: frontmatterRange(document),
     headings: document.headings.map((heading, index) => {
       const nextHeading = document.headings
         .slice(index + 1)
@@ -330,13 +331,11 @@ async function buildInspectSlice(
   };
 }
 
-function frontmatterRange(lines: string[]): null | string {
-  if (lines[0] !== "---") {
-    return null;
-  }
-
-  const endIndex = lines.slice(1).findIndex((line) => line === "---");
-  return endIndex === -1 ? null : formatRange(1, endIndex + 2);
+function frontmatterRange(document: ParsedDocument): null | string {
+  const range = frontmatterRangeForArtifact(document.artifact, document.lines);
+  return range === undefined
+    ? null
+    : formatRange(range.startLine, range.endLine);
 }
 
 function sectionPreview(

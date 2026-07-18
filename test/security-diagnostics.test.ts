@@ -772,6 +772,59 @@ git reset --hard
   assert.match(destructive.evidence.snippet, /git reset --hard/);
 });
 
+test("general Markdown security analysis starts before whitespace thematic breaks", () => {
+  const fixtures: Array<{
+    firstLine: string;
+    kind: "context" | "reference";
+    path: string;
+  }> = [
+    {
+      firstLine: " ---",
+      kind: "context",
+      path: "contexts/security/policy.md",
+    },
+    {
+      firstLine: "--- ",
+      kind: "reference",
+      path: "references/security.md",
+    },
+  ];
+
+  for (const fixture of fixtures) {
+    const content = `${fixture.firstLine}
+# Visible workflow
+
+\`\`\`sh
+git reset --hard
+\`\`\`
+---
+# Another heading
+`;
+    const artifact: Artifact = {
+      path: fixture.path,
+      absolutePath: `/repo/${fixture.path}`,
+      kind: fixture.kind,
+      sizeBytes: Buffer.byteLength(content),
+      contentClassification: "text",
+      markdownParserEligible: true,
+      content,
+    };
+    const findings = securityDiagnosticFindings([artifact]);
+    const copiedFindings = securityDiagnosticFindings([
+      { ...parseDocument(artifact) },
+    ]);
+    const destructive = findingFor(findings, "SEC-DESTRUCTIVE-COMMAND");
+    const copiedDestructive = findingFor(
+      copiedFindings,
+      "SEC-DESTRUCTIVE-COMMAND",
+    );
+
+    assert.equal(destructive.evidence.startLine, 5, fixture.firstLine);
+    assert.match(destructive.evidence.snippet, /git reset --hard/);
+    assert.equal(copiedDestructive.evidence.startLine, 5, fixture.firstLine);
+  }
+});
+
 test("matched Markdown inline code spans keep comment markers literal", () => {
   const examples = [
     {
