@@ -1862,9 +1862,15 @@ function isInlineMarkdownBlockBoundary(
   lineIndex: number,
   openingListItemOwner: number | undefined,
 ): boolean {
-  const line = lines[lineIndex] ?? "";
-  if (isMarkdownInlineBlockBoundaryLine(line)) return true;
-  return markdownListItemOwner(lines, lineIndex) !== openingListItemOwner;
+  if (markdownListItemOwner(lines, lineIndex) !== openingListItemOwner) {
+    return true;
+  }
+  const line = markdownListContainerRelativeLine(
+    lines,
+    lineIndex,
+    openingListItemOwner,
+  );
+  return isMarkdownInlineBlockBoundaryLine(line);
 }
 
 function isMarkdownInlineBlockBoundaryLine(line: string): boolean {
@@ -2296,10 +2302,27 @@ function reviewGuardActions(
   return guards;
 }
 
-function markdownListItem(line: string): { indent: number } | undefined {
-  const match = line.match(/^(\s*)(?:[-*+]|\d+[.)])\s+/);
+function markdownListItem(
+  line: string,
+): { indent: number; contentColumn: number } | undefined {
+  const match = line.match(/^([ \t]*)(?:[-*+]|\d+[.)])[ \t]+/);
   if (match === null) return undefined;
-  return { indent: markdownIndent(match[1] ?? "") };
+  return {
+    indent: markdownIndent(match[1] ?? ""),
+    contentColumn: markdownColumn(match[0]),
+  };
+}
+
+function markdownListContainerRelativeLine(
+  lines: string[],
+  lineIndex: number,
+  listItemOwner: number | undefined,
+): string {
+  const line = lines[lineIndex] ?? "";
+  if (listItemOwner === undefined) return line;
+  const listItem = markdownListItem(lines[listItemOwner] ?? "");
+  if (listItem === undefined) return line;
+  return stripMarkdownIndentColumns(line, listItem.contentColumn) ?? line;
 }
 
 function markdownListItemOwner(
@@ -2330,10 +2353,32 @@ function markdownListItemOwner(
 
 function markdownIndent(line: string): number {
   const whitespace = line.match(/^\s*/)?.[0] ?? "";
-  return [...whitespace].reduce(
-    (width, character) => width + (character === "\t" ? 4 : 1),
+  return markdownColumn(whitespace);
+}
+
+function markdownColumn(text: string): number {
+  return [...text].reduce(
+    (column, character) =>
+      character === "\t" ? column + (4 - (column % 4)) : column + 1,
     0,
   );
+}
+
+function stripMarkdownIndentColumns(
+  line: string,
+  targetColumn: number,
+): string | undefined {
+  let column = 0;
+  let cursor = 0;
+  while (cursor < line.length && /[ \t]/.test(line[cursor] ?? "")) {
+    const character = line[cursor] ?? "";
+    column = character === "\t" ? column + (4 - (column % 4)) : column + 1;
+    cursor += 1;
+    if (column >= targetColumn) {
+      return `${" ".repeat(column - targetColumn)}${line.slice(cursor)}`;
+    }
+  }
+  return targetColumn === 0 ? line : undefined;
 }
 
 function boundedInstructionText(lines: string[], lineIndex: number): string {

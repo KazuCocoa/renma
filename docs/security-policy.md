@@ -318,8 +318,11 @@ multiline spans within one such block remain supported. CommonMark HTML blocks
 that can interrupt a paragraph end delimiter lookup, including raw tags,
 comments, processing instructions, declarations, CDATA, and recognized
 block-level tags; arbitrary inline HTML such as `<span>` does not. HTML-comment,
-inline-code, and fence state begins at the Markdown body after YAML frontmatter;
-frontmatter values never seed body parser state.
+inline-code, and fence boundaries inside a list item are evaluated after
+removing the owning marker's actual content indentation. Multi-digit ordered
+markers, valid wider bullet padding, and nested containers therefore retain
+their CommonMark-relative boundaries. Parser state begins at the Markdown body
+after YAML frontmatter; frontmatter values never seed body parser state.
 
 ### Untrusted content and external traversal
 
