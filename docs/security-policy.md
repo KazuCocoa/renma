@@ -311,23 +311,15 @@ a later action, and dry-run, backup, or rollback does not substitute for
 approval when policy requires it. Inside any fenced code block, `<!--` and
 `-->` are literal content and do not change HTML-comment state outside the
 fence. They are also literal inside matched variable-length backtick code spans.
-Closing backticks are matched only within the same Markdown paragraph or
-list-item continuation; lookup does not cross blank paragraphs, ATX or Setext
-headings, thematic breaks, fences, or sibling and nested list items. Valid
-multiline spans within one such block remain supported. CommonMark HTML blocks
-that can interrupt a paragraph end delimiter lookup, including raw tags,
-comments, processing instructions, declarations, CDATA, and recognized
-block-level tags; arbitrary inline HTML such as `<span>` does not. HTML-comment,
-inline-code, and fence boundaries inside a list item are evaluated after
-removing the owning marker's actual content indentation. Multi-digit ordered
-markers, valid wider bullet padding, and nested containers therefore retain
-their CommonMark-relative boundaries. Fully or partially unindented lazy
-paragraph continuations retain the same item owner until a blank line,
-interrupting block, sibling item, or nested item closes or replaces it. Parser
-recognition validates indentation relative to the active container, limits
-ordered markers to nine digits, and derives one-to-four-column or tab padding
-from the actual marker. Parser state begins at the Markdown body after YAML
-frontmatter; frontmatter values never seed body parser state.
+Eligible Markdown is parsed once with a CommonMark-compatible parser. Renma
+uses its positioned paragraph, list and list-item ancestry, heading, thematic
+break, block quote, raw HTML, inline-code, and fenced or indented code nodes as
+the authoritative structural boundaries. This preserves CommonMark behavior
+for multiline code spans, HTML blocks, inline HTML, ordered-marker lengths,
+container-relative indentation and padding, tabs, nesting, sibling items, and
+lazy paragraph continuations without a separate delimiter or list-owner parser.
+Parser state begins at the Markdown body after YAML frontmatter, and positioned
+body ranges are mapped back to original artifact line numbers.
 
 ### Untrusted content and external traversal
 
@@ -362,9 +354,10 @@ Wording such as “regardless of review findings,” “even when validation fai
 rejects rather than inherits the preceding guard. Guard and contradiction
 matching share the review, validation, verification, inspection, and checking
 vocabulary, including their inflected forms.
-Semantic windows also stop at sibling bullet or numbered items and at nested
-child items. Indented continuation lines remain part of their owning list item,
-and ordinary adjacent prose remains eligible for bounded multiline matching.
+Semantic windows follow positioned CommonMark paragraphs. Valid indented or
+lazy continuations remain part of their parsed paragraph, while sibling and
+nested list items have distinct ancestry and are not combined. Ordinary
+adjacent prose in one paragraph remains eligible for bounded multiline matching.
 
 If a workflow explicitly traverses external sources recursively, put its source
 and destination scope, relevance test, logical visited identity and cycle

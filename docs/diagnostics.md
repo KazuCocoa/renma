@@ -659,23 +659,16 @@ sentence does not protect a separate contradictory bypass instruction.
 Comment-like `<!--` and `-->` text inside any fenced code block is literal
 fence content and never opens or closes an HTML comment for subsequent lines.
 Matched Markdown inline-code spans use the same literal treatment, including
-variable-length backtick delimiters. Closing-delimiter lookup stays within the
-same Markdown paragraph or list-item continuation and does not cross blank
-paragraph boundaries, ATX or Setext headings, thematic breaks, fences, or
-sibling and nested list items. CommonMark HTML blocks that can interrupt a
-paragraph, including raw tags, comments, processing instructions, declarations,
-CDATA, and recognized block-level tags, also end lookup; arbitrary inline HTML
-such as `<span>` does not. Valid multiline spans within that block remain
-supported. Within a list item, boundary parsing first removes the owning
-marker's actual content indentation, including multi-digit ordered markers and
-valid wider bullet padding. Fully or partially unindented CommonMark lazy
-paragraph continuations retain that owner, while blank lines, interrupting
-blocks, sibling items, and nested items close or replace it. Candidate markers
-are validated relative to the active container: indentation is limited to three
-columns, ordered markers to nine digits, and one-to-four-column or tab padding
-uses the marker-derived content column. Comment and fence state starts fresh
-after YAML frontmatter, so frontmatter scalar or block values cannot affect body
-scanning or evidence line numbers.
+variable-length and multiline backtick delimiters. Eligible Markdown is parsed
+once with a CommonMark-compatible parser after YAML frontmatter. Renma derives
+paragraphs, list ancestry, headings and sections, block quotes, thematic
+breaks, HTML, inline code, and fenced or indented code from the resulting
+structural ranges instead of reconstructing delimiter or container state.
+Default CommonMark ownership therefore determines blank-paragraph, ATX and
+Setext heading, thematic-break, HTML-block, fence, sibling-item, nested-item,
+padding, tab, ordered-marker, and lazy-continuation boundaries. Frontmatter is
+excluded from parser state while the parser's source positions are offset back
+to original artifact line numbers.
 
 `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION` reports guidance that makes an external
 page, issue body, log, tool output, attachment, downloaded document, or fetched
@@ -686,10 +679,11 @@ treating source content as untrusted data, preserving provenance, validating
 task-relevant facts, and keeping execution authority in reviewed repository
 guidance or explicit human approval.
 
-Semantic windows remain within one Markdown list item: sibling bullet or
-numbered items and nested child items establish new instruction boundaries,
-while indented continuation lines stay associated with their owning item.
-Ordinary adjacent prose lines can still form one bounded instruction. A review
+Semantic windows use CommonMark paragraph ranges. Source and action text in one
+paragraph, including valid indented or lazy list-item continuations, can form
+one bounded instruction; sibling or nested list items produce distinct
+paragraph and ancestry ranges and are not combined. Ordinary adjacent prose
+lines in one paragraph remain eligible for multiline matching. A review
 guard applies only when it precedes and names the same execution action, so a
 later defensive sentence cannot retroactively suppress an unsafe action and a
 guard for `apply` does not cover a later `execute`. Multiline matches are

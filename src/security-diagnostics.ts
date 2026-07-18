@@ -17,6 +17,11 @@ import {
   policyArtifactFor,
   skillArtifactsByDirectory,
 } from "./security-policy-inventory.js";
+import {
+  createMarkdownSecurityView,
+  type MarkdownSecurityView,
+  type MarkdownSemanticUnit,
+} from "./markdown-security-view.js";
 
 type SecurityCategory = "safety";
 
@@ -739,30 +744,6 @@ const CREDENTIAL_HEADER_RE =
   /\bAuthorization:\s*Bearer\s+(?!<|\$|\{|\[|REDACTED|redacted|xxx|XXX|placeholder|example)[^\s"'`]+/i;
 const PREDICTABLE_TEMP_RE = /\/tmp\/[A-Za-z0-9._/-]+/;
 const PREDICTABLE_TEMP_GLOBAL_RE = /\/tmp\/[A-Za-z0-9._/-]+/g;
-const MARKDOWN_FENCE_RE = /^\s*(?:```|~~~)/;
-const MARKDOWN_THEMATIC_BREAK_RE =
-  /^ {0,3}(?:(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}|(?:-[ \t]*){3,})$/;
-const MARKDOWN_SETEXT_HEADING_UNDERLINE_RE = /^ {0,3}(?:=+|-+)[ \t]*$/;
-const MARKDOWN_HTML_RAW_BLOCK_START_RE =
-  /^ {0,3}<(?:script|pre|style|textarea)(?=[ \t]|>|$)/i;
-const MARKDOWN_HTML_COMMENT_BLOCK_START_RE = /^ {0,3}<!--/;
-const MARKDOWN_HTML_PROCESSING_BLOCK_START_RE = /^ {0,3}<\?/;
-const MARKDOWN_HTML_DECLARATION_BLOCK_START_RE = /^ {0,3}<![A-Z]/;
-const MARKDOWN_HTML_CDATA_BLOCK_START_RE = /^ {0,3}<!\[CDATA\[/;
-const MARKDOWN_HTML_BLOCK_TAG_NAME_SOURCE = String.raw`(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)`;
-const MARKDOWN_HTML_BLOCK_TAG_START_RE = new RegExp(
-  String.raw`^ {0,3}</?${MARKDOWN_HTML_BLOCK_TAG_NAME_SOURCE}(?=[ \t]|/?>|$)`,
-  "i",
-);
-const MARKDOWN_SEMANTIC_PROSE_FENCE_RE =
-  /^\s*(?:`{3,}|~{3,})\s*(?:(?:text|markdown|md)\s*)?$/i;
-const OPERATIONAL_FENCE_ROUTING_RE =
-  /\b(use|follow|apply|execute|run|perform|carry out)\b.{0,60}\b(following|below|these)\b.{0,40}\b(instructions?|steps?|procedure|workflow|payload)\b|\b(following|below)\b.{0,40}\b(instructions?|steps?|procedure|workflow|payload)\b.{0,40}\b(exactly|verbatim|as written)\b/i;
-const OPERATIONAL_FENCE_LABEL_RE =
-  /^\s*(?:(?:operational|execution)\s+)?(?:instructions?|steps?|procedure|workflow|payload)\s*:\s*$/i;
-const OPERATIONAL_FENCE_HEADING_RE =
-  /\b(instructions?|operational instructions?|execution instructions?|procedure|runbook)\b/i;
-
 const SAFEGUARD_BYPASS_PATTERNS = [
   /\b(ignore|bypass|circumvent|skip|omit|disabl(?:e|ing)|deactivat(?:e|ing)|turn off|suppress(?:ed|ing)?)\b.{0,100}\b(security checks?|security policy|security profile|safeguards?|guardrails?|human approval|approval|confirmation|authorization|security warnings?|warnings?|diagnostics?|verification|validation)\b/i,
   /\b(security checks?|security policy|security profile|safeguards?|guardrails?|human approval|approval|confirmation|authorization|security warnings?|warnings?|diagnostics?|verification|validation)\b.{0,100}\b(ignore[ds]?|bypass(?:ed)?|circumvent(?:ed)?|skip(?:ped)?|omit(?:ted)?|disabl(?:e|ed|ing)|deactivat(?:e|ed|ing)|turn(?:ed)? off|suppress(?:ed|ion|ing)?)\b/i,
@@ -856,6 +837,14 @@ function securityFindingsForArtifact(
       : securityConfig;
   const parsedPolicy = policyResolution.policy;
   const policy = applySecurityConfig(parsedPolicy, effectiveSecurityConfig);
+  const sourceLines = artifact.content.split(/\r?\n/);
+  const scanStart = securityContentStart(
+    sourceLines,
+    artifact.markdownParserEligible,
+  );
+  const markdownView = artifact.markdownParserEligible
+    ? createMarkdownSecurityView(artifact.content, scanStart)
+    : undefined;
   const detections: Detection[] = [
     ...(policyArtifact === artifact
       ? invalidCanonicalSecurityDetections(policyResolution.issues)
@@ -866,18 +855,12 @@ function securityFindingsForArtifact(
       effectiveSecurityConfig,
       artifact.content,
       artifact.markdownParserEligible,
+      markdownView,
     ),
   ];
-  const sourceLines = artifact.content.split(/\r?\n/);
-  const scanStart = securityContentStart(
-    sourceLines,
-    artifact.markdownParserEligible,
-  );
-  const lines = artifact.markdownParserEligible
-    ? stripHtmlCommentSpans(sourceLines, scanStart)
+  const lines = markdownView
+    ? sourceLines.map((_, index) => markdownView.visibleLine(index))
     : sourceLines;
-  let inFence = false;
-  let operationalSemanticFence = false;
   let recentHumanApprovalLine = 0;
   let recentRiskMitigationLine = 0;
 
@@ -900,28 +883,20 @@ function securityFindingsForArtifact(
       artifact.content,
       policy,
       artifact.markdownParserEligible,
+      markdownView,
     ),
   );
 
   for (let index = scanStart; index < lines.length; index += 1) {
     const lineNumber = index + 1;
     const line = lines[index] ?? "";
-    const fenceMarker = MARKDOWN_FENCE_RE.test(line);
-    if (fenceMarker) {
-      if (inFence) {
-        inFence = false;
-        operationalSemanticFence = false;
-      } else {
-        inFence = true;
-        operationalSemanticFence = isOperationalSemanticFence(lines, index);
-      }
-    }
+    const inCode = markdownView?.codeBlockAtLine(index) !== undefined;
 
     const strippedComment = line.replace(/^\s*(#|\/\/)\s*/, "");
     const shellComment =
       /^\s*\/\//.test(line) ||
       (/^\s*#/.test(line) &&
-        (inFence ||
+        (inCode ||
           isCommandLike(strippedComment) ||
           CREDENTIAL_ARG_ANY_RE.test(strippedComment) ||
           REMOTE_SCRIPT_RE.test(strippedComment) ||
@@ -932,7 +907,7 @@ function securityFindingsForArtifact(
     if (artifact.markdownParserEligible && isPolicyLine(line)) {
       continue;
     }
-    const quotedProse = artifact.markdownParserEligible && /^\s*>/.test(line);
+    const quotedProse = markdownView?.isBlockQuotedLine(index) ?? false;
     const hasHumanApprovalGuard =
       hasExplicitHumanApprovalGuard(line) ||
       (recentHumanApprovalLine > 0 &&
@@ -942,8 +917,14 @@ function securityFindingsForArtifact(
           lines,
           recentHumanApprovalLine - 1,
           index,
+          markdownView,
         )) ||
-      hasStructuredGuard(lines, index, hasExplicitHumanApprovalGuard);
+      hasStructuredGuard(
+        lines,
+        index,
+        hasExplicitHumanApprovalGuard,
+        markdownView,
+      );
     const hasCommandRiskGuard =
       hasHumanApprovalGuard ||
       hasLocalRiskMitigationGuard(line) ||
@@ -954,11 +935,17 @@ function securityFindingsForArtifact(
           lines,
           recentRiskMitigationLine - 1,
           index,
+          markdownView,
         )) ||
-      hasStructuredGuard(lines, index, hasLocalRiskMitigationGuard);
+      hasStructuredGuard(
+        lines,
+        index,
+        hasLocalRiskMitigationGuard,
+        markdownView,
+      );
     const commandLine =
       !shellComment &&
-      (inFence ||
+      ((markdownView?.isCodeContentLine(index) ?? false) ||
         isCommandLike(line) ||
         CREDENTIAL_ARG_ANY_RE.test(line) ||
         CREDENTIAL_HEADER_RE.test(line));
@@ -984,16 +971,6 @@ function securityFindingsForArtifact(
       detections.push(...predictableTempDetections(line, lineNumber));
     }
 
-    if (
-      artifact.markdownParserEligible &&
-      (!inFence || operationalSemanticFence) &&
-      !fenceMarker &&
-      !quotedProse &&
-      !isNonOperationalExampleLine(lines, index)
-    ) {
-      detections.push(...semanticInstructionDetections(lines, index));
-    }
-
     if (commandLine && !quotedProse) {
       detections.push(
         ...commandDetections(line, lineNumber, hasCommandRiskGuard),
@@ -1005,6 +982,12 @@ function securityFindingsForArtifact(
     }
     if (!quotedProse && hasLocalRiskMitigationGuard(line)) {
       recentRiskMitigationLine = lineNumber;
+    }
+  }
+
+  if (markdownView !== undefined) {
+    for (const unit of markdownView.semanticUnits) {
+      detections.push(...semanticInstructionDetections(unit, markdownView));
     }
   }
 
@@ -1039,23 +1022,23 @@ function bodyPolicyContradictionDetections(
   content: string,
   policy: SecurityPolicy,
   markdownParserEligible: boolean,
+  markdownView?: MarkdownSecurityView,
 ): Detection[] {
   const detections: Detection[] = [];
   const sourceLines = content.split(/\r?\n/);
   const scanStart = securityContentStart(sourceLines, markdownParserEligible);
-  const lines = markdownParserEligible
-    ? stripHtmlCommentSpans(sourceLines, scanStart)
+  const lines = markdownView
+    ? sourceLines.map((_, index) => markdownView.visibleLine(index))
     : sourceLines;
   const emitted = new Set<string>();
-  let inFence = false;
 
   for (let index = scanStart; index < lines.length; index += 1) {
     const line = lines[index] ?? "";
-    if (MARKDOWN_FENCE_RE.test(line)) {
-      inFence = !inFence;
+    if (
+      markdownView?.codeBlockAtLine(index) !== undefined ||
+      (markdownParserEligible && isPolicyLine(line))
+    )
       continue;
-    }
-    if (inFence || (markdownParserEligible && isPolicyLine(line))) continue;
 
     const lineNumber = index + 1;
     const candidates: Array<[string, boolean]> = [
@@ -1468,6 +1451,7 @@ function securityPolicyResolutionDetections(
   config: SecurityConfig | undefined,
   content: string,
   markdownParserEligible: boolean,
+  markdownView?: MarkdownSecurityView,
 ): Detection[] {
   const detections: Detection[] = [];
   if (parsedPolicy.securityProfile === undefined) {
@@ -1476,6 +1460,7 @@ function securityPolicyResolutionDetections(
       resolvedPolicy,
       content,
       markdownParserEligible,
+      markdownView,
     );
     return detections;
   }
@@ -1600,6 +1585,7 @@ function securityPolicyResolutionDetections(
     resolvedPolicy,
     content,
     markdownParserEligible,
+    markdownView,
   );
 
   return detections;
@@ -1610,12 +1596,14 @@ function addForbiddenInputDetections(
   policy: SecurityPolicy,
   content: string,
   markdownParserEligible: boolean,
+  markdownView?: MarkdownSecurityView,
 ): void {
   for (const forbiddenInput of policy.forbiddenInputs) {
     const detection = forbiddenInputDetection(
       content,
       forbiddenInput,
       markdownParserEligible,
+      markdownView,
     );
     if (detection !== undefined) detections.push(detection);
   }
@@ -1733,12 +1721,16 @@ function forbiddenInputDetection(
   content: string,
   forbiddenInput: string,
   markdownParserEligible: boolean,
+  markdownView?: MarkdownSecurityView,
 ): Detection | undefined {
   const needle = forbiddenInput.trim();
   if (needle.length === 0) return undefined;
 
   const pattern = new RegExp(`\\b${escapeRegExp(needle)}\\b`, "i");
-  const lines = content.split(/\r?\n/);
+  const sourceLines = content.split(/\r?\n/);
+  const lines = markdownView
+    ? sourceLines.map((_, index) => markdownView.visibleLine(index))
+    : sourceLines;
   const scanStart = securityContentStart(lines, markdownParserEligible);
   for (let index = scanStart; index < lines.length; index += 1) {
     const line = lines[index] ?? "";
@@ -1765,173 +1757,6 @@ function securityContentStart(
     (line, index) => index > 0 && line.trim() === "---",
   );
   return frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
-}
-
-function stripHtmlCommentSpans(lines: string[], bodyStart: number): string[] {
-  let inComment = false;
-  let fence: MarkdownFence | undefined;
-  let inlineCodeLength: number | undefined;
-  return lines.map((line, lineIndex) => {
-    if (lineIndex < bodyStart) return line;
-    if (fence !== undefined) {
-      if (isMarkdownFenceClosing(line, fence)) fence = undefined;
-      return line;
-    }
-    if (!inComment && inlineCodeLength === undefined) {
-      const openingFence = markdownFenceOpening(line);
-      if (openingFence !== undefined) {
-        fence = openingFence;
-        return line;
-      }
-    }
-
-    let cursor = 0;
-    let visible = "";
-
-    while (cursor < line.length) {
-      if (inComment) {
-        const commentEnd = line.indexOf("-->", cursor);
-        if (commentEnd < 0) return visible;
-        cursor = commentEnd + 3;
-        inComment = false;
-        continue;
-      }
-
-      if (inlineCodeLength !== undefined) {
-        const codeEnd = findBacktickRun(line, cursor, inlineCodeLength);
-        if (codeEnd < 0) {
-          visible += line.slice(cursor);
-          break;
-        }
-        visible += line.slice(cursor, codeEnd + inlineCodeLength);
-        cursor = codeEnd + inlineCodeLength;
-        inlineCodeLength = undefined;
-        continue;
-      }
-
-      const commentStart = line.indexOf("<!--", cursor);
-      const codeStart = line.indexOf("`", cursor);
-      if (codeStart >= 0 && (commentStart < 0 || codeStart < commentStart)) {
-        visible += line.slice(cursor, codeStart);
-        const delimiterLength = backtickRunLength(line, codeStart);
-        visible += line.slice(codeStart, codeStart + delimiterLength);
-        cursor = codeStart + delimiterLength;
-        if (hasClosingBacktickRun(lines, lineIndex, cursor, delimiterLength)) {
-          inlineCodeLength = delimiterLength;
-        }
-        continue;
-      }
-      if (commentStart < 0) {
-        visible += line.slice(cursor);
-        break;
-      }
-      visible += line.slice(cursor, commentStart);
-      if (visible.length > 0 && !/\s$/.test(visible)) visible += " ";
-      cursor = commentStart + 4;
-      inComment = true;
-    }
-
-    return visible;
-  });
-}
-
-function hasClosingBacktickRun(
-  lines: string[],
-  openingLine: number,
-  openingEnd: number,
-  delimiterLength: number,
-): boolean {
-  const listItemOwner = markdownListItemOwner(lines, openingLine);
-  for (let lineIndex = openingLine; lineIndex < lines.length; lineIndex += 1) {
-    if (
-      lineIndex > openingLine &&
-      isInlineMarkdownBlockBoundary(lines, lineIndex, listItemOwner)
-    ) {
-      return false;
-    }
-    const cursor = lineIndex === openingLine ? openingEnd : 0;
-    if (findBacktickRun(lines[lineIndex] ?? "", cursor, delimiterLength) >= 0) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function isInlineMarkdownBlockBoundary(
-  lines: string[],
-  lineIndex: number,
-  openingListItemOwner: number | undefined,
-): boolean {
-  if (markdownListItemOwner(lines, lineIndex) !== openingListItemOwner) {
-    return true;
-  }
-  const line = markdownListContainerRelativeLine(
-    lines,
-    lineIndex,
-    openingListItemOwner,
-  );
-  return isMarkdownInlineBlockBoundaryLine(line);
-}
-
-function isMarkdownInlineBlockBoundaryLine(line: string): boolean {
-  return (
-    !line.trim() ||
-    /^\s*(?:#{1,6}\s+|```|~~~|>)/.test(line) ||
-    MARKDOWN_THEMATIC_BREAK_RE.test(line) ||
-    MARKDOWN_SETEXT_HEADING_UNDERLINE_RE.test(line) ||
-    isCommonMarkInterruptingHtmlBlockStart(line)
-  );
-}
-
-function isCommonMarkInterruptingHtmlBlockStart(line: string): boolean {
-  return (
-    MARKDOWN_HTML_RAW_BLOCK_START_RE.test(line) ||
-    MARKDOWN_HTML_COMMENT_BLOCK_START_RE.test(line) ||
-    MARKDOWN_HTML_PROCESSING_BLOCK_START_RE.test(line) ||
-    MARKDOWN_HTML_DECLARATION_BLOCK_START_RE.test(line) ||
-    MARKDOWN_HTML_CDATA_BLOCK_START_RE.test(line) ||
-    MARKDOWN_HTML_BLOCK_TAG_START_RE.test(line)
-  );
-}
-
-function findBacktickRun(
-  line: string,
-  start: number,
-  delimiterLength: number,
-): number {
-  let cursor = line.indexOf("`", start);
-  while (cursor >= 0) {
-    const length = backtickRunLength(line, cursor);
-    if (length === delimiterLength) return cursor;
-    cursor = line.indexOf("`", cursor + length);
-  }
-  return -1;
-}
-
-function backtickRunLength(line: string, start: number): number {
-  let end = start;
-  while (line[end] === "`") end += 1;
-  return end - start;
-}
-
-type MarkdownFence = {
-  marker: "`" | "~";
-  length: number;
-};
-
-function markdownFenceOpening(line: string): MarkdownFence | undefined {
-  const match = line.match(/^ {0,3}(`{3,}|~{3,})/);
-  if (match === null) return undefined;
-  const fence = match[1] ?? "";
-  const marker = fence[0];
-  if (marker !== "`" && marker !== "~") return undefined;
-  return { marker, length: fence.length };
-}
-
-function isMarkdownFenceClosing(line: string, fence: MarkdownFence): boolean {
-  const match = line.match(/^ {0,3}(`{3,}|~{3,})\s*$/);
-  const candidate = match?.[1] ?? "";
-  return candidate[0] === fence.marker && candidate.length >= fence.length;
 }
 
 function lineSnippet(content: string, line: number): string | undefined {
@@ -1990,82 +1815,104 @@ function isBulkDataSharingInstruction(line: string): boolean {
 }
 
 function semanticInstructionDetections(
-  lines: string[],
-  lineIndex: number,
+  unit: MarkdownSemanticUnit,
+  markdownView: MarkdownSecurityView,
 ): Detection[] {
-  const line = lines[lineIndex] ?? "";
-  if (!line.trim() || /^\s*#{1,6}\s+/.test(line)) return [];
-
   const detections: Detection[] = [];
-  const window = semanticInstructionWindow(lines, lineIndex);
-  const instructionText = window.lines.join(" ");
-  const priorInstructionText = window.lines.slice(0, -1).join(" ");
+  const firstLine =
+    unit.kind === "code" ? unit.contentStartLine : unit.startLine;
+  const instructionLines = unit.lines.map((line) => line.trim());
+  const instructionText = instructionLines.join(" ");
+  if (!instructionText.trim()) return detections;
+  const lineOffsets = instructionLines.map((_, index) =>
+    instructionLines
+      .slice(0, index)
+      .reduce((offset, line) => offset + line.length + 1, 0),
+  );
   const windowEvidence = {
-    startLine: window.startIndex + 1,
-    endLine: lineIndex + 1,
-    snippet: window.lines.join("\n"),
-  };
-  const lineEvidence = {
-    startLine: lineIndex + 1,
-    endLine: lineIndex + 1,
-    snippet: line,
+    startLine: firstLine,
+    endLine: firstLine + instructionLines.length - 1,
+    snippet: instructionLines.join("\n"),
   };
 
-  const safeguardLineMatches = SAFEGUARD_BYPASS_PATTERNS.some((pattern) =>
-    pattern.test(line),
+  const safeguardLineIndex = instructionLines.findIndex(
+    (line) =>
+      SAFEGUARD_BYPASS_PATTERNS.some((pattern) => pattern.test(line)) &&
+      !DIRECT_DEFENSIVE_SEMANTIC_RE.test(line),
   );
   const safeguardWindowMatches = SAFEGUARD_BYPASS_PATTERNS.some((pattern) =>
     pattern.test(instructionText),
   );
-  const safeguardAlreadyMatched = SAFEGUARD_BYPASS_PATTERNS.some((pattern) =>
-    pattern.test(priorInstructionText),
-  );
-  const safeguardInstructionText = safeguardLineMatches
-    ? line
-    : instructionText;
+  const safeguardInstructionText =
+    safeguardLineIndex >= 0
+      ? (instructionLines[safeguardLineIndex] ?? "")
+      : instructionText;
   if (
-    (safeguardLineMatches ||
-      (safeguardWindowMatches && !safeguardAlreadyMatched)) &&
+    (safeguardLineIndex >= 0 || safeguardWindowMatches) &&
     !DIRECT_DEFENSIVE_SEMANTIC_RE.test(safeguardInstructionText)
   ) {
+    const evidence =
+      safeguardLineIndex >= 0
+        ? semanticLineEvidence(instructionLines, firstLine, safeguardLineIndex)
+        : windowEvidence;
     detections.push({
       metadata: RULES.safeguardBypassInstruction,
       severity: "high",
-      ...(safeguardLineMatches ? lineEvidence : windowEvidence),
-      dedupeKey: `${RULES.safeguardBypassInstruction.id}:${lineIndex + 1}`,
+      ...evidence,
+      dedupeKey: `${RULES.safeguardBypassInstruction.id}:${evidence.startLine}`,
     });
   }
 
-  const currentLineStart = window.lines
-    .slice(0, -1)
-    .reduce((offset, item) => offset + item.length + 1, 0);
   const sentences = semanticSentenceSpans(instructionText);
   const untrustedAction = untrustedExecutionActions(sentences).find(
     (action) =>
-      action.end > currentLineStart &&
       UNTRUSTED_CONTENT_SOURCE_RE.test(instructionText.slice(0, action.end)) &&
       !isDefensiveUntrustedAction(sentences, action) &&
-      !hasPrecedingReviewGuard(sentences, action),
+      !hasPrecedingReviewGuard(sentences, action, (sentence) => {
+        const sentenceLineIndex = semanticLineIndexAtOffset(
+          lineOffsets,
+          sentence.start,
+        );
+        return !markdownView.isInlineCodeLine(firstLine + sentenceLineIndex);
+      }),
   );
   if (untrustedAction !== undefined) {
-    const untrustedContentOnLine =
-      untrustedAction.start >= currentLineStart &&
-      UNTRUSTED_CONTENT_SOURCE_RE.test(
-        instructionText.slice(currentLineStart, untrustedAction.end),
-      );
+    const actionLineIndex = semanticLineIndexAtOffset(
+      lineOffsets,
+      untrustedAction.start,
+    );
+    const actionLineStart = lineOffsets[actionLineIndex] ?? 0;
+    const actionLine = instructionLines[actionLineIndex] ?? "";
+    const untrustedContentOnLine = UNTRUSTED_CONTENT_SOURCE_RE.test(
+      instructionText.slice(
+        actionLineStart,
+        actionLineStart + actionLine.length,
+      ),
+    );
+    const evidence = untrustedContentOnLine
+      ? semanticLineEvidence(instructionLines, firstLine, actionLineIndex)
+      : {
+          startLine: firstLine,
+          endLine: firstLine + actionLineIndex,
+          snippet: instructionLines.slice(0, actionLineIndex + 1).join("\n"),
+        };
     detections.push({
       metadata: RULES.untrustedContentAsInstruction,
       severity: "high",
-      ...(untrustedContentOnLine ? lineEvidence : windowEvidence),
-      dedupeKey: `${RULES.untrustedContentAsInstruction.id}:${window.startIndex + 1}:${untrustedAction.start}:${untrustedAction.end}`,
+      ...evidence,
+      dedupeKey: `${RULES.untrustedContentAsInstruction.id}:${firstLine}:${untrustedAction.start}:${untrustedAction.end}`,
     });
   }
 
-  if (
-    RECURSIVE_EXTERNAL_TRAVERSAL_RE.test(line) &&
-    !DIRECT_DEFENSIVE_SEMANTIC_RE.test(line)
-  ) {
-    const sectionText = boundedInstructionText(lines, lineIndex);
+  for (const [lineIndex, line] of instructionLines.entries()) {
+    if (
+      !RECURSIVE_EXTERNAL_TRAVERSAL_RE.test(line) ||
+      DIRECT_DEFENSIVE_SEMANTIC_RE.test(line)
+    ) {
+      continue;
+    }
+    const evidenceLine = firstLine + lineIndex;
+    const sectionText = markdownView.instructionSectionText(evidenceLine);
     const hasAnyBoundary = TRAVERSAL_BOUNDARY_PATTERNS.some((pattern) =>
       pattern.test(sectionText),
     );
@@ -2086,9 +1933,9 @@ function semanticInstructionDetections(
             }
           : RULES.unboundedExternalSourceTraversal,
         severity: sensitiveSink ? "medium" : "low",
-        startLine: lineIndex + 1,
+        startLine: evidenceLine,
         snippet: line,
-        dedupeKey: `${RULES.unboundedExternalSourceTraversal.id}:${lineIndex + 1}`,
+        dedupeKey: `${RULES.unboundedExternalSourceTraversal.id}:${evidenceLine}`,
       });
     }
   }
@@ -2096,28 +1943,26 @@ function semanticInstructionDetections(
   return detections;
 }
 
-function semanticInstructionWindow(
+function semanticLineEvidence(
   lines: string[],
+  firstLine: number,
   lineIndex: number,
-): { startIndex: number; lines: string[] } {
-  let startIndex = lineIndex;
-  const listItemOwner = markdownListItemOwner(lines, lineIndex);
-  while (startIndex > 0 && lineIndex - startIndex < 2) {
-    const candidate = lines[startIndex - 1] ?? "";
-    if (
-      !candidate.trim() ||
-      /^\s*(?:#{1,6}\s+|```|~~~|>|<!--|\/\/)/.test(candidate) ||
-      candidate.trim() === "---"
-    ) {
-      break;
-    }
-    if (markdownListItemOwner(lines, startIndex - 1) !== listItemOwner) break;
-    startIndex -= 1;
-  }
+): Pick<Detection, "startLine" | "endLine" | "snippet"> {
   return {
-    startIndex,
-    lines: lines.slice(startIndex, lineIndex + 1).map((item) => item.trim()),
+    startLine: firstLine + lineIndex,
+    endLine: firstLine + lineIndex,
+    snippet: lines[lineIndex] ?? "",
   };
+}
+
+function semanticLineIndexAtOffset(
+  lineOffsets: number[],
+  offset: number,
+): number {
+  for (let index = lineOffsets.length - 1; index >= 0; index -= 1) {
+    if ((lineOffsets[index] ?? 0) <= offset) return index;
+  }
+  return 0;
 }
 
 type SemanticTextSpan = {
@@ -2221,12 +2066,15 @@ function isDefensiveUntrustedAction(
 function hasPrecedingReviewGuard(
   sentences: SemanticTextSpan[],
   action: UntrustedExecutionAction,
+  guardIsOperational: (sentence: SemanticTextSpan) => boolean = () => true,
 ): boolean {
   const sentence = sentences[action.sentenceIndex];
   if (sentence === undefined) return false;
   if (CONTRADICTORY_REVIEW_ACTION_RE.test(sentence.text)) return false;
 
-  const sameSentenceGuards = reviewGuardActions(sentence);
+  const sameSentenceGuards = guardIsOperational(sentence)
+    ? reviewGuardActions(sentence)
+    : [];
   if (
     sameSentenceGuards.some(
       (guard) =>
@@ -2241,6 +2089,7 @@ function hasPrecedingReviewGuard(
   const precedingSentence = sentences[action.sentenceIndex - 1];
   return (
     precedingSentence !== undefined &&
+    guardIsOperational(precedingSentence) &&
     reviewGuardActions(precedingSentence).some(
       (guard) =>
         guard.verb === action.verb &&
@@ -2300,308 +2149,6 @@ function reviewGuardActions(
     });
   }
   return guards;
-}
-
-type MarkdownListItem = {
-  indent: number;
-  contentColumn: number;
-  orderedStart?: number;
-};
-
-function markdownListItem(
-  lines: string[],
-  lineIndex: number,
-): MarkdownListItem | undefined {
-  const listItem = markdownListMarker(lines[lineIndex] ?? "");
-  if (listItem === undefined) return undefined;
-  const validContainerIndent = markdownActiveListContentColumnsBefore(
-    lines,
-    lineIndex,
-  ).some(
-    (contentColumn) =>
-      listItem.indent >= contentColumn && listItem.indent - contentColumn <= 3,
-  );
-  if (!validContainerIndent) return undefined;
-  if (
-    listItem.orderedStart !== undefined &&
-    listItem.orderedStart !== 1 &&
-    unownedMarkdownParagraphOpenBefore(lines, lineIndex)
-  ) {
-    return undefined;
-  }
-  return listItem;
-}
-
-function markdownListMarker(line: string): MarkdownListItem | undefined {
-  const match = line.match(/^([ \t]*)(?:([-*+])|(\d{1,9})[.)])([ \t]*)(.*)$/);
-  if (match === null) return undefined;
-  const padding = match[4] ?? "";
-  const content = match[5] ?? "";
-  if (!padding && content) return undefined;
-  const marker = match[2] ?? `${match[3] ?? ""}.`;
-  const markerEndColumn = markdownColumn(`${match[1] ?? ""}${marker}`);
-  const paddingEndColumn = markdownColumn(
-    `${match[1] ?? ""}${marker}${padding}`,
-  );
-  const paddingColumns = paddingEndColumn - markerEndColumn;
-  return {
-    indent: markdownIndent(match[1] ?? ""),
-    contentColumn:
-      paddingColumns >= 1 && paddingColumns <= 4
-        ? paddingEndColumn
-        : markerEndColumn + 1,
-    ...(match[3] === undefined
-      ? {}
-      : { orderedStart: Number.parseInt(match[3], 10) }),
-  };
-}
-
-function markdownActiveListContentColumnsBefore(
-  lines: string[],
-  lineIndex: number,
-): number[] {
-  const contentColumns = [0];
-  const seenOwners = new Set<number>();
-  let probe = lineIndex - 1;
-  while (probe >= 0) {
-    const owner = markdownListItemOwner(lines, probe);
-    if (owner === undefined || seenOwners.has(owner)) break;
-    seenOwners.add(owner);
-    const listItem = markdownListItem(lines, owner);
-    if (listItem === undefined) break;
-    contentColumns.push(listItem.contentColumn);
-    probe = owner - 1;
-  }
-  return contentColumns;
-}
-
-function unownedMarkdownParagraphOpenBefore(
-  lines: string[],
-  lineIndex: number,
-): boolean {
-  if (lineIndex <= 0) return false;
-  const previousLine = lines[lineIndex - 1] ?? "";
-  return (
-    !!previousLine.trim() &&
-    !isMarkdownInlineBlockBoundaryLine(previousLine) &&
-    markdownListItemOwner(lines, lineIndex - 1) === undefined
-  );
-}
-
-function markdownListContainerRelativeLine(
-  lines: string[],
-  lineIndex: number,
-  listItemOwner: number | undefined,
-): string {
-  const line = lines[lineIndex] ?? "";
-  if (listItemOwner === undefined) return line;
-  const listItem = markdownListItem(lines, listItemOwner);
-  if (listItem === undefined) return line;
-  return stripMarkdownIndentColumns(line, listItem.contentColumn) ?? line;
-}
-
-function markdownListItemOwner(
-  lines: string[],
-  lineIndex: number,
-): number | undefined {
-  if (markdownListItem(lines, lineIndex) !== undefined) return lineIndex;
-  for (let index = lineIndex - 1; index >= 0; index -= 1) {
-    const candidate = lines[index] ?? "";
-    if (!candidate.trim()) return undefined;
-    const listItem = markdownListItem(lines, index);
-    if (listItem !== undefined) {
-      return listItemParagraphContinuesThrough(
-        lines,
-        index,
-        lineIndex,
-        listItem,
-      )
-        ? index
-        : undefined;
-    }
-  }
-  return undefined;
-}
-
-function listItemParagraphContinuesThrough(
-  lines: string[],
-  listItemOwner: number,
-  lineIndex: number,
-  listItem: { contentColumn: number },
-): boolean {
-  for (let index = listItemOwner + 1; index <= lineIndex; index += 1) {
-    const line = lines[index] ?? "";
-    if (!line.trim() || markdownListItem(lines, index) !== undefined) {
-      return false;
-    }
-    const relativeLine =
-      stripMarkdownIndentColumns(line, listItem.contentColumn) ?? line;
-    if (isMarkdownInlineBlockBoundaryLine(relativeLine)) return false;
-  }
-  return true;
-}
-
-function markdownIndent(line: string): number {
-  const whitespace = line.match(/^\s*/)?.[0] ?? "";
-  return markdownColumn(whitespace);
-}
-
-function markdownColumn(text: string): number {
-  return [...text].reduce(
-    (column, character) =>
-      character === "\t" ? column + (4 - (column % 4)) : column + 1,
-    0,
-  );
-}
-
-function stripMarkdownIndentColumns(
-  line: string,
-  targetColumn: number,
-): string | undefined {
-  let column = 0;
-  let cursor = 0;
-  while (cursor < line.length && /[ \t]/.test(line[cursor] ?? "")) {
-    const character = line[cursor] ?? "";
-    column = character === "\t" ? column + (4 - (column % 4)) : column + 1;
-    cursor += 1;
-    if (column >= targetColumn) {
-      return `${" ".repeat(column - targetColumn)}${line.slice(cursor)}`;
-    }
-  }
-  return targetColumn === 0 ? line : undefined;
-}
-
-function boundedInstructionText(lines: string[], lineIndex: number): string {
-  const range = boundedInstructionRange(lines, lineIndex);
-  const prose: string[] = [];
-  let inFence = false;
-  let operationalSemanticFence = false;
-  for (let index = range.start; index < range.end; index += 1) {
-    const line = lines[index] ?? "";
-    if (MARKDOWN_FENCE_RE.test(line)) {
-      if (inFence) {
-        inFence = false;
-        operationalSemanticFence = false;
-      } else {
-        inFence = true;
-        operationalSemanticFence = isOperationalSemanticFence(lines, index);
-      }
-      continue;
-    }
-    if (
-      (inFence && !operationalSemanticFence) ||
-      /^\s*>/.test(line) ||
-      isNonOperationalExampleLine(lines, index)
-    ) {
-      continue;
-    }
-    prose.push(line);
-  }
-  return prose.join("\n");
-}
-
-function isOperationalSemanticFence(
-  lines: string[],
-  openingFenceIndex: number,
-): boolean {
-  if (!MARKDOWN_SEMANTIC_PROSE_FENCE_RE.test(lines[openingFenceIndex] ?? "")) {
-    return false;
-  }
-  if (isNonOperationalExampleLine(lines, openingFenceIndex)) return false;
-
-  let previous = openingFenceIndex - 1;
-  while (previous >= 0 && !(lines[previous] ?? "").trim()) previous -= 1;
-  if (
-    previous >= 0 &&
-    (OPERATIONAL_FENCE_ROUTING_RE.test(lines[previous] ?? "") ||
-      OPERATIONAL_FENCE_LABEL_RE.test(lines[previous] ?? ""))
-  ) {
-    return true;
-  }
-
-  let childDepth = 7;
-  for (let index = openingFenceIndex - 1; index >= 0; index -= 1) {
-    const match = (lines[index] ?? "").match(/^\s*(#{1,6})\s+(.+)$/);
-    if (match === null) continue;
-    const depth = match[1]?.length ?? 1;
-    if (depth >= childDepth) continue;
-    if (OPERATIONAL_FENCE_HEADING_RE.test(match[2] ?? "")) return true;
-    childDepth = depth;
-  }
-  return false;
-}
-
-function boundedInstructionRange(
-  lines: string[],
-  lineIndex: number,
-): { start: number; end: number } {
-  let headingIndex = -1;
-  let headingDepth = 7;
-  for (let index = lineIndex; index >= 0; index -= 1) {
-    const match = (lines[index] ?? "").match(/^\s*(#{1,6})\s+/);
-    if (match === null) continue;
-    headingIndex = index;
-    headingDepth = match[1]?.length ?? 1;
-    break;
-  }
-
-  if (headingIndex >= 0) {
-    let end = lines.length;
-    for (let index = lineIndex + 1; index < lines.length; index += 1) {
-      const match = (lines[index] ?? "").match(/^\s*(#{1,6})\s+/);
-      if (match !== null && (match[1]?.length ?? 1) <= headingDepth) {
-        end = index;
-        break;
-      }
-    }
-    return { start: headingIndex + 1, end };
-  }
-
-  let start = lineIndex;
-  while (start > 0 && lineIndex - start < 6) {
-    const candidate = lines[start - 1] ?? "";
-    if (!candidate.trim() || candidate.trim() === "---") break;
-    start -= 1;
-  }
-  let end = lineIndex + 1;
-  while (end < lines.length && end - lineIndex <= 6) {
-    const candidate = lines[end] ?? "";
-    if (!candidate.trim() || candidate.trim() === "---") break;
-    end += 1;
-  }
-  return { start, end };
-}
-
-function isNonOperationalExampleLine(
-  lines: string[],
-  lineIndex: number,
-): boolean {
-  const line = lines[lineIndex] ?? "";
-  const exampleBoundary =
-    /\b(unsafe|negative|prohibited|forbidden|noncompliant|bad)\s+(?:example|pattern)s?\b|\bwhat not to do\b/i;
-  if (exampleBoundary.test(line)) return true;
-
-  let previous = lineIndex - 1;
-  while (previous >= 0 && !(lines[previous] ?? "").trim()) previous -= 1;
-  if (
-    previous >= 0 &&
-    /\b(unsafe|negative|prohibited|forbidden|noncompliant|bad)\s+examples?\s*:\s*$/i.test(
-      lines[previous] ?? "",
-    )
-  ) {
-    return true;
-  }
-
-  let childDepth = 7;
-  for (let index = lineIndex; index >= 0; index -= 1) {
-    const match = (lines[index] ?? "").match(/^\s*(#{1,6})\s+(.+)$/);
-    if (match === null) continue;
-    const depth = match[1]?.length ?? 1;
-    if (depth >= childDepth) continue;
-    if (exampleBoundary.test(match[2] ?? "")) return true;
-    childDepth = depth;
-  }
-  return false;
 }
 
 function extractNetworkDestinations(line: string): NetworkDestination[] {
@@ -2712,71 +2259,40 @@ function isPrecedingGuardWithinBoundary(
   lines: string[],
   guardIndex: number,
   instructionIndex: number,
+  markdownView?: MarkdownSecurityView,
 ): boolean {
   if (guardIndex < 0 || guardIndex >= instructionIndex) return false;
+  if (markdownView !== undefined) {
+    return markdownView.sameStructuralSection(guardIndex, instructionIndex);
+  }
   return !lines
     .slice(guardIndex + 1, instructionIndex + 1)
-    .some((line) => /^\s*#{1,6}\s+/.test(line) || line.trim() === "---");
+    .some((line) => !line.trim());
 }
 
 function hasStructuredGuard(
   lines: string[],
   commandIndex: number,
   guard: (line: string) => boolean,
+  markdownView?: MarkdownSecurityView,
 ): boolean {
-  const command = lines[commandIndex] ?? "";
-  const commandIndent = command.match(/^\s*/)?.[0].length ?? 0;
-
-  // Same Markdown list item, including an indented fenced command.
-  if (commandIndent > 0) {
-    for (let index = commandIndex - 1; index >= 0; index -= 1) {
-      const line = lines[index] ?? "";
-      if (/^\s*#{1,6}\s+/.test(line) || line.trim() === "---") break;
-      if (/^\s*[-*+]\s+/.test(line)) return guard(line);
-      const indent = line.match(/^\s*/)?.[0].length ?? 0;
-      if (line.trim() && indent < commandIndent) break;
-    }
+  if (markdownView !== undefined) {
+    return markdownView.associatedGuardLines(commandIndex).some(guard);
   }
 
-  // Paragraph directly associated with the command or its opening fence.
+  // Plain-text and script artifacts retain nearby guard association without
+  // interpreting their contents as Markdown.
   let cursor = commandIndex - 1;
-  while (cursor >= 0 && MARKDOWN_FENCE_RE.test(lines[cursor] ?? ""))
-    cursor -= 1;
   while (cursor >= 0 && !(lines[cursor] ?? "").trim()) cursor -= 1;
-  const paragraph: string[] = [];
-  while (cursor >= 0) {
+  let inspected = 0;
+  while (cursor >= 0 && inspected < 6) {
     const line = lines[cursor] ?? "";
-    if (!line.trim() || line.trim() === "---" || /^\s*#{1,6}\s+/.test(line))
-      break;
-    paragraph.unshift(line);
+    if (!line.trim()) break;
+    if (guard(line)) return true;
     cursor -= 1;
+    inspected += 1;
   }
-  if (paragraph.some(guard)) return true;
-
-  // Explicit guard prose earlier in the same safety/constraint section is
-  // structurally associated without depending on a fixed distance.
-  const headingIndex = findParentSafetyHeading(lines, commandIndex);
-  return (
-    headingIndex >= 0 && lines.slice(headingIndex, commandIndex + 1).some(guard)
-  );
-}
-
-function findParentSafetyHeading(lines: string[], fromIndex: number): number {
-  let childDepth = 7;
-  for (let index = fromIndex - 1; index >= 0; index -= 1) {
-    const match = (lines[index] ?? "").match(/^\s*(#{1,6})\s+(.+)$/);
-    if (!match) continue;
-    const depth = match[1]?.length ?? 1;
-    if (depth >= childDepth) continue;
-    if (
-      /\b(human approval|safety|constraints?|guardrails?)\b/i.test(
-        match[2] ?? "",
-      )
-    )
-      return index;
-    childDepth = depth;
-  }
-  return -1;
+  return false;
 }
 
 function requiresHumanApprovalGuard(line: string): boolean {
