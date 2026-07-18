@@ -765,12 +765,17 @@ const UNTRUSTED_CONTENT_SOURCE_RE =
   /\b(external (?:page|site|document|source|content|instructions?)|issue body|issue description|logs?|tool output|command output|attachment|downloaded (?:file|markdown|document|instructions?)|fetched (?:page|markdown|document|content|instructions?)|retrieved (?:page|document|content|instructions?))\b/i;
 const UNTRUSTED_CONTENT_EXECUTION_RE =
   /\b(execute|run|apply|follow|obey|adopt)\b.{0,80}?\b(every command|all commands?|instructions?|steps?|verbatim|exactly|without review)\b|\b(treat|regard|accept)\b.{0,80}?\b(authoritative|trusted instructions?|commands?|executable guidance)\b|\b(follow|obey|execute|run|apply)\b.{0,50}?\b(it|them|the content|the instructions?)\b.{0,40}?\b(verbatim|exactly|without review)\b/i;
-const UNTRUSTED_CONTENT_REVIEW_GUARD_RE =
-  /\b(review|validate|verify|inspect)\b.{0,80}?\b(before|prior to)\b.{0,60}?\b(execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting)\b/i;
+const REVIEW_VOCABULARY_SOURCE = String.raw`(?:review(?:s|ed|ing|ers?)?|validat(?:e|es|ed|ing|ion)|verif(?:y|ies|ied|ying|ication)|inspect(?:s|ed|ing|ion)|check(?:s|ed|ing)?)`;
+const UNTRUSTED_CONTENT_REVIEW_GUARD_RE = new RegExp(
+  String.raw`\b${REVIEW_VOCABULARY_SOURCE}\b.{0,80}?\b(before|prior to)\b.{0,60}?\b(execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting)\b`,
+  "i",
+);
 const BROAD_REVIEW_GUARD_SCOPE_RE =
   /\b(all|each|every)\b.{0,40}\b(proposed\s+)?(actions?|instructions?|steps?)\b|\bproposed actions?\b/i;
-const CONTRADICTORY_REVIEW_ACTION_RE =
-  /\b(regardless of|irrespective of|despite)\b.{0,60}\b(review|validation|verification|findings?|results?)\b|\beven (?:if|when)\b.{0,60}\b(review|validation|verification)\b.{0,40}\b(fails?|failed|rejects?|rejected|blocks?|blocked|is negative)\b|\bwithout\b.{0,30}\b(review|reviewing|validation|verification)\b|\b(ignore|disregard|bypass|skip|omit)\b.{0,50}\b(review|validation|verification|findings?|results?)\b/i;
+const CONTRADICTORY_REVIEW_ACTION_RE = new RegExp(
+  String.raw`\b(regardless of|irrespective of|despite)\b.{0,60}\b${REVIEW_VOCABULARY_SOURCE}\b|\beven (?:if|when)\b.{0,60}\b${REVIEW_VOCABULARY_SOURCE}\b.{0,40}\b(fails?|failed|rejects?|rejected|blocks?|blocked|is negative)\b|\bwithout\b.{0,30}\b${REVIEW_VOCABULARY_SOURCE}\b|\b(ignore|disregard|bypass|skip|omit)\b.{0,50}\b${REVIEW_VOCABULARY_SOURCE}\b`,
+  "i",
+);
 const DIRECT_DEFENSIVE_ACTION_PREFIX_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,24}$/i;
 const RECURSIVE_EXTERNAL_TRAVERSAL_RE =
@@ -1822,13 +1827,36 @@ function hasClosingBacktickRun(
   openingEnd: number,
   delimiterLength: number,
 ): boolean {
+  const listItemOwner = markdownListItemOwner(lines, openingLine);
   for (let lineIndex = openingLine; lineIndex < lines.length; lineIndex += 1) {
+    if (
+      lineIndex > openingLine &&
+      isInlineMarkdownBlockBoundary(lines, lineIndex, listItemOwner)
+    ) {
+      return false;
+    }
     const cursor = lineIndex === openingLine ? openingEnd : 0;
     if (findBacktickRun(lines[lineIndex] ?? "", cursor, delimiterLength) >= 0) {
       return true;
     }
   }
   return false;
+}
+
+function isInlineMarkdownBlockBoundary(
+  lines: string[],
+  lineIndex: number,
+  openingListItemOwner: number | undefined,
+): boolean {
+  const line = lines[lineIndex] ?? "";
+  if (
+    !line.trim() ||
+    /^\s*(?:#{1,6}\s+|```|~~~|>|<!--|\/\/)/.test(line) ||
+    line.trim() === "---"
+  ) {
+    return true;
+  }
+  return markdownListItemOwner(lines, lineIndex) !== openingListItemOwner;
 }
 
 function findBacktickRun(

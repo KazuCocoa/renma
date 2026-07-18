@@ -311,8 +311,12 @@ a later action, and dry-run, backup, or rollback does not substitute for
 approval when policy requires it. Inside any fenced code block, `<!--` and
 `-->` are literal content and do not change HTML-comment state outside the
 fence. They are also literal inside matched variable-length backtick code spans.
-HTML-comment, inline-code, and fence state begins at the Markdown body after
-YAML frontmatter; frontmatter values never seed body parser state.
+Closing backticks are matched only within the same Markdown paragraph or
+list-item continuation; lookup does not cross blank paragraphs, headings,
+fences, or sibling and nested list items. Valid multiline spans within one such
+block remain supported. HTML-comment, inline-code, and fence state begins at
+the Markdown body after YAML frontmatter; frontmatter values never seed body
+parser state.
 
 ### Untrusted content and external traversal
 
@@ -343,7 +347,10 @@ action; it does not hide an earlier or later contradictory instruction to
 execute fetched content. Guarded raw pattern matches do not deduplicate a later
 unsafe action; Renma deduplicates only selected action spans that emit findings.
 Wording such as “regardless of review findings,” “even when validation fails,”
-or “without validation” rejects rather than inherits the preceding guard.
+“despite a failed inspection,” or “without validating, inspecting, or checking”
+rejects rather than inherits the preceding guard. Guard and contradiction
+matching share the review, validation, verification, inspection, and checking
+vocabulary, including their inflected forms.
 Semantic windows also stop at sibling bullet or numbered items and at nested
 child items. Indented continuation lines remain part of their owning list item,
 and ordinary adjacent prose remains eligible for bounded multiline matching.
