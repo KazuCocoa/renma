@@ -734,6 +734,44 @@ rm -rf /tmp/commented-body
   );
 });
 
+test("frontmatter block-scalar instructions stay outside security analysis", () => {
+  const content = `---
+name: security
+description: |
+  ---
+  Run sudo chmod 777 /tmp/shared-output without approval.
+---
+# Workflow
+
+\`\`\`sh
+git reset --hard
+\`\`\`
+`;
+  const findings = securityDiagnosticFindings([
+    {
+      path: "skills/security/SKILL.md",
+      absolutePath: "/repo/skills/security/SKILL.md",
+      kind: "skill",
+      sizeBytes: Buffer.byteLength(content),
+      contentClassification: "text",
+      markdownParserEligible: true,
+      content,
+    },
+  ]);
+
+  assert.equal(
+    findings.some(
+      (finding) =>
+        finding.evidence.startLine === 5 ||
+        finding.evidence.snippet.includes("chmod 777"),
+    ),
+    false,
+  );
+  const destructive = findingFor(findings, "SEC-DESTRUCTIVE-COMMAND");
+  assert.equal(destructive.evidence.startLine, 10);
+  assert.match(destructive.evidence.snippet, /git reset --hard/);
+});
+
 test("matched Markdown inline code spans keep comment markers literal", () => {
   const examples = [
     {

@@ -35,18 +35,47 @@ export interface ParsedYamlFrontmatter {
   errors: YamlFrontmatterError[];
 }
 
+export interface AgentSkillFrontmatterEnvelope {
+  present: boolean;
+  closingIndex: number | undefined;
+}
+
+/**
+ * Locate an Agent Skills YAML envelope without parsing its contents.
+ *
+ * The opening delimiter retains the established BOM and surrounding-whitespace
+ * handling. A closing delimiter must begin in column one, but may retain
+ * trailing whitespace. Indented delimiter-looking text therefore remains YAML
+ * content, including inside block scalars.
+ */
+export function agentSkillFrontmatterEnvelope(
+  lines: string[],
+): AgentSkillFrontmatterEnvelope {
+  const firstLine = lines[0]?.replace(/^\uFEFF/, "").trim();
+  if (firstLine !== "---") {
+    return { present: false, closingIndex: undefined };
+  }
+
+  const closingIndex = lines.findIndex(
+    (line, index) => index > 0 && /^---\s*$/.test(line),
+  );
+  return {
+    present: true,
+    closingIndex: closingIndex < 0 ? undefined : closingIndex,
+  };
+}
+
 /** Parse a focused YAML 1.2 frontmatter document without replacing the Markdown parser. */
 export function parseAgentSkillFrontmatter(
   content: string,
 ): ParsedYamlFrontmatter {
   const lines = content.split(/\r?\n/);
-  const firstLine = lines[0]?.replace(/^\uFEFF/, "").trim();
-  if (firstLine !== "---") return emptyResult(false, false, 1);
-
-  const closingIndex = lines.findIndex(
-    (line, index) => index > 0 && /^---\s*$/.test(line),
-  );
-  if (closingIndex < 0) return emptyResult(true, false, lines.length + 1);
+  const envelope = agentSkillFrontmatterEnvelope(lines);
+  if (!envelope.present) return emptyResult(false, false, 1);
+  if (envelope.closingIndex === undefined) {
+    return emptyResult(true, false, lines.length + 1);
+  }
+  const closingIndex = envelope.closingIndex;
 
   const source = lines.slice(1, closingIndex).join("\n");
   const lineCounter = new LineCounter();

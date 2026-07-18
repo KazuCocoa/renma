@@ -14,6 +14,7 @@ import type {
 import type { Position } from "unist";
 
 import type { ParsedDocument } from "./types.js";
+import { agentSkillFrontmatterEnvelope } from "./yaml-frontmatter.js";
 
 /** One-based, inclusive range in the original Markdown file. */
 export interface MarkdownSourceRange {
@@ -89,11 +90,8 @@ const syntaxByDocument = new WeakMap<ParsedDocument, MarkdownSyntax>();
 
 /** Find the first Markdown body line after a closed YAML frontmatter envelope. */
 export function markdownBodyStartLine(sourceLines: string[]): number {
-  if (sourceLines[0]?.trim() !== "---") return 1;
-  const closingIndex = sourceLines.findIndex(
-    (line, index) => index > 0 && line.trim() === "---",
-  );
-  return closingIndex > 0 ? closingIndex + 2 : 1;
+  const envelope = agentSkillFrontmatterEnvelope(sourceLines);
+  return envelope.closingIndex === undefined ? 1 : envelope.closingIndex + 2;
 }
 
 /** Parse one Markdown body while retaining original-file source provenance. */

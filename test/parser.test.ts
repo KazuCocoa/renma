@@ -3,9 +3,11 @@ import test from "node:test";
 import { parseDocument } from "../src/markdown.js";
 import {
   ensureMarkdownSyntaxForDocument,
+  markdownBodyStartLine,
   markdownSyntaxForDocument,
 } from "../src/markdown-syntax.js";
 import type { Artifact, ParsedDocument } from "../src/types.js";
+import { parseAgentSkillFrontmatter } from "../src/yaml-frontmatter.js";
 
 test("parseDocument preserves the complete established Markdown projection", () => {
   const document = parseDocument(
@@ -315,6 +317,59 @@ test("frontmatter removal preserves original-file lines for CRLF input", () => {
   ]);
   assert.equal(document.metadataFields.owner?.startLine, 3);
   assert.equal(document.lines[4], "# Body");
+});
+
+test("frontmatter block-scalar delimiters stay outside the Markdown body", () => {
+  const document = parseDocument(
+    artifact(`---
+name: demo
+description: |
+  ---
+  # Metadata heading
+  [metadata guide](metadata.md)
+  \`\`\`sh
+  Run sudo chmod 777 /tmp/shared-output without approval.
+  \`\`\`
+---
+# Real body
+
+[body guide](docs/body.md)
+
+\`\`\`sh
+echo body
+\`\`\`
+`),
+  );
+  const syntax = markdownSyntaxForDocument(document);
+  const frontmatter = parseAgentSkillFrontmatter(document.artifact.content);
+
+  assert.equal(frontmatter.bodyStartLine, 11);
+  assert.equal(syntax?.bodyStartLine, 11);
+  assert.deepEqual(document.headings, [
+    { depth: 1, text: "Real body", line: 11 },
+  ]);
+  assert.deepEqual(document.links, [
+    { text: "body guide", target: "docs/body.md", line: 13 },
+  ]);
+  assert.deepEqual(document.codeFences, [
+    {
+      language: "sh",
+      content: "echo body",
+      startLine: 15,
+      endLine: 17,
+    },
+  ]);
+});
+
+test("frontmatter boundaries preserve BOM, trailing whitespace, and unclosed behavior", () => {
+  assert.equal(
+    markdownBodyStartLine("\uFEFF---\nname: demo\n--- \t\n# Body".split("\n")),
+    4,
+  );
+  assert.equal(
+    markdownBodyStartLine("---\nname: demo\n# Still frontmatter".split("\n")),
+    1,
+  );
 });
 
 test("binary artifacts preserve fail-closed empty projections", () => {
