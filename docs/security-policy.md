@@ -314,7 +314,10 @@ fence. They are also literal inside matched variable-length backtick code spans.
 Closing backticks are matched only within the same Markdown paragraph or
 list-item continuation; lookup does not cross blank paragraphs, ATX or Setext
 headings, thematic breaks, fences, or sibling and nested list items. Valid
-multiline spans within one such block remain supported. HTML-comment,
+multiline spans within one such block remain supported. CommonMark HTML blocks
+that can interrupt a paragraph end delimiter lookup, including raw tags,
+comments, processing instructions, declarations, CDATA, and recognized
+block-level tags; arbitrary inline HTML such as `<span>` does not. HTML-comment,
 inline-code, and fence state begins at the Markdown body after YAML frontmatter;
 frontmatter values never seed body parser state.
 

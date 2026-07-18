@@ -662,7 +662,10 @@ Matched Markdown inline-code spans use the same literal treatment, including
 variable-length backtick delimiters. Closing-delimiter lookup stays within the
 same Markdown paragraph or list-item continuation and does not cross blank
 paragraph boundaries, ATX or Setext headings, thematic breaks, fences, or
-sibling and nested list items. Valid multiline spans within that block remain
+sibling and nested list items. CommonMark HTML blocks that can interrupt a
+paragraph, including raw tags, comments, processing instructions, declarations,
+CDATA, and recognized block-level tags, also end lookup; arbitrary inline HTML
+such as `<span>` does not. Valid multiline spans within that block remain
 supported. Comment and fence state starts fresh after YAML frontmatter, so
 frontmatter scalar or block values cannot affect body scanning or evidence line
 numbers.

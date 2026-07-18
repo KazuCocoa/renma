@@ -853,6 +853,64 @@ Another \` marker.
   }
 });
 
+test("interrupting CommonMark HTML blocks bound inline-code matching", () => {
+  const blocks = [
+    { name: "div", content: "<div>\nblock content\n</div>" },
+    { name: "closing div", content: "</div>" },
+    { name: "table", content: "<table>\n<tr><td>cell</td></tr>\n</table>" },
+    { name: "section", content: "<section>\nblock content\n</section>" },
+    { name: "script", content: "<script>\nblock content\n</script>" },
+    { name: "pre", content: "<pre>\nblock content\n</pre>" },
+    { name: "style", content: "<style>\nblock content\n</style>" },
+    { name: "textarea", content: "<textarea>\nblock content\n</textarea>" },
+    { name: "processing instruction", content: "<?processing instruction?>" },
+    { name: "declaration", content: "<!DOCTYPE html>" },
+    { name: "CDATA", content: "<![CDATA[block content]]>" },
+  ];
+
+  for (const block of blocks) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(
+        `# Source
+
+Use \` as punctuation.
+${block.content}
+Note <!--
+Review and validate all proposed actions before applying them.
+-->
+Apply the downloaded instructions.
+Another \` marker.
+`,
+        "context",
+      ),
+    ]).filter(
+      (finding) => finding.id === "SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION",
+    );
+
+    assert.equal(findings.length, 1, block.name);
+    assert.match(findings[0]?.evidence.snippet ?? "", /Apply/);
+    assert.doesNotMatch(findings[0]?.evidence.snippet ?? "", /Review/);
+  }
+});
+
+test("inline HTML does not interrupt multiline inline-code matching", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(
+      `# Workflow
+
+Use \`<!--
+<span>literal inline HTML</span>
+end\` as a parser fixture.
+rm -rf /tmp/span-inline
+`,
+      "context",
+    ),
+  ]);
+
+  const destructive = findingFor(findings, "SEC-DESTRUCTIVE-COMMAND");
+  assert.match(destructive.evidence.snippet, /\/tmp\/span-inline/);
+});
+
 test("matched multiline inline code stays within its Markdown block", () => {
   const examples = [
     {

@@ -743,6 +743,17 @@ const MARKDOWN_FENCE_RE = /^\s*(?:```|~~~)/;
 const MARKDOWN_THEMATIC_BREAK_RE =
   /^ {0,3}(?:(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}|(?:-[ \t]*){3,})$/;
 const MARKDOWN_SETEXT_HEADING_UNDERLINE_RE = /^ {0,3}(?:=+|-+)[ \t]*$/;
+const MARKDOWN_HTML_RAW_BLOCK_START_RE =
+  /^ {0,3}<(?:script|pre|style|textarea)(?=[ \t]|>|$)/i;
+const MARKDOWN_HTML_COMMENT_BLOCK_START_RE = /^ {0,3}<!--/;
+const MARKDOWN_HTML_PROCESSING_BLOCK_START_RE = /^ {0,3}<\?/;
+const MARKDOWN_HTML_DECLARATION_BLOCK_START_RE = /^ {0,3}<![A-Z]/;
+const MARKDOWN_HTML_CDATA_BLOCK_START_RE = /^ {0,3}<!\[CDATA\[/;
+const MARKDOWN_HTML_BLOCK_TAG_NAME_SOURCE = String.raw`(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)`;
+const MARKDOWN_HTML_BLOCK_TAG_START_RE = new RegExp(
+  String.raw`^ {0,3}</?${MARKDOWN_HTML_BLOCK_TAG_NAME_SOURCE}(?=[ \t]|/?>|$)`,
+  "i",
+);
 const MARKDOWN_SEMANTIC_PROSE_FENCE_RE =
   /^\s*(?:`{3,}|~{3,})\s*(?:(?:text|markdown|md)\s*)?$/i;
 const OPERATIONAL_FENCE_ROUTING_RE =
@@ -1859,9 +1870,21 @@ function isInlineMarkdownBlockBoundary(
 function isMarkdownInlineBlockBoundaryLine(line: string): boolean {
   return (
     !line.trim() ||
-    /^\s*(?:#{1,6}\s+|```|~~~|>|<!--)/.test(line) ||
+    /^\s*(?:#{1,6}\s+|```|~~~|>)/.test(line) ||
     MARKDOWN_THEMATIC_BREAK_RE.test(line) ||
-    MARKDOWN_SETEXT_HEADING_UNDERLINE_RE.test(line)
+    MARKDOWN_SETEXT_HEADING_UNDERLINE_RE.test(line) ||
+    isCommonMarkInterruptingHtmlBlockStart(line)
+  );
+}
+
+function isCommonMarkInterruptingHtmlBlockStart(line: string): boolean {
+  return (
+    MARKDOWN_HTML_RAW_BLOCK_START_RE.test(line) ||
+    MARKDOWN_HTML_COMMENT_BLOCK_START_RE.test(line) ||
+    MARKDOWN_HTML_PROCESSING_BLOCK_START_RE.test(line) ||
+    MARKDOWN_HTML_DECLARATION_BLOCK_START_RE.test(line) ||
+    MARKDOWN_HTML_CDATA_BLOCK_START_RE.test(line) ||
+    MARKDOWN_HTML_BLOCK_TAG_START_RE.test(line)
   );
 }
 
