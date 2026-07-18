@@ -167,10 +167,16 @@ function rulesForEvaluationDate(
     {
       id: "security",
       run: ({ documents }) =>
-        documents.flatMap((document) => [
-          ...secretFindings(document),
-          ...commandFindings(document),
-        ]),
+        documents
+          .filter(
+            (document) =>
+              document.artifact.kind !== "script" &&
+              document.artifact.markdownParserEligible,
+          )
+          .flatMap((document) => [
+            ...secretFindings(document),
+            ...commandFindings(document),
+          ]),
     },
     {
       id: "shape",

@@ -35,6 +35,11 @@ database, agent memory, replacement for RAG, or generic Markdown linter. See the
 [Context Repository notes](https://kazucocoa.blog/context-repository/) for the
 broader product framing.
 
+Renma analyzes the security posture of LLM-facing Markdown instructions and
+metadata. It does not perform language-specific analysis of referenced or
+embedded executable scripts; use appropriate SAST and dependency-scanning tools
+for executable code.
+
 ## Agent Skills And Renma
 
 Run `renma guide skill` before generation. Its deterministic output tells the

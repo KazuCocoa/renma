@@ -4,6 +4,14 @@ Use this guide when writing security-sensitive skills or context assets. It is a
 
 Renma security diagnostics are deterministic repository checks for agent-facing operational instructions. They do not execute commands, call an LLM, enforce runtime behavior, inject context, or turn Renma into a broad supply-chain scanner. They are not language-specific SAST, dependency scanning, runtime monitoring, sandboxing, permission enforcement, telemetry collection, or a proof that an agent workflow is safe. No findings means only that the enabled deterministic checks found no matching repository evidence.
 
+Renma analyzes the security posture of LLM-facing Markdown instructions and
+metadata. It does not perform language-specific analysis of referenced or
+embedded executable scripts; use appropriate SAST and dependency-scanning tools
+for executable code. Markdown instructions that direct an agent to fetch,
+trust, execute, or invoke a script remain eligible for diagnostics. Analyze the
+script itself independently with project-selected tools such as ShellCheck,
+Bandit, Semgrep, ESLint security rules, CodeQL, and dependency scanners.
+
 ## Security Policy Quickstart
 
 Add small security policy metadata to agent-facing Skills or context assets when they include network, upload, secret-handling, command execution, or other sensitive operational instructions. Renma 0.16.0 uses different serialization boundaries for Skills and non-Skill assets.
@@ -311,15 +319,18 @@ a later action, and dry-run, backup, or rollback does not substitute for
 approval when policy requires it. Inside any fenced code block, `<!--` and
 `-->` are literal content and do not change HTML-comment state outside the
 fence. They are also literal inside matched variable-length backtick code spans.
-Eligible Markdown is parsed once with a CommonMark-compatible parser. Renma
-uses positioned paragraph and list-item boundaries, headings, thematic breaks,
-block quotes, raw HTML, inline code, and fenced or indented code as the
-authoritative structure. The paragraph and list-item boundaries prevent sibling
-or nested instructions from being combined. This preserves CommonMark behavior
-for multiline code spans, HTML blocks, inline HTML, ordered-marker lengths,
-container-relative indentation and padding, tabs, nesting, sibling items, and
-lazy continuations without a separate delimiter or list-owner parser. Parser
-state begins after frontmatter, and body ranges map back to original lines.
+Eligible Markdown receives one primary CommonMark-compatible artifact parse.
+Renma uses positioned paragraph and list-item boundaries, headings, thematic
+breaks, block quotes, raw HTML, inline code, and fenced or indented code as the
+authoritative structure. Visible prose recovered from a raw flow-HTML node may
+receive a bounded secondary parse solely to recover inline-code positions after
+HTML-comment removal; ordinary mdast paragraphs are not reparsed. The paragraph
+and list-item boundaries prevent sibling or nested instructions from being
+combined. This preserves CommonMark behavior for multiline code spans, HTML
+blocks, inline HTML, ordered-marker lengths, container-relative indentation and
+padding, tabs, nesting, sibling items, and lazy continuations without a separate
+delimiter or list-owner parser. Parser state begins after frontmatter, and body
+ranges map back to original lines.
 
 ### Untrusted content and external traversal
 
@@ -416,11 +427,12 @@ Runtime enforcement remains outside Renma.
 Renma can also summarize the effective static policy surface across discovered assets. The inventory distinguishes assets with local metadata, inherited policy, effective policy, and no effective policy.
 
 Script and asset bytes never declare local policy. Skill-local scripts and
-assets inherit policy only from one unambiguous owning Skill. Text scripts may
-be scanned under that inherited policy from line 1; ordinary output assets and
-binary files never contribute instruction text. Orphan scripts do not receive
-policy-dependent evaluation from repository configuration without an owning
-Skill and traceable inheritance evidence.
+assets inherit policy only from one unambiguous owning Skill. Scripts remain in
+policy inventory and provenance reporting but never contribute executable
+content to Renma security diagnostics. Ordinary output assets and binary files
+also do not contribute instruction text. Orphan scripts do not receive inherited
+policy from repository configuration without an owning Skill and traceable
+inheritance evidence.
 
 The inventory reports local, inherited, effective, and missing-effective coverage; network/upload/secrets booleans; human approval requirements; approved destinations; forbidden inputs; disallowed commands; and profile resolution counts. It is reporting-only in v2 and does not enforce runtime behavior.
 

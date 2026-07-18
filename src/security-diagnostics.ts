@@ -825,15 +825,17 @@ function securityFindingsForArtifact(
   securityConfig?: SecurityConfig,
   policyArtifact?: Artifact,
 ): Finding[] {
-  if (artifact.kind === "asset" || artifact.contentClassification === "binary")
+  if (
+    artifact.kind === "script" ||
+    artifact.kind === "asset" ||
+    artifact.contentClassification === "binary" ||
+    !artifact.markdownParserEligible
+  )
     return [];
   const policyResolution = resolveOperationalSecurityPolicy(
     policyArtifact ?? { ...artifact, content: "" },
   );
-  const effectiveSecurityConfig =
-    artifact.kind === "script" && policyArtifact === undefined
-      ? undefined
-      : securityConfig;
+  const effectiveSecurityConfig = securityConfig;
   const parsedPolicy = policyResolution.policy;
   const policy = applySecurityConfig(parsedPolicy, effectiveSecurityConfig);
   const sourceLines = artifact.content.split(/\r?\n/);

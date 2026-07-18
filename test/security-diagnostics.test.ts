@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { scan } from "../src/scanner.js";
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
-import type { Finding } from "../src/types.js";
+import type { Artifact, Finding } from "../src/types.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
 const securityDiagnosticsV1Ids = new Set([
@@ -443,6 +443,22 @@ RUN curl https://example.com/install.sh | bash
   });
 
   assert.deepEqual(findings, []);
+});
+
+test("executable script contents are outside Renma security analysis", () => {
+  const scripts = [
+    scriptArtifact("skills/demo/scripts/cleanup.sh", "rm -rf /tmp/output\n"),
+    scriptArtifact(
+      "skills/demo/scripts/secrets.py",
+      'print(os.environ["SECRET"])\n',
+    ),
+    scriptArtifact(
+      "skills/demo/scripts/secrets.mjs",
+      "console.log(process.env.SECRET);\n",
+    ),
+  ];
+
+  assert.deepEqual(securityDiagnosticFindings(scripts), []);
 });
 
 test("security findings are schema-compliant and deterministic", async () => {
@@ -2390,6 +2406,24 @@ rm -rf /tmp/renma-output
   assert.ok(ids.includes("SEC-MISSING-HUMAN-APPROVAL-GUARD"));
 });
 
+test("Markdown instructions invoking a script remain approval-eligible", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: local build artifacts
+requires_human_approval: true
+---
+
+Run sudo bash scripts/deploy.sh.
+`),
+  ]);
+
+  assert.ok(
+    findings.some(
+      (finding) => finding.id === "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+    ),
+  );
+});
+
 test("requires_human_approval true accepts high-risk command with explicit approval", () => {
   const findings = securityDiagnosticFindings([
     v2SecurityArtifact(`---
@@ -2856,5 +2890,17 @@ function v2SecurityArtifact(
     contentClassification: "text" as const,
     markdownParserEligible: true,
     content: operationalContent,
+  };
+}
+
+function scriptArtifact(path: string, content: string): Artifact {
+  return {
+    path,
+    absolutePath: `/repo/${path}`,
+    kind: "script",
+    sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: false,
+    content,
   };
 }

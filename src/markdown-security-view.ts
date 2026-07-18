@@ -48,6 +48,7 @@ type SemanticOffsetRange = { start: number; end: number };
 type SemanticCandidate = {
   unit: MarkdownSemanticUnit;
   operational: boolean;
+  htmlDerived?: true;
 };
 
 type CodeBlockCandidate = SemanticCandidate & {
@@ -141,17 +142,15 @@ export class MarkdownSecurityView {
     const paragraphCandidates = paragraphRecords.map((record) =>
       this.paragraphCandidate(record),
     );
-    paragraphCandidates.push(
-      ...htmlRecords
-        .filter(
-          (record) =>
-            !record.ancestors.some(
-              (ancestor) =>
-                ancestor.type === "paragraph" || ancestor.type === "heading",
-            ),
-        )
-        .flatMap((record) => this.htmlProseCandidates(record)),
-    );
+    const htmlCandidates = htmlRecords
+      .filter(
+        (record) =>
+          !record.ancestors.some(
+            (ancestor) =>
+              ancestor.type === "paragraph" || ancestor.type === "heading",
+          ),
+      )
+      .flatMap((record) => this.htmlProseCandidates(record));
 
     const codeBlocks = codeRecords.map((record) =>
       this.codeBlockCandidate(record),
@@ -168,17 +167,22 @@ export class MarkdownSecurityView {
       }
     }
 
-    this.semanticUnits = [...paragraphCandidates, ...codeBlocks]
+    const semanticCandidates = [
+      ...paragraphCandidates,
+      ...htmlCandidates,
+      ...codeBlocks,
+    ]
       .filter((candidate) => candidate.operational)
-      .map((candidate) => candidate.unit)
-      .sort((left, right) => left.startLine - right.startLine);
-    for (const unit of this.semanticUnits) {
+      .sort((left, right) => left.unit.startLine - right.unit.startLine);
+    this.semanticUnits = semanticCandidates.map((candidate) => candidate.unit);
+    for (const candidate of semanticCandidates) {
       this.inlineCodeByUnit.set(
-        unit,
+        candidate.unit,
         semanticInlineCodeRanges(
-          unit,
+          candidate.unit,
           visibleLineProjections,
           inlineCodeRanges,
+          candidate.htmlDerived === true,
         ),
       );
     }
@@ -361,6 +365,7 @@ export class MarkdownSecurityView {
             !blockQuoted &&
             !this.isNonOperationalExample(record, startLine) &&
             !lines.every((line) => /^\s*\/\//.test(line)),
+          htmlDerived: true,
         });
       }
       runStart = -1;
@@ -530,6 +535,7 @@ function semanticInlineCodeRanges(
   unit: MarkdownSemanticUnit,
   visibleLines: VisibleLineProjection[],
   inlineCodeRanges: SourceColumnRange[],
+  htmlDerived: boolean,
 ): SemanticOffsetRange[] {
   if (unit.kind === "code") return [];
   const lineOffsets: number[] = [];
@@ -567,6 +573,7 @@ function semanticInlineCodeRanges(
     }));
   if (
     sourceRanges.length > 0 ||
+    !htmlDerived ||
     !unit.lines.some((line) => line.includes("`"))
   ) {
     return sourceRanges;

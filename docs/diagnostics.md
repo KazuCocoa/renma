@@ -635,6 +635,12 @@ The identifiers below are part of the current scan output. The current implement
 
 Security diagnostics focus on high-signal heuristics for agent-facing or context-bearing artifacts Renma already discovers, such as skills, contexts, `AGENTS.md`, references, profiles, examples, and Markdown tool guidance. Defensive wording and nearby human approval, dry-run, backup, or rollback guidance may reduce or avoid command-risk findings when they are local to the risky instruction. When the effective human-approval policy is true, dry-run, backup, rollback, or restore guidance does not replace explicit human approval. Renma does not scan `package.json`, GitHub Actions workflows, Dockerfiles, dependency manifests, or repository-wide supply-chain metadata by default.
 
+Renma analyzes the security posture of LLM-facing Markdown instructions and
+metadata. It does not perform language-specific analysis of referenced or
+embedded executable scripts; use appropriate SAST and dependency-scanning tools
+for executable code. Markdown instructions that tell an agent to fetch, trust,
+execute, or invoke a script remain within this diagnostic boundary.
+
 These checks inspect repository knowledge and operational instructions. They are
 not language-specific SAST, dependency scanning, a safety proof, runtime
 monitoring, sandboxing, permission enforcement, or telemetry collection. A scan
@@ -748,10 +754,11 @@ security fields are migration input only.
 
 Script and asset bytes never declare local policy. They participate in the
 security policy inventory even when they have no effective policy. Local
-support inherits policy only from one unambiguous owning Skill; text scripts
-may be scanned under that inherited policy from line 1. Ordinary assets and
-binary files do not contribute instruction text. Orphan scripts receive no
-policy-dependent repository-config evaluation without traceable ownership.
+support inherits policy only from one unambiguous owning Skill. Scripts retain
+discovery, ownership, inherited-policy, Trust Graph, and BOM evidence, but their
+executable contents do not contribute Renma security findings. Ordinary assets
+and binary files also do not contribute instruction text. Orphan scripts receive
+no inherited repository-config policy without traceable ownership.
 The inventory distinguishes local metadata, inherited policy, effective policy,
 and no-effective-policy states. Trust Graph policy edges exist only for
 artifacts with effective policy and list every contributing policy source.

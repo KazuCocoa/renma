@@ -22,10 +22,17 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
-- Strengthened Security Diagnostics with one CommonMark AST parse per eligible
-  Markdown artifact. Positioned paragraph and list-item boundaries prevent
-  sibling or nested instructions from being combined, while heading, block
-  quote, HTML-comment, inline-code, and code-block ranges drive approval
+- Limited security content analysis to LLM-facing Markdown instructions and
+  metadata. Scripts retain discovery, catalog, ownership, inherited-policy,
+  Trust Graph, and BOM evidence, but executable contents require independent
+  project-selected SAST and dependency scanning. Renma still diagnoses Markdown
+  instructions that direct an agent to fetch, trust, execute, or invoke scripts
+  unsafely.
+- Strengthened Security Diagnostics with one primary CommonMark AST parse per
+  eligible Markdown artifact and bounded reparsing only for visible prose
+  recovered from raw flow HTML. Positioned paragraph and list-item boundaries
+  prevent sibling or nested instructions from being combined, while heading,
+  block quote, HTML-comment, inline-code, and code-block ranges drive approval
   proximity, action-span guards, emitted-action deduplication, operational fence
   routing, and deterministic original-line evidence for agent-facing artifacts.
 - Refined the existing bulk sharing, overbroad context, redaction, secret
@@ -41,6 +48,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   SAST, dependency or workflow scanning, runtime enforcement, command or
   network execution, LLM call, telemetry, automatic repair, suppression, or
   policy relaxation. Passing a scan is not a safety proof.
+- Renma analyzes the security posture of LLM-facing Markdown instructions and
+  metadata. It does not perform language-specific analysis of referenced or
+  embedded executable scripts; use appropriate SAST and dependency-scanning
+  tools for executable code.
 
 ## [0.20.1] - 2026-07-16
 
@@ -488,14 +499,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   reachability, extensionless and spaced paths, and oversized-file existence
   evidence.
 - Prevented script and asset bytes from declaring policy. Skill-local scripts
-  and assets inherit the nearest unambiguous Skill policy; text scripts may be
-  scanned under it, while binary files and ordinary output assets stay opaque.
+  and assets inherit the nearest unambiguous Skill policy for inventory and
+  provenance reporting, while binary files and ordinary output assets stay
+  opaque.
 - Rejected files reached through leaf or ancestor symbolic links, including
   Skill-local directory links that point elsewhere inside or outside the
   repository.
-- Scanned non-Markdown scripts from line 1 even when they begin with `---`, and
-  added explicit local, inherited, effective, and missing-effective policy
-  inventory provenance.
+- Added explicit local, inherited, effective, and missing-effective policy
+  inventory provenance for non-Markdown scripts without interpreting script
+  bytes as security policy metadata.
 - Added balanced-parenthesis Markdown destination parsing and single-pass
   decoding for encoded filename characters.
 - Stopped treating a command, Procedure/Steps/Setup headings, ordered workflow
