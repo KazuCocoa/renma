@@ -658,6 +658,10 @@ operational instruction heading is scanned as an instruction. A defensive
 sentence does not protect a separate contradictory bypass instruction.
 Comment-like `<!--` and `-->` text inside any fenced code block is literal
 fence content and never opens or closes an HTML comment for subsequent lines.
+Matched Markdown inline-code spans use the same literal treatment, including
+variable-length backtick delimiters. Comment and fence state starts fresh after
+YAML frontmatter, so frontmatter scalar or block values cannot affect body
+scanning or evidence line numbers.
 
 `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION` reports guidance that makes an external
 page, issue body, log, tool output, attachment, downloaded document, or fetched
@@ -676,7 +680,10 @@ guard applies only when it precedes and names the same execution action, so a
 later defensive sentence cannot retroactively suppress an unsafe action and a
 guard for `apply` does not cover a later `execute`. Multiline matches are
 deduplicated only after an emitted action span is selected; a guarded raw regex
-match does not suppress a later contradictory action.
+match does not suppress a later contradictory action. An action that proceeds
+regardless of review findings, despite failed validation, or without validation
+explicitly rejects the preceding guard and remains an untrusted-content
+finding.
 
 `SEC-UNBOUNDED-EXTERNAL-SOURCE-TRAVERSAL` is an advisory for explicit recursive
 link, issue, attachment, page, or source traversal when the same bounded

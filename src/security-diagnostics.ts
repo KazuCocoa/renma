@@ -769,6 +769,8 @@ const UNTRUSTED_CONTENT_REVIEW_GUARD_RE =
   /\b(review|validate|verify|inspect)\b.{0,80}?\b(before|prior to)\b.{0,60}?\b(execute|executing|run|running|apply|applying|follow|following|obey|obeying|adopt|adopting)\b/i;
 const BROAD_REVIEW_GUARD_SCOPE_RE =
   /\b(all|each|every)\b.{0,40}\b(proposed\s+)?(actions?|instructions?|steps?)\b|\bproposed actions?\b/i;
+const CONTRADICTORY_REVIEW_ACTION_RE =
+  /\b(regardless of|irrespective of|despite)\b.{0,60}\b(review|validation|verification|findings?|results?)\b|\beven (?:if|when)\b.{0,60}\b(review|validation|verification)\b.{0,40}\b(fails?|failed|rejects?|rejected|blocks?|blocked|is negative)\b|\bwithout\b.{0,30}\b(review|reviewing|validation|verification)\b|\b(ignore|disregard|bypass|skip|omit)\b.{0,50}\b(review|validation|verification|findings?|results?)\b/i;
 const DIRECT_DEFENSIVE_ACTION_PREFIX_RE =
   /\b(do not|don't|never|avoid|must not|should not|prohibit|forbid)\b.{0,24}$/i;
 const RECURSIVE_EXTERNAL_TRAVERSAL_RE =
@@ -848,13 +850,13 @@ function securityFindingsForArtifact(
     ),
   ];
   const sourceLines = artifact.content.split(/\r?\n/);
-  const lines = artifact.markdownParserEligible
-    ? stripHtmlCommentSpans(sourceLines)
-    : sourceLines;
   const scanStart = securityContentStart(
     sourceLines,
     artifact.markdownParserEligible,
   );
+  const lines = artifact.markdownParserEligible
+    ? stripHtmlCommentSpans(sourceLines, scanStart)
+    : sourceLines;
   let inFence = false;
   let operationalSemanticFence = false;
   let recentHumanApprovalLine = 0;
@@ -1021,10 +1023,10 @@ function bodyPolicyContradictionDetections(
 ): Detection[] {
   const detections: Detection[] = [];
   const sourceLines = content.split(/\r?\n/);
-  const lines = markdownParserEligible
-    ? stripHtmlCommentSpans(sourceLines)
-    : sourceLines;
   const scanStart = securityContentStart(sourceLines, markdownParserEligible);
+  const lines = markdownParserEligible
+    ? stripHtmlCommentSpans(sourceLines, scanStart)
+    : sourceLines;
   const emitted = new Set<string>();
   let inFence = false;
 
@@ -1746,15 +1748,17 @@ function securityContentStart(
   return frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
 }
 
-function stripHtmlCommentSpans(lines: string[]): string[] {
+function stripHtmlCommentSpans(lines: string[], bodyStart: number): string[] {
   let inComment = false;
   let fence: MarkdownFence | undefined;
-  return lines.map((line) => {
+  let inlineCodeLength: number | undefined;
+  return lines.map((line, lineIndex) => {
+    if (lineIndex < bodyStart) return line;
     if (fence !== undefined) {
       if (isMarkdownFenceClosing(line, fence)) fence = undefined;
       return line;
     }
-    if (!inComment) {
+    if (!inComment && inlineCodeLength === undefined) {
       const openingFence = markdownFenceOpening(line);
       if (openingFence !== undefined) {
         fence = openingFence;
@@ -1774,7 +1778,30 @@ function stripHtmlCommentSpans(lines: string[]): string[] {
         continue;
       }
 
+      if (inlineCodeLength !== undefined) {
+        const codeEnd = findBacktickRun(line, cursor, inlineCodeLength);
+        if (codeEnd < 0) {
+          visible += line.slice(cursor);
+          break;
+        }
+        visible += line.slice(cursor, codeEnd + inlineCodeLength);
+        cursor = codeEnd + inlineCodeLength;
+        inlineCodeLength = undefined;
+        continue;
+      }
+
       const commentStart = line.indexOf("<!--", cursor);
+      const codeStart = line.indexOf("`", cursor);
+      if (codeStart >= 0 && (commentStart < 0 || codeStart < commentStart)) {
+        visible += line.slice(cursor, codeStart);
+        const delimiterLength = backtickRunLength(line, codeStart);
+        visible += line.slice(codeStart, codeStart + delimiterLength);
+        cursor = codeStart + delimiterLength;
+        if (hasClosingBacktickRun(lines, lineIndex, cursor, delimiterLength)) {
+          inlineCodeLength = delimiterLength;
+        }
+        continue;
+      }
       if (commentStart < 0) {
         visible += line.slice(cursor);
         break;
@@ -1787,6 +1814,41 @@ function stripHtmlCommentSpans(lines: string[]): string[] {
 
     return visible;
   });
+}
+
+function hasClosingBacktickRun(
+  lines: string[],
+  openingLine: number,
+  openingEnd: number,
+  delimiterLength: number,
+): boolean {
+  for (let lineIndex = openingLine; lineIndex < lines.length; lineIndex += 1) {
+    const cursor = lineIndex === openingLine ? openingEnd : 0;
+    if (findBacktickRun(lines[lineIndex] ?? "", cursor, delimiterLength) >= 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function findBacktickRun(
+  line: string,
+  start: number,
+  delimiterLength: number,
+): number {
+  let cursor = line.indexOf("`", start);
+  while (cursor >= 0) {
+    const length = backtickRunLength(line, cursor);
+    if (length === delimiterLength) return cursor;
+    cursor = line.indexOf("`", cursor + length);
+  }
+  return -1;
+}
+
+function backtickRunLength(line: string, start: number): number {
+  let end = start;
+  while (line[end] === "`") end += 1;
+  return end - start;
 }
 
 type MarkdownFence = {
@@ -2099,6 +2161,7 @@ function hasPrecedingReviewGuard(
 ): boolean {
   const sentence = sentences[action.sentenceIndex];
   if (sentence === undefined) return false;
+  if (CONTRADICTORY_REVIEW_ACTION_RE.test(sentence.text)) return false;
 
   const sameSentenceGuards = reviewGuardActions(sentence);
   if (

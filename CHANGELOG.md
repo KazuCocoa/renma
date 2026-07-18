@@ -24,10 +24,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 - Strengthened Security Diagnostics with bounded Markdown section handling for
   approval proximity, action-span defensive guards and emitted-action
-  deduplication, list-item and fence-aware HTML-comment spans, operational
-  fenced instruction routing, and deterministic evidence for agent-facing
-  Skills, Context, `AGENTS.md`, local references, profiles, examples, and
-  Markdown tool guidance.
+  deduplication, contradictory review-bypass wording, list-item and
+  body-scoped HTML-comment spans, literal fenced and inline-code delimiters,
+  operational fenced instruction routing, and deterministic evidence for
+  agent-facing Skills, Context, `AGENTS.md`, local references, profiles,
+  examples, and Markdown tool guidance.
 - Refined the existing bulk sharing, overbroad context, redaction, secret
   material, and upload rules to distinguish local reads, prompt/context
   attachment, stdout/log output, and external upload. `process.env.NAME` is no
