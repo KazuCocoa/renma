@@ -1166,9 +1166,9 @@ test("CLI inspect command prints compact outlines and exact slices", async () =>
       "## Windows\n",
       "Use PowerShell.\n",
       "\n",
-      "```powershell\n",
+      "~~~~powershell\n",
       "$env:ANDROID_HOME\n",
-      "```\n",
+      "~~~~\n",
       "\n",
       "## macOS/Linux\n",
       "Use a shell export.\n",
@@ -1182,7 +1182,7 @@ test("CLI inspect command prints compact outlines and exact slices", async () =>
   const outline = JSON.parse(outlineResult.stdout) as {
     codeFences: Array<{ range: string }>;
     frontmatterRange: string;
-    headings: Array<{ range: string; text: string }>;
+    headings: Array<{ preview: string[]; range: string; text: string }>;
   };
   assert.equal(outline.frontmatterRange, "L1-L3");
   assert.deepEqual(
@@ -1190,6 +1190,7 @@ test("CLI inspect command prints compact outlines and exact slices", async () =>
     ["Guide", "Windows", "macOS/Linux"],
   );
   assert.equal(outline.codeFences[0]?.range, "L11-L13");
+  assert.deepEqual(outline.headings[1]?.preview, ["L0009: Use PowerShell."]);
 
   const sliceResult = await withCapturedConsole(() =>
     main(["inspect", source, "--lines", "L8-L9", "--format", "text"]),

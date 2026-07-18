@@ -1,8 +1,9 @@
+import {
+  attachMarkdownSyntax,
+  parseMarkdownSyntax,
+} from "./markdown-syntax.js";
 import type {
   Artifact,
-  CodeFence,
-  Heading,
-  Link,
   MetadataFieldEvidence,
   MetadataValue,
   ParsedMetadata,
@@ -29,79 +30,38 @@ export function parseDocument(artifact: Artifact): ParsedDocument {
       metadataListItems: {},
     };
   }
-  const lines = artifact.content.split(/\r?\n/);
-  const headings: Heading[] = [];
-  const links: Link[] = [];
-  const codeFences: CodeFence[] = [];
+  const syntax = parseMarkdownSyntax(artifact.content);
+  const lines = syntax.sourceLines;
   const metadata = parseFrontmatter(artifact.path, lines);
-  let fenceStart: number | undefined;
-  let fenceLanguage = "";
-  let fenceLines: string[] = [];
-
-  lines.forEach((line, index) => {
-    const lineNumber = index + 1;
-    const fence = line.match(/^```(\S*)\s*$/);
-    if (fence) {
-      if (fenceStart === undefined) {
-        fenceStart = lineNumber;
-        fenceLanguage = fence[1] ?? "";
-        fenceLines = [];
-      } else {
-        codeFences.push({
-          language: fenceLanguage,
-          content: fenceLines.join("\n"),
-          startLine: fenceStart,
-          endLine: lineNumber,
-        });
-        fenceStart = undefined;
-        fenceLanguage = "";
-        fenceLines = [];
-      }
-      return;
-    }
-
-    if (fenceStart !== undefined) {
-      fenceLines.push(line);
-      return;
-    }
-
-    const heading = line.match(/^(#{1,6})\s+(.+?)\s*#*$/);
-    if (heading) {
-      headings.push({
-        depth: heading[1]?.length ?? 1,
-        text: heading[2]?.trim() ?? "",
-        line: lineNumber,
-      });
-    }
-
-    for (const match of line.matchAll(/\[([^\]]+)\]\(([^)]+)\)/g)) {
-      links.push({
-        text: match[1] ?? "",
-        target: match[2] ?? "",
-        line: lineNumber,
-      });
-    }
-  });
-
-  if (fenceStart !== undefined) {
-    codeFences.push({
-      language: fenceLanguage,
-      content: fenceLines.join("\n"),
-      startLine: fenceStart,
-      endLine: lines.length,
-    });
-  }
-
-  return {
+  const document: ParsedDocument = {
     artifact,
     lines,
-    headings,
-    codeFences,
-    links,
+    headings: syntax.headings.map((heading) => ({
+      depth: heading.depth,
+      text: heading.text,
+      line: heading.startLine,
+    })),
+    // Keep the established projection fenced-only. Indented code remains
+    // available through the internal shared syntax representation.
+    codeFences: syntax.codeBlocks
+      .filter((block) => block.kind === "fenced")
+      .map((block) => ({
+        language: block.language,
+        content: block.content,
+        startLine: block.startLine,
+        endLine: block.endLine,
+      })),
+    links: syntax.links.map((link) => ({
+      text: link.text,
+      target: link.target,
+      line: link.startLine,
+    })),
     metadata: metadata.values,
     metadataFields: metadata.fields,
     metadataListItems: metadata.listItems,
   };
+  attachMarkdownSyntax(document, syntax);
+  return document;
 }
 
 const LIST_METADATA_KEYS = new Set([

@@ -11,8 +11,19 @@ import {
   type SecurityPolicy,
   type SecurityProfileChain,
 } from "./security-policy.js";
-import type { Artifact, Finding, RiskClass, SecurityConfig } from "./types.js";
+import type {
+  Artifact,
+  Finding,
+  ParsedDocument,
+  RiskClass,
+  SecurityConfig,
+} from "./types.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
+import { parseDocument } from "./markdown.js";
+import {
+  markdownBodyStartLine,
+  markdownSyntaxForDocument,
+} from "./markdown-syntax.js";
 import {
   MarkdownSecurityView,
   type MarkdownSemanticUnit,
@@ -801,18 +812,20 @@ type SecurityDiagnosticsConfig = {
 };
 
 export function securityDiagnosticFindings(
-  artifacts: Artifact[],
+  inputs: Array<Artifact | ParsedDocument>,
   config: SecurityDiagnosticsConfig = {},
 ): Finding[] {
-  return artifacts.flatMap((artifact) =>
-    securityFindingsForArtifact(artifact, config.security),
-  );
+  return inputs.flatMap((input) => {
+    const document = "artifact" in input ? input : parseDocument(input);
+    return securityFindingsForDocument(document, config.security);
+  });
 }
 
-function securityFindingsForArtifact(
-  artifact: Artifact,
+function securityFindingsForDocument(
+  document: ParsedDocument,
   securityConfig?: SecurityConfig,
 ): Finding[] {
+  const artifact = document.artifact;
   if (
     artifact.kind === "script" ||
     artifact.kind === "asset" ||
@@ -820,7 +833,7 @@ function securityFindingsForArtifact(
     !artifact.markdownParserEligible
   )
     return [];
-  const policyResolution = resolveOperationalSecurityPolicy(artifact);
+  const policyResolution = resolveOperationalSecurityPolicy(document);
   const parsedPolicy = policyResolution.policy;
   const policy = applySecurityConfig(parsedPolicy, securityConfig);
   const sourceLines = artifact.content.split(/\r?\n/);
@@ -828,7 +841,13 @@ function securityFindingsForArtifact(
     sourceLines,
     artifact.markdownParserEligible,
   );
-  const markdownView = new MarkdownSecurityView(artifact.content, scanStart);
+  const syntax = markdownSyntaxForDocument(document);
+  if (syntax === undefined) {
+    throw new Error(
+      "Eligible Markdown document is missing its primary syntax parse",
+    );
+  }
+  const markdownView = new MarkdownSecurityView(syntax);
   const detections: Detection[] = [
     ...invalidCanonicalSecurityDetections(policyResolution.issues),
     ...securityPolicyResolutionDetections(
@@ -1732,11 +1751,7 @@ function securityContentStart(
   lines: string[],
   markdownParserEligible: boolean,
 ): number {
-  if (!markdownParserEligible || lines[0]?.trim() !== "---") return 0;
-  const frontmatterEnd = lines.findIndex(
-    (line, index) => index > 0 && line.trim() === "---",
-  );
-  return frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
+  return markdownParserEligible ? markdownBodyStartLine(lines) - 1 : 0;
 }
 
 function lineSnippet(content: string, line: number): string | undefined {

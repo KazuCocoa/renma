@@ -14,6 +14,10 @@ import {
   type YamlFrontmatterField,
 } from "./yaml-frontmatter.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
+import {
+  markdownCodeLineNumbers,
+  markdownSyntaxForDocument,
+} from "./markdown-syntax.js";
 
 export const AGENT_SKILLS_SPECIFICATION =
   "https://agentskills.io/specification";
@@ -768,10 +772,7 @@ function collectBodyLines(
   document: ParsedDocument,
   frontmatter: ParsedYamlFrontmatter,
 ): BodyLine[] {
-  const fenceLines = agentSkillFenceLines(
-    document.lines,
-    frontmatter.bodyStartLine,
-  );
+  const fenceLines = agentSkillFenceLines(document);
   const headings = document.headings
     .filter(
       (heading) =>
@@ -808,42 +809,11 @@ function collectBodyLines(
   return result;
 }
 
-/** Return all Markdown line numbers occupied by backtick or tilde fences. */
-export function agentSkillFenceLines(
-  lines: string[],
-  bodyStartLine: number,
-): Set<number> {
-  const result = new Set<number>();
-  let active: { character: "`" | "~"; length: number } | undefined;
-
-  for (
-    let index = Math.max(bodyStartLine - 1, 0);
-    index < lines.length;
-    index += 1
-  ) {
-    const lineNumber = index + 1;
-    const line = lines[index] ?? "";
-    if (!active) {
-      const opening = /^(?: {0,3})(`{3,}|~{3,})/.exec(line);
-      if (!opening?.[1]) continue;
-      const marker = opening[1];
-      active = {
-        character: marker[0] as "`" | "~",
-        length: marker.length,
-      };
-      result.add(lineNumber);
-      continue;
-    }
-
-    result.add(lineNumber);
-    const escapedCharacter = active.character === "`" ? "`" : "~";
-    const closing = new RegExp(
-      `^(?: {0,3})${escapedCharacter}{${active.length},}\\s*$`,
-    );
-    if (closing.test(line)) active = undefined;
-  }
-
-  return result;
+/** Return all original-file line numbers occupied by fenced code blocks. */
+export function agentSkillFenceLines(document: ParsedDocument): Set<number> {
+  const syntax = markdownSyntaxForDocument(document);
+  if (syntax === undefined) return new Set<number>();
+  return markdownCodeLineNumbers(syntax, "fenced");
 }
 
 function hasNearbyAlternative(

@@ -539,10 +539,7 @@ function migrationDescription(
     if (active.length > 0) paragraphs.push(active.join(" "));
     active = [];
   };
-  const fenceLines = agentSkillFenceLines(
-    document.lines,
-    frontmatter.bodyStartLine,
-  );
+  const fenceLines = agentSkillFenceLines(document);
   for (let index = 0; index < lines.length; index += 1) {
     const rawLine = lines[index] ?? "";
     const lineNumber = frontmatter.bodyStartLine + index;
