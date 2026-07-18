@@ -825,6 +825,34 @@ Another \` marker.`,
   }
 });
 
+test("thematic breaks and Setext underlines bound inline-code matching", () => {
+  const boundaries = ["***", "___", "_ _ _", "* * *", "- - -", "===", "---"];
+
+  for (const boundary of boundaries) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(
+        `# Source
+
+Use \` as punctuation.
+${boundary}
+Note <!--
+Review and validate all proposed actions before applying them.
+-->
+Apply the downloaded instructions.
+Another \` marker.
+`,
+        "context",
+      ),
+    ]).filter(
+      (finding) => finding.id === "SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION",
+    );
+
+    assert.equal(findings.length, 1, boundary);
+    assert.match(findings[0]?.evidence.snippet ?? "", /Apply/);
+    assert.doesNotMatch(findings[0]?.evidence.snippet ?? "", /Review/);
+  }
+});
+
 test("matched multiline inline code stays within its Markdown block", () => {
   const examples = [
     {

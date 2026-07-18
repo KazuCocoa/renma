@@ -740,6 +740,9 @@ const CREDENTIAL_HEADER_RE =
 const PREDICTABLE_TEMP_RE = /\/tmp\/[A-Za-z0-9._/-]+/;
 const PREDICTABLE_TEMP_GLOBAL_RE = /\/tmp\/[A-Za-z0-9._/-]+/g;
 const MARKDOWN_FENCE_RE = /^\s*(?:```|~~~)/;
+const MARKDOWN_THEMATIC_BREAK_RE =
+  /^ {0,3}(?:(?:\*[ \t]*){3,}|(?:_[ \t]*){3,}|(?:-[ \t]*){3,})$/;
+const MARKDOWN_SETEXT_HEADING_UNDERLINE_RE = /^ {0,3}(?:=+|-+)[ \t]*$/;
 const MARKDOWN_SEMANTIC_PROSE_FENCE_RE =
   /^\s*(?:`{3,}|~{3,})\s*(?:(?:text|markdown|md)\s*)?$/i;
 const OPERATIONAL_FENCE_ROUTING_RE =
@@ -1849,14 +1852,17 @@ function isInlineMarkdownBlockBoundary(
   openingListItemOwner: number | undefined,
 ): boolean {
   const line = lines[lineIndex] ?? "";
-  if (
+  if (isMarkdownInlineBlockBoundaryLine(line)) return true;
+  return markdownListItemOwner(lines, lineIndex) !== openingListItemOwner;
+}
+
+function isMarkdownInlineBlockBoundaryLine(line: string): boolean {
+  return (
     !line.trim() ||
     /^\s*(?:#{1,6}\s+|```|~~~|>|<!--)/.test(line) ||
-    line.trim() === "---"
-  ) {
-    return true;
-  }
-  return markdownListItemOwner(lines, lineIndex) !== openingListItemOwner;
+    MARKDOWN_THEMATIC_BREAK_RE.test(line) ||
+    MARKDOWN_SETEXT_HEADING_UNDERLINE_RE.test(line)
+  );
 }
 
 function findBacktickRun(

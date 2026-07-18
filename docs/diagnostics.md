@@ -661,10 +661,11 @@ fence content and never opens or closes an HTML comment for subsequent lines.
 Matched Markdown inline-code spans use the same literal treatment, including
 variable-length backtick delimiters. Closing-delimiter lookup stays within the
 same Markdown paragraph or list-item continuation and does not cross blank
-paragraph boundaries, headings, fences, or sibling and nested list items.
-Valid multiline spans within that block remain supported. Comment and fence
-state starts fresh after YAML frontmatter, so frontmatter scalar or block
-values cannot affect body scanning or evidence line numbers.
+paragraph boundaries, ATX or Setext headings, thematic breaks, fences, or
+sibling and nested list items. Valid multiline spans within that block remain
+supported. Comment and fence state starts fresh after YAML frontmatter, so
+frontmatter scalar or block values cannot affect body scanning or evidence line
+numbers.
 
 `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION` reports guidance that makes an external
 page, issue body, log, tool output, attachment, downloaded document, or fetched
