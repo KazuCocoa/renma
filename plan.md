@@ -46,10 +46,10 @@ The next active design and implementation area is static Skill Discovery for
 repositories with many layered `SKILL.md` files.
 
 The goal is to make explicit Skill-to-Skill continuation contracts,
-intentional first-hop entrypoints, reachability, and adoption gaps reviewable
-without introducing a runtime Skill selector. Existing Skills remain the source
-of workflow and routing policy; a generated index is only a compact,
-deterministic projection.
+intentional first-hop entrypoints, eligibility, descriptive reachability, and
+separately declared repository-wide coverage reviewable without introducing a
+runtime Skill selector. Existing Skills remain the source of workflow and
+routing policy; a generated index is only a compact, deterministic projection.
 
 [The Skill Discovery design](plan-discovery.md) defines the recommended MVP and
 its open questions. No release number is assigned until the public metadata,
@@ -57,12 +57,13 @@ report, diagnostic, and CLI contracts have been reviewed.
 
 ## Expected Implementation Sequence
 
-1. Finalize the two-field metadata contract, domain types, versioned JSON
-   report, representative fixtures, and contract tests without adding a public
-   command.
-2. Parse and resolve exact declared Skill continuations, preserve evidence,
-   compute entrypoints and reachability, and emit exact diagnostics through an
-   internal report API.
+1. Finalize the two-field metadata contract, single-field repository coverage
+   policy, domain types, versioned JSON report, representative fixtures, and
+   contract tests without adding a public command.
+2. Parse and resolve exact declared Skill continuations, preserve invalid-Skill
+   evidence, compute fail-closed eligibility, entrypoints, and descriptive or
+   authoritative reachability, and emit exact diagnostics through an internal
+   report API.
 3. Add a stdout-only `renma skill-index` command with canonical JSON, compact
    Markdown, and exact focus by Skill ID or repository-relative path.
 

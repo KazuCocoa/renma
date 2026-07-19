@@ -642,6 +642,27 @@ test("published current docs separate implemented discovery from the active unim
   assert.match(proposal, /`renma\.published-entrypoint`/);
   assert.match(
     proposal,
+    /Discovery-eligible Skill[\s\S]*specification-valid canonical Agent Skill[\s\S]*not deprecated[\s\S]*not archived/,
+  );
+  assert.match(
+    proposal,
+    /target is a specification-invalid Skill, retain its Skill identity,\s+path, validation diagnostics, and route evidence/,
+  );
+  assert.match(proposal, /"skill_discovery"[\s\S]*"adopted": true/);
+  assert.match(
+    proposal,
+    /Publishing an entrypoint does not declare that every Discovery-eligible Skill/,
+  );
+  assert.match(
+    proposal,
+    /Repository-wide coverage is a\s+separate explicit configuration decision/,
+  );
+  assert.match(
+    proposal,
+    /global unreachable Skills only in adopted mode|only the adopted state enables authoritative\s+global unreachable diagnostics/,
+  );
+  assert.match(
+    proposal,
     /Arbitrary local Markdown links are \*\*not\*\* authoritative routes/,
   );
   for (const text of [content[0] ?? "", content[3] ?? ""]) {

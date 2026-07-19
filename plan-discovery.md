@@ -15,8 +15,9 @@ This document separates three levels of decision:
 - **Accepted design direction** covers the product boundary, layered graph
   model, source ownership, focused-entrypoint responsibility, deterministic
   evidence, and gradual adoption.
-- **Recommended MVP decisions** cover the proposed metadata names, explicit
-  publication, exact resolution, report shape, command, diagnostics, and
+- **Recommended MVP decisions** cover fail-closed Discovery eligibility, the
+  proposed metadata names, explicit publication, separate repository-wide
+  adoption, exact resolution, report shape, command, diagnostics, and
   implementation sequence. They become public contracts only after contract
   review and implementation.
 - **Deferred extensions and open questions** are not part of the MVP and must
@@ -165,61 +166,100 @@ must be deterministic.
 
 The MVP uses the following terms.
 
-### Skill node
+### Visible Skill
 
-A discovered catalog asset with kind `skill`. A Skill remains visible even
-when it is invalid, inactive, disconnected, or outside an adopted Discovery
-graph. Only a specification-valid canonical Agent Skill contributes
-operational `metadata.renma.*` values, matching the current parser's fail-closed
-contract.
+Every discovered catalog asset with kind `skill` is a visible Skill. Invalid,
+inactive, disconnected, and not-yet-adopted Skills remain visible in the JSON
+report with their source identity and existing diagnostics. Visibility does not
+make a Skill usable for Discovery.
 
-For Discovery, an **active Skill** is a Skill whose lifecycle is not
-`deprecated` or `archived`. Existing lifecycle and invalid-metadata diagnostics
-remain authoritative.
+### Lifecycle-active Skill
+
+A lifecycle-active Skill is not `deprecated` or `archived`. This classification
+is useful descriptive inventory, but lifecycle alone is insufficient for
+publication, traversal, or authoritative coverage.
+
+### Discovery-eligible Skill
+
+A Skill is Discovery-eligible only when it is both:
+
+```text
+a specification-valid canonical Agent Skill
+AND not deprecated
+AND not archived
+```
+
+Only a Discovery-eligible Skill may create a usable continuation, participate
+in Discovery traversal, or be a published entrypoint. Existing Agent Skills
+validation diagnostics remain authoritative. An invalid Skill is not silently
+reclassified as missing, non-Skill, deprecated, or archived.
+
+Only a specification-valid canonical Agent Skill contributes operational
+`metadata.renma.*` values, matching the current parser's fail-closed contract.
+Discovery may retain a rejected field and exact target resolution as review
+evidence, but that evidence does not become an operational route.
 
 ### Declared continuation
 
-A directed source-Skill-to-target-Skill relationship created by one exact
-canonical metadata item. A declared continuation says that the source Skill
-identifies the target as a possible next workflow after the source fulfills its
-own bounded responsibility.
+A directed source-Skill-to-target relationship named by one exact canonical
+metadata item. A declared continuation says that the source Skill identifies
+the target as a possible next workflow after the source fulfills its own
+bounded responsibility.
+
+The report retains a declaration's source, target spelling, resolution, and
+evidence even when the source or resolved target is not Discovery-eligible. It
+becomes an authoritative usable edge only when the declaration is valid and
+both source and target are Discovery-eligible Skills.
 
 It does not express runtime selection, priority, exclusivity, loading,
 execution, or actual use.
 
 ### Published entrypoint
 
-An active, specification-valid Skill with a valid explicit publication marker.
-It is intentionally included in the first-hop index. Publication is not
-inferred from graph position.
+A Discovery-eligible Skill with a valid explicit publication marker. It is
+intentionally included in the first-hop index. Publication is Skill-local and
+is not inferred from graph position.
+
+Publishing an entrypoint does not declare that every Discovery-eligible Skill
+in the repository must be reachable from it. Repository-wide coverage is a
+separate explicit configuration decision.
+
+### Repository-wide Discovery adoption
+
+Repository-wide adoption is a repository policy that every Discovery-eligible
+Skill belongs to the published continuation graph: it is reachable from a
+published entrypoint or is itself intentionally published as an independent
+first hop. It is distinct from publishing any individual Skill and is declared
+only by the proposed repository configuration field below.
 
 ### Structural root
 
-An active Skill with no incoming usable declared continuation from another
-active Skill. Structural roots are graph facts and adoption candidates, not
-published entrypoints.
+A Discovery-eligible Skill with no incoming usable declared continuation from
+another Discovery-eligible Skill. Structural roots are graph facts and adoption
+candidates, not published entrypoints.
 
 ### Standalone Skill
 
-An active Skill with no incoming or outgoing usable declared continuation. A
-standalone Skill may be intentionally published, intentionally independent, or
-not yet adopted into Discovery.
+A Discovery-eligible Skill with no incoming or outgoing usable declared
+continuation. A standalone Skill may be intentionally published, intentionally
+independent, or not yet adopted into Discovery.
 
 ### Unrouted Skill
 
-An active Skill that is not published and has no incoming usable declared
-continuation. Standalone Skills are a subset of unrouted Skills. Unrouted is a
-reporting classification, not automatically a defect.
+A Discovery-eligible Skill that is not published and has no incoming usable
+declared continuation. Standalone Skills are a subset of unrouted Skills.
+Unrouted is a reporting classification, not automatically a defect.
 
 ### Reachable and unreachable Skill
 
-After explicit Discovery adoption, an active Skill is reachable when a
-cycle-safe traversal of usable declared continuations reaches it from at least
-one published entrypoint. An active Skill not reached that way is unreachable.
+A Discovery-eligible Skill is reachable when a cycle-safe traversal of usable
+declared continuations reaches it from at least one published entrypoint.
+Specification-invalid Skills are visible but never satisfy reachability.
 
-Before adoption, reachability is **not evaluated**. Renma must not label every
-active Skill unreachable merely because a repository has not adopted the
-contract.
+In `partial` mode, reachability may be calculated as descriptive projection
+data for the published subgraphs. A not-reached Skill is not thereby a global
+coverage defect. Only explicit repository-wide adoption makes reachability an
+authoritative coverage contract and permits global unreachable diagnostics.
 
 These classifications intentionally overlap. A report should expose each
 property directly instead of forcing every Skill into one artificial category.
@@ -256,6 +296,8 @@ primary entrypoint contract.
 A published entrypoint may have no outgoing continuation when it is itself the
 complete first-hop workflow. Conversely, a structural root with many outgoing
 continuations is not published unless a repository author explicitly says so.
+Neither publication nor structural position enables repository-wide coverage
+diagnostics without the separate adoption configuration.
 
 ## Skill Route Semantics
 
@@ -314,6 +356,30 @@ standalone Skill, an unfinished adoption candidate, or the root of a
 disconnected internal subgraph. Automatically publishing all no-incoming
 Skills would turn a graph fact into unsupported repository policy.
 
+### Recommended repository-wide adoption field
+
+Repository-wide coverage is genuinely repository-wide policy, so the MVP
+should add one minimal proposed configuration field:
+
+```json
+{
+  "skill_discovery": {
+    "adopted": true
+  }
+}
+```
+
+`skill_discovery.adopted: true` means that every Discovery-eligible Skill is
+expected to be reachable from a published entrypoint or intentionally
+published as an independent first hop. Omission or `false` means the repository
+has not declared complete Discovery coverage. No additional Discovery config
+key is proposed.
+
+This field is independent of Skill-local publication. Adding
+`renma.published-entrypoint: "true"` includes one Skill in the first-hop index;
+it does not enable repository-wide unreachable diagnostics. `renma init` must
+not emit the proposed field or silently adopt Discovery.
+
 No alias field is proposed. Exact stable ID and path already serve deterministic
 lookup and focus. Titles, tags, and free-form phrases do not become alternate
 runtime match keys.
@@ -340,10 +406,13 @@ scanner or catalog.
 
 Resolution follows these steps:
 
-1. Read the field only from operational canonical Skill metadata.
+1. Inspect canonical frontmatter together with the current Agent Skills
+   validation result. Only a Discovery-eligible source contributes an
+   operational declaration; a rejected source field may remain visible as
+   non-operational review evidence.
 2. Require a JSON-array string of non-empty strings; do not split commas or
    coerce another type.
-3. For an ID reference, require one exact catalog Skill ID match.
+3. For an ID reference, require one exact catalog asset ID match.
 4. For a path reference, normalize path separators to `/`, remove one leading
    `./` for current compatibility, and require one exact repository-relative
    catalog path. Reject absolute paths and paths that escape the repository.
@@ -351,11 +420,18 @@ Resolution follows these steps:
    duplicate catalog identity makes the target ambiguous, fail closed.
 6. If the resolved target is not a Skill, retain the evidence and report a
    wrong-kind diagnostic.
-7. Retain routes to `deprecated` or `archived` Skills for review, but do not use
-   them for active reachability.
+7. If the target is a specification-invalid Skill, retain its Skill identity,
+   path, validation diagnostics, and route evidence. Do not treat it as
+   missing, wrong-kind, or usable.
+8. Retain routes to valid `deprecated` or `archived` Skills for review, but do
+   not use them for Discovery traversal.
 
-A usable route is resolved, unambiguous, Skill-to-Skill, and connects active
-Skills. Traversal deduplicates by stable Skill ID and terminates through cycles.
+A usable route is resolved, unambiguous, Skill-to-Skill, declared by a
+Discovery-eligible source, and targets a Discovery-eligible Skill. Route data
+separates target resolution from usability and exposes deterministic unusable
+reasons such as `invalid-source`, `invalid-target`, `inactive-source`,
+`inactive-target`, `wrong-kind`, or `ambiguous-target`. Traversal deduplicates
+by stable Skill ID and terminates through cycles.
 
 ### Observed Skill references
 
@@ -376,12 +452,15 @@ LLM.
 The recommended MVP includes:
 
 - the two canonical metadata fields above;
+- the minimal `skill_discovery.adopted` repository-wide coverage field above;
 - exact ID and repository-relative path target resolution;
 - source-path and line-level declaration evidence;
-- lifecycle-aware route resolution;
+- fail-closed Discovery eligibility using current Agent Skills validation and
+  lifecycle evidence;
 - explicit published entrypoints;
 - structural-root, standalone, and unrouted classifications;
-- adoption-aware reachability from published entrypoints;
+- descriptive reachability during partial adoption and authoritative coverage
+  only after repository-wide adoption;
 - a versioned canonical JSON report;
 - compact Markdown that points to source Skills;
 - a stdout-only `renma skill-index` command;
@@ -398,7 +477,8 @@ The MVP excludes:
 - Mermaid output;
 - Readiness, semantic diff, CI, Trust Graph, and BOM integration;
 - scaffold, `guide`, or `suggest-metadata` changes;
-- new repository configuration; and
+- any repository configuration beyond the single coverage field; changes to
+  `renma init`; and
 - automatic repository edits.
 
 ## Report and CLI Contract
@@ -451,6 +531,7 @@ configPath?
 scannedFileCount
 focus?
 adoption
+coverage
 summary
 skills
 routes
@@ -458,37 +539,58 @@ publishedEntrypointIds
 structuralRootIds
 standaloneSkillIds
 unroutedSkillIds
-unreachableSkillIds
+notReachedDiscoveryEligibleSkillIds
 diagnostics
 ```
 
 `adoption.state` is one of:
 
-- `not-adopted`: no Discovery metadata is present;
-- `incomplete`: Discovery metadata is present, but no valid active published
-  entrypoint exists; or
-- `adopted`: at least one valid active Skill has
-  `renma.published-entrypoint: "true"`.
+- `not-adopted`: no Discovery metadata is present and repository-wide coverage
+  is not declared;
+- `partial`: continuations or published entrypoints exist, but
+  `skill_discovery.adopted` is not `true`;
+- `incomplete`: repository-wide coverage is declared, but no valid
+  Discovery-eligible published entrypoint exists; or
+- `adopted`: repository-wide coverage is declared and at least one
+  Discovery-eligible Skill has `renma.published-entrypoint: "true"`.
 
 This is deliberately independent of `renma init`. Initialization records Renma
 repository adoption; it does not silently adopt the Skill Discovery contract.
-No config field is added merely because a config file now exists.
+The current `renma init` output remains unchanged.
+
+The `adoption` object should expose whether Discovery metadata is present,
+whether repository-wide coverage is declared, the config path and field
+evidence when declared, and why the current state was selected. The separate
+`coverage.mode` is `not-evaluated`, `descriptive`, or `authoritative`:
+
+- partial mode with a Discovery-eligible published entrypoint may calculate
+  descriptive reachability without emitting global unreachable diagnostics;
+- incomplete mode cannot evaluate coverage because it has no usable first hop;
+  and
+- adopted mode evaluates authoritative repository-wide coverage.
 
 Each Skill entry should include stable ID, Agent Skills name and description
 when valid, source path, effective owner with provenance, lifecycle, tags,
+Agent Skills validity, lifecycle-active state, Discovery eligibility,
 publication state, structural-root state, standalone state, and reachability.
-Reachability is `null` or an equivalent explicit not-evaluated state before
-adoption.
+Reachability is `reachable`, `not-reached`, or `not-evaluated`; invalid Skills
+remain visible with `discoveryEligible: false` and their existing validation
+diagnostics.
 
 Each route entry should include source ID, declared target, resolution state,
 resolved target ID/path/kind/status when available, usability, and declaration
 evidence. Resolution state distinguishes at least `resolved`, `unresolved`,
-`ambiguous`, and `wrong-kind`.
+`ambiguous`, and `wrong-kind`. Usability is separate and includes stable reasons
+for invalid or inactive sources and targets. A resolved invalid Skill target
+therefore remains a resolved Skill target while the route is unusable.
 
-Summary counts include total and active Skills, declared and usable routes,
+Summary counts distinguish total discovered Skills, lifecycle-active Skills,
+Discovery-eligible Skills, invalid Skills, declared and usable routes,
 published entrypoints, structural roots, standalone and unrouted Skills, and
-reachable active Skills when evaluated. Arrays and diagnostics use stable
-deterministic ordering.
+reachable Discovery-eligible Skills when evaluated. Arrays and diagnostics use
+stable deterministic ordering. `notReachedDiscoveryEligibleSkillIds` is
+descriptive in partial mode and is authoritative coverage evidence only in
+adopted mode.
 
 ### Compact Markdown
 
@@ -497,17 +599,21 @@ Default Markdown should show:
 - the static-only boundary and adoption state;
 - each published entrypoint's ID, description, path, lifecycle, owner, and
   direct declared continuations;
-- compact structural-root, standalone, and unrouted summaries;
-- unreachable Skills only after adoption; and
+- counts plus a deterministically capped structural-root, standalone, and
+  unrouted sample using the current presentation cap;
+- global unreachable Skills only in adopted mode; and
 - exact diagnostics with source links or paths.
 
 It should instruct the reader to open source `SKILL.md` files and apply their
 conditions. It must not reproduce complete workflow instructions or present the
 index as a prompt package.
 
-When there is no valid published entrypoint, Markdown should say that Discovery
-is not adopted or incomplete and show structural roots as candidates. It must
-not silently publish every candidate.
+During partial adoption, default Markdown should show published entrypoints and
+their direct continuation evidence without enumerating every unrelated
+not-reached Skill. When there is no valid published entrypoint, Markdown should
+say that Discovery is not adopted, partial, or incomplete as applicable and
+show only a bounded structural-root candidate summary. It must not silently
+publish every candidate.
 
 ## Diagnostics
 
@@ -520,17 +626,21 @@ required” below means the diagnostic is emitted only when `adoption.state` is
 | `DISCOVERY-INVALID-CONTINUATION-DECLARATION` | `renma.continues-with` is not a valid JSON-array string of non-empty strings. | No | The canonical metadata field, parser error, and line range identify the value to correct or remove. It can only arise from the explicit route field, never an ordinary link. |
 | `DISCOVERY-UNRESOLVED-DECLARED-ROUTE` | A valid declaration item has no exact ID or repository-relative path match, or resolution is ambiguous. | No | The declaration item, index, raw target, source path, and candidate details identify the exact contract to repair. Ordinary references are not considered. |
 | `DISCOVERY-ROUTE-TARGET-NOT-SKILL` | A declaration resolves exactly to a non-Skill asset. | No | The declaration and resolved asset kind/path show that a Context, Lens, or support relationship should use its existing typed field instead. |
-| `DISCOVERY-INACTIVE-ROUTE-TARGET` | An active Skill declares a continuation to a deprecated or archived Skill. | No | The route declaration plus target lifecycle and path support replacement or explicit removal. The edge remains visible but unusable for active reachability. |
+| `DISCOVERY-INACTIVE-ROUTE-TARGET` | A Discovery-eligible Skill declares a continuation to a specification-valid deprecated or archived Skill. | No | The route declaration plus target lifecycle and path support replacement or explicit removal. The edge remains visible but unusable for Discovery traversal. |
 | `DISCOVERY-DUPLICATE-DECLARED-ROUTE` | One source declares the same normalized unresolved target more than once, or multiple items resolve to the same target Skill. | No | All declaration indices and line evidence show the redundant items. Markdown links cannot create this diagnostic. |
-| `DISCOVERY-INVALID-PUBLISHED-ENTRYPOINT` | The publication key is present with a value other than `"true"`, is declared ambiguously, belongs to an invalid Skill, or attempts to publish a deprecated or archived Skill. | No | The publication field and relevant Agent Skills or lifecycle evidence show why the Skill cannot be published. |
-| `DISCOVERY-ENTRYPOINT-WITHOUT-USABLE-BOUNDARIES` | A valid published entrypoint has a deterministically established missing capability, positive usage boundary, or negative routing boundary under current Agent Skills and Skill-quality checks. | No | The publication marker and originating `AS-SKILL-*`, `RN-SKILL-*`, or `QUAL-*` evidence identify the boundary to improve. This is a publication-quality check, not link interpretation, and passing it is not proof of semantic completeness. |
-| `DISCOVERY-ROUTE-CYCLE` | The usable active continuation graph contains a self-loop or multi-Skill strongly connected component. | No | The exact declared edges and source evidence identify the cycle. It is a warning for human review; traversal remains cycle-safe and Renma does not assume every cycle is semantically invalid. |
-| `DISCOVERY-UNREACHABLE-ACTIVE-SKILL` | After adoption, an active Skill is not reachable from any published entrypoint through usable declared continuations. | Yes | Published-entrypoint evidence and the authoritative route graph establish the gap. Ordinary Markdown references cannot make a Skill reachable or unreachable. |
+| `DISCOVERY-INVALID-PUBLISHED-ENTRYPOINT` | The publication key is present with a value other than `"true"`, is declared ambiguously, or attempts to publish a specification-valid deprecated or archived Skill. | No | The publication field and lifecycle evidence show why the Skill cannot be published. A specification-invalid Skill instead remains ineligible under its existing Agent Skills diagnostics. |
+| `DISCOVERY-ENTRYPOINT-WITHOUT-USABLE-BOUNDARIES` | A Discovery-eligible published entrypoint has a deterministically established missing capability, positive usage boundary, or negative routing boundary under current Agent Skills and Skill-quality checks. | No | The publication marker and originating `RN-SKILL-*` or `QUAL-*` evidence identify the boundary to improve. This is a publication-quality check, not link interpretation, and passing it is not proof of semantic completeness. |
+| `DISCOVERY-ROUTE-CYCLE` | The usable Discovery-eligible continuation graph contains a self-loop or multi-Skill strongly connected component. | No | The exact declared edges and source evidence identify the cycle. It is a warning for human review; traversal remains cycle-safe and Renma does not assume every cycle is semantically invalid. |
+| `DISCOVERY-UNREACHABLE-ELIGIBLE-SKILL` | In adopted mode, a Discovery-eligible Skill is not reachable from any published entrypoint through usable declared continuations. | Yes | The repository-wide adoption declaration, published-entrypoint evidence, and authoritative route graph establish the gap. Ordinary Markdown references cannot make a Skill reachable or unreachable. |
 
 Existing duplicate-ID, invalid Agent Skills, lifecycle, ownership, and usage
 guidance diagnostics remain visible and should be reused as related evidence
-rather than reimplemented with different semantics. The MVP adds no confidence,
-centrality, popularity, route-quality, or “best Skill” scores.
+rather than reimplemented with different semantics. In particular, resolving a
+declaration to an invalid Skill adds `invalid-target` usability evidence and
+links to the existing `AS-SKILL-*` diagnostics; it does not add a second
+invalid-Skill diagnostic or pretend the target is missing, inactive, or
+wrong-kind. The MVP adds no confidence, centrality, popularity, route-quality,
+or “best Skill” scores.
 
 ## Adoption Model
 
@@ -542,23 +652,28 @@ Run the proposed report with no Discovery metadata. Renma reports
 `not-adopted`, structural roots, standalone Skills, and exact current repository
 diagnostics. Reachability is not evaluated.
 
-### Stage 2: declare one bounded area
+### Stage 2: declare and publish one bounded area
 
 Add `renma.continues-with` only to source Skills that own real continuation
-policy. Keep the conditions and no-match behavior in each Skill body. The
-report state is `incomplete` until an active entrypoint is published.
+policy, and publish a reviewed first hop when that area is useful. Keep the
+conditions and no-match behavior in each Skill body. The report state is
+`partial`: reachability from published entrypoints is descriptive, and default
+Markdown remains bounded to the published area and compact candidate summaries.
 
-### Stage 3: publish intentional first hops
+### Stage 3: review and expand descriptive coverage
 
-Add `renma.published-entrypoint: "true"` to a small reviewed set of meaningful
-entrypoint Skills. This adopts Discovery for the repository and enables
-authoritative reachability and unreachable warnings.
+Review declared routes, invalid or inactive targets, cycles, usage boundaries,
+and not-reached Discovery-eligible Skills without treating the latter as global
+defects. Add intentional entrypoints or continuations one bounded workflow area
+at a time.
 
-### Stage 4: review and expand
+### Stage 4: declare repository-wide coverage
 
-Review unrouted and unreachable Skills, disconnected subgraphs, inactive
-targets, cycles, and usage boundaries. A Skill may remain intentionally
-standalone and published. Expand one bounded workflow area at a time.
+Set `skill_discovery.adopted: true` only when the repository intends complete
+coverage. The state is `incomplete` until at least one Discovery-eligible Skill
+is published, then `adopted`; only the adopted state enables authoritative
+global unreachable diagnostics. An intentionally independent eligible Skill
+must be published as its own first hop or connected by a usable continuation.
 
 No initial CI gate, repository rewrite, or all-at-once metadata migration is
 required.
@@ -579,10 +694,16 @@ It also must not accept those names as silent aliases. Canonical Skills use
 flat string-valued `metadata.renma.*`; non-Skill assets cannot declare Skill
 continuations or publication.
 
-Repositories without Discovery metadata keep their current scan, catalog,
-graph, Readiness, diff, CI, Trust Graph, and BOM behavior. Adding the standalone
-MVP must not change those report schemas or advertise `skill-index` as current
-behavior before the command ships.
+Repositories without Discovery metadata and without a repository-wide coverage
+declaration keep their current scan, catalog, graph, Readiness, diff, CI, Trust
+Graph, and BOM behavior. Adding the standalone MVP must not change those report
+schemas or advertise `skill-index` as current behavior before the command
+ships.
+
+This design PR does not change `renma.config.json` parsing, metadata parsing,
+versioning, or command behavior. A later implementation PR may parse only the
+reviewed `skill_discovery.adopted` field. `renma init` must continue to omit it,
+because initializing Renma is not repository-wide Skill Discovery adoption.
 
 PR #89 should not be rebased, cherry-picked, restored, or used as the code
 baseline. Implementation starts from the 0.21.0 shared repository snapshot,
@@ -599,8 +720,8 @@ Only after the MVP contract is stable should Renma consider:
   Context/Lens relationships;
 - Trust Graph or Repository Context BOM additions;
 - scaffold, `guide`, metadata suggestion, or review-bundle assistance; and
-- repository-wide configuration if metadata-based adoption proves
-  insufficient.
+- additional Discovery configuration beyond the single reviewed adoption
+  field, if concrete usage demonstrates a need.
 
 LLM-assisted authoring remains an adjacent or dogfooded Skill layer unless a
 future decision changes Renma's boundary. Runtime debugging and observability
@@ -609,30 +730,41 @@ organization-wide discovery requires a separate federation design.
 
 ## Implementation Sequence
 
+The current design PR settles the contract only. It adds no Skill Discovery
+implementation, config or metadata parsing, CLI command, version change, or
+`renma init` behavior.
+
 ### PR 1: Contract, domain types, and fixtures
 
 - finalize `renma.continues-with` and `renma.published-entrypoint` through
-  public-contract review;
+  public-contract review together with the single
+  `skill_discovery.adopted` repository field;
 - define TypeScript domain types for declarations, resolution, adoption,
-  Skill classifications, reachability, and diagnostics;
+  coverage mode, visible/lifecycle-active/Discovery-eligible Skill
+  classifications, reachability, route usability, and diagnostics;
 - define and schema-test `renma.skill-index.v1`;
 - add representative fixtures for category-first, product-first, team-first,
-  direct-leaf, standalone, inactive, ambiguous, cyclic, and partially adopted
-  repositories; and
-- add contract tests for ordering, evidence, and not-evaluated reachability.
+  direct-leaf, standalone, invalid-source, invalid-target, inactive, ambiguous,
+  cyclic, partial, incomplete, and adopted repositories; and
+- add contract tests for ordering, evidence, fail-closed eligibility, adoption
+  states, and descriptive versus authoritative reachability.
 
 This PR adds no operational metadata parsing, public CLI command, existing
 report change, or documentation claim that Skill Discovery is implemented.
 
 ### PR 2: Canonical parsing, resolution, and internal report
 
-- extend the canonical metadata parser with the two reviewed fields;
-- derive declarations from the shared `RepositorySnapshot`;
+- extend the canonical metadata parser with the two reviewed fields and the
+  repository config parser with the single reviewed adoption field;
+- derive declarations, including rejected non-operational evidence, from the
+  shared `RepositorySnapshot`;
 - resolve exact Skill IDs and repository-relative paths with fail-closed
   ambiguity;
-- preserve line evidence and lifecycle state;
-- calculate publication, structural roots, standalone and unrouted Skills,
-  adoption, cycle-safe reachability, and cycles;
+- preserve line evidence, Agent Skills validity, resolved invalid-Skill
+  identity, and lifecycle state;
+- calculate Discovery eligibility, publication, structural roots, standalone
+  and unrouted Skills, adoption, coverage mode, cycle-safe reachability, and
+  cycles;
 - emit the canonical report through an internal API; and
 - add the exact diagnostics defined above.
 
@@ -660,38 +792,42 @@ above:
 
 1. Do observed local Skill references provide enough review value to justify a
    separate non-authoritative projection?
-2. If metadata-based adoption proves too easy to remove accidentally, is a
-   repository-wide adoption flag justified despite the preference for
-   Skill-local policy?
-3. Which integration should follow first after report stability: semantic diff,
+2. Which integration should follow first after report stability: semantic diff,
    Readiness, or CI summary?
-4. Can a useful product projection be derived from existing exact tags and
+3. Can a useful product projection be derived from existing exact tags and
    Context/Lens identity without adding product metadata or a Product asset?
-5. Which route visualization remains readable in genuinely large cyclic or
+4. Which route visualization remains readable in genuinely large cyclic or
    shared-child graphs?
 
 The PR 1 contract review may refine public spelling before release. It must not
-add aliases, observed-route authority, free-form focus, or another metadata
-field without a concrete deterministic MVP consumer.
+add aliases, observed-route authority, free-form focus, another metadata field,
+or another repository config field without a concrete deterministic MVP
+consumer.
 
 ## Success Criteria
 
 The design succeeds when a reviewer can determine, from current repository
 evidence:
 
-1. which Skills are intentionally published first hops;
-2. which exact declarations create authoritative continuations;
-3. where every declaration came from and how it resolved;
-4. which Skills are structural roots, standalone, unrouted, or unreachable;
-5. whether reachability is authoritative or not yet evaluated;
-6. how layered routing varies without requiring a fixed hierarchy;
-7. why source Skills remain authoritative and focused;
-8. why product knowledge survives owner changes; and
-9. why the report is repository governance rather than runtime selection.
+1. which discovered Skills are visible, lifecycle-active, specification-valid,
+   and Discovery-eligible;
+2. why an invalid Skill retains identity and evidence but cannot publish,
+   create a usable route, or satisfy reachability;
+3. which Skills are intentionally published first hops;
+4. whether the repository has separately declared complete Discovery coverage;
+5. which exact declarations create authoritative continuations;
+6. where every declaration came from and how it resolved;
+7. which eligible Skills are structural roots, standalone, unrouted, or not
+   reached, and whether that result is descriptive or authoritative;
+8. how layered routing varies without requiring a fixed hierarchy;
+9. why source Skills remain authoritative and focused;
+10. why product knowledge survives owner changes; and
+11. why the report is repository governance rather than runtime selection.
 
 The first-hop Markdown projection must remain bounded and useful with more than
-100 Skills because it publishes only explicit entrypoints and summarizes gaps
-instead of promoting every structural root.
+100 Skills because it publishes only explicit entrypoints and uses capped
+summaries instead of promoting every structural root or enumerating all
+not-reached Skills during partial adoption.
 
 ## Non-Goals
 
