@@ -26,10 +26,7 @@ jobs:
 
       - run: npm run build
 
-      - name: Validate Renma Skills and Context
-        run: node dist/index.js scan . --fail-on high
-
-      - name: Generate Renma Skill reports
+      - name: Generate Renma inventory reports
         run: |
           mkdir -p renma-reports
           node dist/index.js catalog . \
@@ -38,10 +35,20 @@ jobs:
             --focus "${RENMA_SKILL_FOCUS}" \
             --view composition \
             --format markdown > renma-reports/skill-composition.md
+
+      - name: Generate Renma CI report
+        id: ci-report
+        continue-on-error: true
+        run: |
           node dist/index.js ci-report . \
             --from origin/${{ github.base_ref }} \
             --to HEAD \
             --format markdown > renma-reports/ci-report.md
+
+      - name: Validate Renma Skills and Context
+        id: scan
+        continue-on-error: true
+        run: node dist/index.js scan . --fail-on high
 
       - name: Upload Renma Skill reports
         uses: actions/upload-artifact@v7
@@ -50,6 +57,12 @@ jobs:
           name: renma-skill-reports
           path: renma-reports/
           if-no-files-found: ignore
+
+      - name: Enforce Renma result
+        if: >-
+          steps.ci-report.outcome == 'failure' ||
+          steps.scan.outcome == 'failure'
+        run: exit 1
 
   # Keep pull-request write permission out of the job that runs repository code.
   # Fork PRs retain the uploaded artifact but skip this write-capable job.
