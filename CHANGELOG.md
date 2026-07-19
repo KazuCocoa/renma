@@ -6,6 +6,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.20.2] - 2026-07-19
+
 ### Added
 
 - Added `SEC-SAFEGUARD-BYPASS-INSTRUCTION` for explicit guidance that disables
@@ -900,7 +902,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.20.1...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.20.2...HEAD
+[0.20.2]: https://github.com/KazuCocoa/renma/compare/v0.20.1...v0.20.2
 [0.20.1]: https://github.com/KazuCocoa/renma/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/KazuCocoa/renma/compare/v0.19.2...v0.20.0
 [0.19.2]: https://github.com/KazuCocoa/renma/compare/v0.19.1...v0.19.2
