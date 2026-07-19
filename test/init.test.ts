@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
-import { access, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -159,6 +166,78 @@ test("init does not create a missing target root", async () => {
   assert.equal(result.stdout, "");
   assert.match(result.stderr, /Could not initialize Renma/);
   await assert.rejects(access(root));
+});
+
+test("an explicitly supplied empty root cannot initialize the current directory", async () => {
+  const root = await fixture();
+  const previousCwd = process.cwd();
+
+  try {
+    process.chdir(root);
+    const result = await withCapturedConsole(() => main(["init", ""]));
+
+    assert.equal(result.code, 2);
+    assert.equal(result.stdout, "");
+    assert.match(result.stderr, /Could not initialize Renma/);
+    await assert.rejects(access(path.join(root, "renma.config.json")));
+  } finally {
+    process.chdir(previousCwd);
+  }
+});
+
+test("an unresolved parent-segment root cannot initialize its lexical parent", async () => {
+  const parent = await fixture();
+  const root = `${parent}${path.sep}missing${path.sep}..`;
+  const result = await withCapturedConsole(() => main(["init", root]));
+
+  assert.equal(result.code, 2);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /Could not initialize Renma/);
+  await assert.rejects(access(path.join(parent, "renma.config.json")));
+});
+
+test("an existing regular file cannot be used as an initialization root", async () => {
+  const parent = await fixture();
+  const root = path.join(parent, "repository");
+  const content = "repository marker\n";
+  await writeFile(root, content);
+
+  const result = await withCapturedConsole(() => main(["init", root]));
+
+  assert.equal(result.code, 2);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /is not a directory/);
+  assert.equal(await readFile(root, "utf8"), content);
+  await assert.rejects(access(path.join(parent, "renma.config.json")));
+  await assert.rejects(access(path.join(root, "renma.config.json")));
+});
+
+test("dash-prefixed roots use option separators in rendered next steps", async () => {
+  const parent = await fixture();
+  const root = path.join(parent, "-repo");
+  const previousCwd = process.cwd();
+  await mkdir(root);
+
+  try {
+    process.chdir(parent);
+    const result = await withCapturedConsole(() =>
+      main(["init", "--", "-repo"]),
+    );
+
+    assert.equal(result.code, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(
+      await readFile(path.join(root, "renma.config.json"), "utf8"),
+      INITIAL_CONFIG_CONTENT,
+    );
+    assert.match(result.stdout, /^ {2}renma scan -- -repo$/m);
+    assert.match(
+      result.stdout,
+      /^ {2}renma catalog --format markdown -- -repo$/m,
+    );
+  } finally {
+    process.chdir(previousCwd);
+  }
 });
 
 async function fixture(): Promise<string> {

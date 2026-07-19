@@ -1,5 +1,6 @@
-import { lstat, writeFile } from "node:fs/promises";
+import { lstat, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { renmaCommand } from "../command-invocation.js";
 import { CONFIG_FILENAMES } from "../config.js";
 
 export const INITIAL_CONFIG_CONTENT = `{
@@ -22,6 +23,11 @@ export interface InitResult {
 
 /** Initialize repository-level Renma configuration without touching assets. */
 export async function initializeRepository(root: string): Promise<InitResult> {
+  const rootStat = await stat(root);
+  if (!rootStat.isDirectory()) {
+    throw new Error(`Initialization root ${root} is not a directory.`);
+  }
+
   const [primaryName, legacyName] = CONFIG_FILENAMES;
   const primaryPath = path.join(root, primaryName);
   const legacyPath = path.join(root, legacyName);
@@ -61,12 +67,18 @@ export async function runInitCommand(root: string): Promise<number> {
   const primary = displayPath(result.primaryPath);
   const legacy = displayPath(result.legacyPath);
   if (result.state === "created") {
+    const scan = root.startsWith("-")
+      ? renmaCommand(["scan", "--", root]).display
+      : renmaCommand(["scan", root]).display;
+    const catalog = root.startsWith("-")
+      ? renmaCommand(["catalog", "--format", "markdown", "--", root]).display
+      : renmaCommand(["catalog", root, "--format", "markdown"]).display;
     process.stdout.write(
       `Created ${primary}\n\n` +
         "Renma is initialized for this repository.\n\n" +
         "For an existing repository:\n" +
-        `  renma scan ${shellArgument(root)}\n` +
-        `  renma catalog ${shellArgument(root)} --format markdown\n\n` +
+        `  ${scan}\n` +
+        `  ${catalog}\n\n` +
         "To create a new Skill:\n" +
         "  renma guide skill\n",
     );
@@ -116,11 +128,6 @@ async function pathExists(targetPath: string): Promise<boolean> {
 
 function displayPath(value: string): string {
   return value.split(path.sep).join("/");
-}
-
-function shellArgument(value: string): string {
-  if (/^[A-Za-z0-9_./:@%+,=-]+$/u.test(value)) return value;
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
 function nodeErrorCode(error: unknown): string | undefined {
