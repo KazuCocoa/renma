@@ -10,7 +10,7 @@ metadata:
   renma.tags: '["release","maintenance","dogfooding"]'
   renma.requires-context: '["context.release.prep"]'
   renma.allowed-data: '["public"]'
-  renma.network-allowed: "true"
+  renma.network-allowed: "false"
   renma.external-upload-allowed: "true"
   renma.secrets-allowed: "false"
   renma.requires-human-approval: "true"
