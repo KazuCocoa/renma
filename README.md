@@ -474,8 +474,9 @@ canonical and migration rules.
 - [Example Context Repository](examples/context-repo): richer repository-aware
   Skill, Context Lens, and Context Asset governance.
 - [Context Lens Example](examples/context-lens): focused Context Lens governance.
-- [GitHub Actions Example](examples/github-actions/renma-ci-report.yml): CI report
-  integration.
+- [GitHub Actions Example](examples/github-actions/renma-ci-report.yml): live
+  Skill validation, focused composition, catalog, CI report artifacts, and an
+  updatable CI report comment on same-repository pull requests.
 
 The governing review loop remains:
 
