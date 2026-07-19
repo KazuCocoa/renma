@@ -169,9 +169,9 @@ The MVP uses the following terms.
 ### Visible Skill
 
 Every discovered catalog asset with kind `skill` is a visible Skill. Invalid,
-inactive, disconnected, and not-yet-adopted Skills remain visible in the JSON
-report with their source identity and existing diagnostics. Visibility does not
-make a Skill usable for Discovery.
+inactive, duplicate-ID, disconnected, and not-yet-adopted Skills remain visible
+in the JSON report with their source identity and existing diagnostics.
+Visibility does not make a Skill usable for Discovery.
 
 ### Lifecycle-active Skill
 
@@ -181,18 +181,32 @@ publication, traversal, or authoritative coverage.
 
 ### Discovery-eligible Skill
 
-A Skill is Discovery-eligible only when it is both:
+A Skill is Discovery-eligible only when all of the following are true:
 
 ```text
 a specification-valid canonical Agent Skill
 AND not deprecated
 AND not archived
+AND its effective asset ID is unique across the repository catalog
 ```
+
+Effective ID uniqueness is repository-wide across all catalog assets, not only
+Skills, because Renma asset IDs are global catalog identities. A valid active
+Skill whose effective ID collides with another Skill, Context, Lens, or other
+catalog asset is not Discovery-eligible.
 
 Only a Discovery-eligible Skill may create a usable continuation, participate
 in Discovery traversal, or be a published entrypoint. Existing Agent Skills
 validation diagnostics remain authoritative. An invalid Skill is not silently
 reclassified as missing, non-Skill, deprecated, or archived.
+
+A Skill with a duplicate effective ID likewise remains visible with its source
+path, metadata and declaration evidence, and existing
+`META-DUPLICATE-ASSET-ID` diagnostics, but has `discoveryEligible: false`. It is
+not reclassified as unresolved, missing, wrong-kind, invalid Agent Skill,
+deprecated, or archived. It cannot be published, create or receive a usable
+continuation, or participate in structural-root, standalone, unrouted,
+reachability, cycle, or authoritative coverage calculations.
 
 Only a specification-valid canonical Agent Skill contributes operational
 `metadata.renma.*` values, matching the current parser's fail-closed contract.
@@ -416,8 +430,9 @@ Resolution follows these steps:
 4. For a path reference, normalize path separators to `/`, remove one leading
    `./` for current compatibility, and require one exact repository-relative
    catalog path. Reject absolute paths and paths that escape the repository.
-5. If the spelling matches an ID and a path belonging to different assets, or
-   duplicate catalog identity makes the target ambiguous, fail closed.
+5. If the spelling matches an ID and a path belonging to different assets, fail
+   closed. An ID reference shared by multiple catalog assets is ambiguous, but
+   an exact path reference still resolves to its one path target.
 6. If the resolved target is not a Skill, retain the evidence and report a
    wrong-kind diagnostic.
 7. If the target is a specification-invalid Skill, retain its Skill identity,
@@ -425,13 +440,20 @@ Resolution follows these steps:
    missing, wrong-kind, or usable.
 8. Retain routes to valid `deprecated` or `archived` Skills for review, but do
    not use them for Discovery traversal.
+9. If an exact path resolves to a Skill whose effective ID is not unique,
+   retain the resolved target path, ID, metadata evidence, declaration
+   evidence, and linked `META-DUPLICATE-ASSET-ID` diagnostics. The resolution
+   remains `resolved`, but the route is unusable because the target lacks
+   authoritative graph identity.
 
 A usable route is resolved, unambiguous, Skill-to-Skill, declared by a
 Discovery-eligible source, and targets a Discovery-eligible Skill. Route data
 separates target resolution from usability and exposes deterministic unusable
 reasons such as `invalid-source`, `invalid-target`, `inactive-source`,
-`inactive-target`, `wrong-kind`, or `ambiguous-target`. Traversal deduplicates
-by stable Skill ID and terminates through cycles.
+`inactive-target`, `duplicate-source-id`, `duplicate-target-id`, `wrong-kind`,
+or `ambiguous-target`. A duplicate-ID Skill cannot create or receive a usable
+continuation. Traversal deduplicates by stable Skill ID only after excluding
+identity-ineligible Skills, and terminates through cycles.
 
 ### Observed Skill references
 
@@ -456,7 +478,7 @@ The recommended MVP includes:
 - exact ID and repository-relative path target resolution;
 - source-path and line-level declaration evidence;
 - fail-closed Discovery eligibility using current Agent Skills validation and
-  lifecycle evidence;
+  lifecycle evidence plus repository-wide effective asset ID uniqueness;
 - explicit published entrypoints;
 - structural-root, standalone, and unrouted classifications;
 - descriptive reachability during partial adoption and authoritative coverage
@@ -571,26 +593,29 @@ evidence when declared, and why the current state was selected. The separate
 
 Each Skill entry should include stable ID, Agent Skills name and description
 when valid, source path, effective owner with provenance, lifecycle, tags,
-Agent Skills validity, lifecycle-active state, Discovery eligibility,
-publication state, structural-root state, standalone state, and reachability.
-Reachability is `reachable`, `not-reached`, or `not-evaluated`; invalid Skills
-remain visible with `discoveryEligible: false` and their existing validation
-diagnostics.
+Agent Skills validity, lifecycle-active state, `effectiveIdUnique`, Discovery
+eligibility, publication state, structural-root state, standalone state, and
+reachability. `effectiveIdUnique` states whether the effective ID occurs exactly
+once across all repository catalog assets. Reachability is `reachable`,
+`not-reached`, or `not-evaluated`; invalid and duplicate-ID Skills remain visible
+with `discoveryEligible: false` and their existing diagnostics.
 
-Each route entry should include source ID, declared target, resolution state,
-resolved target ID/path/kind/status when available, usability, and declaration
-evidence. Resolution state distinguishes at least `resolved`, `unresolved`,
-`ambiguous`, and `wrong-kind`. Usability is separate and includes stable reasons
-for invalid or inactive sources and targets. A resolved invalid Skill target
-therefore remains a resolved Skill target while the route is unusable.
+Each route entry should include source ID and path, declared target, resolution
+state, resolved target ID/path/kind/status when available, target-ID uniqueness,
+usability, usability reasons, linked diagnostics, and declaration evidence.
+Resolution state distinguishes at least `resolved`, `unresolved`, `ambiguous`,
+and `wrong-kind`. Usability is separate and includes stable reasons for invalid,
+inactive, or duplicate-ID sources and targets. A path-resolved duplicate-ID
+Skill therefore remains a resolved Skill target while the route is unusable.
 
 Summary counts distinguish total discovered Skills, lifecycle-active Skills,
-Discovery-eligible Skills, invalid Skills, declared and usable routes,
-published entrypoints, structural roots, standalone and unrouted Skills, and
-reachable Discovery-eligible Skills when evaluated. Arrays and diagnostics use
-stable deterministic ordering. `notReachedDiscoveryEligibleSkillIds` is
-descriptive in partial mode and is authoritative coverage evidence only in
-adopted mode.
+Discovery-eligible Skills, invalid Skills, duplicate-effective-ID Skills,
+declared and usable routes, published entrypoints, structural roots, standalone
+and unrouted Skills, and reachable Discovery-eligible Skills when evaluated.
+All ID-based arrays contain only Discovery-eligible Skills with unique catalog
+identity. Arrays and diagnostics use stable deterministic ordering.
+`notReachedDiscoveryEligibleSkillIds` is descriptive in partial mode and is
+authoritative coverage evidence only in adopted mode.
 
 ### Compact Markdown
 
@@ -628,19 +653,27 @@ required” below means the diagnostic is emitted only when `adoption.state` is
 | `DISCOVERY-ROUTE-TARGET-NOT-SKILL` | A declaration resolves exactly to a non-Skill asset. | No | The declaration and resolved asset kind/path show that a Context, Lens, or support relationship should use its existing typed field instead. |
 | `DISCOVERY-INACTIVE-ROUTE-TARGET` | A Discovery-eligible Skill declares a continuation to a specification-valid deprecated or archived Skill. | No | The route declaration plus target lifecycle and path support replacement or explicit removal. The edge remains visible but unusable for Discovery traversal. |
 | `DISCOVERY-DUPLICATE-DECLARED-ROUTE` | One source declares the same normalized unresolved target more than once, or multiple items resolve to the same target Skill. | No | All declaration indices and line evidence show the redundant items. Markdown links cannot create this diagnostic. |
-| `DISCOVERY-INVALID-PUBLISHED-ENTRYPOINT` | The publication key is present with a value other than `"true"`, is declared ambiguously, or attempts to publish a specification-valid deprecated or archived Skill. | No | The publication field and lifecycle evidence show why the Skill cannot be published. A specification-invalid Skill instead remains ineligible under its existing Agent Skills diagnostics. |
+| `DISCOVERY-INVALID-PUBLISHED-ENTRYPOINT` | The publication key is present with a value other than `"true"`, is declared ambiguously, or attempts to publish a specification-valid deprecated or archived Skill. | No | The publication field and lifecycle evidence show why the Skill cannot be published. A specification-invalid or duplicate-ID Skill instead remains ineligible under its existing Agent Skills or catalog-identity diagnostics. |
 | `DISCOVERY-ENTRYPOINT-WITHOUT-USABLE-BOUNDARIES` | A Discovery-eligible published entrypoint has a deterministically established missing capability, positive usage boundary, or negative routing boundary under current Agent Skills and Skill-quality checks. | No | The publication marker and originating `RN-SKILL-*` or `QUAL-*` evidence identify the boundary to improve. This is a publication-quality check, not link interpretation, and passing it is not proof of semantic completeness. |
 | `DISCOVERY-ROUTE-CYCLE` | The usable Discovery-eligible continuation graph contains a self-loop or multi-Skill strongly connected component. | No | The exact declared edges and source evidence identify the cycle. It is a warning for human review; traversal remains cycle-safe and Renma does not assume every cycle is semantically invalid. |
 | `DISCOVERY-UNREACHABLE-ELIGIBLE-SKILL` | In adopted mode, a Discovery-eligible Skill is not reachable from any published entrypoint through usable declared continuations. | Yes | The repository-wide adoption declaration, published-entrypoint evidence, and authoritative route graph establish the gap. Ordinary Markdown references cannot make a Skill reachable or unreachable. |
 
 Existing duplicate-ID, invalid Agent Skills, lifecycle, ownership, and usage
 guidance diagnostics remain visible and should be reused as related evidence
-rather than reimplemented with different semantics. In particular, resolving a
-declaration to an invalid Skill adds `invalid-target` usability evidence and
-links to the existing `AS-SKILL-*` diagnostics; it does not add a second
-invalid-Skill diagnostic or pretend the target is missing, inactive, or
-wrong-kind. The MVP adds no confidence, centrality, popularity, route-quality,
-or “best Skill” scores.
+rather than reimplemented with different semantics. In particular:
+
+- resolving a declaration to an invalid Skill adds `invalid-target` usability
+  evidence and links to the existing `AS-SKILL-*` diagnostics; it does not add
+  a second invalid-Skill diagnostic or pretend the target is missing, inactive,
+  or wrong-kind; and
+- a duplicate effective ID links the existing `META-DUPLICATE-ASSET-ID`
+  evidence from the visible Skill, rejected publication, and affected route.
+  Discovery adds `duplicate-source-id` or `duplicate-target-id` usability
+  evidence, not a competing duplicate-ID diagnostic. Exact path resolution
+  remains distinct from identity usability.
+
+The MVP adds no confidence, centrality, popularity, route-quality, or “best
+Skill” scores.
 
 ## Adoption Model
 
@@ -741,11 +774,16 @@ implementation, config or metadata parsing, CLI command, version change, or
   `skill_discovery.adopted` repository field;
 - define TypeScript domain types for declarations, resolution, adoption,
   coverage mode, visible/lifecycle-active/Discovery-eligible Skill
-  classifications, reachability, route usability, and diagnostics;
+  classifications, effective ID uniqueness, reachability, route usability, and
+  diagnostics;
 - define and schema-test `renma.skill-index.v1`;
 - add representative fixtures for category-first, product-first, team-first,
   direct-leaf, standalone, invalid-source, invalid-target, inactive, ambiguous,
   cyclic, partial, incomplete, and adopted repositories; and
+- add duplicate-identity fixtures covering two valid active Skills with one
+  explicit ID, a valid Skill colliding with a non-Skill asset, a path-resolved
+  continuation to a duplicate-ID Skill, and an attempted duplicate-ID published
+  entrypoint; and
 - add contract tests for ordering, evidence, fail-closed eligibility, adoption
   states, and descriptive versus authoritative reachability.
 
@@ -761,7 +799,8 @@ report change, or documentation claim that Skill Discovery is implemented.
 - resolve exact Skill IDs and repository-relative paths with fail-closed
   ambiguity;
 - preserve line evidence, Agent Skills validity, resolved invalid-Skill
-  identity, and lifecycle state;
+  identity, repository-wide effective ID uniqueness, linked
+  `META-DUPLICATE-ASSET-ID` evidence, and lifecycle state;
 - calculate Discovery eligibility, publication, structural roots, standalone
   and unrouted Skills, adoption, coverage mode, cycle-safe reachability, and
   cycles;
@@ -810,9 +849,10 @@ The design succeeds when a reviewer can determine, from current repository
 evidence:
 
 1. which discovered Skills are visible, lifecycle-active, specification-valid,
-   and Discovery-eligible;
-2. why an invalid Skill retains identity and evidence but cannot publish,
-   create a usable route, or satisfy reachability;
+   repository-unique in effective asset identity, and Discovery-eligible;
+2. why an invalid or duplicate-ID Skill retains source and declaration evidence
+   but cannot publish, create or receive a usable route, participate in
+   authoritative graph calculations, or satisfy reachability;
 3. which Skills are intentionally published first hops;
 4. whether the repository has separately declared complete Discovery coverage;
 5. which exact declarations create authoritative continuations;

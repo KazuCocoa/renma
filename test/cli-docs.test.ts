@@ -646,6 +646,10 @@ test("published current docs separate implemented discovery from the active unim
   );
   assert.match(
     proposal,
+    /effective asset ID is unique across the repository catalog/,
+  );
+  assert.match(
+    proposal,
     /target is a specification-invalid Skill, retain its Skill identity,\s+path, validation diagnostics, and route evidence/,
   );
   assert.match(proposal, /"skill_discovery"[\s\S]*"adopted": true/);
