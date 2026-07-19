@@ -613,8 +613,11 @@ Other default scan glob families are:
   governance? See [`examples/context-repo`](../examples/context-repo).
 - Focusing specifically on Context Lens governance? See
   [`examples/context-lens`](../examples/context-lens).
-- Adding Renma evidence to CI? See the
+- Adding live Skill validation, composition, catalog, and CI evidence to GitHub
+  Actions? See the
   [GitHub Actions example](../examples/github-actions/renma-ci-report.yml).
+  It updates one CI report comment for same-repository pull requests and keeps
+  uploaded artifacts as the fallback for fork pull requests.
 
 ## Commands
 

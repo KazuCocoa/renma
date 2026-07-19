@@ -8,7 +8,6 @@ jobs:
   lint-format-and-test:
     name: ESLint, Prettier, and Tests
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
