@@ -55,11 +55,11 @@ Use this index to choose the smallest document that answers your question.
   boundaries.
 - [Internal Architecture](internal-architecture.md): contributor-facing
   snapshot, evidence, decision, rendering, and fail-closed boundaries.
-- [Current Roadmap](../plan.md): current definition, completed baseline, and
-  planned release direction.
-- [Deferred Skill-to-Skill Discovery Design](../plan-discovery.md): exploratory
-  route/index design with no assigned release; repository and support-resource
-  discovery are already implemented.
+- [Current Roadmap](../plan.md): shipped baseline, product boundaries, and
+  forward-looking priorities.
+- [Skill Discovery Design](../plan-discovery.md): active static route/index
+  design proposal with no assigned release; it is not implemented, while
+  repository and support-resource discovery are already implemented.
 
 ## Examples
 

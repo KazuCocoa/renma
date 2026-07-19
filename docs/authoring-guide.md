@@ -1075,9 +1075,10 @@ preserve the file and stop unless a separate intentional change is supported.
 For current guidance on deriving several focused, bounded workflows from a broad
 existing Skill—including focused `inspect`, graph, Context reuse, and Appium
 examples—see [Advanced Skill Authoring](advanced-skill-authoring.md). That guide
-keeps current focused-workflow authoring separate from deferred Skill-to-Skill
-route and generated-index design. Repository and local support discovery are
-already implemented; `routes_to` and `skill-index` are not.
+keeps current focused-workflow authoring separate from the active,
+not-implemented Skill Discovery design. Repository and local support discovery
+are already implemented; proposed `renma.continues-with` metadata and
+`skill-index` are not.
 
 ## Optional Codex Example
 

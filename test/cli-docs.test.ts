@@ -299,10 +299,10 @@ test("Skill authoring docs establish Renma boundaries before platform semantic r
   assert.match(docsIndex, /Advanced Skill Authoring/);
   assert.match(advanced, /focused-workflow model introduced in 0\.18\.0/);
   assert.match(advanced, /0\.19\.0 authoring contract/);
-  assert.match(advanced, /Deferred Skill-to-Skill discovery/);
+  assert.match(advanced, /active Skill Discovery design/);
   assert.match(advanced, /no assigned\s+release/);
-  assert.doesNotMatch(advanced, /`routes_to`|`skill-index`/);
-  assert.match(readme, /Deferred Skill-to-Skill Discovery Design/);
+  assert.doesNotMatch(advanced, /`renma\.continues-with`|`skill-index`/);
+  assert.match(readme, /Skill Discovery Design/);
   assert.match(authoring, /focused, bounded workflows/);
   assert.doesNotMatch(authoring, /current thin-Skill authoring/);
   for (const document of [readme, manual, authoring, docsIndex]) {
@@ -606,7 +606,7 @@ test("Context Lens docs use canonical Skill metadata and explicit semantic bound
   assert.match(diagnostics, /must reference a Context Asset/);
 });
 
-test("published current docs separate implemented discovery from deferred routing", async () => {
+test("published current docs separate implemented discovery from the active unimplemented design", async () => {
   const documents = [
     "README.md",
     "plan.md",
@@ -619,7 +619,7 @@ test("published current docs separate implemented discovery from deferred routin
   ];
   const content = await Promise.all(documents.map(readRepoFile));
   assert.ok(content.some((text) => /focused workflow/i.test(text)));
-  assert.ok(content.some((text) => /Deferred Skill-to-Skill/i.test(text)));
+  assert.ok(content.some((text) => /active Skill Discovery/i.test(text)));
   assert.ok(
     content.some((text) =>
       /repository.*support-resource\s+discovery.*implemented/is.test(text),
@@ -629,15 +629,49 @@ test("published current docs separate implemented discovery from deferred routin
     assert.doesNotMatch(
       text,
       /Proposed 0\.18\.0 Skill(?:-to-Skill)? Discovery/i,
-      `${documents[index]} assigns deferred discovery to 0.18.0`,
+      `${documents[index]} assigns Skill Discovery to 0.18.0`,
     );
     assert.doesNotMatch(text, /current thin-Skill|thin, bounded Skills/i);
     assert.doesNotMatch(text, /renma-quality@0\.18\.0/);
   }
-  const deferred = content[2] ?? "";
-  assert.match(deferred, /Target: unassigned/);
-  assert.match(deferred, /`routes_to`.*`skill-index`/s);
-  assert.match(deferred, /not Renma\s+0\.18\.0 behavior/);
+  const proposal = content[2] ?? "";
+  assert.match(proposal, /Status: active design proposal/);
+  assert.match(proposal, /Implementation status: not implemented/);
+  assert.match(proposal, /Baseline: Renma 0\.21\.0/);
+  assert.match(proposal, /`renma\.continues-with`/);
+  assert.match(proposal, /`renma\.published-entrypoint`/);
+  assert.match(
+    proposal,
+    /Discovery-eligible Skill[\s\S]*specification-valid canonical Agent Skill[\s\S]*not deprecated[\s\S]*not archived/,
+  );
+  assert.match(
+    proposal,
+    /effective asset ID is unique across the repository catalog/,
+  );
+  assert.match(
+    proposal,
+    /target is a specification-invalid Skill, retain its Skill identity,\s+path, validation diagnostics, and route evidence/,
+  );
+  assert.match(proposal, /"skill_discovery"[\s\S]*"adopted": true/);
+  assert.match(
+    proposal,
+    /Publishing an entrypoint does not declare that every Discovery-eligible Skill/,
+  );
+  assert.match(
+    proposal,
+    /Repository-wide coverage is a\s+separate explicit configuration decision/,
+  );
+  assert.match(
+    proposal,
+    /global unreachable Skills only in adopted mode|only the adopted state enables authoritative\s+global unreachable diagnostics/,
+  );
+  assert.match(
+    proposal,
+    /Arbitrary local Markdown links are \*\*not\*\* authoritative routes/,
+  );
+  for (const text of [content[0] ?? "", content[3] ?? ""]) {
+    assert.doesNotMatch(text, /renma skill-index \[path\]/);
+  }
 });
 
 test("relative Markdown links in current documentation resolve", async () => {

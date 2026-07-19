@@ -5,12 +5,12 @@ LLM-facing knowledge. It keeps Skills, Context Lenses, Context Assets,
 references, ownership, lifecycle, dependencies, and evidence reviewable as
 maintainable software assets.
 
-The current CLI surface covers `scan`, `catalog`, `ownership`, `graph`, focused
-graph views, `trust-graph`, `readiness`, Repository Context BOM reports,
+The current CLI surface covers `init`, `scan`, `catalog`, `ownership`, `graph`,
+focused graph views, `trust-graph`, `readiness`, Repository Context BOM reports,
 repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `guide`,
-`scaffold`, `suggest-metadata`, and `suggest-semantic-split`. Agent Skills validation and
-security diagnostics are deterministic repository checks; they do not execute
-commands or call external services.
+`scaffold`, `suggest-metadata`, and `suggest-semantic-split`. Agent Skills
+validation and security diagnostics are deterministic repository checks; they
+do not execute commands or call external services.
 
 Renma sits at the repository governance layer, not the runtime layer.
 
@@ -530,15 +530,16 @@ Contributors changing collection, evidence, decisions, or command rendering
 should follow the [internal architecture boundaries](docs/internal-architecture.md),
 including the documented fail-closed and 0.18.2 compatibility seams.
 
-Release sequencing belongs in [plan.md](plan.md). Proposed Skill discovery is
-isolated in [plan-discovery.md](plan-discovery.md) and is not implemented by the
-current processing pipeline.
+Release sequencing belongs in [plan.md](plan.md). The active Skill Discovery
+design proposal is isolated in [plan-discovery.md](plan-discovery.md) and is not
+implemented by the current processing pipeline.
 
 ## Implementation Notes
 
 Representative current CLI commands:
 
 ```bash
+renma init [path]
 renma scan [path]
 renma bom [path]
 renma catalog [path]
