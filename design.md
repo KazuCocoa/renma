@@ -3,11 +3,11 @@
 Renma is a Git-native context repository and deterministic governance CLI for
 repositories that hold LLM-facing knowledge.
 
-Current product surface includes `scan`, `catalog`, `ownership`, `graph`,
-focused graph views, `trust-graph`, `readiness`, Repository Context BOM reports,
-repeated-context diagnostics, semantic diff, `ci-report`, `inspect`, `guide`,
-`scaffold`, `suggest-metadata`, `suggest-semantic-split`, Agent Skills validation, and
-security diagnostics for agent-facing operational instructions.
+Current product surface includes `init`, `scan`, `catalog`, `ownership`,
+`graph`, focused graph views, `trust-graph`, `readiness`, Repository Context BOM
+reports, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`,
+`guide`, `scaffold`, `suggest-metadata`, `suggest-semantic-split`, Agent Skills
+validation, and security diagnostics for agent-facing operational instructions.
 
 Focused graph views are inspection tools; they do not choose, inject, or load runtime context for an agent.
 

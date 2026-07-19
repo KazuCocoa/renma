@@ -10,10 +10,10 @@ A focused Skill owns the workflow it needs to execute well; it is not required
 to be a thin router. Renma validates repository structure and declared Context
 relationships but does not select a Skill at runtime.
 
-Deferred Skill-to-Skill discovery from the earlier roadmap has no assigned
-release: 0.18.0 does not add route metadata, discovery aliases, generated
-indexes, or runtime selection. Repository file and Skill-local support-resource
-discovery are already implemented and are separate from that proposal.
+The active Skill Discovery design has no assigned release and is not
+implemented. Its proposed explicit continuation metadata and generated static
+index remain separate from current repository file and Skill-local
+support-resource discovery. Runtime selection stays outside Renma.
 
 ## Derive A Focused Skill From An Existing Skill
 
