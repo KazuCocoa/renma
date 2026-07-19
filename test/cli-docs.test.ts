@@ -6,6 +6,7 @@ import { COMMAND_HELP } from "../src/cli-help.js";
 import { DEFAULT_CONFIG } from "../src/config.js";
 
 const COMMANDS = [
+  "init",
   "scan",
   "bom",
   "catalog",
@@ -159,6 +160,28 @@ test("README preserves the Context Repository philosophy", async () => {
   );
   assert.match(readme, /reusable knowledge/);
   assert.match(readme, /https:\/\/kazucocoa\.blog\/context-repository\//);
+});
+
+test("README and User Manual distinguish repository init from asset scaffold", async () => {
+  const readme = await readRepoFile("README.md");
+  const manual = await readRepoFile("docs/user-manual.md");
+
+  for (const document of [readme, manual]) {
+    assert.match(
+      document,
+      /`?renma init`? initializes repository-level Renma configuration/i,
+    );
+    assert.match(document, /does not\s+create Skills or Context Assets/i);
+    assert.match(
+      document,
+      /`?renma scaffold`? creates one explicitly requested Skill, Context Asset, or\s+Context Lens/i,
+    );
+    assert.match(document, /renma init \./);
+    assert.match(
+      document,
+      /without\s+(?:running\s+)?`?renma init`?|do not need to run `renma init`/i,
+    );
+  }
 });
 
 test("User Manual default glob list matches DEFAULT_CONFIG", async () => {

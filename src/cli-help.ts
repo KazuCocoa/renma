@@ -114,6 +114,35 @@ const CONTEXT_LENS_GUIDE_URL =
 
 export const COMMAND_HELP = [
   {
+    name: "init",
+    usage: "renma init [root]",
+    question: "How can this repository record explicit Renma adoption?",
+    purpose:
+      "Init initializes repository-level Renma configuration. It does not create Skills or Context Assets. Init the repository; scaffold an asset.",
+    useWhen: [
+      "A repository wants to record explicit Renma adoption and pin its initial repository policy.",
+      "You want a minimal renma.config.json with the initial fail-on severity and output format.",
+    ],
+    doNotUseFor: [
+      "Creating a Skill, Context Asset, Context Lens, example asset, or asset directory.",
+      "Replacing guide or scaffold in the Skill authoring sequence.",
+      "Rewriting, normalizing, migrating, or validating an existing configuration file.",
+      "Running scan, catalog, graph, readiness, or any interactive workflow.",
+    ],
+    examples: ["renma init", "renma init .", "renma init path/to/repository"],
+    interpretation: [
+      "When no conventional Renma configuration exists, init creates a minimal renma.config.json and prints next steps.",
+      "An existing renma.config.json or .renma.json is never modified, even when it is empty, malformed, or customized.",
+      "When both conventional files exist, renma.config.json takes precedence and init changes neither file.",
+      "Repositories can use Renma defaults without running init; initialization records explicit repository policy.",
+    ],
+    nextSteps: [
+      "For an existing repository, run renma scan . and renma catalog . --format markdown.",
+      "To create a new Skill, preserve the authoring sequence: renma guide skill, clarify and pass the creation gate, define the smallest intended asset graph, run renma scaffold skill once, then complete and validate the asset.",
+    ],
+    options: ["help"],
+  },
+  {
     name: "scan",
     usage: "renma scan [path] [options]",
     question: "What concrete problems should be fixed?",
@@ -600,7 +629,7 @@ export const COMMAND_HELP = [
     usage: "renma scaffold <skill|context|context_lens> <path> [options]",
     question: "How can a new asset start from a deterministic structure?",
     purpose:
-      "Scaffold creates deterministic starter structures or authoring prompts for three distinct assets: a Skill is a focused workflow entrypoint, Context is independently maintained knowledge, and a Context Lens is purpose-specific interpretation of declared Context.",
+      "Scaffold creates deterministic starter structures for one explicitly requested Skill, Context Asset, or Context Lens after its responsibility and asset boundary have been decided. It does not initialize repository-level configuration. A Skill is a focused workflow entrypoint, Context is independently maintained knowledge, and a Context Lens is purpose-specific interpretation of declared Context.",
     useWhen: [
       "You are creating a new skill, context asset, or context lens.",
       "You want a starter file or prompt with expected metadata and sections.",
@@ -801,6 +830,10 @@ export function renderGlobalHelp(version: string): string {
     "Usage",
     "  renma <command> [args] [options]",
     "  renma <command> --help",
+    "",
+    "Start here: explicit repository adoption (optional)",
+    "  renma init .",
+    "  records a minimal repository policy; repositories can scan with defaults without initialization",
     "",
     "Start here: existing repository",
     "  renma scan . --fail-on high",

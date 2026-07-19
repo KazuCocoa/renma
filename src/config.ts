@@ -12,6 +12,9 @@ import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 const SEVERITIES = ["low", "medium", "high", "critical"] as const;
 const FORMATS = ["text", "json"] as const;
 
+/** Conventional repository configuration filenames in loading precedence. */
+export const CONFIG_FILENAMES = ["renma.config.json", ".renma.json"] as const;
+
 /** Default scan configuration used when no config file or CLI overrides apply. */
 export const DEFAULT_CONFIG: ScanConfig = {
   failOn: "high",
@@ -91,7 +94,7 @@ export async function loadConfig(
 }
 
 async function findDefaultConfig(root: string): Promise<string | undefined> {
-  for (const name of ["renma.config.json", ".renma.json"]) {
+  for (const name of CONFIG_FILENAMES) {
     const candidate = path.join(root, name);
     try {
       await access(candidate);

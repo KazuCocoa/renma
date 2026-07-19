@@ -6,6 +6,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added `renma init [root]` to record explicit repository adoption with a
+  minimal `renma.config.json` while preserving existing conventional config
+  files and keeping repository initialization separate from asset scaffolding.
+
 ## [0.20.2] - 2026-07-19
 
 ### Added

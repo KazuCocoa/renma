@@ -1718,6 +1718,20 @@ test("positive integer options require complete positive decimal strings", async
 test("representative command help shows relevant boundaries and options", async () => {
   const cases = [
     {
+      name: "init",
+      argv: ["init", "/path/that/does/not/exist", "--help"],
+      includes: [
+        /renma init \[root\]/,
+        /initializes repository-level Renma configuration/,
+        /does not create Skills or Context Assets/,
+        /minimal renma\.config\.json/,
+        /never modified, even when it is empty, malformed, or customized/,
+        /renma\.config\.json takes precedence/,
+        /repositories can use Renma defaults without running init/i,
+      ],
+      excludes: [/--owner/, /--config/, /--json/],
+    },
+    {
       name: "scan",
       argv: ["scan", "/path/that/does/not/exist", "--help"],
       includes: [
