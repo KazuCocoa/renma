@@ -13,8 +13,10 @@ import type {
   Artifact,
   ArtifactKind,
   Evidence,
+  ParsedDocument,
   SecurityConfig,
 } from "./types.js";
+import { parseDocument } from "./markdown.js";
 
 type InventoryArtifactKind = ArtifactKind;
 
@@ -137,9 +139,14 @@ const LOCAL_POLICY_METADATA_FIELDS = new Set([
 ]);
 
 export function summarizeSecurityPolicyInventory(
-  artifacts: Artifact[],
+  inputs: Array<Artifact | ParsedDocument>,
   config?: SecurityConfig,
 ): SecurityPolicyInventorySummary {
+  const documents = policyDocuments(inputs);
+  const artifacts = documents.map((document) => document.artifact);
+  const documentsByPath = new Map(
+    documents.map((document) => [document.artifact.path, document]),
+  );
   const summary = zeroSecurityPolicyInventorySummary();
   const networkDestinations = new Map<string, number>();
   const uploadDestinations = new Map<string, number>();
@@ -147,13 +154,19 @@ export function summarizeSecurityPolicyInventory(
   const profileNames = new Map<string, number>();
   const owningSkills = skillArtifactsByDirectory(artifacts);
 
-  for (const artifact of artifacts) {
+  for (const document of documents) {
+    const artifact = document.artifact;
     const policyArtifact = policyArtifactFor(artifact, owningSkills);
     const rawSupportArtifact = isRawSupportArtifact(artifact);
     const evidenceArtifact =
       policyArtifact ??
       (rawSupportArtifact ? { ...artifact, content: "" } : artifact);
-    const parsedPolicy = parseOperationalSecurityPolicy(evidenceArtifact);
+    const policyInput = policyArtifact
+      ? (documentsByPath.get(policyArtifact.path) ?? policyArtifact)
+      : rawSupportArtifact
+        ? evidenceArtifact
+        : document;
+    const parsedPolicy = parseOperationalSecurityPolicy(policyInput);
     const hasMetadata = hasLocalSecurityPolicyMetadata(parsedPolicy);
     if (!isPolicyInventoryArtifact(artifact, hasMetadata)) continue;
 
@@ -235,18 +248,29 @@ export function summarizeSecurityPolicyInventory(
 }
 
 export function collectSecurityPolicyAssetEvidence(
-  artifacts: Artifact[],
+  inputs: Array<Artifact | ParsedDocument>,
   config?: SecurityConfig,
 ): SecurityPolicyAssetEvidence[] {
+  const documents = policyDocuments(inputs);
+  const artifacts = documents.map((document) => document.artifact);
+  const documentsByPath = new Map(
+    documents.map((document) => [document.artifact.path, document]),
+  );
   const owningSkills = skillArtifactsByDirectory(artifacts);
-  return artifacts
-    .map((artifact): SecurityPolicyAssetEvidence | undefined => {
+  return documents
+    .map((document): SecurityPolicyAssetEvidence | undefined => {
+      const artifact = document.artifact;
       const policyArtifact = policyArtifactFor(artifact, owningSkills);
       const rawSupportArtifact = isRawSupportArtifact(artifact);
       const evidenceArtifact =
         policyArtifact ??
         (rawSupportArtifact ? { ...artifact, content: "" } : artifact);
-      const parsedPolicy = parseOperationalSecurityPolicy(evidenceArtifact);
+      const policyInput = policyArtifact
+        ? (documentsByPath.get(policyArtifact.path) ?? policyArtifact)
+        : rawSupportArtifact
+          ? evidenceArtifact
+          : document;
+      const parsedPolicy = parseOperationalSecurityPolicy(policyInput);
       const hasMetadata = hasLocalSecurityPolicyMetadata(parsedPolicy);
       if (!isPolicyInventoryArtifact(artifact, hasMetadata)) return undefined;
 
@@ -340,6 +364,14 @@ export function zeroSecurityPolicyInventorySummary(): SecurityPolicyInventorySum
     topForbiddenInputs: [],
     assetsWithoutEffectivePolicyList: [],
   };
+}
+
+function policyDocuments(
+  inputs: Array<Artifact | ParsedDocument>,
+): ParsedDocument[] {
+  return inputs.map((input) =>
+    "artifact" in input ? input : parseDocument(input),
+  );
 }
 
 export function isPolicyInventoryArtifact(

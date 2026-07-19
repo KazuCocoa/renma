@@ -11,8 +11,16 @@ import {
   type SecurityPolicy,
   type SecurityProfileChain,
 } from "./security-policy.js";
-import type { Artifact, Finding, RiskClass, SecurityConfig } from "./types.js";
+import type {
+  Artifact,
+  Finding,
+  ParsedDocument,
+  RiskClass,
+  SecurityConfig,
+} from "./types.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
+import { parseDocument } from "./markdown.js";
+import { ensureMarkdownSyntaxForDocument } from "./markdown-syntax.js";
 import {
   MarkdownSecurityView,
   type MarkdownSemanticUnit,
@@ -801,18 +809,20 @@ type SecurityDiagnosticsConfig = {
 };
 
 export function securityDiagnosticFindings(
-  artifacts: Artifact[],
+  inputs: Array<Artifact | ParsedDocument>,
   config: SecurityDiagnosticsConfig = {},
 ): Finding[] {
-  return artifacts.flatMap((artifact) =>
-    securityFindingsForArtifact(artifact, config.security),
-  );
+  return inputs.flatMap((input) => {
+    const document = "artifact" in input ? input : parseDocument(input);
+    return securityFindingsForDocument(document, config.security);
+  });
 }
 
-function securityFindingsForArtifact(
-  artifact: Artifact,
+function securityFindingsForDocument(
+  document: ParsedDocument,
   securityConfig?: SecurityConfig,
 ): Finding[] {
+  const artifact = document.artifact;
   if (
     artifact.kind === "script" ||
     artifact.kind === "asset" ||
@@ -820,15 +830,18 @@ function securityFindingsForArtifact(
     !artifact.markdownParserEligible
   )
     return [];
-  const policyResolution = resolveOperationalSecurityPolicy(artifact);
+  const policyResolution = resolveOperationalSecurityPolicy(document);
   const parsedPolicy = policyResolution.policy;
   const policy = applySecurityConfig(parsedPolicy, securityConfig);
   const sourceLines = artifact.content.split(/\r?\n/);
-  const scanStart = securityContentStart(
-    sourceLines,
-    artifact.markdownParserEligible,
-  );
-  const markdownView = new MarkdownSecurityView(artifact.content, scanStart);
+  const syntax = ensureMarkdownSyntaxForDocument(document);
+  if (syntax === undefined) {
+    throw new Error(
+      "Eligible Markdown document is missing its primary syntax parse",
+    );
+  }
+  const markdownView = new MarkdownSecurityView(syntax);
+  const scanStart = syntax.bodyStartLine - 1;
   const detections: Detection[] = [
     ...invalidCanonicalSecurityDetections(policyResolution.issues),
     ...securityPolicyResolutionDetections(
@@ -1006,7 +1019,7 @@ function bodyPolicyContradictionDetections(
 ): Detection[] {
   const detections: Detection[] = [];
   const sourceLines = content.split(/\r?\n/);
-  const scanStart = securityContentStart(sourceLines, markdownParserEligible);
+  const scanStart = securityContentStart(markdownParserEligible, markdownView);
   const lines = markdownView
     ? sourceLines.map((_, index) => markdownView.visibleLine(index))
     : sourceLines;
@@ -1711,7 +1724,7 @@ function forbiddenInputDetection(
   const lines = markdownView
     ? sourceLines.map((_, index) => markdownView.visibleLine(index))
     : sourceLines;
-  const scanStart = securityContentStart(lines, markdownParserEligible);
+  const scanStart = securityContentStart(markdownParserEligible, markdownView);
   for (let index = scanStart; index < lines.length; index += 1) {
     const line = lines[index] ?? "";
     if (!pattern.test(line)) continue;
@@ -1729,14 +1742,16 @@ function forbiddenInputDetection(
 }
 
 function securityContentStart(
-  lines: string[],
   markdownParserEligible: boolean,
+  markdownView: MarkdownSecurityView | undefined,
 ): number {
-  if (!markdownParserEligible || lines[0]?.trim() !== "---") return 0;
-  const frontmatterEnd = lines.findIndex(
-    (line, index) => index > 0 && line.trim() === "---",
-  );
-  return frontmatterEnd > 0 ? frontmatterEnd + 1 : 0;
+  if (!markdownParserEligible) return 0;
+  if (markdownView === undefined) {
+    throw new Error(
+      "Eligible Markdown security analysis requires syntax state",
+    );
+  }
+  return markdownView.bodyStartLine - 1;
 }
 
 function lineSnippet(content: string, line: number): string | undefined {

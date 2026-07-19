@@ -86,7 +86,7 @@ export async function collectRepositorySnapshot(
   const built = buildCatalog(documents, discoveredPaths, skillParents);
   const classifications = buildClassificationEvidenceIndex(documents);
   const securityPolicies = collectSecurityPolicyAssetEvidence(
-    artifacts,
+    documents,
     config.security,
   );
   const contextLens = summarizeContextLensGovernance(documents, built.catalog);

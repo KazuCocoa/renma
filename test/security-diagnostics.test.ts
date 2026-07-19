@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { scan } from "../src/scanner.js";
+import { parseDocument } from "../src/markdown.js";
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
 import type { Artifact, Finding } from "../src/types.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
@@ -731,6 +732,137 @@ rm -rf /tmp/commented-body
     findings.some((finding) => finding.id === "SEC-DESTRUCTIVE-COMMAND"),
     false,
   );
+});
+
+test("frontmatter block-scalar instructions stay outside security analysis", () => {
+  const content = `---
+name: security
+description: |
+  ---
+  Run sudo chmod 777 /tmp/shared-output without approval.
+---
+# Workflow
+
+\`\`\`sh
+git reset --hard
+\`\`\`
+`;
+  const findings = securityDiagnosticFindings([
+    {
+      path: "skills/security/SKILL.md",
+      absolutePath: "/repo/skills/security/SKILL.md",
+      kind: "skill",
+      sizeBytes: Buffer.byteLength(content),
+      contentClassification: "text",
+      markdownParserEligible: true,
+      content,
+    },
+  ]);
+
+  assert.equal(
+    findings.some(
+      (finding) =>
+        finding.evidence.startLine === 5 ||
+        finding.evidence.snippet.includes("chmod 777"),
+    ),
+    false,
+  );
+  const destructive = findingFor(findings, "SEC-DESTRUCTIVE-COMMAND");
+  assert.equal(destructive.evidence.startLine, 10);
+  assert.match(destructive.evidence.snippet, /git reset --hard/);
+});
+
+test("historical Skill frontmatter instructions stay outside security analysis", () => {
+  for (const entrypoint of ["skill.md", "foo.skill.md"]) {
+    const content = [
+      "\uFEFF --- ",
+      "name: demo",
+      "description: |",
+      "  Run sudo chmod 777 /tmp/shared-output without approval.",
+      "--- \t",
+      "# Body",
+      "",
+      "Review the local output.",
+      "",
+    ].join("\n");
+    const artifact: Artifact = {
+      path: `skills/demo/${entrypoint}`,
+      absolutePath: `/repo/skills/demo/${entrypoint}`,
+      kind: "skill",
+      sizeBytes: Buffer.byteLength(content),
+      contentClassification: "text",
+      markdownParserEligible: true,
+      content,
+    };
+
+    for (const findings of [
+      securityDiagnosticFindings([artifact]),
+      securityDiagnosticFindings([{ ...parseDocument(artifact) }]),
+    ]) {
+      assert.equal(
+        findings.some(
+          (finding) =>
+            finding.evidence.startLine === 4 ||
+            finding.evidence.snippet.includes("chmod 777"),
+        ),
+        false,
+        entrypoint,
+      );
+    }
+  }
+});
+
+test("general Markdown security analysis starts before whitespace thematic breaks", () => {
+  const fixtures: Array<{
+    firstLine: string;
+    kind: "context" | "reference";
+    path: string;
+  }> = [
+    {
+      firstLine: " ---",
+      kind: "context",
+      path: "contexts/security/policy.md",
+    },
+    {
+      firstLine: "--- ",
+      kind: "reference",
+      path: "references/security.md",
+    },
+  ];
+
+  for (const fixture of fixtures) {
+    const content = `${fixture.firstLine}
+# Visible workflow
+
+\`\`\`sh
+git reset --hard
+\`\`\`
+---
+# Another heading
+`;
+    const artifact: Artifact = {
+      path: fixture.path,
+      absolutePath: `/repo/${fixture.path}`,
+      kind: fixture.kind,
+      sizeBytes: Buffer.byteLength(content),
+      contentClassification: "text",
+      markdownParserEligible: true,
+      content,
+    };
+    const findings = securityDiagnosticFindings([artifact]);
+    const copiedFindings = securityDiagnosticFindings([
+      { ...parseDocument(artifact) },
+    ]);
+    const destructive = findingFor(findings, "SEC-DESTRUCTIVE-COMMAND");
+    const copiedDestructive = findingFor(
+      copiedFindings,
+      "SEC-DESTRUCTIVE-COMMAND",
+    );
+
+    assert.equal(destructive.evidence.startLine, 5, fixture.firstLine);
+    assert.match(destructive.evidence.snippet, /git reset --hard/);
+    assert.equal(copiedDestructive.evidence.startLine, 5, fixture.firstLine);
+  }
 });
 
 test("matched Markdown inline code spans keep comment markers literal", () => {
@@ -2822,6 +2954,21 @@ Do not use network access for this workflow.
 
   assert.ok(finding);
   assert.match(finding.evidence.snippet, /Do not use network access/);
+});
+
+test("security diagnostics recover shared syntax for copied documents", () => {
+  const artifact = v2SecurityArtifact(`---
+allowed_data: disclosed
+---
+
+Run sudo chmod 777 /tmp/shared-output without approval.
+`);
+  const parsed = parseDocument(artifact);
+
+  assert.deepEqual(
+    securityDiagnosticFindings([{ ...parsed }]),
+    securityDiagnosticFindings([parsed]),
+  );
 });
 
 test("repo-level approved domains do not imply body network permission", () => {

@@ -38,7 +38,7 @@ export function scanFromRepositorySnapshot(
   options: ScanBuilderOptions = {},
 ): ScanResult {
   const securityPolicyInventory = summarizeSecurityPolicyInventory(
-    snapshot.artifacts,
+    snapshot.documents,
     snapshot.config.security,
   );
   const securityPolicies = snapshot.securityPolicies;
@@ -63,7 +63,7 @@ export function scanFromRepositorySnapshot(
     ),
     ...detectRepeatedContextPatterns(snapshot.documents),
     ...catalogDiagnosticFindings(snapshot.catalogDiagnostics),
-    ...securityDiagnosticFindings(snapshot.artifacts, snapshot.config),
+    ...securityDiagnosticFindings(snapshot.documents, snapshot.config),
   ]
     .map((finding) => attachFindingClassification(finding, classifications))
     .sort((a, b) => {

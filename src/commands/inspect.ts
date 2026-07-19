@@ -22,7 +22,13 @@ import { renderTextOutline } from "../renderers/inspect.js";
 import type {
   AssetClassificationEvidence,
   AssetGovernanceEvidence,
+  ParsedDocument,
 } from "../types.js";
+import {
+  ensureMarkdownSyntaxForDocument,
+  markdownCodeLineNumbers,
+} from "../markdown-syntax.js";
+import { frontmatterRangeForArtifact } from "../frontmatter-envelope.js";
 
 const DEFAULT_SECTION_PREVIEW_LINES = 3;
 
@@ -93,7 +99,7 @@ export async function buildInspectOutline(
     contextLens: repository.contextLens,
     classification: repository.classification,
     governance: repository.governance,
-    frontmatterRange: frontmatterRange(document.lines),
+    frontmatterRange: frontmatterRange(document),
     headings: document.headings.map((heading, index) => {
       const nextHeading = document.headings
         .slice(index + 1)
@@ -102,7 +108,7 @@ export async function buildInspectOutline(
       return {
         depth: heading.depth,
         line: heading.line,
-        preview: sectionPreview(document.lines, heading.line + 1, endLine),
+        preview: sectionPreview(document, heading.line + 1, endLine),
         range: formatRange(heading.line, endLine),
         text: heading.text,
       };
@@ -325,26 +331,26 @@ async function buildInspectSlice(
   };
 }
 
-function frontmatterRange(lines: string[]): null | string {
-  if (lines[0] !== "---") {
-    return null;
-  }
-
-  const endIndex = lines.slice(1).findIndex((line) => line === "---");
-  return endIndex === -1 ? null : formatRange(1, endIndex + 2);
+function frontmatterRange(document: ParsedDocument): null | string {
+  const range = frontmatterRangeForArtifact(document.artifact, document.lines);
+  return range === undefined
+    ? null
+    : formatRange(range.startLine, range.endLine);
 }
 
-function sectionPreview(lines: string[], start: number, end: number): string[] {
+function sectionPreview(
+  document: ParsedDocument,
+  start: number,
+  end: number,
+): string[] {
   const preview: string[] = [];
-  let inFence = false;
+  const syntax = ensureMarkdownSyntaxForDocument(document);
+  const codeLines =
+    syntax === undefined ? new Set<number>() : markdownCodeLineNumbers(syntax);
 
   for (let lineNumber = start; lineNumber <= end; lineNumber += 1) {
-    const line = lines[lineNumber - 1] ?? "";
-    if (line.trimStart().startsWith("```")) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence || line.trim() === "") {
+    const line = document.lines[lineNumber - 1] ?? "";
+    if (codeLines.has(lineNumber) || line.trim() === "") {
       continue;
     }
     preview.push(`L${String(lineNumber).padStart(4, "0")}: ${line.trim()}`);

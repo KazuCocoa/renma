@@ -1,8 +1,13 @@
+import {
+  attachMarkdownSyntax,
+  parseMarkdownSyntax,
+} from "./markdown-syntax.js";
+import {
+  markdownBodyStartLineForArtifact,
+  renmaFrontmatterEnvelope,
+} from "./frontmatter-envelope.js";
 import type {
   Artifact,
-  CodeFence,
-  Heading,
-  Link,
   MetadataFieldEvidence,
   MetadataValue,
   ParsedMetadata,
@@ -29,79 +34,42 @@ export function parseDocument(artifact: Artifact): ParsedDocument {
       metadataListItems: {},
     };
   }
-  const lines = artifact.content.split(/\r?\n/);
-  const headings: Heading[] = [];
-  const links: Link[] = [];
-  const codeFences: CodeFence[] = [];
+  const sourceLines = artifact.content.split(/\r?\n/);
+  const syntax = parseMarkdownSyntax(
+    artifact.content,
+    markdownBodyStartLineForArtifact(artifact, sourceLines),
+  );
+  const lines = syntax.sourceLines;
   const metadata = parseFrontmatter(artifact.path, lines);
-  let fenceStart: number | undefined;
-  let fenceLanguage = "";
-  let fenceLines: string[] = [];
-
-  lines.forEach((line, index) => {
-    const lineNumber = index + 1;
-    const fence = line.match(/^```(\S*)\s*$/);
-    if (fence) {
-      if (fenceStart === undefined) {
-        fenceStart = lineNumber;
-        fenceLanguage = fence[1] ?? "";
-        fenceLines = [];
-      } else {
-        codeFences.push({
-          language: fenceLanguage,
-          content: fenceLines.join("\n"),
-          startLine: fenceStart,
-          endLine: lineNumber,
-        });
-        fenceStart = undefined;
-        fenceLanguage = "";
-        fenceLines = [];
-      }
-      return;
-    }
-
-    if (fenceStart !== undefined) {
-      fenceLines.push(line);
-      return;
-    }
-
-    const heading = line.match(/^(#{1,6})\s+(.+?)\s*#*$/);
-    if (heading) {
-      headings.push({
-        depth: heading[1]?.length ?? 1,
-        text: heading[2]?.trim() ?? "",
-        line: lineNumber,
-      });
-    }
-
-    for (const match of line.matchAll(/\[([^\]]+)\]\(([^)]+)\)/g)) {
-      links.push({
-        text: match[1] ?? "",
-        target: match[2] ?? "",
-        line: lineNumber,
-      });
-    }
-  });
-
-  if (fenceStart !== undefined) {
-    codeFences.push({
-      language: fenceLanguage,
-      content: fenceLines.join("\n"),
-      startLine: fenceStart,
-      endLine: lines.length,
-    });
-  }
-
-  return {
+  const document: ParsedDocument = {
     artifact,
     lines,
-    headings,
-    codeFences,
-    links,
+    headings: syntax.headings.map((heading) => ({
+      depth: heading.depth,
+      text: heading.text,
+      line: heading.startLine,
+    })),
+    // Keep the established projection fenced-only. Indented code remains
+    // available through the internal shared syntax representation.
+    codeFences: syntax.codeBlocks
+      .filter((block) => block.kind === "fenced")
+      .map((block) => ({
+        language: block.language,
+        content: block.content,
+        startLine: block.startLine,
+        endLine: block.endLine,
+      })),
+    links: syntax.linkTargets.map((target) => ({
+      text: target.text,
+      target: target.target,
+      line: target.startLine,
+    })),
     metadata: metadata.values,
     metadataFields: metadata.fields,
     metadataListItems: metadata.listItems,
   };
+  attachMarkdownSyntax(document, syntax);
+  return document;
 }
 
 const LIST_METADATA_KEYS = new Set([
@@ -123,13 +91,14 @@ function parseFrontmatter(path: string, lines: string[]): ParsedMetadata {
   const values: Record<string, MetadataValue> = {};
   const fields: Record<string, MetadataFieldEvidence> = {};
   const listItems: Record<string, MetadataFieldEvidence[]> = {};
-  if (lines[0] !== "---") return { values, fields, listItems };
+  const envelope = renmaFrontmatterEnvelope(lines);
+  if (!envelope.present) return { values, fields, listItems };
 
   let activeListKey: string | undefined;
   let activeListStartLine: number | undefined;
   for (let index = 1; index < lines.length; index += 1) {
     const line = lines[index];
-    if (line === "---") break;
+    if (index === envelope.closingIndex) break;
     const listItem = line?.match(/^\s+-\s+(.+)$/);
     if (activeListKey && listItem) {
       const current = values[activeListKey];

@@ -150,6 +150,29 @@ test("validates required identity, filename, name constraints, and directory mat
   }
 });
 
+test("historical Skill entrypoints keep filename errors separate from frontmatter parsing", () => {
+  for (const entrypoint of ["skill.md", "foo.skill.md"]) {
+    const validation = validateAgentSkill(
+      skill(
+        `skills/demo/${entrypoint}`,
+        [
+          "\uFEFF --- ",
+          "name: demo",
+          "description: Use when reviewing demo inputs.",
+          "--- \t",
+          "# Body",
+          "",
+        ].join("\n"),
+      ),
+    );
+    const codes = validation.issues.map((issue) => issue.code);
+
+    assert.ok(codes.includes("AS-SKILL-NONCANONICAL-FILENAME"), entrypoint);
+    assert.equal(codes.includes("AS-SKILL-MISSING-FRONTMATTER"), false);
+    assert.equal(codes.includes("AS-SKILL-UNCLOSED-FRONTMATTER"), false);
+  }
+});
+
 test("accepts Unicode names and NFKC-equivalent parent directories", () => {
   const cases = [
     { parent: "日本語", name: "日本語" },
@@ -481,6 +504,32 @@ test("authoring inspection ignores backtick and tilde fenced examples", () => {
       fenced[0],
     );
   }
+});
+
+test("authoring inspection recovers fenced ranges for copied documents", () => {
+  const parsed = skill(
+    "skills/demo/SKILL.md",
+    `---
+name: demo
+description: Review demo inputs. Use when demo inputs need review.
+---
+# Demo
+
+\`\`\`markdown
+Never upload production data.
+\`\`\`
+
+Review the real input and return a summary.
+`,
+  );
+  const validation = validateAgentSkill({ ...parsed });
+
+  assert.equal(
+    validation.issues.some((issue) =>
+      issue.code.startsWith("RN-SKILL-EXECUTION-CONSTRAINT"),
+    ),
+    false,
+  );
 });
 
 test("frontmatter fence-like text does not hide body authoring constraints", () => {
