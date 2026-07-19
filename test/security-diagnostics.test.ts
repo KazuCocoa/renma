@@ -772,6 +772,46 @@ git reset --hard
   assert.match(destructive.evidence.snippet, /git reset --hard/);
 });
 
+test("historical Skill frontmatter instructions stay outside security analysis", () => {
+  for (const entrypoint of ["skill.md", "foo.skill.md"]) {
+    const content = [
+      "\uFEFF --- ",
+      "name: demo",
+      "description: |",
+      "  Run sudo chmod 777 /tmp/shared-output without approval.",
+      "--- \t",
+      "# Body",
+      "",
+      "Review the local output.",
+      "",
+    ].join("\n");
+    const artifact: Artifact = {
+      path: `skills/demo/${entrypoint}`,
+      absolutePath: `/repo/skills/demo/${entrypoint}`,
+      kind: "skill",
+      sizeBytes: Buffer.byteLength(content),
+      contentClassification: "text",
+      markdownParserEligible: true,
+      content,
+    };
+
+    for (const findings of [
+      securityDiagnosticFindings([artifact]),
+      securityDiagnosticFindings([{ ...parseDocument(artifact) }]),
+    ]) {
+      assert.equal(
+        findings.some(
+          (finding) =>
+            finding.evidence.startLine === 4 ||
+            finding.evidence.snippet.includes("chmod 777"),
+        ),
+        false,
+        entrypoint,
+      );
+    }
+  }
+});
+
 test("general Markdown security analysis starts before whitespace thematic breaks", () => {
   const fixtures: Array<{
     firstLine: string;

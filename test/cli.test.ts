@@ -1274,6 +1274,43 @@ test("inspect uses the Agent Skills frontmatter contract for canonical entrypoin
   );
 });
 
+test("inspect uses the Agent Skills frontmatter contract for historical entrypoints", async () => {
+  for (const entrypoint of ["skill.md", "foo.skill.md"]) {
+    const root = await fixture();
+    const directory = path.join(root, "skills", "demo");
+    const source = path.join(directory, entrypoint);
+    await mkdir(directory, { recursive: true });
+    await writeFile(
+      source,
+      [
+        "\uFEFF --- ",
+        "name: demo",
+        "description: Use when reviewing demo inputs.",
+        "--- \t",
+        "# Historical body",
+        "",
+        "[body guide](docs/body.md)",
+        "",
+      ].join("\n"),
+    );
+
+    const outline = await buildInspectOutline(source);
+
+    assert.equal(outline.classification.kind, "skill", entrypoint);
+    assert.equal(outline.frontmatterRange, "L1-L4", entrypoint);
+    assert.deepEqual(
+      outline.headings.map((heading) => [heading.text, heading.line]),
+      [["Historical body", 5]],
+      entrypoint,
+    );
+    assert.deepEqual(
+      outline.links,
+      [{ line: 7, target: "docs/body.md" }],
+      entrypoint,
+    );
+  }
+});
+
 test("CLI inspect command prints context lens metadata and relationships", async () => {
   const root = await fixture();
   const lens = path.join(

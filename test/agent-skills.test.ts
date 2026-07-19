@@ -150,6 +150,29 @@ test("validates required identity, filename, name constraints, and directory mat
   }
 });
 
+test("historical Skill entrypoints keep filename errors separate from frontmatter parsing", () => {
+  for (const entrypoint of ["skill.md", "foo.skill.md"]) {
+    const validation = validateAgentSkill(
+      skill(
+        `skills/demo/${entrypoint}`,
+        [
+          "\uFEFF --- ",
+          "name: demo",
+          "description: Use when reviewing demo inputs.",
+          "--- \t",
+          "# Body",
+          "",
+        ].join("\n"),
+      ),
+    );
+    const codes = validation.issues.map((issue) => issue.code);
+
+    assert.ok(codes.includes("AS-SKILL-NONCANONICAL-FILENAME"), entrypoint);
+    assert.equal(codes.includes("AS-SKILL-MISSING-FRONTMATTER"), false);
+    assert.equal(codes.includes("AS-SKILL-UNCLOSED-FRONTMATTER"), false);
+  }
+});
+
 test("accepts Unicode names and NFKC-equivalent parent directories", () => {
   const cases = [
     { parent: "日本語", name: "日本語" },
