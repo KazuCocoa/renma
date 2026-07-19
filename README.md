@@ -195,6 +195,18 @@ thresholds are not configurable through `renma.config.json` in this release.
 Run Renma without installing it globally:
 
 ```bash
+npx renma init .
+```
+
+`renma init` initializes repository-level Renma configuration. It does not
+create Skills or Context Assets. Use it when a new repository wants to record
+explicit Renma adoption and pin the minimal initial policy in
+`renma.config.json`.
+
+An existing repository can use Renma's built-in defaults without running
+`renma init`; initialization is optional for the existing-repository workflow:
+
+```bash
 npx renma scan . --fail-on high
 npx renma catalog . --format markdown
 npx renma graph . --format markdown
@@ -263,6 +275,7 @@ node dist/index.js scan . --fail-on high
 
 | Command | Main question |
 | --- | --- |
+| `init` | How can this repository record explicit Renma adoption? |
 | `scan` | What concrete problems should be fixed? |
 | `catalog` | What assets and metadata exist? |
 | `graph` | How are assets structurally connected? |
@@ -281,6 +294,11 @@ node dist/index.js scan . --fail-on high
 Run `renma --help` and `renma <command> --help` for current options, output
 contracts, and next steps. The [User Manual](docs/user-manual.md) is the
 operational command reference.
+
+`renma scaffold` creates one explicitly requested Skill, Context Asset, or
+Context Lens after its responsibility and asset boundary have been decided. It
+does not initialize repository configuration. Init the repository. Scaffold an
+asset.
 
 ## Repository Shape
 

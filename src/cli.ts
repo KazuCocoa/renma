@@ -18,6 +18,7 @@ import {
   type GuideTopic,
 } from "./commands/guide.js";
 import { runInspectCommand, type InspectFormat } from "./commands/inspect.js";
+import { runInitCommand } from "./commands/init.js";
 import {
   runOwnershipCommand,
   type OwnershipFormat,
@@ -67,6 +68,7 @@ interface CommandContract {
 }
 
 const COMMAND_CONTRACTS: Record<CommandName, CommandContract> = {
+  init: { minPositionals: 0, maxPositionals: 1 },
   scan: { minPositionals: 0, maxPositionals: 1 },
   catalog: { minPositionals: 0, maxPositionals: 1 },
   graph: { minPositionals: 0, maxPositionals: 1 },
@@ -176,6 +178,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   if (contractError) return usageError(command, contractError);
 
   try {
+    if (command === "init") {
+      return await runInitCommand(target);
+    }
+
     if (command === "suggest-semantic-split") {
       return await runSuggestSemanticSplit(parsed.values, target);
     }

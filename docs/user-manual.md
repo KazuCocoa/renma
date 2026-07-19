@@ -130,6 +130,18 @@ use their existing top-level metadata syntax.
 
 ## Quick Start
 
+For a new repository that wants to record explicit Renma adoption and pin its
+minimal initial repository policy, run:
+
+```bash
+renma init .
+```
+
+`renma init` initializes repository-level Renma configuration. It does not
+create Skills or Context Assets. An existing repository can use Renma's
+built-in defaults without running `renma init`, so initialization is not a
+prerequisite for scanning or cataloging an existing repository.
+
 For a first pass on an existing repository, run:
 
 ```bash
@@ -629,6 +641,7 @@ portable self-contained Agent Skills package.
 
 renma commands fall into a few groups:
 
+- Repository adoption: `init` records a minimal explicit repository policy without creating assets.
 - Inventory and ownership: `catalog` lists discovered assets and references, `ownership` summarizes owned and unowned assets, `graph` shows relationships between catalog nodes, `trust-graph` exposes deterministic trust evidence, and `bom` combines declared repository evidence into a reviewable Repository Context BOM.
 - Local inspection and authoring: `guide` prints the deterministic pre-generation Skill authoring contract, `inspect` reads one file as an outline or exact line slice, `scaffold` creates starter assets or authoring prompts, `suggest-metadata` emits safe metadata retrofit guidance for existing assets, and `suggest-semantic-split` packages source context and helper commands so a human or coding agent can draft a split for mixed-purpose Markdown.
 - Review and CI: `scan` emits deterministic findings, `readiness` turns repository state into checks and a score, `diff` compares two refs, and `ci-report` formats the comparison for pull-request review.
@@ -671,6 +684,34 @@ renma readiness . --format markdown
 renma bom . --format json
 renma bom . --format markdown
 ```
+
+### `init`
+
+Initializes repository-level Renma configuration at `root`, which defaults to
+`.`:
+
+```bash
+renma init
+renma init .
+renma init path/to/repository
+```
+
+When neither conventional configuration file exists, `init` creates a minimal
+`renma.config.json` containing only the initial `fail_on` and `format` policy.
+The command never overwrites, parses, normalizes, migrates, or validates an
+existing `renma.config.json` or `.renma.json`. If both exist,
+`renma.config.json` takes precedence and neither file is changed.
+
+Use `init` when a repository wants to record explicit Renma adoption. Existing
+repositories can continue directly to `scan` because Renma operates with
+built-in defaults when no configuration file exists. The command does not
+create Skills, Context Assets, Context Lenses, example assets, or asset
+directories, and it does not run any repository analysis command.
+
+`renma scaffold` creates one explicitly requested Skill, Context Asset, or
+Context Lens after its responsibility and asset boundary have been decided. It
+does not initialize repository configuration. Init the repository. Scaffold an
+asset.
 
 ### `scan`
 
@@ -998,10 +1039,12 @@ facts, or claim that `scan` creates Context Assets.
 
 ### `scaffold`
 
-Creates starter assets with distinct responsibilities after `renma guide skill`
-establishes the intended graph: a Skill is a focused workflow entrypoint,
-Context is independently maintained knowledge, and a Context Lens is
-purpose-specific interpretation of one or more declared Context Assets.
+Creates one explicitly requested Skill, Context Asset, or Context Lens after
+its responsibility and asset boundary have been decided and, for Skill
+authoring, after `renma guide skill` establishes the intended graph. A Skill is
+a focused workflow entrypoint, Context is independently maintained knowledge,
+and a Context Lens is purpose-specific interpretation of one or more declared
+Context Assets. `scaffold` does not initialize repository-level configuration.
 
 ```bash
 renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
