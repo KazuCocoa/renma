@@ -133,8 +133,11 @@ used by scan findings, inspect, catalog, ownership, graph and dependency
 resolution, readiness, BOM, Trust Graph, diff, and CI reporting. The
 Discovery-only publication marker is parsed separately into the prepared Skill
 Discovery index and does not enter catalog metadata or dependencies. This is a
-serialization change, not a second governance model or a change to deferred
-consumers' semantics.
+serialization change, not a second governance model or a change to independent
+consumers' semantics. `graph --view discovery` and `skill-index` reuse that
+prepared model; Readiness, semantic diff, CI report, Trust Graph, BOM,
+ownership, init, scaffold, guide, and suggestions do not gain Skill Index
+fields.
 
 Text values are trimmed strings, and `renma.status` retains the existing
 `experimental`, `stable`, `deprecated`, and `archived` lifecycle values. List
@@ -157,7 +160,7 @@ It additionally rejects empty or whitespace-only members, preserves each
 declaration index at the field's exact line evidence, and creates no routes for
 an empty array. It is operational only on canonical `SKILL.md` Agent Skills and
 does not enter `catalog.dependencies`. See the
-[Skill Discovery Graph contract](skill-discovery.md).
+[Skill Discovery Graph and Index contract](skill-discovery.md).
 
 `renma.published-entrypoint` is the explicit Skill-local publication marker.
 Its only valid value is the exact string `"true"`; omission means unpublished.
@@ -168,7 +171,13 @@ publication additionally requires a specification-valid, active canonical
 Skill with a repository-unique effective asset ID. Structural roots do not
 become published automatically. Repository-wide adoption is configured
 separately with `skill_discovery.adopted`; see the
-[Skill Discovery Graph contract](skill-discovery.md).
+[Skill Discovery Graph and Index contract](skill-discovery.md).
+
+`renma skill-index [path]` emits the same prepared evidence as compact Markdown
+or canonical `renma.skill-index.v1` JSON. It adds no metadata interpretation:
+router, workflow, entrypoint, and specialized operational roles remain
+responsibilities of normal Skills rather than new asset kinds. Exact focus is
+by effective Skill ID or repository-relative source path only.
 
 Empty text, invalid status, and invalid lifecycle or freshness values retain
 their existing operational diagnostic semantics and stable finding IDs where

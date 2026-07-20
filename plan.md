@@ -40,7 +40,7 @@ Repository Context BOM v2 describes declared repository evidence, not what a
 runtime consumed. Trust Graph v2 connects static governance evidence without
 assigning subjective trust or routing scores.
 
-## Immediate Priority: Skill Discovery Reachability And Coverage
+## Current Skill Discovery Index
 
 The active design and implementation area is static Skill Discovery for
 repositories with many layered `SKILL.md` files.
@@ -62,8 +62,15 @@ one warning per not-reached eligible Skill. Traversal uses only existing usable
 representative resolved Skill routes and never infers routes from prose or
 Markdown links.
 
+The 0.22.3 slice adds the canonical `renma.skill-index.v1` report and
+stdout-only `renma skill-index` command. It wraps the prepared Discovery index
+from the shared repository snapshot, defaults to compact Markdown, supports
+complete JSON and exact optional focus, and keeps repository diagnostics
+separate from Discovery diagnostics. It does not interpret a task, choose or
+execute a Skill, infer routes, load Context, or create a generated index.
+
 [The Skill Discovery design](plan-discovery.md) defines the full direction and
-the independently bounded 0.22.0, 0.22.1, and 0.22.2 release slices.
+the independently bounded 0.22.0 through 0.22.3 release slices.
 
 ## Expected Implementation Sequence
 
@@ -79,9 +86,11 @@ the independently bounded 0.22.0, 0.22.1, and 0.22.2 release slices.
    graph: cycle-safe traversal, descriptive versus authoritative coverage,
    unrouted classification, and adopted-mode unreachable warnings. Do not add
    a command.
-4. Review a separate versioned `skill-index` report/command after the graph
-   contract has operational use.
-5. Consider Readiness, semantic diff, CI, Trust Graph, BOM, authoring, and
+4. Ship the 0.22.3 versioned `skill-index` report/command from the same prepared
+   snapshot and Discovery index, with JSON, compact Markdown, exact focus,
+   diagnostic separation, and no downstream-report integration.
+5. Consider route-cycle diagnostics, Readiness, semantic diff, CI, Trust Graph,
+   BOM, authoring, and
    richer visualization integrations independently after those contracts are
    stable.
 

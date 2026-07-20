@@ -211,6 +211,7 @@ npx renma scan . --fail-on high
 npx renma catalog . --format markdown
 npx renma graph . --format markdown
 npx renma graph . --view discovery --format markdown
+npx renma skill-index .
 npx renma graph . --view composition --focus <asset-id-or-path> --format markdown
 npx renma graph . --view impact --focus <asset-id-or-path> --format markdown
 npx renma readiness . --format markdown
@@ -280,6 +281,7 @@ node dist/index.js scan . --fail-on high
 | `scan` | What concrete problems should be fixed? |
 | `catalog` | What assets and metadata exist? |
 | `graph` | How are assets structurally connected? |
+| `skill-index` | Where can static Skill Discovery begin and continue? |
 | `trust-graph` | What trust-relevant evidence is connected to each asset? |
 | `readiness` | Is the repository broadly prepared for agent-facing use? |
 | `bom` | What declared repository context manifest should be reviewed? |
@@ -474,7 +476,7 @@ top-level metadata syntax.
 Skill completes its own bounded responsibility. Renma resolves exact stable IDs
 or repository-relative `SKILL.md` paths and reports the result with
 `graph --view discovery`; it does not select, load, invoke, rank, or execute the
-target. See the [Skill Discovery Graph contract](docs/skill-discovery.md).
+target. See the [Skill Discovery Graph and Index contract](docs/skill-discovery.md).
 
 `renma.published-entrypoint: "true"` explicitly publishes one valid, active,
 unique-ID canonical Skill as a first hop. Publication is never inferred from a
@@ -498,6 +500,16 @@ adopted repositories produce authoritative coverage and warnings for eligible
 Skills with no usable path from any effective entrypoint. Renma still does not
 decide which Skill matches a user request.
 
+`renma skill-index [path]` is the compact, stdout-only first-hop report over the
+same prepared Discovery index. Markdown is the default; `--format json` or
+`--json` emits canonical `renma.skill-index.v1` JSON. Exact
+`--focus <skill-id-or-path>` retains the selected Skill's direct incoming and
+outgoing declarations while repository-wide adoption, coverage, and repository
+diagnostics stay global. Coverage is repository-scoped; summary counts and
+visible ID arrays are projection-scoped. The command creates no files and does
+not interpret task text, recommend a Skill, load Context, infer routes, or
+execute a workflow.
+
 See the [Authoring Guide](docs/authoring-guide.md) for authoring responsibility
 and the [compatibility guide](docs/agent-skills-compatibility.md) for the exact
 canonical and migration rules.
@@ -512,14 +524,14 @@ canonical and migration rules.
 - [Renma Quality Profile](docs/quality-profile.md)
 - [Security Policy Guide](docs/security-policy.md)
 - [Repository Context BOM contract](docs/repository-context-bom.md)
-- [Skill Discovery Graph contract](docs/skill-discovery.md)
+- [Skill Discovery Graph and Index contract](docs/skill-discovery.md)
 - [Architecture](architecture.md)
 - [Product Design](design.md)
 - [Current Roadmap](plan.md)
 - [Skill Discovery Design](plan-discovery.md): complete layered direction and
   release slicing. The 0.22.0 route foundation, 0.22.1 publication/adoption,
-  and 0.22.2 reachability/coverage slices are implemented; the versioned
-  `skill-index` report and command remain deferred.
+  0.22.2 reachability/coverage, and 0.22.3 versioned Skill Index report/command
+  slices are implemented.
 - [Interactive Placeholder Example](examples/interactive-placeholder): minimal
   hands-on clarify-before-act Skill interaction with a local tool.
 - [Example Context Repository](examples/context-repo): richer repository-aware

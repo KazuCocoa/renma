@@ -154,6 +154,7 @@ For a first pass on an existing repository, run:
 renma scan .
 renma catalog . --format markdown
 renma graph . --format markdown
+renma skill-index .
 renma readiness . --format markdown
 ```
 
@@ -651,7 +652,7 @@ portable self-contained Agent Skills package.
 renma commands fall into a few groups:
 
 - Repository adoption: `init` records a minimal explicit repository policy without creating assets.
-- Inventory and ownership: `catalog` lists discovered assets and references, `ownership` summarizes owned and unowned assets, `graph` shows relationships between catalog nodes, `trust-graph` exposes deterministic trust evidence, and `bom` combines declared repository evidence into a reviewable Repository Context BOM.
+- Inventory and ownership: `catalog` lists discovered assets and references, `ownership` summarizes owned and unowned assets, `graph` shows relationships between catalog nodes, `skill-index` shows static Skill Discovery first hops and declared continuations, `trust-graph` exposes deterministic trust evidence, and `bom` combines declared repository evidence into a reviewable Repository Context BOM.
 - Local inspection and authoring: `guide` prints the deterministic pre-generation Skill authoring contract, `inspect` reads one file as an outline or exact line slice, `scaffold` creates starter assets or authoring prompts, `suggest-metadata` emits safe metadata retrofit guidance for existing assets, and `suggest-semantic-split` packages source context and helper commands so a human or coding agent can draft a split for mixed-purpose Markdown.
 - Review and CI: `scan` emits deterministic findings, `readiness` turns repository state into checks and a score, `diff` compares two refs, and `ci-report` formats the comparison for pull-request review.
 
@@ -664,6 +665,7 @@ These commands are related, but they answer different repository-review question
 | `scan` | What concrete problems were found? | Fixing diagnostics and CI checks | Finding list |
 | `catalog` | What assets exist? | Reviewing IDs, owners, lifecycle metadata, hashes, tags, and declared dependencies | Asset inventory |
 | `graph` | How are assets connected? | Inspecting dependencies and references | Asset relationship graph |
+| `skill-index` | Where can static Skill Discovery begin and continue? | Finding published entrypoints, declared continuations, reachability, coverage, and exact review evidence | Compact Markdown or `renma.skill-index.v1` JSON |
 | `trust-graph` | What evidence helps reviewers decide whether assets are safe, owned, current, and usable enough? | Tracing owner, lifecycle, policy, dependency, reference, and diagnostic evidence per asset | Evidence graph |
 | `readiness` | Is the repository broadly ready for agent-facing use? | Maintainer summary and CI reporting | Repository-level scorecard |
 | `bom` | What declared repository context manifest should reviewers inspect? | Combining catalog, graph, readiness, diagnostics, lifecycle, hashes, and security posture evidence | Repository Context BOM |
@@ -677,6 +679,7 @@ In short:
 - `scan` lists problems.
 - `catalog` lists what assets exist.
 - `graph` shows structural relationships.
+- `skill-index` shows static Skill Discovery entrypoints and continuations.
 - `trust-graph` connects trust-relevant evidence.
 - `readiness` summarizes repository health.
 - `bom` combines declared catalog, graph, readiness, diagnostics, lifecycle, hash, and security posture evidence.
@@ -687,6 +690,8 @@ Examples:
 renma scan . --format json
 renma catalog . --format json
 renma graph . --format json
+renma skill-index .
+renma skill-index . --format json
 renma trust-graph . --format markdown
 renma trust-graph . --format json
 renma readiness . --format markdown
@@ -769,6 +774,51 @@ JSON is the source of truth for automation. Markdown is a compact pull-request r
 Renma derives each BOM from one in-memory repository snapshot: configuration, discovered artifacts, parsed documents, catalog, graph evidence, diagnostics, readiness, and security summaries all come from the same collected state.
 
 By default, `generatedAt` records when the BOM was produced. Add `--omit-generated-at` when CI or review automation needs to avoid clock-based diffs. With the same checkout path, config path, repository contents, Renma version, and UTC evaluation date, repeated `--omit-generated-at` runs should produce byte-identical JSON. The option does not remove metadata freshness dates, suppress freshness diagnostics, normalize absolute `root` or `configPath`, hide file moves, or guarantee portable byte-for-byte output across runners.
+
+### `skill-index`
+
+Prints the canonical static Skill Index from one shared repository snapshot and
+its already prepared Discovery index:
+
+```bash
+renma skill-index
+renma skill-index .
+renma skill-index . --format markdown
+renma skill-index . --format json
+renma skill-index . --json
+renma skill-index . --focus skill.release-prep --format markdown
+renma skill-index . --focus skills/release-prep/SKILL.md --format json
+```
+
+Markdown is the default compact human/agent view. JSON uses
+`schemaVersion: "renma.skill-index.v1"` and preserves the existing complete
+Discovery Skill and route structures, adoption, repository-scoped coverage,
+publication and reachability facts, structural-root, standalone, and unrouted
+IDs, and separate repository and Discovery diagnostic arrays. Repository
+diagnostics stay repository-wide in a focused report.
+
+Focus accepts only an exact effective Skill ID or exact repository-relative
+`SKILL.md` source path. It retains the selected Skill and its direct incoming
+and outgoing declarations without transitive traversal. It does not accept
+titles, tags, aliases, basenames, suffixes, case-insensitive or fuzzy matches,
+or task text. Selecting focus does not make a Skill reachable:
+
+```text
+coverage is repository-scoped
+
+summary and visible ID arrays are projection-scoped
+```
+
+The command writes only to stdout and creates no `.renma/` directory, config,
+metadata, or generated index. It does not interpret a user request, recommend
+or rank Skills, load Context, assemble prompts, infer undeclared routes, call an
+LLM, invoke a child Skill, or execute a workflow. Warnings still produce exit
+`0`; an error in either diagnostic collection produces exit `1`; invalid CLI,
+config, focus, or report construction produces exit `2`.
+
+Open the referenced source `SKILL.md`, apply its description and routing
+conditions, and follow only a declared continuation supported by those source
+conditions. Renma reports possible declared paths; it does not choose them.
 
 ### `graph`
 
@@ -1233,6 +1283,7 @@ Use `--format <format>` to select output and `--json` as a shortcut where the co
 | `diff` | `json`, `markdown` |
 | `ci-report` | `json`, `markdown` |
 | `graph` | `json`, `markdown`, `mermaid` |
+| `skill-index` | `json`, `markdown` |
 | `trust-graph` | `json`, `markdown` |
 | `inspect` | `text`, `json` |
 | `guide` | `prompt`, `json` |

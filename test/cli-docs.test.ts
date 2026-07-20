@@ -13,6 +13,7 @@ const COMMANDS = [
   "diff",
   "ci-report",
   "graph",
+  "skill-index",
   "trust-graph",
   "ownership",
   "readiness",
@@ -32,6 +33,7 @@ const EXPECTED_FORMATS = new Map<string, string[]>([
   ["diff", ["json", "markdown"]],
   ["ci-report", ["json", "markdown"]],
   ["graph", ["json", "markdown", "mermaid"]],
+  ["skill-index", ["json", "markdown"]],
   ["trust-graph", ["json", "markdown"]],
   ["inspect", ["text", "json"]],
   ["guide", ["prompt", "json"]],
@@ -303,7 +305,7 @@ test("Skill authoring docs establish Renma boundaries before platform semantic r
   assert.match(advanced, /explicit canonical continuation/);
   assert.match(advanced, /static graph projection/);
   assert.match(advanced, /`renma\.continues-with`/);
-  assert.doesNotMatch(advanced, /`skill-index`/);
+  assert.match(advanced, /`renma skill-index .`/);
   assert.match(readme, /Skill Discovery Design/);
   assert.match(authoring, /focused, bounded workflows/);
   assert.doesNotMatch(authoring, /current thin-Skill authoring/);
@@ -608,7 +610,7 @@ test("Context Lens docs use canonical Skill metadata and explicit semantic bound
   assert.match(diagnostics, /must reference a Context Asset/);
 });
 
-test("published current docs separate operational Discovery slices from deferred skill-index", async () => {
+test("published current docs describe all operational Discovery slices and future boundaries", async () => {
   const documents = [
     "README.md",
     "plan.md",
@@ -640,16 +642,16 @@ test("published current docs separate operational Discovery slices from deferred
   const proposal = content[2] ?? "";
   assert.match(
     proposal,
-    /Status: active design with operational route, publication, and reachability slices/,
+    /Status: active design with operational route, publication, reachability, and Skill Index slices/,
   );
   assert.match(
     proposal,
-    /Implementation status:[\s\S]*0\.22\.0 implements[\s\S]*0\.22\.1 implements[\s\S]*0\.22\.2 implements/,
+    /Implementation status:[\s\S]*0\.22\.0 implements[\s\S]*0\.22\.1 implements[\s\S]*0\.22\.2 implements[\s\S]*0\.22\.3 implements/,
   );
   assert.match(proposal, /Baseline: Renma 0\.21\.0/);
   assert.match(
     proposal,
-    /does not need to ship as one\s+atomic `skill-index` MVP/,
+    /delivered as additive slices rather than one\s+atomic `skill-index` MVP/,
   );
   assert.match(
     proposal,
@@ -690,9 +692,36 @@ test("published current docs separate operational Discovery slices from deferred
     proposal,
     /Arbitrary local Markdown links are \*\*not\*\* authoritative routes/,
   );
-  for (const text of [content[0] ?? "", content[3] ?? ""]) {
-    assert.doesNotMatch(text, /renma skill-index \[path\]/);
-  }
+  assert.match(content[0] ?? "", /renma skill-index \[path\]/);
+  assert.match(content[3] ?? "", /renma\.skill-index\.v1/);
+  assert.match(content[6] ?? "", /Route-cycle diagnostics.*remain deferred/s);
+});
+
+test("workflow docs keep orchestration policy in normal owning Skills", async () => {
+  const advanced = await readRepoFile("docs/advanced-skill-authoring.md");
+  assert.match(
+    advanced,
+    /published entrypoint[\s\S]*broad router[\s\S]*intermediate router[\s\S]*workflow\/orchestration Skill[\s\S]*specialized operational Skill/,
+  );
+  assert.match(advanced, /responsibilities, not new\s+Renma asset kinds/);
+  assert.match(
+    advanced,
+    /Workflow Skill[\s\S]*owns overall orchestration policy[\s\S]*Child Skills[\s\S]*own individual operational responsibilities/,
+  );
+  assert.match(
+    advanced,
+    /`renma\.continues-with` declares only possible authoritative continuation edges/,
+  );
+  assert.match(advanced, /Declaration order has no priority meaning/);
+  assert.match(
+    advanced,
+    /Renma does not parse the\s+workflow prose or execute child Skills/,
+  );
+  assert.match(
+    advanced,
+    /workflow semantics remain in the body\s+of the owning workflow Skill/,
+  );
+  assert.match(advanced, /intermediate Skill may own Context/);
 });
 
 test("relative Markdown links in current documentation resolve", async () => {

@@ -481,6 +481,7 @@ export function prepareSkillDiscoveryIndex(
 export function focusSkillDiscoveryIndex(
   index: SkillDiscoveryIndex,
   focus: string,
+  commandName: "graph" | "skill-index" = "graph",
 ): SkillDiscoveryIndex {
   const normalized = normalizeSkillRouteTarget(focus);
   const idMatches = index.skills.filter(
@@ -492,12 +493,12 @@ export function focusSkillDiscoveryIndex(
   const matches = uniqueSkillsByPath([...idMatches, ...pathMatches]);
   if (matches.length === 0) {
     throw new Error(
-      `graph --focus did not match any Skill id or source path: ${focus}`,
+      `${commandName} --focus did not match any Skill id or source path: ${focus}`,
     );
   }
   if (idMatches.length > 1 || matches.length > 1) {
     throw new Error(
-      `graph --focus is ambiguous; use one exact repository-relative SKILL.md path: ${focus}`,
+      `${commandName} --focus is ambiguous; use one exact repository-relative SKILL.md path: ${focus}`,
     );
   }
 

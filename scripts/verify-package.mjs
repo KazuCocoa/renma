@@ -61,6 +61,8 @@ try {
     "dist/discovery.d.ts",
     "dist/commands/inspect.js",
     "dist/commands/inspect.d.ts",
+    "dist/commands/skill-index.js",
+    "dist/commands/skill-index.d.ts",
     "dist/commands/guide.js",
     "dist/commands/guide.d.ts",
     "dist/guidance/skill-authoring.js",
@@ -117,6 +119,7 @@ try {
   for (const modulePath of [
     "dist/commands/guide.js",
     "dist/commands/inspect.js",
+    "dist/commands/skill-index.js",
     "dist/commands/suggest-metadata.js",
     "dist/discovery.js",
     "dist/skill-migration.js",

@@ -6,6 +6,33 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added the stdout-only `renma skill-index [path]` command with default compact
+  Markdown, canonical `renma.skill-index.v1` JSON, `--json`, and exact optional
+  Skill ID or repository-relative `SKILL.md` path focus.
+- Added a pure Skill Index report builder over one shared `RepositorySnapshot`
+  and its prepared Discovery index. The report preserves existing Skill, route,
+  publication, adoption, reachability, coverage, structural-root, standalone,
+  unrouted, focus, and diagnostic projection contracts without rescanning.
+- Added compact, deterministically capped Markdown for published entrypoints,
+  direct continuations, authoritative coverage gaps, structural candidates,
+  separate Discovery/repository diagnostics, and source-Skill continuation
+  guidance.
+- Documented broad and intermediate routers, workflow/orchestration Skills,
+  specialized operational Skills, and the rule that workflow policy stays in
+  the owning Skill body rather than continuation declaration order.
+
+### Compatibility
+
+- Preserved every `graph --view discovery` JSON, Markdown, and Mermaid contract.
+  The Skill Index adds no Mermaid format and does not add route cycles or new
+  reachability semantics.
+- Readiness, semantic diff, CI report, Trust Graph, Repository Context BOM,
+  ownership, init, scaffold, guide, suggestions, configuration, Skill metadata,
+  and package version remain unchanged. The command creates no generated index
+  or repository files.
+
 ## [0.22.2] - 2026-07-19
 
 ### Added
