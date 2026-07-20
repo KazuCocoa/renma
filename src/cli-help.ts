@@ -256,7 +256,7 @@ export const COMMAND_HELP = [
       "Focused output filters to the matched asset and directly connected neighbors.",
       "The composition view resolves the complete explicit required and optional closure and requires --focus.",
       "The impact view resolves reverse explicit composition to required and optional declared dependents; it reports neither runtime usage nor breakage and requires --focus.",
-      "The discovery view separates explicit published entrypoints, repository-wide adoption, derived structural roots, and exact continuation evidence; optional focus keeps global adoption while filtering to one Skill's direct neighborhood.",
+      "The discovery view derives cycle-safe reachability from explicit published entrypoints through usable declared continuations, with descriptive partial coverage and authoritative adopted coverage; optional focus keeps repository-wide adoption and coverage while filtering visible arrays and summary counts to one Skill's direct neighborhood.",
     ],
     nextSteps: [
       "Use catalog to inspect the assets behind graph nodes.",

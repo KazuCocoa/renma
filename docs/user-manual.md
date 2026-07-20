@@ -842,9 +842,14 @@ route-eligible Skills with no incoming usable route; they are not published
 entrypoints or coverage claims. Publication is explicit and additionally
 requires a valid, active, unique-ID canonical Skill. Repository-wide adoption
 is declared separately by boolean `skill_discovery.adopted`; the view reports
-`not-adopted`, `partial`, `incomplete`, or `adopted`. Reachability and coverage
-remain explicitly not evaluated. JSON, Markdown, and Mermaid use one index
-prepared in the repository snapshot. See the
+`not-adopted`, `partial`, `incomplete`, or `adopted`. Effective published
+entrypoints seed cycle-safe traversal over only usable representative resolved
+Skill-to-Skill routes. Partial adoption with an effective entrypoint reports
+descriptive reachability; adopted repositories report authoritative coverage
+and one warning per not-reached eligible Skill. JSON coverage counts remain
+repository-scoped under `--focus`, while visible ID arrays and summary counts
+are filtered to the exact direct-neighborhood projection. JSON, Markdown, and
+Mermaid use one index prepared in the repository snapshot. See the
 [Skill Discovery Graph contract](skill-discovery.md).
 
 The graph forms answer distinct questions:
@@ -855,8 +860,8 @@ The graph forms answer distinct questions:
 | `full` with focus | What is the direct incoming and outgoing neighborhood? |
 | `composition` with focus | What is in the transitive outgoing composition closure? |
 | `impact` with focus | What is in the transitive incoming composition closure? |
-| `discovery` without focus | What explicit published entrypoints, adoption state, continuations, and structural roots exist? |
-| `discovery` with focus | What publication facts and direct incoming/outgoing declarations touch this exact Skill while repository adoption stays global? |
+| `discovery` without focus | Which eligible Skills are reachable from explicit published entrypoints through usable declared continuations, and is that evidence descriptive or authoritative? |
+| `discovery` with focus | What global reachability state and direct incoming/outgoing declarations touch this exact Skill while repository adoption and coverage stay repository-scoped? |
 
 #### Focusing The Graph
 

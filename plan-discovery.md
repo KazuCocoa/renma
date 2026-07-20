@@ -2,14 +2,16 @@
 
 ## Status
 
-Status: active design with operational route-foundation and publication/adoption slices
+Status: active design with operational route, publication, and reachability slices
 
 Implementation status: 0.22.0 implements explicit `renma.continues-with`, exact
 resolution, route diagnostics, structural roots, and
 `graph --view discovery`; 0.22.1 implements explicit
 `renma.published-entrypoint`, strict `skill_discovery.adopted`, publication
-diagnostics, and adoption projection. Reachability, coverage evaluation, and
-`skill-index` remain deferred.
+diagnostics, and adoption projection; 0.22.2 implements cycle-safe reachability,
+descriptive and authoritative coverage, unrouted projection, and adopted-mode
+unreachable warnings. The versioned `skill-index` report and command remain
+deferred.
 
 Baseline: Renma 0.21.0
 
@@ -51,7 +53,8 @@ atomic `skill-index` MVP. The 0.22.0 foundation includes only:
   exact direct-neighborhood focus.
 
 The 0.22.1 slice adds published entrypoints and `skill_discovery.adopted` as a
-separate contract. It does not add reachability, coverage evaluation,
+separate contract. The 0.22.2 slice adds reachability and coverage semantics to
+the existing graph projection without adding `skill-index`. Neither slice adds
 `skill-index`, Readiness, diff, CI report, Trust Graph, BOM, ownership,
 scaffold, init, guide, suggestion, or richer visualization integration. Those
 contracts can be reviewed and delivered independently after operational route
@@ -59,8 +62,9 @@ and publication evidence has been used.
 
 The remainder of this document retains the complete design direction so later
 slices can be evaluated consistently. Publication and adoption describe 0.22.1
-behavior; sections describing reachability, evaluated coverage, global
-unreachable diagnostics, or `skill-index` remain deferred design.
+behavior; reachability, evaluated coverage, and global adopted-mode
+unreachable diagnostics describe 0.22.2 behavior; `skill-index` remains
+deferred design.
 
 ## Problem
 
@@ -420,8 +424,9 @@ adds one minimal configuration field:
 expected to be reachable from a published entrypoint or intentionally
 published as an independent first hop. Omission or `false` means the repository
 has not declared complete Discovery coverage. In 0.22.1 this records policy
-intent but does not evaluate reachability or coverage. No additional Discovery
-config key is supported.
+intent without evaluating reachability or coverage. In 0.22.2 it enables
+authoritative coverage after an effective published entrypoint exists. No
+additional Discovery config key is supported.
 
 This field is independent of Skill-local publication. Adding
 `renma.published-entrypoint: "true"` includes one Skill in the first-hop index;
@@ -725,23 +730,25 @@ diagnostics. Reachability is not evaluated.
 Add `renma.continues-with` only to source Skills that own real continuation
 policy, and publish a reviewed first hop when that area is useful. Keep the
 conditions and no-match behavior in each Skill body. The report state is
-`partial`: publication and direct route evidence are descriptive, coverage is
-`not-evaluated`, and default Markdown remains bounded to the published area and
-compact candidate summaries.
+`partial`: publication and direct route evidence are descriptive. When an
+effective published entrypoint exists, 0.22.2 also calculates descriptive
+reachability without making a repository-wide completeness claim. Default
+Markdown remains bounded to the published area and compact candidate summaries.
 
 ### Stage 3: review and expand descriptive coverage
 
 Review declared routes, invalid or inactive targets, and usage boundaries. Add
 intentional entrypoints or continuations one bounded workflow area at a time.
-Reachability and not-reached Skill calculations remain deferred.
+Reachability and not-reached Skill arrays are descriptive evidence only; they
+do not create global coverage defects during partial adoption.
 
 ### Stage 4: declare repository-wide coverage
 
 Set `skill_discovery.adopted: true` only when the repository intends complete
 coverage. The state is `incomplete` until at least one Discovery-eligible Skill
-is published, then `adopted`. In 0.22.1 coverage still reports
-`not-evaluated`; authoritative global unreachable diagnostics remain a later
-slice.
+is published, then `adopted`. The 0.22.2 slice evaluates authoritative coverage
+and emits one warning per not-reached eligible Skill only in the `adopted`
+state.
 
 No initial CI gate, repository rewrite, or all-at-once metadata migration is
 required.
@@ -819,12 +826,25 @@ organization-wide discovery requires a separate federation design.
 - extend the existing discovery graph JSON, Markdown, Mermaid, and focus
   projection without adding a new command.
 
-### Later report slice: reachability and `skill-index`
+### 0.22.2: reachability and coverage semantics
 
-After publication/adoption contracts and real route usage are reviewed, add
-descriptive versus authoritative reachability, coverage diagnostics, and a
-versioned `skill-index` report/command if the separate command still provides
-clear value.
+- traverse only usable representative resolved Skill-to-Skill routes from
+  effective published entrypoints, with cycle safety and deterministic
+  multi-source provenance;
+- expose per-Skill reachability, repository-wide reachable/not-reached IDs,
+  exact unrouted facts, and repository-scoped coverage counts;
+- calculate descriptive evidence for partial adoption with an effective first
+  hop and authoritative completeness only for adopted repositories;
+- emit one warning per authoritative not-reached eligible Skill through scan,
+  diagnostics v2, and review bundles; and
+- extend the existing JSON, Markdown, Mermaid, and exact-focus projections
+  without integrating downstream reports or adding a command.
+
+### Later report slice: `skill-index`
+
+After the graph reachability contract and real route usage are reviewed, add a
+versioned `skill-index` report/command only if the separate command still
+provides clear value.
 
 ### Later integrations
 

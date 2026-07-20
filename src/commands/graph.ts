@@ -28,6 +28,7 @@ import type {
   Dependency,
   DependencyKind,
 } from "../model.js";
+import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import { classifyRepositorySkillEntrypointPath } from "../discovery.js";
 import {
   collectRepositorySnapshot,
@@ -598,6 +599,9 @@ function formatDiscoveryMarkdown(report: GraphReport): string {
     `- Invalid routes: ${discovery.summary.invalidRouteCount}`,
     `- Published entrypoints in this projection: ${discovery.summary.publishedEntrypointCount}`,
     `- Structural roots: ${discovery.summary.structuralRootCount}`,
+    `- Reachable eligible Skills: ${discovery.summary.reachableSkillCount}`,
+    `- Not-reached eligible Skills: ${discovery.summary.notReachedSkillCount}`,
+    `- Unrouted Skills: ${discovery.summary.unroutedSkillCount}`,
     "",
     "## Adoption",
     "",
@@ -609,7 +613,29 @@ function formatDiscoveryMarkdown(report: GraphReport): string {
     ...(discovery.adoption.configPath
       ? [`- Config: ${discovery.adoption.configPath}`]
       : []),
-    `- Coverage: ${discovery.coverage.mode} (${discovery.coverage.reason})`,
+    "",
+    "## Coverage",
+    "",
+    `- Scope: ${discovery.coverage.scope}`,
+    `- Mode: ${discovery.coverage.mode}`,
+    `- Reason: ${discovery.coverage.reason}`,
+    `- Source published entrypoints: ${discovery.coverage.sourceEntrypointIds.join(", ") || "(none)"}`,
+    `- Eligible Skills: ${discovery.coverage.eligibleSkillCount}`,
+    `- Reachable eligible Skills: ${discovery.coverage.reachableSkillCount}`,
+    `- Not-reached eligible Skills: ${discovery.coverage.notReachedSkillCount}`,
+    `- Authoritative completeness: ${discovery.coverage.complete === null ? "not applicable" : yesNo(discovery.coverage.complete)}`,
+    ...(discovery.coverage.mode === "descriptive"
+      ? [
+          "",
+          "Descriptive coverage is review evidence, not a repository-wide completeness claim.",
+        ]
+      : []),
+    ...(discovery.coverage.mode === "authoritative"
+      ? [
+          "",
+          "Authoritative coverage is evaluated only because the repository explicitly declared skill_discovery.adopted: true.",
+        ]
+      : []),
     "",
     "## Published entrypoints",
     "",
@@ -639,6 +665,8 @@ function formatDiscoveryMarkdown(report: GraphReport): string {
         `- Lifecycle: ${skill.lifecycle ?? "(unspecified)"}`,
         `- Structural root: ${yesNo(skill.structuralRoot)}`,
         `- Standalone: ${yesNo(skill.standalone)}`,
+        `- Unrouted: ${yesNo(skill.unrouted)}`,
+        `- Reachability: ${skill.reachability.state} (${skill.reachability.reason}; minimum depth ${skill.reachability.minimumDepth ?? "n/a"}; sources ${skill.reachability.sourceEntrypointIds.join(", ") || "none"})`,
         "- Direct declared continuations:",
         "",
       );
@@ -661,20 +689,80 @@ function formatDiscoveryMarkdown(report: GraphReport): string {
     }
   }
 
+  if (discovery.coverage.mode === "authoritative") {
+    lines.push("## Authoritative coverage gaps", "");
+    if (discovery.coverage.complete) {
+      lines.push(
+        "- None. Every Discovery-eligible Skill is reachable from an effective published entrypoint.",
+      );
+    } else if (discovery.notReachedDiscoveryEligibleSkillIds.length === 0) {
+      lines.push(
+        "- No authoritative coverage gap is visible in this focused projection. Repository-wide coverage remains incomplete; use unfocused JSON for the complete not-reached ID array.",
+      );
+    } else {
+      for (const id of discovery.notReachedDiscoveryEligibleSkillIds.slice(
+        0,
+        DISCOVERY_PRESENTATION_CAP,
+      )) {
+        const skill = skillsById.get(id);
+        lines.push(
+          `- ${id}${skill ? ` — ${skill.sourcePath} (structural root: ${yesNo(skill.structuralRoot)}; standalone: ${yesNo(skill.standalone)}; unrouted: ${yesNo(skill.unrouted)})` : ""}`,
+        );
+      }
+      appendDiscoveryOmission(
+        lines,
+        discovery.notReachedDiscoveryEligibleSkillIds.length,
+      );
+      lines.push(
+        "",
+        "These are static declared-graph coverage gaps, not claims that the Skills are unused at runtime.",
+      );
+    }
+    lines.push("");
+  }
+
   lines.push("## Structural roots", "");
 
   if (discovery.structuralRootIds.length === 0) {
     lines.push("- None.");
   } else {
-    for (const id of discovery.structuralRootIds) {
+    for (const id of discovery.structuralRootIds.slice(
+      0,
+      DISCOVERY_PRESENTATION_CAP,
+    )) {
       const skill = skillsById.get(id);
       lines.push(`- ${id}${skill ? ` — ${skill.sourcePath}` : ""}`);
     }
+    appendDiscoveryOmission(lines, discovery.structuralRootIds.length);
   }
 
   lines.push(
     "",
     "Structural roots are route-eligible Skills with no incoming usable Skill route. They are candidate graph facts, not recommendations or published entrypoints.",
+    "",
+    "## Unrouted Skills",
+    "",
+    "Unrouted Skills are eligible structural roots that are not explicitly published entrypoints.",
+    "",
+  );
+  if (discovery.unroutedSkillIds.length === 0) {
+    lines.push("- None.");
+  } else {
+    for (const id of discovery.unroutedSkillIds.slice(
+      0,
+      DISCOVERY_PRESENTATION_CAP,
+    )) {
+      const skill = skillsById.get(id);
+      lines.push(
+        `- ${id}${skill ? ` — ${skill.sourcePath} (standalone: ${yesNo(skill.standalone)})` : ""}`,
+      );
+    }
+    appendDiscoveryOmission(lines, discovery.unroutedSkillIds.length);
+  }
+
+  lines.push(
+    "",
+    "Complete JSON contains the full projection-scoped ID arrays; coverage counts remain repository-scoped.",
     "",
     "## Declared routes",
     "",
@@ -728,7 +816,14 @@ function formatDiscoveryMarkdown(report: GraphReport): string {
 function formatDiscoveryMermaid(report: GraphReport): string {
   const discovery = requiredDiscoveryReport(report);
   const nodeIds = new Map<string, string>();
-  const lines = ["graph TD"];
+  const lines = [
+    "graph TD",
+    `  %% coverage mode: ${discovery.coverage.mode}`,
+    `  %% source entrypoint IDs: ${discoveryCommentIds(discovery.coverage.sourceEntrypointIds)}`,
+    `  %% reachable eligible Skill IDs: ${discoveryCommentIds(discovery.reachableDiscoveryEligibleSkillIds)}`,
+    `  %% not-reached eligible Skill IDs: ${discoveryCommentIds(discovery.notReachedDiscoveryEligibleSkillIds)}`,
+    `  %% unrouted Skill IDs: ${discoveryCommentIds(discovery.unroutedSkillIds)}`,
+  ];
   discovery.skills.forEach((skill, index) => {
     const id = `skill_${index}`;
     nodeIds.set(skill.sourcePath, id);
@@ -814,6 +909,25 @@ function formatDiscoveryMermaid(report: GraphReport): string {
     "  %% Solid edges are usable declared Skill continuations. Dotted edges end at synthetic review nodes. Published entrypoints are explicit first-hop declarations; structural roots are derived graph facts. Neither causes Renma to select or execute a Skill. Renma does not execute Skills.",
   );
   return `${lines.join("\n")}\n`;
+}
+
+const DISCOVERY_PRESENTATION_CAP =
+  DEFAULT_QUALITY_PROFILE.presentation.topSummaryItemCap;
+
+function appendDiscoveryOmission(lines: string[], totalCount: number): void {
+  const omittedCount = totalCount - DISCOVERY_PRESENTATION_CAP;
+  if (omittedCount <= 0) return;
+  lines.push(
+    `- ... ${omittedCount} more omitted from Markdown output. Use JSON for the complete ID array.`,
+  );
+}
+
+function discoveryCommentIds(ids: string[]): string {
+  if (ids.length === 0) return "(none)";
+  const visible = ids.slice(0, DISCOVERY_PRESENTATION_CAP).join(", ");
+  return ids.length > DISCOVERY_PRESENTATION_CAP
+    ? `${visible} (${DISCOVERY_PRESENTATION_CAP} of ${ids.length} shown; total ${ids.length})`
+    : visible;
 }
 
 function discoveryRouteResolutionLabel(route: DeclaredSkillRoute): string {

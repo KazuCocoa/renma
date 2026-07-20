@@ -1020,7 +1020,7 @@ test("route diagnostics retain route-specific verification wording", () => {
   assert.match(verification, /repaired relationship evidence/);
 });
 
-test("Discovery adoption uses explicit config plus effective publication and defers coverage", () => {
+test("Discovery derives not-evaluated, descriptive, and authoritative coverage modes", () => {
   const none = prepare([]);
   const continuation = prepare([
     skill("skills/source/SKILL.md", {
@@ -1051,12 +1051,476 @@ test("Discovery adoption uses explicit config plus effective publication and def
   assert.equal(incomplete.adoption.state, "incomplete");
   assert.equal(adopted.adoption.state, "adopted");
   assert.equal(adopted.adoption.configPath, "renma.config.json");
-  for (const index of [none, continuation, publication, incomplete, adopted]) {
-    assert.deepEqual(index.coverage, {
-      mode: "not-evaluated",
-      reason: "reachability-and-coverage-are-deferred",
-    });
-  }
+  assert.deepEqual(none.coverage, {
+    scope: "repository",
+    mode: "not-evaluated",
+    reason: "discovery-not-adopted",
+    sourceEntrypointIds: [],
+    eligibleSkillCount: 0,
+    reachableSkillCount: 0,
+    notReachedSkillCount: 0,
+    complete: null,
+  });
+  assert.equal(continuation.coverage.mode, "not-evaluated");
+  assert.equal(
+    continuation.coverage.reason,
+    "no-effective-published-entrypoint",
+  );
+  assert.equal(publication.coverage.mode, "descriptive");
+  assert.equal(publication.coverage.complete, null);
+  assert.deepEqual(publication.reachableDiscoveryEligibleSkillIds, [
+    "skill.published",
+  ]);
+  assert.equal(incomplete.coverage.mode, "not-evaluated");
+  assert.equal(incomplete.coverage.reason, "no-effective-published-entrypoint");
+  assert.deepEqual(adopted.coverage, {
+    scope: "repository",
+    mode: "authoritative",
+    reason: "repository-wide-discovery-adopted",
+    sourceEntrypointIds: ["skill.published"],
+    eligibleSkillCount: 1,
+    reachableSkillCount: 1,
+    notReachedSkillCount: 0,
+    complete: true,
+  });
+});
+
+test("reachability records every source entrypoint and true minimum depth deterministically", () => {
+  const documents = [
+    skill("skills/alpha/SKILL.md", {
+      id: "skill.alpha",
+      published: true,
+      routes: ["skill.long-one", "skill.shared"],
+    }),
+    skill("skills/beta/SKILL.md", {
+      id: "skill.beta",
+      published: true,
+      routes: ["skill.shared"],
+    }),
+    skill("skills/long-one/SKILL.md", {
+      id: "skill.long-one",
+      routes: ["skill.long-two"],
+    }),
+    skill("skills/long-two/SKILL.md", {
+      id: "skill.long-two",
+      routes: ["skill.shared"],
+    }),
+    skill("skills/shared/SKILL.md", {
+      id: "skill.shared",
+      routes: ["skill.leaf"],
+    }),
+    skill("skills/leaf/SKILL.md", { id: "skill.leaf" }),
+    skill("skills/unreached/SKILL.md", { id: "skill.unreached" }),
+  ];
+  const first = prepare(documents);
+  const second = prepare([...documents].reverse());
+  const byId = new Map(first.skills.map((item) => [item.id, item]));
+
+  assert.deepEqual(first, second);
+  assert.deepEqual(byId.get("skill.alpha")?.reachability, {
+    state: "reachable",
+    reason: "published-entrypoint",
+    sourceEntrypointIds: ["skill.alpha"],
+    minimumDepth: 0,
+  });
+  assert.deepEqual(byId.get("skill.shared")?.reachability, {
+    state: "reachable",
+    reason: "reachable-through-usable-route",
+    sourceEntrypointIds: ["skill.alpha", "skill.beta"],
+    minimumDepth: 1,
+  });
+  assert.equal(byId.get("skill.leaf")?.reachability.minimumDepth, 2);
+  assert.deepEqual(byId.get("skill.unreached")?.reachability, {
+    state: "not-reached",
+    reason: "no-usable-path-from-published-entrypoint",
+    sourceEntrypointIds: [],
+  });
+  assert.deepEqual(first.reachableDiscoveryEligibleSkillIds, [
+    "skill.alpha",
+    "skill.beta",
+    "skill.leaf",
+    "skill.long-one",
+    "skill.long-two",
+    "skill.shared",
+  ]);
+  assert.deepEqual(first.notReachedDiscoveryEligibleSkillIds, [
+    "skill.unreached",
+  ]);
+});
+
+test("reachability output is independent of route declaration order", () => {
+  const prepareOrder = (routes: string[]) =>
+    prepare([
+      skill("skills/root/SKILL.md", {
+        id: "skill.root",
+        published: true,
+        routes,
+      }),
+      skill("skills/long/SKILL.md", {
+        id: "skill.long",
+        routes: ["skill.target"],
+      }),
+      skill("skills/target/SKILL.md", { id: "skill.target" }),
+    ]);
+  const first = prepareOrder(["skill.long", "skill.target"]);
+  const second = prepareOrder(["skill.target", "skill.long"]);
+  const reachabilityProjection = (discovery: ReturnType<typeof prepare>) => ({
+    coverage: discovery.coverage,
+    reachableDiscoveryEligibleSkillIds:
+      discovery.reachableDiscoveryEligibleSkillIds,
+    notReachedDiscoveryEligibleSkillIds:
+      discovery.notReachedDiscoveryEligibleSkillIds,
+    skills: discovery.skills.map((item) => [item.id, item.reachability]),
+  });
+
+  assert.deepEqual(
+    reachabilityProjection(first),
+    reachabilityProjection(second),
+  );
+  assert.equal(
+    first.skills.find((item) => item.id === "skill.target")?.reachability
+      .minimumDepth,
+    1,
+  );
+});
+
+test("reachability terminates through self-loops and connected or disconnected cycles", () => {
+  const discovery = prepare([
+    skill("skills/root/SKILL.md", {
+      id: "skill.root",
+      published: true,
+      routes: ["skill.root", "skill.alpha"],
+    }),
+    skill("skills/alpha/SKILL.md", {
+      id: "skill.alpha",
+      routes: ["skill.beta"],
+    }),
+    skill("skills/beta/SKILL.md", {
+      id: "skill.beta",
+      routes: ["skill.gamma"],
+    }),
+    skill("skills/gamma/SKILL.md", {
+      id: "skill.gamma",
+      routes: ["skill.alpha"],
+    }),
+    skill("skills/delta/SKILL.md", {
+      id: "skill.delta",
+      routes: ["skill.epsilon"],
+    }),
+    skill("skills/epsilon/SKILL.md", {
+      id: "skill.epsilon",
+      routes: ["skill.delta"],
+    }),
+  ]);
+  const byId = new Map(discovery.skills.map((item) => [item.id, item]));
+
+  assert.equal(byId.get("skill.root")?.reachability.minimumDepth, 0);
+  assert.equal(byId.get("skill.alpha")?.reachability.minimumDepth, 1);
+  assert.equal(byId.get("skill.beta")?.reachability.minimumDepth, 2);
+  assert.equal(byId.get("skill.gamma")?.reachability.minimumDepth, 3);
+  assert.equal(byId.get("skill.delta")?.reachability.state, "not-reached");
+  assert.equal(byId.get("skill.epsilon")?.reachability.state, "not-reached");
+  assert.equal(
+    discovery.diagnostics.some((item) => item.code === "DISCOVERY-ROUTE-CYCLE"),
+    false,
+  );
+});
+
+test("reachability traverses only usable representative resolved Skill routes", () => {
+  const discovery = prepare([
+    skill("skills/root/SKILL.md", {
+      id: "skill.root",
+      published: true,
+      routes: [
+        "skill.valid",
+        "skill.valid",
+        "skill.missing",
+        "context.target",
+        "skill.inactive",
+        "skills/duplicate/SKILL.md",
+      ],
+    }),
+    skill("skills/valid/SKILL.md", { id: "skill.valid" }),
+    skill("skills/inactive/SKILL.md", {
+      id: "skill.inactive",
+      status: "archived",
+    }),
+    skill("skills/duplicate/SKILL.md", { id: "skill.duplicate" }),
+    skill("skills/duplicate-copy/SKILL.md", { id: "skill.duplicate" }),
+    context("contexts/target.md", "context.target"),
+  ]);
+  const byPath = new Map(
+    discovery.skills.map((item) => [item.sourcePath, item]),
+  );
+
+  assert.deepEqual(discovery.reachableDiscoveryEligibleSkillIds, [
+    "skill.root",
+    "skill.valid",
+  ]);
+  assert.deepEqual(discovery.notReachedDiscoveryEligibleSkillIds, []);
+  assert.equal(
+    byPath.get("skills/inactive/SKILL.md")?.reachability.reason,
+    "skill-not-discovery-eligible",
+  );
+  assert.equal(
+    byPath.get("skills/duplicate/SKILL.md")?.reachability.reason,
+    "skill-not-discovery-eligible",
+  );
+});
+
+test("reachability excludes resolved invalid targets and their outgoing routes", () => {
+  const invalidTarget = rawDocument(
+    "skills/invalid/SKILL.md",
+    "skill",
+    [
+      "---",
+      "name: invalid",
+      "metadata:",
+      "  renma.id: skill.invalid",
+      `  renma.continues-with: '["skill.leaf"]'`,
+      "---",
+      "# Invalid",
+      "",
+    ].join("\n"),
+  );
+  const discovery = prepare([
+    skill("skills/root/SKILL.md", {
+      id: "skill.root",
+      published: true,
+      routes: ["skills/invalid/SKILL.md"],
+    }),
+    invalidTarget,
+    skill("skills/leaf/SKILL.md", { id: "skill.leaf" }),
+  ]);
+  const rootRoute = discovery.routes.find(
+    (route) => route.sourcePath === "skills/root/SKILL.md",
+  )!;
+  const byPath = new Map(
+    discovery.skills.map((item) => [item.sourcePath, item]),
+  );
+
+  assert.equal(rootRoute.resolution, "resolved");
+  assert.equal(rootRoute.usable, false);
+  assert.deepEqual(rootRoute.usabilityReasons, ["invalid-target"]);
+  assert.deepEqual(byPath.get("skills/invalid/SKILL.md")?.reachability, {
+    state: "not-evaluated",
+    reason: "skill-not-discovery-eligible",
+    sourceEntrypointIds: [],
+  });
+  assert.deepEqual(discovery.reachableDiscoveryEligibleSkillIds, [
+    "skill.root",
+  ]);
+  assert.deepEqual(discovery.notReachedDiscoveryEligibleSkillIds, [
+    "skill.leaf",
+  ]);
+  assert.equal(
+    discovery.reachableDiscoveryEligibleSkillIds.includes("skill.invalid"),
+    false,
+  );
+  assert.equal(
+    discovery.notReachedDiscoveryEligibleSkillIds.includes("skill.invalid"),
+    false,
+  );
+  assert.equal(
+    byPath.get("skills/leaf/SKILL.md")?.reachability.state,
+    "not-reached",
+  );
+});
+
+test("reachability excludes ambiguous targets and every candidate continuation", () => {
+  const discovery = prepare([
+    skill("skills/root/SKILL.md", {
+      id: "skill.root",
+      published: true,
+      routes: ["skill.duplicate"],
+    }),
+    skill("skills/alpha/SKILL.md", {
+      id: "skill.duplicate",
+      routes: ["skill.alpha-leaf"],
+    }),
+    skill("skills/beta/SKILL.md", {
+      id: "skill.duplicate",
+      routes: ["skill.beta-leaf"],
+    }),
+    skill("skills/alpha-leaf/SKILL.md", { id: "skill.alpha-leaf" }),
+    skill("skills/beta-leaf/SKILL.md", { id: "skill.beta-leaf" }),
+  ]);
+  const rootRoute = discovery.routes.find(
+    (route) => route.sourcePath === "skills/root/SKILL.md",
+  )!;
+  const candidatePaths = new Set(
+    rootRoute.candidates.map((candidate) => candidate.sourcePath),
+  );
+
+  assert.equal(rootRoute.resolution, "ambiguous");
+  assert.equal(rootRoute.usable, false);
+  assert.deepEqual(rootRoute.usabilityReasons, ["ambiguous-target"]);
+  assert.deepEqual(
+    candidatePaths,
+    new Set(["skills/alpha/SKILL.md", "skills/beta/SKILL.md"]),
+  );
+  assert.deepEqual(discovery.reachableDiscoveryEligibleSkillIds, [
+    "skill.root",
+  ]);
+  assert.deepEqual(discovery.notReachedDiscoveryEligibleSkillIds, [
+    "skill.alpha-leaf",
+    "skill.beta-leaf",
+  ]);
+  assert.ok(
+    discovery.skills
+      .filter((item) => candidatePaths.has(item.sourcePath))
+      .every((item) => item.reachability.state === "not-evaluated"),
+  );
+  assert.ok(
+    discovery.skills
+      .filter((item) => item.id.endsWith("-leaf"))
+      .every((item) => item.reachability.state === "not-reached"),
+  );
+});
+
+test("reachability excludes duplicate-ID sources and their outgoing declarations", () => {
+  const discovery = prepare([
+    skill("skills/root/SKILL.md", {
+      id: "skill.root",
+      published: true,
+    }),
+    skill("skills/source/SKILL.md", {
+      id: "skill.duplicate-source",
+      published: true,
+      routes: ["skill.leaf"],
+    }),
+    skill("skills/source-copy/SKILL.md", {
+      id: "skill.duplicate-source",
+    }),
+    skill("skills/leaf/SKILL.md", { id: "skill.leaf" }),
+  ]);
+  const duplicateRoute = discovery.routes.find(
+    (route) => route.sourcePath === "skills/source/SKILL.md",
+  )!;
+  const duplicateSource = discovery.skills.find(
+    (item) => item.sourcePath === "skills/source/SKILL.md",
+  )!;
+
+  assert.equal(duplicateSource.routeEligible, false);
+  assert.deepEqual(duplicateSource.publication.rejectionReasons, [
+    "duplicate-skill-id",
+  ]);
+  assert.equal(duplicateRoute.resolution, "resolved");
+  assert.equal(duplicateRoute.usable, false);
+  assert.deepEqual(duplicateRoute.usabilityReasons, ["duplicate-source-id"]);
+  assert.deepEqual(discovery.publishedEntrypointIds, ["skill.root"]);
+  assert.deepEqual(discovery.reachableDiscoveryEligibleSkillIds, [
+    "skill.root",
+  ]);
+  assert.deepEqual(discovery.notReachedDiscoveryEligibleSkillIds, [
+    "skill.leaf",
+  ]);
+  assert.equal(duplicateSource.reachability.state, "not-evaluated");
+  assert.equal(
+    discovery.skills.find((item) => item.id === "skill.leaf")?.reachability
+      .state,
+    "not-reached",
+  );
+});
+
+test("unrouted is structural roots minus effective published entrypoints", () => {
+  const discovery = prepare([
+    skill("skills/published/SKILL.md", {
+      id: "skill.published",
+      published: true,
+      routes: ["skill.child"],
+    }),
+    skill("skills/child/SKILL.md", { id: "skill.child" }),
+    skill("skills/disconnected-root/SKILL.md", {
+      id: "skill.disconnected-root",
+      routes: ["skill.disconnected-child"],
+    }),
+    skill("skills/disconnected-child/SKILL.md", {
+      id: "skill.disconnected-child",
+    }),
+    skill("skills/standalone/SKILL.md", { id: "skill.standalone" }),
+  ]);
+  const byId = new Map(discovery.skills.map((item) => [item.id, item]));
+
+  assert.deepEqual(discovery.unroutedSkillIds, [
+    "skill.disconnected-root",
+    "skill.standalone",
+  ]);
+  assert.equal(byId.get("skill.published")?.unrouted, false);
+  assert.equal(byId.get("skill.disconnected-root")?.unrouted, true);
+  assert.equal(byId.get("skill.standalone")?.unrouted, true);
+  assert.equal(byId.get("skill.disconnected-child")?.unrouted, false);
+  assert.equal(
+    byId.get("skill.disconnected-child")?.reachability.state,
+    "not-reached",
+  );
+});
+
+test("authoritative coverage emits exact unreachable diagnostics and descriptive coverage does not", () => {
+  const documents = [
+    skill("skills/published/SKILL.md", {
+      id: "skill.published",
+      published: true,
+    }),
+    skill("skills/unreached/SKILL.md", { id: "skill.unreached" }),
+  ];
+  const descriptive = prepare(documents);
+  const authoritative = prepare(documents, {
+    repositoryWideAdopted: true,
+    configPath: "renma.config.json",
+  });
+  const diagnostic = authoritative.diagnostics.find(
+    (item) => item.code === DIAGNOSTIC_IDS.DISCOVERY_UNREACHABLE_ELIGIBLE_SKILL,
+  );
+
+  assert.equal(
+    descriptive.diagnostics.some(
+      (item) =>
+        item.code === DIAGNOSTIC_IDS.DISCOVERY_UNREACHABLE_ELIGIBLE_SKILL,
+    ),
+    false,
+  );
+  assert.equal(diagnostic?.severity, "warning");
+  assert.equal(diagnostic?.evidence?.path, "skills/unreached/SKILL.md");
+  assert.match(
+    diagnostic?.message ?? "",
+    /No usable declared continuation path reaches this eligible Skill from any effective published entrypoint/,
+  );
+  assert.deepEqual(diagnostic?.details, {
+    sourceId: "skill.unreached",
+    sourcePath: "skills/unreached/SKILL.md",
+    coverageMode: "authoritative",
+    adoptionState: "adopted",
+    publishedEntrypointIds: ["skill.published"],
+    structuralRoot: true,
+    standalone: true,
+    unrouted: true,
+    configPath: "renma.config.json",
+  });
+  assert.deepEqual(
+    diagnostic?.repairConstraints?.map((item) => item.kind),
+    [
+      "must_preserve",
+      "must_not_change",
+      "allowed_change",
+      "requires_human_decision",
+    ],
+  );
+  assert.match(
+    JSON.stringify(diagnostic?.repairConstraints),
+    /fake continuation/,
+  );
+  assert.match(
+    JSON.stringify(diagnostic?.repairConstraints),
+    /publish every Skill/,
+  );
+  assert.deepEqual(
+    diagnostic?.verificationSteps?.map((item) => item.command),
+    [
+      "renma graph . --view discovery --format json",
+      "renma scan . --format json",
+    ],
+  );
 });
 
 test("exact focus keeps direct incoming and outgoing declared routes", () => {
@@ -1093,6 +1557,10 @@ test("exact focus keeps direct incoming and outgoing declared routes", () => {
     id: "skill.middle",
     sourcePath: "skills/middle/SKILL.md",
   });
+  assert.equal(focused.coverage, discovery.coverage);
+  assert.deepEqual(focused.reachableDiscoveryEligibleSkillIds, []);
+  assert.deepEqual(focused.notReachedDiscoveryEligibleSkillIds, []);
+  assert.deepEqual(focused.unroutedSkillIds, ["skill.root"]);
   assert.throws(
     () => focusSkillDiscoveryIndex(discovery, "skill.unknown"),
     /did not match any Skill id or source path/,
