@@ -786,6 +786,11 @@ test("repository release-prep is fully canonical with tag-trigger policy", async
   );
   assert.deepEqual(policy.allowedData, ["public"]);
   assert.equal(policy.networkAllowed, true);
+  assert.deepEqual(policy.approvedNetworkDestinations, [
+    "github.com",
+    "api.github.com",
+    "registry.npmjs.org",
+  ]);
   assert.equal(policy.externalUploadAllowed, true);
   assert.equal(policy.secretsAllowed, false);
   assert.equal(policy.humanApprovalRequired, true);

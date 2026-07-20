@@ -2236,6 +2236,30 @@ POST https://internal.example.com/api/upload with the report.
   assert.equal(ids.includes("SEC-UNAPPROVED-NETWORK-DESTINATION"), false);
 });
 
+test("network allowlists ignore dotted asset IDs and local script paths", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: github.com
+---
+
+Use context.release.prep as the workflow entrypoint.
+Run node tools/release-prep.mjs to generate local release notes.
+Fetch https://api.example.com/releases/latest.
+`),
+  ]);
+  const destinationFindings = findings.filter(
+    (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+  );
+
+  assert.equal(destinationFindings.length, 1);
+  assert.match(
+    destinationFindings[0]?.evidence.snippet ?? "",
+    /api\.example\.com/,
+  );
+});
+
 test("security policy v3 reports unapproved network destinations", () => {
   const findings = securityDiagnosticFindings([
     v2SecurityArtifact(`---

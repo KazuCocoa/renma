@@ -1775,6 +1775,9 @@ function unapprovedDestinations(
   approvedDestinations: string[],
   invalidAllowlist = false,
 ): NetworkDestination[] {
+  if (!NETWORK_ACTION_RE.test(line)) {
+    return [];
+  }
   const destinations = extractNetworkDestinations(line);
   if (invalidAllowlist) return destinations;
 
