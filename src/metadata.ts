@@ -518,12 +518,6 @@ export function parseAssetMetadata(document: ParsedDocument): {
     const continuesWith = parseContinuationValue(source.values.continues_with);
     if (continuesWith.valid) {
       metadata.continuesWith = continuesWith.items.map((item) => item.trim());
-      const field = source.fields.continues_with;
-      if (field) {
-        source.listItems.continues_with = continuesWith.items.map(() => ({
-          ...field,
-        }));
-      }
     }
   }
 

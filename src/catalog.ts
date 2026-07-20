@@ -423,6 +423,7 @@ function operationalMetadataLists(
     ["optional_lens", metadata.optionalLens ?? []],
     ["conflicts", metadata.conflicts],
     ["superseded_by", metadata.supersededBy],
+    ["continues_with", metadata.continuesWith ?? []],
   ];
 }
 

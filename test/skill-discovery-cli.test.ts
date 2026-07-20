@@ -8,6 +8,7 @@ import { main } from "../src/cli.js";
 import { bom } from "../src/commands/bom.js";
 import { readiness } from "../src/commands/readiness.js";
 import { trustGraph } from "../src/commands/trust-graph.js";
+import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
 import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
 import { scan } from "../src/scanner.js";
 import type { DiagnosticV2 } from "../src/types.js";
@@ -23,6 +24,7 @@ test("graph --view discovery JSON exposes the dedicated route contract", async (
   const report = JSON.parse(result.stdout) as {
     view: string;
     edgeCount: number;
+    diagnostics?: Array<{ code?: string; severity: string }>;
     edges: Array<{
       from: string;
       to: string;
@@ -65,6 +67,7 @@ test("graph --view discovery JSON exposes the dedicated route contract", async (
   };
 
   assert.equal(report.view, "discovery");
+  assert.equal(report.diagnostics, undefined);
   assert.equal(report.edgeCount, 1);
   assert.deepEqual(
     report.edges.map((edge) => [
@@ -126,6 +129,13 @@ test("graph --view discovery JSON exposes the dedicated route contract", async (
       DIAGNOSTIC_IDS.DISCOVERY_UNRESOLVED_DECLARED_ROUTE,
     ],
   );
+  assert.ok(
+    report.discovery.diagnostics.every(
+      (diagnostic) =>
+        diagnostic.code.startsWith("DISCOVERY-") &&
+        !report.diagnostics?.some((item) => item.code === diagnostic.code),
+    ),
+  );
 });
 
 test("graph --view discovery Markdown explains static routing and repairs", async () => {
@@ -170,8 +180,82 @@ test("graph --view discovery Mermaid separates usable and unusable declarations"
   assert.match(first.stdout, /inactive-target/);
   assert.match(first.stdout, /classDef structuralRoot/);
   assert.match(first.stdout, /%% declaration skills\/source\/SKILL.md index 0/);
-  assert.match(first.stdout, /%% Diagnostics:/);
+  assert.match(first.stdout, /%% Discovery diagnostics:/);
   assert.match(first.stdout, /does not execute Skills/);
+});
+
+test("Discovery preserves repository errors separately and returns exit code 1", async () => {
+  const root = await routeFixture();
+  await writeBrokenLens(root);
+
+  const json = await captured(() =>
+    main(["graph", root, "--view", "discovery", "--format", "json"]),
+  );
+  const report = JSON.parse(json.stdout) as {
+    diagnostics?: Array<{ code?: string; severity: string }>;
+    discovery: { diagnostics: Array<{ code: string; severity: string }> };
+  };
+
+  assert.equal(json.code, 1);
+  assert.equal(json.stderr, "");
+  assert.ok(
+    report.diagnostics?.some(
+      (diagnostic) =>
+        diagnostic.code ===
+          CONTEXT_LENS_DIAGNOSTIC_CODES.MISSING_REQUIRED_FIELD &&
+        diagnostic.severity === "error",
+    ),
+  );
+  assert.equal(
+    report.diagnostics?.some((diagnostic) =>
+      diagnostic.code?.startsWith("DISCOVERY-"),
+    ),
+    false,
+  );
+  assert.deepEqual(
+    report.discovery.diagnostics.map((diagnostic) => diagnostic.code),
+    [
+      DIAGNOSTIC_IDS.DISCOVERY_INACTIVE_ROUTE_TARGET,
+      DIAGNOSTIC_IDS.DISCOVERY_UNRESOLVED_DECLARED_ROUTE,
+    ],
+  );
+  assert.ok(
+    report.discovery.diagnostics.every(
+      (diagnostic) => diagnostic.severity === "warning",
+    ),
+  );
+
+  const markdown = await captured(() =>
+    main(["graph", root, "--view", "discovery", "--format", "markdown"]),
+  );
+  assert.equal(markdown.code, 1);
+  const discoveryMarkdown = markdown.stdout.split(
+    "## Repository diagnostics",
+  )[0]!;
+  const repositoryMarkdown = markdown.stdout.split(
+    "## Repository diagnostics",
+  )[1]!;
+  assert.match(discoveryMarkdown, /## Discovery diagnostics/);
+  assert.match(discoveryMarkdown, /DISCOVERY-UNRESOLVED-DECLARED-ROUTE/);
+  assert.doesNotMatch(discoveryMarkdown, /CONTEXT-LENS-MISSING-REQUIRED-FIELD/);
+  assert.match(repositoryMarkdown, /CONTEXT-LENS-MISSING-REQUIRED-FIELD/);
+  assert.doesNotMatch(repositoryMarkdown, /DISCOVERY-/);
+
+  const mermaid = await captured(() =>
+    main(["graph", root, "--view", "discovery", "--format", "mermaid"]),
+  );
+  assert.equal(mermaid.code, 1);
+  const discoveryMermaid = mermaid.stdout.split(
+    "%% Repository diagnostics:",
+  )[0]!;
+  const repositoryMermaid = mermaid.stdout.split(
+    "%% Repository diagnostics:",
+  )[1]!;
+  assert.match(discoveryMermaid, /%% Discovery diagnostics:/);
+  assert.match(discoveryMermaid, /DISCOVERY-UNRESOLVED-DECLARED-ROUTE/);
+  assert.doesNotMatch(discoveryMermaid, /CONTEXT-LENS-MISSING-REQUIRED-FIELD/);
+  assert.match(repositoryMermaid, /CONTEXT-LENS-MISSING-REQUIRED-FIELD/);
+  assert.doesNotMatch(repositoryMermaid, /DISCOVERY-/);
 });
 
 test("Discovery Mermaid remains valid for empty, cyclic, and duplicate-ID graphs", async () => {
@@ -407,6 +491,23 @@ async function writeSkill(
   await writeFile(
     path.join(root, "skills", name, "SKILL.md"),
     skillText(name, id, routes, undefined, status),
+  );
+}
+
+async function writeBrokenLens(root: string): Promise<void> {
+  await mkdir(path.join(root, "lenses", "testing"), { recursive: true });
+  await writeFile(
+    path.join(root, "lenses", "testing", "broken.md"),
+    [
+      "---",
+      "id: lens.testing.broken",
+      "owner: qa-platform",
+      "---",
+      "# Broken Lens",
+      "",
+      "This fixture intentionally omits required lens fields.",
+      "",
+    ].join("\n"),
   );
 }
 

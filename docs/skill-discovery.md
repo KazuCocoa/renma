@@ -100,19 +100,24 @@ renma graph . --view discovery --focus skills/review-request/SKILL.md --format m
 JSON adds a dedicated `discovery` section containing deterministic summary
 counts, visible Skills, every route declaration, structural-root and standalone
 IDs, declaration evidence, linked diagnostics, and optional exact focus
-evidence. Unresolved declarations are never represented as resolved edges.
+evidence. Skill route diagnostics live only in `discovery.diagnostics`;
+pre-existing repository diagnostics remain in the top-level graph
+`diagnostics` collection. Unresolved declarations are never represented as
+resolved edges. The graph command exits with code `1` when either collection
+contains an error, while the initial Discovery diagnostics remain warnings.
 
 Markdown states the static-only boundary, reports counts, lists structural
 roots, shows routes in deterministic source/declaration order, preserves exact
-evidence locations, and includes actionable diagnostics. Readers must open the
-source `SKILL.md` and apply its routing conditions; the report is not an
-executable prompt.
+evidence locations, and separates Discovery diagnostics from repository
+diagnostics. Readers must open the source `SKILL.md` and apply its routing
+conditions; the report is not an executable prompt.
 
 Mermaid renders usable resolved Skill routes as solid edges. Every unresolved,
 ambiguous, wrong-kind, inactive, duplicate, or otherwise unusable declaration
 uses a dotted edge to a labeled synthetic review node. Structural roots receive
 a restrained visual distinction. Evidence and diagnostics are comments, and
-output remains deterministic for empty graphs, duplicate IDs, unresolved
+Discovery and repository diagnostics use separately labeled comment groups.
+Output remains deterministic for empty graphs, duplicate IDs, unresolved
 targets, shared targets, and cycles.
 
 Exact `--focus` is optional for this view. It accepts one exact Skill ID or

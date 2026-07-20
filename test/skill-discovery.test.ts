@@ -382,6 +382,43 @@ test("declaration-index evidence is retained for every canonical route item", ()
   );
 });
 
+test("continuation metadata retains one field record without synthetic item copies", () => {
+  const routes = Array.from(
+    { length: 12 },
+    (_, index) => `skill.short-target-${index.toString().padStart(2, "0")}`,
+  );
+  const document = skill("skills/source/SKILL.md", {
+    id: "skill.source",
+    routes,
+  });
+  const built = buildCatalog([document]);
+  const asset = built.catalog.assets[0]!;
+  const discovery = prepareSkillDiscoveryIndex([document], built.catalog);
+  const field = asset.metadataFields.continues_with!;
+
+  assert.ok(field.raw.length > 256);
+  assert.deepEqual(asset.metadata.continuesWith, routes);
+  assert.deepEqual(asset.metadataListItems.continues_with, []);
+  assert.equal(
+    JSON.stringify(built.catalog).split(JSON.stringify(field.raw)).length - 1,
+    2,
+  );
+  assert.equal(
+    built.diagnostics.filter(
+      (diagnostic) => diagnostic.details?.field === "continues_with",
+    ).length,
+    0,
+  );
+  assert.deepEqual(
+    discovery.routes.map((route) => [
+      route.declarationIndex,
+      route.evidence.startLine,
+      route.evidence.snippet,
+    ]),
+    routes.map((_, index) => [index, 6, field.raw]),
+  );
+});
+
 test("duplicate normalized and duplicate resolved-target declarations retain all evidence", () => {
   const normalized = prepare([
     skill("skills/source/SKILL.md", {

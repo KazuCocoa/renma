@@ -146,6 +146,72 @@ Run renma scan.
   );
 });
 
+test("scan budgets continuation targets individually instead of repeating the field", async () => {
+  const root = await fixtureRoot();
+  const routes = Array.from(
+    { length: 12 },
+    (_, index) => `skill.short-target-${index.toString().padStart(2, "0")}`,
+  );
+  await writeAsset(
+    root,
+    "skills/continuation-budget/SKILL.md",
+    `---
+name: continuation-budget
+description: Review continuation metadata budgets. Use when explicit Skill routes need deterministic size checks.
+metadata:
+  renma.id: skill.continuation-budget
+  renma.continues-with: '${JSON.stringify(routes)}'
+---
+# Continuation Budget
+
+Review the declared continuation targets.
+`,
+  );
+
+  const result = await scan(root);
+  const continuationFindings = result.findings.filter(
+    (finding) =>
+      finding.id === "META-LIST-ITEM-TOO-LONG" &&
+      finding.details?.field === "continues_with",
+  );
+
+  assert.ok(JSON.stringify(routes).length > 256);
+  assert.deepEqual(continuationFindings, []);
+});
+
+test("scan emits at most one advisory for one overlong continuation target", async () => {
+  const root = await fixtureRoot();
+  const longTarget =
+    "Continue with the specialized review workflow only after collecting every relevant request constraint, confirming ownership, documenting ambiguity, preserving source evidence, recording the human decision, and verifying the final handoff conditions in enough narrative detail to exceed the per-item metadata budget without resembling an ID or path.";
+  await writeAsset(
+    root,
+    "skills/continuation-budget/SKILL.md",
+    `---
+name: continuation-budget
+description: Review continuation metadata budgets. Use when explicit Skill routes need deterministic size checks.
+metadata:
+  renma.id: skill.continuation-budget
+  renma.continues-with: '${JSON.stringify([longTarget])}'
+---
+# Continuation Budget
+
+Review the declared continuation target.
+`,
+  );
+
+  const result = await scan(root);
+  const continuationFindings = result.findings.filter(
+    (finding) =>
+      finding.id === "META-LIST-ITEM-TOO-LONG" &&
+      finding.details?.field === "continues_with",
+  );
+
+  assert.ok(longTarget.length > 256);
+  assert.equal(continuationFindings.length, 1);
+  assert.equal(continuationFindings[0]?.severity, "low");
+  assert.equal(continuationFindings[0]?.evidence.startLine, 6);
+});
+
 async function fixtureRoot(): Promise<string> {
   return mkdtemp(path.join(os.tmpdir(), "renma-metadata-budget-"));
 }

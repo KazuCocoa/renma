@@ -142,9 +142,10 @@ export async function runGraphCommand(
     report = focusGraph(fullReport, options.focus);
   }
   process.stdout.write(formatGraph(report, options.format, view));
-  return report.diagnostics?.some(
-    (diagnostic) => diagnostic.severity === "error",
-  )
+  return [
+    ...(report.diagnostics ?? []),
+    ...(report.discovery?.diagnostics ?? []),
+  ].some((diagnostic) => diagnostic.severity === "error")
     ? 1
     : 0;
 }
@@ -275,7 +276,6 @@ function discoveryGraphReport(
     nodes,
     edges,
     discovery,
-    diagnostics: discovery.diagnostics,
   };
 }
 
@@ -634,7 +634,7 @@ function formatDiscoveryMarkdown(report: GraphReport): string {
     }
   }
 
-  lines.push("", "## Diagnostics", "");
+  lines.push("", "## Discovery diagnostics", "");
   if (discovery.diagnostics.length === 0) {
     lines.push("- None.");
   } else {
@@ -646,6 +646,18 @@ function formatDiscoveryMarkdown(report: GraphReport): string {
         `- ${diagnostic.code ?? "RENMA-DIAGNOSTIC"} (${location}): ${diagnostic.message}`,
       );
       if (diagnostic.llmHint) lines.push(`  - Repair: ${diagnostic.llmHint}`);
+    }
+  }
+
+  if (report.diagnostics && report.diagnostics.length > 0) {
+    lines.push("", "## Repository diagnostics", "");
+    for (const diagnostic of report.diagnostics) {
+      const location = diagnostic.evidence
+        ? evidenceLabel(diagnostic.evidence, diagnostic.path ?? "")
+        : (diagnostic.path ?? "repository");
+      lines.push(
+        `- ${diagnostic.code ?? "RENMA-DIAGNOSTIC"} [${diagnostic.severity}] (${location}): ${diagnostic.message}`,
+      );
     }
   }
 
@@ -706,13 +718,24 @@ function formatDiscoveryMermaid(report: GraphReport): string {
     lines.push(`  class ${rootNodes.join(",")} structuralRoot`);
   }
   if (discovery.diagnostics.length > 0) {
-    lines.push("  %% Diagnostics:");
+    lines.push("  %% Discovery diagnostics:");
     for (const diagnostic of discovery.diagnostics) {
       const location = diagnostic.evidence
         ? evidenceLabel(diagnostic.evidence, diagnostic.path ?? "")
         : (diagnostic.path ?? "repository");
       lines.push(
         `  %% ${singleLine(`${diagnostic.code ?? "RENMA-DIAGNOSTIC"} ${location}: ${diagnostic.message}`)}`,
+      );
+    }
+  }
+  if (report.diagnostics && report.diagnostics.length > 0) {
+    lines.push("  %% Repository diagnostics:");
+    for (const diagnostic of report.diagnostics) {
+      const location = diagnostic.evidence
+        ? evidenceLabel(diagnostic.evidence, diagnostic.path ?? "")
+        : (diagnostic.path ?? "repository");
+      lines.push(
+        `  %% ${singleLine(`${diagnostic.code ?? "RENMA-DIAGNOSTIC"} [${diagnostic.severity}] ${location}: ${diagnostic.message}`)}`,
       );
     }
   }
