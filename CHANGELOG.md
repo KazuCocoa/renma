@@ -6,6 +6,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.22.3] - 2026-07-20
+
 ### Added
 
 - Added the stdout-only `renma skill-index [path]` command with default compact
@@ -1024,7 +1026,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.22.2...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.22.3...HEAD
+[0.22.3]: https://github.com/KazuCocoa/renma/compare/v0.22.2...v0.22.3
 [0.22.2]: https://github.com/KazuCocoa/renma/compare/v0.22.1...v0.22.2
 [0.22.1]: https://github.com/KazuCocoa/renma/compare/v0.22.0...v0.22.1
 [0.22.0]: https://github.com/KazuCocoa/renma/compare/v0.21.0...v0.22.0
