@@ -818,6 +818,19 @@ test("invalid publication markers and deterministic boundary gaps emit publicati
   assert.equal(invalidDiagnostic?.details?.markerState, "invalid");
   assert.equal(invalidDiagnostic?.details?.rawMarkerValue, true);
   assert.match(invalidDiagnostic?.evidence?.snippet ?? "", /true/);
+  const invalidVerification = JSON.stringify(
+    invalidDiagnostic?.verificationSteps,
+  );
+  assert.match(invalidVerification, /publication\.accepted/);
+  assert.match(invalidVerification, /publishedEntrypointIds/);
+  assert.match(
+    invalidVerification,
+    /Agent Skills, lifecycle, and duplicate-ID/,
+  );
+  assert.doesNotMatch(
+    invalidVerification,
+    /route resolution|route usability|relationship evidence/i,
+  );
   assert.equal(
     discovery.skills.find(
       (item) => item.sourcePath === "skills/source/SKILL.md",
@@ -828,16 +841,183 @@ test("invalid publication markers and deterministic boundary gaps emit publicati
   assert.deepEqual(boundaryDiagnostic.details?.missingBoundaries, [
     "capability",
   ]);
+  assert.equal(boundaryDiagnostic.evidence?.startLine, 3);
+  assert.notEqual(
+    boundaryDiagnostic.evidence?.startLine,
+    boundaryDiagnostic.details?.publicationMarkerEvidence &&
+      (
+        boundaryDiagnostic.details.publicationMarkerEvidence as {
+          startLine: number;
+        }
+      ).startLine,
+  );
+  assert.deepEqual(boundaryDiagnostic.details?.publicationMarkerEvidence, {
+    path: "skills/weak/SKILL.md",
+    startLine: 6,
+    endLine: 6,
+    snippet: '  renma.published-entrypoint: "true"',
+  });
   assert.ok(
     (
       boundaryDiagnostic.details?.linkedDiagnostics as Array<{ code: string }>
     ).some((item) => item.code === "RN-SKILL-DESCRIPTION-MISSING-CAPABILITY"),
+  );
+  const boundaryVerification = JSON.stringify(
+    boundaryDiagnostic.verificationSteps,
+  );
+  assert.match(boundaryVerification, /Preserve the valid publication marker/);
+  assert.match(boundaryVerification, /canonical Agent Skills description/);
+  assert.match(boundaryVerification, /effective published entrypoint/);
+  assert.match(boundaryVerification, /originating RN-SKILL-\*/);
+  assert.match(boundaryVerification, /publication was not removed merely/);
+  assert.doesNotMatch(
+    boundaryVerification,
+    /route resolution|route usability/i,
+  );
+  assert.equal(
+    boundaryDiagnostic.repairConstraints?.some(
+      (constraint) =>
+        constraint.kind === "allowed_change" &&
+        /remove publication|omit.*marker/i.test(constraint.text),
+    ),
+    false,
   );
   assert.equal(
     discovery.skills.find((item) => item.id === "skill.weak")?.publication
       .accepted,
     true,
   );
+});
+
+test("published boundary diagnostics preserve deterministic RN evidence order and marker traceability", () => {
+  const cases = [
+    {
+      name: "capability",
+      description: "Use this skill when source evidence is available.",
+      body: "Review the source evidence.",
+      expectedBoundary: "capability",
+      expectedCode: "RN-SKILL-DESCRIPTION-MISSING-CAPABILITY",
+      expectedLine: 3,
+    },
+    {
+      name: "usage",
+      description: "Review source evidence.",
+      body: "Review the source evidence.",
+      expectedBoundary: "positive usage boundary",
+      expectedCode: "RN-SKILL-DESCRIPTION-MISSING-USAGE-BOUNDARY",
+      expectedLine: 3,
+    },
+    {
+      name: "selection",
+      description:
+        "Review source evidence. Use when source evidence needs review.",
+      body: [
+        "## Do not use this skill when",
+        "",
+        "- Do not use this skill for runtime execution.",
+      ].join("\n"),
+      expectedBoundary: "negative selection/routing boundary",
+      expectedCode: "RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY",
+      expectedLine: 12,
+    },
+  ] as const;
+
+  for (const item of cases) {
+    const discovery = prepare([
+      publishedSkillWithDescription(
+        `skills/${item.name}/SKILL.md`,
+        `skill.${item.name}`,
+        item.description,
+        item.body,
+      ),
+    ]);
+    const diagnostic = discovery.diagnostics.find(
+      (candidate) =>
+        candidate.code ===
+        DIAGNOSTIC_IDS.DISCOVERY_ENTRYPOINT_WITHOUT_USABLE_BOUNDARIES,
+    );
+    const linked = diagnostic?.details?.linkedDiagnostics as
+      | Array<{ code: string; evidence?: { startLine: number } }>
+      | undefined;
+
+    assert.ok(diagnostic, item.name);
+    assert.deepEqual(
+      diagnostic.details?.missingBoundaries,
+      [item.expectedBoundary],
+      item.name,
+    );
+    assert.deepEqual(
+      linked?.map((candidate) => candidate.code),
+      [item.expectedCode],
+      item.name,
+    );
+    assert.equal(diagnostic.evidence?.startLine, item.expectedLine, item.name);
+    assert.equal(
+      diagnostic.evidence?.startLine,
+      linked?.[0]?.evidence?.startLine,
+      item.name,
+    );
+    assert.equal(
+      (
+        diagnostic.details?.publicationMarkerEvidence as {
+          startLine: number;
+        }
+      ).startLine,
+      6,
+      item.name,
+    );
+  }
+
+  const combined = prepare([
+    publishedSkillWithDescription(
+      "skills/combined/SKILL.md",
+      "skill.combined",
+      "Use this skill.",
+      [
+        "## Do not use this skill when",
+        "",
+        "- Do not use this skill for runtime execution.",
+      ].join("\n"),
+    ),
+  ]).diagnostics.find(
+    (candidate) =>
+      candidate.code ===
+      DIAGNOSTIC_IDS.DISCOVERY_ENTRYPOINT_WITHOUT_USABLE_BOUNDARIES,
+  );
+
+  assert.deepEqual(combined?.details?.missingBoundaries, [
+    "capability",
+    "positive usage boundary",
+    "negative selection/routing boundary",
+  ]);
+  assert.deepEqual(
+    (combined?.details?.linkedDiagnostics as Array<{ code: string }>).map(
+      (candidate) => candidate.code,
+    ),
+    [
+      "RN-SKILL-DESCRIPTION-MISSING-CAPABILITY",
+      "RN-SKILL-DESCRIPTION-MISSING-USAGE-BOUNDARY",
+      "RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY",
+    ],
+  );
+  assert.equal(combined?.evidence?.startLine, 3);
+});
+
+test("route diagnostics retain route-specific verification wording", () => {
+  const diagnostic = prepare([
+    skill("skills/source/SKILL.md", {
+      id: "skill.source",
+      routes: ["skill.missing"],
+    }),
+  ]).diagnostics.find(
+    (candidate) =>
+      candidate.code === DIAGNOSTIC_IDS.DISCOVERY_UNRESOLVED_DECLARED_ROUTE,
+  );
+  const verification = JSON.stringify(diagnostic?.verificationSteps);
+
+  assert.match(verification, /declaration resolves/);
+  assert.match(verification, /usability state/);
+  assert.match(verification, /repaired relationship evidence/);
 });
 
 test("Discovery adoption uses explicit config plus effective publication and defers coverage", () => {
@@ -988,6 +1168,32 @@ function skillWithRawPublication(value: string): ParsedDocument {
       `  renma.published-entrypoint: ${value}`,
       "---",
       "# Source",
+      "",
+    ].join("\n"),
+  );
+}
+
+function publishedSkillWithDescription(
+  sourcePath: string,
+  id: string,
+  description: string,
+  body: string,
+): ParsedDocument {
+  const name = path.posix.basename(path.posix.dirname(sourcePath));
+  return rawDocument(
+    sourcePath,
+    "skill",
+    [
+      "---",
+      `name: ${name}`,
+      `description: ${description}`,
+      "metadata:",
+      `  renma.id: ${id}`,
+      '  renma.published-entrypoint: "true"',
+      "---",
+      `# ${name}`,
+      "",
+      body,
       "",
     ].join("\n"),
   );

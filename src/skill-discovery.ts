@@ -67,6 +67,21 @@ export const SKILL_PUBLICATION_REJECTION_REASONS = [
 export type SkillPublicationRejectionReason =
   (typeof SKILL_PUBLICATION_REJECTION_REASONS)[number];
 
+const PUBLISHED_ENTRYPOINT_BOUNDARIES = [
+  {
+    code: AGENT_SKILL_DIAGNOSTIC_IDS.RN_DESCRIPTION_MISSING_CAPABILITY,
+    label: "capability",
+  },
+  {
+    code: AGENT_SKILL_DIAGNOSTIC_IDS.RN_DESCRIPTION_MISSING_USAGE_BOUNDARY,
+    label: "positive usage boundary",
+  },
+  {
+    code: AGENT_SKILL_DIAGNOSTIC_IDS.RN_DESCRIPTION_OMITS_SELECTION_BOUNDARY,
+    label: "negative selection/routing boundary",
+  },
+] as const;
+
 export interface SkillPublicationMarker {
   state: CanonicalSkillPublicationFieldState;
   canonicalKey: "metadata.renma.published-entrypoint";
@@ -648,9 +663,7 @@ function publicationDiagnosticFor(
     message: `Skill "${skill.id}" cannot be published because ${reason}. ${action}`,
     ...(marker.evidence ? { evidence: marker.evidence } : {}),
     repairConstraints: publicationRepairConstraints(ambiguousMarker),
-    verificationSteps: discoveryVerificationSteps(
-      DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT,
-    ),
+    verificationSteps: publicationMarkerVerificationSteps(),
     llmHint:
       "Preserve the intended bounded first-hop responsibility. Do not publish every structural root, fabricate or clone a Skill, reactivate an inactive Skill merely to publish it, or guess through ambiguous evidence.",
     details: {
@@ -673,43 +686,29 @@ function publishedEntrypointBoundaryDiagnostic(
   skill: VisibleSkillIdentity,
 ): Diagnostic | undefined {
   if (!skill.publication.accepted) return undefined;
-  const boundaryCodes = new Map<string, string>([
-    [
-      AGENT_SKILL_DIAGNOSTIC_IDS.RN_DESCRIPTION_MISSING_CAPABILITY,
-      "capability",
-    ],
-    [
-      AGENT_SKILL_DIAGNOSTIC_IDS.RN_DESCRIPTION_MISSING_USAGE_BOUNDARY,
-      "positive usage boundary",
-    ],
-    [
-      AGENT_SKILL_DIAGNOSTIC_IDS.RN_DESCRIPTION_OMITS_SELECTION_BOUNDARY,
-      "negative selection/routing boundary",
-    ],
-  ]);
-  const linked = skill.linkedDiagnostics.filter((diagnostic) =>
-    boundaryCodes.has(diagnostic.code),
+  const linked = PUBLISHED_ENTRYPOINT_BOUNDARIES.flatMap(({ code }) =>
+    skill.linkedDiagnostics.filter((diagnostic) => diagnostic.code === code),
   );
   if (linked.length === 0) return undefined;
-  const missing = [
-    ...new Set(linked.map((diagnostic) => boundaryCodes.get(diagnostic.code)!)),
-  ];
+  const linkedCodes = new Set(linked.map((diagnostic) => diagnostic.code));
+  const missing = PUBLISHED_ENTRYPOINT_BOUNDARIES.filter(({ code }) =>
+    linkedCodes.has(code),
+  ).map(({ label }) => label);
+  const primaryEvidence = linked.find((diagnostic) => diagnostic.evidence)
+    ?.evidence ?? {
+    path: skill.sourcePath,
+    startLine: 1,
+    endLine: 1,
+    snippet: "published entrypoint boundary evidence",
+  };
   return {
     code: DIAGNOSTIC_IDS.DISCOVERY_ENTRYPOINT_WITHOUT_USABLE_BOUNDARIES,
     severity: "warning",
     path: skill.sourcePath,
     message: `Published entrypoint "${skill.id}" lacks deterministic first-hop boundary evidence for: ${missing.join(", ")}. Improve the source Skill's bounded responsibility; do not remove publication solely to suppress this warning.`,
-    evidence: skill.publication.marker.evidence ??
-      linked[0]?.evidence ?? {
-        path: skill.sourcePath,
-        startLine: 1,
-        endLine: 1,
-        snippet: "published entrypoint boundary evidence",
-      },
+    evidence: primaryEvidence,
     repairConstraints: publicationBoundaryRepairConstraints(),
-    verificationSteps: discoveryVerificationSteps(
-      DIAGNOSTIC_IDS.DISCOVERY_ENTRYPOINT_WITHOUT_USABLE_BOUNDARIES,
-    ),
+    verificationSteps: publishedEntrypointBoundaryVerificationSteps(),
     llmHint:
       "Preserve the intended published first-hop responsibility and add the missing deterministic capability or selection boundary to the canonical Agent Skills description. Passing this warning is not proof of semantic completeness.",
     details: {
@@ -717,6 +716,7 @@ function publishedEntrypointBoundaryDiagnostic(
       sourcePath: skill.sourcePath,
       metadataKey: skill.publication.marker.canonicalKey,
       missingBoundaries: missing,
+      publicationMarkerEvidence: skill.publication.marker.evidence,
       linkedDiagnostics: linked,
     },
   };
@@ -965,7 +965,7 @@ function invalidDeclarationDiagnostic(
     message: `Invalid metadata.${canonicalKey}: ${reason}. Correct or remove the explicit Skill continuation declaration.`,
     ...(field ? { evidence: toEvidence(field) } : {}),
     repairConstraints: discoveryRepairConstraints(),
-    verificationSteps: discoveryVerificationSteps(
+    verificationSteps: routeVerificationSteps(
       DIAGNOSTIC_IDS.DISCOVERY_INVALID_CONTINUATION_DECLARATION,
     ),
     llmHint:
@@ -991,7 +991,7 @@ function unresolvedRouteDiagnostic(route: DeclaredSkillRoute): Diagnostic {
     message: `Skill "${route.sourceId}" continuation ${route.declarationIndex} ${ambiguous ? "is ambiguous" : "has no exact target"}: "${route.rawTarget}".${rejection} Use one exact stable Skill ID or repository-relative SKILL.md path.`,
     evidence: route.evidence,
     repairConstraints: discoveryRepairConstraints(ambiguous),
-    verificationSteps: discoveryVerificationSteps(
+    verificationSteps: routeVerificationSteps(
       DIAGNOSTIC_IDS.DISCOVERY_UNRESOLVED_DECLARED_ROUTE,
     ),
     llmHint: ambiguous
@@ -1021,7 +1021,7 @@ function wrongKindRouteDiagnostic(route: DeclaredSkillRoute): Diagnostic {
     message: `Skill continuation ${route.declarationIndex} resolves to ${target.kind} asset "${target.id}" at ${target.sourcePath}. Skill continuations are Skill-to-Skill only; use existing typed Context or Context Lens relationships for other asset kinds.`,
     evidence: route.evidence,
     repairConstraints: discoveryRepairConstraints(),
-    verificationSteps: discoveryVerificationSteps(
+    verificationSteps: routeVerificationSteps(
       DIAGNOSTIC_IDS.DISCOVERY_ROUTE_TARGET_NOT_SKILL,
     ),
     llmHint:
@@ -1048,7 +1048,7 @@ function inactiveTargetDiagnostic(route: DeclaredSkillRoute): Diagnostic {
     message: `Skill continuation ${route.declarationIndex} targets ${target.lifecycle} Skill "${target.id}" at ${target.sourcePath}. The declaration remains visible but is unusable for structural Discovery.`,
     evidence: route.evidence,
     repairConstraints: discoveryRepairConstraints(),
-    verificationSteps: discoveryVerificationSteps(
+    verificationSteps: routeVerificationSteps(
       DIAGNOSTIC_IDS.DISCOVERY_INACTIVE_ROUTE_TARGET,
     ),
     llmHint:
@@ -1082,7 +1082,7 @@ function duplicateRouteDiagnostic(
     message: `Skill "${representative.sourceId}" declares the same continuation more than once at indices ${indices.join(", ")}. Declaration order is not priority; keep one exact declaration.`,
     evidence: representative.evidence,
     repairConstraints: discoveryRepairConstraints(),
-    verificationSteps: discoveryVerificationSteps(
+    verificationSteps: routeVerificationSteps(
       DIAGNOSTIC_IDS.DISCOVERY_DUPLICATE_DECLARED_ROUTE,
     ),
     llmHint:
@@ -1124,7 +1124,7 @@ function discoveryRepairConstraints(
   ];
 }
 
-function discoveryVerificationSteps(
+function routeVerificationSteps(
   code: string,
 ): NonNullable<Diagnostic["verificationSteps"]> {
   return [
@@ -1137,6 +1137,43 @@ function discoveryVerificationSteps(
       text: "Run Renma scan and confirm diagnostics v2 preserve the repaired relationship evidence.",
       command: "renma scan . --format json",
       expected: `No diagnostics with code ${code} remain for the repaired declaration.`,
+    },
+  ];
+}
+
+function publicationMarkerVerificationSteps(): NonNullable<
+  Diagnostic["verificationSteps"]
+> {
+  const code = DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT;
+  return [
+    {
+      text: "Run the Discovery graph and inspect the Skill's publication marker and effective publication state.",
+      command: "renma graph . --view discovery --format json",
+      expected: `The marker has the intended state, publication.accepted is correct, the rejected Skill is absent from publishedEntrypointIds unless it has become eligible, and no diagnostics with code ${code} remain after a valid repair.`,
+    },
+    {
+      text: "Run Renma scan and confirm publication validation remains separate from existing Skill eligibility evidence.",
+      command: "renma scan . --format json",
+      expected: `No diagnostics with code ${code} remain after a valid repair; existing Agent Skills, lifecycle, and duplicate-ID diagnostics remain authoritative.`,
+    },
+  ];
+}
+
+function publishedEntrypointBoundaryVerificationSteps(): NonNullable<
+  Diagnostic["verificationSteps"]
+> {
+  const code = DIAGNOSTIC_IDS.DISCOVERY_ENTRYPOINT_WITHOUT_USABLE_BOUNDARIES;
+  return [
+    {
+      text: "Preserve the valid publication marker, improve the canonical Agent Skills description, and inspect the Discovery graph again.",
+      command: "renma graph . --view discovery --format json",
+      expected:
+        "The Skill remains an effective published entrypoint and publication was not removed merely to suppress the boundary warning.",
+    },
+    {
+      text: "Run Renma scan and confirm the deterministic description-boundary evidence is repaired.",
+      command: "renma scan . --format json",
+      expected: `The originating RN-SKILL-* boundary issue and ${code} are absent while the Skill remains published.`,
     },
   ];
 }
