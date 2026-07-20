@@ -339,9 +339,12 @@ workflow, or falls outside the intended repository-wide policy. This warning
 also flows through scan, diagnostics v2, and review bundles while remaining
 outside downstream Trust Graph, Readiness, diff, CI, and BOM projections.
 
-Renma 0.22.4 adds `DISCOVERY-ROUTE-CYCLE` with no adoption requirement. It is
-one warning per cyclic strongly connected component, including self-loops, in
-not-adopted, partial, incomplete, and adopted repositories. Details contain
+Renma 0.22.4 adds `DISCOVERY-ROUTE-CYCLE` without requiring repository-wide
+adoption. It is emitted whenever the prepared usable continuation graph
+contains a cyclic strongly connected component, including a self-loop. In
+normal repository states this means `partial`, `incomplete`, or `adopted`: a
+truly `not-adopted` repository has no Discovery metadata and therefore cannot
+contain a usable declared route cycle. Details contain
 sorted `cycleSkillIds`, `cycleSkills`, `selfLoop`, `routeCount`, and complete
 `cycleRoutes` evidence. Every member Skill and internal route links the
 diagnostic. The warning asks a human to decide whether the component is an

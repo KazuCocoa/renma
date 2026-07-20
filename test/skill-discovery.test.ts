@@ -1306,7 +1306,12 @@ test("connected chains, diamonds, shared children, and ordinary assets do not fo
   );
 });
 
-test("route-cycle warnings do not depend on repository-wide Discovery adoption", () => {
+test("route-cycle warnings require route metadata but not repository-wide adoption", () => {
+  const notAdopted = prepare([
+    skill("skills/a/SKILL.md", {
+      id: "skill.a",
+    }),
+  ]);
   const cycle = [
     skill("skills/a/SKILL.md", {
       id: "skill.a",
@@ -1327,7 +1332,7 @@ test("route-cycle warnings do not depend on repository-wide Discovery adoption",
   );
 
   assert.deepEqual(
-    [partial, incomplete, adopted].map((discovery) => [
+    [notAdopted, partial, incomplete, adopted].map((discovery) => [
       discovery.adoption.state,
       discovery.diagnostics.filter(
         (diagnostic) =>
@@ -1335,6 +1340,7 @@ test("route-cycle warnings do not depend on repository-wide Discovery adoption",
       ).length,
     ]),
     [
+      ["not-adopted", 0],
       ["partial", 1],
       ["incomplete", 1],
       ["adopted", 1],

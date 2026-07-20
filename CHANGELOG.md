@@ -21,6 +21,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   propagated the warning through scan, diagnostics v2, review bundles,
   Discovery graph diagnostics, and Skill Index diagnostics.
 
+### Changed
+
+- Clarified the bundled release-prep Skill and Context to require
+  `Renma v<version>` as the GitHub Release title while retaining `v<version>`
+  as the Git tag.
+
 ### Compatibility
 
 - Preserved reachability, minimum depth, source-entrypoint provenance,
