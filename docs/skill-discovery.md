@@ -1,10 +1,10 @@
-# Skill Discovery Graph
+# Skill Discovery Graph and Index
 
-Renma 0.22.x provides a static, declaration-driven Skill-to-Skill graph. It
-does not interpret task text, select, rank, load, invoke, or execute a Skill.
-Repository authors keep routing conditions in source `SKILL.md` files; Renma
-exposes deterministic publication, adoption, continuation, and structural
-evidence.
+Renma 0.22.x provides a static, declaration-driven Skill-to-Skill graph and a
+versioned compact index. It does not interpret task text, select, rank, load,
+invoke, or execute a Skill. Repository authors keep routing conditions in
+source `SKILL.md` files; Renma exposes deterministic publication, adoption,
+continuation, and structural evidence.
 
 The progression is intentionally layered:
 
@@ -21,8 +21,9 @@ The progression is intentionally layered:
   cycle-safe reachability, descriptive coverage, authoritative coverage,
   and adopted-mode unreachable diagnostics
 
-later
-  versioned skill-index report and dedicated skill-index command
+0.22.3
+  versioned renma.skill-index.v1 report and dedicated stdout-only
+  skill-index command
 ```
 
 ## Three separate facts
@@ -215,6 +216,59 @@ reachability. Published, reachable, not-reached, and unrouted ID arrays plus
 summary counts are filtered to visible Skills. Focus never becomes a traversal
 seed and never recomputes coverage from the subset.
 
+## Skill Index command
+
+Renma 0.22.3 adds a compact static index over the same prepared Discovery
+model:
+
+```bash
+renma skill-index .
+renma skill-index . --format markdown
+renma skill-index . --format json
+renma skill-index . --json
+renma skill-index . --focus skill.release-prep --format markdown
+```
+
+Markdown is the default. JSON uses the canonical schema identifier
+`renma.skill-index.v1` and is the complete unfocused automation contract. The
+report contains repository metadata, the existing adoption, coverage, summary,
+visible Skill, route, publication, reachability, structural-root, standalone,
+unrouted, and eligible-ID projections, plus explicitly separate
+`diagnostics.repository` and `diagnostics.discovery` collections.
+
+The command collects one `RepositorySnapshot` and wraps its already prepared
+Discovery index. It does not scan twice or reimplement parsing, exact target
+resolution, eligibility, publication, reachability, coverage, or focus.
+Repository diagnostics remain repository-wide. Focused Discovery diagnostics
+use the existing exact direct-neighborhood projection.
+
+Focus accepts only an exact stable effective Skill ID or exact
+repository-relative Skill source path. It does not match titles, descriptions,
+tags, aliases, basenames, suffixes, letter-case variants, fuzzy phrases, or task
+text. Focus does not perform transitive traversal and does not make the selected
+Skill reachable. In focused reports:
+
+```text
+coverage is repository-scoped
+
+summary and visible ID arrays are projection-scoped
+```
+
+Markdown shows the static-only boundary, summary, adoption and coverage,
+focused Skill when present, effective published entrypoints and their direct
+continuations, authoritative coverage gaps, structural candidates, separate
+diagnostic sections, and instructions to open the referenced source
+`SKILL.md`. Long presentation lists use the established deterministic cap;
+JSON retains complete evidence.
+
+The command writes only to stdout. It does not create `.renma/`, write a
+generated index, modify configuration or Skill metadata, interpret a request,
+select or rank a Skill, load Context, assemble a prompt, infer a route, call an
+LLM, or execute a workflow. Exit `0` means the report was produced with no
+error-severity diagnostic; warnings still exit `0`. Exit `1` means an error is
+present in either diagnostic collection. Invalid CLI use, configuration, focus,
+or report construction exits `2`.
+
 ## Diagnostics
 
 Renma 0.22.1 adds warning diagnostics:
@@ -244,7 +298,7 @@ workflow, or falls outside the intended repository-wide policy. This warning
 also flows through scan, diagnostics v2, and review bundles while remaining
 outside downstream Trust Graph, Readiness, diff, CI, and BOM projections.
 
-## Compatibility and deferred work
+## Compatibility and future work
 
 Continuation and publication data remain separate from
 `catalog.dependencies`. Existing full, summary, workflow, layered,
@@ -253,6 +307,7 @@ Readiness, diff, CI report, Trust Graph, BOM, ownership, init, scaffold, guide,
 and suggestion contracts are unchanged. A repository without Discovery
 metadata or adoption remains valid and reports `not-adopted` without a warning.
 
-Route-cycle diagnostics, a versioned `skill-index` report, a dedicated
-`skill-index` command, and a `renma discovery` command remain deferred. Cycles
-are ordinary traversal-safe graph evidence in 0.22.2.
+Route-cycle diagnostics and a `renma discovery` command remain deferred. Cycles
+are ordinary traversal-safe graph evidence. Readiness, semantic diff, CI
+report, Trust Graph, BOM, ownership, scaffold, init, guide, and suggestion
+contracts remain independent from the Skill Index.

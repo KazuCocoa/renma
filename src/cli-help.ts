@@ -31,7 +31,7 @@ const OPTION_HELP = {
   focus: {
     flags: "--focus <asset-id-or-path>",
     description:
-      "Focus one asset by stable ID or path; required by composition and impact, and optional for discovery.",
+      "Focus one asset by stable ID or path; required by composition and impact, and optional for discovery and skill-index.",
   },
   format: {
     flags: "--format <format>",
@@ -272,6 +272,51 @@ export const COMMAND_HELP = [
       },
       "json",
       "view",
+      "focus",
+      "help",
+    ],
+  },
+  {
+    name: "skill-index",
+    usage: "renma skill-index [path] [options]",
+    question: "Where can static Skill Discovery begin and continue?",
+    purpose:
+      "Skill index emits a compact static view of visible Skills, explicit published entrypoints, declared continuations, reachability, coverage, structural candidates, and exact repository evidence.",
+    useWhen: [
+      "A human or agent needs to find the repository's explicit Skill Discovery starting points.",
+      "You need canonical renma.skill-index.v1 JSON for automation or compact Markdown for review.",
+      "You want one exact Skill's direct declared neighborhood without changing repository-wide coverage facts.",
+    ],
+    doNotUseFor: [
+      "Interpreting task text, recommending or ranking the best Skill, or fuzzy search.",
+      "Loading Context, assembling a prompt, invoking a Skill, or executing a workflow.",
+      "Inferring undeclared routes, creating metadata, or writing a generated index file.",
+    ],
+    examples: [
+      "renma skill-index .",
+      "renma skill-index . --format json",
+      "renma skill-index . --json",
+      "renma skill-index . --focus skill.release-prep --format markdown",
+    ],
+    interpretation: [
+      "Markdown is the default; JSON uses the canonical renma.skill-index.v1 schema.",
+      "Coverage is repository-scoped. Summary counts and visible ID arrays are projection-scoped when --focus is present.",
+      "Focus accepts only one exact effective Skill ID or repository-relative SKILL.md path and retains direct incoming and outgoing declarations.",
+      "Repository diagnostics and Discovery diagnostics remain separate; warning-only reports exit 0, while an error in either collection exits 1.",
+      "The command reads one shared repository snapshot and writes only to stdout.",
+    ],
+    nextSteps: [
+      "Open the referenced source SKILL.md and apply its description and routing conditions to the current request.",
+      "Follow only a declared continuation whose source Skill conditions support it.",
+      "Use graph --view discovery when a graph-shaped JSON, Markdown, or Mermaid projection is needed.",
+    ],
+    options: [
+      "config",
+      {
+        name: "format",
+        description: "Output format: markdown or json. Defaults to markdown.",
+      },
+      "json",
       "focus",
       "help",
     ],

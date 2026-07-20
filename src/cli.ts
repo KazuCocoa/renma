@@ -36,6 +36,10 @@ import {
 } from "./commands/scaffold.js";
 import { runScanCommand } from "./commands/scan.js";
 import {
+  runSkillIndexCommand,
+  type SkillIndexFormat,
+} from "./commands/skill-index.js";
+import {
   runSuggestMetadataCommand,
   SuggestMetadataTargetError,
   type SuggestMetadataFormat,
@@ -72,6 +76,7 @@ const COMMAND_CONTRACTS: Record<CommandName, CommandContract> = {
   scan: { minPositionals: 0, maxPositionals: 1 },
   catalog: { minPositionals: 0, maxPositionals: 1 },
   graph: { minPositionals: 0, maxPositionals: 1 },
+  "skill-index": { minPositionals: 0, maxPositionals: 1 },
   "trust-graph": { minPositionals: 0, maxPositionals: 1 },
   readiness: { minPositionals: 0, maxPositionals: 1 },
   bom: { minPositionals: 0, maxPositionals: 1 },
@@ -224,6 +229,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "graph") {
       return await runGraph(parsed.values, target);
+    }
+
+    if (command === "skill-index") {
+      return await runSkillIndex(parsed.values, target);
     }
 
     if (command === "trust-graph") {
@@ -545,6 +554,47 @@ async function runGraph(values: CliValues, target: string): Promise<number> {
       graphOptions.focus = focus;
     }
     return await runGraphCommand(target, graphOptions);
+  } catch (error) {
+    console.error(
+      error instanceof ConfigError || error instanceof Error
+        ? error.message
+        : String(error),
+    );
+    return 2;
+  }
+}
+
+async function runSkillIndex(
+  values: CliValues,
+  target: string,
+): Promise<number> {
+  const explicitFormat = stringValue(values.format);
+  if (values.json && explicitFormat && explicitFormat !== "json") {
+    return usageError(
+      "skill-index",
+      "--json conflicts with a non-JSON --format value.",
+    );
+  }
+  const format = values.json ? "json" : (explicitFormat ?? "markdown");
+  if (format !== "json" && format !== "markdown") {
+    return usageError(
+      "skill-index",
+      "--format must be either json or markdown.",
+    );
+  }
+
+  const configPath = stringValue(values.config);
+  const overrides: ConfigOverrides = {
+    ...(configPath ? { configPath } : {}),
+  };
+  const focus = stringValue(values.focus);
+
+  try {
+    return await runSkillIndexCommand(target, {
+      format: format as SkillIndexFormat,
+      ...(focus !== undefined ? { focus } : {}),
+      overrides,
+    });
   } catch (error) {
     console.error(
       error instanceof ConfigError || error instanceof Error

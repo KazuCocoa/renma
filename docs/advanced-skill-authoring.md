@@ -12,10 +12,11 @@ relationships but does not select a Skill at runtime.
 
 The 0.22.0 Skill Discovery foundation adds explicit canonical continuation
 metadata and a static graph projection. The 0.22.1 slice adds explicit
-published entrypoints and separately configured repository-wide adoption.
-These remain separate from repository file and Skill-local support-resource
-discovery; reachability, coverage evaluation, and runtime Skill selection are
-still deferred. See the [Skill Discovery Graph contract](skill-discovery.md).
+published entrypoints and separately configured repository-wide adoption;
+0.22.2 adds reachability and coverage; 0.22.3 adds the versioned static Skill
+Index report and command. These remain separate from repository file and
+Skill-local support-resource discovery and from runtime Skill selection. See
+the [Skill Discovery Graph and Index contract](skill-discovery.md).
 
 ## Derive A Focused Skill From An Existing Skill
 
@@ -119,10 +120,68 @@ When this Skill itself owns a reviewed continuation decision, it may add
 `renma.continues-with` as a JSON-array string of exact Skill IDs or
 repository-relative `SKILL.md` paths. Keep the conditions and no-match behavior
 in the source body; the declaration does not make Renma select or execute the
-next Skill. See the [Skill Discovery Graph contract](skill-discovery.md).
+next Skill. See the [Skill Discovery Graph and Index contract](skill-discovery.md).
 
 Use `renma.conflicts` only when two declared assets should not be used together
 without review. Do not use it as a substitute for a clear trigger description.
+
+## Router, Workflow, And Operational Responsibilities
+
+A normal Skill may act as a published entrypoint, a broad router, an
+intermediate router, a workflow/orchestration Skill, a specialized operational
+Skill, or more than one of these roles. These are responsibilities, not new
+Renma asset kinds. Every node remains a focused Agent Skill with a meaningful
+bounded responsibility.
+
+```text
+skill.a
+  -> skill.b
+      -> skill.c
+
+skill.a
+  broad entrypoint or router
+
+skill.b
+  narrower router or workflow coordinator
+
+skill.c
+  specialized operational Skill, often owning detailed Context,
+  references, scripts, or assets
+```
+
+A router still owns a real decision, prerequisite check, classification,
+no-match result, or evidence handoff; it is not merely a directory listing. An
+intermediate Skill may own Context when routing itself requires durable domain
+knowledge. An operational Skill may also be published when it is a genuine
+independent first hop, and a workflow Skill may perform operational work before
+continuing.
+
+The recommended workflow composition model is:
+
+```text
+Workflow Skill
+  owns overall orchestration policy
+
+Child Skills
+  own individual operational responsibilities
+```
+
+The workflow Skill body may define ordering, branching conditions, all-of
+versus one-of intent, parallel review, approval gates, stop and retry
+conditions, evidence passed between steps, and completion conditions. Child
+Skill bodies own their individual triggers, inputs, work, constraints,
+evidence, and completion rules.
+
+`renma.continues-with` declares only possible authoritative continuation edges.
+It does not define execution order, priority, automatic invocation, all-of,
+one-of, parallel execution, retries, approval gates, or input/output handoff
+schemas. Declaration order has no priority meaning. Renma does not parse the
+workflow prose or execute child Skills; workflow semantics remain in the body
+of the owning workflow Skill.
+
+Use `renma skill-index .` to review the compact static first-hop and
+continuation evidence. Open the source Skills to decide whether their authored
+conditions apply to a request.
 
 ## Review Selection Boundaries
 
@@ -160,6 +219,6 @@ add a suppression merely to pass. Have a human review meaningful semantic
 changes before merging.
 
 This workflow creates and governs current Agent Skills-compatible repository
-assets. It does not automatically add continuation declarations, published
-entrypoints, reachability, coverage, prompt assembly, Skill selection, or
-execution.
+assets. It does not automatically add continuation declarations or published
+entrypoints, assemble prompts, select Skills, or execute workflows. Reachability
+and coverage are static reports over declarations, not runtime behavior.
