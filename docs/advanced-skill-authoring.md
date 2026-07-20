@@ -10,10 +10,11 @@ A focused Skill owns the workflow it needs to execute well; it is not required
 to be a thin router. Renma validates repository structure and declared Context
 relationships but does not select a Skill at runtime.
 
-The active Skill Discovery design has no assigned release and is not
-implemented. Its proposed explicit continuation metadata and generated static
-index remain separate from current repository file and Skill-local
-support-resource discovery. Runtime selection stays outside Renma.
+The 0.22.0 Skill Discovery foundation adds explicit canonical continuation
+metadata and a static graph projection. It remains separate from repository
+file and Skill-local support-resource discovery, and it does not add published
+entrypoints, repository-wide adoption, reachability, coverage, or runtime Skill
+selection. See the [Skill Discovery Graph contract](skill-discovery.md).
 
 ## Derive A Focused Skill From An Existing Skill
 
@@ -113,6 +114,12 @@ metadata:
 `renma.optional-context` records knowledge needed only for some cases. These are
 static repository relationships; they do not load or inject Context at runtime.
 
+When this Skill itself owns a reviewed continuation decision, it may add
+`renma.continues-with` as a JSON-array string of exact Skill IDs or
+repository-relative `SKILL.md` paths. Keep the conditions and no-match behavior
+in the source body; the declaration does not make Renma select or execute the
+next Skill. See the [Skill Discovery Graph contract](skill-discovery.md).
+
 Use `renma.conflicts` only when two declared assets should not be used together
 without review. Do not use it as a substitute for a clear trigger description.
 
@@ -152,5 +159,6 @@ add a suppression merely to pass. Have a human review meaningful semantic
 changes before merging.
 
 This workflow creates and governs current Agent Skills-compatible repository
-assets. It does not add automatic Skill selection, Skill-to-Skill route
-semantics, generated discovery indexes, prompt assembly, or execution.
+assets. It does not automatically add continuation declarations, published
+entrypoints, reachability, coverage, prompt assembly, Skill selection, or
+execution.

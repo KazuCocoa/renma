@@ -520,7 +520,7 @@ async function runGraph(values: CliValues, target: string): Promise<number> {
   if (!view) {
     return usageError(
       "graph",
-      "--view must be one of: summary, workflow, full, layered, lens, composition, impact.",
+      "--view must be one of: summary, workflow, full, layered, lens, composition, impact, discovery.",
     );
   }
 
@@ -595,7 +595,8 @@ function normalizeGraphView(value: string): GraphView | undefined {
     value === "full" ||
     value === "layered" ||
     value === "composition" ||
-    value === "impact"
+    value === "impact" ||
+    value === "discovery"
   ) {
     return value;
   }

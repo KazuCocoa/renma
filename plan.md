@@ -40,36 +40,34 @@ Repository Context BOM v2 describes declared repository evidence, not what a
 runtime consumed. Trust Graph v2 connects static governance evidence without
 assigning subjective trust or routing scores.
 
-## Immediate Priority: Skill Discovery
+## Immediate Priority: Skill Discovery Route Foundation
 
 The next active design and implementation area is static Skill Discovery for
 repositories with many layered `SKILL.md` files.
 
-The goal is to make explicit Skill-to-Skill continuation contracts,
-intentional first-hop entrypoints, eligibility, descriptive reachability, and
-separately declared repository-wide coverage reviewable without introducing a
-runtime Skill selector. Existing Skills remain the source of workflow and
-routing policy; a generated index is only a compact, deterministic projection.
+The planned 0.22.0 slice makes explicit Skill-to-Skill continuation contracts,
+exact route resolution, route eligibility/usability, warning diagnostics, and
+structural roots reviewable without introducing a runtime Skill selector.
+Existing Skills remain the source of workflow and routing policy; the graph is
+only a compact, deterministic projection.
 
-[The Skill Discovery design](plan-discovery.md) defines the recommended MVP and
-its open questions. No release number is assigned until the public metadata,
-report, diagnostic, and CLI contracts have been reviewed.
+[The Skill Discovery design](plan-discovery.md) defines the full direction and
+the deliberately narrower 0.22.0 release boundary.
 
 ## Expected Implementation Sequence
 
-1. Finalize the two-field metadata contract, single-field repository coverage
-   policy, domain types, versioned JSON report, representative fixtures, and
-   contract tests without adding a public command.
-2. Parse and resolve exact declared Skill continuations, preserve invalid-Skill
-   evidence, compute fail-closed eligibility, entrypoints, and descriptive or
-   authoritative reachability, and emit exact diagnostics through an internal
-   report API.
-3. Add a stdout-only `renma skill-index` command with canonical JSON, compact
-   Markdown, and exact focus by Skill ID or repository-relative path.
-
-Each step should remain independently reviewable. Readiness, semantic diff,
-CI, Trust Graph, BOM, authoring, and visualization integrations follow only
-after the standalone report contract is stable.
+1. Ship the 0.22.0 foundation with only
+   `metadata.renma.continues-with`, exact ID/path resolution, prepared snapshot
+   route evidence, warnings, structural roots, and
+   `graph --view discovery` JSON/Markdown/Mermaid with optional exact focus.
+2. Review explicit published entrypoints and repository-wide Discovery
+   adoption as a separate contract. Do not infer either from graph position or
+   metadata presence.
+3. Review reachability, coverage, and a separate `skill-index` report/command
+   only after route evidence has operational use.
+4. Consider Readiness, semantic diff, CI, Trust Graph, BOM, authoring, and
+   richer visualization integrations independently after those contracts are
+   stable.
 
 ## Later Candidates
 

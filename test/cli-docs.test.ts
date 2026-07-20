@@ -299,9 +299,11 @@ test("Skill authoring docs establish Renma boundaries before platform semantic r
   assert.match(docsIndex, /Advanced Skill Authoring/);
   assert.match(advanced, /focused-workflow model introduced in 0\.18\.0/);
   assert.match(advanced, /0\.19\.0 authoring contract/);
-  assert.match(advanced, /active Skill Discovery design/);
-  assert.match(advanced, /no assigned\s+release/);
-  assert.doesNotMatch(advanced, /`renma\.continues-with`|`skill-index`/);
+  assert.match(advanced, /0\.22\.0 Skill Discovery foundation/);
+  assert.match(advanced, /explicit canonical continuation/);
+  assert.match(advanced, /static graph projection/);
+  assert.match(advanced, /`renma\.continues-with`/);
+  assert.doesNotMatch(advanced, /`skill-index`/);
   assert.match(readme, /Skill Discovery Design/);
   assert.match(authoring, /focused, bounded workflows/);
   assert.doesNotMatch(authoring, /current thin-Skill authoring/);
@@ -606,7 +608,7 @@ test("Context Lens docs use canonical Skill metadata and explicit semantic bound
   assert.match(diagnostics, /must reference a Context Asset/);
 });
 
-test("published current docs separate implemented discovery from the active unimplemented design", async () => {
+test("published current docs separate the operational Discovery foundation from deferred layers", async () => {
   const documents = [
     "README.md",
     "plan.md",
@@ -614,17 +616,16 @@ test("published current docs separate implemented discovery from the active unim
     "docs/README.md",
     "docs/authoring-guide.md",
     "docs/advanced-skill-authoring.md",
+    "docs/skill-discovery.md",
     "docs/repository-context-bom.md",
     "docs/trust-graph.md",
   ];
   const content = await Promise.all(documents.map(readRepoFile));
   assert.ok(content.some((text) => /focused workflow/i.test(text)));
-  assert.ok(content.some((text) => /active Skill Discovery/i.test(text)));
   assert.ok(
-    content.some((text) =>
-      /repository.*support-resource\s+discovery.*implemented/is.test(text),
-    ),
+    content.some((text) => /Skill Discovery route foundation/i.test(text)),
   );
+  assert.ok(content.some((text) => /graph --view discovery/i.test(text)));
   for (const [index, text] of content.entries()) {
     assert.doesNotMatch(
       text,
@@ -635,9 +636,20 @@ test("published current docs separate implemented discovery from the active unim
     assert.doesNotMatch(text, /renma-quality@0\.18\.0/);
   }
   const proposal = content[2] ?? "";
-  assert.match(proposal, /Status: active design proposal/);
-  assert.match(proposal, /Implementation status: not implemented/);
+  assert.match(
+    proposal,
+    /Status: active design with an operational route-foundation slice/,
+  );
+  assert.match(
+    proposal,
+    /Implementation status:[\s\S]*0\.22\.0 slice implements/,
+  );
   assert.match(proposal, /Baseline: Renma 0\.21\.0/);
+  assert.match(
+    proposal,
+    /does not need to ship as one\s+atomic `skill-index` MVP/,
+  );
+  assert.match(proposal, /0\.22\.0 slice does not add published entrypoints/);
   assert.match(proposal, /`renma\.continues-with`/);
   assert.match(proposal, /`renma\.published-entrypoint`/);
   assert.match(

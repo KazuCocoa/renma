@@ -210,6 +210,7 @@ An existing repository can use Renma's built-in defaults without running
 npx renma scan . --fail-on high
 npx renma catalog . --format markdown
 npx renma graph . --format markdown
+npx renma graph . --view discovery --format markdown
 npx renma graph . --view composition --focus <asset-id-or-path> --format markdown
 npx renma graph . --view impact --focus <asset-id-or-path> --format markdown
 npx renma readiness . --format markdown
@@ -457,6 +458,7 @@ metadata:
   renma.owner: qa-platform
   renma.status: stable
   renma.tags: '["testing","spec-review"]'
+  renma.continues-with: '["skill.testing.test-case-generation","skills/testing/risk-review/SKILL.md"]'
   renma.requires-context: '["context.testing.boundary-value-analysis"]'
   renma.optional-context: '[]'
 ---
@@ -466,6 +468,12 @@ Agent Skills owns the standard identity and body. Renma governance and security
 values use flat, string-valued `metadata.renma.*` entries; list values are JSON
 array strings. Context Assets and other non-Skill assets retain their documented
 top-level metadata syntax.
+
+`renma.continues-with` declares exact possible next Skills after the source
+Skill completes its own bounded responsibility. Renma resolves exact stable IDs
+or repository-relative `SKILL.md` paths and reports the result with
+`graph --view discovery`; it does not select, load, invoke, rank, or execute the
+target. See the [Skill Discovery Graph contract](docs/skill-discovery.md).
 
 See the [Authoring Guide](docs/authoring-guide.md) for authoring responsibility
 and the [compatibility guide](docs/agent-skills-compatibility.md) for the exact
@@ -481,12 +489,13 @@ canonical and migration rules.
 - [Renma Quality Profile](docs/quality-profile.md)
 - [Security Policy Guide](docs/security-policy.md)
 - [Repository Context BOM contract](docs/repository-context-bom.md)
+- [Skill Discovery Graph contract](docs/skill-discovery.md)
 - [Architecture](architecture.md)
 - [Product Design](design.md)
 - [Current Roadmap](plan.md)
-- [Skill Discovery Design](plan-discovery.md): active design proposal for a
-  static route/index contract; it is not implemented and remains separate from
-  current repository and support-resource discovery.
+- [Skill Discovery Design](plan-discovery.md): complete layered direction and
+  release slicing. The 0.22.0 route foundation is implemented; publication,
+  adoption, reachability, coverage, and `skill-index` remain deferred.
 - [Interactive Placeholder Example](examples/interactive-placeholder): minimal
   hands-on clarify-before-act Skill interaction with a local tool.
 - [Example Context Repository](examples/context-repo): richer repository-aware

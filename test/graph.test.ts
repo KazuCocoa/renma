@@ -877,7 +877,7 @@ test("graph CLI rejects unsupported view", async () => {
   assert.equal(result.stdout, "");
   assert.match(
     result.stderr,
-    /--view must be one of: summary, workflow, full, layered, lens, composition, impact\./,
+    /--view must be one of: summary, workflow, full, layered, lens, composition, impact, discovery\./,
   );
 });
 

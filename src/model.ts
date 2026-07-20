@@ -49,6 +49,8 @@ export interface AssetMetadata {
   optionalContext: string[];
   conflicts: string[];
   supersededBy: string[];
+  /** Exact Skill continuation declarations from metadata.renma.continues-with. */
+  continuesWith?: string[];
   appliesTo?: string[];
   focus?: string[];
   expectedOutputs?: string[];

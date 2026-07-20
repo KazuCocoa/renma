@@ -31,7 +31,7 @@ const OPTION_HELP = {
   focus: {
     flags: "--focus <asset-id-or-path>",
     description:
-      "Focus one asset by stable ID or path; required by the composition and impact views.",
+      "Focus one asset by stable ID or path; required by composition and impact, and optional for discovery.",
   },
   format: {
     flags: "--format <format>",
@@ -101,7 +101,7 @@ const OPTION_HELP = {
   view: {
     flags: "--view <view>",
     description:
-      "Graph view: summary, workflow, full, layered, lens, composition, or impact.",
+      "Graph view: summary, workflow, full, layered, lens, composition, impact, or discovery.",
   },
 } as const;
 
@@ -245,6 +245,7 @@ export const COMMAND_HELP = [
     examples: [
       "renma graph . --format markdown",
       "renma graph . --view layered --format mermaid",
+      "renma graph . --view discovery --format markdown",
       "renma graph . --focus contexts/testing/boundary-value-analysis.md --view full",
       "renma graph . --focus skill.testing.spec-review --view composition --format json",
       "renma graph . --focus context.shared-api --view impact --format markdown",
@@ -255,6 +256,7 @@ export const COMMAND_HELP = [
       "Focused output filters to the matched asset and directly connected neighbors.",
       "The composition view resolves the complete explicit required and optional closure and requires --focus.",
       "The impact view resolves reverse explicit composition to required and optional declared dependents; it reports neither runtime usage nor breakage and requires --focus.",
+      "The discovery view shows exact declared Skill continuations, structural roots, unusable declarations, and their evidence; optional focus keeps one Skill's direct incoming and outgoing routes.",
     ],
     nextSteps: [
       "Use catalog to inspect the assets behind graph nodes.",

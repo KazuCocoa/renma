@@ -16,6 +16,7 @@ import type {
 } from "../model.js";
 import {
   collectRepositorySnapshot,
+  repositoryDiagnosticsWithoutSkillDiscovery,
   type RepositorySnapshot,
 } from "../repository-evidence.js";
 import type { SecurityPolicyInventorySummary } from "../security-policy-inventory.js";
@@ -171,8 +172,11 @@ export function buildBomReport(
   const scanResult = scanFromRepositorySnapshot(
     snapshot,
     options.evaluationDate === undefined
-      ? {}
-      : { evaluationDate: options.evaluationDate },
+      ? { includeSkillDiscoveryDiagnostics: false }
+      : {
+          evaluationDate: options.evaluationDate,
+          includeSkillDiscoveryDiagnostics: false,
+        },
   );
   const readinessReport = buildReadinessReport(
     graphReport,
@@ -185,7 +189,7 @@ export function buildBomReport(
   const dependencies = stableEdges(graphReport.edges).map(toBomDependency);
   const diagnostics = stableDiagnostics(
     dedupeDiagnostics([
-      ...snapshot.diagnostics,
+      ...repositoryDiagnosticsWithoutSkillDiscovery(snapshot),
       ...(graphReport.diagnostics ?? []),
       ...(readinessReport.diagnostics ?? []),
     ]),
@@ -422,6 +426,11 @@ function assetLifecycle(asset: Asset): BomAssetLifecycle | undefined {
 }
 
 function toBomDependency(edge: GraphEdge): BomDependency {
+  if (edge.kind === "continues_with") {
+    throw new Error(
+      "Repository Context BOM dependencies cannot include Skill Discovery routes.",
+    );
+  }
   return {
     from: edge.from,
     to: edge.to,

@@ -43,6 +43,7 @@ export const CANONICAL_SKILL_METADATA_KEYS = {
   optional_lens: "renma.optional-lens",
   conflicts: "renma.conflicts",
   superseded_by: "renma.superseded-by",
+  continues_with: "renma.continues-with",
 } as const;
 
 type CanonicalSkillOperationalKey = keyof typeof CANONICAL_SKILL_METADATA_KEYS;
@@ -64,6 +65,30 @@ const CANONICAL_LIST_KEYS = new Set<CanonicalSkillOperationalKey>([
   "conflicts",
   "superseded_by",
 ]);
+
+export type CanonicalSkillContinuationFieldState =
+  | "unsupported"
+  | "absent"
+  | "ambiguous"
+  | "invalid"
+  | "valid";
+
+export interface CanonicalSkillContinuationItem {
+  declarationIndex: number;
+  rawTarget: string;
+  target: string;
+  evidence: MetadataFieldEvidence;
+}
+
+/** Canonical continuation field evidence retained independently from route usability. */
+export interface CanonicalSkillContinuationField {
+  state: CanonicalSkillContinuationFieldState;
+  canonicalKey: typeof CANONICAL_SKILL_METADATA_KEYS.continues_with;
+  agentSkillValid: boolean;
+  items: CanonicalSkillContinuationItem[];
+  fieldEvidence?: MetadataFieldEvidence;
+  reason?: string;
+}
 
 interface OperationalMetadataSource {
   values: Record<string, unknown>;
@@ -489,6 +514,13 @@ export function parseAssetMetadata(document: ParsedDocument): {
     operationalListValue(document, source, "optional_lens", diagnostics),
   );
 
+  if (source.canonicalSkill) {
+    const continuesWith = parseContinuationValue(source.values.continues_with);
+    if (continuesWith.valid) {
+      metadata.continuesWith = continuesWith.items.map((item) => item.trim());
+    }
+  }
+
   if (lastReviewedAt !== undefined && !isIsoDate(lastReviewedAt)) {
     diagnostics.push(
       invalidMetadataDiagnostic(
@@ -531,6 +563,140 @@ export function parseAssetMetadata(document: ParsedDocument): {
     metadataFields: source.fields,
     metadataListItems: source.listItems,
     diagnostics,
+  };
+}
+
+/** Parse the explicit canonical Skill continuation field without selecting legacy fallbacks. */
+export function parseCanonicalSkillContinuationField(
+  document: ParsedDocument,
+): CanonicalSkillContinuationField {
+  const canonicalKey = CANONICAL_SKILL_METADATA_KEYS.continues_with;
+  if (
+    document.artifact.kind !== "skill" ||
+    document.artifact.path.replaceAll("\\", "/").split("/").at(-1) !==
+      "SKILL.md"
+  ) {
+    return {
+      state: "unsupported",
+      canonicalKey,
+      agentSkillValid: false,
+      items: [],
+    };
+  }
+
+  const inspection = inspectAgentSkill(document);
+  const fields = inspection.frontmatter.metadataFields.filter(
+    (field) => field.key === canonicalKey,
+  );
+  if (fields.length === 0) {
+    return {
+      state: "absent",
+      canonicalKey,
+      agentSkillValid: inspection.validation.valid,
+      items: [],
+    };
+  }
+
+  const first = fields[0]!;
+  const fieldEvidence = metadataEvidenceFromYamlField(document, first);
+  const duplicateMetadataMapping = inspection.frontmatter.duplicateFields.some(
+    (field) => field.key === "metadata",
+  );
+  if (duplicateMetadataMapping || fields.length !== 1) {
+    return {
+      state: "ambiguous",
+      canonicalKey,
+      agentSkillValid: inspection.validation.valid,
+      items: [],
+      fieldEvidence,
+      reason: duplicateMetadataMapping
+        ? "the top-level metadata mapping is declared more than once"
+        : `metadata.${canonicalKey} is declared more than once`,
+    };
+  }
+
+  const parsed = parseContinuationValue(first.value);
+  if (!parsed.valid) {
+    return {
+      state: "invalid",
+      canonicalKey,
+      agentSkillValid: inspection.validation.valid,
+      items: [],
+      fieldEvidence,
+      reason: parsed.reason,
+    };
+  }
+
+  return {
+    state: "valid",
+    canonicalKey,
+    agentSkillValid: inspection.validation.valid,
+    fieldEvidence,
+    items: parsed.items.map((rawTarget, declarationIndex) => ({
+      declarationIndex,
+      rawTarget,
+      target: rawTarget.trim(),
+      evidence: { ...fieldEvidence },
+    })),
+  };
+}
+
+type ContinuationValueParseResult =
+  | { valid: true; items: string[] }
+  | { valid: false; reason: string };
+
+function parseContinuationValue(value: unknown): ContinuationValueParseResult {
+  if (typeof value !== "string") {
+    return {
+      valid: false,
+      reason: "must be a string containing a JSON array of non-empty strings",
+    };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return {
+      valid: false,
+      reason:
+        "must be a string containing valid JSON for an array of non-empty strings",
+    };
+  }
+  if (!Array.isArray(parsed)) {
+    return {
+      valid: false,
+      reason: "must contain a JSON array",
+    };
+  }
+  const nonStringIndex = parsed.findIndex((item) => typeof item !== "string");
+  if (nonStringIndex >= 0) {
+    return {
+      valid: false,
+      reason: `array member ${nonStringIndex} must be a string`,
+    };
+  }
+  const items = parsed as string[];
+  const emptyIndex = items.findIndex((item) => item.trim().length === 0);
+  if (emptyIndex >= 0) {
+    return {
+      valid: false,
+      reason: `array member ${emptyIndex} must be non-empty after trimming`,
+    };
+  }
+  return { valid: true, items };
+}
+
+function metadataEvidenceFromYamlField(
+  document: ParsedDocument,
+  field: YamlFrontmatterField,
+): MetadataFieldEvidence {
+  return {
+    path: document.artifact.path,
+    key: field.key,
+    startLine: field.startLine,
+    endLine: field.endLine,
+    raw: document.lines.slice(field.startLine - 1, field.endLine).join("\n"),
   };
 }
 

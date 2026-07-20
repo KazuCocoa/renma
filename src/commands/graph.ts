@@ -30,20 +30,28 @@ import type {
 } from "../model.js";
 import { classifyRepositorySkillEntrypointPath } from "../discovery.js";
 import {
-  collectRepositoryEvidence,
+  collectRepositorySnapshot,
+  repositoryDiagnosticsWithoutSkillDiscovery,
   type RepositoryEvidence,
   type RepositorySnapshot,
 } from "../repository-evidence.js";
+import {
+  focusSkillDiscoveryIndex,
+  type DeclaredSkillRoute,
+  type SkillDiscoveryIndex,
+} from "../skill-discovery.js";
 import type { Diagnostic } from "../types.js";
 
 export type GraphFormat = "json" | "markdown" | "mermaid";
+export type GraphEdgeKind = DependencyKind | "continues_with";
 export type GraphView =
   | "summary"
   | "workflow"
   | "full"
   | "layered"
   | "composition"
-  | "impact";
+  | "impact"
+  | "discovery";
 
 export interface GraphReport {
   root: string;
@@ -56,6 +64,7 @@ export interface GraphReport {
   edges: GraphEdge[];
   composition?: DeclaredCompositionReport;
   impact?: DeclaredImpactReport;
+  discovery?: SkillDiscoveryIndex;
   diagnostics?: Diagnostic[];
 }
 
@@ -76,7 +85,7 @@ export interface GraphNode {
 export interface GraphEdge {
   from: string;
   to: string;
-  kind: DependencyKind;
+  kind: GraphEdgeKind;
   declaration?: string;
   declarationIndex?: number;
   sourcePath: string;
@@ -99,13 +108,18 @@ export async function runGraphCommand(
   },
 ): Promise<number> {
   const view = options.view ?? defaultGraphView(options.format);
-  const evidence = await collectRepositoryEvidence(
+  const snapshot = await collectRepositorySnapshot(
     targetPath,
     options.overrides ?? {},
   );
-  const fullReport = graphFromRepositoryEvidence(evidence);
+  const fullReport = graphFromRepositorySnapshot(snapshot);
   let report: GraphReport;
-  if (view === "composition" || view === "impact") {
+  if (view === "discovery") {
+    const discovery = options.focus
+      ? focusSkillDiscoveryIndex(snapshot.skillDiscovery, options.focus)
+      : snapshot.skillDiscovery;
+    report = discoveryGraphReport(fullReport, discovery);
+  } else if (view === "composition" || view === "impact") {
     if (!options.focus) {
       throw new Error(
         `graph --view ${view} requires --focus <asset-id-or-path>.`,
@@ -113,14 +127,14 @@ export async function runGraphCommand(
     }
     const focusNode = resolveFocusNode(fullReport, options.focus);
     if (view === "composition") {
-      const index = prepareDeclaredCompositionIndex(evidence.catalog);
+      const index = prepareDeclaredCompositionIndex(snapshot.catalog);
       const composition = resolveDeclaredCompositionFromIndex(
         index,
         focusNode.id,
       );
       report = compositionGraphReport(fullReport, composition);
     } else {
-      const index = prepareDeclaredImpactIndex(evidence.catalog);
+      const index = prepareDeclaredImpactIndex(snapshot.catalog);
       const impact = resolveDeclaredImpactFromIndex(index, focusNode.id);
       report = impactGraphReport(fullReport, impact);
     }
@@ -128,9 +142,10 @@ export async function runGraphCommand(
     report = focusGraph(fullReport, options.focus);
   }
   process.stdout.write(formatGraph(report, options.format, view));
-  return report.diagnostics?.some(
-    (diagnostic) => diagnostic.severity === "error",
-  )
+  return [
+    ...(report.diagnostics ?? []),
+    ...(report.discovery?.diagnostics ?? []),
+  ].some((diagnostic) => diagnostic.severity === "error")
     ? 1
     : 0;
 }
@@ -139,8 +154,8 @@ export async function graph(
   targetPath: string,
   overrides: ConfigOverrides = {},
 ): Promise<GraphReport> {
-  return graphFromRepositoryEvidence(
-    await collectRepositoryEvidence(targetPath, overrides),
+  return graphFromRepositorySnapshot(
+    await collectRepositorySnapshot(targetPath, overrides),
   );
 }
 
@@ -170,7 +185,10 @@ export function graphFromRepositoryEvidence(
 export function graphFromRepositorySnapshot(
   snapshot: RepositorySnapshot,
 ): GraphReport {
-  return graphFromRepositoryEvidence(snapshot);
+  return graphFromRepositoryEvidence({
+    ...snapshot,
+    diagnostics: repositoryDiagnosticsWithoutSkillDiscovery(snapshot),
+  });
 }
 
 export function formatGraphJson(report: GraphReport): string {
@@ -214,6 +232,51 @@ function resolveFocusNode(report: GraphReport, focus: string): GraphNode {
     );
   }
   return node;
+}
+
+function discoveryGraphReport(
+  report: GraphReport,
+  discovery: SkillDiscoveryIndex,
+): GraphReport {
+  const visiblePaths = new Set(
+    discovery.skills.map((skill) => skill.sourcePath),
+  );
+  const nodes = report.nodes.filter((node) =>
+    visiblePaths.has(node.sourcePath),
+  );
+  // Only authoritative usable representatives become graph edges. Every
+  // declaration, including unresolved evidence, remains in discovery.routes.
+  const edges = discovery.routes
+    .filter(
+      (route) =>
+        route.usable &&
+        route.representative &&
+        route.resolvedTarget?.kind === "skill",
+    )
+    .map(
+      (route): GraphEdge => ({
+        from: route.sourceId,
+        to: route.normalizedTarget,
+        kind: "continues_with",
+        declaration: "metadata.renma.continues-with",
+        declarationIndex: route.declarationIndex,
+        sourcePath: route.sourcePath,
+        evidence: route.evidence,
+        resolved: true,
+        targetId: route.resolvedTarget!.id,
+        targetKind: "skill",
+        targetPath: route.resolvedTarget!.sourcePath,
+      }),
+    );
+  return {
+    ...report,
+    view: "discovery",
+    nodeCount: nodes.length,
+    edgeCount: edges.length,
+    nodes,
+    edges,
+    discovery,
+  };
 }
 
 function compositionGraphReport(
@@ -317,6 +380,7 @@ export function formatGraphMermaid(
   report: GraphReport,
   view: GraphView = "summary",
 ): string {
+  if (view === "discovery") return formatDiscoveryMermaid(report);
   if (view === "composition") return formatCompositionMermaid(report);
   if (view === "impact") return formatImpactMermaid(report);
   report = graphViewReport(report, view);
@@ -449,6 +513,7 @@ export function formatGraphMarkdown(
   report: GraphReport,
   view: GraphView = "summary",
 ): string {
+  if (view === "discovery") return formatDiscoveryMarkdown(report);
   if (view === "composition") return formatCompositionMarkdown(report);
   if (view === "impact") return formatImpactMarkdown(report);
   report = graphViewReport(report, view);
@@ -505,6 +570,188 @@ export function formatGraphMarkdown(
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+function formatDiscoveryMarkdown(report: GraphReport): string {
+  const discovery = requiredDiscoveryReport(report);
+  const skillsById = new Map(
+    discovery.skills.map((skill) => [skill.id, skill]),
+  );
+  const lines = [
+    "# Renma Skill Discovery Graph",
+    "",
+    `- Repository: ${report.root}`,
+    ...(report.configPath ? [`- Config: ${report.configPath}`] : []),
+    ...(discovery.focus
+      ? [`- Focus: ${discovery.focus.id} (${discovery.focus.sourcePath})`]
+      : []),
+    "- Boundary: this is a static declared Skill-to-Skill continuation projection. Renma does not select, load, invoke, rank, or execute Skills.",
+    "",
+    "Open each source `SKILL.md` and apply its routing conditions before continuing with another Skill.",
+    "",
+    "## Summary",
+    "",
+    `- Visible Skills: ${discovery.summary.visibleSkillCount}`,
+    `- Declared routes: ${discovery.summary.declaredRouteCount}`,
+    `- Usable routes: ${discovery.summary.usableRouteCount}`,
+    `- Unresolved or ambiguous routes: ${discovery.summary.unresolvedOrAmbiguousRouteCount}`,
+    `- Invalid routes: ${discovery.summary.invalidRouteCount}`,
+    `- Structural roots: ${discovery.summary.structuralRootCount}`,
+    "",
+    "## Structural roots",
+    "",
+  ];
+
+  if (discovery.structuralRootIds.length === 0) {
+    lines.push("- None.");
+  } else {
+    for (const id of discovery.structuralRootIds) {
+      const skill = skillsById.get(id);
+      lines.push(`- ${id}${skill ? ` — ${skill.sourcePath}` : ""}`);
+    }
+  }
+
+  lines.push(
+    "",
+    "Structural roots are route-eligible Skills with no incoming usable Skill route. They are graph facts, not published entrypoints.",
+    "",
+    "## Declared routes",
+    "",
+    "| Source | Index | Declared target | Resolution | Usability | Evidence | Diagnostics |",
+    "| --- | ---: | --- | --- | --- | --- | --- |",
+  );
+  if (discovery.routes.length === 0) {
+    lines.push("| (none) |  |  |  |  |  |  |");
+  } else {
+    for (const route of discovery.routes) {
+      const resolution = discoveryRouteResolutionLabel(route);
+      const usability = route.usable
+        ? "usable"
+        : `unusable: ${route.usabilityReasons.join(", ")}`;
+      lines.push(
+        `| ${tableText(`${route.sourceId} (${route.sourcePath})`)} | ${route.declarationIndex} | ${tableText(`${route.rawTarget} → ${route.normalizedTarget}`)} | ${tableText(resolution)} | ${tableText(usability)} | ${tableText(evidenceLabel(route.evidence, route.sourcePath))} | ${tableText(route.linkedDiagnostics.map((item) => item.code).join(", "))} |`,
+      );
+    }
+  }
+
+  lines.push("", "## Discovery diagnostics", "");
+  if (discovery.diagnostics.length === 0) {
+    lines.push("- None.");
+  } else {
+    for (const diagnostic of discovery.diagnostics) {
+      const location = diagnostic.evidence
+        ? evidenceLabel(diagnostic.evidence, diagnostic.path ?? "")
+        : (diagnostic.path ?? "repository");
+      lines.push(
+        `- ${diagnostic.code ?? "RENMA-DIAGNOSTIC"} (${location}): ${diagnostic.message}`,
+      );
+      if (diagnostic.llmHint) lines.push(`  - Repair: ${diagnostic.llmHint}`);
+    }
+  }
+
+  if (report.diagnostics && report.diagnostics.length > 0) {
+    lines.push("", "## Repository diagnostics", "");
+    for (const diagnostic of report.diagnostics) {
+      const location = diagnostic.evidence
+        ? evidenceLabel(diagnostic.evidence, diagnostic.path ?? "")
+        : (diagnostic.path ?? "repository");
+      lines.push(
+        `- ${diagnostic.code ?? "RENMA-DIAGNOSTIC"} [${diagnostic.severity}] (${location}): ${diagnostic.message}`,
+      );
+    }
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+function formatDiscoveryMermaid(report: GraphReport): string {
+  const discovery = requiredDiscoveryReport(report);
+  const nodeIds = new Map<string, string>();
+  const lines = ["graph TD"];
+  discovery.skills.forEach((skill, index) => {
+    const id = `skill_${index}`;
+    nodeIds.set(skill.sourcePath, id);
+    const state = skill.routeEligible ? "" : " [ineligible]";
+    lines.push(
+      `  ${id}["${escapeMermaidLabel(`skill: ${skill.id} (${skill.sourcePath})${state}`)}"]`,
+    );
+  });
+
+  discovery.routes.forEach((route, index) => {
+    const source = nodeIds.get(route.sourcePath);
+    if (!source) return;
+    if (
+      route.usable &&
+      route.representative &&
+      route.resolvedTarget?.kind === "skill"
+    ) {
+      const target = nodeIds.get(route.resolvedTarget.sourcePath);
+      if (target) {
+        lines.push(`  ${source} -->|continues-with| ${target}`);
+      }
+    } else {
+      const synthetic = `route_${index}`;
+      const target = route.resolvedTarget
+        ? `${route.resolvedTarget.kind}: ${route.resolvedTarget.id} (${route.resolvedTarget.sourcePath})`
+        : `${route.resolution}: ${route.normalizedTarget}`;
+      const reasons = route.usabilityReasons.join(", ") || route.resolution;
+      lines.push(
+        `  ${synthetic}["${escapeMermaidLabel(`${target} [${reasons}]`)}"]`,
+      );
+      lines.push(
+        `  ${source} -.->|${escapeMermaidLabel(`continues-with ${route.resolution}`)}| ${synthetic}`,
+      );
+    }
+    lines.push(
+      `  %% declaration ${route.sourcePath} index ${route.declarationIndex} at ${evidenceLabel(route.evidence, route.sourcePath)}`,
+    );
+  });
+
+  const rootNodes = discovery.structuralRootIds.flatMap((rootId) =>
+    discovery.skills
+      .filter((skill) => skill.id === rootId)
+      .map((skill) => nodeIds.get(skill.sourcePath))
+      .filter((id): id is string => id !== undefined),
+  );
+  if (rootNodes.length > 0) {
+    lines.push("  classDef structuralRoot stroke-width:2px,stroke:#64748b");
+    lines.push(`  class ${rootNodes.join(",")} structuralRoot`);
+  }
+  if (discovery.diagnostics.length > 0) {
+    lines.push("  %% Discovery diagnostics:");
+    for (const diagnostic of discovery.diagnostics) {
+      const location = diagnostic.evidence
+        ? evidenceLabel(diagnostic.evidence, diagnostic.path ?? "")
+        : (diagnostic.path ?? "repository");
+      lines.push(
+        `  %% ${singleLine(`${diagnostic.code ?? "RENMA-DIAGNOSTIC"} ${location}: ${diagnostic.message}`)}`,
+      );
+    }
+  }
+  if (report.diagnostics && report.diagnostics.length > 0) {
+    lines.push("  %% Repository diagnostics:");
+    for (const diagnostic of report.diagnostics) {
+      const location = diagnostic.evidence
+        ? evidenceLabel(diagnostic.evidence, diagnostic.path ?? "")
+        : (diagnostic.path ?? "repository");
+      lines.push(
+        `  %% ${singleLine(`${diagnostic.code ?? "RENMA-DIAGNOSTIC"} [${diagnostic.severity}] ${location}: ${diagnostic.message}`)}`,
+      );
+    }
+  }
+  lines.push(
+    "  %% Solid edges are usable declared Skill continuations. Dotted edges end at synthetic review nodes. Structural roots are graph facts, not published entrypoints. Renma does not execute Skills.",
+  );
+  return `${lines.join("\n")}\n`;
+}
+
+function discoveryRouteResolutionLabel(route: DeclaredSkillRoute): string {
+  if (!route.resolvedTarget) {
+    return route.normalizationRejection
+      ? `${route.resolution} (${route.normalizationRejection})`
+      : route.resolution;
+  }
+  return `${route.resolution}: ${route.resolvedTarget.id} (${route.resolvedTarget.kind}, ${route.resolvedTarget.sourcePath}${route.resolvedTarget.lifecycle ? `, ${route.resolvedTarget.lifecycle}` : ""})`;
 }
 
 function formatCompositionMarkdown(report: GraphReport): string {
@@ -983,6 +1230,15 @@ function requiredCompositionReport(
   return report.composition;
 }
 
+function requiredDiscoveryReport(report: GraphReport): SkillDiscoveryIndex {
+  if (!report.discovery) {
+    throw new Error(
+      "Discovery graph formatting requires a resolved Skill Discovery report.",
+    );
+  }
+  return report.discovery;
+}
+
 function requiredImpactReport(report: GraphReport): DeclaredImpactReport {
   if (!report.impact) {
     throw new Error(
@@ -1036,9 +1292,9 @@ function defaultGraphView(format: GraphFormat): GraphView {
 
 function graphViewReport(report: GraphReport, view: GraphView): GraphReport {
   if (report.view === view) return report;
-  if (view === "composition" || view === "impact") {
+  if (view === "composition" || view === "impact" || view === "discovery") {
     throw new Error(
-      `${view === "composition" ? "Composition" : "Impact"} graph formatting requires a resolved ${view === "composition" ? "composition" : "declared impact"} report.`,
+      `${view === "composition" ? "Composition" : view === "impact" ? "Impact" : "Discovery"} graph formatting requires a resolved ${view === "composition" ? "composition" : view === "impact" ? "declared impact" : "Skill Discovery"} report.`,
     );
   }
   if (view === "full" || view === "layered") return { ...report, view };
@@ -1124,7 +1380,10 @@ function graphViewReport(report: GraphReport, view: GraphView): GraphReport {
   };
 }
 
-function projectedNode(node: GraphNode, view: GraphView): GraphNode {
+function projectedNode(
+  node: GraphNode,
+  view: Exclude<GraphView, "composition" | "impact" | "discovery">,
+): GraphNode {
   if (view === "workflow" && keepWorkflowNode(node.sourcePath)) return node;
   const groupId = groupPath(node.sourcePath, view);
   if (!groupId) return node;
