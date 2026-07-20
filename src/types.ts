@@ -312,6 +312,9 @@ export interface ScanConfig {
   suppressions: SuppressionConfig[];
   layout: LayoutPolicyConfig;
   security: SecurityConfig;
+  skillDiscovery: {
+    adopted: boolean;
+  };
 }
 
 /** Loaded configuration plus the path it came from, when applicable. */

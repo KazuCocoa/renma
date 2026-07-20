@@ -623,7 +623,9 @@ test("published current docs separate the operational Discovery foundation from 
   const content = await Promise.all(documents.map(readRepoFile));
   assert.ok(content.some((text) => /focused workflow/i.test(text)));
   assert.ok(
-    content.some((text) => /Skill Discovery route foundation/i.test(text)),
+    content.some((text) =>
+      /0\.22\.0 Skill Discovery foundation|route-foundation/i.test(text),
+    ),
   );
   assert.ok(content.some((text) => /graph --view discovery/i.test(text)));
   for (const [index, text] of content.entries()) {
@@ -638,18 +640,21 @@ test("published current docs separate the operational Discovery foundation from 
   const proposal = content[2] ?? "";
   assert.match(
     proposal,
-    /Status: active design with an operational route-foundation slice/,
+    /Status: active design with operational route-foundation and publication\/adoption slices/,
   );
   assert.match(
     proposal,
-    /Implementation status:[\s\S]*0\.22\.0 slice implements/,
+    /Implementation status:[\s\S]*0\.22\.0 implements[\s\S]*0\.22\.1 implements/,
   );
   assert.match(proposal, /Baseline: Renma 0\.21\.0/);
   assert.match(
     proposal,
     /does not need to ship as one\s+atomic `skill-index` MVP/,
   );
-  assert.match(proposal, /0\.22\.0 slice does not add published entrypoints/);
+  assert.match(
+    proposal,
+    /0\.22\.1 slice adds published entrypoints and `skill_discovery\.adopted`/,
+  );
   assert.match(proposal, /`renma\.continues-with`/);
   assert.match(proposal, /`renma\.published-entrypoint`/);
   assert.match(

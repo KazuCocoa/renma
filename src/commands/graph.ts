@@ -596,11 +596,72 @@ function formatDiscoveryMarkdown(report: GraphReport): string {
     `- Usable routes: ${discovery.summary.usableRouteCount}`,
     `- Unresolved or ambiguous routes: ${discovery.summary.unresolvedOrAmbiguousRouteCount}`,
     `- Invalid routes: ${discovery.summary.invalidRouteCount}`,
+    `- Published entrypoints in this projection: ${discovery.summary.publishedEntrypointCount}`,
     `- Structural roots: ${discovery.summary.structuralRootCount}`,
     "",
-    "## Structural roots",
+    "## Adoption",
+    "",
+    `- State: ${discovery.adoption.state}`,
+    `- Discovery metadata present: ${yesNo(discovery.adoption.discoveryMetadataPresent)}`,
+    `- Repository-wide adopted: ${yesNo(discovery.adoption.repositoryWideAdopted)}`,
+    `- Effective published entrypoints repository-wide: ${discovery.adoption.publishedEntrypointCount}`,
+    `- Reason: ${discovery.adoption.reason}`,
+    ...(discovery.adoption.configPath
+      ? [`- Config: ${discovery.adoption.configPath}`]
+      : []),
+    `- Coverage: ${discovery.coverage.mode} (${discovery.coverage.reason})`,
+    "",
+    "## Published entrypoints",
+    "",
+    "Published entrypoints are explicit first-hop declarations. Structural roots are derived graph facts. Neither causes Renma to select or execute a Skill.",
     "",
   ];
+
+  if (discovery.publishedEntrypointIds.length === 0) {
+    lines.push(
+      discovery.focus && discovery.adoption.publishedEntrypointCount > 0
+        ? "- No effective published entrypoint is visible in this focused projection. The repository-wide adoption state is retained."
+        : `- No effective published entrypoint exists. Adoption state: ${discovery.adoption.state}.`,
+    );
+  } else {
+    for (const id of discovery.publishedEntrypointIds) {
+      const skill = skillsById.get(id);
+      if (!skill) continue;
+      const continuations = discovery.routes.filter(
+        (route) => route.sourcePath === skill.sourcePath,
+      );
+      lines.push(
+        `### ${skill.id}`,
+        "",
+        `- Description: ${skill.description ?? "(unavailable)"}`,
+        `- Source: ${skill.sourcePath}`,
+        `- Owner: ${formatOwnership(skill.ownership)}`,
+        `- Lifecycle: ${skill.lifecycle ?? "(unspecified)"}`,
+        `- Structural root: ${yesNo(skill.structuralRoot)}`,
+        `- Standalone: ${yesNo(skill.standalone)}`,
+        "- Direct declared continuations:",
+        "",
+      );
+      if (continuations.length === 0) {
+        lines.push(
+          "  - None. This Skill may itself be the complete first-hop workflow.",
+        );
+      } else {
+        lines.push(
+          "  | Index | Declared target | Resolution | Usability |",
+          "  | ---: | --- | --- | --- |",
+        );
+        for (const route of continuations) {
+          lines.push(
+            `  | ${route.declarationIndex} | ${tableText(route.rawTarget)} | ${tableText(discoveryRouteResolutionLabel(route))} | ${route.usable ? "usable" : tableText(`unusable: ${route.usabilityReasons.join(", ")}`)} |`,
+          );
+        }
+      }
+      lines.push("");
+    }
+  }
+
+  lines.push("## Structural roots", "");
 
   if (discovery.structuralRootIds.length === 0) {
     lines.push("- None.");
@@ -613,7 +674,7 @@ function formatDiscoveryMarkdown(report: GraphReport): string {
 
   lines.push(
     "",
-    "Structural roots are route-eligible Skills with no incoming usable Skill route. They are graph facts, not published entrypoints.",
+    "Structural roots are route-eligible Skills with no incoming usable Skill route. They are candidate graph facts, not recommendations or published entrypoints.",
     "",
     "## Declared routes",
     "",
@@ -717,6 +778,16 @@ function formatDiscoveryMermaid(report: GraphReport): string {
     lines.push("  classDef structuralRoot stroke-width:2px,stroke:#64748b");
     lines.push(`  class ${rootNodes.join(",")} structuralRoot`);
   }
+  const publishedNodes = discovery.skills
+    .filter((skill) => skill.publication.accepted)
+    .map((skill) => nodeIds.get(skill.sourcePath))
+    .filter((id): id is string => id !== undefined);
+  if (publishedNodes.length > 0) {
+    lines.push(
+      "  classDef publishedEntrypoint fill:#dbeafe,stroke:#2563eb,stroke-width:3px",
+    );
+    lines.push(`  class ${publishedNodes.join(",")} publishedEntrypoint`);
+  }
   if (discovery.diagnostics.length > 0) {
     lines.push("  %% Discovery diagnostics:");
     for (const diagnostic of discovery.diagnostics) {
@@ -740,7 +811,7 @@ function formatDiscoveryMermaid(report: GraphReport): string {
     }
   }
   lines.push(
-    "  %% Solid edges are usable declared Skill continuations. Dotted edges end at synthetic review nodes. Structural roots are graph facts, not published entrypoints. Renma does not execute Skills.",
+    "  %% Solid edges are usable declared Skill continuations. Dotted edges end at synthetic review nodes. Published entrypoints are explicit first-hop declarations; structural roots are derived graph facts. Neither causes Renma to select or execute a Skill. Renma does not execute Skills.",
   );
   return `${lines.join("\n")}\n`;
 }

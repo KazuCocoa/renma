@@ -6,6 +6,31 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added the exact canonical Agent Skills
+  `metadata.renma.published-entrypoint: "true"` marker, publication eligibility
+  and rejection evidence, and deterministic effective published-entrypoint
+  projection without inferring publication from structural roots or routes.
+- Added strict `skill_discovery.adopted` repository configuration and explicit
+  `not-adopted`, `partial`, `incomplete`, and `adopted` states. Coverage remains
+  explicitly `not-evaluated` because reachability and coverage are deferred.
+- Added `DISCOVERY-INVALID-PUBLISHED-ENTRYPOINT` and
+  `DISCOVERY-ENTRYPOINT-WITHOUT-USABLE-BOUNDARIES` warning diagnostics through
+  scan, diagnostics v2, and review bundles.
+- Extended `graph --view discovery` JSON, Markdown, and Mermaid with adoption,
+  publication evidence, explicit published entrypoints, and distinct
+  entrypoint styling while preserving repository diagnostics separately.
+
+### Compatibility
+
+- Discovery publication remains separate from structural-root facts and
+  `catalog.dependencies`. Existing graph views and Readiness, diff, CI report,
+  Trust Graph, BOM, ownership, init, scaffold, guide, and suggestion contracts
+  remain unchanged; `renma init` does not adopt Skill Discovery.
+- Reachability, coverage evaluation, unreachable-Skill diagnostics,
+  `skill-index`, and runtime Skill selection remain deferred.
+
 ## [0.22.0] - 2026-07-19
 
 ### Added

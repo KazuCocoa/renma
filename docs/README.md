@@ -34,9 +34,10 @@ Use this index to choose the smallest document that answers your question.
 - [Declared Impact](declared-impact.md): reverse required and optional
   composition closure, dependent Skill summaries, provenance, and change-review
   boundary.
-- [Skill Discovery Graph](skill-discovery.md): canonical Skill continuation
-  metadata, exact resolution, eligibility/usability, route diagnostics,
-  structural roots, and the discovery graph view.
+- [Skill Discovery Graph](skill-discovery.md): canonical Skill continuation and
+  publication metadata, repository-wide adoption, exact resolution,
+  eligibility/usability, diagnostics, structural roots, and the discovery graph
+  view.
 - [Renma Quality Profile](quality-profile.md): canonical thresholds,
   units, provenance, rationale, false-positive risks, and configuration status.
 
@@ -61,8 +62,9 @@ Use this index to choose the smallest document that answers your question.
 - [Current Roadmap](../plan.md): shipped baseline, product boundaries, and
   forward-looking priorities.
 - [Skill Discovery Design](../plan-discovery.md): complete layered design and
-  release slicing. The 0.22.0 route foundation is operational; publication,
-  adoption, reachability, coverage, and `skill-index` remain deferred.
+  release slicing. The 0.22.0 route foundation and 0.22.1
+  publication/adoption slice are operational; reachability, coverage
+  evaluation, and `skill-index` remain deferred.
 
 ## Examples
 

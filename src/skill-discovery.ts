@@ -5,13 +5,20 @@ import {
   type AgentSkillValidationResult,
   type AgentSkillsValidationSummary,
 } from "./agent-skills.js";
-import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
+import {
+  AGENT_SKILL_DIAGNOSTIC_IDS,
+  DIAGNOSTIC_IDS,
+} from "./diagnostic-ids.js";
 import {
   parseCanonicalSkillContinuationField,
+  parseCanonicalSkillPublicationField,
   type CanonicalSkillContinuationItem,
+  type CanonicalSkillPublicationField,
+  type CanonicalSkillPublicationFieldState,
 } from "./metadata.js";
 import type { Asset, AssetKind, AssetStatus, Catalog } from "./model.js";
 import type {
+  AssetOwnership,
   Diagnostic,
   Evidence,
   MetadataFieldEvidence,
@@ -49,6 +56,50 @@ export interface SkillDiagnosticLink {
   evidence?: Evidence;
 }
 
+export const SKILL_PUBLICATION_REJECTION_REASONS = [
+  "invalid-marker",
+  "ambiguous-marker",
+  "invalid-skill",
+  "inactive-skill",
+  "duplicate-skill-id",
+] as const;
+
+export type SkillPublicationRejectionReason =
+  (typeof SKILL_PUBLICATION_REJECTION_REASONS)[number];
+
+const PUBLISHED_ENTRYPOINT_BOUNDARIES = [
+  {
+    code: AGENT_SKILL_DIAGNOSTIC_IDS.RN_DESCRIPTION_MISSING_CAPABILITY,
+    label: "capability",
+  },
+  {
+    code: AGENT_SKILL_DIAGNOSTIC_IDS.RN_DESCRIPTION_MISSING_USAGE_BOUNDARY,
+    label: "positive usage boundary",
+  },
+  {
+    code: AGENT_SKILL_DIAGNOSTIC_IDS.RN_DESCRIPTION_OMITS_SELECTION_BOUNDARY,
+    label: "negative selection/routing boundary",
+  },
+] as const;
+
+export interface SkillPublicationMarker {
+  state: CanonicalSkillPublicationFieldState;
+  canonicalKey: "metadata.renma.published-entrypoint";
+  present: boolean;
+  valid: boolean;
+  rawValue?: unknown;
+  evidence?: Evidence;
+  reason?: string;
+}
+
+export interface SkillPublicationState {
+  marker: SkillPublicationMarker;
+  requested: boolean;
+  accepted: boolean;
+  rejectionReasons: SkillPublicationRejectionReason[];
+  linkedDiagnostics: SkillDiagnosticLink[];
+}
+
 export interface VisibleSkillIdentity {
   /** Path-based identity remains authoritative even when the visible ID is duplicated. */
   identity: string;
@@ -57,11 +108,15 @@ export interface VisibleSkillIdentity {
   name?: string;
   description?: string;
   lifecycle?: AssetStatus;
+  ownership: AssetOwnership;
   agentSkillsValid: boolean;
   lifecycleActive: boolean;
   effectiveIdUnique: boolean;
   routeEligible: boolean;
   routeEligibilityReasons: SkillRouteUsabilityReason[];
+  publication: SkillPublicationState;
+  structuralRoot: boolean;
+  standalone: boolean;
   linkedDiagnostics: SkillDiagnosticLink[];
 }
 
@@ -116,6 +171,31 @@ export interface SkillDiscoverySummary {
   invalidRouteCount: number;
   structuralRootCount: number;
   standaloneSkillCount: number;
+  publishedEntrypointCount: number;
+}
+
+export type SkillDiscoveryAdoptionState =
+  | "not-adopted"
+  | "partial"
+  | "incomplete"
+  | "adopted";
+
+export interface SkillDiscoveryAdoption {
+  state: SkillDiscoveryAdoptionState;
+  discoveryMetadataPresent: boolean;
+  repositoryWideAdopted: boolean;
+  publishedEntrypointCount: number;
+  reason:
+    | "no-discovery-metadata-or-repository-adoption"
+    | "discovery-metadata-present-without-repository-adoption"
+    | "repository-adoption-has-no-effective-published-entrypoint"
+    | "repository-adoption-has-effective-published-entrypoint";
+  configPath?: string;
+}
+
+export interface SkillDiscoveryCoverage {
+  mode: "not-evaluated";
+  reason: "reachability-and-coverage-are-deferred";
 }
 
 /** Warning diagnostic emitted from explicit Skill continuation evidence. */
@@ -124,6 +204,9 @@ export type SkillDiscoveryDiagnostic = Diagnostic;
 export interface SkillDiscoveryIndex {
   skills: VisibleSkillIdentity[];
   routes: DeclaredSkillRoute[];
+  adoption: SkillDiscoveryAdoption;
+  coverage: SkillDiscoveryCoverage;
+  publishedEntrypointIds: string[];
   structuralRootIds: string[];
   standaloneSkillIds: string[];
   summary: SkillDiscoverySummary;
@@ -132,6 +215,11 @@ export interface SkillDiscoveryIndex {
     id: string;
     sourcePath: string;
   };
+}
+
+export interface SkillDiscoveryPreparationOptions {
+  repositoryWideAdopted?: boolean;
+  configPath?: string;
 }
 
 type MutableRoute = DeclaredSkillRoute;
@@ -146,11 +234,27 @@ export function prepareSkillDiscoveryIndex(
   documents: ParsedDocument[],
   catalog: Catalog,
   agentSkills: AgentSkillsValidationSummary = validateAgentSkills(documents),
+  options: SkillDiscoveryPreparationOptions = {},
 ): SkillDiscoveryIndex {
   const validationsByPath = new Map(
     agentSkills.results.map((result) => [result.path, result]),
   );
   const idCounts = countAssetIds(catalog.assets);
+  const documentsByPath = new Map(
+    documents.map((document) => [document.artifact.path, document]),
+  );
+  const continuationFieldsByPath = new Map(
+    documents.map((document) => [
+      document.artifact.path,
+      parseCanonicalSkillContinuationField(document),
+    ]),
+  );
+  const publicationFieldsByPath = new Map(
+    documents.map((document) => [
+      document.artifact.path,
+      parseCanonicalSkillPublicationField(document),
+    ]),
+  );
   const skills = catalog.assets
     .filter((asset) => asset.kind === "skill")
     .map((asset) =>
@@ -158,6 +262,7 @@ export function prepareSkillDiscoveryIndex(
         asset,
         validationsByPath.get(asset.sourcePath),
         idCounts.get(asset.id) === 1,
+        publicationFieldsByPath.get(asset.sourcePath),
       ),
     )
     .sort(compareVisibleSkills);
@@ -167,13 +272,10 @@ export function prepareSkillDiscoveryIndex(
   const diagnostics: Diagnostic[] = [];
   const routes: MutableRoute[] = [];
 
-  const documentsByPath = new Map(
-    documents.map((document) => [document.artifact.path, document]),
-  );
   for (const skill of skills) {
     const document = documentsByPath.get(skill.sourcePath);
     if (!document) continue;
-    const declaration = parseCanonicalSkillContinuationField(document);
+    const declaration = continuationFieldsByPath.get(skill.sourcePath)!;
     if (declaration.state === "invalid") {
       diagnostics.push(
         invalidDeclarationDiagnostic(
@@ -208,6 +310,15 @@ export function prepareSkillDiscoveryIndex(
   diagnostics.sort(compareDiagnostics);
   linkDiscoveryDiagnostics(routes, diagnostics);
 
+  for (const skill of skills) {
+    const publicationDiagnostic = publicationDiagnosticFor(skill);
+    if (publicationDiagnostic) diagnostics.push(publicationDiagnostic);
+    const boundaryDiagnostic = publishedEntrypointBoundaryDiagnostic(skill);
+    if (boundaryDiagnostic) diagnostics.push(boundaryDiagnostic);
+  }
+  diagnostics.sort(compareDiagnostics);
+  linkPublicationDiagnostics(skills, diagnostics);
+
   const usableRoutes = routes.filter((route) => route.usable);
   const incoming = new Set(
     usableRoutes.flatMap((route) =>
@@ -224,16 +335,44 @@ export function prepareSkillDiscoveryIndex(
     .filter((skill) => !incoming.has(skill.id) && !outgoing.has(skill.id))
     .map((skill) => skill.id)
     .sort((left, right) => left.localeCompare(right));
+  const structuralRoots = new Set(structuralRootIds);
+  const standaloneSkills = new Set(standaloneSkillIds);
+  for (const skill of skills) {
+    skill.structuralRoot = structuralRoots.has(skill.id);
+    skill.standalone = standaloneSkills.has(skill.id);
+  }
+  const publishedEntrypointIds = skills
+    .filter((skill) => skill.publication.accepted)
+    .sort(compareVisibleSkills)
+    .map((skill) => skill.id);
+  const discoveryMetadataPresent = [
+    ...continuationFieldsByPath.values(),
+    ...publicationFieldsByPath.values(),
+  ].some((field) => field.state !== "absent" && field.state !== "unsupported");
+  const adoption = skillDiscoveryAdoption(
+    discoveryMetadataPresent,
+    options.repositoryWideAdopted === true,
+    publishedEntrypointIds.length,
+    options.configPath,
+  );
+  const coverage: SkillDiscoveryCoverage = {
+    mode: "not-evaluated",
+    reason: "reachability-and-coverage-are-deferred",
+  };
 
   const publicRoutes: DeclaredSkillRoute[] = routes;
   return {
     skills,
     routes: publicRoutes,
+    adoption,
+    coverage,
+    publishedEntrypointIds,
     structuralRootIds,
     standaloneSkillIds,
     summary: summarizeDiscovery(
       skills,
       publicRoutes,
+      publishedEntrypointIds,
       structuralRootIds,
       standaloneSkillIds,
     ),
@@ -290,6 +429,9 @@ export function focusSkillDiscoveryIndex(
   const standaloneSkillIds = index.standaloneSkillIds.filter((id) =>
     skills.some((skill) => skill.id === id),
   );
+  const publishedEntrypointIds = index.publishedEntrypointIds.filter((id) =>
+    skills.some((skill) => skill.id === id),
+  );
   const routeKeys = new Set(
     routes.map(
       (route) => `${route.sourcePath}\0${route.declarationIndex.toString()}`,
@@ -311,17 +453,21 @@ export function focusSkillDiscoveryIndex(
           routeKeys.has(`${diagnostic.path}\0${indexValue.toString()}`),
       );
     }
-    return diagnostic.path === selected.sourcePath;
+    return visiblePaths.has(diagnostic.path);
   });
 
   return {
     skills,
     routes,
+    adoption: index.adoption,
+    coverage: index.coverage,
+    publishedEntrypointIds,
     structuralRootIds,
     standaloneSkillIds,
     summary: summarizeDiscovery(
       skills,
       routes,
+      publishedEntrypointIds,
       structuralRootIds,
       standaloneSkillIds,
     ),
@@ -361,6 +507,7 @@ function visibleSkill(
   asset: Asset,
   validation: AgentSkillValidationResult | undefined,
   effectiveIdUnique: boolean,
+  marker: CanonicalSkillPublicationField | undefined,
 ): VisibleSkillIdentity {
   const lifecycleActive =
     asset.metadata.status !== "deprecated" &&
@@ -370,6 +517,18 @@ function visibleSkill(
     routeEligibilityReasons.push("invalid-source");
   if (!lifecycleActive) routeEligibilityReasons.push("inactive-source");
   if (!effectiveIdUnique) routeEligibilityReasons.push("duplicate-source-id");
+  const publicationMarker = publicationMarkerProjection(marker);
+  const publicationRejectionReasons = publicationRejectionReasonsFor(
+    publicationMarker.state,
+    validation?.valid === true,
+    lifecycleActive,
+    effectiveIdUnique,
+  );
+  const linkedDiagnostics = skillDiagnosticLinks(
+    asset,
+    validation,
+    effectiveIdUnique,
+  );
   return {
     identity: asset.sourcePath,
     id: asset.id,
@@ -377,17 +536,236 @@ function visibleSkill(
     ...(validation?.name ? { name: validation.name } : {}),
     ...(validation?.description ? { description: validation.description } : {}),
     ...(asset.metadata.status ? { lifecycle: asset.metadata.status } : {}),
+    ownership: asset.ownership,
     agentSkillsValid: validation?.valid === true,
     lifecycleActive,
     effectiveIdUnique,
     routeEligible: routeEligibilityReasons.length === 0,
     routeEligibilityReasons,
-    linkedDiagnostics: skillDiagnosticLinks(
-      asset,
-      validation,
-      effectiveIdUnique,
-    ),
+    publication: {
+      marker: publicationMarker,
+      requested: publicationMarker.state === "valid",
+      accepted:
+        publicationMarker.state === "valid" &&
+        publicationRejectionReasons.length === 0,
+      rejectionReasons: publicationRejectionReasons,
+      linkedDiagnostics: [...linkedDiagnostics],
+    },
+    structuralRoot: false,
+    standalone: false,
+    linkedDiagnostics,
   };
+}
+
+function publicationMarkerProjection(
+  marker: CanonicalSkillPublicationField | undefined,
+): SkillPublicationMarker {
+  if (!marker) {
+    return {
+      state: "unsupported",
+      canonicalKey: "metadata.renma.published-entrypoint",
+      present: false,
+      valid: false,
+    };
+  }
+  const projection: SkillPublicationMarker = {
+    state: marker.state,
+    canonicalKey: "metadata.renma.published-entrypoint",
+    present: marker.state !== "unsupported" && marker.state !== "absent",
+    valid: marker.state === "valid",
+    ...(marker.fieldEvidence
+      ? { evidence: toEvidence(marker.fieldEvidence) }
+      : {}),
+    ...(marker.reason ? { reason: marker.reason } : {}),
+  };
+  if (Object.prototype.hasOwnProperty.call(marker, "rawValue")) {
+    projection.rawValue = marker.rawValue;
+  }
+  return projection;
+}
+
+function publicationRejectionReasonsFor(
+  markerState: CanonicalSkillPublicationFieldState,
+  agentSkillsValid: boolean,
+  lifecycleActive: boolean,
+  effectiveIdUnique: boolean,
+): SkillPublicationRejectionReason[] {
+  if (markerState === "invalid") return ["invalid-marker"];
+  if (markerState === "ambiguous") return ["ambiguous-marker"];
+  if (markerState !== "valid") return [];
+  const reasons: SkillPublicationRejectionReason[] = [];
+  if (!agentSkillsValid) reasons.push("invalid-skill");
+  if (!lifecycleActive) reasons.push("inactive-skill");
+  if (!effectiveIdUnique) reasons.push("duplicate-skill-id");
+  const unique = new Set(reasons);
+  return SKILL_PUBLICATION_REJECTION_REASONS.filter((reason) =>
+    unique.has(reason),
+  );
+}
+
+function skillDiscoveryAdoption(
+  discoveryMetadataPresent: boolean,
+  repositoryWideAdopted: boolean,
+  publishedEntrypointCount: number,
+  configPath: string | undefined,
+): SkillDiscoveryAdoption {
+  if (!repositoryWideAdopted) {
+    return {
+      state: discoveryMetadataPresent ? "partial" : "not-adopted",
+      discoveryMetadataPresent,
+      repositoryWideAdopted: false,
+      publishedEntrypointCount,
+      reason: discoveryMetadataPresent
+        ? "discovery-metadata-present-without-repository-adoption"
+        : "no-discovery-metadata-or-repository-adoption",
+      ...(configPath ? { configPath } : {}),
+    };
+  }
+  return {
+    state: publishedEntrypointCount > 0 ? "adopted" : "incomplete",
+    discoveryMetadataPresent,
+    repositoryWideAdopted: true,
+    publishedEntrypointCount,
+    reason:
+      publishedEntrypointCount > 0
+        ? "repository-adoption-has-effective-published-entrypoint"
+        : "repository-adoption-has-no-effective-published-entrypoint",
+    ...(configPath ? { configPath } : {}),
+  };
+}
+
+function publicationDiagnosticFor(
+  skill: VisibleSkillIdentity,
+): Diagnostic | undefined {
+  const marker = skill.publication.marker;
+  const invalidMarker = marker.state === "invalid";
+  const ambiguousMarker = marker.state === "ambiguous";
+  const inactiveAttempt =
+    marker.state === "valid" &&
+    skill.agentSkillsValid &&
+    !skill.lifecycleActive;
+  if (!invalidMarker && !ambiguousMarker && !inactiveAttempt) return undefined;
+
+  const reason = invalidMarker
+    ? (marker.reason ?? 'the marker is not the exact YAML string "true"')
+    : ambiguousMarker
+      ? (marker.reason ?? "the marker declaration is ambiguous")
+      : `the Skill lifecycle is ${skill.lifecycle ?? "inactive"}`;
+  const action = ambiguousMarker
+    ? "Resolve the declaration ambiguity with human review, then retain one exact intended marker or omit it."
+    : inactiveAttempt
+      ? "Remove the stale publication attempt or review the lifecycle decision; do not reactivate or clone the Skill merely to publish it."
+      : 'Use the exact YAML string "true" to request publication, or omit the marker.';
+  return {
+    code: DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT,
+    severity: "warning",
+    path: skill.sourcePath,
+    message: `Skill "${skill.id}" cannot be published because ${reason}. ${action}`,
+    ...(marker.evidence ? { evidence: marker.evidence } : {}),
+    repairConstraints: publicationRepairConstraints(ambiguousMarker),
+    verificationSteps: publicationMarkerVerificationSteps(),
+    llmHint:
+      "Preserve the intended bounded first-hop responsibility. Do not publish every structural root, fabricate or clone a Skill, reactivate an inactive Skill merely to publish it, or guess through ambiguous evidence.",
+    details: {
+      sourceId: skill.id,
+      sourcePath: skill.sourcePath,
+      metadataKey: marker.canonicalKey,
+      markerState: marker.state,
+      markerReason: reason,
+      ...(Object.prototype.hasOwnProperty.call(marker, "rawValue")
+        ? { rawMarkerValue: marker.rawValue }
+        : {}),
+      ...(marker.evidence ? { rawMarkerEvidence: marker.evidence } : {}),
+      ...(skill.lifecycle ? { lifecycle: skill.lifecycle } : {}),
+      publicationRejectionReasons: skill.publication.rejectionReasons,
+    },
+  };
+}
+
+function publishedEntrypointBoundaryDiagnostic(
+  skill: VisibleSkillIdentity,
+): Diagnostic | undefined {
+  if (!skill.publication.accepted) return undefined;
+  const linked = PUBLISHED_ENTRYPOINT_BOUNDARIES.flatMap(({ code }) =>
+    skill.linkedDiagnostics.filter((diagnostic) => diagnostic.code === code),
+  );
+  if (linked.length === 0) return undefined;
+  const linkedCodes = new Set(linked.map((diagnostic) => diagnostic.code));
+  const missing = PUBLISHED_ENTRYPOINT_BOUNDARIES.filter(({ code }) =>
+    linkedCodes.has(code),
+  ).map(({ label }) => label);
+  const primaryEvidence = linked.find((diagnostic) => diagnostic.evidence)
+    ?.evidence ?? {
+    path: skill.sourcePath,
+    startLine: 1,
+    endLine: 1,
+    snippet: "published entrypoint boundary evidence",
+  };
+  return {
+    code: DIAGNOSTIC_IDS.DISCOVERY_ENTRYPOINT_WITHOUT_USABLE_BOUNDARIES,
+    severity: "warning",
+    path: skill.sourcePath,
+    message: `Published entrypoint "${skill.id}" lacks deterministic first-hop boundary evidence for: ${missing.join(", ")}. Improve the source Skill's bounded responsibility; do not remove publication solely to suppress this warning.`,
+    evidence: primaryEvidence,
+    repairConstraints: publicationBoundaryRepairConstraints(),
+    verificationSteps: publishedEntrypointBoundaryVerificationSteps(),
+    llmHint:
+      "Preserve the intended published first-hop responsibility and add the missing deterministic capability or selection boundary to the canonical Agent Skills description. Passing this warning is not proof of semantic completeness.",
+    details: {
+      sourceId: skill.id,
+      sourcePath: skill.sourcePath,
+      metadataKey: skill.publication.marker.canonicalKey,
+      missingBoundaries: missing,
+      publicationMarkerEvidence: skill.publication.marker.evidence,
+      linkedDiagnostics: linked,
+    },
+  };
+}
+
+function publicationRepairConstraints(
+  ambiguous: boolean,
+): NonNullable<Diagnostic["repairConstraints"]> {
+  return [
+    {
+      kind: "must_preserve",
+      text: "Preserve the intended bounded first-hop responsibility while repairing publication evidence.",
+    },
+    {
+      kind: "must_not_change",
+      text: "Do not publish every structural root automatically, fabricate or clone a Skill, or reactivate an inactive Skill merely to satisfy publication.",
+    },
+    {
+      kind: "allowed_change",
+      text: 'Retain one exact metadata.renma.published-entrypoint string "true" declaration when publication is intended, or omit the marker when it is not.',
+    },
+    ...(ambiguous
+      ? [
+          {
+            kind: "requires_human_decision" as const,
+            text: "Require human review when intended publication is ambiguous.",
+          },
+        ]
+      : []),
+  ];
+}
+
+function publicationBoundaryRepairConstraints(): NonNullable<
+  Diagnostic["repairConstraints"]
+> {
+  return [
+    {
+      kind: "must_preserve",
+      text: "Preserve the intended published first-hop responsibility and its routing semantics.",
+    },
+    {
+      kind: "must_not_change",
+      text: "Do not remove publication solely to suppress a boundary-quality warning or publish every structural root automatically.",
+    },
+    {
+      kind: "allowed_change",
+      text: "Improve the canonical Agent Skills description with the deterministically missing capability or selection boundary.",
+    },
+  ];
 }
 
 function resolveDeclaredRoute(
@@ -587,7 +965,7 @@ function invalidDeclarationDiagnostic(
     message: `Invalid metadata.${canonicalKey}: ${reason}. Correct or remove the explicit Skill continuation declaration.`,
     ...(field ? { evidence: toEvidence(field) } : {}),
     repairConstraints: discoveryRepairConstraints(),
-    verificationSteps: discoveryVerificationSteps(
+    verificationSteps: routeVerificationSteps(
       DIAGNOSTIC_IDS.DISCOVERY_INVALID_CONTINUATION_DECLARATION,
     ),
     llmHint:
@@ -613,7 +991,7 @@ function unresolvedRouteDiagnostic(route: DeclaredSkillRoute): Diagnostic {
     message: `Skill "${route.sourceId}" continuation ${route.declarationIndex} ${ambiguous ? "is ambiguous" : "has no exact target"}: "${route.rawTarget}".${rejection} Use one exact stable Skill ID or repository-relative SKILL.md path.`,
     evidence: route.evidence,
     repairConstraints: discoveryRepairConstraints(ambiguous),
-    verificationSteps: discoveryVerificationSteps(
+    verificationSteps: routeVerificationSteps(
       DIAGNOSTIC_IDS.DISCOVERY_UNRESOLVED_DECLARED_ROUTE,
     ),
     llmHint: ambiguous
@@ -643,7 +1021,7 @@ function wrongKindRouteDiagnostic(route: DeclaredSkillRoute): Diagnostic {
     message: `Skill continuation ${route.declarationIndex} resolves to ${target.kind} asset "${target.id}" at ${target.sourcePath}. Skill continuations are Skill-to-Skill only; use existing typed Context or Context Lens relationships for other asset kinds.`,
     evidence: route.evidence,
     repairConstraints: discoveryRepairConstraints(),
-    verificationSteps: discoveryVerificationSteps(
+    verificationSteps: routeVerificationSteps(
       DIAGNOSTIC_IDS.DISCOVERY_ROUTE_TARGET_NOT_SKILL,
     ),
     llmHint:
@@ -670,7 +1048,7 @@ function inactiveTargetDiagnostic(route: DeclaredSkillRoute): Diagnostic {
     message: `Skill continuation ${route.declarationIndex} targets ${target.lifecycle} Skill "${target.id}" at ${target.sourcePath}. The declaration remains visible but is unusable for structural Discovery.`,
     evidence: route.evidence,
     repairConstraints: discoveryRepairConstraints(),
-    verificationSteps: discoveryVerificationSteps(
+    verificationSteps: routeVerificationSteps(
       DIAGNOSTIC_IDS.DISCOVERY_INACTIVE_ROUTE_TARGET,
     ),
     llmHint:
@@ -704,7 +1082,7 @@ function duplicateRouteDiagnostic(
     message: `Skill "${representative.sourceId}" declares the same continuation more than once at indices ${indices.join(", ")}. Declaration order is not priority; keep one exact declaration.`,
     evidence: representative.evidence,
     repairConstraints: discoveryRepairConstraints(),
-    verificationSteps: discoveryVerificationSteps(
+    verificationSteps: routeVerificationSteps(
       DIAGNOSTIC_IDS.DISCOVERY_DUPLICATE_DECLARED_ROUTE,
     ),
     llmHint:
@@ -746,7 +1124,7 @@ function discoveryRepairConstraints(
   ];
 }
 
-function discoveryVerificationSteps(
+function routeVerificationSteps(
   code: string,
 ): NonNullable<Diagnostic["verificationSteps"]> {
   return [
@@ -759,6 +1137,43 @@ function discoveryVerificationSteps(
       text: "Run Renma scan and confirm diagnostics v2 preserve the repaired relationship evidence.",
       command: "renma scan . --format json",
       expected: `No diagnostics with code ${code} remain for the repaired declaration.`,
+    },
+  ];
+}
+
+function publicationMarkerVerificationSteps(): NonNullable<
+  Diagnostic["verificationSteps"]
+> {
+  const code = DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT;
+  return [
+    {
+      text: "Run the Discovery graph and inspect the Skill's publication marker and effective publication state.",
+      command: "renma graph . --view discovery --format json",
+      expected: `The marker has the intended state, publication.accepted is correct, the rejected Skill is absent from publishedEntrypointIds unless it has become eligible, and no diagnostics with code ${code} remain after a valid repair.`,
+    },
+    {
+      text: "Run Renma scan and confirm publication validation remains separate from existing Skill eligibility evidence.",
+      command: "renma scan . --format json",
+      expected: `No diagnostics with code ${code} remain after a valid repair; existing Agent Skills, lifecycle, and duplicate-ID diagnostics remain authoritative.`,
+    },
+  ];
+}
+
+function publishedEntrypointBoundaryVerificationSteps(): NonNullable<
+  Diagnostic["verificationSteps"]
+> {
+  const code = DIAGNOSTIC_IDS.DISCOVERY_ENTRYPOINT_WITHOUT_USABLE_BOUNDARIES;
+  return [
+    {
+      text: "Preserve the valid publication marker, improve the canonical Agent Skills description, and inspect the Discovery graph again.",
+      command: "renma graph . --view discovery --format json",
+      expected:
+        "The Skill remains an effective published entrypoint and publication was not removed merely to suppress the boundary warning.",
+    },
+    {
+      text: "Run Renma scan and confirm the deterministic description-boundary evidence is repaired.",
+      command: "renma scan . --format json",
+      expected: `The originating RN-SKILL-* boundary issue and ${code} are absent while the Skill remains published.`,
     },
   ];
 }
@@ -848,6 +1263,36 @@ function linkDiscoveryDiagnostics(
   }
 }
 
+function linkPublicationDiagnostics(
+  skills: VisibleSkillIdentity[],
+  diagnostics: Diagnostic[],
+): void {
+  const publicationCodes = new Set<string>([
+    DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT,
+    DIAGNOSTIC_IDS.DISCOVERY_ENTRYPOINT_WITHOUT_USABLE_BOUNDARIES,
+  ]);
+  for (const diagnostic of diagnostics) {
+    if (
+      !diagnostic.code ||
+      !publicationCodes.has(diagnostic.code) ||
+      !diagnostic.path
+    ) {
+      continue;
+    }
+    const skill = skills.find(
+      (candidate) => candidate.sourcePath === diagnostic.path,
+    );
+    if (!skill) continue;
+    skill.publication.linkedDiagnostics = uniqueDiagnosticLinks([
+      ...skill.publication.linkedDiagnostics,
+      {
+        code: diagnostic.code,
+        ...(diagnostic.evidence ? { evidence: diagnostic.evidence } : {}),
+      },
+    ]);
+  }
+}
+
 function declarationEvidence(
   item: CanonicalSkillContinuationItem,
 ): SkillRouteDeclarationEvidence {
@@ -884,6 +1329,7 @@ function metadataEvidence(
 function summarizeDiscovery(
   skills: VisibleSkillIdentity[],
   routes: DeclaredSkillRoute[],
+  publishedEntrypointIds: string[],
   structuralRootIds: string[],
   standaloneSkillIds: string[],
 ): SkillDiscoverySummary {
@@ -910,6 +1356,7 @@ function summarizeDiscovery(
     ).length,
     structuralRootCount: structuralRootIds.length,
     standaloneSkillCount: standaloneSkillIds.length,
+    publishedEntrypointCount: publishedEntrypointIds.length,
   };
 }
 

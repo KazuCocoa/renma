@@ -2,7 +2,7 @@
 
 ## Current Product
 
-Renma 0.21.0 is a Git-native Context Repository governance CLI for
+Renma 0.22.x is a Git-native Context Repository governance CLI for
 agent-consumable knowledge. It applies the review boundary:
 
 ```text
@@ -40,19 +40,24 @@ Repository Context BOM v2 describes declared repository evidence, not what a
 runtime consumed. Trust Graph v2 connects static governance evidence without
 assigning subjective trust or routing scores.
 
-## Immediate Priority: Skill Discovery Route Foundation
+## Immediate Priority: Skill Discovery Publication And Adoption
 
-The next active design and implementation area is static Skill Discovery for
+The active design and implementation area is static Skill Discovery for
 repositories with many layered `SKILL.md` files.
 
-The planned 0.22.0 slice makes explicit Skill-to-Skill continuation contracts,
+The shipped 0.22.0 slice makes explicit Skill-to-Skill continuation contracts,
 exact route resolution, route eligibility/usability, warning diagnostics, and
 structural roots reviewable without introducing a runtime Skill selector.
 Existing Skills remain the source of workflow and routing policy; the graph is
 only a compact, deterministic projection.
 
+The 0.22.1 slice adds explicit Skill-local published entrypoints and explicit
+repository-wide Discovery adoption. It does not infer either from graph
+position, route metadata, directories, ownership, or the existence of Skills.
+Reachability and coverage remain explicitly not evaluated.
+
 [The Skill Discovery design](plan-discovery.md) defines the full direction and
-the deliberately narrower 0.22.0 release boundary.
+the independently bounded 0.22.0 and 0.22.1 release slices.
 
 ## Expected Implementation Sequence
 
@@ -60,9 +65,10 @@ the deliberately narrower 0.22.0 release boundary.
    `metadata.renma.continues-with`, exact ID/path resolution, prepared snapshot
    route evidence, warnings, structural roots, and
    `graph --view discovery` JSON/Markdown/Mermaid with optional exact focus.
-2. Review explicit published entrypoints and repository-wide Discovery
-   adoption as a separate contract. Do not infer either from graph position or
-   metadata presence.
+2. Ship the 0.22.1 publication/adoption contract with only the exact
+   `metadata.renma.published-entrypoint: "true"` marker, strict
+   `skill_discovery.adopted` policy, adoption states, publication diagnostics,
+   and Discovery graph projection. Do not infer publication or adoption.
 3. Review reachability, coverage, and a separate `skill-index` report/command
    only after route evidence has operational use.
 4. Consider Readiness, semantic diff, CI, Trust Graph, BOM, authoring, and

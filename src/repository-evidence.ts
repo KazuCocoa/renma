@@ -114,6 +114,10 @@ export async function collectRepositorySnapshot(
     documents,
     built.catalog,
     agentSkills,
+    {
+      repositoryWideAdopted: config.skillDiscovery.adopted,
+      ...(configPath ? { configPath } : {}),
+    },
   );
   const classifications = buildClassificationEvidenceIndex(documents);
   const securityPolicies = collectSecurityPolicyAssetEvidence(

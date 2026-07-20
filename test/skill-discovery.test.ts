@@ -8,6 +8,7 @@ import { parseDocument } from "../src/markdown.js";
 import {
   parseAssetMetadata,
   parseCanonicalSkillContinuationField,
+  parseCanonicalSkillPublicationField,
 } from "../src/metadata.js";
 import {
   focusSkillDiscoveryIndex,
@@ -584,6 +585,480 @@ test("non-Skill metadata cannot become an operational Skill continuation", () =>
   assert.deepEqual(prepareSkillDiscoveryIndex([document], catalog).routes, []);
 });
 
+test("canonical publication parsing accepts only the exact YAML string true", () => {
+  const cases = [
+    ['"true"', "valid"],
+    ["true", "invalid"],
+    ['"false"', "invalid"],
+    ["false", "invalid"],
+    ['""', "invalid"],
+    ['"TRUE"', "invalid"],
+    ['" true "', "invalid"],
+    ["1", "invalid"],
+    ["[]", "invalid"],
+    ["{}", "invalid"],
+    ["null", "invalid"],
+  ] as const;
+
+  for (const [value, state] of cases) {
+    const parsed = parseCanonicalSkillPublicationField(
+      skillWithRawPublication(value),
+    );
+    assert.equal(parsed.state, state, value);
+    assert.equal(parsed.fieldEvidence?.key, "renma.published-entrypoint");
+    assert.match(parsed.fieldEvidence?.raw ?? "", /published-entrypoint/);
+  }
+});
+
+test("publication parsing fails closed on duplicate declarations and ignores aliases", () => {
+  const duplicateMarker = rawDocument(
+    "skills/source/SKILL.md",
+    "skill",
+    [
+      "---",
+      "name: source",
+      "description: Review source inputs. Use when source review is needed; do not use for execution.",
+      "metadata:",
+      "  renma.id: skill.source",
+      '  renma.published-entrypoint: "true"',
+      '  renma.published-entrypoint: "true"',
+      "---",
+      "# Source",
+    ].join("\n"),
+  );
+  const duplicateMetadata = rawDocument(
+    "skills/source/SKILL.md",
+    "skill",
+    [
+      "---",
+      "name: source",
+      "description: Review source inputs. Use when source review is needed; do not use for execution.",
+      "metadata:",
+      "  renma.id: skill.source",
+      "metadata:",
+      '  renma.published-entrypoint: "true"',
+      "---",
+      "# Source",
+    ].join("\n"),
+  );
+  const aliases = skill("skills/source/SKILL.md", {
+    id: "skill.source",
+    extraMetadata: [
+      '  published_entrypoint: "true"',
+      '  discovery_entrypoint: "true"',
+      '  entrypoint: "true"',
+      '  renma.entrypoint: "true"',
+    ],
+  });
+  const noncanonical = rawDocument(
+    "skills/source/skill.md",
+    "skill",
+    skillWithRawPublication('"true"').artifact.content,
+  );
+
+  assert.equal(
+    parseCanonicalSkillPublicationField(duplicateMarker).state,
+    "ambiguous",
+  );
+  const duplicateMapping =
+    parseCanonicalSkillPublicationField(duplicateMetadata);
+  assert.equal(duplicateMapping.state, "ambiguous");
+  assert.equal(duplicateMapping.fieldEvidence?.startLine, 7);
+  assert.equal(parseCanonicalSkillPublicationField(aliases).state, "absent");
+  assert.equal(
+    parseCanonicalSkillPublicationField(noncanonical).state,
+    "unsupported",
+  );
+  const ambiguousDiagnostic = prepare([duplicateMarker]).diagnostics.find(
+    (item) =>
+      item.code === DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT,
+  );
+  assert.equal(ambiguousDiagnostic?.details?.markerState, "ambiguous");
+  assert.ok(
+    ambiguousDiagnostic?.repairConstraints?.some(
+      (constraint) => constraint.kind === "requires_human_decision",
+    ),
+  );
+});
+
+test("explicit publication is independent from structural roots and incoming routes", () => {
+  const discovery = prepare([
+    skill("skills/root/SKILL.md", {
+      id: "skill.root",
+      routes: ["skill.target"],
+    }),
+    skill("skills/target/SKILL.md", {
+      id: "skill.target",
+      published: true,
+    }),
+    skill("skills/solo/SKILL.md", {
+      id: "skill.solo",
+      published: true,
+    }),
+  ]);
+  const byId = new Map(discovery.skills.map((item) => [item.id, item]));
+
+  assert.equal(byId.get("skill.root")?.structuralRoot, true);
+  assert.equal(byId.get("skill.root")?.publication.accepted, false);
+  assert.equal(byId.get("skill.target")?.structuralRoot, false);
+  assert.equal(byId.get("skill.target")?.publication.accepted, true);
+  assert.equal(byId.get("skill.solo")?.standalone, true);
+  assert.equal(byId.get("skill.solo")?.publication.accepted, true);
+  assert.deepEqual(discovery.publishedEntrypointIds, [
+    "skill.solo",
+    "skill.target",
+  ]);
+  assert.equal(discovery.adoption.state, "partial");
+});
+
+test("publication rejection preserves invalid, inactive, and duplicate identity evidence", () => {
+  const invalid = rawDocument(
+    "skills/invalid/SKILL.md",
+    "skill",
+    [
+      "---",
+      "name: invalid",
+      "metadata:",
+      "  renma.id: skill.invalid",
+      '  renma.published-entrypoint: "true"',
+      "---",
+      "# Invalid",
+    ].join("\n"),
+  );
+  const discovery = prepare([
+    invalid,
+    skill("skills/deprecated/SKILL.md", {
+      id: "skill.deprecated",
+      status: "deprecated",
+      published: true,
+    }),
+    skill("skills/archived/SKILL.md", {
+      id: "skill.archived",
+      status: "archived",
+      published: true,
+    }),
+    skill("skills/alpha/SKILL.md", {
+      id: "skill.duplicate",
+      published: true,
+    }),
+    skill("skills/beta/SKILL.md", {
+      id: "skill.duplicate",
+      published: true,
+    }),
+  ]);
+  const byPath = new Map(
+    discovery.skills.map((item) => [item.sourcePath, item]),
+  );
+
+  assert.deepEqual(
+    byPath.get("skills/invalid/SKILL.md")?.publication.rejectionReasons,
+    ["invalid-skill"],
+  );
+  assert.ok(
+    byPath
+      .get("skills/invalid/SKILL.md")
+      ?.publication.linkedDiagnostics.some((item) =>
+        item.code.startsWith("AS-SKILL-"),
+      ),
+  );
+  assert.deepEqual(
+    byPath.get("skills/deprecated/SKILL.md")?.publication.rejectionReasons,
+    ["inactive-skill"],
+  );
+  assert.deepEqual(
+    byPath.get("skills/alpha/SKILL.md")?.publication.rejectionReasons,
+    ["duplicate-skill-id"],
+  );
+  assert.ok(
+    byPath
+      .get("skills/alpha/SKILL.md")
+      ?.publication.linkedDiagnostics.some(
+        (item) => item.code === DIAGNOSTIC_IDS.META_DUPLICATE_ASSET_ID,
+      ),
+  );
+  assert.deepEqual(discovery.publishedEntrypointIds, []);
+  assert.equal(
+    discovery.diagnostics.filter(
+      (item) =>
+        item.code === DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT,
+    ).length,
+    2,
+  );
+});
+
+test("invalid publication markers and deterministic boundary gaps emit publication warnings", () => {
+  const invalidMarker = skillWithRawPublication("true");
+  const weakBoundary = rawDocument(
+    "skills/weak/SKILL.md",
+    "skill",
+    [
+      "---",
+      "name: weak",
+      "description: Use this skill when needed.",
+      "metadata:",
+      "  renma.id: skill.weak",
+      '  renma.published-entrypoint: "true"',
+      "---",
+      "# Weak",
+      "",
+      "Review evidence and report completion.",
+    ].join("\n"),
+  );
+  const discovery = prepare([invalidMarker, weakBoundary]);
+  const invalidDiagnostic = discovery.diagnostics.find(
+    (item) =>
+      item.code === DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT,
+  );
+  const boundaryDiagnostic = discovery.diagnostics.find(
+    (item) =>
+      item.code ===
+      DIAGNOSTIC_IDS.DISCOVERY_ENTRYPOINT_WITHOUT_USABLE_BOUNDARIES,
+  );
+
+  assert.equal(invalidDiagnostic?.details?.markerState, "invalid");
+  assert.equal(invalidDiagnostic?.details?.rawMarkerValue, true);
+  assert.match(invalidDiagnostic?.evidence?.snippet ?? "", /true/);
+  const invalidVerification = JSON.stringify(
+    invalidDiagnostic?.verificationSteps,
+  );
+  assert.match(invalidVerification, /publication\.accepted/);
+  assert.match(invalidVerification, /publishedEntrypointIds/);
+  assert.match(
+    invalidVerification,
+    /Agent Skills, lifecycle, and duplicate-ID/,
+  );
+  assert.doesNotMatch(
+    invalidVerification,
+    /route resolution|route usability|relationship evidence/i,
+  );
+  assert.equal(
+    discovery.skills.find(
+      (item) => item.sourcePath === "skills/source/SKILL.md",
+    )?.publication.requested,
+    false,
+  );
+  assert.ok(boundaryDiagnostic);
+  assert.deepEqual(boundaryDiagnostic.details?.missingBoundaries, [
+    "capability",
+  ]);
+  assert.equal(boundaryDiagnostic.evidence?.startLine, 3);
+  assert.notEqual(
+    boundaryDiagnostic.evidence?.startLine,
+    boundaryDiagnostic.details?.publicationMarkerEvidence &&
+      (
+        boundaryDiagnostic.details.publicationMarkerEvidence as {
+          startLine: number;
+        }
+      ).startLine,
+  );
+  assert.deepEqual(boundaryDiagnostic.details?.publicationMarkerEvidence, {
+    path: "skills/weak/SKILL.md",
+    startLine: 6,
+    endLine: 6,
+    snippet: '  renma.published-entrypoint: "true"',
+  });
+  assert.ok(
+    (
+      boundaryDiagnostic.details?.linkedDiagnostics as Array<{ code: string }>
+    ).some((item) => item.code === "RN-SKILL-DESCRIPTION-MISSING-CAPABILITY"),
+  );
+  const boundaryVerification = JSON.stringify(
+    boundaryDiagnostic.verificationSteps,
+  );
+  assert.match(boundaryVerification, /Preserve the valid publication marker/);
+  assert.match(boundaryVerification, /canonical Agent Skills description/);
+  assert.match(boundaryVerification, /effective published entrypoint/);
+  assert.match(boundaryVerification, /originating RN-SKILL-\*/);
+  assert.match(boundaryVerification, /publication was not removed merely/);
+  assert.doesNotMatch(
+    boundaryVerification,
+    /route resolution|route usability/i,
+  );
+  assert.equal(
+    boundaryDiagnostic.repairConstraints?.some(
+      (constraint) =>
+        constraint.kind === "allowed_change" &&
+        /remove publication|omit.*marker/i.test(constraint.text),
+    ),
+    false,
+  );
+  assert.equal(
+    discovery.skills.find((item) => item.id === "skill.weak")?.publication
+      .accepted,
+    true,
+  );
+});
+
+test("published boundary diagnostics preserve deterministic RN evidence order and marker traceability", () => {
+  const cases = [
+    {
+      name: "capability",
+      description: "Use this skill when source evidence is available.",
+      body: "Review the source evidence.",
+      expectedBoundary: "capability",
+      expectedCode: "RN-SKILL-DESCRIPTION-MISSING-CAPABILITY",
+      expectedLine: 3,
+    },
+    {
+      name: "usage",
+      description: "Review source evidence.",
+      body: "Review the source evidence.",
+      expectedBoundary: "positive usage boundary",
+      expectedCode: "RN-SKILL-DESCRIPTION-MISSING-USAGE-BOUNDARY",
+      expectedLine: 3,
+    },
+    {
+      name: "selection",
+      description:
+        "Review source evidence. Use when source evidence needs review.",
+      body: [
+        "## Do not use this skill when",
+        "",
+        "- Do not use this skill for runtime execution.",
+      ].join("\n"),
+      expectedBoundary: "negative selection/routing boundary",
+      expectedCode: "RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY",
+      expectedLine: 12,
+    },
+  ] as const;
+
+  for (const item of cases) {
+    const discovery = prepare([
+      publishedSkillWithDescription(
+        `skills/${item.name}/SKILL.md`,
+        `skill.${item.name}`,
+        item.description,
+        item.body,
+      ),
+    ]);
+    const diagnostic = discovery.diagnostics.find(
+      (candidate) =>
+        candidate.code ===
+        DIAGNOSTIC_IDS.DISCOVERY_ENTRYPOINT_WITHOUT_USABLE_BOUNDARIES,
+    );
+    const linked = diagnostic?.details?.linkedDiagnostics as
+      | Array<{ code: string; evidence?: { startLine: number } }>
+      | undefined;
+
+    assert.ok(diagnostic, item.name);
+    assert.deepEqual(
+      diagnostic.details?.missingBoundaries,
+      [item.expectedBoundary],
+      item.name,
+    );
+    assert.deepEqual(
+      linked?.map((candidate) => candidate.code),
+      [item.expectedCode],
+      item.name,
+    );
+    assert.equal(diagnostic.evidence?.startLine, item.expectedLine, item.name);
+    assert.equal(
+      diagnostic.evidence?.startLine,
+      linked?.[0]?.evidence?.startLine,
+      item.name,
+    );
+    assert.equal(
+      (
+        diagnostic.details?.publicationMarkerEvidence as {
+          startLine: number;
+        }
+      ).startLine,
+      6,
+      item.name,
+    );
+  }
+
+  const combined = prepare([
+    publishedSkillWithDescription(
+      "skills/combined/SKILL.md",
+      "skill.combined",
+      "Use this skill.",
+      [
+        "## Do not use this skill when",
+        "",
+        "- Do not use this skill for runtime execution.",
+      ].join("\n"),
+    ),
+  ]).diagnostics.find(
+    (candidate) =>
+      candidate.code ===
+      DIAGNOSTIC_IDS.DISCOVERY_ENTRYPOINT_WITHOUT_USABLE_BOUNDARIES,
+  );
+
+  assert.deepEqual(combined?.details?.missingBoundaries, [
+    "capability",
+    "positive usage boundary",
+    "negative selection/routing boundary",
+  ]);
+  assert.deepEqual(
+    (combined?.details?.linkedDiagnostics as Array<{ code: string }>).map(
+      (candidate) => candidate.code,
+    ),
+    [
+      "RN-SKILL-DESCRIPTION-MISSING-CAPABILITY",
+      "RN-SKILL-DESCRIPTION-MISSING-USAGE-BOUNDARY",
+      "RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY",
+    ],
+  );
+  assert.equal(combined?.evidence?.startLine, 3);
+});
+
+test("route diagnostics retain route-specific verification wording", () => {
+  const diagnostic = prepare([
+    skill("skills/source/SKILL.md", {
+      id: "skill.source",
+      routes: ["skill.missing"],
+    }),
+  ]).diagnostics.find(
+    (candidate) =>
+      candidate.code === DIAGNOSTIC_IDS.DISCOVERY_UNRESOLVED_DECLARED_ROUTE,
+  );
+  const verification = JSON.stringify(diagnostic?.verificationSteps);
+
+  assert.match(verification, /declaration resolves/);
+  assert.match(verification, /usability state/);
+  assert.match(verification, /repaired relationship evidence/);
+});
+
+test("Discovery adoption uses explicit config plus effective publication and defers coverage", () => {
+  const none = prepare([]);
+  const continuation = prepare([
+    skill("skills/source/SKILL.md", {
+      id: "skill.source",
+      routes: [],
+    }),
+  ]);
+  const publication = prepare([
+    skill("skills/published/SKILL.md", {
+      id: "skill.published",
+      published: true,
+    }),
+  ]);
+  const incomplete = prepare([], { repositoryWideAdopted: true });
+  const adopted = prepare(
+    [
+      skill("skills/published/SKILL.md", {
+        id: "skill.published",
+        published: true,
+      }),
+    ],
+    { repositoryWideAdopted: true, configPath: "renma.config.json" },
+  );
+
+  assert.equal(none.adoption.state, "not-adopted");
+  assert.equal(continuation.adoption.state, "partial");
+  assert.equal(publication.adoption.state, "partial");
+  assert.equal(incomplete.adoption.state, "incomplete");
+  assert.equal(adopted.adoption.state, "adopted");
+  assert.equal(adopted.adoption.configPath, "renma.config.json");
+  for (const index of [none, continuation, publication, incomplete, adopted]) {
+    assert.deepEqual(index.coverage, {
+      mode: "not-evaluated",
+      reason: "reachability-and-coverage-are-deferred",
+    });
+  }
+});
+
 test("exact focus keeps direct incoming and outgoing declared routes", () => {
   const discovery = prepare([
     skill("skills/root/SKILL.md", {
@@ -624,8 +1099,19 @@ test("exact focus keeps direct incoming and outgoing declared routes", () => {
   );
 });
 
-function prepare(documents: ParsedDocument[]) {
-  return prepareSkillDiscoveryIndex(documents, buildCatalog(documents).catalog);
+function prepare(
+  documents: ParsedDocument[],
+  options: {
+    repositoryWideAdopted?: boolean;
+    configPath?: string;
+  } = {},
+) {
+  return prepareSkillDiscoveryIndex(
+    documents,
+    buildCatalog(documents).catalog,
+    undefined,
+    options,
+  );
 }
 
 function skill(
@@ -636,6 +1122,7 @@ function skill(
     status?: "experimental" | "stable" | "deprecated" | "archived";
     body?: string;
     extraMetadata?: string[];
+    published?: boolean;
   },
 ): ParsedDocument {
   const name = path.posix.basename(path.posix.dirname(sourcePath));
@@ -647,6 +1134,7 @@ function skill(
     ...(options.routes
       ? [`  renma.continues-with: '${JSON.stringify(options.routes)}'`]
       : []),
+    ...(options.published ? ['  renma.published-entrypoint: "true"'] : []),
     ...(options.extraMetadata ?? []),
   ];
   return rawDocument(
@@ -662,6 +1150,50 @@ function skill(
       `# ${name}`,
       "",
       options.body ?? "Review the declared evidence and report completion.",
+      "",
+    ].join("\n"),
+  );
+}
+
+function skillWithRawPublication(value: string): ParsedDocument {
+  return rawDocument(
+    "skills/source/SKILL.md",
+    "skill",
+    [
+      "---",
+      "name: source",
+      "description: Review source inputs and produce deterministic evidence. Use when source workflow decisions need review; do not use for runtime selection or execution.",
+      "metadata:",
+      "  renma.id: skill.source",
+      `  renma.published-entrypoint: ${value}`,
+      "---",
+      "# Source",
+      "",
+    ].join("\n"),
+  );
+}
+
+function publishedSkillWithDescription(
+  sourcePath: string,
+  id: string,
+  description: string,
+  body: string,
+): ParsedDocument {
+  const name = path.posix.basename(path.posix.dirname(sourcePath));
+  return rawDocument(
+    sourcePath,
+    "skill",
+    [
+      "---",
+      `name: ${name}`,
+      `description: ${description}`,
+      "metadata:",
+      `  renma.id: ${id}`,
+      '  renma.published-entrypoint: "true"',
+      "---",
+      `# ${name}`,
+      "",
+      body,
       "",
     ].join("\n"),
   );

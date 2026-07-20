@@ -58,6 +58,9 @@ export const DEFAULT_CONFIG: ScanConfig = {
     disallowedCommands: [],
     profiles: {},
   },
+  skillDiscovery: {
+    adopted: false,
+  },
 };
 
 /** Error raised for invalid Renma configuration or CLI configuration input. */
@@ -145,6 +148,7 @@ function normalizeConfig(
     "suppressions",
     "layout",
     "security",
+    "skill_discovery",
   ]);
   for (const key of Object.keys(value)) {
     if (!allowed.has(key)) {
@@ -179,7 +183,27 @@ function normalizeConfig(
   if (value.layout !== undefined) config.layout = layoutPolicy(value.layout);
   if (value.security !== undefined)
     config.security = securityPolicy(value.security);
+  if (value.skill_discovery !== undefined)
+    config.skillDiscovery = skillDiscoveryPolicy(value.skill_discovery);
   return config;
+}
+
+function skillDiscoveryPolicy(value: unknown): ScanConfig["skillDiscovery"] {
+  if (!isRecord(value)) {
+    throw new ConfigError("skill_discovery must be an object.");
+  }
+  const allowed = new Set(["adopted"]);
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) {
+      throw new ConfigError(
+        `Unknown skill_discovery config key "${key}". Allowed keys: adopted.`,
+      );
+    }
+  }
+  if (value.adopted !== undefined && typeof value.adopted !== "boolean") {
+    throw new ConfigError("skill_discovery.adopted must be a boolean.");
+  }
+  return { adopted: value.adopted ?? false };
 }
 
 function enumValue<const T extends readonly string[]>(

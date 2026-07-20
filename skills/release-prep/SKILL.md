@@ -15,6 +15,7 @@ metadata:
   renma.secrets-allowed: "false"
   renma.requires-human-approval: "true"
   renma.forbidden-inputs: '["secrets","credentials","tokens"]'
+  renma.published-entrypoint: "true"
 ---
 
 # Release Prep

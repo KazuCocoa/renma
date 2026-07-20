@@ -46,6 +46,10 @@ export const CANONICAL_SKILL_METADATA_KEYS = {
   continues_with: "renma.continues-with",
 } as const;
 
+/** Canonical one-state Skill publication marker, kept out of catalog metadata. */
+export const CANONICAL_SKILL_PUBLICATION_METADATA_KEY =
+  "renma.published-entrypoint" as const;
+
 type CanonicalSkillOperationalKey = keyof typeof CANONICAL_SKILL_METADATA_KEYS;
 
 const CANONICAL_SKILL_KEY_TO_OPERATIONAL = new Map<string, string>(
@@ -86,6 +90,23 @@ export interface CanonicalSkillContinuationField {
   canonicalKey: typeof CANONICAL_SKILL_METADATA_KEYS.continues_with;
   agentSkillValid: boolean;
   items: CanonicalSkillContinuationItem[];
+  fieldEvidence?: MetadataFieldEvidence;
+  reason?: string;
+}
+
+export type CanonicalSkillPublicationFieldState =
+  | "unsupported"
+  | "absent"
+  | "ambiguous"
+  | "invalid"
+  | "valid";
+
+/** Canonical publication marker evidence retained independently from eligibility. */
+export interface CanonicalSkillPublicationField {
+  state: CanonicalSkillPublicationFieldState;
+  canonicalKey: typeof CANONICAL_SKILL_PUBLICATION_METADATA_KEY;
+  agentSkillValid: boolean;
+  rawValue?: unknown;
   fieldEvidence?: MetadataFieldEvidence;
   reason?: string;
 }
@@ -638,6 +659,73 @@ export function parseCanonicalSkillContinuationField(
       target: rawTarget.trim(),
       evidence: { ...fieldEvidence },
     })),
+  };
+}
+
+/** Parse the one-state canonical Skill publication marker without aliases or legacy fallback. */
+export function parseCanonicalSkillPublicationField(
+  document: ParsedDocument,
+): CanonicalSkillPublicationField {
+  const canonicalKey = CANONICAL_SKILL_PUBLICATION_METADATA_KEY;
+  if (
+    document.artifact.kind !== "skill" ||
+    document.artifact.path.replaceAll("\\", "/").split("/").at(-1) !==
+      "SKILL.md"
+  ) {
+    return {
+      state: "unsupported",
+      canonicalKey,
+      agentSkillValid: false,
+    };
+  }
+
+  const inspection = inspectAgentSkill(document);
+  const fields = inspection.frontmatter.metadataFields.filter(
+    (field) => field.key === canonicalKey,
+  );
+  if (fields.length === 0) {
+    return {
+      state: "absent",
+      canonicalKey,
+      agentSkillValid: inspection.validation.valid,
+    };
+  }
+
+  const first = fields[0]!;
+  const fieldEvidence = metadataEvidenceFromYamlField(document, first);
+  const duplicateMetadataMapping = inspection.frontmatter.duplicateFields.some(
+    (field) => field.key === "metadata",
+  );
+  if (duplicateMetadataMapping || fields.length !== 1) {
+    return {
+      state: "ambiguous",
+      canonicalKey,
+      agentSkillValid: inspection.validation.valid,
+      rawValue: first.value,
+      fieldEvidence,
+      reason: duplicateMetadataMapping
+        ? "the top-level metadata mapping is declared more than once"
+        : `metadata.${canonicalKey} is declared more than once`,
+    };
+  }
+
+  if (first.value !== "true") {
+    return {
+      state: "invalid",
+      canonicalKey,
+      agentSkillValid: inspection.validation.valid,
+      rawValue: first.value,
+      fieldEvidence,
+      reason: 'must be the exact YAML string "true"',
+    };
+  }
+
+  return {
+    state: "valid",
+    canonicalKey,
+    agentSkillValid: inspection.validation.valid,
+    rawValue: first.value,
+    fieldEvidence,
   };
 }
 

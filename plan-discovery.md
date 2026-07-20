@@ -2,11 +2,14 @@
 
 ## Status
 
-Status: active design with an operational route-foundation slice
+Status: active design with operational route-foundation and publication/adoption slices
 
-Implementation status: the planned 0.22.0 slice implements explicit
-`renma.continues-with`, exact resolution, route diagnostics, structural roots,
-and `graph --view discovery`; later Discovery layers remain deferred
+Implementation status: 0.22.0 implements explicit `renma.continues-with`, exact
+resolution, route diagnostics, structural roots, and
+`graph --view discovery`; 0.22.1 implements explicit
+`renma.published-entrypoint`, strict `skill_discovery.adopted`, publication
+diagnostics, and adoption projection. Reachability, coverage evaluation, and
+`skill-index` remain deferred.
 
 Baseline: Renma 0.21.0
 
@@ -19,7 +22,7 @@ This document separates three levels of decision:
   model, source ownership, focused-entrypoint responsibility, deterministic
   evidence, and gradual adoption.
 - **Complete-design decisions** cover fail-closed Discovery eligibility, the
-  proposed metadata names, explicit publication, separate repository-wide
+  incrementally delivered metadata names, explicit publication, separate repository-wide
   adoption, exact resolution, report shape, command, diagnostics, and
   implementation sequence. Each becomes a public contract only in the release
   slice that implements it.
@@ -47,16 +50,17 @@ atomic `skill-index` MVP. The 0.22.0 foundation includes only:
 - JSON, Markdown, and Mermaid through `graph --view discovery`, with optional
   exact direct-neighborhood focus.
 
-The 0.22.0 slice does not add published entrypoints,
-`skill_discovery.adopted`, reachability, coverage, `skill-index`, Readiness,
-diff, CI report, Trust Graph, BOM, ownership, scaffold, init, guide, suggestion,
-or richer visualization integration. Those contracts can be reviewed and
-delivered independently after operational route evidence has been used.
+The 0.22.1 slice adds published entrypoints and `skill_discovery.adopted` as a
+separate contract. It does not add reachability, coverage evaluation,
+`skill-index`, Readiness, diff, CI report, Trust Graph, BOM, ownership,
+scaffold, init, guide, suggestion, or richer visualization integration. Those
+contracts can be reviewed and delivered independently after operational route
+and publication evidence has been used.
 
 The remainder of this document retains the complete design direction so later
-slices can be evaluated consistently. Sections describing publication,
-adoption, reachability, coverage, or `skill-index` are deferred design, not
-0.22.0 behavior.
+slices can be evaluated consistently. Publication and adoption describe 0.22.1
+behavior; sections describing reachability, evaluated coverage, global
+unreachable diagnostics, or `skill-index` remain deferred design.
 
 ## Problem
 
@@ -382,7 +386,7 @@ The source body must explain when each continuation applies and what to do when
 none applies. The metadata list records possible authoritative edges; list
 order does not define priority.
 
-### Recommended publication marker
+### Canonical publication marker
 
 The MVP should also add:
 
@@ -399,10 +403,10 @@ standalone Skill, an unfinished adoption candidate, or the root of a
 disconnected internal subgraph. Automatically publishing all no-incoming
 Skills would turn a graph fact into unsupported repository policy.
 
-### Recommended repository-wide adoption field
+### Canonical repository-wide adoption field
 
-Repository-wide coverage is genuinely repository-wide policy, so the MVP
-should add one minimal proposed configuration field:
+Repository-wide coverage intent is genuinely repository-wide policy, so 0.22.1
+adds one minimal configuration field:
 
 ```json
 {
@@ -415,13 +419,14 @@ should add one minimal proposed configuration field:
 `skill_discovery.adopted: true` means that every Discovery-eligible Skill is
 expected to be reachable from a published entrypoint or intentionally
 published as an independent first hop. Omission or `false` means the repository
-has not declared complete Discovery coverage. No additional Discovery config
-key is proposed.
+has not declared complete Discovery coverage. In 0.22.1 this records policy
+intent but does not evaluate reachability or coverage. No additional Discovery
+config key is supported.
 
 This field is independent of Skill-local publication. Adding
 `renma.published-entrypoint: "true"` includes one Skill in the first-hop index;
 it does not enable repository-wide unreachable diagnostics. `renma init` must
-not emit the proposed field or silently adopt Discovery.
+not emit the field or silently adopt Discovery.
 
 No alias field is proposed. Exact stable ID and path already serve deterministic
 lookup and focus. Titles, tags, and free-form phrases do not become alternate
@@ -720,23 +725,23 @@ diagnostics. Reachability is not evaluated.
 Add `renma.continues-with` only to source Skills that own real continuation
 policy, and publish a reviewed first hop when that area is useful. Keep the
 conditions and no-match behavior in each Skill body. The report state is
-`partial`: reachability from published entrypoints is descriptive, and default
-Markdown remains bounded to the published area and compact candidate summaries.
+`partial`: publication and direct route evidence are descriptive, coverage is
+`not-evaluated`, and default Markdown remains bounded to the published area and
+compact candidate summaries.
 
 ### Stage 3: review and expand descriptive coverage
 
-Review declared routes, invalid or inactive targets, cycles, usage boundaries,
-and not-reached Discovery-eligible Skills without treating the latter as global
-defects. Add intentional entrypoints or continuations one bounded workflow area
-at a time.
+Review declared routes, invalid or inactive targets, and usage boundaries. Add
+intentional entrypoints or continuations one bounded workflow area at a time.
+Reachability and not-reached Skill calculations remain deferred.
 
 ### Stage 4: declare repository-wide coverage
 
 Set `skill_discovery.adopted: true` only when the repository intends complete
 coverage. The state is `incomplete` until at least one Discovery-eligible Skill
-is published, then `adopted`; only the adopted state enables authoritative
-global unreachable diagnostics. An intentionally independent eligible Skill
-must be published as its own first hop or connected by a usable continuation.
+is published, then `adopted`. In 0.22.1 coverage still reports
+`not-evaluated`; authoritative global unreachable diagnostics remain a later
+slice.
 
 No initial CI gate, repository rewrite, or all-at-once metadata migration is
 required.
@@ -761,8 +766,9 @@ continuations or publication.
 Repositories without Discovery metadata keep their current scan, catalog,
 graph, Readiness, diff, CI, Trust Graph, and BOM behavior. The dedicated
 discovery graph view does not add continuation edges to existing graph views or
-advertise `skill-index` as current behavior. `renma.config.json` and
-`renma init` continue to omit repository-wide Discovery adoption.
+advertise `skill-index` as current behavior. `renma init` continues to omit
+repository-wide Discovery adoption; authors may set the strict
+`skill_discovery.adopted` config field explicitly.
 
 PR #89 should not be rebased, cherry-picked, restored, or used as the code
 baseline. Implementation starts from the 0.21.0 shared repository snapshot,
@@ -801,11 +807,17 @@ organization-wide discovery requires a separate federation design.
 - add the dedicated discovery graph JSON, Markdown, Mermaid, exact optional
   focus, CLI help, tests, and documentation.
 
-### Later contract slice: publication and adoption
+### 0.22.1: publication and adoption
 
-Review `renma.published-entrypoint` and `skill_discovery.adopted` independently
-from the route foundation. Do not infer either contract from structural roots
-or the presence of continuation metadata.
+- parse only the exact string `renma.published-entrypoint: "true"` marker;
+- apply existing Discovery eligibility to effective publication and retain
+  stable rejection evidence;
+- parse strict boolean `skill_discovery.adopted` repository policy;
+- expose `not-adopted`, `partial`, `incomplete`, and `adopted` states while
+  keeping coverage explicitly `not-evaluated`;
+- emit publication warnings through scan and diagnostics v2; and
+- extend the existing discovery graph JSON, Markdown, Mermaid, and focus
+  projection without adding a new command.
 
 ### Later report slice: reachability and `skill-index`
 

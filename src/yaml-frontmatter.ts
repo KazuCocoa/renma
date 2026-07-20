@@ -102,12 +102,15 @@ export function parseAgentSkillFrontmatter(
   }
 
   const fields = mapFields(yaml, yaml.contents.items, lineCounter);
-  const metadataPair = yaml.contents.items.find(
-    (pair) => scalarString(pair.key) === "metadata",
-  );
-  const metadataFields = isMap(metadataPair?.value)
-    ? mapFields(yaml, metadataPair.value.items, lineCounter)
-    : [];
+  // Retain field evidence from every top-level metadata mapping. Operational
+  // consumers still fail closed when metadata is duplicated, but dedicated
+  // declaration parsers need the exact field evidence even when the canonical
+  // marker appears only in a later ambiguous mapping.
+  const metadataFields = yaml.contents.items
+    .filter((pair) => scalarString(pair.key) === "metadata")
+    .flatMap((pair) =>
+      isMap(pair.value) ? mapFields(yaml, pair.value.items, lineCounter) : [],
+    );
 
   return {
     present: true,
