@@ -1264,6 +1264,106 @@ test("route-cycle components, members, internal routes, and primary evidence are
   );
 });
 
+test("route-cycle resolution is stack-safe for a 20,000-Skill acyclic chain", () => {
+  const skillCount = 20_000;
+  const routes = Array.from({ length: skillCount - 1 }, (_, index) =>
+    declaredRoute(scaledSkillId(index), scaledSkillId(index + 1)),
+  );
+  const inputSnapshot = JSON.stringify(routes);
+
+  assert.deepEqual(resolveSkillDiscoveryRouteCycles(routes), []);
+  assert.deepEqual(resolveSkillDiscoveryRouteCycles([...routes].reverse()), []);
+  assert.equal(JSON.stringify(routes), inputSnapshot);
+});
+
+test("route-cycle resolution is stack-safe for one large cyclic component", () => {
+  const skillCount = 6_000;
+  const routes = Array.from({ length: skillCount }, (_, index) =>
+    declaredRoute(
+      scaledSkillId(index),
+      scaledSkillId((index + 1) % skillCount),
+    ),
+  );
+  const cycles = resolveSkillDiscoveryRouteCycles(routes);
+  const reversed = resolveSkillDiscoveryRouteCycles([...routes].reverse());
+
+  assert.deepEqual(reversed, cycles);
+  assert.equal(cycles.length, 1);
+  assert.equal(cycles[0]?.cycleSkillIds.length, skillCount);
+  assert.equal(new Set(cycles[0]?.cycleSkillIds).size, skillCount);
+  assert.equal(cycles[0]?.cycleSkillIds[0], "skill.00000");
+  assert.equal(cycles[0]?.cycleSkillIds.at(-1), "skill.05999");
+  assert.equal(cycles[0]?.cycleRoutes.length, skillCount);
+  assert.equal(
+    new Set(
+      cycles[0]?.cycleRoutes.map(
+        (route) => `${route.sourceId}\0${route.targetId}`,
+      ),
+    ).size,
+    skillCount,
+  );
+  assert.deepEqual(
+    cycles[0]?.cycleRoutes[0] && {
+      sourceId: cycles[0].cycleRoutes[0].sourceId,
+      targetId: cycles[0].cycleRoutes[0].targetId,
+      declarationIndex: cycles[0].cycleRoutes[0].declarationIndex,
+    },
+    {
+      sourceId: "skill.00000",
+      targetId: "skill.00001",
+      declarationIndex: 0,
+    },
+  );
+});
+
+test("many independent acyclic components produce no route cycles", () => {
+  const chainCount = 5_000;
+  const routes = Array.from({ length: chainCount }, (_, index) =>
+    declaredRoute(
+      `skill.chain.${index.toString().padStart(5, "0")}.source`,
+      `skill.chain.${index.toString().padStart(5, "0")}.target`,
+    ),
+  );
+
+  assert.deepEqual(resolveSkillDiscoveryRouteCycles(routes), []);
+  assert.deepEqual(resolveSkillDiscoveryRouteCycles([...routes].reverse()), []);
+});
+
+test("many independent cycles keep complete unique internal route groups", () => {
+  const pairCount = 2_000;
+  const routes: DeclaredSkillRoute[] = [];
+  for (let index = 0; index < pairCount; index += 1) {
+    const pairId = index.toString().padStart(5, "0");
+    const sourceId = `skill.pair.${pairId}.a`;
+    const targetId = `skill.pair.${pairId}.b`;
+    routes.push(declaredRoute(sourceId, targetId));
+    routes.push(declaredRoute(targetId, sourceId));
+    if (index + 1 < pairCount) {
+      const nextPairId = (index + 1).toString().padStart(5, "0");
+      routes.push(declaredRoute(targetId, `skill.pair.${nextPairId}.a`, 1));
+    }
+  }
+
+  const cycles = resolveSkillDiscoveryRouteCycles(routes);
+  assert.equal(cycles.length, pairCount);
+  for (let index = 0; index < pairCount; index += 1) {
+    const pairId = index.toString().padStart(5, "0");
+    const sourceId = `skill.pair.${pairId}.a`;
+    const targetId = `skill.pair.${pairId}.b`;
+    assert.deepEqual(cycles[index]?.cycleSkillIds, [sourceId, targetId]);
+    assert.deepEqual(
+      cycles[index]?.cycleRoutes.map((route) => [
+        route.sourceId,
+        route.targetId,
+      ]),
+      [
+        [sourceId, targetId],
+        [targetId, sourceId],
+      ],
+    );
+  }
+});
+
 test("connected chains, diamonds, shared children, and ordinary assets do not form route cycles", () => {
   const documents = [
     skill("skills/root/SKILL.md", {
@@ -2094,6 +2194,48 @@ function prepare(
     undefined,
     options,
   );
+}
+
+function scaledSkillId(index: number): string {
+  return `skill.${index.toString().padStart(5, "0")}`;
+}
+
+function declaredRoute(
+  sourceId: string,
+  targetId: string,
+  declarationIndex = 0,
+): DeclaredSkillRoute {
+  const sourcePath = `skills/${sourceId.replaceAll(".", "-")}/SKILL.md`;
+  const targetPath = `skills/${targetId.replaceAll(".", "-")}/SKILL.md`;
+  return {
+    sourceId,
+    sourcePath,
+    declarationIndex,
+    rawTarget: targetId,
+    normalizedTarget: targetId,
+    resolution: "resolved",
+    candidates: [],
+    resolvedTarget: {
+      id: targetId,
+      sourcePath: targetPath,
+      kind: "skill",
+      effectiveIdUnique: true,
+      agentSkillsValid: true,
+    },
+    usable: true,
+    usabilityReasons: [],
+    representative: true,
+    duplicateDeclarationIndices: [],
+    evidence: {
+      path: sourcePath,
+      startLine: declarationIndex + 1,
+      endLine: declarationIndex + 1,
+      snippet: targetId,
+      metadataKey: "metadata.renma.continues-with",
+      declarationIndex,
+    },
+    linkedDiagnostics: [],
+  };
 }
 
 function skill(

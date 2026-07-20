@@ -861,9 +861,10 @@ organization-wide discovery requires a separate federation design.
 
 ### 0.22.4: route-cycle diagnostics and static-core stabilization
 
-- run deterministic Tarjan strongly connected component detection over only
-  usable representative resolved Skill-to-Skill routes after route usability is
-  prepared and before any focus projection;
+- run deterministic, stack-safe iterative strongly connected component
+  detection over only usable representative resolved Skill-to-Skill routes
+  after route usability is prepared and before any focus projection, grouping
+  internal component routes in one pass for `O(V + E)` work apart from sorting;
 - emit one `DISCOVERY-ROUTE-CYCLE` warning per maximal cyclic component,
   including explicit self-loops, every sorted member Skill, every sorted
   internal route, and canonical first-route primary evidence;

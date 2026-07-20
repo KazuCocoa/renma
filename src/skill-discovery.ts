@@ -760,71 +760,107 @@ export function resolveSkillDiscoveryRouteCycles(
       ]),
     ),
   ].sort((left, right) => left.localeCompare(right));
-  const targetsBySource = new Map<string, string[]>(
-    nodeIds.map((id) => [id, []]),
+  const targetSetsBySource = new Map<string, Set<string>>(
+    nodeIds.map((id) => [id, new Set<string>()]),
+  );
+  const sourceSetsByTarget = new Map<string, Set<string>>(
+    nodeIds.map((id) => [id, new Set<string>()]),
   );
   for (const route of eligibleRoutes) {
-    targetsBySource.get(route.sourceId)!.push(route.resolvedTarget!.id);
+    const targetId = route.resolvedTarget!.id;
+    targetSetsBySource.get(route.sourceId)!.add(targetId);
+    sourceSetsByTarget.get(targetId)!.add(route.sourceId);
   }
-  for (const [sourceId, targets] of targetsBySource) {
-    targetsBySource.set(
-      sourceId,
-      [...new Set(targets)].sort((left, right) => left.localeCompare(right)),
-    );
+  const targetsBySource = new Map<string, string[]>(
+    nodeIds.map((id) => [
+      id,
+      [...targetSetsBySource.get(id)!].sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    ]),
+  );
+  const sourcesByTarget = new Map<string, string[]>(
+    nodeIds.map((id) => [
+      id,
+      [...sourceSetsByTarget.get(id)!].sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    ]),
+  );
+
+  const visited = new Set<string>();
+  const finishingOrder: string[] = [];
+  for (const nodeId of nodeIds) {
+    if (visited.has(nodeId)) continue;
+    visited.add(nodeId);
+    const traversal: Array<{ nodeId: string; nextTargetIndex: number }> = [
+      { nodeId, nextTargetIndex: 0 },
+    ];
+    while (traversal.length > 0) {
+      const frame = traversal[traversal.length - 1]!;
+      const targets = targetsBySource.get(frame.nodeId)!;
+      const targetId = targets[frame.nextTargetIndex];
+      if (targetId !== undefined) {
+        frame.nextTargetIndex += 1;
+        if (!visited.has(targetId)) {
+          visited.add(targetId);
+          traversal.push({ nodeId: targetId, nextTargetIndex: 0 });
+        }
+        continue;
+      }
+      finishingOrder.push(frame.nodeId);
+      traversal.pop();
+    }
   }
 
-  let nextIndex = 0;
-  const indices = new Map<string, number>();
-  const lowLinks = new Map<string, number>();
-  const stack: string[] = [];
-  const onStack = new Set<string>();
+  const assigned = new Set<string>();
   const components: string[][] = [];
-
-  const visit = (sourceId: string): void => {
-    const sourceIndex = nextIndex;
-    nextIndex += 1;
-    indices.set(sourceId, sourceIndex);
-    lowLinks.set(sourceId, sourceIndex);
-    stack.push(sourceId);
-    onStack.add(sourceId);
-
-    for (const targetId of targetsBySource.get(sourceId) ?? []) {
-      if (!indices.has(targetId)) {
-        visit(targetId);
-        lowLinks.set(
-          sourceId,
-          Math.min(lowLinks.get(sourceId)!, lowLinks.get(targetId)!),
-        );
-      } else if (onStack.has(targetId)) {
-        lowLinks.set(
-          sourceId,
-          Math.min(lowLinks.get(sourceId)!, indices.get(targetId)!),
-        );
+  for (let index = finishingOrder.length - 1; index >= 0; index -= 1) {
+    const nodeId = finishingOrder[index]!;
+    if (assigned.has(nodeId)) continue;
+    assigned.add(nodeId);
+    const component: string[] = [];
+    const traversal = [nodeId];
+    while (traversal.length > 0) {
+      const member = traversal.pop()!;
+      component.push(member);
+      const sources = sourcesByTarget.get(member)!;
+      for (
+        let sourceIndex = sources.length - 1;
+        sourceIndex >= 0;
+        sourceIndex -= 1
+      ) {
+        const sourceId = sources[sourceIndex]!;
+        if (assigned.has(sourceId)) continue;
+        assigned.add(sourceId);
+        traversal.push(sourceId);
       }
     }
-
-    if (lowLinks.get(sourceId) !== indices.get(sourceId)) return;
-    const component: string[] = [];
-    while (stack.length > 0) {
-      const member = stack.pop()!;
-      onStack.delete(member);
-      component.push(member);
-      if (member === sourceId) break;
-    }
     components.push(component.sort((left, right) => left.localeCompare(right)));
-  };
+  }
 
-  for (const nodeId of nodeIds) {
-    if (!indices.has(nodeId)) visit(nodeId);
+  const componentBySkillId = new Map<string, number>();
+  for (const [componentId, component] of components.entries()) {
+    for (const skillId of component) {
+      componentBySkillId.set(skillId, componentId);
+    }
+  }
+  const internalRoutesByComponent = new Map<
+    number,
+    Array<DeclaredSkillRoute & { resolvedTarget: ResolvedSkillRouteTarget }>
+  >();
+  for (const route of eligibleRoutes) {
+    const sourceComponent = componentBySkillId.get(route.sourceId)!;
+    const targetComponent = componentBySkillId.get(route.resolvedTarget!.id)!;
+    if (sourceComponent !== targetComponent) continue;
+    const internalRoutes = internalRoutesByComponent.get(sourceComponent) ?? [];
+    internalRoutes.push(route);
+    internalRoutesByComponent.set(sourceComponent, internalRoutes);
   }
 
   return components
-    .flatMap((cycleSkillIds): SkillDiscoveryRouteCycle[] => {
-      const members = new Set(cycleSkillIds);
-      const internalRoutes = eligibleRoutes.filter(
-        (route) =>
-          members.has(route.sourceId) && members.has(route.resolvedTarget!.id),
-      );
+    .flatMap((cycleSkillIds, componentId): SkillDiscoveryRouteCycle[] => {
+      const internalRoutes = internalRoutesByComponent.get(componentId) ?? [];
       const selfLoop =
         cycleSkillIds.length === 1 &&
         internalRoutes.some(
@@ -832,24 +868,23 @@ export function resolveSkillDiscoveryRouteCycles(
         );
       if (cycleSkillIds.length === 1 && !selfLoop) return [];
 
-      const pathsById = new Map<string, string[]>();
+      const pathsById = new Map<string, Set<string>>();
       for (const route of internalRoutes) {
-        pathsById.set(route.sourceId, [
-          ...(pathsById.get(route.sourceId) ?? []),
-          route.sourcePath,
-        ]);
-        pathsById.set(route.resolvedTarget!.id, [
-          ...(pathsById.get(route.resolvedTarget!.id) ?? []),
-          route.resolvedTarget!.sourcePath,
-        ]);
+        const sourcePaths = pathsById.get(route.sourceId) ?? new Set<string>();
+        sourcePaths.add(route.sourcePath);
+        pathsById.set(route.sourceId, sourcePaths);
+        const targetPaths =
+          pathsById.get(route.resolvedTarget!.id) ?? new Set<string>();
+        targetPaths.add(route.resolvedTarget!.sourcePath);
+        pathsById.set(route.resolvedTarget!.id, targetPaths);
       }
       return [
         {
           cycleSkillIds,
           cycleSkills: cycleSkillIds.map((id) => ({
             id,
-            sourcePath: [...new Set(pathsById.get(id) ?? [])].sort(
-              (left, right) => left.localeCompare(right),
+            sourcePath: [...(pathsById.get(id) ?? [])].sort((left, right) =>
+              left.localeCompare(right),
             )[0]!,
           })),
           selfLoop,

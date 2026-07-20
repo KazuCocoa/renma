@@ -8,10 +8,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
-- Added deterministic Tarjan strongly connected component detection over only
-  usable representative resolved Skill-to-Skill continuation routes, including
-  explicit self-loop handling and one `DISCOVERY-ROUTE-CYCLE` warning per
-  maximal cyclic component.
+- Added deterministic, stack-safe iterative strongly connected component
+  detection over only usable representative resolved Skill-to-Skill
+  continuation routes, including one-pass internal-route grouping, explicit
+  self-loop handling, and one `DISCOVERY-ROUTE-CYCLE` warning per maximal cyclic
+  component. Detection is `O(V + E)` apart from deterministic sorting.
 - Added complete sorted cycle member, Skill path, internal route, declaration
   index, and line evidence to each warning, with cycle-specific LLM repair
   constraints, human decision guidance, and graph, Skill Index, and scan
