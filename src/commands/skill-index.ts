@@ -129,7 +129,7 @@ export function formatSkillIndexMarkdown(report: SkillIndexReportV1): string {
     "",
     "## Summary",
     "",
-    "Summary counts and visible ID arrays are projection-scoped. Coverage is repository-scoped.",
+    "Skill, route, structural, visible-ID, and Discovery-diagnostic counts are projection-scoped. Coverage and repository diagnostics are repository-scoped.",
     "",
     `- Visible Skills: ${report.summary.visibleSkillCount}`,
     `- Discovery-eligible Skills: ${report.summary.routeEligibleSkillCount}`,
@@ -213,6 +213,7 @@ function renderFocusedSkill(lines: string[], report: SkillIndexReportV1): void {
     "## Focused Skill",
     "",
     "Focus is an exact static projection, not a recommendation or runtime selection.",
+    "Published-entrypoint lists and route evidence are limited to this focused direct-neighborhood projection. Unfocused JSON contains the complete repository projection.",
     "",
     `### ${focus.id}`,
     "",
@@ -223,7 +224,7 @@ function renderFocusedSkill(lines: string[], report: SkillIndexReportV1): void {
     `- Description: ${singleLine(skill.description ?? "(unavailable)")}`,
     `- Owner: ${formatOwnership(skill.ownership)}`,
     `- Lifecycle: ${skill.lifecycle ?? "(unspecified)"}`,
-    `- Publication: ${skill.publication.accepted ? "published" : skill.publication.requested ? `rejected (${skill.publication.rejectionReasons.join(", ")})` : "not published"}`,
+    `- Publication: ${skill.publication.accepted ? "effective published entrypoint" : skill.publication.requested ? `rejected (${skill.publication.rejectionReasons.join(", ")})` : "not published"}`,
     `- Reachability: ${reachabilityLabel(skill)}`,
     `- Structural root: ${yesNo(skill.structuralRoot)}`,
     `- Standalone: ${yesNo(skill.standalone)}`,
@@ -258,11 +259,13 @@ function renderPublishedEntrypoints(
     "Published entrypoints are explicit first-hop declarations. Structural roots are derived graph facts.",
     "",
   );
+  if (report.focus) {
+    renderFocusedPublishedEntrypoints(lines, report);
+    return;
+  }
   if (report.publishedEntrypointIds.length === 0) {
     lines.push(
-      report.focus && report.adoption.publishedEntrypointCount > 0
-        ? "No effective published entrypoint is visible in this focused projection. Repository-wide adoption and coverage remain above."
-        : `No effective published entrypoint is visible. Repository adoption is ${report.adoption.state}.`,
+      `No effective published entrypoint is visible. Repository adoption is ${report.adoption.state}.`,
     );
     return;
   }
@@ -297,6 +300,56 @@ function renderPublishedEntrypoints(
     lines,
     report.publishedEntrypointIds.length,
     "published entrypoints",
+  );
+}
+
+function renderFocusedPublishedEntrypoints(
+  lines: string[],
+  report: SkillIndexReportV1,
+): void {
+  const focusedSkill = report.skills.find(
+    (candidate) => candidate.sourcePath === report.focus!.sourcePath,
+  );
+  lines.push(
+    "This compact list is limited to the selected Skill's direct-neighborhood projection. Neighboring entrypoints may have declarations outside this projection, so no complete route list is implied.",
+    "",
+    "Unfocused JSON contains the complete repository projection.",
+    "",
+  );
+  if (focusedSkill?.publication.accepted) {
+    lines.push(
+      "The focused Skill is an effective published entrypoint; its authoritative details and visible route evidence appear in the Focused Skill section above.",
+      "",
+    );
+  }
+
+  const otherVisibleEntrypoints = report.publishedEntrypointIds
+    .map((id) =>
+      report.skills.find(
+        (candidate) => candidate.id === id && candidate.publication.accepted,
+      ),
+    )
+    .filter(
+      (skill): skill is NonNullable<typeof skill> =>
+        skill !== undefined && skill.sourcePath !== report.focus!.sourcePath,
+    );
+  if (otherVisibleEntrypoints.length === 0) {
+    lines.push(
+      focusedSkill?.publication.accepted
+        ? "- No other effective published entrypoint is visible in this focused projection."
+        : report.adoption.publishedEntrypointCount > 0
+          ? "- No effective published entrypoint is visible in this focused projection. Repository-wide adoption and coverage remain above."
+          : `- No effective published entrypoint is visible. Repository adoption is ${report.adoption.state}.`,
+    );
+    return;
+  }
+  for (const skill of otherVisibleEntrypoints.slice(0, PRESENTATION_CAP)) {
+    lines.push(`- ${skill.id} — ${skill.sourcePath}`);
+  }
+  appendOmission(
+    lines,
+    otherVisibleEntrypoints.length,
+    "other published entrypoints",
   );
 }
 

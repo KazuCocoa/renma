@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -392,6 +393,106 @@ test("diagnostics stay separated and drive exit codes 0, 1, and 2", async (t) =>
   assert.match(invalid.stderr, /skill_discovery\.adopted must be a boolean/);
 });
 
+test("focused Markdown presents a published Skill once and keeps neighboring entrypoints compact", async (t) => {
+  const root = await fixture(t);
+  await writeSkill(root, "entry", "skill.entry", {
+    published: true,
+    routes: ["skill.neighbor"],
+  });
+  await writeSkill(root, "neighbor", "skill.neighbor", {
+    published: true,
+    routes: ["skill.hidden"],
+  });
+  await writeSkill(root, "hidden", "skill.hidden");
+  const snapshot = await collectRepositorySnapshot(root);
+  const report = buildSkillIndexReport(snapshot, "skill.entry");
+  const markdown = formatSkillIndexMarkdown(report);
+  const focusedSection = markdownSection(
+    markdown,
+    "## Focused Skill",
+    "## Published entrypoints",
+  );
+  const publishedSection = markdownSection(
+    markdown,
+    "## Published entrypoints",
+    "## Structural candidates",
+  );
+
+  assert.equal(occurrences(markdown, "### skill.entry"), 1);
+  assert.equal(occurrences(markdown, "- Description: Review entry"), 1);
+  assert.equal(occurrences(markdown, "- Source: skills/entry/SKILL.md"), 1);
+  assert.equal(occurrences(markdown, "#### Direct outgoing declarations"), 1);
+  assert.match(focusedSection, /Publication: effective published entrypoint/);
+  assert.match(
+    focusedSection,
+    /Published-entrypoint lists and route evidence are limited to this focused direct-neighborhood projection/,
+  );
+  assert.match(
+    publishedSection,
+    /- skill\.neighbor — skills\/neighbor\/SKILL\.md/,
+  );
+  assert.doesNotMatch(publishedSection, /### skill\.neighbor/);
+  assert.doesNotMatch(publishedSection, /Direct declared continuations/);
+  assert.doesNotMatch(publishedSection, /skill\.hidden/);
+  assert.match(
+    publishedSection,
+    /Neighboring entrypoints may have declarations outside this projection, so no complete route list is implied/,
+  );
+  assert.match(
+    publishedSection,
+    /Unfocused JSON contains the complete repository projection/,
+  );
+  assert.match(
+    markdown,
+    /Skill, route, structural, visible-ID, and Discovery-diagnostic counts are projection-scoped\. Coverage and repository diagnostics are repository-scoped\./,
+  );
+});
+
+test("unfocused Markdown keeps detailed entrypoints and Markdown formatting cannot change JSON bytes", async (t) => {
+  const root = await fixture(t);
+  await writeSkill(root, "entry", "skill.entry", {
+    published: true,
+    routes: ["skill.neighbor"],
+  });
+  await writeSkill(root, "neighbor", "skill.neighbor", {
+    published: true,
+    routes: ["skill.hidden"],
+  });
+  await writeSkill(root, "hidden", "skill.hidden");
+  const snapshot = await collectRepositorySnapshot(root);
+  const full = buildSkillIndexReport(snapshot);
+  const focused = buildSkillIndexReport(snapshot, "skill.entry");
+  const fullJsonBefore = formatSkillIndexJson(full);
+  const focusedJsonBefore = formatSkillIndexJson(focused);
+  const normalizedFullJson = formatSkillIndexJson({
+    ...full,
+    root: "/repository",
+  });
+  const normalizedFocusedJson = formatSkillIndexJson({
+    ...focused,
+    root: "/repository",
+  });
+  const markdown = formatSkillIndexMarkdown(full);
+  formatSkillIndexMarkdown(focused);
+
+  assert.doesNotMatch(markdown, /## Focused Skill/);
+  assert.match(markdown, /### skill\.entry/);
+  assert.match(markdown, /### skill\.neighbor/);
+  assert.equal(occurrences(markdown, "- Direct declared continuations:"), 2);
+  assert.equal(occurrences(markdown, "| Source | Index |"), 2);
+  assert.match(markdown, /skill\.hidden/);
+  assert.equal(formatSkillIndexJson(full), fullJsonBefore);
+  assert.equal(formatSkillIndexJson(focused), focusedJsonBefore);
+  assert.equal(
+    sha256(normalizedFullJson),
+    "06201a63b574dcaa029ab94480b658a6df0e2d513f62e26f44c7b0cc5f247063",
+  );
+  assert.equal(
+    sha256(normalizedFocusedJson),
+    "b2bc305ebe2e812f836e7f70951c071d6fb3fd3aaaa3c89bce58f133369f885e",
+  );
+});
+
 test("Markdown applies deterministic caps and points back to source Skills and JSON", async (t) => {
   const root = await fixture(t);
   await writeSkill(root, "entry", "skill.entry", { published: true });
@@ -518,6 +619,26 @@ function diagnosticKey(value: unknown): string {
     item.evidence?.startLine ?? 0,
     item.message ?? "",
   ].join("\0");
+}
+
+function occurrences(value: string, search: string): number {
+  return value.split(search).length - 1;
+}
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function markdownSection(
+  markdown: string,
+  startHeading: string,
+  endHeading: string,
+): string {
+  const start = markdown.indexOf(startHeading);
+  const end = markdown.indexOf(endHeading, start + startHeading.length);
+  assert.notEqual(start, -1, startHeading);
+  assert.notEqual(end, -1, endHeading);
+  return markdown.slice(start, end);
 }
 
 async function captured(
