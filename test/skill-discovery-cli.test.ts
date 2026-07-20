@@ -1,17 +1,23 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { execFile as execFileCallback } from "node:child_process";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import { main } from "../src/cli.js";
 import { bom } from "../src/commands/bom.js";
+import { ciReport } from "../src/commands/ci-report.js";
+import { diff } from "../src/commands/diff.js";
 import { readiness } from "../src/commands/readiness.js";
 import { trustGraph } from "../src/commands/trust-graph.js";
 import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
 import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
 import { scan } from "../src/scanner.js";
 import type { DiagnosticV2 } from "../src/types.js";
+
+const execFile = promisify(execFileCallback);
 
 test("graph --view discovery JSON exposes the dedicated route contract", async () => {
   const root = await routeFixture();
@@ -968,34 +974,68 @@ test("existing graph views remain route-free and invalid view help lists discove
   assert.match(help.stdout, /optional for discovery/);
 });
 
-test("deferred Readiness, Trust Graph, and BOM projections do not adopt Discovery", async () => {
-  const root = await routeFixture();
-  await writeSkill(
-    root,
-    "source",
-    "skill.source",
-    ["skill.target", "skill.missing", "skill.old"],
-    undefined,
-    true,
-  );
-  await writeFile(
-    path.join(root, "renma.config.json"),
-    `${JSON.stringify({ skill_discovery: { adopted: true } })}\n`,
-  );
-  const [readinessReport, trustGraphReport, bomReport] = await Promise.all([
-    readiness(root),
-    trustGraph(root),
-    bom(root, {}, { omitGeneratedAt: true }),
-  ]);
+test("authoritative incomplete Discovery remains excluded from deferred reports", async () => {
+  const root = await authoritativeIncompleteGitFixture();
+  try {
+    const scanReport = await scan(root);
+    const graphResult = await captured(() =>
+      main(["graph", root, "--view", "discovery", "--format", "json"]),
+    );
+    const graphReport = JSON.parse(graphResult.stdout) as {
+      discovery: {
+        coverage: { mode: string; complete: boolean };
+        notReachedDiscoveryEligibleSkillIds: string[];
+      };
+    };
 
-  assert.doesNotMatch(JSON.stringify(readinessReport), /DISCOVERY-/);
-  assert.doesNotMatch(JSON.stringify(trustGraphReport), /DISCOVERY-/);
-  assert.doesNotMatch(JSON.stringify(bomReport), /DISCOVERY-/);
-  const publicationField =
-    /publishedEntrypoint|published_entrypoint|published-entrypoint/;
-  assert.doesNotMatch(JSON.stringify(readinessReport), publicationField);
-  assert.doesNotMatch(JSON.stringify(trustGraphReport), publicationField);
-  assert.doesNotMatch(JSON.stringify(bomReport), publicationField);
+    assert.ok(
+      scanReport.diagnostics.some(
+        (diagnostic) =>
+          diagnostic.code ===
+          DIAGNOSTIC_IDS.DISCOVERY_UNREACHABLE_ELIGIBLE_SKILL,
+      ),
+    );
+    assert.equal(graphResult.code, 0);
+    assert.deepEqual(graphReport.discovery.coverage, {
+      scope: "repository",
+      sourceEntrypointIds: ["skill.published"],
+      eligibleSkillCount: 2,
+      reachableSkillCount: 1,
+      notReachedSkillCount: 1,
+      mode: "authoritative",
+      reason: "repository-wide-discovery-adopted",
+      complete: false,
+    });
+    assert.deepEqual(
+      graphReport.discovery.notReachedDiscoveryEligibleSkillIds,
+      ["skill.unreached"],
+    );
+
+    const [
+      readinessReport,
+      semanticDiffReport,
+      ciReportResult,
+      trustGraphReport,
+      bomReport,
+    ] = await Promise.all([
+      readiness(root),
+      diff(root, { fromRef: "base", toRef: "HEAD" }),
+      ciReport(root, { fromRef: "base", toRef: "HEAD" }),
+      trustGraph(root),
+      bom(root, {}, { omitGeneratedAt: true }),
+    ]);
+
+    assertDiscoveryFree(readinessReport);
+    assertDiscoveryFree(semanticDiffReport);
+    assertDiscoveryFree(ciReportResult);
+    assertDiscoveryFree(trustGraphReport);
+    assertDiscoveryFree(bomReport);
+    assert.equal(ciReportResult.status, "pass");
+    assert.equal(ciReportResult.summary.findingsDelta, 0);
+    assert.equal(ciReportResult.summary.highOrCriticalFindingsDelta, 0);
+  } finally {
+    await rm(root, { force: true, recursive: true });
+  }
 });
 
 async function routeFixture(): Promise<string> {
@@ -1007,6 +1047,35 @@ async function routeFixture(): Promise<string> {
   ]);
   await writeSkill(root, "target", "skill.target");
   await writeSkill(root, "old", "skill.old", undefined, "deprecated");
+  return root;
+}
+
+async function authoritativeIncompleteGitFixture(): Promise<string> {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "renma-discovery-deferred-"),
+  );
+  await writeFile(path.join(root, "renma.config.json"), "{}\n");
+  await writeSkill(
+    root,
+    "published",
+    "skill.published",
+    undefined,
+    undefined,
+    true,
+  );
+  await writeSkill(root, "unreached", "skill.unreached");
+  await git(root, ["init", "-b", "main"]);
+  await git(root, ["config", "user.email", "renma@example.test"]);
+  await git(root, ["config", "user.name", "Renma Test"]);
+  await git(root, ["add", "."]);
+  await git(root, ["commit", "-m", "base"]);
+  await git(root, ["tag", "base"]);
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    `${JSON.stringify({ skill_discovery: { adopted: true } })}\n`,
+  );
+  await git(root, ["add", "renma.config.json"]);
+  await git(root, ["commit", "-m", "adopt discovery"]);
   return root;
 }
 
@@ -1095,4 +1164,24 @@ async function captured(
     process.stdout.write = stdoutWrite;
     process.stderr.write = stderrWrite;
   }
+}
+
+function assertDiscoveryFree(value: unknown): void {
+  const serialized = JSON.stringify(value);
+  assert.doesNotMatch(serialized, /DISCOVERY-/);
+  assert.doesNotMatch(serialized, /"reachability"\s*:/);
+  assert.doesNotMatch(serialized, /"coverage"\s*:/);
+  assert.doesNotMatch(
+    serialized,
+    /"(?:publishedEntrypointIds|reachableDiscoveryEligibleSkillIds|notReachedDiscoveryEligibleSkillIds|unroutedSkillIds)"\s*:/,
+  );
+  assert.doesNotMatch(
+    serialized,
+    /publishedEntrypoint|published_entrypoint|published-entrypoint/,
+  );
+}
+
+async function git(cwd: string, args: string[]): Promise<string> {
+  const { stdout } = await execFile("git", ["-C", cwd, ...args]);
+  return stdout.trim();
 }
