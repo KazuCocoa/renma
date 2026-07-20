@@ -128,7 +128,9 @@ export function readinessFromRepositorySnapshot(
   snapshot: RepositorySnapshot,
 ): ReadinessReport {
   const graphReport = graphFromRepositorySnapshot(snapshot);
-  const scanResult = scanFromRepositorySnapshot(snapshot);
+  const scanResult = scanFromRepositorySnapshot(snapshot, {
+    includeSkillDiscoveryDiagnostics: false,
+  });
   return buildReadinessReport(
     graphReport,
     scanResult.findings,

@@ -1,4 +1,3 @@
-import { validateAgentSkills } from "./agent-skills.js";
 import type { ConfigOverrides } from "./config.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import { createDiagnosticsV2, createReviewBundles } from "./diagnostics-v2.js";
@@ -21,6 +20,8 @@ import type {
 
 interface ScanBuilderOptions {
   evaluationDate?: Date | string;
+  /** Deferred projections may reuse scan evidence without adopting Discovery. */
+  includeSkillDiscoveryDiagnostics?: boolean;
 }
 
 /** Run the complete deterministic scan pipeline for a target path. */
@@ -75,13 +76,26 @@ export function scanFromRepositorySnapshot(
     rawFindings,
     snapshot.config.suppressions,
   );
-  const scanDiagnostics = [
-    ...snapshot.discoveryDiagnostics,
+  const discoveryDiagnostics = snapshot.discoveryDiagnostics.map((diagnostic) =>
+    attachDiagnosticClassification(diagnostic, classifications),
+  );
+  const skillDiscoveryDiagnostics =
+    options.includeSkillDiscoveryDiagnostics === false
+      ? []
+      : snapshot.skillDiscoveryDiagnostics.map((diagnostic) =>
+          attachDiagnosticClassification(diagnostic, classifications),
+        );
+  const remainingDiagnostics = [
     ...snapshot.contextLensDiagnostics,
     ...suppressed.diagnostics,
   ].map((diagnostic) =>
     attachDiagnosticClassification(diagnostic, classifications),
   );
+  const scanDiagnostics = [
+    ...discoveryDiagnostics,
+    ...skillDiscoveryDiagnostics,
+    ...remainingDiagnostics,
+  ];
   const diagnosticsV2 = createDiagnosticsV2({
     findings: suppressed.findings,
     diagnostics: scanDiagnostics,
@@ -89,7 +103,7 @@ export function scanFromRepositorySnapshot(
   const trustGraph = buildTrustGraph({
     catalog: snapshot.catalog,
     findings: suppressed.findings,
-    diagnostics: scanDiagnostics,
+    diagnostics: [...discoveryDiagnostics, ...remainingDiagnostics],
     securityPolicies,
   });
 
@@ -98,7 +112,7 @@ export function scanFromRepositorySnapshot(
     ...(snapshot.configPath ? { configPath: snapshot.configPath } : {}),
     scannedFileCount: snapshot.scannedFileCount,
     format: snapshot.config.format,
-    agentSkills: validateAgentSkills(snapshot.documents),
+    agentSkills: snapshot.agentSkills,
     contextLens: snapshot.contextLens,
     securityPolicyInventory,
     trustGraph,

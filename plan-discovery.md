@@ -2,24 +2,27 @@
 
 ## Status
 
-Status: active design proposal
+Status: active design with an operational route-foundation slice
 
-Implementation status: not implemented
+Implementation status: the planned 0.22.0 slice implements explicit
+`renma.continues-with`, exact resolution, route diagnostics, structural roots,
+and `graph --view discovery`; later Discovery layers remain deferred
 
 Baseline: Renma 0.21.0
 
-Scope: optional static Skill Discovery for a large single repository
+Scope: incrementally delivered static Skill Discovery for a large single
+repository
 
 This document separates three levels of decision:
 
 - **Accepted design direction** covers the product boundary, layered graph
   model, source ownership, focused-entrypoint responsibility, deterministic
   evidence, and gradual adoption.
-- **Recommended MVP decisions** cover fail-closed Discovery eligibility, the
+- **Complete-design decisions** cover fail-closed Discovery eligibility, the
   proposed metadata names, explicit publication, separate repository-wide
   adoption, exact resolution, report shape, command, diagnostics, and
-  implementation sequence. They become public contracts only after contract
-  review and implementation.
+  implementation sequence. Each becomes a public contract only in the release
+  slice that implements it.
 - **Deferred extensions and open questions** are not part of the MVP and must
   not enlarge the first implementation PR.
 
@@ -29,6 +32,31 @@ preserving line provenance, and rendering stdout-only projections. Its older
 metadata names, aliases, inferred entrypoints, authoritative Markdown-link
 routes, report shape, and implementation are not compatibility requirements or
 an implementation base.
+
+## Release slicing
+
+Skill Discovery is deliberately additive and does not need to ship as one
+atomic `skill-index` MVP. The 0.22.0 foundation includes only:
+
+- canonical `metadata.renma.continues-with` declarations;
+- exact ID and repository-relative path resolution;
+- separate resolution and route-usability evidence;
+- warnings for invalid, unresolved, ambiguous, wrong-kind, inactive, and
+  duplicate declarations;
+- structural-root and standalone graph facts; and
+- JSON, Markdown, and Mermaid through `graph --view discovery`, with optional
+  exact direct-neighborhood focus.
+
+The 0.22.0 slice does not add published entrypoints,
+`skill_discovery.adopted`, reachability, coverage, `skill-index`, Readiness,
+diff, CI report, Trust Graph, BOM, ownership, scaffold, init, guide, suggestion,
+or richer visualization integration. Those contracts can be reviewed and
+delivered independently after operational route evidence has been used.
+
+The remainder of this document retains the complete design direction so later
+slices can be evaluated consistently. Sections describing publication,
+adoption, reachability, coverage, or `skill-index` are deferred design, not
+0.22.0 behavior.
 
 ## Problem
 
@@ -95,7 +123,8 @@ Repository authors keep workflow and continuation policy in source SKILL.md
   -> compact canonical metadata declares authoritative continuations
   -> Renma parses the repository once into a shared RepositorySnapshot
   -> Skill Discovery resolves and validates a derived continuation graph
-  -> renma skill-index emits deterministic JSON or compact Markdown
+  -> graph --view discovery emits the first deterministic route projection
+  -> a later skill-index may add a publication/reachability-oriented index
   -> agents and humans open the source Skills and apply their conditions
   -> humans review repository changes
 ```
@@ -469,9 +498,9 @@ entrypoints, reachability, or blocking diagnostics. Renma must not infer route
 intent from surrounding prose with regular expressions, fuzzy matching, or an
 LLM.
 
-## Proposed MVP
+## Complete Discovery MVP (delivered across independent slices)
 
-The recommended MVP includes:
+The complete design may eventually include:
 
 - the two canonical metadata fields above;
 - the minimal `skill_discovery.adopted` repository-wide coverage field above;
@@ -496,18 +525,19 @@ The MVP excludes:
 - fuzzy matching, embeddings, or LLM inference;
 - task input, ranking, or runtime selection;
 - a Product asset or product projection;
-- Mermaid output;
+- Mermaid output in a future `skill-index` command (the 0.22.0 graph projection
+  already provides deterministic Mermaid);
 - Readiness, semantic diff, CI, Trust Graph, and BOM integration;
 - scaffold, `guide`, or `suggest-metadata` changes;
 - any repository configuration beyond the single coverage field; changes to
   `renma init`; and
 - automatic repository edits.
 
-## Report and CLI Contract
+## Deferred full report and CLI contract
 
 ### Command name
 
-The recommended public command remains:
+The deferred publication/reachability-oriented command remains:
 
 ```bash
 renma skill-index [path] [--format json|markdown] [--focus <skill-id-or-path>]
@@ -713,9 +743,10 @@ required.
 
 ## Compatibility
 
-No Discovery metadata or report contract has shipped, so historical proposal
-names are not compatibility requirements. The implementation must not restore
-old top-level fields such as:
+The 0.22.0 route foundation recognizes only
+`metadata.renma.continues-with`; historical proposal names are not
+compatibility requirements. The implementation must not restore old top-level
+fields such as:
 
 ```yaml
 routes_to:
@@ -727,16 +758,11 @@ It also must not accept those names as silent aliases. Canonical Skills use
 flat string-valued `metadata.renma.*`; non-Skill assets cannot declare Skill
 continuations or publication.
 
-Repositories without Discovery metadata and without a repository-wide coverage
-declaration keep their current scan, catalog, graph, Readiness, diff, CI, Trust
-Graph, and BOM behavior. Adding the standalone MVP must not change those report
-schemas or advertise `skill-index` as current behavior before the command
-ships.
-
-This design PR does not change `renma.config.json` parsing, metadata parsing,
-versioning, or command behavior. A later implementation PR may parse only the
-reviewed `skill_discovery.adopted` field. `renma init` must continue to omit it,
-because initializing Renma is not repository-wide Skill Discovery adoption.
+Repositories without Discovery metadata keep their current scan, catalog,
+graph, Readiness, diff, CI, Trust Graph, and BOM behavior. The dedicated
+discovery graph view does not add continuation edges to existing graph views or
+advertise `skill-index` as current behavior. `renma.config.json` and
+`renma init` continue to omit repository-wide Discovery adoption.
 
 PR #89 should not be rebased, cherry-picked, restored, or used as the code
 baseline. Implementation starts from the 0.21.0 shared repository snapshot,
@@ -748,7 +774,7 @@ Only after the MVP contract is stable should Renma consider:
 
 - non-authoritative observed Skill references or route candidates;
 - Readiness, semantic diff, CI summary, suppression, and optional gating;
-- Mermaid or richer route visualizations;
+- richer route visualizations beyond the initial deterministic Mermaid view;
 - product and ownership projections from exact tags, stable IDs, and existing
   Context/Lens relationships;
 - Trust Graph or Repository Context BOM additions;
@@ -761,73 +787,43 @@ future decision changes Renma's boundary. Runtime debugging and observability
 require runtime-produced evidence and remain external. Multi-repository or
 organization-wide discovery requires a separate federation design.
 
-## Implementation Sequence
+## Incremental implementation sequence
 
-The current design PR settles the contract only. It adds no Skill Discovery
-implementation, config or metadata parsing, CLI command, version change, or
-`renma init` behavior.
+### 0.22.0: route foundation and graph projection
 
-### PR 1: Contract, domain types, and fixtures
+- parse only canonical `renma.continues-with` declarations;
+- build one exact, fail-closed route index from the shared snapshot and catalog;
+- preserve declaration, Agent Skills, lifecycle, kind, and identity evidence;
+- calculate route eligibility/usability, structural roots, and standalone
+  Skills without reachability or coverage semantics;
+- emit the five initial warning diagnostics through scan and diagnostics v2;
+  and
+- add the dedicated discovery graph JSON, Markdown, Mermaid, exact optional
+  focus, CLI help, tests, and documentation.
 
-- finalize `renma.continues-with` and `renma.published-entrypoint` through
-  public-contract review together with the single
-  `skill_discovery.adopted` repository field;
-- define TypeScript domain types for declarations, resolution, adoption,
-  coverage mode, visible/lifecycle-active/Discovery-eligible Skill
-  classifications, effective ID uniqueness, reachability, route usability, and
-  diagnostics;
-- define and schema-test `renma.skill-index.v1`;
-- add representative fixtures for category-first, product-first, team-first,
-  direct-leaf, standalone, invalid-source, invalid-target, inactive, ambiguous,
-  cyclic, partial, incomplete, and adopted repositories; and
-- add duplicate-identity fixtures covering two valid active Skills with one
-  explicit ID, a valid Skill colliding with a non-Skill asset, a path-resolved
-  continuation to a duplicate-ID Skill, and an attempted duplicate-ID published
-  entrypoint; and
-- add contract tests for ordering, evidence, fail-closed eligibility, adoption
-  states, and descriptive versus authoritative reachability.
+### Later contract slice: publication and adoption
 
-This PR adds no operational metadata parsing, public CLI command, existing
-report change, or documentation claim that Skill Discovery is implemented.
+Review `renma.published-entrypoint` and `skill_discovery.adopted` independently
+from the route foundation. Do not infer either contract from structural roots
+or the presence of continuation metadata.
 
-### PR 2: Canonical parsing, resolution, and internal report
+### Later report slice: reachability and `skill-index`
 
-- extend the canonical metadata parser with the two reviewed fields and the
-  repository config parser with the single reviewed adoption field;
-- derive declarations, including rejected non-operational evidence, from the
-  shared `RepositorySnapshot`;
-- resolve exact Skill IDs and repository-relative paths with fail-closed
-  ambiguity;
-- preserve line evidence, Agent Skills validity, resolved invalid-Skill
-  identity, repository-wide effective ID uniqueness, linked
-  `META-DUPLICATE-ASSET-ID` evidence, and lifecycle state;
-- calculate Discovery eligibility, publication, structural roots, standalone
-  and unrouted Skills, adoption, coverage mode, cycle-safe reachability, and
-  cycles;
-- emit the canonical report through an internal API; and
-- add the exact diagnostics defined above.
+After publication/adoption contracts and real route usage are reviewed, add
+descriptive versus authoritative reachability, coverage diagnostics, and a
+versioned `skill-index` report/command if the separate command still provides
+clear value.
 
-This PR does not add a public command or change Readiness, diff, CI, graph,
-Trust Graph, BOM, scaffold, or suggestion output.
+### Later integrations
 
-### PR 3: Public `skill-index` command
-
-- register the command in the current CLI and help contract;
-- add canonical JSON and compact Markdown formatting;
-- add exact focus by Skill ID or path;
-- document output, adoption, exit behavior, and interpretation;
-- keep all output stdout-only; and
-- add CLI, package, and documentation contract tests.
-
-### Later PRs
-
-Choose later work from the deferred list only after actual use validates the
-MVP report. Each integration receives its own additive contract review.
+Choose Readiness, diff, CI, Trust Graph, BOM, ownership, authoring, or richer
+visualization additions only after the route and later report contracts are
+stable. Each integration receives its own additive contract review.
 
 ## Open Design Questions
 
-These questions are intentionally post-MVP and do not block the three PRs
-above:
+These questions are intentionally later-slice work and do not block the 0.22.0
+route foundation:
 
 1. Do observed local Skill references provide enough review value to justify a
    separate non-authoritative projection?
@@ -838,10 +834,9 @@ above:
 4. Which route visualization remains readable in genuinely large cyclic or
    shared-child graphs?
 
-The PR 1 contract review may refine public spelling before release. It must not
-add aliases, observed-route authority, free-form focus, another metadata field,
-or another repository config field without a concrete deterministic MVP
-consumer.
+Later contract review must not add aliases, observed-route authority,
+free-form focus, another metadata field, or another repository config field
+without a concrete deterministic consumer.
 
 ## Success Criteria
 
@@ -880,5 +875,6 @@ not-reached Skills during partial adoption.
 - a Product asset or ownership-derived product identity;
 - automatic route, entrypoint, Skill, config, or generated-file edits;
 - quality, confidence, centrality, or popularity scores;
-- Readiness, semantic diff, CI, Trust Graph, or BOM changes in the MVP; and
+- Readiness, semantic diff, CI, Trust Graph, or BOM changes in the 0.22.0
+  foundation; and
 - treating the old experimental PR as the implementation starting point.

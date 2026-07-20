@@ -95,8 +95,8 @@ interpretation.
 
 ## Operational Renma Metadata
 
-Renma 0.16.0 makes these governance keys operational for specification-valid
-Agent Skills:
+Renma makes these governance and static continuation keys operational for
+specification-valid Agent Skills:
 
 ```text
 renma.id
@@ -117,6 +117,7 @@ renma.requires-lens
 renma.optional-lens
 renma.conflicts
 renma.superseded-by
+renma.continues-with
 ```
 
 For new canonical Skills, `description` is the portable discovery source of
@@ -147,6 +148,13 @@ Canonical list metadata is not comma-separated. Malformed JSON, non-array
 JSON, and non-string array members are invalid rather than guessed. Diagnostics
 for canonical values retain evidence for the specific child key under
 `metadata`, not just the parent mapping.
+
+`renma.continues-with` is the explicit Skill-to-Skill continuation contract.
+It additionally rejects empty or whitespace-only members, preserves each
+declaration index at the field's exact line evidence, and creates no routes for
+an empty array. It is operational only on canonical `SKILL.md` Agent Skills and
+does not enter `catalog.dependencies`. See the
+[Skill Discovery Graph contract](skill-discovery.md).
 
 Empty text, invalid status, and invalid lifecycle or freshness values retain
 their existing operational diagnostic semantics and stable finding IDs where

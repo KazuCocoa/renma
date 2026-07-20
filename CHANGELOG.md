@@ -6,6 +6,29 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added the canonical Agent Skills
+  `metadata.renma.continues-with` JSON-array string contract, exact Skill ID or
+  repository-relative path resolution, route eligibility and usability
+  evidence, deterministic duplicate handling, and structural-root facts.
+- Added warning diagnostics for invalid continuation declarations, unresolved
+  or ambiguous routes, non-Skill targets, inactive targets, and duplicate
+  declarations. Discovery diagnostics flow through repository snapshots,
+  normal scan output, and diagnostics v2 repair guidance.
+- Added `graph --view discovery` JSON, Markdown, and Mermaid projections with
+  optional exact Skill ID/path focus over direct incoming and outgoing declared
+  routes.
+
+### Compatibility
+
+- Skill continuations remain separate from `catalog.dependencies`; existing
+  graph views and Readiness, diff, CI report, Trust Graph, BOM, ownership,
+  init, scaffold, guidance, and suggestion behavior are unchanged. The package
+  version remains `0.21.0` until the separate release commit.
+- Published entrypoints, repository-wide Discovery adoption, reachability,
+  coverage, `skill-index`, and downstream report integrations remain deferred.
+
 ## [0.21.0] - 2026-07-19
 
 ### Added

@@ -1,5 +1,9 @@
 import path from "node:path";
 import {
+  validateAgentSkills,
+  type AgentSkillsValidationSummary,
+} from "./agent-skills.js";
+import {
   buildCatalog,
   buildSkillParentIndex,
   type SkillParentIndex,
@@ -23,6 +27,10 @@ import {
   collectSecurityPolicyAssetEvidence,
   type SecurityPolicyAssetEvidence,
 } from "./security-policy-inventory.js";
+import {
+  prepareSkillDiscoveryIndex,
+  type SkillDiscoveryIndex,
+} from "./skill-discovery.js";
 import type {
   Artifact,
   AssetClassificationEvidence,
@@ -50,6 +58,9 @@ export interface RepositorySnapshot extends RepositoryEvidence {
   classifications: ReadonlyMap<string, AssetClassificationEvidence>;
   skillParents: SkillParentIndex;
   securityPolicies: SecurityPolicyAssetEvidence[];
+  agentSkills: AgentSkillsValidationSummary;
+  skillDiscovery: SkillDiscoveryIndex;
+  skillDiscoveryDiagnostics: Diagnostic[];
   discoveryDiagnostics: Diagnostic[];
   catalogDiagnostics: Diagnostic[];
   contextLensDiagnostics: Diagnostic[];
@@ -66,8 +77,22 @@ export async function collectRepositoryEvidence(
     scannedFileCount: snapshot.scannedFileCount,
     catalog: snapshot.catalog,
     contextLens: snapshot.contextLens,
-    diagnostics: snapshot.diagnostics,
+    diagnostics: repositoryDiagnosticsWithoutSkillDiscovery(snapshot),
   };
+}
+
+/** Preserve pre-Discovery diagnostics for projections deferred beyond 0.22. */
+export function repositoryDiagnosticsWithoutSkillDiscovery(
+  snapshot: Pick<
+    RepositorySnapshot,
+    "discoveryDiagnostics" | "catalogDiagnostics" | "contextLensDiagnostics"
+  >,
+): Diagnostic[] {
+  return [
+    ...snapshot.discoveryDiagnostics,
+    ...snapshot.catalogDiagnostics,
+    ...snapshot.contextLensDiagnostics,
+  ];
 }
 
 export async function collectRepositorySnapshot(
@@ -84,6 +109,12 @@ export async function collectRepositorySnapshot(
   const documents = artifacts.map(parseDocument);
   const skillParents = buildSkillParentIndex(documents);
   const built = buildCatalog(documents, discoveredPaths, skillParents);
+  const agentSkills = validateAgentSkills(documents);
+  const skillDiscovery = prepareSkillDiscoveryIndex(
+    documents,
+    built.catalog,
+    agentSkills,
+  );
   const classifications = buildClassificationEvidenceIndex(documents);
   const securityPolicies = collectSecurityPolicyAssetEvidence(
     documents,
@@ -115,6 +146,9 @@ export async function collectRepositorySnapshot(
     classifications,
     skillParents,
     securityPolicies,
+    agentSkills,
+    skillDiscovery,
+    skillDiscoveryDiagnostics: skillDiscovery.diagnostics,
     scannedFileCount: artifacts.length,
     catalog: built.catalog,
     contextLens: contextLens.summary,
@@ -125,6 +159,7 @@ export async function collectRepositorySnapshot(
       ...discoveryDiagnostics,
       ...built.diagnostics,
       ...contextLens.diagnostics,
+      ...skillDiscovery.diagnostics,
     ],
   };
 }
