@@ -6,6 +6,32 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added deterministic Tarjan strongly connected component detection over only
+  usable representative resolved Skill-to-Skill continuation routes, including
+  explicit self-loop handling and one `DISCOVERY-ROUTE-CYCLE` warning per
+  maximal cyclic component.
+- Added complete sorted cycle member, Skill path, internal route, declaration
+  index, and line evidence to each warning, with cycle-specific LLM repair
+  constraints, human decision guidance, and graph, Skill Index, and scan
+  verification steps.
+- Linked each warning to every member Skill and internal route, preserved
+  repository-wide cycle evidence under exact direct-neighborhood focus, and
+  propagated the warning through scan, diagnostics v2, review bundles,
+  Discovery graph diagnostics, and Skill Index diagnostics.
+
+### Compatibility
+
+- Preserved reachability, minimum depth, source-entrypoint provenance,
+  coverage, route resolution/usability, focus neighborhoods, Discovery graph
+  schemas and edge rendering, and the exact `renma.skill-index.v1` top-level
+  shape. Cycles remain traversal-safe static review evidence and do not imply
+  runtime recursion or require repair.
+- Readiness, semantic diff, CI report, Trust Graph, Repository Context BOM,
+  ownership, init, scaffold, guide, suggestions, metadata, configuration,
+  suppression, CI gating, and package version remain unchanged.
+
 ## [0.22.3] - 2026-07-20
 
 ### Added

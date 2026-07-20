@@ -2,7 +2,7 @@
 
 ## Status
 
-Status: active design with operational route, publication, reachability, and Skill Index slices
+Status: stable single-repository static Discovery core
 
 Implementation status: 0.22.0 implements explicit `renma.continues-with`, exact
 resolution, route diagnostics, structural roots, and
@@ -12,7 +12,9 @@ diagnostics, and adoption projection; 0.22.2 implements cycle-safe reachability,
 descriptive and authoritative coverage, unrouted projection, and adopted-mode
 unreachable warnings; 0.22.3 implements the versioned
 `renma.skill-index.v1` report and stdout-only `skill-index` command with compact
-Markdown and exact optional focus.
+Markdown and exact optional focus; 0.22.4 implements deterministic route-cycle
+review diagnostics over the authoritative usable continuation graph and closes
+the current static core stabilization sequence.
 
 Baseline: Renma 0.21.0
 
@@ -58,13 +60,16 @@ separate contract. The 0.22.2 slice adds reachability and coverage semantics to
 the existing graph projection. The 0.22.3 slice adds the separate versioned
 Skill Index report and command without changing the graph or integrating
 Readiness, diff, CI report, Trust Graph, BOM, ownership, scaffold, init, guide,
-suggestion, or richer visualization contracts.
+suggestion, or richer visualization contracts. The 0.22.4 slice adds
+deterministic cycle review warnings without changing route, reachability,
+coverage, report-shape, rendering, or downstream-integration contracts.
 
 The remainder of this document retains the complete design direction so later
 slices can be evaluated consistently. Publication and adoption describe 0.22.1
 behavior; reachability, evaluated coverage, and global adopted-mode
 unreachable diagnostics describe 0.22.2 behavior; the versioned report and
 command describe 0.22.3 behavior.
+Route-cycle review and static-core stabilization describe 0.22.4 behavior.
 
 ## Problem
 
@@ -697,6 +702,7 @@ required” below means the diagnostic is emitted only when `adoption.state` is
 | `DISCOVERY-INVALID-PUBLISHED-ENTRYPOINT` | The publication key is present with a value other than `"true"`, is declared ambiguously, or attempts to publish a specification-valid deprecated or archived Skill. | No | The publication field and lifecycle evidence show why the Skill cannot be published. A specification-invalid or duplicate-ID Skill instead remains ineligible under its existing Agent Skills or catalog-identity diagnostics. |
 | `DISCOVERY-ENTRYPOINT-WITHOUT-USABLE-BOUNDARIES` | A Discovery-eligible published entrypoint has a deterministically established missing capability, positive usage boundary, or negative routing boundary under current Agent Skills and Skill-quality checks. | No | The publication marker and originating `RN-SKILL-*` or `QUAL-*` evidence identify the boundary to improve. This is a publication-quality check, not link interpretation, and passing it is not proof of semantic completeness. |
 | `DISCOVERY-UNREACHABLE-ELIGIBLE-SKILL` | In adopted mode, a Discovery-eligible Skill is not reachable from any published entrypoint through usable declared continuations. | Yes | The repository-wide adoption declaration, published-entrypoint evidence, and authoritative route graph establish the gap. Ordinary Markdown references cannot make a Skill reachable or unreachable. |
+| `DISCOVERY-ROUTE-CYCLE` | Usable representative resolved Skill routes form a self-loop or a multi-Skill strongly connected component. | No | Sorted member Skill paths and every internal route retain exact declaration evidence. One warning covers each maximal component. Review whether the loop is intentional and bounded or accidental; do not infer runtime recursion or remove an arbitrary edge. |
 
 Existing duplicate-ID, invalid Agent Skills, lifecycle, ownership, and usage
 guidance diagnostics remain visible and should be reused as related evidence
@@ -783,9 +789,8 @@ canonical metadata parser, diagnostics, and current CLI conventions.
 
 ## Deferred Extensions
 
-Only after the MVP contract is stable should Renma consider:
+After static-core stabilization, operational trials may inform:
 
-- route-cycle diagnostics;
 - non-authoritative observed Skill references or route candidates;
 - Readiness, semantic diff, CI summary, suppression, and optional gating;
 - richer route visualizations beyond the initial deterministic Mermaid view;
@@ -854,17 +859,39 @@ organization-wide discovery requires a separate federation design.
 - add no Mermaid format, runtime selection, route inference, repository writes,
   metadata, configuration, or downstream-report integration.
 
+### 0.22.4: route-cycle diagnostics and static-core stabilization
+
+- run deterministic Tarjan strongly connected component detection over only
+  usable representative resolved Skill-to-Skill routes after route usability is
+  prepared and before any focus projection;
+- emit one `DISCOVERY-ROUTE-CYCLE` warning per maximal cyclic component,
+  including explicit self-loops, every sorted member Skill, every sorted
+  internal route, and canonical first-route primary evidence;
+- link the warning to every internal route and member Skill, and retain it under
+  exact focus whenever any internal cycle route is visible;
+- propagate the warning through scan, diagnostics v2, review bundles, the
+  existing Discovery graph diagnostics, and Skill Index Discovery diagnostics;
+  and
+- preserve reachability, coverage, `renma.skill-index.v1`, graph rendering,
+  exit codes, metadata, configuration, downstream exclusions, and package
+  version.
+
+After this slice, the current single-repository static Discovery core is
+stable. Operational trials may inform later integrations, but those decisions
+do not reopen the current route, publication, reachability, focus, or report
+contracts automatically.
+
 ### Later integrations
 
-Choose route-cycle diagnostics, Readiness, diff, CI, Trust Graph, BOM,
-ownership, authoring, or richer visualization additions only after the route
-and report contracts are
-stable. Each integration receives its own additive contract review.
+Choose Readiness, diff, CI or optional gating, Trust Graph, BOM, ownership,
+observed-reference, authoring, richer visualization, or federation additions
+only after operational trials. Each integration receives its own additive
+contract review.
 
 ## Open Design Questions
 
-These questions are intentionally later-slice work and do not block the shipped
-0.22.x Discovery contracts:
+These questions are intentionally later work and do not block the stable 0.22.x
+Discovery contracts:
 
 1. Do observed local Skill references provide enough review value to justify a
    separate non-authoritative projection?
@@ -895,10 +922,12 @@ evidence:
 6. where every declaration came from and how it resolved;
 7. which eligible Skills are structural roots, standalone, unrouted, or not
    reached, and whether that result is descriptive or authoritative;
-8. how layered routing varies without requiring a fixed hierarchy;
-9. why source Skills remain authoritative and focused;
-10. why product knowledge survives owner changes; and
-11. why the report is repository governance rather than runtime selection.
+8. which exact usable continuations form each maximal cyclic component and why
+   that static evidence does not prove runtime recursion;
+9. how layered routing varies without requiring a fixed hierarchy;
+10. why source Skills remain authoritative and focused;
+11. why product knowledge survives owner changes; and
+12. why the report is repository governance rather than runtime selection.
 
 The first-hop Markdown projection must remain bounded and useful with more than
 100 Skills because it publishes only explicit entrypoints and uses capped
@@ -916,6 +945,7 @@ not-reached Skills during partial adoption.
 - a Product asset or ownership-derived product identity;
 - automatic route, entrypoint, Skill, config, or generated-file edits;
 - quality, confidence, centrality, or popularity scores;
-- route-cycle diagnostics or Readiness, semantic diff, CI, Trust Graph, or BOM
-  integration in 0.22.3; and
+- Readiness, semantic diff, CI, Trust Graph, BOM, ownership, observed-reference,
+  richer visualization, authoring-assistance, or federation integration in
+  0.22.4; and
 - treating the old experimental PR as the implementation starting point.

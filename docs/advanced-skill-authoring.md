@@ -14,9 +14,11 @@ The 0.22.0 Skill Discovery foundation adds explicit canonical continuation
 metadata and a static graph projection. The 0.22.1 slice adds explicit
 published entrypoints and separately configured repository-wide adoption;
 0.22.2 adds reachability and coverage; 0.22.3 adds the versioned static Skill
-Index report and command. These remain separate from repository file and
-Skill-local support-resource discovery and from runtime Skill selection. See
-the [Skill Discovery Graph and Index contract](skill-discovery.md).
+Index report and command; 0.22.4 adds deterministic route-cycle review
+diagnostics and stabilizes the single-repository static Discovery core. These
+remain separate from repository file and Skill-local support-resource discovery
+and from runtime Skill selection. See the
+[Skill Discovery Graph and Index contract](skill-discovery.md).
 
 ## Derive A Focused Skill From An Existing Skill
 
@@ -182,6 +184,15 @@ of the owning workflow Skill.
 Use `renma skill-index .` to review the compact static first-hop and
 continuation evidence. Open the source Skills to decide whether their authored
 conditions apply to a request.
+
+Continuation cycles are not automatically invalid. A review, retry,
+cross-check, or refinement workflow may intentionally return to an earlier
+Skill. `DISCOVERY-ROUTE-CYCLE` records the exact usable internal declarations;
+it does not prove runtime recursion or instruct an author to remove the first
+edge. Review every internal continuation and make stop, ask, retry, handoff, and
+completion conditions explicit in the owning Skill bodies. Remove or redirect
+an edge only when repository evidence shows that continuation is stale or
+accidental. An intentional bounded cycle may remain.
 
 ## Review Selection Boundaries
 

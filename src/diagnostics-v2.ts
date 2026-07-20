@@ -833,11 +833,18 @@ function affectedSource(diagnostic: DiagnosticV2): string {
 }
 
 function filesForDiagnostic(diagnostic: DiagnosticV2): string[] {
+  const cycleSkills = detailRecordArray(diagnostic, "cycleSkills");
+  const cycleRoutes = detailRecordArray(diagnostic, "cycleRoutes");
   return [
     diagnostic.location?.path,
     detailString(diagnostic, "sourcePath"),
     detailString(diagnostic, "targetPath"),
     ...detailStringArray(diagnostic, "duplicatePaths"),
+    ...cycleSkills.map(recordSourcePath),
+    ...cycleRoutes.flatMap((route) => [
+      recordString(route, "sourcePath"),
+      recordString(route, "targetPath"),
+    ]),
     ...(diagnostic.relatedLocations ?? []).map((location) => location.path),
   ].filter((pathValue): pathValue is string => pathValue !== undefined);
 }
@@ -849,6 +856,7 @@ function extractAssets(diagnostic: DiagnosticV2): string[] {
       detailString(diagnostic, "lensId"),
       detailString(diagnostic, "source"),
       detailString(diagnostic, "target"),
+      ...detailStringArray(diagnostic, "cycleSkillIds"),
       ...detailStringArray(diagnostic, "replacementTargets"),
     ].filter((value): value is string => value !== undefined),
   );
@@ -869,6 +877,33 @@ function extractAssets(diagnostic: DiagnosticV2): string[] {
     if (duplicateId) assets.add(duplicateId.trim());
   }
   return [...assets];
+}
+
+function detailRecordArray(
+  diagnostic: DiagnosticV2,
+  key: string,
+): Array<Record<string, unknown>> {
+  const values = [detailFacts(diagnostic)?.[key], diagnostic.details?.[key]];
+  for (const value of values) {
+    if (!Array.isArray(value)) continue;
+    return value.filter(
+      (item): item is Record<string, unknown> =>
+        typeof item === "object" && item !== null && !Array.isArray(item),
+    );
+  }
+  return [];
+}
+
+function recordString(
+  record: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = record[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function recordSourcePath(record: Record<string, unknown>): string | undefined {
+  return recordString(record, "sourcePath");
 }
 
 function looksAssetLike(value: string): boolean {

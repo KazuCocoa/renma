@@ -13,6 +13,8 @@ import {
 import {
   focusSkillDiscoveryIndex,
   prepareSkillDiscoveryIndex,
+  resolveSkillDiscoveryRouteCycles,
+  type DeclaredSkillRoute,
 } from "../src/skill-discovery.js";
 import type { Artifact, ArtifactKind, ParsedDocument } from "../src/types.js";
 
@@ -1020,6 +1022,506 @@ test("route diagnostics retain route-specific verification wording", () => {
   assert.match(verification, /repaired relationship evidence/);
 });
 
+test("route-cycle diagnostics preserve exact self-loop evidence and review constraints", () => {
+  const discovery = prepare([
+    skill("skills/self/SKILL.md", {
+      id: "skill.self",
+      routes: ["skill.self"],
+    }),
+  ]);
+  const route = discovery.routes[0]!;
+  const diagnostic = discovery.diagnostics.find(
+    (item) => item.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+  );
+
+  assert.equal(diagnostic?.severity, "warning");
+  assert.equal(diagnostic?.path, route.sourcePath);
+  assert.deepEqual(diagnostic?.evidence, route.evidence);
+  assert.deepEqual(diagnostic?.details, {
+    cycleSkillIds: ["skill.self"],
+    cycleSkills: [{ id: "skill.self", sourcePath: "skills/self/SKILL.md" }],
+    selfLoop: true,
+    routeCount: 1,
+    cycleRoutes: [
+      {
+        sourceId: "skill.self",
+        sourcePath: "skills/self/SKILL.md",
+        targetId: "skill.self",
+        targetPath: "skills/self/SKILL.md",
+        declarationIndex: 0,
+        evidence: route.evidence,
+      },
+    ],
+  });
+  assert.match(diagnostic?.message ?? "", /Traversal remains cycle-safe/);
+  assert.match(diagnostic?.message ?? "", /not proof of runtime recursion/);
+  assert.doesNotMatch(diagnostic?.message ?? "", /infinite|runtime will loop/i);
+  assert.deepEqual(
+    diagnostic?.repairConstraints?.map((item) => item.kind),
+    [
+      "must_preserve",
+      "must_not_change",
+      "allowed_change",
+      "requires_human_decision",
+    ],
+  );
+  assert.match(
+    JSON.stringify(diagnostic?.repairConstraints),
+    /Do not remove an arbitrary route/,
+  );
+  assert.match(
+    JSON.stringify(diagnostic?.repairConstraints),
+    /intentional bounded workflow loop/,
+  );
+  assert.deepEqual(
+    diagnostic?.verificationSteps?.map((item) => item.command),
+    [
+      "renma graph . --view discovery --format json",
+      "renma skill-index . --format json",
+      "renma scan . --format json",
+    ],
+  );
+  assert.ok(
+    route.linkedDiagnostics.some(
+      (item) => item.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+    ),
+  );
+  assert.ok(
+    discovery.skills[0]?.linkedDiagnostics.some(
+      (item) => item.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+    ),
+  );
+  assert.equal(
+    discovery.skills[0]?.publication.linkedDiagnostics.some(
+      (item) => item.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+    ),
+    false,
+  );
+});
+
+test("route-cycle diagnostics emit once per maximal two- or three-Skill component", () => {
+  const cases = [
+    {
+      documents: [
+        skill("skills/a/SKILL.md", {
+          id: "skill.a",
+          routes: ["skill.b"],
+        }),
+        skill("skills/b/SKILL.md", {
+          id: "skill.b",
+          routes: ["skill.a"],
+        }),
+      ],
+      ids: ["skill.a", "skill.b"],
+      routeCount: 2,
+    },
+    {
+      documents: [
+        skill("skills/a/SKILL.md", {
+          id: "skill.a",
+          routes: ["skill.b"],
+        }),
+        skill("skills/b/SKILL.md", {
+          id: "skill.b",
+          routes: ["skill.c"],
+        }),
+        skill("skills/c/SKILL.md", {
+          id: "skill.c",
+          routes: ["skill.a"],
+        }),
+      ],
+      ids: ["skill.a", "skill.b", "skill.c"],
+      routeCount: 3,
+    },
+  ];
+
+  for (const item of cases) {
+    const diagnostics = prepare(item.documents).diagnostics.filter(
+      (diagnostic) => diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+    );
+    assert.equal(diagnostics.length, 1, item.ids.join(","));
+    assert.deepEqual(
+      diagnostics[0]?.details?.cycleSkillIds,
+      item.ids,
+      item.ids.join(","),
+    );
+    assert.equal(diagnostics[0]?.details?.routeCount, item.routeCount);
+    assert.equal(diagnostics[0]?.details?.selfLoop, false);
+  }
+});
+
+test("route-cycle components, members, internal routes, and primary evidence are deterministic", () => {
+  const documents = [
+    skill("skills/incoming/SKILL.md", {
+      id: "skill.incoming",
+      routes: ["skill.b"],
+    }),
+    skill("skills/a/SKILL.md", {
+      id: "skill.a",
+      routes: ["skill.c", "skill.b"],
+    }),
+    skill("skills/b/SKILL.md", {
+      id: "skill.b",
+      routes: ["skill.a"],
+    }),
+    skill("skills/c/SKILL.md", {
+      id: "skill.c",
+      routes: ["skill.a", "skill.outgoing"],
+    }),
+    skill("skills/outgoing/SKILL.md", { id: "skill.outgoing" }),
+    skill("skills/x/SKILL.md", { id: "skill.x", routes: ["skill.y"] }),
+    skill("skills/y/SKILL.md", { id: "skill.y", routes: ["skill.x"] }),
+  ];
+  const first = prepare(documents);
+  const second = prepare([...documents].reverse());
+  const selectCycles = (discovery: typeof first) =>
+    discovery.diagnostics.filter(
+      (diagnostic) => diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+    );
+  const firstCycles = selectCycles(first);
+
+  assert.deepEqual(firstCycles, selectCycles(second));
+  assert.deepEqual(
+    firstCycles.map((diagnostic) => diagnostic.details?.cycleSkillIds),
+    [
+      ["skill.a", "skill.b", "skill.c"],
+      ["skill.x", "skill.y"],
+    ],
+  );
+  assert.deepEqual(
+    (
+      firstCycles[0]?.details?.cycleRoutes as Array<{
+        sourceId: string;
+        targetId: string;
+      }>
+    ).map((route) => [route.sourceId, route.targetId]),
+    [
+      ["skill.a", "skill.b"],
+      ["skill.a", "skill.c"],
+      ["skill.b", "skill.a"],
+      ["skill.c", "skill.a"],
+    ],
+  );
+  assert.equal(firstCycles[0]?.path, "skills/a/SKILL.md");
+  assert.equal(
+    firstCycles[0]?.evidence?.startLine,
+    first.routes.find(
+      (route) =>
+        route.sourceId === "skill.a" && route.resolvedTarget?.id === "skill.b",
+    )?.evidence.startLine,
+  );
+  assert.deepEqual(
+    (
+      firstCycles[0]?.details?.cycleRoutes as Array<{
+        sourceId: string;
+        targetId: string;
+      }>
+    ).flatMap((route) => [route.sourceId, route.targetId]),
+    [
+      "skill.a",
+      "skill.b",
+      "skill.a",
+      "skill.c",
+      "skill.b",
+      "skill.a",
+      "skill.c",
+      "skill.a",
+    ],
+  );
+
+  const reversedDeclarationOrder = prepare([
+    skill("skills/a/SKILL.md", {
+      id: "skill.a",
+      routes: ["skill.b", "skill.c"],
+    }),
+    ...documents.filter((document) =>
+      [
+        "skills/b/SKILL.md",
+        "skills/c/SKILL.md",
+        "skills/outgoing/SKILL.md",
+      ].includes(document.artifact.path),
+    ),
+  ]);
+  const reorderedCycle = selectCycles(reversedDeclarationOrder)[0]!;
+  assert.deepEqual(
+    (
+      reorderedCycle.details?.cycleRoutes as Array<{
+        sourceId: string;
+        targetId: string;
+      }>
+    ).map((route) => [route.sourceId, route.targetId]),
+    [
+      ["skill.a", "skill.b"],
+      ["skill.a", "skill.c"],
+      ["skill.b", "skill.a"],
+      ["skill.c", "skill.a"],
+    ],
+  );
+  assert.equal(
+    (reorderedCycle.details?.cycleRoutes as Array<{ targetId: string }>)[0]
+      ?.targetId,
+    "skill.b",
+  );
+});
+
+test("connected chains, diamonds, shared children, and ordinary assets do not form route cycles", () => {
+  const documents = [
+    skill("skills/root/SKILL.md", {
+      id: "skill.root",
+      routes: ["skill.left", "skill.right"],
+    }),
+    skill("skills/left/SKILL.md", {
+      id: "skill.left",
+      routes: ["skill.shared"],
+    }),
+    skill("skills/right/SKILL.md", {
+      id: "skill.right",
+      routes: ["skill.shared"],
+    }),
+    skill("skills/shared/SKILL.md", {
+      id: "skill.shared",
+      routes: ["skill.leaf"],
+    }),
+    skill("skills/leaf/SKILL.md", { id: "skill.leaf" }),
+    skill("skills/disconnected/SKILL.md", { id: "skill.disconnected" }),
+    contextWithRequiredContext("contexts/a.md", "context.a", "context.b"),
+    contextWithRequiredContext("contexts/b.md", "context.b", "context.a"),
+  ];
+  const catalog = buildCatalog(documents).catalog;
+  const discovery = prepare(documents);
+
+  assert.equal(
+    catalog.dependencies.filter(
+      (dependency) =>
+        dependency.from.startsWith("context.") &&
+        dependency.to.startsWith("context."),
+    ).length,
+    2,
+  );
+  assert.equal(
+    discovery.diagnostics.some(
+      (diagnostic) => diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+    ),
+    false,
+  );
+});
+
+test("route-cycle warnings do not depend on repository-wide Discovery adoption", () => {
+  const cycle = [
+    skill("skills/a/SKILL.md", {
+      id: "skill.a",
+      routes: ["skill.a"],
+    }),
+  ];
+  const partial = prepare(cycle);
+  const incomplete = prepare(cycle, { repositoryWideAdopted: true });
+  const adopted = prepare(
+    [
+      skill("skills/a/SKILL.md", {
+        id: "skill.a",
+        routes: ["skill.a"],
+        published: true,
+      }),
+    ],
+    { repositoryWideAdopted: true },
+  );
+
+  assert.deepEqual(
+    [partial, incomplete, adopted].map((discovery) => [
+      discovery.adoption.state,
+      discovery.diagnostics.filter(
+        (diagnostic) =>
+          diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+      ).length,
+    ]),
+    [
+      ["partial", 1],
+      ["incomplete", 1],
+      ["adopted", 1],
+    ],
+  );
+});
+
+test("route-cycle resolution consumes only usable representative resolved Skill routes", () => {
+  const base = prepare([
+    skill("skills/a/SKILL.md", {
+      id: "skill.a",
+      routes: ["skill.b"],
+    }),
+    skill("skills/b/SKILL.md", {
+      id: "skill.b",
+      routes: ["skill.a"],
+    }),
+  ]);
+  const forward = base.routes.find((route) => route.sourceId === "skill.a")!;
+  const reverse = base.routes.find((route) => route.sourceId === "skill.b")!;
+  const withoutResolvedTarget = { ...reverse };
+  delete withoutResolvedTarget.resolvedTarget;
+  const brokenEdges: Array<[string, DeclaredSkillRoute]> = [
+    [
+      "unresolved",
+      {
+        ...withoutResolvedTarget,
+        resolution: "unresolved",
+        usable: false,
+        usabilityReasons: ["unresolved-target"],
+      },
+    ],
+    [
+      "ambiguous",
+      {
+        ...withoutResolvedTarget,
+        resolution: "ambiguous",
+        usable: false,
+        usabilityReasons: ["ambiguous-target"],
+      },
+    ],
+    [
+      "normalization-rejected",
+      {
+        ...withoutResolvedTarget,
+        normalizationRejection: "repository-escape",
+        resolution: "unresolved",
+        usable: false,
+        usabilityReasons: ["unresolved-target"],
+      },
+    ],
+    [
+      "wrong-kind",
+      {
+        ...reverse,
+        resolution: "wrong-kind",
+        resolvedTarget: { ...reverse.resolvedTarget!, kind: "context" },
+        usable: false,
+        usabilityReasons: ["wrong-kind"],
+      },
+    ],
+    ...(
+      [
+        "invalid-source",
+        "invalid-target",
+        "inactive-source",
+        "inactive-target",
+        "duplicate-source-id",
+        "duplicate-target-id",
+      ] as const
+    ).map((reason): [string, DeclaredSkillRoute] => [
+      reason,
+      { ...reverse, usable: false, usabilityReasons: [reason] },
+    ]),
+    [
+      "duplicate-non-representative",
+      {
+        ...reverse,
+        representative: false,
+        usable: false,
+        usabilityReasons: ["duplicate-declaration"],
+      },
+    ],
+  ];
+
+  for (const [label, brokenEdge] of brokenEdges) {
+    assert.deepEqual(
+      resolveSkillDiscoveryRouteCycles([forward, brokenEdge]),
+      [],
+      label,
+    );
+  }
+});
+
+test("duplicate non-representative declarations are excluded from cycle evidence and links", () => {
+  const discovery = prepare([
+    skill("skills/a/SKILL.md", {
+      id: "skill.a",
+      routes: ["skill.b", "skill.b"],
+    }),
+    skill("skills/b/SKILL.md", {
+      id: "skill.b",
+      routes: ["skill.a"],
+    }),
+  ]);
+  const cycle = discovery.diagnostics.find(
+    (diagnostic) => diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+  )!;
+  const duplicate = discovery.routes.find((route) => !route.representative)!;
+
+  assert.equal(cycle.details?.routeCount, 2);
+  assert.equal(
+    duplicate.linkedDiagnostics.some(
+      (diagnostic) => diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+    ),
+    false,
+  );
+  assert.ok(
+    discovery.routes
+      .filter((route) => route.representative)
+      .every((route) =>
+        route.linkedDiagnostics.some(
+          (diagnostic) =>
+            diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+        ),
+      ),
+  );
+});
+
+test("focused projections match cycle diagnostics through every visible internal route", () => {
+  const discovery = prepare([
+    skill("skills/a/SKILL.md", {
+      id: "skill.a",
+      published: true,
+      routes: ["skill.b"],
+    }),
+    skill("skills/b/SKILL.md", {
+      id: "skill.b",
+      routes: ["skill.c", "skill.external"],
+    }),
+    skill("skills/c/SKILL.md", {
+      id: "skill.c",
+      routes: ["skill.a"],
+    }),
+    skill("skills/external/SKILL.md", { id: "skill.external" }),
+    skill("skills/unrelated/SKILL.md", { id: "skill.unrelated" }),
+  ]);
+
+  for (const member of ["a", "b", "c"]) {
+    for (const focus of [`skill.${member}`, `skills/${member}/SKILL.md`]) {
+      const focused = focusSkillDiscoveryIndex(discovery, focus);
+      const cycle = focused.diagnostics.find(
+        (diagnostic) =>
+          diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+      );
+      assert.ok(cycle, focus);
+      assert.deepEqual(cycle.details?.cycleSkillIds, [
+        "skill.a",
+        "skill.b",
+        "skill.c",
+      ]);
+      assert.equal(focused.coverage, discovery.coverage);
+      assert.ok(
+        focused.routes.every(
+          (route) =>
+            route.sourceId === `skill.${member}` ||
+            route.resolvedTarget?.id === `skill.${member}`,
+        ),
+        focus,
+      );
+      assert.equal(
+        focused.skills.some((skill) => skill.id === "skill.unrelated"),
+        false,
+      );
+    }
+  }
+
+  const unrelated = focusSkillDiscoveryIndex(discovery, "skill.unrelated");
+  assert.equal(
+    unrelated.diagnostics.some(
+      (diagnostic) => diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+    ),
+    false,
+  );
+  assert.deepEqual(unrelated.routes, []);
+});
+
 test("Discovery derives not-evaluated, descriptive, and authoritative coverage modes", () => {
   const none = prepare([]);
   const continuation = prepare([
@@ -1220,9 +1722,15 @@ test("reachability terminates through self-loops and connected or disconnected c
   assert.equal(byId.get("skill.gamma")?.reachability.minimumDepth, 3);
   assert.equal(byId.get("skill.delta")?.reachability.state, "not-reached");
   assert.equal(byId.get("skill.epsilon")?.reachability.state, "not-reached");
-  assert.equal(
-    discovery.diagnostics.some((item) => item.code === "DISCOVERY-ROUTE-CYCLE"),
-    false,
+  assert.deepEqual(
+    discovery.diagnostics
+      .filter((item) => item.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE)
+      .map((item) => item.details?.cycleSkillIds),
+    [
+      ["skill.alpha", "skill.beta", "skill.gamma"],
+      ["skill.delta", "skill.epsilon"],
+      ["skill.root"],
+    ],
   );
 });
 
@@ -1694,6 +2202,29 @@ function context(sourcePath: string, id: string): ParsedDocument {
       `id: ${id}`,
       "owner: platform",
       "status: stable",
+      "when_to_use: Skill Discovery tests",
+      "when_not_to_use: Runtime selection",
+      "---",
+      "# Context",
+      "",
+    ].join("\n"),
+  );
+}
+
+function contextWithRequiredContext(
+  sourcePath: string,
+  id: string,
+  target: string,
+): ParsedDocument {
+  return rawDocument(
+    sourcePath,
+    "context",
+    [
+      "---",
+      `id: ${id}`,
+      "owner: platform",
+      "status: stable",
+      `requires_context: ${target}`,
       "when_to_use: Skill Discovery tests",
       "when_not_to_use: Runtime selection",
       "---",

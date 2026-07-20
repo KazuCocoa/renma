@@ -63,7 +63,8 @@ Use this index to choose the smallest document that answers your question.
   forward-looking priorities.
 - [Skill Discovery Design](../plan-discovery.md): complete layered design and
   release slicing. The 0.22.0 route foundation, 0.22.1 publication/adoption,
-  0.22.2 reachability/coverage, and 0.22.3 Skill Index slices are operational.
+  0.22.2 reachability/coverage, 0.22.3 Skill Index, and 0.22.4 route-cycle
+  stabilization slices are operational.
 
 ## Examples
 

@@ -862,6 +862,179 @@ test("Discovery route diagnostics flow through scan and diagnostics v2", async (
   assert.doesNotMatch(JSON.stringify(result.trustGraph), /DISCOVERY-/);
 });
 
+test("route-cycle warnings propagate through scan, diagnostics v2, review bundles, graph, and Skill Index", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-discovery-cli-"));
+  await writeSkill(root, "a", "skill.a", ["skill.b"], undefined, true);
+  await writeSkill(root, "b", "skill.b", ["skill.c", "skill.external"]);
+  await writeSkill(root, "c", "skill.c", ["skill.a"]);
+  await writeSkill(root, "external", "skill.external");
+
+  const graphJson = await captured(() =>
+    main(["graph", root, "--view", "discovery", "--format", "json"]),
+  );
+  const graphMarkdown = await captured(() =>
+    main(["graph", root, "--view", "discovery", "--format", "markdown"]),
+  );
+  const skillIndexJson = await captured(() =>
+    main(["skill-index", root, "--format", "json"]),
+  );
+  const skillIndexMarkdown = await captured(() =>
+    main(["skill-index", root, "--format", "markdown"]),
+  );
+  const scanCommand = await captured(() =>
+    main(["scan", root, "--format", "json"]),
+  );
+  const scanResult = await scan(root);
+  const graphReport = JSON.parse(graphJson.stdout) as {
+    discovery: {
+      diagnostics: Array<{
+        code: string;
+        details: {
+          cycleSkillIds: string[];
+          routeCount: number;
+          cycleRoutes: Array<{
+            sourcePath: string;
+            declarationIndex: number;
+          }>;
+        };
+      }>;
+      skills: Array<{
+        id: string;
+        linkedDiagnostics: Array<{ code: string }>;
+      }>;
+      routes: Array<{
+        sourceId: string;
+        normalizedTarget: string;
+        linkedDiagnostics: Array<{ code: string }>;
+      }>;
+      routeCycles?: unknown;
+      cycleCount?: unknown;
+      cyclicSkillIds?: unknown;
+    };
+  };
+  const indexReport = JSON.parse(skillIndexJson.stdout) as {
+    schemaVersion: string;
+    diagnostics: {
+      repository: Array<{ code?: string }>;
+      discovery: Array<{ code: string }>;
+    };
+    routeCycles?: unknown;
+    cycleCount?: unknown;
+    cyclicSkillIds?: unknown;
+  };
+  const diagnosticV2 = scanResult.diagnosticsV2.find(
+    (item) => item.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+  );
+  const reviewBundle = scanResult.reviewBundles.find((bundle) =>
+    bundle.diagnosticCodes.includes(DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE),
+  );
+  const cycleDiagnostic = graphReport.discovery.diagnostics.find(
+    (diagnostic) => diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+  )!;
+
+  assert.equal(graphJson.code, 0);
+  assert.equal(graphMarkdown.code, 0);
+  assert.equal(skillIndexJson.code, 0);
+  assert.equal(skillIndexMarkdown.code, 0);
+  assert.equal(scanCommand.code, 0);
+  assert.deepEqual(cycleDiagnostic.details.cycleSkillIds, [
+    "skill.a",
+    "skill.b",
+    "skill.c",
+  ]);
+  assert.equal(cycleDiagnostic.details.routeCount, 3);
+  assert.equal(graphReport.discovery.routeCycles, undefined);
+  assert.equal(graphReport.discovery.cycleCount, undefined);
+  assert.equal(graphReport.discovery.cyclicSkillIds, undefined);
+  assert.equal(indexReport.schemaVersion, "renma.skill-index.v1");
+  assert.equal(indexReport.routeCycles, undefined);
+  assert.equal(indexReport.cycleCount, undefined);
+  assert.equal(indexReport.cyclicSkillIds, undefined);
+  assert.equal(
+    indexReport.diagnostics.repository.some(
+      (diagnostic) => diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+    ),
+    false,
+  );
+  assert.ok(
+    indexReport.diagnostics.discovery.some(
+      (diagnostic) => diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+    ),
+  );
+  assert.match(graphMarkdown.stdout, /DISCOVERY-ROUTE-CYCLE/);
+  assert.match(graphMarkdown.stdout, /static route evidence for review/);
+  assert.match(skillIndexMarkdown.stdout, /DISCOVERY-ROUTE-CYCLE/);
+  assert.ok(
+    graphReport.discovery.skills
+      .filter((skill) => ["skill.a", "skill.b", "skill.c"].includes(skill.id))
+      .every((skill) =>
+        skill.linkedDiagnostics.some(
+          (diagnostic) =>
+            diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+        ),
+      ),
+  );
+  assert.equal(
+    graphReport.discovery.skills
+      .find((skill) => skill.id === "skill.external")
+      ?.linkedDiagnostics.some(
+        (diagnostic) =>
+          diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+      ),
+    false,
+  );
+  assert.ok(
+    graphReport.discovery.routes
+      .filter((route) => route.normalizedTarget !== "skill.external")
+      .every((route) =>
+        route.linkedDiagnostics.some(
+          (diagnostic) =>
+            diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+        ),
+      ),
+  );
+  assert.equal(
+    graphReport.discovery.routes
+      .find((route) => route.normalizedTarget === "skill.external")
+      ?.linkedDiagnostics.some(
+        (diagnostic) =>
+          diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+      ),
+    false,
+  );
+  assert.deepEqual(diagnosticV2?.details?.cycleSkillIds, [
+    "skill.a",
+    "skill.b",
+    "skill.c",
+  ]);
+  assert.ok(
+    diagnosticV2?.repairConstraints?.some(
+      (constraint) =>
+        constraint.kind === "must_not_change" &&
+        /arbitrary route/.test(constraint.text),
+    ),
+  );
+  assert.deepEqual(
+    diagnosticV2?.verificationSteps?.map((step) => step.command),
+    [
+      "renma graph . --view discovery --format json",
+      "renma skill-index . --format json",
+      "renma scan . --format json",
+    ],
+  );
+  assert.deepEqual(reviewBundle?.affectedAssets, [
+    "skill.a",
+    "skill.b",
+    "skill.c",
+  ]);
+  assert.deepEqual(reviewBundle?.affectedFiles, [
+    "skills/a/SKILL.md",
+    "skills/b/SKILL.md",
+    "skills/c/SKILL.md",
+  ]);
+  assert.doesNotMatch(JSON.stringify(scanResult.trustGraph), /DISCOVERY-/);
+});
+
 test("invalid canonical continuation declarations flow through scan", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-discovery-cli-"));
   await mkdir(path.join(root, "skills", "source"), { recursive: true });
@@ -1059,7 +1232,7 @@ async function authoritativeIncompleteGitFixture(): Promise<string> {
     root,
     "published",
     "skill.published",
-    undefined,
+    ["skill.published"],
     undefined,
     true,
   );

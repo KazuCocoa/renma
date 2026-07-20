@@ -181,6 +181,28 @@ export interface DeclaredSkillRoute {
   linkedDiagnostics: SkillDiagnosticLink[];
 }
 
+export interface SkillDiscoveryRouteCycleSkill {
+  id: string;
+  sourcePath: string;
+}
+
+export interface SkillDiscoveryRouteCycleRoute {
+  sourceId: string;
+  sourcePath: string;
+  targetId: string;
+  targetPath: string;
+  declarationIndex: number;
+  evidence: SkillRouteDeclarationEvidence;
+}
+
+/** One maximal cyclic component in the authoritative usable continuation graph. */
+export interface SkillDiscoveryRouteCycle {
+  cycleSkillIds: string[];
+  cycleSkills: SkillDiscoveryRouteCycleSkill[];
+  selfLoop: boolean;
+  cycleRoutes: SkillDiscoveryRouteCycleRoute[];
+}
+
 export interface SkillDiscoverySummary {
   visibleSkillCount: number;
   routeEligibleSkillCount: number;
@@ -361,8 +383,12 @@ export function prepareSkillDiscoveryIndex(
   for (const route of routes) {
     diagnostics.push(...routeDiagnostics(route, skillsByPath));
   }
+  diagnostics.push(
+    ...resolveSkillDiscoveryRouteCycles(routes).map(routeCycleDiagnostic),
+  );
   diagnostics.sort(compareDiagnostics);
   linkDiscoveryDiagnostics(routes, diagnostics);
+  linkRouteCycleSkillDiagnostics(skills, diagnostics);
 
   for (const skill of skills) {
     const publicationDiagnostic = publicationDiagnosticFor(skill);
@@ -548,19 +574,9 @@ export function focusSkillDiscoveryIndex(
   );
   const diagnostics = index.diagnostics.filter((diagnostic) => {
     if (!diagnostic.path) return false;
-    const declarationIndex = diagnostic.details?.declarationIndex;
-    if (typeof declarationIndex === "number") {
-      return routeKeys.has(
-        `${diagnostic.path}\0${declarationIndex.toString()}`,
-      );
-    }
-    const declarationIndices = diagnostic.details?.declarationIndices;
-    if (Array.isArray(declarationIndices)) {
-      return declarationIndices.some(
-        (indexValue) =>
-          typeof indexValue === "number" &&
-          routeKeys.has(`${diagnostic.path}\0${indexValue.toString()}`),
-      );
+    const diagnosticRouteKeys = routeKeysForDiagnostic(diagnostic);
+    if (diagnosticRouteKeys.length > 0) {
+      return diagnosticRouteKeys.some((key) => routeKeys.has(key));
     }
     return visiblePaths.has(diagnostic.path);
   });
@@ -723,6 +739,125 @@ export function resolveSkillDiscoveryReachability(
     reachableDiscoveryEligibleSkillIds,
     notReachedDiscoveryEligibleSkillIds,
   };
+}
+
+/**
+ * Resolve maximal cyclic components from the already authoritative usable
+ * Skill continuation graph. This pure helper does not reinterpret usability,
+ * reachability, or repository evidence.
+ */
+export function resolveSkillDiscoveryRouteCycles(
+  routes: readonly DeclaredSkillRoute[],
+): SkillDiscoveryRouteCycle[] {
+  const eligibleRoutes = routes
+    .filter(isAuthoritativeUsableSkillRoute)
+    .sort(compareCycleRoutes);
+  const nodeIds = [
+    ...new Set(
+      eligibleRoutes.flatMap((route) => [
+        route.sourceId,
+        route.resolvedTarget!.id,
+      ]),
+    ),
+  ].sort((left, right) => left.localeCompare(right));
+  const targetsBySource = new Map<string, string[]>(
+    nodeIds.map((id) => [id, []]),
+  );
+  for (const route of eligibleRoutes) {
+    targetsBySource.get(route.sourceId)!.push(route.resolvedTarget!.id);
+  }
+  for (const [sourceId, targets] of targetsBySource) {
+    targetsBySource.set(
+      sourceId,
+      [...new Set(targets)].sort((left, right) => left.localeCompare(right)),
+    );
+  }
+
+  let nextIndex = 0;
+  const indices = new Map<string, number>();
+  const lowLinks = new Map<string, number>();
+  const stack: string[] = [];
+  const onStack = new Set<string>();
+  const components: string[][] = [];
+
+  const visit = (sourceId: string): void => {
+    const sourceIndex = nextIndex;
+    nextIndex += 1;
+    indices.set(sourceId, sourceIndex);
+    lowLinks.set(sourceId, sourceIndex);
+    stack.push(sourceId);
+    onStack.add(sourceId);
+
+    for (const targetId of targetsBySource.get(sourceId) ?? []) {
+      if (!indices.has(targetId)) {
+        visit(targetId);
+        lowLinks.set(
+          sourceId,
+          Math.min(lowLinks.get(sourceId)!, lowLinks.get(targetId)!),
+        );
+      } else if (onStack.has(targetId)) {
+        lowLinks.set(
+          sourceId,
+          Math.min(lowLinks.get(sourceId)!, indices.get(targetId)!),
+        );
+      }
+    }
+
+    if (lowLinks.get(sourceId) !== indices.get(sourceId)) return;
+    const component: string[] = [];
+    while (stack.length > 0) {
+      const member = stack.pop()!;
+      onStack.delete(member);
+      component.push(member);
+      if (member === sourceId) break;
+    }
+    components.push(component.sort((left, right) => left.localeCompare(right)));
+  };
+
+  for (const nodeId of nodeIds) {
+    if (!indices.has(nodeId)) visit(nodeId);
+  }
+
+  return components
+    .flatMap((cycleSkillIds): SkillDiscoveryRouteCycle[] => {
+      const members = new Set(cycleSkillIds);
+      const internalRoutes = eligibleRoutes.filter(
+        (route) =>
+          members.has(route.sourceId) && members.has(route.resolvedTarget!.id),
+      );
+      const selfLoop =
+        cycleSkillIds.length === 1 &&
+        internalRoutes.some(
+          (route) => route.resolvedTarget!.id === route.sourceId,
+        );
+      if (cycleSkillIds.length === 1 && !selfLoop) return [];
+
+      const pathsById = new Map<string, string[]>();
+      for (const route of internalRoutes) {
+        pathsById.set(route.sourceId, [
+          ...(pathsById.get(route.sourceId) ?? []),
+          route.sourcePath,
+        ]);
+        pathsById.set(route.resolvedTarget!.id, [
+          ...(pathsById.get(route.resolvedTarget!.id) ?? []),
+          route.resolvedTarget!.sourcePath,
+        ]);
+      }
+      return [
+        {
+          cycleSkillIds,
+          cycleSkills: cycleSkillIds.map((id) => ({
+            id,
+            sourcePath: [...new Set(pathsById.get(id) ?? [])].sort(
+              (left, right) => left.localeCompare(right),
+            )[0]!,
+          })),
+          selfLoop,
+          cycleRoutes: internalRoutes.map(projectCycleRoute),
+        },
+      ];
+    })
+    .sort(compareRouteCycles);
 }
 
 /** Apply the reviewed target spelling normalization without fuzzy matching. */
@@ -1066,6 +1201,76 @@ function unreachableEligibleSkillDiagnostic(
       ...(adoption.configPath ? { configPath: adoption.configPath } : {}),
     },
   };
+}
+
+function routeCycleDiagnostic(cycle: SkillDiscoveryRouteCycle): Diagnostic {
+  const primaryRoute = cycle.cycleRoutes[0]!;
+  return {
+    code: DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+    severity: "warning",
+    path: primaryRoute.sourcePath,
+    evidence: primaryRoute.evidence,
+    message: `A usable declared Skill continuation cycle exists among Skills: ${cycle.cycleSkillIds.join(", ")}. Traversal remains cycle-safe. This is static route evidence for review, not proof of runtime recursion or an instruction to remove an edge.`,
+    repairConstraints: routeCycleRepairConstraints(),
+    verificationSteps: routeCycleVerificationSteps(),
+    llmHint:
+      "Review every internal continuation and decide whether the component is an intentional bounded workflow loop or an accidental circular contract. An intentional cycle may remain; do not remove an arbitrary edge merely to silence the warning.",
+    details: {
+      cycleSkillIds: cycle.cycleSkillIds,
+      cycleSkills: cycle.cycleSkills,
+      selfLoop: cycle.selfLoop,
+      routeCount: cycle.cycleRoutes.length,
+      cycleRoutes: cycle.cycleRoutes,
+    },
+  };
+}
+
+function routeCycleRepairConstraints(): NonNullable<
+  Diagnostic["repairConstraints"]
+> {
+  return [
+    {
+      kind: "must_preserve",
+      text: "Preserve the real workflow responsibilities, intended review or retry behavior, and source-owned continuation decisions.",
+    },
+    {
+      kind: "must_not_change",
+      text: "Do not remove an arbitrary route, publish or unpublish Skills, flatten the workflow, merge unrelated Skills, or break a valid review loop only to silence the warning.",
+    },
+    {
+      kind: "allowed_change",
+      text: "After reviewing every internal edge, remove or redirect a stale continuation when repository evidence supports it, or clarify bounded stop, ask, retry, handoff, and completion behavior in the owning Skill bodies when the cycle is intentional.",
+    },
+    {
+      kind: "requires_human_decision",
+      text: "Decide whether the component represents an intentional bounded workflow loop or an accidental circular continuation contract.",
+    },
+  ];
+}
+
+function routeCycleVerificationSteps(): NonNullable<
+  Diagnostic["verificationSteps"]
+> {
+  return [
+    {
+      text: "Inspect the complete Discovery graph and confirm every reported internal edge is a real usable representative declaration.",
+      command: "renma graph . --view discovery --format json",
+      expected:
+        "Cycle members and route evidence are complete and deterministic; no inferred, external, or unusable route participates.",
+    },
+    {
+      text: "Inspect the canonical Skill Index and review the owning Skill bodies for bounded workflow behavior.",
+      command: "renma skill-index . --format json",
+      expected:
+        "Intentional cycles retain explicit stop, ask, retry, handoff, or completion semantics; supported repairs remove accidental cycles without changing unrelated routes or publication.",
+    },
+    {
+      text: "Run Renma scan and confirm unrelated route, publication, Agent Skills, and coverage diagnostics remain authoritative.",
+      command: "renma scan . --format json",
+      expected:
+        "The reviewed cycle remains as intentional static evidence or is absent after evidence-backed route repair; unrelated diagnostics are unchanged.",
+    },
+  ];
 }
 
 function unreachableSkillRepairConstraints(): NonNullable<
@@ -1615,33 +1820,39 @@ function linkDiscoveryDiagnostics(
 ): void {
   for (const diagnostic of diagnostics) {
     if (!diagnostic.code || !diagnostic.path) continue;
-    const declarationIndex =
-      typeof diagnostic.details?.declarationIndex === "number"
-        ? diagnostic.details.declarationIndex
-        : undefined;
-    const declarationIndices = Array.isArray(
-      diagnostic.details?.declarationIndices,
-    )
-      ? diagnostic.details.declarationIndices.filter(
-          (item): item is number => typeof item === "number",
-        )
-      : [];
+    const diagnosticRouteKeys = routeKeysForDiagnostic(diagnostic);
     for (const route of routes) {
-      if (route.sourcePath !== diagnostic.path) continue;
-      if (
-        declarationIndex !== undefined &&
-        route.declarationIndex !== declarationIndex
-      ) {
-        continue;
-      }
-      if (
-        declarationIndices.length > 0 &&
-        !declarationIndices.includes(route.declarationIndex)
-      ) {
-        continue;
-      }
+      if (diagnosticRouteKeys.length > 0) {
+        if (!diagnosticRouteKeys.includes(routeKey(route))) continue;
+      } else if (route.sourcePath !== diagnostic.path) continue;
       route.linkedDiagnostics = uniqueDiagnosticLinks([
         ...route.linkedDiagnostics,
+        {
+          code: diagnostic.code,
+          ...(diagnostic.evidence ? { evidence: diagnostic.evidence } : {}),
+        },
+      ]);
+    }
+  }
+}
+
+function linkRouteCycleSkillDiagnostics(
+  skills: VisibleSkillIdentity[],
+  diagnostics: Diagnostic[],
+): void {
+  for (const diagnostic of diagnostics) {
+    if (diagnostic.code !== DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE) continue;
+    const memberPaths = new Set(
+      detailRecordArray(diagnostic.details?.cycleSkills)
+        .map((skill) => skill.sourcePath)
+        .filter((sourcePath): sourcePath is string =>
+          isNonEmptyString(sourcePath),
+        ),
+    );
+    for (const skill of skills) {
+      if (!memberPaths.has(skill.sourcePath)) continue;
+      skill.linkedDiagnostics = uniqueDiagnosticLinks([
+        ...skill.linkedDiagnostics,
         {
           code: diagnostic.code,
           ...(diagnostic.evidence ? { evidence: diagnostic.evidence } : {}),
@@ -1844,6 +2055,109 @@ function compareRoutes(
     left.normalizedTarget.localeCompare(right.normalizedTarget) ||
     left.rawTarget.localeCompare(right.rawTarget)
   );
+}
+
+function isAuthoritativeUsableSkillRoute(
+  route: DeclaredSkillRoute,
+): route is DeclaredSkillRoute & {
+  resolvedTarget: ResolvedSkillRouteTarget & { kind: "skill" };
+} {
+  return (
+    route.usable === true &&
+    route.representative === true &&
+    route.resolution === "resolved" &&
+    route.resolvedTarget?.kind === "skill"
+  );
+}
+
+function compareCycleRoutes(
+  left: DeclaredSkillRoute & { resolvedTarget: ResolvedSkillRouteTarget },
+  right: DeclaredSkillRoute & { resolvedTarget: ResolvedSkillRouteTarget },
+): number {
+  return (
+    left.sourceId.localeCompare(right.sourceId) ||
+    left.resolvedTarget.id.localeCompare(right.resolvedTarget.id) ||
+    left.sourcePath.localeCompare(right.sourcePath) ||
+    left.resolvedTarget.sourcePath.localeCompare(
+      right.resolvedTarget.sourcePath,
+    ) ||
+    left.declarationIndex - right.declarationIndex
+  );
+}
+
+function projectCycleRoute(
+  route: DeclaredSkillRoute & { resolvedTarget: ResolvedSkillRouteTarget },
+): SkillDiscoveryRouteCycleRoute {
+  return {
+    sourceId: route.sourceId,
+    sourcePath: route.sourcePath,
+    targetId: route.resolvedTarget.id,
+    targetPath: route.resolvedTarget.sourcePath,
+    declarationIndex: route.declarationIndex,
+    evidence: route.evidence,
+  };
+}
+
+function compareRouteCycles(
+  left: SkillDiscoveryRouteCycle,
+  right: SkillDiscoveryRouteCycle,
+): number {
+  const length = Math.max(
+    left.cycleSkillIds.length,
+    right.cycleSkillIds.length,
+  );
+  for (let index = 0; index < length; index += 1) {
+    const comparison = (left.cycleSkillIds[index] ?? "").localeCompare(
+      right.cycleSkillIds[index] ?? "",
+    );
+    if (comparison !== 0) return comparison;
+  }
+  return 0;
+}
+
+function routeKeysForDiagnostic(diagnostic: Diagnostic): string[] {
+  const cycleRouteKeys = detailRecordArray(
+    diagnostic.details?.cycleRoutes,
+  ).flatMap((route) =>
+    isNonEmptyString(route.sourcePath) &&
+    typeof route.declarationIndex === "number"
+      ? [`${route.sourcePath}\0${route.declarationIndex.toString()}`]
+      : [],
+  );
+  if (cycleRouteKeys.length > 0) {
+    return [...new Set(cycleRouteKeys)].sort((left, right) =>
+      left.localeCompare(right),
+    );
+  }
+  if (!diagnostic.path) return [];
+  if (typeof diagnostic.details?.declarationIndex === "number") {
+    return [
+      `${diagnostic.path}\0${diagnostic.details.declarationIndex.toString()}`,
+    ];
+  }
+  if (Array.isArray(diagnostic.details?.declarationIndices)) {
+    return diagnostic.details.declarationIndices
+      .filter((item): item is number => typeof item === "number")
+      .map((index) => `${diagnostic.path}\0${index.toString()}`)
+      .sort((left, right) => left.localeCompare(right));
+  }
+  return [];
+}
+
+function routeKey(route: DeclaredSkillRoute): string {
+  return `${route.sourcePath}\0${route.declarationIndex.toString()}`;
+}
+
+function detailRecordArray(value: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is Record<string, unknown> =>
+      typeof item === "object" && item !== null && !Array.isArray(item),
+  );
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
 }
 
 function compareDiagnostics(left: Diagnostic, right: Diagnostic): number {

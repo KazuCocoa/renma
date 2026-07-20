@@ -642,11 +642,11 @@ test("published current docs describe all operational Discovery slices and futur
   const proposal = content[2] ?? "";
   assert.match(
     proposal,
-    /Status: active design with operational route, publication, reachability, and Skill Index slices/,
+    /Status: stable single-repository static Discovery core/,
   );
   assert.match(
     proposal,
-    /Implementation status:[\s\S]*0\.22\.0 implements[\s\S]*0\.22\.1 implements[\s\S]*0\.22\.2 implements[\s\S]*0\.22\.3 implements/,
+    /Implementation status:[\s\S]*0\.22\.0 implements[\s\S]*0\.22\.1 implements[\s\S]*0\.22\.2 implements[\s\S]*0\.22\.3 implements[\s\S]*0\.22\.4 implements/,
   );
   assert.match(proposal, /Baseline: Renma 0\.21\.0/);
   assert.match(
@@ -661,6 +661,11 @@ test("published current docs describe all operational Discovery slices and futur
     proposal,
     /0\.22\.2 slice adds reachability and coverage semantics/,
   );
+  assert.match(
+    proposal,
+    /0\.22\.4 slice adds[\s\S]*deterministic cycle review warnings/,
+  );
+  assert.match(proposal, /`DISCOVERY-ROUTE-CYCLE`/);
   assert.match(proposal, /`renma\.continues-with`/);
   assert.match(proposal, /`renma\.published-entrypoint`/);
   assert.match(
@@ -694,7 +699,11 @@ test("published current docs describe all operational Discovery slices and futur
   );
   assert.match(content[0] ?? "", /renma skill-index \[path\]/);
   assert.match(content[3] ?? "", /renma\.skill-index\.v1/);
-  assert.match(content[6] ?? "", /Route-cycle diagnostics.*remain deferred/s);
+  assert.match(content[6] ?? "", /DISCOVERY-ROUTE-CYCLE/);
+  assert.match(
+    content[6] ?? "",
+    /single-repository static Discovery core is stable after 0\.22\.4/,
+  );
 });
 
 test("workflow docs keep orchestration policy in normal owning Skills", async () => {

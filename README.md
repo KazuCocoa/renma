@@ -500,6 +500,12 @@ adopted repositories produce authoritative coverage and warnings for eligible
 Skills with no usable path from any effective entrypoint. Renma still does not
 decide which Skill matches a user request.
 
+The same usable representative route graph produces one deterministic
+`DISCOVERY-ROUTE-CYCLE` warning per self-loop or maximal cyclic component. Each
+warning retains complete member Skill and internal declaration evidence. A
+cycle is static review evidence, not proof of runtime recursion; traversal
+remains cycle-safe, and intentional bounded review or retry loops may remain.
+
 `renma skill-index [path]` is the compact, stdout-only first-hop report over the
 same prepared Discovery index. Markdown is the default; `--format json` or
 `--json` emits canonical `renma.skill-index.v1` JSON. Exact
@@ -530,8 +536,9 @@ canonical and migration rules.
 - [Current Roadmap](plan.md)
 - [Skill Discovery Design](plan-discovery.md): complete layered direction and
   release slicing. The 0.22.0 route foundation, 0.22.1 publication/adoption,
-  0.22.2 reachability/coverage, and 0.22.3 versioned Skill Index report/command
-  slices are implemented.
+  0.22.2 reachability/coverage, 0.22.3 versioned Skill Index report/command,
+  and 0.22.4 deterministic route-cycle diagnostics/stabilization slices are
+  implemented.
 - [Interactive Placeholder Example](examples/interactive-placeholder): minimal
   hands-on clarify-before-act Skill interaction with a local tool.
 - [Example Context Repository](examples/context-repo): richer repository-aware
