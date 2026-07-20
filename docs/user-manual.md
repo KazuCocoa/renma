@@ -559,6 +559,9 @@ The JSON configuration supports the same names used by the implementation, inclu
 - `format`: default report format.
 - `layout`: compatibility-only `tool_namespace` and `workflow_aliases` input retained for existing configurations. These fields are validated and normalized but do not currently change findings or force Skill-local support migration.
 - `security`: command, network, upload, and profile policy.
+- `skill_discovery`: strict repository-wide Skill Discovery policy. Its only
+  supported key is boolean `adopted`; omission or `false` does not declare
+  repository-wide adoption.
 
 CLI flags override config values when both are provided.
 
@@ -827,15 +830,20 @@ unresolved declaration's target or invent Skill-to-Skill composition. A
 resolved asset with no incoming composition declarations returns a successful
 empty report. See the [Declared Impact contract](declared-impact.md).
 
-The discovery view expands only canonical
-`metadata.renma.continues-with` items. It resolves one exact stable asset ID or
+The discovery view expands canonical `metadata.renma.continues-with` items and
+the exact string marker
+`metadata.renma.published-entrypoint: "true"`. It resolves one exact stable asset ID or
 repository-relative source path, rejects absolute and repository-escaping
 paths, and never matches aliases, titles, tags, basenames, suffixes, prose, or
 ordinary Markdown links. Resolution remains separate from route usability, so
 invalid, inactive, duplicate-ID, wrong-kind, ambiguous, and missing targets
 stay visible without becoming authoritative graph edges. Structural roots are
 route-eligible Skills with no incoming usable route; they are not published
-entrypoints or coverage claims. JSON, Markdown, and Mermaid use one route index
+entrypoints or coverage claims. Publication is explicit and additionally
+requires a valid, active, unique-ID canonical Skill. Repository-wide adoption
+is declared separately by boolean `skill_discovery.adopted`; the view reports
+`not-adopted`, `partial`, `incomplete`, or `adopted`. Reachability and coverage
+remain explicitly not evaluated. JSON, Markdown, and Mermaid use one index
 prepared in the repository snapshot. See the
 [Skill Discovery Graph contract](skill-discovery.md).
 
@@ -847,8 +855,8 @@ The graph forms answer distinct questions:
 | `full` with focus | What is the direct incoming and outgoing neighborhood? |
 | `composition` with focus | What is in the transitive outgoing composition closure? |
 | `impact` with focus | What is in the transitive incoming composition closure? |
-| `discovery` without focus | What explicit Skill continuations and structural roots exist? |
-| `discovery` with focus | What direct incoming and outgoing Skill declarations touch this exact Skill? |
+| `discovery` without focus | What explicit published entrypoints, adoption state, continuations, and structural roots exist? |
+| `discovery` with focus | What publication facts and direct incoming/outgoing declarations touch this exact Skill while repository adoption stays global? |
 
 #### Focusing The Graph
 

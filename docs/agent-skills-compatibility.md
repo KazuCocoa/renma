@@ -118,6 +118,7 @@ renma.optional-lens
 renma.conflicts
 renma.superseded-by
 renma.continues-with
+renma.published-entrypoint
 ```
 
 For new canonical Skills, `description` is the portable discovery source of
@@ -127,11 +128,13 @@ governance and one-way migration preservation, but are deprecated for new Skill
 authoring because duplicating discovery semantics invites drift. They remain
 appropriate top-level governance fields for shared non-Skill Context Assets.
 
-Renma normalizes these values into the existing asset metadata model used by
-scan findings, inspect, catalog, ownership, graph and dependency resolution,
-readiness, BOM, Trust Graph, diff, and CI reporting. This is a serialization
-change, not a second governance model or a change to those consumers'
-semantics.
+Renma normalizes the governance values into the existing asset metadata model
+used by scan findings, inspect, catalog, ownership, graph and dependency
+resolution, readiness, BOM, Trust Graph, diff, and CI reporting. The
+Discovery-only publication marker is parsed separately into the prepared Skill
+Discovery index and does not enter catalog metadata or dependencies. This is a
+serialization change, not a second governance model or a change to deferred
+consumers' semantics.
 
 Text values are trimmed strings, and `renma.status` retains the existing
 `experimental`, `stable`, `deprecated`, and `archived` lifecycle values. List
@@ -154,6 +157,17 @@ It additionally rejects empty or whitespace-only members, preserves each
 declaration index at the field's exact line evidence, and creates no routes for
 an empty array. It is operational only on canonical `SKILL.md` Agent Skills and
 does not enter `catalog.dependencies`. See the
+[Skill Discovery Graph contract](skill-discovery.md).
+
+`renma.published-entrypoint` is the explicit Skill-local publication marker.
+Its only valid value is the exact string `"true"`; omission means unpublished.
+Native YAML booleans, false values, alternate casing, surrounding whitespace,
+other types, duplicate declarations, duplicate top-level `metadata` mappings,
+aliases, and legacy fallback are rejected with exact evidence. Effective
+publication additionally requires a specification-valid, active canonical
+Skill with a repository-unique effective asset ID. Structural roots do not
+become published automatically. Repository-wide adoption is configured
+separately with `skill_discovery.adopted`; see the
 [Skill Discovery Graph contract](skill-discovery.md).
 
 Empty text, invalid status, and invalid lifecycle or freshness values retain

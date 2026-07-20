@@ -90,6 +90,7 @@ test("graph --view discovery JSON exposes the dedicated route contract", async (
     invalidRouteCount: 1,
     structuralRootCount: 1,
     standaloneSkillCount: 0,
+    publishedEntrypointCount: 0,
   });
   assert.deepEqual(report.discovery.structuralRootIds, ["skill.source"]);
   assert.deepEqual(report.discovery.standaloneSkillIds, []);
@@ -355,6 +356,243 @@ test("focused Discovery uses exact Skill ID or source path and direct routes", a
   }
 });
 
+test("Discovery adoption config is strict and invalid forms return exit code 2", async (t) => {
+  const cases = [
+    [{ skill_discovery: [] }, /skill_discovery must be an object/],
+    [
+      { skill_discovery: { adopted: "true" } },
+      /skill_discovery\.adopted must be a boolean/,
+    ],
+    [
+      { skill_discovery: { adopted: true, extra: true } },
+      /Unknown skill_discovery config key "extra"/,
+    ],
+    [
+      { skillDiscovery: { adopted: true } },
+      /Unknown config field "skillDiscovery"/,
+    ],
+  ] as const;
+
+  for (const [config, message] of cases) {
+    await t.test(JSON.stringify(config), async () => {
+      const root = await mkdtemp(
+        path.join(os.tmpdir(), "renma-discovery-cli-"),
+      );
+      await writeFile(
+        path.join(root, "renma.config.json"),
+        `${JSON.stringify(config)}\n`,
+      );
+      const result = await captured(() =>
+        main(["graph", root, "--view", "discovery", "--format", "json"]),
+      );
+      assert.equal(result.code, 2);
+      assert.equal(result.stdout, "");
+      assert.match(result.stderr, message);
+    });
+  }
+});
+
+test("graph Discovery projects explicit adoption and publication in every format", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-discovery-cli-"));
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    `${JSON.stringify({ skill_discovery: { adopted: true } })}\n`,
+  );
+  await writeSkill(
+    root,
+    "published",
+    "skill.published",
+    undefined,
+    "stable",
+    true,
+    "qa-platform",
+  );
+
+  const json = await captured(() =>
+    main(["graph", root, "--view", "discovery", "--format", "json"]),
+  );
+  const report = JSON.parse(json.stdout) as {
+    discovery: {
+      adoption: {
+        state: string;
+        repositoryWideAdopted: boolean;
+        publishedEntrypointCount: number;
+        configPath?: string;
+      };
+      coverage: { mode: string; reason: string };
+      publishedEntrypointIds: string[];
+      skills: Array<{
+        id: string;
+        ownership: {
+          declaredOwner: string | null;
+          effectiveOwner: string | null;
+          source: string;
+        };
+        publication: {
+          marker: { state: string; evidence?: { snippet: string } };
+          requested: boolean;
+          accepted: boolean;
+        };
+      }>;
+    };
+  };
+  assert.equal(json.code, 0);
+  assert.deepEqual(report.discovery.adoption, {
+    state: "adopted",
+    discoveryMetadataPresent: true,
+    repositoryWideAdopted: true,
+    publishedEntrypointCount: 1,
+    reason: "repository-adoption-has-effective-published-entrypoint",
+    configPath: "renma.config.json",
+  });
+  assert.deepEqual(report.discovery.coverage, {
+    mode: "not-evaluated",
+    reason: "reachability-and-coverage-are-deferred",
+  });
+  assert.deepEqual(report.discovery.publishedEntrypointIds, [
+    "skill.published",
+  ]);
+  assert.deepEqual(report.discovery.skills[0]?.ownership, {
+    declaredOwner: "qa-platform",
+    effectiveOwner: "qa-platform",
+    source: "declared",
+  });
+  assert.deepEqual(report.discovery.skills[0]?.publication, {
+    marker: {
+      state: "valid",
+      canonicalKey: "metadata.renma.published-entrypoint",
+      present: true,
+      valid: true,
+      rawValue: "true",
+      evidence: {
+        path: "skills/published/SKILL.md",
+        startLine: 8,
+        endLine: 8,
+        snippet: '  renma.published-entrypoint: "true"',
+      },
+    },
+    requested: true,
+    accepted: true,
+    rejectionReasons: [],
+    linkedDiagnostics: [],
+  });
+
+  const markdown = await captured(() =>
+    main(["graph", root, "--view", "discovery", "--format", "markdown"]),
+  );
+  assert.equal(markdown.code, 0);
+  assert.ok(
+    markdown.stdout.indexOf("## Adoption") <
+      markdown.stdout.indexOf("## Published entrypoints"),
+  );
+  assert.ok(
+    markdown.stdout.indexOf("## Published entrypoints") <
+      markdown.stdout.indexOf("## Structural roots"),
+  );
+  assert.match(markdown.stdout, /State: adopted/);
+  assert.match(markdown.stdout, /### skill\.published/);
+  assert.match(markdown.stdout, /Owner: qa-platform \(declared\)/);
+  assert.match(
+    markdown.stdout,
+    /Published entrypoints are explicit first-hop declarations\. Structural roots are derived graph facts\./,
+  );
+
+  const mermaid = await captured(() =>
+    main(["graph", root, "--view", "discovery", "--format", "mermaid"]),
+  );
+  assert.equal(mermaid.code, 0);
+  assert.match(mermaid.stdout, /classDef publishedEntrypoint/);
+  assert.match(mermaid.stdout, /class skill_0 publishedEntrypoint/);
+  assert.match(mermaid.stdout, /class skill_0 structuralRoot/);
+
+  const full = await captured(() =>
+    main(["graph", root, "--view", "full", "--format", "json"]),
+  );
+  const fullReport = JSON.parse(full.stdout) as {
+    discovery?: unknown;
+    edges: Array<{ kind: string }>;
+  };
+  assert.equal(full.code, 0);
+  assert.equal(fullReport.discovery, undefined);
+  assert.equal(
+    fullReport.edges.some((edge) => edge.kind === "continues_with"),
+    false,
+  );
+  assert.doesNotMatch(
+    full.stdout,
+    /publishedEntrypoint|published_entrypoint|published-entrypoint/,
+  );
+});
+
+test("focused Discovery retains global adoption while filtering entrypoints", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-discovery-cli-"));
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    `${JSON.stringify({ skill_discovery: { adopted: true } })}\n`,
+  );
+  await writeSkill(
+    root,
+    "published",
+    "skill.published",
+    undefined,
+    undefined,
+    true,
+  );
+  await writeSkill(root, "focused", "skill.focused");
+
+  const result = await captured(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "discovery",
+      "--focus",
+      "skill.focused",
+      "--format",
+      "json",
+    ]),
+  );
+  const report = JSON.parse(result.stdout) as {
+    discovery: {
+      adoption: { state: string; publishedEntrypointCount: number };
+      publishedEntrypointIds: string[];
+      summary: { publishedEntrypointCount: number };
+    };
+  };
+
+  assert.equal(result.code, 0);
+  assert.equal(report.discovery.adoption.state, "adopted");
+  assert.equal(report.discovery.adoption.publishedEntrypointCount, 1);
+  assert.deepEqual(report.discovery.publishedEntrypointIds, []);
+  assert.equal(report.discovery.summary.publishedEntrypointCount, 0);
+});
+
+test("explicit Discovery config false does not declare repository-wide adoption", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-discovery-cli-"));
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    `${JSON.stringify({ skill_discovery: { adopted: false } })}\n`,
+  );
+  const result = await captured(() =>
+    main(["graph", root, "--view", "discovery", "--format", "json"]),
+  );
+  const report = JSON.parse(result.stdout) as {
+    discovery: {
+      adoption: { state: string; repositoryWideAdopted: boolean };
+    };
+  };
+
+  assert.equal(result.code, 0);
+  assert.deepEqual(report.discovery.adoption, {
+    state: "not-adopted",
+    discoveryMetadataPresent: false,
+    repositoryWideAdopted: false,
+    publishedEntrypointCount: 0,
+    reason: "no-discovery-metadata-or-repository-adoption",
+    configPath: "renma.config.json",
+  });
+});
+
 test("Discovery route diagnostics flow through scan and diagnostics v2", async () => {
   const root = await routeFixture();
   const result = await scan(root);
@@ -416,6 +654,56 @@ test("invalid canonical continuation declarations flow through scan", async () =
   assert.match(diagnostic.llmHint ?? "", /Correct it[\s\S]*or remove/i);
 });
 
+test("publication warnings flow through scan, diagnostics v2, and review bundles", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-discovery-cli-"));
+  await mkdir(path.join(root, "skills", "source"), { recursive: true });
+  await writeFile(
+    path.join(root, "skills", "source", "SKILL.md"),
+    [
+      "---",
+      "name: source",
+      "description: Review source inputs and produce deterministic evidence. Use when source workflow decisions need review; do not use for runtime selection or execution.",
+      "metadata:",
+      "  renma.id: skill.source",
+      "  renma.published-entrypoint: true",
+      "---",
+      "# Source",
+      "",
+      "Review evidence and report completion.",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await scan(root);
+  const diagnostic = result.diagnostics.find(
+    (item) =>
+      item.code === DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT,
+  );
+  const diagnosticV2 = result.diagnosticsV2.find(
+    (item) =>
+      item.code === DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT,
+  );
+
+  assert.equal(diagnostic?.severity, "warning");
+  assert.equal(diagnostic?.details?.rawMarkerValue, true);
+  assert.equal(diagnosticV2?.repairPolicy, "preserve_semantics");
+  assert.ok(
+    diagnosticV2?.repairConstraints?.some(
+      (constraint) =>
+        constraint.kind === "must_not_change" &&
+        /publish every structural root/.test(constraint.text),
+    ),
+  );
+  assert.ok(
+    result.reviewBundles.some((bundle) =>
+      bundle.diagnosticCodes.includes(
+        DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT,
+      ),
+    ),
+  );
+  assert.doesNotMatch(JSON.stringify(result.trustGraph), /DISCOVERY-/);
+});
+
 test("existing graph views remain route-free and invalid view help lists discovery", async () => {
   const root = await routeFixture();
   const full = await captured(() =>
@@ -457,6 +745,18 @@ test("existing graph views remain route-free and invalid view help lists discove
 
 test("deferred Readiness, Trust Graph, and BOM projections do not adopt Discovery", async () => {
   const root = await routeFixture();
+  await writeSkill(
+    root,
+    "source",
+    "skill.source",
+    ["skill.target", "skill.missing", "skill.old"],
+    undefined,
+    true,
+  );
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    `${JSON.stringify({ skill_discovery: { adopted: true } })}\n`,
+  );
   const [readinessReport, trustGraphReport, bomReport] = await Promise.all([
     readiness(root),
     trustGraph(root),
@@ -466,6 +766,11 @@ test("deferred Readiness, Trust Graph, and BOM projections do not adopt Discover
   assert.doesNotMatch(JSON.stringify(readinessReport), /DISCOVERY-/);
   assert.doesNotMatch(JSON.stringify(trustGraphReport), /DISCOVERY-/);
   assert.doesNotMatch(JSON.stringify(bomReport), /DISCOVERY-/);
+  const publicationField =
+    /publishedEntrypoint|published_entrypoint|published-entrypoint/;
+  assert.doesNotMatch(JSON.stringify(readinessReport), publicationField);
+  assert.doesNotMatch(JSON.stringify(trustGraphReport), publicationField);
+  assert.doesNotMatch(JSON.stringify(bomReport), publicationField);
 });
 
 async function routeFixture(): Promise<string> {
@@ -486,11 +791,13 @@ async function writeSkill(
   id: string,
   routes?: string[],
   status?: "experimental" | "stable" | "deprecated" | "archived",
+  published = false,
+  owner?: string,
 ): Promise<void> {
   await mkdir(path.join(root, "skills", name), { recursive: true });
   await writeFile(
     path.join(root, "skills", name, "SKILL.md"),
-    skillText(name, id, routes, undefined, status),
+    skillText(name, id, routes, undefined, status, published, owner),
   );
 }
 
@@ -517,6 +824,8 @@ function skillText(
   routes?: string[],
   rawRouteValue?: string,
   status?: "experimental" | "stable" | "deprecated" | "archived",
+  published = false,
+  owner?: string,
 ): string {
   return [
     "---",
@@ -530,6 +839,8 @@ function skillText(
         ? [`  renma.continues-with: ${rawRouteValue}`]
         : []),
     ...(status ? [`  renma.status: ${status}`] : []),
+    ...(owner ? [`  renma.owner: ${owner}`] : []),
+    ...(published ? ['  renma.published-entrypoint: "true"'] : []),
     "---",
     `# ${name}`,
     "",

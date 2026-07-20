@@ -1,15 +1,47 @@
 # Skill Discovery Graph
 
-Renma 0.22.0's first operational Skill Discovery slice is a static,
-declaration-driven Skill-to-Skill graph. It does not interpret task text,
-select, rank, load, invoke, or execute a Skill. Repository authors keep routing
-conditions in each source `SKILL.md`; Renma exposes and validates only the
-explicit continuation evidence.
+Renma 0.22.x provides a static, declaration-driven Skill-to-Skill graph. It
+does not interpret task text, select, rank, load, invoke, or execute a Skill.
+Repository authors keep routing conditions in source `SKILL.md` files; Renma
+exposes deterministic publication, adoption, continuation, and structural
+evidence.
 
-## Canonical declaration
+The progression is intentionally layered:
 
-Only a canonical, directory-based Agent Skill named exactly `SKILL.md` can
-declare continuations:
+```text
+0.22.0
+  explicit continuation routes, exact resolution, diagnostics,
+  structural roots, and graph projection
+
+0.22.1
+  explicit published entrypoints and explicit repository-wide
+  Discovery adoption
+
+later
+  reachability, coverage, and skill-index
+```
+
+## Three separate facts
+
+```text
+structural root
+  = a derived Skill graph fact
+
+published entrypoint
+  = an explicit valid Skill-local declaration
+
+repository-wide adoption
+  = an explicit repository configuration decision
+```
+
+A structural root is not automatically published. A published entrypoint does
+not prove complete repository coverage. Neither fact causes Renma to select or
+execute a Skill.
+
+## Canonical declarations
+
+Only a specification-valid, directory-based Agent Skill named exactly
+`SKILL.md` can contribute operational Discovery metadata:
 
 ```yaml
 ---
@@ -19,139 +51,148 @@ metadata:
   renma.id: skill.review-request
   renma.owner: developer-experience
   renma.status: stable
+  renma.published-entrypoint: "true"
   renma.continues-with: '["skill.review-api","skills/review-ui/SKILL.md"]'
 ---
 ```
 
-`metadata.renma.continues-with` must be a YAML string containing a JSON array.
-Every array member must be a string and must remain non-empty after trimming.
-An empty array string (`'[]'`) is valid and declares no routes. Native YAML
-arrays, objects, scalar JSON values, numbers, booleans, null, malformed JSON,
-comma-separated text, and empty members are invalid. Renma does not accept
-`routes_to`, `routes-to`, `hands-off-to`, `delegates-to`, or other aliases.
+`metadata.renma.published-entrypoint` is a one-state marker. The only valid
+value is the exact YAML string `"true"`; omission means not published. YAML
+booleans, `"false"`, empty or whitespace-padded strings, alternate casing,
+numbers, arrays, objects, null, duplicate declarations, and duplicate
+top-level `metadata` mappings fail closed. Renma does not accept
+`published_entrypoint`, `discovery_entrypoint`, `entrypoint`,
+`renma.entrypoint`, or historical aliases, and does not fall back to legacy
+metadata. Rejected markers retain exact field evidence.
 
-For example, this unresolved declaration is syntactically valid but has no
-exact catalog target:
+`metadata.renma.continues-with` remains the 0.22.0 JSON-array string contract.
+Every member must be a non-empty string. An empty array string (`'[]'`) is valid
+and declares no routes. Renma resolves one exact effective asset ID or one
+exact repository-relative source path after the documented path normalization;
+it does not match titles, tags, aliases, basenames, suffixes, prose, or ordinary
+Markdown links.
 
-```yaml
-metadata:
-  renma.continues-with: '["skill.review-missing"]'
+## Publication eligibility
+
+Publication intent and effective publication are separate. A visible Skill
+exposes marker state and evidence, whether publication was requested and
+accepted, stable rejection reasons, and linked existing diagnostics.
+
+A Skill is an effective published entrypoint only when the marker is the exact
+string `"true"` and the Skill is:
+
+- a specification-valid canonical Agent Skill;
+- not deprecated or archived; and
+- unique in effective asset ID across the repository catalog.
+
+Stable publication rejection reasons are `invalid-marker`,
+`ambiguous-marker`, `invalid-skill`, `inactive-skill`, and
+`duplicate-skill-id`. Existing `AS-SKILL-*` validity diagnostics and
+`META-DUPLICATE-ASSET-ID` evidence remain authoritative; Discovery links them
+instead of emitting competing validity or identity diagnostics.
+
+A published Skill may have an incoming route or no outgoing route. A Skill
+with no outgoing route can itself be a complete first-hop workflow. Graph
+position never determines publication.
+
+## Repository-wide adoption
+
+Repository-wide adoption is declared only in Renma JSON configuration:
+
+```json
+{
+  "skill_discovery": {
+    "adopted": true
+  }
+}
 ```
 
-Renma reports the declaration and its exact line evidence. It does not create
-or suggest a placeholder Skill merely to make the route resolve.
+`skill_discovery` must be an object, its only supported key is `adopted`, and
+`adopted` must be a JSON boolean. Omission defaults to `false`; explicit
+`false` does not declare repository-wide adoption. Unknown keys and alternate
+spellings are configuration errors. `renma init` continues to omit this field:
+initializing Renma is not the same decision as adopting repository-wide Skill
+Discovery.
 
-## Exact resolution
+The prepared Discovery index reports one deterministic adoption state:
 
-Each declaration item is trimmed, path separators are normalized to `/`, and
-at most one leading `./` is removed. Absolute paths and paths that escape the
-repository are rejected. Renma then attempts:
+- `not-adopted`: no continuation or publication metadata is present and
+  repository-wide adoption is not true;
+- `partial`: valid, invalid, or rejected continuation/publication metadata is
+  present and repository-wide adoption is not true;
+- `incomplete`: repository-wide adoption is true but no effective published
+  entrypoint exists; or
+- `adopted`: repository-wide adoption is true and at least one effective
+  published entrypoint exists.
 
-1. one exact effective asset-ID match; and
-2. one exact repository-relative source-path match.
-
-There is no suffix, basename, title, tag, alias, fuzzy, case-insensitive, body
-text, or Markdown-link matching. If ID and path identify different assets, or
-an effective ID belongs to multiple assets, resolution is `ambiguous`. One
-exact path can still resolve a duplicate-ID Skill, but the route remains
-unusable because that target has no unique graph identity. A non-Skill target
-is `wrong-kind`, not missing.
-
-Resolution and usability are separate. A usable route requires a valid,
-lifecycle-active canonical Agent Skill at both ends and a repository-unique
-effective asset ID for both Skills. Stable unusability reasons include:
-
-- `invalid-source` and `invalid-target`;
-- `inactive-source` and `inactive-target`;
-- `duplicate-source-id` and `duplicate-target-id`;
-- `wrong-kind`, `ambiguous-target`, and `unresolved-target`; and
-- `duplicate-declaration` for a redundant non-representative item.
-
-Existing `AS-SKILL-*` diagnostics remain authoritative for Agent Skills
-validity, and `META-DUPLICATE-ASSET-ID` remains authoritative for catalog
-identity. Discovery links that evidence instead of creating competing validity
-or identity diagnostics.
-
-When one source declares the same normalized unresolved spelling more than
-once, or multiple items resolve to the same target Skill, Renma retains every
-declaration index and evidence location. One deterministic representative may
-form the usable edge. Declaration order never means priority.
-
-## Structural roots
-
-A structural root is a route-eligible Skill with no incoming usable Skill
-route. A route-eligible Skill with no incoming or outgoing usable route is also
-reported as standalone. These are graph facts, not published entrypoints,
-coverage claims, or evidence that repository-wide Discovery has been adopted.
+Every state explicitly reports coverage as `not-evaluated` with reason
+`reachability-and-coverage-are-deferred`. Renma 0.22.1 does not calculate
+reachable, not-reached, or unreachable Skills and emits no coverage diagnostic.
 
 ## Graph view
 
-The shared repository snapshot prepares the route index once. All Discovery
-formats use that same index:
+All Discovery formats use the same index prepared in the shared repository
+snapshot:
 
 ```bash
 renma graph . --view discovery --format json
 renma graph . --view discovery --format markdown
 renma graph . --view discovery --format mermaid
 renma graph . --view discovery --focus skill.review-request --format json
-renma graph . --view discovery --focus skills/review-request/SKILL.md --format markdown
 ```
 
-JSON adds a dedicated `discovery` section containing deterministic summary
-counts, visible Skills, every route declaration, structural-root and standalone
-IDs, declaration evidence, linked diagnostics, and optional exact focus
-evidence. Skill route diagnostics live only in `discovery.diagnostics`;
-pre-existing repository diagnostics remain in the top-level graph
-`diagnostics` collection. Unresolved declarations are never represented as
-resolved edges. The graph command exits with code `1` when either collection
-contains an error, while the initial Discovery diagnostics remain warnings.
+JSON adds `adoption`, `coverage`, and `publishedEntrypointIds` to the dedicated
+`discovery` object. Each visible Skill includes ownership provenance,
+structural-root and standalone facts, marker evidence, publication request and
+acceptance, rejection reasons, and linked diagnostics. Repository diagnostics
+remain at top-level `diagnostics`; Skill Discovery diagnostics remain under
+`discovery.diagnostics`. Exit-code evaluation considers errors in both
+collections, while current Discovery diagnostics are warnings.
 
-Markdown states the static-only boundary, reports counts, lists structural
-roots, shows routes in deterministic source/declaration order, preserves exact
-evidence locations, and separates Discovery diagnostics from repository
-diagnostics. Readers must open the source `SKILL.md` and apply its routing
-conditions; the report is not an executable prompt.
+Markdown presents Summary, Adoption, Published entrypoints, Structural roots,
+Declared routes, Discovery diagnostics, and then Repository diagnostics when
+present. Published entries include description, source, effective owner and
+provenance, lifecycle, structural-root and standalone facts, and direct route
+resolution/usability. When none exists, Markdown says so and presents roots
+only as candidate graph facts.
 
-Mermaid renders usable resolved Skill routes as solid edges. Every unresolved,
-ambiguous, wrong-kind, inactive, duplicate, or otherwise unusable declaration
-uses a dotted edge to a labeled synthetic review node. Structural roots receive
-a restrained visual distinction. Evidence and diagnostics are comments, and
-Discovery and repository diagnostics use separately labeled comment groups.
-Output remains deterministic for empty graphs, duplicate IDs, unresolved
-targets, shared targets, and cycles.
+Mermaid retains solid usable route edges and dotted unusable declaration edges.
+Published entrypoints and structural roots receive separate deterministic
+classes, including both facts when one Skill has both roles. Styling does not
+change edge meaning or imply invocation.
 
-Exact `--focus` is optional for this view. It accepts one exact Skill ID or
-repository-relative source path and retains the selected Skill's direct
-incoming and outgoing declared routes. An ambiguous or missing focus is a usage
-error; focus never performs fuzzy matching or transitive traversal.
+Exact `--focus` retains the selected Skill's direct incoming and outgoing
+declarations without transitive traversal. A focused projection preserves the
+repository-wide adoption object, filters `publishedEntrypointIds` to visible
+published Skills, and never recomputes adoption from that subset.
 
 ## Diagnostics
 
-The first slice emits warning-severity diagnostics only:
+Renma 0.22.1 adds warning diagnostics:
 
-- `DISCOVERY-INVALID-CONTINUATION-DECLARATION`;
-- `DISCOVERY-UNRESOLVED-DECLARED-ROUTE`;
-- `DISCOVERY-ROUTE-TARGET-NOT-SKILL`;
-- `DISCOVERY-INACTIVE-ROUTE-TARGET`; and
-- `DISCOVERY-DUPLICATE-DECLARED-ROUTE`.
+- `DISCOVERY-INVALID-PUBLISHED-ENTRYPOINT` for an invalid or ambiguous marker,
+  or an exact marker on a specification-valid inactive Skill; and
+- `DISCOVERY-ENTRYPOINT-WITHOUT-USABLE-BOUNDARIES` when current deterministic
+  Agent Skills checks establish that an effective entrypoint lacks a
+  capability, positive usage boundary, or negative selection boundary.
 
-They are included in snapshot aggregate diagnostics and normal `scan` output,
-including diagnostics v2 repair constraints and verification steps. The repair
-policy preserves the intended relationship, permits exact ID/path correction
-or removal of stale evidence, forbids placeholder Skills, and requires human
-review when the target intent is ambiguous. This release adds no Discovery CI
-gate or error-severity policy.
+The boundary warning reuses linked `RN-SKILL-*` evidence and is not proof of
+semantic completeness. Its repair is to improve the bounded first-hop
+responsibility, not to remove publication solely to silence the warning.
+
+Both diagnostics flow through normal scan output, diagnostics v2, and review
+bundles. They do not create a CI gate and remain excluded from Readiness,
+semantic diff, CI report, Trust Graph, and BOM.
 
 ## Compatibility and deferred work
 
-The route index is separate from `catalog.dependencies`; existing full,
-summary, workflow, layered, composition, and impact graph contracts do not gain
-Skill continuation edges. `renma init`, scaffold, Readiness, diff, CI report,
-Trust Graph, BOM, ownership, authoring guidance, and suggestions are unchanged.
-Ordinary Markdown links and noncanonical `skill.md` or `*.skill.md` files do
-not create operational routes.
+Continuation and publication data remain separate from
+`catalog.dependencies`. Existing full, summary, workflow, layered,
+composition, and impact graph outputs remain route/publication-free. Catalog,
+Readiness, diff, CI report, Trust Graph, BOM, ownership, init, scaffold, guide,
+and suggestion contracts are unchanged. A repository without Discovery
+metadata or adoption remains valid and reports `not-adopted` without a warning.
 
-Later slices may review explicit published entrypoints, repository-wide
-Discovery adoption, descriptive or authoritative reachability, coverage,
-`skill-index`, Readiness/diff/CI integration, and richer visualization. None of
-those contracts is inferred or implemented by the 0.22.0 route foundation.
+Reachability, descriptive or authoritative coverage, unreachable-Skill
+diagnostics, `notReachedDiscoveryEligibleSkillIds`, route-cycle diagnostics,
+`skill-index`, and a `renma discovery` command remain deferred.

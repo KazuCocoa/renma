@@ -11,10 +11,11 @@ to be a thin router. Renma validates repository structure and declared Context
 relationships but does not select a Skill at runtime.
 
 The 0.22.0 Skill Discovery foundation adds explicit canonical continuation
-metadata and a static graph projection. It remains separate from repository
-file and Skill-local support-resource discovery, and it does not add published
-entrypoints, repository-wide adoption, reachability, coverage, or runtime Skill
-selection. See the [Skill Discovery Graph contract](skill-discovery.md).
+metadata and a static graph projection. The 0.22.1 slice adds explicit
+published entrypoints and separately configured repository-wide adoption.
+These remain separate from repository file and Skill-local support-resource
+discovery; reachability, coverage evaluation, and runtime Skill selection are
+still deferred. See the [Skill Discovery Graph contract](skill-discovery.md).
 
 ## Derive A Focused Skill From An Existing Skill
 
