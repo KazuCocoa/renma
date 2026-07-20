@@ -131,8 +131,8 @@ For an explicitly requested release trigger:
    - 起動したワークフローを完了まで監視します。テスト、ビルド、パッケージチェック、タグとバージョンのチェック、または公開手順の失敗をリリースブロッカーとして扱います。
 7. After workflow success, verify the version and integrity metadata from the public npm registry. Use read-only registry queries only.
    - ワークフローの成功後、公開 npm レジストリからバージョンと整合性メタデータを検証します。読み取り専用のレジストリクエリだけを使用します。
-8. Generate and present the complete GitHub Release title and body to the user. Wait for explicit content approval and incorporate requested edits before continuing.
-   - GitHub Release の完全なタイトルと本文を生成してユーザーに提示します。明示的な内容承認を待ち、要求された修正を反映してから続行します。
+8. Generate and present the complete GitHub Release title and body to the user. The title must be exactly `Renma v<version>`, including the `v` prefix used by the Git tag. Wait for explicit content approval and incorporate requested edits before continuing.
+   - GitHub Release の完全なタイトルと本文を生成してユーザーに提示します。タイトルは、Git タグで使用する `v` 接頭辞を含め、正確に `Renma v<version>` とします。明示的な内容承認を待ち、要求された修正を反映してから続行します。
 9. Determine whether the tag's GitHub Release will be created or updated. Show the repository, tag, title, and operation, then ask separately for permission to write the approved content to GitHub. Only after that publication approval, create or update the GitHub Release and verify its URL and published content.
    - タグの GitHub Release が作成されるか更新されるかを判断します。リポジトリ、タグ、タイトル、および操作を提示し、承認済みの内容を GitHub に書き込む許可を別途求めます。その公開承認を得た後にのみ、GitHub Release を作成または更新し、その URL と公開内容を検証します。
 10. Return the workflow URL, branch and tag commits, registry evidence, GitHub Release URL, and any residual blockers.
@@ -148,6 +148,8 @@ For an explicitly requested release trigger:
 - `origin/main` とバージョンタグのリモート送信には、それぞれ個別かつ直前の承認が必要です。一方の承認は、もう一方の操作や、その後の GitHub Release への書き込みを許可するものではありません。
 - GitHub Release content approval confirms the text only. Obtain an additional, immediate publication approval for the resolved repository, tag, and create-or-update operation before writing to GitHub.
 - GitHub Release の内容承認は、テキストだけを確認するものです。GitHub に書き込む前に、解決済みのリポジトリ、タグ、および作成または更新操作について、追加の直前公開承認を得ます。
+- Use `Renma v<version>` as the GitHub Release title and `v<version>` as the Git tag. Do not use the bare tag itself as the release title.
+- GitHub Release のタイトルには `Renma v<version>`、Git タグには `v<version>` を使用します。タグだけをリリースタイトルとして使用しません。
 - Local version commits and local annotated tags are allowed when the user asks for release finalization.
 - ユーザーがリリースの確定を求めた場合、ローカルのバージョンコミットと注釈付きタグの作成は許可されます。
 - Do not rewrite unrelated release history while preparing the current release.
@@ -175,5 +177,5 @@ Run `node tools/release-prep.mjs`; use `--check-only` for metadata checks only, 
 - 必須の Renma レポートが実行されているか、スキップしたレポートについて説明されています。
 - The final handoff names blockers, residual risks, and the local commit and tag state.
 - 最終的な引き継ぎに、ブロッカー、残存リスク、およびローカルのコミットとタグの状態が記載されています。
-- Completion evidence for a requested release trigger includes matching remote branch and tag commits, a successful GitHub Actions run, verified npm metadata, and the verified URL and body of the separately approved GitHub Release.
-- 要求されたリリース実行の完了証拠に、一致するリモートブランチとタグのコミット、成功した GitHub Actions の実行、検証済みの npm メタデータ、および別途承認された GitHub Release の検証済み URL と本文が含まれています。
+- Completion evidence for a requested release trigger includes matching remote branch and tag commits, a successful GitHub Actions run, verified npm metadata, and the verified title, URL, and body of the separately approved GitHub Release.
+- 要求されたリリース実行の完了証拠に、一致するリモートブランチとタグのコミット、成功した GitHub Actions の実行、検証済みの npm メタデータ、および別途承認された GitHub Release の検証済みタイトル、URL、本文が含まれています。

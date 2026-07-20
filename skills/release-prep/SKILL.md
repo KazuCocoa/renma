@@ -48,8 +48,8 @@ Use the English text instead when determining requirements.
    - そこに記載された必須入力、ワークフロー、制約、検証、および完了基準に従います。
 3. For a request to generate or display GitHub Release notes, run `node tools/release-prep.mjs --release-notes --version <version>` and return its Markdown output.
    - GitHub Release ノートの生成または表示を求められた場合は、`node tools/release-prep.mjs --release-notes --version <version>` を実行し、その Markdown 出力を返します。
-4. For an explicitly requested release trigger, follow the context's interactive gates in order. Only after explicit human approval, push `origin/main`. Obtain another explicit human approval before pushing the validated version tag. After trusted publishing succeeds, present the GitHub Release body for content approval and obtain separate publication approval before creating or updating the release.
-   - 明示的にリリースの実行を求められた場合は、コンテキストの対話式ゲートに順番どおり従います。人による明示的な承認を得た後に限り（Only after explicit human approval）、`origin/main` を push します。検証済みのバージョンタグ（validated version tag）を push する前に、改めて人による明示的な承認（explicit human approval）を得ます。trusted publishing が成功した後、内容の承認（content approval）を得るために GitHub Release の本文を提示し、リリースを作成または更新する前に別途公開の承認（publication approval）を得ます。
+4. For an explicitly requested release trigger, follow the context's interactive gates in order. Only after explicit human approval, push `origin/main`. Obtain another explicit human approval before pushing the validated version tag. After trusted publishing succeeds, present the GitHub Release title `Renma v<version>` and body for content approval and obtain separate publication approval before creating or updating the release.
+   - 明示的にリリースの実行を求められた場合は、コンテキストの対話式ゲートに順番どおり従います。人による明示的な承認を得た後に限り（Only after explicit human approval）、`origin/main` を push します。検証済みのバージョンタグ（validated version tag）を push する前に、改めて人による明示的な承認（explicit human approval）を得ます。trusted publishing が成功した後、内容の承認（content approval）のために GitHub Release のタイトル `Renma v<version>` と本文を提示し、リリースを作成または更新する前に別途公開の承認（publication approval）を得ます。
 5. Use `tools/release-prep.mjs` for other operations only as directed by that context.
    - その他の操作には、当該コンテキストで指示された場合に限り `tools/release-prep.mjs` を使用します。
 6. Return the release artifacts and evidence specified by the context.
@@ -63,5 +63,7 @@ Use the English text instead when determining requirements.
 - パッケージのリリース手順は GitHub Actions の trusted-publishing ワークフロー内で実行します。ローカルの npm コマンドは、検証および公開レジストリの読み取り専用確認に限定して使用します。
 - Treat `origin/main` and version-tag pushes as separate external writes. Show the resolved `origin` URL, source commit, and exact destination ref, and obtain a separate explicit approval immediately before each push.
 - `origin/main` の push とバージョンタグ（version-tag）の push を、別々の外部書き込みとして扱います。解決された `origin` URL、ソースコミット（source commit）、および正確な宛先 ref（destination ref）を示し、各 push の直前に個別の明示的な承認（explicit approval）を得ます。
-- After the tag workflow succeeds, present the complete generated GitHub Release body and wait for content approval. Then show whether the release will be created or updated and obtain a separate explicit publication approval immediately before writing it to GitHub.
-- タグのワークフローが成功した後、生成された GitHub Release の本文全体を提示し、内容の承認（content approval）を待ちます。次に、リリースが作成されるか更新されるかを示し、GitHub に書き込む直前に個別の明示的な公開承認（explicit publication approval）を得ます。
+- Use exactly `Renma v<version>` for the GitHub Release title. Keep the Git tag as `v<version>`.
+- GitHub Release のタイトルには、正確に `Renma v<version>` を使用します。Git タグは `v<version>` のままにします。
+- After the tag workflow succeeds, present the complete GitHub Release title and generated body and wait for content approval. Then show whether the release will be created or updated and obtain a separate explicit publication approval immediately before writing it to GitHub.
+- タグのワークフローが成功した後、GitHub Release の完全なタイトルと生成された本文を提示し、内容の承認（content approval）を待ちます。次に、リリースが作成されるか更新されるかを示し、GitHub に書き込む直前に個別の明示的な公開承認（explicit publication approval）を得ます。

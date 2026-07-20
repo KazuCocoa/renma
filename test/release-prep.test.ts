@@ -32,6 +32,12 @@ test("release-prep delegates npm publication to tag-triggered GitHub Actions", (
   assert.match(context, /Ask separately for approval to push the tag/);
   assert.match(context, /push only that tag to trigger the workflow/);
   assert.match(context, /verify the version and integrity metadata/);
+  assert.match(skill, /Use exactly `Renma v<version>`/);
+  assert.match(
+    context,
+    /title must be exactly `Renma v<version>`, including the `v` prefix/,
+  );
+  assert.match(context, /Do not use the bare tag itself as the release title/);
   assert.match(context, /Wait for explicit content approval/);
   assert.match(
     context,
