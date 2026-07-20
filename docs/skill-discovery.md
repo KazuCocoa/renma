@@ -17,8 +17,12 @@ The progression is intentionally layered:
   explicit published entrypoints and explicit repository-wide
   Discovery adoption
 
+0.22.2
+  cycle-safe reachability, descriptive coverage, authoritative coverage,
+  and adopted-mode unreachable diagnostics
+
 later
-  reachability, coverage, and skill-index
+  versioned skill-index report and dedicated skill-index command
 ```
 
 ## Three separate facts
@@ -125,9 +129,49 @@ The prepared Discovery index reports one deterministic adoption state:
 - `adopted`: repository-wide adoption is true and at least one effective
   published entrypoint exists.
 
-Every state explicitly reports coverage as `not-evaluated` with reason
-`reachability-and-coverage-are-deferred`. Renma 0.22.1 does not calculate
-reachable, not-reached, or unreachable Skills and emits no coverage diagnostic.
+## Reachability and coverage
+
+Published entrypoints define where Discovery starts. Usable `continues-with`
+routes define where Discovery can continue. Reachability reports what can be
+found through those declarations. Renma still does not decide which Skill
+matches a user request.
+
+Traversal starts from every effective published entrypoint at depth `0` and
+uses only routes that are usable representatives, resolve successfully, and
+target a Skill. Resolution and usability are not reinterpreted during
+traversal. Invalid, inactive, duplicate-ID, unresolved, ambiguous, wrong-kind,
+and duplicate non-representative declarations therefore cannot create
+reachability. Adjacency, entrypoint provenance, and result IDs are sorted;
+per-entrypoint breadth-first traversal gives the true minimum route depth and
+terminates safely through self-loops and larger cycles.
+
+Every visible Skill exposes one reachability object:
+
+- `reachable`: an effective entrypoint or an eligible Skill reached through
+  usable declarations, with every reaching entrypoint ID and minimum depth;
+- `not-reached`: an eligible Skill with no usable path when coverage is being
+  evaluated; or
+- `not-evaluated`: repository coverage is not evaluated, or the Skill itself
+  is not Discovery-eligible.
+
+Coverage always has repository scope and uses one of three modes:
+
+- `not-evaluated`: Discovery is `not-adopted`, `incomplete`, or `partial`
+  without an effective published entrypoint. Reachable and not-reached arrays
+  remain empty.
+- `descriptive`: adoption is `partial` and at least one effective published
+  entrypoint exists. Reachability is review evidence, not a repository-wide
+  completeness claim, and not-reached Skills do not emit coverage warnings.
+- `authoritative`: adoption is `adopted`. `complete` is true only when every
+  Discovery-eligible Skill is reachable; otherwise it is false and each
+  not-reached eligible Skill emits a warning.
+
+The index exposes sorted `reachableDiscoveryEligibleSkillIds`,
+`notReachedDiscoveryEligibleSkillIds`, and `unroutedSkillIds`. Unrouted means
+exactly an eligible structural root that is not an effective published
+entrypoint; it is not a synonym for not-reached. A disconnected child can be
+not-reached while still having an incoming usable route and therefore not be
+unrouted.
 
 ## Graph view
 
@@ -141,30 +185,35 @@ renma graph . --view discovery --format mermaid
 renma graph . --view discovery --focus skill.review-request --format json
 ```
 
-JSON adds `adoption`, `coverage`, and `publishedEntrypointIds` to the dedicated
-`discovery` object. Each visible Skill includes ownership provenance,
+JSON includes `adoption`, repository-scoped `coverage`, published, reachable,
+not-reached, structural-root, standalone, and unrouted ID arrays in the
+dedicated `discovery` object. Each visible Skill includes ownership provenance,
 structural-root and standalone facts, marker evidence, publication request and
-acceptance, rejection reasons, and linked diagnostics. Repository diagnostics
-remain at top-level `diagnostics`; Skill Discovery diagnostics remain under
-`discovery.diagnostics`. Exit-code evaluation considers errors in both
-collections, while current Discovery diagnostics are warnings.
+acceptance, rejection reasons, global reachability, unrouted state, and linked
+diagnostics. Repository diagnostics remain at top-level `diagnostics`; Skill
+Discovery diagnostics remain under `discovery.diagnostics`. Exit-code
+evaluation considers errors in both collections, while current Discovery
+diagnostics are warnings.
 
-Markdown presents Summary, Adoption, Published entrypoints, Structural roots,
+Markdown presents Summary, Adoption, Coverage, Published entrypoints,
+authoritative coverage gaps when adopted, Structural roots, Unrouted Skills,
 Declared routes, Discovery diagnostics, and then Repository diagnostics when
-present. Published entries include description, source, effective owner and
-provenance, lifecycle, structural-root and standalone facts, and direct route
-resolution/usability. When none exists, Markdown says so and presents roots
-only as candidate graph facts.
+present. Descriptive mode shows counts without presenting not-reached Skills as
+defects. Long structural and coverage lists are bounded; JSON retains the full
+arrays.
 
 Mermaid retains solid usable route edges and dotted unusable declaration edges.
 Published entrypoints and structural roots receive separate deterministic
 classes, including both facts when one Skill has both roles. Styling does not
-change edge meaning or imply invocation.
+change edge meaning or imply invocation. Deterministic comments record coverage
+mode plus source-entrypoint, reachable, not-reached, and unrouted ID arrays.
 
 Exact `--focus` retains the selected Skill's direct incoming and outgoing
 declarations without transitive traversal. A focused projection preserves the
-repository-wide adoption object, filters `publishedEntrypointIds` to visible
-published Skills, and never recomputes adoption from that subset.
+repository-wide adoption and coverage objects and every visible Skill's global
+reachability. Published, reachable, not-reached, and unrouted ID arrays plus
+summary counts are filtered to visible Skills. Focus never becomes a traversal
+seed and never recomputes coverage from the subset.
 
 ## Diagnostics
 
@@ -184,6 +233,17 @@ Both diagnostics flow through normal scan output, diagnostics v2, and review
 bundles. They do not create a CI gate and remain excluded from Readiness,
 semantic diff, CI report, Trust Graph, and BOM.
 
+Renma 0.22.2 adds
+`DISCOVERY-UNREACHABLE-ELIGIBLE-SKILL` only in authoritative adopted mode, once
+per not-reached eligible Skill. It states the exact negative graph fact: no
+usable declared continuation path reaches the Skill from any effective
+published entrypoint. It does not claim runtime non-use and does not recommend
+a fake route or blanket publication. Repair requires human review of whether
+the Skill is an independent first hop, belongs beneath a real source-owned
+workflow, or falls outside the intended repository-wide policy. This warning
+also flows through scan, diagnostics v2, and review bundles while remaining
+outside downstream Trust Graph, Readiness, diff, CI, and BOM projections.
+
 ## Compatibility and deferred work
 
 Continuation and publication data remain separate from
@@ -193,6 +253,6 @@ Readiness, diff, CI report, Trust Graph, BOM, ownership, init, scaffold, guide,
 and suggestion contracts are unchanged. A repository without Discovery
 metadata or adoption remains valid and reports `not-adopted` without a warning.
 
-Reachability, descriptive or authoritative coverage, unreachable-Skill
-diagnostics, `notReachedDiscoveryEligibleSkillIds`, route-cycle diagnostics,
-`skill-index`, and a `renma discovery` command remain deferred.
+Route-cycle diagnostics, a versioned `skill-index` report, a dedicated
+`skill-index` command, and a `renma discovery` command remain deferred. Cycles
+are ordinary traversal-safe graph evidence in 0.22.2.

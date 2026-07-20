@@ -608,7 +608,7 @@ test("Context Lens docs use canonical Skill metadata and explicit semantic bound
   assert.match(diagnostics, /must reference a Context Asset/);
 });
 
-test("published current docs separate the operational Discovery foundation from deferred layers", async () => {
+test("published current docs separate operational Discovery slices from deferred skill-index", async () => {
   const documents = [
     "README.md",
     "plan.md",
@@ -640,11 +640,11 @@ test("published current docs separate the operational Discovery foundation from 
   const proposal = content[2] ?? "";
   assert.match(
     proposal,
-    /Status: active design with operational route-foundation and publication\/adoption slices/,
+    /Status: active design with operational route, publication, and reachability slices/,
   );
   assert.match(
     proposal,
-    /Implementation status:[\s\S]*0\.22\.0 implements[\s\S]*0\.22\.1 implements/,
+    /Implementation status:[\s\S]*0\.22\.0 implements[\s\S]*0\.22\.1 implements[\s\S]*0\.22\.2 implements/,
   );
   assert.match(proposal, /Baseline: Renma 0\.21\.0/);
   assert.match(
@@ -654,6 +654,10 @@ test("published current docs separate the operational Discovery foundation from 
   assert.match(
     proposal,
     /0\.22\.1 slice adds published entrypoints and `skill_discovery\.adopted`/,
+  );
+  assert.match(
+    proposal,
+    /0\.22\.2 slice adds reachability and coverage semantics/,
   );
   assert.match(proposal, /`renma\.continues-with`/);
   assert.match(proposal, /`renma\.published-entrypoint`/);

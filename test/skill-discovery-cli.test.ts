@@ -40,6 +40,9 @@ test("graph --view discovery JSON exposes the dedicated route contract", async (
         unresolvedOrAmbiguousRouteCount: number;
         invalidRouteCount: number;
         structuralRootCount: number;
+        reachableSkillCount: number;
+        notReachedSkillCount: number;
+        unroutedSkillCount: number;
       };
       skills: Array<{
         id: string;
@@ -90,7 +93,10 @@ test("graph --view discovery JSON exposes the dedicated route contract", async (
     invalidRouteCount: 1,
     structuralRootCount: 1,
     standaloneSkillCount: 0,
+    unroutedSkillCount: 1,
     publishedEntrypointCount: 0,
+    reachableSkillCount: 0,
+    notReachedSkillCount: 0,
   });
   assert.deepEqual(report.discovery.structuralRootIds, ["skill.source"]);
   assert.deepEqual(report.discovery.standaloneSkillIds, []);
@@ -180,6 +186,9 @@ test("graph --view discovery Mermaid separates usable and unusable declarations"
   assert.match(first.stdout, /-\.->\|continues-with unresolved\|/);
   assert.match(first.stdout, /inactive-target/);
   assert.match(first.stdout, /classDef structuralRoot/);
+  assert.match(first.stdout, /%% coverage mode: not-evaluated/);
+  assert.match(first.stdout, /%% reachable eligible Skill IDs: \(none\)/);
+  assert.match(first.stdout, /%% unrouted Skill IDs: skill\.source/);
   assert.match(first.stdout, /%% declaration skills\/source\/SKILL.md index 0/);
   assert.match(first.stdout, /%% Discovery diagnostics:/);
   assert.match(first.stdout, /does not execute Skills/);
@@ -419,7 +428,16 @@ test("graph Discovery projects explicit adoption and publication in every format
         publishedEntrypointCount: number;
         configPath?: string;
       };
-      coverage: { mode: string; reason: string };
+      coverage: {
+        scope: string;
+        mode: string;
+        reason: string;
+        sourceEntrypointIds: string[];
+        eligibleSkillCount: number;
+        reachableSkillCount: number;
+        notReachedSkillCount: number;
+        complete: boolean | null;
+      };
       publishedEntrypointIds: string[];
       skills: Array<{
         id: string;
@@ -446,8 +464,14 @@ test("graph Discovery projects explicit adoption and publication in every format
     configPath: "renma.config.json",
   });
   assert.deepEqual(report.discovery.coverage, {
-    mode: "not-evaluated",
-    reason: "reachability-and-coverage-are-deferred",
+    scope: "repository",
+    mode: "authoritative",
+    reason: "repository-wide-discovery-adopted",
+    sourceEntrypointIds: ["skill.published"],
+    eligibleSkillCount: 1,
+    reachableSkillCount: 1,
+    notReachedSkillCount: 0,
+    complete: true,
   });
   assert.deepEqual(report.discovery.publishedEntrypointIds, [
     "skill.published",
@@ -490,6 +514,16 @@ test("graph Discovery projects explicit adoption and publication in every format
       markdown.stdout.indexOf("## Structural roots"),
   );
   assert.match(markdown.stdout, /State: adopted/);
+  assert.match(markdown.stdout, /## Coverage/);
+  assert.match(markdown.stdout, /Mode: authoritative/);
+  assert.match(
+    markdown.stdout,
+    /Authoritative coverage is evaluated only because the repository explicitly declared skill_discovery\.adopted: true\./,
+  );
+  assert.match(
+    markdown.stdout,
+    /None\. Every Discovery-eligible Skill is reachable/,
+  );
   assert.match(markdown.stdout, /### skill\.published/);
   assert.match(markdown.stdout, /Owner: qa-platform \(declared\)/);
   assert.match(
@@ -504,6 +538,12 @@ test("graph Discovery projects explicit adoption and publication in every format
   assert.match(mermaid.stdout, /classDef publishedEntrypoint/);
   assert.match(mermaid.stdout, /class skill_0 publishedEntrypoint/);
   assert.match(mermaid.stdout, /class skill_0 structuralRoot/);
+  assert.match(mermaid.stdout, /%% coverage mode: authoritative/);
+  assert.match(mermaid.stdout, /%% source entrypoint IDs: skill\.published/);
+  assert.match(
+    mermaid.stdout,
+    /%% reachable eligible Skill IDs: skill\.published/,
+  );
 
   const full = await captured(() =>
     main(["graph", root, "--view", "full", "--format", "json"]),
@@ -555,16 +595,201 @@ test("focused Discovery retains global adoption while filtering entrypoints", as
   const report = JSON.parse(result.stdout) as {
     discovery: {
       adoption: { state: string; publishedEntrypointCount: number };
+      coverage: {
+        mode: string;
+        reachableSkillCount: number;
+        notReachedSkillCount: number;
+        complete: boolean;
+      };
       publishedEntrypointIds: string[];
-      summary: { publishedEntrypointCount: number };
+      reachableDiscoveryEligibleSkillIds: string[];
+      notReachedDiscoveryEligibleSkillIds: string[];
+      unroutedSkillIds: string[];
+      skills: Array<{
+        id: string;
+        reachability: { state: string; reason: string };
+      }>;
+      summary: {
+        publishedEntrypointCount: number;
+        reachableSkillCount: number;
+        notReachedSkillCount: number;
+        unroutedSkillCount: number;
+      };
     };
   };
 
   assert.equal(result.code, 0);
   assert.equal(report.discovery.adoption.state, "adopted");
   assert.equal(report.discovery.adoption.publishedEntrypointCount, 1);
+  assert.deepEqual(report.discovery.coverage, {
+    scope: "repository",
+    sourceEntrypointIds: ["skill.published"],
+    eligibleSkillCount: 2,
+    reachableSkillCount: 1,
+    notReachedSkillCount: 1,
+    mode: "authoritative",
+    reason: "repository-wide-discovery-adopted",
+    complete: false,
+  });
   assert.deepEqual(report.discovery.publishedEntrypointIds, []);
+  assert.deepEqual(report.discovery.reachableDiscoveryEligibleSkillIds, []);
+  assert.deepEqual(report.discovery.notReachedDiscoveryEligibleSkillIds, [
+    "skill.focused",
+  ]);
+  assert.deepEqual(report.discovery.unroutedSkillIds, ["skill.focused"]);
+  assert.deepEqual(report.discovery.skills[0]?.reachability, {
+    state: "not-reached",
+    reason: "no-usable-path-from-published-entrypoint",
+    sourceEntrypointIds: [],
+  });
   assert.equal(report.discovery.summary.publishedEntrypointCount, 0);
+  assert.equal(report.discovery.summary.reachableSkillCount, 0);
+  assert.equal(report.discovery.summary.notReachedSkillCount, 1);
+  assert.equal(report.discovery.summary.unroutedSkillCount, 1);
+
+  const publishedFocus = await captured(() =>
+    main([
+      "graph",
+      root,
+      "--view",
+      "discovery",
+      "--focus",
+      "skill.published",
+      "--format",
+      "markdown",
+    ]),
+  );
+  assert.match(
+    publishedFocus.stdout,
+    /No authoritative coverage gap is visible in this focused projection\. Repository-wide coverage remains incomplete/,
+  );
+  assert.doesNotMatch(
+    publishedFocus.stdout,
+    /None\. Every Discovery-eligible Skill is reachable/,
+  );
+});
+
+test("descriptive Markdown reports evidence without unreachable defects", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-discovery-cli-"));
+  await writeSkill(
+    root,
+    "published",
+    "skill.published",
+    undefined,
+    undefined,
+    true,
+  );
+  await writeSkill(root, "unreached", "skill.unreached");
+
+  const result = await captured(() =>
+    main(["graph", root, "--view", "discovery", "--format", "markdown"]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /Mode: descriptive/);
+  assert.match(
+    result.stdout,
+    /Descriptive coverage is review evidence, not a repository-wide completeness claim\./,
+  );
+  assert.doesNotMatch(result.stdout, /Authoritative coverage gaps/);
+  assert.doesNotMatch(result.stdout, /DISCOVERY-UNREACHABLE-ELIGIBLE-SKILL/);
+  assert.match(result.stdout, /## Unrouted Skills/);
+});
+
+test("Discovery Markdown and Mermaid cap long ID arrays deterministically", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-discovery-cli-"));
+  await writeSkill(
+    root,
+    "published",
+    "skill.published",
+    undefined,
+    undefined,
+    true,
+  );
+  for (let index = 0; index < 12; index += 1) {
+    const suffix = index.toString().padStart(2, "0");
+    await writeSkill(root, `unreached-${suffix}`, `skill.unreached-${suffix}`);
+  }
+
+  const markdown = await captured(() =>
+    main(["graph", root, "--view", "discovery", "--format", "markdown"]),
+  );
+  const firstMermaid = await captured(() =>
+    main(["graph", root, "--view", "discovery", "--format", "mermaid"]),
+  );
+  const secondMermaid = await captured(() =>
+    main(["graph", root, "--view", "discovery", "--format", "mermaid"]),
+  );
+
+  assert.equal(firstMermaid.stdout, secondMermaid.stdout);
+  assert.match(
+    markdown.stdout,
+    /2 more omitted from Markdown output\. Use JSON for the complete ID array/,
+  );
+  assert.match(
+    firstMermaid.stdout,
+    /not-reached eligible Skill IDs: .*\(10 of 12 shown; total 12\)/,
+  );
+  assert.match(
+    firstMermaid.stdout,
+    /unrouted Skill IDs: .*\(10 of 12 shown; total 12\)/,
+  );
+});
+
+test("authoritative unreachable warnings flow through scan, diagnostics v2, and review bundles", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-discovery-cli-"));
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    `${JSON.stringify({ skill_discovery: { adopted: true } })}\n`,
+  );
+  await writeSkill(
+    root,
+    "published",
+    "skill.published",
+    undefined,
+    undefined,
+    true,
+  );
+  await writeSkill(root, "unreached", "skill.unreached");
+
+  const markdown = await captured(() =>
+    main(["graph", root, "--view", "discovery", "--format", "markdown"]),
+  );
+  const result = await scan(root);
+  const diagnostic = result.diagnostics.find(
+    (item) => item.code === DIAGNOSTIC_IDS.DISCOVERY_UNREACHABLE_ELIGIBLE_SKILL,
+  );
+  const diagnosticV2 = result.diagnosticsV2.find(
+    (item) => item.code === DIAGNOSTIC_IDS.DISCOVERY_UNREACHABLE_ELIGIBLE_SKILL,
+  );
+
+  assert.equal(markdown.code, 0);
+  assert.match(markdown.stdout, /## Authoritative coverage gaps/);
+  assert.match(
+    markdown.stdout,
+    /skill\.unreached — skills\/unreached\/SKILL\.md/,
+  );
+  assert.equal(diagnostic?.severity, "warning");
+  assert.equal(diagnosticV2?.location?.path, "skills/unreached/SKILL.md");
+  assert.ok(
+    diagnosticV2?.repairConstraints?.some(
+      (item) =>
+        item.kind === "must_not_change" && /fake continuation/.test(item.text),
+    ),
+  );
+  assert.ok(
+    diagnosticV2?.verificationSteps?.some(
+      (item) => item.command === "renma graph . --view discovery --format json",
+    ),
+  );
+  assert.ok(
+    result.reviewBundles.some((bundle) =>
+      bundle.diagnosticCodes.includes(
+        DIAGNOSTIC_IDS.DISCOVERY_UNREACHABLE_ELIGIBLE_SKILL,
+      ),
+    ),
+  );
+  assert.doesNotMatch(JSON.stringify(result.trustGraph), /DISCOVERY-/);
 });
 
 test("explicit Discovery config false does not declare repository-wide adoption", async () => {

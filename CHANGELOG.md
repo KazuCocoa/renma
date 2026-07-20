@@ -6,6 +6,33 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added cycle-safe, deterministic multi-entrypoint reachability over only
+  usable representative resolved Skill-to-Skill continuations, including
+  per-Skill state, all reaching entrypoint IDs, and true minimum route depth.
+- Added repository-scoped `not-evaluated`, `descriptive`, and `authoritative`
+  coverage modes; reachable, not-reached, and exact unrouted eligible-Skill ID
+  arrays; and projection-scoped summary counts with repository-scoped coverage
+  retained under exact focus.
+- Added `DISCOVERY-UNREACHABLE-ELIGIBLE-SKILL` warnings only for authoritative
+  adopted-mode coverage gaps, with Skill identity evidence, constrained human
+  repair choices, reachability-specific verification, scan/diagnostics-v2
+  propagation, and review-bundle support.
+- Extended Discovery JSON, Markdown, and Mermaid with coverage, reachability,
+  unrouted facts, adopted-mode coverage gaps, and deterministic coverage
+  comments while preserving existing route edge meaning.
+
+### Compatibility
+
+- Existing Discovery resolution, usability, publication, adoption,
+  structural-root, standalone, focus-neighborhood, warning, and exit-code
+  contracts remain unchanged. No route-cycle diagnostic or new command was
+  added, and `catalog.dependencies` remains separate.
+- Readiness, semantic diff, CI report, Trust Graph, Repository Context BOM,
+  ownership, init, scaffold, guide, suggestions, and package version remain
+  unchanged. `skill-index` remains a later report/CLI slice.
+
 ## [0.22.1] - 2026-07-19
 
 ### Added

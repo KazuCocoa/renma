@@ -100,6 +100,25 @@ export interface SkillPublicationState {
   linkedDiagnostics: SkillDiagnosticLink[];
 }
 
+export type SkillDiscoveryReachabilityState =
+  | "reachable"
+  | "not-reached"
+  | "not-evaluated";
+
+export type SkillDiscoveryReachabilityReason =
+  | "published-entrypoint"
+  | "reachable-through-usable-route"
+  | "no-usable-path-from-published-entrypoint"
+  | "skill-not-discovery-eligible"
+  | "coverage-not-evaluated";
+
+export interface SkillDiscoveryReachability {
+  state: SkillDiscoveryReachabilityState;
+  reason: SkillDiscoveryReachabilityReason;
+  sourceEntrypointIds: string[];
+  minimumDepth?: number;
+}
+
 export interface VisibleSkillIdentity {
   /** Path-based identity remains authoritative even when the visible ID is duplicated. */
   identity: string;
@@ -117,6 +136,8 @@ export interface VisibleSkillIdentity {
   publication: SkillPublicationState;
   structuralRoot: boolean;
   standalone: boolean;
+  unrouted: boolean;
+  reachability: SkillDiscoveryReachability;
   linkedDiagnostics: SkillDiagnosticLink[];
 }
 
@@ -171,7 +192,10 @@ export interface SkillDiscoverySummary {
   invalidRouteCount: number;
   structuralRootCount: number;
   standaloneSkillCount: number;
+  unroutedSkillCount: number;
   publishedEntrypointCount: number;
+  reachableSkillCount: number;
+  notReachedSkillCount: number;
 }
 
 export type SkillDiscoveryAdoptionState =
@@ -193,9 +217,36 @@ export interface SkillDiscoveryAdoption {
   configPath?: string;
 }
 
-export interface SkillDiscoveryCoverage {
-  mode: "not-evaluated";
-  reason: "reachability-and-coverage-are-deferred";
+interface SkillDiscoveryCoverageBase {
+  scope: "repository";
+  sourceEntrypointIds: string[];
+  eligibleSkillCount: number;
+  reachableSkillCount: number;
+  notReachedSkillCount: number;
+}
+
+export type SkillDiscoveryCoverage =
+  | (SkillDiscoveryCoverageBase & {
+      mode: "not-evaluated";
+      reason: "discovery-not-adopted" | "no-effective-published-entrypoint";
+      complete: null;
+    })
+  | (SkillDiscoveryCoverageBase & {
+      mode: "descriptive";
+      reason: "partial-adoption-with-effective-published-entrypoint";
+      complete: null;
+    })
+  | (SkillDiscoveryCoverageBase & {
+      mode: "authoritative";
+      reason: "repository-wide-discovery-adopted";
+      complete: boolean;
+    });
+
+export interface SkillDiscoveryReachabilityResolution {
+  coverage: SkillDiscoveryCoverage;
+  reachabilityBySkillId: ReadonlyMap<string, SkillDiscoveryReachability>;
+  reachableDiscoveryEligibleSkillIds: string[];
+  notReachedDiscoveryEligibleSkillIds: string[];
 }
 
 /** Warning diagnostic emitted from explicit Skill continuation evidence. */
@@ -207,8 +258,11 @@ export interface SkillDiscoveryIndex {
   adoption: SkillDiscoveryAdoption;
   coverage: SkillDiscoveryCoverage;
   publishedEntrypointIds: string[];
+  reachableDiscoveryEligibleSkillIds: string[];
+  notReachedDiscoveryEligibleSkillIds: string[];
   structuralRootIds: string[];
   standaloneSkillIds: string[];
+  unroutedSkillIds: string[];
   summary: SkillDiscoverySummary;
   diagnostics: SkillDiscoveryDiagnostic[];
   focus?: {
@@ -355,26 +409,69 @@ export function prepareSkillDiscoveryIndex(
     publishedEntrypointIds.length,
     options.configPath,
   );
-  const coverage: SkillDiscoveryCoverage = {
-    mode: "not-evaluated",
-    reason: "reachability-and-coverage-are-deferred",
-  };
+  const reachability = resolveSkillDiscoveryReachability(
+    skills,
+    routes,
+    publishedEntrypointIds,
+    adoption,
+  );
+  const publishedEntrypoints = new Set(publishedEntrypointIds);
+  const unroutedSkillIds = structuralRootIds.filter(
+    (id) => !publishedEntrypoints.has(id),
+  );
+  const unroutedSkills = new Set(unroutedSkillIds);
+  for (const skill of skills) {
+    skill.unrouted = unroutedSkills.has(skill.id);
+    skill.reachability =
+      reachability.reachabilityBySkillId.get(skill.id) ??
+      notEvaluatedReachability("skill-not-discovery-eligible");
+  }
+
+  if (reachability.coverage.mode === "authoritative") {
+    const assetsByPath = new Map(
+      catalog.assets.map((asset) => [asset.sourcePath, asset]),
+    );
+    for (const id of reachability.notReachedDiscoveryEligibleSkillIds) {
+      const skill = skills.find(
+        (candidate) => candidate.routeEligible && candidate.id === id,
+      );
+      if (!skill) continue;
+      diagnostics.push(
+        unreachableEligibleSkillDiagnostic(
+          skill,
+          assetsByPath.get(skill.sourcePath),
+          reachability.coverage,
+          adoption,
+        ),
+      );
+    }
+    diagnostics.sort(compareDiagnostics);
+    linkUnreachableDiagnostics(skills, diagnostics);
+  }
 
   const publicRoutes: DeclaredSkillRoute[] = routes;
   return {
     skills,
     routes: publicRoutes,
     adoption,
-    coverage,
+    coverage: reachability.coverage,
     publishedEntrypointIds,
+    reachableDiscoveryEligibleSkillIds:
+      reachability.reachableDiscoveryEligibleSkillIds,
+    notReachedDiscoveryEligibleSkillIds:
+      reachability.notReachedDiscoveryEligibleSkillIds,
     structuralRootIds,
     standaloneSkillIds,
+    unroutedSkillIds,
     summary: summarizeDiscovery(
       skills,
       publicRoutes,
       publishedEntrypointIds,
       structuralRootIds,
       standaloneSkillIds,
+      unroutedSkillIds,
+      reachability.reachableDiscoveryEligibleSkillIds,
+      reachability.notReachedDiscoveryEligibleSkillIds,
     ),
     diagnostics,
   };
@@ -432,6 +529,17 @@ export function focusSkillDiscoveryIndex(
   const publishedEntrypointIds = index.publishedEntrypointIds.filter((id) =>
     skills.some((skill) => skill.id === id),
   );
+  const reachableDiscoveryEligibleSkillIds =
+    index.reachableDiscoveryEligibleSkillIds.filter((id) =>
+      skills.some((skill) => skill.id === id),
+    );
+  const notReachedDiscoveryEligibleSkillIds =
+    index.notReachedDiscoveryEligibleSkillIds.filter((id) =>
+      skills.some((skill) => skill.id === id),
+    );
+  const unroutedSkillIds = index.unroutedSkillIds.filter((id) =>
+    skills.some((skill) => skill.id === id),
+  );
   const routeKeys = new Set(
     routes.map(
       (route) => `${route.sourcePath}\0${route.declarationIndex.toString()}`,
@@ -462,17 +570,157 @@ export function focusSkillDiscoveryIndex(
     adoption: index.adoption,
     coverage: index.coverage,
     publishedEntrypointIds,
+    reachableDiscoveryEligibleSkillIds,
+    notReachedDiscoveryEligibleSkillIds,
     structuralRootIds,
     standaloneSkillIds,
+    unroutedSkillIds,
     summary: summarizeDiscovery(
       skills,
       routes,
       publishedEntrypointIds,
       structuralRootIds,
       standaloneSkillIds,
+      unroutedSkillIds,
+      reachableDiscoveryEligibleSkillIds,
+      notReachedDiscoveryEligibleSkillIds,
     ),
     diagnostics,
     focus: { id: selected.id, sourcePath: selected.sourcePath },
+  };
+}
+
+/**
+ * Resolve deterministic, cycle-safe Skill reachability from prepared Discovery
+ * evidence. This function is pure and never re-evaluates route validity.
+ */
+export function resolveSkillDiscoveryReachability(
+  skills: readonly VisibleSkillIdentity[],
+  routes: readonly DeclaredSkillRoute[],
+  publishedEntrypointIds: readonly string[],
+  adoption: SkillDiscoveryAdoption,
+): SkillDiscoveryReachabilityResolution {
+  const eligibleSkillIds = skills
+    .filter((skill) => skill.routeEligible)
+    .map((skill) => skill.id)
+    .sort((left, right) => left.localeCompare(right));
+  const sourceEntrypointIds = [...new Set(publishedEntrypointIds)].sort(
+    (left, right) => left.localeCompare(right),
+  );
+  const mode =
+    adoption.state === "adopted"
+      ? "authoritative"
+      : adoption.state === "partial" && sourceEntrypointIds.length > 0
+        ? "descriptive"
+        : "not-evaluated";
+  const reachabilityBySkillId = new Map<string, SkillDiscoveryReachability>();
+
+  for (const skill of skills) {
+    if (!skill.routeEligible) {
+      reachabilityBySkillId.set(
+        skill.id,
+        notEvaluatedReachability("skill-not-discovery-eligible"),
+      );
+    }
+  }
+
+  if (mode === "not-evaluated") {
+    for (const id of eligibleSkillIds) {
+      reachabilityBySkillId.set(
+        id,
+        notEvaluatedReachability("coverage-not-evaluated"),
+      );
+    }
+    return {
+      coverage: {
+        scope: "repository",
+        mode,
+        reason:
+          adoption.state === "not-adopted"
+            ? "discovery-not-adopted"
+            : "no-effective-published-entrypoint",
+        sourceEntrypointIds: [],
+        eligibleSkillCount: eligibleSkillIds.length,
+        reachableSkillCount: 0,
+        notReachedSkillCount: 0,
+        complete: null,
+      },
+      reachabilityBySkillId,
+      reachableDiscoveryEligibleSkillIds: [],
+      notReachedDiscoveryEligibleSkillIds: [],
+    };
+  }
+
+  const adjacency = usableSkillAdjacency(routes);
+  const sourcesBySkillId = new Map<string, Set<string>>();
+  const minimumDepthBySkillId = new Map<string, number>();
+  for (const entrypointId of sourceEntrypointIds) {
+    const depths = minimumDepthsFromEntrypoint(entrypointId, adjacency);
+    for (const [skillId, depth] of depths) {
+      const sources = sourcesBySkillId.get(skillId) ?? new Set<string>();
+      sources.add(entrypointId);
+      sourcesBySkillId.set(skillId, sources);
+      minimumDepthBySkillId.set(
+        skillId,
+        Math.min(minimumDepthBySkillId.get(skillId) ?? depth, depth),
+      );
+    }
+  }
+
+  const reachableDiscoveryEligibleSkillIds = eligibleSkillIds.filter((id) =>
+    sourcesBySkillId.has(id),
+  );
+  const notReachedDiscoveryEligibleSkillIds = eligibleSkillIds.filter(
+    (id) => !sourcesBySkillId.has(id),
+  );
+  const entrypointSet = new Set(sourceEntrypointIds);
+  for (const id of reachableDiscoveryEligibleSkillIds) {
+    reachabilityBySkillId.set(id, {
+      state: "reachable",
+      reason: entrypointSet.has(id)
+        ? "published-entrypoint"
+        : "reachable-through-usable-route",
+      sourceEntrypointIds: [...(sourcesBySkillId.get(id) ?? [])].sort((a, b) =>
+        a.localeCompare(b),
+      ),
+      minimumDepth: minimumDepthBySkillId.get(id)!,
+    });
+  }
+  for (const id of notReachedDiscoveryEligibleSkillIds) {
+    reachabilityBySkillId.set(id, {
+      state: "not-reached",
+      reason: "no-usable-path-from-published-entrypoint",
+      sourceEntrypointIds: [],
+    });
+  }
+
+  const commonCoverage = {
+    scope: "repository" as const,
+    sourceEntrypointIds,
+    eligibleSkillCount: eligibleSkillIds.length,
+    reachableSkillCount: reachableDiscoveryEligibleSkillIds.length,
+    notReachedSkillCount: notReachedDiscoveryEligibleSkillIds.length,
+  };
+  const coverage: SkillDiscoveryCoverage =
+    mode === "authoritative"
+      ? {
+          ...commonCoverage,
+          mode,
+          reason: "repository-wide-discovery-adopted",
+          complete: notReachedDiscoveryEligibleSkillIds.length === 0,
+        }
+      : {
+          ...commonCoverage,
+          mode,
+          reason: "partial-adoption-with-effective-published-entrypoint",
+          complete: null,
+        };
+
+  return {
+    coverage,
+    reachabilityBySkillId,
+    reachableDiscoveryEligibleSkillIds,
+    notReachedDiscoveryEligibleSkillIds,
   };
 }
 
@@ -553,8 +801,72 @@ function visibleSkill(
     },
     structuralRoot: false,
     standalone: false,
+    unrouted: false,
+    reachability: notEvaluatedReachability(
+      routeEligibilityReasons.length === 0
+        ? "coverage-not-evaluated"
+        : "skill-not-discovery-eligible",
+    ),
     linkedDiagnostics,
   };
+}
+
+function notEvaluatedReachability(
+  reason: Extract<
+    SkillDiscoveryReachabilityReason,
+    "skill-not-discovery-eligible" | "coverage-not-evaluated"
+  >,
+): SkillDiscoveryReachability {
+  return {
+    state: "not-evaluated",
+    reason,
+    sourceEntrypointIds: [],
+  };
+}
+
+function usableSkillAdjacency(
+  routes: readonly DeclaredSkillRoute[],
+): ReadonlyMap<string, readonly string[]> {
+  const targetsBySource = new Map<string, Set<string>>();
+  for (const route of routes) {
+    if (
+      !route.usable ||
+      !route.representative ||
+      route.resolution !== "resolved" ||
+      route.resolvedTarget?.kind !== "skill"
+    ) {
+      continue;
+    }
+    const targets = targetsBySource.get(route.sourceId) ?? new Set<string>();
+    targets.add(route.resolvedTarget.id);
+    targetsBySource.set(route.sourceId, targets);
+  }
+  return new Map(
+    [...targetsBySource.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([sourceId, targets]) => [
+        sourceId,
+        [...targets].sort((left, right) => left.localeCompare(right)),
+      ]),
+  );
+}
+
+function minimumDepthsFromEntrypoint(
+  entrypointId: string,
+  adjacency: ReadonlyMap<string, readonly string[]>,
+): ReadonlyMap<string, number> {
+  const depths = new Map<string, number>([[entrypointId, 0]]);
+  const queue = [entrypointId];
+  for (let index = 0; index < queue.length; index += 1) {
+    const sourceId = queue[index]!;
+    const nextDepth = depths.get(sourceId)! + 1;
+    for (const targetId of adjacency.get(sourceId) ?? []) {
+      if (depths.has(targetId)) continue;
+      depths.set(targetId, nextDepth);
+      queue.push(targetId);
+    }
+  }
+  return depths;
 }
 
 function publicationMarkerProjection(
@@ -720,6 +1032,81 @@ function publishedEntrypointBoundaryDiagnostic(
       linkedDiagnostics: linked,
     },
   };
+}
+
+function unreachableEligibleSkillDiagnostic(
+  skill: VisibleSkillIdentity,
+  asset: Asset | undefined,
+  coverage: Extract<SkillDiscoveryCoverage, { mode: "authoritative" }>,
+  adoption: SkillDiscoveryAdoption,
+): Diagnostic {
+  const identityEvidence = asset?.metadataFields.id
+    ? toEvidence(asset.metadataFields.id)
+    : undefined;
+  return {
+    code: DIAGNOSTIC_IDS.DISCOVERY_UNREACHABLE_ELIGIBLE_SKILL,
+    severity: "warning",
+    path: skill.sourcePath,
+    message: `Skill "${skill.id}" is not reached. No usable declared continuation path reaches this eligible Skill from any effective published entrypoint. This is static Discovery coverage evidence, not a claim that the Skill is unused at runtime.`,
+    ...(identityEvidence ? { evidence: identityEvidence } : {}),
+    repairConstraints: unreachableSkillRepairConstraints(),
+    verificationSteps: unreachableSkillVerificationSteps(),
+    llmHint:
+      "Review whether this Skill is an independent entrypoint, belongs under a real existing workflow, or is outside the intended repository-wide Discovery policy. Do not invent a continuation or publish every Skill to silence the warning.",
+    details: {
+      sourceId: skill.id,
+      sourcePath: skill.sourcePath,
+      coverageMode: coverage.mode,
+      adoptionState: adoption.state,
+      publishedEntrypointIds: coverage.sourceEntrypointIds,
+      structuralRoot: skill.structuralRoot,
+      standalone: skill.standalone,
+      unrouted: skill.unrouted,
+      ...(adoption.configPath ? { configPath: adoption.configPath } : {}),
+    },
+  };
+}
+
+function unreachableSkillRepairConstraints(): NonNullable<
+  Diagnostic["repairConstraints"]
+> {
+  return [
+    {
+      kind: "must_preserve",
+      text: "Preserve the Skill's actual responsibility and the repository's intended Discovery coverage policy.",
+    },
+    {
+      kind: "must_not_change",
+      text: "Do not add a fake continuation, publish every Skill, or merge unrelated workflows merely to silence the warning.",
+    },
+    {
+      kind: "allowed_change",
+      text: "After review, connect the Skill through a real source-owned continuation, publish it as an independent first hop when it genuinely is one, or revise repository-wide adoption when complete coverage was not actually intended.",
+    },
+    {
+      kind: "requires_human_decision",
+      text: "Decide whether the Skill is an independent entrypoint, belongs under an existing workflow, or is outside the intended repository-wide policy.",
+    },
+  ];
+}
+
+function unreachableSkillVerificationSteps(): NonNullable<
+  Diagnostic["verificationSteps"]
+> {
+  const code = DIAGNOSTIC_IDS.DISCOVERY_UNREACHABLE_ELIGIBLE_SKILL;
+  return [
+    {
+      text: "Inspect repository-wide Skill reachability from every effective published entrypoint after human review.",
+      command: "renma graph . --view discovery --format json",
+      expected:
+        "The Skill is reachable through real usable declarations, is an intentionally published independent entrypoint, or repository-wide adoption has been revised after human review.",
+    },
+    {
+      text: "Run Renma scan and confirm the reviewed coverage result preserves unrelated diagnostics.",
+      command: "renma scan . --format json",
+      expected: `The specific ${code} diagnostic is absent; unrelated route, publication, and Agent Skills diagnostics remain authoritative.`,
+    },
+  ];
 }
 
 function publicationRepairConstraints(
@@ -1293,6 +1680,31 @@ function linkPublicationDiagnostics(
   }
 }
 
+function linkUnreachableDiagnostics(
+  skills: VisibleSkillIdentity[],
+  diagnostics: Diagnostic[],
+): void {
+  for (const diagnostic of diagnostics) {
+    if (
+      diagnostic.code !== DIAGNOSTIC_IDS.DISCOVERY_UNREACHABLE_ELIGIBLE_SKILL ||
+      !diagnostic.path
+    ) {
+      continue;
+    }
+    const skill = skills.find(
+      (candidate) => candidate.sourcePath === diagnostic.path,
+    );
+    if (!skill) continue;
+    skill.linkedDiagnostics = uniqueDiagnosticLinks([
+      ...skill.linkedDiagnostics,
+      {
+        code: diagnostic.code,
+        ...(diagnostic.evidence ? { evidence: diagnostic.evidence } : {}),
+      },
+    ]);
+  }
+}
+
 function declarationEvidence(
   item: CanonicalSkillContinuationItem,
 ): SkillRouteDeclarationEvidence {
@@ -1332,6 +1744,9 @@ function summarizeDiscovery(
   publishedEntrypointIds: string[],
   structuralRootIds: string[],
   standaloneSkillIds: string[],
+  unroutedSkillIds: string[],
+  reachableDiscoveryEligibleSkillIds: string[],
+  notReachedDiscoveryEligibleSkillIds: string[],
 ): SkillDiscoverySummary {
   const unresolvedRouteCount = routes.filter(
     (route) => route.resolution === "unresolved",
@@ -1356,7 +1771,10 @@ function summarizeDiscovery(
     ).length,
     structuralRootCount: structuralRootIds.length,
     standaloneSkillCount: standaloneSkillIds.length,
+    unroutedSkillCount: unroutedSkillIds.length,
     publishedEntrypointCount: publishedEntrypointIds.length,
+    reachableSkillCount: reachableDiscoveryEligibleSkillIds.length,
+    notReachedSkillCount: notReachedDiscoveryEligibleSkillIds.length,
   };
 }
 

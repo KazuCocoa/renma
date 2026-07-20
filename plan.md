@@ -40,7 +40,7 @@ Repository Context BOM v2 describes declared repository evidence, not what a
 runtime consumed. Trust Graph v2 connects static governance evidence without
 assigning subjective trust or routing scores.
 
-## Immediate Priority: Skill Discovery Publication And Adoption
+## Immediate Priority: Skill Discovery Reachability And Coverage
 
 The active design and implementation area is static Skill Discovery for
 repositories with many layered `SKILL.md` files.
@@ -51,13 +51,19 @@ structural roots reviewable without introducing a runtime Skill selector.
 Existing Skills remain the source of workflow and routing policy; the graph is
 only a compact, deterministic projection.
 
-The 0.22.1 slice adds explicit Skill-local published entrypoints and explicit
+The 0.22.1 slice added explicit Skill-local published entrypoints and explicit
 repository-wide Discovery adoption. It does not infer either from graph
 position, route metadata, directories, ownership, or the existence of Skills.
-Reachability and coverage remain explicitly not evaluated.
+
+The 0.22.2 slice adds cycle-safe reachability from effective published
+entrypoints. Partial repositories with an effective first hop receive
+descriptive evidence; adopted repositories receive authoritative coverage and
+one warning per not-reached eligible Skill. Traversal uses only existing usable
+representative resolved Skill routes and never infers routes from prose or
+Markdown links.
 
 [The Skill Discovery design](plan-discovery.md) defines the full direction and
-the independently bounded 0.22.0 and 0.22.1 release slices.
+the independently bounded 0.22.0, 0.22.1, and 0.22.2 release slices.
 
 ## Expected Implementation Sequence
 
@@ -69,9 +75,13 @@ the independently bounded 0.22.0 and 0.22.1 release slices.
    `metadata.renma.published-entrypoint: "true"` marker, strict
    `skill_discovery.adopted` policy, adoption states, publication diagnostics,
    and Discovery graph projection. Do not infer publication or adoption.
-3. Review reachability, coverage, and a separate `skill-index` report/command
-   only after route evidence has operational use.
-4. Consider Readiness, semantic diff, CI, Trust Graph, BOM, authoring, and
+3. Ship the 0.22.2 reachability/coverage slice through the existing Discovery
+   graph: cycle-safe traversal, descriptive versus authoritative coverage,
+   unrouted classification, and adopted-mode unreachable warnings. Do not add
+   a command.
+4. Review a separate versioned `skill-index` report/command after the graph
+   contract has operational use.
+5. Consider Readiness, semantic diff, CI, Trust Graph, BOM, authoring, and
    richer visualization integrations independently after those contracts are
    stable.
 

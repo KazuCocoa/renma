@@ -490,9 +490,13 @@ separate JSON configuration decision:
 ```
 
 `graph --view discovery` reports `not-adopted`, `partial`, `incomplete`, or
-`adopted` plus explicit published entrypoints. Reachability and coverage remain
-`not-evaluated` in this release; Renma does not infer complete coverage or
-runtime selection.
+`adopted` plus explicit published entrypoints. Published entrypoints define
+where Discovery starts, usable `continues-with` routes define where it can
+continue, and reachability reports what can be found through those declarations.
+Partial adoption with an effective entrypoint produces descriptive evidence;
+adopted repositories produce authoritative coverage and warnings for eligible
+Skills with no usable path from any effective entrypoint. Renma still does not
+decide which Skill matches a user request.
 
 See the [Authoring Guide](docs/authoring-guide.md) for authoring responsibility
 and the [compatibility guide](docs/agent-skills-compatibility.md) for the exact
@@ -513,9 +517,9 @@ canonical and migration rules.
 - [Product Design](design.md)
 - [Current Roadmap](plan.md)
 - [Skill Discovery Design](plan-discovery.md): complete layered direction and
-  release slicing. The 0.22.0 route foundation and 0.22.1
-  publication/adoption slice are implemented; reachability, coverage
-  evaluation, and `skill-index` remain deferred.
+  release slicing. The 0.22.0 route foundation, 0.22.1 publication/adoption,
+  and 0.22.2 reachability/coverage slices are implemented; the versioned
+  `skill-index` report and command remain deferred.
 - [Interactive Placeholder Example](examples/interactive-placeholder): minimal
   hands-on clarify-before-act Skill interaction with a local tool.
 - [Example Context Repository](examples/context-repo): richer repository-aware
