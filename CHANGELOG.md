@@ -6,6 +6,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-07-19
+
 ### Added
 
 - Added the canonical Agent Skills
@@ -24,8 +26,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 - Skill continuations remain separate from `catalog.dependencies`; existing
   graph views and Readiness, diff, CI report, Trust Graph, BOM, ownership,
-  init, scaffold, guidance, and suggestion behavior are unchanged. The package
-  version remains `0.21.0` until the separate release commit.
+  init, scaffold, guidance, and suggestion behavior are unchanged.
 - Published entrypoints, repository-wide Discovery adoption, reachability,
   coverage, `skill-index`, and downstream report integrations remain deferred.
 
@@ -940,7 +941,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/KazuCocoa/renma/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/KazuCocoa/renma/compare/v0.20.2...v0.21.0
 [0.20.2]: https://github.com/KazuCocoa/renma/compare/v0.20.1...v0.20.2
 [0.20.1]: https://github.com/KazuCocoa/renma/compare/v0.20.0...v0.20.1
