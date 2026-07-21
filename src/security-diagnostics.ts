@@ -1763,6 +1763,8 @@ function unapprovedNetworkDestinations(
   policy: SecurityPolicy,
   invalidAllowlist = false,
 ): NetworkDestination[] {
+  if (!NETWORK_ACTION_RE.test(line)) return [];
+
   return unapprovedDestinations(
     line,
     policy.approvedNetworkDestinations,

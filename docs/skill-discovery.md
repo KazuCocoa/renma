@@ -24,6 +24,10 @@ The progression is intentionally layered:
 0.22.3
   versioned renma.skill-index.v1 report and dedicated stdout-only
   skill-index command
+
+0.22.4
+  deterministic route-cycle review diagnostics and stabilization of the
+  single-repository static Discovery core
 ```
 
 ## Three separate facts
@@ -146,6 +150,40 @@ reachability. Adjacency, entrypoint provenance, and result IDs are sorted;
 per-entrypoint breadth-first traversal gives the true minimum route depth and
 terminates safely through self-loops and larger cycles.
 
+## Route-cycle review diagnostics
+
+Renma 0.22.4 detects maximal strongly connected components after route
+resolution and usability are complete. The input is exactly the existing
+authoritative continuation edge boundary:
+
+```text
+route.usable === true
+route.representative === true
+route.resolution === "resolved"
+route.resolvedTarget.kind === "skill"
+```
+
+Invalid, inactive, duplicate-ID, unresolved, ambiguous, wrong-kind,
+normalization-rejected, and duplicate non-representative declarations cannot
+participate. Ordinary Markdown references, Context relationships,
+reachability, structural-root state, and directory layout never create cycle
+edges.
+
+A singleton component emits `DISCOVERY-ROUTE-CYCLE` only when its one Skill has
+an explicit self-loop. A component with two or more Skills emits one warning
+for the complete maximal component, including every usable representative
+internal route. Sorted adjacency, members, routes, and component sequences make
+the result independent of document, declaration, Map, and Set insertion order.
+The canonical first internal route supplies the warning's primary path and
+exact `renma.continues-with` evidence.
+
+A cycle is static continuation evidence. It does not prove that an agent will
+recurse or execute the same Skills repeatedly. Renma traversal is cycle-safe. A
+cycle may be intentional, but every internal continuation and the workflow's
+stop, ask, retry, handoff, and completion conditions should be reviewed. An
+intentional bounded cycle may remain after review; Renma does not choose an
+edge to remove or change reachability.
+
 Every visible Skill exposes one reachability object:
 
 - `reachable`: an effective entrypoint or an eligible Skill reached through
@@ -214,7 +252,10 @@ declarations without transitive traversal. A focused projection preserves the
 repository-wide adoption and coverage objects and every visible Skill's global
 reachability. Published, reachable, not-reached, and unrouted ID arrays plus
 summary counts are filtered to visible Skills. Focus never becomes a traversal
-seed and never recomputes coverage from the subset.
+seed and never recomputes coverage or cycles from the subset. Repository-wide
+cycle diagnostics remain visible whenever any recorded internal cycle route is
+part of the focused direct-neighborhood route projection. Focusing an unrelated
+Skill excludes the diagnostic; focus does not become transitive.
 
 ## Skill Index command
 
@@ -298,6 +339,23 @@ workflow, or falls outside the intended repository-wide policy. This warning
 also flows through scan, diagnostics v2, and review bundles while remaining
 outside downstream Trust Graph, Readiness, diff, CI, and BOM projections.
 
+Renma 0.22.4 adds `DISCOVERY-ROUTE-CYCLE` without requiring repository-wide
+adoption. It is emitted whenever the prepared usable continuation graph
+contains a cyclic strongly connected component, including a self-loop. In
+normal repository states this means `partial`, `incomplete`, or `adopted`: a
+truly `not-adopted` repository has no Discovery metadata and therefore cannot
+contain a usable declared route cycle. Details contain
+sorted `cycleSkillIds`, `cycleSkills`, `selfLoop`, `routeCount`, and complete
+`cycleRoutes` evidence. Every member Skill and internal route links the
+diagnostic. The warning asks a human to decide whether the component is an
+intentional bounded workflow loop or an accidental circular continuation
+contract; it does not require every intentional cycle to be removed.
+
+Cycle warnings flow through scan, diagnostics v2, review bundles, Discovery
+graph diagnostics, and Skill Index Discovery diagnostics. They remain warnings
+and do not create a CI gate. JSON report schemas, Markdown sections, and Mermaid
+edge semantics are unchanged; there is no top-level cycle section or count.
+
 ## Compatibility and future work
 
 Continuation and publication data remain separate from
@@ -307,7 +365,9 @@ Readiness, diff, CI report, Trust Graph, BOM, ownership, init, scaffold, guide,
 and suggestion contracts are unchanged. A repository without Discovery
 metadata or adoption remains valid and reports `not-adopted` without a warning.
 
-Route-cycle diagnostics and a `renma discovery` command remain deferred. Cycles
-are ordinary traversal-safe graph evidence. Readiness, semantic diff, CI
-report, Trust Graph, BOM, ownership, scaffold, init, guide, and suggestion
-contracts remain independent from the Skill Index.
+The current single-repository static Discovery core is stable after 0.22.4. A
+`renma discovery` command is not implemented. Readiness, semantic diff, CI
+report or optional gating, Trust Graph, BOM, ownership, observed Markdown
+references, richer visualization, authoring assistance, scaffold, init, guide,
+suggestion, and multi-repository federation remain independent later decisions
+informed by operational trials.

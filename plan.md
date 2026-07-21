@@ -40,9 +40,9 @@ Repository Context BOM v2 describes declared repository evidence, not what a
 runtime consumed. Trust Graph v2 connects static governance evidence without
 assigning subjective trust or routing scores.
 
-## Current Skill Discovery Index
+## Stable Skill Discovery Core
 
-The active design and implementation area is static Skill Discovery for
+The current single-repository static Skill Discovery core is stable for
 repositories with many layered `SKILL.md` files.
 
 The shipped 0.22.0 slice makes explicit Skill-to-Skill continuation contracts,
@@ -69,8 +69,15 @@ complete JSON and exact optional focus, and keeps repository diagnostics
 separate from Discovery diagnostics. It does not interpret a task, choose or
 execute a Skill, infer routes, load Context, or create a generated index.
 
+The 0.22.4 stabilization slice adds deterministic strongly connected component
+review over the existing usable continuation graph. It emits one
+`DISCOVERY-ROUTE-CYCLE` warning per maximal cyclic component, including
+self-loops, with exact internal route and Skill evidence. Cycles remain
+traversal-safe static evidence and may be intentional; Renma does not claim
+runtime recursion or choose a route to remove.
+
 [The Skill Discovery design](plan-discovery.md) defines the full direction and
-the independently bounded 0.22.0 through 0.22.3 release slices.
+the independently bounded 0.22.0 through 0.22.4 release slices.
 
 ## Expected Implementation Sequence
 
@@ -89,10 +96,13 @@ the independently bounded 0.22.0 through 0.22.3 release slices.
 4. Ship the 0.22.3 versioned `skill-index` report/command from the same prepared
    snapshot and Discovery index, with JSON, compact Markdown, exact focus,
    diagnostic separation, and no downstream-report integration.
-5. Consider route-cycle diagnostics, Readiness, semantic diff, CI, Trust Graph,
-   BOM, authoring, and
-   richer visualization integrations independently after those contracts are
-   stable.
+5. Ship the 0.22.4 stabilization slice with deterministic usable-route cycle
+   diagnostics, exact component evidence, linked routes and Skills, focus-aware
+   diagnostic projection, and no report schema, reachability, or downstream
+   integration changes.
+6. Evaluate Readiness, semantic diff, CI, Trust Graph, BOM, observed-reference,
+   ownership, authoring, richer visualization, and federation integrations as
+   independent later decisions informed by operational trials.
 
 ## Later Candidates
 

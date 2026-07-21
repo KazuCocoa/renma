@@ -862,6 +862,298 @@ test("Discovery route diagnostics flow through scan and diagnostics v2", async (
   assert.doesNotMatch(JSON.stringify(result.trustGraph), /DISCOVERY-/);
 });
 
+test("route-cycle warnings propagate through scan, diagnostics v2, review bundles, graph, and Skill Index", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-discovery-cli-"));
+  await writeSkill(root, "a", "skill.a", ["skill.b"], undefined, true);
+  await writeSkill(root, "b", "skill.b", ["skill.c", "skill.external"]);
+  await writeSkill(root, "c", "skill.c", ["skill.a"]);
+  await writeSkill(root, "external", "skill.external");
+
+  const graphJson = await captured(() =>
+    main(["graph", root, "--view", "discovery", "--format", "json"]),
+  );
+  const graphMarkdown = await captured(() =>
+    main(["graph", root, "--view", "discovery", "--format", "markdown"]),
+  );
+  const skillIndexJson = await captured(() =>
+    main(["skill-index", root, "--format", "json"]),
+  );
+  const skillIndexMarkdown = await captured(() =>
+    main(["skill-index", root, "--format", "markdown"]),
+  );
+  const scanCommand = await captured(() =>
+    main(["scan", root, "--format", "json"]),
+  );
+  const scanResult = await scan(root);
+  const graphReport = JSON.parse(graphJson.stdout) as {
+    discovery: {
+      diagnostics: Array<{
+        code: string;
+        details: {
+          cycleSkillIds: string[];
+          routeCount: number;
+          cycleRoutes: Array<{
+            sourcePath: string;
+            declarationIndex: number;
+          }>;
+        };
+      }>;
+      skills: Array<{
+        id: string;
+        linkedDiagnostics: Array<{ code: string }>;
+      }>;
+      routes: Array<{
+        sourceId: string;
+        normalizedTarget: string;
+        linkedDiagnostics: Array<{ code: string }>;
+      }>;
+      routeCycles?: unknown;
+      cycleCount?: unknown;
+      cyclicSkillIds?: unknown;
+    };
+  };
+  const indexReport = JSON.parse(skillIndexJson.stdout) as {
+    schemaVersion: string;
+    diagnostics: {
+      repository: Array<{ code?: string }>;
+      discovery: Array<{ code: string }>;
+    };
+    routeCycles?: unknown;
+    cycleCount?: unknown;
+    cyclicSkillIds?: unknown;
+  };
+  const diagnosticV2 = scanResult.diagnosticsV2.find(
+    (item) => item.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+  );
+  const reviewBundle = scanResult.reviewBundles.find((bundle) =>
+    bundle.diagnosticCodes.includes(DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE),
+  );
+  const cycleDiagnostic = graphReport.discovery.diagnostics.find(
+    (diagnostic) => diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+  )!;
+
+  assert.equal(graphJson.code, 0);
+  assert.equal(graphMarkdown.code, 0);
+  assert.equal(skillIndexJson.code, 0);
+  assert.equal(skillIndexMarkdown.code, 0);
+  assert.equal(scanCommand.code, 0);
+  assert.deepEqual(cycleDiagnostic.details.cycleSkillIds, [
+    "skill.a",
+    "skill.b",
+    "skill.c",
+  ]);
+  assert.equal(cycleDiagnostic.details.routeCount, 3);
+  assert.equal(graphReport.discovery.routeCycles, undefined);
+  assert.equal(graphReport.discovery.cycleCount, undefined);
+  assert.equal(graphReport.discovery.cyclicSkillIds, undefined);
+  assert.equal(indexReport.schemaVersion, "renma.skill-index.v1");
+  assert.equal(indexReport.routeCycles, undefined);
+  assert.equal(indexReport.cycleCount, undefined);
+  assert.equal(indexReport.cyclicSkillIds, undefined);
+  assert.equal(
+    indexReport.diagnostics.repository.some(
+      (diagnostic) => diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+    ),
+    false,
+  );
+  assert.ok(
+    indexReport.diagnostics.discovery.some(
+      (diagnostic) => diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+    ),
+  );
+  assert.match(graphMarkdown.stdout, /DISCOVERY-ROUTE-CYCLE/);
+  assert.match(graphMarkdown.stdout, /static route evidence for review/);
+  assert.match(skillIndexMarkdown.stdout, /DISCOVERY-ROUTE-CYCLE/);
+  assert.ok(
+    graphReport.discovery.skills
+      .filter((skill) => ["skill.a", "skill.b", "skill.c"].includes(skill.id))
+      .every((skill) =>
+        skill.linkedDiagnostics.some(
+          (diagnostic) =>
+            diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+        ),
+      ),
+  );
+  assert.equal(
+    graphReport.discovery.skills
+      .find((skill) => skill.id === "skill.external")
+      ?.linkedDiagnostics.some(
+        (diagnostic) =>
+          diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+      ),
+    false,
+  );
+  assert.ok(
+    graphReport.discovery.routes
+      .filter((route) => route.normalizedTarget !== "skill.external")
+      .every((route) =>
+        route.linkedDiagnostics.some(
+          (diagnostic) =>
+            diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+        ),
+      ),
+  );
+  assert.equal(
+    graphReport.discovery.routes
+      .find((route) => route.normalizedTarget === "skill.external")
+      ?.linkedDiagnostics.some(
+        (diagnostic) =>
+          diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+      ),
+    false,
+  );
+  assert.deepEqual(diagnosticV2?.details?.cycleSkillIds, [
+    "skill.a",
+    "skill.b",
+    "skill.c",
+  ]);
+  assert.ok(
+    diagnosticV2?.repairConstraints?.some(
+      (constraint) =>
+        constraint.kind === "must_not_change" &&
+        /arbitrary route/.test(constraint.text),
+    ),
+  );
+  assert.deepEqual(
+    diagnosticV2?.verificationSteps?.map((step) => step.command),
+    [
+      "renma graph . --view discovery --format json",
+      "renma skill-index . --format json",
+      "renma scan . --format json",
+    ],
+  );
+  assert.deepEqual(reviewBundle?.affectedAssets, [
+    "skill.a",
+    "skill.b",
+    "skill.c",
+  ]);
+  assert.deepEqual(reviewBundle?.affectedFiles, [
+    "skills/a/SKILL.md",
+    "skills/b/SKILL.md",
+    "skills/c/SKILL.md",
+  ]);
+  assert.doesNotMatch(JSON.stringify(scanResult.trustGraph), /DISCOVERY-/);
+});
+
+test("a cycle introduced after base remains excluded from deferred reports", async () => {
+  const root = await routeCycleIntroductionGitFixture();
+  try {
+    const scanReport = await scan(root);
+    const graphResult = await captured(() =>
+      main(["graph", root, "--view", "discovery", "--format", "json"]),
+    );
+    const skillIndexResult = await captured(() =>
+      main(["skill-index", root, "--format", "json"]),
+    );
+    const graphReport = JSON.parse(graphResult.stdout) as {
+      discovery: {
+        diagnostics: Array<{
+          code: string;
+          details: {
+            cycleSkillIds: string[];
+            cycleSkills: Array<{ id: string; sourcePath: string }>;
+            selfLoop: boolean;
+            routeCount: number;
+            cycleRoutes: Array<{
+              sourceId: string;
+              sourcePath: string;
+              targetId: string;
+              targetPath: string;
+            }>;
+          };
+        }>;
+      };
+    };
+    const skillIndexReport = JSON.parse(skillIndexResult.stdout) as {
+      diagnostics: { discovery: Array<{ code: string }> };
+    };
+    const cycleDiagnostics = graphReport.discovery.diagnostics.filter(
+      (diagnostic) => diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+    );
+
+    assert.equal(graphResult.code, 0);
+    assert.equal(skillIndexResult.code, 0);
+    assert.equal(
+      scanReport.diagnostics.filter(
+        (diagnostic) =>
+          diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+      ).length,
+      1,
+    );
+    assert.deepEqual(
+      cycleDiagnostics.map((diagnostic) => ({
+        cycleSkillIds: diagnostic.details.cycleSkillIds,
+        cycleSkills: diagnostic.details.cycleSkills,
+        selfLoop: diagnostic.details.selfLoop,
+        routeCount: diagnostic.details.routeCount,
+        cycleRoutes: diagnostic.details.cycleRoutes.map((route) => ({
+          sourceId: route.sourceId,
+          sourcePath: route.sourcePath,
+          targetId: route.targetId,
+          targetPath: route.targetPath,
+        })),
+      })),
+      [
+        {
+          cycleSkillIds: ["skill.a", "skill.b"],
+          cycleSkills: [
+            { id: "skill.a", sourcePath: "skills/a/SKILL.md" },
+            { id: "skill.b", sourcePath: "skills/b/SKILL.md" },
+          ],
+          selfLoop: false,
+          routeCount: 2,
+          cycleRoutes: [
+            {
+              sourceId: "skill.a",
+              sourcePath: "skills/a/SKILL.md",
+              targetId: "skill.b",
+              targetPath: "skills/b/SKILL.md",
+            },
+            {
+              sourceId: "skill.b",
+              sourcePath: "skills/b/SKILL.md",
+              targetId: "skill.a",
+              targetPath: "skills/a/SKILL.md",
+            },
+          ],
+        },
+      ],
+    );
+    assert.equal(
+      skillIndexReport.diagnostics.discovery.filter(
+        (diagnostic) =>
+          diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+      ).length,
+      1,
+    );
+
+    const [
+      semanticDiffReport,
+      ciReportResult,
+      readinessReport,
+      trustGraphReport,
+      bomReport,
+    ] = await Promise.all([
+      diff(root, { fromRef: "base", toRef: "HEAD" }),
+      ciReport(root, { fromRef: "base", toRef: "HEAD" }),
+      readiness(root),
+      trustGraph(root),
+      bom(root, {}, { omitGeneratedAt: true }),
+    ]);
+
+    assertDiscoveryFree(semanticDiffReport);
+    assertDiscoveryFree(ciReportResult);
+    assertDiscoveryFree(readinessReport);
+    assertDiscoveryFree(trustGraphReport);
+    assertDiscoveryFree(bomReport);
+    assert.equal(ciReportResult.status, "pass");
+    assert.equal(ciReportResult.summary.findingsDelta, 0);
+    assert.equal(ciReportResult.summary.highOrCriticalFindingsDelta, 0);
+  } finally {
+    await rm(root, { force: true, recursive: true });
+  }
+});
+
 test("invalid canonical continuation declarations flow through scan", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-discovery-cli-"));
   await mkdir(path.join(root, "skills", "source"), { recursive: true });
@@ -1079,6 +1371,24 @@ async function authoritativeIncompleteGitFixture(): Promise<string> {
   return root;
 }
 
+async function routeCycleIntroductionGitFixture(): Promise<string> {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "renma-discovery-cycle-diff-"),
+  );
+  await writeSkill(root, "a", "skill.a", ["skill.b"]);
+  await writeSkill(root, "b", "skill.b");
+  await git(root, ["init", "-b", "main"]);
+  await git(root, ["config", "user.email", "renma@example.test"]);
+  await git(root, ["config", "user.name", "Renma Test"]);
+  await git(root, ["add", "."]);
+  await git(root, ["commit", "-m", "base"]);
+  await git(root, ["tag", "base"]);
+  await writeSkill(root, "b", "skill.b", ["skill.a"]);
+  await git(root, ["add", "skills/b/SKILL.md"]);
+  await git(root, ["commit", "-m", "introduce route cycle"]);
+  return root;
+}
+
 async function writeSkill(
   root: string,
   name: string,
@@ -1169,6 +1479,10 @@ async function captured(
 function assertDiscoveryFree(value: unknown): void {
   const serialized = JSON.stringify(value);
   assert.doesNotMatch(serialized, /DISCOVERY-/);
+  assert.doesNotMatch(
+    serialized,
+    /"(?:discovery|routeCycles|cycleCount|cyclicSkillIds|cycleSkillIds|cycleSkills|selfLoop|cycleRoutes)"\s*:/i,
+  );
   assert.doesNotMatch(serialized, /"reachability"\s*:/);
   assert.doesNotMatch(serialized, /"coverage"\s*:/);
   assert.doesNotMatch(

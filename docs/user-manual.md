@@ -795,7 +795,9 @@ Markdown is the default compact human/agent view. JSON uses
 Discovery Skill and route structures, adoption, repository-scoped coverage,
 publication and reachability facts, structural-root, standalone, and unrouted
 IDs, and separate repository and Discovery diagnostic arrays. Repository
-diagnostics stay repository-wide in a focused report.
+diagnostics stay repository-wide in a focused report. Route-cycle warnings
+appear naturally in the existing Discovery diagnostic array and affected Skill
+or route `linkedDiagnostics`; the v1 schema and top-level shape do not change.
 
 Focus accepts only an exact effective Skill ID or exact repository-relative
 `SKILL.md` source path. It retains the selected Skill and its direct incoming
@@ -901,6 +903,15 @@ repository-scoped under `--focus`, while visible ID arrays and summary counts
 are filtered to the exact direct-neighborhood projection. JSON, Markdown, and
 Mermaid use one index prepared in the repository snapshot. See the
 [Skill Discovery Graph contract](skill-discovery.md).
+
+The same authoritative usable route graph is checked for self-loops and
+multi-Skill strongly connected components. `DISCOVERY-ROUTE-CYCLE` reports one
+warning per maximal component with complete internal declaration evidence.
+Cycle detection runs repository-wide before focus; a focused report retains the
+warning when any internal cycle route is visible. A cycle is static
+continuation evidence, not proof of runtime recursion. Traversal remains
+cycle-safe, and an intentional bounded review or retry loop may remain after a
+human reviews its stop, ask, retry, handoff, and completion behavior.
 
 The graph forms answer distinct questions:
 

@@ -11,6 +11,7 @@ metadata:
   renma.requires-context: '["context.release.prep"]'
   renma.allowed-data: '["public"]'
   renma.network-allowed: "true"
+  renma.approved-network-destinations: '["github.com","api.github.com","registry.npmjs.org"]'
   renma.external-upload-allowed: "true"
   renma.secrets-allowed: "false"
   renma.requires-human-approval: "true"
