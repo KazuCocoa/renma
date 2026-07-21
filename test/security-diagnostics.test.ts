@@ -3367,6 +3367,150 @@ test("curl upload association is independent of option order", () => {
   );
 });
 
+const CURL_BOUNDARY_CASES = [
+  {
+    line: "curl https://read.example.com && curl --data @payload.json https://write.example.com",
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: "curl https://read.example.com || curl -X POST https://write.example.com",
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: "curl -X POST https://write.example.com && curl https://read.example.com",
+    network: ["write.example.com", "read.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: "curl https://read.example.com | grep --data",
+    network: ["read.example.com"],
+    upload: [],
+  },
+  {
+    line: "curl https://read.example.com ; curl --upload-file payload.json https://write.example.com",
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: "curl https://read.example.com --next --data @payload.json https://write.example.com",
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: "curl --data @payload.json https://write.example.com --next https://read.example.com",
+    network: ["write.example.com", "read.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: "curl -X PUT https://write.example.com --next https://read.example.com",
+    network: ["write.example.com", "read.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: "curl https://one.example.com https://two.example.com --data @payload.json",
+    network: ["one.example.com", "two.example.com"],
+    upload: ["one.example.com", "two.example.com"],
+  },
+  {
+    line: 'curl https://one.example.com --data "value=left|right&&still --next" https://two.example.com',
+    network: ["one.example.com", "two.example.com"],
+    upload: ["one.example.com", "two.example.com"],
+  },
+  {
+    line: 'curl "https://one.example.com/upload?value=left|right&&next=1" --data @payload.json',
+    network: ["one.example.com"],
+    upload: ["one.example.com"],
+  },
+  {
+    line: String.raw`curl https://one.example.com \| --data @payload.json https://two.example.com`,
+    network: ["one.example.com", "two.example.com"],
+    upload: ["one.example.com", "two.example.com"],
+  },
+  {
+    line: "curl https://read.example.com && curl --data @payload.json https://write.example.com https://write.example.com",
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+] as const;
+
+test("curl upload association stays within shell commands and transfers", () => {
+  for (const expected of CURL_BOUNDARY_CASES) {
+    assert.deepEqual(
+      associatedNetworkDestinations(expected.line).map(
+        (destination) => destination.host,
+      ),
+      expected.network,
+      expected.line,
+    );
+    assert.deepEqual(
+      associatedUploadDestinations(expected.line).map(
+        (destination) => destination.host,
+      ),
+      expected.upload,
+      expected.line,
+    );
+  }
+});
+
+test("curl command and transfer boundaries preserve separate allowlists", () => {
+  const findingsFor = (
+    instruction: string,
+    networkAllowlist: readonly string[],
+    uploadAllowlist: readonly string[],
+  ) =>
+    securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: ${networkAllowlist.join(", ")}
+external_upload_allowed: true
+approved_upload_destinations: ${
+        uploadAllowlist.length > 0
+          ? uploadAllowlist.join(", ")
+          : "approved.example.com"
+      }
+---
+
+${instruction}
+`),
+    ]);
+
+  for (const expected of CURL_BOUNDARY_CASES) {
+    const approved = findingsFor(
+      expected.line,
+      expected.network,
+      expected.upload,
+    );
+    assert.equal(
+      approved.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+      ).length,
+      0,
+      expected.line,
+    );
+    assert.equal(
+      approved.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+      ).length,
+      0,
+      expected.line,
+    );
+
+    const unapprovedUpload = findingsFor(expected.line, expected.network, [
+      "approved.example.com",
+    ]);
+    assert.equal(
+      unapprovedUpload.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+      ).length,
+      expected.upload.length,
+      expected.line,
+    );
+  }
+});
+
 test("curl upload options check approved and unapproved hosts in either order", () => {
   const instructions = [
     "curl --data @payload.json https://sink.example.com/upload",

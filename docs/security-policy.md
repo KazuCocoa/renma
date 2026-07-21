@@ -254,9 +254,12 @@ and action-to-target association stays within a clause. An upload verb elsewhere
 on the line therefore cannot turn a fetch source into an upload destination.
 One governing action can apply to a coordinated comma, `and`, or `or` list of
 destinations when no competing action starts between members. Curl upload
-options are inspected across the complete bounded command clause, so `-d`,
-`--data`, `-F`, `--form`, `-T`, `--upload-file`, `-X POST`, and `-X PUT` apply
-equally before or after the destination URL.
+options are inspected only within the shell command and curl transfer containing
+the destination. Unquoted, unescaped `&&`, `||`, `|`, and `;` delimit shell
+commands, and an unquoted `--next` delimits curl transfers. Within that local
+scope, `-d`, `--data`, `-F`, `--form`, `-T`, `--upload-file`, `-X POST`, and
+`-X PUT` apply equally before or after the destination URL and across multiple
+URLs in the same transfer.
 
 Explicit URL candidates are parsed independently with the WHATWG `URL` parser
 and do not require an ICANN public suffix. This supports credentials in the URL,

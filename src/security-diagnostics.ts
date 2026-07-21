@@ -2506,11 +2506,12 @@ function hasUploadDestinationAssociation(
   candidate: DestinationCandidate,
   clause: { start: number; end: number },
 ): boolean {
+  const curlAssociation = isCurlUploadAssociation(line, candidate, clause);
+  if (curlAssociation !== undefined) return curlAssociation;
   const prefix = associationPrefix(line, candidate, clause);
   return (
     DIRECT_UPLOAD_TARGET_PREFIX_RE.test(prefix) ||
-    PREPOSITIONAL_UPLOAD_TARGET_PREFIX_RE.test(prefix) ||
-    isCurlUploadAssociation(line, candidate, clause)
+    PREPOSITIONAL_UPLOAD_TARGET_PREFIX_RE.test(prefix)
   );
 }
 
@@ -2518,15 +2519,138 @@ function isCurlUploadAssociation(
   line: string,
   candidate: DestinationCandidate,
   clause: { start: number; end: number },
-): boolean {
+): boolean | undefined {
   const projection = destinationActionProjection(line);
-  const prefix = projection.slice(clause.start, candidate.start);
-  if (!/\bcurl\b/i.test(prefix)) return false;
-  const command = projection.slice(clause.start, clause.end);
-  return (
-    CURL_UPLOAD_DATA_OPTION_RE.test(command) ||
-    CURL_UPLOAD_METHOD_RE.test(command)
+  const command = containingShellCommandSpan(
+    projection,
+    candidate.start,
+    clause,
   );
+  const prefix = projection.slice(command.start, candidate.start);
+  if (!/\bcurl\b/i.test(prefix)) return undefined;
+  const transfer = containingCurlTransferSpan(
+    projection,
+    candidate.start,
+    command,
+  );
+  const transferProjection = projection.slice(transfer.start, transfer.end);
+  return (
+    CURL_UPLOAD_DATA_OPTION_RE.test(transferProjection) ||
+    CURL_UPLOAD_METHOD_RE.test(transferProjection)
+  );
+}
+
+function containingShellCommandSpan(
+  projection: string,
+  candidateStart: number,
+  clause: { start: number; end: number },
+): { start: number; end: number } {
+  let start = clause.start;
+
+  for (const separator of unquotedShellSeparatorSpans(projection, clause)) {
+    if (separator.end <= candidateStart) {
+      start = separator.end;
+      continue;
+    }
+    return { start, end: separator.start };
+  }
+
+  return { start, end: clause.end };
+}
+
+function unquotedShellSeparatorSpans(
+  projection: string,
+  bounds: { start: number; end: number },
+): Array<{ start: number; end: number }> {
+  const separators: Array<{ start: number; end: number }> = [];
+  let quote: "'" | '"' | undefined;
+
+  for (let index = bounds.start; index < bounds.end; index += 1) {
+    const character = projection[index];
+    if (quote !== undefined) {
+      if (character === quote) quote = undefined;
+      else if (quote === '"' && character === "\\") index += 1;
+      continue;
+    }
+    if (character === "\\") {
+      index += 1;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+
+    const next = projection[index + 1];
+    const length =
+      character === ";" || character === "|"
+        ? character === "|" && next === "|"
+          ? 2
+          : 1
+        : character === "&" && next === "&"
+          ? 2
+          : 0;
+    if (length === 0) continue;
+    separators.push({ start: index, end: index + length });
+    index += length - 1;
+  }
+
+  return separators;
+}
+
+function containingCurlTransferSpan(
+  projection: string,
+  candidateStart: number,
+  command: { start: number; end: number },
+): { start: number; end: number } {
+  let start = command.start;
+
+  for (const boundary of unquotedCurlNextSpans(projection, command)) {
+    if (boundary.end <= candidateStart) {
+      start = boundary.end;
+      continue;
+    }
+    return { start, end: boundary.start };
+  }
+
+  return { start, end: command.end };
+}
+
+function unquotedCurlNextSpans(
+  projection: string,
+  bounds: { start: number; end: number },
+): Array<{ start: number; end: number }> {
+  const boundaries: Array<{ start: number; end: number }> = [];
+  let quote: "'" | '"' | undefined;
+
+  for (let index = bounds.start; index < bounds.end; index += 1) {
+    const character = projection[index];
+    if (quote !== undefined) {
+      if (character === quote) quote = undefined;
+      else if (quote === '"' && character === "\\") index += 1;
+      continue;
+    }
+    if (character === "\\") {
+      index += 1;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (!projection.startsWith("--next", index)) continue;
+
+    const before = projection[index - 1];
+    const after = projection[index + "--next".length];
+    const startsToken = index === bounds.start || /\s/u.test(before ?? "");
+    const endsToken =
+      index + "--next".length === bounds.end || /\s/u.test(after ?? "");
+    if (!startsToken || !endsToken) continue;
+    boundaries.push({ start: index, end: index + "--next".length });
+    index += "--next".length - 1;
+  }
+
+  return boundaries;
 }
 
 function isNetworkInstruction(line: string): boolean {

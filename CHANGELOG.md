@@ -38,7 +38,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   filenames, Renma identifiers, and command file arguments remain local;
   candidate text cannot create its own action signal; unsupported explicit URLs
   retain fail-closed permission intent; coordinated destination lists inherit
-  one governing action; curl upload options work before or after the URL;
+  one governing action; curl upload options work before or after the URL while
+  remaining bounded to the candidate's shell command and `--next` transfer;
   transport-less IP and strong host candidates require an action; explicit URLs
   support IPv4, bracketed IPv6, internationalized and single-label hosts; and
   network and upload allowlist boundaries remain separate.
