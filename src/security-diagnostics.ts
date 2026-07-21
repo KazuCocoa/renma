@@ -1,3 +1,7 @@
+import { isIP } from "node:net";
+
+import { parse as parseDomain } from "tldts";
+
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import type { DiagnosticId } from "./diagnostic-ids.js";
 import {
@@ -50,10 +54,28 @@ type Detection = {
   dedupeKey?: string;
 };
 
-type NetworkDestination = {
+export type NetworkDestination = {
   raw: string;
   host: string;
   path: string;
+};
+
+export type DestinationCandidateKind =
+  | "explicit-url"
+  | "network-share"
+  | "bare-host"
+  | "local-path"
+  | "local-filename"
+  | "renma-asset-id"
+  | "command-file-argument"
+  | "unsupported-host";
+
+export type DestinationCandidate = {
+  raw: string;
+  start: number;
+  end: number;
+  kind: DestinationCandidateKind;
+  destination?: NetworkDestination;
 };
 
 const RULES = {
@@ -696,8 +718,14 @@ const BODY_SECRET_DISALLOWED_RE =
 
 const NETWORK_ACTION_RE =
   /\b(curl|wget|http|https|api|webhook|post|get|upload|download|fetch|send|sync|push)\b|https?:\/\//i;
-const NETWORK_DESTINATION_RE =
-  /\b(?:https?:\/\/)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}(?::\d+)?(?:\/[^\s"'`<>{}[\]]*)?/gi;
+const DNS_HOST_SOURCE = String.raw`(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?`;
+const IPV4_HOST_SOURCE = String.raw`(?:\d{1,3}\.){3}\d{1,3}`;
+const BRACKETED_IPV6_HOST_SOURCE = String.raw`\[[0-9a-f:.]+\]`;
+const NETWORK_DESTINATION_CANDIDATE_RE = new RegExp(
+  String.raw`(?:https?:\/\/|\/\/|\\\\)?(?:${DNS_HOST_SOURCE}|${IPV4_HOST_SOURCE})(?::\d+)?(?:[\\/][^\s"'\x60<>{}[\]]*)?|https?:\/\/(?:localhost|${BRACKETED_IPV6_HOST_SOURCE})(?::\d+)?(?:\/[^\s"'\x60<>{}[\]]*)?`,
+  "gi",
+);
+const RENMA_ASSET_ID_RE = /^(?:context|skill)(?:\.[a-z0-9][a-z0-9-]*)+$/i;
 const TRAILING_DESTINATION_PUNCTUATION_RE = /[),.;:!?]+$/;
 const EXTERNAL_UPLOAD_RE =
   /\b(upload|send|post|share|attach|submit|sync|push|publish)\b.*\b(external|remote|third[- ]party|pastebin|gist|slack|discord|s3|gcs|cloud|storage|bucket|drive|dropbox|notion|jira|github)\b|\b(post|put)\b.*https?:\/\//i;
@@ -1084,7 +1112,7 @@ function policyDetections(
 
   if (
     policy.networkAllowed === false &&
-    NETWORK_ACTION_RE.test(line) &&
+    hasNetworkAction(line) &&
     !safeOrGuarded
   ) {
     detections.push({
@@ -1283,7 +1311,7 @@ function networkAndUploadDetections(
     return detections;
   }
 
-  if (EXTERNAL_UPLOAD_RE.test(line)) {
+  if (isUploadInstruction(line)) {
     detections.push({
       metadata: RULES.externalUploadInstruction,
       severity: policy.externalUploadAllowed === false ? "high" : "medium",
@@ -1763,7 +1791,7 @@ function unapprovedNetworkDestinations(
   policy: SecurityPolicy,
   invalidAllowlist = false,
 ): NetworkDestination[] {
-  if (!NETWORK_ACTION_RE.test(line)) return [];
+  if (!hasNetworkAction(line)) return [];
 
   return unapprovedDestinations(
     line,
@@ -1799,10 +1827,11 @@ function unapprovedDestinations(
 }
 
 function isUploadInstruction(line: string): boolean {
+  const prose = destinationActionProjection(line);
   return (
-    EXTERNAL_UPLOAD_RE.test(line) ||
-    CLOUD_UPLOAD_RE.test(line) ||
-    (UPLOAD_DESTINATION_ACTION_RE.test(line) &&
+    EXTERNAL_UPLOAD_RE.test(prose) ||
+    CLOUD_UPLOAD_RE.test(prose) ||
+    (UPLOAD_DESTINATION_ACTION_RE.test(prose) &&
       extractNetworkDestinations(line).length > 0)
   );
 }
@@ -2157,20 +2186,100 @@ function reviewGuardActions(
   return guards;
 }
 
+export function classifyDestinationCandidates(
+  line: string,
+): DestinationCandidate[] {
+  const candidates: DestinationCandidate[] = [];
+  for (const match of line.matchAll(NETWORK_DESTINATION_CANDIDATE_RE)) {
+    const raw = match[0] ?? "";
+    const start = match.index ?? 0;
+    const end = start + raw.length;
+    const transport = destinationTransport(raw);
+
+    if (transport === undefined && isCommandFileArgument(line, start)) {
+      candidates.push({
+        raw,
+        start,
+        end,
+        kind: "command-file-argument",
+      });
+      continue;
+    }
+
+    if (transport === undefined && isLocalPathCandidate(line, start)) {
+      candidates.push({ raw, start, end, kind: "local-path" });
+      continue;
+    }
+
+    const normalizedRaw = raw.replace(TRAILING_DESTINATION_PUNCTUATION_RE, "");
+    if (
+      transport === undefined &&
+      (line[start - 1] === "." || RENMA_ASSET_ID_RE.test(normalizedRaw))
+    ) {
+      candidates.push({
+        raw,
+        start,
+        end,
+        kind: RENMA_ASSET_ID_RE.test(normalizedRaw)
+          ? "renma-asset-id"
+          : "local-filename",
+      });
+      continue;
+    }
+
+    const destination = normalizeNetworkDestination(raw);
+    if (destination === undefined) {
+      candidates.push({ raw, start, end, kind: "unsupported-host" });
+      continue;
+    }
+
+    if (transport === "network-share") {
+      candidates.push({
+        raw,
+        start,
+        end,
+        kind: "network-share",
+        destination,
+      });
+      continue;
+    }
+
+    if (transport === "explicit-url") {
+      candidates.push({
+        raw,
+        start,
+        end,
+        kind: "explicit-url",
+        destination,
+      });
+      continue;
+    }
+
+    if (
+      isIP(destination.host) === 1 ||
+      parseDomain(destination.host).isIcann === true
+    ) {
+      candidates.push({
+        raw,
+        start,
+        end,
+        kind: "bare-host",
+        destination,
+      });
+      continue;
+    }
+
+    candidates.push({ raw, start, end, kind: "local-filename" });
+  }
+
+  return candidates;
+}
+
 function extractNetworkDestinations(line: string): NetworkDestination[] {
   const seen = new Set<string>();
   const destinations: NetworkDestination[] = [];
-  for (const match of line.matchAll(NETWORK_DESTINATION_RE)) {
-    const start = match.index ?? 0;
-    const preceding = line[start - 1];
-    const beforePreceding = line[start - 2];
-    if (
-      (preceding === "/" || preceding === "\\") &&
-      beforePreceding !== preceding
-    ) {
-      continue;
-    }
-    const destination = normalizeNetworkDestination(match[0] ?? "");
+  for (const candidate of classifyDestinationCandidates(line)) {
+    const destination = candidate.destination;
     if (destination === undefined) {
       continue;
     }
@@ -2184,6 +2293,46 @@ function extractNetworkDestinations(line: string): NetworkDestination[] {
   return destinations;
 }
 
+function destinationTransport(
+  candidate: string,
+): "explicit-url" | "network-share" | undefined {
+  if (/^https?:\/\//i.test(candidate) || candidate.startsWith("//")) {
+    return "explicit-url";
+  }
+  return candidate.startsWith("\\\\") ? "network-share" : undefined;
+}
+
+function isCommandFileArgument(line: string, start: number): boolean {
+  if (line[start - 1] === "@") return true;
+  const before = line.slice(0, start);
+  const tokenStart = Math.max(
+    before.lastIndexOf(" "),
+    before.lastIndexOf("\t"),
+    before.lastIndexOf("`"),
+    before.lastIndexOf('"'),
+    before.lastIndexOf("'"),
+  );
+  return /^--?[a-z0-9][a-z0-9-]*=$/i.test(before.slice(tokenStart + 1));
+}
+
+function isLocalPathCandidate(line: string, start: number): boolean {
+  const preceding = line[start - 1];
+  if (preceding !== "/" && preceding !== "\\") return false;
+  return line[start - 2] !== preceding;
+}
+
+function destinationActionProjection(line: string): string {
+  const projection = line.split("");
+  for (const candidate of classifyDestinationCandidates(line)) {
+    projection.fill(" ", candidate.start, candidate.end);
+  }
+  return projection.join("");
+}
+
+function hasNetworkAction(line: string): boolean {
+  return NETWORK_ACTION_RE.test(destinationActionProjection(line));
+}
+
 function normalizeNetworkDestination(
   candidate: string,
 ): NetworkDestination | undefined {
@@ -2192,13 +2341,17 @@ function normalizeNetworkDestination(
     return undefined;
   }
 
-  const parseable = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw)
+  const parseable = /^https?:\/\//i.test(raw)
     ? raw
-    : `https://${raw}`;
+    : raw.startsWith("//")
+      ? `https:${raw}`
+      : raw.startsWith("\\\\")
+        ? `https://${raw.slice(2).replaceAll("\\", "/")}`
+        : `https://${raw}`;
   try {
     const url = new URL(parseable);
     const host = url.hostname.toLowerCase();
-    if (!host.includes(".")) {
+    if (isIP(host) === 6 || (isIP(host) !== 1 && !host.includes("."))) {
       return undefined;
     }
     const path = url.pathname.replace(/\/+$/, "");
@@ -2324,9 +2477,7 @@ function requiresHumanApprovalGuard(line: string): boolean {
 }
 
 function referencesConcreteNetworkDestination(line: string): boolean {
-  return (
-    NETWORK_ACTION_RE.test(line) && extractNetworkDestinations(line).length > 0
-  );
+  return hasNetworkAction(line) && extractNetworkDestinations(line).length > 0;
 }
 
 function isDefensiveOrGuardedActionInstruction(line: string): boolean {

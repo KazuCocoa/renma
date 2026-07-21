@@ -233,6 +233,22 @@ use top-level `approved_network_destinations` and
 `approvedUploadDomains`, and repository `security.approvedDomains` and
 `security.approvedUploadDomains`, keep their existing config syntax.
 
+Destination extraction classifies candidates before applying either allowlist.
+Explicit HTTP and HTTPS URLs, protocol-relative URLs, UNC network shares,
+Public Suffix List-backed bare hostnames, and IPv4 destinations are supported.
+Repository-relative and absolute local paths, Windows drive paths, bare and
+hidden filenames, dotted Renma Skill or Context IDs, and command file arguments
+such as `--config=file.json` or `@payload.json` are not destinations. Candidate
+spans are masked before network and upload action matching, so words inside a
+hostname or filename cannot activate their own destination check.
+
+IPv6 and `localhost` destinations are not currently supported and are ignored
+by destination allowlist diagnostics. Ports are accepted but approval remains
+host-and-path based: an approved host without a path covers that host and its
+subdomains at any port, while an approved path prefix requires the exact host.
+Use explicit HTTP(S) syntax for a domain that does not have an ICANN public
+suffix; ambiguous bare dotted tokens are treated as local filenames.
+
 ### Forbidden inputs
 
 Use `renma.forbidden-inputs` for a Skill and top-level `forbidden_inputs` for a

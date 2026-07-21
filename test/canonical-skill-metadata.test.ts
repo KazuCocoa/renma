@@ -740,9 +740,22 @@ test("repository release-prep is fully canonical with tag-trigger policy", async
     markdownParserEligible: true,
     content,
   });
+  const contextRelativePath = "contexts/release/prep.md";
+  const contextAbsolutePath = path.resolve(contextRelativePath);
+  const contextContent = await readFile(contextAbsolutePath, "utf8");
+  const contextDocument = parseDocument({
+    path: contextRelativePath,
+    absolutePath: contextAbsolutePath,
+    kind: "context",
+    sizeBytes: Buffer.byteLength(contextContent),
+    contentClassification: "text",
+    markdownParserEligible: true,
+    content: contextContent,
+  });
   const result = parseAssetMetadata(document);
   const validation = validateAgentSkill(document);
   const policy = parseOperationalSecurityPolicy(document);
+  const contextPolicy = parseOperationalSecurityPolicy(contextDocument);
   const { catalog } = buildCatalog([document]);
   const snapshot = await collectRepositorySnapshot(path.resolve("."));
   const graph = graphFromRepositorySnapshot(snapshot);
@@ -792,9 +805,32 @@ test("repository release-prep is fully canonical with tag-trigger policy", async
     "registry.npmjs.org",
   ]);
   assert.equal(policy.externalUploadAllowed, true);
+  assert.deepEqual(policy.approvedUploadDestinations, [
+    "github.com",
+    "api.github.com",
+  ]);
   assert.equal(policy.secretsAllowed, false);
   assert.equal(policy.humanApprovalRequired, true);
   assert.deepEqual(policy.forbiddenInputs, [
+    "secrets",
+    "credentials",
+    "tokens",
+  ]);
+  assert.deepEqual(contextPolicy.allowedData, ["public"]);
+  assert.equal(contextPolicy.networkAllowed, true);
+  assert.deepEqual(contextPolicy.approvedNetworkDestinations, [
+    "github.com",
+    "api.github.com",
+    "registry.npmjs.org",
+  ]);
+  assert.equal(contextPolicy.externalUploadAllowed, true);
+  assert.deepEqual(contextPolicy.approvedUploadDestinations, [
+    "github.com",
+    "api.github.com",
+  ]);
+  assert.equal(contextPolicy.secretsAllowed, false);
+  assert.equal(contextPolicy.humanApprovalRequired, true);
+  assert.deepEqual(contextPolicy.forbiddenInputs, [
     "secrets",
     "credentials",
     "tokens",
@@ -895,6 +931,26 @@ test("repository release-prep is fully canonical with tag-trigger policy", async
     false: 0,
     unspecified: 0,
   });
+  assert.equal(
+    scan.securityPolicyInventory?.approvedNetworkDestinationCount,
+    6,
+  );
+  assert.equal(scan.securityPolicyInventory?.approvedUploadDestinationCount, 4);
+  assert.deepEqual(
+    scan.securityPolicyInventory?.topApprovedNetworkDestinations,
+    [
+      { destination: "api.github.com", count: 2 },
+      { destination: "github.com", count: 2 },
+      { destination: "registry.npmjs.org", count: 2 },
+    ],
+  );
+  assert.deepEqual(
+    scan.securityPolicyInventory?.topApprovedUploadDestinations,
+    [
+      { destination: "api.github.com", count: 2 },
+      { destination: "github.com", count: 2 },
+    ],
+  );
   assert.equal(
     scan.findings.some(
       (finding) =>

@@ -6,7 +6,10 @@ import test from "node:test";
 
 import { scan } from "../src/scanner.js";
 import { parseDocument } from "../src/markdown.js";
-import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
+import {
+  classifyDestinationCandidates,
+  securityDiagnosticFindings,
+} from "../src/security-diagnostics.js";
 import type { Artifact, Finding } from "../src/types.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
@@ -2236,6 +2239,121 @@ POST https://internal.example.com/api/upload with the report.
   assert.equal(ids.includes("SEC-UNAPPROVED-NETWORK-DESTINATION"), false);
 });
 
+test("destination candidates classify explicit, bare, IPv4, and network-share destinations", () => {
+  const cases = [
+    {
+      line: "Fetch https://api.example.com/path.",
+      kind: "explicit-url",
+      host: "api.example.com",
+      path: "/path",
+    },
+    {
+      line: "Fetch http://api.example.com/path.",
+      kind: "explicit-url",
+      host: "api.example.com",
+      path: "/path",
+    },
+    {
+      line: "Fetch //api.example.com/path.",
+      kind: "explicit-url",
+      host: "api.example.com",
+      path: "/path",
+    },
+    {
+      line: "Fetch api.example.com:8443/path.",
+      kind: "bare-host",
+      host: "api.example.com",
+      path: "/path",
+    },
+    {
+      line: "Fetch http://10.0.0.20/data.",
+      kind: "explicit-url",
+      host: "10.0.0.20",
+      path: "/data",
+    },
+    {
+      line: String.raw`Fetch \\files.example.com\release.`,
+      kind: "network-share",
+      host: "files.example.com",
+      path: "/release",
+    },
+  ] as const;
+
+  for (const expected of cases) {
+    const candidates = classifyDestinationCandidates(expected.line).filter(
+      (candidate) => candidate.destination !== undefined,
+    );
+    assert.equal(candidates.length, 1, expected.line);
+    assert.equal(candidates[0]?.kind, expected.kind, expected.line);
+    assert.equal(
+      candidates[0]?.destination?.host,
+      expected.host,
+      expected.line,
+    );
+    assert.equal(
+      candidates[0]?.destination?.path,
+      expected.path,
+      expected.line,
+    );
+  }
+});
+
+test("destination candidates classify local files, paths, IDs, and command arguments as non-destinations", () => {
+  const cases = [
+    [".github/workflows/npm-publish.yml", "local-path"],
+    ["tools/release-prep.mjs", "local-path"],
+    ["./package.json", "local-path"],
+    ["../package.json", "local-path"],
+    ["dir/package.json", "local-path"],
+    [String.raw`C:\dir\package.json`, "local-path"],
+    ["Publish package.json.", "local-filename"],
+    ["Fetch renma.config.json.", "local-filename"],
+    ["Validate npm-publish.yml.", "local-filename"],
+    ["Copy report.tar.gz.", "local-filename"],
+    ["Use context.release.prep.", "renma-asset-id"],
+    ["Read .env.example.", "local-filename"],
+    ["Submit coverage.xml for local processing.", "local-filename"],
+    ["run --config=renma.config.json", "command-file-argument"],
+    ["curl --data @payload.json", "command-file-argument"],
+    ["Publish `package.json` after validation.", "local-filename"],
+    [
+      "The local filename report.tar.gz remains in the workspace.",
+      "local-filename",
+    ],
+  ] as const;
+
+  for (const [line, kind] of cases) {
+    const candidates = classifyDestinationCandidates(line);
+    assert.ok(candidates.length > 0, line);
+    assert.equal(
+      candidates.some((candidate) => candidate.destination !== undefined),
+      false,
+      line,
+    );
+    assert.ok(
+      candidates.some((candidate) => candidate.kind === kind),
+      `${line}: ${kind}`,
+    );
+  }
+});
+
+test("destination classification is deterministic under repeated and reversed input order", () => {
+  const forward =
+    "Fetch api.example.com, then upload results to uploads.example.com.";
+  const reverse =
+    "Upload results to uploads.example.com, then fetch api.example.com.";
+
+  for (const line of [forward, reverse, forward]) {
+    assert.deepEqual(
+      classifyDestinationCandidates(line)
+        .filter((candidate) => candidate.destination !== undefined)
+        .map((candidate) => candidate.destination?.host)
+        .sort(),
+      ["api.example.com", "uploads.example.com"],
+    );
+  }
+});
+
 test("network allowlists ignore dotted asset IDs and local script paths", () => {
   const findings = securityDiagnosticFindings([
     v2SecurityArtifact(`---
@@ -2300,6 +2418,48 @@ POST https://internal.example.com/other/upload.
       finding.evidence.snippet.includes("internal.example.com/other"),
     ),
   );
+});
+
+test("network destination matching preserves ports, subdomains, and path prefixes", () => {
+  const cases = [
+    {
+      instruction: "Fetch api.example.com:8443/releases/latest.",
+      allowlist: "example.com",
+      approved: true,
+    },
+    {
+      instruction: "Fetch https://internal.example.com/api/releases/latest.",
+      allowlist: "https://internal.example.com/api",
+      approved: true,
+    },
+    {
+      instruction: "Fetch https://api.example.com/api/releases/latest.",
+      allowlist: "https://example.com/api",
+      approved: false,
+    },
+    {
+      instruction: "Fetch https://internal.example.com/other.",
+      allowlist: "https://internal.example.com/api",
+      approved: false,
+    },
+  ] as const;
+
+  for (const { instruction, allowlist, approved } of [
+    ...cases,
+    ...cases.toReversed(),
+  ]) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: ${allowlist}
+---
+
+${instruction}
+`),
+    ]).filter((finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION");
+    assert.equal(findings.length, approved ? 0 : 1, instruction);
+  }
 });
 
 test("unapproved network destination guidance preserves semantic allowlists", () => {
@@ -2817,6 +2977,170 @@ ${instruction}
     assert.match(
       invalid[0]?.evidence.snippet ?? "",
       /uploads\.example\.com/,
+      instruction,
+    );
+  }
+});
+
+test("local dotted tokens never become network or upload destinations", () => {
+  const localReferences = [
+    ".github/workflows/npm-publish.yml",
+    "tools/release-prep.mjs",
+    "./package.json",
+    "../package.json",
+    "dir/package.json",
+    String.raw`C:\dir\package.json`,
+    "Publish package.json.",
+    "Fetch renma.config.json.",
+    "Validate npm-publish.yml.",
+    "Copy report.tar.gz.",
+    "Use context.release.prep.",
+    "Read .env.example.",
+    "Submit coverage.xml for local processing.",
+    "Use `renma.config.json` as the local configuration file.",
+    "The ordinary prose label context.release.prep remains repository-local.",
+    "run --config=renma.config.json",
+    "curl --data @payload.json",
+  ];
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: approved.example.com
+external_upload_allowed: true
+approved_upload_destinations: approved.example.com
+---
+
+${localReferences.join("\n")}
+`),
+  ]).filter(
+    (finding) =>
+      finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION" ||
+      finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+  );
+
+  assert.deepEqual(findings, []);
+});
+
+test("candidate text cannot supply its own network or upload action", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: approved.example.com
+external_upload_allowed: true
+approved_upload_destinations: approved.example.com
+---
+
+Validate npm-publish.yml.
+Document api.example.com as an example label.
+Document npm-publish.github.com as an example label.
+`),
+  ]).filter(
+    (finding) =>
+      finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION" ||
+      finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION" ||
+      finding.id === "SEC-EXTERNAL-UPLOAD-INSTRUCTION",
+  );
+
+  assert.deepEqual(findings, []);
+});
+
+test("IPv4 destinations use deterministic network and upload allowlists", () => {
+  const findingsFor = (
+    instruction: string,
+    networkAllowlist: string,
+    uploadAllowlist: string,
+  ) =>
+    securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: ${networkAllowlist}
+external_upload_allowed: true
+approved_upload_destinations: ${uploadAllowlist}
+---
+
+${instruction}
+`),
+    ]);
+
+  const unapprovedNetwork = findingsFor(
+    "Fetch http://10.0.0.20/data.",
+    "10.0.0.21",
+    "192.168.1.20",
+  );
+  assert.equal(
+    unapprovedNetwork.filter(
+      (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+    ).length,
+    1,
+  );
+
+  const approvedNetwork = findingsFor(
+    "Fetch http://10.0.0.20/data/item.",
+    "http://10.0.0.20/data",
+    "192.168.1.20",
+  );
+  assert.equal(
+    approvedNetwork.some(
+      (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+    ),
+    false,
+  );
+
+  const unapprovedUpload = findingsFor(
+    "Upload results to https://192.168.1.20/upload.",
+    "192.168.1.20",
+    "192.168.1.21",
+  );
+  assert.equal(
+    unapprovedUpload.filter(
+      (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+    ).length,
+    1,
+  );
+
+  const approvedUpload = findingsFor(
+    "Upload results to https://192.168.1.20/upload.",
+    "192.168.1.20",
+    "https://192.168.1.20/upload",
+  );
+  assert.equal(
+    approvedUpload.some(
+      (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+    ),
+    false,
+  );
+});
+
+test("IPv6 and localhost remain unsupported destination forms", () => {
+  for (const instruction of [
+    "Fetch http://localhost/data.",
+    "Fetch http://[2001:db8::20]/data.",
+  ]) {
+    const candidates = classifyDestinationCandidates(instruction);
+    assert.equal(
+      candidates.some((candidate) => candidate.destination !== undefined),
+      false,
+      instruction,
+    );
+
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: approved.example.com
+---
+
+${instruction}
+`),
+    ]);
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+      ),
+      false,
       instruction,
     );
   }

@@ -31,6 +31,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   network actions while preserving upload allowlist detection for every
   supported upload action.
 
+### Fixed
+
+- Hardened network and upload destination classification so local dotted paths,
+  filenames, Renma identifiers, and command file arguments are not treated as
+  destinations; candidate text cannot create its own action signal; IPv4 URLs
+  are checked; and network and upload allowlist boundaries remain separate.
+
 ### Compatibility
 
 - Preserved reachability, minimum depth, source-entrypoint provenance,
