@@ -13,6 +13,10 @@ when_to_use:
 when_not_to_use:
   - Publishing packages directly outside the repository GitHub Actions workflow
 allowed_data: public
+approved_network_destinations:
+  - github.com
+  - api.github.com
+  - registry.npmjs.org
 network_allowed: true
 external_upload_allowed: true
 secrets_allowed: false
