@@ -7,6 +7,8 @@ import test from "node:test";
 import { scan } from "../src/scanner.js";
 import { parseDocument } from "../src/markdown.js";
 import {
+  associatedNetworkDestinations,
+  associatedUploadDestinations,
   classifyDestinationCandidates,
   securityDiagnosticFindings,
 } from "../src/security-diagnostics.js";
@@ -2239,37 +2241,124 @@ POST https://internal.example.com/api/upload with the report.
   assert.equal(ids.includes("SEC-UNAPPROVED-NETWORK-DESTINATION"), false);
 });
 
-test("destination candidates classify explicit, bare, IPv4, and network-share destinations", () => {
+test("destination candidates extract complete explicit URLs before bare tokens", () => {
   const cases = [
     {
-      line: "Fetch https://api.example.com/path.",
+      url: "https://api.example.com/path",
       kind: "explicit-url",
       host: "api.example.com",
       path: "/path",
     },
     {
-      line: "Fetch http://api.example.com/path.",
+      url: "https://user@example.com/path",
       kind: "explicit-url",
-      host: "api.example.com",
+      host: "example.com",
       path: "/path",
     },
     {
-      line: "Fetch //api.example.com/path.",
+      url: "https://user:pass@example.com/path",
       kind: "explicit-url",
-      host: "api.example.com",
+      host: "example.com",
       path: "/path",
     },
+    {
+      url: "http://internal-host/path",
+      kind: "explicit-url",
+      host: "internal-host",
+      path: "/path",
+    },
+    {
+      url: "https://例え.テスト/path",
+      kind: "explicit-url",
+      host: "xn--r8jz45g.xn--zckzah",
+      path: "/path",
+    },
+    {
+      url: "//example.com/path",
+      kind: "explicit-url",
+      host: "example.com",
+      path: "/path",
+    },
+    {
+      url: "//[2001:db8::20]/path",
+      kind: "explicit-url",
+      host: "2001:db8::20",
+      path: "/path",
+    },
+    {
+      url: "http://[2001:0db8:0:0:0:0:0:20]/data",
+      kind: "explicit-url",
+      host: "2001:db8::20",
+      path: "/data",
+    },
+    {
+      url: "http://localhost/health",
+      kind: "explicit-url",
+      host: "localhost",
+      path: "/health",
+    },
+    {
+      url: "http://10.0.0.20/data",
+      kind: "explicit-url",
+      host: "10.0.0.20",
+      path: "/data",
+    },
+  ] as const;
+
+  for (const expected of cases) {
+    const line = `Fetch ${expected.url} now.`;
+    const candidates = classifyDestinationCandidates(line).filter(
+      (candidate) => candidate.destination !== undefined,
+    );
+    assert.equal(candidates.length, 1, line);
+    assert.equal(candidates[0]?.raw, expected.url, line);
+    assert.equal(candidates[0]?.kind, expected.kind, line);
+    assert.equal(candidates[0]?.destination?.host, expected.host, line);
+    assert.equal(candidates[0]?.destination?.path, expected.path, line);
+  }
+});
+
+test("explicit URL hosts drive end-to-end allowlist matching", () => {
+  const cases = [
+    {
+      instruction: "Fetch https://user:pass@example.com/path.",
+      allowlist: "https://example.com",
+      findings: 0,
+    },
+    {
+      instruction: "Fetch https://user:pass@example.com/path.",
+      allowlist: "https://other.example.com",
+      findings: 1,
+    },
+    {
+      instruction: "Fetch https://例え.テスト/path.",
+      allowlist: "https://xn--r8jz45g.xn--zckzah",
+      findings: 0,
+    },
+  ] as const;
+
+  for (const expected of cases) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: "${expected.allowlist}"
+---
+
+${expected.instruction}
+`),
+    ]).filter((finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION");
+    assert.equal(findings.length, expected.findings, expected.instruction);
+  }
+});
+
+test("destination candidates classify unambiguous bare targets and network shares", () => {
+  const cases = [
     {
       line: "Fetch api.example.com:8443/path.",
       kind: "bare-host",
       host: "api.example.com",
       path: "/path",
-    },
-    {
-      line: "Fetch http://10.0.0.20/data.",
-      kind: "explicit-url",
-      host: "10.0.0.20",
-      path: "/data",
     },
     {
       line: String.raw`Fetch \\files.example.com\release.`,
@@ -2298,7 +2387,7 @@ test("destination candidates classify explicit, bare, IPv4, and network-share de
   }
 });
 
-test("destination candidates classify local files, paths, IDs, and command arguments as non-destinations", () => {
+test("local and ambiguous dotted candidates require operational association", () => {
   const cases = [
     [".github/workflows/npm-publish.yml", "local-path"],
     ["tools/release-prep.mjs", "local-path"],
@@ -2307,10 +2396,14 @@ test("destination candidates classify local files, paths, IDs, and command argum
     ["dir/package.json", "local-path"],
     [String.raw`C:\dir\package.json`, "local-path"],
     ["Publish package.json.", "local-filename"],
+    ["Fetch README.md.", "ambiguous-dotted-token"],
+    ["Publish main.rs.", "ambiguous-dotted-token"],
+    ["Run deploy.sh.", "ambiguous-dotted-token"],
     ["Fetch renma.config.json.", "local-filename"],
     ["Validate npm-publish.yml.", "local-filename"],
     ["Copy report.tar.gz.", "local-filename"],
     ["Use context.release.prep.", "renma-asset-id"],
+    ["Use lens.testing.spec-review.", "renma-asset-id"],
     ["Read .env.example.", "local-filename"],
     ["Submit coverage.xml for local processing.", "local-filename"],
     ["run --config=renma.config.json", "command-file-argument"],
@@ -2325,31 +2418,75 @@ test("destination candidates classify local files, paths, IDs, and command argum
   for (const [line, kind] of cases) {
     const candidates = classifyDestinationCandidates(line);
     assert.ok(candidates.length > 0, line);
-    assert.equal(
-      candidates.some((candidate) => candidate.destination !== undefined),
-      false,
-      line,
-    );
     assert.ok(
       candidates.some((candidate) => candidate.kind === kind),
       `${line}: ${kind}`,
     );
+    assert.deepEqual(associatedNetworkDestinations(line), [], line);
+    assert.deepEqual(associatedUploadDestinations(line), [], line);
+  }
+});
+
+test("ambiguous bare hosts promote only through deterministic target syntax", () => {
+  const cases = [
+    ["GET api.example.com", true, false],
+    ["POST api.example.com", true, true],
+    ["PUT uploads.example.com", true, true],
+    ["curl api.example.com", true, false],
+    ["wget api.example.com", true, false],
+    ["Fetch from api.example.com", true, false],
+    ["Download from api.example.com", true, false],
+    ["Upload to uploads.example.com", true, true],
+    ["Send to uploads.example.com", true, true],
+    ["Share with uploads.example.com", true, true],
+    ["Attach the report to uploads.example.com", true, true],
+    ["Submit the report to uploads.example.com", true, true],
+    ["Sync with uploads.example.com", true, true],
+    ["Push to uploads.example.com", true, true],
+    ["Publish the artifact to uploads.example.com", true, true],
+    ["Copy the report to uploads.example.com", true, true],
+    ["Attach logs and reports to uploads.example.com", true, true],
+    ["Fetch README.md", false, false],
+    ["Publish main.rs", false, false],
+    ["Run deploy.sh", false, false],
+  ] as const;
+
+  for (const [line, network, upload] of cases) {
+    assert.equal(
+      associatedNetworkDestinations(line).length === 1,
+      network,
+      line,
+    );
+    assert.equal(associatedUploadDestinations(line).length === 1, upload, line);
   }
 });
 
 test("destination classification is deterministic under repeated and reversed input order", () => {
   const forward =
-    "Fetch api.example.com, then upload results to uploads.example.com.";
+    "Fetch from api.example.com, then upload results to uploads.example.com.";
   const reverse =
-    "Upload results to uploads.example.com, then fetch api.example.com.";
+    "Upload results to uploads.example.com, then fetch from api.example.com.";
 
-  for (const line of [forward, reverse, forward]) {
+  for (const [line, expectedNetwork] of [
+    [forward, ["api.example.com", "uploads.example.com"]],
+    [reverse, ["uploads.example.com", "api.example.com"]],
+    [forward, ["api.example.com", "uploads.example.com"]],
+  ] as const) {
     assert.deepEqual(
       classifyDestinationCandidates(line)
         .filter((candidate) => candidate.destination !== undefined)
-        .map((candidate) => candidate.destination?.host)
-        .sort(),
-      ["api.example.com", "uploads.example.com"],
+        .map((candidate) => candidate.destination?.host),
+      expectedNetwork,
+    );
+    assert.deepEqual(
+      associatedNetworkDestinations(line).map(
+        (destination) => destination.host,
+      ),
+      expectedNetwork,
+    );
+    assert.deepEqual(
+      associatedUploadDestinations(line).map((destination) => destination.host),
+      ["uploads.example.com"],
     );
   }
 });
@@ -2990,6 +3127,9 @@ test("local dotted tokens never become network or upload destinations", () => {
     "../package.json",
     "dir/package.json",
     String.raw`C:\dir\package.json`,
+    "Fetch README.md.",
+    "Publish main.rs.",
+    "Run deploy.sh.",
     "Publish package.json.",
     "Fetch renma.config.json.",
     "Validate npm-publish.yml.",
@@ -3020,6 +3160,106 @@ ${localReferences.join("\n")}
   );
 
   assert.deepEqual(findings, []);
+});
+
+test("destination association stays within each action clause", () => {
+  const cases = [
+    {
+      line: "Fetch from source.example.com and copy package.json locally.",
+      network: ["source.example.com"],
+      upload: [],
+    },
+    {
+      line: "Fetch from source.example.com and publish release notes locally.",
+      network: ["source.example.com"],
+      upload: [],
+    },
+    {
+      line: "Fetch from source.example.com and upload to sink.example.com.",
+      network: ["source.example.com", "sink.example.com"],
+      upload: ["sink.example.com"],
+    },
+    {
+      line: "Document api.example.com as a label and publish README.md locally.",
+      network: [],
+      upload: [],
+    },
+  ] as const;
+
+  for (const expected of cases) {
+    assert.deepEqual(
+      associatedNetworkDestinations(expected.line).map(
+        (destination) => destination.host,
+      ),
+      expected.network,
+      expected.line,
+    );
+    assert.deepEqual(
+      associatedUploadDestinations(expected.line).map(
+        (destination) => destination.host,
+      ),
+      expected.upload,
+      expected.line,
+    );
+
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: source.example.com
+external_upload_allowed: true
+approved_upload_destinations: approved.example.com
+---
+
+${expected.line}
+`),
+    ]);
+    assert.equal(
+      findings.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+      ).length,
+      expected.network.length === 2 ? 1 : 0,
+      expected.line,
+    );
+    assert.equal(
+      findings.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+      ).length,
+      expected.upload.length === 1 ? 1 : 0,
+      expected.line,
+    );
+  }
+});
+
+test("local fetch verbs do not violate denied network policy", () => {
+  const local = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: false
+---
+
+Fetch package.json from the local checkout.
+`),
+  ]);
+  assert.equal(
+    local.some((finding) => finding.id === "SEC-INSTRUCTION-VIOLATES-POLICY"),
+    false,
+  );
+
+  const remote = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: false
+---
+
+Fetch from api.example.com.
+`),
+  ]);
+  assert.equal(
+    remote.filter((finding) => finding.id === "SEC-INSTRUCTION-VIOLATES-POLICY")
+      .length,
+    1,
+  );
 });
 
 test("candidate text cannot supply its own network or upload action", () => {
@@ -3114,36 +3354,181 @@ ${instruction}
   );
 });
 
-test("IPv6 and localhost remain unsupported destination forms", () => {
+test("IPv6 network destinations use canonical exact and path-prefix matching", () => {
+  const cases = [
+    {
+      instruction: "Fetch http://[2001:db8::20]/data.",
+      allowlist: "https://[2001:0db8:0:0:0:0:0:20]",
+      findings: 0,
+    },
+    {
+      instruction: "Fetch http://[2001:db8::20]/data.",
+      allowlist: "https://[2001:db8::21]",
+      findings: 1,
+    },
+    {
+      instruction: "Fetch http://[2001:db8::20]/data/item.",
+      allowlist: "https://[2001:db8::20]/data",
+      findings: 0,
+    },
+    {
+      instruction: "Fetch http://[2001:db8::20]/other.",
+      allowlist: "https://[2001:db8::20]/data",
+      findings: 1,
+    },
+    {
+      instruction: "Fetch https://[2001:db8::20]:8443/data.",
+      allowlist: "https://[2001:db8::20]",
+      findings: 0,
+    },
+    {
+      instruction: "Fetch //[2001:db8::20]/data.",
+      allowlist: "https://[2001:db8::20]",
+      findings: 0,
+    },
+    {
+      instruction: "Fetch http://[::1]/health.",
+      allowlist: "http://[::1]",
+      findings: 0,
+    },
+  ] as const;
+
+  for (const expected of cases) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: "${expected.allowlist}"
+---
+
+${expected.instruction}
+`),
+    ]).filter((finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION");
+    assert.equal(findings.length, expected.findings, expected.instruction);
+  }
+});
+
+test("IPv6 upload destinations retain separate upload approvals", () => {
+  for (const expected of [
+    {
+      instruction: "Upload results to https://[2001:db8::20]:8443/upload/item.",
+      allowlist: "https://[2001:0db8:0:0:0:0:0:20]/upload",
+      findings: 0,
+    },
+    {
+      instruction: "Upload results to https://[2001:db8::20]:8443/upload/item.",
+      allowlist: "https://[2001:db8::20]/other",
+      findings: 1,
+    },
+    {
+      instruction: "Upload results to https://[2001:db8::20]:8443/upload/item.",
+      allowlist: "https://[2001:db8::21]/upload",
+      findings: 1,
+    },
+    {
+      instruction: "Upload results to //[2001:db8::20]/upload/item.",
+      allowlist: "https://[2001:db8::20]/upload",
+      findings: 0,
+    },
+    {
+      instruction: "Upload results to http://[::1]/upload.",
+      allowlist: "https://[::1]",
+      findings: 0,
+    },
+  ] as const) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: "https://[2001:db8::20]"
+external_upload_allowed: true
+approved_upload_destinations: "${expected.allowlist}"
+---
+
+${expected.instruction}
+`),
+    ]).filter((finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION");
+    assert.equal(findings.length, expected.findings, expected.instruction);
+  }
+});
+
+test("invalid, unbracketed, and zone-qualified IPv6 remain unsupported", () => {
   for (const instruction of [
-    "Fetch http://localhost/data.",
-    "Fetch http://[2001:db8::20]/data.",
+    "Fetch http://[2001:db8:::20]/data.",
+    "Fetch http://2001:db8::20/data.",
+    "Fetch http://[fe80::1%25eth0]/data.",
   ]) {
     const candidates = classifyDestinationCandidates(instruction);
+    assert.ok(candidates.length > 0, instruction);
     assert.equal(
       candidates.some((candidate) => candidate.destination !== undefined),
       false,
       instruction,
     );
+    assert.deepEqual(associatedNetworkDestinations(instruction), []);
+    assert.deepEqual(
+      associatedUploadDestinations(instruction.replace("Fetch", "Upload to")),
+      [],
+    );
+  }
+});
 
+test("explicit single-label and localhost destinations match exactly", () => {
+  const cases = [
+    {
+      instruction: "Fetch http://artifact-server/upload.",
+      allowlist: "http://artifact-server",
+      findings: 0,
+    },
+    {
+      instruction: "Fetch http://artifact-server/upload.",
+      allowlist: "http://server",
+      findings: 1,
+    },
+    {
+      instruction: "Fetch http://localhost/health.",
+      allowlist: "http://localhost",
+      findings: 0,
+    },
+    {
+      instruction: "Fetch http://api.localhost/health.",
+      allowlist: "http://localhost",
+      findings: 1,
+    },
+  ] as const;
+
+  for (const expected of cases) {
     const findings = securityDiagnosticFindings([
       v2SecurityArtifact(`---
 allowed_data: public
 network_allowed: true
-approved_network_destinations: approved.example.com
+approved_network_destinations: "${expected.allowlist}"
 ---
 
-${instruction}
+${expected.instruction}
 `),
-    ]);
-    assert.equal(
-      findings.some(
-        (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
-      ),
-      false,
-      instruction,
-    );
+    ]).filter((finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION");
+    assert.equal(findings.length, expected.findings, expected.instruction);
   }
+
+  for (const [allowlist, expectedFindings] of [
+    ["http://artifact-server/upload", 0],
+    ["http://server/upload", 1],
+  ] as const) {
+    const uploadFindings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+external_upload_allowed: true
+approved_upload_destinations: "${allowlist}"
+---
+
+Upload to http://artifact-server/upload/item.
+`),
+    ]).filter((finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION");
+    assert.equal(uploadFindings.length, expectedFindings, allowlist);
+  }
+
+  assert.deepEqual(associatedNetworkDestinations("Fetch localhost."), []);
 });
 
 test("upload allowlists ignore dotted filenames inside local paths", () => {

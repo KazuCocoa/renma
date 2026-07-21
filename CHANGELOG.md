@@ -33,10 +33,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Fixed
 
-- Hardened network and upload destination classification so local dotted paths,
-  filenames, Renma identifiers, and command file arguments are not treated as
-  destinations; candidate text cannot create its own action signal; IPv4 URLs
-  are checked; and network and upload allowlist boundaries remain separate.
+- Hardened network and upload destination classification by separating lexical
+  candidates from clause-associated operational targets. Local dotted paths,
+  filenames, Renma identifiers, and command file arguments remain local;
+  candidate text cannot create its own action signal; explicit URLs support
+  IPv4, bracketed IPv6, internationalized and single-label hosts; and network
+  and upload allowlist boundaries remain separate.
 
 ### Compatibility
 
