@@ -2822,6 +2822,31 @@ ${instruction}
   }
 });
 
+test("upload allowlists ignore dotted filenames inside local paths", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(
+      `---
+allowed_data: public
+external_upload_allowed: true
+approved_upload_destinations:
+  - github.com
+  - api.github.com
+---
+
+Create or validate the annotated tag. Confirm \`.github/workflows/npm-publish.yml\` still triggers on tag pushes and uses npm trusted publishing.
+`,
+      "context",
+    ),
+  ]);
+
+  assert.equal(
+    findings.some(
+      (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+    ),
+    false,
+  );
+});
+
 test("artifact-local denied upload policy still flags approved upload destinations", () => {
   const artifact = v2SecurityArtifact(`---
 allowed_data: redacted logs

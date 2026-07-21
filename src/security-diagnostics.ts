@@ -2161,6 +2161,15 @@ function extractNetworkDestinations(line: string): NetworkDestination[] {
   const seen = new Set<string>();
   const destinations: NetworkDestination[] = [];
   for (const match of line.matchAll(NETWORK_DESTINATION_RE)) {
+    const start = match.index ?? 0;
+    const preceding = line[start - 1];
+    const beforePreceding = line[start - 2];
+    if (
+      (preceding === "/" || preceding === "\\") &&
+      beforePreceding !== preceding
+    ) {
+      continue;
+    }
     const destination = normalizeNetworkDestination(match[0] ?? "");
     if (destination === undefined) {
       continue;
