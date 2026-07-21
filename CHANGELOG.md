@@ -27,6 +27,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Clarified the bundled release-prep Skill and Context to require
   `Renma v<version>` as the GitHub Release title while retaining `v<version>`
   as the Git tag.
+- Limited network allowlist scanning of dotted local identifiers to lines with
+  network actions while preserving upload allowlist detection for every
+  supported upload action.
 
 ### Compatibility
 
