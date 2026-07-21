@@ -36,9 +36,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Hardened network and upload destination classification by separating lexical
   candidates from clause-associated operational targets. Local dotted paths,
   filenames, Renma identifiers, and command file arguments remain local;
-  candidate text cannot create its own action signal; explicit URLs support
-  IPv4, bracketed IPv6, internationalized and single-label hosts; and network
-  and upload allowlist boundaries remain separate.
+  candidate text cannot create its own action signal; unsupported explicit URLs
+  retain fail-closed permission intent; coordinated destination lists inherit
+  one governing action; curl upload options work before or after the URL;
+  transport-less IP and strong host candidates require an action; explicit URLs
+  support IPv4, bracketed IPv6, internationalized and single-label hosts; and
+  network and upload allowlist boundaries remain separate.
 
 ### Compatibility
 

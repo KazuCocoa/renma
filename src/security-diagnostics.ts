@@ -76,6 +76,7 @@ export type DestinationCandidate = {
   start: number;
   end: number;
   kind: DestinationCandidateKind;
+  explicitTransport?: "http" | "https" | "protocol-relative";
   destination?: NetworkDestination;
 };
 
@@ -726,19 +727,24 @@ const BARE_DESTINATION_CANDIDATE_RE = new RegExp(
   "gi",
 );
 const RENMA_ASSET_ID_RE = /^(?:context|skill|lens)(?:\.[a-z0-9][a-z0-9-]*)+$/i;
-const DIRECT_NETWORK_TARGET_PREFIX_RE =
+const DIRECT_AMBIGUOUS_NETWORK_TARGET_PREFIX_RE =
   /\b(?:get|post|put|curl|wget)\b[^.;,!?]{0,160}$/i;
+const DIRECT_BARE_NETWORK_TARGET_PREFIX_RE =
+  /\b(?:get|post|put|curl|wget|fetch|download)\b[^.;,!?]{0,160}$/i;
 const PREPOSITIONAL_NETWORK_TARGET_PREFIX_RE =
   /\b(?:fetch|download)\s+from\s*$|\b(?:upload|send|attach|submit|push|publish|copy)\b[^.;,!?]{0,100}\bto\s*$|\b(?:share|sync)\b[^.;,!?]{0,100}\bwith\s*$/i;
-const DIRECT_UPLOAD_TARGET_PREFIX_RE =
-  /\b(?:post|put)\b[^.;,!?]{0,160}$|\bcurl\b[^.;,!?]{0,160}(?:--data(?:-binary)?\b|-X\s*(?:POST|PUT)\b)[^.;,!?]*$/i;
+const DIRECT_UPLOAD_TARGET_PREFIX_RE = /\b(?:post|put)\b[^.;,!?]{0,160}$/i;
 const PREPOSITIONAL_UPLOAD_TARGET_PREFIX_RE =
   /\b(?:upload|send|attach|submit|push|publish|copy)\b[^.;,!?]{0,100}\bto\s*$|\b(?:share|sync)\b[^.;,!?]{0,100}\bwith\s*$/i;
+const CURL_UPLOAD_DATA_OPTION_RE =
+  /(?:^|\s)(?:-(?:d|F|T)|--(?:data(?:-ascii|-binary|-raw|-urlencode)?|form(?:-string)?|upload-file)(?=\s|=|$))/;
+const CURL_UPLOAD_METHOD_RE =
+  /(?:^|\s)-X(?:\s+|=)?(?:POST|PUT|post|put)(?=\s|$)/;
 const CLEAR_NETWORK_INSTRUCTION_RE = /\b(?:curl|wget|http|https|webhook)\b/i;
 const EXPLICIT_NETWORK_TARGET_RE =
   /\b(?:fetch|get|send|sync|push|upload|download|post|put)\b[^.;!?]{0,100}\b(?:external|remote|network|internet|webhook|api endpoint|server)\b/i;
 const CLAUSE_BOUNDARY_RE =
-  /\b(?:and|then)\b(?=\s+(?:(?:fetch|download|upload|send|share|attach|submit|sync|push|publish|copy|document|get|post|put|curl|wget|run|validate|read|use)\b|then\b))|[;,]|[.!?](?=\s|$)/gi;
+  /\b(?:and|then)\b(?=\s+(?:(?:fetch|download|upload|send|share|attach|submit|sync|push|publish|copy|document|explain|describe|record|note|inspect|review|compare|get|post|put|curl|wget|run|validate|read|use)\b|then\b))|[;,]|[.!?](?=\s|$)/gi;
 const TRAILING_DESTINATION_PUNCTUATION_RE = /[),.;:!?]+$/;
 const EXTERNAL_UPLOAD_RE =
   /\b(upload|send|post|share|attach|submit|sync|push|publish)\b.*\b(external|remote|third[- ]party|pastebin|gist|slack|discord|s3|gcs|cloud|storage|bucket|drive|dropbox|notion|jira|github)\b|\b(post|put)\b.*https?:\/\//i;
@@ -1839,7 +1845,7 @@ function isUploadInstruction(line: string): boolean {
   return (
     EXTERNAL_UPLOAD_RE.test(prose) ||
     CLOUD_UPLOAD_RE.test(prose) ||
-    associatedUploadDestinations(line).length > 0
+    associatedDestinationCandidates(line, "upload").length > 0
   );
 }
 
@@ -2202,11 +2208,13 @@ export function classifyDestinationCandidates(
     const raw = match[0] ?? "";
     const start = match.index ?? 0;
     const destination = normalizeNetworkDestination(raw);
+    const explicitTransport = explicitNetworkTransport(raw);
     candidates.push({
       raw,
       start,
       end: start + raw.length,
       kind: destination === undefined ? "unsupported-host" : "explicit-url",
+      ...(explicitTransport === undefined ? {} : { explicitTransport }),
       ...(destination === undefined ? {} : { destination }),
     });
   }
@@ -2266,7 +2274,7 @@ export function classifyDestinationCandidates(
       continue;
     }
 
-    if (isIP(destination.host) === 1) {
+    if (isIP(destination.host) === 4) {
       candidates.push({
         raw,
         start,
@@ -2312,6 +2320,14 @@ function hasBareDestinationSyntax(candidate: string): boolean {
   return /[\\/]/.test(candidate) || /:\d+(?:[\\/]|$)/.test(candidate);
 }
 
+function explicitNetworkTransport(
+  candidate: string,
+): DestinationCandidate["explicitTransport"] {
+  if (/^https:\/\//i.test(candidate)) return "https";
+  if (/^http:\/\//i.test(candidate)) return "http";
+  return candidate.startsWith("//") ? "protocol-relative" : undefined;
+}
+
 function isCommandFileArgument(line: string, start: number): boolean {
   if (line[start - 1] === "@") return true;
   const before = line.slice(0, start);
@@ -2355,23 +2371,12 @@ function associatedDestinations(
   line: string,
   purpose: "network" | "upload",
 ): NetworkDestination[] {
-  const candidates = classifyDestinationCandidates(line);
-  const clauses = destinationClauseSpans(line, candidates);
   const destinations: NetworkDestination[] = [];
   const seen = new Set<string>();
 
-  for (const candidate of candidates) {
+  for (const candidate of associatedDestinationCandidates(line, purpose)) {
     const destination = candidate.destination;
     if (destination === undefined) continue;
-    const clause = clauses.find(
-      (span) => span.start <= candidate.start && candidate.start < span.end,
-    );
-    if (clause === undefined) continue;
-    const associated =
-      purpose === "network"
-        ? hasNetworkDestinationAssociation(line, candidate, clause)
-        : hasUploadDestinationAssociation(line, candidate, clause);
-    if (!associated) continue;
     const key = `${destination.host}${destination.path}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -2381,6 +2386,62 @@ function associatedDestinations(
   return destinations;
 }
 
+function associatedDestinationCandidates(
+  line: string,
+  purpose: "network" | "upload",
+): DestinationCandidate[] {
+  const candidates = classifyDestinationCandidates(line);
+  const clauses = destinationClauseSpans(line, candidates);
+  const associatedCandidates: DestinationCandidate[] = [];
+  let previousCandidate: DestinationCandidate | undefined;
+  let previousAssociated = false;
+
+  for (const candidate of candidates) {
+    const canRepresentDestination =
+      candidate.destination !== undefined ||
+      candidate.explicitTransport !== undefined;
+    const clause = clauses.find(
+      (span) => span.start <= candidate.start && candidate.start < span.end,
+    );
+    let associated = false;
+    if (canRepresentDestination && clause !== undefined) {
+      associated =
+        purpose === "network"
+          ? hasNetworkDestinationAssociation(line, candidate, clause)
+          : hasUploadDestinationAssociation(line, candidate, clause);
+      if (
+        !associated &&
+        previousAssociated &&
+        previousCandidate !== undefined &&
+        isDestinationListContinuation(line, previousCandidate, candidate)
+      ) {
+        associated = true;
+      }
+    }
+
+    if (associated) associatedCandidates.push(candidate);
+    previousCandidate = candidate;
+    previousAssociated = associated;
+  }
+
+  return associatedCandidates;
+}
+
+function isDestinationListContinuation(
+  line: string,
+  previous: DestinationCandidate,
+  candidate: DestinationCandidate,
+): boolean {
+  const trailingPunctuation = previous.raw.match(/[),.;:!?]+$/u)?.[0] ?? "";
+  if (/[.;:!?]/u.test(trailingPunctuation)) return false;
+  const trailingComma = previous.raw.match(/,+$/u)?.[0] ?? "";
+  const separator = `${trailingComma}${line.slice(previous.end, candidate.start)}`;
+  return (
+    /^(?:\s|,|\band\b|\bor\b)+$/iu.test(separator) &&
+    /,|\b(?:and|or)\b/iu.test(separator)
+  );
+}
+
 function destinationClauseSpans(
   line: string,
   candidates: DestinationCandidate[],
@@ -2388,6 +2449,11 @@ function destinationClauseSpans(
   const projection = line.split("");
   for (const candidate of candidates) {
     projection.fill(" ", candidate.start, candidate.end);
+    const trailingBoundary = candidate.raw.match(/[;,.!?]+$/u)?.[0] ?? "";
+    const boundaryStart = candidate.end - trailingBoundary.length;
+    for (let index = boundaryStart; index < candidate.end; index += 1) {
+      projection[index] = line[index] ?? " ";
+    }
   }
   const prose = projection.join("");
   const spans: Array<{ start: number; end: number }> = [];
@@ -2416,19 +2482,23 @@ function hasNetworkDestinationAssociation(
   candidate: DestinationCandidate,
   clause: { start: number; end: number },
 ): boolean {
-  if (
-    candidate.kind === "explicit-url" ||
-    candidate.kind === "network-share" ||
-    candidate.kind === "bare-host"
-  ) {
-    return true;
-  }
-  if (candidate.kind !== "ambiguous-dotted-token") return false;
+  if (candidate.explicitTransport !== undefined) return true;
+  if (candidate.kind === "network-share") return true;
+  if (candidate.destination === undefined) return false;
   const prefix = associationPrefix(line, candidate, clause);
-  return (
-    DIRECT_NETWORK_TARGET_PREFIX_RE.test(prefix) ||
-    PREPOSITIONAL_NETWORK_TARGET_PREFIX_RE.test(prefix)
-  );
+  if (candidate.kind === "bare-host") {
+    return (
+      DIRECT_BARE_NETWORK_TARGET_PREFIX_RE.test(prefix) ||
+      PREPOSITIONAL_NETWORK_TARGET_PREFIX_RE.test(prefix)
+    );
+  }
+  if (candidate.kind === "ambiguous-dotted-token") {
+    return (
+      DIRECT_AMBIGUOUS_NETWORK_TARGET_PREFIX_RE.test(prefix) ||
+      PREPOSITIONAL_NETWORK_TARGET_PREFIX_RE.test(prefix)
+    );
+  }
+  return false;
 }
 
 function hasUploadDestinationAssociation(
@@ -2436,17 +2506,31 @@ function hasUploadDestinationAssociation(
   candidate: DestinationCandidate,
   clause: { start: number; end: number },
 ): boolean {
-  const destination = candidate.destination;
-  if (destination === undefined) return false;
   const prefix = associationPrefix(line, candidate, clause);
   return (
     DIRECT_UPLOAD_TARGET_PREFIX_RE.test(prefix) ||
-    PREPOSITIONAL_UPLOAD_TARGET_PREFIX_RE.test(prefix)
+    PREPOSITIONAL_UPLOAD_TARGET_PREFIX_RE.test(prefix) ||
+    isCurlUploadAssociation(line, candidate, clause)
+  );
+}
+
+function isCurlUploadAssociation(
+  line: string,
+  candidate: DestinationCandidate,
+  clause: { start: number; end: number },
+): boolean {
+  const projection = destinationActionProjection(line);
+  const prefix = projection.slice(clause.start, candidate.start);
+  if (!/\bcurl\b/i.test(prefix)) return false;
+  const command = projection.slice(clause.start, clause.end);
+  return (
+    CURL_UPLOAD_DATA_OPTION_RE.test(command) ||
+    CURL_UPLOAD_METHOD_RE.test(command)
   );
 }
 
 function isNetworkInstruction(line: string): boolean {
-  if (associatedNetworkDestinations(line).length > 0) return true;
+  if (associatedDestinationCandidates(line, "network").length > 0) return true;
   const prose = destinationActionProjection(line);
   return (
     CLEAR_NETWORK_INSTRUCTION_RE.test(prose) ||
