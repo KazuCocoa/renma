@@ -254,12 +254,17 @@ and action-to-target association stays within a clause. An upload verb elsewhere
 on the line therefore cannot turn a fetch source into an upload destination.
 One governing action can apply to a coordinated comma, `and`, or `or` list of
 destinations when no competing action starts between members. Curl upload
-options are inspected only within the shell command and curl transfer containing
-the destination. Unquoted, unescaped `&&`, `||`, `|`, and `;` delimit shell
-commands, and an unquoted `--next` delimits curl transfers. Within that local
-scope, `-d`, `--data`, `-F`, `--form`, `-T`, `--upload-file`, `-X POST`, and
-`-X PUT` apply equally before or after the destination URL and across multiple
-URLs in the same transfer.
+association first combines adjacent physical lines in the same Markdown block
+when each preceding line ends in an active shell continuation backslash. The
+projection removes the backslash-newline while retaining source-line evidence;
+it never crosses code-block, semantic-unit, hidden HTML-comment, or ordinary
+prose boundaries. Upload options are then inspected only within the shell
+command and curl transfer containing the destination. Unquoted, unescaped
+`&&`, `||`, `|`, `;`, and standalone `&` delimit shell commands, while `&>` and
+`2>&1` remain redirections rather than command boundaries. An unquoted `--next`
+delimits curl transfers. Within that local scope, `-d`, `--data`, `-F`, `--form`,
+`-T`, `--upload-file`, `-X POST`, and `-X PUT` apply equally before or after the
+destination URL and across multiple URLs in the same transfer.
 
 Explicit URL candidates are parsed independently with the WHATWG `URL` parser
 and do not require an ICANN public suffix. This supports credentials in the URL,

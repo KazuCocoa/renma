@@ -39,7 +39,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   candidate text cannot create its own action signal; unsupported explicit URLs
   retain fail-closed permission intent; coordinated destination lists inherit
   one governing action; curl upload options work before or after the URL while
-  remaining bounded to the candidate's shell command and `--next` transfer;
+  backslash-continued commands retain source-line evidence and remain bounded to
+  the candidate's shell command and `--next` transfer; standalone `&` separates
+  commands without treating `&>` or `2>&1` redirections as boundaries;
   transport-less IP and strong host candidates require an action; explicit URLs
   support IPv4, bracketed IPv6, internationalized and single-label hosts; and
   network and upload allowlist boundaries remain separate.

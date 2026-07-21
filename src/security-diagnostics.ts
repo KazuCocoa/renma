@@ -54,6 +54,17 @@ type Detection = {
   dedupeKey?: string;
 };
 
+type DetectionEvidence = Pick<Detection, "startLine" | "endLine" | "snippet">;
+
+type LogicalShellCommand = {
+  projection: string;
+  sourceLineByOffset: number[];
+  memberLineIndexes: number[];
+  sourceLines: string[];
+};
+
+type PolicyDetectionScope = "all" | "destination" | "line-local";
+
 export type NetworkDestination = {
   raw: string;
   host: string;
@@ -899,6 +910,18 @@ function securityFindingsForDocument(
     ),
   ];
   const lines = sourceLines.map((_, index) => markdownView.visibleLine(index));
+  const logicalCommands = logicalShellCommands(
+    sourceLines,
+    lines,
+    scanStart,
+    markdownView,
+  );
+  const logicalCommandByLine = new Map<number, LogicalShellCommand>();
+  for (const command of logicalCommands) {
+    for (const lineIndex of command.memberLineIndexes) {
+      logicalCommandByLine.set(lineIndex, command);
+    }
+  }
   let recentHumanApprovalLine = 0;
   let recentRiskMitigationLine = 0;
 
@@ -928,17 +951,7 @@ function securityFindingsForDocument(
   for (let index = scanStart; index < lines.length; index += 1) {
     const lineNumber = index + 1;
     const line = lines[index] ?? "";
-    const inCode = markdownView?.isCodeBlockLine(index) ?? false;
-
-    const strippedComment = line.replace(/^\s*(#|\/\/)\s*/, "");
-    const shellComment =
-      /^\s*\/\//.test(line) ||
-      (/^\s*#/.test(line) &&
-        (inCode ||
-          isCommandLike(strippedComment) ||
-          CREDENTIAL_ARG_ANY_RE.test(strippedComment) ||
-          REMOTE_SCRIPT_RE.test(strippedComment) ||
-          PREDICTABLE_TEMP_RE.test(strippedComment)));
+    const shellComment = isShellCommentLine(line, index, markdownView);
     if (shellComment) {
       continue;
     }
@@ -987,22 +1000,65 @@ function securityFindingsForDocument(
         isCommandLike(line) ||
         CREDENTIAL_ARG_ANY_RE.test(line) ||
         CREDENTIAL_HEADER_RE.test(line));
+    const evidence: DetectionEvidence = {
+      startLine: lineNumber,
+      snippet: line,
+    };
+    const logicalCommand = logicalCommandByLine.get(index);
+    const logicalCommandStart = logicalCommand?.memberLineIndexes[0] === index;
 
     if (!quotedProse) {
-      detections.push(
-        ...policyDetections(line, lineNumber, policy, hasHumanApprovalGuard),
-      );
+      if (logicalCommand === undefined) {
+        detections.push(
+          ...policyDetections(line, evidence, policy, hasHumanApprovalGuard),
+        );
+      } else {
+        detections.push(
+          ...policyDetections(
+            line,
+            evidence,
+            policy,
+            hasHumanApprovalGuard,
+            "line-local",
+          ),
+        );
+        if (logicalCommandStart) {
+          detections.push(
+            ...policyDetections(
+              logicalCommand.projection,
+              logicalShellCommandEvidence(logicalCommand),
+              policy,
+              hasHumanApprovalGuard,
+              "destination",
+            ),
+          );
+        }
+      }
       detections.push(...disallowedCommandDetections(line, lineNumber, policy));
       if (!commandLine || referencesSensitiveFile(line)) {
         detections.push(...sensitiveDataDetections(line, lineNumber, policy));
       }
-      if (
-        !commandLine ||
-        policy.declared.size > 0 ||
-        isUploadInstruction(line)
+      if (logicalCommand === undefined) {
+        if (
+          !commandLine ||
+          policy.declared.size > 0 ||
+          isUploadInstruction(line)
+        ) {
+          detections.push(
+            ...networkAndUploadDetections(line, evidence, policy),
+          );
+        }
+      } else if (
+        logicalCommandStart &&
+        (policy.declared.size > 0 ||
+          isUploadInstruction(logicalCommand.projection))
       ) {
         detections.push(
-          ...networkAndUploadDetections(line, lineNumber, policy),
+          ...networkAndUploadDetections(
+            logicalCommand.projection,
+            logicalShellCommandEvidence(logicalCommand),
+            policy,
+          ),
         );
       }
       detections.push(...contextScopeDetections(line, lineNumber));
@@ -1033,6 +1089,154 @@ function securityFindingsForDocument(
   return dedupeDetections(detections).map((detection) =>
     findingFromDetection(artifact, detection),
   );
+}
+
+function logicalShellCommands(
+  sourceLines: string[],
+  visibleLines: string[],
+  scanStart: number,
+  markdownView: MarkdownSecurityView,
+): LogicalShellCommand[] {
+  const commands: LogicalShellCommand[] = [];
+  let index = scanStart;
+
+  while (index < visibleLines.length) {
+    const firstLine = visibleLines[index] ?? "";
+    if (
+      !isLogicalShellCommandStart(firstLine) ||
+      !isLogicalShellLineEligible(
+        sourceLines,
+        visibleLines,
+        index,
+        markdownView,
+      )
+    ) {
+      index += 1;
+      continue;
+    }
+
+    const projection: string[] = [];
+    const sourceLineByOffset: number[] = [];
+    const memberLineIndexes = [index];
+    let cursor = index;
+    let quote: "'" | '"' | undefined;
+    const append = (value: string, sourceLine: number): void => {
+      projection.push(value);
+      for (let offset = 0; offset < value.length; offset += 1) {
+        sourceLineByOffset.push(sourceLine);
+      }
+    };
+
+    while (cursor < visibleLines.length) {
+      const physicalLine = visibleLines[cursor] ?? "";
+      const continuation = activeShellContinuation(physicalLine, quote);
+      const next = cursor + 1;
+      const joinsNext =
+        continuation.active &&
+        next < visibleLines.length &&
+        isLogicalShellLineEligible(
+          sourceLines,
+          visibleLines,
+          next,
+          markdownView,
+        ) &&
+        markdownView.sameMarkdownBlock(cursor, next) &&
+        markdownView.isCodeContentLine(cursor) ===
+          markdownView.isCodeContentLine(next);
+      append(joinsNext ? physicalLine.slice(0, -1) : physicalLine, cursor + 1);
+      if (!joinsNext) break;
+      append(" ", cursor + 1);
+      quote = continuation.quote;
+      cursor = next;
+      memberLineIndexes.push(cursor);
+    }
+
+    if (memberLineIndexes.length > 1) {
+      commands.push({
+        projection: projection.join(""),
+        sourceLineByOffset,
+        memberLineIndexes,
+        sourceLines: memberLineIndexes.map(
+          (lineIndex) => sourceLines[lineIndex] ?? "",
+        ),
+      });
+    }
+    index = cursor + 1;
+  }
+
+  return commands;
+}
+
+function isLogicalShellLineEligible(
+  sourceLines: string[],
+  visibleLines: string[],
+  lineIndex: number,
+  markdownView: MarkdownSecurityView,
+): boolean {
+  const source = sourceLines[lineIndex] ?? "";
+  const visible = visibleLines[lineIndex] ?? "";
+  return (
+    source === visible &&
+    !markdownView.isBlockQuotedLine(lineIndex) &&
+    !isPolicyLine(visible) &&
+    !isShellCommentLine(visible, lineIndex, markdownView)
+  );
+}
+
+function isLogicalShellCommandStart(line: string): boolean {
+  return /^\s*(?:(?:[-*+]|\d+[.)])\s+)?(?:[$>%]\s*)?(?:(?:sudo|command|env)\s+|[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*curl\b/i.test(
+    line,
+  );
+}
+
+function activeShellContinuation(
+  line: string,
+  initialQuote: "'" | '"' | undefined,
+): { active: boolean; quote: "'" | '"' | undefined } {
+  let quote = initialQuote;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (quote === "'") {
+      if (character === quote) quote = undefined;
+      continue;
+    }
+    if (quote === '"') {
+      if (character === quote) {
+        quote = undefined;
+        continue;
+      }
+      if (character === "\\") {
+        if (index === line.length - 1) return { active: true, quote };
+        index += 1;
+      }
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (character === "\\") {
+      if (index === line.length - 1) return { active: true, quote };
+      index += 1;
+    }
+  }
+  return { active: false, quote };
+}
+
+function logicalShellCommandEvidence(
+  command: LogicalShellCommand,
+): DetectionEvidence {
+  const fallbackStart = (command.memberLineIndexes[0] ?? 0) + 1;
+  const fallbackEnd =
+    (command.memberLineIndexes[command.memberLineIndexes.length - 1] ??
+      fallbackStart - 1) + 1;
+  return {
+    startLine: command.sourceLineByOffset[0] ?? fallbackStart,
+    endLine:
+      command.sourceLineByOffset[command.sourceLineByOffset.length - 1] ??
+      fallbackEnd,
+    snippet: command.sourceLines.join("\n"),
+  };
 }
 
 function disallowedCommandDetections(
@@ -1113,11 +1317,14 @@ function bodyPolicyContradictionDetections(
 
 function policyDetections(
   line: string,
-  lineNumber: number,
+  evidence: DetectionEvidence,
   policy: SecurityPolicy,
   hasHumanApprovalGuard: boolean,
+  scope: PolicyDetectionScope = "all",
 ): Detection[] {
   const detections: Detection[] = [];
+  const analyzeDestinations = scope !== "line-local";
+  const analyzeLineLocal = scope !== "destination";
   const defensiveAction = isDefensiveActionInstruction(line);
   const safeOrGuarded = isDefensiveOrGuardedActionInstruction(line);
   const invalidNetworkAllowlist = policy.invalidDeclared.has(
@@ -1128,6 +1335,7 @@ function policyDetections(
   );
 
   if (
+    analyzeDestinations &&
     policy.networkAllowed === false &&
     isNetworkInstruction(line) &&
     !safeOrGuarded
@@ -1135,15 +1343,15 @@ function policyDetections(
     detections.push({
       metadata: RULES.instructionViolatesPolicy,
       severity: "high",
-      startLine: lineNumber,
-      snippet: line,
+      ...evidence,
     });
   }
 
   if (
-    invalidNetworkAllowlist ||
-    (policy.networkAllowed !== false &&
-      policy.approvedNetworkDestinations.length > 0)
+    analyzeDestinations &&
+    (invalidNetworkAllowlist ||
+      (policy.networkAllowed !== false &&
+        policy.approvedNetworkDestinations.length > 0))
   ) {
     for (const destination of unapprovedNetworkDestinations(
       line,
@@ -1153,14 +1361,14 @@ function policyDetections(
       detections.push({
         metadata: RULES.unapprovedNetworkDestination,
         severity: "high",
-        startLine: lineNumber,
-        snippet: line,
+        ...evidence,
         dedupeKey: `unapproved-network:${destination.host}${destination.path}`,
       });
     }
   }
 
   if (
+    analyzeDestinations &&
     policy.externalUploadAllowed === false &&
     isUploadInstruction(line) &&
     !safeOrGuarded
@@ -1168,12 +1376,12 @@ function policyDetections(
     detections.push({
       metadata: RULES.instructionViolatesPolicy,
       severity: "high",
-      startLine: lineNumber,
-      snippet: line,
+      ...evidence,
     });
   }
 
   if (
+    analyzeDestinations &&
     isUploadInstruction(line) &&
     (invalidUploadAllowlist ||
       (policy.externalUploadAllowed !== false &&
@@ -1187,8 +1395,7 @@ function policyDetections(
       detections.push({
         metadata: RULES.unapprovedUploadDestination,
         severity: "high",
-        startLine: lineNumber,
-        snippet: line,
+        ...evidence,
         dedupeKey: invalidUploadAllowlist
           ? `invalid-upload:${destination.host}${destination.path}`
           : `unapproved-upload:${destination.host}${destination.path}`,
@@ -1197,6 +1404,7 @@ function policyDetections(
   }
 
   if (
+    analyzeLineLocal &&
     policy.secretsAllowed === false &&
     SECRET_WORD_RE.test(line) &&
     !SAFE_NEGATION_RE.test(line)
@@ -1204,34 +1412,33 @@ function policyDetections(
     detections.push({
       metadata: RULES.instructionViolatesPolicy,
       severity: "high",
-      startLine: lineNumber,
-      snippet: line,
+      ...evidence,
     });
   }
 
   if (
+    analyzeLineLocal &&
     effectiveAllowedDataClass(policy)?.toLowerCase() === "disclosed" &&
     UNDISCLOSED_DATA_RE.test(line)
   ) {
     detections.push({
       metadata: RULES.instructionViolatesPolicy,
       severity: "high",
-      startLine: lineNumber,
-      snippet: line,
+      ...evidence,
     });
   }
 
   const needsApproval =
     policy.humanApprovalRequired === true &&
-    requiresHumanApprovalGuard(line) &&
+    ((analyzeDestinations && requiresDestinationApprovalGuard(line)) ||
+      (analyzeLineLocal && requiresLineLocalApprovalGuard(line))) &&
     !hasHumanApprovalGuard &&
     !defensiveAction;
   if (needsApproval) {
     detections.push({
       metadata: RULES.missingHumanApprovalGuard,
       severity: "medium",
-      startLine: lineNumber,
-      snippet: line,
+      ...evidence,
     });
   }
 
@@ -1320,7 +1527,7 @@ function isSafeSensitiveHandlingInstruction(line: string): boolean {
 
 function networkAndUploadDetections(
   line: string,
-  lineNumber: number,
+  evidence: DetectionEvidence,
   policy: SecurityPolicy,
 ): Detection[] {
   const detections: Detection[] = [];
@@ -1332,8 +1539,7 @@ function networkAndUploadDetections(
     detections.push({
       metadata: RULES.externalUploadInstruction,
       severity: policy.externalUploadAllowed === false ? "high" : "medium",
-      startLine: lineNumber,
-      snippet: line,
+      ...evidence,
     });
   }
 
@@ -1341,8 +1547,7 @@ function networkAndUploadDetections(
     detections.push({
       metadata: RULES.bulkDataSharingInstruction,
       severity: "medium",
-      startLine: lineNumber,
-      snippet: line,
+      ...evidence,
     });
   }
 
@@ -1350,8 +1555,7 @@ function networkAndUploadDetections(
     detections.push({
       metadata: RULES.cloudUploadInstruction,
       severity: "medium",
-      startLine: lineNumber,
-      snippet: line,
+      ...evidence,
     });
   }
 
@@ -2581,6 +2785,7 @@ function unquotedShellSeparatorSpans(
       continue;
     }
 
+    const previous = projection[index - 1];
     const next = projection[index + 1];
     const length =
       character === ";" || character === "|"
@@ -2589,7 +2794,9 @@ function unquotedShellSeparatorSpans(
           : 1
         : character === "&" && next === "&"
           ? 2
-          : 0;
+          : character === "&" && next !== ">" && previous !== ">"
+            ? 1
+            : 0;
     if (length === 0) continue;
     separators.push({ start: index, end: index + length });
     index += length - 1;
@@ -2754,6 +2961,23 @@ function isPolicyLine(line: string): boolean {
   return isSecurityPolicyLine(line);
 }
 
+function isShellCommentLine(
+  line: string,
+  lineIndex: number,
+  markdownView?: MarkdownSecurityView,
+): boolean {
+  const strippedComment = line.replace(/^\s*(#|\/\/)\s*/, "");
+  return (
+    /^\s*\/\//.test(line) ||
+    (/^\s*#/.test(line) &&
+      ((markdownView?.isCodeBlockLine(lineIndex) ?? false) ||
+        isCommandLike(strippedComment) ||
+        CREDENTIAL_ARG_ANY_RE.test(strippedComment) ||
+        REMOTE_SCRIPT_RE.test(strippedComment) ||
+        PREDICTABLE_TEMP_RE.test(strippedComment)))
+  );
+}
+
 function isCommandLike(line: string): boolean {
   return /\b(npm|pnpm|yarn|pip3?|brew|docker|curl|wget|sudo|chmod|chown|git|gh|aws|gcloud|az|kubectl|echo|cat|cp|mv|rm|touch|mkdir)\b/i.test(
     line,
@@ -2811,11 +3035,16 @@ function hasStructuredGuard(
   return false;
 }
 
-function requiresHumanApprovalGuard(line: string): boolean {
+function requiresDestinationApprovalGuard(line: string): boolean {
   return (
     EXTERNAL_UPLOAD_RE.test(line) ||
     CLOUD_UPLOAD_RE.test(line) ||
-    referencesConcreteNetworkDestination(line) ||
+    referencesConcreteNetworkDestination(line)
+  );
+}
+
+function requiresLineLocalApprovalGuard(line: string): boolean {
+  return (
     (SECRET_ACTION_RE.test(line) && SECRET_WORD_RE.test(line)) ||
     (referencesSensitiveFile(line) &&
       !isSafeSensitiveHandlingInstruction(line)) ||

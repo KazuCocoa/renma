@@ -200,6 +200,12 @@ export class MarkdownSecurityView {
     return this.codeContentLines.has(lineIndex);
   }
 
+  sameMarkdownBlock(firstLineIndex: number, lastLineIndex: number): boolean {
+    const first = this.smallestBlockRecordAtLine(firstLineIndex + 1);
+    const last = this.smallestBlockRecordAtLine(lastLineIndex + 1);
+    return first !== undefined && first === last;
+  }
+
   inlineCodeProse(unit: MarkdownSemanticUnit, text: string): string {
     let projection = text;
     for (const range of this.inlineCodeByUnit.get(unit) ?? []) {

