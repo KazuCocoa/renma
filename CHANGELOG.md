@@ -17,6 +17,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Split the former broad `src/types.ts` hub into cohesive low-level contracts
   and an isolated composed scan-result type while retaining the established
   `dist/types.js` compatibility facade.
+- Separated one collected repository core from explicit memoized projections,
+  so catalog avoids unrelated Discovery and security work while scan,
+  Readiness, and BOM continue to share one immutable evidence boundary.
 
 ## [0.22.5] - 2026-07-21
 

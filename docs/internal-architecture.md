@@ -143,33 +143,38 @@ be handled as behavior-changing follow-up work.
 
 ## RepositorySnapshot Is the Repository Evidence Source
 
-`collectRepositorySnapshot` in `src/repository-evidence.ts` performs one
-repository collection and creates the shared in-memory source of repository
-facts. The snapshot contains:
+`collectRepositorySnapshotCore` in `src/repository-evidence.ts` performs one
+discovery pass and parses each discovered artifact once. It freezes the core
+object containing the resolved root, effective configuration, config path,
+artifacts, parsed documents, discovered path set, and discovery diagnostics.
+No derived projection may rediscover files or reread repository content.
 
-- resolved root, configuration, configuration path, and scan count;
-- discovered artifacts and parsed documents;
-- the normalized catalog, Context Lens summary, and diagnostic partitions;
-- repository-relative paths and their captured filesystem states;
-- structural classification evidence indexed by repository-relative path;
-- a parent-Skill index used for exact parent resolution;
-- effective security-policy evidence with its provenance.
+An explicit projection store derives and memoizes these facts from that core:
 
-The indexes belong to the snapshot. Consumers should reuse them instead of
-reparsing files or rebuilding command-specific lookup tables. A new projection
-should normally accept `RepositorySnapshot`, or the narrowest existing
-projection of it, rather than perform another discovery pass.
+- catalog, catalog diagnostics, and the parent-Skill index;
+- Agent Skills validation and the dependent Skill Discovery index;
+- structural classification evidence;
+- effective security-policy evidence;
+- Context Lens summary and diagnostics.
 
-`RepositorySnapshot` does not freeze the working tree. It records what one
-collection read, after which downstream projections operate on that collected
-state. In particular, Readiness builds its graph and scan from one snapshot,
-and BOM builds its graph, scan, Readiness evidence, policy inventory, and
-diagnostics from one snapshot. This prevents one command result from combining
-independently recollected repository states.
+Repository path existence states are captured before
+`collectRepositorySnapshot` returns, using the catalog derived from the same
+core. They remain eager because later filesystem mutation must not change a
+partially prepared snapshot. Pure projections may remain lazy; repeated access
+returns the same prepared object.
 
-`collectRepositoryEvidence` is a narrower compatibility projection for
-consumers such as catalog and graph. It deliberately omits parsed documents,
-sets, maps, and indexes that are implementation details.
+Consumers explicitly prepare only what they need. Scan names its required
+projections and includes Skill Discovery only when that diagnostic slice is
+requested. `collectRepositoryEvidence`, the compatibility path used by
+catalog, prepares only catalog and Context Lens and therefore does not validate
+Agent Skills, build Skill Discovery, classify assets, collect security-policy
+evidence, or capture command-only repository path states.
+
+Readiness builds graph and scan evidence from one `RepositorySnapshot`, and BOM
+builds graph, scan, Readiness, policy inventory, and diagnostics from that same
+snapshot and core. A working-tree mutation after collection cannot influence a
+later lazy projection; a new collection is required to observe it. This keeps
+commands from combining independently recollected repository states.
 
 ## Declared Composition Is Pure Catalog Analysis
 

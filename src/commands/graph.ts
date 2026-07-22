@@ -32,6 +32,7 @@ import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import { classifyRepositorySkillEntrypointPath } from "../discovery.js";
 import {
   collectRepositorySnapshot,
+  prepareRepositorySnapshotProjections,
   repositoryDiagnosticsWithoutSkillDiscovery,
   type RepositoryEvidence,
   type RepositorySnapshot,
@@ -186,8 +187,13 @@ export function graphFromRepositoryEvidence(
 export function graphFromRepositorySnapshot(
   snapshot: RepositorySnapshot,
 ): GraphReport {
+  prepareRepositorySnapshotProjections(snapshot, ["catalog", "context-lens"]);
   return graphFromRepositoryEvidence({
-    ...snapshot,
+    root: snapshot.root,
+    ...(snapshot.configPath ? { configPath: snapshot.configPath } : {}),
+    scannedFileCount: snapshot.scannedFileCount,
+    catalog: snapshot.catalog,
+    contextLens: snapshot.contextLens,
     diagnostics: repositoryDiagnosticsWithoutSkillDiscovery(snapshot),
   });
 }

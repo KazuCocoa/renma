@@ -7,6 +7,7 @@ import {
 import { createDiagnosticsV2, createReviewBundles } from "./diagnostics-v2.js";
 import {
   collectRepositorySnapshot,
+  prepareRepositorySnapshotProjections,
   type RepositorySnapshot,
 } from "./repository-evidence.js";
 import { detectRepeatedContextPatterns } from "./repeated-context.js";
@@ -39,6 +40,16 @@ export function scanFromRepositorySnapshot(
   snapshot: RepositorySnapshot,
   options: ScanBuilderOptions = {},
 ): ScanResult {
+  prepareRepositorySnapshotProjections(snapshot, [
+    "catalog",
+    "agent-skills",
+    ...(options.includeSkillDiscoveryDiagnostics === false
+      ? []
+      : (["skill-discovery"] as const)),
+    "classifications",
+    "security-policies",
+    "context-lens",
+  ]);
   const securityPolicyInventory = summarizeSecurityPolicyInventory(
     snapshot.documents,
     snapshot.config.security,
