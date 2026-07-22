@@ -39,6 +39,46 @@ The dependency direction is checked in CI. Type-only imports are treated as
 architectural dependencies, so lower layers must not import command or renderer
 modules even when the import is erased at runtime.
 
+## Security Destination Analysis
+
+Security destination analysis is a deterministic, non-executing pipeline:
+
+```text
+Markdown/source eligibility
+  -> logical shell projection
+  -> shell command segmentation
+  -> curl transfer segmentation
+  -> lexical destination candidates
+  -> operational association IR
+  -> destination normalization/matching
+  -> existing policy diagnostics
+```
+
+`src/security-diagnostics.ts` owns Markdown eligibility, effective policy,
+guard association, evidence projection, and conversion into the existing public
+finding model. The internal `src/security-destination/` modules own the pure
+destination stages. `analyzeDestinations` projects one input, classifies its
+candidates once, masks candidate text once, and records network and upload
+associations in one intermediate representation. Policy checks derive their
+network and upload views from that result instead of reclassifying raw text.
+
+Lexical classification and operational intent are separate. An explicit
+transport can carry network or upload intent even when its host cannot be
+normalized; the IR records that as `not-evaluated` without exposing a new CLI
+field or diagnostic. Source, command, and curl-transfer spans map back to the
+original input so multiline evidence continues to use the existing finding
+ranges and snippets.
+
+Shell support is intentionally bounded to the behavior established in 0.22.4:
+simple curl commands, single and double quotes, active escapes and
+backslash-newlines, common command separators, redirection exceptions, and curl
+`--next`. Renma does not execute or fully parse shell. Heredocs, command or
+process substitution, subshell evaluation, functions, aliases, variable
+expansion, and complete POSIX or Bash parsing remain outside this analysis.
+Future support for broader shell syntax, additional URL schemes, IPv6 zone
+identifiers, complexity diagnostics, or user-visible not-evaluated results must
+be handled as behavior-changing follow-up work.
+
 ## RepositorySnapshot Is the Repository Evidence Source
 
 `collectRepositorySnapshot` in `src/repository-evidence.ts` performs one

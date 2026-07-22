@@ -1,7 +1,3 @@
-import { isIP } from "node:net";
-
-import { parse as parseDomain } from "tldts";
-
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import type { DiagnosticId } from "./diagnostic-ids.js";
 import {
@@ -29,6 +25,30 @@ import {
   MarkdownSecurityView,
   type MarkdownSemanticUnit,
 } from "./markdown-security-view.js";
+import {
+  analyzeDestinations,
+  isNetworkInstruction,
+  isUploadInstruction,
+  logicalShellCommandEvidence,
+  logicalShellCommands,
+  networkDestinations,
+  unapprovedDestinations,
+  uploadDestinations,
+  type DestinationAnalysis,
+  type LogicalShellCommand,
+  type NetworkDestination,
+} from "./security-destination/index.js";
+
+export {
+  associatedNetworkDestinations,
+  associatedUploadDestinations,
+  classifyDestinationCandidates,
+} from "./security-destination/index.js";
+export type {
+  DestinationCandidate,
+  DestinationCandidateKind,
+  NetworkDestination,
+} from "./security-destination/index.js";
 
 type SecurityCategory = "safety";
 
@@ -56,40 +76,7 @@ type Detection = {
 
 type DetectionEvidence = Pick<Detection, "startLine" | "endLine" | "snippet">;
 
-type LogicalShellCommand = {
-  projection: string;
-  sourceLineByOffset: number[];
-  memberLineIndexes: number[];
-  sourceLines: string[];
-};
-
 type PolicyDetectionScope = "all" | "destination" | "line-local";
-
-export type NetworkDestination = {
-  raw: string;
-  host: string;
-  path: string;
-};
-
-export type DestinationCandidateKind =
-  | "explicit-url"
-  | "network-share"
-  | "bare-host"
-  | "ambiguous-dotted-token"
-  | "local-path"
-  | "local-filename"
-  | "renma-asset-id"
-  | "command-file-argument"
-  | "unsupported-host";
-
-export type DestinationCandidate = {
-  raw: string;
-  start: number;
-  end: number;
-  kind: DestinationCandidateKind;
-  explicitTransport?: "http" | "https" | "protocol-relative";
-  destination?: NetworkDestination;
-};
 
 const RULES = {
   missingPolicyMetadata: {
@@ -729,34 +716,6 @@ const BODY_UPLOAD_DISALLOWED_RE =
 const BODY_SECRET_DISALLOWED_RE =
   /\b(no|without|avoid|exclude|disallow|forbid|forbidden|block|do\s+not|don't|never)\b.{0,80}\b(secret|secrets|credential|credentials|token|password|private key|private keys|\.env|env files?|customer data)\b/i;
 
-const DNS_HOST_SOURCE = String.raw`(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?`;
-const IPV4_HOST_SOURCE = String.raw`(?:\d{1,3}\.){3}\d{1,3}`;
-const EXPLICIT_URL_CANDIDATE_RE = /(?:https?:\/\/|\/\/)[^\s"'`<>{}]+/giu;
-const NETWORK_SHARE_CANDIDATE_RE = /\\\\[^\s"'`<>{}]+/gu;
-const BARE_DESTINATION_CANDIDATE_RE = new RegExp(
-  String.raw`(?:${DNS_HOST_SOURCE}|${IPV4_HOST_SOURCE})(?::\d+)?(?:[\\/][^\s"'\x60<>{}[\]]*)?`,
-  "gi",
-);
-const RENMA_ASSET_ID_RE = /^(?:context|skill|lens)(?:\.[a-z0-9][a-z0-9-]*)+$/i;
-const DIRECT_AMBIGUOUS_NETWORK_TARGET_PREFIX_RE =
-  /\b(?:get|post|put|curl|wget)\b[^.;,!?]{0,160}$/i;
-const DIRECT_BARE_NETWORK_TARGET_PREFIX_RE =
-  /\b(?:get|post|put|curl|wget|fetch|download)\b[^.;,!?]{0,160}$/i;
-const PREPOSITIONAL_NETWORK_TARGET_PREFIX_RE =
-  /\b(?:fetch|download)\s+from\s*$|\b(?:upload|send|attach|submit|push|publish|copy)\b[^.;,!?]{0,100}\bto\s*$|\b(?:share|sync)\b[^.;,!?]{0,100}\bwith\s*$/i;
-const DIRECT_UPLOAD_TARGET_PREFIX_RE = /\b(?:post|put)\b[^.;,!?]{0,160}$/i;
-const PREPOSITIONAL_UPLOAD_TARGET_PREFIX_RE =
-  /\b(?:upload|send|attach|submit|push|publish|copy)\b[^.;,!?]{0,100}\bto\s*$|\b(?:share|sync)\b[^.;,!?]{0,100}\bwith\s*$/i;
-const CURL_UPLOAD_DATA_OPTION_RE =
-  /(?:^|\s)(?:-(?:d|F|T)|--(?:data(?:-ascii|-binary|-raw|-urlencode)?|form(?:-string)?|upload-file)(?=\s|=|$))/;
-const CURL_UPLOAD_METHOD_RE =
-  /(?:^|\s)-X(?:\s+|=)?(?:POST|PUT|post|put)(?=\s|$)/;
-const CLEAR_NETWORK_INSTRUCTION_RE = /\b(?:curl|wget|http|https|webhook)\b/i;
-const EXPLICIT_NETWORK_TARGET_RE =
-  /\b(?:fetch|get|send|sync|push|upload|download|post|put)\b[^.;!?]{0,100}\b(?:external|remote|network|internet|webhook|api endpoint|server)\b/i;
-const CLAUSE_BOUNDARY_RE =
-  /\b(?:and|then)\b(?=\s+(?:(?:fetch|download|upload|send|share|attach|submit|sync|push|publish|copy|document|explain|describe|record|note|inspect|review|compare|get|post|put|curl|wget|run|validate|read|use)\b|then\b))|[;,]|[.!?](?=\s|$)/gi;
-const TRAILING_DESTINATION_PUNCTUATION_RE = /[),.;:!?]+$/;
 const EXTERNAL_UPLOAD_RE =
   /\b(upload|send|post|share|attach|submit|sync|push|publish)\b.*\b(external|remote|third[- ]party|pastebin|gist|slack|discord|s3|gcs|cloud|storage|bucket|drive|dropbox|notion|jira|github)\b|\b(post|put)\b.*https?:\/\//i;
 const CLOUD_UPLOAD_RE =
@@ -910,14 +869,23 @@ function securityFindingsForDocument(
     ),
   ];
   const lines = sourceLines.map((_, index) => markdownView.visibleLine(index));
-  const logicalCommands = logicalShellCommands(
-    sourceLines,
-    lines,
-    scanStart,
-    markdownView,
-  );
+  const logicalCommands = logicalShellCommands(sourceLines, lines, scanStart, {
+    isLineEligible: (lineIndex) =>
+      isLogicalShellLineEligible(sourceLines, lines, lineIndex, markdownView),
+    sameBlock: (firstLineIndex, secondLineIndex) =>
+      markdownView.sameMarkdownBlock(firstLineIndex, secondLineIndex),
+    isCodeContentLine: (lineIndex) => markdownView.isCodeContentLine(lineIndex),
+  });
   const logicalCommandByLine = new Map<number, LogicalShellCommand>();
+  const destinationAnalysisByLogicalCommand = new Map<
+    LogicalShellCommand,
+    DestinationAnalysis
+  >();
   for (const command of logicalCommands) {
+    destinationAnalysisByLogicalCommand.set(
+      command,
+      analyzeDestinations(command.projection),
+    );
     for (const lineIndex of command.memberLineIndexes) {
       logicalCommandByLine.set(lineIndex, command);
     }
@@ -1006,11 +974,23 @@ function securityFindingsForDocument(
     };
     const logicalCommand = logicalCommandByLine.get(index);
     const logicalCommandStart = logicalCommand?.memberLineIndexes[0] === index;
+    const lineDestinationAnalysis = analyzeDestinations(line);
+    const logicalDestinationAnalysis =
+      logicalCommand === undefined
+        ? undefined
+        : destinationAnalysisByLogicalCommand.get(logicalCommand);
 
     if (!quotedProse) {
       if (logicalCommand === undefined) {
         detections.push(
-          ...policyDetections(line, evidence, policy, hasHumanApprovalGuard),
+          ...policyDetections(
+            line,
+            evidence,
+            policy,
+            hasHumanApprovalGuard,
+            "all",
+            lineDestinationAnalysis,
+          ),
         );
       } else {
         detections.push(
@@ -1020,6 +1000,7 @@ function securityFindingsForDocument(
             policy,
             hasHumanApprovalGuard,
             "line-local",
+            lineDestinationAnalysis,
           ),
         );
         if (logicalCommandStart) {
@@ -1030,6 +1011,7 @@ function securityFindingsForDocument(
               policy,
               hasHumanApprovalGuard,
               "destination",
+              logicalDestinationAnalysis,
             ),
           );
         }
@@ -1042,22 +1024,29 @@ function securityFindingsForDocument(
         if (
           !commandLine ||
           policy.declared.size > 0 ||
-          isUploadInstruction(line)
+          isUploadInstruction(lineDestinationAnalysis)
         ) {
           detections.push(
-            ...networkAndUploadDetections(line, evidence, policy),
+            ...networkAndUploadDetections(
+              line,
+              evidence,
+              policy,
+              lineDestinationAnalysis,
+            ),
           );
         }
       } else if (
         logicalCommandStart &&
         (policy.declared.size > 0 ||
-          isUploadInstruction(logicalCommand.projection))
+          (logicalDestinationAnalysis !== undefined &&
+            isUploadInstruction(logicalDestinationAnalysis)))
       ) {
         detections.push(
           ...networkAndUploadDetections(
             logicalCommand.projection,
             logicalShellCommandEvidence(logicalCommand),
             policy,
+            logicalDestinationAnalysis,
           ),
         );
       }
@@ -1091,81 +1080,6 @@ function securityFindingsForDocument(
   );
 }
 
-function logicalShellCommands(
-  sourceLines: string[],
-  visibleLines: string[],
-  scanStart: number,
-  markdownView: MarkdownSecurityView,
-): LogicalShellCommand[] {
-  const commands: LogicalShellCommand[] = [];
-  let index = scanStart;
-
-  while (index < visibleLines.length) {
-    const firstLine = visibleLines[index] ?? "";
-    if (
-      !isLogicalShellCommandStart(firstLine) ||
-      !isLogicalShellLineEligible(
-        sourceLines,
-        visibleLines,
-        index,
-        markdownView,
-      )
-    ) {
-      index += 1;
-      continue;
-    }
-
-    const projection: string[] = [];
-    const sourceLineByOffset: number[] = [];
-    const memberLineIndexes = [index];
-    let cursor = index;
-    let quote: "'" | '"' | undefined;
-    const append = (value: string, sourceLine: number): void => {
-      projection.push(value);
-      for (let offset = 0; offset < value.length; offset += 1) {
-        sourceLineByOffset.push(sourceLine);
-      }
-    };
-
-    while (cursor < visibleLines.length) {
-      const physicalLine = visibleLines[cursor] ?? "";
-      const continuation = activeShellContinuation(physicalLine, quote);
-      const next = cursor + 1;
-      const joinsNext =
-        continuation.active &&
-        next < visibleLines.length &&
-        isLogicalShellLineEligible(
-          sourceLines,
-          visibleLines,
-          next,
-          markdownView,
-        ) &&
-        markdownView.sameMarkdownBlock(cursor, next) &&
-        markdownView.isCodeContentLine(cursor) ===
-          markdownView.isCodeContentLine(next);
-      append(joinsNext ? physicalLine.slice(0, -1) : physicalLine, cursor + 1);
-      if (!joinsNext) break;
-      quote = continuation.quote;
-      cursor = next;
-      memberLineIndexes.push(cursor);
-    }
-
-    if (memberLineIndexes.length > 1) {
-      commands.push({
-        projection: projection.join(""),
-        sourceLineByOffset,
-        memberLineIndexes,
-        sourceLines: memberLineIndexes.map(
-          (lineIndex) => sourceLines[lineIndex] ?? "",
-        ),
-      });
-    }
-    index = cursor + 1;
-  }
-
-  return commands;
-}
-
 function isLogicalShellLineEligible(
   sourceLines: string[],
   visibleLines: string[],
@@ -1180,62 +1094,6 @@ function isLogicalShellLineEligible(
     !isPolicyLine(visible) &&
     !isShellCommentLine(visible, lineIndex, markdownView)
   );
-}
-
-function isLogicalShellCommandStart(line: string): boolean {
-  return /^\s*(?:(?:[-*+]|\d+[.)])\s+)?(?:[$>%]\s*)?(?:(?:sudo|command|env)\s+|[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*curl\b/i.test(
-    line,
-  );
-}
-
-function activeShellContinuation(
-  line: string,
-  initialQuote: "'" | '"' | undefined,
-): { active: boolean; quote: "'" | '"' | undefined } {
-  let quote = initialQuote;
-  for (let index = 0; index < line.length; index += 1) {
-    const character = line[index];
-    if (quote === "'") {
-      if (character === quote) quote = undefined;
-      continue;
-    }
-    if (quote === '"') {
-      if (character === quote) {
-        quote = undefined;
-        continue;
-      }
-      if (character === "\\") {
-        if (index === line.length - 1) return { active: true, quote };
-        index += 1;
-      }
-      continue;
-    }
-    if (character === "'" || character === '"') {
-      quote = character;
-      continue;
-    }
-    if (character === "\\") {
-      if (index === line.length - 1) return { active: true, quote };
-      index += 1;
-    }
-  }
-  return { active: false, quote };
-}
-
-function logicalShellCommandEvidence(
-  command: LogicalShellCommand,
-): DetectionEvidence {
-  const fallbackStart = (command.memberLineIndexes[0] ?? 0) + 1;
-  const fallbackEnd =
-    (command.memberLineIndexes[command.memberLineIndexes.length - 1] ??
-      fallbackStart - 1) + 1;
-  return {
-    startLine: command.sourceLineByOffset[0] ?? fallbackStart,
-    endLine:
-      command.sourceLineByOffset[command.sourceLineByOffset.length - 1] ??
-      fallbackEnd,
-    snippet: command.sourceLines.join("\n"),
-  };
 }
 
 function disallowedCommandDetections(
@@ -1320,10 +1178,12 @@ function policyDetections(
   policy: SecurityPolicy,
   hasHumanApprovalGuard: boolean,
   scope: PolicyDetectionScope = "all",
+  destinationAnalysis?: DestinationAnalysis,
 ): Detection[] {
   const detections: Detection[] = [];
-  const analyzeDestinations = scope !== "line-local";
+  const shouldAnalyzeDestinations = scope !== "line-local";
   const analyzeLineLocal = scope !== "destination";
+  const analysis = destinationAnalysis ?? analyzeDestinations(line);
   const defensiveAction = isDefensiveActionInstruction(line);
   const safeOrGuarded = isDefensiveOrGuardedActionInstruction(line);
   const invalidNetworkAllowlist = policy.invalidDeclared.has(
@@ -1334,9 +1194,9 @@ function policyDetections(
   );
 
   if (
-    analyzeDestinations &&
+    shouldAnalyzeDestinations &&
     policy.networkAllowed === false &&
-    isNetworkInstruction(line) &&
+    isNetworkInstruction(analysis) &&
     !safeOrGuarded
   ) {
     detections.push({
@@ -1347,13 +1207,13 @@ function policyDetections(
   }
 
   if (
-    analyzeDestinations &&
+    shouldAnalyzeDestinations &&
     (invalidNetworkAllowlist ||
       (policy.networkAllowed !== false &&
         policy.approvedNetworkDestinations.length > 0))
   ) {
     for (const destination of unapprovedNetworkDestinations(
-      line,
+      analysis,
       policy,
       invalidNetworkAllowlist,
     )) {
@@ -1367,9 +1227,9 @@ function policyDetections(
   }
 
   if (
-    analyzeDestinations &&
+    shouldAnalyzeDestinations &&
     policy.externalUploadAllowed === false &&
-    isUploadInstruction(line) &&
+    isUploadInstruction(analysis) &&
     !safeOrGuarded
   ) {
     detections.push({
@@ -1380,14 +1240,14 @@ function policyDetections(
   }
 
   if (
-    analyzeDestinations &&
-    isUploadInstruction(line) &&
+    shouldAnalyzeDestinations &&
+    isUploadInstruction(analysis) &&
     (invalidUploadAllowlist ||
       (policy.externalUploadAllowed !== false &&
         policy.approvedUploadDestinations.length > 0))
   ) {
     for (const destination of unapprovedDestinations(
-      associatedUploadDestinations(line),
+      uploadDestinations(analysis),
       policy.approvedUploadDestinations,
       invalidUploadAllowlist,
     )) {
@@ -1429,7 +1289,8 @@ function policyDetections(
 
   const needsApproval =
     policy.humanApprovalRequired === true &&
-    ((analyzeDestinations && requiresDestinationApprovalGuard(line)) ||
+    ((shouldAnalyzeDestinations &&
+      requiresDestinationApprovalGuard(line, analysis)) ||
       (analyzeLineLocal && requiresLineLocalApprovalGuard(line))) &&
     !hasHumanApprovalGuard &&
     !defensiveAction;
@@ -1528,13 +1389,15 @@ function networkAndUploadDetections(
   line: string,
   evidence: DetectionEvidence,
   policy: SecurityPolicy,
+  destinationAnalysis?: DestinationAnalysis,
 ): Detection[] {
   const detections: Detection[] = [];
+  const analysis = destinationAnalysis ?? analyzeDestinations(line);
   if (isDefensiveOrGuardedActionInstruction(line)) {
     return detections;
   }
 
-  if (isUploadInstruction(line)) {
+  if (isUploadInstruction(analysis)) {
     detections.push({
       metadata: RULES.externalUploadInstruction,
       severity: policy.externalUploadAllowed === false ? "high" : "medium",
@@ -2007,48 +1870,14 @@ function lineSnippet(content: string, line: number): string | undefined {
 }
 
 function unapprovedNetworkDestinations(
-  line: string,
+  analysis: DestinationAnalysis,
   policy: SecurityPolicy,
   invalidAllowlist = false,
 ): NetworkDestination[] {
   return unapprovedDestinations(
-    associatedNetworkDestinations(line),
+    networkDestinations(analysis),
     policy.approvedNetworkDestinations,
     invalidAllowlist,
-  );
-}
-
-function unapprovedDestinations(
-  destinations: NetworkDestination[],
-  approvedDestinations: string[],
-  invalidAllowlist = false,
-): NetworkDestination[] {
-  if (invalidAllowlist) return destinations;
-
-  const approved = approvedDestinations
-    .map((destination) => normalizeNetworkDestination(destination))
-    .filter(
-      (destination): destination is NetworkDestination =>
-        destination !== undefined,
-    );
-  if (approved.length === 0) {
-    return [];
-  }
-
-  return destinations.filter(
-    (destination) =>
-      !approved.some((approvedDestination) =>
-        networkDestinationMatches(destination, approvedDestination),
-      ),
-  );
-}
-
-function isUploadInstruction(line: string): boolean {
-  const prose = destinationActionProjection(line);
-  return (
-    EXTERNAL_UPLOAD_RE.test(prose) ||
-    CLOUD_UPLOAD_RE.test(prose) ||
-    associatedDestinationCandidates(line, "upload").length > 0
   );
 }
 
@@ -2160,7 +1989,7 @@ function semanticInstructionDetections(
         .split(/\r?\n/)
         .some(
           (sectionLine) =>
-            isUploadInstruction(sectionLine) ||
+            isUploadInstruction(analyzeDestinations(sectionLine)) ||
             (SECRET_WORD_RE.test(sectionLine) &&
               DATA_DISCLOSURE_ACTION_RE.test(sectionLine)),
         );
@@ -2402,562 +2231,6 @@ function reviewGuardActions(
   return guards;
 }
 
-export function classifyDestinationCandidates(
-  line: string,
-): DestinationCandidate[] {
-  const candidates: DestinationCandidate[] = [];
-
-  for (const match of line.matchAll(EXPLICIT_URL_CANDIDATE_RE)) {
-    const raw = match[0] ?? "";
-    const start = match.index ?? 0;
-    const destination = normalizeNetworkDestination(raw);
-    const explicitTransport = explicitNetworkTransport(raw);
-    candidates.push({
-      raw,
-      start,
-      end: start + raw.length,
-      kind: destination === undefined ? "unsupported-host" : "explicit-url",
-      ...(explicitTransport === undefined ? {} : { explicitTransport }),
-      ...(destination === undefined ? {} : { destination }),
-    });
-  }
-
-  for (const match of line.matchAll(NETWORK_SHARE_CANDIDATE_RE)) {
-    const raw = match[0] ?? "";
-    const start = match.index ?? 0;
-    const end = start + raw.length;
-    if (overlapsDestinationCandidate(candidates, start, end)) continue;
-    const destination = normalizeNetworkDestination(raw);
-    candidates.push({
-      raw,
-      start,
-      end,
-      kind: destination === undefined ? "unsupported-host" : "network-share",
-      ...(destination === undefined ? {} : { destination }),
-    });
-  }
-
-  for (const match of line.matchAll(BARE_DESTINATION_CANDIDATE_RE)) {
-    const raw = match[0] ?? "";
-    const start = match.index ?? 0;
-    const end = start + raw.length;
-    if (overlapsDestinationCandidate(candidates, start, end)) continue;
-
-    if (isCommandFileArgument(line, start)) {
-      candidates.push({
-        raw,
-        start,
-        end,
-        kind: "command-file-argument",
-      });
-      continue;
-    }
-
-    if (isLocalPathCandidate(line, start)) {
-      candidates.push({ raw, start, end, kind: "local-path" });
-      continue;
-    }
-
-    const normalizedRaw = raw.replace(TRAILING_DESTINATION_PUNCTUATION_RE, "");
-    if (line[start - 1] === "." || RENMA_ASSET_ID_RE.test(normalizedRaw)) {
-      candidates.push({
-        raw,
-        start,
-        end,
-        kind: RENMA_ASSET_ID_RE.test(normalizedRaw)
-          ? "renma-asset-id"
-          : "local-filename",
-      });
-      continue;
-    }
-
-    const destination = normalizeNetworkDestination(raw);
-    if (destination === undefined) {
-      candidates.push({ raw, start, end, kind: "unsupported-host" });
-      continue;
-    }
-
-    if (isIP(destination.host) === 4) {
-      candidates.push({
-        raw,
-        start,
-        end,
-        kind: "bare-host",
-        destination,
-      });
-      continue;
-    }
-
-    if (parseDomain(destination.host).isIcann === true) {
-      candidates.push({
-        raw,
-        start,
-        end,
-        kind: hasBareDestinationSyntax(normalizedRaw)
-          ? "bare-host"
-          : "ambiguous-dotted-token",
-        destination,
-      });
-      continue;
-    }
-
-    candidates.push({ raw, start, end, kind: "local-filename" });
-  }
-
-  return candidates.sort(
-    (a, b) => a.start - b.start || b.end - b.start - (a.end - a.start),
-  );
-}
-
-function overlapsDestinationCandidate(
-  candidates: DestinationCandidate[],
-  start: number,
-  end: number,
-): boolean {
-  return candidates.some(
-    (candidate) => start < candidate.end && candidate.start < end,
-  );
-}
-
-function hasBareDestinationSyntax(candidate: string): boolean {
-  return /[\\/]/.test(candidate) || /:\d+(?:[\\/]|$)/.test(candidate);
-}
-
-function explicitNetworkTransport(
-  candidate: string,
-): DestinationCandidate["explicitTransport"] {
-  if (/^https:\/\//i.test(candidate)) return "https";
-  if (/^http:\/\//i.test(candidate)) return "http";
-  return candidate.startsWith("//") ? "protocol-relative" : undefined;
-}
-
-function isCommandFileArgument(line: string, start: number): boolean {
-  if (line[start - 1] === "@") return true;
-  const before = line.slice(0, start);
-  const tokenStart = Math.max(
-    before.lastIndexOf(" "),
-    before.lastIndexOf("\t"),
-    before.lastIndexOf("`"),
-    before.lastIndexOf('"'),
-    before.lastIndexOf("'"),
-  );
-  return /^--?[a-z0-9][a-z0-9-]*=$/i.test(before.slice(tokenStart + 1));
-}
-
-function isLocalPathCandidate(line: string, start: number): boolean {
-  const preceding = line[start - 1];
-  if (preceding !== "/" && preceding !== "\\") return false;
-  return line[start - 2] !== preceding;
-}
-
-function destinationActionProjection(line: string): string {
-  const projection = line.split("");
-  for (const candidate of classifyDestinationCandidates(line)) {
-    projection.fill(" ", candidate.start, candidate.end);
-  }
-  return projection.join("");
-}
-
-export function associatedNetworkDestinations(
-  line: string,
-): NetworkDestination[] {
-  return associatedDestinations(shellContinuationProjection(line), "network");
-}
-
-export function associatedUploadDestinations(
-  line: string,
-): NetworkDestination[] {
-  return associatedDestinations(shellContinuationProjection(line), "upload");
-}
-
-function shellContinuationProjection(line: string): string {
-  const physicalLines = line.split("\n");
-  const projection: string[] = [];
-  let quote: "'" | '"' | undefined;
-
-  for (let index = 0; index < physicalLines.length; index += 1) {
-    const physicalLine = physicalLines[index] ?? "";
-    const continuation = activeShellContinuation(physicalLine, quote);
-    const joinsNext = continuation.active && index + 1 < physicalLines.length;
-    projection.push(joinsNext ? physicalLine.slice(0, -1) : physicalLine);
-    if (joinsNext) {
-      quote = continuation.quote;
-      continue;
-    }
-    quote = undefined;
-    if (index + 1 < physicalLines.length) projection.push("\n");
-  }
-
-  return projection.join("");
-}
-
-function associatedDestinations(
-  line: string,
-  purpose: "network" | "upload",
-): NetworkDestination[] {
-  const destinations: NetworkDestination[] = [];
-  const seen = new Set<string>();
-
-  for (const candidate of associatedDestinationCandidates(line, purpose)) {
-    const destination = candidate.destination;
-    if (destination === undefined) continue;
-    const key = `${destination.host}${destination.path}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    destinations.push(destination);
-  }
-
-  return destinations;
-}
-
-function associatedDestinationCandidates(
-  line: string,
-  purpose: "network" | "upload",
-): DestinationCandidate[] {
-  const candidates = classifyDestinationCandidates(line);
-  const clauses = destinationClauseSpans(line, candidates);
-  const associatedCandidates: DestinationCandidate[] = [];
-  let previousCandidate: DestinationCandidate | undefined;
-  let previousAssociated = false;
-
-  for (const candidate of candidates) {
-    const canRepresentDestination =
-      candidate.destination !== undefined ||
-      candidate.explicitTransport !== undefined;
-    const clause = clauses.find(
-      (span) => span.start <= candidate.start && candidate.start < span.end,
-    );
-    let associated = false;
-    if (canRepresentDestination && clause !== undefined) {
-      associated =
-        purpose === "network"
-          ? hasNetworkDestinationAssociation(line, candidate, clause)
-          : hasUploadDestinationAssociation(line, candidate, clause);
-      if (
-        !associated &&
-        previousAssociated &&
-        previousCandidate !== undefined &&
-        isDestinationListContinuation(line, previousCandidate, candidate)
-      ) {
-        associated = true;
-      }
-    }
-
-    if (associated) associatedCandidates.push(candidate);
-    previousCandidate = candidate;
-    previousAssociated = associated;
-  }
-
-  return associatedCandidates;
-}
-
-function isDestinationListContinuation(
-  line: string,
-  previous: DestinationCandidate,
-  candidate: DestinationCandidate,
-): boolean {
-  const trailingPunctuation = previous.raw.match(/[),.;:!?]+$/u)?.[0] ?? "";
-  if (/[.;:!?]/u.test(trailingPunctuation)) return false;
-  const trailingComma = previous.raw.match(/,+$/u)?.[0] ?? "";
-  const separator = `${trailingComma}${line.slice(previous.end, candidate.start)}`;
-  return (
-    /^(?:\s|,|\band\b|\bor\b)+$/iu.test(separator) &&
-    /,|\b(?:and|or)\b/iu.test(separator)
-  );
-}
-
-function destinationClauseSpans(
-  line: string,
-  candidates: DestinationCandidate[],
-): Array<{ start: number; end: number }> {
-  const projection = line.split("");
-  for (const candidate of candidates) {
-    projection.fill(" ", candidate.start, candidate.end);
-    const trailingBoundary = candidate.raw.match(/[;,.!?]+$/u)?.[0] ?? "";
-    const boundaryStart = candidate.end - trailingBoundary.length;
-    for (let index = boundaryStart; index < candidate.end; index += 1) {
-      projection[index] = line[index] ?? " ";
-    }
-  }
-  const prose = projection.join("");
-  const spans: Array<{ start: number; end: number }> = [];
-  let start = 0;
-  for (const boundary of prose.matchAll(CLAUSE_BOUNDARY_RE)) {
-    const end = boundary.index ?? 0;
-    spans.push({ start, end });
-    start = end + (boundary[0]?.length ?? 0);
-  }
-  spans.push({ start, end: line.length });
-  return spans;
-}
-
-function associationPrefix(
-  line: string,
-  candidate: DestinationCandidate,
-  clause: { start: number; end: number },
-): string {
-  return destinationActionProjection(line)
-    .slice(clause.start, candidate.start)
-    .replace(/[\s`*_([{'"“‘]+$/gu, "");
-}
-
-function hasNetworkDestinationAssociation(
-  line: string,
-  candidate: DestinationCandidate,
-  clause: { start: number; end: number },
-): boolean {
-  if (candidate.explicitTransport !== undefined) return true;
-  if (candidate.kind === "network-share") return true;
-  if (candidate.destination === undefined) return false;
-  const prefix = associationPrefix(line, candidate, clause);
-  if (candidate.kind === "bare-host") {
-    return (
-      DIRECT_BARE_NETWORK_TARGET_PREFIX_RE.test(prefix) ||
-      PREPOSITIONAL_NETWORK_TARGET_PREFIX_RE.test(prefix)
-    );
-  }
-  if (candidate.kind === "ambiguous-dotted-token") {
-    return (
-      DIRECT_AMBIGUOUS_NETWORK_TARGET_PREFIX_RE.test(prefix) ||
-      PREPOSITIONAL_NETWORK_TARGET_PREFIX_RE.test(prefix)
-    );
-  }
-  return false;
-}
-
-function hasUploadDestinationAssociation(
-  line: string,
-  candidate: DestinationCandidate,
-  clause: { start: number; end: number },
-): boolean {
-  const curlAssociation = isCurlUploadAssociation(line, candidate, clause);
-  if (curlAssociation !== undefined) return curlAssociation;
-  const prefix = associationPrefix(line, candidate, clause);
-  return (
-    DIRECT_UPLOAD_TARGET_PREFIX_RE.test(prefix) ||
-    PREPOSITIONAL_UPLOAD_TARGET_PREFIX_RE.test(prefix)
-  );
-}
-
-function isCurlUploadAssociation(
-  line: string,
-  candidate: DestinationCandidate,
-  clause: { start: number; end: number },
-): boolean | undefined {
-  const projection = destinationActionProjection(line);
-  const command = containingShellCommandSpan(
-    projection,
-    candidate.start,
-    clause,
-  );
-  const prefix = projection.slice(command.start, candidate.start);
-  if (!/\bcurl\b/i.test(prefix)) return undefined;
-  const transfer = containingCurlTransferSpan(
-    projection,
-    candidate.start,
-    command,
-  );
-  const transferProjection = projection.slice(transfer.start, transfer.end);
-  return (
-    CURL_UPLOAD_DATA_OPTION_RE.test(transferProjection) ||
-    CURL_UPLOAD_METHOD_RE.test(transferProjection)
-  );
-}
-
-function containingShellCommandSpan(
-  projection: string,
-  candidateStart: number,
-  clause: { start: number; end: number },
-): { start: number; end: number } {
-  let start = clause.start;
-
-  for (const separator of unquotedShellSeparatorSpans(projection, clause)) {
-    if (separator.end <= candidateStart) {
-      start = separator.end;
-      continue;
-    }
-    return { start, end: separator.start };
-  }
-
-  return { start, end: clause.end };
-}
-
-function unquotedShellSeparatorSpans(
-  projection: string,
-  bounds: { start: number; end: number },
-): Array<{ start: number; end: number }> {
-  const separators: Array<{ start: number; end: number }> = [];
-  let quote: "'" | '"' | undefined;
-
-  for (let index = bounds.start; index < bounds.end; index += 1) {
-    const character = projection[index];
-    if (quote !== undefined) {
-      if (character === quote) quote = undefined;
-      else if (quote === '"' && character === "\\") index += 1;
-      continue;
-    }
-    if (character === "\\") {
-      index += 1;
-      continue;
-    }
-    if (character === "'" || character === '"') {
-      quote = character;
-      continue;
-    }
-
-    const previous = projection[index - 1];
-    const next = projection[index + 1];
-    const length =
-      character === ";" || character === "|"
-        ? character === "|" && next === "|"
-          ? 2
-          : 1
-        : character === "&" && next === "&"
-          ? 2
-          : character === "&" && next !== ">" && previous !== ">"
-            ? 1
-            : 0;
-    if (length === 0) continue;
-    separators.push({ start: index, end: index + length });
-    index += length - 1;
-  }
-
-  return separators;
-}
-
-function containingCurlTransferSpan(
-  projection: string,
-  candidateStart: number,
-  command: { start: number; end: number },
-): { start: number; end: number } {
-  let start = command.start;
-
-  for (const boundary of unquotedCurlNextSpans(projection, command)) {
-    if (boundary.end <= candidateStart) {
-      start = boundary.end;
-      continue;
-    }
-    return { start, end: boundary.start };
-  }
-
-  return { start, end: command.end };
-}
-
-function unquotedCurlNextSpans(
-  projection: string,
-  bounds: { start: number; end: number },
-): Array<{ start: number; end: number }> {
-  const boundaries: Array<{ start: number; end: number }> = [];
-  let quote: "'" | '"' | undefined;
-
-  for (let index = bounds.start; index < bounds.end; index += 1) {
-    const character = projection[index];
-    if (quote !== undefined) {
-      if (character === quote) quote = undefined;
-      else if (quote === '"' && character === "\\") index += 1;
-      continue;
-    }
-    if (character === "\\") {
-      index += 1;
-      continue;
-    }
-    if (character === "'" || character === '"') {
-      quote = character;
-      continue;
-    }
-    if (!projection.startsWith("--next", index)) continue;
-
-    const before = projection[index - 1];
-    const after = projection[index + "--next".length];
-    const startsToken = index === bounds.start || /\s/u.test(before ?? "");
-    const endsToken =
-      index + "--next".length === bounds.end || /\s/u.test(after ?? "");
-    if (!startsToken || !endsToken) continue;
-    boundaries.push({ start: index, end: index + "--next".length });
-    index += "--next".length - 1;
-  }
-
-  return boundaries;
-}
-
-function isNetworkInstruction(line: string): boolean {
-  if (associatedDestinationCandidates(line, "network").length > 0) return true;
-  const prose = destinationActionProjection(line);
-  return (
-    CLEAR_NETWORK_INSTRUCTION_RE.test(prose) ||
-    EXPLICIT_NETWORK_TARGET_RE.test(prose)
-  );
-}
-
-function normalizeNetworkDestination(
-  candidate: string,
-): NetworkDestination | undefined {
-  const raw = candidate.trim().replace(TRAILING_DESTINATION_PUNCTUATION_RE, "");
-  if (raw.length === 0) {
-    return undefined;
-  }
-
-  const explicitUrl = /^https?:\/\//i.test(raw) || raw.startsWith("//");
-  const networkShare = raw.startsWith("\\\\");
-  const parseable = /^https?:\/\//i.test(raw)
-    ? raw
-    : raw.startsWith("//")
-      ? `https:${raw}`
-      : raw.startsWith("\\\\")
-        ? `https://${raw.slice(2).replaceAll("\\", "/")}`
-        : `https://${raw}`;
-  try {
-    const url = new URL(parseable);
-    const canonicalHostname = url.hostname.toLowerCase();
-    const host =
-      canonicalHostname.startsWith("[") && canonicalHostname.endsWith("]")
-        ? canonicalHostname.slice(1, -1)
-        : canonicalHostname;
-    const ipVersion = isIP(host);
-    if (
-      (ipVersion === 6 && !explicitUrl) ||
-      (ipVersion === 0 && !host.includes(".") && !explicitUrl && !networkShare)
-    ) {
-      return undefined;
-    }
-    const path = url.pathname.replace(/\/+$/, "");
-    return {
-      raw,
-      host,
-      path: path === "/" ? "" : path,
-    };
-  } catch {
-    return undefined;
-  }
-}
-
-function networkDestinationMatches(
-  candidate: NetworkDestination,
-  approved: NetworkDestination,
-): boolean {
-  if (approved.path.length > 0) {
-    return (
-      candidate.host === approved.host &&
-      (candidate.path === approved.path ||
-        candidate.path.startsWith(`${approved.path}/`))
-    );
-  }
-
-  if (
-    isIP(candidate.host) !== 0 ||
-    isIP(approved.host) !== 0 ||
-    !candidate.host.includes(".") ||
-    !approved.host.includes(".")
-  ) {
-    return candidate.host === approved.host;
-  }
-
-  return (
-    candidate.host === approved.host ||
-    candidate.host.endsWith(`.${approved.host}`)
-  );
-}
-
 function matchesDisallowedCommand(line: string, command: string): boolean {
   const normalizedLine = line.toLowerCase().replace(/\s+/g, " ");
   const normalizedCommand = command.trim().toLowerCase().replace(/\s+/g, " ");
@@ -3055,11 +2328,14 @@ function hasStructuredGuard(
   return false;
 }
 
-function requiresDestinationApprovalGuard(line: string): boolean {
+function requiresDestinationApprovalGuard(
+  line: string,
+  analysis: DestinationAnalysis,
+): boolean {
   return (
     EXTERNAL_UPLOAD_RE.test(line) ||
     CLOUD_UPLOAD_RE.test(line) ||
-    referencesConcreteNetworkDestination(line)
+    networkDestinations(analysis).length > 0
   );
 }
 
@@ -3071,10 +2347,6 @@ function requiresLineLocalApprovalGuard(line: string): boolean {
     PRIVILEGED_COMMAND_RE.test(line) ||
     DESTRUCTIVE_COMMAND_RE.test(line)
   );
-}
-
-function referencesConcreteNetworkDestination(line: string): boolean {
-  return associatedNetworkDestinations(line).length > 0;
 }
 
 function isDefensiveOrGuardedActionInstruction(line: string): boolean {
