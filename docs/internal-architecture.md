@@ -176,6 +176,31 @@ snapshot and core. A working-tree mutation after collection cannot influence a
 later lazy projection; a new collection is required to observe it. This keeps
 commands from combining independently recollected repository states.
 
+## CLI Commands Have One Registered Contract
+
+`COMMAND_REGISTRY` in `src/cli.ts` is the command-level source of truth. Every
+`CommandName` has exactly one registry entry that binds its positional bounds,
+accepted option names, authoritative `CommandHelp` object, default output
+format, command-specific parser/executor, and any expected filesystem-error
+adapter. The registry is checked with `satisfies Record<CommandName,
+CommandSpec>`, so adding help for a command without executor wiring is a type
+error. Help rendering and option rejection use the same registered help
+contract rather than independently maintained command lists.
+
+The global `node:util` parser remains intentionally shared to preserve unknown
+option behavior and short flags. Its option table is itself checked against
+every `CliOptionName`; registration still controls which parsed options an
+individual command accepts. An option therefore cannot leak into a command
+merely because the global parser recognizes it.
+
+Command-specific validation remains close to the executor whose defaults and
+semantics it protects. Shared configuration-path projection and ordinary
+expected-error rendering are centralized, while inspect and semantic-split
+read errors remain explicit registry adapters. The dispatcher performs no
+command-name branch chain: it validates and invokes the selected spec. It also
+preserves synchronous command return timing for stdout-only commands and awaits
+asynchronous executors before applying their expected-error adapters.
+
 ## Declared Composition Is Pure Catalog Analysis
 
 `src/declared-composition.ts` accepts the existing normalized `Catalog` and a

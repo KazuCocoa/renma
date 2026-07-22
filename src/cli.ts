@@ -1,63 +1,40 @@
 import { parseArgs } from "node:util";
 import packageJson from "../package.json" with { type: "json" };
-import { runBomCommand, type BomFormat } from "./commands/bom.js";
-import { runCatalogCommand, type CatalogFormat } from "./commands/catalog.js";
-import {
-  runCiReportCommand,
-  type CiReportFormat,
-} from "./commands/ci-report.js";
-import { runDiffCommand, type DiffFormat } from "./commands/diff.js";
+import { runBomCommand } from "./commands/bom.js";
+import { runCatalogCommand } from "./commands/catalog.js";
+import { runCiReportCommand } from "./commands/ci-report.js";
+import { runDiffCommand } from "./commands/diff.js";
 import {
   runGraphCommand,
   type GraphFormat,
   type GraphView,
 } from "./commands/graph.js";
-import {
-  runGuideCommand,
-  type GuideFormat,
-  type GuideTopic,
-} from "./commands/guide.js";
-import { runInspectCommand, type InspectFormat } from "./commands/inspect.js";
+import { runGuideCommand } from "./commands/guide.js";
+import { runInspectCommand } from "./commands/inspect.js";
 import { runInitCommand } from "./commands/init.js";
-import {
-  runOwnershipCommand,
-  type OwnershipFormat,
-} from "./commands/ownership.js";
-import {
-  runReadinessCommand,
-  type ReadinessFormat,
-} from "./commands/readiness.js";
+import { runOwnershipCommand } from "./commands/ownership.js";
+import { runReadinessCommand } from "./commands/readiness.js";
 import {
   runScaffoldCommand,
-  type ScaffoldFormat,
-  type ScaffoldKind,
   type ScaffoldOptions,
   type ScaffoldResource,
 } from "./commands/scaffold.js";
 import { runScanCommand } from "./commands/scan.js";
-import {
-  runSkillIndexCommand,
-  type SkillIndexFormat,
-} from "./commands/skill-index.js";
+import { runSkillIndexCommand } from "./commands/skill-index.js";
 import {
   runSuggestMetadataCommand,
   SuggestMetadataTargetError,
-  type SuggestMetadataFormat,
 } from "./commands/suggest-metadata.js";
+import { runSuggestSemanticSplitCommand } from "./commands/suggest-semantic-split.js";
+import { runTrustGraphCommand } from "./commands/trust-graph.js";
 import {
-  runSuggestSemanticSplitCommand,
-  type SuggestSemanticSplitFormat,
-} from "./commands/suggest-semantic-split.js";
-import {
-  runTrustGraphCommand,
-  type TrustGraphFormat,
-} from "./commands/trust-graph.js";
-import {
+  commandHelpDefinition,
   commandOptionNames,
   isCommandName,
   renderCommandHelp,
   renderGlobalHelp,
   type CliOptionName,
+  type CommandHelp,
   type CommandName,
 } from "./cli-help.js";
 import { ConfigError, type ConfigOverrides } from "./config.js";
@@ -65,51 +42,222 @@ import type { Severity } from "./types/diagnostics.js";
 
 type CliValues = ReturnType<typeof parseArgs>["values"];
 
-interface CommandContract {
+type CliOptionConfig = {
+  type: "string" | "boolean";
+  short?: string;
+  multiple?: boolean;
+};
+
+const CLI_OPTIONS = {
+  config: { type: "string", short: "c" },
+  "fail-on": { type: "string" },
+  focus: { type: "string" },
+  format: { type: "string" },
+  from: { type: "string" },
+  "include-owned": { type: "boolean" },
+  id: { type: "string" },
+  json: { type: "boolean" },
+  lines: { type: "string" },
+  "omit-generated-at": { type: "boolean" },
+  owner: { type: "string" },
+  resources: { type: "string" },
+  tags: { type: "string", multiple: true },
+  title: { type: "string" },
+  to: { type: "string" },
+  view: { type: "string" },
+  "max-context-bytes": { type: "string" },
+  "max-source-bytes": { type: "string" },
+  help: { type: "boolean", short: "h" },
+  version: { type: "boolean", short: "v" },
+} satisfies Record<CliOptionName, CliOptionConfig>;
+
+const COMMAND_DEFAULT_FORMATS = {
+  scan: "text",
+  catalog: "json",
+  graph: "json",
+  "skill-index": "markdown",
+  "trust-graph": "json",
+  readiness: "json",
+  bom: "json",
+  ownership: "json",
+  diff: "json",
+  "ci-report": "markdown",
+  inspect: "json",
+  guide: "prompt",
+  scaffold: "file",
+  "suggest-metadata": "prompt",
+  "suggest-semantic-split": "prompt",
+} as const satisfies Partial<Record<CommandName, string>>;
+
+export interface CommandContract {
   minPositionals: number;
   maxPositionals: number;
   missingPositionalsMessage?: string;
 }
 
-const COMMAND_CONTRACTS: Record<CommandName, CommandContract> = {
-  init: { minPositionals: 0, maxPositionals: 1 },
-  scan: { minPositionals: 0, maxPositionals: 1 },
-  catalog: { minPositionals: 0, maxPositionals: 1 },
-  graph: { minPositionals: 0, maxPositionals: 1 },
-  "skill-index": { minPositionals: 0, maxPositionals: 1 },
-  "trust-graph": { minPositionals: 0, maxPositionals: 1 },
-  readiness: { minPositionals: 0, maxPositionals: 1 },
-  bom: { minPositionals: 0, maxPositionals: 1 },
-  ownership: { minPositionals: 0, maxPositionals: 1 },
-  diff: { minPositionals: 0, maxPositionals: 1 },
-  "ci-report": { minPositionals: 0, maxPositionals: 1 },
-  inspect: {
-    minPositionals: 1,
-    maxPositionals: 1,
-    missingPositionalsMessage: "inspect requires a target file.",
-  },
-  guide: {
-    minPositionals: 1,
-    maxPositionals: 1,
-    missingPositionalsMessage:
-      "guide requires a topic. The only supported topic is skill.",
-  },
-  scaffold: {
-    minPositionals: 2,
-    maxPositionals: 2,
-    missingPositionalsMessage: "scaffold requires a kind and target path.",
-  },
-  "suggest-metadata": {
-    minPositionals: 1,
-    maxPositionals: 1,
-    missingPositionalsMessage: "suggest-metadata requires a target file.",
-  },
-  "suggest-semantic-split": {
-    minPositionals: 1,
-    maxPositionals: 1,
-    missingPositionalsMessage: "suggest-semantic-split requires a target file.",
-  },
+interface CommandExecutionContext {
+  values: CliValues;
+  positionals: readonly string[];
+  target: string;
+}
+
+interface CommandSpec {
+  name: CommandName;
+  positionals: CommandContract;
+  optionNames: readonly CliOptionName[];
+  help: CommandHelp;
+  defaultFormat?: string;
+  execute(context: CommandExecutionContext): Promise<number> | number;
+  expectedError?(
+    context: CommandExecutionContext,
+    error: unknown,
+  ): string | undefined;
+}
+
+function commandSpec(
+  name: CommandName,
+  positionals: CommandContract,
+  defaultFormat: string | undefined,
+  execute: CommandSpec["execute"],
+  expectedError?: CommandSpec["expectedError"],
+): CommandSpec {
+  return {
+    name,
+    positionals,
+    optionNames: commandOptionNames(name),
+    help: commandHelpDefinition(name),
+    ...(defaultFormat === undefined ? {} : { defaultFormat }),
+    execute,
+    ...(expectedError === undefined ? {} : { expectedError }),
+  };
+}
+
+const OPTIONAL_ROOT: CommandContract = {
+  minPositionals: 0,
+  maxPositionals: 1,
 };
+
+export const COMMAND_REGISTRY = {
+  init: commandSpec("init", OPTIONAL_ROOT, undefined, ({ target }) =>
+    runInitCommand(target),
+  ),
+  scan: commandSpec(
+    "scan",
+    OPTIONAL_ROOT,
+    COMMAND_DEFAULT_FORMATS.scan,
+    ({ values, target }) => runScan(values, target),
+  ),
+  catalog: commandSpec(
+    "catalog",
+    OPTIONAL_ROOT,
+    COMMAND_DEFAULT_FORMATS.catalog,
+    ({ values, target }) => runCatalog(values, target),
+  ),
+  graph: commandSpec(
+    "graph",
+    OPTIONAL_ROOT,
+    COMMAND_DEFAULT_FORMATS.graph,
+    ({ values, target }) => runGraph(values, target),
+  ),
+  "skill-index": commandSpec(
+    "skill-index",
+    OPTIONAL_ROOT,
+    COMMAND_DEFAULT_FORMATS["skill-index"],
+    ({ values, target }) => runSkillIndex(values, target),
+  ),
+  "trust-graph": commandSpec(
+    "trust-graph",
+    OPTIONAL_ROOT,
+    COMMAND_DEFAULT_FORMATS["trust-graph"],
+    ({ values, target }) => runTrustGraph(values, target),
+  ),
+  readiness: commandSpec(
+    "readiness",
+    OPTIONAL_ROOT,
+    COMMAND_DEFAULT_FORMATS.readiness,
+    ({ values, target }) => runReadiness(values, target),
+  ),
+  bom: commandSpec(
+    "bom",
+    OPTIONAL_ROOT,
+    COMMAND_DEFAULT_FORMATS.bom,
+    ({ values, target }) => runBom(values, target),
+  ),
+  ownership: commandSpec(
+    "ownership",
+    OPTIONAL_ROOT,
+    COMMAND_DEFAULT_FORMATS.ownership,
+    ({ values, target }) => runOwnership(values, target),
+  ),
+  diff: commandSpec(
+    "diff",
+    OPTIONAL_ROOT,
+    COMMAND_DEFAULT_FORMATS.diff,
+    ({ values, target }) => runDiff(values, target),
+  ),
+  "ci-report": commandSpec(
+    "ci-report",
+    OPTIONAL_ROOT,
+    COMMAND_DEFAULT_FORMATS["ci-report"],
+    ({ values, target }) => runCiReport(values, target),
+  ),
+  inspect: commandSpec(
+    "inspect",
+    {
+      minPositionals: 1,
+      maxPositionals: 1,
+      missingPositionalsMessage: "inspect requires a target file.",
+    },
+    COMMAND_DEFAULT_FORMATS.inspect,
+    ({ values, target }) => runInspect(values, target),
+    expectedReadableTargetError("inspect", true),
+  ),
+  guide: commandSpec(
+    "guide",
+    {
+      minPositionals: 1,
+      maxPositionals: 1,
+      missingPositionalsMessage:
+        "guide requires a topic. The only supported topic is skill.",
+    },
+    COMMAND_DEFAULT_FORMATS.guide,
+    ({ values, target }) => runGuide(values, target),
+  ),
+  scaffold: commandSpec(
+    "scaffold",
+    {
+      minPositionals: 2,
+      maxPositionals: 2,
+      missingPositionalsMessage: "scaffold requires a kind and target path.",
+    },
+    COMMAND_DEFAULT_FORMATS.scaffold,
+    ({ values, target, positionals }) =>
+      runScaffold(values, target, positionals[2]),
+  ),
+  "suggest-metadata": commandSpec(
+    "suggest-metadata",
+    {
+      minPositionals: 1,
+      maxPositionals: 1,
+      missingPositionalsMessage: "suggest-metadata requires a target file.",
+    },
+    COMMAND_DEFAULT_FORMATS["suggest-metadata"],
+    ({ values, target, positionals }) =>
+      runSuggestMetadata(values, target, positionals.length > 1),
+  ),
+  "suggest-semantic-split": commandSpec(
+    "suggest-semantic-split",
+    {
+      minPositionals: 1,
+      maxPositionals: 1,
+      missingPositionalsMessage:
+        "suggest-semantic-split requires a target file.",
+    },
+    COMMAND_DEFAULT_FORMATS["suggest-semantic-split"],
+    ({ values, target }) => runSuggestSemanticSplit(values, target),
+    expectedReadableTargetError("semantic split", false),
+  ),
+} satisfies Record<CommandName, CommandSpec>;
 
 export async function main(argv = process.argv.slice(2)): Promise<number> {
   let parsed;
@@ -117,28 +265,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     parsed = parseArgs({
       args: argv,
       allowPositionals: true,
-      options: {
-        config: { type: "string", short: "c" },
-        "fail-on": { type: "string" },
-        focus: { type: "string" },
-        format: { type: "string" },
-        from: { type: "string" },
-        "include-owned": { type: "boolean" },
-        id: { type: "string" },
-        json: { type: "boolean" },
-        lines: { type: "string" },
-        "omit-generated-at": { type: "boolean" },
-        owner: { type: "string" },
-        resources: { type: "string" },
-        tags: { type: "string", multiple: true },
-        title: { type: "string" },
-        to: { type: "string" },
-        view: { type: "string" },
-        "max-context-bytes": { type: "string" },
-        "max-source-bytes": { type: "string" },
-        help: { type: "boolean", short: "h" },
-        version: { type: "boolean", short: "v" },
-      },
+      options: CLI_OPTIONS,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -175,81 +302,20 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     return 2;
   }
 
-  const contractError = validateCommandInvocation(
-    command,
-    parsed.positionals,
-    parsed.values,
-  );
+  const spec = COMMAND_REGISTRY[command];
+  const context: CommandExecutionContext = {
+    values: parsed.values,
+    positionals: parsed.positionals,
+    target,
+  };
+  const contractError = validateCommandInvocation(spec, context);
   if (contractError) return usageError(command, contractError);
 
   try {
-    if (command === "init") {
-      return await runInitCommand(target);
-    }
-
-    if (command === "suggest-semantic-split") {
-      return await runSuggestSemanticSplit(parsed.values, target);
-    }
-
-    if (command === "suggest-metadata") {
-      return await runSuggestMetadata(
-        parsed.values,
-        target,
-        parsed.positionals.length > 1,
-      );
-    }
-
-    if (command === "scaffold") {
-      return await runScaffold(parsed.values, target, parsed.positionals[2]);
-    }
-
-    if (command === "guide") {
-      return runGuide(parsed.values, target);
-    }
-
-    if (command === "inspect") {
-      return await runInspect(parsed.values, target);
-    }
-
-    if (command === "catalog") {
-      return await runCatalog(parsed.values, target);
-    }
-
-    if (command === "bom") {
-      return await runBom(parsed.values, target);
-    }
-
-    if (command === "diff") {
-      return await runDiff(parsed.values, target);
-    }
-
-    if (command === "ci-report") {
-      return await runCiReport(parsed.values, target);
-    }
-
-    if (command === "graph") {
-      return await runGraph(parsed.values, target);
-    }
-
-    if (command === "skill-index") {
-      return await runSkillIndex(parsed.values, target);
-    }
-
-    if (command === "trust-graph") {
-      return await runTrustGraph(parsed.values, target);
-    }
-
-    if (command === "ownership") {
-      return await runOwnership(parsed.values, target);
-    }
-
-    if (command === "readiness") {
-      return await runReadiness(parsed.values, target);
-    }
-
-    return await runScan(parsed.values, target);
+    const result = spec.execute(context);
+    return typeof result === "number" ? result : await result;
   } catch (error) {
-    const message = expectedCommandError(command, target, error);
+    const message = spec.expectedError?.(context, error);
     if (message) return usageError(command, message);
     throw error;
   }
@@ -265,14 +331,14 @@ function runGuide(values: CliValues, topicValue: string): number {
 
   const format = values.json
     ? "json"
-    : (stringValue(values.format) ?? "prompt");
+    : (stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS.guide);
   if (format !== "prompt" && format !== "json") {
     return usageError("guide", "--format must be either prompt or json.");
   }
 
   return runGuideCommand({
-    topic: topicValue as GuideTopic,
-    format: format as GuideFormat,
+    topic: topicValue,
+    format,
     renmaVersion: packageJson.version,
   });
 }
@@ -297,7 +363,7 @@ async function runScaffold(
     return usageError("scaffold", "scaffold requires a target path.");
   }
 
-  const format = stringValue(values.format) ?? "file";
+  const format = stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS.scaffold;
   if (format !== "file" && format !== "prompt" && format !== "json") {
     return usageError(
       "scaffold",
@@ -315,9 +381,9 @@ async function runScaffold(
 
   try {
     const scaffoldOptions: ScaffoldOptions = {
-      kind: kindValue as ScaffoldKind,
+      kind: kindValue,
       targetPath,
-      format: format as ScaffoldFormat,
+      format,
     };
     const id = stringValue(values.id);
     const title = stringValue(values.title);
@@ -330,8 +396,7 @@ async function runScaffold(
     if (resources.length > 0) scaffoldOptions.resources = resources;
     return await runScaffoldCommand(scaffoldOptions);
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    return 2;
+    return reportCommandError(error);
   }
 }
 
@@ -341,19 +406,23 @@ function scaffoldResources(value: string | undefined): ScaffoldResource[] {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
-  const allowed = new Set<ScaffoldResource>([
+  const allowed: ReadonlySet<string> = new Set([
     "references",
     "scripts",
     "assets",
   ]);
   for (const resource of resources) {
-    if (!allowed.has(resource as ScaffoldResource)) {
+    if (!allowed.has(resource)) {
       throw new Error(
         "--resources must be a comma-separated list of references,scripts,assets.",
       );
     }
   }
-  return [...new Set(resources as ScaffoldResource[])];
+  return resources.filter(isScaffoldResource);
+}
+
+function isScaffoldResource(value: string): value is ScaffoldResource {
+  return value === "references" || value === "scripts" || value === "assets";
 }
 
 async function runScan(values: CliValues, target: string): Promise<number> {
@@ -371,74 +440,56 @@ async function runScan(values: CliValues, target: string): Promise<number> {
     return usageError("scan", "--format must be either text or json.");
   }
 
-  const configPath = stringValue(values.config);
   const overrides: ConfigOverrides = {
-    ...(configPath ? { configPath } : {}),
+    ...configOverrides(values),
     ...(failOn ? { failOn } : {}),
     ...(format ? { format } : {}),
   };
   try {
     return await runScanCommand(target, overrides);
   } catch (error) {
-    console.error(
-      error instanceof ConfigError || error instanceof Error
-        ? error.message
-        : String(error),
-    );
-    return 2;
+    return reportCommandError(error);
   }
 }
 
 async function runCatalog(values: CliValues, target: string): Promise<number> {
-  const format = values.json ? "json" : (stringValue(values.format) ?? "json");
+  const format = values.json
+    ? "json"
+    : (stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS.catalog);
   if (format !== "json" && format !== "markdown") {
     return usageError("catalog", "--format must be either json or markdown.");
   }
 
-  const configPath = stringValue(values.config);
-  const overrides: ConfigOverrides = {
-    ...(configPath ? { configPath } : {}),
-  };
+  const overrides = configOverrides(values);
 
   try {
     return await runCatalogCommand(target, {
-      format: format as CatalogFormat,
+      format,
       overrides,
     });
   } catch (error) {
-    console.error(
-      error instanceof ConfigError || error instanceof Error
-        ? error.message
-        : String(error),
-    );
-    return 2;
+    return reportCommandError(error);
   }
 }
 
 async function runBom(values: CliValues, target: string): Promise<number> {
-  const format = values.json ? "json" : (stringValue(values.format) ?? "json");
+  const format = values.json
+    ? "json"
+    : (stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS.bom);
   if (format !== "json" && format !== "markdown") {
     return usageError("bom", "--format must be either json or markdown.");
   }
 
-  const configPath = stringValue(values.config);
-  const overrides: ConfigOverrides = {
-    ...(configPath ? { configPath } : {}),
-  };
+  const overrides = configOverrides(values);
 
   try {
     return await runBomCommand(target, {
-      format: format as BomFormat,
+      format,
       overrides,
       omitGeneratedAt: values["omit-generated-at"] === true,
     });
   } catch (error) {
-    console.error(
-      error instanceof ConfigError || error instanceof Error
-        ? error.message
-        : String(error),
-    );
-    return 2;
+    return reportCommandError(error);
   }
 }
 
@@ -449,30 +500,24 @@ async function runDiff(values: CliValues, target: string): Promise<number> {
     return usageError("diff", "diff requires --from <ref> and --to <ref>.");
   }
 
-  const format = values.json ? "json" : (stringValue(values.format) ?? "json");
+  const format = values.json
+    ? "json"
+    : (stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS.diff);
   if (format !== "json" && format !== "markdown") {
     return usageError("diff", "--format must be either json or markdown.");
   }
 
-  const configPath = stringValue(values.config);
-  const overrides: ConfigOverrides = {
-    ...(configPath ? { configPath } : {}),
-  };
+  const overrides = configOverrides(values);
 
   try {
     return await runDiffCommand(target, {
       fromRef,
       toRef,
-      format: format as DiffFormat,
+      format,
       overrides,
     });
   } catch (error) {
-    console.error(
-      error instanceof ConfigError || error instanceof Error
-        ? error.message
-        : String(error),
-    );
-    return 2;
+    return reportCommandError(error);
   }
 }
 
@@ -488,35 +533,29 @@ async function runCiReport(values: CliValues, target: string): Promise<number> {
 
   const format = values.json
     ? "json"
-    : (stringValue(values.format) ?? "markdown");
+    : (stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS["ci-report"]);
   if (format !== "json" && format !== "markdown") {
     return usageError("ci-report", "--format must be either json or markdown.");
   }
 
-  const configPath = stringValue(values.config);
-  const overrides: ConfigOverrides = {
-    ...(configPath ? { configPath } : {}),
-  };
+  const overrides = configOverrides(values);
 
   try {
     return await runCiReportCommand(target, {
       fromRef,
       toRef,
-      format: format as CiReportFormat,
+      format,
       overrides,
     });
   } catch (error) {
-    console.error(
-      error instanceof ConfigError || error instanceof Error
-        ? error.message
-        : String(error),
-    );
-    return 2;
+    return reportCommandError(error);
   }
 }
 
 async function runGraph(values: CliValues, target: string): Promise<number> {
-  const format = values.json ? "json" : (stringValue(values.format) ?? "json");
+  const format = values.json
+    ? "json"
+    : (stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS.graph);
   if (format !== "json" && format !== "markdown" && format !== "mermaid") {
     return usageError(
       "graph",
@@ -533,10 +572,7 @@ async function runGraph(values: CliValues, target: string): Promise<number> {
     );
   }
 
-  const configPath = stringValue(values.config);
-  const overrides: ConfigOverrides = {
-    ...(configPath ? { configPath } : {}),
-  };
+  const overrides = configOverrides(values);
 
   try {
     const graphOptions: {
@@ -545,8 +581,8 @@ async function runGraph(values: CliValues, target: string): Promise<number> {
       focus?: string;
       overrides: ConfigOverrides;
     } = {
-      format: format as GraphFormat,
-      view: view as GraphView,
+      format,
+      view,
       overrides,
     };
     const focus = stringValue(values.focus);
@@ -555,12 +591,7 @@ async function runGraph(values: CliValues, target: string): Promise<number> {
     }
     return await runGraphCommand(target, graphOptions);
   } catch (error) {
-    console.error(
-      error instanceof ConfigError || error instanceof Error
-        ? error.message
-        : String(error),
-    );
-    return 2;
+    return reportCommandError(error);
   }
 }
 
@@ -575,7 +606,9 @@ async function runSkillIndex(
       "--json conflicts with a non-JSON --format value.",
     );
   }
-  const format = values.json ? "json" : (explicitFormat ?? "markdown");
+  const format = values.json
+    ? "json"
+    : (explicitFormat ?? COMMAND_DEFAULT_FORMATS["skill-index"]);
   if (format !== "json" && format !== "markdown") {
     return usageError(
       "skill-index",
@@ -583,25 +616,17 @@ async function runSkillIndex(
     );
   }
 
-  const configPath = stringValue(values.config);
-  const overrides: ConfigOverrides = {
-    ...(configPath ? { configPath } : {}),
-  };
+  const overrides = configOverrides(values);
   const focus = stringValue(values.focus);
 
   try {
     return await runSkillIndexCommand(target, {
-      format: format as SkillIndexFormat,
+      format,
       ...(focus !== undefined ? { focus } : {}),
       overrides,
     });
   } catch (error) {
-    console.error(
-      error instanceof ConfigError || error instanceof Error
-        ? error.message
-        : String(error),
-    );
-    return 2;
+    return reportCommandError(error);
   }
 }
 
@@ -609,7 +634,9 @@ async function runTrustGraph(
   values: CliValues,
   target: string,
 ): Promise<number> {
-  const format = values.json ? "json" : (stringValue(values.format) ?? "json");
+  const format = values.json
+    ? "json"
+    : (stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS["trust-graph"]);
   if (format !== "json" && format !== "markdown") {
     return usageError(
       "trust-graph",
@@ -617,23 +644,15 @@ async function runTrustGraph(
     );
   }
 
-  const configPath = stringValue(values.config);
-  const overrides: ConfigOverrides = {
-    ...(configPath ? { configPath } : {}),
-  };
+  const overrides = configOverrides(values);
 
   try {
     return await runTrustGraphCommand(target, {
-      format: format as TrustGraphFormat,
+      format,
       overrides,
     });
   } catch (error) {
-    console.error(
-      error instanceof ConfigError || error instanceof Error
-        ? error.message
-        : String(error),
-    );
-    return 2;
+    return reportCommandError(error);
   }
 }
 
@@ -657,31 +676,25 @@ async function runOwnership(
   values: CliValues,
   target: string,
 ): Promise<number> {
-  const format = values.json ? "json" : (stringValue(values.format) ?? "json");
+  const format = values.json
+    ? "json"
+    : (stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS.ownership);
   if (format !== "json" && format !== "markdown") {
     return usageError("ownership", "--format must be either json or markdown.");
   }
 
-  const configPath = stringValue(values.config);
-  const overrides: ConfigOverrides = {
-    ...(configPath ? { configPath } : {}),
-  };
+  const overrides = configOverrides(values);
 
   try {
     const owner = stringValue(values.owner)?.trim();
     return await runOwnershipCommand(target, {
-      format: format as OwnershipFormat,
+      format,
       includeOwned: values["include-owned"] === true,
       ...(owner ? { owner } : {}),
       overrides,
     });
   } catch (error) {
-    console.error(
-      error instanceof ConfigError || error instanceof Error
-        ? error.message
-        : String(error),
-    );
-    return 2;
+    return reportCommandError(error);
   }
 }
 
@@ -689,28 +702,22 @@ async function runReadiness(
   values: CliValues,
   target: string,
 ): Promise<number> {
-  const format = values.json ? "json" : (stringValue(values.format) ?? "json");
+  const format = values.json
+    ? "json"
+    : (stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS.readiness);
   if (format !== "json" && format !== "markdown") {
     return usageError("readiness", "--format must be either json or markdown.");
   }
 
-  const configPath = stringValue(values.config);
-  const overrides: ConfigOverrides = {
-    ...(configPath ? { configPath } : {}),
-  };
+  const overrides = configOverrides(values);
 
   try {
     return await runReadinessCommand(target, {
-      format: format as ReadinessFormat,
+      format,
       overrides,
     });
   } catch (error) {
-    console.error(
-      error instanceof ConfigError || error instanceof Error
-        ? error.message
-        : String(error),
-    );
-    return 2;
+    return reportCommandError(error);
   }
 }
 
@@ -720,7 +727,8 @@ function runSuggestSemanticSplit(
 ): Promise<number> {
   const format = values.json
     ? "json"
-    : (stringValue(values.format) ?? "prompt");
+    : (stringValue(values.format) ??
+      COMMAND_DEFAULT_FORMATS["suggest-semantic-split"]);
   if (format !== "prompt" && format !== "json") {
     return Promise.resolve(
       usageError(
@@ -751,7 +759,7 @@ function runSuggestSemanticSplit(
   }
 
   return runSuggestSemanticSplitCommand(target, {
-    format: format as SuggestSemanticSplitFormat,
+    format,
     ...(maxContextBytes ? { maxContextBytes } : {}),
     ...(maxSourceBytes ? { maxSourceBytes } : {}),
   });
@@ -773,7 +781,8 @@ function runSuggestMetadata(
 
   const format = values.json
     ? "json"
-    : (stringValue(values.format) ?? "prompt");
+    : (stringValue(values.format) ??
+      COMMAND_DEFAULT_FORMATS["suggest-metadata"]);
   if (format !== "prompt" && format !== "json") {
     return Promise.resolve(
       usageError("suggest-metadata", "--format must be either prompt or json."),
@@ -782,7 +791,7 @@ function runSuggestMetadata(
 
   const owner = stringValue(values.owner)?.trim();
   return runSuggestMetadataCommand(target, {
-    format: format as SuggestMetadataFormat,
+    format,
     ...(owner ? { owner } : {}),
   }).catch((error: unknown) => {
     if (error instanceof SuggestMetadataTargetError) {
@@ -794,7 +803,9 @@ function runSuggestMetadata(
 }
 
 function runInspect(values: CliValues, target: string): Promise<number> {
-  const format = values.json ? "json" : (stringValue(values.format) ?? "json");
+  const format = values.json
+    ? "json"
+    : (stringValue(values.format) ?? COMMAND_DEFAULT_FORMATS.inspect);
   if (format !== "text" && format !== "json") {
     return Promise.resolve(
       usageError("inspect", "--format must be either text or json."),
@@ -803,7 +814,7 @@ function runInspect(values: CliValues, target: string): Promise<number> {
   const lines = stringValue(values.lines);
 
   return runInspectCommand(target, {
-    format: format as InspectFormat,
+    format,
     ...(lines ? { lines } : {}),
   });
 }
@@ -820,57 +831,68 @@ function globalUsageError(message: string): 2 {
   return 2;
 }
 
+function reportCommandError(error: unknown): 2 {
+  console.error(error instanceof Error ? error.message : String(error));
+  return 2;
+}
+
+function configOverrides(values: CliValues): ConfigOverrides {
+  const configPath = stringValue(values.config);
+  return configPath ? { configPath } : {};
+}
+
 function validateCommandInvocation(
-  command: CommandName,
-  positionals: string[],
-  values: CliValues,
+  spec: CommandSpec,
+  context: CommandExecutionContext,
 ): string | undefined {
-  const allowedOptions = new Set<CliOptionName>(commandOptionNames(command));
-  for (const option of Object.keys(values) as CliOptionName[]) {
+  const allowedOptions = new Set<string>(spec.optionNames);
+  for (const option of Object.keys(context.values)) {
     if (option === "version" || allowedOptions.has(option)) continue;
-    return `${command} does not support --${option}.`;
+    return `${spec.name} does not support --${option}.`;
   }
 
-  const positionalCount = positionals.length === 0 ? 0 : positionals.length - 1;
-  const contract = COMMAND_CONTRACTS[command];
+  const positionalCount =
+    context.positionals.length === 0 ? 0 : context.positionals.length - 1;
+  const contract = spec.positionals;
   if (positionalCount < contract.minPositionals) {
     return (
       contract.missingPositionalsMessage ??
-      `${command} requires ${contract.minPositionals} positional argument(s).`
+      `${spec.name} requires ${contract.minPositionals} positional argument(s).`
     );
   }
   if (positionalCount > contract.maxPositionals) {
-    const unexpected = positionals[contract.maxPositionals + 1];
-    return `${command} received unexpected positional argument${
+    const unexpected = context.positionals[contract.maxPositionals + 1];
+    return `${spec.name} received unexpected positional argument${
       unexpected ? ` "${unexpected}"` : ""
     }.`;
   }
   return undefined;
 }
 
-function expectedCommandError(
-  command: CommandName,
-  target: string,
-  error: unknown,
-): string | undefined {
-  if (command !== "inspect" && command !== "suggest-semantic-split") {
+function expectedReadableTargetError(
+  label: string,
+  includeLineErrors: boolean,
+): NonNullable<CommandSpec["expectedError"]> {
+  return ({ target }, error): string | undefined => {
+    if (
+      includeLineErrors &&
+      error instanceof Error &&
+      error.message.startsWith("--lines ")
+    ) {
+      return error.message;
+    }
+    const code = nodeErrorCode(error);
+    if (code === "ENOENT") {
+      return `Could not read ${label} target ${target}: file does not exist.`;
+    }
+    if (code === "EISDIR") {
+      return `Could not read ${label} target ${target}: target is a directory.`;
+    }
+    if (code === "EACCES" || code === "EPERM") {
+      return `Could not read ${label} target ${target}: target is not readable.`;
+    }
     return undefined;
-  }
-  if (error instanceof Error && error.message.startsWith("--lines ")) {
-    return error.message;
-  }
-  const code = nodeErrorCode(error);
-  const label = command === "inspect" ? "inspect" : "semantic split";
-  if (code === "ENOENT") {
-    return `Could not read ${label} target ${target}: file does not exist.`;
-  }
-  if (code === "EISDIR") {
-    return `Could not read ${label} target ${target}: target is a directory.`;
-  }
-  if (code === "EACCES" || code === "EPERM") {
-    return `Could not read ${label} target ${target}: target is not readable.`;
-  }
-  return undefined;
+  };
 }
 
 function nodeErrorCode(error: unknown): string | undefined {

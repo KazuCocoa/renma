@@ -20,6 +20,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Separated one collected repository core from explicit memoized projections,
   so catalog avoids unrelated Discovery and security work while scan,
   Readiness, and BOM continue to share one immutable evidence boundary.
+- Consolidated CLI help, positional bounds, accepted options, defaults,
+  command-specific parsing/execution, and expected error adapters behind a
+  statically complete typed command registry without changing command output or
+  exit behavior.
 
 ## [0.22.5] - 2026-07-21
 

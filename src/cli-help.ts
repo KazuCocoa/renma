@@ -843,14 +843,22 @@ const COMMAND_MAP = new Map<CommandName, CommandHelp>(
 );
 
 export function isCommandName(value: string): value is CommandName {
-  return COMMAND_MAP.has(value as CommandName);
+  return COMMAND_HELP.some((command) => command.name === value);
 }
 
 /** Return the documented option names accepted by one command. */
 export function commandOptionNames(name: CommandName): CliOptionName[] {
-  const command = COMMAND_MAP.get(name);
-  if (!command) return [];
+  const command = commandHelpDefinition(name);
   return [...new Set(command.options.map(commandOptionName))];
+}
+
+/** Return the authoritative help contract for one registered command. */
+export function commandHelpDefinition(name: CommandName): CommandHelp {
+  const command = COMMAND_MAP.get(name);
+  if (!command) {
+    throw new Error(`Missing CLI help for command ${name}`);
+  }
+  return command;
 }
 
 export function renderGlobalHelp(version: string): string {
@@ -918,10 +926,7 @@ export function renderGlobalHelp(version: string): string {
 }
 
 export function renderCommandHelp(name: CommandName, version: string): string {
-  const command = COMMAND_MAP.get(name);
-  if (!command) {
-    throw new Error(`Missing CLI help for command ${name}`);
-  }
+  const command = commandHelpDefinition(name);
 
   return [
     `renma ${version}`,
