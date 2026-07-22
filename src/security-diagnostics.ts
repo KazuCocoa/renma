@@ -1145,7 +1145,6 @@ function logicalShellCommands(
           markdownView.isCodeContentLine(next);
       append(joinsNext ? physicalLine.slice(0, -1) : physicalLine, cursor + 1);
       if (!joinsNext) break;
-      append(" ", cursor + 1);
       quote = continuation.quote;
       cursor = next;
       memberLineIndexes.push(cursor);
@@ -2562,13 +2561,34 @@ function destinationActionProjection(line: string): string {
 export function associatedNetworkDestinations(
   line: string,
 ): NetworkDestination[] {
-  return associatedDestinations(line, "network");
+  return associatedDestinations(shellContinuationProjection(line), "network");
 }
 
 export function associatedUploadDestinations(
   line: string,
 ): NetworkDestination[] {
-  return associatedDestinations(line, "upload");
+  return associatedDestinations(shellContinuationProjection(line), "upload");
+}
+
+function shellContinuationProjection(line: string): string {
+  const physicalLines = line.split("\n");
+  const projection: string[] = [];
+  let quote: "'" | '"' | undefined;
+
+  for (let index = 0; index < physicalLines.length; index += 1) {
+    const physicalLine = physicalLines[index] ?? "";
+    const continuation = activeShellContinuation(physicalLine, quote);
+    const joinsNext = continuation.active && index + 1 < physicalLines.length;
+    projection.push(joinsNext ? physicalLine.slice(0, -1) : physicalLine);
+    if (joinsNext) {
+      quote = continuation.quote;
+      continue;
+    }
+    quote = undefined;
+    if (index + 1 < physicalLines.length) projection.push("\n");
+  }
+
+  return projection.join("");
 }
 
 function associatedDestinations(

