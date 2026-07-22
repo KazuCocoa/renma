@@ -44,6 +44,14 @@ const BASELINE_CASES = [
 
 test("representative public JSON matches fixed 0.22.5 baselines", async () => {
   const outputs = new Map<string, string>();
+  const packageJson = record(
+    JSON.parse(await readFile(path.resolve("package.json"), "utf8")),
+  );
+  const packageVersion = packageJson.version;
+  assert.equal(typeof packageVersion, "string");
+  if (typeof packageVersion !== "string") {
+    throw new TypeError("package.json version must be a string");
+  }
 
   for (const item of BASELINE_CASES) {
     const expected = await readFile(
@@ -51,7 +59,14 @@ test("representative public JSON matches fixed 0.22.5 baselines", async () => {
       "utf8",
     );
     const actual = await captureProcessOutput(() => main([...item.argv]));
-    const normalizedStdout = actual.stdout.replaceAll(FIXTURE_ROOT, "<ROOT>");
+    const versionNormalizedStdout: string =
+      item.name === "bom"
+        ? assertAndNormalizeBomGeneratorVersion(actual.stdout, packageVersion)
+        : actual.stdout;
+    const normalizedStdout: string = versionNormalizedStdout.replaceAll(
+      FIXTURE_ROOT,
+      "<ROOT>",
+    );
 
     assert.equal(actual.code, item.code, `${item.name} exit code`);
     assert.equal(actual.stderr, "", `${item.name} stderr`);
@@ -118,6 +133,34 @@ function arrayOfRecords(value: unknown): Record<string, unknown>[] {
 function record(value: unknown): Record<string, unknown> {
   assert.ok(value && typeof value === "object" && !Array.isArray(value));
   return value as Record<string, unknown>;
+}
+
+function assertAndNormalizeBomGeneratorVersion(
+  stdout: string,
+  packageVersion: string,
+): string {
+  const bomOutput = record(JSON.parse(stdout));
+  const generator = record(bomOutput.generator);
+  assert.equal(generator.name, "renma");
+  assert.equal(typeof generator.version, "string");
+  assert.equal(generator.version, packageVersion);
+
+  const versionLine = `    "version": ${JSON.stringify(packageVersion)}`;
+  const generatorBlock = [
+    '  "generator": {',
+    '    "name": "renma",',
+    versionLine,
+    "  },",
+  ].join("\n");
+  assert.equal(
+    stdout.split(generatorBlock).length,
+    2,
+    "BOM stdout must contain exactly one expected generator block",
+  );
+  return stdout.replace(
+    generatorBlock,
+    generatorBlock.replace(versionLine, '    "version": "<VERSION>"'),
+  );
 }
 
 async function captureProcessOutput(

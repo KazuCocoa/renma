@@ -3,7 +3,7 @@
   "outputMode": "omit_generated_at",
   "generator": {
     "name": "renma",
-    "version": "0.22.5"
+    "version": "<VERSION>"
   },
   "root": "<ROOT>",
   "configPath": "renma.config.json",

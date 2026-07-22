@@ -5,6 +5,8 @@ These normalized golden files were produced by building commit
 six JSON commands exercised by `test/public-json-compatibility.test.ts` against
 the adjacent `public-json-baseline` repository fixture.
 
-Only the absolute fixture root was replaced with `<ROOT>`. BOM uses
-`--omit-generated-at`; no diagnostic, Finding, evidence, constraint,
-verification, or other public field was removed before capture.
+The absolute fixture root is replaced with `<ROOT>`, and only BOM's expected
+changing `generator.version` is replaced with `<VERSION>`. BOM uses
+`--omit-generated-at`. No diagnostic, Finding, evidence, constraint,
+verification, schema-version, repository asset metadata, or other public field
+is removed before comparison.
