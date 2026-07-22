@@ -6,6 +6,7 @@ import test from "node:test";
 import fc from "fast-check";
 
 import { buildCatalog } from "../src/catalog.js";
+import { createDiagnosticsV2 } from "../src/diagnostics-v2.js";
 import {
   DIAGNOSTIC_IDS,
   omitFromCatalogFindings,
@@ -57,6 +58,12 @@ test("every known metadata diagnostic has a registered code conversion", () => {
     assert.deepEqual(
       finding[0]?.verificationSteps,
       CATALOG_FINDING_DEFINITIONS[code].verificationSteps,
+    );
+    assert.deepEqual(
+      createDiagnosticsV2({ findings: finding, diagnostics: [] }).map(
+        (diagnostic) => diagnostic.code,
+      ),
+      [code],
     );
   }
 });

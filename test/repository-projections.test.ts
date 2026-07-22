@@ -1,7 +1,4 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import test from "node:test";
 
 import { buildBomReport } from "../src/commands/bom.js";
@@ -13,9 +10,11 @@ import {
   type RepositoryProjectionName,
 } from "../src/repository-evidence.js";
 import { scanFromRepositorySnapshot } from "../src/scanner.js";
+import { RepositoryFixture } from "./repository-fixture.js";
 
 test("one collection parses once and memoizes every requested projection", async (t) => {
-  const root = await repositoryFixture(t);
+  const fixture = await repositoryFixture(t);
+  const { root } = fixture;
   let discoveryCount = 0;
   const parsedPaths: string[] = [];
   const projectionCounts = new Map<RepositoryProjectionName, number>();
@@ -60,7 +59,7 @@ test("one collection parses once and memoizes every requested projection", async
 });
 
 test("catalog evidence does not prepare unrelated snapshot projections", async (t) => {
-  const root = await repositoryFixture(t);
+  const { root } = await repositoryFixture(t);
   const projections: RepositoryProjectionName[] = [];
   const result = await collectRepositoryEvidence(
     root,
@@ -75,7 +74,7 @@ test("catalog evidence does not prepare unrelated snapshot projections", async (
 });
 
 test("scan, Readiness, and BOM reuse one collected core", async (t) => {
-  const root = await repositoryFixture(t);
+  const { root } = await repositoryFixture(t);
   let discoveryCount = 0;
   const projectionCounts = new Map<RepositoryProjectionName, number>();
   const snapshot = await collectRepositorySnapshot(
@@ -108,11 +107,14 @@ test("scan, Readiness, and BOM reuse one collected core", async (t) => {
 });
 
 test("a working tree mutation cannot partially affect lazy projections", async (t) => {
-  const root = await repositoryFixture(t);
-  const skillPath = path.join(root, "skills", "demo", "SKILL.md");
+  const fixture = await repositoryFixture(t);
+  const { root } = fixture;
   const snapshot = await collectRepositorySnapshot(root);
 
-  await writeFile(skillPath, "---\nname: [invalid\n---\n# Changed\n");
+  await fixture.write(
+    "skills/demo/SKILL.md",
+    "---\nname: [invalid\n---\n# Changed\n",
+  );
 
   assert.equal(snapshot.agentSkills.validSkillCount, 1);
   assert.equal(snapshot.agentSkills.invalidSkillCount, 0);
@@ -135,26 +137,17 @@ function collectionInstrumentation(
   };
 }
 
-async function repositoryFixture(t: test.TestContext): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "renma-projections-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const skillPath = path.join(root, "skills", "demo", "SKILL.md");
-  await mkdir(path.dirname(skillPath), { recursive: true });
-  await writeFile(
-    skillPath,
-    `---
-name: demo
-description: Review repository evidence. Use when snapshot projections need validation.
-metadata:
-  renma.id: skill.demo
-  renma.owner: qa
-  renma.status: stable
----
-# Demo
-
-Use this Skill when validating repository evidence.
-Do not use it for runtime selection.
-`,
-  );
-  return root;
+async function repositoryFixture(
+  t: test.TestContext,
+): Promise<RepositoryFixture> {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-projections-",
+    testContext: t,
+  });
+  await fixture.skill("demo", {
+    id: "skill.demo",
+    owner: "qa",
+    status: "stable",
+  });
+  return fixture;
 }

@@ -24,6 +24,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   command-specific parsing/execution, and expected error adapters behind a
   statically complete typed command registry without changing command output or
   exit behavior.
+- Added one-pass catalog dependency indexes, typed ESLint checks for promise and
+  switch safety, and a reusable temporary repository fixture builder while
+  preserving rendered ordering and public serialization.
 
 ## [0.22.5] - 2026-07-21
 

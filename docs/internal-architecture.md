@@ -201,6 +201,35 @@ command-name branch chain: it validates and invokes the selected spec. It also
 preserves synchronous command return timing for stdout-only commands and awaits
 asynchronous executors before applying their expected-error adapters.
 
+## Targeted Maintainability Guardrails
+
+Catalog Markdown prepares dependency indexes once before rendering. Outbound
+dependencies are bucketed by source asset ID, inbound dependencies are bucketed
+by the ID of the resolved target, and target identity/path lookups retain the
+first-match semantics of `resolveDependencyTarget`. Bucket order follows the
+existing catalog dependency order, so rendering is byte-compatible while each
+asset performs only two map lookups. Operation-count tests cover the index and
+render passes without wall-clock assertions.
+
+ESLint uses both `tsconfig.json` and `tsconfig.test.json` for typed source and
+test linting. `no-floating-promises`, `no-misused-promises`, and
+`switch-exhaustiveness-check` are enforced. Calls registering tests with
+`node:test` are narrowly marked as known-safe floating calls because the test
+runner owns their returned promises. `no-unnecessary-condition` was evaluated
+but is intentionally deferred: assertion-based narrowing in tests and
+fail-closed defensive recovery in parsers and security analysis produce broad
+false-positive noise, and adopting it now would require a large unrelated
+rewrite. It should be reconsidered only with a scoped assertion/recovery policy,
+not blanket inline suppressions.
+
+Filesystem-backed tests can use `test/repository-fixture.ts` to create and
+clean up isolated repositories, write config and arbitrary files, create
+canonical Skills, Context Assets, and Context Lenses with governance and
+dependency metadata, and initialize Git when ref-based behavior is under test.
+Path normalization rejects absolute paths and traversal. Specialized parser
+fixtures should remain explicit when direct source text is the clearer test
+contract; fixture migration is intentionally incremental.
+
 ## Declared Composition Is Pure Catalog Analysis
 
 `src/declared-composition.ts` accepts the existing normalized `Catalog` and a

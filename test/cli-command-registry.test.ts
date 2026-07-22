@@ -1,13 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import { test } from "node:test";
 
 import fc from "fast-check";
 
 import { COMMAND_HELP, type CommandName } from "../src/cli-help.js";
 import { COMMAND_REGISTRY, main } from "../src/cli.js";
+import { RepositoryFixture } from "./repository-fixture.js";
 
 const DEFAULT_FORMATS: Partial<Record<CommandName, string>> = {
   scan: "text",
@@ -94,19 +92,15 @@ test("registered default formats preserve every command default", () => {
   }
 });
 
-test("the registry dispatches every command to its command-specific parser", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "renma-cli-registry-"));
-  try {
-    const init = await captureConsole(() => main(["init", root]));
-    assert.equal(init.code, 0);
-    assert.match(init.stdout, /Renma is initialized for this repository/);
-    assert.match(
-      await readFile(path.join(root, "renma.config.json"), "utf8"),
-      /"fail_on": "high"/,
-    );
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
+test("the registry dispatches every command to its command-specific parser", async (t) => {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-cli-registry-",
+    testContext: t,
+  });
+  const init = await captureConsole(() => main(["init", fixture.root]));
+  assert.equal(init.code, 0);
+  assert.match(init.stdout, /Renma is initialized for this repository/);
+  assert.match(await fixture.read("renma.config.json"), /"fail_on": "high"/);
 
   const cases: readonly {
     name: CommandName;
