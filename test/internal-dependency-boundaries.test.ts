@@ -56,6 +56,10 @@ interface DependencyException {
 // remain explicit because their historical flat layout does not encode a layer.
 const DIRECTORY_LAYERS: ReadonlyMap<string, LayerClassification> = new Map([
   [
+    "src/types",
+    { layer: "foundation", reason: "cohesive low-level type contracts" },
+  ],
+  [
     "src/security-destination",
     {
       layer: "analysis",
@@ -76,6 +80,16 @@ const DIRECTORY_LAYERS: ReadonlyMap<string, LayerClassification> = new Map([
   ],
   ["src/renderers", { layer: "renderers", reason: "human presentation" }],
   ["src/commands", { layer: "commands", reason: "command orchestration" }],
+]);
+
+const EXACT_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> = new Map([
+  [
+    "src/types/scan-result.ts",
+    {
+      layer: "analysis",
+      reason: "composed scan output may depend on feature report types",
+    },
+  ],
 ]);
 
 const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
@@ -155,23 +169,9 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
 const DEPENDENCY_EXCEPTIONS: readonly DependencyException[] = [
   {
     importingFile: "src/types.ts",
-    targetPath: "src/agent-skills.ts",
-    reason: "legacy ScanResult composition hub; removed by the type split",
-  },
-  {
-    importingFile: "src/types.ts",
-    targetPath: "src/context-lens.ts",
-    reason: "legacy ScanResult composition hub; removed by the type split",
-  },
-  {
-    importingFile: "src/types.ts",
-    targetPath: "src/security-policy-inventory.ts",
-    reason: "legacy ScanResult composition hub; removed by the type split",
-  },
-  {
-    importingFile: "src/types.ts",
-    targetPath: "src/trust-graph.ts",
-    reason: "legacy ScanResult composition hub; removed by the type split",
+    targetPath: "src/types/scan-result.ts",
+    reason:
+      "established dist/types.js facade re-exports the composed ScanResult contract",
   },
   {
     importingFile: "src/repository-evidence.ts",
@@ -271,6 +271,7 @@ test("an illegal runtime import is rejected", () => {
   assertViolation(
     "src/rules.ts",
     'import { run } from "./commands/scan.js";',
+    "src/commands/scan.ts",
     "runtime-import",
     "analysis",
     "commands",
@@ -281,6 +282,7 @@ test("an illegal type-only import is rejected", () => {
   assertViolation(
     "src/catalog.ts",
     'import type { Output } from "./renderers/inspect.js";',
+    "src/renderers/inspect.ts",
     "type-import",
     "repository",
     "renderers",
@@ -291,10 +293,41 @@ test("an illegal re-export is rejected", () => {
   assertViolation(
     "src/markdown.ts",
     'export { run } from "./commands/scan.js";',
+    "src/commands/scan.ts",
     "re-export",
     "parsing",
     "commands",
   );
+});
+
+test("low-level type modules cannot import feature reports, commands, or renderers", () => {
+  const cases = [
+    {
+      sourceText: 'import type { Graph } from "../trust-graph.js";',
+      targetPath: "src/trust-graph.ts",
+      targetLayer: "analysis" as const,
+    },
+    {
+      sourceText: 'import type { Command } from "../commands/scan.js";',
+      targetPath: "src/commands/scan.ts",
+      targetLayer: "commands" as const,
+    },
+    {
+      sourceText: 'import type { Renderer } from "../renderers/inspect.js";',
+      targetPath: "src/renderers/inspect.ts",
+      targetLayer: "renderers" as const,
+    },
+  ];
+  for (const fixture of cases) {
+    assertViolation(
+      "src/types/artifact.ts",
+      fixture.sourceText,
+      fixture.targetPath,
+      "type-import",
+      "foundation",
+      fixture.targetLayer,
+    );
+  }
 });
 
 test("same-layer and lower-layer dependencies are valid", () => {
@@ -387,6 +420,8 @@ function inspectArchitecture(
 
 function classifySourceFile(filePath: string): LayerClassification | undefined {
   const normalized = normalizePath(filePath);
+  const exact = EXACT_MODULE_LAYERS.get(normalized);
+  if (exact) return exact;
   const topLevel = TOP_LEVEL_MODULE_LAYERS.get(normalized);
   if (topLevel) return topLevel;
 
@@ -479,6 +514,7 @@ function resolveSourcePath(
 function assertViolation(
   importingFile: string,
   sourceText: string,
+  targetPath: string,
   kind: RelativeDependency["kind"],
   importingLayer: Layer,
   targetLayer: Layer,
@@ -490,10 +526,7 @@ function assertViolation(
     importingLayer,
     kind,
     specifier: sourceText.match(/"([^"]+)"/)?.[1],
-    targetPath:
-      importingFile === "src/catalog.ts"
-        ? "src/renderers/inspect.ts"
-        : "src/commands/scan.ts",
+    targetPath,
     targetLayer,
   });
 }

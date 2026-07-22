@@ -1,7 +1,8 @@
 import path from "node:path";
 import { frontmatterRangeForArtifact } from "./frontmatter-envelope.js";
 import type { Catalog, CatalogEntry } from "./model.js";
-import type { Diagnostic, Evidence, ParsedDocument } from "./types.js";
+import type { Diagnostic, Evidence } from "./types/diagnostics.js";
+import type { ParsedDocument } from "./types/metadata.js";
 
 export const CONTEXT_LENS_DIAGNOSTIC_CODES = {
   DEPRECATED_FIELD: "CONTEXT-LENS-DEPRECATED-FIELD",

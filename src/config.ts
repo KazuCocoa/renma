@@ -1,12 +1,11 @@
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
+import type { LoadedConfig, ScanConfig } from "./types/configuration.js";
 import type {
-  LoadedConfig,
-  ScanConfig,
   Severity,
   SuppressionConfig,
   SuppressionExpiration,
-} from "./types.js";
+} from "./types/diagnostics.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 
 const SEVERITIES = ["low", "medium", "high", "critical"] as const;

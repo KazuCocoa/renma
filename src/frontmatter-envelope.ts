@@ -1,4 +1,4 @@
-import type { Artifact } from "./types.js";
+import type { Artifact } from "./types/artifact.js";
 import { agentSkillFrontmatterEnvelope } from "./yaml-frontmatter.js";
 
 export interface FrontmatterEnvelope {

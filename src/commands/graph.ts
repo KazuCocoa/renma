@@ -41,7 +41,7 @@ import {
   type DeclaredSkillRoute,
   type SkillDiscoveryIndex,
 } from "../skill-discovery.js";
-import type { Diagnostic } from "../types.js";
+import type { Diagnostic } from "../types/diagnostics.js";
 
 export type GraphFormat = "json" | "markdown" | "mermaid";
 export type GraphEdgeKind = DependencyKind | "continues_with";

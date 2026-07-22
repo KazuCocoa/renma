@@ -3,7 +3,8 @@ import { createHash } from "node:crypto";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { estimateTokens, estimatedTokenUnits } from "./token-estimator.js";
-import type { Finding, ParsedDocument } from "./types.js";
+import type { Finding } from "./types/diagnostics.js";
+import type { ParsedDocument } from "./types/metadata.js";
 
 type RepeatKind = "section_hash" | "heading" | "code_block" | "token_shingle";
 

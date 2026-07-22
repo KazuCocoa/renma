@@ -21,13 +21,10 @@ import {
 import { parseAssetMetadata } from "./metadata.js";
 import { frontmatterRangeForArtifact } from "./frontmatter-envelope.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
-import type {
-  AssetClassificationEvidence,
-  AssetOwnership,
-  Diagnostic,
-  Evidence,
-  ParsedDocument,
-} from "./types.js";
+import type { AssetClassificationEvidence } from "./types/classification.js";
+import type { AssetOwnership } from "./types/governance.js";
+import type { Diagnostic, Evidence } from "./types/diagnostics.js";
+import type { ParsedDocument } from "./types/metadata.js";
 import { buildStaticSupportDependencies } from "./static-support.js";
 
 const QUALITY = DEFAULT_QUALITY_PROFILE;

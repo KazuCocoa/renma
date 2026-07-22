@@ -1,11 +1,11 @@
 import type { AgentSkillMigrationSuggestion } from "../skill-migration.js";
+import type { ArtifactKind } from "../types/artifact.js";
+import type { AssetClassificationEvidence } from "../types/classification.js";
 import type {
-  ArtifactKind,
-  AssetClassificationEvidence,
   AssetDecisionEvidence,
   DecisionStatus,
   SuggestedNextAction,
-} from "../types.js";
+} from "../types/decision.js";
 
 export interface BlockedMetadata {
   field: string;

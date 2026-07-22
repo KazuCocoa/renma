@@ -17,7 +17,7 @@ import {
   markdownBodyStartLineForArtifact,
   renmaFrontmatterEnvelope,
 } from "./frontmatter-envelope.js";
-import type { ParsedDocument } from "./types.js";
+import type { ParsedDocument } from "./types/metadata.js";
 
 /** One-based, inclusive range in the original Markdown file. */
 export interface MarkdownSourceRange {

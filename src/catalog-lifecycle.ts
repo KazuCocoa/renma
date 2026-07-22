@@ -1,5 +1,5 @@
 import type { AssetStatus, CatalogEntry } from "./model.js";
-import type { Diagnostic, Evidence } from "./types.js";
+import type { Diagnostic, Evidence } from "./types/diagnostics.js";
 
 const ACTIVE_STATUSES = new Set<AssetStatus>(["experimental", "stable"]);
 const INACTIVE_STATUSES = new Set<AssetStatus>(["deprecated", "archived"]);

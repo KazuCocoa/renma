@@ -62,10 +62,9 @@ imports, and re-exports all count as dependencies; lateral imports within one
 layer are valid.
 
 Compatibility exceptions name one exact source, target, and reason. The
-current list contains the legacy composed-output imports from `src/types.ts`
-and snapshot construction's established classification-index path; the type
-exceptions are removed by the cohesive type split. The public deep-import type
-re-exports from `src/commands/inspect.ts` and
+current list contains the established `src/types.ts` facade re-export of the
+composed scan result and snapshot construction's classification-index path.
+The public deep-import type re-exports from `src/commands/inspect.ts` and
 `src/commands/suggest-metadata.ts` are also listed and checked exactly rather
 than allowing command modules to re-export arbitrary lower-layer contracts.
 
@@ -82,6 +81,25 @@ non-enumerable. This lets scan classify them before serialization while
 preserving the 0.18.2 JSON projection. Diagnostics that intentionally remain
 catalog-only carry a typed internal disposition, and unknown diagnostics use the
 generic fail-closed catalog Finding definition.
+
+## Cohesive Type Ownership
+
+`src/types.ts` is a compatibility facade for the established
+`renma/dist/types.js` deep import. Internal modules do not use that facade; they
+import the cohesive owner under `src/types/`:
+
+- artifact and parsed metadata contracts remain low-level;
+- classification, governance, decision, diagnostic, and configuration
+  contracts each have one dependency-bounded owner;
+- `ScanResult` lives in `src/types/scan-result.ts`, the only composed type module
+  permitted to import Agent Skills, Context Lens, Security Policy Inventory, and
+  Trust Graph result types.
+
+The low-level type modules are in the `foundation` layer and cannot import
+feature reports, renderers, or commands. The composed scan-result module is in
+the `analysis` layer and must not become a dependency of parsing, repository,
+or other foundation modules. Compatibility re-exports preserve established
+TypeScript deep imports without making the facade an internal dependency hub.
 
 ## Security Destination Analysis
 

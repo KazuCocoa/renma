@@ -31,13 +31,11 @@ import {
   prepareSkillDiscoveryIndex,
   type SkillDiscoveryIndex,
 } from "./skill-discovery.js";
-import type {
-  Artifact,
-  AssetClassificationEvidence,
-  Diagnostic,
-  ParsedDocument,
-  ScanConfig,
-} from "./types.js";
+import type { Artifact } from "./types/artifact.js";
+import type { AssetClassificationEvidence } from "./types/classification.js";
+import type { Diagnostic } from "./types/diagnostics.js";
+import type { ParsedDocument } from "./types/metadata.js";
+import type { ScanConfig } from "./types/configuration.js";
 
 export interface RepositoryEvidence {
   root: string;

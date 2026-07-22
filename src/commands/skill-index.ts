@@ -15,7 +15,7 @@ import {
   type SkillDiscoverySummary,
   type VisibleSkillIdentity,
 } from "../skill-discovery.js";
-import type { Diagnostic, Evidence } from "../types.js";
+import type { Diagnostic, Evidence } from "../types/diagnostics.js";
 
 export type SkillIndexFormat = "json" | "markdown";
 

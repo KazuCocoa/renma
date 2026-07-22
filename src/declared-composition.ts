@@ -9,7 +9,7 @@ import type {
   Dependency,
   DependencyKind,
 } from "./model.js";
-import type { Evidence, Finding } from "./types.js";
+import type { Evidence, Finding } from "./types/diagnostics.js";
 
 export type CompositionMembership = "required" | "optional";
 export type CompositionRelationship =

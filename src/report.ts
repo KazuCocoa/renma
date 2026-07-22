@@ -1,4 +1,4 @@
-import type { ScanResult } from "./types.js";
+import type { ScanResult } from "./types/scan-result.js";
 
 /** Format a scan result as stable pretty-printed JSON. */
 export function formatJson(result: ScanResult): string {

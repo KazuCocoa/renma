@@ -15,12 +15,9 @@ import { securityDiagnosticFindings } from "./security-diagnostics.js";
 import { summarizeSecurityPolicyInventory } from "./security-policy-inventory.js";
 import { applySuppressions } from "./suppressions.js";
 import { buildTrustGraph } from "./trust-graph.js";
-import type {
-  AssetClassificationEvidence,
-  Diagnostic,
-  Finding,
-  ScanResult,
-} from "./types.js";
+import type { AssetClassificationEvidence } from "./types/classification.js";
+import type { Diagnostic, Finding } from "./types/diagnostics.js";
+import type { ScanResult } from "./types/scan-result.js";
 
 interface ScanBuilderOptions {
   evaluationDate?: Date | string;

@@ -6,7 +6,8 @@ import {
   type AgentSkillDiagnosticId,
 } from "./diagnostic-ids.js";
 import { classifyRepositorySkillEntrypointPath } from "./discovery.js";
-import type { CommandInvocation, ParsedDocument } from "./types.js";
+import type { CommandInvocation } from "./types/decision.js";
+import type { ParsedDocument } from "./types/metadata.js";
 import { renmaCommand } from "./command-invocation.js";
 import {
   parseAgentSkillFrontmatter,

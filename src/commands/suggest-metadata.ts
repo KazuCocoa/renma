@@ -20,12 +20,10 @@ import {
 } from "../evidence/target.js";
 import { buildAgentSkillMigrationSuggestion } from "../skill-migration.js";
 import { renderMetadataPrompt } from "../renderers/metadata-suggestion.js";
-import type {
-  ArtifactKind,
-  AssetClassificationEvidence,
-  MetadataValue,
-  SuggestedNextAction,
-} from "../types.js";
+import type { ArtifactKind } from "../types/artifact.js";
+import type { AssetClassificationEvidence } from "../types/classification.js";
+import type { MetadataValue } from "../types/metadata.js";
+import type { SuggestedNextAction } from "../types/decision.js";
 
 export type {
   BlockedMetadata,

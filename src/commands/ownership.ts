@@ -7,7 +7,7 @@ import {
   type AssetOwnership,
   type AssetStatus,
 } from "../model.js";
-import type { Diagnostic } from "../types.js";
+import type { Diagnostic } from "../types/diagnostics.js";
 
 export type OwnershipFormat = "json" | "markdown";
 

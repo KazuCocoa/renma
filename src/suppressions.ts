@@ -1,4 +1,8 @@
-import type { Diagnostic, Finding, SuppressionConfig } from "./types.js";
+import type {
+  Diagnostic,
+  Finding,
+  SuppressionConfig,
+} from "./types/diagnostics.js";
 
 /** Apply active config suppressions by removing matching findings from reports. */
 export function applySuppressions(

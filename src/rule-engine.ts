@@ -1,5 +1,7 @@
 import type { Catalog } from "./model.js";
-import type { Finding, ParsedDocument, ScanConfig } from "./types.js";
+import type { Finding } from "./types/diagnostics.js";
+import type { ParsedDocument } from "./types/metadata.js";
+import type { ScanConfig } from "./types/configuration.js";
 
 /** Shared input passed to each deterministic rule. */
 export interface RuleContext {

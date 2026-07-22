@@ -19,11 +19,9 @@ import {
 } from "../evidence/target.js";
 import type { CatalogEntry, Dependency } from "../model.js";
 import { renderTextOutline } from "../renderers/inspect.js";
-import type {
-  AssetClassificationEvidence,
-  AssetGovernanceEvidence,
-  ParsedDocument,
-} from "../types.js";
+import type { AssetClassificationEvidence } from "../types/classification.js";
+import type { AssetGovernanceEvidence } from "../types/governance.js";
+import type { ParsedDocument } from "../types/metadata.js";
 import {
   ensureMarkdownSyntaxForDocument,
   markdownCodeLineNumbers,

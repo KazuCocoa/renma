@@ -61,7 +61,7 @@ import {
   type CommandName,
 } from "./cli-help.js";
 import { ConfigError, type ConfigOverrides } from "./config.js";
-import type { Severity } from "./types.js";
+import type { Severity } from "./types/diagnostics.js";
 
 type CliValues = ReturnType<typeof parseArgs>["values"];
 

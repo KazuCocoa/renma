@@ -11,13 +11,10 @@ import {
   type SecurityPolicy,
   type SecurityProfileChain,
 } from "./security-policy.js";
-import type {
-  Artifact,
-  Finding,
-  ParsedDocument,
-  RiskClass,
-  SecurityConfig,
-} from "./types.js";
+import type { Artifact } from "./types/artifact.js";
+import type { Finding, RiskClass } from "./types/diagnostics.js";
+import type { ParsedDocument } from "./types/metadata.js";
+import type { SecurityConfig } from "./types/configuration.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { parseDocument } from "./markdown.js";
 import { ensureMarkdownSyntaxForDocument } from "./markdown-syntax.js";

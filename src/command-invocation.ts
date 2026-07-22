@@ -1,4 +1,4 @@
-import type { CommandInvocation } from "./types.js";
+import type { CommandInvocation } from "./types/decision.js";
 
 /** Build machine-executable argv separately from the human shell display. */
 export function renmaCommand<const Args extends string[]>(

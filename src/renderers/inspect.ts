@@ -5,10 +5,8 @@ import type {
   InspectOutline,
   InspectRelationship,
 } from "../evidence/inspect.js";
-import type {
-  AssetClassificationEvidence,
-  AssetGovernanceEvidence,
-} from "../types.js";
+import type { AssetClassificationEvidence } from "../types/classification.js";
+import type { AssetGovernanceEvidence } from "../types/governance.js";
 
 // Rendering must preserve the collected evidence instead of reinterpreting it.
 export function renderTextOutline(outline: InspectOutline): string {

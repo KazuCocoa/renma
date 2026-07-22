@@ -8,7 +8,7 @@ import {
   type Dependency,
 } from "../model.js";
 import { collectRepositoryEvidence } from "../repository-evidence.js";
-import type { Diagnostic } from "../types.js";
+import type { Diagnostic } from "../types/diagnostics.js";
 
 export type CatalogFormat = "json" | "markdown";
 

@@ -1,4 +1,4 @@
-import type { Diagnostic } from "./types.js";
+import type { Diagnostic } from "./types/diagnostics.js";
 
 /** Stable scan finding identifiers emitted by Renma rules. */
 export const DIAGNOSTIC_IDS = {

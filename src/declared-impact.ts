@@ -17,7 +17,7 @@ import type {
   Catalog,
   DependencyKind,
 } from "./model.js";
-import type { Evidence } from "./types.js";
+import type { Evidence } from "./types/diagnostics.js";
 
 export interface ImpactAsset {
   id: string;

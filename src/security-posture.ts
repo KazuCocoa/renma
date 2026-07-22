@@ -1,4 +1,4 @@
-import type { RiskClass, Severity } from "./types.js";
+import type { RiskClass, Severity } from "./types/diagnostics.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 
 const RISK_CLASS_ORDER: Record<RiskClass, number> = {

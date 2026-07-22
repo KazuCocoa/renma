@@ -23,7 +23,7 @@ import {
   collectRepositorySnapshot,
   type RepositorySnapshot,
 } from "../repository-evidence.js";
-import type { Diagnostic, Finding } from "../types.js";
+import type { Diagnostic, Finding } from "../types/diagnostics.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import type { AgentSkillsValidationSummary } from "../agent-skills.js";
 

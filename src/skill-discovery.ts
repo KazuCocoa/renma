@@ -17,13 +17,12 @@ import {
   type CanonicalSkillPublicationFieldState,
 } from "./metadata.js";
 import type { Asset, AssetKind, AssetStatus, Catalog } from "./model.js";
+import type { AssetOwnership } from "./types/governance.js";
+import type { Diagnostic, Evidence } from "./types/diagnostics.js";
 import type {
-  AssetOwnership,
-  Diagnostic,
-  Evidence,
   MetadataFieldEvidence,
   ParsedDocument,
-} from "./types.js";
+} from "./types/metadata.js";
 
 export const SKILL_ROUTE_USABILITY_REASONS = [
   "invalid-source",

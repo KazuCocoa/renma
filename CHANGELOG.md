@@ -14,6 +14,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Classified every production TypeScript module into an enforced dependency
   layer, including type-only imports and re-exports, with narrowly documented
   compatibility seams for established deep imports.
+- Split the former broad `src/types.ts` hub into cohesive low-level contracts
+  and an isolated composed scan-result type while retaining the established
+  `dist/types.js` compatibility facade.
 
 ## [0.22.5] - 2026-07-21
 

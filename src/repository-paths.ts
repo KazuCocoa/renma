@@ -7,7 +7,9 @@ import {
 } from "./discovery.js";
 import type { Catalog } from "./model.js";
 import { staticSupportReferences } from "./static-support.js";
-import type { Artifact, ParsedDocument, ScanConfig } from "./types.js";
+import type { Artifact } from "./types/artifact.js";
+import type { ParsedDocument } from "./types/metadata.js";
+import type { ScanConfig } from "./types/configuration.js";
 import { safeRepositoryPath } from "./repository-boundary.js";
 
 export type RepositoryPathState =

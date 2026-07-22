@@ -14,7 +14,8 @@ import {
 import type { SkillEntrypointPath } from "./discovery.js";
 import { parseDocument } from "./markdown.js";
 import { validateCanonicalSecurityMetadata } from "./security-policy.js";
-import type { Artifact, ParsedDocument } from "./types.js";
+import type { Artifact } from "./types/artifact.js";
+import type { ParsedDocument } from "./types/metadata.js";
 import { parseAgentSkillFrontmatter } from "./yaml-frontmatter.js";
 
 const STANDARD_FIELDS = new Set<string>(AGENT_SKILLS_TOP_LEVEL_FIELDS);

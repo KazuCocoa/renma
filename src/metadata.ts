@@ -5,13 +5,12 @@ import {
   withDiagnosticId,
   type DiagnosticId,
 } from "./diagnostic-ids.js";
+import type { Diagnostic, Evidence } from "./types/diagnostics.js";
 import type {
-  Diagnostic,
-  Evidence,
   MetadataFieldEvidence,
   MetadataValue,
   ParsedDocument,
-} from "./types.js";
+} from "./types/metadata.js";
 import { isIsoDate, parseDayDuration } from "./freshness.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { estimateTokens } from "./token-estimator.js";
