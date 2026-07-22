@@ -41,7 +41,10 @@ export function activeShellContinuation(
   return { active: false, quote };
 }
 
-export function projectShellContinuations(input: string): ShellProjection {
+export function projectShellContinuations(
+  input: string,
+  sourceBaseLine = 1,
+): ShellProjection {
   const physicalLines = input.split("\n");
   const projection: string[] = [];
   const sourceOffsetByProjectionOffset: number[] = [];
@@ -63,7 +66,7 @@ export function projectShellContinuations(input: string): ShellProjection {
     const joinsNext = continuation.active && index + 1 < physicalLines.length;
     append(
       joinsNext ? physicalLine.slice(0, -1) : physicalLine,
-      index + 1,
+      sourceBaseLine + index,
       sourceOffset,
     );
     sourceOffset += physicalLine.length;
@@ -83,6 +86,7 @@ export function projectShellContinuations(input: string): ShellProjection {
     projection: projection.join(""),
     sourceOffsetByProjectionOffset,
     sourceLineByProjectionOffset,
+    sourceBaseLine,
   };
 }
 
@@ -214,14 +218,21 @@ export function logicalShellCommands(
     }
 
     const projection: string[] = [];
-    const sourceLineByOffset: number[] = [];
+    const sourceOffsetByProjectionOffset: number[] = [];
+    const sourceLineByProjectionOffset: number[] = [];
     const memberLineIndexes = [index];
     let cursor = index;
+    let sourceOffset = 0;
     let quote: Quote;
-    const append = (value: string, sourceLine: number): void => {
+    const append = (
+      value: string,
+      sourceLine: number,
+      lineSourceOffset: number,
+    ): void => {
       projection.push(value);
       for (let offset = 0; offset < value.length; offset += 1) {
-        sourceLineByOffset.push(sourceLine);
+        sourceOffsetByProjectionOffset.push(lineSourceOffset + offset);
+        sourceLineByProjectionOffset.push(sourceLine);
       }
     };
 
@@ -235,21 +246,35 @@ export function logicalShellCommands(
         context.isLineEligible(next) &&
         context.sameBlock(cursor, next) &&
         context.isCodeContentLine(cursor) === context.isCodeContentLine(next);
-      append(joinsNext ? physicalLine.slice(0, -1) : physicalLine, cursor + 1);
+      append(
+        joinsNext ? physicalLine.slice(0, -1) : physicalLine,
+        cursor + 1,
+        sourceOffset,
+      );
+      sourceOffset += physicalLine.length;
       if (!joinsNext) break;
+      // The backslash remains in the original input and the following newline
+      // occupies one more source offset, while both are absent from projection.
+      sourceOffset += 1;
       quote = continuation.quote;
       cursor = next;
       memberLineIndexes.push(cursor);
     }
 
     if (memberLineIndexes.length > 1) {
+      const commandSourceLines = memberLineIndexes.map(
+        (lineIndex) => sourceLines[lineIndex] ?? "",
+      );
       commands.push({
-        projection: projection.join(""),
-        sourceLineByOffset,
+        input: commandSourceLines.join("\n"),
+        shellProjection: {
+          projection: projection.join(""),
+          sourceOffsetByProjectionOffset,
+          sourceLineByProjectionOffset,
+          sourceBaseLine: index + 1,
+        },
         memberLineIndexes,
-        sourceLines: memberLineIndexes.map(
-          (lineIndex) => sourceLines[lineIndex] ?? "",
-        ),
+        sourceLines: commandSourceLines,
       });
     }
     index = cursor + 1;
@@ -274,10 +299,12 @@ export function logicalShellCommandEvidence(command: LogicalShellCommand): {
     (command.memberLineIndexes[command.memberLineIndexes.length - 1] ??
       fallbackStart - 1) + 1;
   return {
-    startLine: command.sourceLineByOffset[0] ?? fallbackStart,
+    startLine:
+      command.shellProjection.sourceLineByProjectionOffset[0] ?? fallbackStart,
     endLine:
-      command.sourceLineByOffset[command.sourceLineByOffset.length - 1] ??
-      fallbackEnd,
+      command.shellProjection.sourceLineByProjectionOffset[
+        command.shellProjection.sourceLineByProjectionOffset.length - 1
+      ] ?? fallbackEnd,
     snippet: command.sourceLines.join("\n"),
   };
 }

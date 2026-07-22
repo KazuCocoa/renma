@@ -47,20 +47,28 @@ const CLOUD_UPLOAD_RE =
 
 export function analyzeDestinations(input: string): DestinationAnalysis {
   const shellProjection = projectShellContinuations(input);
+  return analyzeDestinationsFromProjection(input, shellProjection);
+}
+
+export function analyzeDestinationsFromProjection(
+  originalInput: string,
+  shellProjection: ShellProjection,
+): DestinationAnalysis {
+  validateShellProjection(originalInput, shellProjection);
   const candidates = classifyDestinationCandidates(shellProjection.projection);
   const maskedProjection = maskDestinationCandidates(
     shellProjection.projection,
     candidates,
   );
   const context = {
-    input,
+    input: originalInput,
     shellProjection,
     candidates,
     maskedProjection,
     clauses: destinationClauseSpans(shellProjection.projection, candidates),
   };
   return {
-    input,
+    input: originalInput,
     ...shellProjection,
     candidates,
     maskedProjection,
@@ -69,6 +77,29 @@ export function analyzeDestinations(input: string): DestinationAnalysis {
       ...associatedOperationalDestinations(context, "upload"),
     ],
   };
+}
+
+function validateShellProjection(
+  input: string,
+  shellProjection: ShellProjection,
+): void {
+  if (
+    shellProjection.sourceOffsetByProjectionOffset.length !==
+      shellProjection.projection.length ||
+    shellProjection.sourceLineByProjectionOffset.length !==
+      shellProjection.projection.length
+  ) {
+    throw new RangeError("Shell projection mappings must match its length");
+  }
+  if (
+    shellProjection.sourceOffsetByProjectionOffset.some(
+      (offset) => offset < 0 || offset >= input.length,
+    )
+  ) {
+    throw new RangeError(
+      "Shell projection offset falls outside original input",
+    );
+  }
 }
 
 type AssociationContext = {

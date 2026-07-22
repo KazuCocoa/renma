@@ -27,6 +27,7 @@ import {
 } from "./markdown-security-view.js";
 import {
   analyzeDestinations,
+  analyzeLogicalShellCommands,
   isNetworkInstruction,
   isUploadInstruction,
   logicalShellCommandEvidence,
@@ -76,7 +77,12 @@ type Detection = {
 
 type DetectionEvidence = Pick<Detection, "startLine" | "endLine" | "snippet">;
 
-type PolicyDetectionScope = "all" | "destination" | "line-local";
+type PolicyDetectionInput =
+  | { scope: "line-local" }
+  | {
+      scope: "all" | "destination";
+      analysis: DestinationAnalysis;
+    };
 
 const RULES = {
   missingPolicyMetadata: {
@@ -877,15 +883,9 @@ function securityFindingsForDocument(
     isCodeContentLine: (lineIndex) => markdownView.isCodeContentLine(lineIndex),
   });
   const logicalCommandByLine = new Map<number, LogicalShellCommand>();
-  const destinationAnalysisByLogicalCommand = new Map<
-    LogicalShellCommand,
-    DestinationAnalysis
-  >();
+  const destinationAnalysisByLogicalCommand =
+    analyzeLogicalShellCommands(logicalCommands);
   for (const command of logicalCommands) {
-    destinationAnalysisByLogicalCommand.set(
-      command,
-      analyzeDestinations(command.projection),
-    );
     for (const lineIndex of command.memberLineIndexes) {
       logicalCommandByLine.set(lineIndex, command);
     }
@@ -974,44 +974,44 @@ function securityFindingsForDocument(
     };
     const logicalCommand = logicalCommandByLine.get(index);
     const logicalCommandStart = logicalCommand?.memberLineIndexes[0] === index;
-    const lineDestinationAnalysis = analyzeDestinations(line);
     const logicalDestinationAnalysis =
       logicalCommand === undefined
         ? undefined
         : destinationAnalysisByLogicalCommand.get(logicalCommand);
+    let cachedLineDestinationAnalysis: DestinationAnalysis | undefined;
+    const lineDestinationAnalysis = (): DestinationAnalysis => {
+      cachedLineDestinationAnalysis ??= analyzeDestinations(line);
+      return cachedLineDestinationAnalysis;
+    };
 
     if (!quotedProse) {
       if (logicalCommand === undefined) {
         detections.push(
-          ...policyDetections(
-            line,
-            evidence,
-            policy,
-            hasHumanApprovalGuard,
-            "all",
-            lineDestinationAnalysis,
-          ),
+          ...policyDetections(line, evidence, policy, hasHumanApprovalGuard, {
+            scope: "all",
+            analysis: lineDestinationAnalysis(),
+          }),
         );
       } else {
         detections.push(
-          ...policyDetections(
-            line,
-            evidence,
-            policy,
-            hasHumanApprovalGuard,
-            "line-local",
-            lineDestinationAnalysis,
-          ),
+          ...policyDetections(line, evidence, policy, hasHumanApprovalGuard, {
+            scope: "line-local",
+          }),
         );
         if (logicalCommandStart) {
           detections.push(
             ...policyDetections(
-              logicalCommand.projection,
+              logicalCommand.shellProjection.projection,
               logicalShellCommandEvidence(logicalCommand),
               policy,
               hasHumanApprovalGuard,
-              "destination",
-              logicalDestinationAnalysis,
+              {
+                scope: "destination",
+                analysis: requireLogicalDestinationAnalysis(
+                  logicalCommand,
+                  logicalDestinationAnalysis,
+                ),
+              },
             ),
           );
         }
@@ -1024,14 +1024,14 @@ function securityFindingsForDocument(
         if (
           !commandLine ||
           policy.declared.size > 0 ||
-          isUploadInstruction(lineDestinationAnalysis)
+          isUploadInstruction(lineDestinationAnalysis())
         ) {
           detections.push(
             ...networkAndUploadDetections(
               line,
               evidence,
               policy,
-              lineDestinationAnalysis,
+              lineDestinationAnalysis(),
             ),
           );
         }
@@ -1043,10 +1043,13 @@ function securityFindingsForDocument(
       ) {
         detections.push(
           ...networkAndUploadDetections(
-            logicalCommand.projection,
+            logicalCommand.shellProjection.projection,
             logicalShellCommandEvidence(logicalCommand),
             policy,
-            logicalDestinationAnalysis,
+            requireLogicalDestinationAnalysis(
+              logicalCommand,
+              logicalDestinationAnalysis,
+            ),
           ),
         );
       }
@@ -1077,6 +1080,16 @@ function securityFindingsForDocument(
   detections.push(...policyContradictions(policy));
   return dedupeDetections(detections).map((detection) =>
     findingFromDetection(artifact, detection),
+  );
+}
+
+function requireLogicalDestinationAnalysis(
+  command: LogicalShellCommand,
+  analysis: DestinationAnalysis | undefined,
+): DestinationAnalysis {
+  if (analysis !== undefined) return analysis;
+  throw new Error(
+    `Missing destination analysis for logical command starting on line ${command.shellProjection.sourceBaseLine}`,
   );
 }
 
@@ -1177,13 +1190,12 @@ function policyDetections(
   evidence: DetectionEvidence,
   policy: SecurityPolicy,
   hasHumanApprovalGuard: boolean,
-  scope: PolicyDetectionScope = "all",
-  destinationAnalysis?: DestinationAnalysis,
+  input: PolicyDetectionInput,
 ): Detection[] {
   const detections: Detection[] = [];
-  const shouldAnalyzeDestinations = scope !== "line-local";
-  const analyzeLineLocal = scope !== "destination";
-  const analysis = destinationAnalysis ?? analyzeDestinations(line);
+  const shouldAnalyzeDestinations = input.scope !== "line-local";
+  const analyzeLineLocal = input.scope !== "destination";
+  const analysis = input.scope === "line-local" ? undefined : input.analysis;
   const defensiveAction = isDefensiveActionInstruction(line);
   const safeOrGuarded = isDefensiveOrGuardedActionInstruction(line);
   const invalidNetworkAllowlist = policy.invalidDeclared.has(
@@ -1195,6 +1207,7 @@ function policyDetections(
 
   if (
     shouldAnalyzeDestinations &&
+    analysis !== undefined &&
     policy.networkAllowed === false &&
     isNetworkInstruction(analysis) &&
     !safeOrGuarded
@@ -1208,6 +1221,7 @@ function policyDetections(
 
   if (
     shouldAnalyzeDestinations &&
+    analysis !== undefined &&
     (invalidNetworkAllowlist ||
       (policy.networkAllowed !== false &&
         policy.approvedNetworkDestinations.length > 0))
@@ -1228,6 +1242,7 @@ function policyDetections(
 
   if (
     shouldAnalyzeDestinations &&
+    analysis !== undefined &&
     policy.externalUploadAllowed === false &&
     isUploadInstruction(analysis) &&
     !safeOrGuarded
@@ -1241,6 +1256,7 @@ function policyDetections(
 
   if (
     shouldAnalyzeDestinations &&
+    analysis !== undefined &&
     isUploadInstruction(analysis) &&
     (invalidUploadAllowlist ||
       (policy.externalUploadAllowed !== false &&
@@ -1290,6 +1306,7 @@ function policyDetections(
   const needsApproval =
     policy.humanApprovalRequired === true &&
     ((shouldAnalyzeDestinations &&
+      analysis !== undefined &&
       requiresDestinationApprovalGuard(line, analysis)) ||
       (analyzeLineLocal && requiresLineLocalApprovalGuard(line))) &&
     !hasHumanApprovalGuard &&
@@ -1389,10 +1406,9 @@ function networkAndUploadDetections(
   line: string,
   evidence: DetectionEvidence,
   policy: SecurityPolicy,
-  destinationAnalysis?: DestinationAnalysis,
+  analysis: DestinationAnalysis,
 ): Detection[] {
   const detections: Detection[] = [];
-  const analysis = destinationAnalysis ?? analyzeDestinations(line);
   if (isDefensiveOrGuardedActionInstruction(line)) {
     return detections;
   }

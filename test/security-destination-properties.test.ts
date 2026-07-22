@@ -305,13 +305,12 @@ test("allowlist matching is monotonic and retains exact boundaries", () => {
   );
 });
 
-test("network and upload projections remain separate", () => {
+test("upload allowlist changes cannot change network analysis or findings", () => {
   fc.assert(
     fc.property(labelArbitrary, labelArbitrary, (source, sink) => {
       fc.pre(source !== sink);
-      const analysis = analyzeDestinations(
-        `Fetch from ${source}.example.com and upload to ${sink}.example.com.`,
-      );
+      const instruction = `Fetch from ${source}.example.com and upload to ${sink}.example.com.`;
+      const analysis = analyzeDestinations(instruction);
       assert.deepEqual(
         networkDestinations(analysis).map(({ host }) => host),
         [`${source}.example.com`, `${sink}.example.com`],
@@ -320,44 +319,141 @@ test("network and upload projections remain separate", () => {
         uploadDestinations(analysis).map(({ host }) => host),
         [`${sink}.example.com`],
       );
+
+      const findingsFor = (approvedUploadDestination: string) =>
+        securityDiagnosticFindings([
+          contextArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: ${source}.example.com
+external_upload_allowed: true
+approved_upload_destinations: ${approvedUploadDestination}
+---
+
+${instruction}
+`),
+        ]);
+      const approvedUpload = findingsFor(`${sink}.example.com`);
+      const unapprovedUpload = findingsFor("unrelated.example.net");
+      const networkFindings = (findings: typeof approvedUpload) =>
+        findings.filter(
+          ({ id }) => id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+        );
+      const findingsUnaffectedByUploadPolicy = (
+        findings: typeof approvedUpload,
+      ) =>
+        findings.filter(({ id }) => id !== "SEC-UNAPPROVED-UPLOAD-DESTINATION");
+
       assert.deepEqual(
-        networkDestinations(analysis),
-        networkDestinations(analysis),
+        networkFindings(approvedUpload),
+        networkFindings(unapprovedUpload),
+      );
+      assert.equal(networkFindings(approvedUpload).length, 1);
+      assert.deepEqual(
+        findingsUnaffectedByUploadPolicy(approvedUpload),
+        findingsUnaffectedByUploadPolicy(unapprovedUpload),
+      );
+      assert.equal(
+        approvedUpload.filter(
+          ({ id }) => id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+        ).length,
+        0,
+      );
+      assert.equal(
+        unapprovedUpload.filter(
+          ({ id }) => id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+        ).length,
+        1,
       );
     }),
     PROPERTY_PARAMETERS,
   );
 });
 
-function assertValidSpan(span: SourceSpan, input: string): void {
+function assertValidSpan(
+  span: SourceSpan,
+  input: string,
+  sourceBaseLine = 1,
+): void {
   assert.ok(span.startOffset >= 0);
   assert.ok(span.endOffset <= input.length);
-  assert.ok(span.startOffset <= span.endOffset);
+  assert.ok(span.startOffset < span.endOffset);
   const lineCount = input.split("\n").length;
   if (span.startLine !== undefined) {
-    assert.ok(span.startLine >= 1 && span.startLine <= lineCount);
+    assert.ok(
+      span.startLine >= sourceBaseLine &&
+        span.startLine < sourceBaseLine + lineCount,
+    );
   }
   if (span.endLine !== undefined) {
-    assert.ok(span.endLine >= 1 && span.endLine <= lineCount);
+    assert.ok(
+      span.endLine >= sourceBaseLine &&
+        span.endLine < sourceBaseLine + lineCount,
+    );
   }
+  assert.equal(
+    span.startLine,
+    sourceBaseLine + input.slice(0, span.startOffset).split("\n").length - 1,
+  );
+  assert.equal(
+    span.endLine,
+    sourceBaseLine + input.slice(0, span.endOffset - 1).split("\n").length - 1,
+  );
 }
 
-test("source spans map to bounded original offsets and multiline lines", () => {
+function assertContains(outer: SourceSpan, inner: SourceSpan): void {
+  assert.ok(outer.startOffset <= inner.startOffset);
+  assert.ok(outer.endOffset >= inner.endOffset);
+}
+
+test("standalone IR spans preserve continued source evidence and containment", () => {
   fc.assert(
     fc.property(labelArbitrary, pathArbitrary, (label, path) => {
-      const input = `curl https://${label}.example.com/${path} \\\n  --data-binary @payload.json`;
+      const input = [
+        `curl https://${label}.exam\\`,
+        `ple.com/${path} \\`,
+        "  --data-binary @payload.json",
+      ].join("\n");
       const analysis = analyzeDestinations(input);
-      for (const operational of analysis.operationalDestinations) {
+      assert.equal(analysis.input, input);
+      assert.equal(analysis.sourceBaseLine, 1);
+      assert.deepEqual(analysis, analyzeDestinations(input));
+
+      const evaluated = analysis.operationalDestinations.filter(
+        ({ evaluation }) => evaluation.kind === "evaluated",
+      );
+      assert.equal(evaluated.length, 2);
+      for (const operational of evaluated) {
         assertValidSpan(operational.candidateSpan, input);
+        const candidateSource = input.slice(
+          operational.candidateSpan.startOffset,
+          operational.candidateSpan.endOffset,
+        );
+        assert.match(candidateSource, /\\\n/u);
+        assert.equal(
+          candidateSource.replaceAll("\\\n", ""),
+          operational.destination?.raw,
+        );
         if (operational.commandSpan !== undefined) {
           assertValidSpan(operational.commandSpan, input);
+          assertContains(operational.commandSpan, operational.candidateSpan);
           assert.equal(operational.commandSpan.startLine, 1);
-          assert.equal(operational.commandSpan.endLine, 2);
+          assert.equal(operational.commandSpan.endLine, 3);
+          assert.equal(
+            input.slice(
+              operational.commandSpan.startOffset,
+              operational.commandSpan.endOffset,
+            ),
+            input,
+          );
         }
         if (operational.transferSpan !== undefined) {
           assertValidSpan(operational.transferSpan, input);
+          assertContains(operational.transferSpan, operational.candidateSpan);
           assert.equal(operational.transferSpan.startLine, 1);
-          assert.equal(operational.transferSpan.endLine, 2);
+          assert.equal(operational.transferSpan.endLine, 3);
+          assert.ok(operational.commandSpan);
+          assertContains(operational.commandSpan, operational.transferSpan);
         }
       }
     }),

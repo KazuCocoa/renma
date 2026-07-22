@@ -1,13 +1,17 @@
 export type SourceSpan = {
+  /** Offset relative to DestinationAnalysis.input, not the containing artifact. */
   startOffset: number;
+  /** Exclusive offset relative to DestinationAnalysis.input. */
   endOffset: number;
+  /** One-based absolute artifact line, anchored by sourceBaseLine. */
   startLine?: number;
+  /** One-based absolute artifact line, anchored by sourceBaseLine. */
   endLine?: number;
 };
 
 export type LogicalShellCommand = {
-  projection: string;
-  sourceLineByOffset: number[];
+  input: string;
+  shellProjection: ShellProjection;
   memberLineIndexes: number[];
   sourceLines: string[];
 };
@@ -69,9 +73,12 @@ export type ShellProjection = {
   projection: string;
   sourceOffsetByProjectionOffset: number[];
   sourceLineByProjectionOffset: number[];
+  /** One-based line number in the containing artifact for input offset zero. */
+  sourceBaseLine: number;
 };
 
 export type DestinationAnalysis = ShellProjection & {
+  /** Original bounded source before shell continuations are projected away. */
   input: string;
   candidates: DestinationCandidate[];
   maskedProjection: string;
