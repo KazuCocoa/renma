@@ -233,6 +233,74 @@ use top-level `approved_network_destinations` and
 `approvedUploadDomains`, and repository `security.approvedDomains` and
 `security.approvedUploadDomains`, keep their existing config syntax.
 
+Destination analysis separates lexical candidates from operational
+destinations. Explicit HTTP(S) URLs, protocol-relative URLs, UNC network shares,
+bare hosts with a port or path, IPv4 literals, and Public Suffix List-backed
+dotted tokens are lexical candidates. A transport-less PSL-backed token without
+a port or path remains ambiguous because names such as `README.md`, `main.rs`,
+and `deploy.sh` can be both valid DNS names and local filenames. Renma promotes
+such a token only when the same clause uses deterministic target syntax such as
+`GET host`, `curl host`, `fetch from host`, `upload to host`, or `share with
+host`. A transport-less IPv4 literal or host with a port or path is lexically
+unambiguous but still requires an operational action in the same clause;
+direct `fetch` and `download` forms are accepted for these strong candidates.
+Prefer an explicit URL when prose remains ambiguous.
+
+Repository-relative and absolute local paths, Windows drive paths, unlisted
+bare and hidden filenames, dotted Renma Skill, Context, or lens IDs, and command
+file arguments such as `--config=file.json` or `@payload.json` are not
+operational destinations. Candidate spans are masked before action matching,
+and action-to-target association stays within a clause. An upload verb elsewhere
+on the line therefore cannot turn a fetch source into an upload destination.
+One governing action can apply to a coordinated comma, `and`, or `or` list of
+destinations when no competing action starts between members. Curl upload
+association first combines adjacent physical lines in the same Markdown block
+when each preceding line ends in an active shell continuation backslash. The
+projection removes the backslash-newline while retaining source-line evidence;
+it never crosses code-block, semantic-unit, hidden HTML-comment, or ordinary
+prose boundaries. Upload options are then inspected only within the shell
+command and curl transfer containing the destination. Unquoted, unescaped
+`&&`, `||`, `|`, `;`, and standalone `&` delimit shell commands, while `&>` and
+`2>&1` remain redirections rather than command boundaries. An unquoted `--next`
+delimits curl transfers. Within that local scope, `-d`, `--data`, `-F`, `--form`,
+`-T`, `--upload-file`, `-X POST`, and `-X PUT` apply equally before or after the
+destination URL and across multiple URLs in the same transfer.
+
+Explicit URL candidates are parsed independently with the WHATWG `URL` parser
+and do not require an ICANN public suffix. This supports credentials in the URL,
+internationalized hostnames, explicit single-label hosts such as
+`http://artifact-server/upload`, and `http://localhost/health`. Transport-less
+single-label tokens remain unsupported. Only HTTP(S), protocol-relative, and
+existing UNC forms are in scope. Malformed explicit HTTP(S) and
+protocol-relative candidates still retain their transport signal and therefore
+remain network attempts—and upload attempts when governed by upload syntax—for
+permission checks. If WHATWG parsing cannot normalize the host, Renma does not
+fabricate destination evidence or emit an allowlist match finding for it.
+
+IPv4 and bracketed IPv6 literals are supported. IPv6 addresses are stored in
+canonical compressed form without brackets, so equivalent expanded and
+compressed spellings match. IP addresses and single-label hosts match only the
+exact normalized host; DNS suffix matching applies only to dotted DNS hosts.
+Unbracketed IPv6 and IPv6 zone identifiers remain unsupported for deterministic
+destination matching, while explicit forms using them still retain the
+fail-closed permission signal described above. For example:
+
+```yaml
+approved_network_destinations:
+  - "https://[2001:db8::20]"
+```
+
+For canonical Skill metadata, use the same explicit form inside the JSON-array
+string:
+
+```yaml
+renma.approved-network-destinations: '["https://[2001:db8::20]"]'
+```
+
+Ports remain intentionally approval-agnostic. An approved host without a path
+covers that host—and, for dotted DNS hosts only, its subdomains—at any port. An
+approved path prefix requires the exact normalized host.
+
 ### Forbidden inputs
 
 Use `renma.forbidden-inputs` for a Skill and top-level `forbidden_inputs` for a

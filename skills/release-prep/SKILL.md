@@ -13,6 +13,7 @@ metadata:
   renma.network-allowed: "true"
   renma.approved-network-destinations: '["github.com","api.github.com","registry.npmjs.org"]'
   renma.external-upload-allowed: "true"
+  renma.approved-upload-destinations: '["github.com","api.github.com"]'
   renma.secrets-allowed: "false"
   renma.requires-human-approval: "true"
   renma.forbidden-inputs: '["secrets","credentials","tokens"]'

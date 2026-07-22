@@ -31,6 +31,22 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   network actions while preserving upload allowlist detection for every
   supported upload action.
 
+### Fixed
+
+- Hardened network and upload destination classification by separating lexical
+  candidates from clause-associated operational targets. Local dotted paths,
+  filenames, Renma identifiers, and command file arguments remain local;
+  candidate text cannot create its own action signal; unsupported explicit URLs
+  retain fail-closed permission intent; coordinated destination lists inherit
+  one governing action; curl upload options work before or after the URL while
+  backslash-continued commands retain exact token identity and source-line
+  evidence and remain bounded to the candidate's shell command and `--next`
+  transfer; standalone `&` separates
+  commands without treating `&>` or `2>&1` redirections as boundaries;
+  transport-less IP and strong host candidates require an action; explicit URLs
+  support IPv4, bracketed IPv6, internationalized and single-label hosts; and
+  network and upload allowlist boundaries remain separate.
+
 ### Compatibility
 
 - Preserved reachability, minimum depth, source-entrypoint provenance,
