@@ -258,8 +258,14 @@ association first combines adjacent physical lines in the same Markdown block
 when each preceding line ends in an active shell continuation backslash. The
 projection removes the backslash-newline while retaining source-line evidence;
 it never crosses code-block, semantic-unit, hidden HTML-comment, or ordinary
-prose boundaries. Upload options are then inspected only within the shell
-command and curl transfer containing the destination. Unquoted, unescaped
+prose boundaries. Destination IR keeps the bounded original command as its
+input and maps every projected character back to that input. Span offsets are
+therefore command-input-relative, while span line numbers are one-based,
+absolute artifact lines anchored by `sourceBaseLine` (standalone analysis uses
+line 1). Removed continuation backslashes and newlines remain visible as gaps
+in the offset mapping and in source slices. Upload options are then inspected
+only within the shell command and curl transfer containing the destination.
+Unquoted, unescaped
 `&&`, `||`, `|`, `;`, and standalone `&` delimit shell commands, while `&>` and
 `2>&1` remain redirections rather than command boundaries. An unquoted `--next`
 delimits curl transfers. Within that local scope, `-d`, `--data`, `-F`, `--form`,

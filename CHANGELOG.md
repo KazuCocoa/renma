@@ -6,6 +6,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Changed
+
+- Internally modularized deterministic security destination analysis into
+  logical-shell projection, lexical classification, operational association,
+  and normalization/matching layers, with a shared compatibility corpus and
+  seeded property tests. No CLI or diagnostic behavior change is intended.
+
 ## [0.22.4] - 2026-07-21
 
 ### Added
