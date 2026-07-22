@@ -17,9 +17,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Split the former broad `src/types.ts` hub into cohesive low-level contracts
   and an isolated composed scan-result type while retaining the established
   `dist/types.js` compatibility facade.
-- Separated one collected repository core from explicit memoized projections,
-  so catalog avoids unrelated Discovery and security work while scan,
-  Readiness, and BOM continue to share one immutable evidence boundary.
+- Separated one collected repository core from explicit memoized projections.
+  The complete caller-visible evidence graph and every prepared projection are
+  runtime-immutable, including nested configuration, parsed evidence, Sets,
+  and Maps, while catalog still avoids unrelated Discovery and security work
+  and scan, Readiness, and BOM continue to reuse one collection.
+- Pinned representative scan, catalog, graph, Skill Index, Readiness, and BOM
+  JSON output to normalized 0.22.5 golden baselines, including catalog-only
+  diagnostics and their established scan Finding and DiagnosticV2 projections.
 - Consolidated CLI help, positional bounds, accepted options, defaults,
   command-specific parsing/execution, and expected error adapters behind a
   statically complete typed command registry without changing command output or

@@ -1,0 +1,594 @@
+{
+  "root": "<ROOT>",
+  "configPath": "renma.config.json",
+  "scannedFileCount": 7,
+  "score": 57,
+  "level": "not_ready",
+  "summary": {
+    "totalAssets": 7,
+    "ownedAssets": 6,
+    "unownedAssets": 1,
+    "ownershipCoveragePercent": 86,
+    "nodeCount": 7,
+    "edgeCount": 7,
+    "resolvedEdges": 6,
+    "unresolvedEdges": 1,
+    "graphResolutionPercent": 86,
+    "diagnosticCounts": {
+      "error": 0,
+      "warning": 0,
+      "info": 0
+    },
+    "workflow": {
+      "skillEntrypoints": 1,
+      "checks": 6,
+      "pass": 4,
+      "warn": 1,
+      "fail": 1,
+      "readinessPercent": 67
+    },
+    "contextLens": {
+      "enabled": true,
+      "detected": false,
+      "totalLensCount": 0,
+      "validLensCount": 0,
+      "invalidLensCount": 0,
+      "diagnosticCounts": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      },
+      "definitionPaths": [],
+      "targetReferences": [],
+      "targetPaths": [],
+      "unresolvedTargetReferences": [],
+      "scopeSummary": [],
+      "lenses": []
+    },
+    "securityPosture": {
+      "totalSecurityFindings": 0,
+      "riskClasses": {
+        "violation": 0,
+        "suspicious": 0,
+        "advisory": 0,
+        "unclassified": 0
+      },
+      "severities": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "highOrCritical": 0,
+      "topFindingIds": []
+    },
+    "securityPolicyInventory": {
+      "totalPolicyAssets": 7,
+      "assetsWithLocalPolicyMetadata": 7,
+      "assetsWithInheritedPolicy": 0,
+      "assetsWithEffectivePolicy": 7,
+      "assetsWithoutEffectivePolicy": 0,
+      "policySources": {
+        "local": 7,
+        "security_profile": 0,
+        "repository_config": 0,
+        "owning_skill": 0
+      },
+      "assetKinds": {
+        "skill": 1,
+        "context": 6,
+        "context_lens": 0,
+        "agent": 0,
+        "profile": 0,
+        "reference": 0,
+        "example": 0,
+        "script": 0,
+        "asset": 0,
+        "config": 0,
+        "unknown": 0
+      },
+      "networkAllowed": {
+        "true": 0,
+        "false": 7,
+        "unspecified": 0
+      },
+      "externalUploadAllowed": {
+        "true": 0,
+        "false": 7,
+        "unspecified": 0
+      },
+      "secretsAllowed": {
+        "true": 0,
+        "false": 7,
+        "unspecified": 0
+      },
+      "humanApprovalRequired": {
+        "true": 7,
+        "false": 0,
+        "unspecified": 0
+      },
+      "approvedNetworkDestinationCount": 0,
+      "approvedUploadDestinationCount": 0,
+      "forbiddenInputCount": 0,
+      "disallowedCommandCount": 0,
+      "securityProfiles": {
+        "referenced": 0,
+        "resolved": 0,
+        "missing": 0,
+        "cyclic": 0,
+        "none": 7,
+        "names": []
+      },
+      "topApprovedNetworkDestinations": [],
+      "topApprovedUploadDestinations": [],
+      "topForbiddenInputs": [],
+      "assetsWithoutEffectivePolicyList": []
+    }
+  },
+  "checks": [
+    {
+      "id": "diagnostics.errors",
+      "title": "Diagnostic errors",
+      "status": "pass",
+      "severity": "info",
+      "summary": "No error diagnostics were reported."
+    },
+    {
+      "id": "specification.agent_skills",
+      "title": "Agent Skills specification",
+      "status": "pass",
+      "severity": "info",
+      "summary": "1/1 Skill entrypoints pass Agent Skills validation."
+    },
+    {
+      "id": "security.blocking",
+      "title": "Blocking security findings",
+      "status": "pass",
+      "severity": "info",
+      "summary": "No high or critical security findings were reported."
+    },
+    {
+      "id": "ownership.coverage",
+      "title": "Ownership coverage",
+      "status": "warn",
+      "severity": "warning",
+      "summary": "1 of 7 cataloged assets do not have an effective owner.",
+      "evidence": [
+        {
+          "id": "context.missing-owner",
+          "path": "contexts/missing-owner.md",
+          "message": "Missing effective owner."
+        }
+      ]
+    },
+    {
+      "id": "graph.unresolved_edges",
+      "title": "Unresolved graph edges",
+      "status": "fail",
+      "severity": "error",
+      "summary": "1 declared graph edge could not be resolved.",
+      "evidence": [
+        {
+          "id": "skill.review",
+          "path": "skills/review/SKILL.md",
+          "message": "requires reference \"context.unknown\" does not resolve."
+        }
+      ]
+    },
+    {
+      "id": "workflow.context_closure",
+      "title": "Workflow context closure",
+      "status": "fail",
+      "severity": "error",
+      "summary": "2 required workflow context references did not close.",
+      "evidence": [
+        {
+          "id": "skill.review",
+          "path": "skills/review/SKILL.md",
+          "message": "Required context \"context.inactive\" resolves to archived asset contexts/inactive.md."
+        },
+        {
+          "id": "skill.review",
+          "path": "skills/review/SKILL.md",
+          "message": "Required context reference \"context.unknown\" does not resolve."
+        }
+      ]
+    },
+    {
+      "id": "workflow.optional_context",
+      "title": "Workflow optional context",
+      "status": "pass",
+      "severity": "info",
+      "summary": "No optional workflow context references were declared."
+    },
+    {
+      "id": "workflow.clarity",
+      "title": "Workflow clarity",
+      "status": "warn",
+      "severity": "warning",
+      "summary": "1 workflow clarity finding matched skill entrypoints.",
+      "evidence": [
+        {
+          "id": "QUAL-MISSING-ROUTING-CLARITY",
+          "path": "skills/review/SKILL.md",
+          "message": "Add concise routing language: when to use the skill, whether it invokes other skills, or whether it is a utility skill for single operations."
+        }
+      ]
+    },
+    {
+      "id": "workflow.required_inputs",
+      "title": "Workflow required inputs",
+      "status": "pass",
+      "severity": "info",
+      "summary": "All skill workflow entrypoints document required inputs or prerequisites."
+    },
+    {
+      "id": "workflow.completion_criteria",
+      "title": "Workflow completion criteria",
+      "status": "pass",
+      "severity": "info",
+      "summary": "All skill workflow entrypoints document completion criteria."
+    },
+    {
+      "id": "context_lens.governance",
+      "title": "Context Lens governance",
+      "status": "pass",
+      "severity": "info",
+      "summary": "No context lens definitions were detected."
+    },
+    {
+      "id": "assets.lifecycle",
+      "title": "Asset lifecycle",
+      "status": "pass",
+      "severity": "info",
+      "summary": "1 intentionally retained deprecated or archived asset cataloged; inactive assets do not reduce Readiness merely by existing.",
+      "evidence": [
+        {
+          "id": "context.inactive",
+          "path": "contexts/inactive.md",
+          "message": "Asset status is archived."
+        }
+      ]
+    },
+    {
+      "id": "assets.freshness",
+      "title": "Asset freshness",
+      "status": "pass",
+      "severity": "info",
+      "summary": "No expired, overdue, or invalid freshness metadata was found."
+    },
+    {
+      "id": "assets.minimum_inventory",
+      "title": "Minimum inventory",
+      "status": "pass",
+      "severity": "info",
+      "summary": "7 cataloged assets found."
+    },
+    {
+      "id": "workflow.skills_focused",
+      "title": "Focused skill workflows",
+      "status": "pass",
+      "severity": "info",
+      "summary": "Skill entrypoints are focused, discoverable workflows that use progressive disclosure appropriately."
+    },
+    {
+      "id": "layout.disallowed_skill_assets",
+      "title": "Skill-local support policy",
+      "status": "pass",
+      "severity": "info",
+      "summary": "Valid Skill-local support is allowed; reusable knowledge is promoted only when deterministic evidence supports it."
+    },
+    {
+      "id": "layout.context_root",
+      "title": "Canonical context root",
+      "status": "pass",
+      "severity": "info",
+      "summary": "Context assets and declared context paths use canonical roots."
+    },
+    {
+      "id": "layout.helper_root",
+      "title": "Canonical helper root",
+      "status": "pass",
+      "severity": "info",
+      "summary": "Shared helpers use tools/** and Skill-specific scripts may remain local."
+    },
+    {
+      "id": "paths.helper_commands",
+      "title": "Helper command paths",
+      "status": "pass",
+      "severity": "info",
+      "summary": "Markdown helper commands resolve to tools/** or valid Skill-local scripts."
+    },
+    {
+      "id": "docs.layout_consistency",
+      "title": "Layout documentation consistency",
+      "status": "pass",
+      "severity": "info",
+      "summary": "Repository docs describe canonical Skill roots, valid local support, governed Context Assets, and shared helpers consistently."
+    }
+  ],
+  "findings": [
+    {
+      "id": "META-INVALID-STATUS",
+      "title": "Asset metadata uses an invalid lifecycle status",
+      "category": "maintenance",
+      "severity": "medium",
+      "confidence": "high",
+      "evidence": {
+        "path": "contexts/invalid-status.md",
+        "startLine": 4,
+        "endLine": 4,
+        "snippet": "status: active"
+      },
+      "whyItMatters": "Lifecycle status is part of the repository governance contract. Invalid status values make it harder for humans and agents to understand whether a skill, context asset, or support file is experimental, stable, deprecated, or archived.",
+      "remediation": "Use one of the supported lifecycle status values: experimental, stable, deprecated, archived. Do not use migration or relationship states such as active or delegated as lifecycle status.",
+      "constraints": [
+        "Do not introduce runtime context resolution.",
+        "Do not create prompt packages.",
+        "Do not silently rewrite metadata during scan.",
+        "Keep lifecycle status separate from provenance, delegation, or replacement relationships."
+      ],
+      "verificationSteps": [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Run any project-specific validation checks that apply to this repository."
+      ],
+      "llmHint": "Replace invalid lifecycle status values with supported values. If a file was replaced by a shared context asset, consider a deprecated lifecycle status plus a separate supersession reference. Skills use metadata.renma.status and metadata.renma.superseded-by; non-Skills keep status and superseded_by. Pre-0.16 Skill fields are migration input only. Observed fact: The file is under the recognized contexts/** root. Deterministic interpretation: matched context-root with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "classification": {
+          "kind": "context",
+          "scope": "independent",
+          "matchedRule": "context-root",
+          "reasonCode": "under-recognized-context-root",
+          "reason": "The file is under the recognized contexts/** root.",
+          "recognizedRoot": "contexts"
+        }
+      }
+    },
+    {
+      "id": "META-CONTEXT-MISSING-WHEN-TO-USE",
+      "title": "Shared context asset is missing when_to_use metadata",
+      "category": "maintenance",
+      "severity": "low",
+      "confidence": "high",
+      "evidence": {
+        "path": "contexts/missing-boundary.md",
+        "startLine": 1,
+        "endLine": 12,
+        "snippet": "frontmatter missing when_to_use"
+      },
+      "whyItMatters": "Usage boundaries are part of the deterministic catalog surface for shared context assets. Missing or placeholder boundaries force humans and agents to infer when reusable knowledge applies, which increases over-application risk.",
+      "remediation": "Add compact, reviewed when_to_use and when_not_to_use entries. Keep detailed routing explanations, examples, procedures, and rationale in the markdown body or referenced context assets.",
+      "constraints": [
+        "Do not infer missing boundaries from broad body prose.",
+        "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders.",
+        "Do not introduce runtime context resolution.",
+        "Do not create prompt packages.",
+        "Keep metadata compact and preserve detailed guidance outside frontmatter."
+      ],
+      "verificationSteps": [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Confirm shared context assets declare compact positive and negative usage boundaries."
+      ],
+      "llmHint": "Ask the asset owner for concise positive and negative usage boundaries. Do not invent domain exclusions, owners, policies, or runtime routing behavior. Observed fact: The file is under the recognized contexts/** root. Deterministic interpretation: matched context-root with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "classification": {
+          "kind": "context",
+          "scope": "independent",
+          "matchedRule": "context-root",
+          "reasonCode": "under-recognized-context-root",
+          "reason": "The file is under the recognized contexts/** root.",
+          "recognizedRoot": "contexts"
+        }
+      }
+    },
+    {
+      "id": "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY",
+      "title": "Shared context usage-boundary metadata contains placeholders",
+      "category": "maintenance",
+      "severity": "low",
+      "confidence": "high",
+      "evidence": {
+        "path": "contexts/placeholder.md",
+        "startLine": 6,
+        "endLine": 6,
+        "snippet": "  - TODO"
+      },
+      "whyItMatters": "Usage boundaries are part of the deterministic catalog surface for shared context assets. Missing or placeholder boundaries force humans and agents to infer when reusable knowledge applies, which increases over-application risk.",
+      "remediation": "Add compact, reviewed when_to_use and when_not_to_use entries. Keep detailed routing explanations, examples, procedures, and rationale in the markdown body or referenced context assets.",
+      "constraints": [
+        "Do not infer missing boundaries from broad body prose.",
+        "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders.",
+        "Do not introduce runtime context resolution.",
+        "Do not create prompt packages.",
+        "Keep metadata compact and preserve detailed guidance outside frontmatter."
+      ],
+      "verificationSteps": [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Confirm shared context assets declare compact positive and negative usage boundaries."
+      ],
+      "llmHint": "Ask the asset owner for concise positive and negative usage boundaries. Do not invent domain exclusions, owners, policies, or runtime routing behavior. Observed fact: The file is under the recognized contexts/** root. Deterministic interpretation: matched context-root with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "classification": {
+          "kind": "context",
+          "scope": "independent",
+          "matchedRule": "context-root",
+          "reasonCode": "under-recognized-context-root",
+          "reason": "The file is under the recognized contexts/** root.",
+          "recognizedRoot": "contexts"
+        }
+      }
+    },
+    {
+      "id": "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY",
+      "title": "Shared context usage-boundary metadata contains placeholders",
+      "category": "maintenance",
+      "severity": "low",
+      "confidence": "high",
+      "evidence": {
+        "path": "contexts/placeholder.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  - TBD"
+      },
+      "whyItMatters": "Usage boundaries are part of the deterministic catalog surface for shared context assets. Missing or placeholder boundaries force humans and agents to infer when reusable knowledge applies, which increases over-application risk.",
+      "remediation": "Add compact, reviewed when_to_use and when_not_to_use entries. Keep detailed routing explanations, examples, procedures, and rationale in the markdown body or referenced context assets.",
+      "constraints": [
+        "Do not infer missing boundaries from broad body prose.",
+        "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders.",
+        "Do not introduce runtime context resolution.",
+        "Do not create prompt packages.",
+        "Keep metadata compact and preserve detailed guidance outside frontmatter."
+      ],
+      "verificationSteps": [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Confirm shared context assets declare compact positive and negative usage boundaries."
+      ],
+      "llmHint": "Ask the asset owner for concise positive and negative usage boundaries. Do not invent domain exclusions, owners, policies, or runtime routing behavior. Observed fact: The file is under the recognized contexts/** root. Deterministic interpretation: matched context-root with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "classification": {
+          "kind": "context",
+          "scope": "independent",
+          "matchedRule": "context-root",
+          "reasonCode": "under-recognized-context-root",
+          "reason": "The file is under the recognized contexts/** root.",
+          "recognizedRoot": "contexts"
+        }
+      }
+    },
+    {
+      "id": "QUAL-MISSING-ROUTING-CLARITY",
+      "title": "Skill lacks routing clarity",
+      "category": "quality",
+      "severity": "low",
+      "confidence": "medium",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 1,
+        "endLine": 1,
+        "snippet": "---"
+      },
+      "whyItMatters": "Clear skill structure helps agents choose the right workflow and report useful evidence.",
+      "remediation": "Add concise routing language: when to use the skill, whether it invokes other skills, or whether it is a utility skill for single operations."
+    },
+    {
+      "id": "META-UNKNOWN-REFERENCE",
+      "title": "Declared reference does not resolve to a known asset",
+      "category": "maintenance",
+      "severity": "medium",
+      "confidence": "high",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "whyItMatters": "Declared references make repository relationships visible to catalog, graph, and validation reports. Unknown references make skills and context assets harder for humans and agents to trust.",
+      "remediation": "Fix the reference so it points to an existing asset id or repository-relative path, or remove it if the relationship is no longer needed.",
+      "constraints": [
+        "Do not select runtime context.",
+        "Do not assemble prompt packages.",
+        "Do not infer missing dependencies with an LLM during scan.",
+        "Only validate declared repository relationships."
+      ],
+      "verificationSteps": [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Confirm declared references resolve to known assets."
+      ],
+      "llmHint": "Search the repository for the intended asset by nearby filename, title, id, or path. Update or remove unresolved requires reference \"context.unknown\" declared by \"skill.review\". Observed fact: The file is a Skill entrypoint under the recognized skills/** root. Deterministic interpretation: matched skill-entrypoint with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "source": "skill.review",
+        "target": "context.unknown",
+        "referenceKind": "requires",
+        "sourcePath": "skills/review/SKILL.md",
+        "classification": {
+          "kind": "skill",
+          "scope": "independent",
+          "matchedRule": "skill-entrypoint",
+          "reasonCode": "under-canonical-skill-root",
+          "reason": "The file is a Skill entrypoint under the recognized skills/** root.",
+          "recognizedRoot": "skills"
+        }
+      }
+    },
+    {
+      "id": "MAINT-REFERENCE-DEPRECATED-ASSET",
+      "title": "Declared reference targets a deprecated or archived asset",
+      "category": "maintenance",
+      "severity": "medium",
+      "confidence": "high",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "whyItMatters": "Declared references to deprecated or archived assets can keep old knowledge in active repository paths. If a canonical replacement exists, assets should usually reference that replacement directly.",
+      "remediation": "Update the declared reference to point to the canonical replacement if one exists, or document why the deprecated or archived asset is still intentionally referenced.",
+      "constraints": [
+        "Do not introduce runtime context resolution.",
+        "Do not create prompt packages.",
+        "Do not automatically rewrite references during scan.",
+        "Preserve compatibility shims when they are intentionally needed."
+      ],
+      "verificationSteps": [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Confirm active assets do not declare dependencies on deprecated or archived assets unless intentionally documented."
+      ],
+      "llmHint": "Inspect \"contexts/inactive.md\" for superseded_by or canonical context metadata. If a canonical replacement exists, update requires reference \"context.inactive\" declared by \"skill.review\". If not, decide whether the reference should remain and document why.",
+      "details": {
+        "source": "skill.review",
+        "target": "context.inactive",
+        "referenceKind": "requires",
+        "sourcePath": "skills/review/SKILL.md",
+        "targetPath": "contexts/inactive.md",
+        "targetStatus": "archived"
+      }
+    },
+    {
+      "id": "META-UNKNOWN-DEPENDENCY",
+      "title": "Metadata dependency target is unknown",
+      "category": "maintenance",
+      "severity": "medium",
+      "confidence": "high",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "whyItMatters": "Catalog metadata is part of the repository governance contract. Missing or malformed metadata makes asset ownership, lifecycle, and relationships harder to review and validate.",
+      "remediation": "Update the asset metadata so catalog construction can identify the asset and validate declared relationships.",
+      "constraints": [
+        "Do not introduce runtime context resolution.",
+        "Do not create prompt packages.",
+        "Do not silently rewrite metadata during scan."
+      ],
+      "verificationSteps": [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Run any project-specific validation checks that apply to this repository."
+      ],
+      "llmHint": "Add or correct asset governance metadata using the repository's existing frontmatter style, then rerun scan and catalog. Observed fact: The file is a Skill entrypoint under the recognized skills/** root. Deterministic interpretation: matched skill-entrypoint with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "source": "skill.review",
+        "target": "context.unknown",
+        "referenceKind": "requires",
+        "sourcePath": "skills/review/SKILL.md",
+        "classification": {
+          "kind": "skill",
+          "scope": "independent",
+          "matchedRule": "skill-entrypoint",
+          "reasonCode": "under-canonical-skill-root",
+          "reason": "The file is a Skill entrypoint under the recognized skills/** root.",
+          "recognizedRoot": "skills"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,1773 @@
+{
+  "root": "<ROOT>",
+  "configPath": "renma.config.json",
+  "scannedFileCount": 7,
+  "catalog": {
+    "entries": [
+      {
+        "id": "skill.review",
+        "sourcePath": "skills/review/SKILL.md",
+        "contentHash": "sha256:d32f237601faf9ef678fdc24e1bec4dc1b012ab1d0ac2173b193ad4dd89d6c77",
+        "sizeBytes": 1253,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "qa-platform",
+          "effectiveOwner": "qa-platform",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [
+            "context.valid",
+            "context.invalid-status",
+            "context.missing-boundary",
+            "context.placeholder",
+            "context.inactive",
+            "context.missing-owner",
+            "context.unknown"
+          ],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "skill.review",
+          "owner": "qa-platform",
+          "status": "stable"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "skills/review/SKILL.md",
+            "key": "renma.id",
+            "startLine": 5,
+            "endLine": 5,
+            "raw": "  renma.id: skill.review"
+          },
+          "status": {
+            "path": "skills/review/SKILL.md",
+            "key": "renma.status",
+            "startLine": 6,
+            "endLine": 6,
+            "raw": "  renma.status: stable"
+          },
+          "owner": {
+            "path": "skills/review/SKILL.md",
+            "key": "renma.owner",
+            "startLine": 7,
+            "endLine": 7,
+            "raw": "  renma.owner: qa-platform"
+          },
+          "requires_context": {
+            "path": "skills/review/SKILL.md",
+            "key": "renma.requires-context",
+            "startLine": 8,
+            "endLine": 8,
+            "raw": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+          }
+        },
+        "metadataListItems": {
+          "id": [],
+          "status": [],
+          "owner": [],
+          "requires_context": []
+        },
+        "kind": "skill",
+        "requiredContext": [
+          "context.valid",
+          "context.invalid-status",
+          "context.missing-boundary",
+          "context.placeholder",
+          "context.inactive",
+          "context.missing-owner",
+          "context.unknown"
+        ],
+        "optionalContext": [],
+        "requiredLens": [],
+        "optionalLens": [],
+        "conflicts": []
+      },
+      {
+        "id": "context.inactive",
+        "sourcePath": "contexts/inactive.md",
+        "contentHash": "sha256:50aa16076628df3c699878a2aaabb74ad79defc18799f5a6240c839f1d259d8c",
+        "sizeBytes": 366,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "qa-platform",
+          "effectiveOwner": "qa-platform",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [
+            "reviewing historical context"
+          ],
+          "whenNotToUse": [
+            "selecting current guidance"
+          ],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "context.inactive",
+          "owner": "qa-platform",
+          "status": "archived"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "contexts/inactive.md",
+            "key": "id",
+            "startLine": 2,
+            "endLine": 2,
+            "raw": "id: context.inactive"
+          },
+          "owner": {
+            "path": "contexts/inactive.md",
+            "key": "owner",
+            "startLine": 3,
+            "endLine": 3,
+            "raw": "owner: qa-platform"
+          },
+          "status": {
+            "path": "contexts/inactive.md",
+            "key": "status",
+            "startLine": 4,
+            "endLine": 4,
+            "raw": "status: archived"
+          },
+          "when_to_use": {
+            "path": "contexts/inactive.md",
+            "key": "when_to_use",
+            "startLine": 5,
+            "endLine": 6,
+            "raw": "when_to_use:\n  - reviewing historical context"
+          },
+          "when_not_to_use": {
+            "path": "contexts/inactive.md",
+            "key": "when_not_to_use",
+            "startLine": 7,
+            "endLine": 8,
+            "raw": "when_not_to_use:\n  - selecting current guidance"
+          },
+          "allowed_data": {
+            "path": "contexts/inactive.md",
+            "key": "allowed_data",
+            "startLine": 9,
+            "endLine": 9,
+            "raw": "allowed_data: public"
+          },
+          "network_allowed": {
+            "path": "contexts/inactive.md",
+            "key": "network_allowed",
+            "startLine": 10,
+            "endLine": 10,
+            "raw": "network_allowed: false"
+          },
+          "external_upload_allowed": {
+            "path": "contexts/inactive.md",
+            "key": "external_upload_allowed",
+            "startLine": 11,
+            "endLine": 11,
+            "raw": "external_upload_allowed: false"
+          },
+          "secrets_allowed": {
+            "path": "contexts/inactive.md",
+            "key": "secrets_allowed",
+            "startLine": 12,
+            "endLine": 12,
+            "raw": "secrets_allowed: false"
+          },
+          "requires_human_approval": {
+            "path": "contexts/inactive.md",
+            "key": "requires_human_approval",
+            "startLine": 13,
+            "endLine": 13,
+            "raw": "requires_human_approval: true"
+          }
+        },
+        "metadataListItems": {
+          "when_to_use": [
+            {
+              "path": "contexts/inactive.md",
+              "key": "when_to_use",
+              "startLine": 6,
+              "endLine": 6,
+              "raw": "  - reviewing historical context"
+            }
+          ],
+          "when_not_to_use": [
+            {
+              "path": "contexts/inactive.md",
+              "key": "when_not_to_use",
+              "startLine": 8,
+              "endLine": 8,
+              "raw": "  - selecting current guidance"
+            }
+          ]
+        },
+        "kind": "context"
+      },
+      {
+        "id": "context.invalid-status",
+        "sourcePath": "contexts/invalid-status.md",
+        "contentHash": "sha256:85b789064a239193b77099c8761cd03027744342130f1b057423cc75aca7ad9b",
+        "sizeBytes": 359,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "qa-platform",
+          "effectiveOwner": "qa-platform",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [
+            "reviewing invalid lifecycle metadata"
+          ],
+          "whenNotToUse": [
+            "selecting runtime behavior"
+          ],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "context.invalid-status",
+          "owner": "qa-platform"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "contexts/invalid-status.md",
+            "key": "id",
+            "startLine": 2,
+            "endLine": 2,
+            "raw": "id: context.invalid-status"
+          },
+          "owner": {
+            "path": "contexts/invalid-status.md",
+            "key": "owner",
+            "startLine": 3,
+            "endLine": 3,
+            "raw": "owner: qa-platform"
+          },
+          "status": {
+            "path": "contexts/invalid-status.md",
+            "key": "status",
+            "startLine": 4,
+            "endLine": 4,
+            "raw": "status: active"
+          },
+          "when_to_use": {
+            "path": "contexts/invalid-status.md",
+            "key": "when_to_use",
+            "startLine": 5,
+            "endLine": 6,
+            "raw": "when_to_use:\n  - reviewing invalid lifecycle metadata"
+          },
+          "when_not_to_use": {
+            "path": "contexts/invalid-status.md",
+            "key": "when_not_to_use",
+            "startLine": 7,
+            "endLine": 8,
+            "raw": "when_not_to_use:\n  - selecting runtime behavior"
+          },
+          "allowed_data": {
+            "path": "contexts/invalid-status.md",
+            "key": "allowed_data",
+            "startLine": 9,
+            "endLine": 9,
+            "raw": "allowed_data: public"
+          },
+          "network_allowed": {
+            "path": "contexts/invalid-status.md",
+            "key": "network_allowed",
+            "startLine": 10,
+            "endLine": 10,
+            "raw": "network_allowed: false"
+          },
+          "external_upload_allowed": {
+            "path": "contexts/invalid-status.md",
+            "key": "external_upload_allowed",
+            "startLine": 11,
+            "endLine": 11,
+            "raw": "external_upload_allowed: false"
+          },
+          "secrets_allowed": {
+            "path": "contexts/invalid-status.md",
+            "key": "secrets_allowed",
+            "startLine": 12,
+            "endLine": 12,
+            "raw": "secrets_allowed: false"
+          },
+          "requires_human_approval": {
+            "path": "contexts/invalid-status.md",
+            "key": "requires_human_approval",
+            "startLine": 13,
+            "endLine": 13,
+            "raw": "requires_human_approval: true"
+          }
+        },
+        "metadataListItems": {
+          "when_to_use": [
+            {
+              "path": "contexts/invalid-status.md",
+              "key": "when_to_use",
+              "startLine": 6,
+              "endLine": 6,
+              "raw": "  - reviewing invalid lifecycle metadata"
+            }
+          ],
+          "when_not_to_use": [
+            {
+              "path": "contexts/invalid-status.md",
+              "key": "when_not_to_use",
+              "startLine": 8,
+              "endLine": 8,
+              "raw": "  - selecting runtime behavior"
+            }
+          ]
+        },
+        "kind": "context"
+      },
+      {
+        "id": "context.missing-boundary",
+        "sourcePath": "contexts/missing-boundary.md",
+        "contentHash": "sha256:576e72b632dc8717438284dfa5f010bcdb7670b0445e0314cebbfe3b5fce5216",
+        "sizeBytes": 310,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "qa-platform",
+          "effectiveOwner": "qa-platform",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [
+            "selecting runtime behavior"
+          ],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "context.missing-boundary",
+          "owner": "qa-platform",
+          "status": "stable"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "contexts/missing-boundary.md",
+            "key": "id",
+            "startLine": 2,
+            "endLine": 2,
+            "raw": "id: context.missing-boundary"
+          },
+          "owner": {
+            "path": "contexts/missing-boundary.md",
+            "key": "owner",
+            "startLine": 3,
+            "endLine": 3,
+            "raw": "owner: qa-platform"
+          },
+          "status": {
+            "path": "contexts/missing-boundary.md",
+            "key": "status",
+            "startLine": 4,
+            "endLine": 4,
+            "raw": "status: stable"
+          },
+          "when_not_to_use": {
+            "path": "contexts/missing-boundary.md",
+            "key": "when_not_to_use",
+            "startLine": 5,
+            "endLine": 6,
+            "raw": "when_not_to_use:\n  - selecting runtime behavior"
+          },
+          "allowed_data": {
+            "path": "contexts/missing-boundary.md",
+            "key": "allowed_data",
+            "startLine": 7,
+            "endLine": 7,
+            "raw": "allowed_data: public"
+          },
+          "network_allowed": {
+            "path": "contexts/missing-boundary.md",
+            "key": "network_allowed",
+            "startLine": 8,
+            "endLine": 8,
+            "raw": "network_allowed: false"
+          },
+          "external_upload_allowed": {
+            "path": "contexts/missing-boundary.md",
+            "key": "external_upload_allowed",
+            "startLine": 9,
+            "endLine": 9,
+            "raw": "external_upload_allowed: false"
+          },
+          "secrets_allowed": {
+            "path": "contexts/missing-boundary.md",
+            "key": "secrets_allowed",
+            "startLine": 10,
+            "endLine": 10,
+            "raw": "secrets_allowed: false"
+          },
+          "requires_human_approval": {
+            "path": "contexts/missing-boundary.md",
+            "key": "requires_human_approval",
+            "startLine": 11,
+            "endLine": 11,
+            "raw": "requires_human_approval: true"
+          }
+        },
+        "metadataListItems": {
+          "when_not_to_use": [
+            {
+              "path": "contexts/missing-boundary.md",
+              "key": "when_not_to_use",
+              "startLine": 6,
+              "endLine": 6,
+              "raw": "  - selecting runtime behavior"
+            }
+          ]
+        },
+        "kind": "context"
+      },
+      {
+        "id": "context.missing-owner",
+        "sourcePath": "contexts/missing-owner.md",
+        "contentHash": "sha256:882f7c772e8bb7513e03be4a7642c187cf5473c0a9feb873a98f1e970778d143",
+        "sizeBytes": 317,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": null,
+          "effectiveOwner": null,
+          "source": "unowned"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [
+            "reviewing ownership diagnostics"
+          ],
+          "whenNotToUse": [
+            "selecting runtime behavior"
+          ],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "context.missing-owner",
+          "status": "stable"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "contexts/missing-owner.md",
+            "key": "id",
+            "startLine": 2,
+            "endLine": 2,
+            "raw": "id: context.missing-owner"
+          },
+          "status": {
+            "path": "contexts/missing-owner.md",
+            "key": "status",
+            "startLine": 3,
+            "endLine": 3,
+            "raw": "status: stable"
+          },
+          "when_to_use": {
+            "path": "contexts/missing-owner.md",
+            "key": "when_to_use",
+            "startLine": 4,
+            "endLine": 5,
+            "raw": "when_to_use:\n  - reviewing ownership diagnostics"
+          },
+          "when_not_to_use": {
+            "path": "contexts/missing-owner.md",
+            "key": "when_not_to_use",
+            "startLine": 6,
+            "endLine": 7,
+            "raw": "when_not_to_use:\n  - selecting runtime behavior"
+          },
+          "allowed_data": {
+            "path": "contexts/missing-owner.md",
+            "key": "allowed_data",
+            "startLine": 8,
+            "endLine": 8,
+            "raw": "allowed_data: public"
+          },
+          "network_allowed": {
+            "path": "contexts/missing-owner.md",
+            "key": "network_allowed",
+            "startLine": 9,
+            "endLine": 9,
+            "raw": "network_allowed: false"
+          },
+          "external_upload_allowed": {
+            "path": "contexts/missing-owner.md",
+            "key": "external_upload_allowed",
+            "startLine": 10,
+            "endLine": 10,
+            "raw": "external_upload_allowed: false"
+          },
+          "secrets_allowed": {
+            "path": "contexts/missing-owner.md",
+            "key": "secrets_allowed",
+            "startLine": 11,
+            "endLine": 11,
+            "raw": "secrets_allowed: false"
+          },
+          "requires_human_approval": {
+            "path": "contexts/missing-owner.md",
+            "key": "requires_human_approval",
+            "startLine": 12,
+            "endLine": 12,
+            "raw": "requires_human_approval: true"
+          }
+        },
+        "metadataListItems": {
+          "when_to_use": [
+            {
+              "path": "contexts/missing-owner.md",
+              "key": "when_to_use",
+              "startLine": 5,
+              "endLine": 5,
+              "raw": "  - reviewing ownership diagnostics"
+            }
+          ],
+          "when_not_to_use": [
+            {
+              "path": "contexts/missing-owner.md",
+              "key": "when_not_to_use",
+              "startLine": 7,
+              "endLine": 7,
+              "raw": "  - selecting runtime behavior"
+            }
+          ]
+        },
+        "kind": "context"
+      },
+      {
+        "id": "context.placeholder",
+        "sourcePath": "contexts/placeholder.md",
+        "contentHash": "sha256:74a2e4307961b9f40cfce6473db465f3de044cafe9cc2323e9df645e7e1aef47",
+        "sizeBytes": 315,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "qa-platform",
+          "effectiveOwner": "qa-platform",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [
+            "TODO"
+          ],
+          "whenNotToUse": [
+            "TBD"
+          ],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "context.placeholder",
+          "owner": "qa-platform",
+          "status": "stable"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "contexts/placeholder.md",
+            "key": "id",
+            "startLine": 2,
+            "endLine": 2,
+            "raw": "id: context.placeholder"
+          },
+          "owner": {
+            "path": "contexts/placeholder.md",
+            "key": "owner",
+            "startLine": 3,
+            "endLine": 3,
+            "raw": "owner: qa-platform"
+          },
+          "status": {
+            "path": "contexts/placeholder.md",
+            "key": "status",
+            "startLine": 4,
+            "endLine": 4,
+            "raw": "status: stable"
+          },
+          "when_to_use": {
+            "path": "contexts/placeholder.md",
+            "key": "when_to_use",
+            "startLine": 5,
+            "endLine": 6,
+            "raw": "when_to_use:\n  - TODO"
+          },
+          "when_not_to_use": {
+            "path": "contexts/placeholder.md",
+            "key": "when_not_to_use",
+            "startLine": 7,
+            "endLine": 8,
+            "raw": "when_not_to_use:\n  - TBD"
+          },
+          "allowed_data": {
+            "path": "contexts/placeholder.md",
+            "key": "allowed_data",
+            "startLine": 9,
+            "endLine": 9,
+            "raw": "allowed_data: public"
+          },
+          "network_allowed": {
+            "path": "contexts/placeholder.md",
+            "key": "network_allowed",
+            "startLine": 10,
+            "endLine": 10,
+            "raw": "network_allowed: false"
+          },
+          "external_upload_allowed": {
+            "path": "contexts/placeholder.md",
+            "key": "external_upload_allowed",
+            "startLine": 11,
+            "endLine": 11,
+            "raw": "external_upload_allowed: false"
+          },
+          "secrets_allowed": {
+            "path": "contexts/placeholder.md",
+            "key": "secrets_allowed",
+            "startLine": 12,
+            "endLine": 12,
+            "raw": "secrets_allowed: false"
+          },
+          "requires_human_approval": {
+            "path": "contexts/placeholder.md",
+            "key": "requires_human_approval",
+            "startLine": 13,
+            "endLine": 13,
+            "raw": "requires_human_approval: true"
+          }
+        },
+        "metadataListItems": {
+          "when_to_use": [
+            {
+              "path": "contexts/placeholder.md",
+              "key": "when_to_use",
+              "startLine": 6,
+              "endLine": 6,
+              "raw": "  - TODO"
+            }
+          ],
+          "when_not_to_use": [
+            {
+              "path": "contexts/placeholder.md",
+              "key": "when_not_to_use",
+              "startLine": 8,
+              "endLine": 8,
+              "raw": "  - TBD"
+            }
+          ]
+        },
+        "kind": "context"
+      },
+      {
+        "id": "context.valid",
+        "sourcePath": "contexts/valid.md",
+        "contentHash": "sha256:0d20387d0273c49073c64a3a7e2d43190a0a697cb0c4c625db63e3ca63634831",
+        "sizeBytes": 330,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "qa-platform",
+          "effectiveOwner": "qa-platform",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [
+            "reviewing repository evidence"
+          ],
+          "whenNotToUse": [
+            "selecting runtime behavior"
+          ],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "context.valid",
+          "owner": "qa-platform",
+          "status": "stable"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "contexts/valid.md",
+            "key": "id",
+            "startLine": 2,
+            "endLine": 2,
+            "raw": "id: context.valid"
+          },
+          "owner": {
+            "path": "contexts/valid.md",
+            "key": "owner",
+            "startLine": 3,
+            "endLine": 3,
+            "raw": "owner: qa-platform"
+          },
+          "status": {
+            "path": "contexts/valid.md",
+            "key": "status",
+            "startLine": 4,
+            "endLine": 4,
+            "raw": "status: stable"
+          },
+          "when_to_use": {
+            "path": "contexts/valid.md",
+            "key": "when_to_use",
+            "startLine": 5,
+            "endLine": 6,
+            "raw": "when_to_use:\n  - reviewing repository evidence"
+          },
+          "when_not_to_use": {
+            "path": "contexts/valid.md",
+            "key": "when_not_to_use",
+            "startLine": 7,
+            "endLine": 8,
+            "raw": "when_not_to_use:\n  - selecting runtime behavior"
+          },
+          "allowed_data": {
+            "path": "contexts/valid.md",
+            "key": "allowed_data",
+            "startLine": 9,
+            "endLine": 9,
+            "raw": "allowed_data: public"
+          },
+          "network_allowed": {
+            "path": "contexts/valid.md",
+            "key": "network_allowed",
+            "startLine": 10,
+            "endLine": 10,
+            "raw": "network_allowed: false"
+          },
+          "external_upload_allowed": {
+            "path": "contexts/valid.md",
+            "key": "external_upload_allowed",
+            "startLine": 11,
+            "endLine": 11,
+            "raw": "external_upload_allowed: false"
+          },
+          "secrets_allowed": {
+            "path": "contexts/valid.md",
+            "key": "secrets_allowed",
+            "startLine": 12,
+            "endLine": 12,
+            "raw": "secrets_allowed: false"
+          },
+          "requires_human_approval": {
+            "path": "contexts/valid.md",
+            "key": "requires_human_approval",
+            "startLine": 13,
+            "endLine": 13,
+            "raw": "requires_human_approval: true"
+          }
+        },
+        "metadataListItems": {
+          "when_to_use": [
+            {
+              "path": "contexts/valid.md",
+              "key": "when_to_use",
+              "startLine": 6,
+              "endLine": 6,
+              "raw": "  - reviewing repository evidence"
+            }
+          ],
+          "when_not_to_use": [
+            {
+              "path": "contexts/valid.md",
+              "key": "when_not_to_use",
+              "startLine": 8,
+              "endLine": 8,
+              "raw": "  - selecting runtime behavior"
+            }
+          ]
+        },
+        "kind": "context"
+      }
+    ],
+    "assets": [
+      {
+        "id": "skill.review",
+        "sourcePath": "skills/review/SKILL.md",
+        "contentHash": "sha256:d32f237601faf9ef678fdc24e1bec4dc1b012ab1d0ac2173b193ad4dd89d6c77",
+        "sizeBytes": 1253,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "qa-platform",
+          "effectiveOwner": "qa-platform",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [
+            "context.valid",
+            "context.invalid-status",
+            "context.missing-boundary",
+            "context.placeholder",
+            "context.inactive",
+            "context.missing-owner",
+            "context.unknown"
+          ],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "skill.review",
+          "owner": "qa-platform",
+          "status": "stable"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "skills/review/SKILL.md",
+            "key": "renma.id",
+            "startLine": 5,
+            "endLine": 5,
+            "raw": "  renma.id: skill.review"
+          },
+          "status": {
+            "path": "skills/review/SKILL.md",
+            "key": "renma.status",
+            "startLine": 6,
+            "endLine": 6,
+            "raw": "  renma.status: stable"
+          },
+          "owner": {
+            "path": "skills/review/SKILL.md",
+            "key": "renma.owner",
+            "startLine": 7,
+            "endLine": 7,
+            "raw": "  renma.owner: qa-platform"
+          },
+          "requires_context": {
+            "path": "skills/review/SKILL.md",
+            "key": "renma.requires-context",
+            "startLine": 8,
+            "endLine": 8,
+            "raw": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+          }
+        },
+        "metadataListItems": {
+          "id": [],
+          "status": [],
+          "owner": [],
+          "requires_context": []
+        },
+        "kind": "skill",
+        "requiredContext": [
+          "context.valid",
+          "context.invalid-status",
+          "context.missing-boundary",
+          "context.placeholder",
+          "context.inactive",
+          "context.missing-owner",
+          "context.unknown"
+        ],
+        "optionalContext": [],
+        "requiredLens": [],
+        "optionalLens": [],
+        "conflicts": []
+      },
+      {
+        "id": "context.inactive",
+        "sourcePath": "contexts/inactive.md",
+        "contentHash": "sha256:50aa16076628df3c699878a2aaabb74ad79defc18799f5a6240c839f1d259d8c",
+        "sizeBytes": 366,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "qa-platform",
+          "effectiveOwner": "qa-platform",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [
+            "reviewing historical context"
+          ],
+          "whenNotToUse": [
+            "selecting current guidance"
+          ],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "context.inactive",
+          "owner": "qa-platform",
+          "status": "archived"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "contexts/inactive.md",
+            "key": "id",
+            "startLine": 2,
+            "endLine": 2,
+            "raw": "id: context.inactive"
+          },
+          "owner": {
+            "path": "contexts/inactive.md",
+            "key": "owner",
+            "startLine": 3,
+            "endLine": 3,
+            "raw": "owner: qa-platform"
+          },
+          "status": {
+            "path": "contexts/inactive.md",
+            "key": "status",
+            "startLine": 4,
+            "endLine": 4,
+            "raw": "status: archived"
+          },
+          "when_to_use": {
+            "path": "contexts/inactive.md",
+            "key": "when_to_use",
+            "startLine": 5,
+            "endLine": 6,
+            "raw": "when_to_use:\n  - reviewing historical context"
+          },
+          "when_not_to_use": {
+            "path": "contexts/inactive.md",
+            "key": "when_not_to_use",
+            "startLine": 7,
+            "endLine": 8,
+            "raw": "when_not_to_use:\n  - selecting current guidance"
+          },
+          "allowed_data": {
+            "path": "contexts/inactive.md",
+            "key": "allowed_data",
+            "startLine": 9,
+            "endLine": 9,
+            "raw": "allowed_data: public"
+          },
+          "network_allowed": {
+            "path": "contexts/inactive.md",
+            "key": "network_allowed",
+            "startLine": 10,
+            "endLine": 10,
+            "raw": "network_allowed: false"
+          },
+          "external_upload_allowed": {
+            "path": "contexts/inactive.md",
+            "key": "external_upload_allowed",
+            "startLine": 11,
+            "endLine": 11,
+            "raw": "external_upload_allowed: false"
+          },
+          "secrets_allowed": {
+            "path": "contexts/inactive.md",
+            "key": "secrets_allowed",
+            "startLine": 12,
+            "endLine": 12,
+            "raw": "secrets_allowed: false"
+          },
+          "requires_human_approval": {
+            "path": "contexts/inactive.md",
+            "key": "requires_human_approval",
+            "startLine": 13,
+            "endLine": 13,
+            "raw": "requires_human_approval: true"
+          }
+        },
+        "metadataListItems": {
+          "when_to_use": [
+            {
+              "path": "contexts/inactive.md",
+              "key": "when_to_use",
+              "startLine": 6,
+              "endLine": 6,
+              "raw": "  - reviewing historical context"
+            }
+          ],
+          "when_not_to_use": [
+            {
+              "path": "contexts/inactive.md",
+              "key": "when_not_to_use",
+              "startLine": 8,
+              "endLine": 8,
+              "raw": "  - selecting current guidance"
+            }
+          ]
+        },
+        "kind": "context"
+      },
+      {
+        "id": "context.invalid-status",
+        "sourcePath": "contexts/invalid-status.md",
+        "contentHash": "sha256:85b789064a239193b77099c8761cd03027744342130f1b057423cc75aca7ad9b",
+        "sizeBytes": 359,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "qa-platform",
+          "effectiveOwner": "qa-platform",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [
+            "reviewing invalid lifecycle metadata"
+          ],
+          "whenNotToUse": [
+            "selecting runtime behavior"
+          ],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "context.invalid-status",
+          "owner": "qa-platform"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "contexts/invalid-status.md",
+            "key": "id",
+            "startLine": 2,
+            "endLine": 2,
+            "raw": "id: context.invalid-status"
+          },
+          "owner": {
+            "path": "contexts/invalid-status.md",
+            "key": "owner",
+            "startLine": 3,
+            "endLine": 3,
+            "raw": "owner: qa-platform"
+          },
+          "status": {
+            "path": "contexts/invalid-status.md",
+            "key": "status",
+            "startLine": 4,
+            "endLine": 4,
+            "raw": "status: active"
+          },
+          "when_to_use": {
+            "path": "contexts/invalid-status.md",
+            "key": "when_to_use",
+            "startLine": 5,
+            "endLine": 6,
+            "raw": "when_to_use:\n  - reviewing invalid lifecycle metadata"
+          },
+          "when_not_to_use": {
+            "path": "contexts/invalid-status.md",
+            "key": "when_not_to_use",
+            "startLine": 7,
+            "endLine": 8,
+            "raw": "when_not_to_use:\n  - selecting runtime behavior"
+          },
+          "allowed_data": {
+            "path": "contexts/invalid-status.md",
+            "key": "allowed_data",
+            "startLine": 9,
+            "endLine": 9,
+            "raw": "allowed_data: public"
+          },
+          "network_allowed": {
+            "path": "contexts/invalid-status.md",
+            "key": "network_allowed",
+            "startLine": 10,
+            "endLine": 10,
+            "raw": "network_allowed: false"
+          },
+          "external_upload_allowed": {
+            "path": "contexts/invalid-status.md",
+            "key": "external_upload_allowed",
+            "startLine": 11,
+            "endLine": 11,
+            "raw": "external_upload_allowed: false"
+          },
+          "secrets_allowed": {
+            "path": "contexts/invalid-status.md",
+            "key": "secrets_allowed",
+            "startLine": 12,
+            "endLine": 12,
+            "raw": "secrets_allowed: false"
+          },
+          "requires_human_approval": {
+            "path": "contexts/invalid-status.md",
+            "key": "requires_human_approval",
+            "startLine": 13,
+            "endLine": 13,
+            "raw": "requires_human_approval: true"
+          }
+        },
+        "metadataListItems": {
+          "when_to_use": [
+            {
+              "path": "contexts/invalid-status.md",
+              "key": "when_to_use",
+              "startLine": 6,
+              "endLine": 6,
+              "raw": "  - reviewing invalid lifecycle metadata"
+            }
+          ],
+          "when_not_to_use": [
+            {
+              "path": "contexts/invalid-status.md",
+              "key": "when_not_to_use",
+              "startLine": 8,
+              "endLine": 8,
+              "raw": "  - selecting runtime behavior"
+            }
+          ]
+        },
+        "kind": "context"
+      },
+      {
+        "id": "context.missing-boundary",
+        "sourcePath": "contexts/missing-boundary.md",
+        "contentHash": "sha256:576e72b632dc8717438284dfa5f010bcdb7670b0445e0314cebbfe3b5fce5216",
+        "sizeBytes": 310,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "qa-platform",
+          "effectiveOwner": "qa-platform",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [
+            "selecting runtime behavior"
+          ],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "context.missing-boundary",
+          "owner": "qa-platform",
+          "status": "stable"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "contexts/missing-boundary.md",
+            "key": "id",
+            "startLine": 2,
+            "endLine": 2,
+            "raw": "id: context.missing-boundary"
+          },
+          "owner": {
+            "path": "contexts/missing-boundary.md",
+            "key": "owner",
+            "startLine": 3,
+            "endLine": 3,
+            "raw": "owner: qa-platform"
+          },
+          "status": {
+            "path": "contexts/missing-boundary.md",
+            "key": "status",
+            "startLine": 4,
+            "endLine": 4,
+            "raw": "status: stable"
+          },
+          "when_not_to_use": {
+            "path": "contexts/missing-boundary.md",
+            "key": "when_not_to_use",
+            "startLine": 5,
+            "endLine": 6,
+            "raw": "when_not_to_use:\n  - selecting runtime behavior"
+          },
+          "allowed_data": {
+            "path": "contexts/missing-boundary.md",
+            "key": "allowed_data",
+            "startLine": 7,
+            "endLine": 7,
+            "raw": "allowed_data: public"
+          },
+          "network_allowed": {
+            "path": "contexts/missing-boundary.md",
+            "key": "network_allowed",
+            "startLine": 8,
+            "endLine": 8,
+            "raw": "network_allowed: false"
+          },
+          "external_upload_allowed": {
+            "path": "contexts/missing-boundary.md",
+            "key": "external_upload_allowed",
+            "startLine": 9,
+            "endLine": 9,
+            "raw": "external_upload_allowed: false"
+          },
+          "secrets_allowed": {
+            "path": "contexts/missing-boundary.md",
+            "key": "secrets_allowed",
+            "startLine": 10,
+            "endLine": 10,
+            "raw": "secrets_allowed: false"
+          },
+          "requires_human_approval": {
+            "path": "contexts/missing-boundary.md",
+            "key": "requires_human_approval",
+            "startLine": 11,
+            "endLine": 11,
+            "raw": "requires_human_approval: true"
+          }
+        },
+        "metadataListItems": {
+          "when_not_to_use": [
+            {
+              "path": "contexts/missing-boundary.md",
+              "key": "when_not_to_use",
+              "startLine": 6,
+              "endLine": 6,
+              "raw": "  - selecting runtime behavior"
+            }
+          ]
+        },
+        "kind": "context"
+      },
+      {
+        "id": "context.missing-owner",
+        "sourcePath": "contexts/missing-owner.md",
+        "contentHash": "sha256:882f7c772e8bb7513e03be4a7642c187cf5473c0a9feb873a98f1e970778d143",
+        "sizeBytes": 317,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": null,
+          "effectiveOwner": null,
+          "source": "unowned"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [
+            "reviewing ownership diagnostics"
+          ],
+          "whenNotToUse": [
+            "selecting runtime behavior"
+          ],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "context.missing-owner",
+          "status": "stable"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "contexts/missing-owner.md",
+            "key": "id",
+            "startLine": 2,
+            "endLine": 2,
+            "raw": "id: context.missing-owner"
+          },
+          "status": {
+            "path": "contexts/missing-owner.md",
+            "key": "status",
+            "startLine": 3,
+            "endLine": 3,
+            "raw": "status: stable"
+          },
+          "when_to_use": {
+            "path": "contexts/missing-owner.md",
+            "key": "when_to_use",
+            "startLine": 4,
+            "endLine": 5,
+            "raw": "when_to_use:\n  - reviewing ownership diagnostics"
+          },
+          "when_not_to_use": {
+            "path": "contexts/missing-owner.md",
+            "key": "when_not_to_use",
+            "startLine": 6,
+            "endLine": 7,
+            "raw": "when_not_to_use:\n  - selecting runtime behavior"
+          },
+          "allowed_data": {
+            "path": "contexts/missing-owner.md",
+            "key": "allowed_data",
+            "startLine": 8,
+            "endLine": 8,
+            "raw": "allowed_data: public"
+          },
+          "network_allowed": {
+            "path": "contexts/missing-owner.md",
+            "key": "network_allowed",
+            "startLine": 9,
+            "endLine": 9,
+            "raw": "network_allowed: false"
+          },
+          "external_upload_allowed": {
+            "path": "contexts/missing-owner.md",
+            "key": "external_upload_allowed",
+            "startLine": 10,
+            "endLine": 10,
+            "raw": "external_upload_allowed: false"
+          },
+          "secrets_allowed": {
+            "path": "contexts/missing-owner.md",
+            "key": "secrets_allowed",
+            "startLine": 11,
+            "endLine": 11,
+            "raw": "secrets_allowed: false"
+          },
+          "requires_human_approval": {
+            "path": "contexts/missing-owner.md",
+            "key": "requires_human_approval",
+            "startLine": 12,
+            "endLine": 12,
+            "raw": "requires_human_approval: true"
+          }
+        },
+        "metadataListItems": {
+          "when_to_use": [
+            {
+              "path": "contexts/missing-owner.md",
+              "key": "when_to_use",
+              "startLine": 5,
+              "endLine": 5,
+              "raw": "  - reviewing ownership diagnostics"
+            }
+          ],
+          "when_not_to_use": [
+            {
+              "path": "contexts/missing-owner.md",
+              "key": "when_not_to_use",
+              "startLine": 7,
+              "endLine": 7,
+              "raw": "  - selecting runtime behavior"
+            }
+          ]
+        },
+        "kind": "context"
+      },
+      {
+        "id": "context.placeholder",
+        "sourcePath": "contexts/placeholder.md",
+        "contentHash": "sha256:74a2e4307961b9f40cfce6473db465f3de044cafe9cc2323e9df645e7e1aef47",
+        "sizeBytes": 315,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "qa-platform",
+          "effectiveOwner": "qa-platform",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [
+            "TODO"
+          ],
+          "whenNotToUse": [
+            "TBD"
+          ],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "context.placeholder",
+          "owner": "qa-platform",
+          "status": "stable"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "contexts/placeholder.md",
+            "key": "id",
+            "startLine": 2,
+            "endLine": 2,
+            "raw": "id: context.placeholder"
+          },
+          "owner": {
+            "path": "contexts/placeholder.md",
+            "key": "owner",
+            "startLine": 3,
+            "endLine": 3,
+            "raw": "owner: qa-platform"
+          },
+          "status": {
+            "path": "contexts/placeholder.md",
+            "key": "status",
+            "startLine": 4,
+            "endLine": 4,
+            "raw": "status: stable"
+          },
+          "when_to_use": {
+            "path": "contexts/placeholder.md",
+            "key": "when_to_use",
+            "startLine": 5,
+            "endLine": 6,
+            "raw": "when_to_use:\n  - TODO"
+          },
+          "when_not_to_use": {
+            "path": "contexts/placeholder.md",
+            "key": "when_not_to_use",
+            "startLine": 7,
+            "endLine": 8,
+            "raw": "when_not_to_use:\n  - TBD"
+          },
+          "allowed_data": {
+            "path": "contexts/placeholder.md",
+            "key": "allowed_data",
+            "startLine": 9,
+            "endLine": 9,
+            "raw": "allowed_data: public"
+          },
+          "network_allowed": {
+            "path": "contexts/placeholder.md",
+            "key": "network_allowed",
+            "startLine": 10,
+            "endLine": 10,
+            "raw": "network_allowed: false"
+          },
+          "external_upload_allowed": {
+            "path": "contexts/placeholder.md",
+            "key": "external_upload_allowed",
+            "startLine": 11,
+            "endLine": 11,
+            "raw": "external_upload_allowed: false"
+          },
+          "secrets_allowed": {
+            "path": "contexts/placeholder.md",
+            "key": "secrets_allowed",
+            "startLine": 12,
+            "endLine": 12,
+            "raw": "secrets_allowed: false"
+          },
+          "requires_human_approval": {
+            "path": "contexts/placeholder.md",
+            "key": "requires_human_approval",
+            "startLine": 13,
+            "endLine": 13,
+            "raw": "requires_human_approval: true"
+          }
+        },
+        "metadataListItems": {
+          "when_to_use": [
+            {
+              "path": "contexts/placeholder.md",
+              "key": "when_to_use",
+              "startLine": 6,
+              "endLine": 6,
+              "raw": "  - TODO"
+            }
+          ],
+          "when_not_to_use": [
+            {
+              "path": "contexts/placeholder.md",
+              "key": "when_not_to_use",
+              "startLine": 8,
+              "endLine": 8,
+              "raw": "  - TBD"
+            }
+          ]
+        },
+        "kind": "context"
+      },
+      {
+        "id": "context.valid",
+        "sourcePath": "contexts/valid.md",
+        "contentHash": "sha256:0d20387d0273c49073c64a3a7e2d43190a0a697cb0c4c625db63e3ca63634831",
+        "sizeBytes": 330,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "qa-platform",
+          "effectiveOwner": "qa-platform",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [
+            "reviewing repository evidence"
+          ],
+          "whenNotToUse": [
+            "selecting runtime behavior"
+          ],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "context.valid",
+          "owner": "qa-platform",
+          "status": "stable"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "contexts/valid.md",
+            "key": "id",
+            "startLine": 2,
+            "endLine": 2,
+            "raw": "id: context.valid"
+          },
+          "owner": {
+            "path": "contexts/valid.md",
+            "key": "owner",
+            "startLine": 3,
+            "endLine": 3,
+            "raw": "owner: qa-platform"
+          },
+          "status": {
+            "path": "contexts/valid.md",
+            "key": "status",
+            "startLine": 4,
+            "endLine": 4,
+            "raw": "status: stable"
+          },
+          "when_to_use": {
+            "path": "contexts/valid.md",
+            "key": "when_to_use",
+            "startLine": 5,
+            "endLine": 6,
+            "raw": "when_to_use:\n  - reviewing repository evidence"
+          },
+          "when_not_to_use": {
+            "path": "contexts/valid.md",
+            "key": "when_not_to_use",
+            "startLine": 7,
+            "endLine": 8,
+            "raw": "when_not_to_use:\n  - selecting runtime behavior"
+          },
+          "allowed_data": {
+            "path": "contexts/valid.md",
+            "key": "allowed_data",
+            "startLine": 9,
+            "endLine": 9,
+            "raw": "allowed_data: public"
+          },
+          "network_allowed": {
+            "path": "contexts/valid.md",
+            "key": "network_allowed",
+            "startLine": 10,
+            "endLine": 10,
+            "raw": "network_allowed: false"
+          },
+          "external_upload_allowed": {
+            "path": "contexts/valid.md",
+            "key": "external_upload_allowed",
+            "startLine": 11,
+            "endLine": 11,
+            "raw": "external_upload_allowed: false"
+          },
+          "secrets_allowed": {
+            "path": "contexts/valid.md",
+            "key": "secrets_allowed",
+            "startLine": 12,
+            "endLine": 12,
+            "raw": "secrets_allowed: false"
+          },
+          "requires_human_approval": {
+            "path": "contexts/valid.md",
+            "key": "requires_human_approval",
+            "startLine": 13,
+            "endLine": 13,
+            "raw": "requires_human_approval: true"
+          }
+        },
+        "metadataListItems": {
+          "when_to_use": [
+            {
+              "path": "contexts/valid.md",
+              "key": "when_to_use",
+              "startLine": 6,
+              "endLine": 6,
+              "raw": "  - reviewing repository evidence"
+            }
+          ],
+          "when_not_to_use": [
+            {
+              "path": "contexts/valid.md",
+              "key": "when_not_to_use",
+              "startLine": 8,
+              "endLine": 8,
+              "raw": "  - selecting runtime behavior"
+            }
+          ]
+        },
+        "kind": "context"
+      }
+    ],
+    "dependencies": [
+      {
+        "from": "skill.review",
+        "to": "context.inactive",
+        "kind": "requires",
+        "declaration": "requires_context",
+        "declarationIndex": 4,
+        "sourcePath": "skills/review/SKILL.md",
+        "evidence": {
+          "path": "skills/review/SKILL.md",
+          "startLine": 8,
+          "endLine": 8,
+          "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+        }
+      },
+      {
+        "from": "skill.review",
+        "to": "context.invalid-status",
+        "kind": "requires",
+        "declaration": "requires_context",
+        "declarationIndex": 1,
+        "sourcePath": "skills/review/SKILL.md",
+        "evidence": {
+          "path": "skills/review/SKILL.md",
+          "startLine": 8,
+          "endLine": 8,
+          "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+        }
+      },
+      {
+        "from": "skill.review",
+        "to": "context.missing-boundary",
+        "kind": "requires",
+        "declaration": "requires_context",
+        "declarationIndex": 2,
+        "sourcePath": "skills/review/SKILL.md",
+        "evidence": {
+          "path": "skills/review/SKILL.md",
+          "startLine": 8,
+          "endLine": 8,
+          "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+        }
+      },
+      {
+        "from": "skill.review",
+        "to": "context.missing-owner",
+        "kind": "requires",
+        "declaration": "requires_context",
+        "declarationIndex": 5,
+        "sourcePath": "skills/review/SKILL.md",
+        "evidence": {
+          "path": "skills/review/SKILL.md",
+          "startLine": 8,
+          "endLine": 8,
+          "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+        }
+      },
+      {
+        "from": "skill.review",
+        "to": "context.placeholder",
+        "kind": "requires",
+        "declaration": "requires_context",
+        "declarationIndex": 3,
+        "sourcePath": "skills/review/SKILL.md",
+        "evidence": {
+          "path": "skills/review/SKILL.md",
+          "startLine": 8,
+          "endLine": 8,
+          "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+        }
+      },
+      {
+        "from": "skill.review",
+        "to": "context.unknown",
+        "kind": "requires",
+        "declaration": "requires_context",
+        "declarationIndex": 6,
+        "sourcePath": "skills/review/SKILL.md",
+        "evidence": {
+          "path": "skills/review/SKILL.md",
+          "startLine": 8,
+          "endLine": 8,
+          "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+        }
+      },
+      {
+        "from": "skill.review",
+        "to": "context.valid",
+        "kind": "requires",
+        "declaration": "requires_context",
+        "declarationIndex": 0,
+        "sourcePath": "skills/review/SKILL.md",
+        "evidence": {
+          "path": "skills/review/SKILL.md",
+          "startLine": 8,
+          "endLine": 8,
+          "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+        }
+      }
+    ]
+  },
+  "contextLens": {
+    "enabled": true,
+    "detected": false,
+    "totalLensCount": 0,
+    "validLensCount": 0,
+    "invalidLensCount": 0,
+    "diagnosticCounts": {
+      "error": 0,
+      "warning": 0,
+      "info": 0
+    },
+    "definitionPaths": [],
+    "targetReferences": [],
+    "targetPaths": [],
+    "unresolvedTargetReferences": [],
+    "scopeSummary": [],
+    "lenses": []
+  },
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "path": "contexts/invalid-status.md",
+      "message": "Invalid status \"active\". Expected one of: experimental, stable, deprecated, archived.",
+      "evidence": {
+        "path": "contexts/invalid-status.md",
+        "startLine": 4,
+        "endLine": 4,
+        "snippet": "status: active"
+      }
+    },
+    {
+      "severity": "warning",
+      "path": "contexts/missing-boundary.md",
+      "message": "Shared context asset is missing when_to_use metadata.",
+      "evidence": {
+        "path": "contexts/missing-boundary.md",
+        "startLine": 1,
+        "endLine": 12,
+        "snippet": "frontmatter missing when_to_use"
+      }
+    },
+    {
+      "severity": "warning",
+      "path": "contexts/missing-owner.md",
+      "message": "Asset is missing an owner."
+    },
+    {
+      "severity": "warning",
+      "path": "contexts/placeholder.md",
+      "message": "Shared context asset usage-boundary metadata contains placeholder values in when_to_use.",
+      "evidence": {
+        "path": "contexts/placeholder.md",
+        "startLine": 6,
+        "endLine": 6,
+        "snippet": "  - TODO"
+      }
+    },
+    {
+      "severity": "warning",
+      "path": "contexts/placeholder.md",
+      "message": "Shared context asset usage-boundary metadata contains placeholder values in when_not_to_use.",
+      "evidence": {
+        "path": "contexts/placeholder.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  - TBD"
+      }
+    },
+    {
+      "severity": "warning",
+      "path": "skills/review/SKILL.md",
+      "message": "Metadata dependency \"context.unknown\" from \"skill.review\" does not match a catalog entry.",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "details": {
+        "source": "skill.review",
+        "target": "context.unknown",
+        "referenceKind": "requires",
+        "sourcePath": "skills/review/SKILL.md"
+      }
+    }
+  ]
+}

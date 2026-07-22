@@ -48,6 +48,11 @@ export interface RepositorySnapshotCore {
   readonly discoveryDiagnostics: Diagnostic[];
 }
 
+type SnapshotObject = Record<PropertyKey, unknown>;
+
+const SET_MUTATORS = new Set<PropertyKey>(["add", "delete", "clear"]);
+const MAP_MUTATORS = new Set<PropertyKey>(["set", "delete", "clear"]);
+
 export type RepositoryProjectionName =
   | "catalog"
   | "agent-skills"
@@ -171,7 +176,7 @@ export async function collectRepositorySnapshotCore(
     instrumentation?.onDocumentParse?.(artifact.path);
     return parseDocument(artifact);
   });
-  return Object.freeze({
+  return immutableEvidenceGraph({
     root,
     config,
     ...(configPath ? { configPath } : {}),
@@ -214,8 +219,8 @@ export async function collectRepositorySnapshot(
   return createRepositorySnapshot(
     core,
     projections,
-    repositoryPaths,
-    repositoryPathStates,
+    immutableEvidenceGraph(repositoryPaths),
+    immutableEvidenceGraph(repositoryPathStates),
   );
 }
 
@@ -316,7 +321,7 @@ function createRepositorySnapshot(
   repositoryPathStates: ReadonlyMap<string, RepositoryPathState>,
 ): RepositorySnapshot {
   let combinedDiagnostics: Diagnostic[] | undefined;
-  return {
+  return Object.freeze({
     core,
     root: core.root,
     ...(core.configPath ? { configPath: core.configPath } : {}),
@@ -358,15 +363,15 @@ function createRepositorySnapshot(
       return projections.contextLens().diagnostics;
     },
     get diagnostics() {
-      combinedDiagnostics ??= [
+      combinedDiagnostics ??= immutableEvidenceGraph([
         ...core.discoveryDiagnostics,
         ...projections.catalog().diagnostics,
         ...projections.contextLens().diagnostics,
         ...projections.skillDiscovery().diagnostics,
-      ];
+      ]);
       return combinedDiagnostics;
     },
-  };
+  });
 }
 
 function memoizeProjection<T>(
@@ -380,8 +385,111 @@ function memoizeProjection<T>(
   return () => {
     if (!state.prepared) {
       instrumentation?.onProjection?.(name);
-      state = { prepared: true, value: prepare() };
+      state = { prepared: true, value: immutableEvidenceGraph(prepare()) };
     }
     return state.value;
   };
+}
+
+/**
+ * Copy one collected or projected evidence graph into runtime-immutable values.
+ * Set and Map need protected proxies because Object.freeze alone does not block
+ * their mutator methods. The mutable backing collections stay unreachable.
+ */
+function immutableEvidenceGraph<T>(value: T): T {
+  return immutableEvidenceValue(value, new Map<object, unknown>());
+}
+
+function immutableEvidenceValue<T>(value: T, copies: Map<object, unknown>): T {
+  if (typeof value !== "object" || !value) {
+    return value;
+  }
+
+  const existing = copies.get(value);
+  if (existing !== undefined) return existing as T;
+
+  if (Array.isArray(value)) {
+    const copy: unknown[] = [];
+    copies.set(value, copy);
+    for (const item of value) copy.push(immutableEvidenceValue(item, copies));
+    return Object.freeze(copy) as T;
+  }
+
+  if (value instanceof Set) {
+    return immutableSet(value, copies) as T;
+  }
+
+  if (value instanceof Map) {
+    return immutableMap(value, copies) as T;
+  }
+
+  const copy = Object.create(Object.getPrototypeOf(value)) as SnapshotObject;
+  copies.set(value, copy);
+  for (const property of Reflect.ownKeys(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, property);
+    if (!descriptor) continue;
+    if ("value" in descriptor) {
+      descriptor.value = immutableEvidenceValue(descriptor.value, copies);
+    }
+    Object.defineProperty(copy, property, descriptor);
+  }
+  return Object.freeze(copy) as T;
+}
+
+function immutableSet<T>(
+  source: Set<T>,
+  copies: Map<object, unknown>,
+): ReadonlySet<T> {
+  const target = new Set<T>();
+  const view: ReadonlySet<T> = new Proxy(target, {
+    get(set, property) {
+      if (SET_MUTATORS.has(property)) return immutableCollectionMutation;
+      if (property === "forEach") {
+        return (
+          callback: (value: T, valueAgain: T, set: ReadonlySet<T>) => void,
+          thisArg?: unknown,
+        ) => set.forEach((item) => callback.call(thisArg, item, item, view));
+      }
+      const member = Reflect.get(set, property, set) as unknown;
+      return typeof member === "function" ? member.bind(set) : member;
+    },
+  });
+  copies.set(source, view);
+  for (const item of source) {
+    target.add(immutableEvidenceValue(item, copies));
+  }
+  return Object.freeze(view);
+}
+
+function immutableMap<K, V>(
+  source: Map<K, V>,
+  copies: Map<object, unknown>,
+): ReadonlyMap<K, V> {
+  const target = new Map<K, V>();
+  const view: ReadonlyMap<K, V> = new Proxy(target, {
+    get(map, property) {
+      if (MAP_MUTATORS.has(property)) return immutableCollectionMutation;
+      if (property === "forEach") {
+        return (
+          callback: (value: V, key: K, map: ReadonlyMap<K, V>) => void,
+          thisArg?: unknown,
+        ) =>
+          map.forEach((item, key) => callback.call(thisArg, item, key, view));
+      }
+      const member = Reflect.get(map, property, map) as unknown;
+      return typeof member === "function" ? member.bind(map) : member;
+    },
+  });
+  copies.set(source, view);
+  for (const [key, item] of source) {
+    target.set(
+      immutableEvidenceValue(key, copies),
+      immutableEvidenceValue(item, copies),
+    );
+  }
+  return Object.freeze(view);
+}
+
+function immutableCollectionMutation(): never {
+  throw new TypeError("Repository snapshot evidence is immutable");
 }

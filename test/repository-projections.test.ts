@@ -58,6 +58,78 @@ test("one collection parses once and memoizes every requested projection", async
   ]);
 });
 
+test("caller-visible mutations cannot change later lazy projections", async (t) => {
+  const fixture = await mutationRepositoryFixture(t);
+  const snapshot = await collectRepositorySnapshot(fixture.root);
+  const original = await collectRepositorySnapshot(fixture.root);
+
+  const catalogBefore = snapshot.catalog;
+  const expected = {
+    catalog: original.catalog,
+    agentSkills: original.agentSkills,
+    skillDiscovery: original.skillDiscovery,
+    classifications: original.classifications,
+    securityPolicies: original.securityPolicies,
+    contextLens: original.contextLens,
+  };
+
+  assert.throws(() => snapshot.documents.pop(), TypeError);
+  assert.throws(() => snapshot.artifacts.pop(), TypeError);
+  assert.throws(() => {
+    snapshot.config.skillDiscovery.adopted = false;
+  }, TypeError);
+  assert.throws(() => {
+    const document = snapshot.documents[0];
+    if (document) document.lines[0] = "mutated";
+  }, TypeError);
+  assert.throws(() => {
+    const artifact = snapshot.artifacts[0];
+    if (artifact) artifact.path = "skills/mutated/SKILL.md";
+  }, TypeError);
+  assert.throws(
+    () =>
+      (snapshot.core.discoveredPaths as Set<string>).add(
+        "skills/mutated/SKILL.md",
+      ),
+    TypeError,
+  );
+  assert.throws(
+    () =>
+      (snapshot.repositoryPaths as Set<string>).add("skills/mutated/SKILL.md"),
+    TypeError,
+  );
+  assert.throws(
+    () =>
+      (snapshot.repositoryPathStates as Map<string, "parsed" | "absent">).set(
+        "skills/mutated/SKILL.md",
+        "parsed",
+      ),
+    TypeError,
+  );
+  assert.throws(() => catalogBefore.entries.pop(), TypeError);
+  assert.throws(() => {
+    const entry = catalogBefore.entries[0];
+    if (entry) entry.metadata.owner = "mutated";
+  }, TypeError);
+
+  assert.deepEqual(snapshot.catalog, expected.catalog);
+  assert.deepEqual(snapshot.agentSkills, expected.agentSkills);
+  assert.deepEqual(snapshot.skillDiscovery, expected.skillDiscovery);
+  assert.deepEqual(
+    [...snapshot.classifications],
+    [...expected.classifications],
+  );
+  assert.deepEqual(snapshot.securityPolicies, expected.securityPolicies);
+  assert.deepEqual(snapshot.contextLens, expected.contextLens);
+
+  assert.equal(snapshot.catalog, catalogBefore);
+  assert.equal(snapshot.agentSkills, snapshot.agentSkills);
+  assert.equal(snapshot.skillDiscovery, snapshot.skillDiscovery);
+  assert.equal(snapshot.classifications, snapshot.classifications);
+  assert.equal(snapshot.securityPolicies, snapshot.securityPolicies);
+  assert.equal(snapshot.contextLens, snapshot.contextLens);
+});
+
 test("catalog evidence does not prepare unrelated snapshot projections", async (t) => {
   const { root } = await repositoryFixture(t);
   const projections: RepositoryProjectionName[] = [];
@@ -148,6 +220,44 @@ async function repositoryFixture(
     id: "skill.demo",
     owner: "qa",
     status: "stable",
+  });
+  return fixture;
+}
+
+async function mutationRepositoryFixture(
+  t: test.TestContext,
+): Promise<RepositoryFixture> {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-immutable-projections-",
+    testContext: t,
+  });
+  await fixture.writeConfig({ skill_discovery: { adopted: true } });
+  await fixture.skill("source", {
+    id: "skill.source",
+    owner: "qa",
+    status: "stable",
+    continuesWith: ["skill.target"],
+    publishedEntrypoint: true,
+  });
+  await fixture.skill("target", {
+    id: "skill.target",
+    owner: "qa",
+    status: "stable",
+  });
+  await fixture.context("contexts/reference.md", {
+    id: "context.reference",
+    owner: "qa",
+    status: "stable",
+    whenToUse: ["repository review"],
+    whenNotToUse: ["runtime selection"],
+  });
+  await fixture.contextLens("lenses/review.md", {
+    id: "lens.review",
+    owner: "qa",
+    purpose: "Review repository evidence.",
+    appliesTo: ["context.reference"],
+    focus: ["governance"],
+    expectedOutputs: ["review summary"],
   });
   return fixture;
 }

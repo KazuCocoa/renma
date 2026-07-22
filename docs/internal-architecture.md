@@ -144,12 +144,17 @@ be handled as behavior-changing follow-up work.
 ## RepositorySnapshot Is the Repository Evidence Source
 
 `collectRepositorySnapshotCore` in `src/repository-evidence.ts` performs one
-discovery pass and parses each discovered artifact once. It freezes the core
-object containing the resolved root, effective configuration, config path,
-artifacts, parsed documents, discovered path set, and discovery diagnostics.
-No derived projection may rediscover files or reread repository content.
+discovery pass and parses each discovered artifact once. Collection copies the
+complete evidence graph into runtime-immutable values: the effective
+configuration and its nested collections, every Artifact and ParsedDocument,
+their nested arrays and metadata evidence, discovered paths, and discovery
+diagnostics. Sets and Maps use protected read-only views because freezing a
+native Set or Map object does not disable its mutator methods. Their mutable
+backing collections are never exposed. No derived projection may rediscover
+files or reread repository content.
 
-An explicit projection store derives and memoizes these facts from that core:
+An explicit projection store derives and memoizes these facts from that stable
+input:
 
 - catalog, catalog diagnostics, and the parent-Skill index;
 - Agent Skills validation and the dependent Skill Discovery index;
@@ -161,7 +166,11 @@ Repository path existence states are captured before
 `collectRepositorySnapshot` returns, using the catalog derived from the same
 core. They remain eager because later filesystem mutation must not change a
 partially prepared snapshot. Pure projections may remain lazy; repeated access
-returns the same prepared object.
+returns the same prepared object. Each prepared projection is itself copied
+into a runtime-immutable graph before it becomes caller-visible, so mutating a
+prepared catalog or validation result cannot affect a dependent projection.
+The compatibility properties `core`, `config`, `artifacts`, and `documents`
+reference the same immutable collected facts rather than mutable inputs.
 
 Consumers explicitly prepare only what they need. Scan names its required
 projections and includes Skill Discovery only when that diagnostic slice is
@@ -173,8 +182,10 @@ evidence, or capture command-only repository path states.
 Readiness builds graph and scan evidence from one `RepositorySnapshot`, and BOM
 builds graph, scan, Readiness, policy inventory, and diagnostics from that same
 snapshot and core. A working-tree mutation after collection cannot influence a
-later lazy projection; a new collection is required to observe it. This keeps
-commands from combining independently recollected repository states.
+later lazy projection. Caller attempts to mutate snapshot arrays, nested
+objects, configuration, or path collections also fail without changing the
+projection input. A new collection is required to observe different facts.
+This keeps commands from combining independently recollected repository states.
 
 ## CLI Commands Have One Registered Contract
 

@@ -1,0 +1,314 @@
+{
+  "root": "<ROOT>",
+  "configPath": "renma.config.json",
+  "scannedFileCount": 7,
+  "view": "full",
+  "nodeCount": 7,
+  "edgeCount": 7,
+  "nodes": [
+    {
+      "id": "context.inactive",
+      "kind": "context",
+      "sourcePath": "contexts/inactive.md",
+      "contentHash": "sha256:50aa16076628df3c699878a2aaabb74ad79defc18799f5a6240c839f1d259d8c",
+      "sizeBytes": 366,
+      "contentClassification": "text",
+      "markdownParserEligible": true,
+      "ownership": {
+        "declaredOwner": "qa-platform",
+        "effectiveOwner": "qa-platform",
+        "source": "declared"
+      },
+      "status": "archived",
+      "tags": []
+    },
+    {
+      "id": "context.invalid-status",
+      "kind": "context",
+      "sourcePath": "contexts/invalid-status.md",
+      "contentHash": "sha256:85b789064a239193b77099c8761cd03027744342130f1b057423cc75aca7ad9b",
+      "sizeBytes": 359,
+      "contentClassification": "text",
+      "markdownParserEligible": true,
+      "ownership": {
+        "declaredOwner": "qa-platform",
+        "effectiveOwner": "qa-platform",
+        "source": "declared"
+      },
+      "tags": []
+    },
+    {
+      "id": "context.missing-boundary",
+      "kind": "context",
+      "sourcePath": "contexts/missing-boundary.md",
+      "contentHash": "sha256:576e72b632dc8717438284dfa5f010bcdb7670b0445e0314cebbfe3b5fce5216",
+      "sizeBytes": 310,
+      "contentClassification": "text",
+      "markdownParserEligible": true,
+      "ownership": {
+        "declaredOwner": "qa-platform",
+        "effectiveOwner": "qa-platform",
+        "source": "declared"
+      },
+      "status": "stable",
+      "tags": []
+    },
+    {
+      "id": "context.missing-owner",
+      "kind": "context",
+      "sourcePath": "contexts/missing-owner.md",
+      "contentHash": "sha256:882f7c772e8bb7513e03be4a7642c187cf5473c0a9feb873a98f1e970778d143",
+      "sizeBytes": 317,
+      "contentClassification": "text",
+      "markdownParserEligible": true,
+      "ownership": {
+        "declaredOwner": null,
+        "effectiveOwner": null,
+        "source": "unowned"
+      },
+      "status": "stable",
+      "tags": []
+    },
+    {
+      "id": "context.placeholder",
+      "kind": "context",
+      "sourcePath": "contexts/placeholder.md",
+      "contentHash": "sha256:74a2e4307961b9f40cfce6473db465f3de044cafe9cc2323e9df645e7e1aef47",
+      "sizeBytes": 315,
+      "contentClassification": "text",
+      "markdownParserEligible": true,
+      "ownership": {
+        "declaredOwner": "qa-platform",
+        "effectiveOwner": "qa-platform",
+        "source": "declared"
+      },
+      "status": "stable",
+      "tags": []
+    },
+    {
+      "id": "context.valid",
+      "kind": "context",
+      "sourcePath": "contexts/valid.md",
+      "contentHash": "sha256:0d20387d0273c49073c64a3a7e2d43190a0a697cb0c4c625db63e3ca63634831",
+      "sizeBytes": 330,
+      "contentClassification": "text",
+      "markdownParserEligible": true,
+      "ownership": {
+        "declaredOwner": "qa-platform",
+        "effectiveOwner": "qa-platform",
+        "source": "declared"
+      },
+      "status": "stable",
+      "tags": []
+    },
+    {
+      "id": "skill.review",
+      "kind": "skill",
+      "sourcePath": "skills/review/SKILL.md",
+      "contentHash": "sha256:d32f237601faf9ef678fdc24e1bec4dc1b012ab1d0ac2173b193ad4dd89d6c77",
+      "sizeBytes": 1253,
+      "contentClassification": "text",
+      "markdownParserEligible": true,
+      "ownership": {
+        "declaredOwner": "qa-platform",
+        "effectiveOwner": "qa-platform",
+        "source": "declared"
+      },
+      "status": "stable",
+      "tags": []
+    }
+  ],
+  "edges": [
+    {
+      "from": "skill.review",
+      "to": "context.inactive",
+      "kind": "requires",
+      "declaration": "requires_context",
+      "declarationIndex": 4,
+      "sourcePath": "skills/review/SKILL.md",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "resolved": true,
+      "targetId": "context.inactive",
+      "targetKind": "context",
+      "targetPath": "contexts/inactive.md"
+    },
+    {
+      "from": "skill.review",
+      "to": "context.invalid-status",
+      "kind": "requires",
+      "declaration": "requires_context",
+      "declarationIndex": 1,
+      "sourcePath": "skills/review/SKILL.md",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "resolved": true,
+      "targetId": "context.invalid-status",
+      "targetKind": "context",
+      "targetPath": "contexts/invalid-status.md"
+    },
+    {
+      "from": "skill.review",
+      "to": "context.missing-boundary",
+      "kind": "requires",
+      "declaration": "requires_context",
+      "declarationIndex": 2,
+      "sourcePath": "skills/review/SKILL.md",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "resolved": true,
+      "targetId": "context.missing-boundary",
+      "targetKind": "context",
+      "targetPath": "contexts/missing-boundary.md"
+    },
+    {
+      "from": "skill.review",
+      "to": "context.missing-owner",
+      "kind": "requires",
+      "declaration": "requires_context",
+      "declarationIndex": 5,
+      "sourcePath": "skills/review/SKILL.md",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "resolved": true,
+      "targetId": "context.missing-owner",
+      "targetKind": "context",
+      "targetPath": "contexts/missing-owner.md"
+    },
+    {
+      "from": "skill.review",
+      "to": "context.placeholder",
+      "kind": "requires",
+      "declaration": "requires_context",
+      "declarationIndex": 3,
+      "sourcePath": "skills/review/SKILL.md",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "resolved": true,
+      "targetId": "context.placeholder",
+      "targetKind": "context",
+      "targetPath": "contexts/placeholder.md"
+    },
+    {
+      "from": "skill.review",
+      "to": "context.unknown",
+      "kind": "requires",
+      "declaration": "requires_context",
+      "declarationIndex": 6,
+      "sourcePath": "skills/review/SKILL.md",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "resolved": false
+    },
+    {
+      "from": "skill.review",
+      "to": "context.valid",
+      "kind": "requires",
+      "declaration": "requires_context",
+      "declarationIndex": 0,
+      "sourcePath": "skills/review/SKILL.md",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "resolved": true,
+      "targetId": "context.valid",
+      "targetKind": "context",
+      "targetPath": "contexts/valid.md"
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "path": "contexts/invalid-status.md",
+      "message": "Invalid status \"active\". Expected one of: experimental, stable, deprecated, archived.",
+      "evidence": {
+        "path": "contexts/invalid-status.md",
+        "startLine": 4,
+        "endLine": 4,
+        "snippet": "status: active"
+      }
+    },
+    {
+      "severity": "warning",
+      "path": "contexts/missing-boundary.md",
+      "message": "Shared context asset is missing when_to_use metadata.",
+      "evidence": {
+        "path": "contexts/missing-boundary.md",
+        "startLine": 1,
+        "endLine": 12,
+        "snippet": "frontmatter missing when_to_use"
+      }
+    },
+    {
+      "severity": "warning",
+      "path": "contexts/missing-owner.md",
+      "message": "Asset is missing an owner."
+    },
+    {
+      "severity": "warning",
+      "path": "contexts/placeholder.md",
+      "message": "Shared context asset usage-boundary metadata contains placeholder values in when_to_use.",
+      "evidence": {
+        "path": "contexts/placeholder.md",
+        "startLine": 6,
+        "endLine": 6,
+        "snippet": "  - TODO"
+      }
+    },
+    {
+      "severity": "warning",
+      "path": "contexts/placeholder.md",
+      "message": "Shared context asset usage-boundary metadata contains placeholder values in when_not_to_use.",
+      "evidence": {
+        "path": "contexts/placeholder.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  - TBD"
+      }
+    },
+    {
+      "severity": "warning",
+      "path": "skills/review/SKILL.md",
+      "message": "Metadata dependency \"context.unknown\" from \"skill.review\" does not match a catalog entry.",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "details": {
+        "source": "skill.review",
+        "target": "context.unknown",
+        "referenceKind": "requires",
+        "sourcePath": "skills/review/SKILL.md"
+      }
+    }
+  ]
+}
