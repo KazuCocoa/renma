@@ -16,6 +16,10 @@ import {
   unapprovedDestinations,
   uploadDestinations,
 } from "../src/security-destination/index.js";
+import {
+  projectShellContinuations,
+  projectionSpanToSourceSpan,
+} from "../src/security-destination/logical-shell.js";
 import type { Artifact } from "../src/types.js";
 import { SECURITY_DESTINATION_CASES } from "./fixtures/security-destination-cases.js";
 
@@ -126,6 +130,118 @@ test("destination IR separates explicit intent from normalization", () => {
         },
       },
     ],
+  );
+});
+
+test("retained newlines honor a non-default absolute source line base", () => {
+  const input = "curl https://one.example.com\ncurl https://two.example.com";
+  const projection = projectShellContinuations(input, 20);
+  const newlineOffset = input.indexOf("\n");
+
+  assert.equal(projection.projection, input);
+  assert.deepEqual(
+    projection.sourceOffsetByProjectionOffset,
+    Array.from({ length: input.length }, (_, index) => index),
+  );
+  assert.ok(
+    projection.sourceOffsetByProjectionOffset.every(
+      (offset) => offset >= 0 && offset < input.length,
+    ),
+  );
+  assert.ok(
+    projection.sourceLineByProjectionOffset
+      .slice(0, newlineOffset)
+      .every((line) => line === 20),
+  );
+  assert.equal(projection.sourceLineByProjectionOffset[newlineOffset], 20);
+  assert.ok(
+    projection.sourceLineByProjectionOffset
+      .slice(newlineOffset + 1)
+      .every((line) => line === 21),
+  );
+
+  assert.deepEqual(
+    projectionSpanToSourceSpan(
+      { start: 0, end: newlineOffset + 1 },
+      projection,
+      input.length,
+    ),
+    {
+      startOffset: 0,
+      endOffset: newlineOffset + 1,
+      startLine: 20,
+      endLine: 20,
+    },
+  );
+  assert.deepEqual(
+    projectionSpanToSourceSpan(
+      { start: newlineOffset + 1, end: input.length },
+      projection,
+      input.length,
+    ),
+    {
+      startOffset: newlineOffset + 1,
+      endOffset: input.length,
+      startLine: 21,
+      endLine: 21,
+    },
+  );
+});
+
+test("removed continuations retain offset gaps with an absolute line base", () => {
+  const input = [
+    "curl https://sink.example.com/upload \\",
+    "  --data-binary @payload.json",
+  ].join("\n");
+  const projection = projectShellContinuations(input, 40);
+  const backslashOffset = input.indexOf("\\");
+  const secondLineOffset = backslashOffset + 2;
+  const secondLineProjectionOffset =
+    projection.sourceOffsetByProjectionOffset.indexOf(secondLineOffset);
+
+  assert.ok(secondLineProjectionOffset > 0);
+  assert.equal(projection.projection.includes("\n"), false);
+  assert.equal(
+    projection.sourceOffsetByProjectionOffset.includes(backslashOffset),
+    false,
+  );
+  assert.equal(
+    projection.sourceOffsetByProjectionOffset.includes(backslashOffset + 1),
+    false,
+  );
+  assert.equal(
+    (projection.sourceOffsetByProjectionOffset[secondLineProjectionOffset] ??
+      0) -
+      (projection.sourceOffsetByProjectionOffset[
+        secondLineProjectionOffset - 1
+      ] ?? 0),
+    3,
+  );
+  assert.ok(
+    projection.sourceLineByProjectionOffset
+      .slice(0, secondLineProjectionOffset)
+      .every((line) => line === 40),
+  );
+  assert.ok(
+    projection.sourceLineByProjectionOffset
+      .slice(secondLineProjectionOffset)
+      .every((line) => line === 41),
+  );
+  assert.deepEqual(
+    projectionSpanToSourceSpan(
+      {
+        start: secondLineProjectionOffset,
+        end: projection.projection.length,
+      },
+      projection,
+      input.length,
+    ),
+    {
+      startOffset: secondLineOffset,
+      endOffset: input.length,
+      startLine: 41,
+      endLine: 41,
+    },
   );
 });
 

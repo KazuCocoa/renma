@@ -77,7 +77,7 @@ export function projectShellContinuations(
     }
     quote = undefined;
     if (index + 1 < physicalLines.length) {
-      append("\n", index + 1, sourceOffset);
+      append("\n", sourceBaseLine + index, sourceOffset);
       sourceOffset += 1;
     }
   }
