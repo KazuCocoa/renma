@@ -11,6 +11,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Replaced catalog-to-Finding message parsing with producer-assigned stable
   diagnostic identities and an exhaustive typed conversion registry while
   preserving diagnostic wording and public JSON projections.
+- Classified every production TypeScript module into an enforced dependency
+  layer, including type-only imports and re-exports, with narrowly documented
+  compatibility seams for established deep imports.
 
 ## [0.22.5] - 2026-07-21
 

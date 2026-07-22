@@ -39,6 +39,36 @@ The dependency direction is checked in CI. Type-only imports are treated as
 architectural dependencies, so lower layers must not import command or renderer
 modules even when the import is erased at runtime.
 
+Every production TypeScript file belongs to exactly one enforced layer. A
+module may depend on its own layer or a layer above it in this table (toward
+lower-level responsibilities), never on a row below it:
+
+| Order | Layer | Responsibility |
+| ---: | --- | --- |
+| 1 | `foundation` | Shared primitives, stable contracts, configuration, and small dependency-free utilities |
+| 2 | `parsing` | Source parsing, syntax recovery, and lexical projection |
+| 3 | `repository` | Discovery, metadata normalization, catalog construction, and snapshot projections |
+| 4 | `analysis` | Deterministic rules, graph/report intermediate representations, and diagnostics |
+| 5 | `evidence` | Reusable target and inspection evidence construction |
+| 6 | `decisions` | Authoritative decisions and typed authoring guidance |
+| 7 | `renderers` | Human-facing and serialization presentation |
+| 8 | `commands` | Command orchestration |
+| 9 | `cli` | Global parsing, dispatch, and process entry |
+
+Directory-owned modules inherit their directory layer. Historical top-level
+modules are classified in one explicit architecture-test registry, so adding a
+new unclassified `src/**/*.ts` file fails CI. Runtime imports, type-only
+imports, and re-exports all count as dependencies; lateral imports within one
+layer are valid.
+
+Compatibility exceptions name one exact source, target, and reason. The
+current list contains the legacy composed-output imports from `src/types.ts`
+and snapshot construction's established classification-index path; the type
+exceptions are removed by the cohesive type split. The public deep-import type
+re-exports from `src/commands/inspect.ts` and
+`src/commands/suggest-metadata.ts` are also listed and checked exactly rather
+than allowing command modules to re-export arbitrary lower-layer contracts.
+
 ## Typed Catalog Diagnostic Identity
 
 Metadata and catalog producers assign stable `DIAGNOSTIC_IDS` identities when
