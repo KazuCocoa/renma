@@ -39,6 +39,20 @@ The dependency direction is checked in CI. Type-only imports are treated as
 architectural dependencies, so lower layers must not import command or renderer
 modules even when the import is erased at runtime.
 
+## Typed Catalog Diagnostic Identity
+
+Metadata and catalog producers assign stable `DIAGNOSTIC_IDS` identities when
+they create diagnostics. `catalogDiagnosticFindings` selects its Finding
+definition only from that identity; human-readable messages remain evidence and
+presentation text and must never control classification. Structured values that
+a downstream rule needs belong in `details`, not in message parsing.
+
+New internal identities attached to legacy catalog diagnostics are
+non-enumerable. This lets scan classify them before serialization while
+preserving the 0.18.2 JSON projection. Diagnostics that intentionally remain
+catalog-only carry a typed internal disposition, and unknown diagnostics use the
+generic fail-closed catalog Finding definition.
+
 ## Security Destination Analysis
 
 Security destination analysis is a deterministic, non-executing pipeline:

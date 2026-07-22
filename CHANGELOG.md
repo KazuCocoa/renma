@@ -6,6 +6,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced catalog-to-Finding message parsing with producer-assigned stable
+  diagnostic identities and an exhaustive typed conversion registry while
+  preserving diagnostic wording and public JSON projections.
+
 ## [0.22.5] - 2026-07-21
 
 ### Changed

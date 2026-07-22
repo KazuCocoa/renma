@@ -1,3 +1,5 @@
+import type { Diagnostic } from "./types.js";
+
 /** Stable scan finding identifiers emitted by Renma rules. */
 export const DIAGNOSTIC_IDS = {
   COMPOSITION_DECLARED_CONFLICT: "COMPOSITION-DECLARED-CONFLICT",
@@ -134,6 +136,52 @@ export const DIAGNOSTIC_IDS = {
 } as const;
 
 export type DiagnosticId = (typeof DIAGNOSTIC_IDS)[keyof typeof DIAGNOSTIC_IDS];
+
+const OMIT_FROM_CATALOG_FINDINGS = Symbol("omit-from-catalog-findings");
+
+type CodedDiagnostic<T extends Diagnostic> = T & { code: DiagnosticId };
+type CatalogDiagnosticDisposition = Diagnostic & {
+  [OMIT_FROM_CATALOG_FINDINGS]?: true;
+};
+
+/**
+ * Attach stable internal identity without changing the legacy JSON projection.
+ * Existing diagnostics that already exposed `code` continue to do so; catalog
+ * metadata identities added after the 0.18.2 compatibility baseline are kept
+ * non-enumerable and are consumed before serialization.
+ */
+export function withDiagnosticId<T extends Diagnostic>(
+  code: DiagnosticId,
+  diagnostic: T,
+): CodedDiagnostic<T> {
+  Object.defineProperty(diagnostic, "code", {
+    configurable: false,
+    enumerable: false,
+    value: code,
+    writable: false,
+  });
+  return diagnostic as CodedDiagnostic<T>;
+}
+
+/** Preserve catalog diagnostics that intentionally do not become scan findings. */
+export function omitFromCatalogFindings<T extends Diagnostic>(
+  diagnostic: T,
+): T {
+  Object.defineProperty(diagnostic, OMIT_FROM_CATALOG_FINDINGS, {
+    configurable: false,
+    enumerable: false,
+    value: true,
+    writable: false,
+  });
+  return diagnostic;
+}
+
+/** Test the internal catalog-to-Finding disposition without inspecting prose. */
+export function isOmittedFromCatalogFindings(diagnostic: Diagnostic): boolean {
+  return Boolean(
+    (diagnostic as CatalogDiagnosticDisposition)[OMIT_FROM_CATALOG_FINDINGS],
+  );
+}
 
 /** Stable Agent Skills validation identifiers emitted in scan.agentSkills. */
 export const AGENT_SKILL_DIAGNOSTIC_IDS = {
