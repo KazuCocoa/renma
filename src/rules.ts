@@ -22,14 +22,9 @@ import { parseAssetMetadata } from "./metadata.js";
 import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { estimateTokens, markdownBody } from "./token-estimator.js";
-import type {
-  Evidence,
-  Finding,
-  MetadataValue,
-  ParsedDocument,
-  ScanConfig,
-  Severity,
-} from "./types.js";
+import type { Evidence, Finding, Severity } from "./types/diagnostics.js";
+import type { MetadataValue, ParsedDocument } from "./types/metadata.js";
+import type { ScanConfig } from "./types/configuration.js";
 import type { RepositoryPathState } from "./repository-paths.js";
 import { staticSupportReferences } from "./static-support.js";
 

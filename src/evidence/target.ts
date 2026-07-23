@@ -21,12 +21,10 @@ import {
   type RepositorySnapshot,
 } from "../repository-evidence.js";
 import type { SecurityPolicyAssetEvidence } from "../security-policy-inventory.js";
-import type {
-  Artifact,
-  AssetClassificationEvidence,
-  AssetGovernanceEvidence,
-  ParsedDocument,
-} from "../types.js";
+import type { Artifact } from "../types/artifact.js";
+import type { AssetClassificationEvidence } from "../types/classification.js";
+import type { AssetGovernanceEvidence } from "../types/governance.js";
+import type { ParsedDocument } from "../types/metadata.js";
 
 export interface TargetDocumentEvidence {
   absolutePath: string;

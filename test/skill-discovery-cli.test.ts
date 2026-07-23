@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
-import { execFile as execFileCallback } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { promisify } from "node:util";
 
 import { main } from "../src/cli.js";
 import { bom } from "../src/commands/bom.js";
@@ -16,11 +14,10 @@ import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
 import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
 import { scan } from "../src/scanner.js";
 import type { DiagnosticV2 } from "../src/types.js";
+import { RepositoryFixture } from "./repository-fixture.js";
 
-const execFile = promisify(execFileCallback);
-
-test("graph --view discovery JSON exposes the dedicated route contract", async () => {
-  const root = await routeFixture();
+test("graph --view discovery JSON exposes the dedicated route contract", async (t) => {
+  const root = await routeFixture(t);
   const result = await captured(() =>
     main(["graph", root, "--view", "discovery", "--format", "json"]),
   );
@@ -151,8 +148,8 @@ test("graph --view discovery JSON exposes the dedicated route contract", async (
   );
 });
 
-test("graph --view discovery Markdown explains static routing and repairs", async () => {
-  const root = await routeFixture();
+test("graph --view discovery Markdown explains static routing and repairs", async (t) => {
+  const root = await routeFixture(t);
   const result = await captured(() =>
     main(["graph", root, "--view", "discovery", "--format", "markdown"]),
   );
@@ -176,8 +173,8 @@ test("graph --view discovery Markdown explains static routing and repairs", asyn
   assert.match(result.stdout, /Do not create a placeholder/i);
 });
 
-test("graph --view discovery Mermaid separates usable and unusable declarations", async () => {
-  const root = await routeFixture();
+test("graph --view discovery Mermaid separates usable and unusable declarations", async (t) => {
+  const root = await routeFixture(t);
   const first = await captured(() =>
     main(["graph", root, "--view", "discovery", "--format", "mermaid"]),
   );
@@ -200,8 +197,8 @@ test("graph --view discovery Mermaid separates usable and unusable declarations"
   assert.match(first.stdout, /does not execute Skills/);
 });
 
-test("Discovery preserves repository errors separately and returns exit code 1", async () => {
-  const root = await routeFixture();
+test("Discovery preserves repository errors separately and returns exit code 1", async (t) => {
+  const root = await routeFixture(t);
   await writeBrokenLens(root);
 
   const json = await captured(() =>
@@ -322,8 +319,8 @@ test("Discovery Mermaid remains valid for empty, cyclic, and duplicate-ID graphs
   assert.match(duplicate.stdout, /DISCOVERY-DUPLICATE-DECLARED-ROUTE/);
 });
 
-test("focused Discovery uses exact Skill ID or source path and direct routes", async () => {
-  const root = await routeFixture();
+test("focused Discovery uses exact Skill ID or source path and direct routes", async (t) => {
+  const root = await routeFixture(t);
   await writeSkill(root, "upstream", "skill.upstream", ["skill.source"]);
   await writeSkill(root, "unrelated", "skill.unrelated");
 
@@ -824,8 +821,8 @@ test("explicit Discovery config false does not declare repository-wide adoption"
   });
 });
 
-test("Discovery route diagnostics flow through scan and diagnostics v2", async () => {
-  const root = await routeFixture();
+test("Discovery route diagnostics flow through scan and diagnostics v2", async (t) => {
+  const root = await routeFixture(t);
   const result = await scan(root);
   const diagnostic = result.diagnostics.find(
     (item) => item.code === DIAGNOSTIC_IDS.DISCOVERY_UNRESOLVED_DECLARED_ROUTE,
@@ -1227,8 +1224,8 @@ test("publication warnings flow through scan, diagnostics v2, and review bundles
   assert.doesNotMatch(JSON.stringify(result.trustGraph), /DISCOVERY-/);
 });
 
-test("existing graph views remain route-free and invalid view help lists discovery", async () => {
-  const root = await routeFixture();
+test("existing graph views remain route-free and invalid view help lists discovery", async (t) => {
+  const root = await routeFixture(t);
   const full = await captured(() =>
     main(["graph", root, "--view", "full", "--format", "json"]),
   );
@@ -1330,8 +1327,12 @@ test("authoritative incomplete Discovery remains excluded from deferred reports"
   }
 });
 
-async function routeFixture(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "renma-discovery-cli-"));
+async function routeFixture(t: test.TestContext): Promise<string> {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-discovery-cli-",
+    testContext: t,
+  });
+  const { root } = fixture;
   await writeSkill(root, "source", "skill.source", [
     "skill.target",
     "skill.missing",
@@ -1398,28 +1399,21 @@ async function writeSkill(
   published = false,
   owner?: string,
 ): Promise<void> {
-  await mkdir(path.join(root, "skills", name), { recursive: true });
-  await writeFile(
-    path.join(root, "skills", name, "SKILL.md"),
-    skillText(name, id, routes, undefined, status, published, owner),
-  );
+  await RepositoryFixture.at(root).skill(name, {
+    id,
+    ...(routes ? { continuesWith: routes } : {}),
+    ...(status ? { status } : {}),
+    ...(published ? { publishedEntrypoint: true } : {}),
+    ...(owner ? { owner } : {}),
+  });
 }
 
 async function writeBrokenLens(root: string): Promise<void> {
-  await mkdir(path.join(root, "lenses", "testing"), { recursive: true });
-  await writeFile(
-    path.join(root, "lenses", "testing", "broken.md"),
-    [
-      "---",
-      "id: lens.testing.broken",
-      "owner: qa-platform",
-      "---",
-      "# Broken Lens",
-      "",
-      "This fixture intentionally omits required lens fields.",
-      "",
-    ].join("\n"),
-  );
+  await RepositoryFixture.at(root).contextLens("lenses/testing/broken.md", {
+    id: "lens.testing.broken",
+    owner: "qa-platform",
+    body: "# Broken Lens\n\nThis fixture intentionally omits required lens fields.\n",
+  });
 }
 
 function skillText(
@@ -1496,6 +1490,5 @@ function assertDiscoveryFree(value: unknown): void {
 }
 
 async function git(cwd: string, args: string[]): Promise<string> {
-  const { stdout } = await execFile("git", ["-C", cwd, ...args]);
-  return stdout.trim();
+  return RepositoryFixture.at(cwd).git(args);
 }

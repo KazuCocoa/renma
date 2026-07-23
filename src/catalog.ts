@@ -2,6 +2,11 @@ import { createHash } from "node:crypto";
 import { conflictDiagnostics } from "./catalog-conflicts.js";
 import { lifecycleDiagnostics } from "./catalog-lifecycle.js";
 import { contextBodyLanguageDiagnostics } from "./context-language-diagnostics.js";
+import {
+  DIAGNOSTIC_IDS,
+  omitFromCatalogFindings,
+  withDiagnosticId,
+} from "./diagnostic-ids.js";
 import type {
   AssetMetadata,
   Catalog,
@@ -16,13 +21,10 @@ import {
 import { parseAssetMetadata } from "./metadata.js";
 import { frontmatterRangeForArtifact } from "./frontmatter-envelope.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
-import type {
-  AssetClassificationEvidence,
-  AssetOwnership,
-  Diagnostic,
-  Evidence,
-  ParsedDocument,
-} from "./types.js";
+import type { AssetClassificationEvidence } from "./types/classification.js";
+import type { AssetOwnership } from "./types/governance.js";
+import type { Diagnostic, Evidence } from "./types/diagnostics.js";
+import type { ParsedDocument } from "./types/metadata.js";
 import { buildStaticSupportDependencies } from "./static-support.js";
 
 const QUALITY = DEFAULT_QUALITY_PROFILE;
@@ -331,26 +333,28 @@ function metadataBudgetDiagnostics(
     lineCount > QUALITY.frontmatterMaxLines ||
     charCount > QUALITY.frontmatterMaxChars
   ) {
-    diagnostics.push({
-      severity: "warning",
-      path: document.artifact.path,
-      message: `Frontmatter metadata is too large. Frontmatter has ${lineCount} lines and ${charCount} characters; keep metadata as a compact index and move detailed guidance into the markdown body or referenced context assets.`,
-      evidence: {
+    diagnostics.push(
+      withDiagnosticId(DIAGNOSTIC_IDS.META_FRONTMATTER_TOO_LARGE, {
+        severity: "warning",
         path: document.artifact.path,
-        startLine: frontmatter.startLine,
-        endLine: frontmatter.endLine,
-        snippet: `frontmatter: ${lineCount} lines, ${charCount} characters`,
-      },
-      details: {
-        measured: { lines: lineCount, chars: charCount },
-        limit: {
-          lines: QUALITY.frontmatterMaxLines,
-          chars: QUALITY.frontmatterMaxChars,
+        message: `Frontmatter metadata is too large. Frontmatter has ${lineCount} lines and ${charCount} characters; keep metadata as a compact index and move detailed guidance into the markdown body or referenced context assets.`,
+        evidence: {
+          path: document.artifact.path,
+          startLine: frontmatter.startLine,
+          endLine: frontmatter.endLine,
+          snippet: `frontmatter: ${lineCount} lines, ${charCount} characters`,
         },
-        unit: "frontmatter_lines_and_characters",
-        profile: QUALITY.profile,
-      },
-    });
+        details: {
+          measured: { lines: lineCount, chars: charCount },
+          limit: {
+            lines: QUALITY.frontmatterMaxLines,
+            chars: QUALITY.frontmatterMaxChars,
+          },
+          unit: "frontmatter_lines_and_characters",
+          profile: QUALITY.profile,
+        },
+      }),
+    );
   }
 
   for (const [key, items] of Object.entries(metadataListItems)) {
@@ -359,24 +363,26 @@ function metadataBudgetDiagnostics(
       if (!shouldBudgetMetadataItem(key, itemText)) continue;
       if (itemText.length <= QUALITY.metadataListItemMaxChars) continue;
 
-      diagnostics.push({
-        severity: "warning",
-        path: document.artifact.path,
-        message: `Metadata list item is too long in ${key}. Item has ${itemText.length} characters; keep list items short and move routing prose into the markdown body or referenced context assets.`,
-        evidence: {
-          path: item.path,
-          startLine: item.startLine,
-          endLine: item.endLine,
-          snippet: item.raw,
-        },
-        details: {
-          measured: itemText.length,
-          limit: QUALITY.metadataListItemMaxChars,
-          unit: "characters",
-          profile: QUALITY.profile,
-          field: key,
-        },
-      });
+      diagnostics.push(
+        withDiagnosticId(DIAGNOSTIC_IDS.META_LIST_ITEM_TOO_LONG, {
+          severity: "warning",
+          path: document.artifact.path,
+          message: `Metadata list item is too long in ${key}. Item has ${itemText.length} characters; keep list items short and move routing prose into the markdown body or referenced context assets.`,
+          evidence: {
+            path: item.path,
+            startLine: item.startLine,
+            endLine: item.endLine,
+            snippet: item.raw,
+          },
+          details: {
+            measured: itemText.length,
+            limit: QUALITY.metadataListItemMaxChars,
+            unit: "characters",
+            profile: QUALITY.profile,
+            field: key,
+          },
+        }),
+      );
     }
   }
 
@@ -386,24 +392,26 @@ function metadataBudgetDiagnostics(
     for (const value of values) {
       if (!shouldBudgetMetadataItem(key, value)) continue;
       if (value.length <= QUALITY.metadataListItemMaxChars) continue;
-      diagnostics.push({
-        severity: "warning",
-        path: document.artifact.path,
-        message: `Metadata list item is too long in ${key}. Item has ${value.length} characters; keep list items short and move routing prose into the markdown body or referenced context assets.`,
-        evidence: {
-          path: field.path,
-          startLine: field.startLine,
-          endLine: field.endLine,
-          snippet: field.raw,
-        },
-        details: {
-          measured: value.length,
-          limit: QUALITY.metadataListItemMaxChars,
-          unit: "characters",
-          profile: QUALITY.profile,
-          field: key,
-        },
-      });
+      diagnostics.push(
+        withDiagnosticId(DIAGNOSTIC_IDS.META_LIST_ITEM_TOO_LONG, {
+          severity: "warning",
+          path: document.artifact.path,
+          message: `Metadata list item is too long in ${key}. Item has ${value.length} characters; keep list items short and move routing prose into the markdown body or referenced context assets.`,
+          evidence: {
+            path: field.path,
+            startLine: field.startLine,
+            endLine: field.endLine,
+            snippet: field.raw,
+          },
+          details: {
+            measured: value.length,
+            limit: QUALITY.metadataListItemMaxChars,
+            unit: "characters",
+            profile: QUALITY.profile,
+            field: key,
+          },
+        }),
+      );
     }
   }
 
@@ -464,18 +472,20 @@ function dependencyDiagnostics(
     if (!target) {
       if (dependency.kind === "conflicts") continue;
 
-      diagnostics.push({
-        severity: "warning",
-        path: dependency.sourcePath,
-        message: `Metadata dependency "${dependency.to}" from "${dependency.from}" does not match a catalog entry.`,
-        ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
-        details: {
-          source: dependency.from,
-          target: dependency.to,
-          referenceKind: dependency.kind,
-          sourcePath: dependency.sourcePath,
-        },
-      });
+      diagnostics.push(
+        withDiagnosticId(DIAGNOSTIC_IDS.META_UNKNOWN_DEPENDENCY, {
+          severity: "warning",
+          path: dependency.sourcePath,
+          message: `Metadata dependency "${dependency.to}" from "${dependency.from}" does not match a catalog entry.`,
+          ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
+          details: {
+            source: dependency.from,
+            target: dependency.to,
+            referenceKind: dependency.kind,
+            sourcePath: dependency.sourcePath,
+          },
+        }),
+      );
       continue;
     }
 
@@ -484,20 +494,22 @@ function dependencyDiagnostics(
       (target.metadata.status === "deprecated" ||
         target.metadata.status === "archived")
     ) {
-      diagnostics.push({
-        severity: "warning",
-        path: dependency.sourcePath,
-        message: `Metadata dependency "${dependency.to}" from "${dependency.from}" targets a ${target.metadata.status} asset.`,
-        ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
-        details: {
-          source: dependency.from,
-          target: dependency.to,
-          referenceKind: dependency.kind,
-          sourcePath: dependency.sourcePath,
-          targetPath: target.sourcePath,
-          targetStatus: target.metadata.status,
-        },
-      });
+      diagnostics.push(
+        withDiagnosticId(DIAGNOSTIC_IDS.META_INACTIVE_DEPENDENCY, {
+          severity: "warning",
+          path: dependency.sourcePath,
+          message: `Metadata dependency "${dependency.to}" from "${dependency.from}" targets a ${target.metadata.status} asset.`,
+          ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
+          details: {
+            source: dependency.from,
+            target: dependency.to,
+            referenceKind: dependency.kind,
+            sourcePath: dependency.sourcePath,
+            targetPath: target.sourcePath,
+            targetStatus: target.metadata.status,
+          },
+        }),
+      );
     }
   }
 
@@ -534,19 +546,23 @@ function sharedContextMetadataDiagnostics(
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   if (!metadata.id) {
-    diagnostics.push({
-      severity: "warning",
-      path: document.artifact.path,
-      message: "Asset is missing an id.",
-    });
+    diagnostics.push(
+      withDiagnosticId(DIAGNOSTIC_IDS.META_MISSING_ID, {
+        severity: "warning",
+        path: document.artifact.path,
+        message: "Asset is missing an id.",
+      }),
+    );
   }
 
   if (!metadata.owner) {
-    diagnostics.push({
-      severity: "warning",
-      path: document.artifact.path,
-      message: "Asset is missing an owner.",
-    });
+    diagnostics.push(
+      omitFromCatalogFindings({
+        severity: "warning",
+        path: document.artifact.path,
+        message: "Asset is missing an owner.",
+      }),
+    );
   }
 
   if (isCanonicalSharedContext(metadata) && isActiveAsset(metadata)) {
@@ -565,19 +581,23 @@ function contextLensMetadataDiagnostics(
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   if (!metadata.id) {
-    diagnostics.push({
-      severity: "warning",
-      path: document.artifact.path,
-      message: "Asset is missing an id.",
-    });
+    diagnostics.push(
+      withDiagnosticId(DIAGNOSTIC_IDS.META_MISSING_ID, {
+        severity: "warning",
+        path: document.artifact.path,
+        message: "Asset is missing an id.",
+      }),
+    );
   }
 
   if (!metadata.owner) {
-    diagnostics.push({
-      severity: "warning",
-      path: document.artifact.path,
-      message: "Asset is missing an owner.",
-    });
+    diagnostics.push(
+      omitFromCatalogFindings({
+        severity: "warning",
+        path: document.artifact.path,
+        message: "Asset is missing an owner.",
+      }),
+    );
   }
 
   if (!isCanonicalContextLens(metadata) || !isActiveAsset(metadata)) {
@@ -623,21 +643,25 @@ function usageBoundaryDiagnostics(
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   if (metadata.whenToUse.length === 0) {
-    diagnostics.push({
-      severity: "warning",
-      path: document.artifact.path,
-      message: "Shared context asset is missing when_to_use metadata.",
-      evidence: missingMetadataEvidence(document, "when_to_use"),
-    });
+    diagnostics.push(
+      withDiagnosticId(DIAGNOSTIC_IDS.META_CONTEXT_MISSING_WHEN_TO_USE, {
+        severity: "warning",
+        path: document.artifact.path,
+        message: "Shared context asset is missing when_to_use metadata.",
+        evidence: missingMetadataEvidence(document, "when_to_use"),
+      }),
+    );
   }
 
   if (metadata.whenNotToUse.length === 0) {
-    diagnostics.push({
-      severity: "warning",
-      path: document.artifact.path,
-      message: "Shared context asset is missing when_not_to_use metadata.",
-      evidence: missingMetadataEvidence(document, "when_not_to_use"),
-    });
+    diagnostics.push(
+      withDiagnosticId(DIAGNOSTIC_IDS.META_CONTEXT_MISSING_WHEN_NOT_TO_USE, {
+        severity: "warning",
+        path: document.artifact.path,
+        message: "Shared context asset is missing when_not_to_use metadata.",
+        evidence: missingMetadataEvidence(document, "when_not_to_use"),
+      }),
+    );
   }
 
   diagnostics.push(
@@ -667,12 +691,15 @@ function placeholderUsageBoundaryDiagnostics(
         return undefined;
       }
 
-      return {
-        severity: "warning",
-        path: document.artifact.path,
-        message: `Shared context asset usage-boundary metadata contains placeholder values in ${fieldKey}.`,
-        evidence: metadataValueEvidence(document, fieldKey, index),
-      };
+      return withDiagnosticId(
+        DIAGNOSTIC_IDS.META_CONTEXT_PLACEHOLDER_USAGE_BOUNDARY,
+        {
+          severity: "warning",
+          path: document.artifact.path,
+          message: `Shared context asset usage-boundary metadata contains placeholder values in ${fieldKey}.`,
+          evidence: metadataValueEvidence(document, fieldKey, index),
+        },
+      );
     })
     .filter((diagnostic): diagnostic is Diagnostic => diagnostic !== undefined);
 }

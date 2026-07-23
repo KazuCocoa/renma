@@ -8,7 +8,7 @@ import type {
   RepairConstraint,
   ReviewBundle,
   VerificationStep,
-} from "./types.js";
+} from "./types/diagnostics.js";
 
 type BundleSeed = {
   key: string;

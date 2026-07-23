@@ -5,7 +5,7 @@ import {
   logicalSkillDirectory,
 } from "./discovery.js";
 import type { CatalogEntry, Dependency } from "./model.js";
-import type { ParsedDocument } from "./types.js";
+import type { ParsedDocument } from "./types/metadata.js";
 
 const SUPPORT_ROOTS = [
   "references",

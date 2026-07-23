@@ -1,6 +1,8 @@
 import { inspectAgentSkill } from "./agent-skills.js";
 import { parseDocument } from "./markdown.js";
-import type { Artifact, ParsedDocument, SecurityConfig } from "./types.js";
+import type { Artifact } from "./types/artifact.js";
+import type { ParsedDocument } from "./types/metadata.js";
+import type { SecurityConfig } from "./types/configuration.js";
 import type { YamlFrontmatterField } from "./yaml-frontmatter.js";
 
 export interface SecurityPolicyFieldEvidence {

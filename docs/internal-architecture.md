@@ -39,6 +39,68 @@ The dependency direction is checked in CI. Type-only imports are treated as
 architectural dependencies, so lower layers must not import command or renderer
 modules even when the import is erased at runtime.
 
+Every production TypeScript file belongs to exactly one enforced layer. A
+module may depend on its own layer or a layer above it in this table (toward
+lower-level responsibilities), never on a row below it:
+
+| Order | Layer | Responsibility |
+| ---: | --- | --- |
+| 1 | `foundation` | Shared primitives, stable contracts, configuration, and small dependency-free utilities |
+| 2 | `parsing` | Source parsing, syntax recovery, and lexical projection |
+| 3 | `repository` | Discovery, metadata normalization, catalog construction, and snapshot projections |
+| 4 | `analysis` | Deterministic rules, graph/report intermediate representations, and diagnostics |
+| 5 | `evidence` | Reusable target and inspection evidence construction |
+| 6 | `decisions` | Authoritative decisions and typed authoring guidance |
+| 7 | `renderers` | Human-facing and serialization presentation |
+| 8 | `commands` | Command orchestration |
+| 9 | `cli` | Global parsing, dispatch, and process entry |
+
+Directory-owned modules inherit their directory layer. Historical top-level
+modules are classified in one explicit architecture-test registry, so adding a
+new unclassified `src/**/*.ts` file fails CI. Runtime imports, type-only
+imports, and re-exports all count as dependencies; lateral imports within one
+layer are valid.
+
+Compatibility exceptions name one exact source, target, and reason. The
+current list contains the established `src/types.ts` facade re-export of the
+composed scan result and snapshot construction's classification-index path.
+The public deep-import type re-exports from `src/commands/inspect.ts` and
+`src/commands/suggest-metadata.ts` are also listed and checked exactly rather
+than allowing command modules to re-export arbitrary lower-layer contracts.
+
+## Typed Catalog Diagnostic Identity
+
+Metadata and catalog producers assign stable `DIAGNOSTIC_IDS` identities when
+they create diagnostics. `catalogDiagnosticFindings` selects its Finding
+definition only from that identity; human-readable messages remain evidence and
+presentation text and must never control classification. Structured values that
+a downstream rule needs belong in `details`, not in message parsing.
+
+New internal identities attached to legacy catalog diagnostics are
+non-enumerable. This lets scan classify them before serialization while
+preserving the 0.18.2 JSON projection. Diagnostics that intentionally remain
+catalog-only carry a typed internal disposition, and unknown diagnostics use the
+generic fail-closed catalog Finding definition.
+
+## Cohesive Type Ownership
+
+`src/types.ts` is a compatibility facade for the established
+`renma/dist/types.js` deep import. Internal modules do not use that facade; they
+import the cohesive owner under `src/types/`:
+
+- artifact and parsed metadata contracts remain low-level;
+- classification, governance, decision, diagnostic, and configuration
+  contracts each have one dependency-bounded owner;
+- `ScanResult` lives in `src/types/scan-result.ts`, the only composed type module
+  permitted to import Agent Skills, Context Lens, Security Policy Inventory, and
+  Trust Graph result types.
+
+The low-level type modules are in the `foundation` layer and cannot import
+feature reports, renderers, or commands. The composed scan-result module is in
+the `analysis` layer and must not become a dependency of parsing, repository,
+or other foundation modules. Compatibility re-exports preserve established
+TypeScript deep imports without making the facade an internal dependency hub.
+
 ## Security Destination Analysis
 
 Security destination analysis is a deterministic, non-executing pipeline:
@@ -81,33 +143,103 @@ be handled as behavior-changing follow-up work.
 
 ## RepositorySnapshot Is the Repository Evidence Source
 
-`collectRepositorySnapshot` in `src/repository-evidence.ts` performs one
-repository collection and creates the shared in-memory source of repository
-facts. The snapshot contains:
+`collectRepositorySnapshotCore` in `src/repository-evidence.ts` performs one
+discovery pass and parses each discovered artifact once. Collection copies the
+complete evidence graph into runtime-immutable values: the effective
+configuration and its nested collections, every Artifact and ParsedDocument,
+their nested arrays and metadata evidence, discovered paths, and discovery
+diagnostics. Sets and Maps use protected read-only views because freezing a
+native Set or Map object does not disable its mutator methods. Their mutable
+backing collections are never exposed. No derived projection may rediscover
+files or reread repository content.
 
-- resolved root, configuration, configuration path, and scan count;
-- discovered artifacts and parsed documents;
-- the normalized catalog, Context Lens summary, and diagnostic partitions;
-- repository-relative paths and their captured filesystem states;
-- structural classification evidence indexed by repository-relative path;
-- a parent-Skill index used for exact parent resolution;
-- effective security-policy evidence with its provenance.
+An explicit projection store derives and memoizes these facts from that stable
+input:
 
-The indexes belong to the snapshot. Consumers should reuse them instead of
-reparsing files or rebuilding command-specific lookup tables. A new projection
-should normally accept `RepositorySnapshot`, or the narrowest existing
-projection of it, rather than perform another discovery pass.
+- catalog, catalog diagnostics, and the parent-Skill index;
+- Agent Skills validation and the dependent Skill Discovery index;
+- structural classification evidence;
+- effective security-policy evidence;
+- Context Lens summary and diagnostics.
 
-`RepositorySnapshot` does not freeze the working tree. It records what one
-collection read, after which downstream projections operate on that collected
-state. In particular, Readiness builds its graph and scan from one snapshot,
-and BOM builds its graph, scan, Readiness evidence, policy inventory, and
-diagnostics from one snapshot. This prevents one command result from combining
-independently recollected repository states.
+Repository path existence states are captured before
+`collectRepositorySnapshot` returns, using the catalog derived from the same
+core. They remain eager because later filesystem mutation must not change a
+partially prepared snapshot. Pure projections may remain lazy; repeated access
+returns the same prepared object. Each prepared projection is itself copied
+into a runtime-immutable graph before it becomes caller-visible, so mutating a
+prepared catalog or validation result cannot affect a dependent projection.
+The compatibility properties `core`, `config`, `artifacts`, and `documents`
+reference the same immutable collected facts rather than mutable inputs.
 
-`collectRepositoryEvidence` is a narrower compatibility projection for
-consumers such as catalog and graph. It deliberately omits parsed documents,
-sets, maps, and indexes that are implementation details.
+Consumers explicitly prepare only what they need. Scan names its required
+projections and includes Skill Discovery only when that diagnostic slice is
+requested. `collectRepositoryEvidence`, the compatibility path used by
+catalog, prepares only catalog and Context Lens and therefore does not validate
+Agent Skills, build Skill Discovery, classify assets, collect security-policy
+evidence, or capture command-only repository path states.
+
+Readiness builds graph and scan evidence from one `RepositorySnapshot`, and BOM
+builds graph, scan, Readiness, policy inventory, and diagnostics from that same
+snapshot and core. A working-tree mutation after collection cannot influence a
+later lazy projection. Caller attempts to mutate snapshot arrays, nested
+objects, configuration, or path collections also fail without changing the
+projection input. A new collection is required to observe different facts.
+This keeps commands from combining independently recollected repository states.
+
+## CLI Commands Have One Registered Contract
+
+`COMMAND_REGISTRY` in `src/cli.ts` is the command-level source of truth. Every
+`CommandName` has exactly one registry entry that binds its positional bounds,
+accepted option names, authoritative `CommandHelp` object, default output
+format, command-specific parser/executor, and any expected filesystem-error
+adapter. The registry is checked with `satisfies Record<CommandName,
+CommandSpec>`, so adding help for a command without executor wiring is a type
+error. Help rendering and option rejection use the same registered help
+contract rather than independently maintained command lists.
+
+The global `node:util` parser remains intentionally shared to preserve unknown
+option behavior and short flags. Its option table is itself checked against
+every `CliOptionName`; registration still controls which parsed options an
+individual command accepts. An option therefore cannot leak into a command
+merely because the global parser recognizes it.
+
+Command-specific validation remains close to the executor whose defaults and
+semantics it protects. Shared configuration-path projection and ordinary
+expected-error rendering are centralized, while inspect and semantic-split
+read errors remain explicit registry adapters. The dispatcher performs no
+command-name branch chain: it validates and invokes the selected spec. It also
+preserves synchronous command return timing for stdout-only commands and awaits
+asynchronous executors before applying their expected-error adapters.
+
+## Targeted Maintainability Guardrails
+
+Catalog Markdown prepares dependency indexes once before rendering. Outbound
+dependencies are bucketed by source asset ID, inbound dependencies are bucketed
+by the ID of the resolved target, and target identity/path lookups retain the
+first-match semantics of `resolveDependencyTarget`. Bucket order follows the
+existing catalog dependency order, so rendering is byte-compatible while each
+asset performs only two map lookups. Operation-count tests cover the index and
+render passes without wall-clock assertions.
+
+ESLint uses both `tsconfig.json` and `tsconfig.test.json` for typed source and
+test linting. `no-floating-promises`, `no-misused-promises`, and
+`switch-exhaustiveness-check` are enforced. Calls registering tests with
+`node:test` are narrowly marked as known-safe floating calls because the test
+runner owns their returned promises. `no-unnecessary-condition` was evaluated
+but is intentionally deferred: assertion-based narrowing in tests and
+fail-closed defensive recovery in parsers and security analysis produce broad
+false-positive noise, and adopting it now would require a large unrelated
+rewrite. It should be reconsidered only with a scoped assertion/recovery policy,
+not blanket inline suppressions.
+
+Filesystem-backed tests can use `test/repository-fixture.ts` to create and
+clean up isolated repositories, write config and arbitrary files, create
+canonical Skills, Context Assets, and Context Lenses with governance and
+dependency metadata, and initialize Git when ref-based behavior is under test.
+Path normalization rejects absolute paths and traversal. Specialized parser
+fixtures should remain explicit when direct source text is the clearer test
+contract; fixture migration is intentionally incremental.
 
 ## Declared Composition Is Pure Catalog Analysis
 

@@ -1,0 +1,867 @@
+{
+  "schemaVersion": "renma.repository-context-bom.v2",
+  "outputMode": "omit_generated_at",
+  "generator": {
+    "name": "renma",
+    "version": "<VERSION>"
+  },
+  "root": "<ROOT>",
+  "configPath": "renma.config.json",
+  "scope": {
+    "type": "declared_repository_manifest",
+    "runtimeUsage": false,
+    "telemetryCollected": false
+  },
+  "summary": {
+    "scannedFileCount": 7,
+    "assetCount": 7,
+    "dependencyCount": 7,
+    "resolvedDependencyCount": 6,
+    "unresolvedDependencyCount": 1,
+    "ownedAssetCount": 6,
+    "unownedAssetCount": 1,
+    "readinessScore": 57,
+    "readinessLevel": "not_ready",
+    "diagnosticCounts": {
+      "error": 0,
+      "warning": 6,
+      "info": 0
+    }
+  },
+  "assets": [
+    {
+      "id": "context.inactive",
+      "kind": "context",
+      "sourcePath": "contexts/inactive.md",
+      "contentHash": "sha256:50aa16076628df3c699878a2aaabb74ad79defc18799f5a6240c839f1d259d8c",
+      "sizeBytes": 366,
+      "contentClassification": "text",
+      "markdownParserEligible": true,
+      "ownership": {
+        "declaredOwner": "qa-platform",
+        "effectiveOwner": "qa-platform",
+        "source": "declared"
+      },
+      "status": "archived",
+      "tags": [],
+      "lifecycle": {
+        "status": "archived"
+      },
+      "dependencies": [],
+      "dependents": [
+        {
+          "kind": "requires",
+          "from": "skill.review",
+          "sourcePath": "skills/review/SKILL.md"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "id": "context.invalid-status",
+      "kind": "context",
+      "sourcePath": "contexts/invalid-status.md",
+      "contentHash": "sha256:85b789064a239193b77099c8761cd03027744342130f1b057423cc75aca7ad9b",
+      "sizeBytes": 359,
+      "contentClassification": "text",
+      "markdownParserEligible": true,
+      "ownership": {
+        "declaredOwner": "qa-platform",
+        "effectiveOwner": "qa-platform",
+        "source": "declared"
+      },
+      "tags": [],
+      "dependencies": [],
+      "dependents": [
+        {
+          "kind": "requires",
+          "from": "skill.review",
+          "sourcePath": "skills/review/SKILL.md"
+        }
+      ],
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "path": "contexts/invalid-status.md",
+          "message": "Invalid status \"active\". Expected one of: experimental, stable, deprecated, archived.",
+          "evidence": {
+            "path": "contexts/invalid-status.md",
+            "startLine": 4,
+            "endLine": 4,
+            "snippet": "status: active"
+          }
+        }
+      ]
+    },
+    {
+      "id": "context.missing-boundary",
+      "kind": "context",
+      "sourcePath": "contexts/missing-boundary.md",
+      "contentHash": "sha256:576e72b632dc8717438284dfa5f010bcdb7670b0445e0314cebbfe3b5fce5216",
+      "sizeBytes": 310,
+      "contentClassification": "text",
+      "markdownParserEligible": true,
+      "ownership": {
+        "declaredOwner": "qa-platform",
+        "effectiveOwner": "qa-platform",
+        "source": "declared"
+      },
+      "status": "stable",
+      "tags": [],
+      "lifecycle": {
+        "status": "stable"
+      },
+      "dependencies": [],
+      "dependents": [
+        {
+          "kind": "requires",
+          "from": "skill.review",
+          "sourcePath": "skills/review/SKILL.md"
+        }
+      ],
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "path": "contexts/missing-boundary.md",
+          "message": "Shared context asset is missing when_to_use metadata.",
+          "evidence": {
+            "path": "contexts/missing-boundary.md",
+            "startLine": 1,
+            "endLine": 12,
+            "snippet": "frontmatter missing when_to_use"
+          }
+        }
+      ]
+    },
+    {
+      "id": "context.missing-owner",
+      "kind": "context",
+      "sourcePath": "contexts/missing-owner.md",
+      "contentHash": "sha256:882f7c772e8bb7513e03be4a7642c187cf5473c0a9feb873a98f1e970778d143",
+      "sizeBytes": 317,
+      "contentClassification": "text",
+      "markdownParserEligible": true,
+      "ownership": {
+        "declaredOwner": null,
+        "effectiveOwner": null,
+        "source": "unowned"
+      },
+      "status": "stable",
+      "tags": [],
+      "lifecycle": {
+        "status": "stable"
+      },
+      "dependencies": [],
+      "dependents": [
+        {
+          "kind": "requires",
+          "from": "skill.review",
+          "sourcePath": "skills/review/SKILL.md"
+        }
+      ],
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "path": "contexts/missing-owner.md",
+          "message": "Asset is missing an owner."
+        }
+      ]
+    },
+    {
+      "id": "context.placeholder",
+      "kind": "context",
+      "sourcePath": "contexts/placeholder.md",
+      "contentHash": "sha256:74a2e4307961b9f40cfce6473db465f3de044cafe9cc2323e9df645e7e1aef47",
+      "sizeBytes": 315,
+      "contentClassification": "text",
+      "markdownParserEligible": true,
+      "ownership": {
+        "declaredOwner": "qa-platform",
+        "effectiveOwner": "qa-platform",
+        "source": "declared"
+      },
+      "status": "stable",
+      "tags": [],
+      "lifecycle": {
+        "status": "stable"
+      },
+      "dependencies": [],
+      "dependents": [
+        {
+          "kind": "requires",
+          "from": "skill.review",
+          "sourcePath": "skills/review/SKILL.md"
+        }
+      ],
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "path": "contexts/placeholder.md",
+          "message": "Shared context asset usage-boundary metadata contains placeholder values in when_not_to_use.",
+          "evidence": {
+            "path": "contexts/placeholder.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "  - TBD"
+          }
+        },
+        {
+          "severity": "warning",
+          "path": "contexts/placeholder.md",
+          "message": "Shared context asset usage-boundary metadata contains placeholder values in when_to_use.",
+          "evidence": {
+            "path": "contexts/placeholder.md",
+            "startLine": 6,
+            "endLine": 6,
+            "snippet": "  - TODO"
+          }
+        }
+      ]
+    },
+    {
+      "id": "context.valid",
+      "kind": "context",
+      "sourcePath": "contexts/valid.md",
+      "contentHash": "sha256:0d20387d0273c49073c64a3a7e2d43190a0a697cb0c4c625db63e3ca63634831",
+      "sizeBytes": 330,
+      "contentClassification": "text",
+      "markdownParserEligible": true,
+      "ownership": {
+        "declaredOwner": "qa-platform",
+        "effectiveOwner": "qa-platform",
+        "source": "declared"
+      },
+      "status": "stable",
+      "tags": [],
+      "lifecycle": {
+        "status": "stable"
+      },
+      "dependencies": [],
+      "dependents": [
+        {
+          "kind": "requires",
+          "from": "skill.review",
+          "sourcePath": "skills/review/SKILL.md"
+        }
+      ],
+      "diagnostics": []
+    },
+    {
+      "id": "skill.review",
+      "kind": "skill",
+      "sourcePath": "skills/review/SKILL.md",
+      "contentHash": "sha256:d32f237601faf9ef678fdc24e1bec4dc1b012ab1d0ac2173b193ad4dd89d6c77",
+      "sizeBytes": 1253,
+      "contentClassification": "text",
+      "markdownParserEligible": true,
+      "ownership": {
+        "declaredOwner": "qa-platform",
+        "effectiveOwner": "qa-platform",
+        "source": "declared"
+      },
+      "status": "stable",
+      "tags": [],
+      "lifecycle": {
+        "status": "stable"
+      },
+      "dependencies": [
+        {
+          "kind": "requires",
+          "to": "context.inactive",
+          "resolved": true,
+          "targetId": "context.inactive",
+          "targetKind": "context",
+          "targetPath": "contexts/inactive.md"
+        },
+        {
+          "kind": "requires",
+          "to": "context.invalid-status",
+          "resolved": true,
+          "targetId": "context.invalid-status",
+          "targetKind": "context",
+          "targetPath": "contexts/invalid-status.md"
+        },
+        {
+          "kind": "requires",
+          "to": "context.missing-boundary",
+          "resolved": true,
+          "targetId": "context.missing-boundary",
+          "targetKind": "context",
+          "targetPath": "contexts/missing-boundary.md"
+        },
+        {
+          "kind": "requires",
+          "to": "context.missing-owner",
+          "resolved": true,
+          "targetId": "context.missing-owner",
+          "targetKind": "context",
+          "targetPath": "contexts/missing-owner.md"
+        },
+        {
+          "kind": "requires",
+          "to": "context.placeholder",
+          "resolved": true,
+          "targetId": "context.placeholder",
+          "targetKind": "context",
+          "targetPath": "contexts/placeholder.md"
+        },
+        {
+          "kind": "requires",
+          "to": "context.unknown",
+          "resolved": false
+        },
+        {
+          "kind": "requires",
+          "to": "context.valid",
+          "resolved": true,
+          "targetId": "context.valid",
+          "targetKind": "context",
+          "targetPath": "contexts/valid.md"
+        }
+      ],
+      "dependents": [],
+      "diagnostics": [
+        {
+          "severity": "warning",
+          "path": "skills/review/SKILL.md",
+          "message": "Metadata dependency \"context.unknown\" from \"skill.review\" does not match a catalog entry.",
+          "evidence": {
+            "path": "skills/review/SKILL.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+          },
+          "details": {
+            "source": "skill.review",
+            "target": "context.unknown",
+            "referenceKind": "requires",
+            "sourcePath": "skills/review/SKILL.md"
+          }
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "from": "skill.review",
+      "to": "context.inactive",
+      "kind": "requires",
+      "sourcePath": "skills/review/SKILL.md",
+      "resolved": true,
+      "targetId": "context.inactive",
+      "targetKind": "context",
+      "targetPath": "contexts/inactive.md"
+    },
+    {
+      "from": "skill.review",
+      "to": "context.invalid-status",
+      "kind": "requires",
+      "sourcePath": "skills/review/SKILL.md",
+      "resolved": true,
+      "targetId": "context.invalid-status",
+      "targetKind": "context",
+      "targetPath": "contexts/invalid-status.md"
+    },
+    {
+      "from": "skill.review",
+      "to": "context.missing-boundary",
+      "kind": "requires",
+      "sourcePath": "skills/review/SKILL.md",
+      "resolved": true,
+      "targetId": "context.missing-boundary",
+      "targetKind": "context",
+      "targetPath": "contexts/missing-boundary.md"
+    },
+    {
+      "from": "skill.review",
+      "to": "context.missing-owner",
+      "kind": "requires",
+      "sourcePath": "skills/review/SKILL.md",
+      "resolved": true,
+      "targetId": "context.missing-owner",
+      "targetKind": "context",
+      "targetPath": "contexts/missing-owner.md"
+    },
+    {
+      "from": "skill.review",
+      "to": "context.placeholder",
+      "kind": "requires",
+      "sourcePath": "skills/review/SKILL.md",
+      "resolved": true,
+      "targetId": "context.placeholder",
+      "targetKind": "context",
+      "targetPath": "contexts/placeholder.md"
+    },
+    {
+      "from": "skill.review",
+      "to": "context.unknown",
+      "kind": "requires",
+      "sourcePath": "skills/review/SKILL.md",
+      "resolved": false
+    },
+    {
+      "from": "skill.review",
+      "to": "context.valid",
+      "kind": "requires",
+      "sourcePath": "skills/review/SKILL.md",
+      "resolved": true,
+      "targetId": "context.valid",
+      "targetKind": "context",
+      "targetPath": "contexts/valid.md"
+    }
+  ],
+  "readiness": {
+    "score": 57,
+    "level": "not_ready",
+    "checks": [
+      {
+        "id": "diagnostics.errors",
+        "title": "Diagnostic errors",
+        "status": "pass",
+        "severity": "info",
+        "summary": "No error diagnostics were reported."
+      },
+      {
+        "id": "specification.agent_skills",
+        "title": "Agent Skills specification",
+        "status": "pass",
+        "severity": "info",
+        "summary": "1/1 Skill entrypoints pass Agent Skills validation."
+      },
+      {
+        "id": "security.blocking",
+        "title": "Blocking security findings",
+        "status": "pass",
+        "severity": "info",
+        "summary": "No high or critical security findings were reported."
+      },
+      {
+        "id": "ownership.coverage",
+        "title": "Ownership coverage",
+        "status": "warn",
+        "severity": "warning",
+        "summary": "1 of 7 cataloged assets do not have an effective owner.",
+        "evidence": [
+          {
+            "id": "context.missing-owner",
+            "path": "contexts/missing-owner.md",
+            "message": "Missing effective owner."
+          }
+        ]
+      },
+      {
+        "id": "graph.unresolved_edges",
+        "title": "Unresolved graph edges",
+        "status": "fail",
+        "severity": "error",
+        "summary": "1 declared graph edge could not be resolved.",
+        "evidence": [
+          {
+            "id": "skill.review",
+            "path": "skills/review/SKILL.md",
+            "message": "requires reference \"context.unknown\" does not resolve."
+          }
+        ]
+      },
+      {
+        "id": "workflow.context_closure",
+        "title": "Workflow context closure",
+        "status": "fail",
+        "severity": "error",
+        "summary": "2 required workflow context references did not close.",
+        "evidence": [
+          {
+            "id": "skill.review",
+            "path": "skills/review/SKILL.md",
+            "message": "Required context \"context.inactive\" resolves to archived asset contexts/inactive.md."
+          },
+          {
+            "id": "skill.review",
+            "path": "skills/review/SKILL.md",
+            "message": "Required context reference \"context.unknown\" does not resolve."
+          }
+        ]
+      },
+      {
+        "id": "workflow.optional_context",
+        "title": "Workflow optional context",
+        "status": "pass",
+        "severity": "info",
+        "summary": "No optional workflow context references were declared."
+      },
+      {
+        "id": "workflow.clarity",
+        "title": "Workflow clarity",
+        "status": "warn",
+        "severity": "warning",
+        "summary": "1 workflow clarity finding matched skill entrypoints.",
+        "evidence": [
+          {
+            "id": "QUAL-MISSING-ROUTING-CLARITY",
+            "path": "skills/review/SKILL.md",
+            "message": "Add concise routing language: when to use the skill, whether it invokes other skills, or whether it is a utility skill for single operations."
+          }
+        ]
+      },
+      {
+        "id": "workflow.required_inputs",
+        "title": "Workflow required inputs",
+        "status": "pass",
+        "severity": "info",
+        "summary": "All skill workflow entrypoints document required inputs or prerequisites."
+      },
+      {
+        "id": "workflow.completion_criteria",
+        "title": "Workflow completion criteria",
+        "status": "pass",
+        "severity": "info",
+        "summary": "All skill workflow entrypoints document completion criteria."
+      },
+      {
+        "id": "context_lens.governance",
+        "title": "Context Lens governance",
+        "status": "pass",
+        "severity": "info",
+        "summary": "No context lens definitions were detected."
+      },
+      {
+        "id": "assets.lifecycle",
+        "title": "Asset lifecycle",
+        "status": "pass",
+        "severity": "info",
+        "summary": "1 intentionally retained deprecated or archived asset cataloged; inactive assets do not reduce Readiness merely by existing.",
+        "evidence": [
+          {
+            "id": "context.inactive",
+            "path": "contexts/inactive.md",
+            "message": "Asset status is archived."
+          }
+        ]
+      },
+      {
+        "id": "assets.freshness",
+        "title": "Asset freshness",
+        "status": "pass",
+        "severity": "info",
+        "summary": "No expired, overdue, or invalid freshness metadata was found."
+      },
+      {
+        "id": "assets.minimum_inventory",
+        "title": "Minimum inventory",
+        "status": "pass",
+        "severity": "info",
+        "summary": "7 cataloged assets found."
+      },
+      {
+        "id": "workflow.skills_focused",
+        "title": "Focused skill workflows",
+        "status": "pass",
+        "severity": "info",
+        "summary": "Skill entrypoints are focused, discoverable workflows that use progressive disclosure appropriately."
+      },
+      {
+        "id": "layout.disallowed_skill_assets",
+        "title": "Skill-local support policy",
+        "status": "pass",
+        "severity": "info",
+        "summary": "Valid Skill-local support is allowed; reusable knowledge is promoted only when deterministic evidence supports it."
+      },
+      {
+        "id": "layout.context_root",
+        "title": "Canonical context root",
+        "status": "pass",
+        "severity": "info",
+        "summary": "Context assets and declared context paths use canonical roots."
+      },
+      {
+        "id": "layout.helper_root",
+        "title": "Canonical helper root",
+        "status": "pass",
+        "severity": "info",
+        "summary": "Shared helpers use tools/** and Skill-specific scripts may remain local."
+      },
+      {
+        "id": "paths.helper_commands",
+        "title": "Helper command paths",
+        "status": "pass",
+        "severity": "info",
+        "summary": "Markdown helper commands resolve to tools/** or valid Skill-local scripts."
+      },
+      {
+        "id": "docs.layout_consistency",
+        "title": "Layout documentation consistency",
+        "status": "pass",
+        "severity": "info",
+        "summary": "Repository docs describe canonical Skill roots, valid local support, governed Context Assets, and shared helpers consistently."
+      }
+    ],
+    "summary": {
+      "totalAssets": 7,
+      "ownedAssets": 6,
+      "unownedAssets": 1,
+      "ownershipCoveragePercent": 86,
+      "nodeCount": 7,
+      "edgeCount": 7,
+      "resolvedEdges": 6,
+      "unresolvedEdges": 1,
+      "graphResolutionPercent": 86,
+      "diagnosticCounts": {
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      },
+      "workflow": {
+        "skillEntrypoints": 1,
+        "checks": 6,
+        "pass": 4,
+        "warn": 1,
+        "fail": 1,
+        "readinessPercent": 67
+      },
+      "contextLens": {
+        "enabled": true,
+        "detected": false,
+        "totalLensCount": 0,
+        "validLensCount": 0,
+        "invalidLensCount": 0,
+        "diagnosticCounts": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        },
+        "definitionPaths": [],
+        "targetReferences": [],
+        "targetPaths": [],
+        "unresolvedTargetReferences": [],
+        "scopeSummary": [],
+        "lenses": []
+      },
+      "securityPosture": {
+        "totalSecurityFindings": 0,
+        "riskClasses": {
+          "violation": 0,
+          "suspicious": 0,
+          "advisory": 0,
+          "unclassified": 0
+        },
+        "severities": {
+          "critical": 0,
+          "high": 0,
+          "medium": 0,
+          "low": 0
+        },
+        "highOrCritical": 0,
+        "topFindingIds": []
+      },
+      "securityPolicyInventory": {
+        "totalPolicyAssets": 7,
+        "assetsWithLocalPolicyMetadata": 7,
+        "assetsWithInheritedPolicy": 0,
+        "assetsWithEffectivePolicy": 7,
+        "assetsWithoutEffectivePolicy": 0,
+        "policySources": {
+          "local": 7,
+          "security_profile": 0,
+          "repository_config": 0,
+          "owning_skill": 0
+        },
+        "assetKinds": {
+          "skill": 1,
+          "context": 6,
+          "context_lens": 0,
+          "agent": 0,
+          "profile": 0,
+          "reference": 0,
+          "example": 0,
+          "script": 0,
+          "asset": 0,
+          "config": 0,
+          "unknown": 0
+        },
+        "networkAllowed": {
+          "true": 0,
+          "false": 7,
+          "unspecified": 0
+        },
+        "externalUploadAllowed": {
+          "true": 0,
+          "false": 7,
+          "unspecified": 0
+        },
+        "secretsAllowed": {
+          "true": 0,
+          "false": 7,
+          "unspecified": 0
+        },
+        "humanApprovalRequired": {
+          "true": 7,
+          "false": 0,
+          "unspecified": 0
+        },
+        "approvedNetworkDestinationCount": 0,
+        "approvedUploadDestinationCount": 0,
+        "forbiddenInputCount": 0,
+        "disallowedCommandCount": 0,
+        "securityProfiles": {
+          "referenced": 0,
+          "resolved": 0,
+          "missing": 0,
+          "cyclic": 0,
+          "none": 7,
+          "names": []
+        },
+        "topApprovedNetworkDestinations": [],
+        "topApprovedUploadDestinations": [],
+        "topForbiddenInputs": [],
+        "assetsWithoutEffectivePolicyList": []
+      }
+    }
+  },
+  "securityPosture": {
+    "totalSecurityFindings": 0,
+    "riskClasses": {
+      "violation": 0,
+      "suspicious": 0,
+      "advisory": 0,
+      "unclassified": 0
+    },
+    "severities": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "highOrCritical": 0,
+    "topFindingIds": []
+  },
+  "securityPolicyInventory": {
+    "totalPolicyAssets": 7,
+    "assetsWithLocalPolicyMetadata": 7,
+    "assetsWithInheritedPolicy": 0,
+    "assetsWithEffectivePolicy": 7,
+    "assetsWithoutEffectivePolicy": 0,
+    "policySources": {
+      "local": 7,
+      "security_profile": 0,
+      "repository_config": 0,
+      "owning_skill": 0
+    },
+    "assetKinds": {
+      "skill": 1,
+      "context": 6,
+      "context_lens": 0,
+      "agent": 0,
+      "profile": 0,
+      "reference": 0,
+      "example": 0,
+      "script": 0,
+      "asset": 0,
+      "config": 0,
+      "unknown": 0
+    },
+    "networkAllowed": {
+      "true": 0,
+      "false": 7,
+      "unspecified": 0
+    },
+    "externalUploadAllowed": {
+      "true": 0,
+      "false": 7,
+      "unspecified": 0
+    },
+    "secretsAllowed": {
+      "true": 0,
+      "false": 7,
+      "unspecified": 0
+    },
+    "humanApprovalRequired": {
+      "true": 7,
+      "false": 0,
+      "unspecified": 0
+    },
+    "approvedNetworkDestinationCount": 0,
+    "approvedUploadDestinationCount": 0,
+    "forbiddenInputCount": 0,
+    "disallowedCommandCount": 0,
+    "securityProfiles": {
+      "referenced": 0,
+      "resolved": 0,
+      "missing": 0,
+      "cyclic": 0,
+      "none": 7,
+      "names": []
+    },
+    "topApprovedNetworkDestinations": [],
+    "topApprovedUploadDestinations": [],
+    "topForbiddenInputs": [],
+    "assetsWithoutEffectivePolicyList": []
+  },
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "path": "contexts/invalid-status.md",
+      "message": "Invalid status \"active\". Expected one of: experimental, stable, deprecated, archived.",
+      "evidence": {
+        "path": "contexts/invalid-status.md",
+        "startLine": 4,
+        "endLine": 4,
+        "snippet": "status: active"
+      }
+    },
+    {
+      "severity": "warning",
+      "path": "contexts/missing-boundary.md",
+      "message": "Shared context asset is missing when_to_use metadata.",
+      "evidence": {
+        "path": "contexts/missing-boundary.md",
+        "startLine": 1,
+        "endLine": 12,
+        "snippet": "frontmatter missing when_to_use"
+      }
+    },
+    {
+      "severity": "warning",
+      "path": "contexts/missing-owner.md",
+      "message": "Asset is missing an owner."
+    },
+    {
+      "severity": "warning",
+      "path": "contexts/placeholder.md",
+      "message": "Shared context asset usage-boundary metadata contains placeholder values in when_not_to_use.",
+      "evidence": {
+        "path": "contexts/placeholder.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  - TBD"
+      }
+    },
+    {
+      "severity": "warning",
+      "path": "contexts/placeholder.md",
+      "message": "Shared context asset usage-boundary metadata contains placeholder values in when_to_use.",
+      "evidence": {
+        "path": "contexts/placeholder.md",
+        "startLine": 6,
+        "endLine": 6,
+        "snippet": "  - TODO"
+      }
+    },
+    {
+      "severity": "warning",
+      "path": "skills/review/SKILL.md",
+      "message": "Metadata dependency \"context.unknown\" from \"skill.review\" does not match a catalog entry.",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "details": {
+        "source": "skill.review",
+        "target": "context.unknown",
+        "referenceKind": "requires",
+        "sourcePath": "skills/review/SKILL.md"
+      }
+    }
+  ]
+}

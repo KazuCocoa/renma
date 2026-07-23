@@ -1,6 +1,6 @@
 import type { CatalogEntry } from "./model.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
-import type { Diagnostic, Evidence } from "./types.js";
+import type { Diagnostic, Evidence } from "./types/diagnostics.js";
 
 export function conflictDiagnostics(entries: CatalogEntry[]): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];

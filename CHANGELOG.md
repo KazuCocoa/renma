@@ -6,6 +6,33 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced catalog-to-Finding message parsing with producer-assigned stable
+  diagnostic identities and an exhaustive typed conversion registry while
+  preserving diagnostic wording and public JSON projections.
+- Classified every production TypeScript module into an enforced dependency
+  layer, including type-only imports and re-exports, with narrowly documented
+  compatibility seams for established deep imports.
+- Split the former broad `src/types.ts` hub into cohesive low-level contracts
+  and an isolated composed scan-result type while retaining the established
+  `dist/types.js` compatibility facade.
+- Separated one collected repository core from explicit memoized projections.
+  The complete caller-visible evidence graph and every prepared projection are
+  runtime-immutable, including nested configuration, parsed evidence, Sets,
+  and Maps, while catalog still avoids unrelated Discovery and security work
+  and scan, Readiness, and BOM continue to reuse one collection.
+- Pinned representative scan, catalog, graph, Skill Index, Readiness, and BOM
+  JSON output to normalized 0.22.5 golden baselines, including catalog-only
+  diagnostics and their established scan Finding and DiagnosticV2 projections.
+- Consolidated CLI help, positional bounds, accepted options, defaults,
+  command-specific parsing/execution, and expected error adapters behind a
+  statically complete typed command registry without changing command output or
+  exit behavior.
+- Added one-pass catalog dependency indexes, typed ESLint checks for promise and
+  switch safety, and a reusable temporary repository fixture builder while
+  preserving rendered ordering and public serialization.
+
 ## [0.22.5] - 2026-07-21
 
 ### Changed

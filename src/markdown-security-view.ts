@@ -1,4 +1,13 @@
-import type { Code, Heading, Html, Nodes, Paragraph } from "mdast";
+import type {
+  Blockquote,
+  Code,
+  Heading,
+  Html,
+  InlineCode,
+  Nodes,
+  Paragraph,
+  ThematicBreak,
+} from "mdast";
 
 import {
   projectVisibleLines,
@@ -25,6 +34,18 @@ export type MarkdownSemanticUnit = MarkdownSourceRange & {
 
 type PositionedNode = Nodes;
 type NodeRecord = MarkdownNodeRecord;
+type SecurityNode =
+  | Blockquote
+  | Code
+  | Heading
+  | Html
+  | InlineCode
+  | Paragraph
+  | ThematicBreak;
+type RecordForNode<T extends Nodes> = T extends Nodes
+  ? NodeRecord & { node: T }
+  : never;
+type SecurityNodeRecord = RecordForNode<SecurityNode>;
 
 type HeadingRecord = MarkdownSourceRange & {
   depth: number;
@@ -61,7 +82,7 @@ export class MarkdownSecurityView {
 
   private readonly sourceLines: string[];
   readonly bodyStartLine: number;
-  private readonly records: NodeRecord[];
+  private readonly records: SecurityNodeRecord[];
   private readonly visibleLines: string[];
   private readonly headings: HeadingRecord[];
   private readonly thematicBreaks: MarkdownSourceRange[];
@@ -80,9 +101,7 @@ export class MarkdownSecurityView {
     this.codeBlocksByNode = new Map(
       syntax.codeBlocks.map((block) => [block.node, block]),
     );
-    this.records = syntax.records.filter((record) =>
-      isSecurityRecordType(record.node.type),
-    );
+    this.records = syntax.records.filter(isSecurityRecord);
     const headings: HeadingRecord[] = [];
     const thematicBreaks: MarkdownSourceRange[] = [];
     const inlineCodeRanges: SourceColumnRange[] = [];
@@ -92,7 +111,7 @@ export class MarkdownSecurityView {
     for (const record of this.records) {
       switch (record.node.type) {
         case "heading": {
-          const node = record.node as Heading;
+          const node = record.node;
           headings.push({
             ...sourceRange(node, this.bodyStartLine),
             depth: node.depth,
@@ -115,13 +134,13 @@ export class MarkdownSecurityView {
           );
           break;
         case "html":
-          htmlRecords.push(record as NodeRecord & { node: Html });
+          htmlRecords.push({ ...record, node: record.node });
           break;
         case "paragraph":
-          paragraphRecords.push(record as NodeRecord & { node: Paragraph });
+          paragraphRecords.push({ ...record, node: record.node });
           break;
         case "code":
-          codeRecords.push(record as NodeRecord & { node: Code });
+          codeRecords.push({ ...record, node: record.node });
       }
     }
     this.headings = headings;
@@ -455,9 +474,9 @@ export class MarkdownSecurityView {
   }
 }
 
-function isSecurityRecordType(type: string): boolean {
+function isSecurityRecord(record: NodeRecord): record is SecurityNodeRecord {
   return /^(?:blockquote|code|heading|html|inlineCode|paragraph|thematicBreak)$/.test(
-    type,
+    record.node.type,
   );
 }
 

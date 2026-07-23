@@ -13,7 +13,12 @@ import type {
   EffectiveSecurityPolicyEvidence,
   SecurityPolicyAssetEvidence,
 } from "./security-policy-inventory.js";
-import type { Diagnostic, Evidence, Finding, RiskClass } from "./types.js";
+import type {
+  Diagnostic,
+  Evidence,
+  Finding,
+  RiskClass,
+} from "./types/diagnostics.js";
 
 export type TrustGraphSchemaVersion = "renma.trustGraph.v2";
 

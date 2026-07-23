@@ -6,13 +6,13 @@ import {
   markdownBodyStartLineForArtifact,
   renmaFrontmatterEnvelope,
 } from "./frontmatter-envelope.js";
+import type { Artifact } from "./types/artifact.js";
 import type {
-  Artifact,
   MetadataFieldEvidence,
   MetadataValue,
   ParsedMetadata,
   ParsedDocument,
-} from "./types.js";
+} from "./types/metadata.js";
 
 /** Parse a markdown artifact into headings, links, code fences, and frontmatter metadata. */
 export function parseDocument(artifact: Artifact): ParsedDocument {

@@ -9,13 +9,10 @@ import {
   securityProfileChain,
   type SecurityPolicy,
 } from "./security-policy.js";
-import type {
-  Artifact,
-  ArtifactKind,
-  Evidence,
-  ParsedDocument,
-  SecurityConfig,
-} from "./types.js";
+import type { Artifact, ArtifactKind } from "./types/artifact.js";
+import type { Evidence } from "./types/diagnostics.js";
+import type { ParsedDocument } from "./types/metadata.js";
+import type { SecurityConfig } from "./types/configuration.js";
 import { parseDocument } from "./markdown.js";
 
 type InventoryArtifactKind = ArtifactKind;

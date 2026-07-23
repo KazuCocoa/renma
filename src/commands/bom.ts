@@ -21,7 +21,7 @@ import {
 } from "../repository-evidence.js";
 import type { SecurityPolicyInventorySummary } from "../security-policy-inventory.js";
 import type { SecurityPostureSummary } from "../security-posture.js";
-import type { Diagnostic } from "../types.js";
+import type { Diagnostic } from "../types/diagnostics.js";
 
 export type BomFormat = "json" | "markdown";
 export type BomOutputMode = "default" | "omit_generated_at";

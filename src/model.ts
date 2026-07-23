@@ -1,11 +1,9 @@
-import type {
-  ArtifactKind,
-  AssetOwnership,
-  Evidence,
-  MetadataFieldEvidence,
-} from "./types.js";
+import type { ArtifactKind } from "./types/artifact.js";
+import type { AssetOwnership } from "./types/governance.js";
+import type { Evidence } from "./types/diagnostics.js";
+import type { MetadataFieldEvidence } from "./types/metadata.js";
 
-export type { AssetOwnership } from "./types.js";
+export type { AssetOwnership } from "./types/governance.js";
 
 /** Lifecycle state for a skill or context asset. */
 export type AssetStatus = "experimental" | "stable" | "deprecated" | "archived";

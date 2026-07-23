@@ -279,7 +279,18 @@ function skillLocalGovernancePromptLines(
       return [
         "The parent is resolved; the local candidate is an explicit human-provided override.",
       ];
-    default:
+    case "repository-boundary-unresolved":
+    case "repository-boundary-ambiguous":
+    case "conflicting-ownership-evidence":
+    case "skill-local-parent-unresolved":
+    case "repository-tool-not-context":
+    case "outside-recognized-asset-boundary":
+    case "independent-governance-intent-unconfirmed":
+    case "deterministic-metadata-candidate":
+    case "metadata-already-sufficient":
+    case "conflicting-or-incomplete-skill-evidence":
+    case "canonical-agent-skill-no-change":
+    case "agent-skills-migration-review-required":
       return [
         "Governance provenance remains separate from this structural parent resolution.",
       ];

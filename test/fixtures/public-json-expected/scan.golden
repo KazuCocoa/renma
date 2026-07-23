@@ -1,0 +1,2598 @@
+{
+  "root": "<ROOT>",
+  "configPath": "renma.config.json",
+  "scannedFileCount": 7,
+  "format": "json",
+  "agentSkills": {
+    "specification": "https://agentskills.io/specification",
+    "profile": "agentskills.io/specification@2026-07-12",
+    "totalSkillCount": 1,
+    "validSkillCount": 1,
+    "invalidSkillCount": 0,
+    "canonicalSkillCount": 1,
+    "legacySkillCount": 0,
+    "hybridSkillCount": 0,
+    "warningCount": 0,
+    "results": [
+      {
+        "path": "skills/review/SKILL.md",
+        "format": "agent-skills",
+        "valid": true,
+        "name": "review",
+        "description": "Review repository evidence and report deterministic results. Use when repository validation is requested; do not use for runtime selection or command execution.",
+        "migrationRecommended": false,
+        "legacyFields": [],
+        "canonicalRenmaFields": [
+          "renma.allowed-data",
+          "renma.external-upload-allowed",
+          "renma.id",
+          "renma.network-allowed",
+          "renma.owner",
+          "renma.published-entrypoint",
+          "renma.requires-context",
+          "renma.requires-human-approval",
+          "renma.secrets-allowed",
+          "renma.status"
+        ],
+        "errorCount": 0,
+        "warningCount": 0,
+        "issues": []
+      }
+    ]
+  },
+  "contextLens": {
+    "enabled": true,
+    "detected": false,
+    "totalLensCount": 0,
+    "validLensCount": 0,
+    "invalidLensCount": 0,
+    "diagnosticCounts": {
+      "error": 0,
+      "warning": 0,
+      "info": 0
+    },
+    "definitionPaths": [],
+    "targetReferences": [],
+    "targetPaths": [],
+    "unresolvedTargetReferences": [],
+    "scopeSummary": [],
+    "lenses": []
+  },
+  "securityPolicyInventory": {
+    "totalPolicyAssets": 7,
+    "assetsWithLocalPolicyMetadata": 7,
+    "assetsWithInheritedPolicy": 0,
+    "assetsWithEffectivePolicy": 7,
+    "assetsWithoutEffectivePolicy": 0,
+    "policySources": {
+      "local": 7,
+      "security_profile": 0,
+      "repository_config": 0,
+      "owning_skill": 0
+    },
+    "assetKinds": {
+      "skill": 1,
+      "context": 6,
+      "context_lens": 0,
+      "agent": 0,
+      "profile": 0,
+      "reference": 0,
+      "example": 0,
+      "script": 0,
+      "asset": 0,
+      "config": 0,
+      "unknown": 0
+    },
+    "networkAllowed": {
+      "true": 0,
+      "false": 7,
+      "unspecified": 0
+    },
+    "externalUploadAllowed": {
+      "true": 0,
+      "false": 7,
+      "unspecified": 0
+    },
+    "secretsAllowed": {
+      "true": 0,
+      "false": 7,
+      "unspecified": 0
+    },
+    "humanApprovalRequired": {
+      "true": 7,
+      "false": 0,
+      "unspecified": 0
+    },
+    "approvedNetworkDestinationCount": 0,
+    "approvedUploadDestinationCount": 0,
+    "forbiddenInputCount": 0,
+    "disallowedCommandCount": 0,
+    "securityProfiles": {
+      "referenced": 0,
+      "resolved": 0,
+      "missing": 0,
+      "cyclic": 0,
+      "none": 7,
+      "names": []
+    },
+    "topApprovedNetworkDestinations": [],
+    "topApprovedUploadDestinations": [],
+    "topForbiddenInputs": [],
+    "assetsWithoutEffectivePolicyList": []
+  },
+  "trustGraph": {
+    "schemaVersion": "renma.trustGraph.v2",
+    "summary": {
+      "assetCount": 7,
+      "nodeCount": 19,
+      "edgeCount": 33,
+      "findingCount": 8,
+      "nodeTypeCounts": {
+        "asset": 7,
+        "owner": 1,
+        "lifecycle_status": 2,
+        "security_profile": 0,
+        "effective_policy": 1,
+        "diagnostic": 8
+      },
+      "edgeTypeCounts": {
+        "owned_by": 6,
+        "has_lifecycle_status": 6,
+        "declares_dependency": 6,
+        "references": 0,
+        "owns_local_resource": 0,
+        "statically_references": 0,
+        "inherits_owner": 0,
+        "selects_security_profile": 0,
+        "inherits_policy": 0,
+        "has_effective_policy": 7,
+        "has_diagnostic": 8
+      },
+      "findingSeverityCounts": {
+        "critical": 0,
+        "high": 0,
+        "medium": 4,
+        "low": 4,
+        "error": 0,
+        "warning": 0,
+        "info": 0
+      },
+      "riskClassCounts": {
+        "violation": 0,
+        "suspicious": 0,
+        "advisory": 0,
+        "unclassified": 8
+      }
+    },
+    "nodes": [
+      {
+        "id": "asset:context.inactive",
+        "type": "asset",
+        "label": "context.inactive",
+        "properties": {
+          "assetId": "context.inactive",
+          "kind": "context",
+          "sourcePath": "contexts/inactive.md",
+          "contentHash": "sha256:50aa16076628df3c699878a2aaabb74ad79defc18799f5a6240c839f1d259d8c",
+          "sizeBytes": 366,
+          "contentClassification": "text",
+          "markdownParserEligible": true,
+          "tags": [],
+          "ownership": {
+            "declaredOwner": "qa-platform",
+            "effectiveOwner": "qa-platform",
+            "source": "declared"
+          },
+          "status": "archived"
+        },
+        "evidence": [
+          {
+            "path": "contexts/inactive.md",
+            "startLine": 1,
+            "endLine": 1,
+            "snippet": "context.inactive"
+          }
+        ]
+      },
+      {
+        "id": "asset:context.invalid-status",
+        "type": "asset",
+        "label": "context.invalid-status",
+        "properties": {
+          "assetId": "context.invalid-status",
+          "kind": "context",
+          "sourcePath": "contexts/invalid-status.md",
+          "contentHash": "sha256:85b789064a239193b77099c8761cd03027744342130f1b057423cc75aca7ad9b",
+          "sizeBytes": 359,
+          "contentClassification": "text",
+          "markdownParserEligible": true,
+          "tags": [],
+          "ownership": {
+            "declaredOwner": "qa-platform",
+            "effectiveOwner": "qa-platform",
+            "source": "declared"
+          }
+        },
+        "evidence": [
+          {
+            "path": "contexts/invalid-status.md",
+            "startLine": 1,
+            "endLine": 1,
+            "snippet": "context.invalid-status"
+          }
+        ]
+      },
+      {
+        "id": "asset:context.missing-boundary",
+        "type": "asset",
+        "label": "context.missing-boundary",
+        "properties": {
+          "assetId": "context.missing-boundary",
+          "kind": "context",
+          "sourcePath": "contexts/missing-boundary.md",
+          "contentHash": "sha256:576e72b632dc8717438284dfa5f010bcdb7670b0445e0314cebbfe3b5fce5216",
+          "sizeBytes": 310,
+          "contentClassification": "text",
+          "markdownParserEligible": true,
+          "tags": [],
+          "ownership": {
+            "declaredOwner": "qa-platform",
+            "effectiveOwner": "qa-platform",
+            "source": "declared"
+          },
+          "status": "stable"
+        },
+        "evidence": [
+          {
+            "path": "contexts/missing-boundary.md",
+            "startLine": 1,
+            "endLine": 1,
+            "snippet": "context.missing-boundary"
+          }
+        ]
+      },
+      {
+        "id": "asset:context.missing-owner",
+        "type": "asset",
+        "label": "context.missing-owner",
+        "properties": {
+          "assetId": "context.missing-owner",
+          "kind": "context",
+          "sourcePath": "contexts/missing-owner.md",
+          "contentHash": "sha256:882f7c772e8bb7513e03be4a7642c187cf5473c0a9feb873a98f1e970778d143",
+          "sizeBytes": 317,
+          "contentClassification": "text",
+          "markdownParserEligible": true,
+          "tags": [],
+          "ownership": {
+            "declaredOwner": null,
+            "effectiveOwner": null,
+            "source": "unowned"
+          },
+          "status": "stable"
+        },
+        "evidence": [
+          {
+            "path": "contexts/missing-owner.md",
+            "startLine": 1,
+            "endLine": 1,
+            "snippet": "context.missing-owner"
+          }
+        ]
+      },
+      {
+        "id": "asset:context.placeholder",
+        "type": "asset",
+        "label": "context.placeholder",
+        "properties": {
+          "assetId": "context.placeholder",
+          "kind": "context",
+          "sourcePath": "contexts/placeholder.md",
+          "contentHash": "sha256:74a2e4307961b9f40cfce6473db465f3de044cafe9cc2323e9df645e7e1aef47",
+          "sizeBytes": 315,
+          "contentClassification": "text",
+          "markdownParserEligible": true,
+          "tags": [],
+          "ownership": {
+            "declaredOwner": "qa-platform",
+            "effectiveOwner": "qa-platform",
+            "source": "declared"
+          },
+          "status": "stable"
+        },
+        "evidence": [
+          {
+            "path": "contexts/placeholder.md",
+            "startLine": 1,
+            "endLine": 1,
+            "snippet": "context.placeholder"
+          }
+        ]
+      },
+      {
+        "id": "asset:context.valid",
+        "type": "asset",
+        "label": "context.valid",
+        "properties": {
+          "assetId": "context.valid",
+          "kind": "context",
+          "sourcePath": "contexts/valid.md",
+          "contentHash": "sha256:0d20387d0273c49073c64a3a7e2d43190a0a697cb0c4c625db63e3ca63634831",
+          "sizeBytes": 330,
+          "contentClassification": "text",
+          "markdownParserEligible": true,
+          "tags": [],
+          "ownership": {
+            "declaredOwner": "qa-platform",
+            "effectiveOwner": "qa-platform",
+            "source": "declared"
+          },
+          "status": "stable"
+        },
+        "evidence": [
+          {
+            "path": "contexts/valid.md",
+            "startLine": 1,
+            "endLine": 1,
+            "snippet": "context.valid"
+          }
+        ]
+      },
+      {
+        "id": "asset:skill.review",
+        "type": "asset",
+        "label": "skill.review",
+        "properties": {
+          "assetId": "skill.review",
+          "kind": "skill",
+          "sourcePath": "skills/review/SKILL.md",
+          "contentHash": "sha256:d32f237601faf9ef678fdc24e1bec4dc1b012ab1d0ac2173b193ad4dd89d6c77",
+          "sizeBytes": 1253,
+          "contentClassification": "text",
+          "markdownParserEligible": true,
+          "tags": [],
+          "ownership": {
+            "declaredOwner": "qa-platform",
+            "effectiveOwner": "qa-platform",
+            "source": "declared"
+          },
+          "status": "stable"
+        },
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 1,
+            "endLine": 1,
+            "snippet": "skill.review"
+          }
+        ]
+      },
+      {
+        "id": "owner:qa-platform",
+        "type": "owner",
+        "label": "qa-platform"
+      },
+      {
+        "id": "lifecycle_status:archived",
+        "type": "lifecycle_status",
+        "label": "archived"
+      },
+      {
+        "id": "lifecycle_status:stable",
+        "type": "lifecycle_status",
+        "label": "stable"
+      },
+      {
+        "id": "effective_policy:sha256:21f484b535b09d21a5e67dbe27099795b1c48be2111c9cf899fe6254f88d0143",
+        "type": "effective_policy",
+        "label": "sha256:21f484b535b09d21a5e67dbe27099795b1c48be2111c9cf899fe6254f88d0143",
+        "properties": {
+          "fingerprint": "sha256:21f484b535b09d21a5e67dbe27099795b1c48be2111c9cf899fe6254f88d0143",
+          "allowedData": [
+            "public"
+          ],
+          "forbiddenInputs": [],
+          "networkAllowed": false,
+          "externalUploadAllowed": false,
+          "secretsAllowed": false,
+          "humanApprovalRequired": true,
+          "approvedNetworkDestinations": [],
+          "approvedUploadDestinations": [],
+          "disallowedCommands": []
+        }
+      },
+      {
+        "id": "diagnostic:04d7e4f0a0862c7a",
+        "type": "diagnostic",
+        "label": "MAINT-REFERENCE-DEPRECATED-ASSET",
+        "properties": {
+          "source": "finding",
+          "severity": "medium",
+          "message": "Declared reference targets a deprecated or archived asset",
+          "id": "MAINT-REFERENCE-DEPRECATED-ASSET",
+          "title": "Declared reference targets a deprecated or archived asset",
+          "path": "skills/review/SKILL.md"
+        },
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+          }
+        ]
+      },
+      {
+        "id": "diagnostic:14bab776c574a5b3",
+        "type": "diagnostic",
+        "label": "QUAL-MISSING-ROUTING-CLARITY",
+        "properties": {
+          "source": "finding",
+          "severity": "low",
+          "message": "Skill lacks routing clarity",
+          "id": "QUAL-MISSING-ROUTING-CLARITY",
+          "title": "Skill lacks routing clarity",
+          "path": "skills/review/SKILL.md"
+        },
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 1,
+            "endLine": 1,
+            "snippet": "---"
+          }
+        ]
+      },
+      {
+        "id": "diagnostic:29c9d035e3c0ff57",
+        "type": "diagnostic",
+        "label": "META-UNKNOWN-REFERENCE",
+        "properties": {
+          "source": "finding",
+          "severity": "medium",
+          "message": "Declared reference does not resolve to a known asset",
+          "id": "META-UNKNOWN-REFERENCE",
+          "title": "Declared reference does not resolve to a known asset",
+          "path": "skills/review/SKILL.md"
+        },
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+          }
+        ]
+      },
+      {
+        "id": "diagnostic:745dac1b62a87bb3",
+        "type": "diagnostic",
+        "label": "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY",
+        "properties": {
+          "source": "finding",
+          "severity": "low",
+          "message": "Shared context usage-boundary metadata contains placeholders",
+          "id": "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY",
+          "title": "Shared context usage-boundary metadata contains placeholders",
+          "path": "contexts/placeholder.md"
+        },
+        "evidence": [
+          {
+            "path": "contexts/placeholder.md",
+            "startLine": 6,
+            "endLine": 6,
+            "snippet": "  - TODO"
+          }
+        ]
+      },
+      {
+        "id": "diagnostic:75c5ec6ed814c415",
+        "type": "diagnostic",
+        "label": "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY",
+        "properties": {
+          "source": "finding",
+          "severity": "low",
+          "message": "Shared context usage-boundary metadata contains placeholders",
+          "id": "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY",
+          "title": "Shared context usage-boundary metadata contains placeholders",
+          "path": "contexts/placeholder.md"
+        },
+        "evidence": [
+          {
+            "path": "contexts/placeholder.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "  - TBD"
+          }
+        ]
+      },
+      {
+        "id": "diagnostic:99108503ef6246e1",
+        "type": "diagnostic",
+        "label": "META-UNKNOWN-DEPENDENCY",
+        "properties": {
+          "source": "finding",
+          "severity": "medium",
+          "message": "Metadata dependency target is unknown",
+          "id": "META-UNKNOWN-DEPENDENCY",
+          "title": "Metadata dependency target is unknown",
+          "path": "skills/review/SKILL.md"
+        },
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+          }
+        ]
+      },
+      {
+        "id": "diagnostic:b809ff4efdf814d3",
+        "type": "diagnostic",
+        "label": "META-INVALID-STATUS",
+        "properties": {
+          "source": "finding",
+          "severity": "medium",
+          "message": "Asset metadata uses an invalid lifecycle status",
+          "id": "META-INVALID-STATUS",
+          "title": "Asset metadata uses an invalid lifecycle status",
+          "path": "contexts/invalid-status.md"
+        },
+        "evidence": [
+          {
+            "path": "contexts/invalid-status.md",
+            "startLine": 4,
+            "endLine": 4,
+            "snippet": "status: active"
+          }
+        ]
+      },
+      {
+        "id": "diagnostic:ed513313536a1ddf",
+        "type": "diagnostic",
+        "label": "META-CONTEXT-MISSING-WHEN-TO-USE",
+        "properties": {
+          "source": "finding",
+          "severity": "low",
+          "message": "Shared context asset is missing when_to_use metadata",
+          "id": "META-CONTEXT-MISSING-WHEN-TO-USE",
+          "title": "Shared context asset is missing when_to_use metadata",
+          "path": "contexts/missing-boundary.md"
+        },
+        "evidence": [
+          {
+            "path": "contexts/missing-boundary.md",
+            "startLine": 1,
+            "endLine": 12,
+            "snippet": "frontmatter missing when_to_use"
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge:546f775682cd029d",
+        "from": "asset:context.inactive",
+        "to": "owner:qa-platform",
+        "type": "owned_by",
+        "properties": {
+          "ownershipSource": "declared"
+        },
+        "evidence": [
+          {
+            "path": "contexts/inactive.md",
+            "startLine": 3,
+            "endLine": 3,
+            "snippet": "owner: qa-platform"
+          }
+        ]
+      },
+      {
+        "id": "edge:ab46db212af5320e",
+        "from": "asset:context.inactive",
+        "to": "lifecycle_status:archived",
+        "type": "has_lifecycle_status",
+        "evidence": [
+          {
+            "path": "contexts/inactive.md",
+            "startLine": 4,
+            "endLine": 4,
+            "snippet": "status: archived"
+          }
+        ]
+      },
+      {
+        "id": "edge:600481c6311dcc95",
+        "from": "asset:context.inactive",
+        "to": "effective_policy:sha256:21f484b535b09d21a5e67dbe27099795b1c48be2111c9cf899fe6254f88d0143",
+        "type": "has_effective_policy",
+        "properties": {
+          "hasLocalPolicyMetadata": true,
+          "policySources": [
+            "local"
+          ]
+        },
+        "evidence": [
+          {
+            "path": "contexts/inactive.md",
+            "startLine": 9,
+            "endLine": 9,
+            "snippet": "allowed_data: public"
+          },
+          {
+            "path": "contexts/inactive.md",
+            "startLine": 10,
+            "endLine": 10,
+            "snippet": "network_allowed: false"
+          },
+          {
+            "path": "contexts/inactive.md",
+            "startLine": 11,
+            "endLine": 11,
+            "snippet": "external_upload_allowed: false"
+          },
+          {
+            "path": "contexts/inactive.md",
+            "startLine": 12,
+            "endLine": 12,
+            "snippet": "secrets_allowed: false"
+          },
+          {
+            "path": "contexts/inactive.md",
+            "startLine": 13,
+            "endLine": 13,
+            "snippet": "requires_human_approval: true"
+          }
+        ]
+      },
+      {
+        "id": "edge:662558a08d5f10f8",
+        "from": "asset:context.invalid-status",
+        "to": "owner:qa-platform",
+        "type": "owned_by",
+        "properties": {
+          "ownershipSource": "declared"
+        },
+        "evidence": [
+          {
+            "path": "contexts/invalid-status.md",
+            "startLine": 3,
+            "endLine": 3,
+            "snippet": "owner: qa-platform"
+          }
+        ]
+      },
+      {
+        "id": "edge:bc58f633b1372e07",
+        "from": "asset:context.invalid-status",
+        "to": "effective_policy:sha256:21f484b535b09d21a5e67dbe27099795b1c48be2111c9cf899fe6254f88d0143",
+        "type": "has_effective_policy",
+        "properties": {
+          "hasLocalPolicyMetadata": true,
+          "policySources": [
+            "local"
+          ]
+        },
+        "evidence": [
+          {
+            "path": "contexts/invalid-status.md",
+            "startLine": 9,
+            "endLine": 9,
+            "snippet": "allowed_data: public"
+          },
+          {
+            "path": "contexts/invalid-status.md",
+            "startLine": 10,
+            "endLine": 10,
+            "snippet": "network_allowed: false"
+          },
+          {
+            "path": "contexts/invalid-status.md",
+            "startLine": 11,
+            "endLine": 11,
+            "snippet": "external_upload_allowed: false"
+          },
+          {
+            "path": "contexts/invalid-status.md",
+            "startLine": 12,
+            "endLine": 12,
+            "snippet": "secrets_allowed: false"
+          },
+          {
+            "path": "contexts/invalid-status.md",
+            "startLine": 13,
+            "endLine": 13,
+            "snippet": "requires_human_approval: true"
+          }
+        ]
+      },
+      {
+        "id": "edge:db4c59382661e1df",
+        "from": "asset:context.invalid-status",
+        "to": "diagnostic:b809ff4efdf814d3",
+        "type": "has_diagnostic",
+        "evidence": [
+          {
+            "path": "contexts/invalid-status.md",
+            "startLine": 4,
+            "endLine": 4,
+            "snippet": "status: active"
+          }
+        ]
+      },
+      {
+        "id": "edge:2fa05a4050c39259",
+        "from": "asset:context.missing-boundary",
+        "to": "owner:qa-platform",
+        "type": "owned_by",
+        "properties": {
+          "ownershipSource": "declared"
+        },
+        "evidence": [
+          {
+            "path": "contexts/missing-boundary.md",
+            "startLine": 3,
+            "endLine": 3,
+            "snippet": "owner: qa-platform"
+          }
+        ]
+      },
+      {
+        "id": "edge:5095aa5e5d5ed10d",
+        "from": "asset:context.missing-boundary",
+        "to": "lifecycle_status:stable",
+        "type": "has_lifecycle_status",
+        "evidence": [
+          {
+            "path": "contexts/missing-boundary.md",
+            "startLine": 4,
+            "endLine": 4,
+            "snippet": "status: stable"
+          }
+        ]
+      },
+      {
+        "id": "edge:efa5c85f96ba840e",
+        "from": "asset:context.missing-boundary",
+        "to": "effective_policy:sha256:21f484b535b09d21a5e67dbe27099795b1c48be2111c9cf899fe6254f88d0143",
+        "type": "has_effective_policy",
+        "properties": {
+          "hasLocalPolicyMetadata": true,
+          "policySources": [
+            "local"
+          ]
+        },
+        "evidence": [
+          {
+            "path": "contexts/missing-boundary.md",
+            "startLine": 7,
+            "endLine": 7,
+            "snippet": "allowed_data: public"
+          },
+          {
+            "path": "contexts/missing-boundary.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "network_allowed: false"
+          },
+          {
+            "path": "contexts/missing-boundary.md",
+            "startLine": 9,
+            "endLine": 9,
+            "snippet": "external_upload_allowed: false"
+          },
+          {
+            "path": "contexts/missing-boundary.md",
+            "startLine": 10,
+            "endLine": 10,
+            "snippet": "secrets_allowed: false"
+          },
+          {
+            "path": "contexts/missing-boundary.md",
+            "startLine": 11,
+            "endLine": 11,
+            "snippet": "requires_human_approval: true"
+          }
+        ]
+      },
+      {
+        "id": "edge:4d8444207b14b452",
+        "from": "asset:context.missing-boundary",
+        "to": "diagnostic:ed513313536a1ddf",
+        "type": "has_diagnostic",
+        "evidence": [
+          {
+            "path": "contexts/missing-boundary.md",
+            "startLine": 1,
+            "endLine": 12,
+            "snippet": "frontmatter missing when_to_use"
+          }
+        ]
+      },
+      {
+        "id": "edge:33b7fa9e36576241",
+        "from": "asset:context.missing-owner",
+        "to": "lifecycle_status:stable",
+        "type": "has_lifecycle_status",
+        "evidence": [
+          {
+            "path": "contexts/missing-owner.md",
+            "startLine": 3,
+            "endLine": 3,
+            "snippet": "status: stable"
+          }
+        ]
+      },
+      {
+        "id": "edge:0367d1f2ac5c6a7f",
+        "from": "asset:context.missing-owner",
+        "to": "effective_policy:sha256:21f484b535b09d21a5e67dbe27099795b1c48be2111c9cf899fe6254f88d0143",
+        "type": "has_effective_policy",
+        "properties": {
+          "hasLocalPolicyMetadata": true,
+          "policySources": [
+            "local"
+          ]
+        },
+        "evidence": [
+          {
+            "path": "contexts/missing-owner.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "allowed_data: public"
+          },
+          {
+            "path": "contexts/missing-owner.md",
+            "startLine": 9,
+            "endLine": 9,
+            "snippet": "network_allowed: false"
+          },
+          {
+            "path": "contexts/missing-owner.md",
+            "startLine": 10,
+            "endLine": 10,
+            "snippet": "external_upload_allowed: false"
+          },
+          {
+            "path": "contexts/missing-owner.md",
+            "startLine": 11,
+            "endLine": 11,
+            "snippet": "secrets_allowed: false"
+          },
+          {
+            "path": "contexts/missing-owner.md",
+            "startLine": 12,
+            "endLine": 12,
+            "snippet": "requires_human_approval: true"
+          }
+        ]
+      },
+      {
+        "id": "edge:155fe9c3f2f74a65",
+        "from": "asset:context.placeholder",
+        "to": "owner:qa-platform",
+        "type": "owned_by",
+        "properties": {
+          "ownershipSource": "declared"
+        },
+        "evidence": [
+          {
+            "path": "contexts/placeholder.md",
+            "startLine": 3,
+            "endLine": 3,
+            "snippet": "owner: qa-platform"
+          }
+        ]
+      },
+      {
+        "id": "edge:71fcd68fe993e443",
+        "from": "asset:context.placeholder",
+        "to": "lifecycle_status:stable",
+        "type": "has_lifecycle_status",
+        "evidence": [
+          {
+            "path": "contexts/placeholder.md",
+            "startLine": 4,
+            "endLine": 4,
+            "snippet": "status: stable"
+          }
+        ]
+      },
+      {
+        "id": "edge:0013bac413effbf5",
+        "from": "asset:context.placeholder",
+        "to": "effective_policy:sha256:21f484b535b09d21a5e67dbe27099795b1c48be2111c9cf899fe6254f88d0143",
+        "type": "has_effective_policy",
+        "properties": {
+          "hasLocalPolicyMetadata": true,
+          "policySources": [
+            "local"
+          ]
+        },
+        "evidence": [
+          {
+            "path": "contexts/placeholder.md",
+            "startLine": 9,
+            "endLine": 9,
+            "snippet": "allowed_data: public"
+          },
+          {
+            "path": "contexts/placeholder.md",
+            "startLine": 10,
+            "endLine": 10,
+            "snippet": "network_allowed: false"
+          },
+          {
+            "path": "contexts/placeholder.md",
+            "startLine": 11,
+            "endLine": 11,
+            "snippet": "external_upload_allowed: false"
+          },
+          {
+            "path": "contexts/placeholder.md",
+            "startLine": 12,
+            "endLine": 12,
+            "snippet": "secrets_allowed: false"
+          },
+          {
+            "path": "contexts/placeholder.md",
+            "startLine": 13,
+            "endLine": 13,
+            "snippet": "requires_human_approval: true"
+          }
+        ]
+      },
+      {
+        "id": "edge:cce5088bcdbef7a5",
+        "from": "asset:context.placeholder",
+        "to": "diagnostic:745dac1b62a87bb3",
+        "type": "has_diagnostic",
+        "evidence": [
+          {
+            "path": "contexts/placeholder.md",
+            "startLine": 6,
+            "endLine": 6,
+            "snippet": "  - TODO"
+          }
+        ]
+      },
+      {
+        "id": "edge:7c1fead8882f3340",
+        "from": "asset:context.placeholder",
+        "to": "diagnostic:75c5ec6ed814c415",
+        "type": "has_diagnostic",
+        "evidence": [
+          {
+            "path": "contexts/placeholder.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "  - TBD"
+          }
+        ]
+      },
+      {
+        "id": "edge:13032a2fab0cb59f",
+        "from": "asset:context.valid",
+        "to": "owner:qa-platform",
+        "type": "owned_by",
+        "properties": {
+          "ownershipSource": "declared"
+        },
+        "evidence": [
+          {
+            "path": "contexts/valid.md",
+            "startLine": 3,
+            "endLine": 3,
+            "snippet": "owner: qa-platform"
+          }
+        ]
+      },
+      {
+        "id": "edge:593fa380a2c8747c",
+        "from": "asset:context.valid",
+        "to": "lifecycle_status:stable",
+        "type": "has_lifecycle_status",
+        "evidence": [
+          {
+            "path": "contexts/valid.md",
+            "startLine": 4,
+            "endLine": 4,
+            "snippet": "status: stable"
+          }
+        ]
+      },
+      {
+        "id": "edge:ad2dab99ecb21dde",
+        "from": "asset:context.valid",
+        "to": "effective_policy:sha256:21f484b535b09d21a5e67dbe27099795b1c48be2111c9cf899fe6254f88d0143",
+        "type": "has_effective_policy",
+        "properties": {
+          "hasLocalPolicyMetadata": true,
+          "policySources": [
+            "local"
+          ]
+        },
+        "evidence": [
+          {
+            "path": "contexts/valid.md",
+            "startLine": 9,
+            "endLine": 9,
+            "snippet": "allowed_data: public"
+          },
+          {
+            "path": "contexts/valid.md",
+            "startLine": 10,
+            "endLine": 10,
+            "snippet": "network_allowed: false"
+          },
+          {
+            "path": "contexts/valid.md",
+            "startLine": 11,
+            "endLine": 11,
+            "snippet": "external_upload_allowed: false"
+          },
+          {
+            "path": "contexts/valid.md",
+            "startLine": 12,
+            "endLine": 12,
+            "snippet": "secrets_allowed: false"
+          },
+          {
+            "path": "contexts/valid.md",
+            "startLine": 13,
+            "endLine": 13,
+            "snippet": "requires_human_approval: true"
+          }
+        ]
+      },
+      {
+        "id": "edge:f6f76b73a766d706",
+        "from": "asset:skill.review",
+        "to": "owner:qa-platform",
+        "type": "owned_by",
+        "properties": {
+          "ownershipSource": "declared"
+        },
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 7,
+            "endLine": 7,
+            "snippet": "  renma.owner: qa-platform"
+          }
+        ]
+      },
+      {
+        "id": "edge:e027081862ad169f",
+        "from": "asset:skill.review",
+        "to": "lifecycle_status:stable",
+        "type": "has_lifecycle_status",
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 6,
+            "endLine": 6,
+            "snippet": "  renma.status: stable"
+          }
+        ]
+      },
+      {
+        "id": "edge:6cb1986a79c258cd",
+        "from": "asset:skill.review",
+        "to": "asset:context.inactive",
+        "type": "declares_dependency",
+        "properties": {
+          "dependencyKind": "requires",
+          "declaredTarget": "context.inactive"
+        },
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+          }
+        ]
+      },
+      {
+        "id": "edge:0aae2e3997857264",
+        "from": "asset:skill.review",
+        "to": "asset:context.invalid-status",
+        "type": "declares_dependency",
+        "properties": {
+          "dependencyKind": "requires",
+          "declaredTarget": "context.invalid-status"
+        },
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+          }
+        ]
+      },
+      {
+        "id": "edge:1868f7416bedfba9",
+        "from": "asset:skill.review",
+        "to": "asset:context.missing-boundary",
+        "type": "declares_dependency",
+        "properties": {
+          "dependencyKind": "requires",
+          "declaredTarget": "context.missing-boundary"
+        },
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+          }
+        ]
+      },
+      {
+        "id": "edge:106231e74f4c1eb0",
+        "from": "asset:skill.review",
+        "to": "asset:context.missing-owner",
+        "type": "declares_dependency",
+        "properties": {
+          "dependencyKind": "requires",
+          "declaredTarget": "context.missing-owner"
+        },
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+          }
+        ]
+      },
+      {
+        "id": "edge:7035a9311768727c",
+        "from": "asset:skill.review",
+        "to": "asset:context.placeholder",
+        "type": "declares_dependency",
+        "properties": {
+          "dependencyKind": "requires",
+          "declaredTarget": "context.placeholder"
+        },
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+          }
+        ]
+      },
+      {
+        "id": "edge:a1c712d053b5f51e",
+        "from": "asset:skill.review",
+        "to": "asset:context.valid",
+        "type": "declares_dependency",
+        "properties": {
+          "dependencyKind": "requires",
+          "declaredTarget": "context.valid"
+        },
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+          }
+        ]
+      },
+      {
+        "id": "edge:3742630b8a63c79a",
+        "from": "asset:skill.review",
+        "to": "effective_policy:sha256:21f484b535b09d21a5e67dbe27099795b1c48be2111c9cf899fe6254f88d0143",
+        "type": "has_effective_policy",
+        "properties": {
+          "hasLocalPolicyMetadata": true,
+          "policySources": [
+            "local"
+          ]
+        },
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 9,
+            "endLine": 9,
+            "snippet": "  renma.allowed-data: '[\"public\"]'"
+          },
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 10,
+            "endLine": 10,
+            "snippet": "  renma.network-allowed: \"false\""
+          },
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 11,
+            "endLine": 11,
+            "snippet": "  renma.external-upload-allowed: \"false\""
+          },
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 12,
+            "endLine": 12,
+            "snippet": "  renma.secrets-allowed: \"false\""
+          },
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 13,
+            "endLine": 13,
+            "snippet": "  renma.requires-human-approval: \"true\""
+          }
+        ]
+      },
+      {
+        "id": "edge:c9da4cfd87fc6c20",
+        "from": "asset:skill.review",
+        "to": "diagnostic:04d7e4f0a0862c7a",
+        "type": "has_diagnostic",
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+          }
+        ]
+      },
+      {
+        "id": "edge:f95012fca624d825",
+        "from": "asset:skill.review",
+        "to": "diagnostic:14bab776c574a5b3",
+        "type": "has_diagnostic",
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 1,
+            "endLine": 1,
+            "snippet": "---"
+          }
+        ]
+      },
+      {
+        "id": "edge:9a85b471ab74c436",
+        "from": "asset:skill.review",
+        "to": "diagnostic:29c9d035e3c0ff57",
+        "type": "has_diagnostic",
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+          }
+        ]
+      },
+      {
+        "id": "edge:98aae66e1e03f076",
+        "from": "asset:skill.review",
+        "to": "diagnostic:99108503ef6246e1",
+        "type": "has_diagnostic",
+        "evidence": [
+          {
+            "path": "skills/review/SKILL.md",
+            "startLine": 8,
+            "endLine": 8,
+            "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+          }
+        ]
+      }
+    ],
+    "findings": [
+      {
+        "source": "finding",
+        "id": "META-INVALID-STATUS",
+        "title": "Asset metadata uses an invalid lifecycle status",
+        "severity": "medium",
+        "message": "Asset metadata uses an invalid lifecycle status",
+        "path": "contexts/invalid-status.md",
+        "evidence": {
+          "path": "contexts/invalid-status.md",
+          "startLine": 4,
+          "endLine": 4,
+          "snippet": "status: active"
+        }
+      },
+      {
+        "source": "finding",
+        "id": "META-CONTEXT-MISSING-WHEN-TO-USE",
+        "title": "Shared context asset is missing when_to_use metadata",
+        "severity": "low",
+        "message": "Shared context asset is missing when_to_use metadata",
+        "path": "contexts/missing-boundary.md",
+        "evidence": {
+          "path": "contexts/missing-boundary.md",
+          "startLine": 1,
+          "endLine": 12,
+          "snippet": "frontmatter missing when_to_use"
+        }
+      },
+      {
+        "source": "finding",
+        "id": "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY",
+        "title": "Shared context usage-boundary metadata contains placeholders",
+        "severity": "low",
+        "message": "Shared context usage-boundary metadata contains placeholders",
+        "path": "contexts/placeholder.md",
+        "evidence": {
+          "path": "contexts/placeholder.md",
+          "startLine": 6,
+          "endLine": 6,
+          "snippet": "  - TODO"
+        }
+      },
+      {
+        "source": "finding",
+        "id": "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY",
+        "title": "Shared context usage-boundary metadata contains placeholders",
+        "severity": "low",
+        "message": "Shared context usage-boundary metadata contains placeholders",
+        "path": "contexts/placeholder.md",
+        "evidence": {
+          "path": "contexts/placeholder.md",
+          "startLine": 8,
+          "endLine": 8,
+          "snippet": "  - TBD"
+        }
+      },
+      {
+        "source": "finding",
+        "id": "QUAL-MISSING-ROUTING-CLARITY",
+        "title": "Skill lacks routing clarity",
+        "severity": "low",
+        "message": "Skill lacks routing clarity",
+        "path": "skills/review/SKILL.md",
+        "evidence": {
+          "path": "skills/review/SKILL.md",
+          "startLine": 1,
+          "endLine": 1,
+          "snippet": "---"
+        }
+      },
+      {
+        "source": "finding",
+        "id": "MAINT-REFERENCE-DEPRECATED-ASSET",
+        "title": "Declared reference targets a deprecated or archived asset",
+        "severity": "medium",
+        "message": "Declared reference targets a deprecated or archived asset",
+        "path": "skills/review/SKILL.md",
+        "evidence": {
+          "path": "skills/review/SKILL.md",
+          "startLine": 8,
+          "endLine": 8,
+          "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+        }
+      },
+      {
+        "source": "finding",
+        "id": "META-UNKNOWN-DEPENDENCY",
+        "title": "Metadata dependency target is unknown",
+        "severity": "medium",
+        "message": "Metadata dependency target is unknown",
+        "path": "skills/review/SKILL.md",
+        "evidence": {
+          "path": "skills/review/SKILL.md",
+          "startLine": 8,
+          "endLine": 8,
+          "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+        }
+      },
+      {
+        "source": "finding",
+        "id": "META-UNKNOWN-REFERENCE",
+        "title": "Declared reference does not resolve to a known asset",
+        "severity": "medium",
+        "message": "Declared reference does not resolve to a known asset",
+        "path": "skills/review/SKILL.md",
+        "evidence": {
+          "path": "skills/review/SKILL.md",
+          "startLine": 8,
+          "endLine": 8,
+          "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+        }
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "META-INVALID-STATUS",
+      "title": "Asset metadata uses an invalid lifecycle status",
+      "category": "maintenance",
+      "severity": "medium",
+      "confidence": "high",
+      "evidence": {
+        "path": "contexts/invalid-status.md",
+        "startLine": 4,
+        "endLine": 4,
+        "snippet": "status: active"
+      },
+      "whyItMatters": "Lifecycle status is part of the repository governance contract. Invalid status values make it harder for humans and agents to understand whether a skill, context asset, or support file is experimental, stable, deprecated, or archived.",
+      "remediation": "Use one of the supported lifecycle status values: experimental, stable, deprecated, archived. Do not use migration or relationship states such as active or delegated as lifecycle status.",
+      "constraints": [
+        "Do not introduce runtime context resolution.",
+        "Do not create prompt packages.",
+        "Do not silently rewrite metadata during scan.",
+        "Keep lifecycle status separate from provenance, delegation, or replacement relationships."
+      ],
+      "verificationSteps": [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Run any project-specific validation checks that apply to this repository."
+      ],
+      "llmHint": "Replace invalid lifecycle status values with supported values. If a file was replaced by a shared context asset, consider a deprecated lifecycle status plus a separate supersession reference. Skills use metadata.renma.status and metadata.renma.superseded-by; non-Skills keep status and superseded_by. Pre-0.16 Skill fields are migration input only. Observed fact: The file is under the recognized contexts/** root. Deterministic interpretation: matched context-root with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "classification": {
+          "kind": "context",
+          "scope": "independent",
+          "matchedRule": "context-root",
+          "reasonCode": "under-recognized-context-root",
+          "reason": "The file is under the recognized contexts/** root.",
+          "recognizedRoot": "contexts"
+        }
+      }
+    },
+    {
+      "id": "META-CONTEXT-MISSING-WHEN-TO-USE",
+      "title": "Shared context asset is missing when_to_use metadata",
+      "category": "maintenance",
+      "severity": "low",
+      "confidence": "high",
+      "evidence": {
+        "path": "contexts/missing-boundary.md",
+        "startLine": 1,
+        "endLine": 12,
+        "snippet": "frontmatter missing when_to_use"
+      },
+      "whyItMatters": "Usage boundaries are part of the deterministic catalog surface for shared context assets. Missing or placeholder boundaries force humans and agents to infer when reusable knowledge applies, which increases over-application risk.",
+      "remediation": "Add compact, reviewed when_to_use and when_not_to_use entries. Keep detailed routing explanations, examples, procedures, and rationale in the markdown body or referenced context assets.",
+      "constraints": [
+        "Do not infer missing boundaries from broad body prose.",
+        "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders.",
+        "Do not introduce runtime context resolution.",
+        "Do not create prompt packages.",
+        "Keep metadata compact and preserve detailed guidance outside frontmatter."
+      ],
+      "verificationSteps": [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Confirm shared context assets declare compact positive and negative usage boundaries."
+      ],
+      "llmHint": "Ask the asset owner for concise positive and negative usage boundaries. Do not invent domain exclusions, owners, policies, or runtime routing behavior. Observed fact: The file is under the recognized contexts/** root. Deterministic interpretation: matched context-root with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "classification": {
+          "kind": "context",
+          "scope": "independent",
+          "matchedRule": "context-root",
+          "reasonCode": "under-recognized-context-root",
+          "reason": "The file is under the recognized contexts/** root.",
+          "recognizedRoot": "contexts"
+        }
+      }
+    },
+    {
+      "id": "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY",
+      "title": "Shared context usage-boundary metadata contains placeholders",
+      "category": "maintenance",
+      "severity": "low",
+      "confidence": "high",
+      "evidence": {
+        "path": "contexts/placeholder.md",
+        "startLine": 6,
+        "endLine": 6,
+        "snippet": "  - TODO"
+      },
+      "whyItMatters": "Usage boundaries are part of the deterministic catalog surface for shared context assets. Missing or placeholder boundaries force humans and agents to infer when reusable knowledge applies, which increases over-application risk.",
+      "remediation": "Add compact, reviewed when_to_use and when_not_to_use entries. Keep detailed routing explanations, examples, procedures, and rationale in the markdown body or referenced context assets.",
+      "constraints": [
+        "Do not infer missing boundaries from broad body prose.",
+        "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders.",
+        "Do not introduce runtime context resolution.",
+        "Do not create prompt packages.",
+        "Keep metadata compact and preserve detailed guidance outside frontmatter."
+      ],
+      "verificationSteps": [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Confirm shared context assets declare compact positive and negative usage boundaries."
+      ],
+      "llmHint": "Ask the asset owner for concise positive and negative usage boundaries. Do not invent domain exclusions, owners, policies, or runtime routing behavior. Observed fact: The file is under the recognized contexts/** root. Deterministic interpretation: matched context-root with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "classification": {
+          "kind": "context",
+          "scope": "independent",
+          "matchedRule": "context-root",
+          "reasonCode": "under-recognized-context-root",
+          "reason": "The file is under the recognized contexts/** root.",
+          "recognizedRoot": "contexts"
+        }
+      }
+    },
+    {
+      "id": "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY",
+      "title": "Shared context usage-boundary metadata contains placeholders",
+      "category": "maintenance",
+      "severity": "low",
+      "confidence": "high",
+      "evidence": {
+        "path": "contexts/placeholder.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  - TBD"
+      },
+      "whyItMatters": "Usage boundaries are part of the deterministic catalog surface for shared context assets. Missing or placeholder boundaries force humans and agents to infer when reusable knowledge applies, which increases over-application risk.",
+      "remediation": "Add compact, reviewed when_to_use and when_not_to_use entries. Keep detailed routing explanations, examples, procedures, and rationale in the markdown body or referenced context assets.",
+      "constraints": [
+        "Do not infer missing boundaries from broad body prose.",
+        "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders.",
+        "Do not introduce runtime context resolution.",
+        "Do not create prompt packages.",
+        "Keep metadata compact and preserve detailed guidance outside frontmatter."
+      ],
+      "verificationSteps": [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Confirm shared context assets declare compact positive and negative usage boundaries."
+      ],
+      "llmHint": "Ask the asset owner for concise positive and negative usage boundaries. Do not invent domain exclusions, owners, policies, or runtime routing behavior. Observed fact: The file is under the recognized contexts/** root. Deterministic interpretation: matched context-root with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "classification": {
+          "kind": "context",
+          "scope": "independent",
+          "matchedRule": "context-root",
+          "reasonCode": "under-recognized-context-root",
+          "reason": "The file is under the recognized contexts/** root.",
+          "recognizedRoot": "contexts"
+        }
+      }
+    },
+    {
+      "id": "QUAL-MISSING-ROUTING-CLARITY",
+      "title": "Skill lacks routing clarity",
+      "category": "quality",
+      "severity": "low",
+      "confidence": "medium",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 1,
+        "endLine": 1,
+        "snippet": "---"
+      },
+      "whyItMatters": "Clear skill structure helps agents choose the right workflow and report useful evidence.",
+      "remediation": "Add concise routing language: when to use the skill, whether it invokes other skills, or whether it is a utility skill for single operations."
+    },
+    {
+      "id": "META-UNKNOWN-REFERENCE",
+      "title": "Declared reference does not resolve to a known asset",
+      "category": "maintenance",
+      "severity": "medium",
+      "confidence": "high",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "whyItMatters": "Declared references make repository relationships visible to catalog, graph, and validation reports. Unknown references make skills and context assets harder for humans and agents to trust.",
+      "remediation": "Fix the reference so it points to an existing asset id or repository-relative path, or remove it if the relationship is no longer needed.",
+      "constraints": [
+        "Do not select runtime context.",
+        "Do not assemble prompt packages.",
+        "Do not infer missing dependencies with an LLM during scan.",
+        "Only validate declared repository relationships."
+      ],
+      "verificationSteps": [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Confirm declared references resolve to known assets."
+      ],
+      "llmHint": "Search the repository for the intended asset by nearby filename, title, id, or path. Update or remove unresolved requires reference \"context.unknown\" declared by \"skill.review\". Observed fact: The file is a Skill entrypoint under the recognized skills/** root. Deterministic interpretation: matched skill-entrypoint with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "source": "skill.review",
+        "target": "context.unknown",
+        "referenceKind": "requires",
+        "sourcePath": "skills/review/SKILL.md",
+        "classification": {
+          "kind": "skill",
+          "scope": "independent",
+          "matchedRule": "skill-entrypoint",
+          "reasonCode": "under-canonical-skill-root",
+          "reason": "The file is a Skill entrypoint under the recognized skills/** root.",
+          "recognizedRoot": "skills"
+        }
+      }
+    },
+    {
+      "id": "MAINT-REFERENCE-DEPRECATED-ASSET",
+      "title": "Declared reference targets a deprecated or archived asset",
+      "category": "maintenance",
+      "severity": "medium",
+      "confidence": "high",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "whyItMatters": "Declared references to deprecated or archived assets can keep old knowledge in active repository paths. If a canonical replacement exists, assets should usually reference that replacement directly.",
+      "remediation": "Update the declared reference to point to the canonical replacement if one exists, or document why the deprecated or archived asset is still intentionally referenced.",
+      "constraints": [
+        "Do not introduce runtime context resolution.",
+        "Do not create prompt packages.",
+        "Do not automatically rewrite references during scan.",
+        "Preserve compatibility shims when they are intentionally needed."
+      ],
+      "verificationSteps": [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Confirm active assets do not declare dependencies on deprecated or archived assets unless intentionally documented."
+      ],
+      "llmHint": "Inspect \"contexts/inactive.md\" for superseded_by or canonical context metadata. If a canonical replacement exists, update requires reference \"context.inactive\" declared by \"skill.review\". If not, decide whether the reference should remain and document why.",
+      "details": {
+        "source": "skill.review",
+        "target": "context.inactive",
+        "referenceKind": "requires",
+        "sourcePath": "skills/review/SKILL.md",
+        "targetPath": "contexts/inactive.md",
+        "targetStatus": "archived"
+      }
+    },
+    {
+      "id": "META-UNKNOWN-DEPENDENCY",
+      "title": "Metadata dependency target is unknown",
+      "category": "maintenance",
+      "severity": "medium",
+      "confidence": "high",
+      "evidence": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "whyItMatters": "Catalog metadata is part of the repository governance contract. Missing or malformed metadata makes asset ownership, lifecycle, and relationships harder to review and validate.",
+      "remediation": "Update the asset metadata so catalog construction can identify the asset and validate declared relationships.",
+      "constraints": [
+        "Do not introduce runtime context resolution.",
+        "Do not create prompt packages.",
+        "Do not silently rewrite metadata during scan."
+      ],
+      "verificationSteps": [
+        "Run renma scan.",
+        "Run renma catalog.",
+        "Run any project-specific validation checks that apply to this repository."
+      ],
+      "llmHint": "Add or correct asset governance metadata using the repository's existing frontmatter style, then rerun scan and catalog. Observed fact: The file is a Skill entrypoint under the recognized skills/** root. Deterministic interpretation: matched skill-entrypoint with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "source": "skill.review",
+        "target": "context.unknown",
+        "referenceKind": "requires",
+        "sourcePath": "skills/review/SKILL.md",
+        "classification": {
+          "kind": "skill",
+          "scope": "independent",
+          "matchedRule": "skill-entrypoint",
+          "reasonCode": "under-canonical-skill-root",
+          "reason": "The file is a Skill entrypoint under the recognized skills/** root.",
+          "recognizedRoot": "skills"
+        }
+      }
+    }
+  ],
+  "diagnostics": [],
+  "diagnosticsV2": [
+    {
+      "version": 2,
+      "code": "MAINT-REFERENCE-DEPRECATED-ASSET",
+      "severity": "warning",
+      "message": "Declared reference targets a deprecated or archived asset",
+      "repairPolicy": "preserve_semantics",
+      "location": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "repairConstraints": [
+        {
+          "kind": "must_preserve",
+          "text": "Fix the underlying semantic issue, not just the warning count. Update the asset so it accurately represents the real dependencies, references, network requirements, and runtime behavior."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not remove, weaken, relocate, or bypass declarations only to make the diagnostic disappear."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Preserve the source asset's intent and any compatibility guidance while retargeting references."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not remove deprecated or archived assets unless repository policy and human review allow it."
+        },
+        {
+          "kind": "allowed_change",
+          "text": "Retarget the reference to a reviewed replacement when superseded_by or canonical metadata provides one."
+        },
+        {
+          "kind": "requires_human_decision",
+          "text": "Keep the reference and document the reason when no reviewed replacement exists."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not introduce runtime context resolution."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not create prompt packages."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not automatically rewrite references during scan."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Preserve compatibility shims when they are intentionally needed."
+        }
+      ],
+      "verificationSteps": [
+        {
+          "text": "Run renma scan.",
+          "command": "renma scan",
+          "expected": "No diagnostics with code MAINT-REFERENCE-DEPRECATED-ASSET are reported."
+        },
+        {
+          "text": "Run renma catalog.",
+          "command": "renma catalog",
+          "expected": "Catalog output resolves relevant assets and dependencies."
+        },
+        {
+          "text": "Confirm active assets do not declare dependencies on deprecated or archived assets unless intentionally documented."
+        }
+      ],
+      "llmHint": "Inspect \"contexts/inactive.md\" for superseded_by or canonical context metadata. If a canonical replacement exists, update requires reference \"context.inactive\" declared by \"skill.review\". If not, decide whether the reference should remain and document why.",
+      "details": {
+        "target": "context.inactive",
+        "referenceKind": "requires",
+        "sourcePath": "skills/review/SKILL.md",
+        "targetPath": "contexts/inactive.md",
+        "targetStatus": "archived",
+        "findingSeverity": "medium",
+        "category": "maintenance",
+        "confidence": "high",
+        "remediation": "Update the declared reference to point to the canonical replacement if one exists, or document why the deprecated or archived asset is still intentionally referenced.",
+        "whyItMatters": "Declared references to deprecated or archived assets can keep old knowledge in active repository paths. If a canonical replacement exists, assets should usually reference that replacement directly.",
+        "legacyConstraints": [
+          "Do not introduce runtime context resolution.",
+          "Do not create prompt packages.",
+          "Do not automatically rewrite references during scan.",
+          "Preserve compatibility shims when they are intentionally needed."
+        ],
+        "diagnosticId": "MAINT-REFERENCE-DEPRECATED-ASSET@skills/review/SKILL.md:L8#6",
+        "source": "finding",
+        "facts": {
+          "source": "skill.review",
+          "target": "context.inactive",
+          "referenceKind": "requires",
+          "sourcePath": "skills/review/SKILL.md",
+          "targetPath": "contexts/inactive.md",
+          "targetStatus": "archived"
+        }
+      }
+    },
+    {
+      "version": 2,
+      "code": "META-CONTEXT-MISSING-WHEN-TO-USE",
+      "severity": "warning",
+      "message": "Shared context asset is missing when_to_use metadata",
+      "repairPolicy": "preserve_semantics",
+      "location": {
+        "path": "contexts/missing-boundary.md",
+        "startLine": 1,
+        "endLine": 12,
+        "snippet": "frontmatter missing when_to_use"
+      },
+      "repairConstraints": [
+        {
+          "kind": "must_preserve",
+          "text": "Fix the underlying semantic issue, not just the warning count. Update the asset so it accurately represents the real dependencies, references, network requirements, and runtime behavior."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not remove, weaken, relocate, or bypass declarations only to make the diagnostic disappear."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Preserve existing repository semantics and reviewable evidence while making the smallest repair."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not introduce runtime context selection, prompt assembly, or hidden scan-time rewrites."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not infer missing boundaries from broad body prose."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not introduce runtime context resolution."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not create prompt packages."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Keep metadata compact and preserve detailed guidance outside frontmatter."
+        }
+      ],
+      "verificationSteps": [
+        {
+          "text": "Run renma scan.",
+          "command": "renma scan",
+          "expected": "No diagnostics with code META-CONTEXT-MISSING-WHEN-TO-USE are reported."
+        },
+        {
+          "text": "Run renma catalog.",
+          "command": "renma catalog",
+          "expected": "Catalog output resolves relevant assets and dependencies."
+        },
+        {
+          "text": "Confirm shared context assets declare compact positive and negative usage boundaries."
+        }
+      ],
+      "llmHint": "Ask the asset owner for concise positive and negative usage boundaries. Do not invent domain exclusions, owners, policies, or runtime routing behavior. Observed fact: The file is under the recognized contexts/** root. Deterministic interpretation: matched context-root with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "classification": {
+          "kind": "context",
+          "scope": "independent",
+          "matchedRule": "context-root",
+          "reasonCode": "under-recognized-context-root",
+          "reason": "The file is under the recognized contexts/** root.",
+          "recognizedRoot": "contexts"
+        },
+        "findingSeverity": "low",
+        "category": "maintenance",
+        "confidence": "high",
+        "remediation": "Add compact, reviewed when_to_use and when_not_to_use entries. Keep detailed routing explanations, examples, procedures, and rationale in the markdown body or referenced context assets.",
+        "whyItMatters": "Usage boundaries are part of the deterministic catalog surface for shared context assets. Missing or placeholder boundaries force humans and agents to infer when reusable knowledge applies, which increases over-application risk.",
+        "legacyConstraints": [
+          "Do not infer missing boundaries from broad body prose.",
+          "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders.",
+          "Do not introduce runtime context resolution.",
+          "Do not create prompt packages.",
+          "Keep metadata compact and preserve detailed guidance outside frontmatter."
+        ],
+        "diagnosticId": "META-CONTEXT-MISSING-WHEN-TO-USE@contexts/missing-boundary.md:L1#1",
+        "source": "finding",
+        "facts": {
+          "classification": {
+            "kind": "context",
+            "scope": "independent",
+            "matchedRule": "context-root",
+            "reasonCode": "under-recognized-context-root",
+            "reason": "The file is under the recognized contexts/** root.",
+            "recognizedRoot": "contexts"
+          }
+        }
+      }
+    },
+    {
+      "version": 2,
+      "code": "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY",
+      "severity": "warning",
+      "message": "Shared context usage-boundary metadata contains placeholders",
+      "repairPolicy": "preserve_semantics",
+      "location": {
+        "path": "contexts/placeholder.md",
+        "startLine": 6,
+        "endLine": 6,
+        "snippet": "  - TODO"
+      },
+      "repairConstraints": [
+        {
+          "kind": "must_preserve",
+          "text": "Fix the underlying semantic issue, not just the warning count. Update the asset so it accurately represents the real dependencies, references, network requirements, and runtime behavior."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not remove, weaken, relocate, or bypass declarations only to make the diagnostic disappear."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Preserve existing repository semantics and reviewable evidence while making the smallest repair."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not introduce runtime context selection, prompt assembly, or hidden scan-time rewrites."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not infer missing boundaries from broad body prose."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not introduce runtime context resolution."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not create prompt packages."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Keep metadata compact and preserve detailed guidance outside frontmatter."
+        }
+      ],
+      "verificationSteps": [
+        {
+          "text": "Run renma scan.",
+          "command": "renma scan",
+          "expected": "No diagnostics with code META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY are reported."
+        },
+        {
+          "text": "Run renma catalog.",
+          "command": "renma catalog",
+          "expected": "Catalog output resolves relevant assets and dependencies."
+        },
+        {
+          "text": "Confirm shared context assets declare compact positive and negative usage boundaries."
+        }
+      ],
+      "llmHint": "Ask the asset owner for concise positive and negative usage boundaries. Do not invent domain exclusions, owners, policies, or runtime routing behavior. Observed fact: The file is under the recognized contexts/** root. Deterministic interpretation: matched context-root with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "classification": {
+          "kind": "context",
+          "scope": "independent",
+          "matchedRule": "context-root",
+          "reasonCode": "under-recognized-context-root",
+          "reason": "The file is under the recognized contexts/** root.",
+          "recognizedRoot": "contexts"
+        },
+        "findingSeverity": "low",
+        "category": "maintenance",
+        "confidence": "high",
+        "remediation": "Add compact, reviewed when_to_use and when_not_to_use entries. Keep detailed routing explanations, examples, procedures, and rationale in the markdown body or referenced context assets.",
+        "whyItMatters": "Usage boundaries are part of the deterministic catalog surface for shared context assets. Missing or placeholder boundaries force humans and agents to infer when reusable knowledge applies, which increases over-application risk.",
+        "legacyConstraints": [
+          "Do not infer missing boundaries from broad body prose.",
+          "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders.",
+          "Do not introduce runtime context resolution.",
+          "Do not create prompt packages.",
+          "Keep metadata compact and preserve detailed guidance outside frontmatter."
+        ],
+        "diagnosticId": "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY@contexts/placeholder.md:L6#2",
+        "source": "finding",
+        "facts": {
+          "classification": {
+            "kind": "context",
+            "scope": "independent",
+            "matchedRule": "context-root",
+            "reasonCode": "under-recognized-context-root",
+            "reason": "The file is under the recognized contexts/** root.",
+            "recognizedRoot": "contexts"
+          }
+        }
+      }
+    },
+    {
+      "version": 2,
+      "code": "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY",
+      "severity": "warning",
+      "message": "Shared context usage-boundary metadata contains placeholders",
+      "repairPolicy": "preserve_semantics",
+      "location": {
+        "path": "contexts/placeholder.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  - TBD"
+      },
+      "repairConstraints": [
+        {
+          "kind": "must_preserve",
+          "text": "Fix the underlying semantic issue, not just the warning count. Update the asset so it accurately represents the real dependencies, references, network requirements, and runtime behavior."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not remove, weaken, relocate, or bypass declarations only to make the diagnostic disappear."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Preserve existing repository semantics and reviewable evidence while making the smallest repair."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not introduce runtime context selection, prompt assembly, or hidden scan-time rewrites."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not infer missing boundaries from broad body prose."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not introduce runtime context resolution."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not create prompt packages."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Keep metadata compact and preserve detailed guidance outside frontmatter."
+        }
+      ],
+      "verificationSteps": [
+        {
+          "text": "Run renma scan.",
+          "command": "renma scan",
+          "expected": "No diagnostics with code META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY are reported."
+        },
+        {
+          "text": "Run renma catalog.",
+          "command": "renma catalog",
+          "expected": "Catalog output resolves relevant assets and dependencies."
+        },
+        {
+          "text": "Confirm shared context assets declare compact positive and negative usage boundaries."
+        }
+      ],
+      "llmHint": "Ask the asset owner for concise positive and negative usage boundaries. Do not invent domain exclusions, owners, policies, or runtime routing behavior. Observed fact: The file is under the recognized contexts/** root. Deterministic interpretation: matched context-root with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "classification": {
+          "kind": "context",
+          "scope": "independent",
+          "matchedRule": "context-root",
+          "reasonCode": "under-recognized-context-root",
+          "reason": "The file is under the recognized contexts/** root.",
+          "recognizedRoot": "contexts"
+        },
+        "findingSeverity": "low",
+        "category": "maintenance",
+        "confidence": "high",
+        "remediation": "Add compact, reviewed when_to_use and when_not_to_use entries. Keep detailed routing explanations, examples, procedures, and rationale in the markdown body or referenced context assets.",
+        "whyItMatters": "Usage boundaries are part of the deterministic catalog surface for shared context assets. Missing or placeholder boundaries force humans and agents to infer when reusable knowledge applies, which increases over-application risk.",
+        "legacyConstraints": [
+          "Do not infer missing boundaries from broad body prose.",
+          "Do not replace missing boundaries with TODO, TBD, unknown, none, or similar placeholders.",
+          "Do not introduce runtime context resolution.",
+          "Do not create prompt packages.",
+          "Keep metadata compact and preserve detailed guidance outside frontmatter."
+        ],
+        "diagnosticId": "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY@contexts/placeholder.md:L8#3",
+        "source": "finding",
+        "facts": {
+          "classification": {
+            "kind": "context",
+            "scope": "independent",
+            "matchedRule": "context-root",
+            "reasonCode": "under-recognized-context-root",
+            "reason": "The file is under the recognized contexts/** root.",
+            "recognizedRoot": "contexts"
+          }
+        }
+      }
+    },
+    {
+      "version": 2,
+      "code": "META-INVALID-STATUS",
+      "severity": "warning",
+      "message": "Asset metadata uses an invalid lifecycle status",
+      "repairPolicy": "preserve_semantics",
+      "location": {
+        "path": "contexts/invalid-status.md",
+        "startLine": 4,
+        "endLine": 4,
+        "snippet": "status: active"
+      },
+      "repairConstraints": [
+        {
+          "kind": "must_preserve",
+          "text": "Fix the underlying semantic issue, not just the warning count. Update the asset so it accurately represents the real dependencies, references, network requirements, and runtime behavior."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not remove, weaken, relocate, or bypass declarations only to make the diagnostic disappear."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Preserve existing repository semantics and reviewable evidence while making the smallest repair."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not introduce runtime context selection, prompt assembly, or hidden scan-time rewrites."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not introduce runtime context resolution."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not create prompt packages."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not silently rewrite metadata during scan."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Keep lifecycle status separate from provenance, delegation, or replacement relationships."
+        }
+      ],
+      "verificationSteps": [
+        {
+          "text": "Run renma scan.",
+          "command": "renma scan",
+          "expected": "No diagnostics with code META-INVALID-STATUS are reported."
+        },
+        {
+          "text": "Run renma catalog.",
+          "command": "renma catalog",
+          "expected": "Catalog output resolves relevant assets and dependencies."
+        },
+        {
+          "text": "Run any project-specific validation checks that apply to this repository."
+        }
+      ],
+      "llmHint": "Replace invalid lifecycle status values with supported values. If a file was replaced by a shared context asset, consider a deprecated lifecycle status plus a separate supersession reference. Skills use metadata.renma.status and metadata.renma.superseded-by; non-Skills keep status and superseded_by. Pre-0.16 Skill fields are migration input only. Observed fact: The file is under the recognized contexts/** root. Deterministic interpretation: matched context-root with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "classification": {
+          "kind": "context",
+          "scope": "independent",
+          "matchedRule": "context-root",
+          "reasonCode": "under-recognized-context-root",
+          "reason": "The file is under the recognized contexts/** root.",
+          "recognizedRoot": "contexts"
+        },
+        "findingSeverity": "medium",
+        "category": "maintenance",
+        "confidence": "high",
+        "remediation": "Use one of the supported lifecycle status values: experimental, stable, deprecated, archived. Do not use migration or relationship states such as active or delegated as lifecycle status.",
+        "whyItMatters": "Lifecycle status is part of the repository governance contract. Invalid status values make it harder for humans and agents to understand whether a skill, context asset, or support file is experimental, stable, deprecated, or archived.",
+        "legacyConstraints": [
+          "Do not introduce runtime context resolution.",
+          "Do not create prompt packages.",
+          "Do not silently rewrite metadata during scan.",
+          "Keep lifecycle status separate from provenance, delegation, or replacement relationships."
+        ],
+        "diagnosticId": "META-INVALID-STATUS@contexts/invalid-status.md:L4#0",
+        "source": "finding",
+        "facts": {
+          "classification": {
+            "kind": "context",
+            "scope": "independent",
+            "matchedRule": "context-root",
+            "reasonCode": "under-recognized-context-root",
+            "reason": "The file is under the recognized contexts/** root.",
+            "recognizedRoot": "contexts"
+          }
+        }
+      }
+    },
+    {
+      "version": 2,
+      "code": "META-UNKNOWN-DEPENDENCY",
+      "severity": "warning",
+      "message": "Metadata dependency target is unknown",
+      "repairPolicy": "preserve_semantics",
+      "location": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "repairConstraints": [
+        {
+          "kind": "must_preserve",
+          "text": "Fix the underlying semantic issue, not just the warning count. Update the asset so it accurately represents the real dependencies, references, network requirements, and runtime behavior."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not remove, weaken, relocate, or bypass declarations only to make the diagnostic disappear."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not create a fake asset or dependency just to satisfy validation."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Preserve the source asset's intended relationship when correcting the target."
+        },
+        {
+          "kind": "allowed_change",
+          "text": "Correct the reference, add the missing asset only when clear source material exists, or remove the relationship if it is stale."
+        },
+        {
+          "kind": "requires_human_decision",
+          "text": "Ask for review when the intended target cannot be inferred from repository evidence."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not introduce runtime context resolution."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not create prompt packages."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not silently rewrite metadata during scan."
+        }
+      ],
+      "verificationSteps": [
+        {
+          "text": "Run renma scan.",
+          "command": "renma scan",
+          "expected": "No diagnostics with code META-UNKNOWN-DEPENDENCY are reported."
+        },
+        {
+          "text": "Run renma catalog.",
+          "command": "renma catalog",
+          "expected": "Catalog output resolves relevant assets and dependencies."
+        },
+        {
+          "text": "Run any project-specific validation checks that apply to this repository."
+        }
+      ],
+      "llmHint": "Add or correct asset governance metadata using the repository's existing frontmatter style, then rerun scan and catalog. Observed fact: The file is a Skill entrypoint under the recognized skills/** root. Deterministic interpretation: matched skill-entrypoint with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "target": "context.unknown",
+        "referenceKind": "requires",
+        "sourcePath": "skills/review/SKILL.md",
+        "classification": {
+          "kind": "skill",
+          "scope": "independent",
+          "matchedRule": "skill-entrypoint",
+          "reasonCode": "under-canonical-skill-root",
+          "reason": "The file is a Skill entrypoint under the recognized skills/** root.",
+          "recognizedRoot": "skills"
+        },
+        "findingSeverity": "medium",
+        "category": "maintenance",
+        "confidence": "high",
+        "remediation": "Update the asset metadata so catalog construction can identify the asset and validate declared relationships.",
+        "whyItMatters": "Catalog metadata is part of the repository governance contract. Missing or malformed metadata makes asset ownership, lifecycle, and relationships harder to review and validate.",
+        "legacyConstraints": [
+          "Do not introduce runtime context resolution.",
+          "Do not create prompt packages.",
+          "Do not silently rewrite metadata during scan."
+        ],
+        "diagnosticId": "META-UNKNOWN-DEPENDENCY@skills/review/SKILL.md:L8#7",
+        "source": "finding",
+        "facts": {
+          "source": "skill.review",
+          "target": "context.unknown",
+          "referenceKind": "requires",
+          "sourcePath": "skills/review/SKILL.md",
+          "classification": {
+            "kind": "skill",
+            "scope": "independent",
+            "matchedRule": "skill-entrypoint",
+            "reasonCode": "under-canonical-skill-root",
+            "reason": "The file is a Skill entrypoint under the recognized skills/** root.",
+            "recognizedRoot": "skills"
+          }
+        }
+      }
+    },
+    {
+      "version": 2,
+      "code": "META-UNKNOWN-REFERENCE",
+      "severity": "warning",
+      "message": "Declared reference does not resolve to a known asset",
+      "repairPolicy": "preserve_semantics",
+      "location": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 8,
+        "endLine": 8,
+        "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
+      },
+      "repairConstraints": [
+        {
+          "kind": "must_preserve",
+          "text": "Fix the underlying semantic issue, not just the warning count. Update the asset so it accurately represents the real dependencies, references, network requirements, and runtime behavior."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not remove, weaken, relocate, or bypass declarations only to make the diagnostic disappear."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not create a fake asset or dependency just to satisfy validation."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Preserve the source asset's intended relationship when correcting the target."
+        },
+        {
+          "kind": "allowed_change",
+          "text": "Correct the reference, add the missing asset only when clear source material exists, or remove the relationship if it is stale."
+        },
+        {
+          "kind": "requires_human_decision",
+          "text": "Ask for review when the intended target cannot be inferred from repository evidence."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not select runtime context."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not assemble prompt packages."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not infer missing dependencies with an LLM during scan."
+        },
+        {
+          "kind": "allowed_change",
+          "text": "Only validate declared repository relationships."
+        }
+      ],
+      "verificationSteps": [
+        {
+          "text": "Run renma scan.",
+          "command": "renma scan",
+          "expected": "No diagnostics with code META-UNKNOWN-REFERENCE are reported."
+        },
+        {
+          "text": "Run renma catalog.",
+          "command": "renma catalog",
+          "expected": "Catalog output resolves relevant assets and dependencies."
+        },
+        {
+          "text": "Confirm declared references resolve to known assets."
+        }
+      ],
+      "llmHint": "Search the repository for the intended asset by nearby filename, title, id, or path. Update or remove unresolved requires reference \"context.unknown\" declared by \"skill.review\". Observed fact: The file is a Skill entrypoint under the recognized skills/** root. Deterministic interpretation: matched skill-entrypoint with independent scope. Permitted repair: follow the diagnostic remediation while preserving declared semantics and repository boundaries. Human decision still required: confirm any owner, policy, lifecycle, or placement intent that repository evidence does not declare. Verification: rerun renma scan . --fail-on high --format json after an intended change.",
+      "details": {
+        "target": "context.unknown",
+        "referenceKind": "requires",
+        "sourcePath": "skills/review/SKILL.md",
+        "classification": {
+          "kind": "skill",
+          "scope": "independent",
+          "matchedRule": "skill-entrypoint",
+          "reasonCode": "under-canonical-skill-root",
+          "reason": "The file is a Skill entrypoint under the recognized skills/** root.",
+          "recognizedRoot": "skills"
+        },
+        "findingSeverity": "medium",
+        "category": "maintenance",
+        "confidence": "high",
+        "remediation": "Fix the reference so it points to an existing asset id or repository-relative path, or remove it if the relationship is no longer needed.",
+        "whyItMatters": "Declared references make repository relationships visible to catalog, graph, and validation reports. Unknown references make skills and context assets harder for humans and agents to trust.",
+        "legacyConstraints": [
+          "Do not select runtime context.",
+          "Do not assemble prompt packages.",
+          "Do not infer missing dependencies with an LLM during scan.",
+          "Only validate declared repository relationships."
+        ],
+        "diagnosticId": "META-UNKNOWN-REFERENCE@skills/review/SKILL.md:L8#5",
+        "source": "finding",
+        "facts": {
+          "source": "skill.review",
+          "target": "context.unknown",
+          "referenceKind": "requires",
+          "sourcePath": "skills/review/SKILL.md",
+          "classification": {
+            "kind": "skill",
+            "scope": "independent",
+            "matchedRule": "skill-entrypoint",
+            "reasonCode": "under-canonical-skill-root",
+            "reason": "The file is a Skill entrypoint under the recognized skills/** root.",
+            "recognizedRoot": "skills"
+          }
+        }
+      }
+    },
+    {
+      "version": 2,
+      "code": "QUAL-MISSING-ROUTING-CLARITY",
+      "severity": "warning",
+      "message": "Skill lacks routing clarity",
+      "repairPolicy": "preserve_semantics",
+      "location": {
+        "path": "skills/review/SKILL.md",
+        "startLine": 1,
+        "endLine": 1,
+        "snippet": "---"
+      },
+      "repairConstraints": [
+        {
+          "kind": "must_preserve",
+          "text": "Fix the underlying semantic issue, not just the warning count. Update the asset so it accurately represents the real dependencies, references, network requirements, and runtime behavior."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not remove, weaken, relocate, or bypass declarations only to make the diagnostic disappear."
+        },
+        {
+          "kind": "must_preserve",
+          "text": "Preserve existing repository semantics and reviewable evidence while making the smallest repair."
+        },
+        {
+          "kind": "must_not_change",
+          "text": "Do not introduce runtime context selection, prompt assembly, or hidden scan-time rewrites."
+        }
+      ],
+      "verificationSteps": [
+        {
+          "text": "Run Renma scan again and confirm this diagnostic no longer appears.",
+          "command": "renma scan",
+          "expected": "No diagnostics with code QUAL-MISSING-ROUTING-CLARITY are reported."
+        }
+      ],
+      "llmHint": "Use the evidence, repair constraints, and verification steps to make the smallest reviewable patch.",
+      "details": {
+        "findingSeverity": "low",
+        "category": "quality",
+        "confidence": "medium",
+        "remediation": "Add concise routing language: when to use the skill, whether it invokes other skills, or whether it is a utility skill for single operations.",
+        "whyItMatters": "Clear skill structure helps agents choose the right workflow and report useful evidence.",
+        "diagnosticId": "QUAL-MISSING-ROUTING-CLARITY@skills/review/SKILL.md:L1#4",
+        "source": "finding"
+      }
+    }
+  ],
+  "reviewBundles": [
+    {
+      "id": "code-review:meta-context-missing-when-to-use:contexts/missing-boundary.md",
+      "title": "META-CONTEXT-MISSING-WHEN-TO-USE review",
+      "summary": "1 diagnostics share the same code and source.",
+      "severity": "warning",
+      "diagnosticCodes": [
+        "META-CONTEXT-MISSING-WHEN-TO-USE"
+      ],
+      "diagnosticIds": [
+        "META-CONTEXT-MISSING-WHEN-TO-USE@contexts/missing-boundary.md:L1#1"
+      ],
+      "affectedFiles": [
+        "contexts/missing-boundary.md"
+      ],
+      "suggestedReviewOrder": [
+        "Inspect contexts/missing-boundary.md",
+        "Apply the repair constraints before editing.",
+        "Rerun Renma scan."
+      ],
+      "llmHint": "Review these diagnostics together and make the smallest patch that satisfies their shared evidence."
+    },
+    {
+      "id": "code-review:meta-context-placeholder-usage-boundary:contexts/placeholder.md",
+      "title": "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY review",
+      "summary": "2 diagnostics share the same code and source.",
+      "severity": "warning",
+      "diagnosticCodes": [
+        "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY"
+      ],
+      "diagnosticIds": [
+        "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY@contexts/placeholder.md:L6#2",
+        "META-CONTEXT-PLACEHOLDER-USAGE-BOUNDARY@contexts/placeholder.md:L8#3"
+      ],
+      "affectedFiles": [
+        "contexts/placeholder.md"
+      ],
+      "suggestedReviewOrder": [
+        "Inspect contexts/placeholder.md",
+        "Apply the repair constraints before editing.",
+        "Rerun Renma scan."
+      ],
+      "llmHint": "Review these diagnostics together and make the smallest patch that satisfies their shared evidence."
+    },
+    {
+      "id": "code-review:meta-invalid-status:contexts/invalid-status.md",
+      "title": "META-INVALID-STATUS review",
+      "summary": "1 diagnostics share the same code and source.",
+      "severity": "warning",
+      "diagnosticCodes": [
+        "META-INVALID-STATUS"
+      ],
+      "diagnosticIds": [
+        "META-INVALID-STATUS@contexts/invalid-status.md:L4#0"
+      ],
+      "affectedFiles": [
+        "contexts/invalid-status.md"
+      ],
+      "suggestedReviewOrder": [
+        "Inspect contexts/invalid-status.md",
+        "Apply the repair constraints before editing.",
+        "Rerun Renma scan."
+      ],
+      "llmHint": "Review these diagnostics together and make the smallest patch that satisfies their shared evidence."
+    },
+    {
+      "id": "code-review:qual-missing-routing-clarity:skills/review/skill.md",
+      "title": "QUAL-MISSING-ROUTING-CLARITY review",
+      "summary": "1 diagnostics share the same code and source.",
+      "severity": "warning",
+      "diagnosticCodes": [
+        "QUAL-MISSING-ROUTING-CLARITY"
+      ],
+      "diagnosticIds": [
+        "QUAL-MISSING-ROUTING-CLARITY@skills/review/SKILL.md:L1#4"
+      ],
+      "affectedFiles": [
+        "skills/review/SKILL.md"
+      ],
+      "suggestedReviewOrder": [
+        "Inspect skills/review/SKILL.md",
+        "Apply the repair constraints before editing.",
+        "Rerun Renma scan."
+      ],
+      "llmHint": "Review these diagnostics together and make the smallest patch that satisfies their shared evidence."
+    },
+    {
+      "id": "dependency-review:skills/review/skill.md",
+      "title": "Dependency/reference review: skills/review/SKILL.md",
+      "summary": "1 dependency or reference diagnostics affect the same source.",
+      "severity": "warning",
+      "diagnosticCodes": [
+        "MAINT-REFERENCE-DEPRECATED-ASSET"
+      ],
+      "diagnosticIds": [
+        "MAINT-REFERENCE-DEPRECATED-ASSET@skills/review/SKILL.md:L8#6"
+      ],
+      "affectedAssets": [
+        "context.inactive",
+        "skill.review"
+      ],
+      "affectedFiles": [
+        "contexts/inactive.md",
+        "skills/review/SKILL.md"
+      ],
+      "suggestedReviewOrder": [
+        "Inspect declared references in contexts/inactive.md",
+        "Inspect declared references in skills/review/SKILL.md",
+        "Resolve intended target context.inactive",
+        "Resolve intended target skill.review",
+        "Rerun Renma catalog or graph to verify relationships."
+      ],
+      "llmHint": "Repair related references in one patch so catalog and graph output remain consistent."
+    },
+    {
+      "id": "unknown-reference:skills/review/skill.md",
+      "title": "Unresolved reference review: skills/review/SKILL.md",
+      "summary": "2 unresolved reference diagnostics share a source and should be repaired as one dependency decision.",
+      "severity": "warning",
+      "diagnosticCodes": [
+        "META-UNKNOWN-DEPENDENCY",
+        "META-UNKNOWN-REFERENCE"
+      ],
+      "diagnosticIds": [
+        "META-UNKNOWN-DEPENDENCY@skills/review/SKILL.md:L8#7",
+        "META-UNKNOWN-REFERENCE@skills/review/SKILL.md:L8#5"
+      ],
+      "affectedAssets": [
+        "context.unknown",
+        "skill.review"
+      ],
+      "affectedFiles": [
+        "skills/review/SKILL.md"
+      ],
+      "suggestedReviewOrder": [
+        "Inspect declared references in skills/review/SKILL.md",
+        "Resolve intended target context.unknown",
+        "Resolve intended target skill.review",
+        "Rerun Renma catalog or graph to verify relationships."
+      ],
+      "llmHint": "Look for typos, renamed files, or missing declared assets before adding anything new."
+    }
+  ],
+  "exitThreshold": "high"
+}

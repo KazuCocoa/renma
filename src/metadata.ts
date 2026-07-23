@@ -1,12 +1,16 @@
 import type { AssetMetadata, AssetStatus } from "./model.js";
 import { inspectAgentSkill } from "./agent-skills.js";
+import {
+  DIAGNOSTIC_IDS,
+  withDiagnosticId,
+  type DiagnosticId,
+} from "./diagnostic-ids.js";
+import type { Diagnostic, Evidence } from "./types/diagnostics.js";
 import type {
-  Diagnostic,
-  Evidence,
   MetadataFieldEvidence,
   MetadataValue,
   ParsedDocument,
-} from "./types.js";
+} from "./types/metadata.js";
 import { isIsoDate, parseDayDuration } from "./freshness.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { estimateTokens } from "./token-estimator.js";
@@ -456,12 +460,14 @@ export function parseAssetMetadata(document: ParsedDocument): {
 
   if (rawStatus !== undefined && status === undefined) {
     const evidence = metadataFieldEvidence(source, "status");
-    diagnostics.push({
-      severity: "warning",
-      path: document.artifact.path,
-      message: `Invalid status "${rawStatus}". Expected one of: ${STATUSES.join(", ")}.`,
-      ...(evidence ? { evidence } : {}),
-    });
+    diagnostics.push(
+      withDiagnosticId(DIAGNOSTIC_IDS.META_INVALID_STATUS, {
+        severity: "warning",
+        path: document.artifact.path,
+        message: `Invalid status "${rawStatus}". Expected one of: ${STATUSES.join(", ")}.`,
+        ...(evidence ? { evidence } : {}),
+      }),
+    );
   }
 
   assignOptional(metadata, "id", optionalText(metadataText(source.values.id)));
@@ -549,6 +555,7 @@ export function parseAssetMetadata(document: ParsedDocument): {
         source,
         "last_reviewed_at",
         `Invalid last_reviewed_at "${lastReviewedAt}". Expected ISO date YYYY-MM-DD.`,
+        DIAGNOSTIC_IDS.META_INVALID_LAST_REVIEWED_AT,
       ),
     );
   }
@@ -560,6 +567,7 @@ export function parseAssetMetadata(document: ParsedDocument): {
         source,
         "expires_at",
         `Invalid expires_at "${expiresAt}". Expected ISO date YYYY-MM-DD.`,
+        DIAGNOSTIC_IDS.META_INVALID_EXPIRES_AT,
       ),
     );
   }
@@ -574,6 +582,7 @@ export function parseAssetMetadata(document: ParsedDocument): {
         source,
         "review_cycle",
         `Invalid review_cycle "${reviewCycle}". Expected supported ISO 8601 day duration such as P90D.`,
+        DIAGNOSTIC_IDS.META_INVALID_REVIEW_CYCLE,
       ),
     );
   }
@@ -793,14 +802,16 @@ function invalidMetadataDiagnostic(
   source: OperationalMetadataSource,
   field: string,
   message: string,
+  code?: DiagnosticId,
 ): Diagnostic {
   const evidence = metadataFieldEvidence(source, field);
-  return {
+  const diagnostic: Diagnostic = {
     severity: "warning",
     path: document.artifact.path,
     message,
     ...(evidence ? { evidence } : {}),
   };
+  return code ? withDiagnosticId(code, diagnostic) : diagnostic;
 }
 
 function operationalMetadataSource(

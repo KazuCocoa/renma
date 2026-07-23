@@ -20,11 +20,31 @@ export default tseslint.config(
   eslintConfigPrettier,
   {
     files: ["src/**/*.ts", "test/**/*.ts"],
+    languageOptions: {
+      parserOptions: {
+        project: ["./tsconfig.json", "./tsconfig.test.json"],
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
     rules: {
       "@typescript-eslint/consistent-type-imports": [
         "error",
         { prefer: "type-imports" },
       ],
+      "@typescript-eslint/no-floating-promises": [
+        "error",
+        {
+          allowForKnownSafeCalls: [
+            {
+              from: "package",
+              name: ["describe", "it", "test"],
+              package: "node:test",
+            },
+          ],
+        },
+      ],
+      "@typescript-eslint/no-misused-promises": "error",
+      "@typescript-eslint/switch-exhaustiveness-check": "error",
     },
   },
 );

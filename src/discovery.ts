@@ -2,13 +2,10 @@ import { createHash } from "node:crypto";
 import { lstatSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type {
-  Artifact,
-  AssetClassificationEvidence,
-  ArtifactKind,
-  Diagnostic,
-  ScanConfig,
-} from "./types.js";
+import type { Artifact, ArtifactKind } from "./types/artifact.js";
+import type { AssetClassificationEvidence } from "./types/classification.js";
+import type { Diagnostic } from "./types/diagnostics.js";
+import type { ScanConfig } from "./types/configuration.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import {
   safeRepositoryPath,
