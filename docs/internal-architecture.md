@@ -182,21 +182,30 @@ catalog, prepares only catalog and Context Lens and therefore does not validate
 Agent Skills, build Skill Discovery, classify assets, collect security-policy
 evidence, or capture command-only repository path states.
 
-Readiness builds graph and scan evidence plus its compact Skill Discovery
-summary/checks from one `RepositorySnapshot`. Access to `skillDiscovery`
-prepares the dependent catalog and Agent Skills projections at most once and
-reuses the same immutable index used by the Discovery graph and Skill Index.
-Readiness does not call `scan`, `skill-index`, repository discovery, or route
-preparation independently to obtain that evidence.
+Direct Readiness builds graph and scan evidence plus its compact Skill
+Discovery summary/checks from one `RepositorySnapshot`. Its default projection
+option accesses `skillDiscovery`, which prepares the dependent catalog and
+Agent Skills projections at most once and reuses the same immutable index used
+by the Discovery graph and Skill Index. Readiness does not call `scan`,
+`skill-index`, repository discovery, or route preparation independently to
+obtain that evidence. An internal projection option lets consumers that retain
+the pre-0.23.0 Readiness subset omit that access entirely; it does not trigger
+a second collection or parse.
 
 BOM builds graph, scan, its existing Readiness subset, policy inventory, and
 diagnostics from the same snapshot and core; the 0.23.0 Discovery Readiness
-addition is intentionally not projected into BOM, semantic diff, or CI. A
-working-tree mutation after collection cannot influence a later lazy
-projection. Caller attempts to mutate snapshot arrays, nested objects,
-configuration, or path collections also fail without changing the projection
-input. A new collection is required to observe different facts. This keeps
-commands from combining independently recollected repository states.
+addition is intentionally not projected into BOM, semantic diff, or CI.
+Semantic diff requests the internal Readiness subset without Skill Discovery
+for both refs, and CI inherits that behavior through semantic diff. BOM builds
+the subset without requesting Discovery. Defensive `discovery.*` output
+filters remain, but these consumers do not prepare the projection. Existing
+catalog and Agent Skills preparation still occurs only where graph, scan, or
+Readiness already requires it, not as omitted Discovery work. A working-tree
+mutation after collection cannot influence a later lazy projection. Caller
+attempts to mutate snapshot arrays, nested objects, configuration, or path
+collections also fail without changing the projection input. A new collection
+is required to observe different facts. This keeps commands from combining
+independently recollected repository states.
 
 ## CLI Commands Have One Registered Contract
 

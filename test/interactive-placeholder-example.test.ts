@@ -63,16 +63,22 @@ test("interactive-placeholder is a clean, ready thin Agent Skill example", async
   }
 
   assert.equal(
-    readinessReport.checks
-      .filter((check) => check.id !== "discovery.publication")
-      .every((check) => check.status === "pass"),
+    readinessReport.checks.every((check) => check.status === "pass"),
     true,
-    "Every non-publication readiness check should pass for the onboarding example.",
+    "Every readiness check should pass for the onboarding example.",
   );
   assert.equal(
     readinessReport.checks.find((check) => check.id === "discovery.publication")
       ?.status,
-    "warn",
+    "pass",
+  );
+  assert.equal(
+    readinessReport.summary.skillDiscovery.adoptionState,
+    "not-adopted",
+  );
+  assert.equal(
+    readinessReport.summary.skillDiscovery.routeEligibleSkillCount,
+    1,
   );
   assert.equal(
     readinessReport.summary.skillDiscovery.publishedEntrypointCount,

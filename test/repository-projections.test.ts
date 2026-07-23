@@ -212,6 +212,44 @@ test("Readiness prepares and reuses the Skill Discovery projection at most once"
   assert.deepEqual(first.summary.skillDiscovery, second.summary.skillDiscovery);
 });
 
+test("Readiness omits Skill Discovery preparation when its projection is excluded", async (t) => {
+  const { root } = await repositoryFixture(t);
+  let parseCount = 0;
+  const projectionCounts = new Map<RepositoryProjectionName, number>();
+  const snapshot = await collectRepositorySnapshot(
+    root,
+    {},
+    collectionInstrumentation(
+      undefined,
+      () => {
+        parseCount += 1;
+      },
+      (projection) =>
+        projectionCounts.set(
+          projection,
+          (projectionCounts.get(projection) ?? 0) + 1,
+        ),
+    ),
+  );
+
+  const first = readinessFromRepositorySnapshot(snapshot, {
+    includeSkillDiscovery: false,
+  });
+  const second = readinessFromRepositorySnapshot(snapshot, {
+    includeSkillDiscovery: false,
+  });
+
+  assert.equal(parseCount, snapshot.scannedFileCount);
+  assert.equal(projectionCounts.has("skill-discovery"), false);
+  assert.equal(projectionCounts.get("catalog"), 1);
+  assert.equal(projectionCounts.get("agent-skills"), 1);
+  assert.equal(projectionCounts.get("classifications"), 1);
+  assert.equal(projectionCounts.get("security-policies"), 1);
+  assert.equal(projectionCounts.get("context-lens"), 1);
+  assert.equal(projectionCounts.get("repository-paths"), 1);
+  assert.deepEqual(first, second);
+});
+
 test("a working tree mutation cannot partially affect lazy projections", async (t) => {
   const fixture = await repositoryFixture(t);
   const { root } = fixture;

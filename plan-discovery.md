@@ -786,8 +786,10 @@ continuations or publication.
 
 Repositories without Discovery metadata keep their current scan, catalog,
 graph, diff, CI, Trust Graph, and BOM behavior. Readiness adds a stable
-zero-valued `summary.skillDiscovery` and neutral Discovery checks when no
-eligible Skills exist. The dedicated Discovery graph view does not add
+neutral inventory `summary.skillDiscovery`. A `not-adopted` repository may
+still report route-eligible and unrouted Skill counts, but publication is not
+required, structural roots are not promoted, and coverage remains explicitly
+unevaluated without warnings. The dedicated Discovery graph view does not add
 continuation edges to existing graph views; `skill-index` is an independent
 report. `renma init` continues to omit repository-wide Discovery adoption;
 authors may set the strict `skill_discovery.adopted` config field explicitly.
@@ -902,13 +904,21 @@ contracts automatically.
   `discovery.coverage`, `discovery.unrouted_skills`, and
   `discovery.cycle_review` checks with compact evidence that references
   existing structured facts and diagnostic codes;
-- treat adopted coverage as authoritative while partial and not-adopted
-  coverage remain descriptive, and keep cycle presence review-only;
+- treat adopted coverage as authoritative, partial coverage with an effective
+  entrypoint as descriptive, and not-adopted or no-entrypoint coverage as
+  explicitly unevaluated; keep `not-adopted` publication and coverage neutral
+  and cycle presence review-only;
 - add no Discovery scoring weight and do not copy Discovery diagnostics into
   the Readiness diagnostic collection, avoiding a second penalty; and
 - preserve the Discovery graph, `renma.skill-index.v1`, route and eligibility
   semantics, exact diagnostic wording/evidence/repair contracts, and deferred
   semantic diff, CI, Trust Graph, BOM, ownership, runtime, and telemetry work.
+
+Only direct Readiness requests its Discovery projection in this slice.
+Semantic diff requests the internal Readiness subset without Discovery for
+both refs, CI inherits that path, and BOM continues to build its existing
+subset without preparing or serializing Discovery. Defensive output filters
+remain compatibility guards; no second collection or parse is introduced.
 
 ### Later integrations
 

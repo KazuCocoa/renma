@@ -453,7 +453,9 @@ async function snapshot(
   await execFile("tar", ["-xf", archivePath, "-C", root]);
   const target = relativeTarget === "." ? root : join(root, relativeTarget);
   const [readinessReport, graphReport] = await Promise.all([
-    readiness(target, snapshotOverrides(repoRoot, root, overrides)),
+    readiness(target, snapshotOverrides(repoRoot, root, overrides), {
+      includeSkillDiscovery: false,
+    }),
     graph(target, snapshotOverrides(repoRoot, root, overrides)),
   ]);
   return {

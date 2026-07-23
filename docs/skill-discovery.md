@@ -201,7 +201,10 @@ Coverage always has repository scope and uses one of three modes:
 
 - `not-evaluated`: Discovery is `not-adopted`, `incomplete`, or `partial`
   without an effective published entrypoint. Reachable and not-reached arrays
-  remain empty.
+  remain empty. Readiness reports this as unevaluated rather than presenting
+  the empty arrays as `0 reachable` and `0 not-reached`. The check is neutral
+  for `not-adopted`; it warns only when Discovery metadata or explicit
+  repository-wide adoption makes the missing effective entrypoint actionable.
 - `descriptive`: adoption is `partial` and at least one effective published
   entrypoint exists. Reachability is review evidence, not a repository-wide
   completeness claim, and not-reached Skills do not emit coverage warnings.
@@ -378,11 +381,18 @@ diagnostic payload.
 
 The five Readiness checks use the established lower-case dotted ID style:
 
-- `discovery.publication` reviews explicit effective publication only;
+- `discovery.publication` reviews explicit effective publication only.
+  `not-adopted` repositories pass because publication is not required and
+  structural roots are never inferred as published. Partial or incomplete
+  adoption without an effective published entrypoint warns, while valid
+  effective publication and existing publication diagnostics remain
+  authoritative;
 - `discovery.route_validity` aggregates existing resolution and usability
   reasons;
 - `discovery.coverage` is authoritative only for explicit repository-wide
-  adoption and otherwise descriptive;
+  adoption, descriptive only for partial adoption with an effective
+  entrypoint, and explicitly unevaluated when Discovery is not adopted or no
+  effective entrypoint exists;
 - `discovery.unrouted_skills` preserves the existing unpublished/no-incoming
   usable continuation definition and does not reject intentional standalone
   Skills automatically; and
@@ -395,6 +405,13 @@ diagnostics are referenced rather than copied or penalized again. Use
 `renma skill-index` for the complete static report and
 `renma graph --view discovery` for topology and source evidence.
 
+The direct Readiness command prepares the memoized Discovery projection once.
+Its internal projection boundary is disabled for semantic diff snapshots, so
+CI inherits the same exclusion. BOM continues to build and serialize its
+pre-0.23.0 Readiness subset without preparing Discovery for that subset. These
+paths retain their defensive output filters, but do not perform unnecessary
+Discovery projection work.
+
 ## Compatibility and future work
 
 Continuation and publication data remain separate from
@@ -403,8 +420,9 @@ composition, and impact graph outputs remain route/publication-free. Catalog,
 diff, CI report, Trust Graph, BOM, ownership, init, scaffold, guide, and
 suggestion contracts are unchanged. Readiness changes only through the
 additive 0.23.0 summary and checks. A repository without Discovery metadata or
-adoption remains valid and reports a neutral zero-valued Readiness Discovery
-summary with `not-adopted`.
+adoption remains valid and warning-free. Its `not-adopted` Readiness summary is
+a neutral inventory summary: route-eligible, unrouted, and route counts remain
+visible, while publication is not required and coverage is not evaluated.
 
 The current single-repository static Discovery core is stable after 0.22.4,
 and its first downstream projection ships in Readiness 0.23.0. A
@@ -412,4 +430,6 @@ and its first downstream projection ships in Readiness 0.23.0. A
 optional gating, Trust Graph, BOM, ownership, observed Markdown references,
 richer visualization, authoring assistance, scaffold, init, guide, suggestion,
 and multi-repository federation remain independent later decisions informed by
-operational trials.
+operational trials. Their output contracts contain no Discovery additions, and
+the 0.23.0 Readiness integration adds no Discovery preparation to deferred
+diff, CI, BOM, or Trust Graph output paths.

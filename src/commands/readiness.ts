@@ -138,6 +138,10 @@ export interface ReadinessCheck {
   }>;
 }
 
+interface ReadinessProjectionOptions {
+  includeSkillDiscovery?: boolean;
+}
+
 export async function runReadinessCommand(
   targetPath: string,
   options: { format: ReadinessFormat; overrides?: ConfigOverrides },
@@ -150,15 +154,18 @@ export async function runReadinessCommand(
 export async function readiness(
   targetPath: string,
   overrides: ConfigOverrides = {},
+  projectionOptions: ReadinessProjectionOptions = {},
 ): Promise<ReadinessReport> {
   return readinessFromRepositorySnapshot(
     await collectRepositorySnapshot(targetPath, overrides),
+    projectionOptions,
   );
 }
 
 /** Derive graph and scan inputs from the same repository evidence boundary. */
 export function readinessFromRepositorySnapshot(
   snapshot: RepositorySnapshot,
+  projectionOptions: ReadinessProjectionOptions = {},
 ): ReadinessReport {
   const graphReport = graphFromRepositorySnapshot(snapshot);
   const scanResult = scanFromRepositorySnapshot(snapshot, {
@@ -171,7 +178,9 @@ export function readinessFromRepositorySnapshot(
     scanResult.contextLens,
     scanResult.securityPolicyInventory,
     scanResult.agentSkills,
-    snapshot.skillDiscovery,
+    projectionOptions.includeSkillDiscovery === false
+      ? undefined
+      : snapshot.skillDiscovery,
   );
 }
 
@@ -442,6 +451,28 @@ function discoveryPublicationCheck(
   index: SkillDiscoveryIndex | undefined,
   summary: SkillDiscoveryReadinessSummary,
 ): ReadinessCheck {
+  if (!index) {
+    return {
+      id: "discovery.publication",
+      title: "Skill Discovery publication",
+      status: "pass",
+      severity: "info",
+      summary:
+        "No Discovery projection was requested, so publication is neutral.",
+    };
+  }
+
+  if (index.adoption.state === "not-adopted") {
+    return {
+      id: "discovery.publication",
+      title: "Skill Discovery publication",
+      status: "pass",
+      severity: "info",
+      summary:
+        "Skill Discovery is not adopted; no published entrypoint is required, and structural roots are not inferred as published.",
+    };
+  }
+
   const diagnostics = discoveryDiagnostics(
     index,
     DISCOVERY_PUBLICATION_DIAGNOSTIC_IDS,
@@ -456,16 +487,6 @@ function discoveryPublicationCheck(
       evidence: diagnosticEvidence(diagnostics),
     };
   }
-  if (summary.routeEligibleSkillCount === 0) {
-    return {
-      id: "discovery.publication",
-      title: "Skill Discovery publication",
-      status: "pass",
-      severity: "info",
-      summary:
-        "No Discovery-eligible Skills exist, so no published entrypoint is required.",
-    };
-  }
   if (summary.publishedEntrypointCount > 0) {
     return {
       id: "discovery.publication",
@@ -475,14 +496,36 @@ function discoveryPublicationCheck(
       summary: `${summary.publishedEntrypointCount} valid effective published entrypoint${summary.publishedEntrypointCount === 1 ? " is" : "s are"} explicitly declared.`,
     };
   }
-  return {
-    id: "discovery.publication",
-    title: "Skill Discovery publication",
-    status: "warn",
-    severity: "warning",
-    summary:
-      "Discovery-eligible Skills exist, but no valid effective published entrypoint is explicitly declared; structural roots are not inferred as published.",
-  };
+
+  switch (index.adoption.state) {
+    case "partial":
+      return {
+        id: "discovery.publication",
+        title: "Skill Discovery publication",
+        status: "warn",
+        severity: "warning",
+        summary:
+          "Skill Discovery metadata is present, but no valid effective published entrypoint is explicitly declared; structural roots are not inferred as published.",
+      };
+    case "incomplete":
+      return {
+        id: "discovery.publication",
+        title: "Skill Discovery publication",
+        status: "warn",
+        severity: "warning",
+        summary:
+          "Repository-wide Skill Discovery is adopted, but no valid effective published entrypoint exists; structural roots are not inferred as published.",
+      };
+    case "adopted":
+      return {
+        id: "discovery.publication",
+        title: "Skill Discovery publication",
+        status: "warn",
+        severity: "warning",
+        summary:
+          "Repository-wide Skill Discovery has no valid effective published entrypoint; structural roots are not inferred as published.",
+      };
+  }
 }
 
 function discoveryRouteValidityCheck(
@@ -535,59 +578,75 @@ function discoveryCoverageCheck(
   index: SkillDiscoveryIndex | undefined,
   summary: SkillDiscoveryReadinessSummary,
 ): ReadinessCheck {
-  if (!index || summary.routeEligibleSkillCount === 0) {
+  if (!index) {
     return {
       id: "discovery.coverage",
       title: "Skill Discovery coverage",
       status: "pass",
       severity: "info",
-      summary:
-        "No Discovery-eligible Skills exist, so repository-wide coverage is neutral.",
+      summary: "No Discovery projection was requested, so coverage is neutral.",
     };
   }
-  if (index.coverage.mode === "authoritative") {
-    if (summary.notReachedSkillCount === 0) {
+
+  switch (index.coverage.mode) {
+    case "not-evaluated": {
+      if (index.coverage.reason === "discovery-not-adopted") {
+        return {
+          id: "discovery.coverage",
+          title: "Skill Discovery coverage",
+          status: "pass",
+          severity: "info",
+          summary:
+            "Repository-wide Skill Discovery coverage was not evaluated because Skill Discovery is not adopted.",
+        };
+      }
+      const actionable =
+        index.adoption.discoveryMetadataPresent ||
+        index.adoption.repositoryWideAdopted;
+      return {
+        id: "discovery.coverage",
+        title: "Skill Discovery coverage",
+        status: actionable ? "warn" : "pass",
+        severity: actionable ? "warning" : "info",
+        summary:
+          "Repository-wide Skill Discovery coverage cannot be evaluated because no valid effective published entrypoint exists; structural roots are not inferred as entrypoints.",
+      };
+    }
+    case "descriptive":
       return {
         id: "discovery.coverage",
         title: "Skill Discovery coverage",
         status: "pass",
         severity: "info",
-        summary: `All ${summary.routeEligibleSkillCount} Discovery-eligible Skills are reachable under explicit repository-wide adoption.`,
+        summary: `${summary.reachableSkillCount} reachable and ${summary.notReachedSkillCount} not-reached eligible Skills are descriptive only because repository-wide Skill Discovery is not adopted.`,
+      };
+    case "authoritative": {
+      if (summary.notReachedSkillCount === 0) {
+        return {
+          id: "discovery.coverage",
+          title: "Skill Discovery coverage",
+          status: "pass",
+          severity: "info",
+          summary: `All ${summary.routeEligibleSkillCount} Discovery-eligible Skills are reachable under explicit repository-wide adoption.`,
+        };
+      }
+      const diagnostics = discoveryDiagnostics(
+        index,
+        new Set([DIAGNOSTIC_IDS.DISCOVERY_UNREACHABLE_ELIGIBLE_SKILL]),
+      );
+      const status =
+        diagnostics.length > 0
+          ? readinessStatusForDiagnostics(diagnostics)
+          : ({ status: "warn", severity: "warning" } as const);
+      return {
+        id: "discovery.coverage",
+        title: "Skill Discovery coverage",
+        ...status,
+        summary: `${summary.notReachedSkillCount} of ${summary.routeEligibleSkillCount} Discovery-eligible Skills are not reached under explicit repository-wide adoption.`,
+        evidence: diagnosticEvidence(diagnostics),
       };
     }
-    const diagnostics = discoveryDiagnostics(
-      index,
-      new Set([DIAGNOSTIC_IDS.DISCOVERY_UNREACHABLE_ELIGIBLE_SKILL]),
-    );
-    const status =
-      diagnostics.length > 0
-        ? readinessStatusForDiagnostics(diagnostics)
-        : ({ status: "warn", severity: "warning" } as const);
-    return {
-      id: "discovery.coverage",
-      title: "Skill Discovery coverage",
-      ...status,
-      summary: `${summary.notReachedSkillCount} of ${summary.routeEligibleSkillCount} Discovery-eligible Skills are not reached under explicit repository-wide adoption.`,
-      evidence: diagnosticEvidence(diagnostics),
-    };
   }
-  if (index.adoption.repositoryWideAdopted) {
-    return {
-      id: "discovery.coverage",
-      title: "Skill Discovery coverage",
-      status: "warn",
-      severity: "warning",
-      summary:
-        "Repository-wide Discovery adoption is enabled, but coverage is not evaluated because no valid effective published entrypoint exists.",
-    };
-  }
-  return {
-    id: "discovery.coverage",
-    title: "Skill Discovery coverage",
-    status: "pass",
-    severity: "info",
-    summary: `${summary.reachableSkillCount} reachable and ${summary.notReachedSkillCount} not-reached eligible Skills are descriptive only because repository-wide Discovery coverage is not adopted.`,
-  };
 }
 
 function discoveryUnroutedSkillsCheck(

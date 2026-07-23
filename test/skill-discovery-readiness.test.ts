@@ -8,6 +8,8 @@ import {
   formatReadinessJson,
   formatReadinessMarkdown,
   readiness,
+  readinessFromRepositorySnapshot,
+  runReadinessCommand,
   type ReadinessCheck,
 } from "../src/commands/readiness.js";
 import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
@@ -211,7 +213,59 @@ test("partial coverage and unrouted Skills stay descriptive and non-authoritativ
   assert.notEqual(report.level, "not_ready");
 });
 
-test("missing publication never promotes structural roots and retains route counts", async (t) => {
+test("not-adopted repositories retain inventory without publication or coverage warnings", async (t) => {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-readiness-discovery-not-adopted-",
+    testContext: t,
+  });
+  await fixture.skill("first", {
+    id: "skill.first",
+    owner: "qa",
+    status: "stable",
+  });
+  await fixture.skill("second", {
+    id: "skill.second",
+    owner: "qa",
+    status: "stable",
+  });
+
+  const snapshot = await collectRepositorySnapshot(fixture.root);
+  const report = readinessFromRepositorySnapshot(snapshot);
+  const withoutDiscovery = readinessFromRepositorySnapshot(snapshot, {
+    includeSkillDiscovery: false,
+  });
+  const publication = check(report.checks, "discovery.publication");
+  const coverage = check(report.checks, "discovery.coverage");
+  const cli = await captureStdout(() =>
+    runReadinessCommand(fixture.root, { format: "json" }),
+  );
+
+  assert.equal(report.summary.skillDiscovery.adoptionState, "not-adopted");
+  assert.equal(report.summary.skillDiscovery.routeEligibleSkillCount, 2);
+  assert.equal(report.summary.skillDiscovery.unroutedSkillCount, 2);
+  assert.equal(publication.status, "pass");
+  assert.equal(publication.severity, "info");
+  assert.match(publication.summary, /no published entrypoint is required/i);
+  assert.match(publication.summary, /structural roots are not inferred/i);
+  assert.equal(coverage.status, "pass");
+  assert.equal(coverage.severity, "info");
+  assert.match(coverage.summary, /was not evaluated/i);
+  assert.doesNotMatch(coverage.summary, /\d+ reachable/i);
+  assert.deepEqual(
+    discoveryChecks(report.checks).map((item) => item.status),
+    ["pass", "pass", "pass", "pass", "pass"],
+  );
+  assert.equal(report.score, withoutDiscovery.score);
+  assert.equal(report.level, withoutDiscovery.level);
+  assert.deepEqual(report.diagnostics, withoutDiscovery.diagnostics);
+  assert.equal(cli.code, report.level === "ready" ? 0 : 1);
+  assert.equal(
+    (JSON.parse(cli.stdout) as { score: number }).score,
+    report.score,
+  );
+});
+
+test("partial adoption without publication warns without promoting structural roots", async (t) => {
   const fixture = await RepositoryFixture.create({
     prefix: "renma-readiness-discovery-no-publication-",
     testContext: t,
@@ -230,11 +284,41 @@ test("missing publication never promotes structural roots and retains route coun
 
   const report = await readiness(fixture.root);
   const publication = check(report.checks, "discovery.publication");
+  const coverage = check(report.checks, "discovery.coverage");
 
+  assert.equal(report.summary.skillDiscovery.adoptionState, "partial");
   assert.equal(report.summary.skillDiscovery.publishedEntrypointCount, 0);
   assert.equal(report.summary.skillDiscovery.usableRouteCount, 1);
   assert.equal(publication.status, "warn");
   assert.match(publication.summary, /structural roots are not inferred/);
+  assert.equal(coverage.status, "warn");
+  assert.match(coverage.summary, /cannot be evaluated/);
+  assert.match(coverage.summary, /structural roots are not inferred/);
+});
+
+test("incomplete repository adoption warns when no effective entrypoint exists", async (t) => {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-readiness-discovery-incomplete-",
+    testContext: t,
+  });
+  await fixture.writeConfig({ skill_discovery: { adopted: true } });
+  await fixture.skill("only", {
+    id: "skill.only",
+    owner: "qa",
+    status: "stable",
+  });
+
+  const report = await readiness(fixture.root);
+  const publication = check(report.checks, "discovery.publication");
+  const coverage = check(report.checks, "discovery.coverage");
+
+  assert.equal(report.summary.skillDiscovery.adoptionState, "incomplete");
+  assert.equal(report.summary.skillDiscovery.routeEligibleSkillCount, 1);
+  assert.equal(report.summary.skillDiscovery.publishedEntrypointCount, 0);
+  assert.equal(publication.status, "warn");
+  assert.match(publication.summary, /Repository-wide Skill Discovery/);
+  assert.equal(coverage.status, "warn");
+  assert.match(coverage.summary, /cannot be evaluated/);
 });
 
 test("route validity aggregates existing structured unusable reasons and diagnostics", async (t) => {
@@ -483,4 +567,20 @@ function check(
   const result = checks.find((item) => item.id === id);
   assert.ok(result, `missing ${id}`);
   return result;
+}
+
+async function captureStdout(
+  callback: () => Promise<number>,
+): Promise<{ code: number; stdout: string }> {
+  const stdoutWrite = process.stdout.write;
+  let stdout = "";
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    stdout += chunk.toString();
+    return true;
+  }) as typeof process.stdout.write;
+  try {
+    return { code: await callback(), stdout };
+  } finally {
+    process.stdout.write = stdoutWrite;
+  }
 }

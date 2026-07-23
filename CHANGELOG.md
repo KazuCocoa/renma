@@ -30,9 +30,16 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   one repository collection, one parse per artifact, one catalog and Agent
   Skills preparation, and at most one Discovery index preparation.
 - Documented authoritative adopted-mode coverage separately from descriptive
-  partial/not-adopted coverage. Partial coverage does not lower Readiness, and
-  cyclic usable route components remain warning-level review evidence rather
-  than automatic hard failures.
+  partial coverage and explicitly unevaluated not-adopted/no-entrypoint
+  coverage. Not-adopted repositories keep useful Skill and route inventory
+  counts while publication and coverage remain neutral, warning-free policy
+  checks. Partial coverage does not lower Readiness, and cyclic usable route
+  components remain warning-level review evidence rather than automatic hard
+  failures.
+- Changed semantic diff to request its existing Readiness subset without
+  preparing Skill Discovery for either ref; CI inherits the same projection
+  boundary. Direct Readiness still prepares the memoized projection at most
+  once, while BOM continues not to prepare or serialize Discovery Readiness.
 - Kept the 0.23.0 checks visibility-only for scoring. They add no independent
   score weight, do not copy Discovery diagnostics into Readiness diagnostics,
   and therefore do not penalize existing authoritative evidence twice.
@@ -49,7 +56,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   normalization remain unchanged.
 - Semantic diff, CI report and optional gating, Trust Graph, Repository Context
   BOM, ownership, richer visualization, federation, runtime selection,
-  execution, and telemetry integration remain deferred.
+  execution, and telemetry integration remain deferred. Readiness adds no
+  Discovery preparation to those deferred output contracts. No diff, CI, BOM,
+  or gating fields were added.
 
 ## [0.22.6] - 2026-07-22
 
