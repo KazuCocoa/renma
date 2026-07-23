@@ -14,7 +14,8 @@ unreachable warnings; 0.22.3 implements the versioned
 `renma.skill-index.v1` report and stdout-only `skill-index` command with compact
 Markdown and exact optional focus; 0.22.4 implements deterministic route-cycle
 review diagnostics over the authoritative usable continuation graph and closes
-the current static core stabilization sequence.
+the static core stabilization sequence; 0.23.0 implements an additive
+repository-wide Readiness projection over that unchanged prepared index.
 
 Baseline: Renma 0.21.0
 
@@ -63,6 +64,11 @@ Readiness, diff, CI report, Trust Graph, BOM, ownership, scaffold, init, guide,
 suggestion, or richer visualization contracts. The 0.22.4 slice adds
 deterministic cycle review warnings without changing route, reachability,
 coverage, report-shape, rendering, or downstream-integration contracts.
+The 0.23.0 slice adds compact Discovery counts and five focused checks to
+Readiness without changing Discovery core semantics, `renma.skill-index.v1`,
+the Discovery graph, diagnostic payloads, or scoring weights. Semantic diff,
+CI report, Trust Graph, BOM, ownership, and runtime integrations remain
+deferred.
 
 The remainder of this document retains the complete design direction so later
 slices can be evaluated consistently. Publication and adoption describe 0.22.1
@@ -70,6 +76,7 @@ behavior; reachability, evaluated coverage, and global adopted-mode
 unreachable diagnostics describe 0.22.2 behavior; the versioned report and
 command describe 0.22.3 behavior.
 Route-cycle review and static-core stabilization describe 0.22.4 behavior.
+The compact Readiness projection describes 0.23.0 behavior.
 
 ## Problem
 
@@ -138,6 +145,7 @@ Repository authors keep workflow and continuation policy in source SKILL.md
   -> Skill Discovery resolves and validates a derived continuation graph
   -> graph --view discovery emits the first deterministic route projection
   -> skill-index emits the versioned publication/reachability-oriented index
+  -> readiness summarizes repository-level Discovery health from that index
   -> agents and humans open the source Skills and apply their conditions
   -> humans review repository changes
 ```
@@ -777,11 +785,12 @@ flat string-valued `metadata.renma.*`; non-Skill assets cannot declare Skill
 continuations or publication.
 
 Repositories without Discovery metadata keep their current scan, catalog,
-graph, Readiness, diff, CI, Trust Graph, and BOM behavior. The dedicated
-Discovery graph view does not add continuation edges to existing graph views;
-`skill-index` is an independent report. `renma init` continues to omit
-repository-wide Discovery adoption; authors may set the strict
-`skill_discovery.adopted` config field explicitly.
+graph, diff, CI, Trust Graph, and BOM behavior. Readiness adds a stable
+zero-valued `summary.skillDiscovery` and neutral Discovery checks when no
+eligible Skills exist. The dedicated Discovery graph view does not add
+continuation edges to existing graph views; `skill-index` is an independent
+report. `renma init` continues to omit repository-wide Discovery adoption;
+authors may set the strict `skill_discovery.adopted` config field explicitly.
 
 PR #89 should not be rebased, cherry-picked, restored, or used as the code
 baseline. Implementation starts from the 0.21.0 shared repository snapshot,
@@ -792,7 +801,7 @@ canonical metadata parser, diagnostics, and current CLI conventions.
 After static-core stabilization, operational trials may inform:
 
 - non-authoritative observed Skill references or route candidates;
-- Readiness, semantic diff, CI summary, suppression, and optional gating;
+- semantic diff, CI summary, suppression, and optional gating;
 - richer route visualizations beyond the initial deterministic Mermaid view;
 - product and ownership projections from exact tags, stable IDs, and existing
   Context/Lens relationships;
@@ -882,22 +891,41 @@ stable. Operational trials may inform later integrations, but those decisions
 do not reopen the current route, publication, reachability, focus, or report
 contracts automatically.
 
+### 0.23.0: Skill Discovery Readiness integration
+
+- derive one compact `summary.skillDiscovery` from the memoized prepared
+  Discovery index already owned by the shared `RepositorySnapshot`;
+- expose adoption, publication, eligibility, reachability, unrouted, usable,
+  unusable, unresolved, and maximal cycle-component counts without embedding
+  the route graph or duplicating diagnostics;
+- add `discovery.publication`, `discovery.route_validity`,
+  `discovery.coverage`, `discovery.unrouted_skills`, and
+  `discovery.cycle_review` checks with compact evidence that references
+  existing structured facts and diagnostic codes;
+- treat adopted coverage as authoritative while partial and not-adopted
+  coverage remain descriptive, and keep cycle presence review-only;
+- add no Discovery scoring weight and do not copy Discovery diagnostics into
+  the Readiness diagnostic collection, avoiding a second penalty; and
+- preserve the Discovery graph, `renma.skill-index.v1`, route and eligibility
+  semantics, exact diagnostic wording/evidence/repair contracts, and deferred
+  semantic diff, CI, Trust Graph, BOM, ownership, runtime, and telemetry work.
+
 ### Later integrations
 
-Choose Readiness, diff, CI or optional gating, Trust Graph, BOM, ownership,
+Choose diff, CI or optional gating, Trust Graph, BOM, ownership,
 observed-reference, authoring, richer visualization, or federation additions
 only after operational trials. Each integration receives its own additive
 contract review.
 
 ## Open Design Questions
 
-These questions are intentionally later work and do not block the stable 0.22.x
-Discovery contracts:
+These questions are intentionally later work and do not block the stable
+0.23.0 Discovery and Readiness contracts:
 
 1. Do observed local Skill references provide enough review value to justify a
    separate non-authoritative projection?
-2. Which integration should follow first after report stability: semantic diff,
-   Readiness, or CI summary?
+2. Which integration should follow Readiness: semantic diff, CI summary, or an
+   independently reviewed optional gate?
 3. Can a useful product projection be derived from existing exact tags and
    Context/Lens identity without adding product metadata or a Product asset?
 4. Which route visualization remains readable in genuinely large cyclic or

@@ -178,6 +178,40 @@ test("scan, Readiness, and BOM reuse one collected core", async (t) => {
   for (const count of projectionCounts.values()) assert.equal(count, 1);
 });
 
+test("Readiness prepares and reuses the Skill Discovery projection at most once", async (t) => {
+  const { root } = await repositoryFixture(t);
+  let discoveryCount = 0;
+  let parseCount = 0;
+  const projectionCounts = new Map<RepositoryProjectionName, number>();
+  const snapshot = await collectRepositorySnapshot(
+    root,
+    {},
+    collectionInstrumentation(
+      () => {
+        discoveryCount += 1;
+      },
+      () => {
+        parseCount += 1;
+      },
+      (projection) =>
+        projectionCounts.set(
+          projection,
+          (projectionCounts.get(projection) ?? 0) + 1,
+        ),
+    ),
+  );
+
+  const first = readinessFromRepositorySnapshot(snapshot);
+  const second = readinessFromRepositorySnapshot(snapshot);
+
+  assert.equal(discoveryCount, 1);
+  assert.equal(parseCount, snapshot.scannedFileCount);
+  assert.equal(projectionCounts.get("skill-discovery"), 1);
+  assert.equal(projectionCounts.get("catalog"), 1);
+  assert.equal(projectionCounts.get("agent-skills"), 1);
+  assert.deepEqual(first.summary.skillDiscovery, second.summary.skillDiscovery);
+});
+
 test("a working tree mutation cannot partially affect lazy projections", async (t) => {
   const fixture = await repositoryFixture(t);
   const { root } = fixture;

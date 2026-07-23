@@ -1,8 +1,9 @@
 # Renma Internal Architecture
 
-This document describes the 0.20.x maintainability architecture, including the
-additive `guide` command, its shipped interactive authoring protocol, and
-Declared Composition and Declared Impact analysis.
+This document describes the maintainability architecture through 0.23.0,
+including shared immutable repository projections, the additive `guide`
+command, Declared Composition and Declared Impact analysis, and the Skill
+Discovery Readiness projection.
 It is contributor guidance, not a new versioned JSON schema. Renma 0.18.2
 remains the compatibility baseline for existing commands: public fields,
 classifications, diagnostics, severities, exit behavior, and migration direction
@@ -24,7 +25,9 @@ discovery + parsing + repository resolution
         v
 RepositorySnapshot (facts and snapshot-scoped indexes)
         |
-        +--> scan + graph --> Readiness --> BOM
+        +--> prepared Skill Discovery --> discovery graph + skill-index
+        |                              \-> Readiness summary/checks
+        +--> scan + graph -------------> Readiness --> BOM subset
         |
         v
 target evidence --> governance evidence --> command decision --> renderer
@@ -179,13 +182,21 @@ catalog, prepares only catalog and Context Lens and therefore does not validate
 Agent Skills, build Skill Discovery, classify assets, collect security-policy
 evidence, or capture command-only repository path states.
 
-Readiness builds graph and scan evidence from one `RepositorySnapshot`, and BOM
-builds graph, scan, Readiness, policy inventory, and diagnostics from that same
-snapshot and core. A working-tree mutation after collection cannot influence a
-later lazy projection. Caller attempts to mutate snapshot arrays, nested
-objects, configuration, or path collections also fail without changing the
-projection input. A new collection is required to observe different facts.
-This keeps commands from combining independently recollected repository states.
+Readiness builds graph and scan evidence plus its compact Skill Discovery
+summary/checks from one `RepositorySnapshot`. Access to `skillDiscovery`
+prepares the dependent catalog and Agent Skills projections at most once and
+reuses the same immutable index used by the Discovery graph and Skill Index.
+Readiness does not call `scan`, `skill-index`, repository discovery, or route
+preparation independently to obtain that evidence.
+
+BOM builds graph, scan, its existing Readiness subset, policy inventory, and
+diagnostics from the same snapshot and core; the 0.23.0 Discovery Readiness
+addition is intentionally not projected into BOM, semantic diff, or CI. A
+working-tree mutation after collection cannot influence a later lazy
+projection. Caller attempts to mutate snapshot arrays, nested objects,
+configuration, or path collections also fail without changing the projection
+input. A new collection is required to observe different facts. This keeps
+commands from combining independently recollected repository states.
 
 ## CLI Commands Have One Registered Contract
 
@@ -645,6 +656,7 @@ For an internal change:
 3. Keep structural facts, repository-backed governance, decisions, and
    rendering in their respective layers.
 4. Verify stable JSON fields and fail-closed states, not only human text.
-5. For Readiness or BOM changes, prove all derived sections use one snapshot.
+5. For Readiness or BOM changes, prove all derived sections use one snapshot
+   and each required memoized projection is prepared at most once.
 6. Run targeted tests, type checking, linting, the full test suite, build, and
    package verification before release.

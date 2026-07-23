@@ -283,7 +283,7 @@ node dist/index.js scan . --fail-on high
 | `graph` | How are assets structurally connected? |
 | `skill-index` | Where can static Skill Discovery begin and continue? |
 | `trust-graph` | What trust-relevant evidence is connected to each asset? |
-| `readiness` | Is the repository broadly prepared for agent-facing use? |
+| `readiness` | Is the repository broadly prepared, including its declared Skill Discovery topology? |
 | `bom` | What declared repository context manifest should be reviewed? |
 | `ownership` | Where is ownership missing or concentrated? |
 | `diff` | What deterministic evidence changed between Git refs? |

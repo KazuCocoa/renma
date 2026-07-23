@@ -102,6 +102,14 @@ findings, diagnostic errors, and unresolved required graph closure remain
 blocking even when the numeric score would otherwise pass. Deprecated or
 archived assets have no existence penalty.
 
+The 0.23.0 Skill Discovery checks are visibility-first and have no separate
+score weight. Partial or not-adopted coverage never subtracts points, and a
+cycle warning alone never creates a hard failure. Authoritative coverage and
+declared-route problems reuse existing prepared diagnostics as compact check
+evidence; those diagnostics are not copied into Readiness diagnostics, so the
+new checks cannot subtract a second time for the same condition. Existing
+Readiness penalties and thresholds below are unchanged.
+
 | Field | Default | Unit and trigger | Effect | Source | Rationale and false-positive risk | Related check or diagnostic | Reviewed | Configurable later |
 | --- | ---: | --- | --- | --- | --- | --- | --- | --- |
 | `readiness.blockingDiagnosticPenalty` | 40 | points; one or more diagnostic errors | subtract once and fail check | Renma | Structural errors require correction; diagnostic aggregation avoids multiplying one root cause | `diagnostics.errors` | 0.18.0 | possibly |

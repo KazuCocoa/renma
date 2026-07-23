@@ -26,6 +26,12 @@ import {
 import type { Diagnostic, Finding } from "../types/diagnostics.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import type { AgentSkillsValidationSummary } from "../agent-skills.js";
+import {
+  SKILL_ROUTE_USABILITY_REASONS,
+  type SkillDiscoveryAdoptionState,
+  type SkillDiscoveryIndex,
+  type SkillRouteUsabilityReason,
+} from "../skill-discovery.js";
 
 export type ReadinessFormat = "json" | "markdown";
 
@@ -48,6 +54,18 @@ const WORKFLOW_REQUIRED_INPUTS_FINDING_IDS = new Set<string>([
 const WORKFLOW_COMPLETION_CRITERIA_FINDING_IDS = new Set<string>([
   DIAGNOSTIC_IDS.QUAL_MISSING_COMPLETION_CRITERIA,
 ]);
+const DISCOVERY_PUBLICATION_DIAGNOSTIC_IDS = new Set<string>([
+  DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT,
+  DIAGNOSTIC_IDS.DISCOVERY_ENTRYPOINT_WITHOUT_USABLE_BOUNDARIES,
+]);
+const DISCOVERY_ROUTE_VALIDITY_DIAGNOSTIC_IDS = new Set<string>([
+  DIAGNOSTIC_IDS.DISCOVERY_INVALID_CONTINUATION_DECLARATION,
+  DIAGNOSTIC_IDS.DISCOVERY_UNRESOLVED_DECLARED_ROUTE,
+  DIAGNOSTIC_IDS.DISCOVERY_ROUTE_TARGET_NOT_SKILL,
+  DIAGNOSTIC_IDS.DISCOVERY_INACTIVE_ROUTE_TARGET,
+  DIAGNOSTIC_IDS.DISCOVERY_DUPLICATE_DECLARED_ROUTE,
+]);
+const DISCOVERY_EVIDENCE_LIMIT = QUALITY.presentation.topSummaryItemCap;
 export type ReadinessLevel = "ready" | "needs_attention" | "not_ready";
 export type ReadinessCheckStatus = "pass" | "warn" | "fail";
 export type ReadinessCheckSeverity = "info" | "warning" | "error";
@@ -59,6 +77,20 @@ export interface WorkflowReadinessSummary {
   warn: number;
   fail: number;
   readinessPercent: number;
+}
+
+/** Compact repository-wide projection over one prepared Skill Discovery index. */
+export interface SkillDiscoveryReadinessSummary {
+  adoptionState: SkillDiscoveryAdoptionState;
+  publishedEntrypointCount: number;
+  routeEligibleSkillCount: number;
+  reachableSkillCount: number;
+  notReachedSkillCount: number;
+  unroutedSkillCount: number;
+  usableRouteCount: number;
+  unusableRouteCount: number;
+  unresolvedRouteCount: number;
+  cycleComponentCount: number;
 }
 
 export interface ReadinessReport {
@@ -86,6 +118,7 @@ export interface ReadinessReport {
     contextLens: ContextLensSummary;
     securityPosture: SecurityPostureSummary;
     securityPolicyInventory: SecurityPolicyInventorySummary;
+    skillDiscovery: SkillDiscoveryReadinessSummary;
   };
   checks: ReadinessCheck[];
   diagnostics?: Diagnostic[];
@@ -138,6 +171,7 @@ export function readinessFromRepositorySnapshot(
     scanResult.contextLens,
     scanResult.securityPolicyInventory,
     scanResult.agentSkills,
+    snapshot.skillDiscovery,
   );
 }
 
@@ -148,6 +182,7 @@ export function buildReadinessReport(
   contextLens: ContextLensSummary = zeroContextLensSummary(),
   securityPolicyInventory: SecurityPolicyInventorySummary = zeroSecurityPolicyInventorySummary(),
   agentSkills?: AgentSkillsValidationSummary,
+  skillDiscovery?: SkillDiscoveryIndex,
 ): ReadinessReport {
   const diagnosticCounts = countDiagnostics(diagnostics);
   const totalAssets = graphReport.nodes.length;
@@ -168,6 +203,7 @@ export function buildReadinessReport(
   const lifecycleAssets = graphReport.nodes.filter(
     (node) => node.status === "deprecated" || node.status === "archived",
   );
+  const discoveryReadiness = buildSkillDiscoveryReadiness(skillDiscovery);
 
   /**
    * Workflow checks are static entrypoint-readiness checks.
@@ -246,6 +282,7 @@ export function buildReadinessReport(
       "warn",
       "Repository docs describe canonical Skill roots, valid local support, governed Context Assets, and shared helpers consistently.",
     ),
+    ...discoveryReadiness.checks,
   ];
 
   const ownershipPenalty =
@@ -326,11 +363,374 @@ export function buildReadinessReport(
       contextLens,
       securityPosture,
       securityPolicyInventory,
+      skillDiscovery: discoveryReadiness.summary,
     },
     checks,
     ...(diagnostics.length > 0 ? { diagnostics } : {}),
     ...(findings.length > 0 ? { findings } : {}),
   };
+}
+
+/**
+ * Project routine-review counts and checks from the already prepared index.
+ *
+ * These checks are intentionally non-scoring in 0.23.0. Existing Discovery
+ * diagnostics remain authoritative and are referenced as compact evidence
+ * without being copied into the Readiness diagnostic collection.
+ */
+export function buildSkillDiscoveryReadiness(index?: SkillDiscoveryIndex): {
+  summary: SkillDiscoveryReadinessSummary;
+  checks: ReadinessCheck[];
+} {
+  if (!index) {
+    const summary = zeroSkillDiscoveryReadinessSummary();
+    return {
+      summary,
+      checks: [
+        discoveryPublicationCheck(undefined, summary),
+        discoveryRouteValidityCheck(undefined, summary),
+        discoveryCoverageCheck(undefined, summary),
+        discoveryUnroutedSkillsCheck(undefined, summary),
+        discoveryCycleReviewCheck(undefined, summary),
+      ],
+    };
+  }
+
+  const cycleComponentCount = index.diagnostics.filter(
+    (diagnostic) => diagnostic.code === DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE,
+  ).length;
+  const summary: SkillDiscoveryReadinessSummary = {
+    adoptionState: index.adoption.state,
+    publishedEntrypointCount: index.summary.publishedEntrypointCount,
+    routeEligibleSkillCount: index.summary.routeEligibleSkillCount,
+    reachableSkillCount: index.summary.reachableSkillCount,
+    notReachedSkillCount: index.summary.notReachedSkillCount,
+    unroutedSkillCount: index.summary.unroutedSkillCount,
+    usableRouteCount: index.summary.usableRouteCount,
+    unusableRouteCount: index.routes.filter((route) => !route.usable).length,
+    unresolvedRouteCount: index.summary.unresolvedRouteCount,
+    cycleComponentCount,
+  };
+  return {
+    summary,
+    checks: [
+      discoveryPublicationCheck(index, summary),
+      discoveryRouteValidityCheck(index, summary),
+      discoveryCoverageCheck(index, summary),
+      discoveryUnroutedSkillsCheck(index, summary),
+      discoveryCycleReviewCheck(index, summary),
+    ],
+  };
+}
+
+export function zeroSkillDiscoveryReadinessSummary(): SkillDiscoveryReadinessSummary {
+  return {
+    adoptionState: "not-adopted",
+    publishedEntrypointCount: 0,
+    routeEligibleSkillCount: 0,
+    reachableSkillCount: 0,
+    notReachedSkillCount: 0,
+    unroutedSkillCount: 0,
+    usableRouteCount: 0,
+    unusableRouteCount: 0,
+    unresolvedRouteCount: 0,
+    cycleComponentCount: 0,
+  };
+}
+
+function discoveryPublicationCheck(
+  index: SkillDiscoveryIndex | undefined,
+  summary: SkillDiscoveryReadinessSummary,
+): ReadinessCheck {
+  const diagnostics = discoveryDiagnostics(
+    index,
+    DISCOVERY_PUBLICATION_DIAGNOSTIC_IDS,
+  );
+  if (diagnostics.length > 0) {
+    const status = readinessStatusForDiagnostics(diagnostics);
+    return {
+      id: "discovery.publication",
+      title: "Skill Discovery publication",
+      ...status,
+      summary: `${summary.publishedEntrypointCount} effective published entrypoint${summary.publishedEntrypointCount === 1 ? "" : "s"}; ${diagnostics.length} explicit publication warning${diagnostics.length === 1 ? "" : "s"} require review.`,
+      evidence: diagnosticEvidence(diagnostics),
+    };
+  }
+  if (summary.routeEligibleSkillCount === 0) {
+    return {
+      id: "discovery.publication",
+      title: "Skill Discovery publication",
+      status: "pass",
+      severity: "info",
+      summary:
+        "No Discovery-eligible Skills exist, so no published entrypoint is required.",
+    };
+  }
+  if (summary.publishedEntrypointCount > 0) {
+    return {
+      id: "discovery.publication",
+      title: "Skill Discovery publication",
+      status: "pass",
+      severity: "info",
+      summary: `${summary.publishedEntrypointCount} valid effective published entrypoint${summary.publishedEntrypointCount === 1 ? " is" : "s are"} explicitly declared.`,
+    };
+  }
+  return {
+    id: "discovery.publication",
+    title: "Skill Discovery publication",
+    status: "warn",
+    severity: "warning",
+    summary:
+      "Discovery-eligible Skills exist, but no valid effective published entrypoint is explicitly declared; structural roots are not inferred as published.",
+  };
+}
+
+function discoveryRouteValidityCheck(
+  index: SkillDiscoveryIndex | undefined,
+  summary: SkillDiscoveryReadinessSummary,
+): ReadinessCheck {
+  if (!index || summary.unusableRouteCount === 0) {
+    return {
+      id: "discovery.route_validity",
+      title: "Skill Discovery route validity",
+      status: "pass",
+      severity: "info",
+      summary: `${summary.usableRouteCount} usable continuation route${summary.usableRouteCount === 1 ? "" : "s"} and no unusable declarations.`,
+    };
+  }
+
+  const diagnostics = discoveryDiagnostics(
+    index,
+    DISCOVERY_ROUTE_VALIDITY_DIAGNOSTIC_IDS,
+  );
+  const status =
+    diagnostics.length > 0
+      ? readinessStatusForDiagnostics(diagnostics)
+      : ({ status: "warn", severity: "warning" } as const);
+  const reasonCounts = skillRouteReasonCounts(index);
+  const reasonSummary = SKILL_ROUTE_USABILITY_REASONS.flatMap((reason) => {
+    const count = reasonCounts.get(reason) ?? 0;
+    return count > 0 ? [`${reason}: ${count}`] : [];
+  }).join(", ");
+  const evidence = compactEvidence([
+    ...diagnosticEvidence(diagnostics),
+    ...index.routes
+      .filter((route) => !route.usable)
+      .map((route) => ({
+        id: route.sourceId,
+        path: route.sourcePath,
+        message: `Continuation ${route.declarationIndex} is unusable: ${route.usabilityReasons.join(", ")}.`,
+      })),
+  ]);
+  return {
+    id: "discovery.route_validity",
+    title: "Skill Discovery route validity",
+    ...status,
+    summary: `${summary.unusableRouteCount} of ${index.routes.length} declared continuation route${index.routes.length === 1 ? "" : "s"} are unusable${reasonSummary ? ` (${reasonSummary})` : ""}.`,
+    ...(evidence.length > 0 ? { evidence } : {}),
+  };
+}
+
+function discoveryCoverageCheck(
+  index: SkillDiscoveryIndex | undefined,
+  summary: SkillDiscoveryReadinessSummary,
+): ReadinessCheck {
+  if (!index || summary.routeEligibleSkillCount === 0) {
+    return {
+      id: "discovery.coverage",
+      title: "Skill Discovery coverage",
+      status: "pass",
+      severity: "info",
+      summary:
+        "No Discovery-eligible Skills exist, so repository-wide coverage is neutral.",
+    };
+  }
+  if (index.coverage.mode === "authoritative") {
+    if (summary.notReachedSkillCount === 0) {
+      return {
+        id: "discovery.coverage",
+        title: "Skill Discovery coverage",
+        status: "pass",
+        severity: "info",
+        summary: `All ${summary.routeEligibleSkillCount} Discovery-eligible Skills are reachable under explicit repository-wide adoption.`,
+      };
+    }
+    const diagnostics = discoveryDiagnostics(
+      index,
+      new Set([DIAGNOSTIC_IDS.DISCOVERY_UNREACHABLE_ELIGIBLE_SKILL]),
+    );
+    const status =
+      diagnostics.length > 0
+        ? readinessStatusForDiagnostics(diagnostics)
+        : ({ status: "warn", severity: "warning" } as const);
+    return {
+      id: "discovery.coverage",
+      title: "Skill Discovery coverage",
+      ...status,
+      summary: `${summary.notReachedSkillCount} of ${summary.routeEligibleSkillCount} Discovery-eligible Skills are not reached under explicit repository-wide adoption.`,
+      evidence: diagnosticEvidence(diagnostics),
+    };
+  }
+  if (index.adoption.repositoryWideAdopted) {
+    return {
+      id: "discovery.coverage",
+      title: "Skill Discovery coverage",
+      status: "warn",
+      severity: "warning",
+      summary:
+        "Repository-wide Discovery adoption is enabled, but coverage is not evaluated because no valid effective published entrypoint exists.",
+    };
+  }
+  return {
+    id: "discovery.coverage",
+    title: "Skill Discovery coverage",
+    status: "pass",
+    severity: "info",
+    summary: `${summary.reachableSkillCount} reachable and ${summary.notReachedSkillCount} not-reached eligible Skills are descriptive only because repository-wide Discovery coverage is not adopted.`,
+  };
+}
+
+function discoveryUnroutedSkillsCheck(
+  index: SkillDiscoveryIndex | undefined,
+  summary: SkillDiscoveryReadinessSummary,
+): ReadinessCheck {
+  if (!index || summary.unroutedSkillCount === 0) {
+    return {
+      id: "discovery.unrouted_skills",
+      title: "Unrouted Discovery-eligible Skills",
+      status: "pass",
+      severity: "info",
+      summary:
+        "No unpublished Discovery-eligible Skill lacks an incoming usable continuation.",
+    };
+  }
+  if (!index.adoption.repositoryWideAdopted) {
+    return {
+      id: "discovery.unrouted_skills",
+      title: "Unrouted Discovery-eligible Skills",
+      status: "pass",
+      severity: "info",
+      summary: `${summary.unroutedSkillCount} eligible Skill${summary.unroutedSkillCount === 1 ? " is" : "s are"} unpublished with no incoming usable continuation; this is descriptive because repository-wide Discovery is not adopted, and standalone Skills may be intentionally independent.`,
+    };
+  }
+  const diagnostics = discoveryDiagnostics(
+    index,
+    new Set([DIAGNOSTIC_IDS.DISCOVERY_UNREACHABLE_ELIGIBLE_SKILL]),
+  ).filter((diagnostic) =>
+    index.unroutedSkillIds.some(
+      (id) =>
+        index.skills.find((skill) => skill.id === id)?.sourcePath ===
+        diagnostic.path,
+    ),
+  );
+  const evidence = compactEvidence([
+    ...diagnosticEvidence(diagnostics),
+    ...index.unroutedSkillIds.map((id) => {
+      const skill = index.skills.find((candidate) => candidate.id === id);
+      return {
+        id,
+        ...(skill ? { path: skill.sourcePath } : {}),
+        message:
+          "The Skill is unpublished and has no incoming usable continuation.",
+      };
+    }),
+  ]);
+  return {
+    id: "discovery.unrouted_skills",
+    title: "Unrouted Discovery-eligible Skills",
+    status: "warn",
+    severity: "warning",
+    summary: `${summary.unroutedSkillCount} Discovery-eligible Skill${summary.unroutedSkillCount === 1 ? " is" : "s are"} unrouted under explicit repository-wide adoption; standalone intent still requires human review.`,
+    evidence,
+  };
+}
+
+function discoveryCycleReviewCheck(
+  index: SkillDiscoveryIndex | undefined,
+  summary: SkillDiscoveryReadinessSummary,
+): ReadinessCheck {
+  if (!index || summary.cycleComponentCount === 0) {
+    return {
+      id: "discovery.cycle_review",
+      title: "Skill Discovery cycle review",
+      status: "pass",
+      severity: "info",
+      summary: "No cyclic usable continuation components require review.",
+    };
+  }
+  const diagnostics = discoveryDiagnostics(
+    index,
+    new Set([DIAGNOSTIC_IDS.DISCOVERY_ROUTE_CYCLE]),
+  );
+  return {
+    id: "discovery.cycle_review",
+    title: "Skill Discovery cycle review",
+    status: "warn",
+    severity: "warning",
+    summary: `${summary.cycleComponentCount} maximal cyclic usable continuation component${summary.cycleComponentCount === 1 ? "" : "s"} require review; this static evidence does not prove runtime recursion or require an arbitrary route removal.`,
+    evidence: diagnosticEvidence(diagnostics),
+  };
+}
+
+function discoveryDiagnostics(
+  index: SkillDiscoveryIndex | undefined,
+  codes: ReadonlySet<string>,
+): Diagnostic[] {
+  return (
+    index?.diagnostics.filter(
+      (diagnostic) => diagnostic.code && codes.has(diagnostic.code),
+    ) ?? []
+  );
+}
+
+function readinessStatusForDiagnostics(
+  diagnostics: Diagnostic[],
+): Pick<ReadinessCheck, "status" | "severity"> {
+  return diagnostics.some((diagnostic) => diagnostic.severity === "error")
+    ? { status: "fail", severity: "error" }
+    : { status: "warn", severity: "warning" };
+}
+
+function diagnosticEvidence(
+  diagnostics: readonly Diagnostic[],
+): NonNullable<ReadinessCheck["evidence"]> {
+  return compactEvidence(
+    diagnostics.map((diagnostic) => {
+      const evidencePath = diagnostic.path ?? diagnostic.evidence?.path;
+      return {
+        ...(diagnostic.code ? { id: diagnostic.code } : {}),
+        ...(evidencePath ? { path: evidencePath } : {}),
+        message: diagnostic.message,
+      };
+    }),
+  );
+}
+
+function compactEvidence(
+  evidence: NonNullable<ReadinessCheck["evidence"]>,
+): NonNullable<ReadinessCheck["evidence"]> {
+  const seen = new Set<string>();
+  return evidence
+    .filter((item) => {
+      const key = `${item.id ?? ""}\0${item.path ?? ""}\0${item.message ?? ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, DISCOVERY_EVIDENCE_LIMIT);
+}
+
+function skillRouteReasonCounts(
+  index: SkillDiscoveryIndex,
+): ReadonlyMap<SkillRouteUsabilityReason, number> {
+  const counts = new Map<SkillRouteUsabilityReason, number>();
+  for (const route of index.routes) {
+    if (route.usable) continue;
+    for (const reason of route.usabilityReasons) {
+      counts.set(reason, (counts.get(reason) ?? 0) + 1);
+    }
+  }
+  return counts;
 }
 
 function agentSkillsSpecificationCheck(
@@ -454,6 +854,10 @@ export function formatReadinessMarkdown(report: ReadinessReport): string {
       report.summary.securityPolicyInventory,
     ),
     "",
+    "## Skill Discovery",
+    "",
+    ...formatSkillDiscoveryReadinessMarkdown(report),
+    "",
     "## Workflow Readiness",
     "",
     "| Metric | Value |",
@@ -502,6 +906,62 @@ export function formatReadinessMarkdown(report: ReadinessReport): string {
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+function formatSkillDiscoveryReadinessMarkdown(
+  report: ReadinessReport,
+): string[] {
+  const discovery = report.summary.skillDiscovery;
+  const lines = [
+    `- Adoption: ${discovery.adoptionState}`,
+    `- Published entrypoints: ${discovery.publishedEntrypointCount}`,
+    `- Discovery-eligible Skills: ${discovery.routeEligibleSkillCount}`,
+    `- Reachable Skills: ${discovery.reachableSkillCount}`,
+    `- Not reached: ${discovery.notReachedSkillCount}`,
+    `- Unrouted Skills: ${discovery.unroutedSkillCount}`,
+    `- Usable routes: ${discovery.usableRouteCount}`,
+    `- Unusable routes: ${discovery.unusableRouteCount}`,
+    `- Unresolved routes: ${discovery.unresolvedRouteCount}`,
+    `- Route cycles requiring review: ${discovery.cycleComponentCount}`,
+  ];
+  const affected = report.checks
+    .filter(
+      (check) =>
+        check.id.startsWith("discovery.") &&
+        check.status !== "pass" &&
+        check.evidence &&
+        check.evidence.length > 0,
+    )
+    .flatMap((check) =>
+      check.evidence!.map((evidence) => ({
+        checkId: check.id,
+        id: evidence.id,
+        path: evidence.path,
+      })),
+    );
+  const compact = new Map<string, (typeof affected)[number]>();
+  for (const item of affected) {
+    const key = `${item.checkId}\0${item.id ?? ""}\0${item.path ?? ""}`;
+    if (!compact.has(key)) compact.set(key, item);
+  }
+  if (compact.size > 0) {
+    lines.push("", "### Discovery check evidence", "");
+    for (const item of [...compact.values()].slice(
+      0,
+      DISCOVERY_EVIDENCE_LIMIT,
+    )) {
+      const identity = item.id ?? "(affected evidence)";
+      lines.push(
+        `- ${item.checkId}: ${identity}${item.path ? ` — ${item.path}` : ""}`,
+      );
+    }
+  }
+  lines.push(
+    "",
+    "Run `renma skill-index` for the complete Discovery report.",
+    "Run `renma graph --view discovery` for route topology and source evidence.",
+  );
+  return lines;
 }
 
 function formatContextLensMarkdown(contextLens: ContextLensSummary): string[] {

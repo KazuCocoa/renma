@@ -279,7 +279,10 @@ export function buildDiffReport(
         .map(([, edge]) => edge),
     },
     readiness: {
-      checkChanges: checkChanges(fromReadiness.checks, toReadiness.checks),
+      checkChanges: checkChanges(
+        readinessChecksWithoutDiscovery(fromReadiness.checks),
+        readinessChecksWithoutDiscovery(toReadiness.checks),
+      ),
     },
     security: buildSecurityDiffSummary({
       addedFindings,
@@ -296,6 +299,12 @@ export function buildDiffReport(
       ),
     },
   };
+}
+
+function readinessChecksWithoutDiscovery(checks: unknown[]): unknown[] {
+  return checks.filter(
+    (check) => !stringField(check, "id").startsWith("discovery."),
+  );
 }
 
 export function formatDiff(report: DiffReport, format: DiffFormat): string {
