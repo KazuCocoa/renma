@@ -8,7 +8,7 @@
     "outDir": "dist",
     "sourceMap": true,
     "declaration": true,
-    "declarationMap": true,
+    "declarationMap": false,
     "noEmitOnError": true,
     "moduleDetection": "force",
     "isolatedModules": true,
