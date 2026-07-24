@@ -6,6 +6,63 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.23.3] - 2026-07-23
+
+### Added
+
+- Added strict `skill_discovery.ci_policy` configuration with supported values
+  `off` and `warn`. It defaults to `off`; `warn` requires
+  `skill_discovery.adopted: true`, and unknown keys, non-string modes, and
+  unsupported modes are configuration errors. `renma init` remains unchanged
+  and does not enable the policy.
+- Added the top-level `CiReport.skillDiscoveryPolicy` contract with schema
+  `renma.skill-discovery-ci-policy.v1`. It records the base, target, and
+  stricter effective modes plus deterministic `pass`/`warn` outcome, count,
+  and compact matches. Stable match IDs cover adoption weakened, adoption
+  incomplete, newly not-reached eligible Skills under authoritative coverage,
+  existing routes becoming unusable under authoritative coverage, and newly
+  added unusable routes under authoritative coverage.
+- Added bounded CI Markdown policy configuration, outcome, and match details
+  plus one plural-aware review note when matches request review. Added focused
+  configuration, evaluator, archived-ref, status-composition, exit, cycle
+  neutrality, formatter compatibility, instrumentation, and public-contract
+  tests. Fixed-seed properties cover disabled-policy neutrality, cycle
+  neutrality, permutation invariance, immutability, and deterministic repeated
+  evaluation.
+
+### Changed
+
+- Changed CI execution to retain only the two archived
+  `skillDiscovery.ciPolicy` modes beside the unchanged `DiffReport`. The
+  stricter `off < warn` mode wins, so both `off -> warn` and `warn -> off`
+  evaluate immediately and target-only policy removal cannot bypass review.
+- Added a pure warn-only evaluator and pure status composition. Existing
+  `FAIL` remains dominant, existing `WARN` remains `WARN`, and an existing
+  `PASS` becomes `WARN` only when the enabled Discovery policy matches. Policy
+  warnings still exit `0`; no Discovery policy condition can produce `FAIL`.
+- Preserved the one-pass archived-ref pipeline: one repository collection, one
+  parse per artifact, one catalog preparation, one Agent Skills validation,
+  one Skill Discovery preparation per ref, and one Discovery diff
+  construction. CI performs no second config load, repository discovery, or
+  semantic diff.
+
+### Compatibility
+
+- Preserved `renma.skill-discovery-diff.v1`, direct diff JSON and Markdown,
+  direct diff exits, route and cycle identities, Readiness scoring and levels,
+  diagnostics, `buildDiffReport()`, and `diffWithoutSkillDiscovery()`. The
+  nested CI-compatible `diff` remains free of Discovery and policy fields.
+- Preserved pre-0.23.2 CI formatting without invented Discovery fields and
+  0.23.2 observation-only formatting without an invented policy evaluation.
+  Newly generated reports always contain both `skillDiscovery` and
+  `skillDiscoveryPolicy`.
+- Cycles, removed entrypoints, newly unrouted Skills, removed routes,
+  declaration-count-only changes, newly reachable or resolved not-reached
+  Skills, routes becoming usable, adoption becoming authoritative, and count
+  deltas without matching identities remain non-policy evidence. Hard-fail
+  gating, a fail mode, per-rule configuration, suppressions, and allowlists
+  remain deferred for independent review without an assigned release.
+
 ## [0.23.2] - 2026-07-23
 
 ### Added
@@ -1283,6 +1340,7 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
 [Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.23.2...HEAD
+[0.23.3]: https://github.com/KazuCocoa/renma/compare/v0.23.2...v0.23.3
 [0.23.2]: https://github.com/KazuCocoa/renma/compare/v0.23.1...v0.23.2
 [0.23.1]: https://github.com/KazuCocoa/renma/compare/v0.23.0...v0.23.1
 [0.23.0]: https://github.com/KazuCocoa/renma/compare/v0.22.6...v0.23.0

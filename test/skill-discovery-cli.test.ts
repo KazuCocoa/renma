@@ -21,6 +21,7 @@ import { trustGraph } from "../src/commands/trust-graph.js";
 import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
 import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
 import { scan } from "../src/scanner.js";
+import { SKILL_DISCOVERY_CI_POLICY_MATCH_IDS } from "../src/skill-discovery-ci-policy.js";
 import type { DiagnosticV2 } from "../src/types.js";
 import { RepositoryFixture } from "./repository-fixture.js";
 
@@ -386,6 +387,18 @@ test("Discovery adoption config is strict and invalid forms return exit code 2",
     [
       { skill_discovery: { adopted: true, extra: true } },
       /Unknown skill_discovery config key "extra"/,
+    ],
+    [
+      { skill_discovery: { adopted: true, ci_policy: true } },
+      /skill_discovery\.ci_policy must be one of: off, warn/,
+    ],
+    [
+      { skill_discovery: { adopted: true, ci_policy: "fail" } },
+      /skill_discovery\.ci_policy must be one of: off, warn/,
+    ],
+    [
+      { skill_discovery: { adopted: false, ci_policy: "warn" } },
+      /skill_discovery\.ci_policy "warn" requires skill_discovery\.adopted to be true/,
     ],
     [
       { skillDiscovery: { adopted: true } },
@@ -1220,6 +1233,12 @@ test("CI reports a neutral published entrypoint, route, and reachability change"
     assert.equal("discovery" in compatible, false);
     assert.deepEqual(report.diff, compatible);
     assert.equal(report.status, "pass");
+    assert.deepEqual(report.skillDiscoveryPolicy.configured, {
+      from: "off",
+      to: "off",
+      effective: "off",
+    });
+    assert.equal(report.skillDiscoveryPolicy.outcome, "pass");
     assert.deepEqual(report.notes, ["No CI report regressions detected."]);
     assert.equal(command.code, 0);
     assert.match(markdown, /^## Skill Discovery Changes$/m);
@@ -1294,6 +1313,149 @@ test("CI displays newly not-reached Skills without changing policy", async () =>
     assert.match(markdown, /^### Newly not-reached Skills$/m);
     assert.match(markdown, /skill\.target/);
     assert.doesNotMatch(markdown, /Review .*not-reached/i);
+  } finally {
+    await rm(root, { force: true, recursive: true });
+  }
+});
+
+test("opt-in CI policy warns on a newly not-reached Skill and exits zero", async () => {
+  const root = await newlyNotReachedDiscoveryCiGitFixture("warn");
+  try {
+    const direct = await diff(root, {
+      fromRef: "base",
+      toRef: "HEAD",
+    });
+    const report = await ciReport(root, {
+      fromRef: "base",
+      toRef: "HEAD",
+    });
+    const markdown = formatCiReport(report, "markdown");
+    const command = await captured(() =>
+      runCiReportCommand(root, {
+        fromRef: "base",
+        toRef: "HEAD",
+        format: "json",
+      }),
+    );
+
+    assert.deepEqual(report.skillDiscoveryPolicy.configured, {
+      from: "warn",
+      to: "warn",
+      effective: "warn",
+    });
+    assert.equal(report.skillDiscoveryPolicy.outcome, "warn");
+    assert.deepEqual(
+      report.skillDiscoveryPolicy.matches.map((match) => match.id),
+      [SKILL_DISCOVERY_CI_POLICY_MATCH_IDS.NEWLY_NOT_REACHED],
+    );
+    assert.equal(report.status, "warn");
+    assert.deepEqual(report.notes, [
+      "Skill Discovery CI review policy matched 1 change.",
+    ]);
+    assert.equal(command.code, 0);
+    assert.equal(
+      (JSON.parse(command.stdout) as { status: string }).status,
+      "warn",
+    );
+    assert.match(markdown, /^### CI review policy matches$/m);
+    assert.match(markdown, /skill_discovery_ci\.newly_not_reached/);
+    assert.equal("discovery" in report.diff, false);
+    assert.equal(
+      direct.discovery.schemaVersion,
+      "renma.skill-discovery-diff.v1",
+    );
+    assert.doesNotMatch(
+      JSON.stringify(direct),
+      /skillDiscoveryPolicy|ciPolicy|ci_policy/,
+    );
+  } finally {
+    await rm(root, { force: true, recursive: true });
+  }
+});
+
+test("target cannot bypass base warn policy by disabling adoption and policy", async () => {
+  const root = await policyDisableBypassGitFixture();
+  try {
+    const report = await ciReport(root, {
+      fromRef: "base",
+      toRef: "HEAD",
+    });
+    const command = await captured(() =>
+      runCiReportCommand(root, {
+        fromRef: "base",
+        toRef: "HEAD",
+        format: "json",
+      }),
+    );
+
+    assert.deepEqual(report.skillDiscoveryPolicy.configured, {
+      from: "warn",
+      to: "off",
+      effective: "warn",
+    });
+    assert.equal(report.skillDiscoveryPolicy.outcome, "warn");
+    assert.deepEqual(
+      report.skillDiscoveryPolicy.matches.map((match) => match.id),
+      [SKILL_DISCOVERY_CI_POLICY_MATCH_IDS.ADOPTION_WEAKENED],
+    );
+    assert.equal(report.status, "warn");
+    assert.equal(command.code, 0);
+  } finally {
+    await rm(root, { force: true, recursive: true });
+  }
+});
+
+test("existing CI fail remains dominant over a Discovery policy warning", async () => {
+  const root = await newlyNotReachedDiscoveryCiGitFixture("warn", true);
+  try {
+    const report = await ciReport(root, {
+      fromRef: "base",
+      toRef: "HEAD",
+    });
+    const command = await captured(() =>
+      runCiReportCommand(root, {
+        fromRef: "base",
+        toRef: "HEAD",
+        format: "json",
+      }),
+    );
+
+    assert.equal(report.skillDiscoveryPolicy.outcome, "warn");
+    assert.equal(report.status, "fail");
+    assert.equal(command.code, 1);
+    assert.ok(
+      report.notes.includes(
+        "Review new high or critical findings before merge.",
+      ),
+    );
+    assert.ok(
+      report.notes.includes(
+        "Skill Discovery CI review policy matched 1 change.",
+      ),
+    );
+  } finally {
+    await rm(root, { force: true, recursive: true });
+  }
+});
+
+test("cycles remain non-policy evidence when warn mode is enabled", async () => {
+  const root = await enabledPolicyCycleGitFixture();
+  try {
+    const report = await ciReport(root, {
+      fromRef: "base",
+      toRef: "HEAD",
+    });
+
+    assert.equal(report.skillDiscovery.cycles.added.length, 1);
+    assert.deepEqual(report.skillDiscoveryPolicy.configured, {
+      from: "warn",
+      to: "warn",
+      effective: "warn",
+    });
+    assert.equal(report.skillDiscoveryPolicy.outcome, "pass");
+    assert.deepEqual(report.skillDiscoveryPolicy.matches, []);
+    assert.equal(report.status, "pass");
+    assert.deepEqual(report.notes, ["No CI report regressions detected."]);
   } finally {
     await rm(root, { force: true, recursive: true });
   }
@@ -1608,11 +1770,19 @@ async function incompleteDiscoveryCiGitFixture(): Promise<string> {
   return fixture.root;
 }
 
-async function newlyNotReachedDiscoveryCiGitFixture(): Promise<string> {
+async function newlyNotReachedDiscoveryCiGitFixture(
+  ciPolicy: "off" | "warn" = "off",
+  withBlockingFinding = false,
+): Promise<string> {
   const fixture = await RepositoryFixture.create({
     prefix: "renma-discovery-ci-not-reached-",
   });
-  await fixture.writeConfig({ skill_discovery: { adopted: true } });
+  await fixture.writeConfig({
+    skill_discovery: {
+      adopted: true,
+      ...(ciPolicy === "warn" ? { ci_policy: "warn" } : {}),
+    },
+  });
   await fixture.skill("entry", {
     id: "skill.entry",
     publishedEntrypoint: true,
@@ -1626,9 +1796,69 @@ async function newlyNotReachedDiscoveryCiGitFixture(): Promise<string> {
   await fixture.skill("entry", {
     id: "skill.entry",
     publishedEntrypoint: true,
+    ...(withBlockingFinding
+      ? {
+          body: [
+            "# entry",
+            "",
+            "Review repository evidence.",
+            "",
+            'api_key = "abcd1234abcd1234"',
+          ].join("\n"),
+        }
+      : {}),
   });
   await fixture.git(["add", "skills/entry/SKILL.md"]);
   await fixture.git(["commit", "-m", "remove continuation"]);
+  return fixture.root;
+}
+
+async function policyDisableBypassGitFixture(): Promise<string> {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-discovery-ci-policy-bypass-",
+  });
+  await fixture.writeConfig({
+    skill_discovery: { adopted: true, ci_policy: "warn" },
+  });
+  await fixture.skill("entry", {
+    id: "skill.entry",
+    publishedEntrypoint: true,
+  });
+  await fixture.initializeGit();
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "base"]);
+  await fixture.git(["tag", "base"]);
+  await fixture.writeConfig({
+    skill_discovery: { adopted: false, ci_policy: "off" },
+  });
+  await fixture.git(["add", "renma.config.json"]);
+  await fixture.git(["commit", "-m", "disable discovery policy"]);
+  return fixture.root;
+}
+
+async function enabledPolicyCycleGitFixture(): Promise<string> {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-discovery-ci-policy-cycle-",
+  });
+  await fixture.writeConfig({
+    skill_discovery: { adopted: true, ci_policy: "warn" },
+  });
+  await fixture.skill("a", {
+    id: "skill.a",
+    publishedEntrypoint: true,
+    continuesWith: ["skill.b"],
+  });
+  await fixture.skill("b", { id: "skill.b" });
+  await fixture.initializeGit();
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "base"]);
+  await fixture.git(["tag", "base"]);
+  await fixture.skill("b", {
+    id: "skill.b",
+    continuesWith: ["skill.a"],
+  });
+  await fixture.git(["add", "skills/b/SKILL.md"]);
+  await fixture.git(["commit", "-m", "introduce cycle"]);
   return fixture.root;
 }
 

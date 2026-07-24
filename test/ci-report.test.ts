@@ -9,6 +9,7 @@ import fc from "fast-check";
 import {
   buildCiReportFromDiff,
   ciReport,
+  composeCiReportStatus,
   determineCiReportStatus,
   formatCiReport,
   runCiReportCommand,
@@ -27,6 +28,10 @@ import {
   zeroSecurityPolicyInventorySummary,
   type SecurityPolicyInventorySummary,
 } from "../src/security-policy-inventory.js";
+import {
+  SKILL_DISCOVERY_CI_POLICY_MATCH_IDS,
+  evaluateSkillDiscoveryCiPolicy,
+} from "../src/skill-discovery-ci-policy.js";
 
 const execFile = promisify(execFileCallback);
 
@@ -213,8 +218,9 @@ test("formatCiReport tolerates legacy fixtures without security diff", () => {
 
 test("formatCiReport preserves legacy CI reports without Skill Discovery", () => {
   const current = sampleReport();
-  const { skillDiscovery, ...legacyReport } = current;
+  const { skillDiscovery, skillDiscoveryPolicy, ...legacyReport } = current;
   void skillDiscovery;
+  void skillDiscoveryPolicy;
   const legacy: CiReportFormatInput = legacyReport;
   const before = JSON.stringify(legacy);
 
@@ -228,6 +234,24 @@ test("formatCiReport preserves legacy CI reports without Skill Discovery", () =>
   assert.match(markdown, /^## Review Notes$/m);
 });
 
+test("formatCiReport preserves 0.23.2 observation-only Skill Discovery", () => {
+  const current = sampleReport();
+  const { skillDiscoveryPolicy, ...legacyReport } = current;
+  void skillDiscoveryPolicy;
+  const legacy: CiReportFormatInput = legacyReport;
+  const before = JSON.stringify(legacy);
+
+  const json = formatCiReport(legacy, "json");
+  const markdown = formatCiReport(legacy, "markdown");
+
+  assert.equal(JSON.stringify(legacy), before);
+  assert.equal("skillDiscovery" in JSON.parse(json), true);
+  assert.equal("skillDiscoveryPolicy" in JSON.parse(json), false);
+  assert.match(markdown, /^## Skill Discovery Changes$/m);
+  assert.match(markdown, /- CI policy effect: none \(observation only\)/);
+  assert.doesNotMatch(markdown, /- CI review policy:/);
+});
+
 test("formatCiReport renders bounded neutral Skill Discovery changes", () => {
   const report = sampleReport();
   report.skillDiscovery = representativeSkillDiscoveryDiff();
@@ -236,7 +260,8 @@ test("formatCiReport renders bounded neutral Skill Discovery changes", () => {
 
   assert.match(markdown, /^## Skill Discovery Changes$/m);
   assert.match(markdown, /- Schema: renma\.skill-discovery-diff\.v1/);
-  assert.match(markdown, /- CI policy effect: none \(observation only\)/);
+  assert.match(markdown, /- CI review policy: off/);
+  assert.match(markdown, /- Policy outcome: PASS — policy disabled/);
   assert.match(markdown, /- Adoption: partial -> adopted/);
   assert.match(markdown, /- Coverage: descriptive -> authoritative/);
   assert.match(markdown, /- Published entrypoints: \+1 \/ -0/);
@@ -287,6 +312,39 @@ test("formatCiReport caps Skill Discovery detail lists", () => {
   assert.match(markdown, /- 2 more not shown; see JSON for the full list\./);
   assert.doesNotMatch(markdown, /skill\.10 \(/);
   assert.equal(report.skillDiscovery.publishedEntrypoints.added.length, 12);
+});
+
+test("formatCiReport caps policy matches without truncating JSON", () => {
+  const discovery = neutralSkillDiscoveryDiff();
+  discovery.adoption = {
+    from: "adopted",
+    to: "adopted",
+    changed: false,
+  };
+  discovery.coverage = {
+    from: "authoritative",
+    to: "authoritative",
+    changed: false,
+  };
+  discovery.reachability.newlyNotReached = Array.from(
+    { length: 12 },
+    (_, index) => ({
+      id: `skill.${index}`,
+      path: `skills/${index}/SKILL.md`,
+    }),
+  );
+  const report = buildCiReportFromDiff(completeDiffReport(discovery), {
+    from: "warn",
+    to: "warn",
+  });
+
+  const markdown = formatCiReport(report, "markdown");
+  const json = JSON.parse(formatCiReport(report, "json")) as CiReport;
+
+  assert.match(markdown, /^### CI review policy matches$/m);
+  assert.match(markdown, /- 2 more not shown; see JSON for the full list\./);
+  assert.equal(report.skillDiscoveryPolicy.matches.length, 12);
+  assert.equal(json.skillDiscoveryPolicy.matches.length, 12);
 });
 
 test("formatCiReport renders finding risk classes when present", () => {
@@ -432,6 +490,13 @@ test("ci report policy warns on readiness score decrease", () => {
   assert.equal(determineCiReportStatus(report), "warn");
 });
 
+test("CI status composition keeps fail dominant and Discovery warn-only", () => {
+  assert.equal(composeCiReportStatus("fail", "warn"), "fail");
+  assert.equal(composeCiReportStatus("warn", "warn"), "warn");
+  assert.equal(composeCiReportStatus("pass", "warn"), "warn");
+  assert.equal(composeCiReportStatus("pass", "pass"), "pass");
+});
+
 test("ci report policy inventory counts do not change CI status", () => {
   const report = policyDiffReport({});
   const fromInventory = policyInventory({ totalPolicyAssets: 1 });
@@ -476,8 +541,108 @@ test("buildCiReportFromDiff is pure, deterministic, and keeps Discovery outside 
   assert.deepEqual(first, second);
   assert.deepEqual(first.skillDiscovery, complete.discovery);
   assert.equal(first.skillDiscovery, complete.discovery);
+  assert.deepEqual(first.skillDiscoveryPolicy, {
+    schemaVersion: "renma.skill-discovery-ci-policy.v1",
+    configured: {
+      from: "off",
+      to: "off",
+      effective: "off",
+    },
+    outcome: "pass",
+    matchCount: 0,
+    matches: [],
+  });
   assert.equal("discovery" in first.diff, false);
   assert.equal(first.status, determineCiReportStatus(first.diff));
+});
+
+test("enabled Discovery policy upgrades pass to warn with one review note", () => {
+  const discovery = neutralSkillDiscoveryDiff();
+  discovery.adoption = {
+    from: "adopted",
+    to: "incomplete",
+    changed: true,
+  };
+
+  const report = buildCiReportFromDiff(completeDiffReport(discovery), {
+    from: "off",
+    to: "warn",
+  });
+  const markdown = formatCiReport(report, "markdown");
+
+  assert.equal(report.status, "warn");
+  assert.equal(report.skillDiscoveryPolicy.outcome, "warn");
+  assert.equal(report.skillDiscoveryPolicy.matchCount, 1);
+  assert.equal(
+    report.skillDiscoveryPolicy.matches[0]?.id,
+    SKILL_DISCOVERY_CI_POLICY_MATCH_IDS.ADOPTION_INCOMPLETE,
+  );
+  assert.deepEqual(report.notes, [
+    "Skill Discovery CI review policy matched 1 change.",
+  ]);
+  assert.equal("discovery" in report.diff, false);
+  assert.match(markdown, /- CI review policy: off -> warn/);
+  assert.match(markdown, /- Effective CI review policy: warn/);
+  assert.match(
+    markdown,
+    /- Policy outcome: WARN — review requested; exit behavior unchanged/,
+  );
+  assert.match(markdown, /^### CI review policy matches$/m);
+  assert.match(
+    markdown,
+    /skill_discovery_ci\.adoption_incomplete: adopted -> incomplete/,
+  );
+  assert.doesNotMatch(markdown, /No CI report regressions detected/);
+});
+
+test("existing fail remains dominant when Discovery policy warns", () => {
+  const compatible = policyDiffReport({
+    addedFindings: [finding("SEC-NEW-CRITICAL", "critical", "violation")],
+  });
+  const discovery = neutralSkillDiscoveryDiff();
+  discovery.adoption = {
+    from: "adopted",
+    to: "incomplete",
+    changed: true,
+  };
+
+  const report = buildCiReportFromDiff(
+    { ...compatible, discovery },
+    { from: "warn", to: "warn" },
+  );
+
+  assert.equal(report.status, "fail");
+  assert.ok(
+    report.notes.includes("Review new high or critical findings before merge."),
+  );
+  assert.ok(
+    report.notes.includes("Skill Discovery CI review policy matched 1 change."),
+  );
+});
+
+test("existing warn and Discovery warn retain both independent reasons", () => {
+  const compatible = policyDiffReport({
+    summary: {
+      readinessScoreDelta: -1,
+    },
+  });
+  const discovery = neutralSkillDiscoveryDiff();
+  discovery.adoption = {
+    from: "adopted",
+    to: "incomplete",
+    changed: true,
+  };
+
+  const report = buildCiReportFromDiff(
+    { ...compatible, discovery },
+    { from: "warn", to: "warn" },
+  );
+
+  assert.equal(report.status, "warn");
+  assert.deepEqual(report.notes, [
+    "Readiness score decreased.",
+    "Skill Discovery CI review policy matched 1 change.",
+  ]);
 });
 
 test("a route becoming unresolved and unusable remains one neutral changed route", () => {
@@ -584,6 +749,7 @@ test("CI status and notes are invariant under arbitrary Discovery-only changes",
 test("representative CI report matches the public JSON golden", async () => {
   const report = buildCiReportFromDiff(
     completeDiffReport(representativeSkillDiscoveryDiff()),
+    { from: "off", to: "warn" },
   );
   const golden = await readFile(
     join(process.cwd(), "test/fixtures/ci-report.golden"),
@@ -596,10 +762,15 @@ test("representative CI report matches the public JSON golden", async () => {
     report.skillDiscovery.schemaVersion,
     "renma.skill-discovery-diff.v1",
   );
+  assert.equal(
+    report.skillDiscoveryPolicy.schemaVersion,
+    "renma.skill-discovery-ci-policy.v1",
+  );
+  assert.equal(report.status, "warn");
   assert.equal("discovery" in report.diff, false);
   assert.doesNotMatch(
-    JSON.stringify(report.skillDiscovery),
-    /diagnostics|declarationIndex|startLine|endLine|snippet|renma-diff-/,
+    JSON.stringify(report.skillDiscoveryPolicy),
+    /diagnostics|declarationIndex|startLine|endLine|snippet|renma-diff-|configPath|skillDiscovery/,
   );
 });
 
@@ -686,6 +857,15 @@ test("ci report prepares Skill Discovery once for both refs", async () => {
       report.skillDiscovery.schemaVersion,
       "renma.skill-discovery-diff.v1",
     );
+    assert.deepEqual(report.skillDiscoveryPolicy.configured, {
+      from: "off",
+      to: "off",
+      effective: "off",
+    });
+    assert.equal(
+      report.skillDiscoveryPolicy.schemaVersion,
+      "renma.skill-discovery-ci-policy.v1",
+    );
     assert.deepEqual(report.skillDiscovery, neutralSkillDiscoveryDiff());
     assert.deepEqual(commandJson.skillDiscovery, report.skillDiscovery);
     assert.match(markdown, /^## Skill Discovery Changes$/m);
@@ -754,6 +934,10 @@ function sampleReport(): CiReport {
       highOrCriticalFindingsDelta: 1,
     },
     skillDiscovery: neutralSkillDiscoveryDiff(),
+    skillDiscoveryPolicy: evaluateSkillDiscoveryCiPolicy(
+      neutralSkillDiscoveryDiff(),
+      { from: "off", to: "off" },
+    ),
     securityPosture: {
       added: zeroSecurityPostureSummary(),
       resolved: zeroSecurityPostureSummary(),

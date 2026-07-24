@@ -203,21 +203,28 @@ one parse per artifact, one catalog preparation, one Agent Skills validation,
 and one Skill Discovery preparation per ref. It does not call `skill-index`,
 reconstruct Discovery, or recollect for graph or Readiness.
 
-CI calls the complete public semantic-diff pipeline exactly once, then passes
-the resulting `DiffReport` to the pure `buildCiReportFromDiff()` projection.
-Each ref has one repository collection, one parse per artifact, one catalog
-preparation, one Agent Skills validation, and one Skill Discovery preparation.
-The projection destructures `discovery` from that one report, exposes the same
-object as top-level `CiReport.skillDiscovery`, and keeps the remaining
-`CiCompatibleDiffReport` under `diff`. It does not recollect, reconstruct
-Discovery, or run a second comparison.
+CI calls `executeDiff()` exactly once. The execution returns the unchanged
+`DiffReport` plus only the base and target `skillDiscovery.ciPolicy` modes from
+the two collected snapshots. Each ref has one repository collection, one parse
+per artifact, one catalog preparation, one Agent Skills validation, and one
+Skill Discovery preparation. The projection destructures `discovery` from
+that report, exposes the same object as top-level `CiReport.skillDiscovery`,
+evaluates the two policy modes into top-level `skillDiscoveryPolicy`, and keeps
+the remaining `CiCompatibleDiffReport` under `diff`. It does not recollect,
+reload config, reconstruct Discovery, or run a second comparison.
 
-The compatible diff is the only input to `determineCiReportStatus()` and review
-notes. Top-level Discovery content is presentation-only and cannot affect
-Readiness scores, CI status, notes, or exit behavior by type or control flow.
+`determineCiReportStatus()` still receives only the compatible diff. The pure
+`skill-discovery-ci-policy` module selects the stricter `off < warn` mode,
+constructs compact stable-ID matches from the existing diff, and does not read
+files, import commands, render Markdown, or mutate input. A separate pure
+status helper composes `fail > warn > pass`; Discovery policy can only request
+`WARN`, and `WARN` keeps exit `0`. Review-note construction appends one policy
+note after preserving existing reasons. Cycles never create a match.
+
 CI Markdown uses the shared presentation cap, while JSON retains the complete
-versioned diff once. The formatter accepts a legacy report without
-`skillDiscovery` and omits the new section rather than inventing facts.
+versioned diff and policy evaluation once each. The formatter accepts both
+legacy generations: pre-0.23.2 reports omit the Discovery section, and 0.23.2
+reports keep observation-only Discovery without inventing policy facts.
 
 The exported `buildDiffReport()` helper still accepts pre-0.23.1 snapshots that
 contain only ref, root, Readiness, and graph. When either prepared Discovery

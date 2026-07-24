@@ -1,5 +1,5 @@
 import {
-  diff,
+  executeDiff,
   type DiffCollectionInstrumentation,
   type DiffReport,
   type DiffReportWithoutSkillDiscovery,
@@ -26,6 +26,12 @@ import type {
   SkillDiscoveryRouteChange,
   SkillDiscoveryRouteDiffState,
 } from "../skill-discovery-diff.js";
+import {
+  evaluateSkillDiscoveryCiPolicy,
+  type SkillDiscoveryCiPolicyConfiguration,
+  type SkillDiscoveryCiPolicyEvaluation,
+  type SkillDiscoveryCiPolicyMatch,
+} from "../skill-discovery-ci-policy.js";
 
 export type CiReportFormat = DiffFormat;
 export type CiReportStatus = "pass" | "warn" | "fail";
@@ -38,6 +44,7 @@ export interface CiReport {
   status: CiReportStatus;
   summary: DiffReport["summary"];
   skillDiscovery: SkillDiscoveryDiff;
+  skillDiscoveryPolicy: SkillDiscoveryCiPolicyEvaluation;
   securityPosture: {
     added: SecurityPostureSummary;
     resolved: SecurityPostureSummary;
@@ -46,7 +53,10 @@ export interface CiReport {
   diff: CiCompatibleDiffReport;
 }
 
-export type CiReportFormatInput = CiReport | Omit<CiReport, "skillDiscovery">;
+export type CiReportFormatInput =
+  | CiReport
+  | Omit<CiReport, "skillDiscoveryPolicy">
+  | Omit<CiReport, "skillDiscovery" | "skillDiscoveryPolicy">;
 
 interface CiReportOptions {
   fromRef: string;
@@ -83,12 +93,30 @@ export async function ciReport(
   targetPath: string,
   options: CiReportOptions,
 ): Promise<CiReport> {
-  return buildCiReportFromDiff(await diff(targetPath, options));
+  const execution = await executeDiff(targetPath, options);
+  return buildCiReportFromDiff(
+    execution.report,
+    execution.skillDiscoveryCiPolicy,
+  );
 }
 
-export function buildCiReportFromDiff(report: DiffReport): CiReport {
+export function buildCiReportFromDiff(
+  report: DiffReport,
+  configuredPolicy: SkillDiscoveryCiPolicyConfiguration = {
+    from: "off",
+    to: "off",
+  },
+): CiReport {
   const { discovery, ...ciCompatibleDiff } = report;
-  const status = determineCiReportStatus(ciCompatibleDiff);
+  const existingStatus = determineCiReportStatus(ciCompatibleDiff);
+  const skillDiscoveryPolicy = evaluateSkillDiscoveryCiPolicy(
+    discovery,
+    configuredPolicy,
+  );
+  const status = composeCiReportStatus(
+    existingStatus,
+    skillDiscoveryPolicy.outcome,
+  );
   const securityPosture = {
     added: summarizeSecurityPosture(ciCompatibleDiff.findings.added),
     resolved: summarizeSecurityPosture(ciCompatibleDiff.findings.removed),
@@ -101,8 +129,14 @@ export function buildCiReportFromDiff(report: DiffReport): CiReport {
     status,
     summary: ciCompatibleDiff.summary,
     skillDiscovery: discovery,
+    skillDiscoveryPolicy,
     securityPosture,
-    notes: reviewNotes(ciCompatibleDiff, status, securityPosture.added),
+    notes: reviewNotes(
+      ciCompatibleDiff,
+      status,
+      securityPosture.added,
+      skillDiscoveryPolicy,
+    ),
     diff: ciCompatibleDiff,
   };
 }
@@ -138,6 +172,16 @@ export function determineCiReportStatus(
   return "pass";
 }
 
+export function composeCiReportStatus(
+  existingStatus: CiReportStatus,
+  discoveryPolicyOutcome: SkillDiscoveryCiPolicyEvaluation["outcome"],
+): CiReportStatus {
+  if (existingStatus === "fail") return "fail";
+  if (existingStatus === "warn" || discoveryPolicyOutcome === "warn")
+    return "warn";
+  return "pass";
+}
+
 function hasNewHighOrCriticalFinding(report: CiCompatibleDiffReport): boolean {
   return report.findings.added.some(
     (finding) => finding.severity === "high" || finding.severity === "critical",
@@ -168,6 +212,7 @@ function reviewNotes(
   report: CiCompatibleDiffReport,
   status: CiReportStatus,
   addedSecurityPosture: SecurityPostureSummary,
+  skillDiscoveryPolicy: SkillDiscoveryCiPolicyEvaluation,
 ): string[] {
   const notes: string[] = [];
 
@@ -195,6 +240,12 @@ function reviewNotes(
   if (report.summary.findingsDelta < 0) {
     notes.push("Scan findings decreased.");
   }
+  if (skillDiscoveryPolicy.outcome === "warn") {
+    const suffix = skillDiscoveryPolicy.matchCount === 1 ? "change" : "changes";
+    notes.push(
+      `Skill Discovery CI review policy matched ${skillDiscoveryPolicy.matchCount} ${suffix}.`,
+    );
+  }
   if (status === "pass" && notes.length === 0) {
     notes.push("No CI report regressions detected.");
   }
@@ -205,7 +256,15 @@ function reviewNotes(
 function formatCiReportMarkdown(report: CiReportFormatInput): string {
   const skillDiscoveryLines =
     "skillDiscovery" in report
-      ? ["", ...formatSkillDiscoverySection(report.skillDiscovery)]
+      ? [
+          "",
+          ...formatSkillDiscoverySection(
+            report.skillDiscovery,
+            "skillDiscoveryPolicy" in report
+              ? report.skillDiscoveryPolicy
+              : undefined,
+          ),
+        ]
       : [];
   const lines = [
     "# Renma CI Report",
@@ -272,95 +331,151 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
   return `${lines.join("\n")}\n`;
 }
 
-function formatSkillDiscoverySection(discovery: SkillDiscoveryDiff): string[] {
+function formatSkillDiscoverySection(
+  discovery: SkillDiscoveryDiff,
+  policy?: SkillDiscoveryCiPolicyEvaluation,
+): string[] {
   const lines = [
     "## Skill Discovery Changes",
     "",
     `- Schema: ${discovery.schemaVersion}`,
-    "- CI policy effect: none (observation only)",
   ];
+  lines.push(
+    ...(policy
+      ? formatSkillDiscoveryPolicySummary(policy)
+      : ["- CI policy effect: none (observation only)"]),
+  );
 
   if (!hasSkillDiscoveryChanges(discovery)) {
     lines.push("- No Skill Discovery topology changes.");
-    return lines;
+  } else {
+    lines.push(
+      `- Adoption: ${discovery.adoption.from} -> ${discovery.adoption.to}`,
+      `- Coverage: ${discovery.coverage.from} -> ${discovery.coverage.to}`,
+      `- Published entrypoints: +${discovery.publishedEntrypoints.added.length} / -${discovery.publishedEntrypoints.removed.length}`,
+      `- Reachability: +${discovery.reachability.newlyReachable.length} reachable / +${discovery.reachability.newlyNotReached.length} not-reached`,
+      `- Unrouted Skills: +${discovery.unroutedSkills.newlyUnrouted.length} / -${discovery.unroutedSkills.resolvedUnrouted.length}`,
+      `- Routes: +${discovery.routes.added.length} / -${discovery.routes.removed.length} / ${discovery.routes.changed.length} changed`,
+      `- Cyclic components: +${discovery.cycles.added.length} / -${discovery.cycles.resolved.length}`,
+    );
+    appendSkillDiscoveryDetails(
+      lines,
+      "Added published entrypoints",
+      discovery.publishedEntrypoints.added,
+      formatDiscoverySkill,
+    );
+    appendSkillDiscoveryDetails(
+      lines,
+      "Removed published entrypoints",
+      discovery.publishedEntrypoints.removed,
+      formatDiscoverySkill,
+    );
+    appendSkillDiscoveryDetails(
+      lines,
+      "Newly reachable Skills",
+      discovery.reachability.newlyReachable,
+      formatDiscoverySkill,
+    );
+    appendSkillDiscoveryDetails(
+      lines,
+      "Newly not-reached Skills",
+      discovery.reachability.newlyNotReached,
+      formatDiscoverySkill,
+    );
+    appendSkillDiscoveryDetails(
+      lines,
+      "Newly unrouted Skills",
+      discovery.unroutedSkills.newlyUnrouted,
+      formatDiscoverySkill,
+    );
+    appendSkillDiscoveryDetails(
+      lines,
+      "Resolved unrouted Skills",
+      discovery.unroutedSkills.resolvedUnrouted,
+      formatDiscoverySkill,
+    );
+    appendSkillDiscoveryDetails(
+      lines,
+      "Added routes",
+      discovery.routes.added,
+      formatDiscoveryRoute,
+    );
+    appendSkillDiscoveryDetails(
+      lines,
+      "Removed routes",
+      discovery.routes.removed,
+      formatDiscoveryRoute,
+    );
+    appendSkillDiscoveryDetails(
+      lines,
+      "Changed routes",
+      discovery.routes.changed,
+      formatDiscoveryRouteChange,
+    );
+    appendSkillDiscoveryDetails(
+      lines,
+      "Added cyclic components",
+      discovery.cycles.added,
+      formatDiscoveryCycle,
+    );
+    appendSkillDiscoveryDetails(
+      lines,
+      "Resolved cyclic components",
+      discovery.cycles.resolved,
+      formatDiscoveryCycle,
+    );
   }
 
-  lines.push(
-    `- Adoption: ${discovery.adoption.from} -> ${discovery.adoption.to}`,
-    `- Coverage: ${discovery.coverage.from} -> ${discovery.coverage.to}`,
-    `- Published entrypoints: +${discovery.publishedEntrypoints.added.length} / -${discovery.publishedEntrypoints.removed.length}`,
-    `- Reachability: +${discovery.reachability.newlyReachable.length} reachable / +${discovery.reachability.newlyNotReached.length} not-reached`,
-    `- Unrouted Skills: +${discovery.unroutedSkills.newlyUnrouted.length} / -${discovery.unroutedSkills.resolvedUnrouted.length}`,
-    `- Routes: +${discovery.routes.added.length} / -${discovery.routes.removed.length} / ${discovery.routes.changed.length} changed`,
-    `- Cyclic components: +${discovery.cycles.added.length} / -${discovery.cycles.resolved.length}`,
-  );
-  appendSkillDiscoveryDetails(
-    lines,
-    "Added published entrypoints",
-    discovery.publishedEntrypoints.added,
-    formatDiscoverySkill,
-  );
-  appendSkillDiscoveryDetails(
-    lines,
-    "Removed published entrypoints",
-    discovery.publishedEntrypoints.removed,
-    formatDiscoverySkill,
-  );
-  appendSkillDiscoveryDetails(
-    lines,
-    "Newly reachable Skills",
-    discovery.reachability.newlyReachable,
-    formatDiscoverySkill,
-  );
-  appendSkillDiscoveryDetails(
-    lines,
-    "Newly not-reached Skills",
-    discovery.reachability.newlyNotReached,
-    formatDiscoverySkill,
-  );
-  appendSkillDiscoveryDetails(
-    lines,
-    "Newly unrouted Skills",
-    discovery.unroutedSkills.newlyUnrouted,
-    formatDiscoverySkill,
-  );
-  appendSkillDiscoveryDetails(
-    lines,
-    "Resolved unrouted Skills",
-    discovery.unroutedSkills.resolvedUnrouted,
-    formatDiscoverySkill,
-  );
-  appendSkillDiscoveryDetails(
-    lines,
-    "Added routes",
-    discovery.routes.added,
-    formatDiscoveryRoute,
-  );
-  appendSkillDiscoveryDetails(
-    lines,
-    "Removed routes",
-    discovery.routes.removed,
-    formatDiscoveryRoute,
-  );
-  appendSkillDiscoveryDetails(
-    lines,
-    "Changed routes",
-    discovery.routes.changed,
-    formatDiscoveryRouteChange,
-  );
-  appendSkillDiscoveryDetails(
-    lines,
-    "Added cyclic components",
-    discovery.cycles.added,
-    formatDiscoveryCycle,
-  );
-  appendSkillDiscoveryDetails(
-    lines,
-    "Resolved cyclic components",
-    discovery.cycles.resolved,
-    formatDiscoveryCycle,
-  );
+  if (policy?.outcome === "warn") {
+    appendSkillDiscoveryDetails(
+      lines,
+      "CI review policy matches",
+      policy.matches,
+      formatSkillDiscoveryPolicyMatch,
+    );
+  }
   return lines;
+}
+
+function formatSkillDiscoveryPolicySummary(
+  policy: SkillDiscoveryCiPolicyEvaluation,
+): string[] {
+  const { from, to, effective } = policy.configured;
+  const configured =
+    from === to
+      ? [`- CI review policy: ${from}`]
+      : [
+          `- CI review policy: ${from} -> ${to}`,
+          `- Effective CI review policy: ${effective}`,
+        ];
+  if (effective === "off") {
+    return [...configured, "- Policy outcome: PASS — policy disabled"];
+  }
+  if (policy.outcome === "pass") {
+    return [
+      ...configured,
+      "- Policy outcome: PASS — no configured review conditions matched",
+    ];
+  }
+  return [
+    ...configured,
+    "- Policy outcome: WARN — review requested; exit behavior unchanged",
+  ];
+}
+
+function formatSkillDiscoveryPolicyMatch(
+  match: SkillDiscoveryCiPolicyMatch,
+): string {
+  if (match.skill) {
+    return `${match.id}: ${match.skill.id} (\`${match.skill.path}\`)`;
+  }
+  if (match.route) {
+    return `${match.id}: \`${match.route.sourcePath}\` -> \`${match.route.normalizedTarget}\``;
+  }
+  if (match.fromState !== undefined && match.toState !== undefined) {
+    return `${match.id}: ${match.fromState} -> ${match.toState}`;
+  }
+  return `${match.id}: ${match.summary}`;
 }
 
 function hasSkillDiscoveryChanges(discovery: SkillDiscoveryDiff): boolean {

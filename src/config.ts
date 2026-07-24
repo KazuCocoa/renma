@@ -10,6 +10,7 @@ import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 
 const SEVERITIES = ["low", "medium", "high", "critical"] as const;
 const FORMATS = ["text", "json"] as const;
+const SKILL_DISCOVERY_CI_POLICY_MODES = ["off", "warn"] as const;
 
 /** Conventional repository configuration filenames in loading precedence. */
 export const CONFIG_FILENAMES = ["renma.config.json", ".renma.json"] as const;
@@ -59,6 +60,7 @@ export const DEFAULT_CONFIG: ScanConfig = {
   },
   skillDiscovery: {
     adopted: false,
+    ciPolicy: "off",
   },
 };
 
@@ -191,18 +193,32 @@ function skillDiscoveryPolicy(value: unknown): ScanConfig["skillDiscovery"] {
   if (!isRecord(value)) {
     throw new ConfigError("skill_discovery must be an object.");
   }
-  const allowed = new Set(["adopted"]);
+  const allowed = new Set(["adopted", "ci_policy"]);
   for (const key of Object.keys(value)) {
     if (!allowed.has(key)) {
       throw new ConfigError(
-        `Unknown skill_discovery config key "${key}". Allowed keys: adopted.`,
+        `Unknown skill_discovery config key "${key}". Allowed keys: adopted, ci_policy.`,
       );
     }
   }
   if (value.adopted !== undefined && typeof value.adopted !== "boolean") {
     throw new ConfigError("skill_discovery.adopted must be a boolean.");
   }
-  return { adopted: value.adopted ?? false };
+  const adopted = value.adopted ?? false;
+  const ciPolicy =
+    value.ci_policy === undefined
+      ? "off"
+      : enumValue(
+          "skill_discovery.ci_policy",
+          value.ci_policy,
+          SKILL_DISCOVERY_CI_POLICY_MODES,
+        );
+  if (ciPolicy === "warn" && adopted !== true) {
+    throw new ConfigError(
+      'skill_discovery.ci_policy "warn" requires skill_discovery.adopted to be true.',
+    );
+  }
+  return { adopted, ciPolicy };
 }
 
 function enumValue<const T extends readonly string[]>(

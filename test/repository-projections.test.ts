@@ -79,6 +79,9 @@ test("caller-visible mutations cannot change later lazy projections", async (t) 
     snapshot.config.skillDiscovery.adopted = false;
   }, TypeError);
   assert.throws(() => {
+    snapshot.config.skillDiscovery.ciPolicy = "warn";
+  }, TypeError);
+  assert.throws(() => {
     const document = snapshot.documents[0];
     if (document) document.lines[0] = "mutated";
   }, TypeError);

@@ -18,7 +18,8 @@ the static core stabilization sequence; 0.23.0 implements an additive
 repository-wide Readiness projection over that unchanged prepared index; and
 0.23.1 implements an observation-only direct semantic diff over two prepared
 indexes. 0.23.2 projects that same versioned diff into CI as neutral review
-information without changing CI policy.
+information. 0.23.3 adds an explicit warn-only CI review policy over five
+fixed Discovery changes without adding hard-fail gating.
 
 Baseline: Renma 0.21.0
 
@@ -73,8 +74,10 @@ the Discovery graph, diagnostic payloads, or scoring weights. The 0.23.1 slice
 adds exact Discovery topology changes to direct semantic diff without
 classifying them as improvements or regressions. The 0.23.2 slice places those
 exact facts once at the top level of CI JSON and adds bounded neutral Markdown.
-Trust Graph, BOM, ownership, runtime integration, and optional CI policy or
-gating remain deferred.
+The 0.23.3 slice adds strict `off`/`warn` configuration, stricter archived-ref
+selection, deterministic policy matches, bounded policy rendering, and
+warn-only CI status composition. Trust Graph, BOM, ownership, runtime
+integration, and hard-fail gating remain deferred.
 
 The remainder of this document retains the complete design direction so later
 slices can be evaluated consistently. Publication and adoption describe 0.22.1
@@ -85,6 +88,7 @@ Route-cycle review and static-core stabilization describe 0.22.4 behavior.
 The compact Readiness projection describes 0.23.0 behavior.
 The direct semantic diff projection describes 0.23.1 behavior.
 The neutral CI report projection describes 0.23.2 behavior.
+The opt-in warn-only CI review policy describes 0.23.3 behavior.
 
 ## Problem
 
@@ -974,6 +978,38 @@ collection or parse is introduced.
 - format legacy pre-0.23.2 CI reports without inventing a Discovery section or
   mutating their JSON shape.
 
+### 0.23.3: opt-in warn-only Skill Discovery CI review policy
+
+- add strict `skill_discovery.ci_policy` with only `off` and `warn`, default
+  `off`, and require `skill_discovery.adopted: true` for `warn`; init does not
+  enable the policy;
+- retain the base and target modes beside the unchanged internal diff result
+  and select the stricter value under `off < warn`, so enabling applies
+  immediately and `warn -> off` cannot bypass review;
+- emit top-level `skillDiscoveryPolicy` with schema
+  `renma.skill-discovery-ci-policy.v1`, configured base/target/effective modes,
+  `pass`/`warn` outcome, deterministic count, and compact sorted matches;
+- match only adoption weakened, adoption incomplete, newly not-reached
+  eligible Skills under authoritative target coverage, existing routes
+  becoming unusable under authoritative target coverage, and added unusable
+  routes under authoritative target coverage;
+- use stable match IDs
+  `skill_discovery_ci.adoption_weakened`,
+  `skill_discovery_ci.adoption_incomplete`,
+  `skill_discovery_ci.newly_not_reached`,
+  `skill_discovery_ci.route_became_unusable`, and
+  `skill_discovery_ci.added_unusable_route`;
+- keep cycles, removed entrypoints, newly unrouted Skills, removed routes,
+  declaration-count-only changes, newly reachable or resolved not-reached
+  Skills, routes becoming usable, adoption becoming authoritative, and
+  count-only deltas non-policy;
+- add one review note and bounded Markdown matches when enabled conditions
+  match; upgrade only existing `PASS` to `WARN`, preserve dominant `FAIL`, and
+  keep `WARN` exit `0`; and
+- preserve direct diff, Readiness, diagnostics, route/cycle semantics, the
+  nested compatible CI diff, and one collection and Discovery preparation per
+  archived ref.
+
 ### Later integrations
 
 The planned review order is:
@@ -982,17 +1018,19 @@ The planned review order is:
 0.23.0 — Discovery Readiness integration
 0.23.1 — Discovery semantic diff integration
 0.23.2 — neutral Discovery CI report integration
-later   — optional CI policy or gating
+0.23.3 — opt-in warn-only Discovery CI review policy
+later   — independently reviewed hard-fail gating
 ```
 
-Optional policy or gating, Trust Graph, BOM, ownership, observed-reference,
-authoring, richer visualization, and federation additions require independent
-additive contract review.
+Hard-fail gating, Trust Graph, BOM, ownership, observed-reference, authoring,
+richer visualization, and federation additions require independent additive
+contract review. Hard-fail gating has no assigned release.
 
 ## Open Design Questions
 
 These questions are intentionally later work and do not block the stable
-0.23.2 Discovery, Readiness, direct semantic diff, and neutral CI contracts:
+0.23.3 Discovery, Readiness, direct semantic diff, CI projection, and warn-only
+policy contracts:
 
 1. Do observed local Skill references provide enough review value to justify a
    separate non-authoritative projection?
@@ -1045,7 +1083,7 @@ not-reached Skills during partial adoption.
 - automatic route, entrypoint, Skill, config, or generated-file edits;
 - quality, confidence, centrality, or popularity scores;
 - Trust Graph, BOM, ownership, observed-reference, richer visualization,
-  authoring-assistance, federation integration, or optional CI policy and
-  gating in 0.23.2;
+  authoring-assistance, federation integration, or hard-fail CI gating in
+  0.23.3;
   and
 - treating the old experimental PR as the implementation starting point.

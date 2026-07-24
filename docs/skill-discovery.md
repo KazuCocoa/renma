@@ -1,12 +1,12 @@
 # Skill Discovery Graph and Index
 
-Renma 0.23.2 provides a static, declaration-driven Skill-to-Skill graph, a
+Renma 0.23.3 provides a static, declaration-driven Skill-to-Skill graph, a
 versioned Skill Index, a compact repository-level Readiness projection, an
-observation-only direct semantic diff, and a neutral CI report projection. It
-does not interpret task text, select, rank, load, invoke, or execute a Skill.
-Repository authors keep routing conditions in source `SKILL.md` files; Renma
-exposes deterministic publication, adoption, continuation, and structural
-evidence.
+observation-only direct semantic diff, a CI report projection, and an opt-in
+warn-only CI review policy. It does not interpret task text, select, rank, load,
+invoke, or execute a Skill. Repository authors keep routing conditions in
+source `SKILL.md` files; Renma exposes deterministic publication, adoption,
+continuation, and structural evidence.
 
 The progression is intentionally layered:
 
@@ -39,6 +39,9 @@ The progression is intentionally layered:
 
 0.23.2
   neutral Skill Discovery semantic-diff projection in CI reports
+
+0.23.3
+  opt-in warn-only Skill Discovery CI review policy
 ```
 
 ## Three separate facts
@@ -122,17 +125,20 @@ Repository-wide adoption is declared only in Renma JSON configuration:
 ```json
 {
   "skill_discovery": {
-    "adopted": true
+    "adopted": true,
+    "ci_policy": "warn"
   }
 }
 ```
 
-`skill_discovery` must be an object, its only supported key is `adopted`, and
-`adopted` must be a JSON boolean. Omission defaults to `false`; explicit
-`false` does not declare repository-wide adoption. Unknown keys and alternate
-spellings are configuration errors. `renma init` continues to omit this field:
-initializing Renma is not the same decision as adopting repository-wide Skill
-Discovery.
+`skill_discovery` must be an object. Its supported keys are boolean `adopted`
+and string `ci_policy`. Adoption omission defaults to `false`; explicit
+`false` does not declare repository-wide adoption. `ci_policy` supports only
+`off` and `warn`, defaults to `off`, and `warn` requires `adopted: true`.
+Unknown keys, non-string modes, unsupported modes, and alternate spellings are
+configuration errors. `renma init` continues to omit this field: initializing
+Renma is not the same decision as adopting repository-wide Skill Discovery or
+enabling CI review policy.
 
 The prepared Discovery index reports one deterministic adoption state:
 
@@ -457,34 +463,78 @@ Discovery independently, or copy its complete report or diagnostics.
 These facts have no improvement/regression label and do not change direct diff
 exit behavior.
 
-## CI report projection
+## CI report projection and review policy
 
-Renma 0.23.2 exposes the exact existing `SkillDiscoveryDiff` once as required
+Renma exposes the exact existing `SkillDiscoveryDiff` once as required
 top-level `CiReport.skillDiscovery`. Its schema remains
 `renma.skill-discovery-diff.v1`; CI does not construct a second Discovery
 schema or comparison. The nested `CiCompatibleDiffReport` under `diff` omits
 `discovery`, preserving the compact earlier contract and avoiding duplicate
 JSON.
 
-CI calls complete `diff()` exactly once. Each ref therefore uses one immutable
-`RepositorySnapshot`, one discovery pass, one parse per artifact, one catalog
-preparation, one Agent Skills validation, and one Skill Discovery preparation.
-Graph, the Discovery-excluded Readiness subset, and Discovery facts reuse that
-same snapshot.
+CI uses the internal semantic-diff execution exactly once. Each ref therefore
+uses one immutable `RepositorySnapshot`, one discovery pass, one parse per
+artifact, one catalog preparation, one Agent Skills validation, and one Skill
+Discovery preparation. Graph, the Discovery-excluded Readiness subset,
+Discovery facts, and that ref's effective `skillDiscovery.ciPolicy` reuse the
+same snapshot. There is no second diff, config load, repository discovery, or
+Discovery preparation.
+
+New reports also contain one top-level `skillDiscoveryPolicy` value:
+
+```text
+schemaVersion: renma.skill-discovery-ci-policy.v1
+configured: { from, to, effective }
+outcome: pass | warn
+matchCount
+matches
+```
+
+The effective mode uses the stricter archived-ref value under `off < warn`.
+Thus `off -> warn` and `warn -> off` both evaluate as `warn`; a pull request
+cannot bypass review merely by disabling the policy in its target config.
+When effective mode is `off`, evaluation returns `pass`, zero matches, and no
+hypothetical results.
+
+Enabled policy evaluation uses only these stable match IDs and conditions:
+
+- `skill_discovery_ci.adoption_weakened`: adoption moves from `adopted` or
+  `incomplete` to `partial` or `not-adopted`;
+- `skill_discovery_ci.adoption_incomplete`: target adoption is `incomplete`;
+- `skill_discovery_ci.newly_not_reached`: one match per existing
+  `reachability.newlyNotReached` Skill, only with authoritative target coverage;
+- `skill_discovery_ci.route_became_unusable`: one match per changed route whose
+  usable state changes from `true` to `false`, only with authoritative target
+  coverage; and
+- `skill_discovery_ci.added_unusable_route`: one match per added route whose
+  usable state is `false`, only with authoritative target coverage.
+
+Removed entrypoints, newly unrouted Skills, removed routes,
+declaration-count-only changes, newly reachable Skills, resolved not-reached
+Skills, routes becoming usable, adoption becoming authoritative, cycles and
+self-loops, partial/not-adopted coverage observations, and count deltas without
+matching identities do not create policy matches. In particular, a cycle is
+review evidence rather than an automatic defect.
 
 CI Markdown places a bounded `## Skill Discovery Changes` section after the
-semantic-diff summary. It reports schema, neutral policy effect, adoption,
-coverage, publication, reachability, unrouted Skills, route changes, and cycle
-changes. Detailed lists use the shared top-summary cap and direct readers to
-JSON for omitted entries. It does not render the complete graph, diagnostics,
-declaration indices, source lines, or repair instructions.
+semantic-diff summary. It reports policy configuration and outcome plus
+adoption, coverage, publication, reachability, unrouted Skills, route changes,
+cycle changes, and bounded policy matches. Detailed lists use the shared
+top-summary cap and direct readers to JSON for omitted entries. It does not
+render the complete graph, diagnostics, declaration indices, source lines, or
+repair instructions.
 
-`determineCiReportStatus()` and review notes continue to receive only the
-Discovery-free compatible diff. Discovery changes therefore do not affect
-Readiness scores, `PASS`/`WARN`/`FAIL`, review notes, or the established
-`0`/`1` exit behavior. Pre-0.23.2 serialized CI reports without
-`skillDiscovery` retain their prior JSON and Markdown shape when formatted.
-Optional policy or gating remains later work.
+`determineCiReportStatus()` remains typed only over the Discovery-free
+compatible diff. A separate pure composition keeps `fail > warn > pass`: an
+existing `FAIL` remains `FAIL`, an existing `WARN` remains `WARN`, and an
+existing `PASS` becomes `WARN` only when policy outcome is `warn`. One concise
+policy review note is appended for matches. Discovery policy cannot produce
+`FAIL`, and its `WARN` exits `0`.
+
+Pre-0.23.2 serialized CI reports without either Discovery field retain their
+prior JSON and Markdown shape. A 0.23.2 report with `skillDiscovery` but no
+`skillDiscoveryPolicy` retains its observation-only section. Formatting does
+not mutate either legacy generation.
 
 Programmatic compatibility is preserved separately from the direct command
 contract. `buildDiffReport()` accepts older snapshots without prepared
@@ -499,19 +549,21 @@ Continuation and publication data remain separate from
 composition, and impact graph outputs remain route/publication-free. Catalog,
 Trust Graph, BOM, ownership, init, scaffold, guide, and suggestion contracts
 are unchanged. Readiness changes only through the additive 0.23.0 summary and
-checks; direct diff changes only through the additive 0.23.1 section; CI
-changes only through the additive neutral 0.23.2 projection. A repository
-without Discovery metadata or adoption remains valid and warning-free. Its
+checks; direct diff changes only through the additive 0.23.1 section; CI adds
+the neutral projection in 0.23.2 and explicit warn-only policy in 0.23.3. A
+repository without Discovery policy opt-in remains valid and policy-neutral.
+Its
 `not-adopted` Readiness summary is a neutral inventory
 summary: route-eligible, unrouted, and route counts remain visible, while
 publication is not required and coverage is not evaluated.
 
 The current single-repository static Discovery core is stable after 0.22.4,
 with Readiness integration in 0.23.0, direct semantic diff integration in
-0.23.1, and neutral CI report integration in 0.23.2. A `renma discovery`
-command is not implemented. Optional CI policy or gating, Trust Graph, BOM,
+0.23.1, neutral CI report integration in 0.23.2, and opt-in warn-only CI policy
+in 0.23.3. A `renma discovery` command is not implemented. Hard-fail gating,
+per-rule configuration, policy suppressions or allowlists, Trust Graph, BOM,
 ownership, observed Markdown references,
 richer visualization, authoring assistance, scaffold, init, guide, suggestion,
 and multi-repository federation remain independent later decisions informed by
-operational trials. BOM and Trust Graph output contracts contain no Discovery
-additions in 0.23.2.
+operational trials. Hard-fail gating has no assigned release. BOM and Trust
+Graph output contracts contain no Discovery additions in 0.23.3.
