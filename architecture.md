@@ -490,18 +490,30 @@ the Discovery-excluded Readiness subset, and the memoized Discovery index share
 that evidence. Direct diff assigns no improvement/regression classification and
 does not change exits.
 
-CI calls the complete semantic diff once, reusing the same one-snapshot-per-ref
-evidence path and intentionally preparing one Discovery index per ref. Its pure
-projection places the existing `renma.skill-discovery-diff.v1` value once at
-top-level `skillDiscovery` and keeps the nested compatible `diff`
-Discovery-free. Bounded CI Markdown reports the changes after the semantic-diff
-summary. Status, notes, Readiness scores, and exits continue to inspect only
-the compatible diff; optional Discovery policy or gating is deferred.
+CI executes the complete semantic diff once, reusing the same
+one-snapshot-per-ref evidence path and intentionally preparing one Discovery
+index per ref. The internal execution context retains only the base and target
+`skillDiscovery.ciPolicy` modes beside the unchanged report. Its pure CI
+projection places `renma.skill-discovery-diff.v1` once at top-level
+`skillDiscovery`, places `renma.skill-discovery-ci-policy.v1` once at top-level
+`skillDiscoveryPolicy`, and keeps the nested compatible `diff` free of both.
+
+The policy defaults to `off`; explicit `warn` requires repository-wide
+adoption. The stricter archived-ref mode wins under `off < warn`. A pure fixed
+evaluator matches only adoption weakening, adoption incomplete, authoritative
+newly not-reached Skills, authoritative usable-to-unusable route changes, and
+authoritative added unusable routes. A separate composition step preserves
+`fail > warn > pass`: policy may upgrade `PASS` to `WARN`, never produce
+`FAIL`, and `WARN` still exits `0`. Cycles remain non-policy evidence. Direct
+diff and Readiness remain policy-free, and hard-fail gating is deferred without
+an assigned release.
 
 Older programmatic diff-builder inputs receive a neutral Discovery
 compatibility section, while older diff formatter inputs without `discovery`
-retain their previous Markdown. Older CI formatter inputs without
-`skillDiscovery` likewise retain their previous JSON and Markdown shape.
+retain their previous Markdown. Pre-0.23.2 CI formatter inputs without
+Discovery fields retain their previous JSON and Markdown; 0.23.2 inputs with
+`skillDiscovery` but without `skillDiscoveryPolicy` retain the observation-only
+Discovery section.
 
 ## Repository Health Reports
 

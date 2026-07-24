@@ -27,6 +27,13 @@ export interface SecurityConfig {
   profiles?: Record<string, SecurityProfileConfig> | undefined;
 }
 
+export type SkillDiscoveryCiPolicyMode = "off" | "warn";
+
+export interface SkillDiscoveryConfig {
+  adopted: boolean;
+  ciPolicy: SkillDiscoveryCiPolicyMode;
+}
+
 /** Effective scan configuration after defaults, config files, and CLI overrides. */
 export interface ScanConfig {
   failOn: Severity;
@@ -39,9 +46,7 @@ export interface ScanConfig {
   suppressions: SuppressionConfig[];
   layout: LayoutPolicyConfig;
   security: SecurityConfig;
-  skillDiscovery: {
-    adopted: boolean;
-  };
+  skillDiscovery: SkillDiscoveryConfig;
 }
 
 /** Loaded configuration plus the path it came from, when applicable. */

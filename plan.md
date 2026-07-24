@@ -2,7 +2,7 @@
 
 ## Current Product
 
-Renma 0.23.2 is a Git-native Context Repository governance CLI for
+Renma 0.23.3 is a Git-native Context Repository governance CLI for
 agent-consumable knowledge. It applies the review boundary:
 
 ```text
@@ -100,10 +100,18 @@ behavior. CI now intentionally pays for one prepared Discovery index per ref
 while retaining one immutable repository snapshot and one semantic-diff
 execution.
 
+The 0.23.3 slice adds an explicit `skill_discovery.ci_policy: "warn"` review
+policy over five fixed Discovery changes. The default remains `off`; `warn`
+requires repository-wide adoption. CI evaluates the stricter archived-ref mode
+so target-only disablement cannot bypass review, records
+`renma.skill-discovery-ci-policy.v1`, and can upgrade only `PASS` to `WARN`.
+Policy warnings exit `0`, existing `FAIL` remains dominant, cycles remain
+non-policy evidence, and direct diff remains policy-free.
+
 [The Skill Discovery design](plan-discovery.md) defines the full direction and
 the independently bounded 0.22.0 through 0.22.4 core slices, 0.23.0 Readiness
-integration, 0.23.1 semantic diff integration, and 0.23.2 neutral CI report
-integration.
+integration, 0.23.1 semantic diff integration, 0.23.2 neutral CI report
+integration, and 0.23.3 opt-in warn-only CI review policy.
 
 ## Expected Implementation Sequence
 
@@ -137,9 +145,13 @@ integration.
    once, placing its existing Discovery value once at top level, retaining the
    Discovery-free nested diff, and keeping policy, notes, scores, and exits
    independent of Discovery.
-9. Evaluate optional CI policy or gating only as a later separately reviewed
-   decision, as with Trust Graph, BOM, observed-reference, ownership,
-   authoring, richer visualization, and federation integrations.
+9. Ship the 0.23.3 opt-in warn-only review policy with strict `off`/`warn`
+   configuration, the stricter base/target mode, five fixed deterministic
+   match conditions, one bounded policy result and review note, `WARN` exit
+   `0`, and no direct-diff or Readiness changes.
+10. Evaluate hard-fail gating only as a later independently reviewed decision,
+    as with Trust Graph, BOM, observed-reference, ownership, authoring, richer
+    visualization, and federation integrations.
 
 The current roadmap sequence is:
 
@@ -147,7 +159,8 @@ The current roadmap sequence is:
 0.23.0 — Discovery Readiness integration
 0.23.1 — Discovery semantic diff integration
 0.23.2 — neutral Discovery CI report integration
-later   — optional CI policy or gating
+0.23.3 — opt-in warn-only Discovery CI review policy
+later   — independently reviewed hard-fail gating
 ```
 
 The later line identifies review order, not committed product behavior.
@@ -156,7 +169,8 @@ The later line identifies review order, not committed product behavior.
 
 Possible later Renma core work includes:
 
-- optional CI policy for exact, repository-adopted Discovery violations;
+- independently reviewed hard-fail gating after operational experience with
+  the fixed warn-only Discovery policy;
 - product and ownership projections based on stable IDs, exact tags, and
   existing Context or Lens relationships;
 - observed Skill-reference analysis kept separate from authoritative declared

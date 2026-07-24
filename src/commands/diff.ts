@@ -15,6 +15,7 @@ import {
 import type { ContextLensSummary } from "../context-lens.js";
 import type { SecurityPolicyInventorySummary } from "../security-policy-inventory.js";
 import type { ConfigOverrides } from "../config.js";
+import type { SkillDiscoveryCiPolicyMode } from "../types/configuration.js";
 import {
   collectRepositorySnapshot,
   type RepositoryCollectionInstrumentation,
@@ -152,6 +153,14 @@ export interface DiffCollectionInstrumentation {
   to?: RepositoryCollectionInstrumentation;
 }
 
+export interface DiffExecutionContext {
+  report: DiffReport;
+  skillDiscoveryCiPolicy: {
+    from: SkillDiscoveryCiPolicyMode;
+    to: SkillDiscoveryCiPolicyMode;
+  };
+}
+
 interface DiffOptions {
   fromRef: string;
   toRef: string;
@@ -177,7 +186,15 @@ export async function diff(
   targetPath: string,
   options: DiffOptions,
 ): Promise<DiffReport> {
-  return diffWithProjection(targetPath, options, true);
+  return (await executeDiff(targetPath, options)).report;
+}
+
+/** @internal Execute one complete semantic diff while retaining CI-only ref evidence. */
+export async function executeDiff(
+  targetPath: string,
+  options: DiffOptions,
+): Promise<DiffExecutionContext> {
+  return executeDiffWithProjection(targetPath, options, true);
 }
 
 /** @internal Build the pre-0.23.1 projection for compatibility consumers. */
@@ -185,31 +202,34 @@ export async function diffWithoutSkillDiscovery(
   targetPath: string,
   options: DiffOptions,
 ): Promise<DiffReportWithoutSkillDiscovery> {
-  return diffWithProjection(targetPath, options, false);
+  return executeDiffWithProjection(targetPath, options, false);
 }
 
-function diffWithProjection(
+function executeDiffWithProjection(
   targetPath: string,
   options: DiffOptions,
   includeSkillDiscovery: true,
-): Promise<DiffReport>;
-function diffWithProjection(
+): Promise<DiffExecutionContext>;
+function executeDiffWithProjection(
   targetPath: string,
   options: DiffOptions,
   includeSkillDiscovery: false,
 ): Promise<DiffReportWithoutSkillDiscovery>;
-async function diffWithProjection(
+async function executeDiffWithProjection(
   targetPath: string,
   options: DiffOptions,
   includeSkillDiscovery: boolean,
-): Promise<DiffReport | DiffReportWithoutSkillDiscovery> {
+): Promise<DiffExecutionContext | DiffReportWithoutSkillDiscovery> {
   const absoluteTarget = await realpath(resolve(process.cwd(), targetPath));
   const repoRoot = await realpath(
     await gitOutput(absoluteTarget, ["rev-parse", "--show-toplevel"]),
   );
   const relativeTarget = pathWithinRepo(repoRoot, absoluteTarget);
   const tempRoot = await mkdtemp(join(tmpdir(), "renma-diff-"));
-  let report: DiffReport | DiffReportWithoutSkillDiscovery | undefined;
+  let result:
+    | DiffExecutionContext
+    | DiffReportWithoutSkillDiscovery
+    | undefined;
   let primaryError: unknown;
 
   try {
@@ -239,15 +259,27 @@ async function diffWithProjection(
     if (fromResult.status === "rejected") throw fromResult.reason;
     if (toResult.status === "rejected") throw toResult.reason;
 
-    const fromSnapshot = fromResult.value;
-    const toSnapshot = toResult.value;
-    report = includeSkillDiscovery
-      ? buildDiffReport(repoRoot, fromSnapshot, toSnapshot)
-      : buildDiffReportWithoutSkillDiscovery(
+    const fromCollected = fromResult.value;
+    const toCollected = toResult.value;
+    if (includeSkillDiscovery) {
+      result = {
+        report: buildDiffReport(
           repoRoot,
-          fromSnapshot,
-          toSnapshot,
-        );
+          fromCollected.snapshot,
+          toCollected.snapshot,
+        ),
+        skillDiscoveryCiPolicy: {
+          from: fromCollected.skillDiscoveryCiPolicy,
+          to: toCollected.skillDiscoveryCiPolicy,
+        },
+      };
+    } else {
+      result = buildDiffReportWithoutSkillDiscovery(
+        repoRoot,
+        fromCollected.snapshot,
+        toCollected.snapshot,
+      );
+    }
   } catch (error) {
     primaryError = error;
   }
@@ -266,8 +298,8 @@ async function diffWithProjection(
 
   if (primaryError !== undefined) throw primaryError;
   if (cleanupError !== undefined) throw cleanupError;
-  if (report === undefined) throw new Error("Diff report was not generated.");
-  return report;
+  if (result === undefined) throw new Error("Diff report was not generated.");
+  return result;
 }
 
 export function buildDiffReport(
@@ -725,7 +757,10 @@ async function snapshot(
   overrides: ConfigOverrides = {},
   instrumentation?: RepositoryCollectionInstrumentation,
   includeSkillDiscovery = true,
-): Promise<DiffSnapshot> {
+): Promise<{
+  snapshot: DiffSnapshot;
+  skillDiscoveryCiPolicy: SkillDiscoveryCiPolicyMode;
+}> {
   const root = join(tempRoot, label);
   const archivePath = join(tempRoot, `${label}.tar`);
   await mkdir(root, { recursive: true });
@@ -748,13 +783,16 @@ async function snapshot(
     includeSkillDiscovery: false,
   });
   return {
-    ref,
-    root: target,
-    readiness: readinessReport,
-    graph: graphReport,
-    ...(includeSkillDiscovery
-      ? { discovery: repositorySnapshot.skillDiscovery }
-      : {}),
+    snapshot: {
+      ref,
+      root: target,
+      readiness: readinessReport,
+      graph: graphReport,
+      ...(includeSkillDiscovery
+        ? { discovery: repositorySnapshot.skillDiscovery }
+        : {}),
+    },
+    skillDiscoveryCiPolicy: repositorySnapshot.config.skillDiscovery.ciPolicy,
   };
 }
 

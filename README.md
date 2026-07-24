@@ -300,8 +300,9 @@ operational command reference.
 
 `renma ci-report` includes the existing versioned Skill Discovery semantic diff
 once at top-level `skillDiscovery` and keeps its nested compatible `diff`
-Discovery-free. The bounded Markdown section is observation-only: Discovery
-does not affect CI status, review notes, Readiness scores, or exit behavior.
+Discovery-free. Repositories may opt into the fixed warn-only review policy
+with `skill_discovery.ci_policy: "warn"`. Matches can upgrade `PASS` to `WARN`
+and add one review note, but never produce `FAIL`; `WARN` still exits `0`.
 
 `renma scaffold` creates one explicitly requested Skill, Context Asset, or
 Context Lens after its responsibility and asset boundary have been decided. It
@@ -491,10 +492,29 @@ separate JSON configuration decision:
 ```json
 {
   "skill_discovery": {
-    "adopted": true
+    "adopted": true,
+    "ci_policy": "warn"
   }
 }
 ```
+
+`ci_policy` supports only `off` and `warn`, defaults to `off`, and requires
+`adopted: true` when set to `warn`. `renma init` does not enable it. CI reads
+the mode from both archived refs and uses the stricter value (`off < warn`), so
+enabling applies immediately and changing `warn` to `off` in the target ref
+does not bypass review.
+
+The fixed warn-only conditions are repository adoption weakening from
+`adopted`/`incomplete` to `partial`/`not-adopted`, target adoption becoming
+`incomplete`, an eligible Skill becoming not-reached under authoritative
+target coverage, an existing route becoming unusable under authoritative
+target coverage, and a newly added unusable route under authoritative target
+coverage. Cycles, removed entrypoints, newly unrouted Skills, removed routes,
+declaration-count-only changes, newly reachable or resolved not-reached
+Skills, routes becoming usable, and adoption becoming authoritative remain
+review evidence without policy matches. Direct `renma diff` remains
+policy-free; hard-fail gating, per-rule configuration, and policy suppressions
+are deferred.
 
 `graph --view discovery` reports `not-adopted`, `partial`, `incomplete`, or
 `adopted` plus explicit published entrypoints. Published entrypoints define

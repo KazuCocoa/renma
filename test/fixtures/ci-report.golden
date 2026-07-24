@@ -14,7 +14,7 @@
     "readinessScore": 80,
     "readinessLevel": "needs_attention"
   },
-  "status": "pass",
+  "status": "warn",
   "summary": {
     "readinessScoreDelta": 0,
     "readinessLevelChanged": false,
@@ -143,6 +143,36 @@
       "resolved": []
     }
   },
+  "skillDiscoveryPolicy": {
+    "schemaVersion": "renma.skill-discovery-ci-policy.v1",
+    "configured": {
+      "from": "off",
+      "to": "warn",
+      "effective": "warn"
+    },
+    "outcome": "warn",
+    "matchCount": 2,
+    "matches": [
+      {
+        "id": "skill_discovery_ci.newly_not_reached",
+        "summary": "Eligible Skill became not-reached under authoritative coverage.",
+        "skill": {
+          "id": "skill.orphan",
+          "path": "skills/orphan/SKILL.md"
+        }
+      },
+      {
+        "id": "skill_discovery_ci.route_became_unusable",
+        "summary": "Existing Skill Discovery route became unusable.",
+        "route": {
+          "sourcePath": "skills/entry/SKILL.md",
+          "normalizedTarget": "skill.target"
+        },
+        "fromState": "usable",
+        "toState": "unusable"
+      }
+    ]
+  },
   "securityPosture": {
     "added": {
       "totalSecurityFindings": 0,
@@ -180,7 +210,7 @@
     }
   },
   "notes": [
-    "No CI report regressions detected."
+    "Skill Discovery CI review policy matched 2 changes."
   ],
   "diff": {
     "root": "/repo",
