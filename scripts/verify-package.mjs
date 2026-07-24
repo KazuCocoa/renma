@@ -101,6 +101,7 @@ try {
     "dist-test/",
     "test/",
     "src/",
+    "examples/",
     "coverage/",
     ".git/",
   ]) {
@@ -108,13 +109,18 @@ try {
       throw new Error(`Package unexpectedly includes ${forbiddenPrefix}`);
     }
   }
-  for (const forbidden of [
-    "examples/interactive-placeholder/workspace/output.txt",
-    "npm-debug.log",
-  ]) {
+  for (const forbidden of ["plan.md", "plan-discovery.md", "npm-debug.log"]) {
     if (files.has(forbidden)) {
       throw new Error(`Package unexpectedly includes ${forbidden}`);
     }
+  }
+  const generatedSourceMap = [...files].find((file) =>
+    file.endsWith(".js.map"),
+  );
+  if (generatedSourceMap) {
+    throw new Error(
+      `Package unexpectedly includes generated source map ${generatedSourceMap}`,
+    );
   }
 
   const tarballPath = path.resolve(packDirectory, report.filename);

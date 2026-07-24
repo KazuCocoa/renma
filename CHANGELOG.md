@@ -6,6 +6,29 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.23.4] - 2026-07-24
+
+### Changed
+
+- Reduced the published npm package from 3,078,627 to 2,062,004 unpacked bytes
+  (33.0% smaller) and from 315 to 205 files (34.9% fewer) compared with 0.23.3.
+  The release omits generated JavaScript source maps, repository examples, and
+  internal planning documents from the package while retaining them in the
+  source repository.
+- Changed links to repository-only examples and planning documents in packaged
+  documentation to use stable GitHub URLs, so those resources remain
+  accessible without being duplicated in the npm artifact.
+- Added package verification guards that reject generated source maps,
+  repository examples, and internal planning documents if they re-enter the
+  published artifact.
+
+### Compatibility
+
+- Preserved the CLI, runtime JavaScript, TypeScript declarations, published
+  schemas, user documentation, README targets, and deep-import checks. The
+  reduction changes only debug source-map availability and which
+  repository-only support files are copied into the npm package.
+
 ## [0.23.3] - 2026-07-24
 
 ### Added
@@ -1339,7 +1362,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.23.3...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.23.4...HEAD
+[0.23.4]: https://github.com/KazuCocoa/renma/compare/v0.23.3...v0.23.4
 [0.23.3]: https://github.com/KazuCocoa/renma/compare/v0.23.2...v0.23.3
 [0.23.2]: https://github.com/KazuCocoa/renma/compare/v0.23.1...v0.23.2
 [0.23.1]: https://github.com/KazuCocoa/renma/compare/v0.23.0...v0.23.1

@@ -59,21 +59,26 @@ Use this index to choose the smallest document that answers your question.
   boundaries.
 - [Internal Architecture](internal-architecture.md): contributor-facing
   snapshot, evidence, decision, rendering, and fail-closed boundaries.
-- [Current Roadmap](../plan.md): shipped baseline, product boundaries, and
-  forward-looking priorities.
-- [Skill Discovery Design](../plan-discovery.md): complete layered design and
+- [Current Roadmap](https://github.com/KazuCocoa/renma/blob/main/plan.md):
+  shipped baseline, product boundaries, and forward-looking priorities.
+- [Skill Discovery Design](https://github.com/KazuCocoa/renma/blob/main/plan-discovery.md):
+  complete layered design and
   release slicing. The 0.22.0 route foundation, 0.22.1 publication/adoption,
   0.22.2 reachability/coverage, 0.22.3 Skill Index, and 0.22.4 route-cycle
   stabilization slices are operational.
 
 ## Examples
 
-- [Interactive Placeholder Example](../examples/interactive-placeholder): a
+- [Interactive Placeholder Example](https://github.com/KazuCocoa/renma/tree/main/examples/interactive-placeholder):
+  a
   minimal hands-on clarify-before-act Skill interaction with a local tool.
-- [Example Context Repository](../examples/context-repo): richer
+- [Example Context Repository](https://github.com/KazuCocoa/renma/tree/main/examples/context-repo):
+  richer
   repository-aware Skill, Context Lens, and Context Asset governance.
-- [Context Lens Example](../examples/context-lens): focused Context Lens
+- [Context Lens Example](https://github.com/KazuCocoa/renma/tree/main/examples/context-lens):
+  focused Context Lens
   governance.
-- [GitHub Actions example](../examples/github-actions/renma-ci-report.yml): live
+- [GitHub Actions example](https://github.com/KazuCocoa/renma/blob/main/examples/github-actions/renma-ci-report.yml):
+  live
   Skill validation, focused composition, catalog, CI report artifacts, and an
   updatable CI report comment on same-repository pull requests.

@@ -534,7 +534,8 @@ replace semantic review of the Skill.
 
 For a repository-aware specification-review example using a Skill, a Context
 Lens, and direct Context Asset relationships, see
-[`examples/context-repo`](../examples/context-repo). It is statically navigable
+[`examples/context-repo`](https://github.com/KazuCocoa/renma/tree/main/examples/context-repo).
+It is statically navigable
 only for a consumer with the repository checkout that follows the Skill and
 Lens relative links; Renma validates the relationships but does not load them.
 
@@ -632,14 +633,15 @@ Other default scan glob families are:
 - Fixing scan findings? See [Diagnostics Reference](diagnostics.md).
 - Reviewing thresholds? See [Renma Quality Profile](quality-profile.md).
 - Trying a minimal clarify-before-act Skill interaction? Use
-  [`examples/interactive-placeholder`](../examples/interactive-placeholder).
+  [`examples/interactive-placeholder`](https://github.com/KazuCocoa/renma/tree/main/examples/interactive-placeholder).
 - Trying richer repository-aware Skill, Context Lens, and Context Asset
-  governance? See [`examples/context-repo`](../examples/context-repo).
+  governance? See
+  [`examples/context-repo`](https://github.com/KazuCocoa/renma/tree/main/examples/context-repo).
 - Focusing specifically on Context Lens governance? See
-  [`examples/context-lens`](../examples/context-lens).
+  [`examples/context-lens`](https://github.com/KazuCocoa/renma/tree/main/examples/context-lens).
 - Adding live Skill validation, composition, catalog, and CI evidence to GitHub
   Actions? See the
-  [GitHub Actions example](../examples/github-actions/renma-ci-report.yml).
+  [GitHub Actions example](https://github.com/KazuCocoa/renma/blob/main/examples/github-actions/renma-ci-report.yml).
   It updates one CI report comment for same-repository pull requests and keeps
   uploaded artifacts as the fallback for fork pull requests.
 
@@ -647,7 +649,8 @@ Other default scan glob families are:
 
 For a mini-repository with a statically navigable Skill, a Context Lens, shared
 Context Assets, ownership metadata, and graph relationships, see
-[`examples/context-repo`](../examples/context-repo). The consumer must have the
+[`examples/context-repo`](https://github.com/KazuCocoa/renma/tree/main/examples/context-repo).
+The consumer must have the
 checkout and follow the Skill and Lens relative links; the fixture is not a
 portable self-contained Agent Skills package.
 

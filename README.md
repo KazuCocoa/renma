@@ -558,18 +558,23 @@ canonical and migration rules.
 - [Skill Discovery Graph and Index contract](docs/skill-discovery.md)
 - [Architecture](architecture.md)
 - [Product Design](design.md)
-- [Current Roadmap](plan.md)
-- [Skill Discovery Design](plan-discovery.md): complete layered direction and
+- [Current Roadmap](https://github.com/KazuCocoa/renma/blob/main/plan.md)
+- [Skill Discovery Design](https://github.com/KazuCocoa/renma/blob/main/plan-discovery.md):
+  complete layered direction and
   release slicing. The 0.22.0 route foundation, 0.22.1 publication/adoption,
   0.22.2 reachability/coverage, 0.22.3 versioned Skill Index report/command,
   and 0.22.4 deterministic route-cycle diagnostics/stabilization slices are
   implemented.
-- [Interactive Placeholder Example](examples/interactive-placeholder): minimal
+- [Interactive Placeholder Example](https://github.com/KazuCocoa/renma/tree/main/examples/interactive-placeholder):
+  minimal
   hands-on clarify-before-act Skill interaction with a local tool.
-- [Example Context Repository](examples/context-repo): richer repository-aware
+- [Example Context Repository](https://github.com/KazuCocoa/renma/tree/main/examples/context-repo):
+  richer repository-aware
   Skill, Context Lens, and Context Asset governance.
-- [Context Lens Example](examples/context-lens): focused Context Lens governance.
-- [GitHub Actions Example](examples/github-actions/renma-ci-report.yml): live
+- [Context Lens Example](https://github.com/KazuCocoa/renma/tree/main/examples/context-lens):
+  focused Context Lens governance.
+- [GitHub Actions Example](https://github.com/KazuCocoa/renma/blob/main/examples/github-actions/renma-ci-report.yml):
+  live
   Skill validation, focused composition, catalog, CI report artifacts, and an
   updatable CI report comment on same-repository pull requests.
 

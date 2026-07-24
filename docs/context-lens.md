@@ -29,7 +29,9 @@ or LLM can identify the same questions, risks, evidence, and expected output.
 Renma can validate the declared structure and relationships, but it cannot
 deterministically prove that this semantic guidance is professionally sound.
 
-See [`examples/context-lens`](../examples/context-lens) for a runnable fixture
+See
+[`examples/context-lens`](https://github.com/KazuCocoa/renma/tree/main/examples/context-lens)
+for a runnable fixture
 with two valid Lenses, a complete focused workflow, and zero scan findings.
 
 ## The Problem A Lens Solves
