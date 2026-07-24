@@ -1040,7 +1040,7 @@ test("route-cycle warnings propagate through scan, diagnostics v2, review bundle
   assert.doesNotMatch(JSON.stringify(scanResult.trustGraph), /DISCOVERY-/);
 });
 
-test("a cycle introduced after base reaches Readiness while deferred reports remain unchanged", async () => {
+test("a cycle introduced after base reaches Readiness, direct diff, and neutral CI while Trust Graph and BOM remain unchanged", async () => {
   const root = await routeCycleIntroductionGitFixture();
   try {
     const scanReport = await scan(root);
@@ -1411,7 +1411,7 @@ test("existing graph views remain route-free and invalid view help lists discove
   assert.match(help.stdout, /optional for discovery/);
 });
 
-test("authoritative incomplete Discovery reaches Readiness and direct diff while deferred reports remain unchanged", async () => {
+test("authoritative incomplete Discovery reaches Readiness, direct diff, and neutral CI while Trust Graph and BOM remain unchanged", async () => {
   const root = await authoritativeIncompleteGitFixture();
   try {
     const scanReport = await scan(root);

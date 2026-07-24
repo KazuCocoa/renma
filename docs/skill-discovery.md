@@ -1,11 +1,12 @@
 # Skill Discovery Graph and Index
 
 Renma 0.23.2 provides a static, declaration-driven Skill-to-Skill graph, a
-versioned compact index, a compact repository-level Readiness projection, and
-an observation-only direct semantic diff. It does not interpret task text,
-select, rank, load, invoke, or execute a Skill. Repository authors keep routing
-conditions in source `SKILL.md` files; Renma exposes deterministic publication,
-adoption, continuation, and structural evidence.
+versioned Skill Index, a compact repository-level Readiness projection, an
+observation-only direct semantic diff, and a neutral CI report projection. It
+does not interpret task text, select, rank, load, invoke, or execute a Skill.
+Repository authors keep routing conditions in source `SKILL.md` files; Renma
+exposes deterministic publication, adoption, continuation, and structural
+evidence.
 
 The progression is intentionally layered:
 
@@ -33,8 +34,11 @@ The progression is intentionally layered:
 0.23.0
   compact Skill Discovery summary and focused checks in Readiness
 
-0.23.2
+0.23.1
   observation-only Skill Discovery topology changes in direct semantic diff
+
+0.23.2
+  neutral Skill Discovery semantic-diff projection in CI reports
 ```
 
 ## Three separate facts
