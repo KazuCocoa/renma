@@ -15,7 +15,9 @@ unreachable warnings; 0.22.3 implements the versioned
 Markdown and exact optional focus; 0.22.4 implements deterministic route-cycle
 review diagnostics over the authoritative usable continuation graph and closes
 the static core stabilization sequence; 0.23.0 implements an additive
-repository-wide Readiness projection over that unchanged prepared index.
+repository-wide Readiness projection over that unchanged prepared index; and
+0.23.1 implements an observation-only direct semantic diff over two prepared
+indexes without changing CI policy.
 
 Baseline: Renma 0.21.0
 
@@ -66,9 +68,10 @@ deterministic cycle review warnings without changing route, reachability,
 coverage, report-shape, rendering, or downstream-integration contracts.
 The 0.23.0 slice adds compact Discovery counts and five focused checks to
 Readiness without changing Discovery core semantics, `renma.skill-index.v1`,
-the Discovery graph, diagnostic payloads, or scoring weights. Semantic diff,
-CI report, Trust Graph, BOM, ownership, and runtime integrations remain
-deferred.
+the Discovery graph, diagnostic payloads, or scoring weights. The 0.23.1 slice
+adds exact Discovery topology changes to direct semantic diff without
+classifying them as improvements or regressions. CI report, Trust Graph, BOM,
+ownership, runtime integration, and optional gating remain deferred.
 
 The remainder of this document retains the complete design direction so later
 slices can be evaluated consistently. Publication and adoption describe 0.22.1
@@ -77,6 +80,7 @@ unreachable diagnostics describe 0.22.2 behavior; the versioned report and
 command describe 0.22.3 behavior.
 Route-cycle review and static-core stabilization describe 0.22.4 behavior.
 The compact Readiness projection describes 0.23.0 behavior.
+The direct semantic diff projection describes 0.23.1 behavior.
 
 ## Problem
 
@@ -785,14 +789,16 @@ flat string-valued `metadata.renma.*`; non-Skill assets cannot declare Skill
 continuations or publication.
 
 Repositories without Discovery metadata keep their current scan, catalog,
-graph, diff, CI, Trust Graph, and BOM behavior. Readiness adds a stable
-neutral inventory `summary.skillDiscovery`. A `not-adopted` repository may
-still report route-eligible and unrouted Skill counts, but publication is not
-required, structural roots are not promoted, and coverage remains explicitly
-unevaluated without warnings. The dedicated Discovery graph view does not add
-continuation edges to existing graph views; `skill-index` is an independent
-report. `renma init` continues to omit repository-wide Discovery adoption;
-authors may set the strict `skill_discovery.adopted` config field explicitly.
+graph, CI, Trust Graph, and BOM behavior. Readiness adds a stable neutral
+inventory `summary.skillDiscovery`; direct diff adds a stable no-change
+Discovery section when both refs retain the same topology. A `not-adopted`
+repository may still report route-eligible and unrouted Skill counts, but
+publication is not required, structural roots are not promoted, and coverage
+remains explicitly unevaluated without warnings. The dedicated Discovery graph
+view does not add continuation edges to existing graph views; `skill-index` is
+an independent report. `renma init` continues to omit repository-wide
+Discovery adoption; authors may set the strict `skill_discovery.adopted` config
+field explicitly.
 
 PR #89 should not be rebased, cherry-picked, restored, or used as the code
 baseline. Implementation starts from the 0.21.0 shared repository snapshot,
@@ -803,7 +809,7 @@ canonical metadata parser, diagnostics, and current CLI conventions.
 After static-core stabilization, operational trials may inform:
 
 - non-authoritative observed Skill references or route candidates;
-- semantic diff, CI summary, suppression, and optional gating;
+- CI summary, suppression, and optional gating;
 - richer route visualizations beyond the initial deterministic Mermaid view;
 - product and ownership projections from exact tags, stable IDs, and existing
   Context/Lens relationships;
@@ -915,27 +921,60 @@ contracts automatically.
   semantic diff, CI, Trust Graph, BOM, ownership, runtime, and telemetry work.
 
 Only direct Readiness requests its Discovery projection in this slice.
-Semantic diff requests the internal Readiness subset without Discovery for
-both refs, CI inherits that path, and BOM continues to build its existing
-subset without preparing or serializing Discovery. Defensive output filters
-remain compatibility guards; no second collection or parse is introduced.
+The 0.23.1 direct diff continues to request this internal Readiness subset
+without Discovery checks, then compares `snapshot.skillDiscovery` separately.
+BOM continues to build its existing subset without preparing or serializing
+Discovery. Defensive output filters remain compatibility guards; no second
+collection or parse is introduced.
 
-### Later integrations
+### 0.23.1: Skill Discovery semantic diff integration
 
-Choose diff, CI or optional gating, Trust Graph, BOM, ownership,
-observed-reference, authoring, richer visualization, or federation additions
-only after operational trials. Each integration receives its own additive
+- collect exactly one immutable `RepositorySnapshot` for each archived Git ref,
+  derive graph and the pre-0.23.0 Readiness subset from it, and access its
+  memoized `skillDiscovery` projection once;
+- add `DiffReport.discovery` with exact adoption and coverage transitions,
+  compact count deltas, effective published entrypoint identities,
+  reachable/not-reached and unrouted identity changes, canonical route-group
+  changes, and maximal cycle-component changes;
+- identify Skills by repository-relative path plus ID, routes by normalized
+  source Skill path plus normalized declared target, and cycles by sorted
+  member IDs;
+- group duplicate declarations under `declarationCount`, ignore declaration
+  order, array position, source lines, and discovery order, and report
+  resolution or usability changes under one stable route identity rather than
+  as removal plus addition;
+- keep direct Markdown bounded and complete JSON deterministic without copying
+  the Skill Index, diagnostics, raw snippets, declaration indices, temp paths,
+  timestamps, or mutable internals; and
+- omit the new section through an explicit CI-compatible diff projection.
+  Discovery facts do not affect CI JSON, Markdown, status, notes, exit behavior,
+  Readiness scoring, or any diagnostic contract in 0.23.1.
+
+### 0.23.2 and later integrations
+
+The planned review order is:
+
+```text
+0.23.0 — Discovery Readiness integration
+0.23.1 — Discovery semantic diff integration
+0.23.2 — Discovery CI report integration
+later   — optional CI policy or gating
+```
+
+0.23.2 CI report integration is not committed product behavior. Optional
+gating, Trust Graph, BOM, ownership, observed-reference, authoring, richer
+visualization, and federation additions also require independent additive
 contract review.
 
 ## Open Design Questions
 
 These questions are intentionally later work and do not block the stable
-0.23.0 Discovery and Readiness contracts:
+0.23.1 Discovery, Readiness, and direct semantic diff contracts:
 
 1. Do observed local Skill references provide enough review value to justify a
    separate non-authoritative projection?
-2. Which integration should follow Readiness: semantic diff, CI summary, or an
-   independently reviewed optional gate?
+2. Should 0.23.2 expose neutral Discovery diff facts in CI, and if so which
+   compact projection avoids implying policy?
 3. Can a useful product projection be derived from existing exact tags and
    Context/Lens identity without adding product metadata or a Product asset?
 4. Which route visualization remains readable in genuinely large cyclic or
@@ -984,7 +1023,7 @@ not-reached Skills during partial adoption.
 - a Product asset or ownership-derived product identity;
 - automatic route, entrypoint, Skill, config, or generated-file edits;
 - quality, confidence, centrality, or popularity scores;
-- Readiness, semantic diff, CI, Trust Graph, BOM, ownership, observed-reference,
-  richer visualization, authoring-assistance, or federation integration in
-  0.22.4; and
+- CI, Trust Graph, BOM, ownership, observed-reference, richer visualization,
+  authoring-assistance, federation integration, or optional gating in 0.23.1;
+  and
 - treating the old experimental PR as the implementation starting point.

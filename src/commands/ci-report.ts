@@ -1,4 +1,10 @@
-import { diff, type DiffReport, type DiffFormat } from "./diff.js";
+import {
+  diffWithoutSkillDiscovery,
+  type DiffCollectionInstrumentation,
+  type DiffReport,
+  type DiffReportWithoutSkillDiscovery,
+  type DiffFormat,
+} from "./diff.js";
 import {
   summarizeSecurityPosture,
   type SecurityPostureSummary,
@@ -16,6 +22,7 @@ import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 
 export type CiReportFormat = DiffFormat;
 export type CiReportStatus = "pass" | "warn" | "fail";
+export type CiCompatibleDiffReport = DiffReportWithoutSkillDiscovery;
 
 export interface CiReport {
   root: string;
@@ -28,13 +35,14 @@ export interface CiReport {
     resolved: SecurityPostureSummary;
   };
   notes: string[];
-  diff: DiffReport;
+  diff: CiCompatibleDiffReport;
 }
 
 interface CiReportOptions {
   fromRef: string;
   toRef: string;
   overrides?: ConfigOverrides;
+  instrumentation?: DiffCollectionInstrumentation;
 }
 
 const MAX_LIST_ITEMS = DEFAULT_QUALITY_PROFILE.presentation.topSummaryItemCap;
@@ -65,7 +73,9 @@ export async function ciReport(
   targetPath: string,
   options: CiReportOptions,
 ): Promise<CiReport> {
-  const report = await diff(targetPath, options);
+  const report = omitSkillDiscovery(
+    await diffWithoutSkillDiscovery(targetPath, options),
+  );
   const status = determineCiReportStatus(report);
   const securityPosture = {
     added: summarizeSecurityPosture(report.findings.added),
@@ -83,6 +93,14 @@ export async function ciReport(
   };
 }
 
+function omitSkillDiscovery(
+  report: CiCompatibleDiffReport & Partial<Pick<DiffReport, "discovery">>,
+): CiCompatibleDiffReport {
+  const { discovery, ...ciCompatibleDiff } = report;
+  void discovery;
+  return ciCompatibleDiff;
+}
+
 export function formatCiReport(
   report: CiReport,
   format: CiReportFormat,
@@ -91,7 +109,9 @@ export function formatCiReport(
   return formatCiReportMarkdown(report);
 }
 
-export function determineCiReportStatus(report: DiffReport): CiReportStatus {
+export function determineCiReportStatus(
+  report: CiCompatibleDiffReport,
+): CiReportStatus {
   if (
     hasNewHighOrCriticalFinding(report) ||
     hasNewUnresolvedRequiredEdge(report) ||
@@ -112,21 +132,25 @@ export function determineCiReportStatus(report: DiffReport): CiReportStatus {
   return "pass";
 }
 
-function hasNewHighOrCriticalFinding(report: DiffReport): boolean {
+function hasNewHighOrCriticalFinding(report: CiCompatibleDiffReport): boolean {
   return report.findings.added.some(
     (finding) => finding.severity === "high" || finding.severity === "critical",
   );
 }
 
-function hasNewUnresolvedRequiredEdge(report: DiffReport): boolean {
+function hasNewUnresolvedRequiredEdge(report: CiCompatibleDiffReport): boolean {
   return report.graph.newUnresolvedEdges.some(isRequiredEdge);
 }
 
-function hasBlockingContextLensDiagnostics(report: DiffReport): boolean {
+function hasBlockingContextLensDiagnostics(
+  report: CiCompatibleDiffReport,
+): boolean {
   return (report.to.contextLens?.diagnosticCounts.error ?? 0) > 0;
 }
 
-function newUnresolvedRequiredEdgeCount(report: DiffReport): number {
+function newUnresolvedRequiredEdgeCount(
+  report: CiCompatibleDiffReport,
+): number {
   return report.graph.newUnresolvedEdges.filter(isRequiredEdge).length;
 }
 
@@ -135,7 +159,7 @@ function isRequiredEdge(edge: { kind: string }): boolean {
 }
 
 function reviewNotes(
-  report: DiffReport,
+  report: CiCompatibleDiffReport,
   status: CiReportStatus,
   addedSecurityPosture: SecurityPostureSummary,
 ): string[] {

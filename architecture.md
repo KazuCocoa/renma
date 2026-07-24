@@ -469,12 +469,32 @@ Categories:
 - Orphaned context changes
 - Repeated-context candidate changes
 - Safety and risk changes
+- Explicit Skill Discovery topology changes
 
 Current command:
 
 ```bash
 renma diff . --from main --to HEAD
 ```
+
+Direct semantic diff includes the observation-only
+`renma.skill-discovery-diff.v1` section. It compares prepared adoption,
+coverage, effective publication, reachability, unrouted, canonical route-group,
+and maximal cycle-component facts. Route groups use normalized source Skill
+path plus normalized declared target, independent of declaration index, order,
+or source line. State changes under that identity are changed routes;
+identity-only presence determines additions and removals.
+
+Each ref is collected once into one immutable `RepositorySnapshot`; graph,
+the Discovery-excluded Readiness subset, and the memoized Discovery index share
+that evidence. Direct diff assigns no improvement/regression classification and
+does not change exits. CI requests the pre-0.23.1 projection before snapshot
+derivation, so it retains one collection and parse per artifact for each ref
+without preparing or comparing Discovery. Its defensive output projection
+still omits the section. Older programmatic builder inputs receive a neutral
+Discovery compatibility section, while older formatter inputs without
+`discovery` retain their previous Markdown. Neutral CI integration is deferred
+for independent 0.23.2 review and any gating is deferred beyond that.
 
 ## Repository Health Reports
 

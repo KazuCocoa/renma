@@ -398,8 +398,66 @@ test("ci report omits suppressed high findings introduced between git refs", asy
     assert.equal(report.summary.findingsDelta, 0);
     assert.equal(report.summary.highOrCriticalFindingsDelta, 0);
     assert.notEqual(report.status, "fail");
+    assert.equal("discovery" in report.diff, false);
+    assert.equal(
+      "discovery" in
+        (JSON.parse(json) as { diff: Record<string, unknown> }).diff,
+      false,
+    );
+    assert.doesNotMatch(markdown, /Skill Discovery/);
     assert.doesNotMatch(markdown, /SEC-LITERAL-SECRET/);
     assert.doesNotMatch(json, /SEC-LITERAL-SECRET/);
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
+test("ci report skips Skill Discovery preparation for both refs", async () => {
+  const repo = await createSuppressedFindingRepo();
+  const counts = {
+    from: instrumentationCounts(),
+    to: instrumentationCounts(),
+  };
+  try {
+    const report = await ciReport(repo, {
+      fromRef: "base",
+      toRef: "HEAD",
+      instrumentation: {
+        from: instrumentation(counts.from),
+        to: instrumentation(counts.to),
+      },
+    });
+    const markdown = formatCiReport(report, "markdown");
+    const json = JSON.parse(formatCiReport(report, "json")) as CiReport;
+    const command = await withCapturedStdout(() =>
+      runCiReportCommand(repo, {
+        fromRef: "base",
+        toRef: "HEAD",
+        format: "json",
+      }),
+    );
+    const commandJson = JSON.parse(command.stdout) as CiReport;
+
+    for (const refCounts of [counts.from, counts.to]) {
+      assert.equal(refCounts.discovery, 1);
+      assert.equal(refCounts.parsedPaths.length, 1);
+      assert.equal(
+        refCounts.parsedPaths.length,
+        new Set(refCounts.parsedPaths).size,
+      );
+      assert.equal(refCounts.projections.get("catalog"), 1);
+      assert.equal(refCounts.projections.get("agent-skills"), 1);
+      assert.equal(refCounts.projections.get("skill-discovery") ?? 0, 0);
+    }
+    assert.equal(report.status, "pass");
+    assert.deepEqual(report.notes, ["No CI report regressions detected."]);
+    assert.equal(command.code, 0);
+    assert.equal(commandJson.status, report.status);
+    assert.deepEqual(commandJson.notes, report.notes);
+    assert.equal("discovery" in report.diff, false);
+    assert.equal("discovery" in json.diff, false);
+    assert.equal("discovery" in commandJson.diff, false);
+    assert.doesNotMatch(markdown, /Skill Discovery/);
   } finally {
     await rm(repo, { force: true, recursive: true });
   }
@@ -824,4 +882,32 @@ async function withCapturedStdout(
   } finally {
     process.stdout.write = stdoutWrite;
   }
+}
+
+interface InstrumentationCounts {
+  discovery: number;
+  parsedPaths: string[];
+  projections: Map<string, number>;
+}
+
+function instrumentationCounts(): InstrumentationCounts {
+  return {
+    discovery: 0,
+    parsedPaths: [],
+    projections: new Map(),
+  };
+}
+
+function instrumentation(counts: InstrumentationCounts) {
+  return {
+    onDiscovery() {
+      counts.discovery += 1;
+    },
+    onDocumentParse(path: string) {
+      counts.parsedPaths.push(path);
+    },
+    onProjection(name: string) {
+      counts.projections.set(name, (counts.projections.get(name) ?? 0) + 1);
+    },
+  };
 }

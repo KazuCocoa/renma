@@ -2,7 +2,7 @@
 
 ## Current Product
 
-Renma 0.23.0 is a Git-native Context Repository governance CLI for
+Renma 0.23.1 is a Git-native Context Repository governance CLI for
 agent-consumable knowledge. It applies the review boundary:
 
 ```text
@@ -83,9 +83,18 @@ adoption makes coverage gaps review warnings; partial and not-adopted coverage
 remain descriptive. The checks add visibility without a new score weight or a
 second penalty for existing diagnostics.
 
+The 0.23.1 slice adds an observation-only `DiffReport.discovery` projection to
+direct `renma diff`. It compares exact adoption, coverage, effective
+publication, reachable/not-reached and unrouted Skill identities, canonical
+route groups, and maximal cyclic components from the prepared indexes for two
+refs. Route identity uses normalized source path plus normalized declared
+target, so declaration order and source lines are not semantic identity.
+Renma assigns no improvement/regression classification, CI status, warning,
+gate, or exit-code effect to these facts.
+
 [The Skill Discovery design](plan-discovery.md) defines the full direction and
-the independently bounded 0.22.0 through 0.22.4 core slices and 0.23.0
-Readiness integration.
+the independently bounded 0.22.0 through 0.22.4 core slices, 0.23.0 Readiness
+integration, and 0.23.1 semantic diff integration.
 
 ## Expected Implementation Sequence
 
@@ -112,15 +121,32 @@ Readiness integration.
    compact additive summary and five non-double-counting checks. Preserve
    descriptive partial coverage, warning-only cycle review, and every existing
    Discovery semantic and diagnostic contract.
-7. Evaluate semantic diff, CI, Trust Graph, BOM, observed-reference, ownership,
-   authoring, richer visualization, and federation integrations as independent
-   later decisions informed by operational trials.
+7. Ship the 0.23.1 observation-only direct semantic diff from one immutable
+   `RepositorySnapshot` per ref. Compare prepared Discovery identities and
+   route/cycle state without changing Readiness, diagnostics, CI, or exits.
+8. Evaluate 0.23.2 CI report integration independently. Any optional CI policy
+   or gating remains a later separately reviewed decision, as do Trust Graph,
+   BOM, observed-reference, ownership, authoring, richer visualization, and
+   federation integrations.
+
+The current roadmap sequence is:
+
+```text
+0.23.0 — Discovery Readiness integration
+0.23.1 — Discovery semantic diff integration
+0.23.2 — Discovery CI report integration
+later   — optional CI policy or gating
+```
+
+The 0.23.2 and later lines identify review order, not committed product
+behavior.
 
 ## Later Candidates
 
 Possible later Renma core work includes:
 
-- Discovery summaries in semantic diff and CI reports;
+- Discovery projection in CI reports after an independent 0.23.2 contract
+  review;
 - optional CI policy for exact, repository-adopted Discovery violations;
 - product and ownership projections based on stable IDs, exact tags, and
   existing Context or Lens relationships;

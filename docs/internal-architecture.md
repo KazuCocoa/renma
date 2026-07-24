@@ -194,18 +194,46 @@ a second collection or parse.
 
 BOM builds graph, scan, its existing Readiness subset, policy inventory, and
 diagnostics from the same snapshot and core; the 0.23.0 Discovery Readiness
-addition is intentionally not projected into BOM, semantic diff, or CI.
-Semantic diff requests the internal Readiness subset without Skill Discovery
-for both refs, and CI inherits that behavior through semantic diff. BOM builds
-the subset without requesting Discovery. Defensive `discovery.*` output
-filters remain, but these consumers do not prepare the projection. Existing
-catalog and Agent Skills preparation still occurs only where graph, scan, or
-Readiness already requires it, not as omitted Discovery work. A working-tree
-mutation after collection cannot influence a later lazy projection. Caller
-attempts to mutate snapshot arrays, nested objects, configuration, or path
-collections also fail without changing the projection input. A new collection
-is required to observe different facts. This keeps commands from combining
-independently recollected repository states.
+addition is intentionally not projected into BOM. Semantic diff archives each
+ref and performs exactly one `collectRepositorySnapshot` for that ref. It
+derives graph and the Discovery-excluded Readiness subset from the same
+immutable snapshot, then builds its dedicated 0.23.1 topology diff directly
+from the memoized `snapshot.skillDiscovery`. This produces one discovery pass,
+one parse per artifact, one catalog preparation, one Agent Skills validation,
+and one Skill Discovery preparation per ref. It does not call `skill-index`,
+reconstruct Discovery, or recollect for graph or Readiness.
+
+CI calls the same internal semantic-diff pipeline once with the pre-0.23.1
+projection selected before snapshot derivation. Each ref still has one
+repository collection and one parse per artifact, but CI never dereferences
+`snapshot.skillDiscovery` and never constructs `SkillDiscoveryDiff`. The
+defensive `CiCompatibleDiffReport` omission remains at the serialization
+boundary. CI JSON, Markdown, status, notes, and exit behavior therefore retain
+their previous contract, with integration and policy deferred to 0.23.2 or
+later.
+
+The exported `buildDiffReport()` helper still accepts pre-0.23.1 snapshots that
+contain only ref, root, Readiness, and graph. When either prepared Discovery
+index is absent it supplies a stable neutral Discovery compatibility object
+without inferring topology from those older fields. `formatDiff()` also accepts
+a legacy report without `discovery` and renders the previous non-Discovery
+Markdown shape. BOM builds its subset without requesting Discovery. Defensive
+`discovery.*` Readiness check filters remain. Existing catalog and Agent Skills
+preparation still occurs only where graph, scan, Readiness, or the direct diff
+projection requires it. A working-tree mutation after collection cannot
+influence a later lazy projection. Caller attempts to mutate snapshot arrays,
+nested objects, configuration, or path collections also fail without changing
+the projection input. A new collection is required to observe different
+facts. This keeps commands from combining independently recollected repository
+states.
+
+The Discovery diff projection is pure. Skill keys use normalized
+repository-relative path plus ID; route-group keys use normalized source Skill
+path plus normalized declared target; cycle keys use sorted maximal component
+member IDs. Declaration indices, YAML order, source lines, traversal order,
+resolved targets, diagnostics, and mutable index objects are not identities.
+Duplicate declarations change one group's count, while operational resolution
+or usability changes under the same key remain one changed route.
 
 ## CLI Commands Have One Registered Contract
 

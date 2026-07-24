@@ -1,11 +1,11 @@
 # Skill Discovery Graph and Index
 
-Renma 0.23.0 provides a static, declaration-driven Skill-to-Skill graph, a
-versioned compact index, and a compact repository-level Readiness projection.
-It does not interpret task text, select, rank, load, invoke, or execute a Skill.
-Repository authors keep routing conditions in source `SKILL.md` files; Renma
-exposes deterministic publication, adoption, continuation, and structural
-evidence.
+Renma 0.23.1 provides a static, declaration-driven Skill-to-Skill graph, a
+versioned compact index, a compact repository-level Readiness projection, and
+an observation-only direct semantic diff. It does not interpret task text,
+select, rank, load, invoke, or execute a Skill. Repository authors keep routing
+conditions in source `SKILL.md` files; Renma exposes deterministic publication,
+adoption, continuation, and structural evidence.
 
 The progression is intentionally layered:
 
@@ -32,6 +32,9 @@ The progression is intentionally layered:
 
 0.23.0
   compact Skill Discovery summary and focused checks in Readiness
+
+0.23.1
+  observation-only Skill Discovery topology changes in direct semantic diff
 ```
 
 ## Three separate facts
@@ -334,7 +337,8 @@ responsibility, not to remove publication solely to silence the warning.
 Both diagnostics flow through normal scan output, diagnostics v2, and review
 bundles. They do not create a CI gate. Readiness 0.23.0 may reference their
 stable codes and messages as compact check evidence without copying them into
-its diagnostic collection; semantic diff, CI report, Trust Graph, and BOM
+its diagnostic collection. The 0.23.1 semantic diff compares prepared topology
+facts but does not copy these diagnostics; CI report, Trust Graph, and BOM
 remain excluded.
 
 Renma 0.22.2 adds
@@ -347,8 +351,8 @@ the Skill is an independent first hop, belongs beneath a real source-owned
 workflow, or falls outside the intended repository-wide policy. This warning
 also flows through scan, diagnostics v2, and review bundles. Readiness 0.23.0
 uses it as the authority for adopted-mode coverage check evidence without
-duplicating the diagnostic or applying another score penalty. It remains
-outside Trust Graph, semantic diff, CI, and BOM projections.
+duplicating the diagnostic or applying another score penalty. Its diagnostic
+payload remains outside Trust Graph, semantic diff, CI, and BOM projections.
 
 Renma 0.22.4 adds `DISCOVERY-ROUTE-CYCLE` without requiring repository-wide
 adoption. It is emitted whenever the prepared usable continuation graph
@@ -406,30 +410,76 @@ diagnostics are referenced rather than copied or penalized again. Use
 `renma graph --view discovery` for topology and source evidence.
 
 The direct Readiness command prepares the memoized Discovery projection once.
-Its internal projection boundary is disabled for semantic diff snapshots, so
-CI inherits the same exclusion. BOM continues to build and serialize its
-pre-0.23.0 Readiness subset without preparing Discovery for that subset. These
-paths retain their defensive output filters, but do not perform unnecessary
-Discovery projection work.
+Semantic diff retains the pre-0.23.0 Readiness subset, then uses the same
+snapshot's prepared Discovery index only for its dedicated 0.23.1 section.
+CI requests the older projection before snapshot derivation and therefore
+never prepares or compares Discovery. BOM continues to build and serialize its
+pre-0.23.0 Readiness subset without preparing Discovery for that subset.
+
+## Semantic diff projection
+
+Renma 0.23.1 adds an observation-only `discovery` section to direct
+`renma diff` JSON and Markdown. It reports exact from/to adoption and coverage
+modes, count deltas, effective published entrypoint additions/removals,
+newly-reachable and newly-not-reached Skills, newly/resolved unrouted Skills,
+route additions/removals/state changes, and added/resolved maximal cyclic
+components. Count deltas use `to - from`; identity lists remain present because
+equal additions and removals can cancel numerically.
+
+Skill identity is repository-relative path plus visible ID. Route identity is
+normalized source Skill path plus normalized declared target. It deliberately
+excludes declaration index, YAML array position, source line, discovery order,
+resolved target, and object insertion order. Declarations with the same route
+identity form one group whose `declarationCount` records duplicate changes.
+Reordering declarations therefore produces no diff. A resolution, candidate,
+resolved-target, lifecycle, usability, or reason change under the same
+identity is one changed route; only identity presence determines route
+addition or removal.
+
+Cycle identity is the sorted maximal strongly connected component member-ID
+set. Internal edge order does not create a resolved-plus-added cycle pair;
+edge changes remain route changes. Reachability uses only the prepared
+reachable/not-reached partitions, and empty sets stay empty when coverage is
+not evaluated. Structural roots are never inferred as publication.
+
+Each archived ref is collected once into one immutable `RepositorySnapshot`.
+Graph, the Discovery-excluded Readiness subset, and `snapshot.skillDiscovery`
+therefore share one parse, catalog preparation, Agent Skills validation, and
+Discovery preparation per ref. The diff does not call `skill-index`, reconstruct
+Discovery independently, or copy its complete report or diagnostics.
+
+These facts have no improvement/regression label and do not change direct diff
+exit behavior. CI selects the older diff projection before snapshot derivation,
+so it performs one collection and parse per artifact for each ref without
+preparing a Discovery index or building a Discovery diff. CI JSON and Markdown
+explicitly omit `discovery`; CI status, notes, and exits are unchanged in
+0.23.1. Neutral CI report integration is reserved for an independently reviewed
+0.23.2 slice, while optional policy or gating remains later work.
+
+Programmatic compatibility is preserved separately from the direct command
+contract. `buildDiffReport()` accepts older snapshots without prepared
+Discovery indexes and returns a stable neutral Discovery section rather than
+inferring topology. `formatDiff()` accepts older serialized reports without
+`discovery` and retains their previous non-Discovery Markdown shape.
 
 ## Compatibility and future work
 
 Continuation and publication data remain separate from
 `catalog.dependencies`. Existing full, summary, workflow, layered,
 composition, and impact graph outputs remain route/publication-free. Catalog,
-diff, CI report, Trust Graph, BOM, ownership, init, scaffold, guide, and
-suggestion contracts are unchanged. Readiness changes only through the
-additive 0.23.0 summary and checks. A repository without Discovery metadata or
-adoption remains valid and warning-free. Its `not-adopted` Readiness summary is
-a neutral inventory summary: route-eligible, unrouted, and route counts remain
-visible, while publication is not required and coverage is not evaluated.
+CI report, Trust Graph, BOM, ownership, init, scaffold, guide, and suggestion
+contracts are unchanged. Readiness changes only through the additive 0.23.0
+summary and checks; direct diff changes only through the additive 0.23.1
+section. A repository without Discovery metadata or adoption remains valid and
+warning-free. Its `not-adopted` Readiness summary is a neutral inventory
+summary: route-eligible, unrouted, and route counts remain visible, while
+publication is not required and coverage is not evaluated.
 
 The current single-repository static Discovery core is stable after 0.22.4,
-and its first downstream projection ships in Readiness 0.23.0. A
-`renma discovery` command is not implemented. Semantic diff, CI report or
-optional gating, Trust Graph, BOM, ownership, observed Markdown references,
+with Readiness integration in 0.23.0 and direct semantic diff integration in
+0.23.1. A `renma discovery` command is not implemented. CI report or optional
+gating, Trust Graph, BOM, ownership, observed Markdown references,
 richer visualization, authoring assistance, scaffold, init, guide, suggestion,
 and multi-repository federation remain independent later decisions informed by
-operational trials. Their output contracts contain no Discovery additions, and
-the 0.23.0 Readiness integration adds no Discovery preparation to deferred
-diff, CI, BOM, or Trust Graph output paths.
+operational trials. CI, BOM, and Trust Graph output contracts contain no
+Discovery additions in 0.23.1.
