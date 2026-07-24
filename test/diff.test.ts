@@ -10,6 +10,7 @@ import {
   zeroSecurityPolicyInventorySummary,
   type SecurityPolicyInventorySummary,
 } from "../src/security-policy-inventory.js";
+import type { SkillDiscoveryIndex } from "../src/skill-discovery.js";
 
 const execFile = promisify(execFileCallback);
 
@@ -250,6 +251,9 @@ test("formatDiff renders markdown summaries", () => {
   assert.match(markdown, /Readiness score: 90 \(\+90\)/);
   assert.match(markdown, /Scanned files: 6 \(\+6\)/);
   assert.match(markdown, /Total assets: 1 \(\+1\)/);
+  assert.match(markdown, /^## Skill Discovery Changes$/m);
+  assert.match(markdown, /- Adoption: not-adopted -> not-adopted/);
+  assert.equal(parsed.discovery.schemaVersion, "renma.skill-discovery-diff.v1");
   assert.doesNotMatch(markdown, /- Assets:/);
   assert.match(markdown, /Added assets: 1/);
   assert.match(markdown, /^## Security Changes$/m);
@@ -275,6 +279,41 @@ test("formatDiff renders markdown summaries", () => {
   );
   assert.equal(parsed.security.posture.added.totalSecurityFindings, 1);
   assert.equal(parsed.security.policyInventory.totalPolicyAssets, 2);
+});
+
+test("diff collects and prepares each archived ref exactly once", async () => {
+  const repo = await createGitRepo();
+  const counts = {
+    from: instrumentationCounts(),
+    to: instrumentationCounts(),
+  };
+  try {
+    const report = await diff(repo, {
+      fromRef: "base",
+      toRef: "HEAD",
+      instrumentation: {
+        from: instrumentation(counts.from),
+        to: instrumentation(counts.to),
+      },
+    });
+
+    assert.equal(
+      report.discovery.schemaVersion,
+      "renma.skill-discovery-diff.v1",
+    );
+    for (const refCounts of [counts.from, counts.to]) {
+      assert.equal(refCounts.discovery, 1);
+      assert.equal(refCounts.projections.get("catalog"), 1);
+      assert.equal(refCounts.projections.get("agent-skills"), 1);
+      assert.equal(refCounts.projections.get("skill-discovery"), 1);
+      assert.equal(
+        refCounts.parsedPaths.length,
+        new Set(refCounts.parsedPaths).size,
+      );
+    }
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
 });
 
 test("formatDiff tolerates legacy reports without security diff", () => {
@@ -393,7 +432,55 @@ function snapshot(ref: string, overrides: Partial<SnapshotInput>) {
       nodes: input.nodes,
       edges: input.edges,
     },
+    discovery: emptySkillDiscoveryIndex(),
   } as unknown as Parameters<typeof buildDiffReport>[1];
+}
+
+function emptySkillDiscoveryIndex(): SkillDiscoveryIndex {
+  return {
+    skills: [],
+    routes: [],
+    adoption: {
+      state: "not-adopted",
+      discoveryMetadataPresent: false,
+      repositoryWideAdopted: false,
+      publishedEntrypointCount: 0,
+      reason: "no-discovery-metadata-or-repository-adoption",
+    },
+    coverage: {
+      scope: "repository",
+      mode: "not-evaluated",
+      reason: "discovery-not-adopted",
+      complete: null,
+      sourceEntrypointIds: [],
+      eligibleSkillCount: 0,
+      reachableSkillCount: 0,
+      notReachedSkillCount: 0,
+    },
+    publishedEntrypointIds: [],
+    reachableDiscoveryEligibleSkillIds: [],
+    notReachedDiscoveryEligibleSkillIds: [],
+    structuralRootIds: [],
+    standaloneSkillIds: [],
+    unroutedSkillIds: [],
+    summary: {
+      visibleSkillCount: 0,
+      routeEligibleSkillCount: 0,
+      declaredRouteCount: 0,
+      usableRouteCount: 0,
+      unresolvedRouteCount: 0,
+      ambiguousRouteCount: 0,
+      unresolvedOrAmbiguousRouteCount: 0,
+      invalidRouteCount: 0,
+      structuralRootCount: 0,
+      standaloneSkillCount: 0,
+      unroutedSkillCount: 0,
+      publishedEntrypointCount: 0,
+      reachableSkillCount: 0,
+      notReachedSkillCount: 0,
+    },
+    diagnostics: [],
+  };
 }
 
 interface SnapshotInput {
@@ -538,4 +625,32 @@ function skillMarkdown(id: string, status: string): string {
 async function git(cwd: string, args: string[]): Promise<string> {
   const { stdout } = await execFile("git", ["-C", cwd, ...args]);
   return stdout.trim();
+}
+
+interface InstrumentationCounts {
+  discovery: number;
+  parsedPaths: string[];
+  projections: Map<string, number>;
+}
+
+function instrumentationCounts(): InstrumentationCounts {
+  return {
+    discovery: 0,
+    parsedPaths: [],
+    projections: new Map(),
+  };
+}
+
+function instrumentation(counts: InstrumentationCounts) {
+  return {
+    onDiscovery() {
+      counts.discovery += 1;
+    },
+    onDocumentParse(path: string) {
+      counts.parsedPaths.push(path);
+    },
+    onProjection(name: string) {
+      counts.projections.set(name, (counts.projections.get(name) ?? 0) + 1);
+    },
+  };
 }

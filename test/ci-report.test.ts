@@ -398,6 +398,13 @@ test("ci report omits suppressed high findings introduced between git refs", asy
     assert.equal(report.summary.findingsDelta, 0);
     assert.equal(report.summary.highOrCriticalFindingsDelta, 0);
     assert.notEqual(report.status, "fail");
+    assert.equal("discovery" in report.diff, false);
+    assert.equal(
+      "discovery" in
+        (JSON.parse(json) as { diff: Record<string, unknown> }).diff,
+      false,
+    );
+    assert.doesNotMatch(markdown, /Skill Discovery/);
     assert.doesNotMatch(markdown, /SEC-LITERAL-SECRET/);
     assert.doesNotMatch(json, /SEC-LITERAL-SECRET/);
   } finally {

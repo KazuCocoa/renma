@@ -3,8 +3,11 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { execFile as execFileCallback } from "node:child_process";
-import { graph, type GraphReport } from "./graph.js";
-import { readiness, type ReadinessReport } from "./readiness.js";
+import { graphFromRepositorySnapshot, type GraphReport } from "./graph.js";
+import {
+  readinessFromRepositorySnapshot,
+  type ReadinessReport,
+} from "./readiness.js";
 import {
   buildSecurityDiffSummary,
   type SecurityDiffSummary,
@@ -12,6 +15,20 @@ import {
 import type { ContextLensSummary } from "../context-lens.js";
 import type { SecurityPolicyInventorySummary } from "../security-policy-inventory.js";
 import type { ConfigOverrides } from "../config.js";
+import {
+  collectRepositorySnapshot,
+  type RepositoryCollectionInstrumentation,
+} from "../repository-evidence.js";
+import {
+  buildSkillDiscoveryDiff,
+  type SkillDiscoveryCycleDiff,
+  type SkillDiscoveryDiff,
+  type SkillDiscoveryDiffSkill,
+  type SkillDiscoveryRouteChange,
+  type SkillDiscoveryRouteDiffState,
+} from "../skill-discovery-diff.js";
+import type { SkillDiscoveryIndex } from "../skill-discovery.js";
+import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 
 const execFile = promisify(execFileCallback);
 
@@ -44,6 +61,7 @@ export interface DiffReport {
   readiness: {
     checkChanges: ReadinessCheckChange[];
   };
+  discovery: SkillDiscoveryDiff;
   security: SecurityDiffSummary;
   findings: {
     added: FindingDelta[];
@@ -121,6 +139,12 @@ interface Snapshot {
   root: string;
   readiness: ReadinessReport;
   graph: GraphReport;
+  discovery: SkillDiscoveryIndex;
+}
+
+export interface DiffCollectionInstrumentation {
+  from?: RepositoryCollectionInstrumentation;
+  to?: RepositoryCollectionInstrumentation;
 }
 
 export async function runDiffCommand(
@@ -143,6 +167,7 @@ export async function diff(
     fromRef: string;
     toRef: string;
     overrides?: ConfigOverrides;
+    instrumentation?: DiffCollectionInstrumentation;
   },
 ): Promise<DiffReport> {
   const absoluteTarget = await realpath(resolve(process.cwd(), targetPath));
@@ -163,6 +188,7 @@ export async function diff(
         tempRoot,
         "from",
         options.overrides,
+        options.instrumentation?.from,
       ),
       snapshot(
         repoRoot,
@@ -171,6 +197,7 @@ export async function diff(
         tempRoot,
         "to",
         options.overrides,
+        options.instrumentation?.to,
       ),
     ]);
 
@@ -284,6 +311,10 @@ export function buildDiffReport(
         readinessChecksWithoutDiscovery(toReadiness.checks),
       ),
     },
+    discovery: buildSkillDiscoveryDiff(
+      fromSnapshot.discovery,
+      toSnapshot.discovery,
+    ),
     security: buildSecurityDiffSummary({
       addedFindings,
       removedFindings,
@@ -332,6 +363,8 @@ function formatDiffMarkdown(report: DiffReport): string {
     `- Findings: ${signed(report.summary.findingsDelta)}`,
     `- High/critical findings: ${signed(report.summary.highOrCriticalFindingsDelta)}`,
     "",
+    ...formatSkillDiscoveryChanges(report.discovery),
+    "",
     "## Catalog",
     "",
     `- Added assets: ${report.catalog.addedAssets.length}`,
@@ -378,6 +411,124 @@ function formatDiffMarkdown(report: DiffReport): string {
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+const DIFF_DETAIL_LIMIT =
+  DEFAULT_QUALITY_PROFILE.presentation.topSummaryItemCap;
+
+function formatSkillDiscoveryChanges(discovery: SkillDiscoveryDiff): string[] {
+  const lines = [
+    "## Skill Discovery Changes",
+    "",
+    `- Adoption: ${discovery.adoption.from} -> ${discovery.adoption.to}`,
+    `- Coverage: ${discovery.coverage.from} -> ${discovery.coverage.to}`,
+    `- Published entrypoints: +${discovery.publishedEntrypoints.added.length} / -${discovery.publishedEntrypoints.removed.length}`,
+    `- Reachability: +${discovery.reachability.newlyReachable.length} reachable / +${discovery.reachability.newlyNotReached.length} not-reached`,
+    `- Unrouted Skills: +${discovery.unroutedSkills.newlyUnrouted.length} / -${discovery.unroutedSkills.resolvedUnrouted.length}`,
+    `- Routes: +${discovery.routes.added.length} / -${discovery.routes.removed.length} / ${discovery.routes.changed.length} changed`,
+    `- Cyclic components: +${discovery.cycles.added.length} / -${discovery.cycles.resolved.length}`,
+  ];
+  appendDiscoveryDetails(
+    lines,
+    "Added published entrypoints",
+    discovery.publishedEntrypoints.added,
+    formatDiscoverySkill,
+  );
+  appendDiscoveryDetails(
+    lines,
+    "Removed published entrypoints",
+    discovery.publishedEntrypoints.removed,
+    formatDiscoverySkill,
+  );
+  appendDiscoveryDetails(
+    lines,
+    "Newly reachable Skills",
+    discovery.reachability.newlyReachable,
+    formatDiscoverySkill,
+  );
+  appendDiscoveryDetails(
+    lines,
+    "Newly not-reached Skills",
+    discovery.reachability.newlyNotReached,
+    formatDiscoverySkill,
+  );
+  appendDiscoveryDetails(
+    lines,
+    "Newly unrouted Skills",
+    discovery.unroutedSkills.newlyUnrouted,
+    formatDiscoverySkill,
+  );
+  appendDiscoveryDetails(
+    lines,
+    "Resolved unrouted Skills",
+    discovery.unroutedSkills.resolvedUnrouted,
+    formatDiscoverySkill,
+  );
+  appendDiscoveryDetails(
+    lines,
+    "Added routes",
+    discovery.routes.added,
+    formatDiscoveryRoute,
+  );
+  appendDiscoveryDetails(
+    lines,
+    "Removed routes",
+    discovery.routes.removed,
+    formatDiscoveryRoute,
+  );
+  appendDiscoveryDetails(
+    lines,
+    "Changed routes",
+    discovery.routes.changed,
+    formatDiscoveryRouteChange,
+  );
+  appendDiscoveryDetails(
+    lines,
+    "Added cyclic components",
+    discovery.cycles.added,
+    formatDiscoveryCycle,
+  );
+  appendDiscoveryDetails(
+    lines,
+    "Resolved cyclic components",
+    discovery.cycles.resolved,
+    formatDiscoveryCycle,
+  );
+  return lines;
+}
+
+function appendDiscoveryDetails<T>(
+  lines: string[],
+  heading: string,
+  items: readonly T[],
+  render: (item: T) => string,
+): void {
+  if (items.length === 0) return;
+  lines.push("", `### ${heading}`, "");
+  lines.push(
+    ...items.slice(0, DIFF_DETAIL_LIMIT).map((item) => `- ${render(item)}`),
+  );
+  if (items.length > DIFF_DETAIL_LIMIT) {
+    lines.push(
+      `- ${items.length - DIFF_DETAIL_LIMIT} more not shown; see JSON for the full list.`,
+    );
+  }
+}
+
+function formatDiscoverySkill(skill: SkillDiscoveryDiffSkill): string {
+  return `${skill.id} (\`${skill.path}\`)`;
+}
+
+function formatDiscoveryRoute(route: SkillDiscoveryRouteDiffState): string {
+  return `\`${route.sourcePath}\` -> \`${route.normalizedTarget}\` (${route.resolution}, ${route.usable ? "usable" : "unusable"}, ${route.declarationCount} declaration${route.declarationCount === 1 ? "" : "s"})`;
+}
+
+function formatDiscoveryRouteChange(change: SkillDiscoveryRouteChange): string {
+  return `\`${change.identity.sourcePath}\` -> \`${change.identity.normalizedTarget}\`: ${change.changedFields.join(", ")}`;
+}
+
+function formatDiscoveryCycle(cycle: SkillDiscoveryCycleDiff): string {
+  return `${cycle.skillIds.join(", ")}${cycle.selfLoop ? " (self-loop)" : ""}`;
 }
 
 function formatSecurityChanges(
@@ -439,6 +590,7 @@ async function snapshot(
   tempRoot: string,
   label: string,
   overrides: ConfigOverrides = {},
+  instrumentation?: RepositoryCollectionInstrumentation,
 ): Promise<Snapshot> {
   const root = join(tempRoot, label);
   const archivePath = join(tempRoot, `${label}.tar`);
@@ -452,17 +604,21 @@ async function snapshot(
   ]);
   await execFile("tar", ["-xf", archivePath, "-C", root]);
   const target = relativeTarget === "." ? root : join(root, relativeTarget);
-  const [readinessReport, graphReport] = await Promise.all([
-    readiness(target, snapshotOverrides(repoRoot, root, overrides), {
-      includeSkillDiscovery: false,
-    }),
-    graph(target, snapshotOverrides(repoRoot, root, overrides)),
-  ]);
+  const repositorySnapshot = await collectRepositorySnapshot(
+    target,
+    snapshotOverrides(repoRoot, root, overrides),
+    instrumentation,
+  );
+  const graphReport = graphFromRepositorySnapshot(repositorySnapshot);
+  const readinessReport = readinessFromRepositorySnapshot(repositorySnapshot, {
+    includeSkillDiscovery: false,
+  });
   return {
     ref,
     root: target,
     readiness: readinessReport,
     graph: graphReport,
+    discovery: repositorySnapshot.skillDiscovery,
   };
 }
 

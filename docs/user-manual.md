@@ -1061,9 +1061,30 @@ renma diff . --from main --to HEAD
 renma diff . --from main --to HEAD --format markdown
 ```
 
-Use this to review what changed between branches or commits. The command builds readiness data for both refs and reports asset, graph, check, and finding deltas.
+Use this to review what changed between branches or commits. The command
+collects each archived ref once and derives graph, the existing
+Discovery-excluded Readiness subset, and Skill Discovery changes from the same
+immutable repository snapshot.
 
-Output includes readiness deltas, changed assets, graph edge changes, check changes, and added or removed findings.
+Output includes readiness deltas, changed assets, graph edge changes, check
+changes, added or removed findings, and an additive
+`renma.skill-discovery-diff.v1` section. The Discovery section reports exact
+adoption and coverage transitions, count deltas, published entrypoint changes,
+newly reachable/not-reached and newly/resolved unrouted Skill identities,
+route additions/removals/state changes, and added/resolved cyclic components.
+
+Skills are identified by repository-relative path and ID. Routes are grouped
+by normalized source Skill path and normalized declared target, so declaration
+reordering, YAML array position, and source-line movement do not create false
+changes. Duplicate declarations change one `declarationCount`; resolution,
+candidate, target, lifecycle, usability, and reason changes under the same
+identity remain a changed route instead of removal plus addition. Cycle
+identity uses the sorted maximal component member IDs.
+
+The section reports facts only. It does not classify improvements or
+regressions, infer publication or routes, describe runtime use, copy Skill
+Index diagnostics, or affect the command exit code. Markdown caps detailed
+lists and directs readers to JSON for omitted entries.
 
 ### `ci-report`
 
@@ -1076,7 +1097,12 @@ renma ci-report . --from main --to HEAD --format json
 
 The report summarizes readiness deltas, graph-resolution changes, added and removed findings, and policy-relevant status. It is CI-oriented: `PASS` and `WARN` exit `0`, `FAIL` exits `1`, and usage, command, or configuration errors exit `2`.
 
-Output includes a CI status (`PASS`, `WARN`, or `FAIL`), a summary, readiness changes, graph changes, and review-focused finding changes.
+Output includes a CI status (`PASS`, `WARN`, or `FAIL`), a summary, readiness
+changes, graph changes, and review-focused finding changes. In 0.23.1, its
+nested diff intentionally omits the direct diff `discovery` section. CI JSON,
+Markdown, status, notes, and exits apply no Skill Discovery policy. A neutral
+CI projection may be reviewed independently for 0.23.2; optional gating remains
+later work.
 
 Repository Context BOM artifacts describe declared repository state, not prompt assembly, context injection, agent execution, actual LLM runtime usage, or telemetry. Use `renma bom . --format json` when CI needs a machine-readable manifest and `renma bom . --format markdown` for review comments or artifacts. For v2 compatibility and reproducibility details, see the [Repository Context BOM contract](repository-context-bom.md).
 

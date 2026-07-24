@@ -6,6 +6,61 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-07-23
+
+### Added
+
+- Added the observation-only top-level `DiffReport.discovery` contract with
+  schema version `renma.skill-discovery-diff.v1`. Direct diff now reports exact
+  adoption and coverage transitions, compact `to - from` summary deltas,
+  effective published entrypoint additions/removals, newly reachable and
+  not-reached Skills, newly and resolved unrouted Skills, route
+  additions/removals/state changes, and added/resolved maximal cyclic
+  components.
+- Added deterministic route grouping by normalized repository-relative source
+  Skill path plus normalized declared target. Duplicate declarations are
+  represented by one route group's `declarationCount`; declaration reordering,
+  YAML array position, source lines, discovery order, and resolved target are
+  not route identity.
+- Added compact bounded `## Skill Discovery Changes` Markdown details and a
+  complete deterministic JSON section without copying Skill Index arrays,
+  Discovery diagnostics, raw evidence, declaration indices, temporary roots,
+  timestamps, or mutable internals.
+- Added focused route-state, publication, reachability, unrouted, normalization,
+  duplicate, cycle, invalid/duplicate-ID, snapshot-instrumentation, direct
+  diff/CI compatibility, and fixed public JSON golden coverage. Property tests
+  cover insertion and declaration permutation, reversal, determinism, summary
+  negation, and input immutability.
+
+### Changed
+
+- Changed semantic diff snapshot preparation to collect exactly one immutable
+  `RepositorySnapshot` per Git ref. Graph, the Discovery-excluded Readiness
+  subset, and `snapshot.skillDiscovery` now share one discovery pass, one parse
+  per artifact, one catalog preparation, one Agent Skills validation, and one
+  Skill Discovery preparation per ref. Diff does not call `skill-index`,
+  reconstruct Discovery, or recollect for graph or Readiness.
+- Added an explicit `CiCompatibleDiffReport` projection that removes
+  `discovery` from the nested CI diff. CI JSON and Markdown, status calculation,
+  notes, and exit behavior retain their existing contract and receive no
+  Discovery policy in 0.23.1.
+- Updated the roadmap sequence to 0.23.0 Readiness, 0.23.1 direct semantic diff,
+  independently reviewed 0.23.2 CI report integration, and only later optional
+  CI policy or gating.
+
+### Compatibility
+
+- Preserved Discovery route resolution, usability, publication, adoption,
+  reachability, unrouted, and cycle semantics and every Discovery diagnostic
+  ID, severity, message, evidence, repair constraint, and verification step.
+  Generic `readiness.checkChanges` still excludes `discovery.*`; Readiness
+  scoring and levels, Skill Index, Discovery graph, BOM, Trust Graph, ownership,
+  runtime boundaries, and direct diff exit behavior are unchanged.
+- Added only the intentional Discovery semantic diff golden. No unrelated
+  public JSON golden was regenerated. CI report integration remains deferred
+  to 0.23.2 review; optional CI policy or gating remains a later independent
+  decision.
+
 ## [0.23.0] - 2026-07-23
 
 ### Added
@@ -1172,7 +1227,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.23.1...HEAD
+[0.23.1]: https://github.com/KazuCocoa/renma/compare/v0.23.0...v0.23.1
 [0.23.0]: https://github.com/KazuCocoa/renma/compare/v0.22.6...v0.23.0
 [0.22.6]: https://github.com/KazuCocoa/renma/compare/v0.22.5...v0.22.6
 [0.22.5]: https://github.com/KazuCocoa/renma/compare/v0.22.4...v0.22.5

@@ -1,0 +1,202 @@
+{
+  "schemaVersion": "renma.skill-discovery-diff.v1",
+  "adoption": {
+    "from": "adopted",
+    "to": "adopted",
+    "changed": false
+  },
+  "coverage": {
+    "from": "authoritative",
+    "to": "authoritative",
+    "changed": false
+  },
+  "summary": {
+    "publishedEntrypointCountDelta": 0,
+    "routeEligibleSkillCountDelta": 1,
+    "reachableSkillCountDelta": 1,
+    "notReachedSkillCountDelta": 0,
+    "unroutedSkillCountDelta": 0,
+    "usableRouteCountDelta": 3,
+    "unusableRouteCountDelta": -1,
+    "unresolvedRouteCountDelta": 0,
+    "cycleComponentCountDelta": 1
+  },
+  "publishedEntrypoints": {
+    "added": [
+      {
+        "id": "skill.b",
+        "path": "skills/b/SKILL.md"
+      }
+    ],
+    "removed": [
+      {
+        "id": "skill.a",
+        "path": "skills/a/SKILL.md"
+      }
+    ]
+  },
+  "reachability": {
+    "newlyReachable": [
+      {
+        "id": "skill.b",
+        "path": "skills/b/SKILL.md"
+      },
+      {
+        "id": "skill.c",
+        "path": "skills/c/SKILL.md"
+      }
+    ],
+    "newlyNotReached": [
+      {
+        "id": "skill.a",
+        "path": "skills/a/SKILL.md"
+      }
+    ]
+  },
+  "unroutedSkills": {
+    "newlyUnrouted": [
+      {
+        "id": "skill.a",
+        "path": "skills/a/SKILL.md"
+      }
+    ],
+    "resolvedUnrouted": [
+      {
+        "id": "skill.b",
+        "path": "skills/b/SKILL.md"
+      }
+    ]
+  },
+  "routes": {
+    "added": [
+      {
+        "sourceId": "skill.b",
+        "sourcePath": "skills/b/SKILL.md",
+        "normalizedTarget": "skill.c",
+        "declarationCount": 1,
+        "resolution": "resolved",
+        "candidates": [
+          {
+            "id": "skill.c",
+            "path": "skills/c/SKILL.md",
+            "kind": "skill"
+          }
+        ],
+        "resolvedTarget": {
+          "id": "skill.c",
+          "path": "skills/c/SKILL.md",
+          "kind": "skill",
+          "lifecycle": "stable"
+        },
+        "usable": true,
+        "usabilityReasons": []
+      },
+      {
+        "sourceId": "skill.c",
+        "sourcePath": "skills/c/SKILL.md",
+        "normalizedTarget": "skill.b",
+        "declarationCount": 1,
+        "resolution": "resolved",
+        "candidates": [
+          {
+            "id": "skill.b",
+            "path": "skills/b/SKILL.md",
+            "kind": "skill"
+          }
+        ],
+        "resolvedTarget": {
+          "id": "skill.b",
+          "path": "skills/b/SKILL.md",
+          "kind": "skill",
+          "lifecycle": "stable"
+        },
+        "usable": true,
+        "usabilityReasons": []
+      }
+    ],
+    "removed": [],
+    "changed": [
+      {
+        "identity": {
+          "sourcePath": "skills/a/SKILL.md",
+          "normalizedTarget": "skill.c"
+        },
+        "changedFields": [
+          "resolution",
+          "candidates",
+          "resolvedTarget",
+          "targetLifecycle",
+          "usable",
+          "usabilityReasons"
+        ],
+        "from": {
+          "sourceId": "skill.a",
+          "sourcePath": "skills/a/SKILL.md",
+          "normalizedTarget": "skill.c",
+          "declarationCount": 1,
+          "resolution": "ambiguous",
+          "candidates": [
+            {
+              "id": "skill.c",
+              "path": "skills/c-duplicate/SKILL.md",
+              "kind": "skill"
+            },
+            {
+              "id": "skill.c",
+              "path": "skills/c/SKILL.md",
+              "kind": "skill"
+            }
+          ],
+          "usable": false,
+          "usabilityReasons": [
+            "ambiguous-target"
+          ]
+        },
+        "to": {
+          "sourceId": "skill.a",
+          "sourcePath": "skills/a/SKILL.md",
+          "normalizedTarget": "skill.c",
+          "declarationCount": 1,
+          "resolution": "resolved",
+          "candidates": [
+            {
+              "id": "skill.c",
+              "path": "skills/c/SKILL.md",
+              "kind": "skill"
+            }
+          ],
+          "resolvedTarget": {
+            "id": "skill.c",
+            "path": "skills/c/SKILL.md",
+            "kind": "skill",
+            "lifecycle": "stable"
+          },
+          "usable": true,
+          "usabilityReasons": []
+        }
+      }
+    ]
+  },
+  "cycles": {
+    "added": [
+      {
+        "skillIds": [
+          "skill.b",
+          "skill.c"
+        ],
+        "skills": [
+          {
+            "id": "skill.b",
+            "path": "skills/b/SKILL.md"
+          },
+          {
+            "id": "skill.c",
+            "path": "skills/c/SKILL.md"
+          }
+        ],
+        "selfLoop": false
+      }
+    ],
+    "resolved": []
+  }
+}

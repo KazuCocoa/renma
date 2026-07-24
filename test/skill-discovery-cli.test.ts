@@ -7,7 +7,7 @@ import test from "node:test";
 import { main } from "../src/cli.js";
 import { bom } from "../src/commands/bom.js";
 import { ciReport } from "../src/commands/ci-report.js";
-import { diff } from "../src/commands/diff.js";
+import { diff, formatDiff } from "../src/commands/diff.js";
 import { readiness } from "../src/commands/readiness.js";
 import { trustGraph } from "../src/commands/trust-graph.js";
 import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
@@ -1138,7 +1138,21 @@ test("a cycle introduced after base reaches Readiness while deferred reports rem
       bom(root, {}, { omitGeneratedAt: true }),
     ]);
 
-    assertDiscoveryFree(semanticDiffReport);
+    assert.equal(
+      semanticDiffReport.discovery.schemaVersion,
+      "renma.skill-discovery-diff.v1",
+    );
+    assert.deepEqual(
+      semanticDiffReport.discovery.cycles.added.map((cycle) => [
+        cycle.skillIds,
+        cycle.selfLoop,
+      ]),
+      [[["skill.a", "skill.b"], false]],
+    );
+    const semanticDiffMarkdown = formatDiff(semanticDiffReport, "markdown");
+    assert.match(semanticDiffMarkdown, /^## Skill Discovery Changes$/m);
+    assert.match(semanticDiffMarkdown, /^### Added cyclic components$/m);
+    assert.match(semanticDiffMarkdown, /skill\.a, skill\.b/);
     assertDiscoveryFree(ciReportResult);
     assert.equal(readinessReport.summary.skillDiscovery.cycleComponentCount, 1);
     assert.equal(
@@ -1269,7 +1283,7 @@ test("existing graph views remain route-free and invalid view help lists discove
   assert.match(help.stdout, /optional for discovery/);
 });
 
-test("authoritative incomplete Discovery reaches Readiness while deferred reports remain unchanged", async () => {
+test("authoritative incomplete Discovery reaches Readiness and direct diff while deferred reports remain unchanged", async () => {
   const root = await authoritativeIncompleteGitFixture();
   try {
     const scanReport = await scan(root);
@@ -1329,7 +1343,20 @@ test("authoritative incomplete Discovery reaches Readiness while deferred report
         ?.status,
       "warn",
     );
-    assertDiscoveryFree(semanticDiffReport);
+    assert.deepEqual(semanticDiffReport.discovery.adoption, {
+      from: "partial",
+      to: "adopted",
+      changed: true,
+    });
+    assert.deepEqual(semanticDiffReport.discovery.coverage, {
+      from: "descriptive",
+      to: "authoritative",
+      changed: true,
+    });
+    assert.deepEqual(semanticDiffReport.discovery.reachability, {
+      newlyReachable: [],
+      newlyNotReached: [],
+    });
     assertDiscoveryFree(ciReportResult);
     assertDiscoveryFree(trustGraphReport);
     assertDiscoveryFree(bomReport);

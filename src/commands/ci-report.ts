@@ -16,6 +16,7 @@ import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 
 export type CiReportFormat = DiffFormat;
 export type CiReportStatus = "pass" | "warn" | "fail";
+export type CiCompatibleDiffReport = Omit<DiffReport, "discovery">;
 
 export interface CiReport {
   root: string;
@@ -28,7 +29,7 @@ export interface CiReport {
     resolved: SecurityPostureSummary;
   };
   notes: string[];
-  diff: DiffReport;
+  diff: CiCompatibleDiffReport;
 }
 
 interface CiReportOptions {
@@ -71,6 +72,8 @@ export async function ciReport(
     added: summarizeSecurityPosture(report.findings.added),
     resolved: summarizeSecurityPosture(report.findings.removed),
   };
+  const { discovery, ...ciCompatibleDiff } = report;
+  void discovery;
   return {
     root: report.root,
     from: report.from,
@@ -79,7 +82,7 @@ export async function ciReport(
     summary: report.summary,
     securityPosture,
     notes: reviewNotes(report, status, securityPosture.added),
-    diff: report,
+    diff: ciCompatibleDiff,
   };
 }
 
@@ -91,7 +94,9 @@ export function formatCiReport(
   return formatCiReportMarkdown(report);
 }
 
-export function determineCiReportStatus(report: DiffReport): CiReportStatus {
+export function determineCiReportStatus(
+  report: CiCompatibleDiffReport,
+): CiReportStatus {
   if (
     hasNewHighOrCriticalFinding(report) ||
     hasNewUnresolvedRequiredEdge(report) ||
@@ -112,21 +117,25 @@ export function determineCiReportStatus(report: DiffReport): CiReportStatus {
   return "pass";
 }
 
-function hasNewHighOrCriticalFinding(report: DiffReport): boolean {
+function hasNewHighOrCriticalFinding(report: CiCompatibleDiffReport): boolean {
   return report.findings.added.some(
     (finding) => finding.severity === "high" || finding.severity === "critical",
   );
 }
 
-function hasNewUnresolvedRequiredEdge(report: DiffReport): boolean {
+function hasNewUnresolvedRequiredEdge(report: CiCompatibleDiffReport): boolean {
   return report.graph.newUnresolvedEdges.some(isRequiredEdge);
 }
 
-function hasBlockingContextLensDiagnostics(report: DiffReport): boolean {
+function hasBlockingContextLensDiagnostics(
+  report: CiCompatibleDiffReport,
+): boolean {
   return (report.to.contextLens?.diagnosticCounts.error ?? 0) > 0;
 }
 
-function newUnresolvedRequiredEdgeCount(report: DiffReport): number {
+function newUnresolvedRequiredEdgeCount(
+  report: CiCompatibleDiffReport,
+): number {
   return report.graph.newUnresolvedEdges.filter(isRequiredEdge).length;
 }
 
@@ -135,7 +144,7 @@ function isRequiredEdge(edge: { kind: string }): boolean {
 }
 
 function reviewNotes(
-  report: DiffReport,
+  report: CiCompatibleDiffReport,
   status: CiReportStatus,
   addedSecurityPosture: SecurityPostureSummary,
 ): string[] {
