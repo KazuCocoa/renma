@@ -67,6 +67,23 @@ test("interactive-placeholder is a clean, ready thin Agent Skill example", async
     true,
     "Every readiness check should pass for the onboarding example.",
   );
+  assert.equal(
+    readinessReport.checks.find((check) => check.id === "discovery.publication")
+      ?.status,
+    "pass",
+  );
+  assert.equal(
+    readinessReport.summary.skillDiscovery.adoptionState,
+    "not-adopted",
+  );
+  assert.equal(
+    readinessReport.summary.skillDiscovery.routeEligibleSkillCount,
+    1,
+  );
+  assert.equal(
+    readinessReport.summary.skillDiscovery.publishedEntrypointCount,
+    0,
+  );
 
   const skill = await readFile(SKILL_PATH, "utf8");
   assert.match(skill, /\[local tool guide\]\(\.\.\/\.\.\/tools\/README\.md\)/);

@@ -279,7 +279,10 @@ export function buildDiffReport(
         .map(([, edge]) => edge),
     },
     readiness: {
-      checkChanges: checkChanges(fromReadiness.checks, toReadiness.checks),
+      checkChanges: checkChanges(
+        readinessChecksWithoutDiscovery(fromReadiness.checks),
+        readinessChecksWithoutDiscovery(toReadiness.checks),
+      ),
     },
     security: buildSecurityDiffSummary({
       addedFindings,
@@ -296,6 +299,12 @@ export function buildDiffReport(
       ),
     },
   };
+}
+
+function readinessChecksWithoutDiscovery(checks: unknown[]): unknown[] {
+  return checks.filter(
+    (check) => !stringField(check, "id").startsWith("discovery."),
+  );
 }
 
 export function formatDiff(report: DiffReport, format: DiffFormat): string {
@@ -444,7 +453,9 @@ async function snapshot(
   await execFile("tar", ["-xf", archivePath, "-C", root]);
   const target = relativeTarget === "." ? root : join(root, relativeTarget);
   const [readinessReport, graphReport] = await Promise.all([
-    readiness(target, snapshotOverrides(repoRoot, root, overrides)),
+    readiness(target, snapshotOverrides(repoRoot, root, overrides), {
+      includeSkillDiscovery: false,
+    }),
     graph(target, snapshotOverrides(repoRoot, root, overrides)),
   ]);
   return {

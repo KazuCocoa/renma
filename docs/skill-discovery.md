@@ -1,10 +1,11 @@
 # Skill Discovery Graph and Index
 
-Renma 0.22.x provides a static, declaration-driven Skill-to-Skill graph and a
-versioned compact index. It does not interpret task text, select, rank, load,
-invoke, or execute a Skill. Repository authors keep routing conditions in
-source `SKILL.md` files; Renma exposes deterministic publication, adoption,
-continuation, and structural evidence.
+Renma 0.23.0 provides a static, declaration-driven Skill-to-Skill graph, a
+versioned compact index, and a compact repository-level Readiness projection.
+It does not interpret task text, select, rank, load, invoke, or execute a Skill.
+Repository authors keep routing conditions in source `SKILL.md` files; Renma
+exposes deterministic publication, adoption, continuation, and structural
+evidence.
 
 The progression is intentionally layered:
 
@@ -28,6 +29,9 @@ The progression is intentionally layered:
 0.22.4
   deterministic route-cycle review diagnostics and stabilization of the
   single-repository static Discovery core
+
+0.23.0
+  compact Skill Discovery summary and focused checks in Readiness
 ```
 
 ## Three separate facts
@@ -197,7 +201,10 @@ Coverage always has repository scope and uses one of three modes:
 
 - `not-evaluated`: Discovery is `not-adopted`, `incomplete`, or `partial`
   without an effective published entrypoint. Reachable and not-reached arrays
-  remain empty.
+  remain empty. Readiness reports this as unevaluated rather than presenting
+  the empty arrays as `0 reachable` and `0 not-reached`. The check is neutral
+  for `not-adopted`; it warns only when Discovery metadata or explicit
+  repository-wide adoption makes the missing effective entrypoint actionable.
 - `descriptive`: adoption is `partial` and at least one effective published
   entrypoint exists. Reachability is review evidence, not a repository-wide
   completeness claim, and not-reached Skills do not emit coverage warnings.
@@ -325,8 +332,10 @@ semantic completeness. Its repair is to improve the bounded first-hop
 responsibility, not to remove publication solely to silence the warning.
 
 Both diagnostics flow through normal scan output, diagnostics v2, and review
-bundles. They do not create a CI gate and remain excluded from Readiness,
-semantic diff, CI report, Trust Graph, and BOM.
+bundles. They do not create a CI gate. Readiness 0.23.0 may reference their
+stable codes and messages as compact check evidence without copying them into
+its diagnostic collection; semantic diff, CI report, Trust Graph, and BOM
+remain excluded.
 
 Renma 0.22.2 adds
 `DISCOVERY-UNREACHABLE-ELIGIBLE-SKILL` only in authoritative adopted mode, once
@@ -336,8 +345,10 @@ published entrypoint. It does not claim runtime non-use and does not recommend
 a fake route or blanket publication. Repair requires human review of whether
 the Skill is an independent first hop, belongs beneath a real source-owned
 workflow, or falls outside the intended repository-wide policy. This warning
-also flows through scan, diagnostics v2, and review bundles while remaining
-outside downstream Trust Graph, Readiness, diff, CI, and BOM projections.
+also flows through scan, diagnostics v2, and review bundles. Readiness 0.23.0
+uses it as the authority for adopted-mode coverage check evidence without
+duplicating the diagnostic or applying another score penalty. It remains
+outside Trust Graph, semantic diff, CI, and BOM projections.
 
 Renma 0.22.4 adds `DISCOVERY-ROUTE-CYCLE` without requiring repository-wide
 adoption. It is emitted whenever the prepared usable continuation graph
@@ -352,22 +363,73 @@ intentional bounded workflow loop or an accidental circular continuation
 contract; it does not require every intentional cycle to be removed.
 
 Cycle warnings flow through scan, diagnostics v2, review bundles, Discovery
-graph diagnostics, and Skill Index Discovery diagnostics. They remain warnings
-and do not create a CI gate. JSON report schemas, Markdown sections, and Mermaid
-edge semantics are unchanged; there is no top-level cycle section or count.
+graph diagnostics, Skill Index Discovery diagnostics, and the compact
+Readiness cycle-review check. They remain warnings, do not create a CI gate,
+and do not by themselves make Readiness fail. Discovery JSON report schemas,
+Markdown sections, and Mermaid edge semantics are unchanged; there is no
+top-level cycle section or count in the Discovery graph or Skill Index.
+
+## Readiness projection
+
+Renma 0.23.0 adds routine-review visibility under
+`readiness.summary.skillDiscovery`. The summary is derived only from the
+memoized prepared Discovery index in the shared `RepositorySnapshot` and
+contains the existing adoption state plus compact publication, eligibility,
+reachability, unrouted, route-usability, unresolved-route, and maximal
+cycle-component counts. It contains no complete Skill array, route list, or
+diagnostic payload.
+
+The five Readiness checks use the established lower-case dotted ID style:
+
+- `discovery.publication` reviews explicit effective publication only.
+  `not-adopted` repositories pass because publication is not required and
+  structural roots are never inferred as published. Partial or incomplete
+  adoption without an effective published entrypoint warns, while valid
+  effective publication and existing publication diagnostics remain
+  authoritative;
+- `discovery.route_validity` aggregates existing resolution and usability
+  reasons;
+- `discovery.coverage` is authoritative only for explicit repository-wide
+  adoption, descriptive only for partial adoption with an effective
+  entrypoint, and explicitly unevaluated when Discovery is not adopted or no
+  effective entrypoint exists;
+- `discovery.unrouted_skills` preserves the existing unpublished/no-incoming
+  usable continuation definition and does not reject intentional standalone
+  Skills automatically; and
+- `discovery.cycle_review` counts maximal cyclic components as warning-level
+  human review evidence.
+
+The 0.23.0 projection adds no scoring weight. Partial coverage never reduces
+the score, cycle presence alone is not a hard failure, and existing Discovery
+diagnostics are referenced rather than copied or penalized again. Use
+`renma skill-index` for the complete static report and
+`renma graph --view discovery` for topology and source evidence.
+
+The direct Readiness command prepares the memoized Discovery projection once.
+Its internal projection boundary is disabled for semantic diff snapshots, so
+CI inherits the same exclusion. BOM continues to build and serialize its
+pre-0.23.0 Readiness subset without preparing Discovery for that subset. These
+paths retain their defensive output filters, but do not perform unnecessary
+Discovery projection work.
 
 ## Compatibility and future work
 
 Continuation and publication data remain separate from
 `catalog.dependencies`. Existing full, summary, workflow, layered,
 composition, and impact graph outputs remain route/publication-free. Catalog,
-Readiness, diff, CI report, Trust Graph, BOM, ownership, init, scaffold, guide,
-and suggestion contracts are unchanged. A repository without Discovery
-metadata or adoption remains valid and reports `not-adopted` without a warning.
+diff, CI report, Trust Graph, BOM, ownership, init, scaffold, guide, and
+suggestion contracts are unchanged. Readiness changes only through the
+additive 0.23.0 summary and checks. A repository without Discovery metadata or
+adoption remains valid and warning-free. Its `not-adopted` Readiness summary is
+a neutral inventory summary: route-eligible, unrouted, and route counts remain
+visible, while publication is not required and coverage is not evaluated.
 
-The current single-repository static Discovery core is stable after 0.22.4. A
-`renma discovery` command is not implemented. Readiness, semantic diff, CI
-report or optional gating, Trust Graph, BOM, ownership, observed Markdown
-references, richer visualization, authoring assistance, scaffold, init, guide,
-suggestion, and multi-repository federation remain independent later decisions
-informed by operational trials.
+The current single-repository static Discovery core is stable after 0.22.4,
+and its first downstream projection ships in Readiness 0.23.0. A
+`renma discovery` command is not implemented. Semantic diff, CI report or
+optional gating, Trust Graph, BOM, ownership, observed Markdown references,
+richer visualization, authoring assistance, scaffold, init, guide, suggestion,
+and multi-repository federation remain independent later decisions informed by
+operational trials. Their output contracts contain no Discovery additions, and
+the 0.23.0 Readiness integration adds no Discovery preparation to deferred
+diff, CI, BOM, or Trust Graph output paths.

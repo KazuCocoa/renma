@@ -9,7 +9,7 @@ import { scan } from "../src/scanner.js";
 
 const EXAMPLE_ROOT = path.join(process.cwd(), "examples", "context-lens");
 
-test("Context Lens example is clean, ready, and keeps its nested Skill relationships", async () => {
+test("Context Lens example is clean, ready, and reports explicit Discovery publication state", async () => {
   const [
     scanResult,
     readinessReport,
@@ -52,6 +52,23 @@ test("Context Lens example is clean, ready, and keeps its nested Skill relations
   assert.equal(
     readinessReport.checks.every((check) => check.status === "pass"),
     true,
+  );
+  assert.equal(
+    readinessReport.checks.find((check) => check.id === "discovery.publication")
+      ?.status,
+    "pass",
+  );
+  assert.equal(
+    readinessReport.summary.skillDiscovery.adoptionState,
+    "not-adopted",
+  );
+  assert.equal(
+    readinessReport.summary.skillDiscovery.routeEligibleSkillCount,
+    1,
+  );
+  assert.equal(
+    readinessReport.summary.skillDiscovery.publishedEntrypointCount,
+    0,
   );
 
   assert.equal(

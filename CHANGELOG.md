@@ -6,6 +6,60 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-07-22
+
+### Added
+
+- Added additive `summary.skillDiscovery` Readiness JSON with the existing
+  adoption state and compact counts for effective published entrypoints,
+  route-eligible, reachable, not-reached, and unrouted Skills, usable,
+  unusable, and unresolved routes, and maximal cyclic components.
+- Added `discovery.publication`, `discovery.route_validity`,
+  `discovery.coverage`, `discovery.unrouted_skills`, and
+  `discovery.cycle_review` Readiness checks with deterministic compact evidence
+  derived from the prepared Skill Discovery index and its existing structured
+  diagnostics.
+- Added a compact Skill Discovery section to Readiness Markdown with direct
+  guidance to `renma skill-index` and `renma graph --view discovery` for full
+  static evidence.
+
+### Changed
+
+- Changed Readiness to reuse the memoized immutable Skill Discovery projection
+  from its existing shared `RepositorySnapshot`; one command still performs
+  one repository collection, one parse per artifact, one catalog and Agent
+  Skills preparation, and at most one Discovery index preparation.
+- Documented authoritative adopted-mode coverage separately from descriptive
+  partial coverage and explicitly unevaluated not-adopted/no-entrypoint
+  coverage. Not-adopted repositories keep useful Skill and route inventory
+  counts while publication and coverage remain neutral, warning-free policy
+  checks. Partial coverage does not lower Readiness, and cyclic usable route
+  components remain warning-level review evidence rather than automatic hard
+  failures.
+- Changed semantic diff to request its existing Readiness subset without
+  preparing Skill Discovery for either ref; CI inherits the same projection
+  boundary. Direct Readiness still prepares the memoized projection at most
+  once, while BOM continues not to prepare or serialize Discovery Readiness.
+- Kept the 0.23.0 checks visibility-only for scoring. They add no independent
+  score weight, do not copy Discovery diagnostics into Readiness diagnostics,
+  and therefore do not penalize existing authoritative evidence twice.
+
+### Compatibility
+
+- Preserved Discovery route resolution, usability, eligibility, publication,
+  adoption, reachability, unrouted classification, and cycle detection;
+  preserved `renma.skill-index.v1`, `graph --view discovery`, and every existing
+  Discovery diagnostic ID, severity, wording, evidence, repair constraint, and
+  verification step.
+- Updated only the intentional additive Readiness public JSON golden. Existing
+  Readiness fields, scores, levels, diagnostic arrays, and package-version
+  normalization remain unchanged.
+- Semantic diff, CI report and optional gating, Trust Graph, Repository Context
+  BOM, ownership, richer visualization, federation, runtime selection,
+  execution, and telemetry integration remain deferred. Readiness adds no
+  Discovery preparation to those deferred output contracts. No diff, CI, BOM,
+  or gating fields were added.
+
 ## [0.22.6] - 2026-07-22
 
 ### Changed
@@ -1118,7 +1172,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.22.6...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/KazuCocoa/renma/compare/v0.22.6...v0.23.0
 [0.22.6]: https://github.com/KazuCocoa/renma/compare/v0.22.5...v0.22.6
 [0.22.5]: https://github.com/KazuCocoa/renma/compare/v0.22.4...v0.22.5
 [0.22.4]: https://github.com/KazuCocoa/renma/compare/v0.22.3...v0.22.4

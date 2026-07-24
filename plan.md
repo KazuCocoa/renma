@@ -2,7 +2,7 @@
 
 ## Current Product
 
-Renma 0.22.x is a Git-native Context Repository governance CLI for
+Renma 0.23.0 is a Git-native Context Repository governance CLI for
 agent-consumable knowledge. It applies the review boundary:
 
 ```text
@@ -76,8 +76,16 @@ self-loops, with exact internal route and Skill evidence. Cycles remain
 traversal-safe static evidence and may be intentional; Renma does not claim
 runtime recursion or choose a route to remove.
 
+The 0.23.0 slice projects the existing prepared Discovery index into
+`renma readiness`. It adds compact repository-wide counts plus publication,
+route-validity, coverage, unrouted-Skill, and cycle-review checks. Authoritative
+adoption makes coverage gaps review warnings; partial and not-adopted coverage
+remain descriptive. The checks add visibility without a new score weight or a
+second penalty for existing diagnostics.
+
 [The Skill Discovery design](plan-discovery.md) defines the full direction and
-the independently bounded 0.22.0 through 0.22.4 release slices.
+the independently bounded 0.22.0 through 0.22.4 core slices and 0.23.0
+Readiness integration.
 
 ## Expected Implementation Sequence
 
@@ -100,15 +108,19 @@ the independently bounded 0.22.0 through 0.22.4 release slices.
    diagnostics, exact component evidence, linked routes and Skills, focus-aware
    diagnostic projection, and no report schema, reachability, or downstream
    integration changes.
-6. Evaluate Readiness, semantic diff, CI, Trust Graph, BOM, observed-reference,
-   ownership, authoring, richer visualization, and federation integrations as
-   independent later decisions informed by operational trials.
+6. Ship the 0.23.0 Readiness projection from the same prepared index with a
+   compact additive summary and five non-double-counting checks. Preserve
+   descriptive partial coverage, warning-only cycle review, and every existing
+   Discovery semantic and diagnostic contract.
+7. Evaluate semantic diff, CI, Trust Graph, BOM, observed-reference, ownership,
+   authoring, richer visualization, and federation integrations as independent
+   later decisions informed by operational trials.
 
 ## Later Candidates
 
 Possible later Renma core work includes:
 
-- Discovery summaries in Readiness, semantic diff, and CI reports;
+- Discovery summaries in semantic diff and CI reports;
 - optional CI policy for exact, repository-adopted Discovery violations;
 - product and ownership projections based on stable IDs, exact tags, and
   existing Context or Lens relationships;

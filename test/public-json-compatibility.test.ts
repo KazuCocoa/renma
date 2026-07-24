@@ -42,7 +42,7 @@ const BASELINE_CASES = [
   },
 ] as const;
 
-test("representative public JSON matches fixed 0.22.5 baselines", async () => {
+test("representative public JSON matches fixed compatibility baselines", async () => {
   const outputs = new Map<string, string>();
   const packageJson = record(
     JSON.parse(await readFile(path.resolve("package.json"), "utf8")),
@@ -105,6 +105,45 @@ test("representative public JSON matches fixed 0.22.5 baselines", async () => {
   for (const findingId of findingIds) {
     assert.ok(diagnosticV2Codes.includes(findingId), String(findingId));
   }
+
+  const readinessOutput = parseOutput(outputs, "readiness");
+  const readinessSummary = record(readinessOutput.summary);
+  assert.equal(readinessSummary.totalAssets, 7);
+  assert.equal(readinessSummary.ownershipCoveragePercent, 86);
+  assert.equal(readinessSummary.graphResolutionPercent, 86);
+  assert.deepEqual(record(readinessSummary.skillDiscovery), {
+    adoptionState: "adopted",
+    publishedEntrypointCount: 1,
+    routeEligibleSkillCount: 1,
+    reachableSkillCount: 1,
+    notReachedSkillCount: 0,
+    unroutedSkillCount: 0,
+    usableRouteCount: 0,
+    unusableRouteCount: 0,
+    unresolvedRouteCount: 0,
+    cycleComponentCount: 0,
+  });
+  assert.deepEqual(
+    arrayOfRecords(readinessOutput.checks)
+      .slice(-5)
+      .map((check) => check.id),
+    [
+      "discovery.publication",
+      "discovery.route_validity",
+      "discovery.coverage",
+      "discovery.unrouted_skills",
+      "discovery.cycle_review",
+    ],
+  );
+  const compactDiscovery = JSON.stringify(readinessSummary.skillDiscovery);
+  assert.doesNotMatch(
+    compactDiscovery,
+    /"(?:skills|routes|diagnostics|publishedEntrypointIds|reachableDiscoveryEligibleSkillIds|notReachedDiscoveryEligibleSkillIds|unroutedSkillIds)"/,
+  );
+  assert.doesNotMatch(
+    outputs.get("readiness") ?? "",
+    /OMIT_FROM_CATALOG_FINDINGS|diagnosticIdentity/,
+  );
 });
 
 test("CLI JSON output matches direct command serialization", async () => {

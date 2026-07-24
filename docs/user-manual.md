@@ -1033,11 +1033,24 @@ renma readiness . --format markdown
 renma readiness . --format json
 ```
 
-Readiness combines catalog diagnostics, Context Lens governance diagnostics, ownership metadata, graph resolution, required and optional context references, asset status, and selected scan findings into an agent-readiness score.
+Readiness combines catalog diagnostics, Context Lens governance diagnostics, ownership metadata, graph resolution, required and optional context references, asset status, selected scan findings, and a compact projection of the prepared Skill Discovery index.
 
-Output includes a readiness score and level, workflow checks, Context Lens counts, diagnostics, scan findings that affect readiness, and graph or ownership summary data. JSON output includes `summary.contextLens`; Markdown output includes a `Context Lens` section.
+Output includes a readiness score and level, workflow checks, Context Lens counts, diagnostics, scan findings that affect readiness, graph or ownership summary data, and `summary.skillDiscovery`. The Skill Discovery summary reports the existing adoption state and counts for effective published entrypoints, route-eligible Skills, reachable and not-reached Skills, unrouted Skills, usable and unusable routes, unresolved routes, and maximal cyclic components. It does not embed the complete Skill or route graph.
 
-Security posture and Context Lens summaries remain static repository evidence in this report. Readiness does not choose runtime context, assemble prompts, inject context, or describe what an LLM actually used.
+The focused checks are `discovery.publication`,
+`discovery.route_validity`, `discovery.coverage`,
+`discovery.unrouted_skills`, and `discovery.cycle_review`. Coverage gaps are
+authoritative only when `skill_discovery.adopted: true`; partial and
+not-adopted coverage is descriptive and does not reduce the score. Cycles
+remain warning-level review evidence and do not by themselves make a
+repository not ready. These checks add no 0.23.0 scoring weight and Discovery
+diagnostics are referenced rather than duplicated or penalized again.
+
+Markdown includes compact `Context Lens` and `Skill Discovery` sections. Run
+`renma skill-index` for the complete static Discovery report or
+`renma graph --view discovery` for topology and source evidence.
+
+Security posture, Context Lens, and Skill Discovery summaries remain static repository evidence in this report. Readiness does not accept task text, select or execute a Skill, choose runtime context, assemble prompts, inject context, or describe what an LLM actually used.
 
 ### `diff`
 

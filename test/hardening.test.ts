@@ -7,6 +7,7 @@ import { main } from "../src/cli.js";
 import {
   formatReadinessJson,
   formatReadinessMarkdown,
+  zeroSkillDiscoveryReadinessSummary,
   type ReadinessReport,
 } from "../src/commands/readiness.js";
 import { loadConfig } from "../src/config.js";
@@ -222,6 +223,7 @@ function readinessReportWithFindings(count: number): ReadinessReport {
       contextLens: zeroContextLensSummary(),
       securityPosture: zeroSecurityPostureSummary(),
       securityPolicyInventory: zeroSecurityPolicyInventorySummary(),
+      skillDiscovery: zeroSkillDiscoveryReadinessSummary(),
     },
     checks: [
       {

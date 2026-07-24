@@ -72,7 +72,7 @@ export interface BomReport {
     score: number;
     level: ReadinessLevel;
     checks: ReadinessReport["checks"];
-    summary: ReadinessReport["summary"];
+    summary: Omit<ReadinessReport["summary"], "skillDiscovery">;
   };
   securityPosture: SecurityPostureSummary;
   securityPolicyInventory: SecurityPolicyInventorySummary;
@@ -196,6 +196,12 @@ export function buildBomReport(
   );
   const diagnosticCounts = countDiagnostics(diagnostics);
   const omitGeneratedAt = options.omitGeneratedAt === true;
+  const bomReadinessChecks = readinessReport.checks.filter(
+    (check) => !check.id.startsWith("discovery."),
+  );
+  const bomReadinessSummary = withoutSkillDiscoveryReadiness(
+    readinessReport.summary,
+  );
 
   return {
     schemaVersion: "renma.repository-context-bom.v2",
@@ -235,13 +241,21 @@ export function buildBomReport(
     readiness: {
       score: readinessReport.score,
       level: readinessReport.level,
-      checks: readinessReport.checks,
-      summary: readinessReport.summary,
+      checks: bomReadinessChecks,
+      summary: bomReadinessSummary,
     },
     securityPosture: readinessReport.summary.securityPosture,
     securityPolicyInventory: readinessReport.summary.securityPolicyInventory,
     diagnostics,
   };
+}
+
+function withoutSkillDiscoveryReadiness(
+  summary: ReadinessReport["summary"],
+): Omit<ReadinessReport["summary"], "skillDiscovery"> {
+  const { skillDiscovery, ...existingSummary } = summary;
+  void skillDiscovery;
+  return existingSummary;
 }
 
 function generatedAtIso(options: BomBuildOptions): string {

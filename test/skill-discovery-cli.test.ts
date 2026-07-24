@@ -1032,7 +1032,7 @@ test("route-cycle warnings propagate through scan, diagnostics v2, review bundle
   assert.doesNotMatch(JSON.stringify(scanResult.trustGraph), /DISCOVERY-/);
 });
 
-test("a cycle introduced after base remains excluded from deferred reports", async () => {
+test("a cycle introduced after base reaches Readiness while deferred reports remain unchanged", async () => {
   const root = await routeCycleIntroductionGitFixture();
   try {
     const scanReport = await scan(root);
@@ -1140,7 +1140,13 @@ test("a cycle introduced after base remains excluded from deferred reports", asy
 
     assertDiscoveryFree(semanticDiffReport);
     assertDiscoveryFree(ciReportResult);
-    assertDiscoveryFree(readinessReport);
+    assert.equal(readinessReport.summary.skillDiscovery.cycleComponentCount, 1);
+    assert.equal(
+      readinessReport.checks.find(
+        (check) => check.id === "discovery.cycle_review",
+      )?.status,
+      "warn",
+    );
     assertDiscoveryFree(trustGraphReport);
     assertDiscoveryFree(bomReport);
     assert.equal(ciReportResult.status, "pass");
@@ -1263,7 +1269,7 @@ test("existing graph views remain route-free and invalid view help lists discove
   assert.match(help.stdout, /optional for discovery/);
 });
 
-test("authoritative incomplete Discovery remains excluded from deferred reports", async () => {
+test("authoritative incomplete Discovery reaches Readiness while deferred reports remain unchanged", async () => {
   const root = await authoritativeIncompleteGitFixture();
   try {
     const scanReport = await scan(root);
@@ -1314,7 +1320,15 @@ test("authoritative incomplete Discovery remains excluded from deferred reports"
       bom(root, {}, { omitGeneratedAt: true }),
     ]);
 
-    assertDiscoveryFree(readinessReport);
+    assert.equal(
+      readinessReport.summary.skillDiscovery.notReachedSkillCount,
+      1,
+    );
+    assert.equal(
+      readinessReport.checks.find((check) => check.id === "discovery.coverage")
+        ?.status,
+      "warn",
+    );
     assertDiscoveryFree(semanticDiffReport);
     assertDiscoveryFree(ciReportResult);
     assertDiscoveryFree(trustGraphReport);

@@ -123,6 +123,18 @@
       "topApprovedUploadDestinations": [],
       "topForbiddenInputs": [],
       "assetsWithoutEffectivePolicyList": []
+    },
+    "skillDiscovery": {
+      "adoptionState": "adopted",
+      "publishedEntrypointCount": 1,
+      "routeEligibleSkillCount": 1,
+      "reachableSkillCount": 1,
+      "notReachedSkillCount": 0,
+      "unroutedSkillCount": 0,
+      "usableRouteCount": 0,
+      "unusableRouteCount": 0,
+      "unresolvedRouteCount": 0,
+      "cycleComponentCount": 0
     }
   },
   "checks": [
@@ -305,6 +317,41 @@
       "status": "pass",
       "severity": "info",
       "summary": "Repository docs describe canonical Skill roots, valid local support, governed Context Assets, and shared helpers consistently."
+    },
+    {
+      "id": "discovery.publication",
+      "title": "Skill Discovery publication",
+      "status": "pass",
+      "severity": "info",
+      "summary": "1 valid effective published entrypoint is explicitly declared."
+    },
+    {
+      "id": "discovery.route_validity",
+      "title": "Skill Discovery route validity",
+      "status": "pass",
+      "severity": "info",
+      "summary": "0 usable continuation routes and no unusable declarations."
+    },
+    {
+      "id": "discovery.coverage",
+      "title": "Skill Discovery coverage",
+      "status": "pass",
+      "severity": "info",
+      "summary": "All 1 Discovery-eligible Skills are reachable under explicit repository-wide adoption."
+    },
+    {
+      "id": "discovery.unrouted_skills",
+      "title": "Unrouted Discovery-eligible Skills",
+      "status": "pass",
+      "severity": "info",
+      "summary": "No unpublished Discovery-eligible Skill lacks an incoming usable continuation."
+    },
+    {
+      "id": "discovery.cycle_review",
+      "title": "Skill Discovery cycle review",
+      "status": "pass",
+      "severity": "info",
+      "summary": "No cyclic usable continuation components require review."
     }
   ],
   "findings": [

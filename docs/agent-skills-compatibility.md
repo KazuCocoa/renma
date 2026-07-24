@@ -134,10 +134,11 @@ resolution, readiness, BOM, Trust Graph, diff, and CI reporting. The
 Discovery-only publication marker is parsed separately into the prepared Skill
 Discovery index and does not enter catalog metadata or dependencies. This is a
 serialization change, not a second governance model or a change to independent
-consumers' semantics. `graph --view discovery` and `skill-index` reuse that
-prepared model; Readiness, semantic diff, CI report, Trust Graph, BOM,
-ownership, init, scaffold, guide, and suggestions do not gain Skill Index
-fields.
+consumers' semantics. `graph --view discovery`, `skill-index`, and the compact
+0.23.0 Readiness Discovery summary/checks reuse that prepared model. Readiness
+does not embed Skill Index arrays or diagnostic payloads; semantic diff, CI
+report, Trust Graph, BOM, ownership, init, scaffold, guide, and suggestions do
+not gain Skill Index fields.
 
 Text values are trimmed strings, and `renma.status` retains the existing
 `experimental`, `stable`, `deprecated`, and `archived` lifecycle values. List
