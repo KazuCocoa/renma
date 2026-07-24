@@ -40,10 +40,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   per artifact, one catalog preparation, one Agent Skills validation, and one
   Skill Discovery preparation per ref. Diff does not call `skill-index`,
   reconstruct Discovery, or recollect for graph or Readiness.
-- Added an explicit `CiCompatibleDiffReport` projection that removes
-  `discovery` from the nested CI diff. CI JSON and Markdown, status calculation,
-  notes, and exit behavior retain their existing contract and receive no
-  Discovery policy in 0.23.1.
+- Changed CI report to request its pre-0.23.1 semantic-diff projection before
+  snapshot derivation. Each ref still uses one repository collection and one
+  parse per artifact, while CI does not prepare `skill-discovery` or construct
+  a Discovery diff. A defensive `CiCompatibleDiffReport` omission remains at
+  the output boundary. CI JSON and Markdown, status calculation, notes, and
+  exit behavior retain their existing contract and receive no Discovery
+  integration or policy in 0.23.1.
 - Updated the roadmap sequence to 0.23.0 Readiness, 0.23.1 direct semantic diff,
   independently reviewed 0.23.2 CI report integration, and only later optional
   CI policy or gating.
@@ -56,6 +59,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   Generic `readiness.checkChanges` still excludes `discovery.*`; Readiness
   scoring and levels, Skill Index, Discovery graph, BOM, Trust Graph, ownership,
   runtime boundaries, and direct diff exit behavior are unchanged.
+- Preserved the exported pre-0.23.1 `buildDiffReport()` snapshot shape and
+  legacy `formatDiff()` inputs. Missing prepared indexes produce a stable
+  neutral Discovery compatibility projection without inferred topology;
+  legacy reports without `discovery` render the previous non-Discovery
+  Markdown.
 - Added only the intentional Discovery semantic diff golden. No unrelated
   public JSON golden was regenerated. CI report integration remains deferred
   to 0.23.2 review; optional CI policy or gating remains a later independent

@@ -411,8 +411,9 @@ diagnostics are referenced rather than copied or penalized again. Use
 
 The direct Readiness command prepares the memoized Discovery projection once.
 Semantic diff retains the pre-0.23.0 Readiness subset, then uses the same
-snapshot's prepared Discovery index only for its dedicated 0.23.1 section. CI
-explicitly projects that section out. BOM continues to build and serialize its
+snapshot's prepared Discovery index only for its dedicated 0.23.1 section.
+CI requests the older projection before snapshot derivation and therefore
+never prepares or compares Discovery. BOM continues to build and serialize its
 pre-0.23.0 Readiness subset without preparing Discovery for that subset.
 
 ## Semantic diff projection
@@ -448,10 +449,18 @@ Discovery preparation per ref. The diff does not call `skill-index`, reconstruct
 Discovery independently, or copy its complete report or diagnostics.
 
 These facts have no improvement/regression label and do not change direct diff
-exit behavior. CI JSON and Markdown explicitly omit `discovery`; CI status,
-notes, and exits are unchanged in 0.23.1. Neutral CI report integration is
-reserved for an independently reviewed 0.23.2 slice, while optional policy or
-gating remains later work.
+exit behavior. CI selects the older diff projection before snapshot derivation,
+so it performs one collection and parse per artifact for each ref without
+preparing a Discovery index or building a Discovery diff. CI JSON and Markdown
+explicitly omit `discovery`; CI status, notes, and exits are unchanged in
+0.23.1. Neutral CI report integration is reserved for an independently reviewed
+0.23.2 slice, while optional policy or gating remains later work.
+
+Programmatic compatibility is preserved separately from the direct command
+contract. `buildDiffReport()` accepts older snapshots without prepared
+Discovery indexes and returns a stable neutral Discovery section rather than
+inferring topology. `formatDiff()` accepts older serialized reports without
+`discovery` and retains their previous non-Discovery Markdown shape.
 
 ## Compatibility and future work
 

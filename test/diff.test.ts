@@ -205,6 +205,95 @@ test("buildDiffReport compares deterministic readiness snapshots", () => {
   assert.equal(report.security.policyInventory.securityProfiles.cyclic, -1);
 });
 
+test("buildDiffReport accepts legacy snapshots without Discovery indexes", () => {
+  const { discovery: fromDiscovery, ...fromSnapshot } = snapshot("base", {
+    totalAssets: 1,
+    nodes: [
+      node("old-context", "contexts/old.md", "context", "docs", "stable"),
+    ],
+  });
+  const { discovery: toDiscovery, ...toSnapshot } = snapshot("head", {
+    score: 10,
+    totalAssets: 1,
+    nodes: [
+      node("new-context", "contexts/new.md", "context", "docs", "stable"),
+    ],
+  });
+  assert.ok(fromDiscovery);
+  assert.ok(toDiscovery);
+
+  const report = buildDiffReport("/repo", fromSnapshot, toSnapshot);
+  const expected = buildDiffReport(
+    "/repo",
+    { ...fromSnapshot, discovery: fromDiscovery },
+    { ...toSnapshot, discovery: toDiscovery },
+  );
+  const { discovery: expectedDiscovery, ...expectedExistingFields } = expected;
+  const { discovery: actualDiscovery, ...actualExistingFields } = report;
+  void expectedDiscovery;
+  void actualDiscovery;
+
+  assert.deepEqual(report.discovery, {
+    schemaVersion: "renma.skill-discovery-diff.v1",
+    adoption: {
+      from: "not-adopted",
+      to: "not-adopted",
+      changed: false,
+    },
+    coverage: {
+      from: "not-evaluated",
+      to: "not-evaluated",
+      changed: false,
+    },
+    summary: {
+      publishedEntrypointCountDelta: 0,
+      routeEligibleSkillCountDelta: 0,
+      reachableSkillCountDelta: 0,
+      notReachedSkillCountDelta: 0,
+      unroutedSkillCountDelta: 0,
+      usableRouteCountDelta: 0,
+      unusableRouteCountDelta: 0,
+      unresolvedRouteCountDelta: 0,
+      cycleComponentCountDelta: 0,
+    },
+    publishedEntrypoints: {
+      added: [],
+      removed: [],
+    },
+    reachability: {
+      newlyReachable: [],
+      newlyNotReached: [],
+    },
+    unroutedSkills: {
+      newlyUnrouted: [],
+      resolvedUnrouted: [],
+    },
+    routes: {
+      added: [],
+      removed: [],
+      changed: [],
+    },
+    cycles: {
+      added: [],
+      resolved: [],
+    },
+  });
+  assert.deepEqual(
+    report.catalog.addedAssets.map((asset) => asset.id),
+    ["new-context"],
+  );
+  assert.deepEqual(
+    report.catalog.removedAssets.map((asset) => asset.id),
+    ["old-context"],
+  );
+  assert.equal(report.summary.readinessScoreDelta, 10);
+  assert.deepEqual(actualExistingFields, expectedExistingFields);
+  assert.doesNotMatch(
+    JSON.stringify(report.discovery),
+    /diagnostics|declarationIndex|repositoryPaths|documents|artifacts/,
+  );
+});
+
 test("formatDiff renders markdown summaries", () => {
   const report = buildDiffReport(
     "/repo",
@@ -279,6 +368,49 @@ test("formatDiff renders markdown summaries", () => {
   );
   assert.equal(parsed.security.posture.added.totalSecurityFindings, 1);
   assert.equal(parsed.security.policyInventory.totalPolicyAssets, 2);
+});
+
+test("formatDiff renders legacy reports without a Discovery section", () => {
+  const fullReport = buildDiffReport(
+    "/repo",
+    snapshot("base", {}),
+    snapshot("head", {
+      totalAssets: 1,
+      nodes: [
+        node("skill", "skills/demo/SKILL.md", "skill", "platform", "stable"),
+      ],
+    }),
+  );
+  const { discovery, ...legacyReport } = fullReport;
+  void discovery;
+  const serializedLegacyReport = JSON.stringify(legacyReport);
+  const parsedLegacyReport = JSON.parse(
+    serializedLegacyReport,
+  ) as typeof legacyReport;
+
+  const markdown = formatDiff(parsedLegacyReport, "markdown");
+  const json = JSON.parse(formatDiff(parsedLegacyReport, "json")) as Record<
+    string,
+    unknown
+  >;
+  const expectedMarkdown = formatDiff(fullReport, "markdown").replace(
+    /\n## Skill Discovery Changes\n[\s\S]*?\n## Catalog/,
+    "\n## Catalog",
+  );
+
+  assert.equal(markdown, expectedMarkdown);
+  assert.doesNotMatch(markdown, /^## Skill Discovery Changes$/m);
+  assert.match(markdown, /^## Catalog$/m);
+  assert.match(markdown, /- Added assets: 1/);
+  assert.match(markdown, /^## Graph$/m);
+  assert.match(markdown, /- Added edges: 0/);
+  assert.match(markdown, /^## Readiness checks$/m);
+  assert.match(markdown, /- \(none\)/);
+  assert.match(markdown, /^## Findings$/m);
+  assert.match(markdown, /- Added findings: 0/);
+  assert.match(markdown, /^## Security Changes$/m);
+  assert.match(markdown, /- Added security findings: 0/);
+  assert.equal("discovery" in json, false);
 });
 
 test("diff collects and prepares each archived ref exactly once", async () => {

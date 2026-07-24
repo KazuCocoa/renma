@@ -75,6 +75,11 @@ export interface DiffReport {
   };
 }
 
+export type DiffReportWithoutSkillDiscovery = Omit<DiffReport, "discovery">;
+export type DiffReportFormatInput =
+  | DiffReport
+  | DiffReportWithoutSkillDiscovery;
+
 interface DiffEndpoint {
   ref: string;
   scannedFileCount: number;
@@ -134,17 +139,24 @@ interface EvidenceDelta {
   snippet?: string | undefined;
 }
 
-interface Snapshot {
+export interface DiffSnapshot {
   ref: string;
   root: string;
   readiness: ReadinessReport;
   graph: GraphReport;
-  discovery: SkillDiscoveryIndex;
+  discovery?: SkillDiscoveryIndex;
 }
 
 export interface DiffCollectionInstrumentation {
   from?: RepositoryCollectionInstrumentation;
   to?: RepositoryCollectionInstrumentation;
+}
+
+interface DiffOptions {
+  fromRef: string;
+  toRef: string;
+  overrides?: ConfigOverrides;
+  instrumentation?: DiffCollectionInstrumentation;
 }
 
 export async function runDiffCommand(
@@ -163,20 +175,41 @@ export async function runDiffCommand(
 
 export async function diff(
   targetPath: string,
-  options: {
-    fromRef: string;
-    toRef: string;
-    overrides?: ConfigOverrides;
-    instrumentation?: DiffCollectionInstrumentation;
-  },
+  options: DiffOptions,
 ): Promise<DiffReport> {
+  return diffWithProjection(targetPath, options, true);
+}
+
+/** @internal Build the pre-0.23.1 semantic diff projection used by CI. */
+export async function diffWithoutSkillDiscovery(
+  targetPath: string,
+  options: DiffOptions,
+): Promise<DiffReportWithoutSkillDiscovery> {
+  return diffWithProjection(targetPath, options, false);
+}
+
+function diffWithProjection(
+  targetPath: string,
+  options: DiffOptions,
+  includeSkillDiscovery: true,
+): Promise<DiffReport>;
+function diffWithProjection(
+  targetPath: string,
+  options: DiffOptions,
+  includeSkillDiscovery: false,
+): Promise<DiffReportWithoutSkillDiscovery>;
+async function diffWithProjection(
+  targetPath: string,
+  options: DiffOptions,
+  includeSkillDiscovery: boolean,
+): Promise<DiffReport | DiffReportWithoutSkillDiscovery> {
   const absoluteTarget = await realpath(resolve(process.cwd(), targetPath));
   const repoRoot = await realpath(
     await gitOutput(absoluteTarget, ["rev-parse", "--show-toplevel"]),
   );
   const relativeTarget = pathWithinRepo(repoRoot, absoluteTarget);
   const tempRoot = await mkdtemp(join(tmpdir(), "renma-diff-"));
-  let report: DiffReport | undefined;
+  let report: DiffReport | DiffReportWithoutSkillDiscovery | undefined;
   let primaryError: unknown;
 
   try {
@@ -189,6 +222,7 @@ export async function diff(
         "from",
         options.overrides,
         options.instrumentation?.from,
+        includeSkillDiscovery,
       ),
       snapshot(
         repoRoot,
@@ -198,6 +232,7 @@ export async function diff(
         "to",
         options.overrides,
         options.instrumentation?.to,
+        includeSkillDiscovery,
       ),
     ]);
 
@@ -206,7 +241,13 @@ export async function diff(
 
     const fromSnapshot = fromResult.value;
     const toSnapshot = toResult.value;
-    report = buildDiffReport(repoRoot, fromSnapshot, toSnapshot);
+    report = includeSkillDiscovery
+      ? buildDiffReport(repoRoot, fromSnapshot, toSnapshot)
+      : buildDiffReportWithoutSkillDiscovery(
+          repoRoot,
+          fromSnapshot,
+          toSnapshot,
+        );
   } catch (error) {
     primaryError = error;
   }
@@ -231,9 +272,38 @@ export async function diff(
 
 export function buildDiffReport(
   root: string,
-  fromSnapshot: Snapshot,
-  toSnapshot: Snapshot,
+  fromSnapshot: DiffSnapshot,
+  toSnapshot: DiffSnapshot,
 ): DiffReport {
+  return buildDiffReportProjection(root, fromSnapshot, toSnapshot, true);
+}
+
+function buildDiffReportWithoutSkillDiscovery(
+  root: string,
+  fromSnapshot: DiffSnapshot,
+  toSnapshot: DiffSnapshot,
+): DiffReportWithoutSkillDiscovery {
+  return buildDiffReportProjection(root, fromSnapshot, toSnapshot, false);
+}
+
+function buildDiffReportProjection(
+  root: string,
+  fromSnapshot: DiffSnapshot,
+  toSnapshot: DiffSnapshot,
+  includeSkillDiscovery: true,
+): DiffReport;
+function buildDiffReportProjection(
+  root: string,
+  fromSnapshot: DiffSnapshot,
+  toSnapshot: DiffSnapshot,
+  includeSkillDiscovery: false,
+): DiffReportWithoutSkillDiscovery;
+function buildDiffReportProjection(
+  root: string,
+  fromSnapshot: DiffSnapshot,
+  toSnapshot: DiffSnapshot,
+  includeSkillDiscovery: boolean,
+): DiffReport | DiffReportWithoutSkillDiscovery {
   const fromReadiness = fromSnapshot.readiness;
   const toReadiness = toSnapshot.readiness;
   const fromFindings = findingMap(fromReadiness.findings ?? []);
@@ -251,7 +321,7 @@ export function buildDiffReport(
     .filter(([key]) => !toFindings.has(key))
     .map(([, finding]) => finding);
 
-  return {
+  const shared = {
     root,
     from: fromEndpoint,
     to: toEndpoint,
@@ -311,10 +381,8 @@ export function buildDiffReport(
         readinessChecksWithoutDiscovery(toReadiness.checks),
       ),
     },
-    discovery: buildSkillDiscoveryDiff(
-      fromSnapshot.discovery,
-      toSnapshot.discovery,
-    ),
+  };
+  const tail = {
     security: buildSecurityDiffSummary({
       addedFindings,
       removedFindings,
@@ -330,6 +398,17 @@ export function buildDiffReport(
       ),
     },
   };
+
+  if (!includeSkillDiscovery) return { ...shared, ...tail };
+
+  return {
+    ...shared,
+    discovery:
+      fromSnapshot.discovery && toSnapshot.discovery
+        ? buildSkillDiscoveryDiff(fromSnapshot.discovery, toSnapshot.discovery)
+        : neutralSkillDiscoveryDiff(),
+    ...tail,
+  };
 }
 
 function readinessChecksWithoutDiscovery(checks: unknown[]): unknown[] {
@@ -338,14 +417,21 @@ function readinessChecksWithoutDiscovery(checks: unknown[]): unknown[] {
   );
 }
 
-export function formatDiff(report: DiffReport, format: DiffFormat): string {
+export function formatDiff(
+  report: DiffReportFormatInput,
+  format: DiffFormat,
+): string {
   if (format === "json") {
     return `${JSON.stringify(report, null, 2)}\n`;
   }
   return formatDiffMarkdown(report);
 }
 
-function formatDiffMarkdown(report: DiffReport): string {
+function formatDiffMarkdown(report: DiffReportFormatInput): string {
+  const discovery = "discovery" in report ? report.discovery : undefined;
+  const discoveryLines = discovery
+    ? ["", ...formatSkillDiscoveryChanges(discovery)]
+    : [];
   const lines = [
     `# Renma semantic diff`,
     "",
@@ -362,8 +448,7 @@ function formatDiffMarkdown(report: DiffReport): string {
     `- Graph resolution: ${signed(report.summary.graphResolutionDelta)}`,
     `- Findings: ${signed(report.summary.findingsDelta)}`,
     `- High/critical findings: ${signed(report.summary.highOrCriticalFindingsDelta)}`,
-    "",
-    ...formatSkillDiscoveryChanges(report.discovery),
+    ...discoveryLines,
     "",
     "## Catalog",
     "",
@@ -411,6 +496,54 @@ function formatDiffMarkdown(report: DiffReport): string {
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+function neutralSkillDiscoveryDiff(): SkillDiscoveryDiff {
+  return {
+    schemaVersion: "renma.skill-discovery-diff.v1",
+    adoption: {
+      from: "not-adopted",
+      to: "not-adopted",
+      changed: false,
+    },
+    coverage: {
+      from: "not-evaluated",
+      to: "not-evaluated",
+      changed: false,
+    },
+    summary: {
+      publishedEntrypointCountDelta: 0,
+      routeEligibleSkillCountDelta: 0,
+      reachableSkillCountDelta: 0,
+      notReachedSkillCountDelta: 0,
+      unroutedSkillCountDelta: 0,
+      usableRouteCountDelta: 0,
+      unusableRouteCountDelta: 0,
+      unresolvedRouteCountDelta: 0,
+      cycleComponentCountDelta: 0,
+    },
+    publishedEntrypoints: {
+      added: [],
+      removed: [],
+    },
+    reachability: {
+      newlyReachable: [],
+      newlyNotReached: [],
+    },
+    unroutedSkills: {
+      newlyUnrouted: [],
+      resolvedUnrouted: [],
+    },
+    routes: {
+      added: [],
+      removed: [],
+      changed: [],
+    },
+    cycles: {
+      added: [],
+      resolved: [],
+    },
+  };
 }
 
 const DIFF_DETAIL_LIMIT =
@@ -591,7 +724,8 @@ async function snapshot(
   label: string,
   overrides: ConfigOverrides = {},
   instrumentation?: RepositoryCollectionInstrumentation,
-): Promise<Snapshot> {
+  includeSkillDiscovery = true,
+): Promise<DiffSnapshot> {
   const root = join(tempRoot, label);
   const archivePath = join(tempRoot, `${label}.tar`);
   await mkdir(root, { recursive: true });
@@ -618,11 +752,13 @@ async function snapshot(
     root: target,
     readiness: readinessReport,
     graph: graphReport,
-    discovery: repositorySnapshot.skillDiscovery,
+    ...(includeSkillDiscovery
+      ? { discovery: repositorySnapshot.skillDiscovery }
+      : {}),
   };
 }
 
-function endpoint(snapshot: Snapshot): DiffEndpoint {
+function endpoint(snapshot: DiffSnapshot): DiffEndpoint {
   return {
     ref: snapshot.ref,
     scannedFileCount: snapshot.readiness.scannedFileCount,

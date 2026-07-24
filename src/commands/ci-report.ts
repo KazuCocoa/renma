@@ -1,4 +1,10 @@
-import { diff, type DiffReport, type DiffFormat } from "./diff.js";
+import {
+  diffWithoutSkillDiscovery,
+  type DiffCollectionInstrumentation,
+  type DiffReport,
+  type DiffReportWithoutSkillDiscovery,
+  type DiffFormat,
+} from "./diff.js";
 import {
   summarizeSecurityPosture,
   type SecurityPostureSummary,
@@ -16,7 +22,7 @@ import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 
 export type CiReportFormat = DiffFormat;
 export type CiReportStatus = "pass" | "warn" | "fail";
-export type CiCompatibleDiffReport = Omit<DiffReport, "discovery">;
+export type CiCompatibleDiffReport = DiffReportWithoutSkillDiscovery;
 
 export interface CiReport {
   root: string;
@@ -36,6 +42,7 @@ interface CiReportOptions {
   fromRef: string;
   toRef: string;
   overrides?: ConfigOverrides;
+  instrumentation?: DiffCollectionInstrumentation;
 }
 
 const MAX_LIST_ITEMS = DEFAULT_QUALITY_PROFILE.presentation.topSummaryItemCap;
@@ -66,14 +73,14 @@ export async function ciReport(
   targetPath: string,
   options: CiReportOptions,
 ): Promise<CiReport> {
-  const report = await diff(targetPath, options);
+  const report = omitSkillDiscovery(
+    await diffWithoutSkillDiscovery(targetPath, options),
+  );
   const status = determineCiReportStatus(report);
   const securityPosture = {
     added: summarizeSecurityPosture(report.findings.added),
     resolved: summarizeSecurityPosture(report.findings.removed),
   };
-  const { discovery, ...ciCompatibleDiff } = report;
-  void discovery;
   return {
     root: report.root,
     from: report.from,
@@ -82,8 +89,16 @@ export async function ciReport(
     summary: report.summary,
     securityPosture,
     notes: reviewNotes(report, status, securityPosture.added),
-    diff: ciCompatibleDiff,
+    diff: report,
   };
+}
+
+function omitSkillDiscovery(
+  report: CiCompatibleDiffReport & Partial<Pick<DiffReport, "discovery">>,
+): CiCompatibleDiffReport {
+  const { discovery, ...ciCompatibleDiff } = report;
+  void discovery;
+  return ciCompatibleDiff;
 }
 
 export function formatCiReport(
