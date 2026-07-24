@@ -81,33 +81,53 @@ export type DiffReportFormatInput =
   | DiffReport
   | DiffReportWithoutSkillDiscovery;
 
-interface DiffEndpoint {
+export interface DiffOwnershipEndpoint {
+  ownedAssets: number;
+  eligibleAssets: number;
+  coveragePercent: number;
+}
+
+export interface DiffEndpoint {
   ref: string;
   scannedFileCount: number;
   totalAssets: number;
   readinessScore: number;
   readinessLevel: string;
+  ownership?: DiffOwnershipEndpoint | undefined;
   contextLens?: ContextLensSummary;
   securityPolicyInventory?: SecurityPolicyInventorySummary;
 }
 
-interface AssetDelta {
+export interface AssetDelta {
   id: string;
   path?: string | undefined;
   kind?: string | undefined;
   owner?: string | undefined;
+  declaredOwner?: string | null | undefined;
+  effectiveOwner?: string | null | undefined;
   status?: string | undefined;
 }
 
-interface AssetChange {
+const COMPARABLE_ASSET_FIELDS = [
+  "path",
+  "kind",
+  "owner",
+  "declaredOwner",
+  "effectiveOwner",
+  "status",
+] as const;
+
+export type ComparableAssetField = (typeof COMPARABLE_ASSET_FIELDS)[number];
+
+export interface AssetChange {
   id: string;
   path?: string | undefined;
-  changedFields: string[];
+  changedFields: ComparableAssetField[];
   from: AssetDelta;
   to: AssetDelta;
 }
 
-interface EdgeDelta {
+export interface EdgeDelta {
   source: string;
   target: string;
   kind: string;
@@ -476,7 +496,11 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
     `- Readiness level changed: ${report.summary.readinessLevelChanged ? "yes" : "no"}`,
     `- Scanned files: ${report.to.scannedFileCount} (${signed(report.to.scannedFileCount - report.from.scannedFileCount)})`,
     `- Total assets: ${report.to.totalAssets} (${signed(report.summary.totalAssetsDelta)})`,
-    `- Ownership coverage: ${signed(report.summary.ownershipCoverageDelta)}`,
+    formatOwnershipDelta(
+      report.from,
+      report.to,
+      report.summary.ownershipCoverageDelta,
+    ),
     `- Graph resolution: ${signed(report.summary.graphResolutionDelta)}`,
     `- Findings: ${signed(report.summary.findingsDelta)}`,
     `- High/critical findings: ${signed(report.summary.highOrCriticalFindingsDelta)}`,
@@ -696,7 +720,7 @@ function formatDiscoveryCycle(cycle: SkillDiscoveryCycleDiff): string {
   return `${cycle.skillIds.join(", ")}${cycle.selfLoop ? " (self-loop)" : ""}`;
 }
 
-function formatSecurityChanges(
+export function formatSecurityChanges(
   security: SecurityDiffSummary | undefined,
 ): string[] {
   const { posture, policyInventory } =
@@ -725,8 +749,8 @@ function formatSecurityChanges(
     `- Effective policy from owning Skills: ${formatSignedNumber(policyInventory.policySources.owning_skill)}`,
     `- Network allowed: ${formatSignedNumber(policyInventory.networkAllowed.true)}`,
     `- Network denied: ${formatSignedNumber(policyInventory.networkAllowed.false)}`,
-    `- Upload allowed: ${formatSignedNumber(policyInventory.externalUploadAllowed.true)}`,
-    `- Upload denied: ${formatSignedNumber(policyInventory.externalUploadAllowed.false)}`,
+    `- External upload allowed: ${formatSignedNumber(policyInventory.externalUploadAllowed.true)}`,
+    `- External upload denied: ${formatSignedNumber(policyInventory.externalUploadAllowed.false)}`,
     `- Secrets allowed: ${formatSignedNumber(policyInventory.secretsAllowed.true)}`,
     `- Secrets denied: ${formatSignedNumber(policyInventory.secretsAllowed.false)}`,
     `- Human approval required: ${formatSignedNumber(policyInventory.humanApprovalRequired.true)}`,
@@ -803,6 +827,11 @@ function endpoint(snapshot: DiffSnapshot): DiffEndpoint {
     totalAssets: snapshot.readiness.summary.totalAssets,
     readinessScore: snapshot.readiness.score,
     readinessLevel: snapshot.readiness.level,
+    ownership: {
+      ownedAssets: snapshot.readiness.summary.ownedAssets,
+      eligibleAssets: snapshot.readiness.summary.totalAssets,
+      coveragePercent: snapshot.readiness.summary.ownershipCoveragePercent,
+    },
     contextLens: snapshot.readiness.summary.contextLens,
     securityPolicyInventory: snapshot.readiness.summary.securityPolicyInventory,
   };
@@ -816,10 +845,8 @@ function changedAssets(
     .flatMap(([key, toAsset]) => {
       const fromAsset = fromAssets.get(key);
       if (!fromAsset) return [];
-      const changedFields = ["path", "kind", "owner", "status"].filter(
-        (field) =>
-          fromAsset[field as keyof AssetDelta] !==
-          toAsset[field as keyof AssetDelta],
+      const changedFields = COMPARABLE_ASSET_FIELDS.filter(
+        (field) => fromAsset[field] !== toAsset[field],
       );
       return changedFields.length === 0
         ? []
@@ -870,11 +897,17 @@ function checkChanges(
 function assetMap(nodes: unknown[]): Map<string, AssetDelta> {
   return stableMap(
     nodes.map((node) => {
+      const ownership = objectField(node, "ownership");
       const asset = {
         id: firstString(node, ["id", "path", "sourcePath"]),
         path: firstOptionalString(node, ["sourcePath", "path"]),
         kind: firstOptionalString(node, ["kind"]),
         owner: firstOptionalString(node, ["owner"]),
+        declaredOwner: optionalNullableStringField(ownership, "declaredOwner"),
+        effectiveOwner: optionalNullableStringField(
+          ownership,
+          "effectiveOwner",
+        ),
         status: firstOptionalString(node, ["status"]),
       };
       return [asset.id, asset] as const;
@@ -885,15 +918,27 @@ function assetMap(nodes: unknown[]): Map<string, AssetDelta> {
 function edgeMap(edges: unknown[]): Map<string, EdgeDelta> {
   return stableMap(
     edges.map((edge) => {
+      const identitySource = firstString(edge, [
+        "source",
+        "sourceId",
+        "sourcePath",
+        "from",
+      ]);
+      const identityTarget = firstString(edge, [
+        "target",
+        "targetId",
+        "targetPath",
+        "to",
+      ]);
       const normalized = {
-        source: firstString(edge, ["source", "sourceId", "sourcePath", "from"]),
-        target: firstString(edge, ["target", "targetId", "targetPath", "to"]),
+        source: firstString(edge, ["source", "sourceId", "from", "sourcePath"]),
+        target: firstString(edge, ["target", "targetId", "to", "targetPath"]),
         kind: firstString(edge, ["kind", "type"]),
         resolved: booleanField(edge, "resolved"),
         evidence: evidenceDelta(objectField(edge, "evidence")),
       };
       return [
-        `${normalized.source}\0${normalized.kind}\0${normalized.target}`,
+        `${identitySource}\0${normalized.kind}\0${identityTarget}`,
         normalized,
       ] as const;
     }),
@@ -1043,6 +1088,25 @@ function signed(value: number): string {
   return value > 0 ? `+${value}` : String(value);
 }
 
+function formatOwnershipDelta(
+  from: DiffEndpoint,
+  to: DiffEndpoint,
+  coverageDelta: number,
+): string {
+  if (!from.ownership || !to.ownership) {
+    return `- Ownership coverage: ${signed(coverageDelta)}`;
+  }
+  return `- Ownership: ${formatOwnershipEndpoint(from.ownership)} -> ${formatOwnershipEndpoint(to.ownership)} (${formatPercentagePointDelta(coverageDelta)})`;
+}
+
+function formatOwnershipEndpoint(ownership: DiffOwnershipEndpoint): string {
+  return `${ownership.ownedAssets}/${ownership.eligibleAssets} (${ownership.coveragePercent}%)`;
+}
+
+function formatPercentagePointDelta(value: number): string {
+  return `${formatSignedNumber(value)} pp`;
+}
+
 function formatSignedNumber(value: number): string {
   return value >= 0 ? `+${value}` : String(value);
 }
@@ -1084,6 +1148,16 @@ function optionalStringField(
 ): string | undefined {
   const candidate = objectField(value, field);
   return typeof candidate === "string" ? candidate : undefined;
+}
+
+function optionalNullableStringField(
+  value: unknown,
+  field: string,
+): string | null | undefined {
+  const candidate = objectField(value, field);
+  return typeof candidate === "string" || candidate === null
+    ? candidate
+    : undefined;
 }
 
 function optionalNumberField(

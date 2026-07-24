@@ -19,6 +19,7 @@ test("buildDiffReport compares deterministic readiness snapshots", () => {
     score: 82,
     level: "not_ready",
     totalAssets: 2,
+    ownedAssets: 1,
     ownershipCoveragePercent: 50,
     graphResolutionPercent: 50,
     nodes: [
@@ -81,6 +82,7 @@ test("buildDiffReport compares deterministic readiness snapshots", () => {
     score: 91,
     level: "ready",
     totalAssets: 3,
+    ownedAssets: 3,
     ownershipCoveragePercent: 100,
     graphResolutionPercent: 75,
     nodes: [
@@ -145,6 +147,16 @@ test("buildDiffReport compares deterministic readiness snapshots", () => {
     findingsDelta: 0,
     highOrCriticalFindingsDelta: 0,
   });
+  assert.deepEqual(report.from.ownership, {
+    ownedAssets: 1,
+    eligibleAssets: 2,
+    coveragePercent: 50,
+  });
+  assert.deepEqual(report.to.ownership, {
+    ownedAssets: 3,
+    eligibleAssets: 3,
+    coveragePercent: 100,
+  });
   assert.deepEqual(
     report.catalog.addedAssets.map((asset) => asset.id),
     ["new-context"],
@@ -203,6 +215,103 @@ test("buildDiffReport compares deterministic readiness snapshots", () => {
   assert.equal(report.security.policyInventory.networkAllowed.true, 1);
   assert.equal(report.security.policyInventory.securityProfiles.missing, 1);
   assert.equal(report.security.policyInventory.securityProfiles.cyclic, -1);
+});
+
+test("buildDiffReport exposes canonical declared and effective owner changes", () => {
+  const report = buildDiffReport(
+    "/repo",
+    snapshot("base", {
+      totalAssets: 1,
+      ownedAssets: 1,
+      ownershipCoveragePercent: 100,
+      nodes: [
+        canonicalNode(
+          "skill.release-prep",
+          "skills/release-prep/SKILL.md",
+          "skill",
+          "team-a",
+          "team-a",
+          "stable",
+        ),
+      ],
+    }),
+    snapshot("head", {
+      totalAssets: 3,
+      ownedAssets: 3,
+      ownershipCoveragePercent: 100,
+      nodes: [
+        canonicalNode(
+          "skill.z-added",
+          "skills/z-added/SKILL.md",
+          "skill",
+          "team-z",
+          "team-z",
+          "stable",
+        ),
+        canonicalNode(
+          "skill.release-prep",
+          "skills/release-prep/SKILL.md",
+          "skill",
+          "team-b",
+          "team-b",
+          "stable",
+        ),
+        canonicalNode(
+          "skill.a-added",
+          "skills/a-added/SKILL.md",
+          "skill",
+          null,
+          "inherited-team",
+          "stable",
+        ),
+      ],
+    }),
+  );
+
+  assert.deepEqual(
+    report.catalog.addedAssets.map((asset) => asset.id),
+    ["skill.a-added", "skill.z-added"],
+  );
+  assert.deepEqual(report.catalog.addedAssets[0], {
+    id: "skill.a-added",
+    path: "skills/a-added/SKILL.md",
+    kind: "skill",
+    owner: undefined,
+    declaredOwner: null,
+    effectiveOwner: "inherited-team",
+    status: "stable",
+  });
+  assert.deepEqual(report.catalog.changedAssets[0]?.changedFields, [
+    "declaredOwner",
+    "effectiveOwner",
+  ]);
+  assert.equal(report.catalog.changedAssets[0]?.from.declaredOwner, "team-a");
+  assert.equal(report.catalog.changedAssets[0]?.to.effectiveOwner, "team-b");
+  assert.equal(report.summary.ownershipCoverageDelta, 0);
+});
+
+test("buildDiffReport preserves readiness ownership behavior for an empty eligible set", () => {
+  const report = buildDiffReport(
+    "/repo",
+    snapshot("base", {
+      totalAssets: 0,
+      ownedAssets: 0,
+      ownershipCoveragePercent: 100,
+    }),
+    snapshot("head", {
+      totalAssets: 0,
+      ownedAssets: 0,
+      ownershipCoveragePercent: 100,
+    }),
+  );
+
+  assert.deepEqual(report.from.ownership, {
+    ownedAssets: 0,
+    eligibleAssets: 0,
+    coveragePercent: 100,
+  });
+  assert.deepEqual(report.to.ownership, report.from.ownership);
+  assert.equal(report.summary.ownershipCoverageDelta, 0);
 });
 
 test("buildDiffReport accepts legacy snapshots without Discovery indexes", () => {
@@ -515,6 +624,7 @@ function snapshot(ref: string, overrides: Partial<SnapshotInput>) {
     score: 0,
     level: "not_ready",
     totalAssets: 0,
+    ownedAssets: 0,
     scannedFileCount: 0,
     ownershipCoveragePercent: 0,
     graphResolutionPercent: 0,
@@ -534,8 +644,8 @@ function snapshot(ref: string, overrides: Partial<SnapshotInput>) {
       level: input.level,
       summary: {
         totalAssets: input.totalAssets,
-        ownedAssets: 0,
-        unownedAssets: input.totalAssets,
+        ownedAssets: input.ownedAssets,
+        unownedAssets: input.totalAssets - input.ownedAssets,
         ownershipCoveragePercent: input.ownershipCoveragePercent,
         nodeCount: input.nodes.length,
         edgeCount: input.edges.length,
@@ -619,10 +729,11 @@ interface SnapshotInput {
   score: number;
   level: string;
   totalAssets: number;
+  ownedAssets: number;
   scannedFileCount: number;
   ownershipCoveragePercent: number;
   graphResolutionPercent: number;
-  nodes: Array<ReturnType<typeof node>>;
+  nodes: Array<ReturnType<typeof node> | ReturnType<typeof canonicalNode>>;
   edges: Array<ReturnType<typeof edge>>;
   checks: Array<ReturnType<typeof check>>;
   findings: Array<ReturnType<typeof finding>>;
@@ -681,6 +792,27 @@ function node(
   status: string,
 ) {
   return { id, sourcePath, kind, owner, status };
+}
+
+function canonicalNode(
+  id: string,
+  sourcePath: string,
+  kind: string,
+  declaredOwner: string | null,
+  effectiveOwner: string | null,
+  status: string,
+) {
+  return {
+    id,
+    sourcePath,
+    kind,
+    ownership: {
+      declaredOwner,
+      effectiveOwner,
+      source: declaredOwner === null ? "inherited" : "declared",
+    },
+    status,
+  };
 }
 
 function edge(

@@ -166,12 +166,22 @@ test("formatCiReport includes security changes from the semantic diff", () => {
     totalPolicyAssets: 3,
     assetsWithLocalPolicyMetadata: 2,
     assetsWithoutEffectivePolicy: 2,
+    networkDenied: 1,
+    externalUploadDenied: 1,
+    secretsDenied: 1,
+    humanApprovalRequired: 1,
+    forbiddenInputCount: 1,
     missingSecurityProfiles: 0,
   });
   const toInventory = policyInventory({
     totalPolicyAssets: 5,
     assetsWithLocalPolicyMetadata: 4,
     assetsWithoutEffectivePolicy: 1,
+    networkDenied: 2,
+    externalUploadDenied: 2,
+    secretsDenied: 2,
+    humanApprovalRequired: 2,
+    forbiddenInputCount: 2,
     missingSecurityProfiles: 1,
   });
   report.diff.findings.added = [
@@ -202,7 +212,264 @@ test("formatCiReport includes security changes from the semantic diff", () => {
   assert.match(markdown, /- Policy assets: \+2/);
   assert.match(markdown, /- Assets with local policy metadata: \+2/);
   assert.match(markdown, /- Assets without effective policy: -1/);
+  assert.match(markdown, /- Network denied: \+1/);
+  assert.match(markdown, /- External upload denied: \+1/);
+  assert.match(markdown, /- Secrets denied: \+1/);
+  assert.match(markdown, /- Human approval required: \+1/);
+  assert.match(markdown, /- Forbidden inputs: \+1/);
   assert.match(markdown, /- Missing security profiles: \+1/);
+});
+
+test("formatCiReport renders ownership, asset, edge, and readiness governance details", () => {
+  const report = sampleReport();
+  report.from.ownership = {
+    ownedAssets: 1,
+    eligibleAssets: 1,
+    coveragePercent: 100,
+  };
+  report.to.ownership = {
+    ownedAssets: 2,
+    eligibleAssets: 2,
+    coveragePercent: 100,
+  };
+  report.diff.from.ownership = report.from.ownership;
+  report.diff.to.ownership = report.to.ownership;
+  report.summary.ownershipCoverageDelta = 0;
+  report.diff.summary.ownershipCoverageDelta = 0;
+  report.diff.catalog.addedAssets = [
+    {
+      id: "skill.repository.contribute-skill",
+      path: "skills/repository/contribute-skill/SKILL.md",
+      kind: "skill",
+      status: "active",
+      declaredOwner: "qe-platform",
+      effectiveOwner: "qe-platform",
+    },
+    {
+      id: "context.optional-metadata",
+      declaredOwner: null,
+      effectiveOwner: null,
+    },
+  ];
+  report.diff.catalog.removedAssets = [
+    {
+      id: "context.retired",
+      path: "contexts/retired.md",
+      kind: "context",
+      owner: "docs",
+      status: "stable",
+    },
+  ];
+  report.diff.catalog.changedAssets = [
+    {
+      id: "skill.owner-added",
+      path: "skills/owner-added/SKILL.md",
+      changedFields: ["owner"],
+      from: { id: "skill.owner-added" },
+      to: { id: "skill.owner-added", owner: "team-a" },
+    },
+    {
+      id: "skill.owner-changed",
+      path: "skills/owner-changed/SKILL.md",
+      changedFields: ["declaredOwner", "effectiveOwner"],
+      from: {
+        id: "skill.owner-changed",
+        declaredOwner: "team-a",
+        effectiveOwner: "team-a",
+      },
+      to: {
+        id: "skill.owner-changed",
+        declaredOwner: "team-b",
+        effectiveOwner: "team-b",
+      },
+    },
+    {
+      id: "skill.owner-removed",
+      path: "skills/owner-removed/SKILL.md",
+      changedFields: ["declaredOwner", "effectiveOwner"],
+      from: {
+        id: "skill.owner-removed",
+        declaredOwner: "team-a",
+        effectiveOwner: "team-a",
+      },
+      to: {
+        id: "skill.owner-removed",
+        declaredOwner: null,
+        effectiveOwner: null,
+      },
+    },
+    {
+      id: "skill.all-fields",
+      path: "skills/new/SKILL.md",
+      changedFields: ["path", "kind", "status"],
+      from: {
+        id: "skill.all-fields",
+        path: "skills/old/SKILL.md",
+        kind: "context",
+        status: "experimental",
+      },
+      to: {
+        id: "skill.all-fields",
+        path: "skills/new/SKILL.md",
+        kind: "skill",
+        status: "stable",
+      },
+    },
+  ];
+  report.diff.graph.addedEdges = [
+    {
+      source: "skill.repository.contribute-skill",
+      target: "context.repository.authoring-standards",
+      kind: "requires",
+      resolved: true,
+    },
+    {
+      source: "skill.example",
+      target: "context.missing",
+      kind: "requires",
+      resolved: false,
+    },
+  ];
+  report.diff.graph.removedEdges = [
+    {
+      source: "skill.old",
+      target: "context.old",
+      kind: "optional",
+      resolved: true,
+    },
+  ];
+  report.diff.readiness.checkChanges = [
+    {
+      id: "ownership.coverage",
+      title: "Ownership coverage",
+      fromStatus: "pass",
+      toStatus: "pass",
+      fromSeverity: "info",
+      toSeverity: "info",
+      summaryChanged: true,
+    },
+    {
+      id: "graph.resolution",
+      title: "Graph resolution",
+      fromStatus: "warn",
+      toStatus: "pass",
+      fromSeverity: "warning",
+      toSeverity: "info",
+      summaryChanged: false,
+    },
+  ];
+
+  const markdown = formatCiReport(report, "markdown");
+
+  assert.match(
+    markdown,
+    /- Ownership: 1\/1 \(100%\) -> 2\/2 \(100%\) \(\+0 pp\)/,
+  );
+  assert.match(markdown, /^## Asset Changes$/m);
+  assert.match(
+    markdown,
+    /- `skill\.repository\.contribute-skill`[\s\S]* {2}- Path: `skills\/repository\/contribute-skill\/SKILL\.md`[\s\S]* {2}- Kind: skill[\s\S]* {2}- Status: active[\s\S]* {2}- Declared owner: qe-platform[\s\S]* {2}- Effective owner: qe-platform/,
+  );
+  assert.match(
+    markdown,
+    /- `context\.optional-metadata`[\s\S]* {2}- Path: \(none\)[\s\S]* {2}- Declared owner: \(none\)[\s\S]* {2}- Effective owner: \(none\)/,
+  );
+  assert.match(markdown, / {2}- Owner: docs/);
+  assert.match(markdown, / {2}- owner: \(none\) -> `team-a`/);
+  assert.match(markdown, / {2}- declared owner: `team-a` -> `team-b`/);
+  assert.match(markdown, / {2}- effective owner: `team-a` -> \(none\)/);
+  assert.match(
+    markdown,
+    / {2}- path: `skills\/old\/SKILL\.md` -> `skills\/new\/SKILL\.md`/,
+  );
+  assert.match(markdown, / {2}- kind: `context` -> `skill`/);
+  assert.match(markdown, / {2}- status: `experimental` -> `stable`/);
+  assert.match(markdown, /^## Graph Changes$/m);
+  assert.match(
+    markdown,
+    /`skill\.repository\.contribute-skill` --requires--> `context\.repository\.authoring-standards` \(resolved\)/,
+  );
+  assert.match(
+    markdown,
+    /`skill\.example` --requires--> `context\.missing` \(unresolved\)/,
+  );
+  assert.match(
+    markdown,
+    /`skill\.old` --optional--> `context\.old` \(resolved\)/,
+  );
+  assert.match(markdown, /^## Readiness Check Changes$/m);
+  assert.match(
+    markdown,
+    /- `ownership\.coverage`: pass\/info -> pass\/info; summary changed: yes/,
+  );
+  assert.match(
+    markdown,
+    /- `graph\.resolution`: warn\/warning -> pass\/info; summary changed: no/,
+  );
+});
+
+test("formatCiReport caps every governance detail collection without truncating JSON", () => {
+  const report = sampleReport();
+  report.diff.catalog.addedAssets = Array.from({ length: 12 }, (_, index) => ({
+    id: `added.${index}`,
+  }));
+  report.diff.catalog.removedAssets = Array.from(
+    { length: 12 },
+    (_, index) => ({ id: `removed.${index}` }),
+  );
+  report.diff.catalog.changedAssets = Array.from(
+    { length: 12 },
+    (_, index) => ({
+      id: `changed.${index}`,
+      changedFields: ["status"],
+      from: { id: `changed.${index}`, status: "experimental" },
+      to: { id: `changed.${index}`, status: "stable" },
+    }),
+  );
+  report.diff.graph.addedEdges = Array.from({ length: 12 }, (_, index) => ({
+    source: `added.source.${index}`,
+    target: `added.target.${index}`,
+    kind: "requires",
+    resolved: true,
+  }));
+  report.diff.graph.removedEdges = Array.from({ length: 12 }, (_, index) => ({
+    source: `removed.source.${index}`,
+    target: `removed.target.${index}`,
+    kind: "optional",
+    resolved: true,
+  }));
+  report.diff.readiness.checkChanges = Array.from(
+    { length: 12 },
+    (_, index) => ({
+      id: `check.${index}`,
+      title: `Check ${index}`,
+      fromStatus: "pass",
+      toStatus: "pass",
+      fromSeverity: "info",
+      toSeverity: "info",
+      summaryChanged: true,
+    }),
+  );
+
+  const markdown = formatCiReport(report, "markdown");
+  const json = JSON.parse(formatCiReport(report, "json")) as CiReport;
+
+  assert.equal(
+    markdown.match(/2 more not shown; see JSON for the full list\./g)?.length,
+    6,
+  );
+  assert.doesNotMatch(markdown, /`added\.10`/);
+  assert.doesNotMatch(markdown, /`removed\.10`/);
+  assert.doesNotMatch(markdown, /`changed\.10`/);
+  assert.doesNotMatch(markdown, /`check\.10`/);
+  assert.doesNotMatch(markdown, /added\.source\.10/);
+  assert.doesNotMatch(markdown, /removed\.source\.10/);
+  assert.equal(json.diff.catalog.addedAssets.length, 12);
+  assert.equal(json.diff.catalog.removedAssets.length, 12);
+  assert.equal(json.diff.catalog.changedAssets.length, 12);
+  assert.equal(json.diff.graph.addedEdges.length, 12);
+  assert.equal(json.diff.graph.removedEdges.length, 12);
+  assert.equal(json.diff.readiness.checkChanges.length, 12);
 });
 
 test("formatCiReport tolerates legacy fixtures without security diff", () => {
@@ -230,6 +497,7 @@ test("formatCiReport preserves legacy CI reports without Skill Discovery", () =>
   assert.equal(JSON.stringify(legacy), before);
   assert.equal("skillDiscovery" in JSON.parse(json), false);
   assert.doesNotMatch(markdown, /Skill Discovery/);
+  assert.match(markdown, /- Ownership coverage: \+1/);
   assert.match(markdown, /^## Security Posture$/m);
   assert.match(markdown, /^## Review Notes$/m);
 });
@@ -774,6 +1042,58 @@ test("representative CI report matches the public JSON golden", async () => {
   );
 });
 
+test("ci report keeps an owner-covered Skill, resolved edge, and fail-closed policy PASS", async () => {
+  const repo = await createGovernanceVisibilityRepo();
+  try {
+    const report = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+    const markdown = formatCiReport(report, "markdown");
+    const json = JSON.parse(formatCiReport(report, "json")) as CiReport;
+
+    assert.equal(report.status, "pass");
+    assert.equal(report.from.readinessScore, 100);
+    assert.equal(report.to.readinessScore, 100);
+    assert.deepEqual(report.from.ownership, {
+      ownedAssets: 1,
+      eligibleAssets: 1,
+      coveragePercent: 100,
+    });
+    assert.deepEqual(report.to.ownership, {
+      ownedAssets: 2,
+      eligibleAssets: 2,
+      coveragePercent: 100,
+    });
+    assert.equal(report.skillDiscoveryPolicy.configured.effective, "off");
+    assert.equal(report.skillDiscoveryPolicy.outcome, "pass");
+    assert.match(
+      markdown,
+      /- Ownership: 1\/1 \(100%\) -> 2\/2 \(100%\) \(\+0 pp\)/,
+    );
+    assert.match(
+      markdown,
+      /- `skill\.repository\.contribute-skill`[\s\S]* {2}- Path: `skills\/repository\/contribute-skill\/SKILL\.md`[\s\S]* {2}- Kind: skill[\s\S]* {2}- Status: stable[\s\S]* {2}- Declared owner: qe-platform[\s\S]* {2}- Effective owner: qe-platform/,
+    );
+    assert.match(
+      markdown,
+      /`skill\.repository\.contribute-skill` --requires--> `context\.repository\.authoring-standards` \(resolved\)/,
+    );
+    assert.match(
+      markdown,
+      /- `assets\.minimum_inventory`: pass\/info -> pass\/info; summary changed: yes/,
+    );
+    assert.match(markdown, /- Network denied: \+1/);
+    assert.match(markdown, /- External upload denied: \+1/);
+    assert.match(markdown, /- Secrets denied: \+1/);
+    assert.match(markdown, /- Human approval required: \+1/);
+    assert.match(markdown, /- Forbidden inputs: \+1/);
+    assert.equal(json.diff.catalog.addedAssets.length, 1);
+    assert.equal(json.diff.graph.addedEdges.length, 1);
+    assert.ok(json.diff.readiness.checkChanges.length > 0);
+    assert.equal(json.status, "pass");
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
 test("ci report omits suppressed high findings introduced between git refs", async () => {
   const repo = await createSuppressedFindingRepo();
   try {
@@ -1189,6 +1509,11 @@ interface PolicyInventoryInput {
   totalPolicyAssets?: number | undefined;
   assetsWithLocalPolicyMetadata?: number | undefined;
   assetsWithoutEffectivePolicy?: number | undefined;
+  networkDenied?: number | undefined;
+  externalUploadDenied?: number | undefined;
+  secretsDenied?: number | undefined;
+  humanApprovalRequired?: number | undefined;
+  forbiddenInputCount?: number | undefined;
   approvedNetworkDestinationCount?: number | undefined;
   approvedUploadDestinationCount?: number | undefined;
   referencedSecurityProfiles?: number | undefined;
@@ -1204,6 +1529,11 @@ function policyInventory(
     input.assetsWithLocalPolicyMetadata ?? 0;
   inventory.assetsWithoutEffectivePolicy =
     input.assetsWithoutEffectivePolicy ?? 0;
+  inventory.networkAllowed.false = input.networkDenied ?? 0;
+  inventory.externalUploadAllowed.false = input.externalUploadDenied ?? 0;
+  inventory.secretsAllowed.false = input.secretsDenied ?? 0;
+  inventory.humanApprovalRequired.true = input.humanApprovalRequired ?? 0;
+  inventory.forbiddenInputCount = input.forbiddenInputCount ?? 0;
   inventory.approvedNetworkDestinationCount =
     input.approvedNetworkDestinationCount ?? 0;
   inventory.approvedUploadDestinationCount =
@@ -1228,6 +1558,11 @@ function policyDiffReport(options: {
       totalAssets: 10,
       readinessScore: 80,
       readinessLevel: "needs_attention",
+      ownership: {
+        ownedAssets: 8,
+        eligibleAssets: 10,
+        coveragePercent: 80,
+      },
     },
     to: {
       ref: "HEAD",
@@ -1235,6 +1570,11 @@ function policyDiffReport(options: {
       totalAssets: 10,
       readinessScore: 80,
       readinessLevel: "needs_attention",
+      ownership: {
+        ownedAssets: 8,
+        eligibleAssets: 10,
+        coveragePercent: 80,
+      },
     },
     summary: {
       readinessScoreDelta: 0,
@@ -1283,6 +1623,114 @@ function finding(id: string, severity: string, riskClass?: string) {
       startLine: 1,
     },
   };
+}
+
+async function createGovernanceVisibilityRepo(): Promise<string> {
+  const repo = await mkdtemp(join(tmpdir(), "renma-ci-governance-"));
+  await git(repo, ["init", "-b", "main"]);
+  await git(repo, ["config", "user.email", "renma@example.test"]);
+  await git(repo, ["config", "user.name", "Renma Test"]);
+  await writeGovernedContext(repo);
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "base"]);
+  await git(repo, ["tag", "base"]);
+
+  await writePublishedGovernedSkill(repo);
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "head"]);
+  return repo;
+}
+
+async function writeGovernedContext(repo: string): Promise<void> {
+  const directory = join(repo, "contexts", "repository");
+  await mkdir(directory, { recursive: true });
+  await writeFile(
+    join(directory, "authoring-standards.md"),
+    [
+      "---",
+      "id: context.repository.authoring-standards",
+      "owner: qe-platform",
+      "status: stable",
+      "allowed_data: public",
+      "network_allowed: false",
+      "external_upload_allowed: false",
+      "secrets_allowed: false",
+      "requires_human_approval: true",
+      "forbidden_inputs:",
+      "  - credentials",
+      "when_to_use:",
+      "  - Reviewing repository contribution standards",
+      "when_not_to_use:",
+      "  - Unrelated product implementation",
+      "---",
+      "# Repository Authoring Standards",
+      "",
+      "Use this context to review repository contribution standards.",
+      "",
+    ].join("\n"),
+  );
+}
+
+async function writePublishedGovernedSkill(repo: string): Promise<void> {
+  const directory = join(repo, "skills", "repository", "contribute-skill");
+  await mkdir(directory, { recursive: true });
+  await writeFile(
+    join(directory, "SKILL.md"),
+    [
+      "---",
+      "name: contribute-skill",
+      "description: Use this Skill when a repository contribution needs deterministic governance review, required inputs, completion criteria, and verification.",
+      "metadata:",
+      "  renma.id: skill.repository.contribute-skill",
+      "  renma.owner: qe-platform",
+      "  renma.status: stable",
+      '  renma.published-entrypoint: "true"',
+      "  renma.requires-context: '[\"context.repository.authoring-standards\"]'",
+      "  renma.allowed-data: '[\"public\"]'",
+      '  renma.network-allowed: "false"',
+      '  renma.external-upload-allowed: "false"',
+      '  renma.secrets-allowed: "false"',
+      '  renma.requires-human-approval: "true"',
+      "  renma.forbidden-inputs: '[\"credentials\"]'",
+      "---",
+      "# Contribute Skill",
+      "",
+      "Use this workflow for governed repository contributions.",
+      "",
+      "## Do Not Use For",
+      "",
+      "Do not use it for unrelated product implementation.",
+      "",
+      "## Instructions",
+      "",
+      "1. Inspect the repository standards.",
+      "2. Review the proposed contribution.",
+      "3. Verify the result.",
+      "",
+      "## Required Inputs",
+      "",
+      "- The proposed Skill contribution.",
+      "- Repository authoring standards.",
+      "",
+      "## Completion Criteria",
+      "",
+      "- The contribution satisfies the repository standards.",
+      "- Verification results are recorded.",
+      "",
+      "## Examples",
+      "",
+      "Input: a proposed Skill. Output: a deterministic governance review.",
+      "",
+      "## Preflight",
+      "",
+      "Confirm the required context resolves.",
+      "",
+      "## Verification",
+      "",
+      "Run `renma ci-report` and inspect the result.",
+      "",
+    ].join("\n"),
+  );
 }
 
 async function createSuppressedFindingRepo(): Promise<string> {

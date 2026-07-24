@@ -1108,13 +1108,23 @@ topology changes. Newly generated JSON includes the complete
 `renma.skill-discovery-diff.v1` value once at top-level `skillDiscovery` plus
 one `renma.skill-discovery-ci-policy.v1` evaluation at top-level
 `skillDiscoveryPolicy`; the existing nested `diff` remains Discovery- and
-policy-free.
+policy-free. Diff endpoints also expose the readiness ownership numerator,
+eligible-asset denominator, and coverage percentage while retaining the
+existing `summary.ownershipCoverageDelta` field.
 
-Markdown adds a bounded `## Skill Discovery Changes` section after
-`## Semantic Diff`. It summarizes configured and effective policy, policy
-outcome, adoption, coverage, published entrypoints, reachability, unrouted
-Skills, routes, cyclic components, and bounded policy matches. Use JSON for
-every identity when the Markdown section reports omitted entries.
+Markdown is a bounded review artifact. It shows before/after ownership counts
+and percentages, added and changed asset metadata with canonical declared and
+effective ownership, added and removed graph edges with resolution state,
+readiness check status/severity and summary changes, and concrete security
+policy inventory deltas. Each detail collection uses the shared presentation
+limit and directs reviewers to JSON when more items exist. JSON remains the
+complete, unbounded machine-readable report.
+
+Markdown also includes a bounded `## Skill Discovery Changes` section after
+the general governance details. It summarizes configured and effective policy,
+policy outcome, adoption, coverage, published entrypoints, reachability,
+unrouted Skills, routes, cyclic components, and bounded policy matches. Use
+JSON for every identity when a Markdown section reports omitted entries.
 
 The policy is disabled by default. To opt in:
 
@@ -1142,7 +1152,11 @@ not-reached Skills, routes becoming usable, adoption becoming authoritative,
 and count-only deltas do not match. Policy matches add one review note and may
 upgrade existing `PASS` to `WARN`; they never create `FAIL`. `WARN` exits `0`,
 while any existing non-Discovery `FAIL` remains dominant and exits `1`.
-Readiness scoring and direct `renma diff` remain policy-free.
+Ownership, asset, edge, readiness-check, and security inventory details are
+observability evidence and do not independently alter `PASS`, `WARN`, or
+`FAIL`. Readiness scoring and direct `renma diff` remain policy-free, and
+Discovery CI policy continues to control only its existing configured review
+behavior.
 
 CI prepares the complete semantic diff once. For each ref, graph, Readiness,
 Discovery facts, and the policy mode reuse one immutable repository snapshot

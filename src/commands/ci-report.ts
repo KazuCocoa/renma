@@ -1,18 +1,19 @@
 import {
   executeDiff,
+  formatSecurityChanges,
+  type AssetChange,
+  type AssetDelta,
   type DiffCollectionInstrumentation,
+  type DiffEndpoint,
   type DiffReport,
   type DiffReportWithoutSkillDiscovery,
   type DiffFormat,
+  type EdgeDelta,
 } from "./diff.js";
 import {
   summarizeSecurityPosture,
   type SecurityPostureSummary,
 } from "../security-posture.js";
-import {
-  buildSecurityDiffSummary,
-  type SecurityDiffSummary,
-} from "../security-diff.js";
 import {
   zeroSecurityPolicyInventorySummary,
   type SecurityPolicyInventorySummary,
@@ -275,7 +276,11 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     `- Range: \`${report.from.ref}\` -> \`${report.to.ref}\``,
     `- Readiness: ${report.from.readinessLevel} ${report.from.readinessScore} -> ${report.to.readinessLevel} ${report.to.readinessScore} (${formatDelta(report.summary.readinessScoreDelta)})`,
     `- Total assets: ${report.from.totalAssets} -> ${report.to.totalAssets} (${formatDelta(report.summary.totalAssetsDelta)})`,
-    `- Ownership coverage: ${formatDelta(report.summary.ownershipCoverageDelta)}`,
+    formatOwnershipSummary(
+      report.from,
+      report.to,
+      report.summary.ownershipCoverageDelta,
+    ),
     `- Graph resolution: ${formatDelta(report.summary.graphResolutionDelta)}`,
     `- Findings: ${formatDelta(report.summary.findingsDelta)}`,
     `- High/critical findings: ${formatDelta(report.summary.highOrCriticalFindingsDelta)}`,
@@ -299,6 +304,18 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     `- Resolved edges: ${report.diff.graph.resolvedEdges.length}`,
     `- Added findings: ${report.diff.findings.added.length}`,
     `- Resolved findings: ${report.diff.findings.removed.length}`,
+    "",
+    "## Asset Changes",
+    "",
+    ...formatAssetChanges(report.diff.catalog),
+    "",
+    "## Graph Changes",
+    "",
+    ...formatGraphChanges(report.diff.graph),
+    "",
+    "## Readiness Check Changes",
+    "",
+    ...formatReadinessCheckChanges(report.diff.readiness.checkChanges),
     ...skillDiscoveryLines,
     "",
     "## Security Posture",
@@ -307,7 +324,7 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     "",
     "## Security Changes",
     "",
-    ...formatSecurityChangesSection(report.diff.security),
+    ...formatSecurityChanges(report.diff.security),
     "",
     "## Security Policy Inventory",
     "",
@@ -329,6 +346,152 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
   ];
 
   return `${lines.join("\n")}\n`;
+}
+
+function formatOwnershipSummary(
+  from: DiffEndpoint,
+  to: DiffEndpoint,
+  coverageDelta: number,
+): string {
+  if (!from.ownership || !to.ownership) {
+    return `- Ownership coverage: ${formatDelta(coverageDelta)}`;
+  }
+  return `- Ownership: ${formatOwnershipEndpoint(from)} -> ${formatOwnershipEndpoint(to)} (${formatDelta(coverageDelta)} pp)`;
+}
+
+function formatOwnershipEndpoint(endpoint: DiffEndpoint): string {
+  const ownership = endpoint.ownership;
+  if (!ownership) return "(unavailable)";
+  return `${ownership.ownedAssets}/${ownership.eligibleAssets} (${ownership.coveragePercent}%)`;
+}
+
+function formatAssetChanges(
+  catalog: CiCompatibleDiffReport["catalog"],
+): string[] {
+  return [
+    ...formatAssetList("Added assets", catalog.addedAssets),
+    "",
+    ...formatAssetList("Removed assets", catalog.removedAssets),
+    "",
+    ...formatChangedAssetList(catalog.changedAssets),
+  ];
+}
+
+function formatAssetList(heading: string, assets: AssetDelta[]): string[] {
+  if (assets.length === 0) return [`### ${heading}`, "", "- None"];
+  return [
+    `### ${heading}`,
+    "",
+    ...assets
+      .slice(0, MAX_LIST_ITEMS)
+      .flatMap((asset) => formatAssetDetails(asset)),
+    ...formatOverflow(assets.length),
+  ];
+}
+
+function formatAssetDetails(asset: AssetDelta): string[] {
+  const lines = [
+    `- \`${asset.id}\``,
+    `  - Path: ${formatCodeValue(asset.path)}`,
+    `  - Kind: ${formatPlainValue(asset.kind)}`,
+    `  - Status: ${formatPlainValue(asset.status)}`,
+  ];
+  if (hasCanonicalOwnership(asset)) {
+    lines.push(
+      `  - Declared owner: ${formatPlainValue(asset.declaredOwner)}`,
+      `  - Effective owner: ${formatPlainValue(asset.effectiveOwner)}`,
+    );
+  } else {
+    lines.push(`  - Owner: ${formatPlainValue(asset.owner)}`);
+  }
+  return lines;
+}
+
+function hasCanonicalOwnership(asset: AssetDelta): boolean {
+  return "declaredOwner" in asset || "effectiveOwner" in asset;
+}
+
+function formatChangedAssetList(changes: AssetChange[]): string[] {
+  if (changes.length === 0) return ["### Changed assets", "", "- None"];
+  return [
+    "### Changed assets",
+    "",
+    ...changes
+      .slice(0, MAX_LIST_ITEMS)
+      .flatMap((change) => formatChangedAsset(change)),
+    ...formatOverflow(changes.length),
+  ];
+}
+
+function formatChangedAsset(change: AssetChange): string[] {
+  const path = change.path ?? change.to.path ?? change.from.path;
+  return [
+    `- \`${change.id}\` (${formatCodeValue(path)})`,
+    ...change.changedFields.map(
+      (field) =>
+        `  - ${formatComparableAssetField(field)}: ${formatCodeValue(change.from[field])} -> ${formatCodeValue(change.to[field])}`,
+    ),
+  ];
+}
+
+function formatComparableAssetField(field: string): string {
+  switch (field) {
+    case "declaredOwner":
+      return "declared owner";
+    case "effectiveOwner":
+      return "effective owner";
+    default:
+      return field;
+  }
+}
+
+function formatGraphChanges(graph: CiCompatibleDiffReport["graph"]): string[] {
+  return [
+    ...formatEdgeList("Added edges", graph.addedEdges),
+    "",
+    ...formatEdgeList("Removed edges", graph.removedEdges),
+  ];
+}
+
+function formatEdgeList(heading: string, edges: EdgeDelta[]): string[] {
+  if (edges.length === 0) return [`### ${heading}`, "", "- None"];
+  return [
+    `### ${heading}`,
+    "",
+    ...edges.slice(0, MAX_LIST_ITEMS).map((edge) => `- ${formatEdge(edge)}`),
+    ...formatOverflow(edges.length),
+  ];
+}
+
+function formatEdge(edge: EdgeDelta): string {
+  return `\`${edge.source}\` --${edge.kind}--> \`${edge.target}\` (${edge.resolved ? "resolved" : "unresolved"})`;
+}
+
+function formatReadinessCheckChanges(
+  changes: CiCompatibleDiffReport["readiness"]["checkChanges"],
+): string[] {
+  if (changes.length === 0) return ["- None"];
+  return [
+    ...changes.slice(0, MAX_LIST_ITEMS).map((change) => {
+      const from = formatCheckState(change.fromStatus, change.fromSeverity);
+      const to = formatCheckState(change.toStatus, change.toSeverity);
+      return `- \`${change.id}\`: ${from} -> ${to}; summary changed: ${change.summaryChanged ? "yes" : "no"}`;
+    }),
+    ...formatOverflow(changes.length),
+  ];
+}
+
+function formatCheckState(status: string, severity?: string): string {
+  return severity ? `${status}/${severity}` : status;
+}
+
+function formatCodeValue(value: unknown): string {
+  if (typeof value !== "string" || value.length === 0) return "(none)";
+  return `\`${value}\``;
+}
+
+function formatPlainValue(value: unknown): string {
+  return typeof value === "string" && value.length > 0 ? value : "(none)";
 }
 
 function formatSkillDiscoverySection(
@@ -527,36 +690,6 @@ function formatDiscoveryRouteChange(change: SkillDiscoveryRouteChange): string {
 
 function formatDiscoveryCycle(cycle: SkillDiscoveryCycleDiff): string {
   return `${cycle.skillIds.join(", ")}${cycle.selfLoop ? " (self-loop)" : ""}`;
-}
-
-function formatSecurityChangesSection(
-  security: CiReport["diff"]["security"] | undefined,
-): string[] {
-  const { posture, policyInventory } = security ?? emptySecurityDiff();
-  return [
-    `- Added security findings: ${posture.added.totalSecurityFindings}`,
-    `- Resolved security findings: ${posture.resolved.totalSecurityFindings}`,
-    `- Added violations: ${posture.added.riskClasses.violation}`,
-    `- Added suspicious: ${posture.added.riskClasses.suspicious}`,
-    `- Added advisory: ${posture.added.riskClasses.advisory}`,
-    `- Policy assets: ${formatDelta(policyInventory.totalPolicyAssets)}`,
-    `- Assets with local policy metadata: ${formatDelta(policyInventory.assetsWithLocalPolicyMetadata)}`,
-    `- Assets with inherited policy: ${formatDelta(policyInventory.assetsWithInheritedPolicy)}`,
-    `- Assets with effective policy: ${formatDelta(policyInventory.assetsWithEffectivePolicy)}`,
-    `- Assets without effective policy: ${formatDelta(policyInventory.assetsWithoutEffectivePolicy)}`,
-    `- Effective policy from local metadata: ${formatDelta(policyInventory.policySources.local)}`,
-    `- Effective policy from security profiles: ${formatDelta(policyInventory.policySources.security_profile)}`,
-    `- Effective policy from repository config: ${formatDelta(policyInventory.policySources.repository_config)}`,
-    `- Effective policy from owning Skills: ${formatDelta(policyInventory.policySources.owning_skill)}`,
-    `- Missing security profiles: ${formatDelta(policyInventory.securityProfiles.missing)}`,
-  ];
-}
-
-function emptySecurityDiff(): SecurityDiffSummary {
-  return buildSecurityDiffSummary({
-    addedFindings: [],
-    removedFindings: [],
-  });
 }
 
 function formatSecurityPostureSection(report: CiReport["securityPosture"]) {

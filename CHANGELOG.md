@@ -6,6 +6,36 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.23.5] - 2026-07-24
+
+### Added
+
+- Added readiness-derived ownership endpoint counts to semantic diff and CI
+  JSON while retaining `summary.ownershipCoverageDelta`. CI Markdown now shows
+  owned and eligible asset counts, percentages, and percentage-point changes.
+- Added bounded CI Markdown details for added, removed, and changed assets;
+  canonical declared/effective owner changes; added and removed graph edges
+  with resolution state; and readiness check status, severity, and summary
+  changes. Complete unbounded collections remain available in JSON.
+- Added concrete security policy inventory changes for denied network access,
+  denied external upload, denied secrets, required human approval, and
+  forbidden inputs, using the same security-change projection as direct diff
+  Markdown.
+
+### Changed
+
+- Changed diff asset evidence to preserve canonical declared and effective
+  ownership and graph edge evidence to prefer stable asset IDs over source
+  paths when both are available.
+
+### Compatibility
+
+- Preserved existing JSON keys, ownership coverage delta, readiness scoring,
+  unresolved-required-edge handling, Discovery CI policy, and established
+  `PASS`/`WARN`/`FAIL` behavior. Added resolved edges, owner-covered assets, and
+  fail-closed policy inventory changes remain review evidence rather than
+  regressions.
+
 ## [0.23.4] - 2026-07-24
 
 ### Changed
@@ -1362,7 +1392,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.23.4...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.23.5...HEAD
+[0.23.5]: https://github.com/KazuCocoa/renma/compare/v0.23.4...v0.23.5
 [0.23.4]: https://github.com/KazuCocoa/renma/compare/v0.23.3...v0.23.4
 [0.23.3]: https://github.com/KazuCocoa/renma/compare/v0.23.2...v0.23.3
 [0.23.2]: https://github.com/KazuCocoa/renma/compare/v0.23.1...v0.23.2
