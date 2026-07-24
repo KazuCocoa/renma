@@ -2,7 +2,7 @@
 
 ## Current Product
 
-Renma 0.23.1 is a Git-native Context Repository governance CLI for
+Renma 0.23.2 is a Git-native Context Repository governance CLI for
 agent-consumable knowledge. It applies the review boundary:
 
 ```text
@@ -92,9 +92,18 @@ target, so declaration order and source lines are not semantic identity.
 Renma assigns no improvement/regression classification, CI status, warning,
 gate, or exit-code effect to these facts.
 
+The 0.23.2 slice projects that exact `renma.skill-discovery-diff.v1` value once
+at the top level of `renma ci-report`. The nested compatible diff stays
+Discovery-free, Markdown details use the shared presentation cap, and
+Discovery does not affect CI status, review notes, Readiness scoring, or exit
+behavior. CI now intentionally pays for one prepared Discovery index per ref
+while retaining one immutable repository snapshot and one semantic-diff
+execution.
+
 [The Skill Discovery design](plan-discovery.md) defines the full direction and
 the independently bounded 0.22.0 through 0.22.4 core slices, 0.23.0 Readiness
-integration, and 0.23.1 semantic diff integration.
+integration, 0.23.1 semantic diff integration, and 0.23.2 neutral CI report
+integration.
 
 ## Expected Implementation Sequence
 
@@ -124,29 +133,29 @@ integration, and 0.23.1 semantic diff integration.
 7. Ship the 0.23.1 observation-only direct semantic diff from one immutable
    `RepositorySnapshot` per ref. Compare prepared Discovery identities and
    route/cycle state without changing Readiness, diagnostics, CI, or exits.
-8. Evaluate 0.23.2 CI report integration independently. Any optional CI policy
-   or gating remains a later separately reviewed decision, as do Trust Graph,
-   BOM, observed-reference, ownership, authoring, richer visualization, and
-   federation integrations.
+8. Ship the 0.23.2 neutral CI projection by running the complete semantic diff
+   once, placing its existing Discovery value once at top level, retaining the
+   Discovery-free nested diff, and keeping policy, notes, scores, and exits
+   independent of Discovery.
+9. Evaluate optional CI policy or gating only as a later separately reviewed
+   decision, as with Trust Graph, BOM, observed-reference, ownership,
+   authoring, richer visualization, and federation integrations.
 
 The current roadmap sequence is:
 
 ```text
 0.23.0 — Discovery Readiness integration
 0.23.1 — Discovery semantic diff integration
-0.23.2 — Discovery CI report integration
+0.23.2 — neutral Discovery CI report integration
 later   — optional CI policy or gating
 ```
 
-The 0.23.2 and later lines identify review order, not committed product
-behavior.
+The later line identifies review order, not committed product behavior.
 
 ## Later Candidates
 
 Possible later Renma core work includes:
 
-- Discovery projection in CI reports after an independent 0.23.2 contract
-  review;
 - optional CI policy for exact, repository-adopted Discovery violations;
 - product and ownership projections based on stable IDs, exact tags, and
   existing Context or Lens relationships;

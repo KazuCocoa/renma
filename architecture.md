@@ -488,13 +488,20 @@ identity-only presence determines additions and removals.
 Each ref is collected once into one immutable `RepositorySnapshot`; graph,
 the Discovery-excluded Readiness subset, and the memoized Discovery index share
 that evidence. Direct diff assigns no improvement/regression classification and
-does not change exits. CI requests the pre-0.23.1 projection before snapshot
-derivation, so it retains one collection and parse per artifact for each ref
-without preparing or comparing Discovery. Its defensive output projection
-still omits the section. Older programmatic builder inputs receive a neutral
-Discovery compatibility section, while older formatter inputs without
-`discovery` retain their previous Markdown. Neutral CI integration is deferred
-for independent 0.23.2 review and any gating is deferred beyond that.
+does not change exits.
+
+CI calls the complete semantic diff once, reusing the same one-snapshot-per-ref
+evidence path and intentionally preparing one Discovery index per ref. Its pure
+projection places the existing `renma.skill-discovery-diff.v1` value once at
+top-level `skillDiscovery` and keeps the nested compatible `diff`
+Discovery-free. Bounded CI Markdown reports the changes after the semantic-diff
+summary. Status, notes, Readiness scores, and exits continue to inspect only
+the compatible diff; optional Discovery policy or gating is deferred.
+
+Older programmatic diff-builder inputs receive a neutral Discovery
+compatibility section, while older diff formatter inputs without `discovery`
+retain their previous Markdown. Older CI formatter inputs without
+`skillDiscovery` likewise retain their previous JSON and Markdown shape.
 
 ## Repository Health Reports
 
@@ -551,8 +558,8 @@ should follow the [internal architecture boundaries](docs/internal-architecture.
 including the documented fail-closed and 0.18.2 compatibility seams.
 
 Release sequencing belongs in [plan.md](plan.md). The active Skill Discovery
-design proposal is isolated in [plan-discovery.md](plan-discovery.md) and is not
-implemented by the current processing pipeline.
+design and release-slice contract is isolated in
+[plan-discovery.md](plan-discovery.md).
 
 ## Implementation Notes
 

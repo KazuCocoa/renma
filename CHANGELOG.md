@@ -6,6 +6,53 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.23.2] - 2026-07-23
+
+### Added
+
+- Added the required top-level `CiReport.skillDiscovery` field using the
+  existing observation-only `renma.skill-discovery-diff.v1` contract. Newly
+  generated CI JSON includes the complete deterministic Discovery diff once;
+  the nested `diff` remains the established Discovery-free
+  `CiCompatibleDiffReport`.
+- Added a bounded `## Skill Discovery Changes` CI Markdown section after the
+  semantic-diff summary. It reports schema, neutral policy effect, adoption,
+  coverage, entrypoint, reachability, unrouted-Skill, route, and cycle changes,
+  caps detail lists with the shared presentation limit, and directs readers to
+  JSON for omitted entries.
+- Added focused archived-ref, pure-projection, formatter-compatibility,
+  instrumentation, exit-behavior, and public CI JSON golden tests. Fixed-seed
+  properties prove that Discovery-only changes cannot affect status or notes,
+  mutate the direct diff, enter the nested compatible diff, or make repeated
+  projection nondeterministic.
+
+### Changed
+
+- Changed `ci-report` to call the complete public semantic diff exactly once
+  and project it through `buildCiReportFromDiff()`. Each ref still has one
+  immutable `RepositorySnapshot`, one discovery pass, one parse per artifact,
+  one catalog preparation, and one Agent Skills validation; CI now
+  intentionally prepares one Skill Discovery index per ref and constructs the
+  existing diff once.
+- Preserved CI policy by continuing to pass only
+  `CiCompatibleDiffReport` into status and review-note evaluation. Adoption,
+  coverage, publication, reachability, unrouted Skills, route usability, and
+  cycles remain neutral review facts and do not change Readiness scores,
+  `PASS`/`WARN`/`FAIL`, notes, or exit codes.
+
+### Compatibility
+
+- Preserved direct `renma diff` JSON, Markdown, route and cycle identities, and
+  exit behavior. `diffWithoutSkillDiscovery()` remains available as the older
+  projection for compatibility consumers.
+- Added a defensive CI formatter input for pre-0.23.2 serialized reports.
+  Legacy reports without `skillDiscovery` keep their previous JSON and
+  Markdown shape without an invented neutral section or mutation.
+- Updated only the intentional CI report golden. The existing
+  `skill-discovery-diff.golden` and unrelated public JSON goldens are
+  unchanged. Optional Discovery CI policy and gating remain deferred without
+  an assigned release.
+
 ## [0.23.1] - 2026-07-23
 
 ### Added
@@ -1235,7 +1282,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.23.1...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.23.2...HEAD
+[0.23.2]: https://github.com/KazuCocoa/renma/compare/v0.23.1...v0.23.2
 [0.23.1]: https://github.com/KazuCocoa/renma/compare/v0.23.0...v0.23.1
 [0.23.0]: https://github.com/KazuCocoa/renma/compare/v0.22.6...v0.23.0
 [0.22.6]: https://github.com/KazuCocoa/renma/compare/v0.22.5...v0.22.6

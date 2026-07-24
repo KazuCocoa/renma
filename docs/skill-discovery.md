@@ -1,11 +1,12 @@
 # Skill Discovery Graph and Index
 
-Renma 0.23.1 provides a static, declaration-driven Skill-to-Skill graph, a
-versioned compact index, a compact repository-level Readiness projection, and
-an observation-only direct semantic diff. It does not interpret task text,
-select, rank, load, invoke, or execute a Skill. Repository authors keep routing
-conditions in source `SKILL.md` files; Renma exposes deterministic publication,
-adoption, continuation, and structural evidence.
+Renma 0.23.2 provides a static, declaration-driven Skill-to-Skill graph, a
+versioned Skill Index, a compact repository-level Readiness projection, an
+observation-only direct semantic diff, and a neutral CI report projection. It
+does not interpret task text, select, rank, load, invoke, or execute a Skill.
+Repository authors keep routing conditions in source `SKILL.md` files; Renma
+exposes deterministic publication, adoption, continuation, and structural
+evidence.
 
 The progression is intentionally layered:
 
@@ -35,6 +36,9 @@ The progression is intentionally layered:
 
 0.23.1
   observation-only Skill Discovery topology changes in direct semantic diff
+
+0.23.2
+  neutral Skill Discovery semantic-diff projection in CI reports
 ```
 
 ## Three separate facts
@@ -337,8 +341,8 @@ responsibility, not to remove publication solely to silence the warning.
 Both diagnostics flow through normal scan output, diagnostics v2, and review
 bundles. They do not create a CI gate. Readiness 0.23.0 may reference their
 stable codes and messages as compact check evidence without copying them into
-its diagnostic collection. The 0.23.1 semantic diff compares prepared topology
-facts but does not copy these diagnostics; CI report, Trust Graph, and BOM
+its diagnostic collection. The semantic diff and neutral CI projection compare
+prepared topology facts but do not copy these diagnostics; Trust Graph and BOM
 remain excluded.
 
 Renma 0.22.2 adds
@@ -411,10 +415,12 @@ diagnostics are referenced rather than copied or penalized again. Use
 
 The direct Readiness command prepares the memoized Discovery projection once.
 Semantic diff retains the pre-0.23.0 Readiness subset, then uses the same
-snapshot's prepared Discovery index only for its dedicated 0.23.1 section.
-CI requests the older projection before snapshot derivation and therefore
-never prepares or compares Discovery. BOM continues to build and serialize its
-pre-0.23.0 Readiness subset without preparing Discovery for that subset.
+snapshot's prepared Discovery index for its dedicated versioned section.
+CI calls that complete semantic diff once and projects its existing
+`SkillDiscoveryDiff`; it therefore intentionally prepares one Discovery index
+per ref without a second collection or comparison. BOM continues to build and
+serialize its pre-0.23.0 Readiness subset without preparing Discovery for that
+subset.
 
 ## Semantic diff projection
 
@@ -449,12 +455,36 @@ Discovery preparation per ref. The diff does not call `skill-index`, reconstruct
 Discovery independently, or copy its complete report or diagnostics.
 
 These facts have no improvement/regression label and do not change direct diff
-exit behavior. CI selects the older diff projection before snapshot derivation,
-so it performs one collection and parse per artifact for each ref without
-preparing a Discovery index or building a Discovery diff. CI JSON and Markdown
-explicitly omit `discovery`; CI status, notes, and exits are unchanged in
-0.23.1. Neutral CI report integration is reserved for an independently reviewed
-0.23.2 slice, while optional policy or gating remains later work.
+exit behavior.
+
+## CI report projection
+
+Renma 0.23.2 exposes the exact existing `SkillDiscoveryDiff` once as required
+top-level `CiReport.skillDiscovery`. Its schema remains
+`renma.skill-discovery-diff.v1`; CI does not construct a second Discovery
+schema or comparison. The nested `CiCompatibleDiffReport` under `diff` omits
+`discovery`, preserving the compact earlier contract and avoiding duplicate
+JSON.
+
+CI calls complete `diff()` exactly once. Each ref therefore uses one immutable
+`RepositorySnapshot`, one discovery pass, one parse per artifact, one catalog
+preparation, one Agent Skills validation, and one Skill Discovery preparation.
+Graph, the Discovery-excluded Readiness subset, and Discovery facts reuse that
+same snapshot.
+
+CI Markdown places a bounded `## Skill Discovery Changes` section after the
+semantic-diff summary. It reports schema, neutral policy effect, adoption,
+coverage, publication, reachability, unrouted Skills, route changes, and cycle
+changes. Detailed lists use the shared top-summary cap and direct readers to
+JSON for omitted entries. It does not render the complete graph, diagnostics,
+declaration indices, source lines, or repair instructions.
+
+`determineCiReportStatus()` and review notes continue to receive only the
+Discovery-free compatible diff. Discovery changes therefore do not affect
+Readiness scores, `PASS`/`WARN`/`FAIL`, review notes, or the established
+`0`/`1` exit behavior. Pre-0.23.2 serialized CI reports without
+`skillDiscovery` retain their prior JSON and Markdown shape when formatted.
+Optional policy or gating remains later work.
 
 Programmatic compatibility is preserved separately from the direct command
 contract. `buildDiffReport()` accepts older snapshots without prepared
@@ -467,19 +497,21 @@ inferring topology. `formatDiff()` accepts older serialized reports without
 Continuation and publication data remain separate from
 `catalog.dependencies`. Existing full, summary, workflow, layered,
 composition, and impact graph outputs remain route/publication-free. Catalog,
-CI report, Trust Graph, BOM, ownership, init, scaffold, guide, and suggestion
-contracts are unchanged. Readiness changes only through the additive 0.23.0
-summary and checks; direct diff changes only through the additive 0.23.1
-section. A repository without Discovery metadata or adoption remains valid and
-warning-free. Its `not-adopted` Readiness summary is a neutral inventory
+Trust Graph, BOM, ownership, init, scaffold, guide, and suggestion contracts
+are unchanged. Readiness changes only through the additive 0.23.0 summary and
+checks; direct diff changes only through the additive 0.23.1 section; CI
+changes only through the additive neutral 0.23.2 projection. A repository
+without Discovery metadata or adoption remains valid and warning-free. Its
+`not-adopted` Readiness summary is a neutral inventory
 summary: route-eligible, unrouted, and route counts remain visible, while
 publication is not required and coverage is not evaluated.
 
 The current single-repository static Discovery core is stable after 0.22.4,
-with Readiness integration in 0.23.0 and direct semantic diff integration in
-0.23.1. A `renma discovery` command is not implemented. CI report or optional
-gating, Trust Graph, BOM, ownership, observed Markdown references,
+with Readiness integration in 0.23.0, direct semantic diff integration in
+0.23.1, and neutral CI report integration in 0.23.2. A `renma discovery`
+command is not implemented. Optional CI policy or gating, Trust Graph, BOM,
+ownership, observed Markdown references,
 richer visualization, authoring assistance, scaffold, init, guide, suggestion,
 and multi-repository federation remain independent later decisions informed by
-operational trials. CI, BOM, and Trust Graph output contracts contain no
-Discovery additions in 0.23.1.
+operational trials. BOM and Trust Graph output contracts contain no Discovery
+additions in 0.23.2.

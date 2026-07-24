@@ -1,0 +1,312 @@
+{
+  "root": "/repo",
+  "from": {
+    "ref": "main",
+    "scannedFileCount": 8,
+    "totalAssets": 10,
+    "readinessScore": 80,
+    "readinessLevel": "needs_attention"
+  },
+  "to": {
+    "ref": "HEAD",
+    "scannedFileCount": 8,
+    "totalAssets": 10,
+    "readinessScore": 80,
+    "readinessLevel": "needs_attention"
+  },
+  "status": "pass",
+  "summary": {
+    "readinessScoreDelta": 0,
+    "readinessLevelChanged": false,
+    "totalAssetsDelta": 0,
+    "ownershipCoverageDelta": 0,
+    "graphResolutionDelta": 0,
+    "findingsDelta": 0,
+    "highOrCriticalFindingsDelta": 0
+  },
+  "skillDiscovery": {
+    "schemaVersion": "renma.skill-discovery-diff.v1",
+    "adoption": {
+      "from": "partial",
+      "to": "adopted",
+      "changed": true
+    },
+    "coverage": {
+      "from": "descriptive",
+      "to": "authoritative",
+      "changed": true
+    },
+    "summary": {
+      "publishedEntrypointCountDelta": 1,
+      "routeEligibleSkillCountDelta": 0,
+      "reachableSkillCountDelta": 1,
+      "notReachedSkillCountDelta": 1,
+      "unroutedSkillCountDelta": 0,
+      "usableRouteCountDelta": -1,
+      "unusableRouteCountDelta": 1,
+      "unresolvedRouteCountDelta": 1,
+      "cycleComponentCountDelta": 1
+    },
+    "publishedEntrypoints": {
+      "added": [
+        {
+          "id": "skill.entry",
+          "path": "skills/entry/SKILL.md"
+        }
+      ],
+      "removed": []
+    },
+    "reachability": {
+      "newlyReachable": [
+        {
+          "id": "skill.target",
+          "path": "skills/target/SKILL.md"
+        }
+      ],
+      "newlyNotReached": [
+        {
+          "id": "skill.orphan",
+          "path": "skills/orphan/SKILL.md"
+        }
+      ]
+    },
+    "unroutedSkills": {
+      "newlyUnrouted": [],
+      "resolvedUnrouted": []
+    },
+    "routes": {
+      "added": [],
+      "removed": [],
+      "changed": [
+        {
+          "identity": {
+            "sourcePath": "skills/entry/SKILL.md",
+            "normalizedTarget": "skill.target"
+          },
+          "changedFields": [
+            "resolution",
+            "resolvedTarget",
+            "usable",
+            "usabilityReasons"
+          ],
+          "from": {
+            "sourceId": "skill.entry",
+            "sourcePath": "skills/entry/SKILL.md",
+            "normalizedTarget": "skill.target",
+            "declarationCount": 1,
+            "resolution": "resolved",
+            "candidates": [],
+            "resolvedTarget": {
+              "id": "skill.target",
+              "path": "skills/target/SKILL.md",
+              "kind": "skill",
+              "lifecycle": "stable"
+            },
+            "usable": true,
+            "usabilityReasons": []
+          },
+          "to": {
+            "sourceId": "skill.entry",
+            "sourcePath": "skills/entry/SKILL.md",
+            "normalizedTarget": "skill.target",
+            "declarationCount": 1,
+            "resolution": "unresolved",
+            "candidates": [],
+            "usable": false,
+            "usabilityReasons": [
+              "unresolved-target"
+            ]
+          }
+        }
+      ]
+    },
+    "cycles": {
+      "added": [
+        {
+          "skillIds": [
+            "skill.entry",
+            "skill.target"
+          ],
+          "skills": [
+            {
+              "id": "skill.entry",
+              "path": "skills/entry/SKILL.md"
+            },
+            {
+              "id": "skill.target",
+              "path": "skills/target/SKILL.md"
+            }
+          ],
+          "selfLoop": false
+        }
+      ],
+      "resolved": []
+    }
+  },
+  "securityPosture": {
+    "added": {
+      "totalSecurityFindings": 0,
+      "riskClasses": {
+        "violation": 0,
+        "suspicious": 0,
+        "advisory": 0,
+        "unclassified": 0
+      },
+      "severities": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "highOrCritical": 0,
+      "topFindingIds": []
+    },
+    "resolved": {
+      "totalSecurityFindings": 0,
+      "riskClasses": {
+        "violation": 0,
+        "suspicious": 0,
+        "advisory": 0,
+        "unclassified": 0
+      },
+      "severities": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "highOrCritical": 0,
+      "topFindingIds": []
+    }
+  },
+  "notes": [
+    "No CI report regressions detected."
+  ],
+  "diff": {
+    "root": "/repo",
+    "from": {
+      "ref": "main",
+      "scannedFileCount": 8,
+      "totalAssets": 10,
+      "readinessScore": 80,
+      "readinessLevel": "needs_attention"
+    },
+    "to": {
+      "ref": "HEAD",
+      "scannedFileCount": 8,
+      "totalAssets": 10,
+      "readinessScore": 80,
+      "readinessLevel": "needs_attention"
+    },
+    "summary": {
+      "readinessScoreDelta": 0,
+      "readinessLevelChanged": false,
+      "totalAssetsDelta": 0,
+      "ownershipCoverageDelta": 0,
+      "graphResolutionDelta": 0,
+      "findingsDelta": 0,
+      "highOrCriticalFindingsDelta": 0
+    },
+    "catalog": {
+      "addedAssets": [],
+      "removedAssets": [],
+      "changedAssets": []
+    },
+    "graph": {
+      "addedEdges": [],
+      "removedEdges": [],
+      "newUnresolvedEdges": [],
+      "resolvedEdges": []
+    },
+    "readiness": {
+      "checkChanges": []
+    },
+    "findings": {
+      "added": [],
+      "removed": [],
+      "countById": []
+    },
+    "security": {
+      "posture": {
+        "added": {
+          "totalSecurityFindings": 0,
+          "riskClasses": {
+            "violation": 0,
+            "suspicious": 0,
+            "advisory": 0,
+            "unclassified": 0
+          },
+          "severities": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "highOrCritical": 0,
+          "topFindingIds": []
+        },
+        "resolved": {
+          "totalSecurityFindings": 0,
+          "riskClasses": {
+            "violation": 0,
+            "suspicious": 0,
+            "advisory": 0,
+            "unclassified": 0
+          },
+          "severities": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          },
+          "highOrCritical": 0,
+          "topFindingIds": []
+        }
+      },
+      "policyInventory": {
+        "totalPolicyAssets": 0,
+        "assetsWithLocalPolicyMetadata": 0,
+        "assetsWithInheritedPolicy": 0,
+        "assetsWithEffectivePolicy": 0,
+        "assetsWithoutEffectivePolicy": 0,
+        "policySources": {
+          "local": 0,
+          "security_profile": 0,
+          "repository_config": 0,
+          "owning_skill": 0
+        },
+        "networkAllowed": {
+          "true": 0,
+          "false": 0,
+          "unspecified": 0
+        },
+        "externalUploadAllowed": {
+          "true": 0,
+          "false": 0,
+          "unspecified": 0
+        },
+        "secretsAllowed": {
+          "true": 0,
+          "false": 0,
+          "unspecified": 0
+        },
+        "humanApprovalRequired": {
+          "true": 0,
+          "false": 0,
+          "unspecified": 0
+        },
+        "approvedNetworkDestinationCount": 0,
+        "approvedUploadDestinationCount": 0,
+        "forbiddenInputCount": 0,
+        "disallowedCommandCount": 0,
+        "securityProfiles": {
+          "referenced": 0,
+          "resolved": 0,
+          "missing": 0,
+          "cyclic": 0,
+          "none": 0
+        }
+      }
+    }
+  }
+}

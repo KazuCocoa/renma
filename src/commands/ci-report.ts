@@ -1,5 +1,5 @@
 import {
-  diffWithoutSkillDiscovery,
+  diff,
   type DiffCollectionInstrumentation,
   type DiffReport,
   type DiffReportWithoutSkillDiscovery,
@@ -19,6 +19,13 @@ import {
 } from "../security-policy-inventory.js";
 import type { ConfigOverrides } from "../config.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
+import type {
+  SkillDiscoveryCycleDiff,
+  SkillDiscoveryDiff,
+  SkillDiscoveryDiffSkill,
+  SkillDiscoveryRouteChange,
+  SkillDiscoveryRouteDiffState,
+} from "../skill-discovery-diff.js";
 
 export type CiReportFormat = DiffFormat;
 export type CiReportStatus = "pass" | "warn" | "fail";
@@ -30,6 +37,7 @@ export interface CiReport {
   to: DiffReport["to"];
   status: CiReportStatus;
   summary: DiffReport["summary"];
+  skillDiscovery: SkillDiscoveryDiff;
   securityPosture: {
     added: SecurityPostureSummary;
     resolved: SecurityPostureSummary;
@@ -37,6 +45,8 @@ export interface CiReport {
   notes: string[];
   diff: CiCompatibleDiffReport;
 }
+
+export type CiReportFormatInput = CiReport | Omit<CiReport, "skillDiscovery">;
 
 interface CiReportOptions {
   fromRef: string;
@@ -73,36 +83,32 @@ export async function ciReport(
   targetPath: string,
   options: CiReportOptions,
 ): Promise<CiReport> {
-  const report = omitSkillDiscovery(
-    await diffWithoutSkillDiscovery(targetPath, options),
-  );
-  const status = determineCiReportStatus(report);
-  const securityPosture = {
-    added: summarizeSecurityPosture(report.findings.added),
-    resolved: summarizeSecurityPosture(report.findings.removed),
-  };
-  return {
-    root: report.root,
-    from: report.from,
-    to: report.to,
-    status,
-    summary: report.summary,
-    securityPosture,
-    notes: reviewNotes(report, status, securityPosture.added),
-    diff: report,
-  };
+  return buildCiReportFromDiff(await diff(targetPath, options));
 }
 
-function omitSkillDiscovery(
-  report: CiCompatibleDiffReport & Partial<Pick<DiffReport, "discovery">>,
-): CiCompatibleDiffReport {
+export function buildCiReportFromDiff(report: DiffReport): CiReport {
   const { discovery, ...ciCompatibleDiff } = report;
-  void discovery;
-  return ciCompatibleDiff;
+  const status = determineCiReportStatus(ciCompatibleDiff);
+  const securityPosture = {
+    added: summarizeSecurityPosture(ciCompatibleDiff.findings.added),
+    resolved: summarizeSecurityPosture(ciCompatibleDiff.findings.removed),
+  };
+
+  return {
+    root: ciCompatibleDiff.root,
+    from: ciCompatibleDiff.from,
+    to: ciCompatibleDiff.to,
+    status,
+    summary: ciCompatibleDiff.summary,
+    skillDiscovery: discovery,
+    securityPosture,
+    notes: reviewNotes(ciCompatibleDiff, status, securityPosture.added),
+    diff: ciCompatibleDiff,
+  };
 }
 
 export function formatCiReport(
-  report: CiReport,
+  report: CiReportFormatInput,
   format: CiReportFormat,
 ): string {
   if (format === "json") return `${JSON.stringify(report, null, 2)}\n`;
@@ -196,7 +202,11 @@ function reviewNotes(
   return notes;
 }
 
-function formatCiReportMarkdown(report: CiReport): string {
+function formatCiReportMarkdown(report: CiReportFormatInput): string {
+  const skillDiscoveryLines =
+    "skillDiscovery" in report
+      ? ["", ...formatSkillDiscoverySection(report.skillDiscovery)]
+      : [];
   const lines = [
     "# Renma CI Report",
     "",
@@ -230,6 +240,7 @@ function formatCiReportMarkdown(report: CiReport): string {
     `- Resolved edges: ${report.diff.graph.resolvedEdges.length}`,
     `- Added findings: ${report.diff.findings.added.length}`,
     `- Resolved findings: ${report.diff.findings.removed.length}`,
+    ...skillDiscoveryLines,
     "",
     "## Security Posture",
     "",
@@ -259,6 +270,148 @@ function formatCiReportMarkdown(report: CiReport): string {
   ];
 
   return `${lines.join("\n")}\n`;
+}
+
+function formatSkillDiscoverySection(discovery: SkillDiscoveryDiff): string[] {
+  const lines = [
+    "## Skill Discovery Changes",
+    "",
+    `- Schema: ${discovery.schemaVersion}`,
+    "- CI policy effect: none (observation only)",
+  ];
+
+  if (!hasSkillDiscoveryChanges(discovery)) {
+    lines.push("- No Skill Discovery topology changes.");
+    return lines;
+  }
+
+  lines.push(
+    `- Adoption: ${discovery.adoption.from} -> ${discovery.adoption.to}`,
+    `- Coverage: ${discovery.coverage.from} -> ${discovery.coverage.to}`,
+    `- Published entrypoints: +${discovery.publishedEntrypoints.added.length} / -${discovery.publishedEntrypoints.removed.length}`,
+    `- Reachability: +${discovery.reachability.newlyReachable.length} reachable / +${discovery.reachability.newlyNotReached.length} not-reached`,
+    `- Unrouted Skills: +${discovery.unroutedSkills.newlyUnrouted.length} / -${discovery.unroutedSkills.resolvedUnrouted.length}`,
+    `- Routes: +${discovery.routes.added.length} / -${discovery.routes.removed.length} / ${discovery.routes.changed.length} changed`,
+    `- Cyclic components: +${discovery.cycles.added.length} / -${discovery.cycles.resolved.length}`,
+  );
+  appendSkillDiscoveryDetails(
+    lines,
+    "Added published entrypoints",
+    discovery.publishedEntrypoints.added,
+    formatDiscoverySkill,
+  );
+  appendSkillDiscoveryDetails(
+    lines,
+    "Removed published entrypoints",
+    discovery.publishedEntrypoints.removed,
+    formatDiscoverySkill,
+  );
+  appendSkillDiscoveryDetails(
+    lines,
+    "Newly reachable Skills",
+    discovery.reachability.newlyReachable,
+    formatDiscoverySkill,
+  );
+  appendSkillDiscoveryDetails(
+    lines,
+    "Newly not-reached Skills",
+    discovery.reachability.newlyNotReached,
+    formatDiscoverySkill,
+  );
+  appendSkillDiscoveryDetails(
+    lines,
+    "Newly unrouted Skills",
+    discovery.unroutedSkills.newlyUnrouted,
+    formatDiscoverySkill,
+  );
+  appendSkillDiscoveryDetails(
+    lines,
+    "Resolved unrouted Skills",
+    discovery.unroutedSkills.resolvedUnrouted,
+    formatDiscoverySkill,
+  );
+  appendSkillDiscoveryDetails(
+    lines,
+    "Added routes",
+    discovery.routes.added,
+    formatDiscoveryRoute,
+  );
+  appendSkillDiscoveryDetails(
+    lines,
+    "Removed routes",
+    discovery.routes.removed,
+    formatDiscoveryRoute,
+  );
+  appendSkillDiscoveryDetails(
+    lines,
+    "Changed routes",
+    discovery.routes.changed,
+    formatDiscoveryRouteChange,
+  );
+  appendSkillDiscoveryDetails(
+    lines,
+    "Added cyclic components",
+    discovery.cycles.added,
+    formatDiscoveryCycle,
+  );
+  appendSkillDiscoveryDetails(
+    lines,
+    "Resolved cyclic components",
+    discovery.cycles.resolved,
+    formatDiscoveryCycle,
+  );
+  return lines;
+}
+
+function hasSkillDiscoveryChanges(discovery: SkillDiscoveryDiff): boolean {
+  return (
+    discovery.adoption.changed ||
+    discovery.coverage.changed ||
+    Object.values(discovery.summary).some((value) => value !== 0) ||
+    discovery.publishedEntrypoints.added.length > 0 ||
+    discovery.publishedEntrypoints.removed.length > 0 ||
+    discovery.reachability.newlyReachable.length > 0 ||
+    discovery.reachability.newlyNotReached.length > 0 ||
+    discovery.unroutedSkills.newlyUnrouted.length > 0 ||
+    discovery.unroutedSkills.resolvedUnrouted.length > 0 ||
+    discovery.routes.added.length > 0 ||
+    discovery.routes.removed.length > 0 ||
+    discovery.routes.changed.length > 0 ||
+    discovery.cycles.added.length > 0 ||
+    discovery.cycles.resolved.length > 0
+  );
+}
+
+function appendSkillDiscoveryDetails<T>(
+  lines: string[],
+  heading: string,
+  items: readonly T[],
+  render: (item: T) => string,
+): void {
+  if (items.length === 0) return;
+  lines.push("", `### ${heading}`, "");
+  lines.push(
+    ...items.slice(0, MAX_LIST_ITEMS).map((item) => `- ${render(item)}`),
+    ...formatOverflow(items.length),
+  );
+}
+
+function formatDiscoverySkill(skill: SkillDiscoveryDiffSkill): string {
+  return `${skill.id} (\`${skill.path}\`)`;
+}
+
+function formatDiscoveryRoute(route: SkillDiscoveryRouteDiffState): string {
+  const declarationLabel =
+    route.declarationCount === 1 ? "declaration" : "declarations";
+  return `\`${route.sourcePath}\` -> \`${route.normalizedTarget}\` (${route.resolution}, ${route.usable ? "usable" : "unusable"}, ${route.declarationCount} ${declarationLabel})`;
+}
+
+function formatDiscoveryRouteChange(change: SkillDiscoveryRouteChange): string {
+  return `\`${change.identity.sourcePath}\` -> \`${change.identity.normalizedTarget}\`: ${change.changedFields.join(", ")}`;
+}
+
+function formatDiscoveryCycle(cycle: SkillDiscoveryCycleDiff): string {
+  return `${cycle.skillIds.join(", ")}${cycle.selfLoop ? " (self-loop)" : ""}`;
 }
 
 function formatSecurityChangesSection(

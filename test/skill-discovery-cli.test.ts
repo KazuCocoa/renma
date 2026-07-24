@@ -6,8 +6,16 @@ import test from "node:test";
 
 import { main } from "../src/cli.js";
 import { bom } from "../src/commands/bom.js";
-import { ciReport } from "../src/commands/ci-report.js";
-import { diff, formatDiff } from "../src/commands/diff.js";
+import {
+  ciReport,
+  formatCiReport,
+  runCiReportCommand,
+} from "../src/commands/ci-report.js";
+import {
+  diff,
+  diffWithoutSkillDiscovery,
+  formatDiff,
+} from "../src/commands/diff.js";
 import { readiness } from "../src/commands/readiness.js";
 import { trustGraph } from "../src/commands/trust-graph.js";
 import { CONTEXT_LENS_DIAGNOSTIC_CODES } from "../src/context-lens.js";
@@ -1032,7 +1040,7 @@ test("route-cycle warnings propagate through scan, diagnostics v2, review bundle
   assert.doesNotMatch(JSON.stringify(scanResult.trustGraph), /DISCOVERY-/);
 });
 
-test("a cycle introduced after base reaches Readiness while deferred reports remain unchanged", async () => {
+test("a cycle introduced after base reaches Readiness, direct diff, and neutral CI while Trust Graph and BOM remain unchanged", async () => {
   const root = await routeCycleIntroductionGitFixture();
   try {
     const scanReport = await scan(root);
@@ -1153,7 +1161,15 @@ test("a cycle introduced after base reaches Readiness while deferred reports rem
     assert.match(semanticDiffMarkdown, /^## Skill Discovery Changes$/m);
     assert.match(semanticDiffMarkdown, /^### Added cyclic components$/m);
     assert.match(semanticDiffMarkdown, /skill\.a, skill\.b/);
-    assertDiscoveryFree(ciReportResult);
+    assert.deepEqual(
+      ciReportResult.skillDiscovery,
+      semanticDiffReport.discovery,
+    );
+    assertDiscoveryFree(ciReportResult.diff);
+    const ciMarkdown = formatCiReport(ciReportResult, "markdown");
+    assert.match(ciMarkdown, /^## Skill Discovery Changes$/m);
+    assert.match(ciMarkdown, /^### Added cyclic components$/m);
+    assert.match(ciMarkdown, /skill\.a, skill\.b/);
     assert.equal(readinessReport.summary.skillDiscovery.cycleComponentCount, 1);
     assert.equal(
       readinessReport.checks.find(
@@ -1166,6 +1182,118 @@ test("a cycle introduced after base reaches Readiness while deferred reports rem
     assert.equal(ciReportResult.status, "pass");
     assert.equal(ciReportResult.summary.findingsDelta, 0);
     assert.equal(ciReportResult.summary.highOrCriticalFindingsDelta, 0);
+  } finally {
+    await rm(root, { force: true, recursive: true });
+  }
+});
+
+test("CI reports a neutral published entrypoint, route, and reachability change", async () => {
+  const root = await healthyDiscoveryCiGitFixture();
+  try {
+    const direct = await diff(root, { fromRef: "base", toRef: "HEAD" });
+    const compatible = await diffWithoutSkillDiscovery(root, {
+      fromRef: "base",
+      toRef: "HEAD",
+    });
+    const report = await ciReport(root, {
+      fromRef: "base",
+      toRef: "HEAD",
+    });
+    const markdown = formatCiReport(report, "markdown");
+    const command = await captured(() =>
+      runCiReportCommand(root, {
+        fromRef: "base",
+        toRef: "HEAD",
+        format: "json",
+      }),
+    );
+
+    assert.deepEqual(report.skillDiscovery, direct.discovery);
+    assert.deepEqual(report.skillDiscovery.publishedEntrypoints.added, [
+      { id: "skill.entry", path: "skills/entry/SKILL.md" },
+    ]);
+    assert.deepEqual(report.skillDiscovery.reachability.newlyReachable, [
+      { id: "skill.target", path: "skills/target/SKILL.md" },
+    ]);
+    assert.equal(report.skillDiscovery.routes.added.length, 1);
+    assert.equal("discovery" in report.diff, false);
+    assert.equal("discovery" in compatible, false);
+    assert.deepEqual(report.diff, compatible);
+    assert.equal(report.status, "pass");
+    assert.deepEqual(report.notes, ["No CI report regressions detected."]);
+    assert.equal(command.code, 0);
+    assert.match(markdown, /^## Skill Discovery Changes$/m);
+    assert.match(markdown, /^### Added published entrypoints$/m);
+    assert.match(markdown, /^### Newly reachable Skills$/m);
+    assert.match(markdown, /^### Added routes$/m);
+  } finally {
+    await rm(root, { force: true, recursive: true });
+  }
+});
+
+test("CI keeps adopted-to-incomplete Discovery transitions observation-only", async () => {
+  const root = await incompleteDiscoveryCiGitFixture();
+  try {
+    const report = await ciReport(root, {
+      fromRef: "base",
+      toRef: "HEAD",
+    });
+    const markdown = formatCiReport(report, "markdown");
+    const command = await captured(() =>
+      runCiReportCommand(root, {
+        fromRef: "base",
+        toRef: "HEAD",
+        format: "markdown",
+      }),
+    );
+
+    assert.deepEqual(report.skillDiscovery.adoption, {
+      from: "adopted",
+      to: "incomplete",
+      changed: true,
+    });
+    assert.deepEqual(report.skillDiscovery.coverage, {
+      from: "authoritative",
+      to: "not-evaluated",
+      changed: true,
+    });
+    assert.equal(report.status, "pass");
+    assert.deepEqual(report.notes, ["No CI report regressions detected."]);
+    assert.equal(command.code, 0);
+    assert.match(markdown, /- Adoption: adopted -> incomplete/);
+    assert.match(markdown, /- Coverage: authoritative -> not-evaluated/);
+    assert.doesNotMatch(markdown, /Review .*Discovery/i);
+  } finally {
+    await rm(root, { force: true, recursive: true });
+  }
+});
+
+test("CI displays newly not-reached Skills without changing policy", async () => {
+  const root = await newlyNotReachedDiscoveryCiGitFixture();
+  try {
+    const report = await ciReport(root, {
+      fromRef: "base",
+      toRef: "HEAD",
+    });
+    const markdown = formatCiReport(report, "markdown");
+    const command = await captured(() =>
+      runCiReportCommand(root, {
+        fromRef: "base",
+        toRef: "HEAD",
+        format: "json",
+      }),
+    );
+
+    assert.deepEqual(report.skillDiscovery.reachability.newlyNotReached, [
+      { id: "skill.target", path: "skills/target/SKILL.md" },
+    ]);
+    assert.equal(report.skillDiscovery.routes.removed.length, 1);
+    assert.equal(report.status, "pass");
+    assert.deepEqual(report.notes, ["No CI report regressions detected."]);
+    assert.equal(command.code, 0);
+    assert.match(markdown, /^### Newly not-reached Skills$/m);
+    assert.match(markdown, /skill\.target/);
+    assert.doesNotMatch(markdown, /Review .*not-reached/i);
   } finally {
     await rm(root, { force: true, recursive: true });
   }
@@ -1283,7 +1411,7 @@ test("existing graph views remain route-free and invalid view help lists discove
   assert.match(help.stdout, /optional for discovery/);
 });
 
-test("authoritative incomplete Discovery reaches Readiness and direct diff while deferred reports remain unchanged", async () => {
+test("authoritative incomplete Discovery reaches Readiness, direct diff, and neutral CI while Trust Graph and BOM remain unchanged", async () => {
   const root = await authoritativeIncompleteGitFixture();
   try {
     const scanReport = await scan(root);
@@ -1357,7 +1485,11 @@ test("authoritative incomplete Discovery reaches Readiness and direct diff while
       newlyReachable: [],
       newlyNotReached: [],
     });
-    assertDiscoveryFree(ciReportResult);
+    assert.deepEqual(
+      ciReportResult.skillDiscovery,
+      semanticDiffReport.discovery,
+    );
+    assertDiscoveryFree(ciReportResult.diff);
     assertDiscoveryFree(trustGraphReport);
     assertDiscoveryFree(bomReport);
     assert.equal(ciReportResult.status, "pass");
@@ -1429,6 +1561,75 @@ async function routeCycleIntroductionGitFixture(): Promise<string> {
   await git(root, ["add", "skills/b/SKILL.md"]);
   await git(root, ["commit", "-m", "introduce route cycle"]);
   return root;
+}
+
+async function healthyDiscoveryCiGitFixture(): Promise<string> {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-discovery-ci-healthy-",
+  });
+  await fixture.writeConfig({ skill_discovery: { adopted: true } });
+  await fixture.skill("root", {
+    id: "skill.root",
+    publishedEntrypoint: true,
+    continuesWith: ["skill.entry"],
+  });
+  await fixture.skill("entry", { id: "skill.entry" });
+  await fixture.skill("target", { id: "skill.target" });
+  await fixture.initializeGit();
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "base"]);
+  await fixture.git(["tag", "base"]);
+  await fixture.skill("entry", {
+    id: "skill.entry",
+    publishedEntrypoint: true,
+    continuesWith: ["skill.target"],
+  });
+  await fixture.git(["add", "skills/entry/SKILL.md"]);
+  await fixture.git(["commit", "-m", "add published continuation"]);
+  return fixture.root;
+}
+
+async function incompleteDiscoveryCiGitFixture(): Promise<string> {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-discovery-ci-incomplete-",
+  });
+  await fixture.writeConfig({ skill_discovery: { adopted: true } });
+  await fixture.skill("entry", {
+    id: "skill.entry",
+    publishedEntrypoint: true,
+  });
+  await fixture.initializeGit();
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "base"]);
+  await fixture.git(["tag", "base"]);
+  await fixture.skill("entry", { id: "skill.entry" });
+  await fixture.git(["add", "skills/entry/SKILL.md"]);
+  await fixture.git(["commit", "-m", "remove published entrypoint"]);
+  return fixture.root;
+}
+
+async function newlyNotReachedDiscoveryCiGitFixture(): Promise<string> {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-discovery-ci-not-reached-",
+  });
+  await fixture.writeConfig({ skill_discovery: { adopted: true } });
+  await fixture.skill("entry", {
+    id: "skill.entry",
+    publishedEntrypoint: true,
+    continuesWith: ["skill.target"],
+  });
+  await fixture.skill("target", { id: "skill.target" });
+  await fixture.initializeGit();
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "base"]);
+  await fixture.git(["tag", "base"]);
+  await fixture.skill("entry", {
+    id: "skill.entry",
+    publishedEntrypoint: true,
+  });
+  await fixture.git(["add", "skills/entry/SKILL.md"]);
+  await fixture.git(["commit", "-m", "remove continuation"]);
+  return fixture.root;
 }
 
 async function writeSkill(

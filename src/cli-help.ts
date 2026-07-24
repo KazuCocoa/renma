@@ -543,7 +543,7 @@ export const COMMAND_HELP = [
       "CI report produces a pull-request-oriented summary from deterministic Renma evidence.",
     useWhen: [
       "CI needs a PASS, WARN, or FAIL status with review-focused details.",
-      "A PR reviewer needs readiness, graph, and finding changes summarized.",
+      "A PR reviewer needs readiness, graph, finding, and declared Skill Discovery changes summarized.",
       "You want Markdown for a PR comment or JSON for automation.",
     ],
     doNotUseFor: [
@@ -557,6 +557,7 @@ export const COMMAND_HELP = [
     ],
     interpretation: [
       "The report combines deterministic evidence for review.",
+      "Skill Discovery changes are observation-only and do not affect CI status or exits.",
       "PASS and WARN exit 0; FAIL exits 1; usage errors exit 2.",
       "Reviewers should still inspect meaningful semantic changes.",
     ],

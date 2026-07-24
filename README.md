@@ -298,6 +298,11 @@ Run `renma --help` and `renma <command> --help` for current options, output
 contracts, and next steps. The [User Manual](docs/user-manual.md) is the
 operational command reference.
 
+`renma ci-report` includes the existing versioned Skill Discovery semantic diff
+once at top-level `skillDiscovery` and keeps its nested compatible `diff`
+Discovery-free. The bounded Markdown section is observation-only: Discovery
+does not affect CI status, review notes, Readiness scores, or exit behavior.
+
 `renma scaffold` creates one explicitly requested Skill, Context Asset, or
 Context Lens after its responsibility and asset boundary have been decided. It
 does not initialize repository configuration. Init the repository. Scaffold an

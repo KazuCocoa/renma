@@ -180,7 +180,7 @@ export async function diff(
   return diffWithProjection(targetPath, options, true);
 }
 
-/** @internal Build the pre-0.23.1 semantic diff projection used by CI. */
+/** @internal Build the pre-0.23.1 projection for compatibility consumers. */
 export async function diffWithoutSkillDiscovery(
   targetPath: string,
   options: DiffOptions,

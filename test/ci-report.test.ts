@@ -1,17 +1,21 @@
 import assert from "node:assert/strict";
 import { execFile as execFileCallback } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
+import fc from "fast-check";
 import {
+  buildCiReportFromDiff,
   ciReport,
   determineCiReportStatus,
   formatCiReport,
   runCiReportCommand,
   type CiReport,
+  type CiReportFormatInput,
 } from "../src/commands/ci-report.js";
+import type { DiffReport } from "../src/commands/diff.js";
 import { zeroContextLensSummary } from "../src/context-lens.js";
 import { scan } from "../src/scanner.js";
 import {
@@ -89,6 +93,11 @@ test("formatCiReport renders structured JSON", () => {
   assert.equal(parsed.diff.security.posture.added.totalSecurityFindings, 0);
   assert.equal(parsed.diff.security.policyInventory.totalPolicyAssets, 5);
   assert.equal(parsed.securityPosture.added.totalSecurityFindings, 0);
+  assert.equal(
+    parsed.skillDiscovery.schemaVersion,
+    "renma.skill-discovery-diff.v1",
+  );
+  assert.equal("discovery" in parsed.diff, false);
   assert.equal(
     parsed.to.securityPolicyInventory?.assetsWithLocalPolicyMetadata,
     3,
@@ -200,6 +209,84 @@ test("formatCiReport tolerates legacy fixtures without security diff", () => {
   assert.match(markdown, /^## Security Changes$/m);
   assert.match(markdown, /- Added security findings: 0/);
   assert.match(markdown, /- Policy assets: \+0/);
+});
+
+test("formatCiReport preserves legacy CI reports without Skill Discovery", () => {
+  const current = sampleReport();
+  const { skillDiscovery, ...legacyReport } = current;
+  void skillDiscovery;
+  const legacy: CiReportFormatInput = legacyReport;
+  const before = JSON.stringify(legacy);
+
+  const json = formatCiReport(legacy, "json");
+  const markdown = formatCiReport(legacy, "markdown");
+
+  assert.equal(JSON.stringify(legacy), before);
+  assert.equal("skillDiscovery" in JSON.parse(json), false);
+  assert.doesNotMatch(markdown, /Skill Discovery/);
+  assert.match(markdown, /^## Security Posture$/m);
+  assert.match(markdown, /^## Review Notes$/m);
+});
+
+test("formatCiReport renders bounded neutral Skill Discovery changes", () => {
+  const report = sampleReport();
+  report.skillDiscovery = representativeSkillDiscoveryDiff();
+
+  const markdown = formatCiReport(report, "markdown");
+
+  assert.match(markdown, /^## Skill Discovery Changes$/m);
+  assert.match(markdown, /- Schema: renma\.skill-discovery-diff\.v1/);
+  assert.match(markdown, /- CI policy effect: none \(observation only\)/);
+  assert.match(markdown, /- Adoption: partial -> adopted/);
+  assert.match(markdown, /- Coverage: descriptive -> authoritative/);
+  assert.match(markdown, /- Published entrypoints: \+1 \/ -0/);
+  assert.match(markdown, /- Reachability: \+1 reachable \/ \+1 not-reached/);
+  assert.match(markdown, /- Routes: \+0 \/ -0 \/ 1 changed/);
+  assert.match(markdown, /^### Added published entrypoints$/m);
+  assert.match(markdown, /^### Newly not-reached Skills$/m);
+  assert.match(markdown, /^### Changed routes$/m);
+  assert.match(markdown, /^### Added cyclic components$/m);
+  assert.ok(
+    markdown.indexOf("## Semantic Diff") <
+      markdown.indexOf("## Skill Discovery Changes"),
+  );
+  assert.ok(
+    markdown.indexOf("## Skill Discovery Changes") <
+      markdown.indexOf("## Security Posture"),
+  );
+});
+
+test("formatCiReport renders a stable no-change Skill Discovery section", () => {
+  const markdown = formatCiReport(sampleReport(), "markdown");
+  const discoverySection = markdown.slice(
+    markdown.indexOf("## Skill Discovery Changes"),
+    markdown.indexOf("## Security Posture"),
+  );
+
+  assert.match(discoverySection, /^## Skill Discovery Changes$/m);
+  assert.match(discoverySection, /- No Skill Discovery topology changes\./);
+  assert.doesNotMatch(
+    discoverySection,
+    /^### (?:Added|Removed|Newly|Resolved)/m,
+  );
+});
+
+test("formatCiReport caps Skill Discovery detail lists", () => {
+  const report = sampleReport();
+  report.skillDiscovery.publishedEntrypoints.added = Array.from(
+    { length: 12 },
+    (_, index) => ({
+      id: `skill.${index}`,
+      path: `skills/${index}/SKILL.md`,
+    }),
+  );
+  report.skillDiscovery.summary.publishedEntrypointCountDelta = 12;
+
+  const markdown = formatCiReport(report, "markdown");
+
+  assert.match(markdown, /- 2 more not shown; see JSON for the full list\./);
+  assert.doesNotMatch(markdown, /skill\.10 \(/);
+  assert.equal(report.skillDiscovery.publishedEntrypoints.added.length, 12);
 });
 
 test("formatCiReport renders finding risk classes when present", () => {
@@ -378,6 +465,144 @@ test("ci report policy fails blocking Context Lens diagnostics", () => {
   assert.equal(determineCiReportStatus(report), "fail");
 });
 
+test("buildCiReportFromDiff is pure, deterministic, and keeps Discovery outside nested diff", () => {
+  const complete = completeDiffReport(representativeSkillDiscoveryDiff());
+  const before = JSON.stringify(complete);
+
+  const first = buildCiReportFromDiff(complete);
+  const second = buildCiReportFromDiff(complete);
+
+  assert.equal(JSON.stringify(complete), before);
+  assert.deepEqual(first, second);
+  assert.deepEqual(first.skillDiscovery, complete.discovery);
+  assert.equal(first.skillDiscovery, complete.discovery);
+  assert.equal("discovery" in first.diff, false);
+  assert.equal(first.status, determineCiReportStatus(first.diff));
+});
+
+test("a route becoming unresolved and unusable remains one neutral changed route", () => {
+  const discovery = representativeSkillDiscoveryDiff();
+  discovery.adoption = {
+    from: "adopted",
+    to: "adopted",
+    changed: false,
+  };
+  discovery.coverage = {
+    from: "authoritative",
+    to: "authoritative",
+    changed: false,
+  };
+  discovery.publishedEntrypoints.added = [];
+  discovery.reachability.newlyReachable = [];
+  discovery.reachability.newlyNotReached = [];
+  discovery.cycles.added = [];
+  const report = buildCiReportFromDiff({
+    ...policyDiffReport({}),
+    discovery,
+  });
+
+  assert.equal(report.skillDiscovery.routes.changed.length, 1);
+  assert.deepEqual(report.skillDiscovery.routes.changed[0]?.identity, {
+    sourcePath: "skills/entry/SKILL.md",
+    normalizedTarget: "skill.target",
+  });
+  assert.equal(report.status, "pass");
+  assert.deepEqual(report.notes, ["No CI report regressions detected."]);
+  assert.equal("discovery" in report.diff, false);
+});
+
+test("existing blocking policy still fails when Discovery changes", () => {
+  const compatible = policyDiffReport({
+    addedFindings: [finding("SEC-NEW-CRITICAL", "critical", "violation")],
+    summary: {
+      findingsDelta: 1,
+      highOrCriticalFindingsDelta: 1,
+    },
+  });
+  const report = buildCiReportFromDiff({
+    ...compatible,
+    discovery: representativeSkillDiscoveryDiff(),
+  });
+
+  assert.equal(report.status, "fail");
+  assert.ok(
+    report.notes.includes("Review new high or critical findings before merge."),
+  );
+  assert.ok(!report.notes.some((note) => /Discovery/i.test(note)));
+  assert.equal("discovery" in report.diff, false);
+});
+
+test("CI status and notes are invariant under arbitrary Discovery-only changes", () => {
+  const compatible = sampleReport().diff;
+
+  fc.assert(
+    fc.property(
+      fc.boolean(),
+      fc.integer({ min: -100, max: 100 }),
+      fc.integer({ min: 0, max: 20 }),
+      (changed, delta, itemCount) => {
+        const firstDiscovery = neutralSkillDiscoveryDiff();
+        const secondDiscovery = neutralSkillDiscoveryDiff();
+        secondDiscovery.adoption = {
+          from: "partial",
+          to: changed ? "adopted" : "partial",
+          changed,
+        };
+        secondDiscovery.coverage = {
+          from: "descriptive",
+          to: changed ? "authoritative" : "descriptive",
+          changed,
+        };
+        secondDiscovery.summary.reachableSkillCountDelta = delta;
+        secondDiscovery.reachability.newlyNotReached = Array.from(
+          { length: itemCount },
+          (_, index) => ({
+            id: `skill.${index}`,
+            path: `skills/${index}/SKILL.md`,
+          }),
+        );
+
+        const first = buildCiReportFromDiff({
+          ...compatible,
+          discovery: firstDiscovery,
+        });
+        const second = buildCiReportFromDiff({
+          ...compatible,
+          discovery: secondDiscovery,
+        });
+
+        assert.equal(first.status, second.status);
+        assert.deepEqual(first.notes, second.notes);
+        assert.equal("discovery" in first.diff, false);
+        assert.equal("discovery" in second.diff, false);
+      },
+    ),
+    { seed: 232, numRuns: 100 },
+  );
+});
+
+test("representative CI report matches the public JSON golden", async () => {
+  const report = buildCiReportFromDiff(
+    completeDiffReport(representativeSkillDiscoveryDiff()),
+  );
+  const golden = await readFile(
+    join(process.cwd(), "test/fixtures/ci-report.golden"),
+    "utf8",
+  );
+  const json = formatCiReport(report, "json");
+
+  assert.equal(json, golden);
+  assert.equal(
+    report.skillDiscovery.schemaVersion,
+    "renma.skill-discovery-diff.v1",
+  );
+  assert.equal("discovery" in report.diff, false);
+  assert.doesNotMatch(
+    JSON.stringify(report.skillDiscovery),
+    /diagnostics|declarationIndex|startLine|endLine|snippet|renma-diff-/,
+  );
+});
+
 test("ci report omits suppressed high findings introduced between git refs", async () => {
   const repo = await createSuppressedFindingRepo();
   try {
@@ -404,7 +629,7 @@ test("ci report omits suppressed high findings introduced between git refs", asy
         (JSON.parse(json) as { diff: Record<string, unknown> }).diff,
       false,
     );
-    assert.doesNotMatch(markdown, /Skill Discovery/);
+    assert.match(markdown, /^## Skill Discovery Changes$/m);
     assert.doesNotMatch(markdown, /SEC-LITERAL-SECRET/);
     assert.doesNotMatch(json, /SEC-LITERAL-SECRET/);
   } finally {
@@ -412,7 +637,7 @@ test("ci report omits suppressed high findings introduced between git refs", asy
   }
 });
 
-test("ci report skips Skill Discovery preparation for both refs", async () => {
+test("ci report prepares Skill Discovery once for both refs", async () => {
   const repo = await createSuppressedFindingRepo();
   const counts = {
     from: instrumentationCounts(),
@@ -447,7 +672,7 @@ test("ci report skips Skill Discovery preparation for both refs", async () => {
       );
       assert.equal(refCounts.projections.get("catalog"), 1);
       assert.equal(refCounts.projections.get("agent-skills"), 1);
-      assert.equal(refCounts.projections.get("skill-discovery") ?? 0, 0);
+      assert.equal(refCounts.projections.get("skill-discovery"), 1);
     }
     assert.equal(report.status, "pass");
     assert.deepEqual(report.notes, ["No CI report regressions detected."]);
@@ -457,7 +682,14 @@ test("ci report skips Skill Discovery preparation for both refs", async () => {
     assert.equal("discovery" in report.diff, false);
     assert.equal("discovery" in json.diff, false);
     assert.equal("discovery" in commandJson.diff, false);
-    assert.doesNotMatch(markdown, /Skill Discovery/);
+    assert.equal(
+      report.skillDiscovery.schemaVersion,
+      "renma.skill-discovery-diff.v1",
+    );
+    assert.deepEqual(report.skillDiscovery, neutralSkillDiscoveryDiff());
+    assert.deepEqual(commandJson.skillDiscovery, report.skillDiscovery);
+    assert.match(markdown, /^## Skill Discovery Changes$/m);
+    assert.match(markdown, /- No Skill Discovery topology changes\./);
   } finally {
     await rm(repo, { force: true, recursive: true });
   }
@@ -521,6 +753,7 @@ function sampleReport(): CiReport {
       findingsDelta: 1,
       highOrCriticalFindingsDelta: 1,
     },
+    skillDiscovery: neutralSkillDiscoveryDiff(),
     securityPosture: {
       added: zeroSecurityPostureSummary(),
       resolved: zeroSecurityPostureSummary(),
@@ -605,6 +838,154 @@ function sampleReport(): CiReport {
         toPolicyInventory: targetInventory,
       }),
     } as unknown as CiReport["diff"],
+  };
+}
+
+function completeDiffReport(discovery: CiReport["skillDiscovery"]): DiffReport {
+  return {
+    ...policyDiffReport({}),
+    discovery,
+  };
+}
+
+function neutralSkillDiscoveryDiff(): CiReport["skillDiscovery"] {
+  return {
+    schemaVersion: "renma.skill-discovery-diff.v1",
+    adoption: {
+      from: "not-adopted",
+      to: "not-adopted",
+      changed: false,
+    },
+    coverage: {
+      from: "not-evaluated",
+      to: "not-evaluated",
+      changed: false,
+    },
+    summary: {
+      publishedEntrypointCountDelta: 0,
+      routeEligibleSkillCountDelta: 0,
+      reachableSkillCountDelta: 0,
+      notReachedSkillCountDelta: 0,
+      unroutedSkillCountDelta: 0,
+      usableRouteCountDelta: 0,
+      unusableRouteCountDelta: 0,
+      unresolvedRouteCountDelta: 0,
+      cycleComponentCountDelta: 0,
+    },
+    publishedEntrypoints: {
+      added: [],
+      removed: [],
+    },
+    reachability: {
+      newlyReachable: [],
+      newlyNotReached: [],
+    },
+    unroutedSkills: {
+      newlyUnrouted: [],
+      resolvedUnrouted: [],
+    },
+    routes: {
+      added: [],
+      removed: [],
+      changed: [],
+    },
+    cycles: {
+      added: [],
+      resolved: [],
+    },
+  };
+}
+
+function representativeSkillDiscoveryDiff(): CiReport["skillDiscovery"] {
+  const discovery = neutralSkillDiscoveryDiff();
+  const routeFrom = {
+    sourceId: "skill.entry",
+    sourcePath: "skills/entry/SKILL.md",
+    normalizedTarget: "skill.target",
+    declarationCount: 1,
+    resolution: "resolved" as const,
+    candidates: [],
+    resolvedTarget: {
+      id: "skill.target",
+      path: "skills/target/SKILL.md",
+      kind: "skill",
+      lifecycle: "stable",
+    },
+    usable: true,
+    usabilityReasons: [],
+  };
+  const { resolvedTarget, ...routeWithoutResolvedTarget } = routeFrom;
+  void resolvedTarget;
+  const routeTo = {
+    ...routeWithoutResolvedTarget,
+    resolution: "unresolved" as const,
+    usable: false,
+    usabilityReasons: ["unresolved-target"] as Array<"unresolved-target">,
+  };
+
+  return {
+    ...discovery,
+    adoption: {
+      from: "partial",
+      to: "adopted",
+      changed: true,
+    },
+    coverage: {
+      from: "descriptive",
+      to: "authoritative",
+      changed: true,
+    },
+    summary: {
+      ...discovery.summary,
+      publishedEntrypointCountDelta: 1,
+      reachableSkillCountDelta: 1,
+      notReachedSkillCountDelta: 1,
+      usableRouteCountDelta: -1,
+      unusableRouteCountDelta: 1,
+      unresolvedRouteCountDelta: 1,
+      cycleComponentCountDelta: 1,
+    },
+    publishedEntrypoints: {
+      added: [{ id: "skill.entry", path: "skills/entry/SKILL.md" }],
+      removed: [],
+    },
+    reachability: {
+      newlyReachable: [{ id: "skill.target", path: "skills/target/SKILL.md" }],
+      newlyNotReached: [{ id: "skill.orphan", path: "skills/orphan/SKILL.md" }],
+    },
+    routes: {
+      added: [],
+      removed: [],
+      changed: [
+        {
+          identity: {
+            sourcePath: routeFrom.sourcePath,
+            normalizedTarget: routeFrom.normalizedTarget,
+          },
+          changedFields: [
+            "resolution",
+            "resolvedTarget",
+            "usable",
+            "usabilityReasons",
+          ],
+          from: routeFrom,
+          to: routeTo,
+        },
+      ],
+    },
+    cycles: {
+      added: [
+        {
+          skillIds: ["skill.entry", "skill.target"],
+          skills: [
+            { id: "skill.entry", path: "skills/entry/SKILL.md" },
+            { id: "skill.target", path: "skills/target/SKILL.md" },
+          ],
+          selfLoop: false,
+        },
+      ],
+      resolved: [],
+    },
   };
 }
 
