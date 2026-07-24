@@ -28,11 +28,8 @@
     "dist",
     "scripts",
     "docs",
-    "examples",
     "architecture.md",
     "design.md",
-    "plan.md",
-    "plan-discovery.md",
     "CHANGELOG.md",
     "LICENSE",
     "README.md"
