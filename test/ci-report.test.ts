@@ -250,6 +250,14 @@ test("formatCiReport renders ownership, asset, edge, and readiness governance de
       declaredOwner: null,
       effectiveOwner: null,
     },
+    {
+      id: "context.inherited-owner",
+      path: "contexts/inherited.md",
+      kind: "context",
+      status: "stable",
+      declaredOwner: null,
+      effectiveOwner: "docs",
+    },
   ];
   report.diff.catalog.removedAssets = [
     {
@@ -257,6 +265,8 @@ test("formatCiReport renders ownership, asset, edge, and readiness governance de
       path: "contexts/retired.md",
       kind: "context",
       owner: "docs",
+      declaredOwner: undefined,
+      effectiveOwner: undefined,
       status: "stable",
     },
   ];
@@ -374,6 +384,10 @@ test("formatCiReport renders ownership, asset, edge, and readiness governance de
     markdown,
     /- `context\.optional-metadata`[\s\S]* {2}- Path: \(none\)[\s\S]* {2}- Declared owner: \(none\)[\s\S]* {2}- Effective owner: \(none\)/,
   );
+  assert.match(
+    markdown,
+    /- `context\.inherited-owner`[\s\S]* {2}- Declared owner: \(none\)[\s\S]* {2}- Effective owner: docs/,
+  );
   assert.match(markdown, / {2}- Owner: docs/);
   assert.match(markdown, / {2}- owner: \(none\) -> `team-a`/);
   assert.match(markdown, / {2}- declared owner: `team-a` -> `team-b`/);
@@ -406,6 +420,32 @@ test("formatCiReport renders ownership, asset, edge, and readiness governance de
     markdown,
     /- `graph\.resolution`: warn\/warning -> pass\/info; summary changed: no/,
   );
+});
+
+test("formatCiReport ownership Markdown is stable across a JSON round trip", () => {
+  const report = sampleReport();
+  report.diff.catalog.addedAssets = [
+    {
+      id: "context.legacy-owner",
+      path: "contexts/legacy.md",
+      kind: "context",
+      owner: "docs",
+      declaredOwner: undefined,
+      effectiveOwner: undefined,
+      status: "stable",
+    },
+  ];
+
+  const inMemory = formatCiReport(report, "markdown");
+  const roundTripped = formatCiReport(
+    JSON.parse(JSON.stringify(report)) as CiReport,
+    "markdown",
+  );
+
+  assert.equal(roundTripped, inMemory);
+  assert.match(inMemory, /- Owner: docs/);
+  assert.doesNotMatch(inMemory, /- Declared owner: \(none\)/);
+  assert.doesNotMatch(inMemory, /- Effective owner: \(none\)/);
 });
 
 test("formatCiReport caps every governance detail collection without truncating JSON", () => {
@@ -1086,6 +1126,14 @@ test("ci report keeps an owner-covered Skill, resolved edge, and fail-closed pol
     assert.match(markdown, /- Human approval required: \+1/);
     assert.match(markdown, /- Forbidden inputs: \+1/);
     assert.equal(json.diff.catalog.addedAssets.length, 1);
+    assert.equal(
+      json.diff.catalog.addedAssets[0]?.declaredOwner,
+      "qe-platform",
+    );
+    assert.equal(
+      json.diff.catalog.addedAssets[0]?.effectiveOwner,
+      "qe-platform",
+    );
     assert.equal(json.diff.graph.addedEdges.length, 1);
     assert.ok(json.diff.readiness.checkChanges.length > 0);
     assert.equal(json.status, "pass");

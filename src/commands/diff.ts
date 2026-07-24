@@ -898,16 +898,21 @@ function assetMap(nodes: unknown[]): Map<string, AssetDelta> {
   return stableMap(
     nodes.map((node) => {
       const ownership = objectField(node, "ownership");
+      const declaredOwner = optionalNullableStringField(
+        ownership,
+        "declaredOwner",
+      );
+      const effectiveOwner = optionalNullableStringField(
+        ownership,
+        "effectiveOwner",
+      );
       const asset = {
         id: firstString(node, ["id", "path", "sourcePath"]),
         path: firstOptionalString(node, ["sourcePath", "path"]),
         kind: firstOptionalString(node, ["kind"]),
         owner: firstOptionalString(node, ["owner"]),
-        declaredOwner: optionalNullableStringField(ownership, "declaredOwner"),
-        effectiveOwner: optionalNullableStringField(
-          ownership,
-          "effectiveOwner",
-        ),
+        ...(declaredOwner !== undefined ? { declaredOwner } : {}),
+        ...(effectiveOwner !== undefined ? { effectiveOwner } : {}),
         status: firstOptionalString(node, ["status"]),
       };
       return [asset.id, asset] as const;
@@ -921,20 +926,30 @@ function edgeMap(edges: unknown[]): Map<string, EdgeDelta> {
       const identitySource = firstString(edge, [
         "source",
         "sourceId",
-        "sourcePath",
         "from",
+        "sourcePath",
       ]);
       const identityTarget = firstString(edge, [
+        "declaredTarget",
+        "to",
         "target",
         "targetId",
         "targetPath",
-        "to",
       ]);
+      const resolved = booleanField(edge, "resolved");
       const normalized = {
         source: firstString(edge, ["source", "sourceId", "from", "sourcePath"]),
-        target: firstString(edge, ["target", "targetId", "to", "targetPath"]),
+        target: resolved
+          ? firstString(edge, [
+              "targetId",
+              "target",
+              "to",
+              "targetPath",
+              "declaredTarget",
+            ])
+          : identityTarget,
         kind: firstString(edge, ["kind", "type"]),
-        resolved: booleanField(edge, "resolved"),
+        resolved,
         evidence: evidenceDelta(objectField(edge, "evidence")),
       };
       return [

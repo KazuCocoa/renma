@@ -408,7 +408,9 @@ function formatAssetDetails(asset: AssetDelta): string[] {
 }
 
 function hasCanonicalOwnership(asset: AssetDelta): boolean {
-  return "declaredOwner" in asset || "effectiveOwner" in asset;
+  return (
+    asset.declaredOwner !== undefined || asset.effectiveOwner !== undefined
+  );
 }
 
 function formatChangedAssetList(changes: AssetChange[]): string[] {

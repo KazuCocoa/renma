@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
+import { buildCiReportFromDiff } from "../src/commands/ci-report.js";
 import { buildDiffReport, diff, formatDiff } from "../src/commands/diff.js";
 import {
   zeroSecurityPolicyInventorySummary,
@@ -161,6 +162,8 @@ test("buildDiffReport compares deterministic readiness snapshots", () => {
     report.catalog.addedAssets.map((asset) => asset.id),
     ["new-context"],
   );
+  assert.equal("declaredOwner" in report.catalog.addedAssets[0]!, false);
+  assert.equal("effectiveOwner" in report.catalog.addedAssets[0]!, false);
   assert.deepEqual(
     report.catalog.removedAssets.map((asset) => asset.id),
     ["old-context"],
@@ -312,6 +315,217 @@ test("buildDiffReport preserves readiness ownership behavior for an empty eligib
   });
   assert.deepEqual(report.to.ownership, report.from.ownership);
   assert.equal(report.summary.ownershipCoverageDelta, 0);
+});
+
+test("graph edge identity ignores source asset path moves", () => {
+  const report = buildDiffReport(
+    "/repo",
+    snapshot("base", {
+      totalAssets: 2,
+      ownedAssets: 2,
+      ownershipCoveragePercent: 100,
+      graphResolutionPercent: 100,
+      nodes: [
+        canonicalNode(
+          "skill.demo",
+          "skills/old/SKILL.md",
+          "skill",
+          "platform",
+          "platform",
+          "stable",
+        ),
+        canonicalNode(
+          "context.shared",
+          "contexts/shared.md",
+          "context",
+          "docs",
+          "docs",
+          "stable",
+        ),
+      ],
+      edges: [
+        graphEdge(
+          "skill.demo",
+          "context.shared",
+          "requires",
+          "skills/old/SKILL.md",
+          true,
+          "context.shared",
+        ),
+      ],
+    }),
+    snapshot("head", {
+      totalAssets: 2,
+      ownedAssets: 2,
+      ownershipCoveragePercent: 100,
+      graphResolutionPercent: 100,
+      nodes: [
+        canonicalNode(
+          "skill.demo",
+          "skills/new/SKILL.md",
+          "skill",
+          "platform",
+          "platform",
+          "stable",
+        ),
+        canonicalNode(
+          "context.shared",
+          "contexts/shared.md",
+          "context",
+          "docs",
+          "docs",
+          "stable",
+        ),
+      ],
+      edges: [
+        graphEdge(
+          "skill.demo",
+          "context.shared",
+          "requires",
+          "skills/new/SKILL.md",
+          true,
+          "context.shared",
+        ),
+      ],
+    }),
+  );
+
+  assert.deepEqual(report.graph.addedEdges, []);
+  assert.deepEqual(report.graph.removedEdges, []);
+  assert.deepEqual(report.graph.newUnresolvedEdges, []);
+  assert.deepEqual(report.graph.resolvedEdges, []);
+});
+
+test("moving a source with an existing unresolved required edge stays PASS", () => {
+  const report = buildDiffReport(
+    "/repo",
+    snapshot("base", {
+      totalAssets: 1,
+      ownedAssets: 1,
+      ownershipCoveragePercent: 100,
+      graphResolutionPercent: 0,
+      nodes: [
+        canonicalNode(
+          "skill.demo",
+          "skills/old/SKILL.md",
+          "skill",
+          "platform",
+          "platform",
+          "stable",
+        ),
+      ],
+      edges: [
+        graphEdge(
+          "skill.demo",
+          "context.missing",
+          "requires",
+          "skills/old/SKILL.md",
+          false,
+        ),
+      ],
+    }),
+    snapshot("head", {
+      totalAssets: 1,
+      ownedAssets: 1,
+      ownershipCoveragePercent: 100,
+      graphResolutionPercent: 0,
+      nodes: [
+        canonicalNode(
+          "skill.demo",
+          "skills/new/SKILL.md",
+          "skill",
+          "platform",
+          "platform",
+          "stable",
+        ),
+      ],
+      edges: [
+        graphEdge(
+          "skill.demo",
+          "context.missing",
+          "requires",
+          "skills/new/SKILL.md",
+          false,
+        ),
+      ],
+    }),
+  );
+
+  assert.deepEqual(report.graph.addedEdges, []);
+  assert.deepEqual(report.graph.removedEdges, []);
+  assert.deepEqual(report.graph.newUnresolvedEdges, []);
+  assert.equal(buildCiReportFromDiff(report).status, "pass");
+});
+
+test("path declaration resolution is a resolved edge transition", () => {
+  const nodes = [
+    canonicalNode(
+      "skill.demo",
+      "skills/demo/SKILL.md",
+      "skill",
+      "platform",
+      "platform",
+      "stable",
+    ),
+    canonicalNode(
+      "context.shared",
+      "contexts/shared.md",
+      "context",
+      "docs",
+      "docs",
+      "stable",
+    ),
+  ];
+  const report = buildDiffReport(
+    "/repo",
+    snapshot("base", {
+      totalAssets: 2,
+      ownedAssets: 2,
+      ownershipCoveragePercent: 100,
+      graphResolutionPercent: 0,
+      nodes,
+      edges: [
+        graphEdge(
+          "skill.demo",
+          "contexts/shared.md",
+          "requires",
+          "skills/demo/SKILL.md",
+          false,
+        ),
+      ],
+    }),
+    snapshot("head", {
+      totalAssets: 2,
+      ownedAssets: 2,
+      ownershipCoveragePercent: 100,
+      graphResolutionPercent: 100,
+      nodes,
+      edges: [
+        graphEdge(
+          "skill.demo",
+          "contexts/shared.md",
+          "requires",
+          "skills/demo/SKILL.md",
+          true,
+          "context.shared",
+        ),
+      ],
+    }),
+  );
+
+  assert.deepEqual(report.graph.addedEdges, []);
+  assert.deepEqual(report.graph.removedEdges, []);
+  assert.deepEqual(report.graph.newUnresolvedEdges, []);
+  assert.deepEqual(report.graph.resolvedEdges, [
+    {
+      source: "skill.demo",
+      target: "context.shared",
+      kind: "requires",
+      resolved: true,
+      evidence: undefined,
+    },
+  ]);
+  assert.equal(buildCiReportFromDiff(report).status, "pass");
 });
 
 test("buildDiffReport accepts legacy snapshots without Discovery indexes", () => {
@@ -734,7 +948,7 @@ interface SnapshotInput {
   ownershipCoveragePercent: number;
   graphResolutionPercent: number;
   nodes: Array<ReturnType<typeof node> | ReturnType<typeof canonicalNode>>;
-  edges: Array<ReturnType<typeof edge>>;
+  edges: Array<ReturnType<typeof edge> | ReturnType<typeof graphEdge>>;
   checks: Array<ReturnType<typeof check>>;
   findings: Array<ReturnType<typeof finding>>;
   securityPolicyInventory?: SecurityPolicyInventorySummary | undefined;
@@ -828,6 +1042,24 @@ function edge(
     kind,
     resolved,
     evidence: { path, startLine: 1, endLine: 1, snippet: target },
+  };
+}
+
+function graphEdge(
+  from: string,
+  to: string,
+  kind: string,
+  sourcePath: string,
+  resolved: boolean,
+  targetId?: string,
+) {
+  return {
+    from,
+    to,
+    kind,
+    sourcePath,
+    resolved,
+    ...(targetId ? { targetId } : {}),
   };
 }
 
