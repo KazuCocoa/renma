@@ -1098,11 +1098,30 @@ renma ci-report . --from main --to HEAD --format json
 The report summarizes readiness deltas, graph-resolution changes, added and removed findings, and policy-relevant status. It is CI-oriented: `PASS` and `WARN` exit `0`, `FAIL` exits `1`, and usage, command, or configuration errors exit `2`.
 
 Output includes a CI status (`PASS`, `WARN`, or `FAIL`), a summary, readiness
-changes, graph changes, and review-focused finding changes. In 0.23.1, its
-nested diff intentionally omits the direct diff `discovery` section. CI JSON,
-Markdown, status, notes, and exits apply no Skill Discovery policy. A neutral
-CI projection may be reviewed independently for 0.23.2; optional gating remains
-later work.
+changes, graph changes, review-focused finding changes, and neutral Skill
+Discovery topology changes. Newly generated JSON includes the complete
+`renma.skill-discovery-diff.v1` value once at top-level `skillDiscovery`; the
+existing nested `diff` remains Discovery-free.
+
+Markdown adds a bounded `## Skill Discovery Changes` section after
+`## Semantic Diff`. It summarizes adoption, coverage, published entrypoints,
+reachability, unrouted Skills, routes, and cyclic components, and caps detail
+lists using the normal CI presentation limit. Use JSON for every identity when
+the Markdown section reports omitted entries.
+
+Skill Discovery is observation-only in 0.23.2. CI status, review notes,
+Readiness scores, and exit behavior inspect only the compatible nested diff,
+not `skillDiscovery`. A Discovery-only change can therefore retain `PASS`,
+`No CI report regressions detected.`, and exit `0`. Existing non-Discovery
+conditions continue to produce `WARN` or `FAIL` exactly as before. Optional
+Discovery policy or gating remains later work.
+
+CI prepares the complete semantic diff once. For each ref, graph, Readiness,
+and Discovery facts reuse one immutable repository snapshot with one discovery
+pass, one parse per artifact, one catalog preparation, one Agent Skills
+validation, and one Skill Discovery preparation. Legacy pre-0.23.2 serialized
+CI reports without `skillDiscovery` still format without a synthetic Discovery
+section.
 
 Repository Context BOM artifacts describe declared repository state, not prompt assembly, context injection, agent execution, actual LLM runtime usage, or telemetry. Use `renma bom . --format json` when CI needs a machine-readable manifest and `renma bom . --format markdown` for review comments or artifacts. For v2 compatibility and reproducibility details, see the [Repository Context BOM contract](repository-context-bom.md).
 

@@ -203,14 +203,21 @@ one parse per artifact, one catalog preparation, one Agent Skills validation,
 and one Skill Discovery preparation per ref. It does not call `skill-index`,
 reconstruct Discovery, or recollect for graph or Readiness.
 
-CI calls the same internal semantic-diff pipeline once with the pre-0.23.1
-projection selected before snapshot derivation. Each ref still has one
-repository collection and one parse per artifact, but CI never dereferences
-`snapshot.skillDiscovery` and never constructs `SkillDiscoveryDiff`. The
-defensive `CiCompatibleDiffReport` omission remains at the serialization
-boundary. CI JSON, Markdown, status, notes, and exit behavior therefore retain
-their previous contract, with integration and policy deferred to 0.23.2 or
-later.
+CI calls the complete public semantic-diff pipeline exactly once, then passes
+the resulting `DiffReport` to the pure `buildCiReportFromDiff()` projection.
+Each ref has one repository collection, one parse per artifact, one catalog
+preparation, one Agent Skills validation, and one Skill Discovery preparation.
+The projection destructures `discovery` from that one report, exposes the same
+object as top-level `CiReport.skillDiscovery`, and keeps the remaining
+`CiCompatibleDiffReport` under `diff`. It does not recollect, reconstruct
+Discovery, or run a second comparison.
+
+The compatible diff is the only input to `determineCiReportStatus()` and review
+notes. Top-level Discovery content is presentation-only and cannot affect
+Readiness scores, CI status, notes, or exit behavior by type or control flow.
+CI Markdown uses the shared presentation cap, while JSON retains the complete
+versioned diff once. The formatter accepts a legacy report without
+`skillDiscovery` and omits the new section rather than inventing facts.
 
 The exported `buildDiffReport()` helper still accepts pre-0.23.1 snapshots that
 contain only ref, root, Readiness, and graph. When either prepared Discovery

@@ -17,7 +17,8 @@ review diagnostics over the authoritative usable continuation graph and closes
 the static core stabilization sequence; 0.23.0 implements an additive
 repository-wide Readiness projection over that unchanged prepared index; and
 0.23.1 implements an observation-only direct semantic diff over two prepared
-indexes without changing CI policy.
+indexes. 0.23.2 projects that same versioned diff into CI as neutral review
+information without changing CI policy.
 
 Baseline: Renma 0.21.0
 
@@ -70,8 +71,10 @@ The 0.23.0 slice adds compact Discovery counts and five focused checks to
 Readiness without changing Discovery core semantics, `renma.skill-index.v1`,
 the Discovery graph, diagnostic payloads, or scoring weights. The 0.23.1 slice
 adds exact Discovery topology changes to direct semantic diff without
-classifying them as improvements or regressions. CI report, Trust Graph, BOM,
-ownership, runtime integration, and optional gating remain deferred.
+classifying them as improvements or regressions. The 0.23.2 slice places those
+exact facts once at the top level of CI JSON and adds bounded neutral Markdown.
+Trust Graph, BOM, ownership, runtime integration, and optional CI policy or
+gating remain deferred.
 
 The remainder of this document retains the complete design direction so later
 slices can be evaluated consistently. Publication and adoption describe 0.22.1
@@ -81,6 +84,7 @@ command describe 0.22.3 behavior.
 Route-cycle review and static-core stabilization describe 0.22.4 behavior.
 The compact Readiness projection describes 0.23.0 behavior.
 The direct semantic diff projection describes 0.23.1 behavior.
+The neutral CI report projection describes 0.23.2 behavior.
 
 ## Problem
 
@@ -150,6 +154,7 @@ Repository authors keep workflow and continuation policy in source SKILL.md
   -> graph --view discovery emits the first deterministic route projection
   -> skill-index emits the versioned publication/reachability-oriented index
   -> readiness summarizes repository-level Discovery health from that index
+  -> diff and ci-report expose exact topology changes for review
   -> agents and humans open the source Skills and apply their conditions
   -> humans review repository changes
 ```
@@ -950,34 +955,50 @@ collection or parse is introduced.
   Discovery facts do not affect CI JSON, Markdown, status, notes, exit behavior,
   Readiness scoring, or any diagnostic contract in 0.23.1.
 
-### 0.23.2 and later integrations
+### 0.23.2: neutral Skill Discovery CI report integration
+
+- call the complete public semantic diff exactly once, so each archived ref
+  retains one immutable snapshot, one discovery pass, one parse per artifact,
+  one catalog preparation, one Agent Skills validation, and one Skill
+  Discovery preparation;
+- project the existing `SkillDiscoveryDiff` once as required top-level
+  `CiReport.skillDiscovery`, retaining
+  `renma.skill-discovery-diff.v1` without reconstructing or reinterpreting it;
+- keep the nested `CiCompatibleDiffReport` under `diff` Discovery-free, avoiding
+  duplicate JSON and preserving its pre-0.23.2 contract;
+- add bounded CI Markdown after `## Semantic Diff` with a schema line, explicit
+  observation-only policy line, compact counts, and capped identity details;
+- keep `determineCiReportStatus()` and review-note evaluation typed only over
+  the compatible diff, so Discovery does not affect status, notes, Readiness
+  scores, or exits; and
+- format legacy pre-0.23.2 CI reports without inventing a Discovery section or
+  mutating their JSON shape.
+
+### Later integrations
 
 The planned review order is:
 
 ```text
 0.23.0 — Discovery Readiness integration
 0.23.1 — Discovery semantic diff integration
-0.23.2 — Discovery CI report integration
+0.23.2 — neutral Discovery CI report integration
 later   — optional CI policy or gating
 ```
 
-0.23.2 CI report integration is not committed product behavior. Optional
-gating, Trust Graph, BOM, ownership, observed-reference, authoring, richer
-visualization, and federation additions also require independent additive
-contract review.
+Optional policy or gating, Trust Graph, BOM, ownership, observed-reference,
+authoring, richer visualization, and federation additions require independent
+additive contract review.
 
 ## Open Design Questions
 
 These questions are intentionally later work and do not block the stable
-0.23.1 Discovery, Readiness, and direct semantic diff contracts:
+0.23.2 Discovery, Readiness, direct semantic diff, and neutral CI contracts:
 
 1. Do observed local Skill references provide enough review value to justify a
    separate non-authoritative projection?
-2. Should 0.23.2 expose neutral Discovery diff facts in CI, and if so which
-   compact projection avoids implying policy?
-3. Can a useful product projection be derived from existing exact tags and
+2. Can a useful product projection be derived from existing exact tags and
    Context/Lens identity without adding product metadata or a Product asset?
-4. Which route visualization remains readable in genuinely large cyclic or
+3. Which route visualization remains readable in genuinely large cyclic or
    shared-child graphs?
 
 Later contract review must not add aliases, observed-route authority,
@@ -1023,7 +1044,8 @@ not-reached Skills during partial adoption.
 - a Product asset or ownership-derived product identity;
 - automatic route, entrypoint, Skill, config, or generated-file edits;
 - quality, confidence, centrality, or popularity scores;
-- CI, Trust Graph, BOM, ownership, observed-reference, richer visualization,
-  authoring-assistance, federation integration, or optional gating in 0.23.1;
+- Trust Graph, BOM, ownership, observed-reference, richer visualization,
+  authoring-assistance, federation integration, or optional CI policy and
+  gating in 0.23.2;
   and
 - treating the old experimental PR as the implementation starting point.
