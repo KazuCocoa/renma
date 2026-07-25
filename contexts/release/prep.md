@@ -1,7 +1,7 @@
 ---
 id: context.release.prep
 title: Release Prep Workflow
-version: 0.1.0
+version: 0.2.0
 owner: maintainers
 status: stable
 tags:
@@ -50,9 +50,9 @@ Determine workflow requirements from the English sections.
 
 ## Summary
 
-Renma release preparation is local-first and evidence-based. Use `tools/release-prep.mjs` for deterministic metadata checks, GitHub-ready release notes, Renma dogfooding reports, validation commands, and optional npm-version-style local commit/tag finalization.
+Renma release work is local-first, evidence-based, and resumable. Use this workflow for preparation, validation, publication, and GitHub Release management. Use `tools/release-prep.mjs` for deterministic metadata checks, GitHub-ready release notes, Renma dogfooding reports, validation commands, and optional npm-version-style local commit/tag finalization.
 
-Renma のリリース準備は、ローカルでの作業と証拠に基づく確認を優先します。決定的なメタデータチェック、GitHub 向けリリースノート、Renma のドッグフーディングレポート、検証コマンド、および任意の npm version 形式のローカルコミット・タグ確定には、`tools/release-prep.mjs` を使用します。
+Renma のリリース作業は、ローカルでの作業と証拠に基づく確認を優先し、途中から再開できます。このワークフローを、準備、検証、公開、および GitHub Release 管理に使用します。決定的なメタデータチェック、GitHub 向けリリースノート、Renma のドッグフーディングレポート、検証コマンド、および任意の npm version 形式のローカルコミット・タグ確定には、`tools/release-prep.mjs` を使用します。
 
 GitHub Actions owns the package release step. Each external write occurs only after explicit human approval for its exact destination and ref or release operation. The gates cover `origin/main`, the version tag, and the final GitHub Release separately.
 
@@ -66,6 +66,8 @@ This context applies when:
 
 - Preparing a new Renma release from a local checkout.
 - ローカルチェックアウトから新しい Renma リリースを準備する場合。
+- Releasing, publishing, or shipping a Renma version, including terse requests such as "release it."
+- 「release it」のような短い依頼を含め、Renma のバージョンをリリース、公開、または出荷する場合。
 - Reconciling `CHANGELOG.md`, `package.json`, `package-lock.json`, docs, and release notes for a target version.
 - 対象バージョンについて、`CHANGELOG.md`、`package.json`、`package-lock.json`、ドキュメント、およびリリースノートの整合性を取る場合。
 - Generating or displaying GitHub-ready release notes from an existing changelog section.
@@ -74,6 +76,8 @@ This context applies when:
 - レビューまたは CI のためのリリース証拠を作成する場合。
 - Interactively pushing validated `origin/main` and version-tag refs, then creating or updating an approved GitHub Release.
 - 検証済みの `origin/main` とバージョンタグの ref を対話的にリモートへ送信し、承認済みの GitHub Release を作成または更新する場合。
+- Creating or updating only the GitHub Release page for an existing published tag.
+- 公開済みの既存タグについて、GitHub Release ページだけを作成または更新する場合。
 
 This context does not apply when:
 
@@ -120,9 +124,13 @@ For full release preparation:
 7. Hand off changed artifacts, generated release notes, validation results, blockers, residual risks, commit hash, and tag name.
    - 変更した成果物、生成したリリースノート、検証結果、ブロッカー、残存リスク、コミットハッシュ、およびタグ名を引き継ぎます。
 
-For an explicitly requested release trigger:
+For any request to release, publish, ship, or complete a Renma version:
 
-明示的にリリースの実行を求められた場合は、次の手順を実行します。
+Renma のバージョンをリリース、公開、出荷、または完了する依頼では、次の手順を実行します。
+
+First inspect local and remote state and resume at the earliest incomplete step. Treat matching branch refs, an existing annotated tag, a successful tag workflow, verified npm metadata, and an existing GitHub Release as completed evidence. Never repeat an external write solely because an earlier workflow step is already complete.
+
+最初にローカルとリモートの状態を確認し、最初の未完了ステップから再開します。一致するブランチ ref、既存の注釈付きタグ、成功済みのタグワークフロー、検証済み npm メタデータ、および既存の GitHub Release を完了済みの証拠として扱います。前のワークフローステップがすでに完了しているという理由だけで、外部への書き込みを繰り返しません。
 
 1. Confirm the worktree is clean, the checked-out branch is `main`, the release commit is a fast-forward candidate for `origin/main`, the version matches `package.json`, and the version tag is absent locally and remotely.
    - ワークツリーがクリーンであること、チェックアウト中のブランチが `main` であること、リリースコミットが `origin/main` に fast-forward 可能であること、バージョンが `package.json` と一致すること、およびバージョンタグがローカルとリモートの両方に存在しないことを確認します。
@@ -144,6 +152,10 @@ For an explicitly requested release trigger:
    - タグの GitHub Release が作成されるか更新されるかを判断します。リポジトリ、タグ、タイトル、および操作を提示し、承認済みの内容を GitHub に書き込む許可を別途求めます。その公開承認を得た後にのみ、GitHub Release を作成または更新し、その URL と公開内容を検証します。
 10. Return the workflow URL, branch and tag commits, registry evidence, GitHub Release URL, and any residual blockers.
     - ワークフロー URL、ブランチとタグのコミット、レジストリの証拠、GitHub Release の URL、および残っているブロッカーを返します。
+
+For a GitHub-Release-only request on an existing tag, verify steps 4, 6, and 7 as completed evidence, then perform steps 8 through 10. Do not require the tag to be absent, recreate it, or repeat branch and tag pushes.
+
+既存タグに対する GitHub Release のみの依頼では、ステップ 4、6、7 を完了済みの証拠として確認した後、ステップ 8 から 10 を実行します。タグが存在しないことを要求したり、タグを再作成したり、ブランチやタグの push を繰り返したりしません。
 
 ## Constraints
 

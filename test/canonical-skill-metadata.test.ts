@@ -774,7 +774,7 @@ test("repository release-prep is fully canonical with tag-trigger policy", async
   assert.deepEqual(validation.issues, []);
   assert.equal(result.metadata.id, "skill.release-prep");
   assert.equal(result.metadata.title, "Release Prep");
-  assert.equal(result.metadata.version, "0.1.0");
+  assert.equal(result.metadata.version, "0.2.0");
   assert.equal(result.metadata.owner, "maintainers");
   assert.equal(result.metadata.status, "stable");
   assert.deepEqual(result.metadata.tags, [
@@ -867,7 +867,7 @@ test("repository release-prep is fully canonical with tag-trigger policy", async
   assert.ok(bomAsset.ownership);
   assert.equal(bomAsset.ownership.effectiveOwner, "maintainers");
   assert.equal(bomAsset.status, "stable");
-  assert.equal(bomAsset.version, "0.1.0");
+  assert.equal(bomAsset.version, "0.2.0");
   assert.deepEqual(bomAsset.tags, ["dogfooding", "maintenance", "release"]);
   assert.deepEqual(bomAsset.lifecycle, { status: "stable" });
   assert.ok(

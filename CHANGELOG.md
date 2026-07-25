@@ -6,6 +6,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Changed
+
+- Broadened the repository-owned `release-prep` Skill to trigger for general
+  release, publish, ship, and GitHub Release page requests, and to resume safely
+  from already verified release stages without repeating completed external
+  writes.
+
 ## [0.23.5] - 2026-07-24
 
 ### Added

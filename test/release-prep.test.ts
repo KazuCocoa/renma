@@ -3,6 +3,25 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
+test("release-prep routes broad and resumable release requests", () => {
+  const skill = readFileSync("skills/release-prep/SKILL.md", "utf8");
+  const context = readFileSync("contexts/release/prep.md", "utf8");
+
+  for (const trigger of [
+    "release 0.23.5",
+    "release it",
+    "publish or ship this version",
+    "update the GitHub Release page",
+  ]) {
+    assert.ok(skill.includes(`"${trigger}"`), `missing trigger: ${trigger}`);
+  }
+  assert.match(skill, /Resume from already verified release stages/);
+  assert.match(skill, /GitHub Release for an existing tag/);
+  assert.match(context, /resume at the earliest incomplete step/);
+  assert.match(context, /GitHub-Release-only request on an existing tag/);
+  assert.match(context, /Do not require the tag to be absent/);
+});
+
 test("release-prep routes release-notes-only requests without finalization", () => {
   const skill = readFileSync("skills/release-prep/SKILL.md", "utf8");
   const context = readFileSync("contexts/release/prep.md", "utf8");
