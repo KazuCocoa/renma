@@ -2,7 +2,7 @@
 
 ## Current Product
 
-Renma 0.23.3 is a Git-native Context Repository governance CLI for
+Renma 0.24.0 is a Git-native Context Repository governance CLI for
 agent-consumable knowledge. It applies the review boundary:
 
 ```text
@@ -39,6 +39,27 @@ injection, workflow execution, or runtime telemetry collection.
 Repository Context BOM v2 describes declared repository evidence, not what a
 runtime consumed. Trust Graph v2 connects static governance evidence without
 assigning subjective trust or routing scores.
+
+## Structure-Aware Security Command Analysis
+
+The shipped 0.24.0 slice adds one bounded internal analysis result per relevant
+logical command or line-local instruction. It reuses the existing Markdown
+syntax pipeline, exact structural guard scope, and destination IR; classifies
+npm-style dependency pinning, sensitive sources, and local or disclosure
+sinks; and then projects the existing public diagnostics.
+
+Unguarded npm-style version variables are unpinned. The accepted fail-closed
+form is `${NAME:?message}` at the use site or in an associated guard for the
+same case-sensitive variable. Environment API access is not an environment
+file. Proven local-only sensitive handling can avoid a sensitive-file finding
+only with an exact no-disclosure guard; stdout, logs, prompt/Context use,
+network, upload, contradiction, ambiguity, and unsupported syntax remain
+fail-closed.
+
+This slice adds no public analysis schema or diagnostic ID. It is not complete
+shell parsing, general JavaScript/TypeScript data flow, cross-command or
+cross-file taint, runtime policy enforcement, prompt assembly, or Context
+injection.
 
 ## Stable Skill Discovery Core
 
@@ -149,7 +170,11 @@ integration, and 0.23.3 opt-in warn-only CI review policy.
    configuration, the stricter base/target mode, five fixed deterministic
    match conditions, one bounded policy result and review note, `WARN` exit
    `0`, and no direct-diff or Readiness changes.
-10. Evaluate hard-fail gating only as a later independently reviewed decision,
+10. Ship the 0.24.0 bounded security-command analysis by reusing structural
+    Markdown guards and destination analysis, preserving public findings, and
+    failing closed through the existing fallback for unsupported syntax.
+11. Evaluate hard-fail gating and broader source-to-sink analysis only as later
+    independently reviewed decisions,
     as with Trust Graph, BOM, observed-reference, ownership, authoring, richer
     visualization, and federation integrations.
 
@@ -160,7 +185,8 @@ The current roadmap sequence is:
 0.23.1 — Discovery semantic diff integration
 0.23.2 — neutral Discovery CI report integration
 0.23.3 — opt-in warn-only Discovery CI review policy
-later   — independently reviewed hard-fail gating
+0.24.0 — bounded structure-aware security command analysis
+later   — broader source-to-sink analysis and independently reviewed gating
 ```
 
 The later line identifies review order, not committed product behavior.
@@ -171,6 +197,9 @@ Possible later Renma core work includes:
 
 - independently reviewed hard-fail gating after operational experience with
   the fixed warn-only Discovery policy;
+- broader source-to-sink analysis for additional languages and syntax,
+  arbitrary cross-command or cross-file flow, and a separately versioned public
+  evidence contract;
 - product and ownership projections based on stable IDs, exact tags, and
   existing Context or Lens relationships;
 - observed Skill-reference analysis kept separate from authoritative declared

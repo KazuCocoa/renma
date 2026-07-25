@@ -103,7 +103,17 @@ policy metadata, security profile resolution, approved network and upload
 destination checks, and explicit human approval guards. They remain
 deterministic repository checks, not runtime enforcement.
 
-Security diagnostics are deterministic review guardrails for LLM-facing operational instructions. They flag patterns such as unpinned remote shell execution, unpinned dependency installs, privileged commands without nearby guardrails, predictable temporary paths, and credential-like command arguments; they do not replace SAST, secret scanning, dependency scanning, or human security review.
+Security diagnostics are deterministic review guardrails for LLM-facing
+operational instructions. Bounded structure-aware command analysis classifies
+npm-style version variables, actual sensitive-file sources, local-only
+operations, disclosure sinks, and exact structural guards while reusing the
+existing destination analysis. Unsupported syntax retains conservative
+fallback behavior. These checks flag patterns such as unpinned remote shell
+execution, unverified dependency variables, privileged commands without nearby
+guardrails, predictable temporary paths, and credential-like command
+arguments; they do not replace full language parsing, SAST, secret scanning,
+dependency scanning, or human security review. The internal analysis evidence
+is not a public report schema.
 
 Security posture summaries in Readiness and CI reports describe effective
 policy, security profile resolution, allowed data, forbidden inputs, approved

@@ -641,11 +641,13 @@ embedded executable scripts; use appropriate SAST and dependency-scanning tools
 for executable code. Markdown instructions that tell an agent to fetch, trust,
 execute, or invoke a script remain within this diagnostic boundary.
 
-These checks inspect repository knowledge and operational instructions. They are
-not language-specific SAST, dependency scanning, a safety proof, runtime
-monitoring, sandboxing, permission enforcement, or telemetry collection. A scan
-with no findings means only that the enabled deterministic checks found no
-matching evidence; it does not establish that an agent workflow is safe.
+These checks inspect repository knowledge and operational instructions.
+Selected command and JavaScript forms use bounded structure-aware recognition,
+not complete language interpretation. The checks are not language-specific
+SAST, dependency scanning, a safety proof, runtime monitoring, sandboxing,
+permission enforcement, or telemetry collection. A scan with no findings means
+only that the enabled deterministic checks found no matching evidence; it does
+not establish that an agent workflow is safe.
 
 ### Instruction-integrity boundaries
 
@@ -713,17 +715,50 @@ crawls the sources itself.
 
 ### Data-sharing source and sink boundaries
 
-The existing bulk-data, overbroad-context, no-redaction, secret-material, and
-upload diagnostics now distinguish broad sources from disclosure sinks. A
-local read of a whole repository may still be an overbroad context-collection
-advisory, but it is not bulk sharing without a prompt/context attachment,
-stdout/log output, or upload/share sink. Full logs, all environment variables,
-whole repositories, and credential directories become bulk-sharing evidence
-when instructions attach, print, log, paste, send, or upload them. Minimal
-task-relevant sanitized snippets and explicit defensive redaction wording are
-excluded. `process.env.NAME` is environment API access, not a `.env` file path;
-an actual `.env` reference remains sensitive-file evidence, while a local read
-alone is not secret disclosure.
+The bulk-data, overbroad-context, no-redaction, secret-material, sensitive-file,
+and upload diagnostics distinguish sources from local or disclosure sinks.
+Bounded source kinds cover environment files, private keys, certificates and
+signing material, credential stores, cloud credential files, other sensitive
+files, and environment-variable API access. The API form is not a file:
+`process.env.NAME` and `process.env["NAME"]` do not become `.env` evidence,
+while `readFileSync(".env")` and `fs.readFile(".env", callback)` remain actual
+file references.
+
+Bounded sink kinds distinguish local files, stdout or logs, prompt or Context
+inclusion, network access, external upload, and unknown destinations. A
+supported operation avoids a sensitive-file finding only when every sink is a
+local file and exact structurally associated wording forbids disclosure. The
+guard does not cross unrelated headings, thematic breaks, sibling items, or
+code blocks. It cannot neutralize a real disclosure sink, a contradictory
+instruction, an upload later in the same supported command, or unknown syntax.
+Unsupported syntax follows the conservative existing rule path.
+
+A local read of a whole repository may still be an overbroad
+context-collection advisory, but it is not bulk sharing without a
+prompt/context attachment, stdout/log output, or upload/share sink. Full logs,
+all environment variables, whole repositories, and credential directories
+become bulk-sharing evidence when instructions attach, print, log, paste, send,
+or upload them. Minimal task-relevant sanitized snippets and explicit
+defensive redaction wording are excluded.
+
+### Dependency version-variable boundaries
+
+Supported npm, pnpm, and yarn package references are classified once as
+literal-pinned, fail-closed variable-pinned, variable-unverified, or unpinned.
+`${NAME:?message}` is the accepted fail-closed variable form. It may appear at
+the version use site or in an exact structurally associated guard for the same
+case-sensitive variable. A version-like name, earlier assignment, ambient
+environment value, `${NAME:-default}`, prose pinning claim, different variable,
+later guard, or guard in another section does not verify the use.
+
+Both unpinned and variable-unverified references emit the existing
+`SEC-UNPINNED-DEPENDENCY-INSTALL`; no new diagnostic ID is introduced.
+Remediation never selects a version without repository evidence or human
+review. Pip, Brew, container-image, unsupported-syntax, severity, ordering, and
+deduplication behavior retains its existing compatibility path.
+
+The source/sink, guard, and support evidence is internal in 0.24.0. No Finding,
+scan, Readiness, BOM, diff, or CI JSON field exposes the analysis trace.
 
 ### Security Policy Metadata
 
@@ -886,7 +921,7 @@ examples by asset kind.
 | `SEC-UNBOUNDED-EXTERNAL-SOURCE-TRAVERSAL`        | Recursive external traversal has no local boundary.  | Content recursively follows links, issues, pages, or attachments without any stated scope or termination control. | Add source, relevance, visited/cycle, cap, failure-stop, and unresolved-scope guidance in the same section. |
 | `SEC-UNAPPROVED-NETWORK-DESTINATION`             | Network destination is not approved.                 | Instructions contact a host outside the allowed list.                                              | Enumerate the actual required domains in approved network destinations after review.                   |
 | `SEC-UNAPPROVED-UPLOAD-DESTINATION`              | Upload destination is not approved.                  | Instructions upload data to an unapproved service or host.                                         | Use an approved destination or update policy intentionally.                                            |
-| `SEC-UNPINNED-DEPENDENCY-INSTALL`                | Dependency install is not pinned.                    | Examples install packages without exact versions or digests.                                       | Pin package versions or use a reproducible install source.                                             |
+| `SEC-UNPINNED-DEPENDENCY-INSTALL`                | Dependency install is not pinned.                    | Examples install packages without a literal pin or use an unverified npm-style version variable.   | Use a reviewed literal version, the exact `${NAME:?message}` guard for the same variable, or a reproducible lockfile source; do not invent a version. |
 | `SEC-UNPINNED-REMOTE-SCRIPT`                     | Remote script execution is unpinned.                 | Commands pipe or execute remote scripts without an immutable reference.                            | Pin the script source and verify it before execution.                                                  |
 | `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION`           | Untrusted source content becomes executable guidance. | Content follows fetched, downloaded, attached, logged, or tool-produced instructions as authority without review. | Treat the content as data, preserve provenance, validate facts, and use reviewed local authority for actions. |
 

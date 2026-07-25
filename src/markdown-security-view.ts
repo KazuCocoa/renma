@@ -32,6 +32,15 @@ export type MarkdownSemanticUnit = MarkdownSourceRange & {
   contentStartLine?: number;
 };
 
+export type SecurityGuardEvidence = MarkdownSourceRange & {
+  kind:
+    | "same-instruction"
+    | "same-list-item"
+    | "preceding-paragraph"
+    | "safety-section";
+  text: string;
+};
+
 type PositionedNode = Nodes;
 type NodeRecord = MarkdownNodeRecord;
 type SecurityNode =
@@ -90,6 +99,7 @@ export class MarkdownSecurityView {
   private readonly codeBlockLines = new Set<number>();
   private readonly codeContentLines = new Set<number>();
   private readonly codeBlocksByNode: ReadonlyMap<Code, MarkdownCodeBlockRecord>;
+  private readonly codeBlocks: readonly MarkdownCodeBlockRecord[];
   private readonly inlineCodeByUnit = new WeakMap<
     MarkdownSemanticUnit,
     SemanticOffsetRange[]
@@ -98,6 +108,7 @@ export class MarkdownSecurityView {
   constructor(syntax: MarkdownSyntax) {
     this.sourceLines = syntax.sourceLines;
     this.bodyStartLine = syntax.bodyStartLine;
+    this.codeBlocks = syntax.codeBlocks;
     this.codeBlocksByNode = new Map(
       syntax.codeBlocks.map((block) => [block.node, block]),
     );
@@ -219,6 +230,13 @@ export class MarkdownSecurityView {
     return this.codeContentLines.has(lineIndex);
   }
 
+  languageAt(lineIndex: number): string | undefined {
+    const line = lineIndex + 1;
+    return this.codeBlocks.find(
+      (block) => block.contentStartLine <= line && block.contentEndLine >= line,
+    )?.language;
+  }
+
   sameMarkdownBlock(firstLineIndex: number, lastLineIndex: number): boolean {
     const first = this.smallestBlockRecordAtLine(firstLineIndex + 1);
     const last = this.smallestBlockRecordAtLine(lastLineIndex + 1);
@@ -251,36 +269,77 @@ export class MarkdownSecurityView {
   }
 
   associatedGuardLines(lineIndex: number): string[] {
+    const lines = this.associatedGuardEvidence(lineIndex).flatMap((evidence) =>
+      evidence.text.split("\n"),
+    );
+    return [...new Set(lines)];
+  }
+
+  associatedGuardEvidence(lineIndex: number): SecurityGuardEvidence[] {
     const line = lineIndex + 1;
     const record = this.smallestBlockRecordAtLine(line);
     if (record === undefined) return [];
-    const candidates = new Set<number>();
+    const candidates: Array<{
+      kind: SecurityGuardEvidence["kind"];
+      range: MarkdownSourceRange;
+      includeCodeContent: boolean;
+    }> = [];
+
+    const recordRange = sourceRange(record.node, this.bodyStartLine);
+    if (recordRange.startLine < line) {
+      candidates.push({
+        kind: "same-instruction",
+        range: { ...recordRange, endLine: line - 1 },
+        includeCodeContent: record.node.type === "code",
+      });
+    }
+
     const listItem = [...record.ancestors]
       .reverse()
       .find((ancestor) => ancestor.type === "listItem");
     if (listItem !== undefined) {
       const range = sourceRange(listItem, this.bodyStartLine);
-      addLines(candidates, { ...range, endLine: line });
+      if (range.startLine < line) {
+        candidates.push({
+          kind: "same-list-item",
+          range: this.guardRangeAfterBoundaries(
+            { ...range, endLine: line - 1 },
+            true,
+          ),
+          includeCodeContent: false,
+        });
+      }
     }
 
     const previous = record.parent.children[record.index - 1];
     if (previous?.type === "paragraph") {
-      addLines(candidates, sourceRange(previous, this.bodyStartLine));
+      candidates.push({
+        kind: "preceding-paragraph",
+        range: sourceRange(previous, this.bodyStartLine),
+        includeCodeContent: false,
+      });
     }
 
     const safetyHeading = [...this.headingChainAt(line)]
       .reverse()
       .find((heading) => SAFETY_HEADING_RE.test(heading.text));
     if (safetyHeading !== undefined) {
-      addLines(candidates, {
-        startLine: safetyHeading.endLine + 1,
-        endLine: line,
+      candidates.push({
+        kind: "safety-section",
+        range: this.guardRangeAfterBoundaries(
+          {
+            startLine: safetyHeading.endLine + 1,
+            endLine: line - 1,
+          },
+          false,
+        ),
+        includeCodeContent: false,
       });
     }
-    candidates.delete(lineIndex);
-    return [...candidates]
-      .sort((left, right) => left - right)
-      .map((candidate) => this.visibleLine(candidate));
+
+    return candidates.flatMap(({ kind, range, includeCodeContent }) =>
+      this.guardEvidenceForRange(kind, range, includeCodeContent),
+    );
   }
 
   instructionSectionText(line: number): string {
@@ -471,6 +530,75 @@ export class MarkdownSecurityView {
       const range = sourceRange(node, this.bodyStartLine);
       return range.startLine <= line && range.endLine >= line;
     });
+  }
+
+  private guardEvidenceForRange(
+    kind: SecurityGuardEvidence["kind"],
+    range: MarkdownSourceRange,
+    includeCodeContent: boolean,
+  ): SecurityGuardEvidence[] {
+    const evidence: SecurityGuardEvidence[] = [];
+    let startLine: number | undefined;
+    let lines: string[] = [];
+    const flush = (endLine: number): void => {
+      while (lines.length > 0 && !(lines[0] ?? "").trim()) {
+        lines.shift();
+        if (startLine !== undefined) startLine += 1;
+      }
+      while (lines.length > 0 && !(lines[lines.length - 1] ?? "").trim()) {
+        lines.pop();
+        endLine -= 1;
+      }
+      if (startLine !== undefined && lines.length > 0) {
+        evidence.push({
+          kind,
+          startLine,
+          endLine,
+          text: lines.join("\n"),
+        });
+      }
+      startLine = undefined;
+      lines = [];
+    };
+
+    for (let line = range.startLine; line <= range.endLine; line += 1) {
+      const lineIndex = line - 1;
+      const excluded =
+        this.isBlockQuotedLine(lineIndex) ||
+        (includeCodeContent
+          ? !this.isCodeContentLine(lineIndex)
+          : this.isCodeBlockLine(lineIndex));
+      if (excluded) {
+        flush(line - 1);
+        continue;
+      }
+      startLine ??= line;
+      lines.push(this.visibleLine(lineIndex));
+    }
+    flush(range.endLine);
+    return evidence;
+  }
+
+  private guardRangeAfterBoundaries(
+    range: MarkdownSourceRange,
+    includeHeadings: boolean,
+  ): MarkdownSourceRange {
+    const boundaries = [
+      ...this.thematicBreaks,
+      ...(includeHeadings ? this.headings : []),
+    ].filter(
+      (boundary) =>
+        boundary.startLine >= range.startLine &&
+        boundary.startLine <= range.endLine,
+    );
+    const lastBoundary = boundaries.sort(
+      (left, right) => left.startLine - right.startLine,
+    )[boundaries.length - 1];
+    return {
+      startLine:
+        lastBoundary === undefined ? range.startLine : lastBoundary.endLine + 1,
+      endLine: range.endLine,
+    };
   }
 }
 

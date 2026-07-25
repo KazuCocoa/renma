@@ -1,6 +1,6 @@
 # Renma Internal Architecture
 
-This document describes the maintainability architecture through 0.23.0,
+This document describes the maintainability architecture through 0.24.0,
 including shared immutable repository projections, the additive `guide`
 command, Declared Composition and Declared Impact analysis, and the Skill
 Discovery Readiness projection.
@@ -104,28 +104,44 @@ the `analysis` layer and must not become a dependency of parsing, repository,
 or other foundation modules. Compatibility re-exports preserve established
 TypeScript deep imports without making the facade an internal dependency hub.
 
-## Security Destination Analysis
+## Security Command and Destination Analysis
 
-Security destination analysis is a deterministic, non-executing pipeline:
+Security command analysis is a deterministic, non-executing pipeline:
 
 ```text
 Markdown/source eligibility
-  -> logical shell projection
-  -> shell command segmentation
-  -> curl transfer segmentation
-  -> lexical destination candidates
-  -> operational association IR
-  -> destination normalization/matching
+  -> one relevant logical command or line-local instruction
+  -> exact structural guard evidence
+  -> bounded shell/JavaScript recognition
+  +-> npm-style dependency pinning
+  +-> sensitive source and sink classification
+  \-> existing destination analysis and normalization
+  -> supported structured projection or conservative fallback
   -> existing policy diagnostics
 ```
 
 `src/security-diagnostics.ts` owns Markdown eligibility, effective policy,
-guard association, evidence projection, and conversion into the existing public
-finding model. The internal `src/security-destination/` modules own the pure
+guard application, fallback selection, evidence projection, ordering,
+deduplication, and conversion into the existing public Finding model.
+`MarkdownSecurityView.associatedGuardEvidence()` supplies exact source ranges
+for the same instruction, same list item, preceding paragraph, and active
+safety section without crossing unrelated headings, thematic breaks, sibling
+items, code blocks, or quoted examples.
+
+The internal `src/security-command/` analysis modules own bounded tokenization,
+npm-style dependency pinning, sensitive-source classification, sink
+classification, no-disclosure guard matching, and the cohesive immutable
+command result. One result is cached for each relevant line-local instruction.
+Each logical shell command receives one result that reuses its existing
+`DestinationAnalysis`; physical continuation members do not independently
+reanalyze that command.
+
+The internal `src/security-destination/` modules continue to own the pure
 destination stages. `analyzeDestinations` projects one input, classifies its
 candidates once, masks candidate text once, and records network and upload
-associations in one intermediate representation. Policy checks derive their
-network and upload views from that result instead of reclassifying raw text.
+associations in one intermediate representation. Policy checks and command
+sink classification derive their network and upload views from that result
+instead of reclassifying raw text.
 
 Lexical classification and operational intent are separate. An explicit
 transport can carry network or upload intent even when its host cannot be
@@ -134,15 +150,25 @@ field or diagnostic. Source, command, and curl-transfer spans map back to the
 original input so multiline evidence continues to use the existing finding
 ranges and snippets.
 
-Shell support is intentionally bounded to the behavior established in 0.22.4:
-simple curl commands, single and double quotes, active escapes and
-backslash-newlines, common command separators, redirection exceptions, and curl
-`--next`. Renma does not execute or fully parse shell. Heredocs, command or
-process substitution, subshell evaluation, functions, aliases, variable
-expansion, and complete POSIX or Bash parsing remain outside this analysis.
-Future support for broader shell syntax, additional URL schemes, IPv6 zone
-identifiers, complexity diagnostics, or user-visible not-evaluated results must
-be handled as behavior-changing follow-up work.
+Shell support remains intentionally bounded: simple quoting, exact npm, pnpm,
+and yarn install forms, the `${NAME:?message}` fail-closed expansion, selected
+sensitive-file readers, local output redirection, disclosure pipelines, and the
+established curl destination behavior. JavaScript recognition distinguishes
+`process.env` access from literal sensitive-file reads without an AST or
+general data-flow claim. Unknown, ambiguous, or unsupported syntax selects the
+conservative legacy rule path and cannot earn a local-only suppression.
+
+Renma does not execute or fully parse shell or JavaScript. Heredocs, command or
+process substitution, subshell evaluation, functions, aliases, general
+JavaScript/TypeScript data flow, and complete POSIX or Bash parsing remain
+outside this analysis. Cross-command and cross-file taint, additional language
+support, public source-to-sink evidence, configurable security suppressions,
+subjective confidence scores, runtime enforcement, prompt construction, and
+Context injection remain deferred.
+
+The command IR, source and sink classifications, guard identity, support state,
+and trace evidence are internal in 0.24.0. Scan, Readiness, BOM, diff, CI, and
+other CLI JSON retain the existing Finding contracts and diagnostic IDs.
 
 ## RepositorySnapshot Is the Repository Evidence Source
 

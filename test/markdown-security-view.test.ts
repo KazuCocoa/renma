@@ -195,6 +195,104 @@ After the thematic break.
   assert.equal(view.sameStructuralSection(5, 6), true);
 });
 
+test("guard evidence retains exact structural scope and source identity", () => {
+  const source = `## Safety
+
+Never print, log, attach, upload, or include profile contents in agent Context.
+
+\`\`\`bash
+: "\${APPIUM_VERSION:?Set an approved exact version}"
+npm install -g "appium@\${APPIUM_VERSION}"
+\`\`\`
+`;
+  const view = securityView(source, 0);
+  const commandIndex = source
+    .split("\n")
+    .findIndex((line) => line.startsWith("npm install"));
+  const evidence = view.associatedGuardEvidence(commandIndex);
+
+  assert.ok(
+    evidence.some(
+      (guard) =>
+        guard.kind === "same-instruction" &&
+        guard.startLine === 6 &&
+        guard.endLine === 6 &&
+        guard.text.includes("APPIUM_VERSION:?"),
+    ),
+  );
+  assert.ok(
+    evidence.some(
+      (guard) =>
+        guard.kind === "preceding-paragraph" &&
+        guard.startLine === 3 &&
+        guard.endLine === 3 &&
+        guard.text.startsWith("Never print"),
+    ),
+  );
+  assert.ok(
+    evidence.some(
+      (guard) =>
+        guard.kind === "safety-section" &&
+        guard.startLine === 3 &&
+        guard.endLine === 3,
+    ),
+  );
+  assert.equal(view.languageAt(commandIndex), "bash");
+  assert.equal(view.languageAt(0), undefined);
+});
+
+test("guard evidence excludes sibling items, quoted examples, and unrelated code blocks", () => {
+  const source = `- Ask for explicit human approval.
+- Run the reviewed command.
+
+> Never print, log, attach, upload, or include secrets in Context.
+
+\`\`\`text
+Never disclose credentials.
+\`\`\`
+
+\`\`\`bash
+sudo chmod 755 /opt/example
+\`\`\`
+`;
+  const view = securityView(source, 0);
+  const commandIndex = source
+    .split("\n")
+    .findIndex((line) => line.startsWith("sudo"));
+  const evidenceText = view
+    .associatedGuardEvidence(commandIndex)
+    .map(({ text }) => text)
+    .join("\n");
+
+  assert.doesNotMatch(evidenceText, /explicit human approval/);
+  assert.doesNotMatch(evidenceText, /Never print/);
+  assert.doesNotMatch(evidenceText, /Never disclose credentials/);
+});
+
+test("guard evidence never crosses a thematic break", () => {
+  const source = `## Safety
+
+Ask the user for explicit approval.
+
+***
+
+\`\`\`bash
+sudo chmod 755 /opt/example
+\`\`\`
+`;
+  const view = securityView(source, 0);
+  const commandIndex = source
+    .split("\n")
+    .findIndex((line) => line.startsWith("sudo"));
+
+  assert.equal(
+    view
+      .associatedGuardEvidence(commandIndex)
+      .some(({ text }) => text.includes("explicit approval")),
+    false,
+  );
+});
+
 test("HTML prose extraction keeps visible actions outside comments", () => {
   const view = securityView(
     `<div>

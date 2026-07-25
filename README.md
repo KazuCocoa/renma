@@ -36,9 +36,12 @@ database, agent memory, replacement for RAG, or generic Markdown linter. See the
 broader product framing.
 
 Renma analyzes the security posture of LLM-facing Markdown instructions and
-metadata. It does not perform language-specific analysis of referenced or
-embedded executable scripts; use appropriate SAST and dependency-scanning tools
-for executable code.
+metadata. Its bounded structure-aware command analysis reuses Markdown scope
+and destination evidence to distinguish guarded version variables, actual
+sensitive files, local-only handling, and disclosure sinks. Unknown syntax
+fails closed. Renma does not fully interpret shell or JavaScript, analyze
+referenced executable scripts, expose a source-to-sink JSON API, or replace
+SAST and dependency-scanning tools.
 
 ## Agent Skills And Renma
 

@@ -6,12 +6,59 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-07-24
+
+### Added
+
+- Added an internal `security-command` analysis layer that classifies npm-style
+  dependency pinning, sensitive sources, local and disclosure sinks, exact
+  guard evidence, destination evidence, and supported/fallback state once per
+  relevant command. The analysis is deterministic, non-executing, and is not a
+  new public CLI JSON contract.
+- Added exact structural guard evidence with source ranges for the same
+  instruction, same list item, preceding paragraph, and active safety section.
+  Added focused unit, integration, scan, compatibility, and fixed-seed property
+  coverage for source ranges, determinism, immutability, guard scope, variable
+  identity, and fail-closed disclosure behavior.
+
 ### Changed
 
+- Changed npm, pnpm, and yarn version-variable handling so an unguarded
+  variable emits `SEC-UNPINNED-DEPENDENCY-INSTALL`. The exact
+  `${NAME:?message}` fail-closed form is accepted at the use site or from a
+  structurally associated guard for the same case-sensitive variable. Renma
+  does not infer verification from a variable name, assignment, default, or
+  ambient environment and does not invent a remediation version.
+- Changed sensitive-file decisions to distinguish actual environment files,
+  keys, certificates/signing material, credential stores, cloud credentials,
+  and other sensitive files from environment-variable API access.
+  `process.env.NAME` and `process.env["NAME"]` remain non-file evidence.
+- Changed guarded local-only sensitive handling to avoid
+  `SEC-SENSITIVE-FILE-REFERENCE` and related secret-material findings only when
+  bounded analysis proves every sink is a local file and an exact structural
+  no-disclosure guard applies. Stdout, logs, prompts/Context, network, uploads,
+  contradictory instructions, and unknown syntax remain findings.
+- Kept unsupported shell and JavaScript syntax on an explicit conservative
+  fallback. Existing pip, Brew, container-image, destination, policy,
+  severity, remediation, ordering, and deduplication behavior remains in
+  place.
 - Broadened the repository-owned `release-prep` Skill to trigger for general
   release, publish, ship, and GitHub Release page requests, and to resume safely
   from already verified release stages without repeating completed external
   writes.
+
+### Compatibility
+
+- Preserved every public diagnostic ID, Finding field, CLI schema, deep import,
+  command option, exit behavior, destination normalization rule, logical shell
+  continuation, policy inheritance rule, and deterministic ordering contract.
+  The internal source, sink, guard, support, and trace evidence is not exposed
+  through scan, readiness, BOM, diff, or CI JSON in 0.24.0.
+- Preserved one destination and command analysis per logical command and one
+  cached analysis per relevant line-local instruction. Full shell parsing,
+  general JavaScript/TypeScript data flow, cross-command or cross-file taint,
+  public source-to-sink JSON, configurable security suppressions, and runtime
+  enforcement remain deferred.
 
 ## [0.23.5] - 2026-07-24
 
@@ -1401,7 +1448,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.23.5...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/KazuCocoa/renma/compare/v0.23.5...v0.24.0
 [0.23.5]: https://github.com/KazuCocoa/renma/compare/v0.23.4...v0.23.5
 [0.23.4]: https://github.com/KazuCocoa/renma/compare/v0.23.3...v0.23.4
 [0.23.3]: https://github.com/KazuCocoa/renma/compare/v0.23.2...v0.23.3
