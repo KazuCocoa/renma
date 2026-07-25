@@ -1,10 +1,13 @@
 export { analyzeSecurityCommand } from "./analyze.js";
 export {
   associatedFailClosedVariableGuardNames,
+  executableFailClosedVariableGuardNames,
   explicitNoDisclosureGuards,
-  failClosedVariableGuardNames,
+  hasPositiveDisclosureAction,
   isExplicitNoDisclosureGuard,
+  positiveDisclosureActions,
 } from "./guards.js";
+export type { DisclosureAction, DisclosureActionKind } from "./guards.js";
 export type {
   DependencyInstallAnalysis,
   DependencyPinningKind,

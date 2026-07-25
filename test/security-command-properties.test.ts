@@ -27,7 +27,7 @@ test("security command analysis is deterministic and does not mutate input", () 
         },
         guards: [
           {
-            kind: "preceding-paragraph" as const,
+            kind: "same-instruction" as const,
             startLine: 18,
             endLine: 18,
             text: `: "\${${variableName}:?Set exact}"`,
@@ -134,7 +134,7 @@ test("whitespace and harmless quoting preserve exact guarded variable identity",
           },
           guards: [
             {
-              kind: "preceding-paragraph",
+              kind: "same-instruction",
               startLine: 1,
               endLine: 1,
               text: `: "\${${variableName}:?Set exact}"`,
@@ -166,7 +166,7 @@ test("changing the guarded variable invalidates the guard", () => {
         },
         guards: [
           {
-            kind: "preceding-paragraph",
+            kind: "same-instruction",
             startLine: 1,
             endLine: 1,
             text: `: "\${${guarded}:?Set exact}"`,
@@ -182,61 +182,181 @@ test("changing the guarded variable invalidates the guard", () => {
   );
 });
 
+test("textual or control-flow fail-closed examples never verify variables", () => {
+  const invalidGuard = fc.constantFrom(
+    (name: string) => `# Example: \${${name}:?Set exact}`,
+    (name: string) => `echo '\${${name}:?Set exact}'`,
+    (name: string) => `false && : "\${${name}:?Set exact}"`,
+    (name: string) => `Use \${${name}:?Set exact} before installing.`,
+    (name: string) => `if approved; then\n: "\${${name}:?Set exact}"\nfi`,
+  );
+
+  fc.assert(
+    fc.property(variableArbitrary, invalidGuard, (variableName, guardText) => {
+      const text = `npm install "appium@\${${variableName}}"`;
+      const analysis = analyzeSecurityCommand({
+        source: {
+          text,
+          startLine: 2,
+          endLine: 2,
+          lines: [text],
+          language: "bash",
+        },
+        guards: [
+          {
+            kind: "same-instruction",
+            startLine: 1,
+            endLine: 1,
+            text: guardText(variableName),
+          },
+        ],
+      });
+
+      assert.equal(
+        analysis.dependencyInstalls[0]?.pinning,
+        "variable-unverified",
+      );
+    }),
+    PROPERTY_PARAMETERS,
+  );
+});
+
+test("attached and separated option values preserve the same package projection", () => {
+  fc.assert(
+    fc.property(
+      fc.constantFrom("--registry", "--tag", "--workspace"),
+      variableArbitrary,
+      (option, variableName) => {
+        const value =
+          option === "--registry"
+            ? "https://registry.npmjs.org"
+            : option === "--workspace"
+              ? "workspace-a"
+              : "next";
+        const packageReference = `appium@\${${variableName}}`;
+        const attached = analyzeSecurityCommand({
+          source: {
+            text: `npm install ${option}=${value} "${packageReference}"`,
+            startLine: 1,
+            endLine: 1,
+            lines: [`npm install ${option}=${value} "${packageReference}"`],
+            language: "bash",
+          },
+        });
+        const separated = analyzeSecurityCommand({
+          source: {
+            text: `npm install ${option} ${value} "${packageReference}"`,
+            startLine: 1,
+            endLine: 1,
+            lines: [`npm install ${option} ${value} "${packageReference}"`],
+            language: "bash",
+          },
+        });
+
+        assert.equal(attached.support, "supported");
+        assert.equal(separated.support, "supported");
+        assert.deepEqual(
+          attached.dependencyInstalls.map(
+            ({ packageManager, packageName, reference, pinning }) => ({
+              packageManager,
+              packageName,
+              reference,
+              pinning,
+            }),
+          ),
+          separated.dependencyInstalls.map(
+            ({ packageManager, packageName, reference, pinning }) => ({
+              packageManager,
+              packageName,
+              reference,
+              pinning,
+            }),
+          ),
+        );
+        assert.equal(
+          attached.dependencyInstalls[0]?.pinning,
+          "variable-unverified",
+        );
+      },
+    ),
+    PROPERTY_PARAMETERS,
+  );
+});
+
 test("disclosure sinks cannot be neutralized and fallback stays fail-closed", () => {
   fc.assert(
-    fc.property(variableArbitrary, (variableName) => {
-      const guard = {
-        kind: "preceding-paragraph" as const,
-        startLine: 1,
-        endLine: 1,
-        text: "Never print, log, attach, upload, or include profile contents in agent Context.",
-      };
-      const disclosure = 'security cms -D -i "$PROFILE_PATH" | cat';
-      const disclosureAnalysis = analyzeSecurityCommand({
-        source: {
-          text: disclosure,
-          startLine: 2,
-          endLine: 2,
-          lines: [disclosure],
-          language: "bash",
-        },
-        guards: [guard],
-      });
-      assert.equal(disclosureAnalysis.localOnlySensitiveOperation, false);
-      assert.ok(
-        disclosureAnalysis.sinks.some(({ kind }) => kind === "stdout-or-log"),
-      );
+    fc.property(
+      variableArbitrary,
+      fc.constantFrom("upload", "send", "share", "post", "publish"),
+      (variableName, disclosureAction) => {
+        const guard = {
+          kind: "preceding-paragraph" as const,
+          startLine: 1,
+          endLine: 1,
+          text: "Never print, log, attach, upload, or include profile contents in agent Context.",
+        };
+        const disclosure = 'security cms -D -i "$PROFILE_PATH" | cat';
+        const disclosureAnalysis = analyzeSecurityCommand({
+          source: {
+            text: disclosure,
+            startLine: 2,
+            endLine: 2,
+            lines: [disclosure],
+            language: "bash",
+          },
+          guards: [guard],
+        });
+        assert.equal(disclosureAnalysis.localOnlySensitiveOperation, false);
+        assert.ok(
+          disclosureAnalysis.sinks.some(({ kind }) => kind === "stdout-or-log"),
+        );
 
-      const supported = analyzeSecurityCommand({
-        source: {
-          text: `npm install "appium@\${${variableName}}"`,
-          startLine: 2,
-          endLine: 2,
-          lines: [`npm install "appium@\${${variableName}}"`],
-          language: "bash",
-        },
-      });
-      const fallback = analyzeSecurityCommand({
-        source: {
-          text: `npm install "appium@\${${variableName}}" || resolve-version`,
-          startLine: 2,
-          endLine: 2,
-          lines: [
-            `npm install "appium@\${${variableName}}" || resolve-version`,
-          ],
-          language: "bash",
-        },
-      });
-      assert.equal(
-        supported.dependencyInstalls[0]?.pinning,
-        "variable-unverified",
-      );
-      assert.equal(
-        fallback.dependencyInstalls[0]?.pinning,
-        "variable-unverified",
-      );
-      assert.equal(fallback.support, "fallback-required");
-    }),
+        const contradictory = `Do not print .env; ${disclosureAction} .env to an external service.`;
+        const contradictoryAnalysis = analyzeSecurityCommand({
+          source: {
+            text: contradictory,
+            startLine: 2,
+            endLine: 2,
+            lines: [contradictory],
+          },
+        });
+        assert.ok(
+          contradictoryAnalysis.sinks.some(
+            ({ kind }) => kind === "external-upload",
+          ),
+        );
+
+        const supported = analyzeSecurityCommand({
+          source: {
+            text: `npm install "appium@\${${variableName}}"`,
+            startLine: 2,
+            endLine: 2,
+            lines: [`npm install "appium@\${${variableName}}"`],
+            language: "bash",
+          },
+        });
+        const fallback = analyzeSecurityCommand({
+          source: {
+            text: `npm install "appium@\${${variableName}}" || resolve-version`,
+            startLine: 2,
+            endLine: 2,
+            lines: [
+              `npm install "appium@\${${variableName}}" || resolve-version`,
+            ],
+            language: "bash",
+          },
+        });
+        assert.equal(
+          supported.dependencyInstalls[0]?.pinning,
+          "variable-unverified",
+        );
+        assert.equal(
+          fallback.dependencyInstalls[0]?.pinning,
+          "variable-unverified",
+        );
+        assert.equal(fallback.support, "fallback-required");
+      },
+    ),
     PROPERTY_PARAMETERS,
   );
 });

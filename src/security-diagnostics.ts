@@ -24,6 +24,8 @@ import {
 } from "./markdown-security-view.js";
 import {
   analyzeSecurityCommand,
+  hasPositiveDisclosureAction,
+  positiveDisclosureActions,
   type SecurityCommandAnalysis,
 } from "./security-command/index.js";
 import {
@@ -1266,8 +1268,15 @@ function policyDetections(
   const shouldAnalyzeDestinations = input.scope !== "line-local";
   const analyzeLineLocal = input.scope !== "destination";
   const analysis = input.scope === "line-local" ? undefined : input.analysis;
-  const defensiveAction = isDefensiveActionInstruction(line);
-  const safeOrGuarded = isDefensiveOrGuardedActionInstruction(line);
+  const positiveActions = positiveDisclosureActions(line);
+  const positiveDestinationAction = positiveActions.some(
+    ({ kind }) => kind === "network" || kind === "external-upload",
+  );
+  const defensiveAction =
+    isDefensiveActionInstruction(line) && positiveActions.length === 0;
+  const safeOrGuarded =
+    GUARDED_ACTION_RE.test(line) ||
+    (defensiveAction && !positiveDestinationAction);
   const invalidNetworkAllowlist = policy.invalidDeclared.has(
     "approvedNetworkDestinations",
   );
@@ -1352,7 +1361,7 @@ function policyDetections(
     analyzeLineLocal &&
     policy.secretsAllowed === false &&
     SECRET_WORD_RE.test(line) &&
-    !SAFE_NEGATION_RE.test(line)
+    !isSafeSensitiveHandlingInstruction(line)
   ) {
     detections.push({
       metadata: RULES.instructionViolatesPolicy,
@@ -1434,9 +1443,17 @@ function sensitiveDataDetections(
     ({ kind }) => kind !== "environment-variable-api",
   );
   const sensitiveFile = sensitiveSources.length > 0;
+  const hasDisclosureSink = analysis.sinks.some(({ kind }) =>
+    [
+      "stdout-or-log",
+      "prompt-or-context",
+      "network",
+      "external-upload",
+    ].includes(kind),
+  );
   const safeHandling =
-    isSafeSensitiveHandlingInstruction(line) ||
-    analysis.localOnlySensitiveOperation;
+    analysis.localOnlySensitiveOperation ||
+    (!hasDisclosureSink && isSafeSensitiveHandlingInstruction(line));
   const sourceEvidence =
     sensitiveSources.length === 0
       ? evidence
@@ -1450,14 +1467,6 @@ function sensitiveDataDetections(
     });
   }
 
-  const hasDisclosureSink = analysis.sinks.some(({ kind }) =>
-    [
-      "stdout-or-log",
-      "prompt-or-context",
-      "network",
-      "external-upload",
-    ].includes(kind),
-  );
   const exposesSecret =
     (SECRET_ACTION_RE.test(line) || hasDisclosureSink) &&
     (SECRET_WORD_RE.test(line) || sensitiveFile) &&
@@ -1489,12 +1498,22 @@ function fallbackSensitiveDataDetections(
   );
   const sensitiveFile =
     referencesSensitiveFile(line) || sensitiveSources.length > 0;
+  const hasDisclosureSink = analysis.sinks.some(({ kind }) =>
+    [
+      "stdout-or-log",
+      "prompt-or-context",
+      "network",
+      "external-upload",
+    ].includes(kind),
+  );
+  const safeHandling =
+    !hasDisclosureSink && isSafeSensitiveHandlingInstruction(line);
   const sourceEvidence =
     sensitiveSources.length === 0
       ? evidence
       : detectionEvidenceForSource(analysis, sensitiveSources[0] ?? undefined);
 
-  if (sensitiveFile && !isSafeSensitiveHandlingInstruction(line)) {
+  if (sensitiveFile && !safeHandling) {
     detections.push({
       metadata: RULES.sensitiveFileReference,
       severity: "high",
@@ -1503,9 +1522,9 @@ function fallbackSensitiveDataDetections(
   }
 
   const exposesSecret =
-    SECRET_ACTION_RE.test(line) &&
+    (SECRET_ACTION_RE.test(line) || hasDisclosureSink) &&
     (SECRET_WORD_RE.test(line) || sensitiveFile) &&
-    !isSafeSensitiveHandlingInstruction(line);
+    !safeHandling;
   if (exposesSecret) {
     detections.push({
       metadata: RULES.secretMaterialInstruction,
@@ -1551,6 +1570,7 @@ function referencesSensitiveFile(line: string): boolean {
 }
 
 function isSafeSensitiveHandlingInstruction(line: string): boolean {
+  if (hasPositiveDisclosureAction(line)) return false;
   return (
     SAFE_NEGATION_RE.test(line) ||
     /\b(never|do not|don't|avoid|exclude|skip)\b.{0,50}\b(upload|send|share|attach|copy|paste|include|print|cat|echo|log|dump)\b/i.test(
@@ -1569,7 +1589,13 @@ function networkAndUploadDetections(
   analysis: DestinationAnalysis,
 ): Detection[] {
   const detections: Detection[] = [];
-  if (isDefensiveOrGuardedActionInstruction(line)) {
+  const positiveDestinationAction = positiveDisclosureActions(line).some(
+    ({ kind }) => kind === "network" || kind === "external-upload",
+  );
+  if (
+    GUARDED_ACTION_RE.test(line) ||
+    (isDefensiveActionInstruction(line) && !positiveDestinationAction)
+  ) {
     return detections;
   }
 

@@ -16,20 +16,46 @@ type DependencyClassification = {
 
 const OPTION_WITH_VALUE = new Set([
   "--cache",
+  "--cache-folder",
   "--cwd",
   "--dir",
   "--filter",
+  "--global-dir",
+  "--modules-folder",
+  "--mutex",
   "--prefix",
   "--registry",
+  "--store-dir",
   "--tag",
   "--workspace",
+]);
+const OPTION_WITHOUT_VALUE = new Set([
+  "-D",
+  "-E",
+  "-O",
+  "-P",
+  "-g",
+  "--dev",
+  "--exact",
+  "--global",
+  "--ignore-scripts",
+  "--no-save",
+  "--offline",
+  "--optional",
+  "--peer",
+  "--prod",
+  "--save",
+  "--save-dev",
+  "--save-exact",
+  "--save-optional",
+  "--save-peer",
+  "--workspace-root",
 ]);
 const VARIABLE_RE =
   /\$(?:\{([A-Za-z_][A-Za-z0-9_]*)(?:(:)([-?])([^}]*))?\}|([A-Za-z_][A-Za-z0-9_]*))/gu;
 
 export function classifyDependencyInstalls(
   tokens: readonly ShellToken[],
-  input: string,
   shellProjection: ShellProjection,
   sourceLength: number,
   guards: readonly SecurityGuardEvidence[],
@@ -52,7 +78,7 @@ export function classifyDependencyInstalls(
       continue;
     }
 
-    let skipNextOptionValue = false;
+    let optionsEnded = false;
     for (
       let argumentIndex = command.argumentsStart;
       argumentIndex < tokens.length;
@@ -61,24 +87,45 @@ export function classifyDependencyInstalls(
       const token = tokens[argumentIndex];
       if (token === undefined) break;
       if (token.kind === "operator") break;
-      if (skipNextOptionValue) {
-        skipNextOptionValue = false;
+      if (!optionsEnded && token.value === "--") {
+        optionsEnded = true;
         continue;
       }
-      if (token.value.startsWith("-")) {
-        skipNextOptionValue = OPTION_WITH_VALUE.has(
-          token.value.split("=")[0] ?? token.value,
-        );
+      if (!optionsEnded && token.value.startsWith("-")) {
+        const equalsAt = token.value.indexOf("=");
+        const optionName =
+          equalsAt < 0 ? token.value : token.value.slice(0, equalsAt);
+        if (equalsAt >= 0) {
+          if (equalsAt === token.value.length - 1) supported = false;
+          continue;
+        }
+        if (OPTION_WITH_VALUE.has(optionName)) {
+          const value = tokens[argumentIndex + 1];
+          if (
+            value?.kind !== "word" ||
+            value.value.length === 0 ||
+            value.value.startsWith("-")
+          ) {
+            supported = false;
+            continue;
+          }
+          argumentIndex += 1;
+          continue;
+        }
+        if (!OPTION_WITHOUT_VALUE.has(optionName)) {
+          supported = false;
+        }
         continue;
       }
-      if (token.value.includes("=")) continue;
       const classified = classifyPackageReference(
         manager,
         token,
-        input,
         associatedGuards,
       );
-      if (classified === undefined) continue;
+      if (classified === undefined) {
+        supported = false;
+        continue;
+      }
       installs.push({
         ...classified,
         sourceSpan: projectionSpanToSourceSpan(
@@ -136,7 +183,6 @@ function dependencyCommand(
 function classifyPackageReference(
   packageManager: DependencyInstallAnalysis["packageManager"],
   token: ShellToken,
-  input: string,
   associatedGuards: ReadonlySet<string>,
 ): Omit<DependencyInstallAnalysis, "sourceSpan"> | undefined {
   const reference = token.value;
@@ -145,13 +191,19 @@ function classifyPackageReference(
     isPlaceholder(reference) ||
     reference.startsWith(".") ||
     reference.startsWith("/") ||
-    reference.startsWith("$")
+    reference.startsWith("$") ||
+    reference.includes("=")
   ) {
     return undefined;
   }
 
   const parsed = npmPackageNameAndVersion(reference);
-  if (parsed === undefined) return undefined;
+  if (
+    parsed === undefined ||
+    !/^(?:@[A-Za-z0-9._~-]+\/)?[A-Za-z0-9._~-]+$/u.test(parsed.packageName)
+  ) {
+    return undefined;
+  }
   const variableNames: string[] = [];
   let allVariablesFailClosed = true;
   let hasVariable = false;
@@ -161,13 +213,11 @@ function classifyPackageReference(
     if (name === undefined) continue;
     variableNames.push(name);
     const directFailClosed =
-      match[2] === ":" && match[3] === "?" && (match[4] ?? "").length > 0;
-    const prefixGuards = failClosedVariableGuardNamesBefore(input, token.start);
-    if (
-      !directFailClosed &&
-      !associatedGuards.has(name) &&
-      !prefixGuards.has(name)
-    ) {
+      match[2] === ":" &&
+      match[3] === "?" &&
+      (match[4] ?? "").length > 0 &&
+      !token.raw.includes("'");
+    if (!directFailClosed && !associatedGuards.has(name)) {
       allVariablesFailClosed = false;
     }
   }
@@ -216,20 +266,6 @@ function npmPackageNameAndVersion(
     packageName: reference.slice(0, versionAt),
     version: reference.slice(versionAt + 1),
   };
-}
-
-function failClosedVariableGuardNamesBefore(
-  input: string,
-  offset: number,
-): Set<string> {
-  const prefix = input.slice(0, offset);
-  const names = new Set<string>();
-  const pattern = /\$\{([A-Za-z_][A-Za-z0-9_]*):\?([^}\r\n]+)\}/gu;
-  for (const match of prefix.matchAll(pattern)) {
-    const name = match[1];
-    if (name !== undefined) names.add(name);
-  }
-  return names;
 }
 
 function isPlaceholder(value: string): boolean {

@@ -37,7 +37,6 @@ export function analyzeSecurityCommand(
   const tokenization = tokenizeBoundedShell(shellProjection.projection);
   const dependencies = classifyDependencyInstalls(
     tokenization.tokens,
-    shellProjection.projection,
     shellProjection,
     source.text.length,
     guards,

@@ -26,9 +26,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Changed npm, pnpm, and yarn version-variable handling so an unguarded
   variable emits `SEC-UNPINNED-DEPENDENCY-INSTALL`. The exact
   `${NAME:?message}` fail-closed form is accepted at the use site or from a
-  structurally associated guard for the same case-sensitive variable. Renma
-  does not infer verification from a variable name, assignment, default, or
-  ambient environment and does not invent a remediation version.
+  structurally associated executable guard for the same case-sensitive
+  variable. Comments, prose, single-quoted literals, later guards, and
+  unsupported control flow are not guard evidence. Renma does not infer
+  verification from a variable name, assignment, default, or ambient
+  environment and does not invent a remediation version.
+- Corrected npm-style attached option values so they do not consume the next
+  package candidate, retained separated option-value handling, and made
+  incomplete or ambiguous candidate projections select conservative fallback.
 - Changed sensitive-file decisions to distinguish actual environment files,
   keys, certificates/signing material, credential stores, cloud credentials,
   and other sensitive files from environment-variable API access.
@@ -38,6 +43,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   bounded analysis proves every sink is a local file and an exact structural
   no-disclosure guard applies. Stdout, logs, prompts/Context, network, uploads,
   contradictory instructions, and unknown syntax remain findings.
+- Classified standard output/error descriptor devices as disclosure,
+  `/dev/tcp/**` and `/dev/udp/**` as network, and other unproven special devices
+  as unknown. Disclosure negation now applies to its bounded action clause, so
+  defensive wording cannot hide a later positive disclosure or upload.
 - Kept unsupported shell and JavaScript syntax on an explicit conservative
   fallback. Existing pip, Brew, container-image, destination, policy,
   severity, remediation, ordering, and deduplication behavior remains in

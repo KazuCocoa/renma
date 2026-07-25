@@ -158,6 +158,16 @@ established curl destination behavior. JavaScript recognition distinguishes
 general data-flow claim. Unknown, ambiguous, or unsupported syntax selects the
 conservative legacy rule path and cannot earn a local-only suppression.
 
+Npm-style option projection distinguishes attached values from separated
+values and selects fallback when any non-option candidate cannot be
+classified. Associated version guards are accepted only as exact executable
+fail-closed statements earlier in the same bounded instruction; textual
+mentions and ambiguous control flow are not execution evidence. Sink
+classification treats standard descriptor devices as disclosure, `/dev/tcp`
+and `/dev/udp` as network, and other unproven special devices as unknown.
+Disclosure negation is attached to its bounded action clause rather than the
+whole input.
+
 Renma does not execute or fully parse shell or JavaScript. Heredocs, command or
 process substitution, subshell evaluation, functions, aliases, general
 JavaScript/TypeScript data flow, and complete POSIX or Bash parsing remain

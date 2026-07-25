@@ -3,6 +3,7 @@ import {
   type ShellProjection,
 } from "../security-destination/index.js";
 import { projectionSpanToSourceSpan } from "../security-destination/logical-shell.js";
+import { positiveDisclosureActions } from "./guards.js";
 import type { ShellToken } from "./shell.js";
 import type {
   SensitiveSinkAnalysis,
@@ -65,13 +66,6 @@ const SHELL_LANGUAGE_RE = /^(?:bash|sh|shell|zsh)$/i;
 const JAVASCRIPT_LANGUAGE_RE =
   /^(?:javascript|js|jsx|mjs|cjs|typescript|ts|tsx)$/i;
 const SOURCE_PRODUCING_COMMAND_RE = /^(?:cat|base64|openssl|security)$/i;
-const PROMPT_SINK_RE =
-  /\b(copy|paste|attach|include|load|send|provide|put)\b.{0,100}\b(prompt|agent context|context|tool input|request|message)\b/i;
-const STDOUT_OR_LOG_RE =
-  /\b(print|console\.log|logger|log|dump|echo|output to stdout|write to stdout)\b/i;
-const EXTERNAL_DISCLOSURE_RE = /\b(upload|attach|send|share|post|publish)\b/i;
-const NEGATED_DISCLOSURE_RE =
-  /\b(never|do\s+not|don't|avoid|exclude|skip|omit|must\s+not)\b.{0,80}\b(print|log|dump|echo|output|attach|include|upload|send|share|paste)\b/i;
 
 export function classifySensitiveData(
   input: string,
@@ -291,31 +285,23 @@ function classifySinks(
       sourceSpan: span,
     });
   }
-  if (!NEGATED_DISCLOSURE_RE.test(input)) {
-    addPatternSink(
-      sinks,
-      "prompt-or-context",
-      input,
-      PROMPT_SINK_RE,
-      shellProjection,
-      sourceLength,
-    );
-    addPatternSink(
-      sinks,
-      "stdout-or-log",
-      input,
-      STDOUT_OR_LOG_RE,
-      shellProjection,
-      sourceLength,
-    );
-    addPatternSink(
-      sinks,
-      "external-upload",
-      input,
-      EXTERNAL_DISCLOSURE_RE,
-      shellProjection,
-      sourceLength,
-    );
+  for (const action of positiveDisclosureActions(input)) {
+    if (
+      action.kind === "stdout-or-log" &&
+      action.action.toLowerCase() === "cat" &&
+      commandActionHasOutputRedirection(tokens, action.start)
+    ) {
+      continue;
+    }
+    sinks.push({
+      kind: action.kind,
+      raw: action.action,
+      sourceSpan: projectionSpanToSourceSpan(
+        { start: action.start, end: action.end },
+        shellProjection,
+        sourceLength,
+      ),
+    });
   }
 
   const redirections = outputRedirections(tokens);
@@ -327,9 +313,7 @@ function classifySinks(
       sourceLength,
     );
     sinks.push({
-      kind: /\.(?:log|out)(?:\b|$)/i.test(target.value)
-        ? "stdout-or-log"
-        : "local-file",
+      kind: redirectionSinkKind(target.value),
       raw: target.raw,
       sourceSpan: span,
     });
@@ -361,7 +345,7 @@ function classifySinks(
 
   if (
     pipeIndex < 0 &&
-    hasUnredirectedSourceProducingSegment(tokens) &&
+    hasUnredirectedSourceProducingSegment(input, tokens) &&
     !sinks.some(({ kind }) =>
       ["external-upload", "network", "prompt-or-context"].includes(kind),
     )
@@ -388,25 +372,36 @@ function classifySinks(
   return dedupeSinks(sinks);
 }
 
-function addPatternSink(
-  sinks: SensitiveSinkAnalysis[],
-  kind: SensitiveSinkKind,
-  input: string,
-  pattern: RegExp,
-  shellProjection: ShellProjection,
-  sourceLength: number,
-): void {
-  const match = input.match(pattern);
-  if (match?.index === undefined) return;
-  sinks.push({
-    kind,
-    raw: match[0],
-    sourceSpan: projectionSpanToSourceSpan(
-      { start: match.index, end: match.index + match[0].length },
-      shellProjection,
-      sourceLength,
-    ),
-  });
+function commandActionHasOutputRedirection(
+  tokens: readonly ShellToken[],
+  actionStart: number,
+): boolean {
+  const actionIndex = tokens.findIndex(
+    ({ kind, start }) => kind === "word" && start === actionStart,
+  );
+  if (actionIndex < 0) return false;
+  let segmentStart = actionIndex;
+  while (
+    segmentStart > 0 &&
+    !isShellCommandBoundary(tokens[segmentStart - 1])
+  ) {
+    segmentStart -= 1;
+  }
+  let segmentEnd = actionIndex + 1;
+  while (
+    segmentEnd < tokens.length &&
+    !isShellCommandBoundary(tokens[segmentEnd])
+  ) {
+    segmentEnd += 1;
+  }
+  return outputRedirections(tokens.slice(segmentStart, segmentEnd)).length > 0;
+}
+
+function isShellCommandBoundary(token: ShellToken | undefined): boolean {
+  return (
+    token?.kind === "operator" &&
+    ["&&", "||", ";", "|", "&"].includes(token.value)
+  );
 }
 
 function outputRedirections(
@@ -435,6 +430,27 @@ function outputRedirections(
   return redirections;
 }
 
+function redirectionSinkKind(target: string): SensitiveSinkKind {
+  if (
+    /^(?:\/dev\/(?:stdout|stderr|fd\/[12])|\/proc\/self\/fd\/[12])$/u.test(
+      target,
+    )
+  ) {
+    return "stdout-or-log";
+  }
+  if (/^\/dev\/(?:tcp|udp)(?:\/|$)/u.test(target)) {
+    return "network";
+  }
+  if (
+    /^(?:\/dev(?:\/|$)|\/proc\/(?:self|\d+)\/fd(?:\/|$)|NUL$|CON$|PRN$|AUX$|COM\d+$|LPT\d+$)/iu.test(
+      target,
+    )
+  ) {
+    return "unknown";
+  }
+  return /\.(?:log|out)(?:\b|$)/i.test(target) ? "stdout-or-log" : "local-file";
+}
+
 function localCopyDestination(
   tokens: readonly ShellToken[],
 ): ShellToken | undefined {
@@ -451,8 +467,24 @@ function localCopyDestination(
 }
 
 function hasUnredirectedSourceProducingSegment(
+  input: string,
   tokens: readonly ShellToken[],
 ): boolean {
+  const negatedCommandOffsets = new Set(
+    tokens
+      .filter(
+        ({ kind, value }) =>
+          kind === "word" && SOURCE_PRODUCING_COMMAND_RE.test(value),
+      )
+      .filter(
+        (token) =>
+          !positiveDisclosureActions(input).some(
+            (action) =>
+              action.kind === "stdout-or-log" && action.start === token.start,
+          ) && /^(?:cat)$/i.test(token.value),
+      )
+      .map(({ start }) => start),
+  );
   let segmentStart = 0;
   for (let index = 0; index <= tokens.length; index += 1) {
     const token = tokens[index];
@@ -463,8 +495,10 @@ function hasUnredirectedSourceProducingSegment(
     if (!boundary) continue;
     const segment = tokens.slice(segmentStart, index);
     const sourceProducing = segment.some(
-      ({ kind, value }) =>
-        kind === "word" && SOURCE_PRODUCING_COMMAND_RE.test(value),
+      ({ kind, value, start }) =>
+        kind === "word" &&
+        SOURCE_PRODUCING_COMMAND_RE.test(value) &&
+        !negatedCommandOffsets.has(start),
     );
     const outputRedirected = outputRedirections(segment).length > 0;
     if (sourceProducing && !outputRedirected) return true;

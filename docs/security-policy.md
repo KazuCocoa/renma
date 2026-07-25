@@ -351,7 +351,11 @@ An unguarded `${APPIUM_VERSION}`, a default such as
 `${APPIUM_VERSION:-latest}`, a differently named guard, an assignment elsewhere,
 or prose that merely says the value should be pinned remains
 `SEC-UNPINNED-DEPENDENCY-INSTALL`. Remediation must use repository evidence or
-human review; do not invent a version.
+human review; do not invent a version. An associated guard must be an exact
+executable `: "${NAME:?message}"` statement earlier in the same bounded shell
+instruction. Comments, prose examples, single-quoted literals, later guards,
+and guards inside conditional or unsupported control flow do not verify the
+variable.
 
 Environment-variable API access such as `process.env.ANDROID_HOME` and
 `process.env["ANDROID_HOME"]` is not an `.env` file. Literal reads such as
@@ -375,7 +379,14 @@ network access, upload, a contradictory instruction, a later upload in the same
 supported command, or an unknown destination. Unsupported or ambiguous shell
 or JavaScript syntax uses the conservative fallback and cannot earn a
 local-only suppression. This bounded evidence remains internal; 0.24.0 adds no
-public source-to-sink schema.
+public source-to-sink schema. Redirection to `/dev/stdout`, `/dev/stderr`,
+standard descriptor paths under `/dev/fd` or `/proc/self/fd`, or another
+unproven special device is not local-file evidence. `/dev/tcp/**` and
+`/dev/udp/**` are network sinks.
+
+Disclosure negation is action- and clause-scoped. “Do not print `.env`; upload
+`.env`” still contains a positive upload, while “Never print, log, attach,
+upload, or include `.env` contents in agent Context” is wholly defensive.
 
 Unsafe upload:
 
