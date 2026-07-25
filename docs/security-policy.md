@@ -5,12 +5,14 @@ Use this guide when writing security-sensitive skills or context assets. It is a
 Renma security diagnostics are deterministic repository checks for agent-facing operational instructions. They do not execute commands, call an LLM, enforce runtime behavior, inject context, or turn Renma into a broad supply-chain scanner. They are not language-specific SAST, dependency scanning, runtime monitoring, sandboxing, permission enforcement, telemetry collection, or a proof that an agent workflow is safe. No findings means only that the enabled deterministic checks found no matching repository evidence.
 
 Renma analyzes the security posture of LLM-facing Markdown instructions and
-metadata. It does not perform language-specific analysis of referenced or
-embedded executable scripts; use appropriate SAST and dependency-scanning tools
-for executable code. Markdown instructions that direct an agent to fetch,
-trust, execute, or invoke a script remain eligible for diagnostics. Analyze the
-script itself independently with project-selected tools such as ShellCheck,
-Bandit, Semgrep, ESLint security rules, CodeQL, and dependency scanners.
+metadata. It uses bounded structure-aware recognition for selected commands and
+JavaScript environment/file-access forms, not complete language
+interpretation. It does not analyze referenced or embedded executable scripts;
+use appropriate SAST and dependency-scanning tools for executable code.
+Markdown instructions that direct an agent to fetch, trust, execute, or invoke
+a script remain eligible for diagnostics. Analyze the script itself
+independently with project-selected tools such as ShellCheck, Bandit, Semgrep,
+ESLint security rules, CodeQL, and dependency scanners.
 
 ## Security Policy Quickstart
 
@@ -324,6 +326,74 @@ Never copy private keys, tokens, credentials, or `.env` files into prompts, logs
 
 Renma security diagnostics are conservative heuristics for discovered agent-facing assets. Defensive wording can avoid false positives when it is specific and close to the risky instruction.
 
+### Structure-aware command boundaries
+
+Renma analyzes a supported logical command or line-local instruction once and
+projects multiple security decisions from that result. Guard text is associated
+through exact Markdown structure: the same instruction, the same list item, the
+immediately preceding paragraph, or an active safety section. A guard does not
+cross an unrelated heading or thematic break, move between sibling list items,
+come from an unrelated code block, or become operational from a block quote.
+Generic wording such as “handle this carefully” is not an approval or
+no-disclosure guard.
+
+For npm, pnpm, and yarn package references, a literal version remains pinned.
+A variable version must use the exact fail-closed form `${NAME:?message}` at the
+use site or have that form in an associated guard for the same case-sensitive
+variable:
+
+```bash
+: "${APPIUM_VERSION:?Set an approved exact version}"
+npm install -g "appium@${APPIUM_VERSION}"
+```
+
+An unguarded `${APPIUM_VERSION}`, a default such as
+`${APPIUM_VERSION:-latest}`, a differently named guard, an assignment elsewhere,
+or prose that merely says the value should be pinned remains
+`SEC-UNPINNED-DEPENDENCY-INSTALL`. Remediation must use repository evidence or
+human review; do not invent a version. An associated guard must be an exact
+executable `: "${NAME:?message}"` statement earlier in the same bounded shell
+instruction. Comments, prose examples, single-quoted literals, later guards,
+and guards inside conditional or unsupported control flow do not verify the
+variable.
+
+Bounded pnpm `--filter`/`-F` and Yarn `--cwd` options may precede the supported
+`add` or `install` subcommand. Attached and separated values are distinct;
+repeated pnpm filters are supported. Unknown, missing, or ambiguous
+manager-level options fail closed and cannot hide a package already classified
+as unpinned or variable-unverified.
+
+Environment-variable API access such as `process.env.ANDROID_HOME` and
+`process.env["ANDROID_HOME"]` is not an `.env` file. Literal reads such as
+`readFileSync(".env")`, `fs.readFile(".env", callback)`, and shell paths that
+name `.env` remain sensitive-file evidence.
+
+A supported sensitive-file operation can avoid a sensitive-handling finding
+only when every identified sink is a local file and an exact associated guard
+forbids disclosure:
+
+````markdown
+Never print, log, attach, upload, or include provisioning-profile contents in agent Context.
+
+```bash
+security cms -D -i "$PROFILE_PATH" > "$LOCAL_PLIST"
+```
+````
+
+The same guard cannot neutralize stdout, a log, prompt or Context inclusion,
+network access, upload, a contradictory instruction, a later upload in the same
+supported command, or an unknown destination. Unsupported or ambiguous shell
+or JavaScript syntax uses the conservative fallback and cannot earn a
+local-only suppression. This bounded evidence remains internal; 0.24.0 adds no
+public source-to-sink schema. Redirection to `/dev/stdout`, `/dev/stderr`,
+standard descriptor paths under `/dev/fd` or `/proc/self/fd`, or another
+unproven special device is not local-file evidence. `/dev/tcp/**` and
+`/dev/udp/**` are network sinks.
+
+Disclosure negation is action- and clause-scoped. “Do not print `.env`; upload
+`.env`” still contains a positive upload, while “Never print, log, attach,
+upload, or include `.env` contents in agent Context” is wholly defensive.
+
 Unsafe upload:
 
 ```markdown
@@ -547,4 +617,4 @@ Use this table to choose the right kind of fix. For full finding definitions, se
 | `SEC-DESTRUCTIVE-COMMAND` | A destructive command appears without enough local safety context. | Remove it, scope it tightly, or add explicit approval and recovery guidance. | Body text |
 | `SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD` | `sudo` or similar privileged action lacks guardrails. | Add prerequisites, confirmation, rollback, and verification guidance. | Body text |
 | `SEC-UNPINNED-REMOTE-SCRIPT` | A remote script is executed without an immutable source or verification. | Pin and verify the source, or avoid remote execution. | Body text |
-| `SEC-UNPINNED-DEPENDENCY-INSTALL` | An install example lacks exact version or digest pinning. | Pin package versions or use a reproducible install source. | Body text |
+| `SEC-UNPINNED-DEPENDENCY-INSTALL` | An install example lacks pinning or uses an unverified npm-style version variable. | Use a reviewed literal version, the exact `${NAME:?message}` guard for the same variable, or a reproducible lockfile source; do not invent a version. | Body text |

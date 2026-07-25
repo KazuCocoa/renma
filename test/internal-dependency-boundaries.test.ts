@@ -67,6 +67,13 @@ const DIRECTORY_LAYERS: ReadonlyMap<string, LayerClassification> = new Map([
     },
   ],
   [
+    "src/security-command",
+    {
+      layer: "analysis",
+      reason: "pure structure-aware security command analysis",
+    },
+  ],
+  [
     "src/evidence",
     { layer: "evidence", reason: "reusable evidence construction" },
   ],
@@ -345,6 +352,31 @@ test("same-layer and lower-layer dependencies are valid", () => {
       },
     ]).violations,
     [],
+  );
+});
+
+test("security command modules remain in the pure analysis layer", () => {
+  assert.deepEqual(
+    inspectArchitecture([
+      {
+        filePath: "src/security-command/analyze.ts",
+        sourceText: 'import { parse } from "../markdown-security-view.js";',
+      },
+      {
+        filePath: "src/security-command/guards.ts",
+        sourceText:
+          'import type { Span } from "../security-destination/types.js";',
+      },
+    ]).violations,
+    [],
+  );
+  assertViolation(
+    "src/security-command/analyze.ts",
+    'import { run } from "../commands/scan.js";',
+    "src/commands/scan.ts",
+    "runtime-import",
+    "analysis",
+    "commands",
   );
 });
 

@@ -23,6 +23,12 @@ import {
   type MarkdownSemanticUnit,
 } from "./markdown-security-view.js";
 import {
+  analyzeSecurityCommand,
+  hasPositiveDisclosureAction,
+  positiveDisclosureActions,
+  type SecurityCommandAnalysis,
+} from "./security-command/index.js";
+import {
   analyzeDestinations,
   analyzeLogicalShellCommands,
   isNetworkInstruction,
@@ -585,17 +591,17 @@ const RULES = {
     whyItMatters:
       "Unpinned dependencies make agent setup non-reproducible and can unexpectedly pull compromised or breaking packages.",
     remediation:
-      "Pin package, image, and formula versions or refer to the repository lockfile.",
+      "Pin package, image, and formula versions, use an accepted fail-closed guard for npm-style version variables, or refer to the repository lockfile.",
     constraints: [
       "Do not pick arbitrary versions without checking the repository's intended support matrix.",
       "Preserve existing package manager conventions.",
     ],
     verificationSteps: [
       "Run renma scan.",
-      "Confirm dependency install instructions are pinned or lockfile-based.",
+      "Confirm dependency install instructions are literal-pinned, fail-closed variable-guarded, or lockfile-based.",
     ],
     llmHint:
-      "Pin packages, images, or formulas in setup instructions, or route through the repository's lockfile command.",
+      "Use a reviewed literal version, an exact ${NAME:?message} guard for the same npm-style version variable, or the repository's lockfile command. Do not invent a version.",
     confidence: "medium",
     riskClass: "suspicious",
   },
@@ -882,6 +888,33 @@ function securityFindingsForDocument(
   const logicalCommandByLine = new Map<number, LogicalShellCommand>();
   const destinationAnalysisByLogicalCommand =
     analyzeLogicalShellCommands(logicalCommands);
+  const securityAnalysisByLogicalCommand = new Map(
+    logicalCommands.map((command) => {
+      const destinationAnalysis = requireLogicalDestinationAnalysis(
+        command,
+        destinationAnalysisByLogicalCommand.get(command),
+      );
+      const startLineIndex = command.memberLineIndexes[0] ?? 0;
+      const language = markdownView.languageAt(startLineIndex);
+      return [
+        command,
+        analyzeSecurityCommand({
+          source: {
+            text: command.input,
+            startLine: command.shellProjection.sourceBaseLine,
+            endLine:
+              (command.memberLineIndexes[
+                command.memberLineIndexes.length - 1
+              ] ?? startLineIndex) + 1,
+            lines: command.sourceLines,
+            ...(language === undefined ? {} : { language }),
+          },
+          guards: markdownView.associatedGuardEvidence(startLineIndex),
+          destinationAnalysis,
+        }),
+      ] as const;
+    }),
+  );
   for (const command of logicalCommands) {
     for (const lineIndex of command.memberLineIndexes) {
       logicalCommandByLine.set(lineIndex, command);
@@ -975,10 +1008,27 @@ function securityFindingsForDocument(
       logicalCommand === undefined
         ? undefined
         : destinationAnalysisByLogicalCommand.get(logicalCommand);
-    let cachedLineDestinationAnalysis: DestinationAnalysis | undefined;
+    const logicalSecurityAnalysis =
+      logicalCommand === undefined
+        ? undefined
+        : securityAnalysisByLogicalCommand.get(logicalCommand);
+    let cachedLineSecurityAnalysis: SecurityCommandAnalysis | undefined;
+    const lineSecurityAnalysis = (): SecurityCommandAnalysis => {
+      const language = markdownView.languageAt(index);
+      cachedLineSecurityAnalysis ??= analyzeSecurityCommand({
+        source: {
+          text: line,
+          startLine: lineNumber,
+          endLine: lineNumber,
+          lines: [line],
+          ...(language === undefined ? {} : { language }),
+        },
+        guards: markdownView.associatedGuardEvidence(index),
+      });
+      return cachedLineSecurityAnalysis;
+    };
     const lineDestinationAnalysis = (): DestinationAnalysis => {
-      cachedLineDestinationAnalysis ??= analyzeDestinations(line);
-      return cachedLineDestinationAnalysis;
+      return lineSecurityAnalysis().destinationAnalysis;
     };
 
     if (!quotedProse) {
@@ -1014,8 +1064,24 @@ function securityFindingsForDocument(
         }
       }
       detections.push(...disallowedCommandDetections(line, lineNumber, policy));
-      if (!commandLine || referencesSensitiveFile(line)) {
-        detections.push(...sensitiveDataDetections(line, lineNumber, policy));
+      if (logicalCommand === undefined) {
+        detections.push(
+          ...sensitiveDataDetections(
+            line,
+            evidence,
+            policy,
+            lineSecurityAnalysis(),
+          ),
+        );
+      } else if (logicalCommandStart && logicalSecurityAnalysis !== undefined) {
+        detections.push(
+          ...sensitiveDataDetections(
+            logicalCommand.shellProjection.projection,
+            logicalShellCommandEvidence(logicalCommand),
+            policy,
+            logicalSecurityAnalysis,
+          ),
+        );
       }
       if (logicalCommand === undefined) {
         if (
@@ -1056,7 +1122,16 @@ function securityFindingsForDocument(
 
     if (commandLine && !quotedProse) {
       detections.push(
-        ...commandDetections(line, lineNumber, hasCommandRiskGuard),
+        ...commandDetections(
+          line,
+          lineNumber,
+          hasCommandRiskGuard,
+          logicalCommand === undefined
+            ? lineSecurityAnalysis()
+            : logicalCommandStart
+              ? logicalSecurityAnalysis
+              : undefined,
+        ),
       );
     }
 
@@ -1193,8 +1268,15 @@ function policyDetections(
   const shouldAnalyzeDestinations = input.scope !== "line-local";
   const analyzeLineLocal = input.scope !== "destination";
   const analysis = input.scope === "line-local" ? undefined : input.analysis;
-  const defensiveAction = isDefensiveActionInstruction(line);
-  const safeOrGuarded = isDefensiveOrGuardedActionInstruction(line);
+  const positiveActions = positiveDisclosureActions(line);
+  const positiveDestinationAction = positiveActions.some(
+    ({ kind }) => kind === "network" || kind === "external-upload",
+  );
+  const defensiveAction =
+    isDefensiveActionInstruction(line) && positiveActions.length === 0;
+  const safeOrGuarded =
+    GUARDED_ACTION_RE.test(line) ||
+    (defensiveAction && !positiveDestinationAction);
   const invalidNetworkAllowlist = policy.invalidDeclared.has(
     "approvedNetworkDestinations",
   );
@@ -1279,7 +1361,7 @@ function policyDetections(
     analyzeLineLocal &&
     policy.secretsAllowed === false &&
     SECRET_WORD_RE.test(line) &&
-    !SAFE_NEGATION_RE.test(line)
+    !isSafeSensitiveHandlingInstruction(line)
   ) {
     detections.push({
       metadata: RULES.instructionViolatesPolicy,
@@ -1348,25 +1430,47 @@ function policyContradictions(policy: SecurityPolicy): Detection[] {
 
 function sensitiveDataDetections(
   line: string,
-  lineNumber: number,
+  evidence: DetectionEvidence,
   policy: SecurityPolicy,
+  analysis: SecurityCommandAnalysis,
 ): Detection[] {
-  const detections: Detection[] = [];
-  const sensitiveFile = referencesSensitiveFile(line);
+  if (analysis.support === "fallback-required") {
+    return fallbackSensitiveDataDetections(line, evidence, policy, analysis);
+  }
 
-  if (sensitiveFile && !isSafeSensitiveHandlingInstruction(line)) {
+  const detections: Detection[] = [];
+  const sensitiveSources = analysis.sensitiveSources.filter(
+    ({ kind }) => kind !== "environment-variable-api",
+  );
+  const sensitiveFile = sensitiveSources.length > 0;
+  const hasDisclosureSink = analysis.sinks.some(({ kind }) =>
+    [
+      "stdout-or-log",
+      "prompt-or-context",
+      "network",
+      "external-upload",
+    ].includes(kind),
+  );
+  const safeHandling =
+    analysis.localOnlySensitiveOperation ||
+    (!hasDisclosureSink && isSafeSensitiveHandlingInstruction(line));
+  const sourceEvidence =
+    sensitiveSources.length === 0
+      ? evidence
+      : detectionEvidenceForSource(analysis, sensitiveSources[0] ?? undefined);
+
+  if (sensitiveFile && !safeHandling) {
     detections.push({
       metadata: RULES.sensitiveFileReference,
       severity: "high",
-      startLine: lineNumber,
-      snippet: line,
+      ...sourceEvidence,
     });
   }
 
   const exposesSecret =
-    SECRET_ACTION_RE.test(line) &&
+    (SECRET_ACTION_RE.test(line) || hasDisclosureSink) &&
     (SECRET_WORD_RE.test(line) || sensitiveFile) &&
-    !isSafeSensitiveHandlingInstruction(line);
+    !safeHandling;
 
   if (exposesSecret) {
     detections.push({
@@ -1375,12 +1479,90 @@ function sensitiveDataDetections(
         policy.secretsAllowed === false || policy.externalUploadAllowed === true
           ? "critical"
           : "high",
-      startLine: lineNumber,
-      snippet: line,
+      ...sourceEvidence,
     });
   }
 
   return detections;
+}
+
+function fallbackSensitiveDataDetections(
+  line: string,
+  evidence: DetectionEvidence,
+  policy: SecurityPolicy,
+  analysis: SecurityCommandAnalysis,
+): Detection[] {
+  const detections: Detection[] = [];
+  const sensitiveSources = analysis.sensitiveSources.filter(
+    ({ kind }) => kind !== "environment-variable-api",
+  );
+  const sensitiveFile =
+    referencesSensitiveFile(line) || sensitiveSources.length > 0;
+  const hasDisclosureSink = analysis.sinks.some(({ kind }) =>
+    [
+      "stdout-or-log",
+      "prompt-or-context",
+      "network",
+      "external-upload",
+    ].includes(kind),
+  );
+  const safeHandling =
+    !hasDisclosureSink && isSafeSensitiveHandlingInstruction(line);
+  const sourceEvidence =
+    sensitiveSources.length === 0
+      ? evidence
+      : detectionEvidenceForSource(analysis, sensitiveSources[0] ?? undefined);
+
+  if (sensitiveFile && !safeHandling) {
+    detections.push({
+      metadata: RULES.sensitiveFileReference,
+      severity: "high",
+      ...sourceEvidence,
+    });
+  }
+
+  const exposesSecret =
+    (SECRET_ACTION_RE.test(line) || hasDisclosureSink) &&
+    (SECRET_WORD_RE.test(line) || sensitiveFile) &&
+    !safeHandling;
+  if (exposesSecret) {
+    detections.push({
+      metadata: RULES.secretMaterialInstruction,
+      severity:
+        policy.secretsAllowed === false || policy.externalUploadAllowed === true
+          ? "critical"
+          : "high",
+      ...sourceEvidence,
+    });
+  }
+  return detections;
+}
+
+function detectionEvidenceForSource(
+  analysis: SecurityCommandAnalysis,
+  source: SecurityCommandAnalysis["sensitiveSources"][number] | undefined,
+): DetectionEvidence {
+  if (source === undefined) {
+    return {
+      startLine: analysis.source.startLine,
+      endLine: analysis.source.endLine,
+      snippet: analysis.source.text,
+    };
+  }
+  const startLine = source.sourceSpan.startLine ?? analysis.source.startLine;
+  const endLine = source.sourceSpan.endLine ?? startLine;
+  const relativeStart = Math.max(0, startLine - analysis.source.startLine);
+  const relativeEnd = Math.max(
+    relativeStart,
+    endLine - analysis.source.startLine,
+  );
+  return {
+    startLine,
+    ...(endLine === startLine ? {} : { endLine }),
+    snippet: analysis.source.lines
+      .slice(relativeStart, relativeEnd + 1)
+      .join("\n"),
+  };
 }
 
 function referencesSensitiveFile(line: string): boolean {
@@ -1388,6 +1570,7 @@ function referencesSensitiveFile(line: string): boolean {
 }
 
 function isSafeSensitiveHandlingInstruction(line: string): boolean {
+  if (hasPositiveDisclosureAction(line)) return false;
   return (
     SAFE_NEGATION_RE.test(line) ||
     /\b(never|do not|don't|avoid|exclude|skip)\b.{0,50}\b(upload|send|share|attach|copy|paste|include|print|cat|echo|log|dump)\b/i.test(
@@ -1406,7 +1589,13 @@ function networkAndUploadDetections(
   analysis: DestinationAnalysis,
 ): Detection[] {
   const detections: Detection[] = [];
-  if (isDefensiveOrGuardedActionInstruction(line)) {
+  const positiveDestinationAction = positiveDisclosureActions(line).some(
+    ({ kind }) => kind === "network" || kind === "external-upload",
+  );
+  if (
+    GUARDED_ACTION_RE.test(line) ||
+    (isDefensiveActionInstruction(line) && !positiveDestinationAction)
+  ) {
     return detections;
   }
 
@@ -1470,6 +1659,7 @@ function commandDetections(
   line: string,
   lineNumber: number,
   hasCommandRiskGuard: boolean,
+  analysis?: SecurityCommandAnalysis,
 ): Detection[] {
   const detections: Detection[] = [];
   const defensiveAction = isDefensiveOrGuardedActionInstruction(line);
@@ -1488,7 +1678,19 @@ function commandDetections(
     });
   }
 
-  const unpinnedInstall = unpinnedDependencyInstall(line);
+  const structuredUnpinnedInstall =
+    analysis?.npmStyleInstallCommand === true &&
+    analysis.dependencyInstalls.some(
+      ({ pinning }) =>
+        pinning === "unpinned" || pinning === "variable-unverified",
+    );
+  const requiresDependencyFallback =
+    analysis === undefined ||
+    analysis.support === "fallback-required" ||
+    !analysis.npmStyleInstallCommand;
+  const unpinnedInstall =
+    structuredUnpinnedInstall ||
+    (requiresDependencyFallback && unpinnedDependencyInstall(line));
   if (unpinnedInstall && !defensiveAction) {
     detections.push({
       metadata: RULES.unpinnedDependencyInstall,
@@ -2429,13 +2631,21 @@ function splitCommandArgs(value: string): string[] {
 }
 
 function isUnpinnedNpmPackage(arg: string): boolean {
-  if (isPlaceholder(arg) || arg.startsWith("$") || arg.startsWith(".")) {
+  const normalized = arg.replace(/^(['"])(.*)\1$/u, "$2");
+  if (
+    isPlaceholder(normalized) ||
+    normalized.startsWith(".") ||
+    /^\$[A-Za-z_][A-Za-z0-9_]*$/u.test(normalized)
+  ) {
     return false;
   }
-  const packageName = arg.startsWith("@")
-    ? arg.split("@").slice(0, 2).join("@")
-    : arg.split("@")[0];
-  return packageName === arg;
+  if (normalized.includes("$(")) return true;
+  const packageName = normalized.startsWith("@")
+    ? normalized.split("@").slice(0, 2).join("@")
+    : normalized.split("@")[0];
+  if (packageName === normalized) return true;
+  const version = normalized.slice(packageName?.length ?? 0);
+  return version.includes("$");
 }
 
 function isUnpinnedPythonPackage(arg: string): boolean {
