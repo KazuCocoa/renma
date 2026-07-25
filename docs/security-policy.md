@@ -357,6 +357,12 @@ instruction. Comments, prose examples, single-quoted literals, later guards,
 and guards inside conditional or unsupported control flow do not verify the
 variable.
 
+Bounded pnpm `--filter`/`-F` and Yarn `--cwd` options may precede the supported
+`add` or `install` subcommand. Attached and separated values are distinct;
+repeated pnpm filters are supported. Unknown, missing, or ambiguous
+manager-level options fail closed and cannot hide a package already classified
+as unpinned or variable-unverified.
+
 Environment-variable API access such as `process.env.ANDROID_HOME` and
 `process.env["ANDROID_HOME"]` is not an `.env` file. Literal reads such as
 `readFileSync(".env")`, `fs.readFile(".env", callback)`, and shell paths that

@@ -98,6 +98,58 @@ npm install --registry=https://registry.npmjs.org appium@3.0.0
   );
 });
 
+test("recognized manager-level options preserve dependency findings before the subcommand", () => {
+  const findings = dependencyFindings(`
+\`\`\`bash
+pnpm --filter web add webdriverio
+pnpm --filter=web add webdriverio
+pnpm -F web add webdriverio
+pnpm -F=web add webdriverio
+pnpm --filter web --filter=api -F tools add webdriverio appium@3.0.0
+yarn --cwd packages/app add detox
+yarn --cwd=packages/app add detox
+pnpm --filter web add "webdriverio@\${WEBDRIVERIO_VERSION}"
+pnpm --filter= add webdriverio
+pnpm --unknown=web add webdriverio
+pnpm --unknown=web add "webdriverio@\${WEBDRIVERIO_VERSION}"
+pnpm --filter web add webdriverio@9.1.0
+yarn --cwd packages/app add detox@20.0.0
+\`\`\`
+`);
+
+  assert.deepEqual(
+    findings.map(({ evidence }) => evidence.snippet),
+    [
+      "pnpm --filter web add webdriverio",
+      "pnpm --filter=web add webdriverio",
+      "pnpm -F web add webdriverio",
+      "pnpm -F=web add webdriverio",
+      "pnpm --filter web --filter=api -F tools add webdriverio appium@3.0.0",
+      "yarn --cwd packages/app add detox",
+      "yarn --cwd=packages/app add detox",
+      'pnpm --filter web add "webdriverio@${WEBDRIVERIO_VERSION}"',
+      "pnpm --filter= add webdriverio",
+      "pnpm --unknown=web add webdriverio",
+      'pnpm --unknown=web add "webdriverio@${WEBDRIVERIO_VERSION}"',
+    ],
+  );
+});
+
+test("manager-level options remain classified across shell continuations", () => {
+  const findings = dependencyFindings(`
+\`\`\`bash
+pnpm --filter web --filter=api add \\
+  webdriverio appium@3.0.0
+\`\`\`
+`);
+
+  assert.equal(findings.length, 1);
+  assert.equal(
+    findings[0]?.evidence.snippet,
+    "pnpm --filter web --filter=api add \\",
+  );
+});
+
 test("only an executable bounded fail-closed statement verifies a version variable", () => {
   const invalid = [
     `\`\`\`bash

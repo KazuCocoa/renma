@@ -1679,8 +1679,7 @@ function commandDetections(
   }
 
   const structuredUnpinnedInstall =
-    analysis?.support === "supported" &&
-    analysis.npmStyleInstallCommand &&
+    analysis?.npmStyleInstallCommand === true &&
     analysis.dependencyInstalls.some(
       ({ pinning }) =>
         pinning === "unpinned" || pinning === "variable-unverified",

@@ -98,6 +98,97 @@ test("npm-style options keep attached and separated values out of package projec
   );
 });
 
+test("recognized manager-level options locate supported dependency subcommands", () => {
+  const fixtures = [
+    ["pnpm --filter web add webdriverio", ["webdriverio"]],
+    ["pnpm --filter=web add webdriverio", ["webdriverio"]],
+    ["pnpm -F web add webdriverio", ["webdriverio"]],
+    ["pnpm -F=web add webdriverio", ["webdriverio"]],
+    [
+      "pnpm --filter web --filter=api -F tools add webdriverio appium@3.0.0",
+      ["webdriverio", "appium"],
+    ],
+    ["yarn --cwd packages/app add detox", ["detox"]],
+    ["yarn --cwd=packages/app add detox", ["detox"]],
+  ] as const;
+
+  for (const [input, packageNames] of fixtures) {
+    const analysis = shellAnalysis(input);
+    assert.equal(analysis.support, "supported", input);
+    assert.equal(analysis.npmStyleInstallCommand, true, input);
+    assert.deepEqual(
+      analysis.dependencyInstalls.map(({ packageName }) => packageName),
+      packageNames,
+      input,
+    );
+  }
+});
+
+test("manager-level option projection preserves pinning and fallback evidence", () => {
+  const pinned = [
+    shellAnalysis("pnpm --filter web add webdriverio@9.1.0"),
+    shellAnalysis("yarn --cwd packages/app add detox@20.0.0"),
+  ];
+  for (const analysis of pinned) {
+    assert.equal(analysis.support, "supported");
+    assert.deepEqual(
+      analysis.dependencyInstalls.map(({ pinning }) => pinning),
+      ["pinned-literal"],
+    );
+  }
+
+  const variable = shellAnalysis(
+    'pnpm -F web add "webdriverio@${WEBDRIVERIO_VERSION}"',
+  );
+  assert.equal(variable.dependencyInstalls[0]?.pinning, "variable-unverified");
+
+  const missingValue = shellAnalysis("pnpm --filter= add webdriverio");
+  const unknownAttached = shellAnalysis("pnpm --unknown=web add webdriverio");
+  const unknownAttachedVariable = shellAnalysis(
+    'pnpm --unknown=web add "webdriverio@${WEBDRIVERIO_VERSION}"',
+  );
+  const unknownSeparated = shellAnalysis(
+    "yarn --unknown packages/app add detox",
+  );
+  for (const analysis of [
+    missingValue,
+    unknownAttached,
+    unknownAttachedVariable,
+    unknownSeparated,
+  ]) {
+    assert.equal(analysis.support, "fallback-required");
+    assert.equal(analysis.npmStyleInstallCommand, true);
+  }
+  assert.equal(missingValue.dependencyInstalls[0]?.pinning, "unpinned");
+  assert.equal(unknownAttached.dependencyInstalls[0]?.pinning, "unpinned");
+  assert.equal(
+    unknownAttachedVariable.dependencyInstalls[0]?.pinning,
+    "variable-unverified",
+  );
+  assert.deepEqual(unknownSeparated.dependencyInstalls, []);
+});
+
+test("manager-level option analysis is deterministic across continuations", () => {
+  const input = `pnpm --filter web --filter=api add \\
+  webdriverio "appium@\${APPIUM_VERSION}"`;
+  const first = shellAnalysis(input);
+  const second = shellAnalysis(input);
+
+  assert.deepEqual(first, second);
+  assert.equal(first.support, "supported");
+  assert.deepEqual(
+    first.dependencyInstalls.map(({ packageName, pinning }) => ({
+      packageName,
+      pinning,
+    })),
+    [
+      { packageName: "webdriverio", pinning: "unpinned" },
+      { packageName: "appium", pinning: "variable-unverified" },
+    ],
+  );
+  assert.equal(first.dependencyInstalls[0]?.sourceSpan.startLine, 11);
+});
+
 test("incomplete npm-style candidate projection requires conservative fallback", () => {
   const unclassified = shellAnalysis(
     "npm install appium github:owner/repository",
@@ -471,12 +562,13 @@ function shellAnalysis(
   text: string,
   guards: Parameters<typeof analyzeSecurityCommand>[0]["guards"] = [],
 ): SecurityCommandAnalysis {
+  const lines = text.split("\n");
   return analyzeSecurityCommand({
     source: {
       text,
       startLine: 10,
-      endLine: 10,
-      lines: [text],
+      endLine: 9 + lines.length,
+      lines,
       language: "bash",
     },
     guards,

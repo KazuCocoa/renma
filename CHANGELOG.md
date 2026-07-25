@@ -32,8 +32,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   verification from a variable name, assignment, default, or ambient
   environment and does not invent a remediation version.
 - Corrected npm-style attached option values so they do not consume the next
-  package candidate, retained separated option-value handling, and made
-  incomplete or ambiguous candidate projections select conservative fallback.
+  package candidate, retained separated option-value handling, and recognized
+  bounded pnpm filter and Yarn working-directory options before their
+  subcommands. Incomplete or ambiguous candidate and manager-option projections
+  select conservative fallback without discarding reliable package evidence.
 - Changed sensitive-file decisions to distinguish actual environment files,
   keys, certificates/signing material, credential stores, cloud credentials,
   and other sensitive files from environment-variable API access.

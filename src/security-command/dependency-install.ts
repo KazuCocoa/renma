@@ -14,7 +14,13 @@ type DependencyClassification = {
   supported: boolean;
 };
 
+type DependencyCommand = {
+  argumentsStart?: number;
+  supported: boolean;
+};
+
 const OPTION_WITH_VALUE = new Set([
+  "-F",
   "--cache",
   "--cache-folder",
   "--cwd",
@@ -51,6 +57,13 @@ const OPTION_WITHOUT_VALUE = new Set([
   "--save-peer",
   "--workspace-root",
 ]);
+const MANAGER_OPTION_WITH_VALUE: Readonly<
+  Record<DependencyInstallAnalysis["packageManager"], ReadonlySet<string>>
+> = {
+  npm: new Set(),
+  pnpm: new Set(["--filter", "-F"]),
+  yarn: new Set(["--cwd"]),
+};
 const VARIABLE_RE =
   /\$(?:\{([A-Za-z_][A-Za-z0-9_]*)(?:(:)([-?])([^}]*))?\}|([A-Za-z_][A-Za-z0-9_]*))/gu;
 
@@ -75,8 +88,8 @@ export function classifyDependencyInstalls(
     npmStyleInstallCommand = true;
     if (!command.supported) {
       supported = false;
-      continue;
     }
+    if (command.argumentsStart === undefined) continue;
 
     let optionsEnded = false;
     for (
@@ -154,15 +167,56 @@ function dependencyCommand(
   tokens: readonly ShellToken[],
   managerIndex: number,
   manager: DependencyInstallAnalysis["packageManager"],
-): { argumentsStart: number; supported: boolean } | undefined {
-  const first = tokens[managerIndex + 1];
+): DependencyCommand | undefined {
+  let cursor = managerIndex + 1;
+  let sawManagerOption = false;
+
+  while (tokens[cursor]?.kind === "word") {
+    const option = tokens[cursor];
+    if (option === undefined || !option.value.startsWith("-")) break;
+    sawManagerOption = true;
+    const projection = consumeManagerOption(tokens, cursor, manager);
+    if (projection === undefined) {
+      const command = option.value.includes("=")
+        ? supportedDependencyCommand(tokens, cursor + 1, manager)
+        : undefined;
+      return {
+        ...(command === undefined ? {} : command),
+        supported: false,
+      };
+    }
+    if (!projection.supported) {
+      const command =
+        projection.nextIndex === cursor + 1
+          ? supportedDependencyCommand(tokens, projection.nextIndex, manager)
+          : undefined;
+      return {
+        ...(command === undefined ? {} : command),
+        supported: false,
+      };
+    }
+    cursor = projection.nextIndex;
+  }
+
+  const command = supportedDependencyCommand(tokens, cursor, manager);
+  if (command !== undefined) {
+    return { ...command, supported: true };
+  }
+  return sawManagerOption ? { supported: false } : undefined;
+}
+
+function supportedDependencyCommand(
+  tokens: readonly ShellToken[],
+  commandIndex: number,
+  manager: DependencyInstallAnalysis["packageManager"],
+): Pick<DependencyCommand, "argumentsStart"> | undefined {
+  const first = tokens[commandIndex];
   if (first?.kind !== "word") return undefined;
   if (manager === "yarn" && first.value.toLowerCase() === "global") {
-    const add = tokens[managerIndex + 2];
-    if (add?.kind !== "word" || add.value.toLowerCase() !== "add") {
-      return undefined;
-    }
-    return { argumentsStart: managerIndex + 3, supported: true };
+    const add = tokens[commandIndex + 1];
+    return add?.kind === "word" && add.value.toLowerCase() === "add"
+      ? { argumentsStart: commandIndex + 2 }
+      : undefined;
   }
   const command = first.value.toLowerCase();
   const accepted =
@@ -171,13 +225,37 @@ function dependencyCommand(
       : manager === "pnpm"
         ? command === "install" || command === "add"
         : command === "add";
-  if (accepted) {
-    return { argumentsStart: managerIndex + 2, supported: true };
+  return accepted ? { argumentsStart: commandIndex + 1 } : undefined;
+}
+
+function consumeManagerOption(
+  tokens: readonly ShellToken[],
+  optionIndex: number,
+  manager: DependencyInstallAnalysis["packageManager"],
+): { nextIndex: number; supported: boolean } | undefined {
+  const option = tokens[optionIndex];
+  if (option?.kind !== "word") return undefined;
+  const equalsAt = option.value.indexOf("=");
+  const optionName =
+    equalsAt < 0 ? option.value : option.value.slice(0, equalsAt);
+  if (!MANAGER_OPTION_WITH_VALUE[manager].has(optionName)) {
+    return undefined;
   }
-  if (command.startsWith("-")) {
-    return { argumentsStart: managerIndex + 2, supported: false };
+  if (equalsAt >= 0) {
+    return {
+      nextIndex: optionIndex + 1,
+      supported: equalsAt < option.value.length - 1,
+    };
   }
-  return undefined;
+  const value = tokens[optionIndex + 1];
+  if (
+    value?.kind !== "word" ||
+    value.value.length === 0 ||
+    value.value.startsWith("-")
+  ) {
+    return { nextIndex: optionIndex + 1, supported: false };
+  }
+  return { nextIndex: optionIndex + 2, supported: true };
 }
 
 function classifyPackageReference(
