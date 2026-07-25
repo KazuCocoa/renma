@@ -102,16 +102,14 @@ export interface AssetDelta {
   id: string;
   path?: string | undefined;
   kind?: string | undefined;
-  owner?: string | undefined;
-  declaredOwner?: string | null | undefined;
-  effectiveOwner?: string | null | undefined;
+  declaredOwner: string | null;
+  effectiveOwner: string | null;
   status?: string | undefined;
 }
 
 const COMPARABLE_ASSET_FIELDS = [
   "path",
   "kind",
-  "owner",
   "declaredOwner",
   "effectiveOwner",
   "status",
@@ -898,21 +896,14 @@ function assetMap(nodes: unknown[]): Map<string, AssetDelta> {
   return stableMap(
     nodes.map((node) => {
       const ownership = objectField(node, "ownership");
-      const declaredOwner = optionalNullableStringField(
-        ownership,
-        "declaredOwner",
-      );
-      const effectiveOwner = optionalNullableStringField(
-        ownership,
-        "effectiveOwner",
-      );
-      const asset = {
+      const asset: AssetDelta = {
         id: firstString(node, ["id", "path", "sourcePath"]),
         path: firstOptionalString(node, ["sourcePath", "path"]),
         kind: firstOptionalString(node, ["kind"]),
-        owner: firstOptionalString(node, ["owner"]),
-        ...(declaredOwner !== undefined ? { declaredOwner } : {}),
-        ...(effectiveOwner !== undefined ? { effectiveOwner } : {}),
+        declaredOwner:
+          optionalNullableStringField(ownership, "declaredOwner") ?? null,
+        effectiveOwner:
+          optionalNullableStringField(ownership, "effectiveOwner") ?? null,
         status: firstOptionalString(node, ["status"]),
       };
       return [asset.id, asset] as const;

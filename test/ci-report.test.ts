@@ -264,32 +264,39 @@ test("formatCiReport renders ownership, asset, edge, and readiness governance de
       id: "context.retired",
       path: "contexts/retired.md",
       kind: "context",
-      owner: "docs",
-      declaredOwner: undefined,
-      effectiveOwner: undefined,
+      declaredOwner: "docs",
+      effectiveOwner: "docs",
       status: "stable",
     },
   ];
   report.diff.catalog.changedAssets = [
     {
-      id: "skill.owner-added",
-      path: "skills/owner-added/SKILL.md",
-      changedFields: ["owner"],
-      from: { id: "skill.owner-added" },
-      to: { id: "skill.owner-added", owner: "team-a" },
+      id: "skill.declared-owner-changed",
+      path: "skills/declared-owner-changed/SKILL.md",
+      changedFields: ["declaredOwner"],
+      from: {
+        id: "skill.declared-owner-changed",
+        declaredOwner: "team-a",
+        effectiveOwner: "platform",
+      },
+      to: {
+        id: "skill.declared-owner-changed",
+        declaredOwner: "team-b",
+        effectiveOwner: "platform",
+      },
     },
     {
-      id: "skill.owner-changed",
-      path: "skills/owner-changed/SKILL.md",
-      changedFields: ["declaredOwner", "effectiveOwner"],
+      id: "skill.effective-owner-changed",
+      path: "skills/effective-owner-changed/SKILL.md",
+      changedFields: ["effectiveOwner"],
       from: {
-        id: "skill.owner-changed",
-        declaredOwner: "team-a",
+        id: "skill.effective-owner-changed",
+        declaredOwner: null,
         effectiveOwner: "team-a",
       },
       to: {
-        id: "skill.owner-changed",
-        declaredOwner: "team-b",
+        id: "skill.effective-owner-changed",
+        declaredOwner: null,
         effectiveOwner: "team-b",
       },
     },
@@ -316,12 +323,16 @@ test("formatCiReport renders ownership, asset, edge, and readiness governance de
         id: "skill.all-fields",
         path: "skills/old/SKILL.md",
         kind: "context",
+        declaredOwner: null,
+        effectiveOwner: null,
         status: "experimental",
       },
       to: {
         id: "skill.all-fields",
         path: "skills/new/SKILL.md",
         kind: "skill",
+        declaredOwner: null,
+        effectiveOwner: null,
         status: "stable",
       },
     },
@@ -388,10 +399,11 @@ test("formatCiReport renders ownership, asset, edge, and readiness governance de
     markdown,
     /- `context\.inherited-owner`[\s\S]* {2}- Declared owner: \(none\)[\s\S]* {2}- Effective owner: docs/,
   );
-  assert.match(markdown, / {2}- Owner: docs/);
-  assert.match(markdown, / {2}- owner: \(none\) -> `team-a`/);
   assert.match(markdown, / {2}- declared owner: `team-a` -> `team-b`/);
+  assert.match(markdown, / {2}- declared owner: `team-a` -> \(none\)/);
+  assert.match(markdown, / {2}- effective owner: `team-a` -> `team-b`/);
   assert.match(markdown, / {2}- effective owner: `team-a` -> \(none\)/);
+  assert.doesNotMatch(markdown, / {2}- owner:/i);
   assert.match(
     markdown,
     / {2}- path: `skills\/old\/SKILL\.md` -> `skills\/new\/SKILL\.md`/,
@@ -422,16 +434,31 @@ test("formatCiReport renders ownership, asset, edge, and readiness governance de
   );
 });
 
-test("formatCiReport ownership Markdown is stable across a JSON round trip", () => {
+test("formatCiReport canonical ownership Markdown is stable across a JSON round trip", () => {
   const report = sampleReport();
   report.diff.catalog.addedAssets = [
     {
-      id: "context.legacy-owner",
-      path: "contexts/legacy.md",
+      id: "context.declared-owner",
+      path: "contexts/declared.md",
       kind: "context",
-      owner: "docs",
-      declaredOwner: undefined,
-      effectiveOwner: undefined,
+      declaredOwner: "docs",
+      effectiveOwner: "docs",
+      status: "stable",
+    },
+    {
+      id: "context.inherited-owner",
+      path: "contexts/inherited.md",
+      kind: "context",
+      declaredOwner: null,
+      effectiveOwner: "platform",
+      status: "stable",
+    },
+    {
+      id: "context.unowned",
+      path: "contexts/unowned.md",
+      kind: "context",
+      declaredOwner: null,
+      effectiveOwner: null,
       status: "stable",
     },
   ];
@@ -443,27 +470,53 @@ test("formatCiReport ownership Markdown is stable across a JSON round trip", () 
   );
 
   assert.equal(roundTripped, inMemory);
-  assert.match(inMemory, /- Owner: docs/);
-  assert.doesNotMatch(inMemory, /- Declared owner: \(none\)/);
-  assert.doesNotMatch(inMemory, /- Effective owner: \(none\)/);
+  assert.match(
+    inMemory,
+    /- `context\.declared-owner`[\s\S]* {2}- Declared owner: docs[\s\S]* {2}- Effective owner: docs/,
+  );
+  assert.match(
+    inMemory,
+    /- `context\.inherited-owner`[\s\S]* {2}- Declared owner: \(none\)[\s\S]* {2}- Effective owner: platform/,
+  );
+  assert.match(
+    inMemory,
+    /- `context\.unowned`[\s\S]* {2}- Declared owner: \(none\)[\s\S]* {2}- Effective owner: \(none\)/,
+  );
+  assert.doesNotMatch(inMemory, / {2}- owner:/i);
 });
 
 test("formatCiReport caps every governance detail collection without truncating JSON", () => {
   const report = sampleReport();
   report.diff.catalog.addedAssets = Array.from({ length: 12 }, (_, index) => ({
     id: `added.${index}`,
+    declaredOwner: null,
+    effectiveOwner: null,
   }));
   report.diff.catalog.removedAssets = Array.from(
     { length: 12 },
-    (_, index) => ({ id: `removed.${index}` }),
+    (_, index) => ({
+      id: `removed.${index}`,
+      declaredOwner: null,
+      effectiveOwner: null,
+    }),
   );
   report.diff.catalog.changedAssets = Array.from(
     { length: 12 },
     (_, index) => ({
       id: `changed.${index}`,
       changedFields: ["status"],
-      from: { id: `changed.${index}`, status: "experimental" },
-      to: { id: `changed.${index}`, status: "stable" },
+      from: {
+        id: `changed.${index}`,
+        declaredOwner: null,
+        effectiveOwner: null,
+        status: "experimental",
+      },
+      to: {
+        id: `changed.${index}`,
+        declaredOwner: null,
+        effectiveOwner: null,
+        status: "stable",
+      },
     }),
   );
   report.diff.graph.addedEdges = Array.from({ length: 12 }, (_, index) => ({

@@ -162,8 +162,8 @@ test("buildDiffReport compares deterministic readiness snapshots", () => {
     report.catalog.addedAssets.map((asset) => asset.id),
     ["new-context"],
   );
-  assert.equal("declaredOwner" in report.catalog.addedAssets[0]!, false);
-  assert.equal("effectiveOwner" in report.catalog.addedAssets[0]!, false);
+  assert.equal(report.catalog.addedAssets[0]?.declaredOwner, "docs");
+  assert.equal(report.catalog.addedAssets[0]?.effectiveOwner, "docs");
   assert.deepEqual(
     report.catalog.removedAssets.map((asset) => asset.id),
     ["old-context"],
@@ -224,8 +224,8 @@ test("buildDiffReport exposes canonical declared and effective owner changes", (
   const report = buildDiffReport(
     "/repo",
     snapshot("base", {
-      totalAssets: 1,
-      ownedAssets: 1,
+      totalAssets: 3,
+      ownedAssets: 3,
       ownershipCoveragePercent: 100,
       nodes: [
         canonicalNode(
@@ -236,12 +236,28 @@ test("buildDiffReport exposes canonical declared and effective owner changes", (
           "team-a",
           "stable",
         ),
+        canonicalNode(
+          "skill.inherited-owner",
+          "skills/inherited-owner/SKILL.md",
+          "skill",
+          null,
+          "team-a",
+          "stable",
+        ),
+        canonicalNode(
+          "skill.owner-removed",
+          "skills/owner-removed/SKILL.md",
+          "skill",
+          "team-c",
+          "team-c",
+          "stable",
+        ),
       ],
     }),
     snapshot("head", {
-      totalAssets: 3,
-      ownedAssets: 3,
-      ownershipCoveragePercent: 100,
+      totalAssets: 6,
+      ownedAssets: 4,
+      ownershipCoveragePercent: 67,
       nodes: [
         canonicalNode(
           "skill.z-added",
@@ -260,11 +276,35 @@ test("buildDiffReport exposes canonical declared and effective owner changes", (
           "stable",
         ),
         canonicalNode(
+          "skill.inherited-owner",
+          "skills/inherited-owner/SKILL.md",
+          "skill",
+          null,
+          "team-b",
+          "stable",
+        ),
+        canonicalNode(
+          "skill.owner-removed",
+          "skills/owner-removed/SKILL.md",
+          "skill",
+          null,
+          null,
+          "stable",
+        ),
+        canonicalNode(
           "skill.a-added",
           "skills/a-added/SKILL.md",
           "skill",
           null,
           "inherited-team",
+          "stable",
+        ),
+        canonicalNode(
+          "skill.m-unowned",
+          "skills/m-unowned/SKILL.md",
+          "skill",
+          null,
+          null,
           "stable",
         ),
       ],
@@ -273,24 +313,109 @@ test("buildDiffReport exposes canonical declared and effective owner changes", (
 
   assert.deepEqual(
     report.catalog.addedAssets.map((asset) => asset.id),
-    ["skill.a-added", "skill.z-added"],
+    ["skill.a-added", "skill.m-unowned", "skill.z-added"],
   );
   assert.deepEqual(report.catalog.addedAssets[0], {
     id: "skill.a-added",
     path: "skills/a-added/SKILL.md",
     kind: "skill",
-    owner: undefined,
     declaredOwner: null,
     effectiveOwner: "inherited-team",
     status: "stable",
   });
-  assert.deepEqual(report.catalog.changedAssets[0]?.changedFields, [
+  assert.deepEqual(report.catalog.addedAssets[1], {
+    id: "skill.m-unowned",
+    path: "skills/m-unowned/SKILL.md",
+    kind: "skill",
+    declaredOwner: null,
+    effectiveOwner: null,
+    status: "stable",
+  });
+  assert.deepEqual(report.catalog.addedAssets[2], {
+    id: "skill.z-added",
+    path: "skills/z-added/SKILL.md",
+    kind: "skill",
+    declaredOwner: "team-z",
+    effectiveOwner: "team-z",
+    status: "stable",
+  });
+  const declaredChange = report.catalog.changedAssets.find(
+    (change) => change.id === "skill.release-prep",
+  );
+  const effectiveChange = report.catalog.changedAssets.find(
+    (change) => change.id === "skill.inherited-owner",
+  );
+  const ownerRemoval = report.catalog.changedAssets.find(
+    (change) => change.id === "skill.owner-removed",
+  );
+  assert.deepEqual(declaredChange?.changedFields, [
     "declaredOwner",
     "effectiveOwner",
   ]);
-  assert.equal(report.catalog.changedAssets[0]?.from.declaredOwner, "team-a");
-  assert.equal(report.catalog.changedAssets[0]?.to.effectiveOwner, "team-b");
-  assert.equal(report.summary.ownershipCoverageDelta, 0);
+  assert.equal(declaredChange?.from.declaredOwner, "team-a");
+  assert.equal(declaredChange?.to.effectiveOwner, "team-b");
+  assert.deepEqual(effectiveChange?.changedFields, ["effectiveOwner"]);
+  assert.equal(effectiveChange?.from.declaredOwner, null);
+  assert.equal(effectiveChange?.to.effectiveOwner, "team-b");
+  assert.deepEqual(ownerRemoval?.changedFields, [
+    "declaredOwner",
+    "effectiveOwner",
+  ]);
+  assert.equal(ownerRemoval?.to.declaredOwner, null);
+  assert.equal(ownerRemoval?.to.effectiveOwner, null);
+  assert.equal(report.summary.ownershipCoverageDelta, -33);
+});
+
+test("buildDiffReport uses null when canonical ownership is absent and ignores top-level owner", () => {
+  const report = buildDiffReport(
+    "/repo",
+    snapshot("base", {
+      totalAssets: 1,
+      ownedAssets: 0,
+      nodes: [
+        {
+          id: "context.existing",
+          sourcePath: "contexts/existing.md",
+          kind: "context",
+          owner: "team-a",
+          status: "stable",
+        },
+      ],
+    }),
+    snapshot("head", {
+      totalAssets: 2,
+      ownedAssets: 0,
+      nodes: [
+        {
+          id: "context.existing",
+          sourcePath: "contexts/existing.md",
+          kind: "context",
+          owner: "team-b",
+          status: "stable",
+        },
+        {
+          id: "context.added",
+          sourcePath: "contexts/added.md",
+          kind: "context",
+          owner: "team-c",
+          status: "stable",
+        },
+      ],
+    }),
+  );
+
+  assert.deepEqual(report.catalog.changedAssets, []);
+  assert.deepEqual(report.catalog.addedAssets, [
+    {
+      id: "context.added",
+      path: "contexts/added.md",
+      kind: "context",
+      declaredOwner: null,
+      effectiveOwner: null,
+      status: "stable",
+    },
+  ]);
+  assert.equal("owner" in report.catalog.addedAssets[0]!, false);
 });
 
 test("buildDiffReport preserves readiness ownership behavior for an empty eligible set", () => {
@@ -947,7 +1072,7 @@ interface SnapshotInput {
   scannedFileCount: number;
   ownershipCoveragePercent: number;
   graphResolutionPercent: number;
-  nodes: Array<ReturnType<typeof node> | ReturnType<typeof canonicalNode>>;
+  nodes: unknown[];
   edges: Array<ReturnType<typeof edge> | ReturnType<typeof graphEdge>>;
   checks: Array<ReturnType<typeof check>>;
   findings: Array<ReturnType<typeof finding>>;
@@ -1002,10 +1127,20 @@ function node(
   id: string,
   sourcePath: string,
   kind: string,
-  owner: string,
+  declaredOwner: string,
   status: string,
 ) {
-  return { id, sourcePath, kind, owner, status };
+  return {
+    id,
+    sourcePath,
+    kind,
+    ownership: {
+      declaredOwner,
+      effectiveOwner: declaredOwner,
+      source: "declared",
+    },
+    status,
+  };
 }
 
 function canonicalNode(

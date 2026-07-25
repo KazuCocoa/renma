@@ -24,9 +24,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
-- Changed diff asset evidence to preserve canonical declared and effective
-  ownership while retaining legacy `owner` presentation when canonical values
-  are absent, including before and after JSON serialization.
+- Changed semantic diff asset ownership to expose only canonical declared and
+  effective ownership, including inherited and unowned states.
 - Changed graph edge identity to use the stable source asset ID and declared
   target independently from source-path evidence and resolution-derived target
   fields. Resolved presentation still prefers the resolved target asset ID.

@@ -1120,6 +1120,10 @@ policy inventory deltas. Each detail collection uses the shared presentation
 limit and directs reviewers to JSON when more items exist. JSON remains the
 complete, unbounded machine-readable report.
 
+Asset details in diff and CI-report JSON use canonical `declaredOwner` and
+`effectiveOwner` values. CI-report Markdown always renders both values so
+declared, inherited, and unowned states remain explicit.
+
 Markdown also includes a bounded `## Skill Discovery Changes` section after
 the general governance details. It summarizes configured and effective policy,
 policy outcome, adoption, coverage, published entrypoints, reachability,

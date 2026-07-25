@@ -390,27 +390,14 @@ function formatAssetList(heading: string, assets: AssetDelta[]): string[] {
 }
 
 function formatAssetDetails(asset: AssetDelta): string[] {
-  const lines = [
+  return [
     `- \`${asset.id}\``,
     `  - Path: ${formatCodeValue(asset.path)}`,
     `  - Kind: ${formatPlainValue(asset.kind)}`,
     `  - Status: ${formatPlainValue(asset.status)}`,
+    `  - Declared owner: ${formatPlainValue(asset.declaredOwner)}`,
+    `  - Effective owner: ${formatPlainValue(asset.effectiveOwner)}`,
   ];
-  if (hasCanonicalOwnership(asset)) {
-    lines.push(
-      `  - Declared owner: ${formatPlainValue(asset.declaredOwner)}`,
-      `  - Effective owner: ${formatPlainValue(asset.effectiveOwner)}`,
-    );
-  } else {
-    lines.push(`  - Owner: ${formatPlainValue(asset.owner)}`);
-  }
-  return lines;
-}
-
-function hasCanonicalOwnership(asset: AssetDelta): boolean {
-  return (
-    asset.declaredOwner !== undefined || asset.effectiveOwner !== undefined
-  );
 }
 
 function formatChangedAssetList(changes: AssetChange[]): string[] {
