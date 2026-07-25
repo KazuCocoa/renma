@@ -7,12 +7,12 @@ Renma security diagnostics are deterministic repository checks for agent-facing 
 Renma analyzes the security posture of LLM-facing Markdown instructions and
 metadata. It uses bounded structure-aware recognition for selected commands and
 JavaScript environment/file-access forms, not complete language
-interpretation. It does not analyze referenced or embedded executable scripts;
-use appropriate SAST and dependency-scanning tools for executable code.
-Markdown instructions that direct an agent to fetch, trust, execute, or invoke
-a script remain eligible for diagnostics. Analyze the script itself
-independently with project-selected tools such as ShellCheck, Bandit, Semgrep,
-ESLint security rules, CodeQL, and dependency scanners.
+interpretation. It does not analyze script or asset contents as executable
+code; use appropriate SAST and dependency-scanning tools for executable code.
+Markdown instructions that direct an agent to reference, fetch, trust, execute,
+or invoke a script or asset remain eligible for diagnostics. Analyze the script
+or asset itself independently with project-selected tools such as ShellCheck,
+Bandit, Semgrep, ESLint security rules, CodeQL, and dependency scanners.
 
 ## Security Policy Quickstart
 

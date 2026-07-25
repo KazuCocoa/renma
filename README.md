@@ -42,7 +42,8 @@ repository assets. It does not:
 - call an LLM for core analysis;
 - select a live Skill, Context Asset, or Context Lens;
 - assemble prompts or inject Context;
-- execute Skills, agents, tools, or commands;
+- execute Skills, agents, workflows, or operational commands found in repository
+  instructions;
 - collect runtime telemetry;
 - perform general-purpose SAST or arbitrary language data-flow analysis;
 - rewrite repository semantics or weaken policy automatically; or

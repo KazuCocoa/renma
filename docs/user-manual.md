@@ -107,8 +107,10 @@ Assets or unrelated repository files.
 
 Only files marked Markdown-parser eligible contribute frontmatter metadata,
 headings, links, code fences, and repeated-context evidence. Text scripts and
-data assets remain raw text for dedicated static path or security analysis;
-binary assets remain opaque.
+data assets remain raw text for dedicated static path and inventory analysis;
+binary assets remain opaque. Renma does not analyze script or asset contents as
+executable code. Security command analysis applies to eligible agent-facing
+Markdown instructions that reference or invoke them.
 
 Avoid using reserved support directory names as skill names. Paths such as
 `skills/assets/SKILL.md`, `skills/examples/SKILL.md`,

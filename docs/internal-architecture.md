@@ -79,9 +79,9 @@ a downstream rule needs belong in `details`, not in message parsing.
 
 New internal identities attached to legacy catalog diagnostics are
 non-enumerable. This lets scan classify them before serialization while
-preserving the 0.18.2 JSON projection. Diagnostics that intentionally remain
-catalog-only carry a typed internal disposition, and unknown diagnostics use the
-generic fail-closed catalog Finding definition.
+preserving the established JSON projection. Diagnostics that intentionally
+remain catalog-only carry a typed internal disposition, and unknown diagnostics
+use the generic fail-closed catalog Finding definition.
 
 ## Cohesive Type Ownership
 
@@ -638,7 +638,8 @@ edit-shaped response.
 Public machine-readable output is protected at the serialized command boundary.
 Fields such as classification evidence, governance provenance,
 `decisionStatus`, command invocation `command` and `args`, and established
-diagnostic fields must remain compatible with 0.18.2.
+diagnostic fields must remain compatible with the established serialized
+contract.
 
 Internal working types have a different role. `RepositorySnapshot`, parsed
 documents, `ReadonlyMap` indexes, `ReadonlySet` repository paths, and
@@ -679,7 +680,7 @@ diagnostics is structural. A Skill-local scan detail may therefore retain
 snapshot-backed `resolved`, `missing`, or `ambiguous` parent evidence.
 
 Do not silently make scan annotations repository-enriched merely to make the
-implementations look uniform. The distinction preserves the 0.18.2 public
+implementations look uniform. The distinction preserves the established public
 diagnostic shape; changing it requires an explicit contract decision and
 characterization tests.
 
@@ -687,8 +688,8 @@ characterization tests.
 
 A blocked Agent Skills migration may retain partial
 `candidateAgentSkillsFields` and `candidateRenmaMetadata` maps. These fields are
-diagnostic evidence retained for 0.18.2 JSON compatibility, not an applicable
-patch.
+diagnostic evidence retained for compatibility with the established JSON
+projection, not an applicable patch.
 
 `decisionStatus` is authoritative. A frontmatter migration is applicable only
 when the decision is not blocked and `canonicalFrontmatter` is present.
