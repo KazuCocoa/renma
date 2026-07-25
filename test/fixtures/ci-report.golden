@@ -5,14 +5,24 @@
     "scannedFileCount": 8,
     "totalAssets": 10,
     "readinessScore": 80,
-    "readinessLevel": "needs_attention"
+    "readinessLevel": "needs_attention",
+    "ownership": {
+      "ownedAssets": 8,
+      "eligibleAssets": 10,
+      "coveragePercent": 80
+    }
   },
   "to": {
     "ref": "HEAD",
     "scannedFileCount": 8,
     "totalAssets": 10,
     "readinessScore": 80,
-    "readinessLevel": "needs_attention"
+    "readinessLevel": "needs_attention",
+    "ownership": {
+      "ownedAssets": 8,
+      "eligibleAssets": 10,
+      "coveragePercent": 80
+    }
   },
   "status": "warn",
   "summary": {
@@ -219,14 +229,24 @@
       "scannedFileCount": 8,
       "totalAssets": 10,
       "readinessScore": 80,
-      "readinessLevel": "needs_attention"
+      "readinessLevel": "needs_attention",
+      "ownership": {
+        "ownedAssets": 8,
+        "eligibleAssets": 10,
+        "coveragePercent": 80
+      }
     },
     "to": {
       "ref": "HEAD",
       "scannedFileCount": 8,
       "totalAssets": 10,
       "readinessScore": 80,
-      "readinessLevel": "needs_attention"
+      "readinessLevel": "needs_attention",
+      "ownership": {
+        "ownedAssets": 8,
+        "eligibleAssets": 10,
+        "coveragePercent": 80
+      }
     },
     "summary": {
       "readinessScoreDelta": 0,
