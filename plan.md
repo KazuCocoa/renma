@@ -1,237 +1,93 @@
 # Renma Roadmap
 
-## Current Product
+## Current Checkpoint
 
-Renma 0.24.0 is a Git-native Context Repository governance CLI for
-agent-consumable knowledge. It applies the review boundary:
+Renma 0.24.1 is a focused maintenance checkpoint after the 0.24.0
+structure-aware security-analysis release.
+
+The checkpoint aligns implementation, tests, CLI help, examples, code comments,
+and repository documentation. It does not add a product feature or intentionally
+change public behavior.
+
+The current product remains a single-repository, deterministic Context
+Repository governance CLI:
 
 ```text
 LLM proposes. Renma verifies. Human approves.
 ```
 
-The shipped product provides:
+Current contracts live in [architecture.md](architecture.md),
+[design.md](design.md), and the [documentation index](docs/README.md).
+Historical release detail belongs only in [CHANGELOG.md](CHANGELOG.md).
 
-- focused, bounded Skills using the canonical Agent Skills format;
-- Context Lenses and independently owned Context Assets;
-- deterministic, repository-bounded discovery and normalized repository
-  evidence;
-- catalog, graph, ownership, Readiness, semantic diff, CI report, and review
-  bundle projections;
-- Declared Composition and Declared Impact analysis;
-- Trust Graph v2 and Repository Context BOM v2;
-- deterministic authoring guidance, inspection, and metadata or semantic-split
-  suggestions;
-- `renma scaffold` for explicitly requested starter assets; and
-- `renma init` for recording repository adoption with a minimal configuration
-  file, independently from asset scaffolding.
+## Stabilization Priorities
 
-Historical release detail belongs in [CHANGELOG.md](CHANGELOG.md). Current
-contracts live in [architecture.md](architecture.md), [design.md](design.md),
-and the focused documents under [docs/](docs/README.md).
+The current stabilization phase prioritizes:
 
-## Current Product Boundaries
+- keeping documentation aligned with executable command, schema, diagnostic,
+  path, metadata, ordering, and compatibility contracts;
+- preserving one immutable repository-evidence snapshot per analyzed repository
+  state;
+- keeping static Skill Discovery, security analysis, composition, impact,
+  Readiness, diff, CI, Trust Graph, and BOM boundaries explicit;
+- removing obsolete chronology and duplicated contract lists from evergreen
+  documentation;
+- protecting documented deep imports and compatibility re-exports;
+- improving maintainability without adding dependencies or broadening runtime
+  responsibility.
 
-Renma owns deterministic repository discovery, parsing, validation,
-projections, diagnostics, and review evidence. It does not own live task
-interpretation, runtime Skill or Context selection, prompt assembly, Context
-injection, workflow execution, or runtime telemetry collection.
+## Open Core Candidates
 
-Repository Context BOM v2 describes declared repository evidence, not what a
-runtime consumed. Trust Graph v2 connects static governance evidence without
-assigning subjective trust or routing scores.
+These candidates have no assigned release and require independent evidence and
+contract review:
 
-## Structure-Aware Security Command Analysis
+- hard-fail Skill Discovery CI gating after operational experience with the
+  existing opt-in warn-only policy;
+- broader source-to-sink analysis for additional languages or syntax, including
+  any separately versioned public evidence contract;
+- observed Skill-reference evidence kept separate from authoritative declared
+  continuation routes;
+- product or ownership projections derived only from stable IDs, exact tags,
+  and existing Context or Lens relationships;
+- richer focused visualization over existing stable report data;
+- additive Trust Graph or BOM evidence whose compatibility impact is explicit.
 
-The shipped 0.24.0 slice adds one bounded internal analysis result per relevant
-logical command or line-local instruction. It reuses the existing Markdown
-syntax pipeline, exact structural guard scope, and destination IR; classifies
-npm-style dependency pinning, sensitive sources, and local or disclosure
-sinks; and then projects the existing public diagnostics.
-
-Unguarded npm-style version variables are unpinned. The accepted fail-closed
-form is `${NAME:?message}` at the use site or in an associated guard for the
-same case-sensitive variable. Environment API access is not an environment
-file. Proven local-only sensitive handling can avoid a sensitive-file finding
-only with an exact no-disclosure guard; stdout, logs, prompt/Context use,
-network, upload, contradiction, ambiguity, and unsupported syntax remain
-fail-closed.
-
-This slice adds no public analysis schema or diagnostic ID. It is not complete
-shell parsing, general JavaScript/TypeScript data flow, cross-command or
-cross-file taint, runtime policy enforcement, prompt assembly, or Context
-injection.
-
-## Stable Skill Discovery Core
-
-The current single-repository static Skill Discovery core is stable for
-repositories with many layered `SKILL.md` files.
-
-The shipped 0.22.0 slice makes explicit Skill-to-Skill continuation contracts,
-exact route resolution, route eligibility/usability, warning diagnostics, and
-structural roots reviewable without introducing a runtime Skill selector.
-Existing Skills remain the source of workflow and routing policy; the graph is
-only a compact, deterministic projection.
-
-The 0.22.1 slice added explicit Skill-local published entrypoints and explicit
-repository-wide Discovery adoption. It does not infer either from graph
-position, route metadata, directories, ownership, or the existence of Skills.
-
-The 0.22.2 slice adds cycle-safe reachability from effective published
-entrypoints. Partial repositories with an effective first hop receive
-descriptive evidence; adopted repositories receive authoritative coverage and
-one warning per not-reached eligible Skill. Traversal uses only existing usable
-representative resolved Skill routes and never infers routes from prose or
-Markdown links.
-
-The 0.22.3 slice adds the canonical `renma.skill-index.v1` report and
-stdout-only `renma skill-index` command. It wraps the prepared Discovery index
-from the shared repository snapshot, defaults to compact Markdown, supports
-complete JSON and exact optional focus, and keeps repository diagnostics
-separate from Discovery diagnostics. It does not interpret a task, choose or
-execute a Skill, infer routes, load Context, or create a generated index.
-
-The 0.22.4 stabilization slice adds deterministic strongly connected component
-review over the existing usable continuation graph. It emits one
-`DISCOVERY-ROUTE-CYCLE` warning per maximal cyclic component, including
-self-loops, with exact internal route and Skill evidence. Cycles remain
-traversal-safe static evidence and may be intentional; Renma does not claim
-runtime recursion or choose a route to remove.
-
-The 0.23.0 slice projects the existing prepared Discovery index into
-`renma readiness`. It adds compact repository-wide counts plus publication,
-route-validity, coverage, unrouted-Skill, and cycle-review checks. Authoritative
-adoption makes coverage gaps review warnings; partial and not-adopted coverage
-remain descriptive. The checks add visibility without a new score weight or a
-second penalty for existing diagnostics.
-
-The 0.23.1 slice adds an observation-only `DiffReport.discovery` projection to
-direct `renma diff`. It compares exact adoption, coverage, effective
-publication, reachable/not-reached and unrouted Skill identities, canonical
-route groups, and maximal cyclic components from the prepared indexes for two
-refs. Route identity uses normalized source path plus normalized declared
-target, so declaration order and source lines are not semantic identity.
-Renma assigns no improvement/regression classification, CI status, warning,
-gate, or exit-code effect to these facts.
-
-The 0.23.2 slice projects that exact `renma.skill-discovery-diff.v1` value once
-at the top level of `renma ci-report`. The nested compatible diff stays
-Discovery-free, Markdown details use the shared presentation cap, and
-Discovery does not affect CI status, review notes, Readiness scoring, or exit
-behavior. CI now intentionally pays for one prepared Discovery index per ref
-while retaining one immutable repository snapshot and one semantic-diff
-execution.
-
-The 0.23.3 slice adds an explicit `skill_discovery.ci_policy: "warn"` review
-policy over five fixed Discovery changes. The default remains `off`; `warn`
-requires repository-wide adoption. CI evaluates the stricter archived-ref mode
-so target-only disablement cannot bypass review, records
-`renma.skill-discovery-ci-policy.v1`, and can upgrade only `PASS` to `WARN`.
-Policy warnings exit `0`, existing `FAIL` remains dominant, cycles remain
-non-policy evidence, and direct diff remains policy-free.
-
-[The Skill Discovery design](plan-discovery.md) defines the full direction and
-the independently bounded 0.22.0 through 0.22.4 core slices, 0.23.0 Readiness
-integration, 0.23.1 semantic diff integration, 0.23.2 neutral CI report
-integration, and 0.23.3 opt-in warn-only CI review policy.
-
-## Expected Implementation Sequence
-
-1. Ship the 0.22.0 foundation with only
-   `metadata.renma.continues-with`, exact ID/path resolution, prepared snapshot
-   route evidence, warnings, structural roots, and
-   `graph --view discovery` JSON/Markdown/Mermaid with optional exact focus.
-2. Ship the 0.22.1 publication/adoption contract with only the exact
-   `metadata.renma.published-entrypoint: "true"` marker, strict
-   `skill_discovery.adopted` policy, adoption states, publication diagnostics,
-   and Discovery graph projection. Do not infer publication or adoption.
-3. Ship the 0.22.2 reachability/coverage slice through the existing Discovery
-   graph: cycle-safe traversal, descriptive versus authoritative coverage,
-   unrouted classification, and adopted-mode unreachable warnings. Do not add
-   a command.
-4. Ship the 0.22.3 versioned `skill-index` report/command from the same prepared
-   snapshot and Discovery index, with JSON, compact Markdown, exact focus,
-   diagnostic separation, and no downstream-report integration.
-5. Ship the 0.22.4 stabilization slice with deterministic usable-route cycle
-   diagnostics, exact component evidence, linked routes and Skills, focus-aware
-   diagnostic projection, and no report schema, reachability, or downstream
-   integration changes.
-6. Ship the 0.23.0 Readiness projection from the same prepared index with a
-   compact additive summary and five non-double-counting checks. Preserve
-   descriptive partial coverage, warning-only cycle review, and every existing
-   Discovery semantic and diagnostic contract.
-7. Ship the 0.23.1 observation-only direct semantic diff from one immutable
-   `RepositorySnapshot` per ref. Compare prepared Discovery identities and
-   route/cycle state without changing Readiness, diagnostics, CI, or exits.
-8. Ship the 0.23.2 neutral CI projection by running the complete semantic diff
-   once, placing its existing Discovery value once at top level, retaining the
-   Discovery-free nested diff, and keeping policy, notes, scores, and exits
-   independent of Discovery.
-9. Ship the 0.23.3 opt-in warn-only review policy with strict `off`/`warn`
-   configuration, the stricter base/target mode, five fixed deterministic
-   match conditions, one bounded policy result and review note, `WARN` exit
-   `0`, and no direct-diff or Readiness changes.
-10. Ship the 0.24.0 bounded security-command analysis by reusing structural
-    Markdown guards and destination analysis, preserving public findings, and
-    failing closed through the existing fallback for unsupported syntax.
-11. Evaluate hard-fail gating and broader source-to-sink analysis only as later
-    independently reviewed decisions,
-    as with Trust Graph, BOM, observed-reference, ownership, authoring, richer
-    visualization, and federation integrations.
-
-The current roadmap sequence is:
-
-```text
-0.23.0 — Discovery Readiness integration
-0.23.1 — Discovery semantic diff integration
-0.23.2 — neutral Discovery CI report integration
-0.23.3 — opt-in warn-only Discovery CI review policy
-0.24.0 — bounded structure-aware security command analysis
-later   — broader source-to-sink analysis and independently reviewed gating
-```
-
-The later line identifies review order, not committed product behavior.
-
-## Later Candidates
-
-Possible later Renma core work includes:
-
-- independently reviewed hard-fail gating after operational experience with
-  the fixed warn-only Discovery policy;
-- broader source-to-sink analysis for additional languages and syntax,
-  arbitrary cross-command or cross-file flow, and a separately versioned public
-  evidence contract;
-- product and ownership projections based on stable IDs, exact tags, and
-  existing Context or Lens relationships;
-- observed Skill-reference analysis kept separate from authoritative declared
-  routes;
-- Trust Graph or BOM additions after their contract impact is reviewed; and
-- richer focused visualizations over stable report data.
-
-These are candidates, not commitments, and have no assigned release.
+None is a commitment. A candidate becomes product work only after its user
+problem, deterministic inputs, output contract, compatibility effect, and
+non-goals are reviewed.
 
 ## Adjacent or External Capabilities
 
-- LLM-assisted authoring support should remain a dogfooded Skill layer,
-  companion package, or other adjacent workflow unless a future product
-  decision changes the boundary. Renma core continues to verify the resulting
-  repository assets deterministically.
-- Runtime debugging and observability require evidence produced by runtimes,
-  such as selected Skill revisions and actually loaded Context. Renma may later
-  validate or correlate an external evidence contract, but it cannot
-  independently collect that evidence.
-- Multi-repository and organization-wide workflows require separate federation,
-  identity, transport, and policy decisions.
-- Optional semantic review helpers may prepare bounded evidence or suggestions;
-  they must not become required for deterministic validation.
+Some useful capabilities should remain outside Renma core unless a future
+product decision changes the boundary:
 
-## Explicit Non-Goals
+- LLM-assisted authoring orchestration can live in a Skill, companion workflow,
+  or calling agent while Renma verifies the resulting repository assets.
+- Runtime debugging and observability require evidence produced by runtimes.
+  Renma may eventually validate a separate evidence artifact, but it cannot
+  independently claim what a runtime selected or consumed.
+- Multi-repository and organization-wide use requires separate identity,
+  federation, transport, and policy decisions.
+- Hosted dashboards, provider gateways, package distribution transport, and
+  workflow execution are ecosystem responsibilities.
+
+## Explicit Non-Commitments
+
+Renma is not committed to:
 
 - accepting free-form task text and selecting or ranking a Skill;
 - fuzzy, embedding, or LLM-based runtime routing;
-- prompt construction, Context bundling or injection, and agent execution;
+- prompt construction, Context bundling or injection, or agent execution;
 - runtime telemetry collection or claims about actual runtime consumption;
-- automatic Skill, metadata, route, or generated-index edits;
+- automatic Skill, metadata, route, policy, or generated-index edits;
 - a required category, product, team, or workflow directory hierarchy;
-- subjective routing confidence, centrality, quality, or “best Skill” scores;
-  and
-- treating an owner change as a product identity change.
+- subjective trust, confidence, centrality, popularity, or “best Skill” scores;
+- treating owner changes as product identity changes;
+- making optional LLM assistance required for deterministic validation.
+
+## Decision Rule
+
+Prefer the smallest additive contract that answers a demonstrated repository
+governance question. Keep deferred ideas visibly separate from shipped behavior,
+and move completed implementation history to the changelog instead of extending
+this roadmap.

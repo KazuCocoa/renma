@@ -47,7 +47,7 @@ Use the English text instead when determining requirements.
 1. Read `context.release.prep` before preparing or changing release artifacts.
    - リリース成果物を準備または変更する前に、`context.release.prep` を読みます。
 2. Treat any request whose primary intent is to release, publish, or ship this repository as a release request, whether or not the user says "release prep." This includes terse requests such as `release 0.23.5`, `release it`, `publish this version`, and `update the GitHub Release page`. This classification selects the workflow only; obtain the Context's explicit human approval immediately before every external write.
-   - ユーザーが「release prep」と言わない場合でも、このリポジトリのリリース、公開、または出荷が主目的の依頼はすべてリリース依頼として扱います。これには、`release 0.23.5`、`release it`、`publish this version`、`update the GitHub Release page` のような短い依頼も含まれます。この分類はワークフローを選択するだけです。外部への書き込みの直前には、Context が定める人による明示的な承認を得ます。Obtain explicit human approval immediately before every external write.
+   - Approval gate: Obtain explicit human approval immediately before every external write. 日本語訳: ユーザーが「release prep」と言わない場合でも、このリポジトリのリリース、公開、または出荷が主目的の依頼はすべてリリース依頼として扱います。これには、`release 0.23.5`、`release it`、`publish this version`、`update the GitHub Release page` のような短い依頼も含まれます。この分類はワークフローを選択するだけです。外部への書き込みの直前には、Context が定める人による明示的な承認を得ます。
 3. Inspect the current release state, accept completed pushes, package publication, and GitHub Release writes as evidence, and resume at the earliest incomplete stage.
    - 現在のリリース状態を確認し、完了済みステージを証拠として受け入れ、最初の未完了ステージから再開します。
 4. Follow the Context's required inputs, workflow, constraints, validation, and completion criteria for the selected stage.

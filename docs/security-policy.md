@@ -16,7 +16,10 @@ ESLint security rules, CodeQL, and dependency scanners.
 
 ## Security Policy Quickstart
 
-Add small security policy metadata to agent-facing Skills or context assets when they include network, upload, secret-handling, command execution, or other sensitive operational instructions. Renma 0.16.0 uses different serialization boundaries for Skills and non-Skill assets.
+Add small security policy metadata to agent-facing Skills or context assets when
+they include network, upload, secret-handling, command execution, or other
+sensitive operational instructions. Skills and non-Skill assets use different
+serialization boundaries.
 
 ### Canonical Skill security policy
 
@@ -34,7 +37,7 @@ metadata:
   renma.owner: qa-platform
   renma.status: stable
   renma.allowed-data: '["repo-local-files","sanitized-ci-diagnostics"]'
-  renma.network-allowed: "true"
+  renma.network-allowed: "false"
   renma.external-upload-allowed: "false"
   renma.secrets-allowed: "false"
   renma.requires-human-approval: "true"
@@ -213,7 +216,13 @@ Prefer the narrowest policy location that matches the decision:
 - Use `renma.security-profile` for a Skill or top-level `security_profile` for a non-Skill asset when selecting reusable team contracts.
 - Use repository-level security config for common approved network destinations, upload destinations, or disallowed commands that apply broadly.
 
-If settings disagree, keep the stricter effective policy. Do not relax asset-local denials through a profile or repository allowance.
+Policy resolution follows declared precedence rather than an automatic
+strictest-wins merge. A valid asset-local scalar overrides the selected profile
+and repository value; within a profile chain, a child scalar overrides its base.
+If that override is more permissive, Renma still uses the higher-precedence
+value and emits `SEC-POLICY-OVERRIDE-CONTRADICTION` for review. An asset-local
+denial therefore remains effective against a profile or repository allowance,
+but a permissive local override is reported rather than silently made stricter.
 
 ### Human approval semantics
 
@@ -384,8 +393,8 @@ The same guard cannot neutralize stdout, a log, prompt or Context inclusion,
 network access, upload, a contradictory instruction, a later upload in the same
 supported command, or an unknown destination. Unsupported or ambiguous shell
 or JavaScript syntax uses the conservative fallback and cannot earn a
-local-only suppression. This bounded evidence remains internal; 0.24.0 adds no
-public source-to-sink schema. Redirection to `/dev/stdout`, `/dev/stderr`,
+local-only suppression. This bounded evidence remains internal; no public
+source-to-sink schema exposes it. Redirection to `/dev/stdout`, `/dev/stderr`,
 standard descriptor paths under `/dev/fd` or `/proc/self/fd`, or another
 unproven special device is not local-file evidence. `/dev/tcp/**` and
 `/dev/udp/**` are network sinks.
@@ -556,7 +565,7 @@ Security findings may include `riskClass` so reviewers can distinguish clear vio
 
 Renma can summarize security posture from existing static security findings. The summary groups findings by `riskClass` (`violation`, `suspicious`, `advisory`, and `unclassified`) and by severity, and reports high/critical security finding counts.
 
-This is reporting-only in the v2 contract:
+This summary is reporting-only:
 
 - it does not add new detectors
 - it does not change scan `fail_on`
@@ -578,7 +587,10 @@ also do not contribute instruction text. Orphan scripts do not receive inherited
 policy from repository configuration without an owning Skill and traceable
 inheritance evidence.
 
-The inventory reports local, inherited, effective, and missing-effective coverage; network/upload/secrets booleans; human approval requirements; approved destinations; forbidden inputs; disallowed commands; and profile resolution counts. It is reporting-only in v2 and does not enforce runtime behavior.
+The inventory reports local, inherited, effective, and missing-effective
+coverage; network/upload/secrets booleans; human approval requirements; approved
+destinations; forbidden inputs; disallowed commands; and profile resolution
+counts. It is reporting-only and does not enforce runtime behavior.
 
 `renma trust-graph` also includes effective policy evidence. Each effective policy node uses a deterministic fingerprint over normalized allowed data, forbidden inputs, network/upload/secrets booleans, human approval requirement, approved destinations, and disallowed commands. Every `has_effective_policy` edge carries a deterministic `policySources` array containing each source that contributed to the fingerprint: `local`, `security_profile`, `repository_config`, and/or `owning_skill`. Owning-Skill inheritance retains `inheritedFrom`, and selected-profile evidence retains the selected profile and profile chain. The graph does not enforce policy at runtime.
 

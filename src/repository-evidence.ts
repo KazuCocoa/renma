@@ -144,7 +144,7 @@ export async function collectRepositoryEvidence(
   };
 }
 
-/** Preserve pre-Discovery diagnostics for projections deferred beyond 0.22. */
+/** Preserve the Discovery-free diagnostic projection for compatibility consumers. */
 export function repositoryDiagnosticsWithoutSkillDiscovery(
   snapshot: Pick<
     RepositorySnapshot,

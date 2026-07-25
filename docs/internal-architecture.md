@@ -1,13 +1,11 @@
 # Renma Internal Architecture
 
-This document describes the maintainability architecture through 0.24.0,
-including shared immutable repository projections, the additive `guide`
-command, Declared Composition and Declared Impact analysis, and the Skill
-Discovery Readiness projection.
-It is contributor guidance, not a new versioned JSON schema. Renma 0.18.2
-remains the compatibility baseline for existing commands: public fields,
-classifications, diagnostics, severities, exit behavior, and migration direction
-must not change as a side effect.
+This document describes the contributor architecture behind Renma's shared
+immutable repository projections, authoring guidance, Declared Composition and
+Declared Impact analysis, and Skill Discovery projections. It is implementation
+guidance, not a public JSON schema. Public fields, classifications, diagnostics,
+severities, exit behavior, and migration direction must not change as an
+incidental effect of an internal refactor.
 
 The high-level product boundary remains in [Architecture](../architecture.md).
 Stable classification and decision fields are documented in the
@@ -180,8 +178,10 @@ subjective confidence scores, runtime enforcement, prompt construction, and
 Context injection remain deferred.
 
 The command IR, source and sink classifications, guard identity, support state,
-and trace evidence are internal in 0.24.0. Scan, Readiness, BOM, diff, CI, and
-other CLI JSON retain the existing Finding contracts and diagnostic IDs.
+and trace evidence are internal implementation details. Filesystem reachability
+of their emitted modules does not make them public report fields. Scan,
+Readiness, BOM, diff, CI, and other CLI JSON retain the established Finding
+contracts and diagnostic IDs.
 
 ## RepositorySnapshot Is the Repository Evidence Source
 
@@ -222,35 +222,24 @@ Agent Skills, build Skill Discovery, classify assets, collect security-policy
 evidence, or capture command-only repository path states.
 
 Direct Readiness builds graph and scan evidence plus its compact Skill
-Discovery summary/checks from one `RepositorySnapshot`. Its default projection
-option accesses `skillDiscovery`, which prepares the dependent catalog and
-Agent Skills projections at most once and reuses the same immutable index used
-by the Discovery graph and Skill Index. Readiness does not call `scan`,
-`skill-index`, repository discovery, or route preparation independently to
-obtain that evidence. An internal projection option lets consumers that retain
-the pre-0.23.0 Readiness subset omit that access entirely; it does not trigger
-a second collection or parse.
+Discovery summary and checks from one `RepositorySnapshot`. Accessing
+`skillDiscovery` prepares its catalog and Agent Skills dependencies at most
+once and reuses the immutable index used by the Discovery graph and Skill
+Index. An internal Discovery-free projection remains available to compatible
+consumers; it omits that access without triggering another collection or parse.
 
-BOM builds graph, scan, its existing Readiness subset, policy inventory, and
-diagnostics from the same snapshot and core; the 0.23.0 Discovery Readiness
-addition is intentionally not projected into BOM. Semantic diff archives each
-ref and performs exactly one `collectRepositorySnapshot` for that ref. It
-derives graph and the Discovery-excluded Readiness subset from the same
-immutable snapshot, then builds its dedicated 0.23.1 topology diff directly
-from the memoized `snapshot.skillDiscovery`. This produces one discovery pass,
-one parse per artifact, one catalog preparation, one Agent Skills validation,
-and one Skill Discovery preparation per ref. It does not call `skill-index`,
-reconstruct Discovery, or recollect for graph or Readiness.
+BOM builds graph, scan, its intentionally Discovery-free Readiness subset,
+policy inventory, and diagnostics from the same snapshot and core. Semantic
+diff performs exactly one snapshot collection per ref, derives graph and the
+Discovery-free Readiness subset from it, and builds topology changes directly
+from the memoized Skill Discovery indexes. It does not invoke another command,
+reconstruct Discovery, or recollect repository facts.
 
-CI calls `executeDiff()` exactly once. The execution returns the unchanged
-`DiffReport` plus only the base and target `skillDiscovery.ciPolicy` modes from
-the two collected snapshots. Each ref has one repository collection, one parse
-per artifact, one catalog preparation, one Agent Skills validation, and one
-Skill Discovery preparation. The projection destructures `discovery` from
-that report, exposes the same object as top-level `CiReport.skillDiscovery`,
-evaluates the two policy modes into top-level `skillDiscoveryPolicy`, and keeps
-the remaining `CiCompatibleDiffReport` under `diff`. It does not recollect,
-reload config, reconstruct Discovery, or run a second comparison.
+CI calls `executeDiff()` once. It exposes the diff's Discovery projection at
+top level, evaluates the two snapshot policy modes as
+`skillDiscoveryPolicy`, and retains a compatibility-shaped nested diff. It
+does not recollect, reload configuration, reconstruct Discovery, or run a
+second comparison.
 
 `determineCiReportStatus()` still receives only the compatible diff. The pure
 `skill-discovery-ci-policy` module selects the stricter `off < warn` mode,
@@ -261,24 +250,17 @@ status helper composes `fail > warn > pass`; Discovery policy can only request
 note after preserving existing reasons. Cycles never create a match.
 
 CI Markdown uses the shared presentation cap, while JSON retains the complete
-versioned diff and policy evaluation once each. The formatter accepts both
-legacy generations: pre-0.23.2 reports omit the Discovery section, and 0.23.2
-reports keep observation-only Discovery without inventing policy facts.
+diff and policy evaluation once each. Formatters accept reports that lack the
+optional Discovery or policy projections and do not invent missing facts.
+Likewise, the exported `buildDiffReport()` helper accepts minimal compatible
+snapshots without prepared Discovery and supplies a stable neutral
+compatibility object rather than inferring topology from unrelated fields.
 
-The exported `buildDiffReport()` helper still accepts pre-0.23.1 snapshots that
-contain only ref, root, Readiness, and graph. When either prepared Discovery
-index is absent it supplies a stable neutral Discovery compatibility object
-without inferring topology from those older fields. `formatDiff()` also accepts
-a legacy report without `discovery` and renders the previous non-Discovery
-Markdown shape. BOM builds its subset without requesting Discovery. Defensive
-`discovery.*` Readiness check filters remain. Existing catalog and Agent Skills
-preparation still occurs only where graph, scan, Readiness, or the direct diff
-projection requires it. A working-tree mutation after collection cannot
-influence a later lazy projection. Caller attempts to mutate snapshot arrays,
-nested objects, configuration, or path collections also fail without changing
-the projection input. A new collection is required to observe different
-facts. This keeps commands from combining independently recollected repository
-states.
+Catalog and Agent Skills preparation occurs only where a consumer requires
+those projections. A working-tree mutation after collection cannot influence a
+later lazy projection, and caller attempts to mutate snapshot arrays, nested
+objects, configuration, or path collections cannot change the projection
+input. A new collection is required to observe different facts.
 
 The Discovery diff projection is pure. Skill keys use normalized
 repository-relative path plus ID; route-group keys use normalized source Skill
@@ -551,29 +533,28 @@ may reuse small exported authoring invariants, but must not duplicate the full
 guide. The guidance source may import canonical metadata definitions; metadata
 and renderers must not import command modules.
 
-The 0.19.1 follow-up adds one `interaction` object to that same guidance source.
-It owns only normative opening, phase, truth-source, epistemic, unknown-scope,
-progression, disposition, question, gate, validation, persistence, and handoff
-rules. In 0.19.2, `illustrationRules` and the ordered top-level `illustrations`
-array are structurally separate. The previous interaction example fields and
-special top-level API object have no aliases because this additive projection
-has no independently versioned schema.
+The `interaction` object owns normative opening, phase, truth-source,
+epistemic, unknown-scope, progression, disposition, question, gate,
+validation, persistence, and handoff rules. `illustrationRules` and the
+ordered top-level `illustrations` array remain structurally separate. They have
+no compatibility aliases because authoring guidance is an unversioned internal
+projection rather than an independently versioned schema.
 
 Illustrations share one `SkillAuthoringIllustration` type and demonstrate
 authoring tensions rather than Skill categories. They may be ignored or used
 partially; no selector, similarity matcher, request classifier, or closest-example
-instruction exists. The prompt renders all protocol and illustration-usage rules
-before the non-normative collection. JSON serializes the same source directly.
-Future illustrations can be added without modifying the normative interaction
+instruction exists. The prompt renders all protocol and illustration-usage
+rules before the non-normative collection. JSON serializes the same source
+directly. Illustration membership does not modify the normative interaction
 contract.
 
-In 0.20.0, `externalTraversalRules` is another top-level normative collection,
-rendered after metadata rules and before illustration usage. It is conditional
-on recursive discovery inside external sources. It defines what an authored
-Skill and its consuming runtime must specify; it neither authorizes nor causes
-Renma to fetch, normalize, identify, or crawl external sources. It adds no
-illustration selector, traversal state metadata, hidden prompt package, or live
-visited registry.
+`externalTraversalRules` is a top-level normative collection rendered after
+metadata rules and before illustration usage. It applies only to recursive
+discovery inside external sources. It defines what an authored Skill and its
+consuming runtime must specify; it neither authorizes nor causes Renma to
+fetch, normalize, identify, or crawl external sources. It adds no illustration
+selector, traversal state metadata, hidden prompt package, or live visited
+registry.
 
 Prompt and JSON are intentionally different projections of that source. The
 prompt renders each illustration's title, demonstrated tensions, notice,
@@ -614,7 +595,7 @@ may use explicit user statements, clearly applicable supplied artifacts,
 applicable and effective repository evidence, or successfully consulted
 authoritative source content. Renma structural rules constrain placement but do
 not establish domain truth. Authoring-time source access comes from the current
-request, tools, and environment; future Skill policy is not retroactive
+request, tools, and environment; finished-Skill policy is not retroactive
 authorization.
 
 Likewise, deterministic detection does not imply deterministic repair. The
@@ -667,17 +648,27 @@ They may be narrowed or reorganized when behavior-focused tests prove that the
 serialized contract is unchanged.
 
 Inspect renderer DTOs live in `src/evidence/inspect.ts`, so renderers do not
-depend on command modules. `src/commands/inspect.ts` re-exports the established
-types to preserve existing TypeScript deep imports.
+depend on command modules. `src/commands/inspect.ts` and
+`src/commands/suggest-metadata.ts` re-export established result types as
+compatibility facades. `src/types.ts`,
+`src/context-language-diagnostics.ts`, and the destination-analysis exports
+from `src/security-diagnostics.ts` serve the same bounded purpose.
+
+The package publishes `dist` without an exports map, but filesystem
+reachability is not a promise that every emitted module is a stable deep
+import. Only entrypoints explicitly documented or verified by package
+compatibility tests are supported. Internal modules such as
+`security-command/*` remain implementation details even when the package
+layout makes them physically importable.
 
 Human-readable reasons and prompts may evolve unless a test intentionally
 protects exact wording. Stable branching must use typed fields such as
 `matchedRule`, `reasonCode`, `parentResolution`, ownership provenance, and
 `decisionStatus`, not prose parsing.
 
-## Intentional 0.18.2 Compatibility Seams
+## Intentional Compatibility Seams
 
-Two parallel-looking paths remain intentional in 0.19.x.
+Two parallel-looking paths remain intentional.
 
 ### Scan keeps structural parent evidence
 
@@ -732,15 +723,16 @@ Skill for a live task, assemble prompts, invoke Skill tools, observe model runs,
 or collect runtime telemetry. Static instructions and policies are evidence
 about repository content; they are not proof of runtime behavior.
 
-Future runtime signals may be imported as a separate, explicitly versioned
-evidence artifact linked to a repository snapshot or BOM. Signal production,
-collection, storage, and Skill execution remain outside this architecture.
+Runtime-produced evidence has no implicit place in repository analysis. Any
+separately defined evidence contract must keep signal production, collection,
+storage, and Skill execution outside this architecture.
 
 ## Contributor Checklist
 
 For an internal change:
 
-1. Add or confirm a behavior-focused test for the 0.18.2 result.
+1. Add or confirm a behavior-focused test for the established
+   compatibility-sensitive result.
 2. Reuse the snapshot and shared resolution paths before adding another
    collector or index.
 3. Keep structural facts, repository-backed governance, decisions, and

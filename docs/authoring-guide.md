@@ -275,8 +275,7 @@ Before creating files, establish the focused recurring task, expected result,
 meaningful completion or failure behavior, smallest justified asset structure,
 source authority, authoring-time consultation, finished-Skill runtime access,
 blocking security and domain decisions, and the owner required by file-mode
-scaffold unless repository evidence already supplies it. Pause while a
-blocking human decision remains unresolved.
+scaffold. Pause while a blocking human decision remains unresolved.
 
 Do not block creation on runtime task unknowns when the Skill contract can
 detect and report them with evidence, continue unaffected work, request runtime
@@ -1078,7 +1077,10 @@ examples—see [Advanced Skill Authoring](advanced-skill-authoring.md). That gui
 keeps focused-workflow authoring separate from static Skill Discovery.
 Repository and local support discovery, `renma.continues-with`, explicit
 `renma.published-entrypoint`, adoption states, and the discovery graph view are
-implemented. Reachability, coverage evaluation, and `skill-index` are not.
+implemented together with reachability, coverage evaluation, route-cycle review,
+and `skill-index`. See the
+[Skill Discovery Graph and Index contract](skill-discovery.md) for the complete
+static boundary.
 
 ## Optional Codex Example
 

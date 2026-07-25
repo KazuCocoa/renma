@@ -1,84 +1,92 @@
 # Renma Documentation
 
-Use this index to choose the smallest document that answers your question.
+Each document below has one primary responsibility. Follow the link whose
+authority matches the question instead of copying its contract into another
+document.
 
 ## Start Here
 
-- [README](../README.md): product identity, boundaries, quick start, primary
-  workflows, and command orientation.
-- [User Manual](user-manual.md): operational workflows, command behavior,
-  output formats, and CI usage.
-- [Authoring Guide](authoring-guide.md): canonical new-Skill and existing-Skill
-  authoring workflows. New Skill generation and intentional boundary redesign
-  start with the interactive clarification protocol printed by
-  `renma guide skill`; the consuming LLM conducts the conversation while Renma
-  remains deterministic and non-interactive. Ordinary existing-Skill
-  maintenance starts with `scan`.
+- [README](../README.md) is the product entrypoint: what Renma is, why a
+  Context Repository exists, the primary product boundary, installation, first
+  use, and a short command overview.
+- [User Manual](user-manual.md) is authoritative for current CLI workflows,
+  command purposes, options, formats, examples, expected outputs, and next
+  steps. Emitted `renma --help` and `renma <command> --help` remain the
+  command-line authority.
+- [Authoring Guide](authoring-guide.md) is authoritative for new-Skill and
+  existing-Skill authoring workflows, clarification, the creation gate, and the
+  boundary between Renma and the consuming LLM.
 
-## Format And Governance Contracts
+## Diagnostics And Security
 
-- [Agent Skills Compatibility and Migration](agent-skills-compatibility.md):
-  canonical Skill format, pre-0.16 migration, conflicts, and blocked migration.
-- [Security Policy Guide](security-policy.md): security metadata semantics,
-  profiles, diagnostics, and review boundaries.
-- [Repository Context BOM](repository-context-bom.md): authoritative BOM v2
-  snapshot, output, reproducibility, migration, and provenance contract.
-- [Trust Graph v2 Contract](trust-graph.md): authoritative node, edge,
-  provenance, ordering, and compatibility contract.
-- [Published JSON Schemas](schemas/): machine-readable BOM v2 and Trust Graph
-  v2 contracts included in the npm package.
-- [Diagnostics Reference](diagnostics.md): scan finding identifiers and repair
-  guidance.
-- [Declared Composition](declared-composition.md): required and optional
-  closure, provenance, completeness, cycle, conflict, and graph-view contract.
-- [Declared Impact](declared-impact.md): reverse required and optional
-  composition closure, dependent Skill summaries, provenance, and change-review
-  boundary.
-- [Skill Discovery Graph and Index](skill-discovery.md): canonical Skill continuation and
-  publication metadata, repository-wide adoption, exact resolution,
-  eligibility/usability, diagnostics, structural roots, the discovery graph
-  view, and canonical `renma.skill-index.v1` command/report.
-- [Renma Quality Profile](quality-profile.md): canonical thresholds,
-  units, provenance, rationale, false-positive risks, and configuration status.
+- [Diagnostics Reference](diagnostics.md) defines Finding semantics, diagnostic
+  interpretation, classification and evidence conventions,
+  compatibility-sensitive identifiers, repair constraints, and verification
+  expectations.
+- [Security Policy Guide](security-policy.md) defines supported security
+  metadata and bounded agent-facing instruction analysis. It also defines the
+  boundary between Renma, SAST, secret scanning, dependency scanning, and
+  runtime controls.
+- [Renma Quality Profile](quality-profile.md) records the exact deterministic
+  thresholds, units, provenance, rationale, and configuration status used by
+  quality checks.
+- [Metadata Budget](metadata-budget.md) focuses on metadata size diagnostics.
+- [Context Lifecycle Diagnostics](context-lifecycle-diagnostics.md),
+  [Context Conflict Diagnostics](context-conflict-diagnostics.md), and
+  [Context Language Diagnostics](context-language-diagnostics.md) explain their
+  respective focused diagnostic families.
 
-## Focused References
+## Asset And Relationship Contracts
 
-- [Advanced Skill Authoring](advanced-skill-authoring.md): deriving focused,
-  bounded Skills from existing workflows while using progressive disclosure.
-- [Context Lens](context-lens.md): canonical semantics, placement decisions,
-  persona guidance, fields, examples, and runtime boundaries.
-- [Context Lifecycle Diagnostics](context-lifecycle-diagnostics.md)
-- [Context Conflict Diagnostics](context-conflict-diagnostics.md)
-- [Context Language Diagnostics](context-language-diagnostics.md)
-- [Metadata Budget](metadata-budget.md)
+- [Agent Skills Compatibility and Migration](agent-skills-compatibility.md)
+  defines canonical Skill paths and metadata, accepted migration-only forms,
+  validation, and the one-way migration boundary.
+- [Advanced Skill Authoring](advanced-skill-authoring.md) applies the canonical
+  authoring model to focused workflows, orchestration, and progressive
+  disclosure.
+- [Context Lens](context-lens.md) defines when a Context Lens is justified, its
+  fields and relationships, and its non-runtime boundary.
+- [Declared Composition](declared-composition.md) defines the forward explicit
+  required/optional closure, provenance, completeness, conflicts, and cycles.
+- [Declared Impact](declared-impact.md) defines the reverse explicit
+  composition closure and its change-review boundary.
+- [Skill Discovery](skill-discovery.md) defines declared continuations,
+  publication, route resolution, reachability, coverage,
+  `renma.skill-index.v1`, Discovery diff, and warn-only CI policy without
+  describing runtime routing.
+- [Repository Context BOM v2](repository-context-bom.md) defines
+  `renma.repository-context-bom.v2`, deterministic ordering, reproducibility,
+  and the declared-manifest boundary.
+- [Trust Graph v2](trust-graph.md) defines `renma.trustGraph.v2`, node and edge
+  provenance, ordering, and the distinction between evidence and a trust score.
+- [Published JSON Schemas](schemas/) contains the machine-readable BOM v2 and
+  Trust Graph v2 contracts shipped in the npm package.
 
-## Product Model And Direction
+## Architecture, Design, Direction, And History
 
-- [Product Design](../design.md): asset semantics and relationships.
-- [Architecture](../architecture.md): processing architecture and product
-  boundaries.
-- [Internal Architecture](internal-architecture.md): contributor-facing
-  snapshot, evidence, decision, rendering, and fail-closed boundaries.
-- [Current Roadmap](https://github.com/KazuCocoa/renma/blob/main/plan.md):
-  shipped baseline, product boundaries, and forward-looking priorities.
-- [Skill Discovery Design](https://github.com/KazuCocoa/renma/blob/main/plan-discovery.md):
-  complete layered design and
-  release slicing. The 0.22.0 route foundation, 0.22.1 publication/adoption,
-  0.22.2 reachability/coverage, 0.22.3 Skill Index, and 0.22.4 route-cycle
-  stabilization slices are operational.
+- [Public Architecture](../architecture.md) owns the high-level layers, data
+  flow, stable product boundaries, and public contract surfaces.
+- [Internal Architecture](internal-architecture.md) owns module
+  responsibilities, dependency direction, shared projections, compatibility
+  facades, invariants, and implementation rationale.
+- [Product Design](../design.md) owns durable product decisions and distinctions,
+  including capabilities intentionally outside Renma core.
+- [Current Roadmap](https://github.com/KazuCocoa/renma/blob/main/plan.md) owns
+  the current stabilization checkpoint, open candidates, deferred ecosystem
+  concerns, and explicit non-commitments.
+- [Skill Discovery Design](https://github.com/KazuCocoa/renma/blob/main/plan-discovery.md)
+  records the durable rationale behind the current static Discovery boundary;
+  the current operational contract remains in
+  [Skill Discovery](skill-discovery.md).
+- [Changelog](../CHANGELOG.md) owns chronological release history,
+  version-specific changes, and compatibility notes.
 
 ## Examples
 
-- [Interactive Placeholder Example](https://github.com/KazuCocoa/renma/tree/main/examples/interactive-placeholder):
-  a
-  minimal hands-on clarify-before-act Skill interaction with a local tool.
-- [Example Context Repository](https://github.com/KazuCocoa/renma/tree/main/examples/context-repo):
-  richer
-  repository-aware Skill, Context Lens, and Context Asset governance.
-- [Context Lens Example](https://github.com/KazuCocoa/renma/tree/main/examples/context-lens):
-  focused Context Lens
-  governance.
-- [GitHub Actions example](https://github.com/KazuCocoa/renma/blob/main/examples/github-actions/renma-ci-report.yml):
-  live
-  Skill validation, focused composition, catalog, CI report artifacts, and an
-  updatable CI report comment on same-repository pull requests.
+Repository examples are source-checkout resources rather than npm package
+contents:
+
+- [Interactive Placeholder](https://github.com/KazuCocoa/renma/tree/main/examples/interactive-placeholder)
+- [Example Context Repository](https://github.com/KazuCocoa/renma/tree/main/examples/context-repo)
+- [Context Lens](https://github.com/KazuCocoa/renma/tree/main/examples/context-lens)
+- [GitHub Actions](https://github.com/KazuCocoa/renma/blob/main/examples/github-actions/renma-ci-report.yml)

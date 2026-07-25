@@ -1,11 +1,11 @@
 import packageJson from "../package.json" with { type: "json" };
 
 /**
- * Renma's versioned deterministic quality policy.
+ * Renma's deterministic quality policy.
  *
  * These values are Renma advisories unless a field is explicitly grouped
  * under `agentSkills`. They are deliberately internal: repositories
- * cannot override them through renma.config.json yet.
+ * cannot override them through renma.config.json.
  */
 export const RENMA_QUALITY_PROFILE_VERSION =
   `renma-quality@${packageJson.version}` as const;

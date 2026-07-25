@@ -12,6 +12,10 @@ export type VisibleLineProjection = {
 
 type RemovedRange = { start: number; end: number };
 
+/**
+ * Remove comments while retaining a monotonic source-to-visible offset map, so
+ * diagnostics over projected text can be mapped back to original source lines.
+ */
 export function projectVisibleLines(
   lines: string[],
   comments: SourceColumnRange[],
