@@ -60,6 +60,15 @@ The review boundary is:
 LLM proposes. Renma verifies. Human approves.
 ```
 
+```mermaid
+flowchart LR
+  Proposer["LLM or coding agent"] -->|proposes changes| Repository["Git-reviewed Context Repository<br/>Skills · Context Assets · Context Lenses · policy"]
+  Repository -->|repository instructions and assets| Renma["Renma<br/>deterministic static analysis"]
+  Renma -->|produces| Evidence["Review evidence<br/>findings · catalog · graphs · readiness · diff"]
+  Evidence --> Reviewer["Human review and approval"]
+  Reviewer -->|approved changes return to Git| Repository
+```
+
 ## Agent Skills And Renma
 
 Canonical Agent Skills entrypoints are:
