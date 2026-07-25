@@ -128,7 +128,7 @@ For any request to release, publish, ship, or complete a Renma version:
 
 Renma のバージョンをリリース、公開、出荷、または完了する依頼では、次の手順を実行します。
 
-First inspect local and remote state and resume at the earliest incomplete step. Treat matching branch refs, an existing annotated tag, a successful tag workflow, verified npm metadata, and an existing GitHub Release as completed evidence. Never repeat an external write solely because an earlier workflow step is already complete.
+First inspect local and remote state and resume at the earliest incomplete step. Treat matching branch refs, an existing annotated tag, a successful tag workflow, verified npm metadata, and an existing GitHub Release as completed evidence. Completed evidence prevents re-execution of the corresponding external write.
 
 最初にローカルとリモートの状態を確認し、最初の未完了ステップから再開します。一致するブランチ ref、既存の注釈付きタグ、成功済みのタグワークフロー、検証済み npm メタデータ、および既存の GitHub Release を完了済みの証拠として扱います。前のワークフローステップがすでに完了しているという理由だけで、外部への書き込みを繰り返しません。
 
