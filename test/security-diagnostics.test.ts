@@ -4953,6 +4953,514 @@ Do not use network access for this workflow.
   assert.match(finding.evidence.snippet, /Do not use network access/);
 });
 
+test("body policy contradictions distinguish workflow bans from local safeguards", () => {
+  for (const { policy, body } of [
+    {
+      policy: "network_allowed: true",
+      body: "Do not allow npx to download a missing package.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Never let npx download a missing Appium package.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Do not allow npx to download a missing package from the internet.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Do not use the Git remote API for authentication.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Never call https://untrusted.example.com from this step.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Avoid external webhooks when running locally.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Do not use network access to production systems.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "No network access is required for local validation.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Network access is not required for local validation.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "There is no requirement for network access.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Network access is unnecessary for local validation.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Network access is optional for local validation.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "Never upload debug logs to a public bucket.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "Never perform external uploads to public buckets.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "Never upload anything to untrusted.example.com.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "External uploads are not required by this workflow.",
+    },
+    {
+      policy: "external_upload_allowed: true\nsecrets_allowed: true",
+      body: "Do not upload secrets to third-party services.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "Never print secrets to logs.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "Do not include credentials in command arguments.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "This workflow must not access credentials from production.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "Secrets are forbidden in command arguments.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "No secret access is needed for this task.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "The process does not require credentials.",
+    },
+  ]) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: disclosed
+${policy}
+---
+
+${body}
+`),
+    ]);
+
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "SEC-BODY-POLICY-CONTRADICTION",
+      ),
+      false,
+      body,
+    );
+  }
+
+  for (const { policy, body } of [
+    {
+      policy: "network_allowed: true",
+      body: "Do not use network access for this workflow.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "This workflow must run without internet access.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Internet access is forbidden for this workflow.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "This workflow must run entirely offline.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Never allow any network access for this workflow.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "No network access is allowed for this workflow.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "This workflow must not use the network.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "The workflow cannot access the internet.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "Never perform external uploads.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "This workflow must not upload anything externally.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "External uploads are forbidden.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "No external uploads are allowed for this workflow.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "This workflow must not upload files.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "Never upload files externally.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "Uploads must not be performed in this workflow.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "This workflow must run without access to secrets.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "This workflow must not access any credentials.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "Secrets are forbidden for this workflow.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "No secrets are allowed for this workflow.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "No secret access is allowed for this workflow.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "This workflow must run without secrets.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "Credentials must not be used in this workflow.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "No secrets may be used for this process.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "Never access credentials during this task.",
+    },
+  ]) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: disclosed
+${policy}
+---
+
+${body}
+`),
+    ]);
+
+    assert.equal(
+      findings.filter(
+        (finding) => finding.id === "SEC-BODY-POLICY-CONTRADICTION",
+      ).length,
+      1,
+      body,
+    );
+  }
+});
+
+test("body policy contradictions ignore explicit local phase qualifiers", () => {
+  for (const { policy, body } of [
+    {
+      policy: "network_allowed: true",
+      body: "Do not use network access during local setup.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Do not use network access for the installation step.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "Never perform external uploads during local validation.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "Never access credentials during local setup.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "No secret access is allowed for the validation step.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Do not use network access in local mode.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "Never perform external uploads during local run.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "Never access credentials for this command.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Do not use network access within the setup phase.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Do not use network access for authentication.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "Never perform external uploads during maintenance.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "No secret access is allowed in production.",
+    },
+  ]) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: disclosed
+${policy}
+---
+
+${body}
+`),
+    ]);
+
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "SEC-BODY-POLICY-CONTRADICTION",
+      ),
+      false,
+      body,
+    );
+  }
+});
+
+test("body policy contradictions ignore bounded requirement modal phrases", () => {
+  for (const { policy, body } of [
+    {
+      policy: "network_allowed: true",
+      body: "No network access should be required for local validation.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "No external uploads will be needed for local validation.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "No secret access should be needed for this task.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Network access may not be necessary for local validation.",
+    },
+  ]) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: disclosed
+${policy}
+---
+
+${body}
+`),
+    ]);
+
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "SEC-BODY-POLICY-CONTRADICTION",
+      ),
+      false,
+      body,
+    );
+  }
+});
+
+test("body policy requirement modal exclusion stays bounded to direct completions", () => {
+  for (const modal of ["should", "will", "would", "may"]) {
+    for (const polarity of ["", "not "]) {
+      for (const completion of ["required", "needed"]) {
+        const body = `No network access ${modal} ${polarity}be ${completion} for local validation.`;
+        const findings = securityDiagnosticFindings([
+          v2SecurityArtifact(`---
+allowed_data: disclosed
+network_allowed: true
+---
+
+${body}
+`),
+        ]);
+
+        assert.equal(
+          findings.some(
+            (finding) => finding.id === "SEC-BODY-POLICY-CONTRADICTION",
+          ),
+          false,
+          body,
+        );
+      }
+    }
+  }
+});
+
+test("body policy contradictions require a complete supported clause", () => {
+  for (const { policy, body } of [
+    {
+      policy: "network_allowed: true",
+      body: "No network access except to approved domains.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "No external uploads unless explicitly approved.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "No secret access except through the approved vault.",
+    },
+  ]) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: disclosed
+${policy}
+---
+
+${body}
+`),
+    ]);
+
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "SEC-BODY-POLICY-CONTRADICTION",
+      ),
+      false,
+      body,
+    );
+  }
+});
+
+test("unsupported clause remainders do not hide later workflow prohibitions", () => {
+  for (const { policy, body, expectedSnippet, rejectedSnippet } of [
+    {
+      policy: "network_allowed: true",
+      body: "No network access except to approved domains. This workflow must run offline.",
+      expectedSnippet: "This workflow must run offline.",
+      rejectedSnippet: "except to approved domains",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "No external uploads unless explicitly approved. External uploads are forbidden for this workflow.",
+      expectedSnippet: "External uploads are forbidden for this workflow.",
+      rejectedSnippet: "unless explicitly approved",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "No secret access except through the approved vault. Credentials must not be used in this workflow.",
+      expectedSnippet: "Credentials must not be used in this workflow.",
+      rejectedSnippet: "except through the approved vault",
+    },
+  ]) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: disclosed
+${policy}
+---
+
+${body}
+`),
+    ]).filter((finding) => finding.id === "SEC-BODY-POLICY-CONTRADICTION");
+
+    assert.equal(findings.length, 1, body);
+    assert.equal(findings[0]?.evidence.snippet, expectedSnippet, body);
+    assert.doesNotMatch(
+      findings[0]?.evidence.snippet ?? "",
+      new RegExp(rejectedSnippet, "i"),
+      body,
+    );
+  }
+});
+
+test("requirement language and local safeguards do not hide workflow bans", () => {
+  for (const { policy, body } of [
+    {
+      policy: "network_allowed: true",
+      body: "Network access is not required for local validation. This workflow must run offline.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "No network access should be required for local validation. This workflow must run offline.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "No external uploads will be needed for local validation. Uploads must not be performed in this workflow.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "No secret access should be needed for this task. Credentials must not be used in this workflow.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Do not use network access during local setup. This workflow must not use the network.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "This workflow must not use the network. Do not use network access during local setup.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Do not allow npx to download a missing package. This workflow must not use the network.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "The workflow cannot access the internet. Do not allow npx to download a missing package.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "Never upload debug logs to a public bucket. Uploads must not be performed in this workflow.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "Credentials must not be used in this workflow. Never print secrets to logs.",
+    },
+  ]) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: disclosed
+${policy}
+---
+
+${body}
+`),
+    ]);
+
+    assert.equal(
+      findings.filter(
+        (finding) => finding.id === "SEC-BODY-POLICY-CONTRADICTION",
+      ).length,
+      1,
+      body,
+    );
+  }
+});
+
 test("security diagnostics recover shared syntax for copied documents", () => {
   const artifact = v2SecurityArtifact(`---
 allowed_data: disclosed

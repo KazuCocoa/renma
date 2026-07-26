@@ -143,12 +143,19 @@ Document preparation resolves the parsed and effective policies once, creates
 one `MarkdownSecurityView`, prepares one destination and security analysis for
 each logical command, and indexes a normalized prose projection for every line
 in each operational paragraph semantic unit. That private paragraph projection
-retains each source line's normalized start and end offsets. Genuine soft wraps
-use a space, while mdast `break` nodes preserve explicit Markdown hard breaks
-as newlines and therefore as clause boundaries. The shared security-command
+retains each source line's normalized start and end offsets. It also prepares
+the ordered paragraph list, disclosure-clause ranges, structural eligibility,
+and each physical line's intersecting clause range once. Genuine soft wraps use
+a space, while mdast `break` nodes preserve explicit Markdown hard breaks as
+newlines and therefore as clause boundaries. The shared security-command
 classifier evaluates action polarity only in clauses intersecting the current
 line range, so an action before a soft-wrapped secret term remains negated
-without allowing unrelated earlier clauses to guard later actions. The
+without allowing unrelated earlier clauses to guard later actions.
+
+Paragraph-clause destination analysis is cached privately by the exact prepared
+paragraph object plus its `clauseStart:clauseEnd` offsets. Repeated physical-line
+checks over the same clause reuse that result; normalized text alone is never a
+cache identity. Guard evidence and Finding evidence remain line-specific. The
 projection never crosses paragraph, list-item, blockquote, heading,
 thematic-break, hidden comment, or code boundaries, and it does not replace
 physical-line or logical-command evidence or analysis input.
@@ -179,6 +186,15 @@ candidates once, masks candidate text once, and records network and upload
 associations in one intermediate representation. Policy checks and command
 sink classification derive their network and upload views from that result
 instead of reclassifying raw text.
+
+`src/security-prose-vocabulary.ts` owns only exact lexical sources shared by
+multiple prose-oriented detectors. Each owning detector still controls regex
+structure, distance bounds, flags, captures, operational association, and
+evidence. Similar terms stay local when their semantics differ: command guards
+retain their disclosure-action union and polarity subsets, the sensitive-data
+classifier retains path and bounded data-flow grammar, and destination
+association retains its structural target rules. Shared regexes are compiled
+once at module initialization; no detector compiles patterns in a scan loop.
 
 Lexical classification and operational intent are separate. An explicit
 transport can carry network or upload intent even when its host cannot be

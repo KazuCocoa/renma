@@ -15,6 +15,12 @@ import type {
   OperationalDestination,
   ShellProjection,
 } from "./types.js";
+import {
+  CLOUD_UPLOAD_ACTION_TERMS,
+  CLOUD_UPLOAD_DESTINATION_TERMS,
+  EXTERNAL_UPLOAD_ACTION_TERMS,
+  EXTERNAL_UPLOAD_DESTINATION_TERMS,
+} from "../security-prose-vocabulary.js";
 
 type OffsetSpan = { start: number; end: number };
 type Association = Pick<
@@ -40,10 +46,14 @@ const CLAUSE_BOUNDARY_RE =
 const CLEAR_NETWORK_INSTRUCTION_RE = /\b(?:curl|wget|http|https|webhook)\b/i;
 const EXPLICIT_NETWORK_TARGET_RE =
   /\b(?:fetch|get|send|sync|push|upload|download|post|put)\b[^.;!?]{0,100}\b(?:external|remote|network|internet|webhook|api endpoint|server)\b/i;
-const EXTERNAL_UPLOAD_RE =
-  /\b(upload|send|post|share|attach|submit|sync|push|publish)\b.*\b(external|remote|third[- ]party|pastebin|gist|slack|discord|s3|gcs|cloud|storage|bucket|drive|dropbox|notion|jira|github)\b|\b(post|put)\b.*https?:\/\//i;
-const CLOUD_UPLOAD_RE =
-  /\b(upload|sync|copy|send|push|publish)\b.*\b(s3|gcs|cloud storage|bucket|drive|dropbox|box|onedrive|blob storage|azure storage|storage)\b/i;
+const EXTERNAL_UPLOAD_RE = new RegExp(
+  String.raw`\b(${EXTERNAL_UPLOAD_ACTION_TERMS})\b.*\b(${EXTERNAL_UPLOAD_DESTINATION_TERMS})\b|\b(post|put)\b.*https?:\/\/`,
+  "i",
+);
+const CLOUD_UPLOAD_RE = new RegExp(
+  String.raw`\b(${CLOUD_UPLOAD_ACTION_TERMS})\b.*\b(${CLOUD_UPLOAD_DESTINATION_TERMS})\b`,
+  "i",
+);
 
 export function analyzeDestinations(input: string): DestinationAnalysis {
   const shellProjection = projectShellContinuations(input);
