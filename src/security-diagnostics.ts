@@ -834,6 +834,54 @@ type SecurityDiagnosticsConfig = {
   security?: SecurityConfig;
 };
 
+interface PreparedLogicalCommandAnalysis {
+  readonly commands: readonly LogicalShellCommand[];
+  readonly commandByLine: ReadonlyMap<number, LogicalShellCommand>;
+  readonly destinationByCommand: ReadonlyMap<
+    LogicalShellCommand,
+    DestinationAnalysis
+  >;
+  readonly securityByCommand: ReadonlyMap<
+    LogicalShellCommand,
+    SecurityCommandAnalysis
+  >;
+}
+
+interface PreparedSecurityDocumentAnalysis {
+  readonly artifact: Artifact;
+  readonly parsedPolicy: SecurityPolicy;
+  readonly effectivePolicy: SecurityPolicy;
+  readonly securityConfig: SecurityConfig | undefined;
+  readonly policyIssues: readonly CanonicalSecurityMetadataIssue[];
+  readonly sourceLines: readonly string[];
+  readonly visibleLines: readonly string[];
+  readonly markdownView: MarkdownSecurityView;
+  readonly scanStart: number;
+  readonly logicalCommands: PreparedLogicalCommandAnalysis;
+}
+
+interface SecurityGuardHistory {
+  recentHumanApprovalLine: number;
+  recentRiskMitigationLine: number;
+}
+
+interface SecurityLineContext {
+  readonly index: number;
+  readonly lineNumber: number;
+  readonly line: string;
+  readonly quotedProse: boolean;
+  readonly commandLine: boolean;
+  readonly evidence: DetectionEvidence;
+  readonly hasHumanApprovalGuard: boolean;
+  readonly hasCommandRiskGuard: boolean;
+  readonly logicalCommand: LogicalShellCommand | undefined;
+  readonly logicalCommandStart: boolean;
+  readonly logicalDestinationAnalysis: DestinationAnalysis | undefined;
+  readonly logicalSecurityAnalysis: SecurityCommandAnalysis | undefined;
+  readonly lineSecurityAnalysis: () => SecurityCommandAnalysis;
+  readonly lineDestinationAnalysis: () => DestinationAnalysis;
+}
+
 export function securityDiagnosticFindings(
   inputs: Array<Artifact | ParsedDocument>,
   config: SecurityDiagnosticsConfig = {},
@@ -848,6 +896,25 @@ function securityFindingsForDocument(
   document: ParsedDocument,
   securityConfig?: SecurityConfig,
 ): Finding[] {
+  const prepared = prepareSecurityDocumentAnalysis(document, securityConfig);
+  if (prepared === undefined) return [];
+
+  const detections: Detection[] = [
+    ...collectPolicyPreludeDetections(prepared),
+    ...collectSecurityLineDetections(prepared),
+    ...collectSemanticInstructionDetections(prepared),
+    ...policyContradictions(prepared.effectivePolicy),
+  ];
+
+  return dedupeDetections(detections).map((detection) =>
+    findingFromDetection(prepared.artifact, detection),
+  );
+}
+
+function prepareSecurityDocumentAnalysis(
+  document: ParsedDocument,
+  securityConfig?: SecurityConfig,
+): PreparedSecurityDocumentAnalysis | undefined {
   const artifact = document.artifact;
   if (
     artifact.kind === "script" ||
@@ -855,10 +922,11 @@ function securityFindingsForDocument(
     artifact.contentClassification === "binary" ||
     !artifact.markdownParserEligible
   )
-    return [];
+    return undefined;
+
   const policyResolution = resolveOperationalSecurityPolicy(document);
   const parsedPolicy = policyResolution.policy;
-  const policy = applySecurityConfig(parsedPolicy, securityConfig);
+  const effectivePolicy = applySecurityConfig(parsedPolicy, securityConfig);
   const sourceLines = artifact.content.split(/\r?\n/);
   const syntax = ensureMarkdownSyntaxForDocument(document);
   if (syntax === undefined) {
@@ -868,33 +936,54 @@ function securityFindingsForDocument(
   }
   const markdownView = new MarkdownSecurityView(syntax);
   const scanStart = syntax.bodyStartLine - 1;
-  const detections: Detection[] = [
-    ...invalidCanonicalSecurityDetections(policyResolution.issues),
-    ...securityPolicyResolutionDetections(
-      parsedPolicy,
-      policy,
-      securityConfig,
-      artifact.content,
-      artifact.markdownParserEligible,
-      markdownView,
-    ),
-  ];
-  const lines = sourceLines.map((_, index) => markdownView.visibleLine(index));
-  const logicalCommands = logicalShellCommands(sourceLines, lines, scanStart, {
+  const visibleLines = sourceLines.map((_, index) =>
+    markdownView.visibleLine(index),
+  );
+  const logicalCommands = prepareLogicalCommandAnalysis(
+    sourceLines,
+    visibleLines,
+    scanStart,
+    markdownView,
+  );
+
+  return {
+    artifact,
+    parsedPolicy,
+    effectivePolicy,
+    securityConfig,
+    policyIssues: policyResolution.issues,
+    sourceLines,
+    visibleLines,
+    markdownView,
+    scanStart,
+    logicalCommands,
+  };
+}
+
+function prepareLogicalCommandAnalysis(
+  sourceLines: string[],
+  visibleLines: string[],
+  scanStart: number,
+  markdownView: MarkdownSecurityView,
+): PreparedLogicalCommandAnalysis {
+  const commands = logicalShellCommands(sourceLines, visibleLines, scanStart, {
     isLineEligible: (lineIndex) =>
-      isLogicalShellLineEligible(sourceLines, lines, lineIndex, markdownView),
+      isLogicalShellLineEligible(
+        sourceLines,
+        visibleLines,
+        lineIndex,
+        markdownView,
+      ),
     sameBlock: (firstLineIndex, secondLineIndex) =>
       markdownView.sameMarkdownBlock(firstLineIndex, secondLineIndex),
     isCodeContentLine: (lineIndex) => markdownView.isCodeContentLine(lineIndex),
   });
-  const logicalCommandByLine = new Map<number, LogicalShellCommand>();
-  const destinationAnalysisByLogicalCommand =
-    analyzeLogicalShellCommands(logicalCommands);
-  const securityAnalysisByLogicalCommand = new Map(
-    logicalCommands.map((command) => {
+  const destinationByCommand = analyzeLogicalShellCommands(commands);
+  const securityByCommand = new Map(
+    commands.map((command) => {
       const destinationAnalysis = requireLogicalDestinationAnalysis(
         command,
-        destinationAnalysisByLogicalCommand.get(command),
+        destinationByCommand.get(command),
       );
       const startLineIndex = command.memberLineIndexes[0] ?? 0;
       const language = markdownView.languageAt(startLineIndex);
@@ -917,19 +1006,48 @@ function securityFindingsForDocument(
       ] as const;
     }),
   );
-  for (const command of logicalCommands) {
+  const commandByLine = new Map<number, LogicalShellCommand>();
+  for (const command of commands) {
     for (const lineIndex of command.memberLineIndexes) {
-      logicalCommandByLine.set(lineIndex, command);
+      commandByLine.set(lineIndex, command);
     }
   }
-  let recentHumanApprovalLine = 0;
-  let recentRiskMitigationLine = 0;
 
+  return {
+    commands,
+    commandByLine,
+    destinationByCommand,
+    securityByCommand,
+  };
+}
+
+function collectPolicyPreludeDetections(
+  prepared: PreparedSecurityDocumentAnalysis,
+): Detection[] {
+  const {
+    artifact,
+    parsedPolicy,
+    effectivePolicy,
+    securityConfig,
+    policyIssues,
+    markdownView,
+  } = prepared;
+  const detections: Detection[] = [
+    ...invalidCanonicalSecurityDetections(policyIssues),
+    ...securityPolicyResolutionDetections(
+      parsedPolicy,
+      effectivePolicy,
+      securityConfig,
+      artifact.content,
+      artifact.markdownParserEligible,
+      markdownView,
+    ),
+  ];
   if (
     (artifact.kind === "skill" || artifact.kind === "context") &&
     !parsedPolicy.invalidDeclared.has("allowedData") &&
-    effectiveAllowedDataClass(policy) === undefined &&
-    effectiveAllowedDataList(policy).length === 0
+    effectiveAllowedDataClass(effectivePolicy) === undefined &&
+    effectiveAllowedDataList(effectivePolicy).length === 0
   ) {
     detections.push({
       metadata: RULES.missingPolicyMetadata,
@@ -942,219 +1060,296 @@ function securityFindingsForDocument(
   detections.push(
     ...bodyPolicyContradictionDetections(
       artifact.content,
-      policy,
+      effectivePolicy,
       artifact.markdownParserEligible,
       markdownView,
     ),
   );
 
-  for (let index = scanStart; index < lines.length; index += 1) {
-    const lineNumber = index + 1;
-    const line = lines[index] ?? "";
-    const shellComment = isShellCommentLine(line, index, markdownView);
-    if (shellComment) {
-      continue;
-    }
-    if (artifact.markdownParserEligible && isPolicyLine(line)) {
-      continue;
-    }
-    const quotedProse = markdownView?.isBlockQuotedLine(index) ?? false;
-    const hasHumanApprovalGuard =
-      hasExplicitHumanApprovalGuard(line) ||
-      (recentHumanApprovalLine > 0 &&
-        lineNumber - recentHumanApprovalLine <=
-          DEFAULT_QUALITY_PROFILE.security.precedingLineFastPath &&
-        isPrecedingGuardWithinBoundary(
-          lines,
-          recentHumanApprovalLine - 1,
-          index,
-          markdownView,
-        )) ||
-      hasStructuredGuard(
-        lines,
-        index,
-        hasExplicitHumanApprovalGuard,
-        markdownView,
-      );
-    const hasCommandRiskGuard =
-      hasHumanApprovalGuard ||
-      hasLocalRiskMitigationGuard(line) ||
-      (recentRiskMitigationLine > 0 &&
-        lineNumber - recentRiskMitigationLine <=
-          DEFAULT_QUALITY_PROFILE.security.precedingLineFastPath &&
-        isPrecedingGuardWithinBoundary(
-          lines,
-          recentRiskMitigationLine - 1,
-          index,
-          markdownView,
-        )) ||
-      hasStructuredGuard(
-        lines,
-        index,
-        hasLocalRiskMitigationGuard,
-        markdownView,
-      );
-    const commandLine =
-      !shellComment &&
-      ((markdownView?.isCodeContentLine(index) ?? false) ||
-        isCommandLike(line) ||
-        CREDENTIAL_ARG_ANY_RE.test(line) ||
-        CREDENTIAL_HEADER_RE.test(line));
-    const evidence: DetectionEvidence = {
-      startLine: lineNumber,
-      snippet: line,
-    };
-    const logicalCommand = logicalCommandByLine.get(index);
-    const logicalCommandStart = logicalCommand?.memberLineIndexes[0] === index;
-    const logicalDestinationAnalysis =
-      logicalCommand === undefined
-        ? undefined
-        : destinationAnalysisByLogicalCommand.get(logicalCommand);
-    const logicalSecurityAnalysis =
-      logicalCommand === undefined
-        ? undefined
-        : securityAnalysisByLogicalCommand.get(logicalCommand);
-    let cachedLineSecurityAnalysis: SecurityCommandAnalysis | undefined;
-    const lineSecurityAnalysis = (): SecurityCommandAnalysis => {
-      const language = markdownView.languageAt(index);
-      cachedLineSecurityAnalysis ??= analyzeSecurityCommand({
-        source: {
-          text: line,
-          startLine: lineNumber,
-          endLine: lineNumber,
-          lines: [line],
-          ...(language === undefined ? {} : { language }),
-        },
-        guards: markdownView.associatedGuardEvidence(index),
-      });
-      return cachedLineSecurityAnalysis;
-    };
-    const lineDestinationAnalysis = (): DestinationAnalysis => {
-      return lineSecurityAnalysis().destinationAnalysis;
-    };
+  return detections;
+}
 
-    if (!quotedProse) {
-      if (logicalCommand === undefined) {
-        detections.push(
-          ...policyDetections(line, evidence, policy, hasHumanApprovalGuard, {
-            scope: "all",
-            analysis: lineDestinationAnalysis(),
-          }),
-        );
-      } else {
-        detections.push(
-          ...policyDetections(line, evidence, policy, hasHumanApprovalGuard, {
-            scope: "line-local",
-          }),
-        );
-        if (logicalCommandStart) {
-          detections.push(
-            ...policyDetections(
-              logicalCommand.shellProjection.projection,
-              logicalShellCommandEvidence(logicalCommand),
-              policy,
-              hasHumanApprovalGuard,
-              {
-                scope: "destination",
-                analysis: requireLogicalDestinationAnalysis(
-                  logicalCommand,
-                  logicalDestinationAnalysis,
-                ),
-              },
-            ),
-          );
-        }
-      }
-      detections.push(...disallowedCommandDetections(line, lineNumber, policy));
-      if (logicalCommand === undefined) {
-        detections.push(
-          ...sensitiveDataDetections(
-            line,
-            evidence,
-            policy,
-            lineSecurityAnalysis(),
-          ),
-        );
-      } else if (logicalCommandStart && logicalSecurityAnalysis !== undefined) {
-        detections.push(
-          ...sensitiveDataDetections(
-            logicalCommand.shellProjection.projection,
-            logicalShellCommandEvidence(logicalCommand),
-            policy,
-            logicalSecurityAnalysis,
-          ),
-        );
-      }
-      if (logicalCommand === undefined) {
-        if (
-          !commandLine ||
-          policy.declared.size > 0 ||
-          isUploadInstruction(lineDestinationAnalysis())
-        ) {
-          detections.push(
-            ...networkAndUploadDetections(
-              line,
-              evidence,
-              policy,
-              lineDestinationAnalysis(),
-            ),
-          );
-        }
-      } else if (
-        logicalCommandStart &&
-        (policy.declared.size > 0 ||
-          (logicalDestinationAnalysis !== undefined &&
-            isUploadInstruction(logicalDestinationAnalysis)))
-      ) {
-        detections.push(
-          ...networkAndUploadDetections(
-            logicalCommand.shellProjection.projection,
-            logicalShellCommandEvidence(logicalCommand),
-            policy,
-            requireLogicalDestinationAnalysis(
-              logicalCommand,
-              logicalDestinationAnalysis,
-            ),
-          ),
-        );
-      }
-      detections.push(...contextScopeDetections(line, lineNumber));
-      detections.push(...predictableTempDetections(line, lineNumber));
-    }
+function collectSecurityLineDetections(
+  prepared: PreparedSecurityDocumentAnalysis,
+): Detection[] {
+  const detections: Detection[] = [];
+  const guardHistory: SecurityGuardHistory = {
+    recentHumanApprovalLine: 0,
+    recentRiskMitigationLine: 0,
+  };
 
-    if (commandLine && !quotedProse) {
+  for (
+    let index = prepared.scanStart;
+    index < prepared.visibleLines.length;
+    index += 1
+  ) {
+    const context = prepareSecurityLineContext(prepared, guardHistory, index);
+    if (context === undefined) continue;
+    detections.push(...securityLineDetections(prepared, context));
+    updateSecurityGuardHistory(guardHistory, context);
+  }
+
+  return detections;
+}
+
+function prepareSecurityLineContext(
+  prepared: PreparedSecurityDocumentAnalysis,
+  guardHistory: SecurityGuardHistory,
+  index: number,
+): SecurityLineContext | undefined {
+  const { artifact, visibleLines, markdownView, logicalCommands } = prepared;
+  const lineNumber = index + 1;
+  const line = visibleLines[index] ?? "";
+  if (isShellCommentLine(line, index, markdownView)) {
+    return undefined;
+  }
+  if (artifact.markdownParserEligible && isPolicyLine(line)) {
+    return undefined;
+  }
+
+  const quotedProse = markdownView.isBlockQuotedLine(index);
+  const hasHumanApprovalGuard =
+    hasExplicitHumanApprovalGuard(line) ||
+    (guardHistory.recentHumanApprovalLine > 0 &&
+      lineNumber - guardHistory.recentHumanApprovalLine <=
+        DEFAULT_QUALITY_PROFILE.security.precedingLineFastPath &&
+      isPrecedingGuardWithinBoundary(
+        visibleLines,
+        guardHistory.recentHumanApprovalLine - 1,
+        index,
+        markdownView,
+      )) ||
+    hasStructuredGuard(
+      visibleLines,
+      index,
+      hasExplicitHumanApprovalGuard,
+      markdownView,
+    );
+  const hasCommandRiskGuard =
+    hasHumanApprovalGuard ||
+    hasLocalRiskMitigationGuard(line) ||
+    (guardHistory.recentRiskMitigationLine > 0 &&
+      lineNumber - guardHistory.recentRiskMitigationLine <=
+        DEFAULT_QUALITY_PROFILE.security.precedingLineFastPath &&
+      isPrecedingGuardWithinBoundary(
+        visibleLines,
+        guardHistory.recentRiskMitigationLine - 1,
+        index,
+        markdownView,
+      )) ||
+    hasStructuredGuard(
+      visibleLines,
+      index,
+      hasLocalRiskMitigationGuard,
+      markdownView,
+    );
+  const commandLine =
+    markdownView.isCodeContentLine(index) ||
+    isCommandLike(line) ||
+    CREDENTIAL_ARG_ANY_RE.test(line) ||
+    CREDENTIAL_HEADER_RE.test(line);
+  const evidence: DetectionEvidence = {
+    startLine: lineNumber,
+    snippet: line,
+  };
+  const logicalCommand = logicalCommands.commandByLine.get(index);
+  const logicalCommandStart = logicalCommand?.memberLineIndexes[0] === index;
+  const logicalDestinationAnalysis =
+    logicalCommand === undefined
+      ? undefined
+      : logicalCommands.destinationByCommand.get(logicalCommand);
+  const logicalSecurityAnalysis =
+    logicalCommand === undefined
+      ? undefined
+      : logicalCommands.securityByCommand.get(logicalCommand);
+  let cachedLineSecurityAnalysis: SecurityCommandAnalysis | undefined;
+  const lineSecurityAnalysis = (): SecurityCommandAnalysis => {
+    const language = markdownView.languageAt(index);
+    cachedLineSecurityAnalysis ??= analyzeSecurityCommand({
+      source: {
+        text: line,
+        startLine: lineNumber,
+        endLine: lineNumber,
+        lines: [line],
+        ...(language === undefined ? {} : { language }),
+      },
+      guards: markdownView.associatedGuardEvidence(index),
+    });
+    return cachedLineSecurityAnalysis;
+  };
+  const lineDestinationAnalysis = (): DestinationAnalysis => {
+    return lineSecurityAnalysis().destinationAnalysis;
+  };
+
+  return {
+    index,
+    lineNumber,
+    line,
+    quotedProse,
+    commandLine,
+    evidence,
+    hasHumanApprovalGuard,
+    hasCommandRiskGuard,
+    logicalCommand,
+    logicalCommandStart,
+    logicalDestinationAnalysis,
+    logicalSecurityAnalysis,
+    lineSecurityAnalysis,
+    lineDestinationAnalysis,
+  };
+}
+
+function securityLineDetections(
+  prepared: PreparedSecurityDocumentAnalysis,
+  context: SecurityLineContext,
+): Detection[] {
+  const { effectivePolicy: policy } = prepared;
+  const {
+    lineNumber,
+    line,
+    quotedProse,
+    commandLine,
+    evidence,
+    hasHumanApprovalGuard,
+    hasCommandRiskGuard,
+    logicalCommand,
+    logicalCommandStart,
+    logicalDestinationAnalysis,
+    logicalSecurityAnalysis,
+    lineSecurityAnalysis,
+    lineDestinationAnalysis,
+  } = context;
+  const detections: Detection[] = [];
+
+  if (!quotedProse) {
+    if (logicalCommand === undefined) {
       detections.push(
-        ...commandDetections(
+        ...policyDetections(line, evidence, policy, hasHumanApprovalGuard, {
+          scope: "all",
+          analysis: lineDestinationAnalysis(),
+        }),
+      );
+    } else {
+      detections.push(
+        ...policyDetections(line, evidence, policy, hasHumanApprovalGuard, {
+          scope: "line-local",
+        }),
+      );
+      if (logicalCommandStart) {
+        detections.push(
+          ...policyDetections(
+            logicalCommand.shellProjection.projection,
+            logicalShellCommandEvidence(logicalCommand),
+            policy,
+            hasHumanApprovalGuard,
+            {
+              scope: "destination",
+              analysis: requireLogicalDestinationAnalysis(
+                logicalCommand,
+                logicalDestinationAnalysis,
+              ),
+            },
+          ),
+        );
+      }
+    }
+    detections.push(...disallowedCommandDetections(line, lineNumber, policy));
+    if (logicalCommand === undefined) {
+      detections.push(
+        ...sensitiveDataDetections(
           line,
-          lineNumber,
-          hasCommandRiskGuard,
-          logicalCommand === undefined
-            ? lineSecurityAnalysis()
-            : logicalCommandStart
-              ? logicalSecurityAnalysis
-              : undefined,
+          evidence,
+          policy,
+          lineSecurityAnalysis(),
+        ),
+      );
+    } else if (logicalCommandStart && logicalSecurityAnalysis !== undefined) {
+      detections.push(
+        ...sensitiveDataDetections(
+          logicalCommand.shellProjection.projection,
+          logicalShellCommandEvidence(logicalCommand),
+          policy,
+          logicalSecurityAnalysis,
         ),
       );
     }
-
-    if (!quotedProse && hasExplicitHumanApprovalGuard(line)) {
-      recentHumanApprovalLine = lineNumber;
+    if (logicalCommand === undefined) {
+      if (
+        !commandLine ||
+        policy.declared.size > 0 ||
+        isUploadInstruction(lineDestinationAnalysis())
+      ) {
+        detections.push(
+          ...networkAndUploadDetections(
+            line,
+            evidence,
+            policy,
+            lineDestinationAnalysis(),
+          ),
+        );
+      }
+    } else if (
+      logicalCommandStart &&
+      (policy.declared.size > 0 ||
+        (logicalDestinationAnalysis !== undefined &&
+          isUploadInstruction(logicalDestinationAnalysis)))
+    ) {
+      detections.push(
+        ...networkAndUploadDetections(
+          logicalCommand.shellProjection.projection,
+          logicalShellCommandEvidence(logicalCommand),
+          policy,
+          requireLogicalDestinationAnalysis(
+            logicalCommand,
+            logicalDestinationAnalysis,
+          ),
+        ),
+      );
     }
-    if (!quotedProse && hasLocalRiskMitigationGuard(line)) {
-      recentRiskMitigationLine = lineNumber;
-    }
+    detections.push(...contextScopeDetections(line, lineNumber));
+    detections.push(...predictableTempDetections(line, lineNumber));
   }
 
-  if (markdownView !== undefined) {
-    for (const unit of markdownView.semanticUnits) {
-      detections.push(...semanticInstructionDetections(unit, markdownView));
-    }
+  if (commandLine && !quotedProse) {
+    detections.push(
+      ...commandDetections(
+        line,
+        lineNumber,
+        hasCommandRiskGuard,
+        logicalCommand === undefined
+          ? lineSecurityAnalysis()
+          : logicalCommandStart
+            ? logicalSecurityAnalysis
+            : undefined,
+      ),
+    );
   }
 
-  detections.push(...policyContradictions(policy));
-  return dedupeDetections(detections).map((detection) =>
-    findingFromDetection(artifact, detection),
-  );
+  return detections;
+}
+
+function updateSecurityGuardHistory(
+  guardHistory: SecurityGuardHistory,
+  context: SecurityLineContext,
+): void {
+  if (!context.quotedProse && hasExplicitHumanApprovalGuard(context.line)) {
+    guardHistory.recentHumanApprovalLine = context.lineNumber;
+  }
+  if (!context.quotedProse && hasLocalRiskMitigationGuard(context.line)) {
+    guardHistory.recentRiskMitigationLine = context.lineNumber;
+  }
+}
+
+function collectSemanticInstructionDetections(
+  prepared: PreparedSecurityDocumentAnalysis,
+): Detection[] {
+  const detections: Detection[] = [];
+  for (const unit of prepared.markdownView.semanticUnits) {
+    detections.push(
+      ...semanticInstructionDetections(unit, prepared.markdownView),
+    );
+  }
+  return detections;
 }
 
 function requireLogicalDestinationAnalysis(
@@ -1990,7 +2185,7 @@ function pushOverrideContradiction(
 }
 
 function invalidCanonicalSecurityDetections(
-  issues: CanonicalSecurityMetadataIssue[],
+  issues: readonly CanonicalSecurityMetadataIssue[],
 ): Detection[] {
   return issues.map((issue) => ({
     metadata: {
@@ -2506,7 +2701,7 @@ function hasLocalRiskMitigationGuard(line: string): boolean {
 }
 
 function isPrecedingGuardWithinBoundary(
-  lines: string[],
+  lines: readonly string[],
   guardIndex: number,
   instructionIndex: number,
   markdownView?: MarkdownSecurityView,
@@ -2521,7 +2716,7 @@ function isPrecedingGuardWithinBoundary(
 }
 
 function hasStructuredGuard(
-  lines: string[],
+  lines: readonly string[],
   commandIndex: number,
   guard: (line: string) => boolean,
   markdownView?: MarkdownSecurityView,
