@@ -166,7 +166,8 @@ candidate mentioned in one clause, it records modality, scope,
 supported-clause completeness, and normalized source offsets independently.
 One clause may therefore produce multiple facts for the same domain when
 coordinated statements carry independent requirement, scope, safeguard, or
-prohibition meaning.
+prohibition meaning. Coordinated predicates may inherit one explicit workflow
+subject while retaining predicate-local classification and evidence.
 Only a complete `prohibited` fact with `workflow` scope can contradict an
 enabled permissive policy for the same domain. `unknown`, `not-required`,
 `local-safeguard`, local-step, specific-source, specific-target, and

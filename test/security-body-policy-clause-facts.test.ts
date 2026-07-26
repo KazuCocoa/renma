@@ -35,6 +35,15 @@ interface SameClauseRegressionCase {
   readonly prefixCompleteness: BodyPolicyClauseFacts["completeness"];
 }
 
+interface SharedSubjectRegressionCase {
+  readonly name: string;
+  readonly domain: PolicyDomain;
+  readonly firstPredicate: string;
+  readonly firstModality: BodyPolicyModality;
+  readonly firstScope: BodyPolicyScope;
+  readonly laterPredicate: string;
+}
+
 const BODY_POLICY_MATRIX: readonly CharacterizationCase[] = [
   {
     name: "network prohibited workflow complete",
@@ -221,6 +230,37 @@ const SAME_CLAUSE_REGRESSIONS: readonly SameClauseRegressionCase[] = [
   ),
 ];
 
+const SHARED_SUBJECT_REGRESSIONS: readonly SharedSubjectRegressionCase[] = [
+  ...sharedSubjectDomainCases("network", "must not use the network", {
+    affirmativeRequirement: "requires network access",
+    negativeRequirement: "does not require network access",
+    specificRestriction: "must not use network access to production systems",
+    specificScope: "specific-target",
+    specificModality: "local-safeguard",
+    localSafeguard:
+      "must not allow npx to download a missing package from the internet",
+    localSafeguardScope: "specific-source",
+  }),
+  ...sharedSubjectDomainCases("upload", "must not upload files", {
+    affirmativeRequirement: "requires external uploads",
+    negativeRequirement: "does not require external uploads",
+    specificRestriction: "must not upload logs to a public bucket",
+    specificScope: "specific-target",
+    specificModality: "prohibited",
+    localSafeguard: "must not upload secrets to third-party services",
+    localSafeguardScope: "specific-target",
+  }),
+  ...sharedSubjectDomainCases("secrets", "must not use credentials", {
+    affirmativeRequirement: "requires credentials",
+    negativeRequirement: "does not require credentials",
+    specificRestriction: "must not access credentials from production",
+    specificScope: "specific-source",
+    specificModality: "prohibited",
+    localSafeguard: "must not print secrets to logs",
+    localSafeguardScope: "specific-target",
+  }),
+];
+
 test("body-policy characterization matrix preserves the 0.24.4 decision boundary", () => {
   for (const fixture of BODY_POLICY_MATRIX) {
     const findings = bodyPolicyFindings(fixture.body, fixture.domain);
@@ -337,6 +377,144 @@ test("same-domain candidates remain independent before later workflow prohibitio
         `${fixture.name}, ${variant.name}`,
       );
     }
+  }
+});
+
+test("shared workflow subjects retain independent coordinated predicate facts", () => {
+  for (const fixture of SHARED_SUBJECT_REGRESSIONS) {
+    for (const variant of [
+      {
+        name: "and",
+        body: `This workflow ${fixture.firstPredicate} and ${fixture.laterPredicate}.`,
+      },
+      {
+        name: "comma and",
+        body: `This workflow ${fixture.firstPredicate}, and ${fixture.laterPredicate}.`,
+      },
+      {
+        name: "soft wrapped",
+        body: `This workflow ${fixture.firstPredicate}, and\n${fixture.laterPredicate}.`,
+      },
+    ]) {
+      const normalizedClause = variant.body.replaceAll("\n", " ");
+      const firstEvidence = `This workflow ${fixture.firstPredicate}`;
+      const laterEvidence = normalizedClause.slice(0, -1);
+      const facts = bodyPolicyClauseFacts(normalizedClause).filter(
+        ({ domain }) => domain === fixture.domain,
+      );
+      assert.equal(facts.length, 2, `${fixture.name}, ${variant.name}`);
+      assertFactEvidence(
+        facts[0],
+        normalizedClause,
+        firstEvidence,
+        {
+          modality: fixture.firstModality,
+          scope: fixture.firstScope,
+          completeness: "complete",
+        },
+        `${fixture.name}, ${variant.name}, first predicate`,
+      );
+      assertFactEvidence(
+        facts[1],
+        normalizedClause,
+        laterEvidence,
+        {
+          modality: "prohibited",
+          scope: "workflow",
+          completeness: "complete",
+        },
+        `${fixture.name}, ${variant.name}, later predicate`,
+      );
+
+      const findings = bodyPolicyFindings(variant.body, fixture.domain);
+      assert.equal(findings.length, 1, `${fixture.name}, ${variant.name}`);
+      assert.equal(
+        findings[0]?.evidence.snippet,
+        variant.body,
+        `${fixture.name}, ${variant.name}`,
+      );
+    }
+  }
+});
+
+test("every workflow-prefix prohibition family retains a coordinated predicate", () => {
+  for (const { domain, body } of [
+    {
+      domain: "network",
+      body: "This workflow requires network access and must run offline.",
+    },
+    {
+      domain: "upload",
+      body: "This workflow requires external uploads and must not upload anything externally.",
+    },
+    {
+      domain: "secrets",
+      body: "This workflow requires credentials and must run without secrets.",
+    },
+  ] as const) {
+    const facts = bodyPolicyClauseFacts(body).filter(
+      (fact) => fact.domain === domain,
+    );
+    assert.equal(facts.length, 2, body);
+    assert.deepEqual(
+      {
+        modality: facts[1]?.modality,
+        scope: facts[1]?.scope,
+        completeness: facts[1]?.completeness,
+      },
+      {
+        modality: "prohibited",
+        scope: "workflow",
+        completeness: "complete",
+      },
+      body,
+    );
+    assert.equal(bodyPolicyFindings(body, domain).length, 1, body);
+  }
+});
+
+test("shared workflow-subject negative controls remain clean", () => {
+  for (const { domain, body, expected } of [
+    {
+      domain: "network",
+      body: "This workflow requires network access.",
+      expected: { modality: "unknown", scope: "workflow" },
+    },
+    {
+      domain: "network",
+      body: "This workflow does not require network access.",
+      expected: { modality: "not-required", scope: "workflow" },
+    },
+    {
+      domain: "network",
+      body: "This workflow must not use network access to production systems.",
+      expected: { modality: "local-safeguard", scope: "specific-target" },
+    },
+    {
+      domain: "upload",
+      body: "This workflow must not upload logs to a public bucket.",
+      expected: { modality: "prohibited", scope: "specific-target" },
+    },
+    {
+      domain: "secrets",
+      body: "This workflow must not access credentials from production.",
+      expected: { modality: "prohibited", scope: "specific-source" },
+    },
+  ] as const) {
+    const facts = bodyPolicyClauseFacts(body).filter(
+      (fact) => fact.domain === domain,
+    );
+    assert.equal(facts.length, 1, body);
+    assert.deepEqual(
+      {
+        modality: facts[0]?.modality,
+        scope: facts[0]?.scope,
+        completeness: facts[0]?.completeness,
+      },
+      { ...expected, completeness: "complete" },
+      body,
+    );
+    assert.equal(bodyPolicyFindings(body, domain).length, 0, body);
   }
 });
 
@@ -515,6 +693,55 @@ function sameClauseDomainCases(
       prefixModality: "local-safeguard",
       prefixScope: prefixes.localSafeguardScope,
       prefixCompleteness: "complete",
+    },
+  ];
+}
+
+function sharedSubjectDomainCases(
+  domain: PolicyDomain,
+  laterPredicate: string,
+  predicates: {
+    readonly affirmativeRequirement: string;
+    readonly negativeRequirement: string;
+    readonly specificRestriction: string;
+    readonly specificScope: "specific-source" | "specific-target";
+    readonly specificModality: "prohibited" | "local-safeguard";
+    readonly localSafeguard: string;
+    readonly localSafeguardScope: "specific-source" | "specific-target";
+  },
+): readonly SharedSubjectRegressionCase[] {
+  return [
+    {
+      name: `${domain} shared-subject affirmative requirement`,
+      domain,
+      firstPredicate: predicates.affirmativeRequirement,
+      firstModality: "unknown",
+      firstScope: "workflow",
+      laterPredicate,
+    },
+    {
+      name: `${domain} shared-subject negative requirement`,
+      domain,
+      firstPredicate: predicates.negativeRequirement,
+      firstModality: "not-required",
+      firstScope: "workflow",
+      laterPredicate,
+    },
+    {
+      name: `${domain} shared-subject specific restriction`,
+      domain,
+      firstPredicate: predicates.specificRestriction,
+      firstModality: predicates.specificModality,
+      firstScope: predicates.specificScope,
+      laterPredicate,
+    },
+    {
+      name: `${domain} shared-subject local safeguard`,
+      domain,
+      firstPredicate: predicates.localSafeguard,
+      firstModality: "local-safeguard",
+      firstScope: predicates.localSafeguardScope,
+      laterPredicate,
     },
   ];
 }

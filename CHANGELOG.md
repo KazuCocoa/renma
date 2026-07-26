@@ -12,7 +12,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 - Preserved the Renma 0.24.4 same-clause decision boundary by evaluating
   coordinated requirement, local, qualified, safeguard, and workflow
-  prohibition candidates independently for each body-policy domain.
+  prohibition predicates independently for each body-policy domain, including
+  predicates that share an explicit workflow subject.
 - Kept affirmative requirement language distinct from genuinely negative
   `not-required` facts so it cannot suppress a later workflow prohibition.
 

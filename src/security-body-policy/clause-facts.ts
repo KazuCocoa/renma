@@ -46,6 +46,7 @@ type DomainCandidateKind =
 
 interface DomainCandidate extends EvidenceRange {
   readonly kind: DomainCandidateKind;
+  readonly predicateStart: number;
 }
 
 const DOMAIN_ORDER: readonly BodyPolicyDomain[] = [
@@ -202,6 +203,12 @@ const WORKFLOW_SCOPE_RE = new RegExp(
   "i",
 );
 const LOCAL_SCOPE_RE = new RegExp(String.raw`\b${LOCAL_SCOPE_TERMS}\b`, "i");
+const NOT_REQUIREMENT_PREDICATE_RE =
+  /\b(?:does\s+not\s+require|(?:is|are|was|were)\s+(?:not\s+(?:required|needed|necessary)|unnecessary|optional)|(?:should|will|would|may)\s+not\s+be\s+(?:required|needed|necessary)|no\s+requirement|no)\b/gi;
+const AFFIRMATIVE_REQUIREMENT_PREDICATE_RE =
+  /\b(?:requires|(?:is|are|was|were)\s+(?:required|needed|necessary)|(?:should|will|would|may)\s+be\s+(?:required|needed|necessary))\b/gi;
+const PROHIBITION_PREDICATE_RE =
+  /\b(?:do\s+not|don't|never|must\s+not|shall\s+not|will\s+not|does\s+not|cannot|can't|not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled|without|no|(?:must|shall|will|has\s+to|needs\s+to)\s+(?:run|operate|work)|keep|run|operate)\b/gi;
 
 /** @internal Extract bounded semantic facts from one prepared Markdown clause. */
 export function bodyPolicyClauseFacts(
@@ -243,34 +250,21 @@ function classifyDomainFacts(
     clause,
     PROHIBITED_PATTERNS[domain],
     "supported-prohibition",
-  ).filter(
-    (candidate) =>
-      !requirements.some((requirement) =>
-        evidenceOverlaps(candidate, requirement),
-      ),
   );
   const genericProhibitions = candidateEvidence(
     clause,
     [GENERIC_PROHIBITION_PATTERNS[domain]],
     "generic-prohibition",
-  ).filter(
-    (candidate) =>
-      !requirements.some((requirement) =>
-        evidenceOverlaps(candidate, requirement),
-      ) &&
-      !affirmativeRequirements.some((requirement) =>
-        evidenceOverlaps(candidate, requirement),
-      ) &&
-      !supportedProhibitions.some((prohibition) =>
-        evidenceOverlaps(candidate, prohibition),
-      ),
   );
-  const candidates = independentCandidates([
-    ...requirements,
-    ...affirmativeRequirements,
-    ...supportedProhibitions,
-    ...genericProhibitions,
-  ]);
+  const candidates = independentCandidates(
+    [
+      ...requirements,
+      ...affirmativeRequirements,
+      ...supportedProhibitions,
+      ...genericProhibitions,
+    ],
+    clause,
+  );
   if (candidates.length === 0) {
     return [
       {
@@ -288,56 +282,63 @@ function classifyDomainFacts(
     const nextCandidate = candidates[index + 1];
     const boundaryEnd = candidateBoundaryEnd(clause, candidate, nextCandidate);
     const contextEnd = candidateContextEnd(clause, candidate, boundaryEnd);
-    const context = clause.slice(candidate.start, contextEnd);
+    const context = clause.slice(candidate.predicateStart, contextEnd);
+    const workflowSubject = inheritedWorkflowSubject(clause, candidate);
+    const projectedSupportedEnd =
+      candidate.kind === "generic-prohibition" && workflowSubject !== undefined
+        ? projectedSupportedPredicateEnd(
+            clause.slice(workflowSubject.start, workflowSubject.end),
+            context,
+            domain,
+          )
+        : undefined;
     const evidence = {
       start: 0,
-      end: Math.min(candidate.end, contextEnd) - candidate.start,
+      end:
+        projectedSupportedEnd ??
+        Math.min(candidate.end, contextEnd) - candidate.predicateStart,
     };
+    const supportedProhibition =
+      candidate.kind === "supported-prohibition" ||
+      projectedSupportedEnd !== undefined;
     const baseModality =
       candidate.kind === "not-required"
         ? "not-required"
         : candidate.kind === "affirmative-requirement"
           ? "unknown"
           : "prohibited";
-    const scope = classifyScope(context, domain, baseModality, evidence);
+    const scope = classifyScope(
+      context,
+      domain,
+      baseModality,
+      evidence,
+      workflowSubject !== undefined,
+    );
     const modality =
       baseModality !== "prohibited"
         ? baseModality
         : isLocalSafeguard(context, domain, scope.scope)
           ? "local-safeguard"
-          : candidate.kind === "supported-prohibition" ||
+          : supportedProhibition ||
               scope.scope === "local-step" ||
               scope.scope === "specific-target" ||
               scope.scope === "specific-source"
             ? "prohibited"
             : "unknown";
-    return facts(
+    const supportedEnd = candidate.predicateStart + scope.supportedEnd;
+    return {
       domain,
       modality,
-      scope,
-      candidate.start,
-      clause.slice(candidate.start, boundaryEnd),
-    );
+      scope: scope.scope,
+      completeness: TRIVIAL_REMAINDER_RE.test(
+        clause.slice(supportedEnd, boundaryEnd),
+      )
+        ? "complete"
+        : "unsupported-remainder",
+      evidenceStart: workflowSubject?.start ?? candidate.start,
+      evidenceEnd: supportedEnd,
+    };
   });
-}
-
-function facts(
-  domain: BodyPolicyDomain,
-  modality: BodyPolicyModality,
-  scope: ScopeClassification,
-  evidenceStart: number,
-  clause: string,
-): BodyPolicyClauseFacts {
-  return {
-    domain,
-    modality,
-    scope: scope.scope,
-    completeness: TRIVIAL_REMAINDER_RE.test(clause.slice(scope.supportedEnd))
-      ? "complete"
-      : "unsupported-remainder",
-    evidenceStart,
-    evidenceEnd: evidenceStart + scope.supportedEnd,
-  };
 }
 
 function classifyScope(
@@ -345,6 +346,7 @@ function classifyScope(
   domain: BodyPolicyDomain,
   modality: BodyPolicyModality,
   evidence: EvidenceRange,
+  inheritedWorkflowScope = false,
 ): ScopeClassification {
   const semanticEnd = semanticContentEnd(clause);
   if (hasSpecificSourceScope(clause, domain)) {
@@ -386,6 +388,9 @@ function classifyScope(
     return { scope: "local-step", supportedEnd: semanticEnd };
   }
   if (WORKFLOW_SCOPE_RE.test(clause)) {
+    return { scope: "workflow", supportedEnd };
+  }
+  if (inheritedWorkflowScope) {
     return { scope: "workflow", supportedEnd };
   }
   if (modality === "prohibited") {
@@ -488,6 +493,12 @@ function candidateEvidence(
         kind,
         start: match.index,
         end: match.index + match[0].length,
+        predicateStart: candidatePredicateStart(
+          text,
+          match.index,
+          match.index + match[0].length,
+          kind,
+        ),
       });
     }
   }
@@ -496,44 +507,136 @@ function candidateEvidence(
 
 function independentCandidates(
   candidates: readonly DomainCandidate[],
+  text: string,
 ): readonly DomainCandidate[] {
   const ordered = [...candidates].sort(
     (left, right) =>
-      left.start - right.start ||
+      left.predicateStart - right.predicateStart ||
       candidateKindOrder(left.kind) - candidateKindOrder(right.kind) ||
+      left.start - right.start ||
       right.end - left.end,
   );
   const selected: DomainCandidate[] = [];
   for (const candidate of ordered) {
-    const duplicate = selected.find(
-      (existing) =>
-        existing.kind === candidate.kind &&
-        existing.start === candidate.start &&
-        existing.end === candidate.end,
+    const samePredicateIndex = selected.findIndex(
+      (existing) => existing.predicateStart === candidate.predicateStart,
     );
-    if (duplicate !== undefined) continue;
-
-    const overlappingIndex = selected.findIndex((existing) =>
-      evidenceOverlaps(existing, candidate),
-    );
-    if (overlappingIndex < 0) {
+    if (samePredicateIndex < 0) {
+      const previous = selected[selected.length - 1];
+      if (
+        previous !== undefined &&
+        evidenceOverlaps(previous, candidate) &&
+        !hasCoordinatedPredicateBoundary(text, previous, candidate)
+      ) {
+        continue;
+      }
       selected.push(candidate);
       continue;
     }
 
-    const existing = selected[overlappingIndex];
+    const existing = selected[samePredicateIndex];
     if (
       existing !== undefined &&
       candidateKindOrder(candidate.kind) < candidateKindOrder(existing.kind)
     ) {
-      selected[overlappingIndex] = candidate;
+      selected[samePredicateIndex] = candidate;
     }
   }
   return selected.sort(
     (left, right) =>
-      left.start - right.start ||
+      left.predicateStart - right.predicateStart ||
       candidateKindOrder(left.kind) - candidateKindOrder(right.kind),
   );
+}
+
+function candidatePredicateStart(
+  text: string,
+  start: number,
+  end: number,
+  kind: DomainCandidateKind,
+): number {
+  const predicatePattern =
+    kind === "not-required"
+      ? NOT_REQUIREMENT_PREDICATE_RE
+      : kind === "affirmative-requirement"
+        ? AFFIRMATIVE_REQUIREMENT_PREDICATE_RE
+        : PROHIBITION_PREDICATE_RE;
+  const candidateText = text.slice(start, end);
+  const matches = [...candidateText.matchAll(predicatePattern)].flatMap(
+    (match) => (match.index === undefined ? [] : [{ index: match.index }]),
+  );
+  if (kind === "supported-prohibition" || kind === "generic-prohibition") {
+    const connector = /(?:,[ \t]*)?\band\b[ \t]*/gi;
+    let predicateFloor = 0;
+    for (const match of candidateText.matchAll(connector)) {
+      if (match.index !== undefined) {
+        predicateFloor = match.index + match[0].length;
+      }
+    }
+    const predicate = matches.find((match) => match.index >= predicateFloor);
+    return predicate === undefined ? start : start + predicate.index;
+  }
+  const predicate = matches[matches.length - 1];
+  return predicate === undefined ? start : start + predicate.index;
+}
+
+function projectedSupportedPredicateEnd(
+  workflowSubject: string,
+  predicateContext: string,
+  domain: BodyPolicyDomain,
+): number | undefined {
+  const prefix = `${workflowSubject} `;
+  const projection = `${prefix}${predicateContext}`;
+  let selectedEnd: number | undefined;
+  for (const pattern of PROHIBITED_PATTERNS[domain]) {
+    const evidence = evidenceForPattern(projection, pattern);
+    if (evidence === undefined || evidence.end <= prefix.length) continue;
+    const predicateEnd = evidence.end - prefix.length;
+    if (selectedEnd === undefined || predicateEnd > selectedEnd) {
+      selectedEnd = predicateEnd;
+    }
+  }
+  return selectedEnd;
+}
+
+function hasCoordinatedPredicateBoundary(
+  text: string,
+  earlier: DomainCandidate,
+  later: DomainCandidate,
+): boolean {
+  if (later.predicateStart < earlier.end) return false;
+  return /(?:,[ \t]*)?\band\b[ \t]*$/i.test(
+    text.slice(earlier.end, later.predicateStart),
+  );
+}
+
+function inheritedWorkflowSubject(
+  text: string,
+  candidate: DomainCandidate,
+): EvidenceRange | undefined {
+  const matcher = new RegExp(
+    WORKFLOW_SCOPE_RE.source,
+    WORKFLOW_SCOPE_RE.flags.includes("g")
+      ? WORKFLOW_SCOPE_RE.flags
+      : `${WORKFLOW_SCOPE_RE.flags}g`,
+  );
+  let selected: EvidenceRange | undefined;
+  for (const match of text
+    .slice(0, candidate.predicateStart)
+    .matchAll(matcher)) {
+    if (match.index === undefined) continue;
+    const start = match.index;
+    const end = start + match[0].length;
+    const suffix = text.slice(end, candidate.predicateStart);
+    if (
+      start >= candidate.start ||
+      /^[ \t]*$/.test(suffix) ||
+      /(?:,[ \t]*)?\band\b[ \t]*$/i.test(suffix)
+    ) {
+      selected = { start, end };
+    }
+  }
+  return selected;
 }
 
 function candidateKindOrder(kind: DomainCandidateKind): number {
@@ -557,10 +660,18 @@ function candidateBoundaryEnd(
   // Only a recognized later candidate shortens the completeness boundary.
   // Otherwise coordinated trailing prose remains an unsupported remainder.
   if (nextCandidate === undefined) return semanticContentEnd(text);
-  const between = text.slice(candidate.end, nextCandidate.start);
+  const nextWorkflowSubject = inheritedWorkflowSubject(text, nextCandidate);
+  const nextStatementStart =
+    nextCandidate.start >= candidate.end
+      ? nextCandidate.start
+      : nextWorkflowSubject !== undefined &&
+          nextWorkflowSubject.start >= candidate.end
+        ? nextWorkflowSubject.start
+        : nextCandidate.predicateStart;
+  const between = text.slice(candidate.end, nextStatementStart);
   const connector = /(?:,[ \t]*)?\band\b[ \t]*$/i.exec(between);
   const untrimmedEnd =
-    connector === null ? nextCandidate.start : candidate.end + connector.index;
+    connector === null ? nextStatementStart : candidate.end + connector.index;
   return text.slice(0, untrimmedEnd).trimEnd().length;
 }
 
