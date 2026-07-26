@@ -250,33 +250,30 @@ export function bodyPolicyContrastiveClauseFacts(
   }
 
   const laterOffset = earlierClause.length + separator.length;
+  const workflowSubjects = workflowSubjectsWithinFacts(
+    earlierSemanticClause,
+    earlierFacts,
+  );
   const projectedFacts: BodyPolicyClauseFacts[] = [];
   for (const domain of DOMAIN_ORDER) {
-    const earlierFact = earlierFacts.find(
-      (fact) => fact.domain === domain && fact.scope === "workflow",
-    );
-    if (earlierFact === undefined) continue;
-    const workflowSubject = workflowSubjectWithinFact(
-      earlierSemanticClause,
-      earlierFact,
-    );
-    if (workflowSubject === undefined) continue;
-    const projectedFact = contrastiveProjectionFact(
-      earlierSemanticClause.slice(workflowSubject.start, workflowSubject.end),
-      laterClause,
-      domain,
-      /;[ \t]*however/i.test(separator),
-    );
-    if (projectedFact === undefined) continue;
-    const projectionPrefixLength =
-      workflowSubject.end - workflowSubject.start + 1;
-    projectedFacts.push({
-      ...projectedFact,
-      evidenceStart: workflowSubject.start,
-      evidenceEnd:
-        laterOffset +
-        Math.max(0, projectedFact.evidenceEnd - projectionPrefixLength),
-    });
+    for (const workflowSubject of workflowSubjects) {
+      const projectedFact = contrastiveProjectionFact(
+        earlierSemanticClause.slice(workflowSubject.start, workflowSubject.end),
+        laterClause,
+        domain,
+        /;[ \t]*however/i.test(separator),
+      );
+      if (projectedFact === undefined) continue;
+      const projectionPrefixLength =
+        workflowSubject.end - workflowSubject.start + 1;
+      projectedFacts.push({
+        ...projectedFact,
+        evidenceStart: workflowSubject.start,
+        evidenceEnd:
+          laterOffset +
+          Math.max(0, projectedFact.evidenceEnd - projectionPrefixLength),
+      });
+    }
   }
   return [...earlierFacts, ...projectedFacts];
 }
@@ -849,6 +846,22 @@ function workflowSubjectWithinFact(
     }
   }
   return undefined;
+}
+
+function workflowSubjectsWithinFacts(
+  clause: string,
+  facts: readonly BodyPolicyClauseFacts[],
+): readonly EvidenceRange[] {
+  const subjects = new Map<string, EvidenceRange>();
+  for (const fact of facts) {
+    if (fact.scope !== "workflow") continue;
+    const subject = workflowSubjectWithinFact(clause, fact);
+    if (subject === undefined) continue;
+    subjects.set(`${subject.start}:${subject.end}`, subject);
+  }
+  return [...subjects.values()].sort(
+    (left, right) => left.start - right.start || left.end - right.end,
+  );
 }
 
 function contrastiveProjectionFact(

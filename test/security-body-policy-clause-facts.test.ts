@@ -66,6 +66,17 @@ interface ContrastiveSharedSubjectRegressionCase extends SharedSubjectRegression
   readonly laterSubject: "" | "it ";
 }
 
+interface CrossDomainContrastiveRegressionCase {
+  readonly name: string;
+  readonly earlierDomain: PolicyDomain;
+  readonly laterDomain: PolicyDomain;
+  readonly firstPredicate: string;
+  readonly firstModality: BodyPolicyModality;
+  readonly connector: " but " | ", yet " | "; however, ";
+  readonly laterSubject: "" | "it ";
+  readonly laterPredicate: string;
+}
+
 const BODY_POLICY_MATRIX: readonly CharacterizationCase[] = [
   {
     name: "network prohibited workflow complete",
@@ -325,6 +336,80 @@ const CONTRASTIVE_SHARED_SUBJECT_REGRESSIONS: readonly ContrastiveSharedSubjectR
       "requires credentials",
       "does not require credentials",
     ),
+  ];
+
+const CROSS_DOMAIN_CONTRASTIVE_REGRESSIONS: readonly CrossDomainContrastiveRegressionCase[] =
+  [
+    {
+      name: "network to secrets",
+      earlierDomain: "network",
+      laterDomain: "secrets",
+      firstPredicate: "requires network access",
+      firstModality: "unknown",
+      connector: " but ",
+      laterSubject: "",
+      laterPredicate: "must not use credentials",
+    },
+    {
+      name: "network to upload",
+      earlierDomain: "network",
+      laterDomain: "upload",
+      firstPredicate: "requires network access",
+      firstModality: "unknown",
+      connector: ", yet ",
+      laterSubject: "",
+      laterPredicate: "must not upload files",
+    },
+    {
+      name: "secrets to network",
+      earlierDomain: "secrets",
+      laterDomain: "network",
+      firstPredicate: "requires credentials",
+      firstModality: "unknown",
+      connector: " but ",
+      laterSubject: "",
+      laterPredicate: "must not use the network",
+    },
+    {
+      name: "secrets to upload",
+      earlierDomain: "secrets",
+      laterDomain: "upload",
+      firstPredicate: "requires credentials",
+      firstModality: "unknown",
+      connector: "; however, ",
+      laterSubject: "it ",
+      laterPredicate: "must not upload files",
+    },
+    {
+      name: "upload to secrets",
+      earlierDomain: "upload",
+      laterDomain: "secrets",
+      firstPredicate: "requires external uploads",
+      firstModality: "unknown",
+      connector: " but ",
+      laterSubject: "",
+      laterPredicate: "must not use credentials",
+    },
+    {
+      name: "upload to network",
+      earlierDomain: "upload",
+      laterDomain: "network",
+      firstPredicate: "requires external uploads",
+      firstModality: "unknown",
+      connector: ", yet ",
+      laterSubject: "",
+      laterPredicate: "must not use the network",
+    },
+    {
+      name: "negative network requirement to upload",
+      earlierDomain: "network",
+      laterDomain: "upload",
+      firstPredicate: "does not require network access",
+      firstModality: "not-required",
+      connector: ", yet ",
+      laterSubject: "",
+      laterPredicate: "must not upload files",
+    },
   ];
 
 test("body-policy characterization matrix preserves the 0.24.4 decision boundary", () => {
@@ -679,6 +764,109 @@ ${body}
   );
 });
 
+test("contrastive workflow subjects project across body-policy domains", () => {
+  for (const fixture of CROSS_DOMAIN_CONTRASTIVE_REGRESSIONS) {
+    for (const softWrapped of [false, true]) {
+      const body = softWrapped
+        ? `This workflow ${fixture.firstPredicate}${fixture.connector.trimEnd()}\n${fixture.laterSubject}${fixture.laterPredicate}.`
+        : `This workflow ${fixture.firstPredicate}${fixture.connector}${fixture.laterSubject}${fixture.laterPredicate}.`;
+      const normalizedBody = body.replaceAll("\n", " ");
+      const variant = softWrapped ? "soft wrapped" : "one line";
+      const message = `${fixture.name}, ${variant}`;
+      const firstEvidence = `This workflow ${fixture.firstPredicate}`;
+      const laterEvidence = normalizedBody.slice(0, -1);
+      const facts = contrastiveClauseFacts(normalizedBody);
+      const earlierFact = facts.find(
+        (fact) =>
+          fact.domain === fixture.earlierDomain &&
+          fact.evidenceEnd <= firstEvidence.length,
+      );
+      const laterFact = facts.find(
+        (fact) =>
+          fact.domain === fixture.laterDomain && fact.modality === "prohibited",
+      );
+
+      assertFactEvidence(
+        earlierFact,
+        normalizedBody,
+        firstEvidence,
+        {
+          modality: fixture.firstModality,
+          scope: "workflow",
+          completeness: "complete",
+        },
+        `${message}, earlier domain`,
+      );
+      assertFactEvidence(
+        laterFact,
+        normalizedBody,
+        laterEvidence,
+        {
+          modality: "prohibited",
+          scope: "workflow",
+          completeness: "complete",
+        },
+        `${message}, later domain`,
+      );
+
+      const findings = bodyPolicyFindings(body, fixture.laterDomain);
+      assert.equal(findings.length, 1, message);
+      assert.equal(findings[0]?.evidence.snippet, body, message);
+    }
+  }
+});
+
+test("contrastive subject proof skips earlier facts without explicit subjects", () => {
+  const body =
+    "No network access and this workflow requires network access but must not use the network.";
+  const normalizedBody = body.replaceAll("\n", " ");
+  const facts = contrastiveClauseFacts(normalizedBody).filter(
+    (fact) => fact.domain === "network",
+  );
+
+  assert.equal(facts.length, 3, body);
+  assertFactEvidence(
+    facts[2],
+    normalizedBody,
+    "this workflow requires network access but must not use the network",
+    {
+      modality: "prohibited",
+      scope: "workflow",
+      completeness: "complete",
+    },
+    body,
+  );
+  const findings = bodyPolicyFindings(body, "network");
+  assert.equal(findings.length, 1, body);
+  assert.equal(
+    findings[0]?.evidence.snippet,
+    "No network access and this workflow requires network access",
+    body,
+  );
+});
+
+test("contrastive projection deduplicates a subject proven by multiple facts", () => {
+  const body =
+    "This workflow requires network access and must run offline but must not use credentials.";
+  const facts = contrastiveClauseFacts(body).filter(
+    (fact) => fact.domain === "secrets",
+  );
+
+  assert.equal(facts.length, 1, body);
+  assertFactEvidence(
+    facts[0],
+    body,
+    body.slice(0, -1),
+    {
+      modality: "prohibited",
+      scope: "workflow",
+      completeness: "complete",
+    },
+    body,
+  );
+  assert.equal(bodyPolicyFindings(body, "secrets").length, 1, body);
+});
+
 test("shared workflow-subject negative controls remain clean", () => {
   for (const { domain, body, expected } of [
     {
@@ -789,6 +977,46 @@ test("unrelated workflow prose does not give generic prohibitions workflow scope
 
 test("contrastive projection preserves body-policy precision boundaries", () => {
   for (const { name, domain, body } of [
+    {
+      name: "cross-domain changed helper subject",
+      domain: "secrets",
+      body: "This workflow requires network access but the helper must not use credentials.",
+    },
+    {
+      name: "cross-domain period",
+      domain: "secrets",
+      body: "This workflow requires network access. Must not use credentials.",
+    },
+    {
+      name: "cross-domain bare semicolon",
+      domain: "secrets",
+      body: "This workflow requires network access; must not use credentials.",
+    },
+    {
+      name: "cross-domain phase transition",
+      domain: "secrets",
+      body: "This workflow requires network access then must not use credentials.",
+    },
+    {
+      name: "cross-domain local prohibition",
+      domain: "secrets",
+      body: "This workflow requires network access but must not use credentials during local setup.",
+    },
+    {
+      name: "cross-domain specific upload target",
+      domain: "upload",
+      body: "This workflow requires network access, yet must not upload files to a public bucket.",
+    },
+    {
+      name: "cross-domain specific secret source",
+      domain: "secrets",
+      body: "This workflow requires network access; however, must not access credentials from production.",
+    },
+    {
+      name: "cross-domain hard break",
+      domain: "secrets",
+      body: "This workflow requires network access but  \nmust not use credentials.",
+    },
     {
       name: "period and changed subject",
       domain: "network",

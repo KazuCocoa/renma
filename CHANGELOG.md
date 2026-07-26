@@ -15,8 +15,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   prohibition predicates independently for each body-policy domain, including
   predicates that share an explicit workflow subject across ordinary
   coordination or the body-policy-only contrastive `but`, `yet`, `however`,
-  and `; however,` boundaries. Sentence endings, hard breaks, bare semicolons,
-  and `then` remain subject-isolation boundaries.
+  and `; however,` boundaries, including when the coordinated predicates
+  mention different body-policy domains. Sentence endings, hard breaks, bare
+  semicolons, and `then` remain subject-isolation boundaries.
 - Kept affirmative requirement language distinct from genuinely negative
   `not-required` facts so it cannot suppress a later workflow prohibition.
 
