@@ -145,10 +145,10 @@ type CatalogDiagnosticDisposition = Diagnostic & {
 };
 
 /**
- * Attach stable internal identity without changing the legacy JSON projection.
+ * Attach stable internal identity without changing the established JSON projection.
  * Existing diagnostics that already exposed `code` continue to do so; catalog
- * metadata identities added after the 0.18.2 compatibility baseline are kept
- * non-enumerable and are consumed before serialization.
+ * metadata identities used only for internal branching remain non-enumerable
+ * and are consumed before serialization.
  */
 export function withDiagnosticId<T extends Diagnostic>(
   code: DiagnosticId,

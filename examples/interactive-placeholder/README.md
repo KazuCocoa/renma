@@ -33,7 +33,7 @@ retains final control over it.
 
 ## Prerequisites
 
-- Node.js 22 or newer for the local demonstration.
+- Node.js 22.17 or newer for the local demonstration.
 - A built Renma checkout for the `node dist/index.js` inspection commands.
 - Run the Renma commands below from the repository root.
 

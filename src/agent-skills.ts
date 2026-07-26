@@ -22,6 +22,7 @@ import {
 
 export const AGENT_SKILLS_SPECIFICATION =
   "https://agentskills.io/specification";
+/** External specification snapshot used by validation, independent of Renma's version. */
 export const AGENT_SKILLS_VALIDATION_PROFILE =
   "agentskills.io/specification@2026-07-12";
 

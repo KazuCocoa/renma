@@ -1,6 +1,9 @@
 # Repository Context BOM
 
-`renma bom` emits a declared repository manifest for review and CI consumers. Renma 0.18.0 supports only the v2 BOM and Trust Graph schemas. It does not provide a v1 compatibility mode. V2 is the first supported long-term contract; earlier v1 output was an experimental pre-contract surface removed before broader adoption.
+`renma bom` emits a declared repository manifest for review and CI consumers.
+Renma supports only the v2 BOM schema; it does not provide a v1 compatibility
+mode. V2 is the first supported long-term contract. Earlier v1 output was an
+experimental pre-contract surface removed before broader adoption.
 
 The BOM is not a runtime usage report. It does not describe what an LLM actually consumed, assemble prompts, choose task-specific context, inject context into agents, execute agents, call an LLM, import consumed-context evidence, or collect telemetry.
 
@@ -16,7 +19,7 @@ flowchart TD
   Json["Authoritative JSON"]
   Markdown["Markdown review projection"]
   Revision["Git, CI, or PR context supplies revision identity"]
-  Runtime["Future runtime consumed-context evidence — separate artifact"]
+  Runtime["Runtime consumed-context evidence — separate artifact"]
   Sources --> Snapshot
   Snapshot --> Catalog
   Snapshot --> Diagnostics
@@ -35,7 +38,7 @@ The diagram separates collection from projection: every BOM section is derived
 from one collected snapshot, JSON is authoritative, and Markdown is a review
 view. `--omit-generated-at` removes generation-time noise only. Revision
 identity stays in the surrounding Git, CI, or pull-request context, and any
-runtime consumed-context evidence remains a separate future artifact.
+runtime consumed-context evidence remains a separate artifact.
 
 ## Snapshot Contract
 
@@ -89,15 +92,15 @@ Freshness evaluation uses the UTC calendar date. Metadata dates remain part of t
 
 V2 is the first supported long-term contract for normalized ownership,
 first-class support assets, and static support relationships. Consumers must
-inspect `schemaVersion` independently from `generator.version`. A future
-incompatible contract may intentionally introduce v3.
+inspect `schemaVersion` independently from `generator.version`. An incompatible
+contract must use a new schema version.
 
 Within a schema, changes should be backward-compatible and additive:
 
 - existing fields must not be removed, renamed, or given incompatible types or meanings;
 - new optional fields may be added when a real consumer requires them;
 - enum additions are consumer-visible changes and must be documented;
-- a future breaking contract requires a new schema version rather than silently changing existing semantics.
+- a breaking contract requires a new schema version rather than silently changing existing semantics.
 
 Treat `owns_local_resource`, `statically_references`, `inherits_owner`, and
 `inherits_policy` as static repository evidence, not runtime behavior. Branch
@@ -133,7 +136,7 @@ the schema defines every nested field):
 {
   "schemaVersion": "renma.repository-context-bom.v2",
   "outputMode": "omit_generated_at",
-  "generator": { "name": "renma", "version": "0.18.0" },
+  "generator": { "name": "renma", "version": "<installed-version>" },
   "root": "/checkout/repository",
   "scope": { "type": "declared_repository_manifest", "runtimeUsage": false, "telemetryCollected": false },
   "summary": { "scannedFileCount": 0, "assetCount": 0, "dependencyCount": 0, "resolvedDependencyCount": 0, "unresolvedDependencyCount": 0, "ownedAssetCount": 0, "unownedAssetCount": 0, "readinessScore": 100, "readinessLevel": "ready", "diagnosticCounts": { "error": 0, "warning": 0, "info": 0 } },
@@ -161,12 +164,21 @@ BOM v2 provenance is deliberately repository-local:
 - current absolute `root` and `configPath` information when available;
 - lifecycle, dependency, diagnostic, readiness, security posture, and security policy inventory evidence.
 
-Renma does not automatically invoke Git or add Git commit, branch, tag, or dirty-state fields. Git revision identity is expected to come from the surrounding Git, CI, artifact, or pull-request context. Native Git provenance fields and a BOM digest may be considered later if external artifact storage or cross-run consumers require them.
+Renma does not automatically invoke Git or add Git commit, branch, tag, or
+dirty-state fields. Git revision identity comes from the surrounding Git, CI,
+artifact, or pull-request context.
 
 ## Consumed-Context Evidence
 
-The BOM v2 schema describes declared repository state. Future consumed-context evidence must not redefine or mutate that meaning.
+The BOM v2 schema describes declared repository state. Consumed-context evidence
+must not redefine or mutate that meaning.
 
-Runtime evidence should be a separate artifact or explicitly separate attachment. A future evidence record should relate back to a BOM using stable values such as a BOM digest or snapshot identity, asset ID, asset content hash, producer identity and version, and observation timestamp.
+Runtime evidence should be a separate artifact or explicitly separate
+attachment. Such a record should relate back to a BOM using stable values such
+as a BOM digest or snapshot identity, asset ID, asset content hash, producer
+identity and version, and observation timestamp.
 
-External agents, editor integrations, wrappers, or CI tools may produce those signals. Renma may later validate imported signals against the repository model, but Renma must not become the telemetry collector, runtime wrapper, dashboard, or provider gateway.
+External agents, editor integrations, wrappers, or CI tools may produce those
+signals. They remain outside the BOM contract and Renma's role as a static
+repository analyzer; Renma is not a telemetry collector, runtime wrapper,
+dashboard, or provider gateway.

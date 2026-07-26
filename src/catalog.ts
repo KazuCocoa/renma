@@ -134,7 +134,6 @@ export function withResolvedSkillParent(
   };
 }
 
-/** Build a deterministic catalog of skill and context entries from parsed documents. */
 export function buildCatalog(
   documents: ParsedDocument[],
   repositoryPaths: ReadonlySet<string> = new Set(

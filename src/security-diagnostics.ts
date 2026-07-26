@@ -43,6 +43,8 @@ import {
   type NetworkDestination,
 } from "./security-destination/index.js";
 
+// Preserve the established destination-analysis deep imports while the
+// implementation remains owned by security-destination.
 export {
   associatedNetworkDestinations,
   associatedUploadDestinations,

@@ -1,23 +1,13 @@
 # Renma Product Design
 
-Renma is a Git-native context repository and deterministic governance CLI for
+Renma is a Git-native Context Repository and deterministic governance CLI for
 repositories that hold LLM-facing knowledge.
 
-Current product surface includes `init`, `scan`, `catalog`, `ownership`,
-`graph`, focused graph views, `trust-graph`, `readiness`, Repository Context BOM
-reports, repeated-context diagnostics, semantic diff, `ci-report`, `inspect`,
-`guide`, `scaffold`, `suggest-metadata`, `suggest-semantic-split`, Agent Skills
-validation, and security diagnostics for agent-facing operational instructions.
+Its product value is a reviewable repository model, not a runtime:
 
-Focused graph views are inspection tools; they do not choose, inject, or load runtime context for an agent.
-
-Renma prepares deterministic repository evidence. Agents operate outside Renma
-and decide how to consume repository assets according to their own runtime
-behavior.
-
-Renma helps teams keep shared knowledge discoverable, owned, validated,
-reviewable, and reusable in Git. It is not an agent runtime and does not decide
-what context an agent should load at task time.
+```text
+LLM proposes. Renma verifies. Human approves.
+```
 
 ## Core Distinction
 
@@ -25,570 +15,244 @@ what context an agent should load at task time.
 flowchart LR
   Skill["Skill: focused task and workflow"]
   Lens["Context Lens: purpose-oriented interpretation"]
-  Asset["Context Asset: independently owned source-of-truth knowledge"]
-  Skill -->|may reference| Lens
-  Skill -->|may reference directly| Asset
-  Lens -->|interprets| Asset
+  Context["Context Asset: independently governed knowledge"]
+  Skill -->|may declare| Lens
+  Skill -->|may declare| Context
+  Lens -->|interprets| Context
 ```
 
-Skills define a focused task or workflow. They can own activation boundaries,
-inputs, ordered instructions, decisions, constraints, short commands, examples,
-edge cases, verification, output, and completion criteria. They can also declare
-Context Asset and Context Lens relationships.
+A **Skill** owns a focused task or workflow: activation boundaries, required
+inputs, ordered instructions, decisions, constraints, verification, output, and
+completion criteria.
 
-Context assets hold independently maintained knowledge. Cross-Skill reuse is
-one reason for a Context Asset, but independent ownership or lifecycle,
-separate maintenance, source-of-truth status, or another explicit independent
-governance reason is also sufficient. Information important only to one
-workflow's correctness remains in the Skill or justified Skill-local support;
-correctness importance alone does not create a Context boundary.
+A **Context Asset** owns knowledge that merits independent governance. Reuse
+across Skills is one reason to create one, but independent ownership, lifecycle,
+source-of-truth status, or maintenance cadence is also sufficient.
+Correctness importance alone does not create a Context boundary: detail used
+only by one workflow can remain in that Skill or justified Skill-local support.
 
-An external URL preserved in a Context body is a source reference, not a
-catalog asset or Renma graph node. Runtime access to that URL is a separate,
-evidence-backed security-policy decision. A Markdown link does not grant network
-permission, and Renma must not infer permissive policy or an approved destination
-from unreviewed text.
+A **Context Lens** records how one or more Context Assets should be interpreted
+for a purpose. It is a static repository relationship, not a runtime selector or
+prompt template.
 
-Context Lenses describe how one or more Context Assets should be interpreted for
-a purpose. They are repository governance metadata, not runtime lens selection
-or prompt assembly.
+These relationships describe maintained source material. They do not instruct
+Renma to load, rank, merge, or inject anything for a live task.
 
-These arrows are declared repository relationships, not a runtime loading
-pipeline. Renma validates them but does not select a Lens, choose task-specific
-Context, or inject either asset into an agent session.
+## Why a Context Repository
+
+Knowledge used by agents has software-maintenance properties: it changes, gains
+dependencies, becomes stale, acquires owners, and can conflict with other
+knowledge. Keeping that material in Git makes identity, provenance, review,
+history, and automation visible.
+
+Renma therefore treats repository evidence as the authority:
+
+- stable IDs and repository-relative paths identify assets;
+- ownership and lifecycle are explicit governance, not naming heuristics;
+- relationships carry source evidence;
+- deterministic output makes review diffs meaningful;
+- human approval remains necessary for semantic changes.
+
+Renma does not infer ownership from directory names, prose, Git authors, or
+modification history. It also does not infer that a local file should be
+promoted, that two assets are semantically equivalent, or that one conflicting
+asset should win.
 
 ## Product Boundary
 
-Renma owns repository quality and governance:
+Renma owns:
 
-- Asset discovery and classification
-- Owner, status, lifecycle, and metadata checks
-- Broken reference and dependency checks
-- Catalog and graph snapshots
-- Orphaned, deprecated, archived, conflicting, and missing asset diagnostics
-- Deterministic evidence for repeated or duplicated knowledge
-- Deterministic readiness reports for repository maintainers
+- bounded repository discovery and classification;
+- metadata, lifecycle, ownership, relationship, and layout validation;
+- deterministic diagnostics and security review evidence;
+- catalog, ownership, graph, composition, impact, Readiness, diff, CI,
+  Skill Discovery, Trust Graph, and BOM projections;
+- non-editing inspection, authoring guidance, and bounded suggestions.
 
-Renma does not own runtime behavior:
+Renma does not own:
 
-- No skill selection for a user task
-- No prompt construction or context bundling
-- No context injection into an agent
-- No task-specific context choice service
-- No tool execution on behalf of an agent
-- No provider gateway or agent coordination layer
-- No telemetry collection responsibility
+- interpretation of free-form live tasks;
+- Skill, Context, or Lens selection and ranking;
+- prompt construction, Context bundling, or injection;
+- workflow or tool execution;
+- provider gateways or agent orchestration;
+- runtime telemetry collection;
+- automatic semantic rewrites or repository-wide repair.
 
-## Authoring Guidance Boundary
+External agents and runtimes decide how to consume repository assets. Passing
+Renma checks means the enabled deterministic governance checks passed; it does
+not prove that a workflow is safe, correct, or effective at runtime.
 
-`renma guide skill` projects one structured source with two explicit layers.
-The normative interaction protocol applies to every current request. A separate
-ordered illustration collection contains optional, intentionally incomplete
-demonstrations of individual decision patterns.
+## Focused Skills and Progressive Disclosure
 
-Renma does not match a request to a built-in example, select the closest
-illustration, or define Skill-type templates. The consuming LLM reasons from the
-current request and evidence, may ignore all illustrations, and may combine
-lessons from several when their underlying conditions independently apply.
-Illustrations can evolve without changing the normative protocol.
+A Skill should remain complete enough to own its workflow without becoming the
+only source of truth for reusable knowledge. Skill-local `references/`,
+`profiles/`, `examples/`, `scripts/`, and `assets/` support progressive
+disclosure when they have a clear local responsibility.
 
-Any future import of external signals from CI, IDE wrappers, agent plugins, or
-other integrations must treat those signals as separately produced offline
-review evidence. Renma itself is not telemetry-responsible.
+Promotion to shared `contexts/` is a semantic and governance decision. File size,
+location, repeated wording, or a diagnostic may provide evidence, but none
+authorizes an automatic split. Shared helper implementations belong under
+`tools/**`; shared knowledge belongs in Context Assets.
 
-## LLM-Actionable Diagnostics
+Context Assets should be organized by meaning rather than migration state.
+Temporary staging paths may help during a reviewed move, but durable paths
+should communicate domain, tool, policy, platform, team, or testing scope.
 
-Security diagnostics focus on conservative operational-instruction risks,
-policy metadata, security profile resolution, approved network and upload
-destination checks, and explicit human approval guards. They remain
-deterministic repository checks, not runtime enforcement.
+## Repository and Compatibility Model
 
-Security diagnostics are deterministic review guardrails for LLM-facing
-operational instructions. Bounded structure-aware command analysis classifies
-npm-style version variables, actual sensitive-file sources, local-only
-operations, disclosure sinks, and exact structural guards while reusing the
-existing destination analysis. Unsupported syntax retains conservative
-fallback behavior. These checks flag patterns such as unpinned remote shell
-execution, unverified dependency variables, privileged commands without nearby
-guardrails, predictable temporary paths, and credential-like command
-arguments; they do not replace full language parsing, SAST, secret scanning,
-dependency scanning, or human security review. The internal analysis evidence
-is not a public report schema.
+Canonical Skills use the portable Agent Skills format plus flat,
+string-valued `metadata.renma.*` governance fields. Context Assets and other
+non-Skill assets use Renma's focused top-level metadata contract.
 
-Security posture summaries in Readiness and CI reports describe effective
-policy, security profile resolution, allowed data, forbidden inputs, approved
-network and upload destinations, human approval requirements, and high-risk
-findings without enforcing runtime behavior.
+`contexts/` is the preferred shared-Context root. `context/` remains an accepted
+compatibility alias. Historical Skill entrypoint spellings remain migration
+input where documented, but canonical Skills are directory-based `SKILL.md`
+entrypoints under the supported Skill roots.
 
-Trust Graph v2 is a deterministic interpretation of existing catalog, graph, scan, and security evidence. It exposes stable asset, owner, lifecycle, dependency, security profile, compositional effective-policy provenance, and diagnostic evidence, but it does not introduce subjective trust scores or a separate runtime system. `scan` lists concrete problems, `graph` shows structural relationships, `trust-graph` connects trust-relevant evidence, and `readiness` summarizes repository-level preparedness.
+The exact current fields, encodings, paths, and migration behavior belong in the
+[Agent Skills compatibility contract](docs/agent-skills-compatibility.md) and
+[Authoring Guide](docs/authoring-guide.md), not in a second list here.
 
-Repository Context BOM v2 is a declared repository evidence snapshot: assets, hashes, owners, lifecycle states, dependencies, security posture, diagnostics, and readiness evidence. Snapshot consistency comes from one in-memory repository snapshot per BOM execution, not output formatting flags. `--omit-generated-at` only removes run-time generation timestamp noise; it does not ignore repository metadata timestamps such as `lastReviewedAt` or `expiresAt`, suppress freshness diagnostics, normalize environment-dependent absolute paths such as `root` or `configPath`, hide file moves, or provide portable byte-for-byte output across runners. The BOM does not claim actual LLM runtime usage. Actual consumed-context evidence remains a future separate artifact or attachment that external agents or wrappers may produce and Renma may later validate against the repository model. See `docs/repository-context-bom.md` for the v2 contract.
-
-Renma findings should be useful not only to humans, but also to LLM coding
-agents. A good Renma diagnostic should explain what is wrong, why it matters for
-repository governance, where the evidence is, what direction a safe fix should
-take, what constraints must be preserved, and how to verify the fix.
-
-Renma should not apply large semantic rewrites by itself. It should produce
-structured diagnostics that can be provided to a coding agent to guide a
-reviewable repository patch.
-
-Current diagnostics include evidence, `whyItMatters`, remediation, typed repair
-constraints, verification steps, and LLM-facing hints where applicable. These
-fields remain deterministic rule output, not LLM-generated validation.
-
-Example diagnostic shape (selected stable fields from a deterministic fixture;
-input-specific `details` omitted):
-
-```json
-{
-  "id": "QUAL-SKILL-MIXED-RESPONSIBILITY",
-  "severity": "low",
-  "category": "maintenance",
-  "confidence": "medium",
-  "title": "Skill may mix its workflow with reusable knowledge",
-  "evidence": {
-    "path": "skills/mobile/SKILL.md",
-    "startLine": 11,
-    "endLine": 11,
-    "snippet": "Detected reusable-knowledge headings: Platform Facts - Known Issues - Domain Rules - Product Policy; Detected reusable-knowledge phrases: known issue"
-  },
-  "whyItMatters": "Reusable setup notes, troubleshooting, platform guidance, testing heuristics, or domain rules are easier to own, review, and reuse when they live in shared context assets instead of only inside one skill.",
-  "remediation": "Review the matched headings and phrases. Promote content to contexts/ only when it needs cross-Skill reuse, independent ownership, lifecycle, or source-of-truth status; otherwise keep Skill-specific detail in SKILL.md or references/.",
-  "constraints": [
-    "Do not make Renma select runtime context.",
-    "Do not assemble prompt packages.",
-    "Do not automatically rewrite or split skills.",
-    "Preserve SKILL.md as a focused workflow entrypoint.",
-    "Give extracted context assets stable metadata such as id, owner, and status."
-  ],
-  "verificationSteps": [
-    "Run renma scan.",
-    "Confirm the advisory is resolved or intentionally accepted after reusable knowledge is represented as shared context assets."
-  ],
-  "llmHint": "Check whether the matched knowledge is used across Skills or needs independent ownership. Use contexts/ only for shared knowledge; keep Skill-local procedures and edge cases in SKILL.md or references/."
-}
-```
-
-Central repair workflow:
-
-1. A single `SKILL.md` contains reusable domain knowledge, tool guidance, and
-   QA heuristics.
-2. Renma detects reusable-knowledge signals and reports possible mixed
-   responsibility. The finding does not require every matched detail to move.
-3. A coding agent reads the diagnostics and proposes a patch that moves
-   knowledge into `contexts/` only when it needs cross-Skill reuse, independent
-   ownership, lifecycle, or source-of-truth status. Skill-specific workflow and
-   detail remain in `SKILL.md` or Skill-local References.
-4. A human reviews the patch.
-5. Renma scans the repository again and confirms the skill/context separation is
-   healthier.
-
-Optional LLM-assisted evaluation is advisory and outside core validation. See
-`architecture.md` section `Optional LLM Evaluation Boundary` for the rule:
-`scan`, catalog construction, and deterministic rule evaluation do not call an
-LLM; optional helpers may prepare review bundles or suggestions for a human or
-calling agent to apply.
-
-## Repository Model
-
-An illustrative repository shape gives shared Context Assets first-class space:
-
-```text
-skills/
-  testing/
-    test-case-generation/
-      SKILL.md
-    spec-review/
-      SKILL.md
-    regression-planning/
-      SKILL.md
-
-contexts/
-  testing/
-    boundary-value-analysis.md
-    negative-testing.md
-    regression-risk.md
-  domain/
-    payment/
-      idempotency.md
-      duplicate-charge.md
-      refund-risk.md
-  mobile/
-    offline-behavior.md
-    background-resume.md
-  tools/
-    appium/
-      usage-guideline.md
-      limitations.md
-  teams/
-    checkout/
-      payment-api-contracts.md
-      known-risk-patterns.md
-
-lenses/
-  testing/
-    spec-review-boundary-values.md
-
-metadata/
-graph/
-catalog/
-```
-
-This is not a required layout for every repository asset. A repository may
-organize Context Assets, Context Lenses, policies, references, evidence, and
-other knowledge by domain, product, team, workflow, or a combination of those
-dimensions. Canonical Skill entrypoints in 0.16.0 remain under
-`skills/**/SKILL.md` and `.agents/skills/**/SKILL.md`; arbitrary Skill roots and
-domain-local `*/skills/**/SKILL.md` layouts are not implemented. Renma's broader
-model means repository knowledge need not be embedded inside those Skill
-directories.
-
-`contexts/` is preferred for shared context assets. `context/` remains supported
-as a compatibility alias. Files under either root are classified as the
-`context` artifact kind, not as `reference`. Experimental `context_lens` assets
-can live under `lenses/`, or context files can opt in with `type: context_lens`.
-
-Skill-local `assets/`, `profiles/`, `references/`, `examples/`, and `scripts/`
-remain supported. They are useful for local workflow variants, nearby examples,
-Skill-specific supporting text, fixtures, and helpers. Profiles represent
-Skill-local overlays or workflow variants; they are not generic global
-personas. When evidence shows that knowledge is reusable across Skills, teams,
-tools, or agents, it should move into `contexts/` as an owned Context Asset.
-Shared helper implementations may move to `tools/**`; location alone does not
-require either promotion.
-
-Renma can also flag large skill-local support files as shared-context candidates when they contain generic source-of-truth structure such as setup, decision logic, troubleshooting, validation, constraints, policy, or procedure guidance. This advisory does not decide semantic reuse itself. It surfaces structurally broad support files and asks the calling LLM or human to inspect the repository for similar concepts, overlapping guidance, and reuse opportunities before making a reviewable patch.
-
-Shared context assets should be organized by semantic scope, not migration state. Folders such as `contexts/promoted/` or `contexts/generated/` can be useful temporary staging concepts, but final context assets should live under meaning-oriented paths such as `contexts/tools/...`, `contexts/domain/...`, `contexts/testing/...`, `contexts/teams/...`, `contexts/policies/...`, or `contexts/platform/...`.
-
-## Artifact Kinds
-
-Renma normalizes scanned files into asset kinds:
-
-- `skill`: focused task or workflow with activation boundaries, instructions,
-  verification, output, and completion criteria
-- `context`: shared source-of-truth knowledge asset under `contexts/` or
-  `context/`
-- `context_lens`: purpose-oriented interpretation layer over context assets
-- `profile`: skill-local overlay or variant
-- `reference`: skill-local supporting material
-- `example`: skill-local example or fixture text
-- `script`: Skill-local deterministic executable implementation
-- `asset`: Skill-local template, image, data, font, PDF, or output resource
-- `agent`: repository or agent instruction file
-- `config`: Renma configuration
-- `unknown`: scanned file that does not match a known kind
-
-Catalog, graph, Trust Graph, and BOM output include script and asset inventory.
-Each cataloged asset records original-byte size and hash, text/binary
-classification, and Markdown-parser eligibility. Binary assets remain opaque;
-Renma does not decode them as UTF-8 or expose their bytes in snippets.
-Non-Markdown text remains available to dedicated path and security analysis but
-cannot declare catalog metadata or contribute Markdown structure. Skill-local
-support without a local owner inherits effective ownership from the nearest
-Skill, with inherited provenance exposed in normalized reports.
-
-The dedicated `context` kind is central to the product model. It lets catalog,
-graph, and validation output distinguish reusable team-owned knowledge from
-skill-local reference material.
-
-## Context Asset Metadata
-
-Context assets should use small, reviewable metadata blocks:
-
-```yaml
----
-id: context.testing.boundary-value-analysis-v2
-title: Boundary Value Analysis
-owner: qa-platform
-status: stable
-version: 1.0.0
-tags:
-  - testing
-  - qa
-when_to_use:
-  - Designing tests around numeric, date, quantity, or limit boundaries
-when_not_to_use:
-  - Exploratory testing notes that do not depend on boundaries
-requires_context:
-  - testing.negative-testing
-optional_context:
-  - context.domain.payment.duplicate-charge
-conflicts:
-  - context.testing.boundary-value-analysis-v1
-superseded_by:
-  - context.testing.boundary-value-analysis-v3
----
-```
-
-The current parser supports YAML-style block lists for selected deterministic metadata fields. Supported block-list fields are `tags`, `when_to_use`, `when_not_to_use`, `requires_context`, `optional_context`, `conflicts`, and `superseded_by`; arbitrary nested maps are not metadata.
-
-Initial status values:
+Supported lifecycle states are:
 
 - `experimental`
 - `stable`
 - `deprecated`
 - `archived`
 
-`status` describes lifecycle only. It should not be used for replacement,
-delegation, migration provenance, or canonical-source relationships. For
-example, a skill-local reference replaced by a shared context asset should use a
-valid lifecycle status such as `deprecated`, plus a separate relationship field
-such as `superseded_by: contexts/tools/example/setup.md` when the repository
-needs to preserve that link. Renma may catalog `superseded_by` as a static
-reference relationship, but it should not treat values such as `active` or
-`delegated` as valid lifecycle statuses.
+Lifecycle is not replacement, delegation, or provenance. A superseded local
+support file may remain as a documented compatibility shim, but its lifecycle
+state and its explicit supersession relationship remain separate facts.
 
-When reusable knowledge is promoted from a skill-local support file into
-`contexts/`, the original `skills/*/references/` file may remain temporarily as
-a compatibility shim. Renma can warn when a skill still routes readers through a
-deprecated or superseded local support asset instead of referencing the
-canonical shared context directly.
+## Explicit Relationships
 
-Renma can also warn when other repository assets continue to reference a
-deprecated or superseded support file instead of the canonical shared context.
-This broader advisory helps remove hidden indirection after context promotion
-while preserving compatibility shims when they are intentionally needed.
+Renma models explicit repository relationships rather than general
+natural-language inheritance.
 
-Renma starts deterministic validation for fields it actually uses: duplicate IDs,
-invalid statuses, missing owner or ID on published shared context, unknown
-declared references, dependencies on deprecated or archived assets, and orphaned
-first-class shared context assets. Declared references resolve by exact asset ID
-or repository-relative path, with a leading `./` normalized away. Renma does not
-use fuzzy matching, semantic search, LLM inference, or runtime context selection
-for these checks.
+Required and optional Context or Lens declarations describe static composition.
+Lens `applies_to` describes interpretation. Conflict and supersession
+declarations retain review evidence. Skill Discovery continuation is a separate
+Skill-to-Skill topology contract. Skill-local ownership, policy, and static
+reference edges are derived only from unambiguous repository evidence.
 
-## Dependency Model
+The distinctions matter:
 
-Dependencies are typed relationships between assets:
+- required versus optional membership is not precedence;
+- declaration order is not routing priority;
+- graph reachability is not runtime use;
+- reverse declared impact is not proof of breakage;
+- a Markdown URL is a source reference, not permission to use the network;
+- a local support link is not a shared Context declaration.
 
-- `requires`: the target asset is needed for the source asset to be complete
-- `optional`: useful context that is not always required
-- `applies_to`: context asset interpreted by a context lens
-- `conflicts`: assets that should not both be active without human review
-- `extends`: overlay or profile relationship
-- `references`: declared static relationship from a skill or support asset toward a context asset or local file
-- `covered_by`: evaluation or evidence coverage relationship
+The [Architecture](architecture.md) defines the active relationship vocabulary.
+Focused contracts define
+[Declared Composition](docs/declared-composition.md),
+[Declared Impact](docs/declared-impact.md), and
+[Skill Discovery](docs/skill-discovery.md).
 
-Edges should carry source evidence: path, range when available, declaration
-form, and enough snippet text for review.
+## Determinism and Fail-Closed Behavior
 
-The graph is repository evidence. It must not become a task-specific context selector.
+The same repository contents, configuration, Renma version, and evaluation
+inputs should produce the same deterministic facts. Stable ordering,
+deduplication, normalized paths, original-byte hashes, and original-file
+evidence ranges are compatibility-sensitive.
 
-## Declared Composition Model
+Renma fails closed when repository boundaries, identities, parents,
+relationships, syntax, or policy evidence are unresolved or ambiguous.
+Uncertainty remains visible instead of being converted into guessed governance.
 
-Renma models explicit composition, not general natural-language inheritance.
-The pure composition resolver consumes the existing catalog and expands only
-`requires_context`, `optional_context`, `requires_lens`, `optional_lens`, and
-Lens `applies_to` declarations. It does not expand references, conflicts,
-lifecycle, ownership, policy, static-support, or `extends` edges.
+This principle applies equally to authoring suggestions: a successful
+`no-change-recommended` decision is preferable to manufacturing an edit, and a
+blocked decision must not expose partial evidence as an applicable patch.
 
-Traversal tracks `(stable asset ID, required-or-optional membership)`. Each
-state is processed once. A required route dominates the final classification,
-but optional and required predecessor edges are both retained. Once a route
-crosses an optional edge, descendants on that route stay optional. The root is
-reported separately even when a cycle reaches it again.
+## Diagnostics and Repair
 
-Provenance storage is edge-based rather than a list of every root-to-node path.
-Stable declaration edges retain source path, line range, snippet, declaration
-form, and route membership. This keeps storage proportional to assets and
-declarations even when the number of possible paths is exponential.
+A Finding should tell a maintainer:
 
-Strongly connected components detect required and optional composition cycles.
-Completeness and cycle freedom remain separate; a fully resolved cyclic closure
-has `requiredComplete: true` and `cycleFree: false`. Conflict pairs are
-normalized by stable ID with inclusion provenance, and no winner is selected.
+- what deterministic rule matched;
+- why the evidence matters;
+- where the original source range is;
+- what repair direction is supported;
+- which constraints a patch must preserve;
+- how to verify the result.
 
-Focused cycle membership is root-relative. Repository scan aggregation groups
-the same SCC across roots, retains deterministic required and optional root
-lists, and emits the stronger required diagnostic when either classification is
-present. Sorted SCC members are never presented as an edge path; renderers use
-the actual retained cycle subgraph.
+Detection does not imply deterministic repair. Repeated-context evidence,
+ambiguous ownership, boundary changes, conflicts, and source-of-truth choices
+require repository investigation and human review.
 
-Target-kind validation keeps currently supported Context-to-Context
-dependencies while requiring Context fields to target Context, Lens fields to
-target Lenses, and Lens `applies_to` to originate from a Lens and target
-Context. Unknown and wrong-kind required/optional targets affect their own
-completeness flags. The `applies_to` source-kind check runs before target
-resolution so an invalid source and unresolved target remain independently
-visible.
+The [Diagnostics Reference](docs/diagnostics.md) owns Finding fields,
+diagnostic IDs, evidence conventions, severity, risk classification, and repair
+constraints. Keeping the exact contract there avoids a second example or field
+list drifting in product design.
 
-One-off resolution prepares repository lookup indexes internally. Scan prepares
-the same index once and reuses it across roots; reached IDs drive member,
-lifecycle, freshness, and conflict work without repeated full-catalog filters.
-Root reports are consumed one at a time, with only compact cycle groups and
-Skill conflict findings retained across iterations.
+## Security Design
 
-The existing `graph --view composition --focus <asset-id-or-path>` projection
-owns JSON, Markdown, and Mermaid rendering. There is no second scanner,
-catalog, repository model, graph command, runtime bundle, or prompt assembler.
-`extends` remains limited to typed overlay/profile resolvers with explicit
-merge semantics.
+Security diagnostics are conservative checks over agent-facing repository
+instructions and effective policy metadata. They use Markdown structure, exact
+guard scope, bounded command and destination recognition, policy inheritance,
+and fail-closed fallback.
 
-## Declared Impact Model
+Renma distinguishes repository policy evidence from runtime enforcement. An
+external URL in Markdown is body content, not a catalog node, approved
+destination, or network grant. Renma must not manufacture permissive allowed
+data, secrets, network, external-upload, or human-approval policy values.
 
-Declared Impact answers the reverse composition question for one resolved
-focus: which cataloged assets and Skills explicitly include it? Its prepared
-`DeclaredImpactIndex` extends the unchanged forward `DeclaredCompositionIndex`
-with an incoming declaration lookup retaining resolved source and target
-assets, raw dependencies, normalized composition relationships, declaration
-form and index, source path, line evidence, and kind mismatches. Composition and
-scan prepare only the forward index.
+This scope complements rather than replaces full language parsing, SAST, secret
+scanning, dependency analysis, runtime controls, and human security review. See
+the [Security Policy](docs/security-policy.md).
 
-Reverse expansion is limited to incoming `requires_context`,
-`optional_context`, `requires_lens`, `optional_lens`, and Lens `applies_to`.
-An all-required route produces required impact. After any optional declaration,
-every upstream dependent on that route remains optional. Required membership
-dominates an asset's final classification without discarding optional
-provenance. Stable IDs are deduplicated; titles, paths, content similarity,
-popularity, and model inference are not identity signals.
+## Authoring Guidance
 
-The report exposes required and optional dependents, required and optional
-Skill subsets, direct status, retained declaration edges, and invalid incoming
-declarations. Edges point in their original declaration direction toward the
-focus. Traversal terminates through `(asset ID, membership)` state, including
-cycles, and storage remains proportional to reachable declarations rather than
-possible complete paths.
+Authoring guidance separates a normative interaction protocol from
+non-normative illustrations. The protocol defines evidence qualification,
+question behavior, the creation gate, progression, verification, and handoff.
+Illustrations demonstrate tensions; they are not Skill categories or templates.
 
-`graph --view impact --focus <asset-id-or-path>` is an additive projection with
-JSON, Markdown, and Mermaid output. It does not add scan findings, ranking,
-centrality, Git-diff inference, runtime consumer tracking, automatic test
-selection, or Skill-to-Skill discovery. Required declared impact is review
-scope evidence, not a claim of actual breakage or a mandate to change a file.
-See the [Declared Impact contract](docs/declared-impact.md).
+Renma does not classify a request, select a closest illustration, conduct the
+conversation, or retain authoring state. A consuming LLM may ignore or combine
+illustrations only when their underlying conditions independently apply.
+Illustration membership does not change the normative protocol.
 
-## Core Workflow
+Authoring-time source access comes from the current request, supplied artifacts,
+and available tools. Finished-Skill policy never retroactively authorizes access
+during authoring. Conversation state such as Confirmed, Proposed, Unresolved,
+Blocking, Deferred, or reversible defaults is not repository metadata.
 
-Renma should keep the deterministic path boring and reliable:
+## Report Interpretation
 
-1. Load configuration from defaults, config files, and CLI flags.
-2. Discover bounded repository files with stable POSIX-style paths.
-3. Classify artifacts into normalized kinds, including first-class `context`.
-4. Parse Markdown, frontmatter, headings, links, code fences, and metadata.
-5. Build catalog entries with IDs, kind, source path, content hash, owner,
-   status, tags, declared dependencies, dependents, and diagnostics.
-6. Build graph snapshots from declared references and dependency metadata.
-7. Run deterministic rules over parsed files and graph evidence.
-8. Emit the command's documented text, JSON, Markdown, or Mermaid projection
-   for Git review and CI.
+Report families remain separate because they answer different questions:
 
-Optional LLM assistance may help with semantic split suggestions, duplicate
-labeling, or review summaries. LLM output is advisory. Deterministic evidence is
-the authority.
+- catalog and ownership show inventory and governance;
+- graph views show relationships;
+- composition and impact show focused explicit closures;
+- Readiness summarizes one repository state;
+- diff and CI compare two states;
+- Skill Index describes static Discovery topology and coverage;
+- Trust Graph v2 connects trust-relevant evidence without a subjective score;
+- Repository Context BOM v2 records declared repository evidence, not runtime
+  consumption.
 
-## Rules
+Exact command usage belongs in the [User Manual](docs/user-manual.md). Exact
+schemas belong in their focused contract documents.
 
-Implemented deterministic rules focus on repository health:
+## Optional LLM Assistance
 
-- Missing context asset ID
-- Missing owner on shared context assets
-- Invalid lifecycle status
-- Duplicate asset IDs
-- Unknown declared references
-- Wrong declared relationship target kind
-- Duplicate values in one dependency field
-- Required and optional composition cycles
-- Transitive required and optional declared conflicts
-- Declared dependency on deprecated or archived context
-- Orphaned shared context asset
-- Superseded local support asset reference advisories
-- Oversized skill entrypoint
-- Skill may contain reusable context worth extracting
-- Oversized context or skill-local support file
-- Missing skill routing guidance
-- Missing negative routing guidance
-- Missing preflight or verification guidance
-- Unused skill-local profile, reference, or example
-- Literal secret-like values
-- Destructive commands without nearby confirmation or recovery guidance
-- Risky remote defaults
-- Broad environment copying into subprocesses
-- Hardcoded user-local paths in reusable guidance
+Optional LLM-facing helpers may prepare review bundles, metadata candidates, or
+semantic-split suggestions from bounded deterministic evidence. Their output is
+advisory. Core validation does not call an LLM, and helpers do not silently
+rewrite files.
 
-Current reporting includes deterministic Readiness output, ownership coverage,
-graph snapshots, repeated-context diagnostics, semantic diff, Trust Graph,
-Repository Context BOM, security posture summaries, CI reports, and optional
-LLM-friendly review bundles. These are repository projections and evidence, not
-runtime selection or execution services.
+## Durable Product Decisions
 
-Passing Renma checks does not prove a workflow is safe. It means the repository
-met the deterministic governance checks that were enabled.
+- Keep repository evidence deterministic and Git-reviewable.
+- Keep shared Context first-class and independently governable.
+- Preserve focused Skills rather than reducing them to thin routers.
+- Keep runtime selection, execution, and telemetry outside core.
+- Preserve exact compatibility boundaries instead of inferring migrations.
+- Keep semantic repair and meaningful repository design under human review.
+- Add fields or projections only when a concrete deterministic consumer exists.
 
-## QA And Testing Focus
-
-QA/testing is the first strong product focus because teams often ask agents to
-generate tests while the real expertise lives in scattered documents or senior
-engineers' heads.
-
-Good context assets in this domain include:
-
-- Boundary value analysis
-- Negative testing heuristics
-- Regression risk models
-- Payment idempotency and duplicate-charge risk
-- Refund edge cases
-- Mobile offline and background-resume behavior
-- Appium usage limits
-- Team-specific test strategy
-- Known checkout or payment contract risks
-
-Skills can reference those assets for tasks such as test-case generation, spec
-review, regression planning, or release readiness. The context assets remain
-the source of truth.
-
-## Catalog Output
-
-`renma catalog` should provide deterministic inventory:
-
-- ID
-- Kind
-- Source path
-- Content hash
-- Owner
-- Status
-- Tags
-- Declared dependencies
-- Dependents
-- Diagnostics
-
-Catalog output should be stable across filesystems and Node versions so diffs
-are useful in pull requests.
-
-## Repository Health Readiness
-
-Readiness v1 is a deterministic static repository-health report for maintainers:
-
-```bash
-renma readiness [path] [--format json|markdown]
-```
-
-It answers repository-level questions:
-
-- Are shared context assets identifiable and owned?
-- Are lifecycle states explicit?
-- Are skills clear entrypoints rather than overloaded knowledge dumps?
-- Are dependency declarations resolvable?
-- Are deprecated or archived assets still reachable?
-- Are important context assets orphaned?
-- Is repeated knowledge visible enough for maintainers to consolidate it?
-- Which changed assets affect which skills or teams?
-
-Readiness is about preparing the repository for agents. It is not a guarantee
-about any particular agent run.
-
-The Markdown report is intentionally compact for PR review: level, score, workflow readiness, graph resolution, ownership coverage, diagnostics, and layout status. The JSON report exposes the same deterministic facts for CI.
-
-Readiness does not call an LLM, select runtime context, assemble prompts, auto-repair files, perform cross-document semantic consistency analysis, score repairability, or plan per-skill patches.
-
-## Implementation Principles
-
-- Prefer deterministic analysis over hidden inference.
-- Keep the CLI minimal-dependency and Git-friendly.
-- Keep repository paths stable and portable.
-- Parse structured metadata instead of relying on ad hoc text matching where
-  reasonable.
-- Preserve human ownership and review.
-- Treat existing documents as changeable product design, not sacred API.
-- Make shared context first-class before adding external signal features.
-- Design for gradual adoption in repositories that already have skill debt.
+QA and testing remain useful product examples because their expertise is often
+distributed across workflows, tool limits, domain risks, and team policy. They
+are not a required repository hierarchy or a special asset model.

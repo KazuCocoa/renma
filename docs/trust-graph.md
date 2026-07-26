@@ -1,7 +1,8 @@
 # Trust Graph v2 Contract
 
-Renma 0.18.0 emits only `renma.trustGraph.v2`, the first supported long-term
-Trust Graph contract. The authoritative machine-readable definition is the
+Renma emits only `renma.trustGraph.v2`, the first supported long-term Trust Graph
+contract. There is no v1 compatibility mode. The authoritative
+machine-readable definition is the
 [Trust Graph v2 JSON Schema](schemas/trust-graph-v2.schema.json).
 
 The required top-level fields are `schemaVersion`, `summary`, `nodes`, `edges`,

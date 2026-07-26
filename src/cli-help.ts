@@ -342,7 +342,7 @@ export const COMMAND_HELP = [
       "renma trust-graph . --format json",
     ],
     interpretation: [
-      "Renma 0.18.0 emits only Trust Graph v2, the first supported long-term contract; there is no v1 compatibility mode.",
+      "Trust Graph v2 is the only supported contract; there is no v1 compatibility mode.",
       "The report connects evidence; it does not decide trust for you.",
       "Missing owner, lifecycle, policy, or diagnostic evidence should be reviewed in context.",
       "JSON is the source of truth for downstream tooling; Markdown is for human review.",
@@ -424,7 +424,7 @@ export const COMMAND_HELP = [
       "renma bom . --format json --omit-generated-at",
     ],
     interpretation: [
-      "Renma 0.18.0 emits only BOM v2, the first supported long-term contract; there is no v1 compatibility mode.",
+      "Repository Context BOM v2 is the only supported contract; there is no v1 compatibility mode.",
       "The BOM is a declared repository manifest, not a runtime usage report or telemetry.",
       "--omit-generated-at only removes the run-time generation timestamp.",
       "With the same checkout path, config path, repository contents, Renma version, and UTC evaluation date, repeated --omit-generated-at JSON runs should be byte-identical.",
@@ -496,7 +496,7 @@ export const COMMAND_HELP = [
   {
     name: "diff",
     usage: "renma diff [path] --from <ref> --to <ref> [options]",
-    question: "What deterministic readiness evidence changed between refs?",
+    question: "What deterministic repository evidence changed between refs?",
     purpose:
       "Diff compares deterministic repository evidence between Git refs for context and skill review.",
     useWhen: [

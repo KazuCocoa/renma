@@ -6,6 +6,34 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-07-25
+
+### Changed
+
+- Aligned the README, user and authoring guides, diagnostics and security
+  references, architecture, product design, and roadmap with the shipped CLI,
+  repository model, and public output contracts.
+- Clarified which document owns each current contract, replaced duplicated
+  release narration with canonical cross-links, and kept historical behavior
+  in this changelog or focused compatibility documentation.
+- Documented internal module responsibilities, dependency direction,
+  compatibility facades, immutable projections, deterministic ordering,
+  evidence ranges, and fail-closed boundaries in terms of their rationale and
+  invariants.
+- Removed redundant or obsolete release-specific code comments and corrected
+  comments that understated the assets or relationships represented by the
+  catalog.
+- Added lightweight consistency checks for canonical documentation links and
+  package/changelog version agreement.
+
+### Compatibility
+
+- This is a documentation and maintainability release. It intentionally
+  preserves every public command, option, schema identifier, Finding field,
+  diagnostic ID, severity and risk classification, exit behavior, evidence
+  range, ordering, deduplication rule, discovery boundary, compatibility
+  re-export, deep import, and package-content contract.
+
 ## [0.24.0] - 2026-07-24
 
 ### Added
@@ -1459,7 +1487,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.24.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.24.1...HEAD
+[0.24.1]: https://github.com/KazuCocoa/renma/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/KazuCocoa/renma/compare/v0.23.5...v0.24.0
 [0.23.5]: https://github.com/KazuCocoa/renma/compare/v0.23.4...v0.23.5
 [0.23.4]: https://github.com/KazuCocoa/renma/compare/v0.23.3...v0.23.4

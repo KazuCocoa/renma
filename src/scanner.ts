@@ -22,7 +22,7 @@ import type { ScanResult } from "./types/scan-result.js";
 
 interface ScanBuilderOptions {
   evaluationDate?: Date | string;
-  /** Deferred projections may reuse scan evidence without adopting Discovery. */
+  /** Optional projections may reuse scan evidence without preparing Discovery. */
   includeSkillDiscoveryDiagnostics?: boolean;
 }
 

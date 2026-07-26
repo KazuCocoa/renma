@@ -66,7 +66,7 @@ export interface MetadataCandidateSuggestionDecisionInput {
  * Decide Skill migration applicability before rendering any candidate text.
  *
  * Blocked migrations intentionally retain partial diagnostic candidate fields
- * for 0.18.2 JSON compatibility. `canonicalFrontmatter` and renderer patch
+ * for established JSON compatibility. `canonicalFrontmatter` and renderer patch
  * instructions remain gated by the decision status, so those fields are not
  * an independently applicable patch.
  */

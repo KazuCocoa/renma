@@ -1,7 +1,6 @@
 # Declared Impact
 
-Renma 0.20.1 adds a deterministic reverse projection over Declared
-Composition:
+Renma provides a deterministic reverse projection over Declared Composition:
 
 ```text
 Focused asset

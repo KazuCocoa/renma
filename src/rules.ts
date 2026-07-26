@@ -2258,7 +2258,7 @@ function thinSkillLayoutFindings(document: ParsedDocument): Finding[] {
   // Agent Skills explicitly permits step-by-step instructions and command
   // examples in SKILL.md. Focused-workflow quality is evaluated by dedicated
   // routing, input, completion, progressive-disclosure, and mixed-knowledge
-  // rules instead of the removed 0.17 thin-router heuristic.
+  // rules rather than a generic thin-router heuristic.
   return [];
 }
 

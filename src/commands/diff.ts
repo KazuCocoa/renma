@@ -215,7 +215,7 @@ export async function executeDiff(
   return executeDiffWithProjection(targetPath, options, true);
 }
 
-/** @internal Build the pre-0.23.1 projection for compatibility consumers. */
+/** @internal Build the Discovery-free projection for compatibility consumers. */
 export async function diffWithoutSkillDiscovery(
   targetPath: string,
   options: DiffOptions,

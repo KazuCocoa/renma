@@ -52,15 +52,15 @@ When renma is installed as a package, use the `renma` binary:
 renma scan .
 ```
 
-For the breaking 0.16.0 Skill format, scan validation, and one-way migration
-workflow, see [Agent Skills Compatibility and Migration](agent-skills-compatibility.md).
+For the canonical Skill format, scan validation, and one-way migration workflow,
+see [Agent Skills Compatibility and Migration](agent-skills-compatibility.md).
 Agent Skills results appear inside `scan`; there is no separate Skill-validation
 command.
 
-Renma 0.16.0 requires specification-valid Agent Skills for operational Skills.
-All Renma Skill governance and security metadata uses flat, string-valued
-`metadata.renma.*` entries. Pre-0.16 top-level Skill metadata is accepted only
-as migration input for `suggest-metadata`; non-Skill metadata behavior is
+Operational Skills must be specification-valid Agent Skills. All Renma Skill
+governance and security metadata uses flat, string-valued
+`metadata.renma.*` entries. Legacy pre-0.16 top-level Skill metadata is accepted
+only as migration input for `suggest-metadata`; non-Skill metadata behavior is
 unchanged.
 
 ## Repository Layout
@@ -73,7 +73,8 @@ renma is most useful when agent knowledge is stored in predictable places:
   spellings are not Agent Skills-compatible.
 - `contexts/**` for shared context assets.
 - configurable prompt or documentation paths for reusable prompts and broader docs.
-- `*.renma.json` for structured metadata assets.
+- `renma.config.json` and `.renma.json` are the conventional repository
+  configuration filenames.
 
 Tool helper implementations usually belong under `tools/**`. They can be referenced from skills and commands, but they are not the same thing as user-facing documentation under `docs/**`.
 
@@ -106,8 +107,10 @@ Assets or unrelated repository files.
 
 Only files marked Markdown-parser eligible contribute frontmatter metadata,
 headings, links, code fences, and repeated-context evidence. Text scripts and
-data assets remain raw text for dedicated static path or security analysis;
-binary assets remain opaque.
+data assets remain raw text for dedicated static path and inventory analysis;
+binary assets remain opaque. Renma does not analyze script or asset contents as
+executable code. Security command analysis applies to eligible agent-facing
+Markdown instructions that reference or invoke them.
 
 Avoid using reserved support directory names as skill names. Paths such as
 `skills/assets/SKILL.md`, `skills/examples/SKILL.md`,
@@ -558,7 +561,7 @@ The JSON configuration supports the same names used by the implementation, inclu
 - `max_depth`: maximum discovery depth.
 - `concurrency`: scan concurrency.
 - `fail_on`: scan exit threshold: `low`, `medium`, `high`, or `critical`.
-- `format`: default report format.
+- `format`: default `scan` output format.
 - `layout`: compatibility-only `tool_namespace` and `workflow_aliases` input retained for existing configurations. These fields are validated and normalized but do not currently change findings or force Skill-local support migration.
 - `security`: command, network, upload, and profile policy.
 - `skill_discovery`: strict repository-wide Skill Discovery configuration.
@@ -567,7 +570,9 @@ The JSON configuration supports the same names used by the implementation, inclu
   `adopted: true`. Unknown keys and unsupported values are errors. `renma init`
   does not enable adoption or the CI policy.
 
-CLI flags override config values when both are provided.
+For `scan`, `--fail-on` and `--format` override the corresponding configuration
+values. Other commands use their documented command-specific format defaults
+and flags.
 
 Within a canonical Skill entrypoint or one of its classified support documents,
 helper commands may use `scripts/helper.mjs` or `./scripts/helper.mjs`; Renma
@@ -660,6 +665,8 @@ renma commands fall into a few groups:
 - Inventory and ownership: `catalog` lists discovered assets and references, `ownership` summarizes owned and unowned assets, `graph` shows relationships between catalog nodes, `skill-index` shows static Skill Discovery first hops and declared continuations, `trust-graph` exposes deterministic trust evidence, and `bom` combines declared repository evidence into a reviewable Repository Context BOM.
 - Local inspection and authoring: `guide` prints the deterministic pre-generation Skill authoring contract, `inspect` reads one file as an outline or exact line slice, `scaffold` creates starter assets or authoring prompts, `suggest-metadata` emits safe metadata retrofit guidance for existing assets, and `suggest-semantic-split` packages source context and helper commands so a human or coding agent can draft a split for mixed-purpose Markdown.
 - Review and CI: `scan` emits deterministic findings, `readiness` turns repository state into checks and a score, `diff` compares two refs, and `ci-report` formats the comparison for pull-request review.
+
+Use `renma --version` (or `renma -v`) to print the installed package version.
 
 ## Scan, Catalog, Graph, Trust Graph, Readiness, And BOM
 
@@ -770,7 +777,11 @@ renma bom . --format markdown
 renma bom . --format json --omit-generated-at
 ```
 
-Use the BOM when reviewers or CI consumers need one repository evidence manifest that combines existing Renma evidence. Renma 0.18.0 supports only v2, the first supported long-term BOM contract. It does not provide a v1 compatibility mode. V2 includes normalized declared/effective ownership plus static support relationships. See the [Repository Context BOM contract](repository-context-bom.md).
+Use the BOM when reviewers or CI consumers need one repository evidence manifest
+that combines existing Renma evidence. Renma supports only v2, the first
+supported long-term BOM contract; there is no v1 compatibility mode. V2 includes
+normalized declared/effective ownership plus static support relationships. See
+the [Repository Context BOM contract](repository-context-bom.md).
 
 The BOM is not a record of actual LLM runtime usage. Renma does not collect telemetry, assemble prompts, choose task-specific context, inject context into agents, import consumed-context evidence, or claim what an LLM actually consumed.
 
@@ -998,9 +1009,15 @@ Use this when a reviewer or downstream tool needs one stable evidence layer that
 
 Trust Graph is repository evidence. It does not compute a trust score, select or inject runtime context, assemble prompts, call an LLM, collect telemetry, or enforce policy at runtime.
 
-Renma 0.18.0 supports only Trust Graph v2, the first supported long-term contract. It includes normalized ownership and static `owns_local_resource`, `statically_references`, `inherits_owner`, and `inherits_policy` evidence. JSON is the source of truth; Markdown is for human review. `scan --format json` includes the same v2 contract under `trustGraph`.
+Renma supports only Trust Graph v2, the first supported long-term contract. It
+includes normalized ownership and static `owns_local_resource`,
+`statically_references`, `inherits_owner`, and `inherits_policy` evidence. JSON
+is the source of truth; Markdown is for human review. `scan --format json`
+includes the same v2 contract under `trustGraph`.
 
-Consumers must branch on `schemaVersion`, not on the Renma package version. A future incompatible contract may intentionally introduce v3.
+Consumers must branch on `schemaVersion`, not on the Renma package version.
+Changes within v2 must remain additive and backward-compatible; an incompatible
+change requires a new schema version.
 
 Reviewers can use Trust Graph to find assets without owners, find assets without lifecycle status, inspect assets sharing the same effective policy fingerprint, and connect diagnostics back to asset evidence. `trust-graph` exits `0` when the report is generated successfully; use `scan --fail-on` when CI should fail on findings.
 
@@ -1048,7 +1065,7 @@ The focused checks are `discovery.publication`,
 authoritative only when `skill_discovery.adopted: true`; partial and
 not-adopted coverage is descriptive and does not reduce the score. Cycles
 remain warning-level review evidence and do not by themselves make a
-repository not ready. These checks add no 0.23.0 scoring weight and Discovery
+repository not ready. These checks add no scoring weight, and Discovery
 diagnostics are referenced rather than duplicated or penalized again.
 
 Markdown includes compact `Context Lens` and `Skill Discovery` sections. Run
@@ -1059,17 +1076,15 @@ Security posture, Context Lens, and Skill Discovery summaries remain static repo
 
 ### `diff`
 
-Compares deterministic readiness reports for two git refs.
+Compares deterministic repository evidence for two git refs.
 
 ```bash
 renma diff . --from main --to HEAD
 renma diff . --from main --to HEAD --format markdown
 ```
 
-Use this to review what changed between branches or commits. The command
-collects each archived ref once and derives graph, the existing
-Discovery-excluded Readiness subset, and Skill Discovery changes from the same
-immutable repository snapshot.
+Use this to review changes in Renma evidence between branches or commits. This is
+not a generic source-code diff.
 
 Output includes readiness deltas, changed assets, graph edge changes, check
 changes, added or removed findings, and an additive
@@ -1162,13 +1177,10 @@ observability evidence and do not independently alter `PASS`, `WARN`, or
 Discovery CI policy continues to control only its existing configured review
 behavior.
 
-CI prepares the complete semantic diff once. For each ref, graph, Readiness,
-Discovery facts, and the policy mode reuse one immutable repository snapshot
-with one discovery pass, one parse per artifact, one catalog preparation, one
-Agent Skills validation, and one Skill Discovery preparation. There is no
-second config load or diff execution. Legacy pre-0.23.2 reports format without
-a synthetic Discovery section; 0.23.2 reports retain their observation-only
-Discovery section without an invented policy result.
+Serialized reports that predate the Discovery fields continue to format without
+a synthetic Discovery section. A report that contains `skillDiscovery` but no
+`skillDiscoveryPolicy` retains its observation-only Discovery section without an
+invented policy result.
 
 Repository Context BOM artifacts describe declared repository state, not prompt assembly, context injection, agent execution, actual LLM runtime usage, or telemetry. Use `renma bom . --format json` when CI needs a machine-readable manifest and `renma bom . --format markdown` for review comments or artifacts. For v2 compatibility and reproducibility details, see the [Repository Context BOM contract](repository-context-bom.md).
 
@@ -1233,8 +1245,8 @@ example or ask the LLM to choose the closest one. The consuming LLM applies the
 normative protocol to current evidence. It may ignore illustrations or combine
 individual decision patterns, but must not copy their workflows, structures,
 questions, completion criteria, security policies, unresolved items, or domain
-assumptions as templates. Future illustrations can be added without changing
-the normative interaction protocol.
+assumptions as templates. Optional illustrations do not change the normative
+interaction protocol.
 
 The default prompt keeps illustrations compact to reduce anchoring. JSON retains
 their useful optional structures and source-specific review details. Both
@@ -1263,12 +1275,18 @@ renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
 renma scaffold context contexts/testing/boundary-value-analysis.md --owner qa-platform
 renma scaffold context_lens lenses/testing/spec-review-boundary-values.md --owner qa-platform
 renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform --format prompt
+renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform --id skill.testing.spec-review --title "Spec review" --tags testing,review --resources references,scripts,assets
 ```
 
 `scaffold --format file` writes a starter file, `--format prompt` emits an
 authoring prompt, and `--format json` emits structured scaffold data. The
 generated content is intentionally minimal; fill in metadata, dependencies, and
 verification steps before depending on it in automation.
+
+`--id`, `--title`, and comma-separated or repeated `--tags` set scaffold
+metadata. For a Skill scaffold, `--resources` creates only the selected empty
+`references`, `scripts`, or `assets` directories; it never creates placeholder
+files or accepts other resource directory names.
 
 For a Context Lens, replace every placeholder `purpose`, `applies_to`, `focus`,
 and `expected_outputs` value with repository-grounded content. Every
@@ -1319,9 +1337,9 @@ not emit an executable `scan .` action. Establish the repository root with an
 explicit root or repository marker before verification; the caller's current
 directory is not assumed to contain the target.
 
-For Skill targets using the pre-0.16 Renma Skill format, the 0.16.0 metadata
-migration path is one-way: recognized governance and security frontmatter
-becomes Agent Skills identity plus `metadata.renma.*`. Separately, `skill.md` and `*.skill.md` targets
+For Skill targets using the legacy pre-0.16 Renma Skill format, metadata
+migration is one-way: recognized governance and security frontmatter becomes
+Agent Skills identity plus `metadata.renma.*`. Separately, `skill.md` and `*.skill.md` targets
 report any required entrypoint rename or move, even when their frontmatter
 already uses Agent Skills fields. For a canonical Agent Skill, `--owner` may
 instead propose an owner metadata retrofit; it never causes reverse migration.
@@ -1378,6 +1396,7 @@ Suggests a semantic split for large or mixed-purpose assets.
 ```bash
 renma suggest-semantic-split docs/large-runbook.md
 renma suggest-semantic-split docs/large-runbook.md --format json
+renma suggest-semantic-split docs/large-runbook.md --max-source-bytes 32768
 renma suggest-semantic-split docs/large-runbook.md --max-context-bytes 32768
 ```
 
@@ -1387,7 +1406,11 @@ Output is a prompt by default. With `--format json`, output includes source cont
 
 ## Output Formats
 
-Use `--format <format>` to select output and `--json` as a shortcut where the command supports JSON.
+Use `--format <format>` to select output and `--json` as a shortcut where the
+command help lists that shortcut. `scaffold` supports JSON only through
+`--format json`. Avoid combining `--json` and `--format`: `skill-index` rejects
+`--json` with a non-JSON `--format`; the other commands that accept `--json`
+let it select JSON.
 
 | Command | Formats |
 | --- | --- |
@@ -1417,7 +1440,8 @@ A typical CI flow is:
 2. Run `renma scan . --fail-on high`.
 3. Run `renma readiness . --format json` and store the result as an artifact.
 4. Compare refs with `renma diff . --from main --to HEAD`.
-5. Publish `renma ci-report` in the pull-request summary.
+5. Publish `renma ci-report . --from main --to HEAD --format markdown` in the
+   pull-request summary.
 
 Example:
 
@@ -1425,6 +1449,7 @@ Example:
 npm run build
 renma scan . --fail-on high
 renma readiness . --format json > renma-readiness.json
+renma ci-report . --from main --to HEAD --format markdown
 ```
 
 `renma readiness` exits `1` when blocking diagnostics make the repository not ready, including Context Lens governance errors such as duplicate lens IDs, missing required fields, or unresolved `applies_to` targets.

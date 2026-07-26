@@ -383,7 +383,7 @@ export function buildReadinessReport(
 /**
  * Project routine-review counts and checks from the already prepared index.
  *
- * These checks are intentionally non-scoring in 0.23.0. Existing Discovery
+ * These checks are intentionally non-scoring. Existing Discovery
  * diagnostics remain authoritative and are referenced as compact evidence
  * without being copied into the Readiness diagnostic collection.
  */

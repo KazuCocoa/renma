@@ -105,6 +105,10 @@ function maskRawMatches(line: string, matches: string[]): string {
   return masked;
 }
 
+/**
+ * Derive only repository-proven Skill ownership and static-reference edges.
+ * Ambiguous Skill parents and unresolved or external paths never produce edges.
+ */
 export function buildStaticSupportDependencies(
   documents: ParsedDocument[],
   entries: CatalogEntry[],

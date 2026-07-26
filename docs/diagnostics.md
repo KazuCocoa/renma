@@ -6,13 +6,10 @@ Thresholds, units, provenance, and false-positive controls are canonical in the
 [Renma Quality Profile](quality-profile.md). Agent Skills specification
 errors are kept separate from Renma quality advisories.
 
-Agent Skills validation also reports authoring-only `RN-SKILL-*` warnings. In
-0.18.0, `RN-SKILL-DESCRIPTION-MISSING-CAPABILITY` identifies a generic
-description that does not say what the Skill does;
-`RN-SKILL-DESCRIPTION-MISSING-USAGE-BOUNDARY` covers when to use it; and
-`RN-SKILL-DESCRIPTION-OMITS-SELECTION-BOUNDARY` covers an important body
-exclusion missing from discovery metadata. These warnings do not make an
-otherwise specification-valid Skill invalid.
+Agent Skills validation also reports authoring-only `RN-SKILL-*` warnings. These
+warnings do not make an otherwise specification-valid Skill invalid. The
+canonical identifier table is in
+[Agent Skills Diagnostic Identifiers](agent-skills-compatibility.md#agent-skills-diagnostic-identifiers).
 
 ## Diagnostic Types
 
@@ -544,6 +541,30 @@ Readiness and CI reports may include two security summaries: security posture fr
 
 Semantic diff and CI reports may include security deltas, including added/resolved security findings grouped by `riskClass` and effective policy inventory count changes. These summaries are reporting-only and do not change scan `fail_on`, readiness scoring, or CI status.
 
+### Finding and evidence JSON contract
+
+Each `findings` entry contains these required fields:
+
+- `id`, the stable scan finding identifier;
+- `title`, the concise human-readable finding title;
+- `category`, one of `quality`, `safety`, `structure`, or `maintenance`;
+- `severity` and `confidence`;
+- `evidence`;
+- `whyItMatters`; and
+- `remediation`.
+
+A Finding may also include `riskClass`, `constraints`, `repairConstraints`,
+`verificationSteps`, `verificationStepsV2`, `llmHint`, and structured `details`.
+Consumers must tolerate absent optional fields and additive fields they do not
+recognize.
+
+`evidence` always contains `path`, `startLine`, `endLine`, and `snippet`.
+Line numbers are one-based and inclusive. Paths identify the scanned source
+reported by Renma; consumers should not parse `snippet` to recover identity or
+location. Findings use stable source order: evidence path first, then start line.
+That order is for deterministic review and does not replace severity or
+confidence when prioritizing work.
+
 ## Discovery Diagnostics
 
 These diagnostics are emitted while renma discovers files.
@@ -631,7 +652,10 @@ It is different from:
 
 Finding identifiers are useful when you want to group, filter, document, or automate responses to scan results. CI systems, editor integrations, docs, and LLM-assisted repair workflows can use the identifier to understand the category of problem without relying on the exact wording of the human-readable message.
 
-The identifiers below are part of the current scan output. The current implementation does not declare them as a permanent public API, so integrations should avoid assuming stronger stability than the project documents. If renma adopts long-term stability guarantees later, identifier changes should come with documented migrations.
+The identifiers below are stable scan output and are compatibility-sensitive.
+Integrations may group or filter on them without parsing human-readable titles or
+messages. Renaming or removing an identifier requires an intentional
+compatibility decision and a documented migration.
 
 Security diagnostics focus on high-signal heuristics for agent-facing or context-bearing artifacts Renma already discovers, such as skills, contexts, `AGENTS.md`, references, profiles, examples, and Markdown tool guidance. Defensive wording and nearby human approval, dry-run, backup, or rollback guidance may reduce or avoid command-risk findings when they are local to the risky instruction. When the effective human-approval policy is true, dry-run, backup, rollback, or restore guidance does not replace explicit human approval. Renma does not scan `package.json`, GitHub Actions workflows, Dockerfiles, dependency manifests, or repository-wide supply-chain metadata by default.
 
@@ -757,8 +781,8 @@ Remediation never selects a version without repository evidence or human
 review. Pip, Brew, container-image, unsupported-syntax, severity, ordering, and
 deduplication behavior retains its existing compatibility path.
 
-The source/sink, guard, and support evidence is internal in 0.24.0. No Finding,
-scan, Readiness, BOM, diff, or CI JSON field exposes the analysis trace.
+The source/sink, guard, and support evidence is internal. No Finding, scan,
+Readiness, BOM, diff, or CI JSON field exposes the analysis trace.
 
 ### Security Policy Metadata
 

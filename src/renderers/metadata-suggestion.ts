@@ -4,8 +4,9 @@ type SkillSuggestionPromptState = "blocked" | "candidate" | "no-proposal";
 
 export function renderMetadataPrompt(suggestion: MetadataSuggestion): string {
   // `decisionStatus` is the application gate. Blocked Skill migrations retain
-  // partial candidate evidence for 0.18.2 JSON compatibility, so the renderer
-  // must never promote that evidence into an applicable patch.
+  // partial candidate evidence for compatibility with the established JSON
+  // projection, so the renderer must never promote that evidence into an
+  // applicable patch.
   if (suggestion.agentSkills)
     return renderAgentSkillMigrationPrompt(suggestion);
   const blocked = suggestion.decisionStatus === "blocked";

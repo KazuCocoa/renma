@@ -8,6 +8,8 @@ import type { ParsedDocument } from "./types/metadata.js";
 
 type RepeatKind = "section_hash" | "heading" | "code_block" | "token_shingle";
 
+// Keep the retired link ID in this exported cap helper for compatibility.
+// Repeated links are intentionally not emitted by the detector.
 type RepeatedContextFindingId =
   | typeof DIAGNOSTIC_IDS.MAINT_REPEATED_SECTION
   | typeof DIAGNOSTIC_IDS.MAINT_REPEATED_HEADING

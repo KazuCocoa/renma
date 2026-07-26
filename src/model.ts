@@ -107,7 +107,7 @@ export interface Dependency {
   evidence?: Evidence;
 }
 
-/** Deterministic catalog of normalized repository assets and their declared edges. */
+/** Deterministic catalog of normalized repository assets and declared or derived edges. */
 export interface Catalog {
   entries: CatalogEntry[];
   assets: Asset[];

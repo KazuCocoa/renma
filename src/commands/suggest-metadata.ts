@@ -25,6 +25,7 @@ import type { AssetClassificationEvidence } from "../types/classification.js";
 import type { MetadataValue } from "../types/metadata.js";
 import type { SuggestedNextAction } from "../types/decision.js";
 
+// Preserve established command-module result-type deep imports.
 export type {
   BlockedMetadata,
   MetadataSuggestion,
