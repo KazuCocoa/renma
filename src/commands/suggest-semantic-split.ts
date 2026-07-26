@@ -1,6 +1,7 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { buildInspectOutline, type InspectOutline } from "./inspect.js";
+import { formatJsonDocument } from "../report.js";
 
 const DEFAULT_MAX_CONTEXT_BYTES = 32 * 1024;
 const CONTEXT_DIRS = new Set(["references", "profiles", "examples", "r"]);
@@ -60,7 +61,7 @@ export async function runSuggestSemanticSplitCommand(
   const format = options.format ?? "prompt";
   process.stdout.write(
     format === "json"
-      ? `${JSON.stringify(semanticSplitReviewBundle, null, 2)}\n`
+      ? formatJsonDocument(semanticSplitReviewBundle)
       : renderReviewPrompt(semanticSplitReviewBundle),
   );
   return 0;

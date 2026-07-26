@@ -72,10 +72,14 @@ than allowing command modules to re-export arbitrary lower-layer contracts.
 ## Typed Catalog Diagnostic Identity
 
 Metadata and catalog producers assign stable `DIAGNOSTIC_IDS` identities when
-they create diagnostics. `catalogDiagnosticFindings` selects its Finding
-definition only from that identity; human-readable messages remain evidence and
-presentation text and must never control classification. Structured values that
-a downstream rule needs belong in `details`, not in message parsing.
+they create diagnostics. `src/catalog-findings.ts` owns the ordered definition
+registry and diagnostic-to-Finding conversion; `scanner.ts` re-exports the
+established conversion symbols while retaining scan orchestration.
+`catalogDiagnosticFindings` selects its Finding definition only from typed
+identity; human-readable messages remain evidence and presentation text and
+must never control classification. The diagnostic-code list is derived from the
+definition registry rather than maintained separately. Structured values that a
+downstream rule needs belong in `details`, not in message parsing.
 
 New internal identities attached to legacy catalog diagnostics are
 non-enumerable. This lets scan classify them before serialization while
@@ -229,11 +233,15 @@ Index. An internal Discovery-free projection remains available to compatible
 consumers; it omits that access without triggering another collection or parse.
 
 BOM builds graph, scan, its intentionally Discovery-free Readiness subset,
-policy inventory, and diagnostics from the same snapshot and core. Semantic
-diff performs exactly one snapshot collection per ref, derives graph and the
-Discovery-free Readiness subset from it, and builds topology changes directly
-from the memoized Skill Discovery indexes. It does not invoke another command,
-reconstruct Discovery, or recollect repository facts.
+policy inventory, and diagnostics from the same snapshot and core. Scan
+constructs the inventory summary from the already prepared
+`snapshot.securityPolicies` rows, so policy selection, parsing, profile
+resolution, inheritance, and provenance preparation occur once for that
+snapshot path. Semantic diff performs exactly one snapshot collection per ref,
+derives graph and the Discovery-free Readiness subset from it, and builds
+topology changes directly from the memoized Skill Discovery indexes. It does
+not invoke another command, reconstruct Discovery, or recollect repository
+facts.
 
 CI calls `executeDiff()` once. It exposes the diff's Discovery projection at
 top level, evaluates the two snapshot policy modes as
@@ -304,6 +312,12 @@ first-match semantics of `resolveDependencyTarget`. Bucket order follows the
 existing catalog dependency order, so rendering is byte-compatible while each
 asset performs only two map lookups. Operation-count tests cover the index and
 render passes without wall-clock assertions.
+
+BOM prepares dependency, dependent, and exact-path diagnostic buckets after
+the complete arrays reach their established stable order. Asset projection uses
+map lookups into those buckets, so it does not repeatedly scan the complete
+dependency or diagnostic arrays. Bucket accumulation preserves resolved and
+unresolved semantics, duplicates, and array order.
 
 ESLint uses both `tsconfig.json` and `tsconfig.test.json` for typed source and
 test linting. `no-floating-promises`, `no-misused-promises`, and
@@ -640,6 +654,13 @@ Fields such as classification evidence, governance provenance,
 `decisionStatus`, command invocation `command` and `args`, and established
 diagnostic fields must remain compatible with the established serialized
 contract.
+
+`formatJsonDocument` in `src/report.ts` owns only the common serialization form:
+native `JSON.stringify` with two-space indentation followed by exactly one
+newline. It does not sort or rewrite keys; deterministic field order remains the
+responsibility of report construction. Formatters with preprocessing, custom
+ordering, replacers, compact output, or different newline behavior remain
+separate.
 
 Internal working types have a different role. `RepositorySnapshot`, parsed
 documents, `ReadonlyMap` indexes, `ReadonlySet` repository paths, and

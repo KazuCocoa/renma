@@ -29,6 +29,7 @@ import type {
   DependencyKind,
 } from "../model.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
+import { formatJsonDocument } from "../report.js";
 import { classifyRepositorySkillEntrypointPath } from "../discovery.js";
 import {
   collectRepositorySnapshot,
@@ -199,7 +200,7 @@ export function graphFromRepositorySnapshot(
 }
 
 export function formatGraphJson(report: GraphReport): string {
-  return `${JSON.stringify(report, null, 2)}\n`;
+  return formatJsonDocument(report);
 }
 
 function focusGraph(report: GraphReport, focus?: string): GraphReport {

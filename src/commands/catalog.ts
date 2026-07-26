@@ -8,6 +8,7 @@ import {
   type CatalogEntry,
   type Dependency,
 } from "../model.js";
+import { formatJsonDocument } from "../report.js";
 import { collectRepositoryEvidence } from "../repository-evidence.js";
 import type { Diagnostic } from "../types/diagnostics.js";
 
@@ -67,7 +68,7 @@ export async function catalog(
 
 /** Format the catalog command result as deterministic pretty JSON. */
 export function formatCatalogJson(result: CatalogResult): string {
-  return `${JSON.stringify(result, null, 2)}\n`;
+  return formatJsonDocument(result);
 }
 
 /** Format a compact Markdown catalog intended for code review and generated docs. */

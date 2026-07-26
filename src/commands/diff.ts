@@ -30,6 +30,7 @@ import {
 } from "../skill-discovery-diff.js";
 import type { SkillDiscoveryIndex } from "../skill-discovery.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
+import { formatJsonDocument } from "../report.js";
 
 const execFile = promisify(execFileCallback);
 
@@ -472,7 +473,7 @@ export function formatDiff(
   format: DiffFormat,
 ): string {
   if (format === "json") {
-    return `${JSON.stringify(report, null, 2)}\n`;
+    return formatJsonDocument(report);
   }
   return formatDiffMarkdown(report);
 }

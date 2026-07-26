@@ -18,6 +18,7 @@ import {
   type TargetRepositoryEvidence,
 } from "../evidence/target.js";
 import type { CatalogEntry, Dependency } from "../model.js";
+import { formatJsonDocument } from "../report.js";
 import { renderTextOutline } from "../renderers/inspect.js";
 import type { AssetClassificationEvidence } from "../types/classification.js";
 import type { AssetGovernanceEvidence } from "../types/governance.js";
@@ -54,9 +55,7 @@ export async function runInspectCommand(
   if (options.lines) {
     const slice = await buildInspectSlice(target, options.lines);
     process.stdout.write(
-      options.format === "text"
-        ? `${slice.text}\n`
-        : `${JSON.stringify(slice, null, 2)}\n`,
+      options.format === "text" ? `${slice.text}\n` : formatJsonDocument(slice),
     );
     return 0;
   }
@@ -65,7 +64,7 @@ export async function runInspectCommand(
   process.stdout.write(
     options.format === "text"
       ? renderTextOutline(outline)
-      : `${JSON.stringify(outline, null, 2)}\n`,
+      : formatJsonDocument(outline),
   );
   return 0;
 }

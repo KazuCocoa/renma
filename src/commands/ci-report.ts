@@ -20,6 +20,7 @@ import {
 } from "../security-policy-inventory.js";
 import type { ConfigOverrides } from "../config.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
+import { formatJsonDocument } from "../report.js";
 import type {
   SkillDiscoveryCycleDiff,
   SkillDiscoveryDiff,
@@ -146,7 +147,7 @@ export function formatCiReport(
   report: CiReportFormatInput,
   format: CiReportFormat,
 ): string {
-  if (format === "json") return `${JSON.stringify(report, null, 2)}\n`;
+  if (format === "json") return formatJsonDocument(report);
   return formatCiReportMarkdown(report);
 }
 

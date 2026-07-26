@@ -19,6 +19,7 @@ import {
   repositoryDiagnosticsWithoutSkillDiscovery,
   type RepositorySnapshot,
 } from "../repository-evidence.js";
+import { formatJsonDocument } from "../report.js";
 import type { SecurityPolicyInventorySummary } from "../security-policy-inventory.js";
 import type { SecurityPostureSummary } from "../security-posture.js";
 import type { Diagnostic } from "../types/diagnostics.js";
@@ -130,6 +131,12 @@ export interface BomDependency {
   targetPath?: string;
 }
 
+interface BomAssociationIndex {
+  readonly dependenciesBySource: ReadonlyMap<string, readonly BomDependency[]>;
+  readonly dependentsByTarget: ReadonlyMap<string, readonly BomDependency[]>;
+  readonly diagnosticsByPath: ReadonlyMap<string, readonly Diagnostic[]>;
+}
+
 export async function runBomCommand(
   targetPath: string,
   options: {
@@ -194,6 +201,7 @@ export function buildBomReport(
       ...(readinessReport.diagnostics ?? []),
     ]),
   );
+  const associations = buildBomAssociationIndex(dependencies, diagnostics);
   const diagnosticCounts = countDiagnostics(diagnostics);
   const omitGeneratedAt = options.omitGeneratedAt === true;
   const bomReadinessChecks = readinessReport.checks.filter(
@@ -235,7 +243,7 @@ export function buildBomReport(
       diagnosticCounts,
     },
     assets: stableAssets(snapshot.catalog.assets).map((asset) =>
-      toBomAsset(asset, dependencies, diagnostics),
+      toBomAsset(asset, associations),
     ),
     dependencies,
     readiness: {
@@ -266,7 +274,7 @@ function generatedAtIso(options: BomBuildOptions): string {
 }
 
 export function formatBomJson(report: BomReport): string {
-  return `${JSON.stringify(report, null, 2)}\n`;
+  return formatJsonDocument(report);
 }
 
 export function formatBomMarkdown(report: BomReport): string {
@@ -379,11 +387,7 @@ export function formatBomMarkdown(report: BomReport): string {
   return `${lines.join("\n")}\n`;
 }
 
-function toBomAsset(
-  asset: Asset,
-  dependencies: BomDependency[],
-  diagnostics: Diagnostic[],
-): BomAsset {
+function toBomAsset(asset: Asset, associations: BomAssociationIndex): BomAsset {
   const lifecycle = assetLifecycle(asset);
   return {
     id: asset.id,
@@ -400,13 +404,15 @@ function toBomAsset(
       left.localeCompare(right),
     ),
     ...(lifecycle ? { lifecycle } : {}),
-    dependencies: dependencies
-      .filter((dependency) => dependency.from === asset.id)
-      .map(toAssetDependency),
-    dependents: dependencies
-      .filter((dependency) => dependency.targetId === asset.id)
-      .map(toAssetDependent),
-    diagnostics: diagnosticsForPath(diagnostics, asset.sourcePath),
+    dependencies: (associations.dependenciesBySource.get(asset.id) ?? []).map(
+      toAssetDependency,
+    ),
+    dependents: (associations.dependentsByTarget.get(asset.id) ?? []).map(
+      toAssetDependent,
+    ),
+    diagnostics: [
+      ...(associations.diagnosticsByPath.get(asset.sourcePath) ?? []),
+    ],
   };
 }
 
@@ -502,6 +508,46 @@ function stableDiagnostics(diagnostics: Diagnostic[]): Diagnostic[] {
   return [...diagnostics].sort(compareDiagnostics);
 }
 
+function buildBomAssociationIndex(
+  dependencies: readonly BomDependency[],
+  diagnostics: readonly Diagnostic[],
+): BomAssociationIndex {
+  const dependenciesBySource = new Map<string, BomDependency[]>();
+  const dependentsByTarget = new Map<string, BomDependency[]>();
+  const diagnosticsByPath = new Map<string, Diagnostic[]>();
+
+  for (const dependency of dependencies) {
+    addAssociation(dependenciesBySource, dependency.from, dependency);
+    if (dependency.targetId) {
+      addAssociation(dependentsByTarget, dependency.targetId, dependency);
+    }
+  }
+  for (const diagnostic of diagnostics) {
+    if (diagnostic.path) {
+      addAssociation(diagnosticsByPath, diagnostic.path, diagnostic);
+    }
+  }
+
+  return {
+    dependenciesBySource,
+    dependentsByTarget,
+    diagnosticsByPath,
+  };
+}
+
+function addAssociation<Value>(
+  associations: Map<string, Value[]>,
+  key: string,
+  value: Value,
+): void {
+  const values = associations.get(key);
+  if (values) {
+    values.push(value);
+  } else {
+    associations.set(key, [value]);
+  }
+}
+
 function dedupeDiagnostics(diagnostics: Diagnostic[]): Diagnostic[] {
   const seen = new Set<string>();
   const deduped: Diagnostic[] = [];
@@ -561,13 +607,6 @@ function countDiagnostics(
     info: diagnostics.filter((diagnostic) => diagnostic.severity === "info")
       .length,
   };
-}
-
-function diagnosticsForPath(
-  diagnostics: Diagnostic[],
-  sourcePath: string,
-): Diagnostic[] {
-  return diagnostics.filter((diagnostic) => diagnostic.path === sourcePath);
 }
 
 function compareDiagnostics(left: Diagnostic, right: Diagnostic): number {

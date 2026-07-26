@@ -24,6 +24,7 @@ import {
 import { scanFromRepositorySnapshot } from "../src/scanner.js";
 import type { ScanResult } from "../src/types.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
+import { RepositoryFixture } from "./repository-fixture.js";
 
 test("bom report declares Repository Context BOM schema and scope", async () => {
   const report = await bom(await bomFixture());
@@ -146,6 +147,100 @@ test("bom dependencies include resolved target evidence and unresolved edges", a
     report.dependencies.filter((dependency) => dependency.resolved).length,
   );
   assert.equal(report.summary.unresolvedDependencyCount, 1);
+});
+
+test("bom projects indexed dependency, dependent, and diagnostic associations in stable order", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.skill("alpha", {
+    id: "skill.alpha",
+    owner: "qa-platform",
+    status: "stable",
+    metadata: {
+      "requires-context": JSON.stringify([
+        "context.target",
+        "context.missing",
+        "context.clean",
+      ]),
+    },
+  });
+  await fixture.skill("beta", {
+    id: "skill.beta",
+    owner: "qa-platform",
+    status: "stable",
+    metadata: {
+      "requires-context": JSON.stringify(["context.target"]),
+    },
+  });
+  await fixture.context("contexts/target.md", {
+    id: "context.target",
+    owner: "qa-platform",
+    status: "active",
+  });
+  await fixture.context("contexts/clean.md", {
+    id: "context.clean",
+    owner: "qa-platform",
+    status: "stable",
+    whenToUse: ["deterministic BOM association tests"],
+    whenNotToUse: ["runtime routing"],
+  });
+  await fixture.context("contexts/isolated.md", {
+    id: "context.isolated",
+    owner: "qa-platform",
+    status: "stable",
+    whenToUse: ["isolated asset projection tests"],
+    whenNotToUse: ["runtime routing"],
+  });
+
+  const report = await bom(fixture.root, {}, { omitGeneratedAt: true });
+  const alpha = report.assets.find((asset) => asset.id === "skill.alpha");
+  const target = report.assets.find((asset) => asset.id === "context.target");
+  const isolated = report.assets.find(
+    (asset) => asset.id === "context.isolated",
+  );
+
+  assert.deepEqual(alpha?.dependencies, [
+    {
+      kind: "requires",
+      to: "context.clean",
+      resolved: true,
+      targetId: "context.clean",
+      targetKind: "context",
+      targetPath: "contexts/clean.md",
+    },
+    {
+      kind: "requires",
+      to: "context.missing",
+      resolved: false,
+    },
+    {
+      kind: "requires",
+      to: "context.target",
+      resolved: true,
+      targetId: "context.target",
+      targetKind: "context",
+      targetPath: "contexts/target.md",
+    },
+  ]);
+  assert.deepEqual(target?.dependents, [
+    {
+      kind: "requires",
+      from: "skill.alpha",
+      sourcePath: "skills/alpha/SKILL.md",
+    },
+    {
+      kind: "requires",
+      from: "skill.beta",
+      sourcePath: "skills/beta/SKILL.md",
+    },
+  ]);
+  const targetDiagnostics = report.diagnostics.filter(
+    (diagnostic) => diagnostic.path === "contexts/target.md",
+  );
+  assert.ok(targetDiagnostics.length > 1);
+  assert.deepEqual(target?.diagnostics, targetDiagnostics);
+  assert.deepEqual(isolated?.dependencies, []);
+  assert.deepEqual(isolated?.dependents, []);
+  assert.deepEqual(isolated?.diagnostics, []);
 });
 
 test("bom uses shared repository evidence for assets and dependencies", async () => {

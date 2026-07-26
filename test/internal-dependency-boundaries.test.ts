@@ -148,6 +148,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
       ],
     ),
     ...topLevelModules("analysis", "deterministic analysis and reporting IR", [
+      "catalog-findings.ts",
       "declared-composition.ts",
       "declared-impact.ts",
       "diagnostics-v2.ts",
