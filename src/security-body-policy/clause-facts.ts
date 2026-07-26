@@ -47,6 +47,7 @@ type DomainCandidateKind =
 interface DomainCandidate extends EvidenceRange {
   readonly kind: DomainCandidateKind;
   readonly predicateStart: number;
+  readonly directWorkflowSubject: EvidenceRange | undefined;
 }
 
 const DOMAIN_ORDER: readonly BodyPolicyDomain[] = [
@@ -208,7 +209,10 @@ const NOT_REQUIREMENT_PREDICATE_RE =
 const AFFIRMATIVE_REQUIREMENT_PREDICATE_RE =
   /\b(?:requires|(?:is|are|was|were)\s+(?:required|needed|necessary)|(?:should|will|would|may)\s+be\s+(?:required|needed|necessary))\b/gi;
 const PROHIBITION_PREDICATE_RE =
-  /\b(?:do\s+not|don't|never|must\s+not|shall\s+not|will\s+not|does\s+not|cannot|can't|not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled|without|no|(?:must|shall|will|has\s+to|needs\s+to)\s+(?:run|operate|work)|keep|run|operate)\b/gi;
+  /\b(?:do\s+not|don't|never|must\s+not|shall\s+not|will\s+not|does\s+not|cannot|can't|not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled|without|no|(?:must|shall|will|has\s+to|needs\s+to)\s+(?:run|operate|work)(?:\s+without)?|keep|run|operate)\b/gi;
+const COORDINATED_PREDICATE_RE = /(?:,[ \t]*)?\band\b[ \t]*$/i;
+const SHARED_SUBJECT_PREDICATE_BRIDGE_RE =
+  /(?:,[ \t]*(?:and(?:[ \t]+(?:also|still|therefore))?)?|[ \t]+and(?:[ \t]+(?:also|still|therefore))?)[ \t]*$/i;
 
 /** @internal Extract bounded semantic facts from one prepared Markdown clause. */
 export function bodyPolicyClauseFacts(
@@ -283,15 +287,26 @@ function classifyDomainFacts(
     const boundaryEnd = candidateBoundaryEnd(clause, candidate, nextCandidate);
     const contextEnd = candidateContextEnd(clause, candidate, boundaryEnd);
     const context = clause.slice(candidate.predicateStart, contextEnd);
-    const workflowSubject = inheritedWorkflowSubject(clause, candidate);
+    const candidateWorkflowSubject =
+      inheritedWorkflowSubject(clause, candidate) ??
+      coordinatedWorkflowSubject(clause, candidates[index - 1], candidate);
     const projectedSupportedEnd =
-      candidate.kind === "generic-prohibition" && workflowSubject !== undefined
+      candidate.kind === "generic-prohibition" &&
+      candidateWorkflowSubject !== undefined
         ? projectedSupportedPredicateEnd(
-            clause.slice(workflowSubject.start, workflowSubject.end),
+            clause.slice(
+              candidateWorkflowSubject.start,
+              candidateWorkflowSubject.end,
+            ),
             context,
             domain,
           )
         : undefined;
+    const workflowSubject = candidateWorkflowSubject;
+    const inheritsWorkflowScope =
+      workflowSubject !== undefined &&
+      (candidate.kind !== "generic-prohibition" ||
+        projectedSupportedEnd !== undefined);
     const evidence = {
       start: 0,
       end:
@@ -307,12 +322,16 @@ function classifyDomainFacts(
         : candidate.kind === "affirmative-requirement"
           ? "unknown"
           : "prohibited";
+    const scopeModality =
+      baseModality === "prohibited" && !supportedProhibition
+        ? "unknown"
+        : baseModality;
     const scope = classifyScope(
       context,
       domain,
-      baseModality,
+      scopeModality,
       evidence,
-      workflowSubject !== undefined,
+      inheritsWorkflowScope,
     );
     const modality =
       baseModality !== "prohibited"
@@ -489,16 +508,24 @@ function candidateEvidence(
       : `${pattern.flags}g`;
     for (const match of text.matchAll(new RegExp(pattern.source, flags))) {
       if (match.index === undefined || match[0].length === 0) continue;
+      const start = match.index;
+      const end = match.index + match[0].length;
+      const directWorkflowSubject =
+        kind === "supported-prohibition"
+          ? leadingWorkflowSubject(text, start, end)
+          : undefined;
       candidates.push({
         kind,
-        start: match.index,
-        end: match.index + match[0].length,
+        start,
+        end,
         predicateStart: candidatePredicateStart(
           text,
-          match.index,
-          match.index + match[0].length,
+          start,
+          end,
           kind,
+          directWorkflowSubject !== undefined,
         ),
+        directWorkflowSubject,
       });
     }
   }
@@ -554,6 +581,7 @@ function candidatePredicateStart(
   start: number,
   end: number,
   kind: DomainCandidateKind,
+  directWorkflowPrefix: boolean,
 ): number {
   const predicatePattern =
     kind === "not-required"
@@ -566,6 +594,10 @@ function candidatePredicateStart(
     (match) => (match.index === undefined ? [] : [{ index: match.index }]),
   );
   if (kind === "supported-prohibition" || kind === "generic-prohibition") {
+    if (directWorkflowPrefix) {
+      const predicate = matches[matches.length - 1];
+      return predicate === undefined ? start : start + predicate.index;
+    }
     const connector = /(?:,[ \t]*)?\band\b[ \t]*/gi;
     let predicateFloor = 0;
     for (const match of candidateText.matchAll(connector)) {
@@ -604,8 +636,15 @@ function hasCoordinatedPredicateBoundary(
   earlier: DomainCandidate,
   later: DomainCandidate,
 ): boolean {
+  if (
+    later.kind === "supported-prohibition" &&
+    later.directWorkflowSubject !== undefined &&
+    later.predicateStart > earlier.predicateStart
+  ) {
+    return true;
+  }
   if (later.predicateStart < earlier.end) return false;
-  return /(?:,[ \t]*)?\band\b[ \t]*$/i.test(
+  return COORDINATED_PREDICATE_RE.test(
     text.slice(earlier.end, later.predicateStart),
   );
 }
@@ -614,6 +653,9 @@ function inheritedWorkflowSubject(
   text: string,
   candidate: DomainCandidate,
 ): EvidenceRange | undefined {
+  if (candidate.directWorkflowSubject !== undefined) {
+    return candidate.directWorkflowSubject;
+  }
   const matcher = new RegExp(
     WORKFLOW_SCOPE_RE.source,
     WORKFLOW_SCOPE_RE.flags.includes("g")
@@ -628,15 +670,31 @@ function inheritedWorkflowSubject(
     const start = match.index;
     const end = start + match[0].length;
     const suffix = text.slice(end, candidate.predicateStart);
-    if (
-      start >= candidate.start ||
-      /^[ \t]*$/.test(suffix) ||
-      /(?:,[ \t]*)?\band\b[ \t]*$/i.test(suffix)
-    ) {
+    if (start >= candidate.start || /^[ \t]*$/.test(suffix)) {
       selected = { start, end };
     }
   }
   return selected;
+}
+
+function coordinatedWorkflowSubject(
+  text: string,
+  earlier: DomainCandidate | undefined,
+  later: DomainCandidate,
+): EvidenceRange | undefined {
+  // Generic projection may borrow a subject only from the immediately
+  // preceding same-domain fact across this small, explicit bridge grammar.
+  if (
+    earlier === undefined ||
+    later.predicateStart <= earlier.predicateStart ||
+    later.predicateStart < earlier.end ||
+    !SHARED_SUBJECT_PREDICATE_BRIDGE_RE.test(
+      text.slice(earlier.end, later.predicateStart),
+    )
+  ) {
+    return undefined;
+  }
+  return inheritedWorkflowSubject(text, earlier);
 }
 
 function candidateKindOrder(kind: DomainCandidateKind): number {
@@ -660,7 +718,15 @@ function candidateBoundaryEnd(
   // Only a recognized later candidate shortens the completeness boundary.
   // Otherwise coordinated trailing prose remains an unsupported remainder.
   if (nextCandidate === undefined) return semanticContentEnd(text);
-  const nextWorkflowSubject = inheritedWorkflowSubject(text, nextCandidate);
+  const coordinatedNextWorkflowSubject = coordinatedWorkflowSubject(
+    text,
+    candidate,
+    nextCandidate,
+  );
+  const nextWorkflowSubject =
+    nextCandidate.directWorkflowSubject ??
+    coordinatedNextWorkflowSubject ??
+    inheritedWorkflowSubject(text, nextCandidate);
   const nextStatementStart =
     nextCandidate.start >= candidate.end
       ? nextCandidate.start
@@ -669,7 +735,11 @@ function candidateBoundaryEnd(
         ? nextWorkflowSubject.start
         : nextCandidate.predicateStart;
   const between = text.slice(candidate.end, nextStatementStart);
-  const connector = /(?:,[ \t]*)?\band\b[ \t]*$/i.exec(between);
+  const connector =
+    nextCandidate.directWorkflowSubject === undefined &&
+    coordinatedNextWorkflowSubject === undefined
+      ? COORDINATED_PREDICATE_RE.exec(between)
+      : SHARED_SUBJECT_PREDICATE_BRIDGE_RE.exec(between);
   const untrimmedEnd =
     connector === null ? nextStatementStart : candidate.end + connector.index;
   return text.slice(0, untrimmedEnd).trimEnd().length;
@@ -696,6 +766,22 @@ function evidenceForPattern(
   const match = pattern.exec(text);
   if (match?.index === undefined) return undefined;
   return { start: match.index, end: match.index + match[0].length };
+}
+
+function leadingWorkflowSubject(
+  text: string,
+  start: number,
+  end: number,
+): EvidenceRange | undefined {
+  const evidence = evidenceForPattern(
+    text.slice(start, end),
+    WORKFLOW_SCOPE_RE,
+  );
+  if (evidence?.start !== 0) return undefined;
+  return {
+    start: start + evidence.start,
+    end: start + evidence.end,
+  };
 }
 
 function noRequirementPatterns(subject: string): readonly RegExp[] {

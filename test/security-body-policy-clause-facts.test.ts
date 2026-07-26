@@ -44,6 +44,15 @@ interface SharedSubjectRegressionCase {
   readonly laterPredicate: string;
 }
 
+interface ModifiedSharedSubjectRegressionCase extends SharedSubjectRegressionCase {
+  readonly connector:
+    | " and also "
+    | ", and also "
+    | " and still "
+    | ", "
+    | " and therefore ";
+}
+
 const BODY_POLICY_MATRIX: readonly CharacterizationCase[] = [
   {
     name: "network prohibited workflow complete",
@@ -261,6 +270,28 @@ const SHARED_SUBJECT_REGRESSIONS: readonly SharedSubjectRegressionCase[] = [
   }),
 ];
 
+const MODIFIED_SHARED_SUBJECT_REGRESSIONS: readonly ModifiedSharedSubjectRegressionCase[] =
+  [
+    ...modifiedSharedSubjectDomainCases(
+      "network",
+      "must not use the network",
+      "requires network access",
+      "does not require network access",
+    ),
+    ...modifiedSharedSubjectDomainCases(
+      "upload",
+      "must not upload files",
+      "requires external uploads",
+      "does not require external uploads",
+    ),
+    ...modifiedSharedSubjectDomainCases(
+      "secrets",
+      "must not use credentials",
+      "requires credentials",
+      "does not require credentials",
+    ),
+  ];
+
 test("body-policy characterization matrix preserves the 0.24.4 decision boundary", () => {
   for (const fixture of BODY_POLICY_MATRIX) {
     const findings = bodyPolicyFindings(fixture.body, fixture.domain);
@@ -437,19 +468,65 @@ test("shared workflow subjects retain independent coordinated predicate facts", 
   }
 });
 
-test("every workflow-prefix prohibition family retains a coordinated predicate", () => {
+test("direct workflow-prefix matches retain modified shared-subject predicates", () => {
+  for (const fixture of MODIFIED_SHARED_SUBJECT_REGRESSIONS) {
+    for (const softWrapped of [false, true]) {
+      const body = softWrapped
+        ? `This workflow ${fixture.firstPredicate}${fixture.connector.trimEnd()}\n${fixture.laterPredicate}.`
+        : `This workflow ${fixture.firstPredicate}${fixture.connector}${fixture.laterPredicate}.`;
+      const variant = softWrapped ? "soft wrapped" : "one line";
+      const message = `${fixture.name}, ${variant}`;
+      const normalizedClause = body.replaceAll("\n", " ");
+      const firstEvidence = `This workflow ${fixture.firstPredicate}`;
+      const laterEvidence = normalizedClause.slice(0, -1);
+      const facts = bodyPolicyClauseFacts(normalizedClause).filter(
+        ({ domain }) => domain === fixture.domain,
+      );
+
+      assert.equal(facts.length, 2, message);
+      assertFactEvidence(
+        facts[0],
+        normalizedClause,
+        firstEvidence,
+        {
+          modality: fixture.firstModality,
+          scope: fixture.firstScope,
+          completeness: "complete",
+        },
+        `${message}, first predicate`,
+      );
+      assertFactEvidence(
+        facts[1],
+        normalizedClause,
+        laterEvidence,
+        {
+          modality: "prohibited",
+          scope: "workflow",
+          completeness: "complete",
+        },
+        `${message}, later predicate`,
+      );
+
+      const findings = bodyPolicyFindings(body, fixture.domain);
+      assert.equal(findings.length, 1, message);
+      assert.equal(findings[0]?.evidence.snippet, body, message);
+    }
+  }
+});
+
+test("every workflow-prefix prohibition family retains a modified coordinated predicate", () => {
   for (const { domain, body } of [
     {
       domain: "network",
-      body: "This workflow requires network access and must run offline.",
+      body: "This workflow requires network access and also must run offline.",
     },
     {
       domain: "upload",
-      body: "This workflow requires external uploads and must not upload anything externally.",
+      body: "This workflow requires external uploads and also must not upload anything externally.",
     },
     {
       domain: "secrets",
-      body: "This workflow requires credentials and must run without secrets.",
+      body: "This workflow requires credentials and also must run without secrets.",
     },
   ] as const) {
     const facts = bodyPolicyClauseFacts(body).filter(
@@ -516,6 +593,69 @@ test("shared workflow-subject negative controls remain clean", () => {
     );
     assert.equal(bodyPolicyFindings(body, domain).length, 0, body);
   }
+});
+
+test("modified shared-subject text retains body-policy suppression boundaries", () => {
+  for (const { name, domain, body } of [
+    {
+      name: "quoted example",
+      domain: "network",
+      body: 'This workflow requires network access and also "must not use the network" is example wording.',
+    },
+    {
+      name: "descriptive text",
+      domain: "upload",
+      body: "This workflow requires external uploads and also documents a prohibition on uploads.",
+    },
+    {
+      name: "conditional prohibition",
+      domain: "secrets",
+      body: "This workflow requires credentials and also must not use credentials if offline mode is selected.",
+    },
+    {
+      name: "local prohibition",
+      domain: "network",
+      body: "This workflow requires network access and also must not use the network during local setup.",
+    },
+    {
+      name: "specific target",
+      domain: "upload",
+      body: "This workflow requires external uploads and also must not upload files to a public bucket.",
+    },
+    {
+      name: "specific source",
+      domain: "secrets",
+      body: "This workflow requires credentials and also must not access credentials from production.",
+    },
+    {
+      name: "unsupported remainder",
+      domain: "network",
+      body: "This workflow requires network access and also must not use the network except for approved domains.",
+    },
+  ] as const) {
+    assert.equal(bodyPolicyFindings(body, domain).length, 0, name);
+  }
+});
+
+test("unrelated workflow prose does not give generic prohibitions workflow scope", () => {
+  const body =
+    "This workflow documents deployment guidance, and also do not expose credentials.";
+  const facts = bodyPolicyClauseFacts(body).filter(
+    (fact) => fact.domain === "secrets",
+  );
+  assert.equal(facts.length, 1, body);
+  assertFactEvidence(
+    facts[0],
+    body,
+    "do not expose credentials",
+    {
+      modality: "unknown",
+      scope: "unknown",
+      completeness: "complete",
+    },
+    body,
+  );
+  assert.equal(bodyPolicyFindings(body, "secrets").length, 0, body);
 });
 
 test("affirmative requirements never become not-required facts or findings", () => {
@@ -741,6 +881,61 @@ function sharedSubjectDomainCases(
       firstPredicate: predicates.localSafeguard,
       firstModality: "local-safeguard",
       firstScope: predicates.localSafeguardScope,
+      laterPredicate,
+    },
+  ];
+}
+
+function modifiedSharedSubjectDomainCases(
+  domain: PolicyDomain,
+  laterPredicate: string,
+  affirmativeRequirement: string,
+  negativeRequirement: string,
+): readonly ModifiedSharedSubjectRegressionCase[] {
+  return [
+    {
+      name: `${domain} shared-subject and also`,
+      domain,
+      firstPredicate: affirmativeRequirement,
+      firstModality: "unknown",
+      firstScope: "workflow",
+      connector: " and also ",
+      laterPredicate,
+    },
+    {
+      name: `${domain} shared-subject comma and also`,
+      domain,
+      firstPredicate: affirmativeRequirement,
+      firstModality: "unknown",
+      firstScope: "workflow",
+      connector: ", and also ",
+      laterPredicate,
+    },
+    {
+      name: `${domain} shared-subject and still`,
+      domain,
+      firstPredicate: negativeRequirement,
+      firstModality: "not-required",
+      firstScope: "workflow",
+      connector: " and still ",
+      laterPredicate,
+    },
+    {
+      name: `${domain} shared-subject comma only`,
+      domain,
+      firstPredicate: affirmativeRequirement,
+      firstModality: "unknown",
+      firstScope: "workflow",
+      connector: ", ",
+      laterPredicate,
+    },
+    {
+      name: `${domain} shared-subject and therefore`,
+      domain,
+      firstPredicate: affirmativeRequirement,
+      firstModality: "unknown",
+      firstScope: "workflow",
+      connector: " and therefore ",
       laterPredicate,
     },
   ];
