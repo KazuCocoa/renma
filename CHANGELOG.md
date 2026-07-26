@@ -29,8 +29,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 - This internal maintainability release intentionally preserves public CLI
   behavior, schemas, diagnostics, findings, ordering, deduplication, evidence,
-  deep imports, package entrypoints, and runtime boundaries. Only package and
-  generator version fields change to 0.24.2.
+  deep imports, package entrypoints, and runtime boundaries.
+  Package-version-derived values, including the BOM generator version and
+  quality-profile identifiers, advance to 0.24.2.
 
 ## [0.24.1] - 2026-07-25
 
