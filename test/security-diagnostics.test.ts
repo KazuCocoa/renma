@@ -4984,6 +4984,26 @@ test("body policy contradictions distinguish workflow bans from local safeguards
       body: "Do not use network access to production systems.",
     },
     {
+      policy: "network_allowed: true",
+      body: "No network access is required for local validation.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Network access is not required for local validation.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "There is no requirement for network access.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Network access is unnecessary for local validation.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Network access is optional for local validation.",
+    },
+    {
       policy: "external_upload_allowed: true",
       body: "Never upload debug logs to a public bucket.",
     },
@@ -4994,6 +5014,10 @@ test("body policy contradictions distinguish workflow bans from local safeguards
     {
       policy: "external_upload_allowed: true",
       body: "Never upload anything to untrusted.example.com.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "External uploads are not required by this workflow.",
     },
     {
       policy: "external_upload_allowed: true\nsecrets_allowed: true",
@@ -5014,6 +5038,14 @@ test("body policy contradictions distinguish workflow bans from local safeguards
     {
       policy: "secrets_allowed: true",
       body: "Secrets are forbidden in command arguments.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "No secret access is needed for this task.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "The process does not require credentials.",
     },
   ]) {
     const findings = securityDiagnosticFindings([
@@ -5053,6 +5085,18 @@ ${body}
       body: "This workflow must run entirely offline.",
     },
     {
+      policy: "network_allowed: true",
+      body: "Never allow any network access for this workflow.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "This workflow must not use the network.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "The workflow cannot access the internet.",
+    },
+    {
       policy: "external_upload_allowed: true",
       body: "Never perform external uploads.",
     },
@@ -5063,6 +5107,18 @@ ${body}
     {
       policy: "external_upload_allowed: true",
       body: "External uploads are forbidden.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "This workflow must not upload files.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "Never upload files externally.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "Uploads must not be performed in this workflow.",
     },
     {
       policy: "secrets_allowed: true",
@@ -5084,6 +5140,18 @@ ${body}
       policy: "secrets_allowed: true",
       body: "This workflow must run without secrets.",
     },
+    {
+      policy: "secrets_allowed: true",
+      body: "Credentials must not be used in this workflow.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "No secrets may be used for this process.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "Never access credentials during this task.",
+    },
   ]) {
     const findings = securityDiagnosticFindings([
       v2SecurityArtifact(`---
@@ -5096,10 +5164,53 @@ ${body}
     ]);
 
     assert.equal(
-      findings.some(
+      findings.filter(
         (finding) => finding.id === "SEC-BODY-POLICY-CONTRADICTION",
-      ),
-      true,
+      ).length,
+      1,
+      body,
+    );
+  }
+});
+
+test("requirement language and local safeguards do not hide workflow bans", () => {
+  for (const { policy, body } of [
+    {
+      policy: "network_allowed: true",
+      body: "Network access is not required for local validation. This workflow must run offline.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Do not allow npx to download a missing package. This workflow must not use the network.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "The workflow cannot access the internet. Do not allow npx to download a missing package.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "Never upload debug logs to a public bucket. Uploads must not be performed in this workflow.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "Credentials must not be used in this workflow. Never print secrets to logs.",
+    },
+  ]) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: disclosed
+${policy}
+---
+
+${body}
+`),
+    ]);
+
+    assert.equal(
+      findings.filter(
+        (finding) => finding.id === "SEC-BODY-POLICY-CONTRADICTION",
+      ).length,
+      1,
       body,
     );
   }

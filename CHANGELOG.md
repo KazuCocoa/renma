@@ -16,6 +16,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Preserved one-line and Markdown soft-wrap parity for local safeguards such as
   preventing `npx` from downloading a missing package, while retaining genuine
   workflow-wide policy contradictions.
+- Distinguished requirement language such as “not required,” “not needed,” and
+  “optional” from an actual workflow-wide prohibition.
+- Preserved bounded global prohibition grammar for network access, external
+  uploads, and secret use without broadening local safeguard detection.
 
 ### Changed
 
@@ -1605,7 +1609,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.24.3...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.24.4...HEAD
+[0.24.4]: https://github.com/KazuCocoa/renma/compare/v0.24.3...v0.24.4
 [0.24.3]: https://github.com/KazuCocoa/renma/compare/v0.24.2...v0.24.3
 [0.24.2]: https://github.com/KazuCocoa/renma/compare/v0.24.1...v0.24.2
 [0.24.1]: https://github.com/KazuCocoa/renma/compare/v0.24.0...v0.24.1

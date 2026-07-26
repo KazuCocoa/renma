@@ -534,6 +534,113 @@ access to secrets.`,
   }
 });
 
+test("requirement language stays non-contradictory across soft wraps", () => {
+  const fixtures = [
+    {
+      policy: "network_allowed: true",
+      oneLine: "No network access is required for local validation.",
+      wrapped: `No network access is
+required for local validation.`,
+    },
+    {
+      policy: "external_upload_allowed: true",
+      oneLine: "External uploads are not required by this workflow.",
+      wrapped: `External uploads are not
+required by this workflow.`,
+    },
+    {
+      policy: "secrets_allowed: true",
+      oneLine: "No secret access is needed for this task.",
+      wrapped: `No secret access is
+needed for this task.`,
+    },
+    {
+      policy: "secrets_allowed: true",
+      oneLine: "The process does not require credentials.",
+      wrapped: `The process does not
+require credentials.`,
+    },
+  ];
+
+  for (const fixture of fixtures) {
+    const oracle = project(fixture.oneLine, fixture.policy, BODY_POLICY_IDS);
+    const wrapped = project(fixture.wrapped, fixture.policy, BODY_POLICY_IDS);
+    assert.deepEqual(oracle, [], fixture.oneLine);
+    assert.deepEqual(wrapped, oracle, fixture.wrapped);
+  }
+});
+
+test("supported workflow prohibitions retain identity and bounded soft-wrap evidence", () => {
+  const fixtures = [
+    {
+      policy: "network_allowed: true",
+      oneLine: "Never allow any network access for this workflow.",
+      wrapped: `Never allow any network
+access for this workflow.`,
+    },
+    {
+      policy: "network_allowed: true",
+      oneLine: "This workflow must not use the network.",
+      wrapped: `This workflow must not use
+the network.`,
+    },
+    {
+      policy: "network_allowed: true",
+      oneLine: "The workflow cannot access the internet.",
+      wrapped: `The workflow cannot access
+the internet.`,
+    },
+    {
+      policy: "external_upload_allowed: true",
+      oneLine: "This workflow must not upload files.",
+      wrapped: `This workflow must not upload
+files.`,
+    },
+    {
+      policy: "external_upload_allowed: true",
+      oneLine: "Never upload files externally.",
+      wrapped: `Never upload files
+externally.`,
+    },
+    {
+      policy: "external_upload_allowed: true",
+      oneLine: "Uploads must not be performed in this workflow.",
+      wrapped: `Uploads must not be performed
+in this workflow.`,
+    },
+    {
+      policy: "secrets_allowed: true",
+      oneLine: "Credentials must not be used in this workflow.",
+      wrapped: `Credentials must not be used
+in this workflow.`,
+    },
+    {
+      policy: "secrets_allowed: true",
+      oneLine: "No secrets may be used for this process.",
+      wrapped: `No secrets may be used
+for this process.`,
+    },
+    {
+      policy: "secrets_allowed: true",
+      oneLine: "Never access credentials during this task.",
+      wrapped: `Never access credentials
+during this task.`,
+    },
+  ];
+
+  for (const fixture of fixtures) {
+    const oracle = project(fixture.oneLine, fixture.policy, BODY_POLICY_IDS);
+    const wrapped = project(fixture.wrapped, fixture.policy, BODY_POLICY_IDS);
+    assert.deepEqual(oracle, [
+      finding("SEC-BODY-POLICY-CONTRADICTION", "high", 6, 6, fixture.oneLine),
+    ]);
+    assert.deepEqual(identityProjection(wrapped), identityProjection(oracle));
+    assert.deepEqual(wrapped, [
+      finding("SEC-BODY-POLICY-CONTRADICTION", "high", 6, 7, fixture.wrapped),
+    ]);
+  }
+});
+
 test("localized body-policy safeguards stay non-contradictory across soft wraps", () => {
   const fixtures = [
     {
@@ -690,6 +797,30 @@ Never print secrets to logs.`,
       fixture.wrapped,
     );
   }
+});
+
+test("requirement language does not hide a later wrapped workflow prohibition", () => {
+  const oneLine =
+    "Network access is not required for local validation. This workflow must run offline.";
+  const wrapped = `Network access is not required for local validation. This workflow
+must run offline.`;
+  const oracle = project(oneLine, "network_allowed: true", BODY_POLICY_IDS);
+  const wrappedFindings = project(
+    wrapped,
+    "network_allowed: true",
+    BODY_POLICY_IDS,
+  );
+
+  assert.deepEqual(oracle, [
+    finding("SEC-BODY-POLICY-CONTRADICTION", "high", 6, 6, oneLine),
+  ]);
+  assert.deepEqual(
+    identityProjection(wrappedFindings),
+    identityProjection(oracle),
+  );
+  assert.deepEqual(wrappedFindings, [
+    finding("SEC-BODY-POLICY-CONTRADICTION", "high", 6, 7, wrapped),
+  ]);
 });
 
 test("workflow-wide network bans stay contradictory across soft wraps", () => {

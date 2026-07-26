@@ -183,8 +183,8 @@ const RULES = {
       "Make the body instructions and security metadata agree, or split them into separate artifacts with explicit policy fields.",
     constraints: [
       "deterministic",
-      "compares policy metadata with simple body denials",
-      "does not classify intent",
+      "uses bounded workflow-scope and prohibition patterns",
+      "does not perform general natural-language intent classification",
     ],
     verificationSteps: [
       "Run renma scan and confirm policy fields match the body instructions.",
@@ -736,10 +736,20 @@ const FORBIDDEN_INPUT_ACTION_PATTERN =
   /\b(copy|print|cat|echo|paste|upload|send|share|attach|include|dump|export|log|summari[sz]e|read|collect|provide|load|use)\b/i;
 const SAFE_FORBIDDEN_INPUT_PATTERN =
   /\b(do\s+not|don't|never|avoid|exclude|without|redact|remove|omit|strip|skip)\b.{0,80}\b(secret|secrets|credential|credentials|token|password|private key|private keys|\.env|env files?|customer data)\b/i;
+const BODY_NO_REQUIREMENT_SUFFIX_RE =
+  /^\s+(?:is|are|was|were)\s+(?:not\s+)?(?:required|needed|necessary|unnecessary|optional)\b/i;
 const BODY_NETWORK_DISALLOWED_PATTERNS = [
   /\b(?:no|without)\s+(?:(?:any|all)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b(?!\s+(?:access|use|usage|connectivity|to)\b)/i,
   /\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:(?:all|any)\s+)?(?:(?:use|allow|permit)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b(?!\s+(?:access|use|usage|connectivity|to)\b)/i,
   /\b(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\s+(?:(?:is|are)\s+(?:not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled)|(?:must|may|should)\s+not\s+be\s+(?:used|available|enabled))\b/i,
+  new RegExp(
+    String.raw`\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:allow|permit)\s+(?:any|all)\s+(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b[^.!?\n]{0,40}\b(?:for|throughout|during|within|in)\s+${WORKFLOW_SCOPE_TERMS}\b`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,40}\b(?:(?:must|shall|will|does)\s+not|cannot|can't|never)\s+(?:use|access)\s+(?:(?:any|all|the)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b`,
+    "i",
+  ),
   new RegExp(
     String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,40}\b(?:must|shall|will|has\s+to|needs\s+to)\s+(?:run|operate|work)\s+(?:(?:entirely|completely)\s+)?(?:offline|air[- ]gapped)\b`,
     "i",
@@ -759,6 +769,18 @@ const BODY_UPLOAD_DISALLOWED_PATTERNS = [
   /\b(?:(?:all|any)\s+)?(?:external\s+)?uploads?\s+(?:are|is)\s+(?:not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled)\b/i,
   new RegExp(
     String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,40}\b(?:(?:must|shall|will|does)\s+not|cannot|can't|never)\s+(?:${EXTERNAL_UPLOAD_ACTION_TERMS})\s+(?:anything|everything|externally)\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,40}\b(?:(?:must|shall|will|does)\s+not|cannot|can't|never)\s+(?:${EXTERNAL_UPLOAD_ACTION_TERMS})\s+(?:files?|artifacts?|data)\b`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:${EXTERNAL_UPLOAD_ACTION_TERMS})\s+(?:any\s+|all\s+)?files?\s+externally\b`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\b(?:(?:all|any)\s+)?(?:external\s+)?uploads?\s+(?:must|shall|should|may)\s+not\s+be\s+(?:performed|made|allowed|permitted)\s+(?:for|throughout|during|within|in)\s+${WORKFLOW_SCOPE_TERMS}\b`,
     "i",
   ),
 ] as const;
@@ -786,6 +808,14 @@ const BODY_SECRET_DISALLOWED_PATTERNS = [
   ),
   new RegExp(
     String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,50}\bwithout\s+(?:any\s+)?(?:${BODY_SECRET_TARGET_TERMS})\b(?!\s+(?:from|through|via)\b)`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\b(?:${BODY_SECRET_TARGET_TERMS})\s+(?:must|shall|should|may)\s+not\s+be\s+(?:accessed|read|loaded|used|accepted|handled)\s+(?:for|throughout|during|within|in)\s+${WORKFLOW_SCOPE_TERMS}\b`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\bno\s+(?:${BODY_SECRET_TARGET_TERMS})\s+(?:may|must|should|can)\s+be\s+(?:accessed|read|loaded|used|accepted|handled)\s+(?:for|throughout|during|within|in)\s+${WORKFLOW_SCOPE_TERMS}\b`,
     "i",
   ),
 ] as const;
@@ -1391,6 +1421,7 @@ function collectPolicyPreludeDetections(
       artifact.markdownParserEligible,
       markdownView,
       prepared.securityParagraphs,
+      prepared.securityParagraphContextByLine,
     ),
   );
 
@@ -1797,7 +1828,7 @@ function firstBodyPolicyContradictionMatch(
 ): RegExpExecArray | undefined {
   let selected: RegExpExecArray | undefined;
   for (const pattern of patterns) {
-    const match = pattern.exec(text);
+    const match = firstBodyPolicyPatternMatch(text, pattern);
     if (
       match?.index !== undefined &&
       (selected === undefined || match.index < selected.index)
@@ -1808,12 +1839,52 @@ function firstBodyPolicyContradictionMatch(
   return selected;
 }
 
+function firstBodyPolicyPatternMatch(
+  text: string,
+  pattern: RegExp,
+): RegExpExecArray | undefined {
+  const flags = pattern.flags.includes("g")
+    ? pattern.flags
+    : `${pattern.flags}g`;
+  const matcher = new RegExp(pattern.source, flags);
+  for (const match of text.matchAll(matcher)) {
+    if (match.index === undefined) continue;
+    if (!bodyPolicyMatchExpressesNoRequirement(text, match)) return match;
+  }
+  return undefined;
+}
+
+function bodyPolicyMatchExpressesNoRequirement(
+  text: string,
+  match: RegExpExecArray,
+): boolean {
+  return bodyPolicyMatchEndExpressesNoRequirement(
+    text,
+    match[0],
+    match.index + match[0].length,
+  );
+}
+
+function bodyPolicyMatchEndExpressesNoRequirement(
+  text: string,
+  matchedText: string,
+  matchEnd: number,
+): boolean {
+  if (!/\b(?:no|without)\b/i.test(matchedText)) return false;
+  const suffix = text.slice(matchEnd);
+  return BODY_NO_REQUIREMENT_SUFFIX_RE.test(suffix);
+}
+
 function bodyPolicyContradictionDetections(
   content: string,
   policy: SecurityPolicy,
   markdownParserEligible: boolean,
   markdownView?: MarkdownSecurityView,
   securityParagraphs: readonly PreparedSecurityParagraphContext[] = [],
+  securityParagraphContextByLine: ReadonlyMap<
+    number,
+    SecurityParagraphLineContext
+  > = new Map(),
 ): Detection[] {
   const sourceLines = content.split(/\r?\n/);
   const scanStart = securityContentStart(markdownParserEligible, markdownView);
@@ -1855,6 +1926,17 @@ function bodyPolicyContradictionDetections(
       if (!candidate.enabled || selected.has(candidate.kind)) continue;
       const match = firstBodyPolicyContradictionMatch(line, candidate.patterns);
       if (match === undefined) continue;
+      const paragraphLineContext = securityParagraphContextByLine.get(index);
+      if (
+        paragraphLineContext !== undefined &&
+        bodyPolicyMatchEndExpressesNoRequirement(
+          paragraphLineContext.preparedParagraph.paragraph.text,
+          match[0],
+          paragraphLineContext.lineStartOffset + match.index + match[0].length,
+        )
+      ) {
+        continue;
+      }
       selected.set(candidate.kind, {
         detection: {
           metadata: RULES.bodyPolicyContradiction,
