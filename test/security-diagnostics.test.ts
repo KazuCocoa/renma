@@ -4953,6 +4953,58 @@ Do not use network access for this workflow.
   assert.match(finding.evidence.snippet, /Do not use network access/);
 });
 
+test("body network policy contradictions distinguish workflow bans from local tool safeguards", () => {
+  for (const body of [
+    "Do not allow npx to download a missing package.",
+    "Never let npx download a missing Appium package.",
+    "Do not allow npx to download a missing package from the internet.",
+  ]) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: disclosed
+network_allowed: true
+approved_network_destinations: registry.npmjs.org
+---
+
+${body}
+`),
+    ]);
+
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "SEC-BODY-POLICY-CONTRADICTION",
+      ),
+      false,
+      body,
+    );
+  }
+
+  for (const body of [
+    "Do not use network access for this workflow.",
+    "This workflow must run without internet access.",
+    "Internet access is forbidden for this workflow.",
+  ]) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: disclosed
+network_allowed: true
+approved_network_destinations: github.com
+---
+
+${body}
+`),
+    ]);
+
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "SEC-BODY-POLICY-CONTRADICTION",
+      ),
+      true,
+      body,
+    );
+  }
+});
+
 test("security diagnostics recover shared syntax for copied documents", () => {
   const artifact = v2SecurityArtifact(`---
 allowed_data: disclosed

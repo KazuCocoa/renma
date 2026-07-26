@@ -626,6 +626,70 @@ remote API.`,
   }
 });
 
+test("local npx download safeguards stay non-contradictory across soft wraps", () => {
+  const fixtures = [
+    {
+      oneLine: "Do not allow npx to download a missing package.",
+      wrapped: `Do not allow npx to
+download a missing package.`,
+    },
+    {
+      oneLine: "Never let npx download a missing Appium package.",
+      wrapped: `Never let npx
+download a missing Appium package.`,
+    },
+    {
+      oneLine:
+        "Resolve command mode once. Use `appium` by default; when the user explicitly selects local mode, run from the project root and replace every `appium ...` invocation in this procedure with `npx --no-install appium ...`. Never mix global and local modes in one run or allow `npx` to download a missing Appium package.",
+      wrapped: `Resolve command mode once. Use \`appium\` by default; when the user explicitly
+selects local mode, run from the project root and replace every \`appium ...\`
+invocation in this procedure with \`npx --no-install appium ...\`. Never mix global
+and local modes in one run or allow \`npx\` to download a missing Appium package.`,
+    },
+    {
+      oneLine:
+        "Do not allow npx to download a missing package from the internet.",
+      wrapped: `Do not allow npx to download a missing package from the
+internet.`,
+    },
+  ];
+
+  for (const fixture of fixtures) {
+    const oracle = project(
+      fixture.oneLine,
+      "network_allowed: true",
+      BODY_POLICY_IDS,
+    );
+    const wrapped = project(
+      fixture.wrapped,
+      "network_allowed: true",
+      BODY_POLICY_IDS,
+    );
+    assert.deepEqual(oracle, [], fixture.oneLine);
+    assert.deepEqual(wrapped, oracle, fixture.wrapped);
+  }
+});
+
+test("workflow-wide network bans stay contradictory across soft wraps", () => {
+  const oneLine = "This workflow must run without internet access.";
+  const wrapped = `This workflow must run without
+internet access.`;
+  const oracle = project(oneLine, "network_allowed: true", BODY_POLICY_IDS);
+  const wrappedFindings = project(
+    wrapped,
+    "network_allowed: true",
+    BODY_POLICY_IDS,
+  );
+
+  assert.deepEqual(identityProjection(oracle), [
+    { id: "SEC-BODY-POLICY-CONTRADICTION", severity: "high" },
+  ]);
+  assert.deepEqual(
+    identityProjection(wrappedFindings),
+    identityProjection(oracle),
+  );
+});
+
 test("Context scope, bulk sharing, and redaction preserve one-line meaning", () => {
   const cases = [
     {

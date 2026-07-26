@@ -729,7 +729,9 @@ const FORBIDDEN_INPUT_ACTION_PATTERN =
 const SAFE_FORBIDDEN_INPUT_PATTERN =
   /\b(do\s+not|don't|never|avoid|exclude|without|redact|remove|omit|strip|skip)\b.{0,80}\b(secret|secrets|credential|credentials|token|password|private key|private keys|\.env|env files?|customer data)\b/i;
 const BODY_NETWORK_DISALLOWED_RE =
-  /\b(no|without|avoid|exclude|disallow|forbid|forbidden|block|do\s+not|don't|never)\b.{0,80}\b(network|internet|external|remote|http|https|api|webhook|download|fetch|curl|wget)\b/i;
+  /\b(no|without|avoid|exclude|disallow|forbid|forbidden|block|do\s+not|don't|never)\b.{0,80}\b(network|internet|external|remote|http|https|api|webhook)\b|\b(network|internet)(?:\s+(?:access|use|usage|connectivity))?\b.{0,80}\b(?:(?:is|are)\s+(?:not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled)|must\s+not\s+be\s+used|may\s+not\s+be\s+used)\b/i;
+const BODY_LOCAL_TOOL_NETWORK_ACTION_RE =
+  /\b(do\s+not|don't|never|avoid|exclude|disallow|forbid|forbidden|block)\b[^.!?\n]{0,160}\b(allow|let|permit|enable|use)\s+(?:the\s+)?(?:`[^`\r\n]+`|[a-z0-9_.-]+)\s+(?:to\s+)?(?:(?:implicitly|automatically)\s+)?(?:download|fetch)\b/i;
 const BODY_UPLOAD_DISALLOWED_RE =
   /\b(no|without|avoid|exclude|disallow|forbid|forbidden|block|do\s+not|don't|never)\b.{0,80}\b(upload|send|post|share|attach|submit|sync|push|publish|external upload|third-party)\b/i;
 const BODY_SECRET_DISALLOWED_RE =
@@ -1722,16 +1724,19 @@ function bodyPolicyContradictionDetections(
       kind: "network",
       enabled: policy.networkAllowed === true,
       pattern: BODY_NETWORK_DISALLOWED_RE,
+      localizedRestrictionPattern: BODY_LOCAL_TOOL_NETWORK_ACTION_RE,
     },
     {
       kind: "upload",
       enabled: policy.externalUploadAllowed === true,
       pattern: BODY_UPLOAD_DISALLOWED_RE,
+      localizedRestrictionPattern: undefined,
     },
     {
       kind: "secrets",
       enabled: policy.secretsAllowed === true,
       pattern: BODY_SECRET_DISALLOWED_RE,
+      localizedRestrictionPattern: undefined,
     },
   ] as const;
   const selected = new Map<
@@ -1752,7 +1757,8 @@ function bodyPolicyContradictionDetections(
       if (
         !candidate.enabled ||
         selected.has(candidate.kind) ||
-        !candidate.pattern.test(line)
+        !candidate.pattern.test(line) ||
+        candidate.localizedRestrictionPattern?.test(line)
       ) {
         continue;
       }
@@ -1780,7 +1786,11 @@ function bodyPolicyContradictionDetections(
       for (const [kindOrder, candidate] of kinds.entries()) {
         if (!candidate.enabled) continue;
         const match = candidate.pattern.exec(clause);
-        if (match?.index === undefined) continue;
+        if (
+          match?.index === undefined ||
+          candidate.localizedRestrictionPattern?.test(clause)
+        )
+          continue;
         const matchStart = clauseRange.start + match.index;
         const matchEnd = matchStart + match[0].length;
         const evidence = paragraphEvidenceForRange(
