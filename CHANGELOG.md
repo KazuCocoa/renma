@@ -25,6 +25,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Preserved bounded global prohibition grammar for network access, external
   uploads, and secret use without attempting general natural-language intent
   classification.
+- Required a recognized prohibition to consume the supported semantic content
+  of its containing clause, leaving exception-bearing or otherwise
+  unclassified clause remainders intentionally unreported.
 
 ### Changed
 

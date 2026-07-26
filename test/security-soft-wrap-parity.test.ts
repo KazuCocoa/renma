@@ -648,8 +648,106 @@ necessary for local validation.`,
   }
 });
 
+test("unsupported body-policy clause remainders stay clean across soft wraps", () => {
+  const fixtures = [
+    {
+      policy: "network_allowed: true",
+      oneLine: "No network access except to approved domains.",
+      wrapped: `No network access except to
+approved domains.`,
+    },
+    {
+      policy: "external_upload_allowed: true",
+      oneLine: "No external uploads unless explicitly approved.",
+      wrapped: `No external uploads unless
+explicitly approved.`,
+    },
+    {
+      policy: "secrets_allowed: true",
+      oneLine: "No secret access except through the approved vault.",
+      wrapped: `No secret access except through
+the approved vault.`,
+    },
+  ];
+
+  for (const fixture of fixtures) {
+    const oracle = project(fixture.oneLine, fixture.policy, BODY_POLICY_IDS);
+    const wrapped = project(fixture.wrapped, fixture.policy, BODY_POLICY_IDS);
+    assert.deepEqual(oracle, [], fixture.oneLine);
+    assert.deepEqual(wrapped, oracle, fixture.wrapped);
+  }
+});
+
+test("later workflow prohibitions retain bounded evidence after unsupported clauses", () => {
+  const fixtures = [
+    {
+      policy: "network_allowed: true",
+      oneLine:
+        "No network access except to approved domains. This workflow must run offline.",
+      oneLineEvidence: "This workflow must run offline.",
+      wrapped: `No network access except to approved domains.
+This workflow must run
+offline.`,
+      wrappedEvidence: `This workflow must run
+offline.`,
+    },
+    {
+      policy: "external_upload_allowed: true",
+      oneLine:
+        "No external uploads unless explicitly approved. External uploads are forbidden for this workflow.",
+      oneLineEvidence: "External uploads are forbidden for this workflow.",
+      wrapped: `No external uploads unless explicitly approved.
+External uploads are forbidden for this
+workflow.`,
+      wrappedEvidence: `External uploads are forbidden for this
+workflow.`,
+    },
+    {
+      policy: "secrets_allowed: true",
+      oneLine:
+        "No secret access except through the approved vault. Credentials must not be used in this workflow.",
+      oneLineEvidence: "Credentials must not be used in this workflow.",
+      wrapped: `No secret access except through the approved vault.
+Credentials must not be used in this
+workflow.`,
+      wrappedEvidence: `Credentials must not be used in this
+workflow.`,
+    },
+  ];
+
+  for (const fixture of fixtures) {
+    const oracle = project(fixture.oneLine, fixture.policy, BODY_POLICY_IDS);
+    const wrapped = project(fixture.wrapped, fixture.policy, BODY_POLICY_IDS);
+    assert.deepEqual(oracle, [
+      finding(
+        "SEC-BODY-POLICY-CONTRADICTION",
+        "high",
+        6,
+        6,
+        fixture.oneLineEvidence,
+      ),
+    ]);
+    assert.deepEqual(identityProjection(wrapped), identityProjection(oracle));
+    assert.deepEqual(wrapped, [
+      finding(
+        "SEC-BODY-POLICY-CONTRADICTION",
+        "high",
+        7,
+        8,
+        fixture.wrappedEvidence,
+      ),
+    ]);
+  }
+});
+
 test("supported workflow prohibitions retain identity and bounded soft-wrap evidence", () => {
   const fixtures = [
+    {
+      policy: "network_allowed: true",
+      oneLine: "No network access is allowed for this workflow.",
+      wrapped: `No network access is allowed for this
+workflow.`,
+    },
     {
       policy: "network_allowed: true",
       oneLine: "Do not use network access for this workflow.",
@@ -914,8 +1012,9 @@ Never print secrets to logs.`,
 test("requirement language does not hide a later wrapped workflow prohibition", () => {
   const oneLine =
     "No network access should be required for local validation. This workflow must run offline.";
-  const wrapped = `No network access should be required for local validation. This workflow
-must run offline.`;
+  const wrapped = `No network access should be required for local validation.
+This workflow must run
+offline.`;
   const oracle = project(oneLine, "network_allowed: true", BODY_POLICY_IDS);
   const wrappedFindings = project(
     wrapped,
@@ -924,14 +1023,27 @@ must run offline.`;
   );
 
   assert.deepEqual(oracle, [
-    finding("SEC-BODY-POLICY-CONTRADICTION", "high", 6, 6, oneLine),
+    finding(
+      "SEC-BODY-POLICY-CONTRADICTION",
+      "high",
+      6,
+      6,
+      "This workflow must run offline.",
+    ),
   ]);
   assert.deepEqual(
     identityProjection(wrappedFindings),
     identityProjection(oracle),
   );
   assert.deepEqual(wrappedFindings, [
-    finding("SEC-BODY-POLICY-CONTRADICTION", "high", 6, 7, wrapped),
+    finding(
+      "SEC-BODY-POLICY-CONTRADICTION",
+      "high",
+      7,
+      8,
+      `This workflow must run
+offline.`,
+    ),
   ]);
 });
 
@@ -1096,6 +1208,23 @@ should be required for local validation.`,
         ),
       ),
       [{ id: "SEC-BODY-POLICY-CONTRADICTION", severity: "high" }],
+    );
+    assert.deepEqual(
+      project(
+        `No network access except to approved domains.${breakMarker}
+This workflow must run offline.`,
+        "network_allowed: true",
+        BODY_POLICY_IDS,
+      ),
+      [
+        finding(
+          "SEC-BODY-POLICY-CONTRADICTION",
+          "high",
+          7,
+          7,
+          "This workflow must run offline.",
+        ),
+      ],
     );
     assert.deepEqual(
       identityProjection(

@@ -5090,6 +5090,10 @@ ${body}
     },
     {
       policy: "network_allowed: true",
+      body: "No network access is allowed for this workflow.",
+    },
+    {
+      policy: "network_allowed: true",
       body: "This workflow must not use the network.",
     },
     {
@@ -5107,6 +5111,10 @@ ${body}
     {
       policy: "external_upload_allowed: true",
       body: "External uploads are forbidden.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "No external uploads are allowed for this workflow.",
     },
     {
       policy: "external_upload_allowed: true",
@@ -5135,6 +5143,10 @@ ${body}
     {
       policy: "secrets_allowed: true",
       body: "No secrets are allowed for this workflow.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "No secret access is allowed for this workflow.",
     },
     {
       policy: "secrets_allowed: true",
@@ -5307,6 +5319,82 @@ ${body}
         );
       }
     }
+  }
+});
+
+test("body policy contradictions require a complete supported clause", () => {
+  for (const { policy, body } of [
+    {
+      policy: "network_allowed: true",
+      body: "No network access except to approved domains.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "No external uploads unless explicitly approved.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "No secret access except through the approved vault.",
+    },
+  ]) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: disclosed
+${policy}
+---
+
+${body}
+`),
+    ]);
+
+    assert.equal(
+      findings.some(
+        (finding) => finding.id === "SEC-BODY-POLICY-CONTRADICTION",
+      ),
+      false,
+      body,
+    );
+  }
+});
+
+test("unsupported clause remainders do not hide later workflow prohibitions", () => {
+  for (const { policy, body, expectedSnippet, rejectedSnippet } of [
+    {
+      policy: "network_allowed: true",
+      body: "No network access except to approved domains. This workflow must run offline.",
+      expectedSnippet: "This workflow must run offline.",
+      rejectedSnippet: "except to approved domains",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "No external uploads unless explicitly approved. External uploads are forbidden for this workflow.",
+      expectedSnippet: "External uploads are forbidden for this workflow.",
+      rejectedSnippet: "unless explicitly approved",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "No secret access except through the approved vault. Credentials must not be used in this workflow.",
+      expectedSnippet: "Credentials must not be used in this workflow.",
+      rejectedSnippet: "except through the approved vault",
+    },
+  ]) {
+    const findings = securityDiagnosticFindings([
+      v2SecurityArtifact(`---
+allowed_data: disclosed
+${policy}
+---
+
+${body}
+`),
+    ]).filter((finding) => finding.id === "SEC-BODY-POLICY-CONTRADICTION");
+
+    assert.equal(findings.length, 1, body);
+    assert.equal(findings[0]?.evidence.snippet, expectedSnippet, body);
+    assert.doesNotMatch(
+      findings[0]?.evidence.snippet ?? "",
+      new RegExp(rejectedSnippet, "i"),
+      body,
+    );
   }
 });
 
