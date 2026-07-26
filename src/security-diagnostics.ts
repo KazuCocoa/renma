@@ -897,8 +897,19 @@ interface SecurityParagraphSourceLine {
   readonly endOffset: number;
 }
 
-interface SecurityParagraphLineContext {
+interface SecurityParagraphClauseRange {
+  readonly start: number;
+  readonly end: number;
+}
+
+interface PreparedSecurityParagraphContext {
   readonly paragraph: SecurityParagraphContext;
+  readonly clauseRanges: readonly SecurityParagraphClauseRange[];
+  readonly structurallyEligible: boolean;
+}
+
+interface SecurityParagraphLineContext {
+  readonly preparedParagraph: PreparedSecurityParagraphContext;
   readonly lineStartOffset: number;
   readonly lineEndOffset: number;
 }
@@ -994,6 +1005,7 @@ function prepareSecurityDocumentAnalysis(
   const securityParagraphContextByLine = prepareSecurityParagraphContexts(
     markdownView,
     syntax,
+    logicalCommands.commandByLine,
   );
 
   return {
@@ -1014,6 +1026,7 @@ function prepareSecurityDocumentAnalysis(
 function prepareSecurityParagraphContexts(
   markdownView: MarkdownSecurityView,
   syntax: MarkdownSyntax,
+  logicalCommandByLine: ReadonlyMap<number, LogicalShellCommand>,
 ): ReadonlyMap<number, SecurityParagraphLineContext> {
   const contextByLine = new Map<number, SecurityParagraphLineContext>();
   const hardBreakLineIndexes = new Set(
@@ -1060,9 +1073,22 @@ function prepareSecurityParagraphContexts(
       text,
       lines: paragraphLines,
     };
+    const preparedParagraph: PreparedSecurityParagraphContext = {
+      paragraph,
+      clauseRanges: disclosureClauseRangesIntersectingRange(
+        paragraph.text,
+        0,
+        paragraph.text.length,
+      ),
+      structurallyEligible: isStructurallyEligibleProseParagraph(
+        paragraph,
+        markdownView,
+        logicalCommandByLine,
+      ),
+    };
     for (const [index, line] of normalizedLines.entries()) {
       contextByLine.set(line.lineIndex, {
-        paragraph,
+        preparedParagraph,
         lineStartOffset: lineStartOffsets[index] ?? 0,
         lineEndOffset: lineEndOffsets[index] ?? 0,
       });
@@ -1074,35 +1100,37 @@ function prepareSecurityParagraphContexts(
 function paragraphClausesIntersectingLine(
   context: SecurityParagraphLineContext,
 ): string | undefined {
-  if (context.paragraph.startLine === context.paragraph.endLine) {
+  const { paragraph, clauseRanges } = context.preparedParagraph;
+  if (paragraph.startLine === paragraph.endLine) {
     return undefined;
   }
-  const ranges = disclosureClauseRangesIntersectingRange(
-    context.paragraph.text,
-    context.lineStartOffset,
-    context.lineEndOffset,
+  const ranges = clauseRanges.filter(
+    ({ start, end }) =>
+      start < context.lineEndOffset && end > context.lineStartOffset,
   );
   const first = ranges[0];
   const last = ranges[ranges.length - 1];
   if (first === undefined || last === undefined) return undefined;
-  const text = context.paragraph.text.slice(first.start, last.end);
+  const text = paragraph.text.slice(first.start, last.end);
   return text ===
-    context.paragraph.text.slice(context.lineStartOffset, context.lineEndOffset)
+    paragraph.text.slice(context.lineStartOffset, context.lineEndOffset)
     ? undefined
     : text;
 }
 
 function preparedSecurityParagraphs(
   contextByLine: ReadonlyMap<number, SecurityParagraphLineContext>,
-): SecurityParagraphContext[] {
-  const paragraphs: SecurityParagraphContext[] = [];
-  const seen = new Set<SecurityParagraphContext>();
-  for (const { paragraph } of contextByLine.values()) {
-    if (seen.has(paragraph)) continue;
-    seen.add(paragraph);
-    paragraphs.push(paragraph);
+): PreparedSecurityParagraphContext[] {
+  const paragraphs: PreparedSecurityParagraphContext[] = [];
+  const seen = new Set<PreparedSecurityParagraphContext>();
+  for (const { preparedParagraph } of contextByLine.values()) {
+    if (seen.has(preparedParagraph)) continue;
+    seen.add(preparedParagraph);
+    paragraphs.push(preparedParagraph);
   }
-  return paragraphs.sort((left, right) => left.startLine - right.startLine);
+  return paragraphs.sort(
+    (left, right) => left.paragraph.startLine - right.paragraph.startLine,
+  );
 }
 
 function paragraphEvidenceForRange(
@@ -1236,7 +1264,6 @@ function collectPolicyPreludeDetections(
       artifact.markdownParserEligible,
       markdownView,
       prepared.securityParagraphContextByLine,
-      prepared.logicalCommands.commandByLine,
     ),
   ];
   if (
@@ -1260,7 +1287,6 @@ function collectPolicyPreludeDetections(
       artifact.markdownParserEligible,
       markdownView,
       prepared.securityParagraphContextByLine,
-      prepared.logicalCommands.commandByLine,
     ),
   );
 
@@ -1362,7 +1388,8 @@ function prepareSecurityLineContext(
       : logicalCommands.securityByCommand.get(logicalCommand);
   const securityParagraphContext =
     prepared.securityParagraphContextByLine.get(index);
-  const paragraphText = securityParagraphContext?.paragraph.text;
+  const preparedParagraph = securityParagraphContext?.preparedParagraph;
+  const paragraphText = preparedParagraph?.paragraph.text;
   const paragraphLineStartOffset = securityParagraphContext?.lineStartOffset;
   const paragraphLineEndOffset = securityParagraphContext?.lineEndOffset;
   const paragraphClauseText =
@@ -1370,12 +1397,7 @@ function prepareSecurityLineContext(
       ? undefined
       : paragraphClausesIntersectingLine(securityParagraphContext);
   const paragraphClauseContextAvailable =
-    securityParagraphContext !== undefined &&
-    isStructurallyEligibleProseParagraph(
-      securityParagraphContext.paragraph,
-      markdownView,
-      logicalCommands.commandByLine,
-    );
+    preparedParagraph?.structurallyEligible ?? false;
   let cachedLineSecurityAnalysis: SecurityCommandAnalysis | undefined;
   const lineSecurityAnalysis = (): SecurityCommandAnalysis => {
     const language = markdownView.languageAt(index);
@@ -1689,7 +1711,6 @@ function bodyPolicyContradictionDetections(
     number,
     SecurityParagraphLineContext
   > = new Map(),
-  logicalCommandByLine: ReadonlyMap<number, LogicalShellCommand> = new Map(),
 ): Detection[] {
   const sourceLines = content.split(/\r?\n/);
   const scanStart = securityContentStart(markdownParserEligible, markdownView);
@@ -1749,22 +1770,11 @@ function bodyPolicyContradictionDetections(
     }
   }
 
-  for (const paragraph of preparedSecurityParagraphs(
+  for (const preparedParagraph of preparedSecurityParagraphs(
     securityParagraphContextByLine,
   )) {
-    if (
-      !isStructurallyEligibleProseParagraph(
-        paragraph,
-        markdownView,
-        logicalCommandByLine,
-      )
-    )
-      continue;
-    const clauseRanges = disclosureClauseRangesIntersectingRange(
-      paragraph.text,
-      0,
-      paragraph.text.length,
-    );
+    if (!preparedParagraph.structurallyEligible) continue;
+    const { paragraph, clauseRanges } = preparedParagraph;
     for (const clauseRange of clauseRanges) {
       const clause = paragraph.text.slice(clauseRange.start, clauseRange.end);
       for (const [kindOrder, candidate] of kinds.entries()) {
@@ -2410,7 +2420,6 @@ function securityPolicyResolutionDetections(
     number,
     SecurityParagraphLineContext
   > = new Map(),
-  logicalCommandByLine: ReadonlyMap<number, LogicalShellCommand> = new Map(),
 ): Detection[] {
   const detections: Detection[] = [];
   if (parsedPolicy.securityProfile === undefined) {
@@ -2421,7 +2430,6 @@ function securityPolicyResolutionDetections(
       markdownParserEligible,
       markdownView,
       securityParagraphContextByLine,
-      logicalCommandByLine,
     );
     return detections;
   }
@@ -2548,7 +2556,6 @@ function securityPolicyResolutionDetections(
     markdownParserEligible,
     markdownView,
     securityParagraphContextByLine,
-    logicalCommandByLine,
   );
 
   return detections;
@@ -2564,7 +2571,6 @@ function addForbiddenInputDetections(
     number,
     SecurityParagraphLineContext
   > = new Map(),
-  logicalCommandByLine: ReadonlyMap<number, LogicalShellCommand> = new Map(),
 ): void {
   for (const forbiddenInput of policy.forbiddenInputs) {
     const detection = forbiddenInputDetection(
@@ -2573,7 +2579,6 @@ function addForbiddenInputDetections(
       markdownParserEligible,
       markdownView,
       securityParagraphContextByLine,
-      logicalCommandByLine,
     );
     if (detection !== undefined) detections.push(detection);
   }
@@ -2696,7 +2701,6 @@ function forbiddenInputDetection(
     number,
     SecurityParagraphLineContext
   > = new Map(),
-  logicalCommandByLine: ReadonlyMap<number, LogicalShellCommand> = new Map(),
 ): Detection | undefined {
   const needle = forbiddenInput.trim();
   if (needle.length === 0) return undefined;
@@ -2725,26 +2729,18 @@ function forbiddenInputDetection(
 
   const paragraphPattern = new RegExp(`\\b${escapeRegExp(needle)}\\b`, "giu");
   let paragraphDetection: Detection | undefined;
-  paragraphSearch: for (const paragraph of preparedSecurityParagraphs(
+  paragraphSearch: for (const preparedParagraph of preparedSecurityParagraphs(
     securityParagraphContextByLine,
   )) {
-    if (
-      !isStructurallyEligibleProseParagraph(
-        paragraph,
-        markdownView,
-        logicalCommandByLine,
-      )
-    )
-      continue;
+    if (!preparedParagraph.structurallyEligible) continue;
+    const { paragraph, clauseRanges } = preparedParagraph;
     for (const match of paragraph.text.matchAll(paragraphPattern)) {
       if (match.index === undefined) continue;
       const matchStart = match.index;
       const matchEnd = matchStart + match[0].length;
-      const clauseRange = disclosureClauseRangesIntersectingRange(
-        paragraph.text,
-        matchStart,
-        matchEnd,
-      )[0];
+      const clauseRange = clauseRanges.find(
+        ({ start, end }) => start < matchEnd && end > matchStart,
+      );
       if (clauseRange === undefined) continue;
       const clause = paragraph.text.slice(clauseRange.start, clauseRange.end);
       if (SAFE_FORBIDDEN_INPUT_PATTERN.test(clause)) continue;

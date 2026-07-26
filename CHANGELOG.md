@@ -54,13 +54,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 ### Compatibility
 
 - Except for the documented soft-wrap parity corrections, Renma 0.24.3
-  preserves public diagnostics, evidence, ordering, deduplication, policy
-  semantics, CLI behavior, schemas, package entrypoints, and runtime
-  boundaries.
-- Paragraph context remains a private polarity input only. Finding evidence,
-  destination and logical-command analysis, fallback behavior, public schemas,
-  diagnostic IDs, severities, ordering, deduplication, package entrypoints,
-  and runtime boundaries are unchanged.
+  preserves public diagnostics, ordering, deduplication, policy semantics, CLI
+  behavior, schemas, package entrypoints, and runtime boundaries.
+- Paragraph context remains a private, clause-bounded interpretation input. It
+  supplements selected prose-only polarity, action-target association,
+  destination, approval, forbidden-input, body-policy, and Context-scope checks
+  without replacing physical source evidence or command-scoped analysis.
+- Existing unaffected Finding evidence remains unchanged. Newly recognized
+  wrapped cases use the smallest source-based physical-line range required to
+  represent the matched action, target, literal phrase, or prohibition.
 
 ## [0.24.2] - 2026-07-25
 

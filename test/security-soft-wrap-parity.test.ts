@@ -528,6 +528,19 @@ echo "$PASSWORD"
   );
 });
 
+test("unfenced command-shaped paragraphs retain exact command results", () => {
+  for (const command of ['echo "$PASSWORD"', '- echo "$PASSWORD"']) {
+    assert.deepEqual(
+      project(command, "secrets_allowed: false", COMMAND_PATH_IDS),
+      [
+        finding("SEC-INSTRUCTION-VIOLATES-POLICY", "high", 6, 6, command),
+        finding("SEC-SECRET-MATERIAL-INSTRUCTION", "critical", 6, 6, command),
+      ],
+      command,
+    );
+  }
+});
+
 test("body-policy contradictions retain one-line interpretation and physical evidence", () => {
   const alreadyEquivalent = [
     {
