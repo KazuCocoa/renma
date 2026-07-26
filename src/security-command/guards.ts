@@ -15,6 +15,10 @@ export type DisclosureAction = {
   clauseEnd: number;
 };
 
+type ClassifiedDisclosureAction = DisclosureAction & {
+  readonly negated: boolean;
+};
+
 const EXECUTABLE_FAIL_CLOSED_GUARD_RE =
   /^\s*:\s+(?:"\$\{([A-Za-z_][A-Za-z0-9_]*):\?([^}"\r\n]+)\}"|\$\{([A-Za-z_][A-Za-z0-9_]*):\?([^}\s\r\n]+)\})\s*(?:#.*)?$/u;
 const AMBIGUOUS_GUARD_CONTROL_FLOW_RE =
@@ -92,13 +96,47 @@ export function isExplicitNoDisclosureGuard(text: string): boolean {
 }
 
 export function positiveDisclosureActions(text: string): DisclosureAction[] {
-  const actions: DisclosureAction[] = [];
+  return classifyDisclosureActions(text)
+    .filter(({ negated }) => !negated)
+    .map(({ action, kind, start, end, clauseStart, clauseEnd }) => ({
+      action,
+      kind,
+      start,
+      end,
+      clauseStart,
+      clauseEnd,
+    }));
+}
+
+/** @internal Classify action polarity only in clauses intersecting this range. */
+export function disclosureRangeIsExplicitlyProhibited(
+  text: string,
+  rangeStart: number,
+  rangeEnd: number,
+): boolean {
+  let hasNegatedAction = false;
+  let hasPositiveAction = false;
+  for (const action of classifyDisclosureActions(text)) {
+    const intersectsRange =
+      action.clauseStart < rangeEnd && action.clauseEnd > rangeStart;
+    if (!intersectsRange) continue;
+    if (action.negated) {
+      hasNegatedAction = true;
+    } else {
+      hasPositiveAction = true;
+    }
+  }
+  return hasNegatedAction && !hasPositiveAction;
+}
+
+function classifyDisclosureActions(text: string): ClassifiedDisclosureAction[] {
+  const actions: ClassifiedDisclosureAction[] = [];
   for (const clause of disclosureClauses(text)) {
     for (const match of clause.text.matchAll(DISCLOSURE_ACTION_RE)) {
       if (match.index === undefined) continue;
       const raw = match[0];
       const start = clause.start + match.index;
-      if (isNegatedDisclosureAction(clause.text, match.index)) continue;
+      const negated = isNegatedDisclosureAction(clause.text, match.index);
       for (const kind of disclosureActionKinds(raw, clause.text)) {
         actions.push({
           action: raw,
@@ -107,6 +145,7 @@ export function positiveDisclosureActions(text: string): DisclosureAction[] {
           end: start + raw.length,
           clauseStart: clause.start,
           clauseEnd: clause.end,
+          negated,
         });
       }
     }

@@ -456,6 +456,79 @@ upload it, or return it as evidence.`,
   }
 });
 
+test("action-before-secret soft wraps match one-line prohibitions", () => {
+  const fixtures = [
+    {
+      oneLine: "Never upload the password.",
+      wrapped: `Never upload the
+password.`,
+    },
+    {
+      oneLine: "Never echo the password.",
+      wrapped: `Never echo the
+password.`,
+    },
+    {
+      oneLine:
+        "Never pass the password to the command line or upload the credential.",
+      wrapped: `Never pass the password to the command line or upload the
+credential.`,
+    },
+  ];
+
+  for (const { oneLine, wrapped } of fixtures) {
+    const expected = affectedDisclosureFindings(oneLine);
+    assert.deepEqual(expected, [], oneLine);
+    assert.deepEqual(affectedDisclosureFindings(wrapped), expected, wrapped);
+  }
+});
+
+test("explicit Markdown hard breaks terminate paragraph negation", () => {
+  const positiveLine = "Upload the password as evidence.";
+  const twoSpaceBreak = [
+    "Never log or upload the password  ",
+    positiveLine,
+  ].join("\n");
+  const backslashBreak = [
+    "Never log or upload the password\\",
+    positiveLine,
+  ].join("\n");
+  const expected = [
+    {
+      id: "SEC-INSTRUCTION-VIOLATES-POLICY",
+      severity: "high",
+      line: 7,
+      snippet: positiveLine,
+    },
+    {
+      id: "SEC-SECRET-MATERIAL-INSTRUCTION",
+      severity: "critical",
+      line: 7,
+      snippet: positiveLine,
+    },
+  ];
+
+  for (const fixture of [twoSpaceBreak, backslashBreak]) {
+    assert.deepEqual(
+      affectedDisclosureFindings(fixture).map(({ id, severity, evidence }) => ({
+        id,
+        severity,
+        line: evidence.startLine,
+        snippet: evidence.snippet,
+      })),
+      expected,
+      fixture,
+    );
+  }
+
+  assert.deepEqual(
+    affectedDisclosureFindings(
+      ["Never log or upload the password", positiveLine].join("\n"),
+    ),
+    [],
+  );
+});
+
 test("later sentences and contrastive clauses retain positive disclosure findings", () => {
   const fixtures = [
     "Read the password, echo it, log it, and upload it as evidence.",

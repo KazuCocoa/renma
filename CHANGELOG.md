@@ -6,7 +6,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
-## [0.24.4] - 2026-07-25
+## [0.24.3] - 2026-07-25
 
 ### Fixed
 
@@ -15,21 +15,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   within one Markdown paragraph.
 - Preserved paragraph-local negation for the secret-specific
   `SEC-INSTRUCTION-VIOLATES-POLICY` interpretation under restrictive policy.
-- Retained each physical line's position in the paragraph projection so an
-  earlier unrelated action does not invalidate a later explicit no-disclosure
-  clause.
+- Retained each physical line's normalized range in the paragraph projection
+  so action polarity remains available when the disclosure action and secret
+  term occur on different soft-wrapped lines, while an earlier unrelated
+  action does not invalidate a later explicit no-disclosure clause.
+- Preserved explicit Markdown hard breaks as clause boundaries while joining
+  genuine soft wraps with a space.
 - Paragraph-local negation remains clause-aware and does not cross paragraph,
   list-item, blockquote, heading, thematic-break, hidden-comment, or code
   boundaries. Genuine positive disclosure instructions remain detected.
-
-### Compatibility
-
-- Paragraph context is a private polarity input only. Finding evidence,
-  destination and logical-command analysis, fallback behavior, public schemas,
-  diagnostic IDs, severities, ordering, deduplication, package entrypoints,
-  and runtime boundaries are unchanged.
-
-## [0.24.3] - 2026-07-25
 
 ### Changed
 
@@ -51,11 +45,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Compatibility
 
-- Renma 0.24.3 is a behavior-preserving internal maintainability release. It
-  does not intentionally change public diagnostics, evidence, ordering,
-  deduplication, policy semantics, CLI behavior, schemas, package entrypoints,
-  or runtime boundaries. Normal package-version-derived values advance to
-  0.24.3.
+- Except for the documented false-positive correction, Renma 0.24.3 preserves
+  public diagnostics, evidence, ordering, deduplication, policy semantics, CLI
+  behavior, schemas, package entrypoints, and runtime boundaries.
+- Paragraph context remains a private polarity input only. Finding evidence,
+  destination and logical-command analysis, fallback behavior, public schemas,
+  diagnostic IDs, severities, ordering, deduplication, package entrypoints,
+  and runtime boundaries are unchanged.
 
 ## [0.24.2] - 2026-07-25
 
@@ -1566,7 +1562,7 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
 [Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.24.3...HEAD
-[0.24.3]: https://github.com/KazuCocoa/renma/compare/v0.24.2...v0.24.3
+[0.24.3]: https://github.com/KazuCocoa/renma/compare/v0.24.3...v0.24.3
 [0.24.2]: https://github.com/KazuCocoa/renma/compare/v0.24.1...v0.24.2
 [0.24.1]: https://github.com/KazuCocoa/renma/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/KazuCocoa/renma/compare/v0.23.5...v0.24.0
