@@ -160,6 +160,23 @@ projection never crosses paragraph, list-item, blockquote, heading,
 thematic-break, hidden comment, or code boundaries, and it does not replace
 physical-line or logical-command evidence or analysis input.
 
+The private `src/security-body-policy/` classifier consumes those already
+prepared clause ranges. For each supported network, external-upload, or secret
+domain mentioned in one clause, it records modality, scope,
+supported-clause completeness, and normalized source offsets independently.
+Only a complete `prohibited` fact with `workflow` scope can contradict an
+enabled permissive policy for the same domain. `unknown`, `not-required`,
+`local-safeguard`, local-step, specific-source, specific-target, and
+unsupported-remainder states fail open by producing no contradiction. Facts
+are computed once per prepared clause, while Finding construction maps their
+offsets back to the occupied physical source lines.
+
+Clause-fact composition remains separate from lexical sharing.
+`src/security-prose-vocabulary.ts` may supply exact terms used identically by
+multiple detectors, but the body-policy module owns the semantic relationship
+between domain, modality, scope, and completeness. It is not a public schema,
+configuration surface, or general natural-language parser.
+
 The physical-line stage keeps one lazy analysis accessor for a line outside a
 logical command. It intentionally runs line-local checks on physical
 continuation members while limiting destination, sensitive data, and upload
@@ -195,6 +212,10 @@ retain their disclosure-action union and polarity subsets, the sensitive-data
 classifier retains path and bounded data-flow grammar, and destination
 association retains its structural target rules. Shared regexes are compiled
 once at module initialization; no detector compiles patterns in a scan loop.
+
+Authors should state whole-workflow prohibitions explicitly. Renma
+intentionally does not infer a body-policy contradiction from ambiguous or
+unsupported prose.
 
 Lexical classification and operational intent are separate. An explicit
 transport can carry network or upload intent even when its host cannot be

@@ -6,6 +6,32 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-07-26
+
+### Changed
+
+- Replaced growing sentence-level body-policy contradiction patterns with a
+  private clause-facts model that separates security domain, modality, scope,
+  and supported-clause completeness.
+- Preserved precision-first handling: only complete, high-confidence
+  workflow-wide prohibitions contradict permissive policy metadata; local
+  safeguards, requirement language, specific sources or targets, unknown
+  states, and unsupported clauses remain unreported.
+- Reused prepared Markdown clauses and retained physical source offsets so
+  ordinary soft wraps preserve meaning, explicit hard breaks remain
+  boundaries, and mixed-clause evidence stays bounded.
+- Kept exact shared lexical vocabulary separate from classifier-specific
+  semantic fact composition.
+
+### Compatibility
+
+- Preserved diagnostic IDs, titles, severities, confidence, risk classes,
+  remediation, LLM hints, evidence, ordering, deduplication, policy resolution,
+  CLI behavior, Diagnostics v2, review bundles, public types, schemas, package
+  entrypoints, and supported deep imports.
+- Added no dependencies, public diagnostics, public configuration, or public
+  clause-fact output.
+
 ## [0.24.4] - 2026-07-26
 
 ### Fixed

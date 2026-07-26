@@ -74,6 +74,13 @@ const DIRECTORY_LAYERS: ReadonlyMap<string, LayerClassification> = new Map([
     },
   ],
   [
+    "src/security-body-policy",
+    {
+      layer: "analysis",
+      reason: "pure body-policy clause fact analysis",
+    },
+  ],
+  [
     "src/evidence",
     { layer: "evidence", reason: "reusable evidence construction" },
   ],
