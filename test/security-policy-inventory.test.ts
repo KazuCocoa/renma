@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   collectSecurityPolicyAssetEvidence,
+  summarizeSecurityPolicyAssetEvidence,
   summarizeSecurityPolicyInventory,
   zeroSecurityPolicyInventorySummary,
 } from "../src/security-policy-inventory.js";
@@ -15,6 +16,100 @@ test("empty policy inventory returns a zero summary", () => {
     summarizeSecurityPolicyInventory([]),
     zeroSecurityPolicyInventorySummary(),
   );
+  assert.deepEqual(
+    summarizeSecurityPolicyAssetEvidence([]),
+    zeroSecurityPolicyInventorySummary(),
+  );
+});
+
+test("prepared policy evidence produces the compatibility inventory summary", () => {
+  const inputs = [
+    artifact(
+      "skills/demo/SKILL.md",
+      "skill",
+      policy({
+        networkAllowed: false,
+        securityProfile: "strict",
+      }),
+    ),
+    artifact("skills/demo/scripts/run.mjs", "script", "echo safe\n"),
+    artifact(
+      "contexts/missing.md",
+      "context",
+      policy({ securityProfile: "missing-profile" }),
+    ),
+    artifact(
+      "contexts/cyclic.md",
+      "context",
+      policy({ securityProfile: "cycle-a" }),
+    ),
+  ];
+  const config = {
+    ...baseSecurityConfig(),
+    approvedDomains: ["shared.example.com"],
+    profiles: {
+      strict: profile({
+        approvedDomains: ["shared.example.com"],
+        forbiddenInputs: ["credentials"],
+      }),
+      "cycle-a": profile({ securityProfile: "cycle-b" }),
+      "cycle-b": profile({ securityProfile: "cycle-a" }),
+    },
+  } satisfies SecurityConfig;
+  const evidence = collectSecurityPolicyAssetEvidence(inputs, config);
+
+  assert.equal(
+    JSON.stringify(summarizeSecurityPolicyAssetEvidence(evidence)),
+    JSON.stringify(summarizeSecurityPolicyInventory(inputs, config)),
+  );
+  assert.deepEqual(
+    summarizeSecurityPolicyAssetEvidence([...evidence].reverse()),
+    summarizeSecurityPolicyAssetEvidence(evidence),
+  );
+});
+
+test("prepared policy evidence preserves raw effective list counting for compatibility", () => {
+  const inputs = [
+    artifact("contexts/raw-config.md", "context", "# Raw config\n"),
+  ];
+  const config = {
+    ...baseSecurityConfig(),
+    approvedDomains: [" shared.example.com ", "shared.example.com", ""],
+    approvedUploadDomains: [" uploads.example.com ", "uploads.example.com"],
+    disallowedCommands: [" curl ", "curl"],
+  } satisfies SecurityConfig;
+  const evidence = collectSecurityPolicyAssetEvidence(inputs, config);
+  const summary = summarizeSecurityPolicyAssetEvidence(evidence);
+
+  assert.deepEqual(summary, summarizeSecurityPolicyInventory(inputs, config));
+  assert.equal(summary.approvedNetworkDestinationCount, 3);
+  assert.equal(summary.approvedUploadDestinationCount, 2);
+  assert.equal(summary.disallowedCommandCount, 2);
+  assert.deepEqual(summary.topApprovedNetworkDestinations, [
+    { destination: "", count: 1 },
+    { destination: " shared.example.com ", count: 1 },
+    { destination: "shared.example.com", count: 1 },
+  ]);
+  assert.doesNotMatch(
+    JSON.stringify(evidence),
+    /security-policy-summary-detail/,
+  );
+});
+
+test("prepared policy evidence counts owning-Skill inheritance once per support asset", () => {
+  const evidence = collectSecurityPolicyAssetEvidence([
+    artifact(
+      "skills/demo/SKILL.md",
+      "skill",
+      policy({ networkAllowed: false }),
+    ),
+    artifact("skills/demo/scripts/run.mjs", "script", "echo safe\n"),
+    artifact("skills/demo/assets/input.json", "asset", "{}\n"),
+  ]);
+  const summary = summarizeSecurityPolicyAssetEvidence(evidence);
+
+  assert.equal(summary.assetsWithInheritedPolicy, 2);
+  assert.equal(summary.policySources.owning_skill, 2);
 });
 
 test("effective policy provenance lists every contributing source", () => {
@@ -267,6 +362,12 @@ test("duplicate policy values retain every supplying source", () => {
     },
   )[0];
   assert.deepEqual(evidence?.policySources, ["local", "repository_config"]);
+  assert.ok(evidence);
+  const summary = summarizeSecurityPolicyAssetEvidence([evidence]);
+  assert.equal(summary.approvedNetworkDestinationCount, 1);
+  assert.deepEqual(summary.topApprovedNetworkDestinations, [
+    { destination: "shared.example.com", count: 1 },
+  ]);
 });
 
 test("invalid local destination metadata blocks repository accumulation provenance", () => {
@@ -292,6 +393,10 @@ test("invalid local destination metadata blocks repository accumulation provenan
   )[0];
   assert.deepEqual(evidence?.policySources, ["local"]);
   assert.deepEqual(evidence?.effectivePolicy.approvedNetworkDestinations, []);
+  assert.ok(evidence);
+  const summary = summarizeSecurityPolicyAssetEvidence([evidence]);
+  assert.equal(summary.approvedNetworkDestinationCount, 0);
+  assert.deepEqual(summary.topApprovedNetworkDestinations, []);
 });
 
 test("skill and context without policy metadata are counted as missing", () => {
@@ -552,6 +657,37 @@ test("cyclic security profiles increment cyclic profile counts", () => {
   assert.equal(summary.securityProfiles.resolved, 0);
   assert.equal(summary.securityProfiles.missing, 0);
   assert.equal(summary.securityProfiles.cyclic, 1);
+});
+
+test("prepared policy evidence retains missing and cyclic profile counts", () => {
+  const evidence = collectSecurityPolicyAssetEvidence(
+    [
+      artifact(
+        "skills/missing/SKILL.md",
+        "skill",
+        policy({ securityProfile: "missing-profile" }),
+      ),
+      artifact(
+        "skills/cyclic/SKILL.md",
+        "skill",
+        policy({ securityProfile: "a" }),
+      ),
+    ],
+    {
+      ...baseSecurityConfig(),
+      profiles: {
+        a: profile({ securityProfile: "b" }),
+        b: profile({ securityProfile: "a" }),
+      },
+    },
+  );
+  const summary = summarizeSecurityPolicyAssetEvidence(evidence);
+
+  assert.equal(summary.securityProfiles.referenced, 2);
+  assert.equal(summary.securityProfiles.resolved, 0);
+  assert.equal(summary.securityProfiles.missing, 1);
+  assert.equal(summary.securityProfiles.cyclic, 1);
+  assert.equal(summary.securityProfiles.none, 0);
 });
 
 test("unknown artifacts are included only when they declare policy metadata", () => {

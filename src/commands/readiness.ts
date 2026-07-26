@@ -23,6 +23,7 @@ import {
   collectRepositorySnapshot,
   type RepositorySnapshot,
 } from "../repository-evidence.js";
+import { formatJsonDocument } from "../report.js";
 import type { Diagnostic, Finding } from "../types/diagnostics.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import type { AgentSkillsValidationSummary } from "../agent-skills.js";
@@ -850,7 +851,7 @@ function blockingSecurityCheck(findings: Finding[]): ReadinessCheck {
 }
 
 export function formatReadinessJson(report: ReadinessReport): string {
-  return `${JSON.stringify(report, null, 2)}\n`;
+  return formatJsonDocument(report);
 }
 
 function workflowReadinessSummaryLine(report: ReadinessReport): string {

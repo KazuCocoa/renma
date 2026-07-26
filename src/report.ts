@@ -1,8 +1,13 @@
 import type { ScanResult } from "./types/scan-result.js";
 
-/** Format a scan result as stable pretty-printed JSON. */
+/** Format one complete JSON document with two-space indentation and one newline. */
+export function formatJsonDocument(value: unknown): string {
+  return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+/** Format a scan result as pretty-printed JSON. */
 export function formatJson(result: ScanResult): string {
-  return `${JSON.stringify(result, null, 2)}\n`;
+  return formatJsonDocument(result);
 }
 
 /** Format a scan result as human-readable terminal text. */

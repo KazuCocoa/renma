@@ -1,4 +1,5 @@
 import type { ConfigOverrides } from "../config.js";
+import { formatJsonDocument } from "../report.js";
 import { scan } from "../scanner.js";
 import type {
   TrustGraph,
@@ -67,7 +68,7 @@ export async function trustGraph(
 }
 
 export function formatTrustGraphJson(graph: TrustGraph): string {
-  return `${JSON.stringify(graph, null, 2)}\n`;
+  return formatJsonDocument(graph);
 }
 
 export function formatTrustGraphMarkdown(graph: TrustGraph): string {

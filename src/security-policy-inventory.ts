@@ -98,6 +98,23 @@ export type SecurityPolicySource =
   | "repository_config"
   | "owning_skill";
 
+const SECURITY_POLICY_SUMMARY_DETAIL = Symbol("security-policy-summary-detail");
+
+interface SecurityPolicySummaryDetail {
+  networkAllowed: boolean | undefined;
+  externalUploadAllowed: boolean | undefined;
+  secretsAllowed: boolean | undefined;
+  humanApprovalRequired: boolean | undefined;
+  approvedNetworkDestinations: readonly string[];
+  approvedUploadDestinations: readonly string[];
+  forbiddenInputs: readonly string[];
+  disallowedCommands: readonly string[];
+}
+
+type PreparedSecurityPolicyAssetEvidence = SecurityPolicyAssetEvidence & {
+  readonly [SECURITY_POLICY_SUMMARY_DETAIL]?: SecurityPolicySummaryDetail;
+};
+
 const POLICY_INVENTORY_KINDS = new Set<ArtifactKind>([
   "skill",
   "context",
@@ -139,61 +156,42 @@ export function summarizeSecurityPolicyInventory(
   inputs: Array<Artifact | ParsedDocument>,
   config?: SecurityConfig,
 ): SecurityPolicyInventorySummary {
-  const documents = policyDocuments(inputs);
-  const artifacts = documents.map((document) => document.artifact);
-  const documentsByPath = new Map(
-    documents.map((document) => [document.artifact.path, document]),
+  return summarizeSecurityPolicyAssetEvidence(
+    collectSecurityPolicyAssetEvidence(inputs, config),
   );
+}
+
+export function summarizeSecurityPolicyAssetEvidence(
+  evidence: readonly SecurityPolicyAssetEvidence[],
+): SecurityPolicyInventorySummary {
   const summary = zeroSecurityPolicyInventorySummary();
   const networkDestinations = new Map<string, number>();
   const uploadDestinations = new Map<string, number>();
   const forbiddenInputs = new Map<string, number>();
   const profileNames = new Map<string, number>();
-  const owningSkills = skillArtifactsByDirectory(artifacts);
 
-  for (const document of documents) {
-    const artifact = document.artifact;
-    const policyArtifact = policyArtifactFor(artifact, owningSkills);
-    const rawSupportArtifact = isRawSupportArtifact(artifact);
-    const evidenceArtifact =
-      policyArtifact ??
-      (rawSupportArtifact ? { ...artifact, content: "" } : artifact);
-    const policyInput = policyArtifact
-      ? (documentsByPath.get(policyArtifact.path) ?? policyArtifact)
-      : rawSupportArtifact
-        ? evidenceArtifact
-        : document;
-    const parsedPolicy = parseOperationalSecurityPolicy(policyInput);
-    const hasMetadata = hasLocalSecurityPolicyMetadata(parsedPolicy);
-    if (!isPolicyInventoryArtifact(artifact, hasMetadata)) continue;
-
-    const effectiveConfig =
-      rawSupportArtifact && !policyArtifact ? undefined : config;
-    const resolved = resolveSecurityConfig(parsedPolicy, effectiveConfig);
-    const policy = resolved.policy;
-    const localPolicyMetadata = !rawSupportArtifact && hasMetadata;
-    const effectivePolicy = hasEffectiveSecurityPolicy(policy);
-    const inheritedPolicy = policyArtifact !== undefined && effectivePolicy;
+  for (const asset of evidence) {
+    const policy =
+      (asset as PreparedSecurityPolicyAssetEvidence)[
+        SECURITY_POLICY_SUMMARY_DETAIL
+      ] ?? asset.effectivePolicy;
     summary.totalPolicyAssets += 1;
-    summary.assetKinds[artifact.kind as InventoryArtifactKind] += 1;
+    summary.assetKinds[asset.kind as InventoryArtifactKind] += 1;
 
-    if (localPolicyMetadata) summary.assetsWithLocalPolicyMetadata += 1;
-    if (inheritedPolicy) summary.assetsWithInheritedPolicy += 1;
-    if (effectivePolicy) {
+    if (asset.hasLocalPolicyMetadata)
+      summary.assetsWithLocalPolicyMetadata += 1;
+    if (asset.inheritedFrom) summary.assetsWithInheritedPolicy += 1;
+    if (asset.hasEffectivePolicy) {
       summary.assetsWithEffectivePolicy += 1;
-      const sources = effectivePolicySources(
-        resolved.policySources,
-        policyArtifact !== undefined,
-      );
-      assertEffectivePolicySources(sources, artifact.path);
-      for (const source of sources) {
+      assertEffectivePolicySources(asset.policySources, asset.path);
+      for (const source of asset.policySources) {
         summary.policySources[source] += 1;
       }
     } else {
       summary.assetsWithoutEffectivePolicy += 1;
       summary.assetsWithoutEffectivePolicyList.push({
-        path: artifact.path,
-        kind: artifact.kind,
+        path: asset.path,
+        kind: asset.kind,
       });
     }
 
@@ -224,7 +222,7 @@ export function summarizeSecurityPolicyInventory(
       policy.disallowedCommands,
     ).length;
 
-    countSecurityProfile(summary, profileNames, parsedPolicy, config);
+    countSecurityProfile(summary, profileNames, asset);
   }
 
   summary.securityProfiles.names = topCounts(profileNames, "name");
@@ -316,7 +314,7 @@ export function collectSecurityPolicyAssetEvidence(
       };
       if (row.hasEffectivePolicy)
         assertEffectivePolicySources(row.policySources, row.path);
-      return row;
+      return withSecurityPolicySummaryDetail(row, policy);
     })
     .filter((row): row is SecurityPolicyAssetEvidence => row !== undefined)
     .sort((left, right) => {
@@ -474,7 +472,7 @@ function zeroPolicyBooleanCounts(): PolicyBooleanCounts {
 
 function countPolicyBoolean(
   counts: PolicyBooleanCounts,
-  value: boolean | undefined,
+  value: boolean | null | undefined,
 ): void {
   if (value === true) {
     counts.true += 1;
@@ -487,7 +485,7 @@ function countPolicyBoolean(
 
 function addUniqueCounts(
   counts: Map<string, number>,
-  values: string[],
+  values: readonly string[],
 ): number {
   const uniqueValues = uniqueStrings(values);
   for (const value of uniqueValues) {
@@ -499,27 +497,32 @@ function addUniqueCounts(
 function countSecurityProfile(
   summary: SecurityPolicyInventorySummary,
   profileNames: Map<string, number>,
-  policy: SecurityPolicy,
-  config: SecurityConfig | undefined,
+  asset: SecurityPolicyAssetEvidence,
 ): void {
-  if (policy.securityProfile === undefined) {
+  if (asset.selectedSecurityProfile === undefined) {
     summary.securityProfiles.none += 1;
     return;
   }
 
   summary.securityProfiles.referenced += 1;
   profileNames.set(
-    policy.securityProfile,
-    (profileNames.get(policy.securityProfile) ?? 0) + 1,
+    asset.selectedSecurityProfile,
+    (profileNames.get(asset.selectedSecurityProfile) ?? 0) + 1,
   );
 
-  const chain = securityProfileChain(policy.securityProfile, config);
-  if (chain.missingProfile !== undefined) {
-    summary.securityProfiles.missing += 1;
-  } else if (chain.cycle !== undefined) {
-    summary.securityProfiles.cyclic += 1;
-  } else {
-    summary.securityProfiles.resolved += 1;
+  switch (asset.profileResolution) {
+    case "missing":
+      summary.securityProfiles.missing += 1;
+      break;
+    case "cyclic":
+      summary.securityProfiles.cyclic += 1;
+      break;
+    case "resolved":
+      summary.securityProfiles.resolved += 1;
+      break;
+    case "none":
+      summary.securityProfiles.none += 1;
+      break;
   }
 }
 
@@ -550,6 +553,28 @@ function normalizeEffectivePolicy(
       .digest("hex")}`,
     ...summary,
   };
+}
+
+function withSecurityPolicySummaryDetail(
+  evidence: SecurityPolicyAssetEvidence,
+  policy: SecurityPolicy,
+): SecurityPolicyAssetEvidence {
+  Object.defineProperty(evidence, SECURITY_POLICY_SUMMARY_DETAIL, {
+    configurable: false,
+    enumerable: false,
+    value: {
+      networkAllowed: policy.networkAllowed,
+      externalUploadAllowed: policy.externalUploadAllowed,
+      secretsAllowed: policy.secretsAllowed,
+      humanApprovalRequired: policy.humanApprovalRequired,
+      approvedNetworkDestinations: policy.approvedNetworkDestinations,
+      approvedUploadDestinations: policy.approvedUploadDestinations,
+      forbiddenInputs: policy.forbiddenInputs,
+      disallowedCommands: policy.disallowedCommands,
+    } satisfies SecurityPolicySummaryDetail,
+    writable: false,
+  });
+  return evidence;
 }
 
 function normalizeStringList(values: string[]): string[] {
@@ -633,6 +658,6 @@ function topCounts<Key extends string>(
     .slice(0, DEFAULT_QUALITY_PROFILE.presentation.topSummaryItemCap);
 }
 
-function uniqueStrings(values: string[]): string[] {
+function uniqueStrings(values: readonly string[]): string[] {
   return [...new Set(values)];
 }

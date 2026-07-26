@@ -18,6 +18,7 @@ import {
   collectTargetRepositoryEvidence,
   type TargetRepositoryEvidence,
 } from "../evidence/target.js";
+import { formatJsonDocument } from "../report.js";
 import { buildAgentSkillMigrationSuggestion } from "../skill-migration.js";
 import { renderMetadataPrompt } from "../renderers/metadata-suggestion.js";
 import type { ArtifactKind } from "../types/artifact.js";
@@ -56,7 +57,7 @@ export async function runSuggestMetadataCommand(
   const format = options.format ?? "prompt";
   process.stdout.write(
     format === "json"
-      ? `${JSON.stringify(suggestion, null, 2)}\n`
+      ? formatJsonDocument(suggestion)
       : renderMetadataPrompt(suggestion),
   );
   return 0;

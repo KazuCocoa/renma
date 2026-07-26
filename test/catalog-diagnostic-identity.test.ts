@@ -6,6 +6,11 @@ import test from "node:test";
 import fc from "fast-check";
 
 import { buildCatalog } from "../src/catalog.js";
+import {
+  CATALOG_FINDING_DEFINITIONS,
+  CATALOG_FINDING_DIAGNOSTIC_CODES,
+  catalogDiagnosticFindings,
+} from "../src/catalog-findings.js";
 import { createDiagnosticsV2 } from "../src/diagnostics-v2.js";
 import {
   DIAGNOSTIC_IDS,
@@ -13,9 +18,9 @@ import {
 } from "../src/diagnostic-ids.js";
 import { parseDocument } from "../src/markdown.js";
 import {
-  CATALOG_FINDING_DEFINITIONS,
-  CATALOG_FINDING_DIAGNOSTIC_CODES,
-  catalogDiagnosticFindings,
+  CATALOG_FINDING_DEFINITIONS as SCANNER_CATALOG_FINDING_DEFINITIONS,
+  CATALOG_FINDING_DIAGNOSTIC_CODES as SCANNER_CATALOG_FINDING_DIAGNOSTIC_CODES,
+  catalogDiagnosticFindings as scannerCatalogDiagnosticFindings,
 } from "../src/scanner.js";
 import type { Artifact, ArtifactKind, Diagnostic } from "../src/types.js";
 
@@ -32,6 +37,18 @@ test("catalog Finding classification is invariant under diagnostic wording", () 
       { seed: 0x22_05, numRuns: 50 },
     );
   }
+});
+
+test("scanner preserves exact Catalog Finding compatibility re-exports", () => {
+  assert.equal(
+    SCANNER_CATALOG_FINDING_DEFINITIONS,
+    CATALOG_FINDING_DEFINITIONS,
+  );
+  assert.equal(
+    SCANNER_CATALOG_FINDING_DIAGNOSTIC_CODES,
+    CATALOG_FINDING_DIAGNOSTIC_CODES,
+  );
+  assert.equal(scannerCatalogDiagnosticFindings, catalogDiagnosticFindings);
 });
 
 test("every known metadata diagnostic has a registered code conversion", () => {
@@ -221,7 +238,7 @@ test("unknown catalog diagnostics fall back safely and omissions remain typed", 
 
 test("catalog-to-Finding classification cannot branch on message prose", async () => {
   const source = await readFile(
-    path.join(process.cwd(), "src", "scanner.ts"),
+    path.join(process.cwd(), "src", "catalog-findings.ts"),
     "utf8",
   );
   const adapterStart = source.indexOf(
@@ -235,6 +252,13 @@ test("catalog-to-Finding classification cannot branch on message prose", async (
   const adapter = source.slice(adapterStart, adapterEnd);
   assert.doesNotMatch(adapter, /diagnostic\.message\s*\.(?:match|includes)/);
   assert.doesNotMatch(adapter, /(?:test|match)\(\s*diagnostic\.message/);
+
+  const scannerSource = await readFile(
+    path.join(process.cwd(), "src", "scanner.ts"),
+    "utf8",
+  );
+  assert.doesNotMatch(scannerSource, /interface CatalogFindingDefinition/);
+  assert.doesNotMatch(scannerSource, /const STATUS_FINDING/);
 });
 
 function codedDiagnostic(code: string, message: string): Diagnostic {

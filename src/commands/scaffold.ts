@@ -5,6 +5,7 @@ import {
   RENMA_FIRST_AUTHORING_BOUNDARY,
   SKILL_AUTHORING_PRINCIPLE,
 } from "../guidance/skill-authoring.js";
+import { formatJsonDocument } from "../report.js";
 
 export type ScaffoldKind = "skill" | "context" | "context_lens";
 export type ScaffoldFormat = "file" | "prompt" | "json";
@@ -40,7 +41,7 @@ export async function runScaffoldCommand(
   const bundle = buildScaffoldBundle(options);
 
   if (options.format === "json") {
-    process.stdout.write(`${JSON.stringify(bundle, null, 2)}\n`);
+    process.stdout.write(formatJsonDocument(bundle));
     return 0;
   }
 

@@ -1,6 +1,7 @@
 import type { ConfigOverrides } from "../config.js";
 import type { AssetOwnership } from "../model.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
+import { formatJsonDocument } from "../report.js";
 import {
   collectRepositorySnapshot,
   repositoryDiagnosticsWithoutSkillDiscovery,
@@ -111,7 +112,7 @@ export function buildSkillIndexReport(
 }
 
 export function formatSkillIndexJson(report: SkillIndexReportV1): string {
-  return `${JSON.stringify(report, null, 2)}\n`;
+  return formatJsonDocument(report);
 }
 
 export function formatSkillIndexMarkdown(report: SkillIndexReportV1): string {

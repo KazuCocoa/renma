@@ -7,6 +7,7 @@ import {
   type AssetOwnership,
   type AssetStatus,
 } from "../model.js";
+import { formatJsonDocument } from "../report.js";
 import type { Diagnostic } from "../types/diagnostics.js";
 
 export type OwnershipFormat = "json" | "markdown";
@@ -135,7 +136,7 @@ export async function ownership(
 }
 
 export function formatOwnershipJson(report: OwnershipReport): string {
-  return `${JSON.stringify(report, null, 2)}\n`;
+  return formatJsonDocument(report);
 }
 
 export function formatOwnershipMarkdown(report: OwnershipReport): string {

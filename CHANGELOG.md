@@ -6,6 +6,33 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.24.2] - 2026-07-25
+
+### Changed
+
+- Reused prepared per-asset security policy evidence when constructing policy
+  inventory summaries, so snapshot-based scan and BOM paths do not parse or
+  resolve the same policy solely for the summary.
+- Moved Catalog diagnostic-to-Finding definitions into their cohesive
+  deterministic analysis module while preserving the established scanner
+  deep-import re-exports.
+- Indexed BOM dependency, dependent, and exact-path diagnostic associations
+  once before projecting assets, preserving their stable order and duplicate
+  behavior.
+- Centralized the exact two-space `JSON.stringify` document format with one
+  trailing newline while leaving deterministic key order with report
+  construction.
+- Reviewed directly touched private and local names; none were materially
+  misleading, so no naming-only changes were included.
+
+### Compatibility
+
+- This internal maintainability release intentionally preserves public CLI
+  behavior, schemas, diagnostics, findings, ordering, deduplication, evidence,
+  deep imports, package entrypoints, and runtime boundaries.
+  Package-version-derived values, including the BOM generator version and
+  quality-profile identifiers, advance to 0.24.2.
+
 ## [0.24.1] - 2026-07-25
 
 ### Changed
