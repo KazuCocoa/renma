@@ -415,6 +415,201 @@ test("mixed defensive and positive disclosure clauses remain unsafe", () => {
   }
 });
 
+test("soft-wrapped no-disclosure prose preserves secret negation", () => {
+  const findings = affectedDisclosureFindings(`
+Have the human operator set
+\`P12_PASSWORD\` in the local shell outside the agent or chat context. Never pass the
+password on the command line, echo it, log it, upload it, or return it as evidence;
+unset it immediately after signing:
+`);
+
+  assert.deepEqual(findings, []);
+});
+
+test("one-line and soft-wrapped no-disclosure forms are equivalent", () => {
+  const fixtures = [
+    "Never pass the password on the command line, echo it, log it, upload it, or return it as evidence.",
+    `Never pass the
+password on the command line, echo it, log it, upload it, or return it as evidence.`,
+    `Never pass the password on the command line,
+echo it, log it,
+upload it, or return it as evidence.`,
+  ];
+
+  for (const fixture of fixtures) {
+    assert.deepEqual(affectedDisclosureFindings(fixture), [], fixture);
+  }
+});
+
+test("later sentences and contrastive clauses retain positive disclosure findings", () => {
+  const fixtures = [
+    "Read the password, echo it, log it, and upload it as evidence.",
+    "Never log the password. Then upload the password as evidence.",
+    `Never log the password;
+upload the password as evidence.`,
+    "Do not echo the password, but upload it to the external service.",
+  ];
+
+  for (const fixture of fixtures) {
+    const ids = new Set(
+      affectedDisclosureFindings(fixture).map(({ id }) => id),
+    );
+    assert.ok(ids.has("SEC-INSTRUCTION-VIOLATES-POLICY"), fixture);
+    assert.ok(ids.has("SEC-SECRET-MATERIAL-INSTRUCTION"), fixture);
+  }
+
+  assert.deepEqual(
+    affectedDisclosureFindings(`Never log the password;
+upload the password as evidence.`).map(({ id, evidence }) => ({
+      id,
+      line: evidence.startLine,
+      snippet: evidence.snippet,
+    })),
+    [
+      {
+        id: "SEC-INSTRUCTION-VIOLATES-POLICY",
+        line: 7,
+        snippet: "upload the password as evidence.",
+      },
+      {
+        id: "SEC-SECRET-MATERIAL-INSTRUCTION",
+        line: 7,
+        snippet: "upload the password as evidence.",
+      },
+    ],
+  );
+});
+
+test("paragraph negation does not cross Markdown structural boundaries", () => {
+  const fixtures = [
+    {
+      name: "separate paragraphs",
+      body: `Never log or upload the password.
+
+Upload the password as evidence.`,
+      positiveLine: 8,
+    },
+    {
+      name: "blockquote",
+      body: `> Never log or upload the password.
+
+Upload the password as evidence.`,
+      positiveLine: 8,
+    },
+    {
+      name: "separate list items",
+      body: `- Never log or upload the password.
+- Upload the password as evidence.`,
+      positiveLine: 7,
+    },
+  ];
+
+  for (const { name, body, positiveLine } of fixtures) {
+    const findings = affectedDisclosureFindings(body);
+    for (const id of [
+      "SEC-INSTRUCTION-VIOLATES-POLICY",
+      "SEC-SECRET-MATERIAL-INSTRUCTION",
+    ]) {
+      assert.ok(
+        findings.some(
+          (finding) =>
+            finding.id === id &&
+            finding.evidence.startLine === positiveLine &&
+            finding.evidence.snippet.includes("Upload the password"),
+        ),
+        `${name}: ${id}`,
+      );
+    }
+  }
+});
+
+test("paragraph negation does not alter a following code block", () => {
+  const findings = affectedDisclosureFindings(`
+Never log or upload the password.
+
+\`\`\`bash
+echo "$P12_PASSWORD"
+echo "password"
+\`\`\`
+`);
+
+  assert.deepEqual(
+    findings.map(({ id, severity, evidence }) => ({
+      id,
+      severity,
+      line: evidence.startLine,
+      snippet: evidence.snippet,
+    })),
+    [
+      {
+        id: "SEC-INSTRUCTION-VIOLATES-POLICY",
+        severity: "high",
+        line: 10,
+        snippet: 'echo "password"',
+      },
+      {
+        id: "SEC-SECRET-MATERIAL-INSTRUCTION",
+        severity: "critical",
+        line: 10,
+        snippet: 'echo "password"',
+      },
+    ],
+  );
+});
+
+test("secret negation is invariant at explicit soft-wrap positions", () => {
+  const fixtures = [
+    `Never
+pass the password on the command line, echo it, log it, upload it, or return it as evidence.`,
+    `Never pass
+the password on the command line, echo it, log it, upload it, or return it as evidence.`,
+    `Never pass the password
+on the command line, echo it, log it, upload it, or return it as evidence.`,
+    `Never pass the password on the command line, echo it,
+log it, upload it, or return it as evidence.`,
+    `Never pass the password on the command line, echo it, log it, upload it,
+or return it as evidence.`,
+  ];
+
+  for (const fixture of fixtures) {
+    assert.deepEqual(affectedDisclosureFindings(fixture), [], fixture);
+  }
+});
+
+test("wrapped positive disclosure preserves exact finding evidence and ordering", () => {
+  const findings = affectedDisclosureFindings(`Read the password, echo it,
+log it, and upload it as evidence.`);
+
+  assert.deepEqual(
+    findings.map(({ id, severity, evidence }) => ({
+      id,
+      severity,
+      path: evidence.path,
+      startLine: evidence.startLine,
+      endLine: evidence.endLine,
+      snippet: evidence.snippet,
+    })),
+    [
+      {
+        id: "SEC-INSTRUCTION-VIOLATES-POLICY",
+        severity: "high",
+        path: "contexts/security-command.md",
+        startLine: 6,
+        endLine: 6,
+        snippet: "Read the password, echo it,",
+      },
+      {
+        id: "SEC-SECRET-MATERIAL-INSTRUCTION",
+        severity: "critical",
+        path: "contexts/security-command.md",
+        startLine: 6,
+        endLine: 6,
+        snippet: "Read the password, echo it,",
+      },
+    ],
+  );
+});
+
 test("never print does not suppress a later positive disclosure verb", () => {
   for (const action of [
     "log",
@@ -525,9 +720,36 @@ function sensitiveHandlingFindings(body: string) {
   );
 }
 
+function affectedDisclosureFindings(body: string) {
+  return securityDiagnosticFindings([restrictedContextArtifact(body)]).filter(
+    ({ id }) =>
+      id === "SEC-SECRET-MATERIAL-INSTRUCTION" ||
+      id === "SEC-INSTRUCTION-VIOLATES-POLICY",
+  );
+}
+
 function contextArtifact(body: string): Artifact {
   const content = `---
 allowed_data: public
+---
+
+${body.trim()}
+`;
+  return {
+    path: "contexts/security-command.md",
+    absolutePath: "/repo/contexts/security-command.md",
+    kind: "context",
+    sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: true,
+    content,
+  };
+}
+
+function restrictedContextArtifact(body: string): Artifact {
+  const content = `---
+allowed_data: public
+secrets_allowed: false
 ---
 
 ${body.trim()}

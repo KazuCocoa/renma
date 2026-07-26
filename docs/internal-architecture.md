@@ -140,14 +140,21 @@ artifact eligibility
 ```
 
 Document preparation resolves the parsed and effective policies once, creates
-one `MarkdownSecurityView`, and prepares one destination and security analysis
-for each logical command. The physical-line stage keeps one lazy analysis
-accessor for a line outside a logical command. It intentionally runs line-local
-checks on physical continuation members while limiting destination, sensitive
-data, and upload checks over the complete command to the logical-command start.
-Only human-approval and command-risk guard history is mutable across physical
-lines; the current line is evaluated before either history is updated, and
-blockquoted prose cannot update them.
+one `MarkdownSecurityView`, prepares one destination and security analysis for
+each logical command, and indexes a normalized prose projection for every line
+in each operational paragraph semantic unit. That private paragraph projection
+preserves clause-aware action polarity across Markdown soft wraps. It never
+crosses paragraph, list-item, blockquote, heading, thematic-break, hidden
+comment, or code boundaries, and it does not replace physical-line or
+logical-command evidence or analysis input.
+
+The physical-line stage keeps one lazy analysis accessor for a line outside a
+logical command. It intentionally runs line-local checks on physical
+continuation members while limiting destination, sensitive data, and upload
+checks over the complete command to the logical-command start. Only
+human-approval and command-risk guard history is mutable across physical lines;
+the current line is evaluated before either history is updated, and blockquoted
+prose cannot update them.
 `MarkdownSecurityView.associatedGuardEvidence()` supplies exact source ranges
 for the same instruction, same list item, preceding paragraph, and active
 safety section without crossing unrelated headings, thematic breaks, sibling

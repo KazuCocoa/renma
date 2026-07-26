@@ -858,6 +858,10 @@ interface PreparedSecurityDocumentAnalysis {
   readonly markdownView: MarkdownSecurityView;
   readonly scanStart: number;
   readonly logicalCommands: PreparedLogicalCommandAnalysis;
+  readonly securityParagraphContextByLine: ReadonlyMap<
+    number,
+    SecurityParagraphContext
+  >;
 }
 
 interface SecurityGuardHistory {
@@ -865,10 +869,17 @@ interface SecurityGuardHistory {
   recentRiskMitigationLine: number;
 }
 
+interface SecurityParagraphContext {
+  readonly startLine: number;
+  readonly endLine: number;
+  readonly text: string;
+}
+
 interface SecurityLineContext {
   readonly index: number;
   readonly lineNumber: number;
   readonly line: string;
+  readonly paragraphText?: string;
   readonly quotedProse: boolean;
   readonly commandLine: boolean;
   readonly evidence: DetectionEvidence;
@@ -945,6 +956,8 @@ function prepareSecurityDocumentAnalysis(
     scanStart,
     markdownView,
   );
+  const securityParagraphContextByLine =
+    prepareSecurityParagraphContexts(markdownView);
 
   return {
     artifact,
@@ -957,7 +970,35 @@ function prepareSecurityDocumentAnalysis(
     markdownView,
     scanStart,
     logicalCommands,
+    securityParagraphContextByLine,
   };
+}
+
+function prepareSecurityParagraphContexts(
+  markdownView: MarkdownSecurityView,
+): ReadonlyMap<number, SecurityParagraphContext> {
+  const contextByLine = new Map<number, SecurityParagraphContext>();
+  for (const unit of markdownView.semanticUnits) {
+    if (unit.kind !== "paragraph") continue;
+    const text = unit.lines
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join(" ");
+    if (!text) continue;
+    const context: SecurityParagraphContext = {
+      startLine: unit.startLine,
+      endLine: unit.endLine,
+      text,
+    };
+    for (
+      let lineIndex = unit.startLine - 1;
+      lineIndex < unit.endLine;
+      lineIndex += 1
+    ) {
+      contextByLine.set(lineIndex, context);
+    }
+  }
+  return contextByLine;
 }
 
 function prepareLogicalCommandAnalysis(
@@ -1162,6 +1203,8 @@ function prepareSecurityLineContext(
     logicalCommand === undefined
       ? undefined
       : logicalCommands.securityByCommand.get(logicalCommand);
+  const paragraphText =
+    prepared.securityParagraphContextByLine.get(index)?.text;
   let cachedLineSecurityAnalysis: SecurityCommandAnalysis | undefined;
   const lineSecurityAnalysis = (): SecurityCommandAnalysis => {
     const language = markdownView.languageAt(index);
@@ -1185,6 +1228,7 @@ function prepareSecurityLineContext(
     index,
     lineNumber,
     line,
+    ...(paragraphText === undefined ? {} : { paragraphText }),
     quotedProse,
     commandLine,
     evidence,
@@ -1207,6 +1251,7 @@ function securityLineDetections(
   const {
     lineNumber,
     line,
+    paragraphText,
     quotedProse,
     commandLine,
     evidence,
@@ -1224,10 +1269,17 @@ function securityLineDetections(
   if (!quotedProse) {
     if (logicalCommand === undefined) {
       detections.push(
-        ...policyDetections(line, evidence, policy, hasHumanApprovalGuard, {
-          scope: "all",
-          analysis: lineDestinationAnalysis(),
-        }),
+        ...policyDetections(
+          line,
+          evidence,
+          policy,
+          hasHumanApprovalGuard,
+          {
+            scope: "all",
+            analysis: lineDestinationAnalysis(),
+          },
+          paragraphText,
+        ),
       );
     } else {
       detections.push(
@@ -1261,6 +1313,7 @@ function securityLineDetections(
           evidence,
           policy,
           lineSecurityAnalysis(),
+          paragraphText,
         ),
       );
     } else if (logicalCommandStart && logicalSecurityAnalysis !== undefined) {
@@ -1460,6 +1513,7 @@ function policyDetections(
   policy: SecurityPolicy,
   hasHumanApprovalGuard: boolean,
   input: PolicyDetectionInput,
+  paragraphText?: string,
 ): Detection[] {
   const detections: Detection[] = [];
   const shouldAnalyzeDestinations = input.scope !== "line-local";
@@ -1558,7 +1612,9 @@ function policyDetections(
     analyzeLineLocal &&
     policy.secretsAllowed === false &&
     SECRET_WORD_RE.test(line) &&
-    !isSafeSensitiveHandlingInstruction(line)
+    !isSafeSensitiveHandlingInstruction(line) &&
+    (paragraphText === undefined ||
+      !isSafeSensitiveHandlingInstruction(paragraphText))
   ) {
     detections.push({
       metadata: RULES.instructionViolatesPolicy,
@@ -1630,6 +1686,7 @@ function sensitiveDataDetections(
   evidence: DetectionEvidence,
   policy: SecurityPolicy,
   analysis: SecurityCommandAnalysis,
+  paragraphText?: string,
 ): Detection[] {
   if (analysis.support === "fallback-required") {
     return fallbackSensitiveDataDetections(line, evidence, policy, analysis);
@@ -1650,6 +1707,8 @@ function sensitiveDataDetections(
   );
   const safeHandling =
     analysis.localOnlySensitiveOperation ||
+    (paragraphText !== undefined &&
+      isSafeSensitiveHandlingInstruction(paragraphText)) ||
     (!hasDisclosureSink && isSafeSensitiveHandlingInstruction(line));
   const sourceEvidence =
     sensitiveSources.length === 0

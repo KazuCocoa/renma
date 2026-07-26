@@ -6,6 +6,26 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.24.4] - 2026-07-25
+
+### Fixed
+
+- Fixed a false-positive `SEC-SECRET-MATERIAL-INSTRUCTION` result when an
+  explicit no-disclosure sentence was soft-wrapped across physical lines
+  within one Markdown paragraph.
+- Preserved paragraph-local negation for the secret-specific
+  `SEC-INSTRUCTION-VIOLATES-POLICY` interpretation under restrictive policy.
+- Paragraph-local negation remains clause-aware and does not cross paragraph,
+  list-item, blockquote, heading, thematic-break, hidden-comment, or code
+  boundaries. Genuine positive disclosure instructions remain detected.
+
+### Compatibility
+
+- Paragraph context is a private polarity input only. Finding evidence,
+  destination and logical-command analysis, fallback behavior, public schemas,
+  diagnostic IDs, severities, ordering, deduplication, package entrypoints,
+  and runtime boundaries are unchanged.
+
 ## [0.24.3] - 2026-07-25
 
 ### Changed
