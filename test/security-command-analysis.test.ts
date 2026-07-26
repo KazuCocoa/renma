@@ -5,6 +5,7 @@ import { MarkdownSecurityView } from "../src/markdown-security-view.js";
 import { parseMarkdownSyntax } from "../src/markdown-syntax.js";
 import {
   analyzeSecurityCommand,
+  positiveDisclosureActions,
   type SecurityCommandAnalysis,
 } from "../src/security-command/index.js";
 
@@ -541,6 +542,32 @@ test("a negated print action cannot neutralize later positive disclosure actions
       action,
     );
   }
+});
+
+test("positive disclosure actions retain their public filtered result", () => {
+  assert.deepEqual(
+    positiveDisclosureActions(
+      "Never log the password. Then upload it and echo it.",
+    ),
+    [
+      {
+        action: "upload",
+        kind: "external-upload",
+        start: 29,
+        end: 35,
+        clauseStart: 28,
+        clauseEnd: 50,
+      },
+      {
+        action: "echo",
+        kind: "stdout-or-log",
+        start: 43,
+        end: 47,
+        clauseStart: 28,
+        clauseEnd: 50,
+      },
+    ],
+  );
 });
 
 test("ambiguous substitution remains fallback-required and cannot become local-only", () => {

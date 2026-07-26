@@ -140,14 +140,26 @@ artifact eligibility
 ```
 
 Document preparation resolves the parsed and effective policies once, creates
-one `MarkdownSecurityView`, and prepares one destination and security analysis
-for each logical command. The physical-line stage keeps one lazy analysis
-accessor for a line outside a logical command. It intentionally runs line-local
-checks on physical continuation members while limiting destination, sensitive
-data, and upload checks over the complete command to the logical-command start.
-Only human-approval and command-risk guard history is mutable across physical
-lines; the current line is evaluated before either history is updated, and
-blockquoted prose cannot update them.
+one `MarkdownSecurityView`, prepares one destination and security analysis for
+each logical command, and indexes a normalized prose projection for every line
+in each operational paragraph semantic unit. That private paragraph projection
+retains each source line's normalized start and end offsets. Genuine soft wraps
+use a space, while mdast `break` nodes preserve explicit Markdown hard breaks
+as newlines and therefore as clause boundaries. The shared security-command
+classifier evaluates action polarity only in clauses intersecting the current
+line range, so an action before a soft-wrapped secret term remains negated
+without allowing unrelated earlier clauses to guard later actions. The
+projection never crosses paragraph, list-item, blockquote, heading,
+thematic-break, hidden comment, or code boundaries, and it does not replace
+physical-line or logical-command evidence or analysis input.
+
+The physical-line stage keeps one lazy analysis accessor for a line outside a
+logical command. It intentionally runs line-local checks on physical
+continuation members while limiting destination, sensitive data, and upload
+checks over the complete command to the logical-command start. Only
+human-approval and command-risk guard history is mutable across physical lines;
+the current line is evaluated before either history is updated, and blockquoted
+prose cannot update them.
 `MarkdownSecurityView.associatedGuardEvidence()` supplies exact source ranges
 for the same instruction, same list item, preceding paragraph, and active
 safety section without crossing unrelated headings, thematic breaks, sibling
@@ -155,11 +167,11 @@ items, code blocks, or quoted examples.
 
 The internal `src/security-command/` analysis modules own bounded tokenization,
 npm-style dependency pinning, sensitive-source classification, sink
-classification, no-disclosure guard matching, and the cohesive immutable
-command result. One result is cached for each relevant line-local instruction.
-Each logical shell command receives one result that reuses its existing
-`DestinationAnalysis`; physical continuation members do not independently
-reanalyze that command.
+classification, shared disclosure-action extraction and clause polarity,
+no-disclosure guard matching, and the cohesive immutable command result. One
+result is cached for each relevant line-local instruction. Each logical shell
+command receives one result that reuses its existing `DestinationAnalysis`;
+physical continuation members do not independently reanalyze that command.
 
 The internal `src/security-destination/` modules continue to own the pure
 destination stages. `analyzeDestinations` projects one input, classifies its

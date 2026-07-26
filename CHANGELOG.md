@@ -8,6 +8,31 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [0.24.3] - 2026-07-25
 
+### Fixed
+
+- Fixed a false-positive `SEC-SECRET-MATERIAL-INSTRUCTION` result when an
+  explicit no-disclosure sentence was soft-wrapped across physical lines
+  within one Markdown paragraph.
+- Preserved paragraph-local negation for the secret-specific
+  `SEC-INSTRUCTION-VIOLATES-POLICY` interpretation under restrictive policy.
+- Retained each physical line's normalized range in the paragraph projection
+  so action polarity remains available when the disclosure action and secret
+  term occur on different soft-wrapped lines, while an earlier unrelated
+  action does not invalidate a later explicit no-disclosure clause.
+- Preserved explicit Markdown hard breaks as clause boundaries while joining
+  genuine soft wraps with a space.
+- Paragraph-local negation remains clause-aware and does not cross paragraph,
+  list-item, blockquote, heading, thematic-break, hidden-comment, or code
+  boundaries. Genuine positive disclosure instructions remain detected.
+- Extended Markdown soft-wrap parity to adjacent security checks where actions,
+  sensitive targets, configured forbidden inputs, or policy-prohibition
+  phrases span physical lines within one clause. Explicit Markdown hard breaks
+  remain clause boundaries, and genuine positive instructions remain detected.
+- Distinguished structural command context from ordinary prose that mentions
+  command names such as Git, AWS, or echo, preserving paragraph-level approval,
+  forbidden-input, and body-policy interpretation across soft wraps while
+  keeping code and prepared logical commands command-scoped.
+
 ### Changed
 
 - Made security-diagnostics document preparation explicit while retaining one
@@ -28,11 +53,16 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Compatibility
 
-- Renma 0.24.3 is a behavior-preserving internal maintainability release. It
-  does not intentionally change public diagnostics, evidence, ordering,
-  deduplication, policy semantics, CLI behavior, schemas, package entrypoints,
-  or runtime boundaries. Normal package-version-derived values advance to
-  0.24.3.
+- Except for the documented soft-wrap parity corrections, Renma 0.24.3
+  preserves public diagnostics, ordering, deduplication, policy semantics, CLI
+  behavior, schemas, package entrypoints, and runtime boundaries.
+- Paragraph context remains a private, clause-bounded interpretation input. It
+  supplements selected prose-only polarity, action-target association,
+  destination, approval, forbidden-input, body-policy, and Context-scope checks
+  without replacing physical source evidence or command-scoped analysis.
+- Existing unaffected Finding evidence remains unchanged. Newly recognized
+  wrapped cases use the smallest source-based physical-line range required to
+  represent the matched action, target, literal phrase, or prohibition.
 
 ## [0.24.2] - 2026-07-25
 
