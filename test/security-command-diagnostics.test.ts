@@ -426,6 +426,21 @@ unset it immediately after signing:
   assert.deepEqual(findings, []);
 });
 
+test("earlier paragraph actions do not invalidate a later wrapped prohibition", () => {
+  const findings = affectedDisclosureFindings(`
+Run \`resigner\` to embed the profile and sign. \`--profile\` accepts a **directory**
+path containing \`.mobileprovision\` files, not the \`.mobileprovision\` file itself; never upload, attach, print, or log those files.
+resigner selects the matching profile automatically. Include \`--bundle-id-remap\`
+flags only when your profile app identifier is not a true wildcard (\`*\`). Each
+remap must use \`old.bundle.id=new.bundle.id\` syntax. Have the human operator set
+\`P12_PASSWORD\` in the local shell outside the agent or chat context. Never pass the
+password on the command line, echo it, log it, upload it, or return it as evidence;
+unset it immediately after signing:
+`);
+
+  assert.deepEqual(findings, []);
+});
+
 test("one-line and soft-wrapped no-disclosure forms are equivalent", () => {
   const fixtures = [
     "Never pass the password on the command line, echo it, log it, upload it, or return it as evidence.",

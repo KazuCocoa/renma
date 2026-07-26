@@ -143,10 +143,12 @@ Document preparation resolves the parsed and effective policies once, creates
 one `MarkdownSecurityView`, prepares one destination and security analysis for
 each logical command, and indexes a normalized prose projection for every line
 in each operational paragraph semantic unit. That private paragraph projection
-preserves clause-aware action polarity across Markdown soft wraps. It never
-crosses paragraph, list-item, blockquote, heading, thematic-break, hidden
-comment, or code boundaries, and it does not replace physical-line or
-logical-command evidence or analysis input.
+retains each source line's normalized offset, preserving clause-aware action
+polarity across Markdown soft wraps without allowing unrelated actions in
+earlier clauses to invalidate a later prohibition. It never crosses paragraph,
+list-item, blockquote, heading, thematic-break, hidden comment, or code
+boundaries, and it does not replace physical-line or logical-command evidence
+or analysis input.
 
 The physical-line stage keeps one lazy analysis accessor for a line outside a
 logical command. It intentionally runs line-local checks on physical

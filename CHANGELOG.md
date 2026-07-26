@@ -15,6 +15,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   within one Markdown paragraph.
 - Preserved paragraph-local negation for the secret-specific
   `SEC-INSTRUCTION-VIOLATES-POLICY` interpretation under restrictive policy.
+- Retained each physical line's position in the paragraph projection so an
+  earlier unrelated action does not invalidate a later explicit no-disclosure
+  clause.
 - Paragraph-local negation remains clause-aware and does not cross paragraph,
   list-item, blockquote, heading, thematic-break, hidden-comment, or code
   boundaries. Genuine positive disclosure instructions remain detected.

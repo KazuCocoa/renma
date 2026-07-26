@@ -860,7 +860,7 @@ interface PreparedSecurityDocumentAnalysis {
   readonly logicalCommands: PreparedLogicalCommandAnalysis;
   readonly securityParagraphContextByLine: ReadonlyMap<
     number,
-    SecurityParagraphContext
+    SecurityParagraphLineContext
   >;
 }
 
@@ -875,11 +875,17 @@ interface SecurityParagraphContext {
   readonly text: string;
 }
 
+interface SecurityParagraphLineContext {
+  readonly paragraph: SecurityParagraphContext;
+  readonly lineStartOffset: number;
+}
+
 interface SecurityLineContext {
   readonly index: number;
   readonly lineNumber: number;
   readonly line: string;
   readonly paragraphText?: string;
+  readonly paragraphLineStartOffset?: number;
   readonly quotedProse: boolean;
   readonly commandLine: boolean;
   readonly evidence: DetectionEvidence;
@@ -976,26 +982,34 @@ function prepareSecurityDocumentAnalysis(
 
 function prepareSecurityParagraphContexts(
   markdownView: MarkdownSecurityView,
-): ReadonlyMap<number, SecurityParagraphContext> {
-  const contextByLine = new Map<number, SecurityParagraphContext>();
+): ReadonlyMap<number, SecurityParagraphLineContext> {
+  const contextByLine = new Map<number, SecurityParagraphLineContext>();
   for (const unit of markdownView.semanticUnits) {
     if (unit.kind !== "paragraph") continue;
-    const text = unit.lines
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .join(" ");
+    const normalizedLines = unit.lines
+      .map((line, index) => ({
+        lineIndex: unit.startLine - 1 + index,
+        text: line.trim(),
+      }))
+      .filter(({ text }) => Boolean(text));
+    const lineStartOffsets: number[] = [];
+    let text = "";
+    for (const line of normalizedLines) {
+      const separator = text ? " " : "";
+      lineStartOffsets.push(text.length + separator.length);
+      text += `${separator}${line.text}`;
+    }
     if (!text) continue;
-    const context: SecurityParagraphContext = {
+    const paragraph: SecurityParagraphContext = {
       startLine: unit.startLine,
       endLine: unit.endLine,
       text,
     };
-    for (
-      let lineIndex = unit.startLine - 1;
-      lineIndex < unit.endLine;
-      lineIndex += 1
-    ) {
-      contextByLine.set(lineIndex, context);
+    for (const [index, line] of normalizedLines.entries()) {
+      contextByLine.set(line.lineIndex, {
+        paragraph,
+        lineStartOffset: lineStartOffsets[index] ?? 0,
+      });
     }
   }
   return contextByLine;
@@ -1203,8 +1217,10 @@ function prepareSecurityLineContext(
     logicalCommand === undefined
       ? undefined
       : logicalCommands.securityByCommand.get(logicalCommand);
-  const paragraphText =
-    prepared.securityParagraphContextByLine.get(index)?.text;
+  const securityParagraphContext =
+    prepared.securityParagraphContextByLine.get(index);
+  const paragraphText = securityParagraphContext?.paragraph.text;
+  const paragraphLineStartOffset = securityParagraphContext?.lineStartOffset;
   let cachedLineSecurityAnalysis: SecurityCommandAnalysis | undefined;
   const lineSecurityAnalysis = (): SecurityCommandAnalysis => {
     const language = markdownView.languageAt(index);
@@ -1229,6 +1245,9 @@ function prepareSecurityLineContext(
     lineNumber,
     line,
     ...(paragraphText === undefined ? {} : { paragraphText }),
+    ...(paragraphLineStartOffset === undefined
+      ? {}
+      : { paragraphLineStartOffset }),
     quotedProse,
     commandLine,
     evidence,
@@ -1252,6 +1271,7 @@ function securityLineDetections(
     lineNumber,
     line,
     paragraphText,
+    paragraphLineStartOffset,
     quotedProse,
     commandLine,
     evidence,
@@ -1279,6 +1299,7 @@ function securityLineDetections(
             analysis: lineDestinationAnalysis(),
           },
           paragraphText,
+          paragraphLineStartOffset,
         ),
       );
     } else {
@@ -1314,6 +1335,7 @@ function securityLineDetections(
           policy,
           lineSecurityAnalysis(),
           paragraphText,
+          paragraphLineStartOffset,
         ),
       );
     } else if (logicalCommandStart && logicalSecurityAnalysis !== undefined) {
@@ -1514,6 +1536,7 @@ function policyDetections(
   hasHumanApprovalGuard: boolean,
   input: PolicyDetectionInput,
   paragraphText?: string,
+  paragraphLineStartOffset?: number,
 ): Detection[] {
   const detections: Detection[] = [];
   const shouldAnalyzeDestinations = input.scope !== "line-local";
@@ -1613,8 +1636,11 @@ function policyDetections(
     policy.secretsAllowed === false &&
     SECRET_WORD_RE.test(line) &&
     !isSafeSensitiveHandlingInstruction(line) &&
-    (paragraphText === undefined ||
-      !isSafeSensitiveHandlingInstruction(paragraphText))
+    !paragraphExplicitlyProhibitsLineDisclosure(
+      line,
+      paragraphText,
+      paragraphLineStartOffset,
+    )
   ) {
     detections.push({
       metadata: RULES.instructionViolatesPolicy,
@@ -1687,6 +1713,7 @@ function sensitiveDataDetections(
   policy: SecurityPolicy,
   analysis: SecurityCommandAnalysis,
   paragraphText?: string,
+  paragraphLineStartOffset?: number,
 ): Detection[] {
   if (analysis.support === "fallback-required") {
     return fallbackSensitiveDataDetections(line, evidence, policy, analysis);
@@ -1707,8 +1734,11 @@ function sensitiveDataDetections(
   );
   const safeHandling =
     analysis.localOnlySensitiveOperation ||
-    (paragraphText !== undefined &&
-      isSafeSensitiveHandlingInstruction(paragraphText)) ||
+    paragraphExplicitlyProhibitsLineDisclosure(
+      line,
+      paragraphText,
+      paragraphLineStartOffset,
+    ) ||
     (!hasDisclosureSink && isSafeSensitiveHandlingInstruction(line));
   const sourceEvidence =
     sensitiveSources.length === 0
@@ -1740,6 +1770,23 @@ function sensitiveDataDetections(
   }
 
   return detections;
+}
+
+function paragraphExplicitlyProhibitsLineDisclosure(
+  line: string,
+  paragraphText: string | undefined,
+  paragraphLineStartOffset: number | undefined,
+): boolean {
+  if (
+    paragraphText === undefined ||
+    paragraphLineStartOffset === undefined ||
+    positiveDisclosureActions(line.trim()).length === 0
+  ) {
+    return false;
+  }
+  return !positiveDisclosureActions(paragraphText).some(
+    ({ start }) => start >= paragraphLineStartOffset,
+  );
 }
 
 function fallbackSensitiveDataDetections(
