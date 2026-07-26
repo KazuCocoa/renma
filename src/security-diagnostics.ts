@@ -58,6 +58,7 @@ import {
 } from "./security-prose-vocabulary.js";
 import {
   bodyPolicyClauseFacts,
+  bodyPolicyContrastiveClauseFacts,
   type BodyPolicyClauseFacts,
   type BodyPolicyDomain,
 } from "./security-body-policy/clause-facts.js";
@@ -1800,6 +1801,47 @@ function hasEarlierBodyPolicyFact(
   );
 }
 
+function bodyPolicyContrastiveFactRanges(
+  text: string,
+  clauseRanges: readonly SecurityParagraphClauseRange[],
+): ReadonlyArray<{
+  readonly fact: BodyPolicyClauseFacts;
+  readonly range: SecurityParagraphClauseRange;
+}> {
+  const meaningfulRanges = clauseRanges.filter(
+    ({ start, end }) => text.slice(start, end).trim().length > 0,
+  );
+  const projected: Array<{
+    fact: BodyPolicyClauseFacts;
+    range: SecurityParagraphClauseRange;
+  }> = [];
+  for (let index = 1; index < meaningfulRanges.length; index += 1) {
+    const earlierRange = meaningfulRanges[index - 1];
+    const laterRange = meaningfulRanges[index];
+    if (earlierRange === undefined || laterRange === undefined) continue;
+    const earlierClause = text.slice(earlierRange.start, earlierRange.end);
+    const separator = text.slice(earlierRange.end, laterRange.start);
+    const laterClause = text.slice(laterRange.start, laterRange.end);
+    const laterOffset = earlierClause.length + separator.length;
+    for (const fact of bodyPolicyContrastiveClauseFacts(
+      earlierClause,
+      separator,
+      laterClause,
+    )) {
+      if (fact.evidenceEnd <= laterOffset) continue;
+      projected.push({
+        fact,
+        range: bodyPolicyFactEvidenceRange(
+          text,
+          { start: earlierRange.start, end: laterRange.end },
+          fact,
+        ),
+      });
+    }
+  }
+  return projected;
+}
+
 function bodyPolicyContradictionDetections(
   prepared: PreparedSecurityDocumentAnalysis,
 ): Detection[] {
@@ -1877,6 +1919,38 @@ function bodyPolicyContradictionDetections(
           },
         });
       }
+    }
+    for (const { fact, range } of bodyPolicyContrastiveFactRanges(
+      paragraph.text,
+      clauseRanges,
+    )) {
+      const domain = fact.domain;
+      if (domain === undefined) continue;
+      const kindOrder = enabledDomainOrder.get(domain);
+      if (
+        kindOrder === undefined ||
+        !bodyPolicyFactEmitsContradiction(fact, domain)
+      ) {
+        continue;
+      }
+      const evidence =
+        paragraph.startLine === paragraph.endLine
+          ? {
+              startLine: paragraph.startLine,
+              snippet: paragraph.text.slice(range.start, range.end),
+            }
+          : clippedParagraphEvidenceForRange(paragraph, range.start, range.end);
+      if (evidence === undefined) continue;
+      candidates.push({
+        domain,
+        kindOrder,
+        detection: {
+          metadata: RULES.bodyPolicyContradiction,
+          severity: "high",
+          ...evidence,
+          dedupeKey: `body-policy-contradiction:${domain}`,
+        },
+      });
     }
   }
 

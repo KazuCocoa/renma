@@ -213,6 +213,14 @@ const PROHIBITION_PREDICATE_RE =
 const COORDINATED_PREDICATE_RE = /(?:,[ \t]*)?\band\b[ \t]*$/i;
 const SHARED_SUBJECT_PREDICATE_BRIDGE_RE =
   /(?:,[ \t]*(?:and(?:[ \t]+(?:also|still|therefore))?)?|[ \t]+and(?:[ \t]+(?:also|still|therefore))?)[ \t]*$/i;
+// The shared technical splitter also recognizes semicolons, sentence endings,
+// newlines, but, however, yet, and then. Body-policy subject inheritance may
+// cross only but, yet, however, or a semicolon immediately followed by
+// however. Bare semicolons, sentence endings, hard breaks, and then stay hard
+// boundaries.
+const CONTRASTIVE_CLAUSE_BRIDGE_RE =
+  /^[ \t]*(?:but|yet|however|;[ \t]*however)[ \t]*$/i;
+const CONTRASTIVE_PREDICATE_PREFIX_RE = /^[ \t]*(?:,[ \t]*)?(?:it[ \t]+)?$/i;
 
 /** @internal Extract bounded semantic facts from one prepared Markdown clause. */
 export function bodyPolicyClauseFacts(
@@ -222,6 +230,55 @@ export function bodyPolicyClauseFacts(
     DOMAIN_EVIDENCE_PATTERNS[domain].test(clause),
   );
   return domains.flatMap((domain) => classifyDomainFacts(clause, domain));
+}
+
+/** @internal Project a proven workflow subject across one contrastive boundary. */
+export function bodyPolicyContrastiveClauseFacts(
+  earlierClause: string,
+  separator: string,
+  laterClause: string,
+): readonly BodyPolicyClauseFacts[] {
+  const earlierSemanticClause = CONTRASTIVE_CLAUSE_BRIDGE_RE.test(separator)
+    ? earlierClause.replace(/[ \t]*,[ \t]*$/u, "")
+    : earlierClause;
+  const earlierFacts = bodyPolicyClauseFacts(earlierSemanticClause);
+  if (
+    separator.includes("\n") ||
+    !CONTRASTIVE_CLAUSE_BRIDGE_RE.test(separator)
+  ) {
+    return earlierFacts;
+  }
+
+  const laterOffset = earlierClause.length + separator.length;
+  const projectedFacts: BodyPolicyClauseFacts[] = [];
+  for (const domain of DOMAIN_ORDER) {
+    const earlierFact = earlierFacts.find(
+      (fact) => fact.domain === domain && fact.scope === "workflow",
+    );
+    if (earlierFact === undefined) continue;
+    const workflowSubject = workflowSubjectWithinFact(
+      earlierSemanticClause,
+      earlierFact,
+    );
+    if (workflowSubject === undefined) continue;
+    const projectedFact = contrastiveProjectionFact(
+      earlierSemanticClause.slice(workflowSubject.start, workflowSubject.end),
+      laterClause,
+      domain,
+      /;[ \t]*however/i.test(separator),
+    );
+    if (projectedFact === undefined) continue;
+    const projectionPrefixLength =
+      workflowSubject.end - workflowSubject.start + 1;
+    projectedFacts.push({
+      ...projectedFact,
+      evidenceStart: workflowSubject.start,
+      evidenceEnd:
+        laterOffset +
+        Math.max(0, projectedFact.evidenceEnd - projectionPrefixLength),
+    });
+  }
+  return [...earlierFacts, ...projectedFacts];
 }
 
 function classifyDomainFacts(
@@ -766,6 +823,65 @@ function evidenceForPattern(
   const match = pattern.exec(text);
   if (match?.index === undefined) return undefined;
   return { start: match.index, end: match.index + match[0].length };
+}
+
+function workflowSubjectWithinFact(
+  clause: string,
+  fact: BodyPolicyClauseFacts,
+): EvidenceRange | undefined {
+  const matcher = new RegExp(
+    WORKFLOW_SCOPE_RE.source,
+    WORKFLOW_SCOPE_RE.flags.includes("g")
+      ? WORKFLOW_SCOPE_RE.flags
+      : `${WORKFLOW_SCOPE_RE.flags}g`,
+  );
+  for (const match of clause.matchAll(matcher)) {
+    if (match.index === undefined) continue;
+    const evidence = {
+      start: match.index,
+      end: match.index + match[0].length,
+    };
+    if (
+      evidence.start >= fact.evidenceStart &&
+      evidence.end <= fact.evidenceEnd
+    ) {
+      return evidence;
+    }
+  }
+  return undefined;
+}
+
+function contrastiveProjectionFact(
+  workflowSubject: string,
+  laterClause: string,
+  domain: BodyPolicyDomain,
+  requiresLeadingComma: boolean,
+): BodyPolicyClauseFacts | undefined {
+  const prefix = `${workflowSubject} `;
+  const projection = `${prefix}${laterClause}`;
+  const supportedCandidate = candidateEvidence(
+    projection,
+    PROHIBITED_PATTERNS[domain],
+    "supported-prohibition",
+  ).find((candidate) => {
+    const predicatePrefix = projection.slice(
+      prefix.length,
+      candidate.predicateStart,
+    );
+    return (
+      candidate.directWorkflowSubject !== undefined &&
+      candidate.predicateStart >= prefix.length &&
+      CONTRASTIVE_PREDICATE_PREFIX_RE.test(predicatePrefix) &&
+      (!requiresLeadingComma || /^[ \t]*,/u.test(predicatePrefix))
+    );
+  });
+  if (supportedCandidate === undefined) return undefined;
+  return bodyPolicyClauseFacts(projection).find(
+    (fact) =>
+      fact.domain === domain &&
+      fact.evidenceStart === 0 &&
+      fact.evidenceEnd >= supportedCandidate.end,
+  );
 }
 
 function leadingWorkflowSubject(

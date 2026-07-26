@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   bodyPolicyClauseFacts,
+  bodyPolicyContrastiveClauseFacts,
   type BodyPolicyClauseFacts,
   type BodyPolicyModality,
   type BodyPolicyScope,
 } from "../src/security-body-policy/clause-facts.js";
+import { disclosureClauseRangesIntersectingRange } from "../src/security-command/guards.js";
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
 import type { Finding } from "../src/types/diagnostics.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
@@ -51,6 +53,17 @@ interface ModifiedSharedSubjectRegressionCase extends SharedSubjectRegressionCas
     | " and still "
     | ", "
     | " and therefore ";
+}
+
+interface ContrastiveSharedSubjectRegressionCase extends SharedSubjectRegressionCase {
+  readonly connector:
+    | " but "
+    | ", but "
+    | " yet "
+    | ", yet "
+    | " however, "
+    | "; however, ";
+  readonly laterSubject: "" | "it ";
 }
 
 const BODY_POLICY_MATRIX: readonly CharacterizationCase[] = [
@@ -285,6 +298,28 @@ const MODIFIED_SHARED_SUBJECT_REGRESSIONS: readonly ModifiedSharedSubjectRegress
       "does not require external uploads",
     ),
     ...modifiedSharedSubjectDomainCases(
+      "secrets",
+      "must not use credentials",
+      "requires credentials",
+      "does not require credentials",
+    ),
+  ];
+
+const CONTRASTIVE_SHARED_SUBJECT_REGRESSIONS: readonly ContrastiveSharedSubjectRegressionCase[] =
+  [
+    ...contrastiveSharedSubjectDomainCases(
+      "network",
+      "must not use the network",
+      "requires network access",
+      "does not require network access",
+    ),
+    ...contrastiveSharedSubjectDomainCases(
+      "upload",
+      "must not upload files",
+      "requires external uploads",
+      "does not require external uploads",
+    ),
+    ...contrastiveSharedSubjectDomainCases(
       "secrets",
       "must not use credentials",
       "requires credentials",
@@ -550,6 +585,100 @@ test("every workflow-prefix prohibition family retains a modified coordinated pr
   }
 });
 
+test("contrastive clause boundaries retain shared workflow-subject facts", () => {
+  for (const fixture of CONTRASTIVE_SHARED_SUBJECT_REGRESSIONS) {
+    for (const softWrapped of [false, true]) {
+      const body = softWrapped
+        ? `This workflow ${fixture.firstPredicate}${fixture.connector.trimEnd()}\n${fixture.laterSubject}${fixture.laterPredicate}.`
+        : `This workflow ${fixture.firstPredicate}${fixture.connector}${fixture.laterSubject}${fixture.laterPredicate}.`;
+      const variant = softWrapped ? "soft wrapped" : "one line";
+      const message = `${fixture.name}, ${variant}`;
+      const normalizedBody = body.replaceAll("\n", " ");
+      const firstEvidence = `This workflow ${fixture.firstPredicate}`;
+      const laterEvidence = normalizedBody.slice(0, -1);
+      const facts = contrastiveClauseFacts(normalizedBody).filter(
+        ({ domain }) => domain === fixture.domain,
+      );
+
+      assert.equal(facts.length, 2, message);
+      assertFactEvidence(
+        facts[0],
+        normalizedBody,
+        firstEvidence,
+        {
+          modality: fixture.firstModality,
+          scope: "workflow",
+          completeness: "complete",
+        },
+        `${message}, first predicate`,
+      );
+      assertFactEvidence(
+        facts[1],
+        normalizedBody,
+        laterEvidence,
+        {
+          modality: "prohibited",
+          scope: "workflow",
+          completeness: "complete",
+        },
+        `${message}, later predicate`,
+      );
+
+      const findings = bodyPolicyFindings(body, fixture.domain);
+      assert.equal(findings.length, 1, message);
+      assert.equal(findings[0]?.evidence.snippet, body, message);
+    }
+  }
+});
+
+test("contrastive findings retain domain order and one finding per domain", () => {
+  const snippets = {
+    secrets: "This workflow requires credentials but must not use credentials.",
+    upload:
+      "This workflow requires external uploads but must not upload files.",
+    network:
+      "This workflow requires network access but must not use the network.",
+    duplicateNetwork:
+      "This workflow does not require network access, yet must not use the network.",
+  } as const;
+  const body = [
+    snippets.secrets,
+    snippets.upload,
+    snippets.network,
+    snippets.duplicateNetwork,
+  ].join(" ");
+  const path = "skills/security/SKILL.md";
+  const content = canonicalSkillFixture(
+    path,
+    `---
+metadata:
+  renma.allowed-data: '["disclosed"]'
+  renma.network-allowed: 'true'
+  renma.external-upload-allowed: 'true'
+  renma.secrets-allowed: 'true'
+---
+
+${body}
+`,
+  );
+  const findings = securityDiagnosticFindings([
+    {
+      path,
+      absolutePath: `/repo/${path}`,
+      kind: "skill",
+      sizeBytes: Buffer.byteLength(content),
+      contentClassification: "text",
+      markdownParserEligible: true,
+      content,
+    },
+  ]).filter((finding) => finding.id === "SEC-BODY-POLICY-CONTRADICTION");
+
+  assert.deepEqual(
+    findings.map((finding) => finding.evidence.snippet),
+    [snippets.network, snippets.upload, snippets.secrets],
+  );
+});
+
 test("shared workflow-subject negative controls remain clean", () => {
   for (const { domain, body, expected } of [
     {
@@ -656,6 +785,105 @@ test("unrelated workflow prose does not give generic prohibitions workflow scope
     body,
   );
   assert.equal(bodyPolicyFindings(body, "secrets").length, 0, body);
+});
+
+test("contrastive projection preserves body-policy precision boundaries", () => {
+  for (const { name, domain, body } of [
+    {
+      name: "period and changed subject",
+      domain: "network",
+      body: "This workflow requires network access. The helper must not use the network.",
+    },
+    {
+      name: "period and implicit subject",
+      domain: "network",
+      body: "This workflow requires network access. Must not use the network.",
+    },
+    {
+      name: "but and changed local subject",
+      domain: "network",
+      body: "This workflow requires network access but the local setup must not use the network.",
+    },
+    {
+      name: "bare semicolon and changed command subject",
+      domain: "upload",
+      body: "This workflow requires external uploads; the validation command must not upload files.",
+    },
+    {
+      name: "bare semicolon and implicit subject",
+      domain: "upload",
+      body: "This workflow requires external uploads; must not upload files.",
+    },
+    {
+      name: "semicolon however without comma",
+      domain: "network",
+      body: "This workflow requires network access; however must not use the network.",
+    },
+    {
+      name: "yet and changed helper subject",
+      domain: "secrets",
+      body: "This workflow requires credentials, yet the offline helper must not use credentials.",
+    },
+    {
+      name: "local prohibition",
+      domain: "network",
+      body: "This workflow requires network access but must not use the network during local setup.",
+    },
+    {
+      name: "specific upload target",
+      domain: "upload",
+      body: "This workflow requires external uploads, yet must not upload files to a public bucket.",
+    },
+    {
+      name: "specific secret source",
+      domain: "secrets",
+      body: "This workflow requires credentials; however, must not access credentials from production.",
+    },
+    {
+      name: "unsupported remainder",
+      domain: "network",
+      body: "This workflow requires network access but must not use the network except for approved domains.",
+    },
+    {
+      name: "phase transition",
+      domain: "network",
+      body: "This workflow requires network access then must not use the network.",
+    },
+    {
+      name: "Markdown hard break",
+      domain: "network",
+      body: "This workflow requires network access but  \nmust not use the network.",
+    },
+  ] as const) {
+    assert.equal(bodyPolicyFindings(body, domain).length, 0, name);
+  }
+});
+
+test("workflow subjects do not cross Markdown structural boundaries", () => {
+  for (const { name, body } of [
+    {
+      name: "paragraphs",
+      body: "This workflow requires network access.\n\nMust not use the network.",
+    },
+    {
+      name: "list items",
+      body: "- This workflow requires network access\n- Must not use the network.",
+    },
+    {
+      name: "blockquotes",
+      body: "> This workflow requires network access.\n>\n> Must not use the network.",
+    },
+    {
+      name: "heading",
+      body: "## This workflow requires network access\n\nMust not use the network.",
+    },
+    {
+      name: "code block",
+      body: "This workflow requires network access.\n\n```\nMust not use the network.\n```",
+    },
+  ] as const) {
+    assert.equal(bodyPolicyFindings(body, "network").length, 0, name);
+  }
 });
 
 test("affirmative requirements never become not-required facts or findings", () => {
@@ -939,6 +1167,96 @@ function modifiedSharedSubjectDomainCases(
       laterPredicate,
     },
   ];
+}
+
+function contrastiveSharedSubjectDomainCases(
+  domain: PolicyDomain,
+  laterPredicate: string,
+  affirmativeRequirement: string,
+  negativeRequirement: string,
+): readonly ContrastiveSharedSubjectRegressionCase[] {
+  return [
+    {
+      name: `${domain} shared-subject but`,
+      domain,
+      firstPredicate: affirmativeRequirement,
+      firstModality: "unknown",
+      firstScope: "workflow",
+      connector: " but ",
+      laterSubject: "",
+      laterPredicate,
+    },
+    {
+      name: `${domain} shared-subject comma but`,
+      domain,
+      firstPredicate: negativeRequirement,
+      firstModality: "not-required",
+      firstScope: "workflow",
+      connector: ", but ",
+      laterSubject: "",
+      laterPredicate,
+    },
+    {
+      name: `${domain} shared-subject yet`,
+      domain,
+      firstPredicate: affirmativeRequirement,
+      firstModality: "unknown",
+      firstScope: "workflow",
+      connector: " yet ",
+      laterSubject: "",
+      laterPredicate,
+    },
+    {
+      name: `${domain} shared-subject comma yet`,
+      domain,
+      firstPredicate: negativeRequirement,
+      firstModality: "not-required",
+      firstScope: "workflow",
+      connector: ", yet ",
+      laterSubject: "",
+      laterPredicate,
+    },
+    {
+      name: `${domain} shared-subject however`,
+      domain,
+      firstPredicate: affirmativeRequirement,
+      firstModality: "unknown",
+      firstScope: "workflow",
+      connector: " however, ",
+      laterSubject: "",
+      laterPredicate,
+    },
+    {
+      name: `${domain} shared-subject semicolon however`,
+      domain,
+      firstPredicate: negativeRequirement,
+      firstModality: "not-required",
+      firstScope: "workflow",
+      connector: "; however, ",
+      laterSubject: "it ",
+      laterPredicate,
+    },
+  ];
+}
+
+function contrastiveClauseFacts(
+  text: string,
+): readonly BodyPolicyClauseFacts[] {
+  const ranges = disclosureClauseRangesIntersectingRange(
+    text,
+    0,
+    text.length,
+  ).filter(({ start, end }) => text.slice(start, end).trim().length > 0);
+  assert.equal(ranges.length, 2, text);
+  const earlier = ranges[0];
+  const later = ranges[1];
+  assert.ok(earlier, text);
+  assert.ok(later, text);
+  return bodyPolicyContrastiveClauseFacts(
+    text.slice(earlier.start, earlier.end),
+    text.slice(earlier.end, later.start),
+    text.slice(later.start, later.end),
+  );
 }
 
 function assertFactEvidence(
