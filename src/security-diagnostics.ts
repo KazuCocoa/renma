@@ -50,6 +50,14 @@ import {
   type LogicalShellCommand,
   type NetworkDestination,
 } from "./security-destination/index.js";
+import {
+  BODY_SECRET_TARGET_TERMS,
+  CLOUD_UPLOAD_ACTION_TERMS,
+  CLOUD_UPLOAD_DESTINATION_TERMS,
+  EXTERNAL_UPLOAD_ACTION_TERMS,
+  EXTERNAL_UPLOAD_DESTINATION_TERMS,
+  WORKFLOW_SCOPE_TERMS,
+} from "./security-prose-vocabulary.js";
 
 // Preserve the established destination-analysis deep imports while the
 // implementation remains owned by security-destination.
@@ -732,30 +740,64 @@ const BODY_NETWORK_DISALLOWED_PATTERNS = [
   /\b(?:no|without)\s+(?:(?:any|all)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b(?!\s+(?:access|use|usage|connectivity|to)\b)/i,
   /\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:(?:all|any)\s+)?(?:(?:use|allow|permit)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b(?!\s+(?:access|use|usage|connectivity|to)\b)/i,
   /\b(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\s+(?:(?:is|are)\s+(?:not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled)|(?:must|may|should)\s+not\s+be\s+(?:used|available|enabled))\b/i,
-  /\b(?:this|the)\s+(?:workflow|task|process|run|operation)\b[^.!?\n]{0,40}\b(?:must|shall|will|has\s+to|needs\s+to)\s+(?:run|operate|work)\s+(?:(?:entirely|completely)\s+)?(?:offline|air[- ]gapped)\b/i,
-  /\b(?:keep|run|operate)\s+(?:this|the)\s+(?:workflow|task|process|run|operation)\s+(?:(?:entirely|completely)\s+)?(?:offline|air[- ]gapped)\b/i,
+  new RegExp(
+    String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,40}\b(?:must|shall|will|has\s+to|needs\s+to)\s+(?:run|operate|work)\s+(?:(?:entirely|completely)\s+)?(?:offline|air[- ]gapped)\b`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\b(?:keep|run|operate)\s+${WORKFLOW_SCOPE_TERMS}\s+(?:(?:entirely|completely)\s+)?(?:offline|air[- ]gapped)\b`,
+    "i",
+  ),
 ] as const;
 const BODY_UPLOAD_DISALLOWED_PATTERNS = [
   /\b(?:no|without)\s+(?:(?:any|all)\s+)?(?:external\s+)?uploads\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)/i,
   /\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:perform|allow|permit|make)\s+(?:(?:(?:any|all)\s+)?external\s+uploads?|(?:any|all)\s+uploads?|uploads)\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)/i,
-  /\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:upload|send|post|share|attach|submit|sync|push|publish)\s+(?:anything|everything|externally)\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)/i,
+  new RegExp(
+    String.raw`\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:${EXTERNAL_UPLOAD_ACTION_TERMS})\s+(?:anything|everything|externally)\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)`,
+    "i",
+  ),
   /\b(?:(?:all|any)\s+)?(?:external\s+)?uploads?\s+(?:are|is)\s+(?:not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled)\b/i,
-  /\b(?:this|the)\s+(?:workflow|task|process|run|operation)\b[^.!?\n]{0,40}\b(?:(?:must|shall|will|does)\s+not|cannot|can't|never)\s+(?:upload|send|post|share|attach|submit|sync|push|publish)\s+(?:anything|everything|externally)\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)/i,
+  new RegExp(
+    String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,40}\b(?:(?:must|shall|will|does)\s+not|cannot|can't|never)\s+(?:${EXTERNAL_UPLOAD_ACTION_TERMS})\s+(?:anything|everything|externally)\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)`,
+    "i",
+  ),
 ] as const;
 const BODY_SECRET_DISALLOWED_PATTERNS = [
-  /\bwithout\s+(?:(?:any|all)\s+)?(?:(?:access|permission)\s+to\s+|(?:the\s+)?use\s+of\s+)(?:secrets?|credentials?|tokens?|passwords?|private keys?|\.env files?)\b(?!\s+(?:from|through|via)\b)/i,
+  new RegExp(
+    String.raw`\bwithout\s+(?:(?:any|all)\s+)?(?:(?:access|permission)\s+to\s+|(?:the\s+)?use\s+of\s+)(?:${BODY_SECRET_TARGET_TERMS})\b(?!\s+(?:from|through|via)\b)`,
+    "i",
+  ),
   /\bno\s+(?:secret|credential|token|password|private[- ]key)\s+(?:access|use|usage)\b/i,
-  /\b(?:this|the)\s+(?:workflow|task|process|run|operation)\b[^.!?\n]{0,50}\b(?:(?:must|shall|will|does)\s+not|cannot|can't|never)\s+(?:access|read|load|use|accept|handle)\s+(?:any\s+)?(?:secrets?|credentials?|tokens?|passwords?|private keys?|\.env files?)\b(?!\s+(?:from|through|via)\b)/i,
-  /\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:access|read|load|use|accept|handle)\s+(?:any\s+)?(?:secrets?|credentials?|tokens?|passwords?|private keys?|\.env files?)\b[^.!?\n]{0,40}\b(?:for|throughout|during|within|in)\s+(?:this|the)\s+(?:workflow|task|process|run|operation)\b/i,
-  /\b(?:secrets?|credentials?|tokens?|passwords?|private keys?|\.env files?)\s+(?:are|is)\s+(?:not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled)(?:\s+(?:for|throughout|during|within|in)\s+(?:this|the)\s+(?:workflow|task|process|run|operation))?(?=[.!?]|$)/i,
-  /\bno\s+(?:secrets?|credentials?|tokens?|passwords?|private keys?|\.env files?)\s+(?:are|is)\s+(?:allowed|permitted|available)(?:\s+(?:for|throughout|during|within|in)\s+(?:this|the)\s+(?:workflow|task|process|run|operation))?(?=[.!?]|$)/i,
-  /\b(?:this|the)\s+(?:workflow|task|process|run|operation)\b[^.!?\n]{0,50}\bwithout\s+(?:any\s+)?(?:secrets?|credentials?|tokens?|passwords?|private keys?|\.env files?)\b(?!\s+(?:from|through|via)\b)/i,
+  new RegExp(
+    String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,50}\b(?:(?:must|shall|will|does)\s+not|cannot|can't|never)\s+(?:access|read|load|use|accept|handle)\s+(?:any\s+)?(?:${BODY_SECRET_TARGET_TERMS})\b(?!\s+(?:from|through|via)\b)`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:access|read|load|use|accept|handle)\s+(?:any\s+)?(?:${BODY_SECRET_TARGET_TERMS})\b[^.!?\n]{0,40}\b(?:for|throughout|during|within|in)\s+${WORKFLOW_SCOPE_TERMS}\b`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\b(?:${BODY_SECRET_TARGET_TERMS})\s+(?:are|is)\s+(?:not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled)(?:\s+(?:for|throughout|during|within|in)\s+${WORKFLOW_SCOPE_TERMS})?(?=[.!?]|$)`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\bno\s+(?:${BODY_SECRET_TARGET_TERMS})\s+(?:are|is)\s+(?:allowed|permitted|available)(?:\s+(?:for|throughout|during|within|in)\s+${WORKFLOW_SCOPE_TERMS})?(?=[.!?]|$)`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,50}\bwithout\s+(?:any\s+)?(?:${BODY_SECRET_TARGET_TERMS})\b(?!\s+(?:from|through|via)\b)`,
+    "i",
+  ),
 ] as const;
 
-const EXTERNAL_UPLOAD_RE =
-  /\b(upload|send|post|share|attach|submit|sync|push|publish)\b.*\b(external|remote|third[- ]party|pastebin|gist|slack|discord|s3|gcs|cloud|storage|bucket|drive|dropbox|notion|jira|github)\b|\b(post|put)\b.*https?:\/\//i;
-const CLOUD_UPLOAD_RE =
-  /\b(upload|sync|copy|send|push|publish)\b.*\b(s3|gcs|cloud storage|bucket|drive|dropbox|box|onedrive|blob storage|azure storage|storage)\b/i;
+const EXTERNAL_UPLOAD_RE = new RegExp(
+  String.raw`\b(${EXTERNAL_UPLOAD_ACTION_TERMS})\b.*\b(${EXTERNAL_UPLOAD_DESTINATION_TERMS})\b|\b(post|put)\b.*https?:\/\/`,
+  "i",
+);
+const CLOUD_UPLOAD_RE = new RegExp(
+  String.raw`\b(${CLOUD_UPLOAD_ACTION_TERMS})\b.*\b(${CLOUD_UPLOAD_DESTINATION_TERMS})\b`,
+  "i",
+);
 const BULK_DATA_SOURCE_RE =
   /\b(entire|whole|all|full|complete|raw)\b.{0,100}\b(repo|repository|workspace|codebase|project|context|logs?|files?|history|dataset|environment variables|env vars|process\.env|credentials?|credential (?:directory|folder|store)|secrets?)\b|\b(everything|all files|full logs|full context|entire repo|whole repository|all environment variables|all env vars|credential (?:directory|folder|store))\b/i;
 const DATA_DISCLOSURE_ACTION_RE =
@@ -889,6 +931,7 @@ interface PreparedSecurityDocumentAnalysis {
   readonly markdownView: MarkdownSecurityView;
   readonly scanStart: number;
   readonly logicalCommands: PreparedLogicalCommandAnalysis;
+  readonly securityParagraphs: readonly PreparedSecurityParagraphContext[];
   readonly securityParagraphContextByLine: ReadonlyMap<
     number,
     SecurityParagraphLineContext
@@ -925,10 +968,22 @@ interface PreparedSecurityParagraphContext {
   readonly structurallyEligible: boolean;
 }
 
+interface SecurityParagraphClauseContext {
+  readonly startOffset: number;
+  readonly endOffset: number;
+  readonly text: string;
+}
+
 interface SecurityParagraphLineContext {
   readonly preparedParagraph: PreparedSecurityParagraphContext;
   readonly lineStartOffset: number;
   readonly lineEndOffset: number;
+  readonly paragraphClause?: SecurityParagraphClauseContext;
+}
+
+interface PreparedSecurityParagraphAnalysis {
+  readonly paragraphs: readonly PreparedSecurityParagraphContext[];
+  readonly contextByLine: ReadonlyMap<number, SecurityParagraphLineContext>;
 }
 
 interface SecurityLineContext {
@@ -951,10 +1006,15 @@ interface SecurityLineContext {
   readonly logicalSecurityAnalysis: SecurityCommandAnalysis | undefined;
   readonly lineSecurityAnalysis: () => SecurityCommandAnalysis;
   readonly lineDestinationAnalysis: () => DestinationAnalysis;
-  readonly paragraphClauseSecurityAnalysis: () =>
-    | SecurityCommandAnalysis
+  readonly paragraphClauseDestinationAnalysis: () =>
+    | DestinationAnalysis
     | undefined;
 }
+
+const paragraphClauseDestinationAnalysisCache = new WeakMap<
+  PreparedSecurityParagraphContext,
+  Map<string, DestinationAnalysis>
+>();
 
 export function securityDiagnosticFindings(
   inputs: Array<Artifact | ParsedDocument>,
@@ -1019,7 +1079,7 @@ function prepareSecurityDocumentAnalysis(
     scanStart,
     markdownView,
   );
-  const securityParagraphContextByLine = prepareSecurityParagraphContexts(
+  const securityParagraphAnalysis = prepareSecurityParagraphContexts(
     markdownView,
     syntax,
     logicalCommands.commandByLine,
@@ -1036,7 +1096,8 @@ function prepareSecurityDocumentAnalysis(
     markdownView,
     scanStart,
     logicalCommands,
-    securityParagraphContextByLine,
+    securityParagraphs: securityParagraphAnalysis.paragraphs,
+    securityParagraphContextByLine: securityParagraphAnalysis.contextByLine,
   };
 }
 
@@ -1044,7 +1105,8 @@ function prepareSecurityParagraphContexts(
   markdownView: MarkdownSecurityView,
   syntax: MarkdownSyntax,
   logicalCommandByLine: ReadonlyMap<number, LogicalShellCommand>,
-): ReadonlyMap<number, SecurityParagraphLineContext> {
+): PreparedSecurityParagraphAnalysis {
+  const paragraphs: PreparedSecurityParagraphContext[] = [];
   const contextByLine = new Map<number, SecurityParagraphLineContext>();
   const hardBreakLineIndexes = new Set(
     syntax.records.flatMap((record) =>
@@ -1103,51 +1165,76 @@ function prepareSecurityParagraphContexts(
         logicalCommandByLine,
       ),
     };
+    paragraphs.push(preparedParagraph);
     for (const [index, line] of normalizedLines.entries()) {
+      const lineStartOffset = lineStartOffsets[index] ?? 0;
+      const lineEndOffset = lineEndOffsets[index] ?? 0;
+      const paragraphClause = paragraphClauseIntersectingLine(
+        preparedParagraph,
+        lineStartOffset,
+        lineEndOffset,
+      );
       contextByLine.set(line.lineIndex, {
         preparedParagraph,
-        lineStartOffset: lineStartOffsets[index] ?? 0,
-        lineEndOffset: lineEndOffsets[index] ?? 0,
+        lineStartOffset,
+        lineEndOffset,
+        ...(paragraphClause === undefined ? {} : { paragraphClause }),
       });
     }
   }
-  return contextByLine;
+  return { paragraphs, contextByLine };
 }
 
-function paragraphClausesIntersectingLine(
-  context: SecurityParagraphLineContext,
-): string | undefined {
-  const { paragraph, clauseRanges } = context.preparedParagraph;
+function paragraphClauseIntersectingLine(
+  preparedParagraph: PreparedSecurityParagraphContext,
+  lineStartOffset: number,
+  lineEndOffset: number,
+): SecurityParagraphClauseContext | undefined {
+  const { paragraph, clauseRanges } = preparedParagraph;
   if (paragraph.startLine === paragraph.endLine) {
     return undefined;
   }
-  const ranges = clauseRanges.filter(
-    ({ start, end }) =>
-      start < context.lineEndOffset && end > context.lineStartOffset,
-  );
-  const first = ranges[0];
-  const last = ranges[ranges.length - 1];
+  let first: SecurityParagraphClauseRange | undefined;
+  let last: SecurityParagraphClauseRange | undefined;
+  for (const range of clauseRanges) {
+    if (range.start >= lineEndOffset || range.end <= lineStartOffset) continue;
+    first ??= range;
+    last = range;
+  }
   if (first === undefined || last === undefined) return undefined;
   const text = paragraph.text.slice(first.start, last.end);
-  return text ===
-    paragraph.text.slice(context.lineStartOffset, context.lineEndOffset)
-    ? undefined
-    : text;
+  if (text === paragraph.text.slice(lineStartOffset, lineEndOffset)) {
+    return undefined;
+  }
+  return {
+    startOffset: first.start,
+    endOffset: last.end,
+    text,
+  };
 }
 
-function preparedSecurityParagraphs(
-  contextByLine: ReadonlyMap<number, SecurityParagraphLineContext>,
-): PreparedSecurityParagraphContext[] {
-  const paragraphs: PreparedSecurityParagraphContext[] = [];
-  const seen = new Set<PreparedSecurityParagraphContext>();
-  for (const { preparedParagraph } of contextByLine.values()) {
-    if (seen.has(preparedParagraph)) continue;
-    seen.add(preparedParagraph);
-    paragraphs.push(preparedParagraph);
-  }
-  return paragraphs.sort(
-    (left, right) => left.paragraph.startLine - right.paragraph.startLine,
+function cachedParagraphClauseDestinationAnalysis(
+  context: SecurityParagraphLineContext,
+): DestinationAnalysis | undefined {
+  const clause = context.paragraphClause;
+  if (clause === undefined) return undefined;
+  let analyses = paragraphClauseDestinationAnalysisCache.get(
+    context.preparedParagraph,
   );
+  if (analyses === undefined) {
+    analyses = new Map();
+    paragraphClauseDestinationAnalysisCache.set(
+      context.preparedParagraph,
+      analyses,
+    );
+  }
+  const key = `${clause.startOffset}:${clause.endOffset}`;
+  let analysis = analyses.get(key);
+  if (analysis === undefined) {
+    analysis = analyzeDestinations(clause.text);
+    analyses.set(key, analysis);
+  }
+  return analysis;
 }
 
 function paragraphEvidenceForRange(
@@ -1280,7 +1367,7 @@ function collectPolicyPreludeDetections(
       artifact.content,
       artifact.markdownParserEligible,
       markdownView,
-      prepared.securityParagraphContextByLine,
+      prepared.securityParagraphs,
     ),
   ];
   if (
@@ -1303,7 +1390,7 @@ function collectPolicyPreludeDetections(
       effectivePolicy,
       artifact.markdownParserEligible,
       markdownView,
-      prepared.securityParagraphContextByLine,
+      prepared.securityParagraphs,
     ),
   );
 
@@ -1409,10 +1496,7 @@ function prepareSecurityLineContext(
   const paragraphText = preparedParagraph?.paragraph.text;
   const paragraphLineStartOffset = securityParagraphContext?.lineStartOffset;
   const paragraphLineEndOffset = securityParagraphContext?.lineEndOffset;
-  const paragraphClauseText =
-    securityParagraphContext === undefined
-      ? undefined
-      : paragraphClausesIntersectingLine(securityParagraphContext);
+  const paragraphClauseText = securityParagraphContext?.paragraphClause?.text;
   const paragraphClauseContextAvailable =
     preparedParagraph?.structurallyEligible ?? false;
   let cachedLineSecurityAnalysis: SecurityCommandAnalysis | undefined;
@@ -1433,23 +1517,12 @@ function prepareSecurityLineContext(
   const lineDestinationAnalysis = (): DestinationAnalysis => {
     return lineSecurityAnalysis().destinationAnalysis;
   };
-  let cachedParagraphClauseSecurityAnalysis:
-    | SecurityCommandAnalysis
-    | undefined;
-  const paragraphClauseSecurityAnalysis = ():
-    | SecurityCommandAnalysis
+  const paragraphClauseDestinationAnalysis = ():
+    | DestinationAnalysis
     | undefined => {
-    if (paragraphClauseText === undefined) return undefined;
-    cachedParagraphClauseSecurityAnalysis ??= analyzeSecurityCommand({
-      source: {
-        text: paragraphClauseText,
-        startLine: lineNumber,
-        endLine: lineNumber,
-        lines: [paragraphClauseText],
-      },
-      guards: markdownView.associatedGuardEvidence(index),
-    });
-    return cachedParagraphClauseSecurityAnalysis;
+    return securityParagraphContext === undefined
+      ? undefined
+      : cachedParagraphClauseDestinationAnalysis(securityParagraphContext);
   };
 
   return {
@@ -1474,7 +1547,7 @@ function prepareSecurityLineContext(
     logicalSecurityAnalysis,
     lineSecurityAnalysis,
     lineDestinationAnalysis,
-    paragraphClauseSecurityAnalysis,
+    paragraphClauseDestinationAnalysis,
   };
 }
 
@@ -1502,7 +1575,7 @@ function securityLineDetections(
     logicalSecurityAnalysis,
     lineSecurityAnalysis,
     lineDestinationAnalysis,
-    paragraphClauseSecurityAnalysis,
+    paragraphClauseDestinationAnalysis,
   } = context;
   const detections: Detection[] = [];
   const proseParagraphClauseText =
@@ -1520,8 +1593,7 @@ function securityLineDetections(
     currentLineDestinationAnalysis !== undefined &&
     lineHasParagraphDestinationTarget(line, currentLineDestinationAnalysis);
   const proseDestinationAnalysis = paragraphDestinationAnchor
-    ? (paragraphClauseSecurityAnalysis()?.destinationAnalysis ??
-      currentLineDestinationAnalysis)
+    ? (paragraphClauseDestinationAnalysis() ?? currentLineDestinationAnalysis)
     : currentLineDestinationAnalysis;
 
   if (!quotedProse) {
@@ -1741,10 +1813,7 @@ function bodyPolicyContradictionDetections(
   policy: SecurityPolicy,
   markdownParserEligible: boolean,
   markdownView?: MarkdownSecurityView,
-  securityParagraphContextByLine: ReadonlyMap<
-    number,
-    SecurityParagraphLineContext
-  > = new Map(),
+  securityParagraphs: readonly PreparedSecurityParagraphContext[] = [],
 ): Detection[] {
   const sourceLines = content.split(/\r?\n/);
   const scanStart = securityContentStart(markdownParserEligible, markdownView);
@@ -1800,9 +1869,7 @@ function bodyPolicyContradictionDetections(
     }
   }
 
-  for (const preparedParagraph of preparedSecurityParagraphs(
-    securityParagraphContextByLine,
-  )) {
+  for (const preparedParagraph of securityParagraphs) {
     if (!preparedParagraph.structurallyEligible) continue;
     const { paragraph, clauseRanges } = preparedParagraph;
     for (const clauseRange of clauseRanges) {
@@ -2449,10 +2516,7 @@ function securityPolicyResolutionDetections(
   content: string,
   markdownParserEligible: boolean,
   markdownView?: MarkdownSecurityView,
-  securityParagraphContextByLine: ReadonlyMap<
-    number,
-    SecurityParagraphLineContext
-  > = new Map(),
+  securityParagraphs: readonly PreparedSecurityParagraphContext[] = [],
 ): Detection[] {
   const detections: Detection[] = [];
   if (parsedPolicy.securityProfile === undefined) {
@@ -2462,7 +2526,7 @@ function securityPolicyResolutionDetections(
       content,
       markdownParserEligible,
       markdownView,
-      securityParagraphContextByLine,
+      securityParagraphs,
     );
     return detections;
   }
@@ -2588,7 +2652,7 @@ function securityPolicyResolutionDetections(
     content,
     markdownParserEligible,
     markdownView,
-    securityParagraphContextByLine,
+    securityParagraphs,
   );
 
   return detections;
@@ -2600,10 +2664,7 @@ function addForbiddenInputDetections(
   content: string,
   markdownParserEligible: boolean,
   markdownView?: MarkdownSecurityView,
-  securityParagraphContextByLine: ReadonlyMap<
-    number,
-    SecurityParagraphLineContext
-  > = new Map(),
+  securityParagraphs: readonly PreparedSecurityParagraphContext[] = [],
 ): void {
   for (const forbiddenInput of policy.forbiddenInputs) {
     const detection = forbiddenInputDetection(
@@ -2611,7 +2672,7 @@ function addForbiddenInputDetections(
       forbiddenInput,
       markdownParserEligible,
       markdownView,
-      securityParagraphContextByLine,
+      securityParagraphs,
     );
     if (detection !== undefined) detections.push(detection);
   }
@@ -2730,10 +2791,7 @@ function forbiddenInputDetection(
   forbiddenInput: string,
   markdownParserEligible: boolean,
   markdownView?: MarkdownSecurityView,
-  securityParagraphContextByLine: ReadonlyMap<
-    number,
-    SecurityParagraphLineContext
-  > = new Map(),
+  securityParagraphs: readonly PreparedSecurityParagraphContext[] = [],
 ): Detection | undefined {
   const needle = forbiddenInput.trim();
   if (needle.length === 0) return undefined;
@@ -2762,9 +2820,7 @@ function forbiddenInputDetection(
 
   const paragraphPattern = new RegExp(`\\b${escapeRegExp(needle)}\\b`, "giu");
   let paragraphDetection: Detection | undefined;
-  paragraphSearch: for (const preparedParagraph of preparedSecurityParagraphs(
-    securityParagraphContextByLine,
-  )) {
+  paragraphSearch: for (const preparedParagraph of securityParagraphs) {
     if (!preparedParagraph.structurallyEligible) continue;
     const { paragraph, clauseRanges } = preparedParagraph;
     for (const match of paragraph.text.matchAll(paragraphPattern)) {

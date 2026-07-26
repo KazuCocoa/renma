@@ -6,6 +6,39 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.24.4] - 2026-07-26
+
+### Fixed
+
+- Distinguished workflow-wide network, upload, and secret prohibitions from
+  local command, destination, source, and data-handling safeguards when
+  reporting `SEC-BODY-POLICY-CONTRADICTION`.
+- Preserved one-line and Markdown soft-wrap parity for local safeguards such as
+  preventing `npx` from downloading a missing package, while retaining genuine
+  workflow-wide policy contradictions.
+
+### Changed
+
+- Consolidated only exact shared security-prose action, destination, workflow
+  scope, and body-secret lexical sources into one private internal vocabulary
+  module. Intentional classifier-specific supersets and subsets remain local.
+- Prepared normalized paragraph, clause-range, structural-eligibility, and
+  line-intersection facts once per paragraph and reused the ordered paragraph
+  list across security checks.
+- Cached paragraph-clause destination analysis by exact prepared paragraph
+  identity and clause offsets while keeping line-specific guard and Finding
+  evidence unchanged.
+- Documented ownership boundaries for security diagnostics, command guards,
+  sensitive-data classification, destination association, and shared prose
+  vocabulary.
+
+### Compatibility
+
+- Preserved diagnostic IDs, severity, evidence, deduplication, ordering, CLI
+  schemas, and exit behavior outside the intentional body-policy
+  false-positive correction.
+- Added no dependencies and made no public API or package export changes.
+
 ## [0.24.3] - 2026-07-25
 
 ### Fixed
