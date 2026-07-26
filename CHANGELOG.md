@@ -28,6 +28,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   sensitive targets, configured forbidden inputs, or policy-prohibition
   phrases span physical lines within one clause. Explicit Markdown hard breaks
   remain clause boundaries, and genuine positive instructions remain detected.
+- Distinguished structural command context from ordinary prose that mentions
+  command names such as Git, AWS, or echo, preserving paragraph-level approval,
+  forbidden-input, and body-policy interpretation across soft wraps while
+  keeping code and prepared logical commands command-scoped.
 
 ### Changed
 
@@ -49,9 +53,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Compatibility
 
-- Except for the documented false-positive correction, Renma 0.24.3 preserves
-  public diagnostics, evidence, ordering, deduplication, policy semantics, CLI
-  behavior, schemas, package entrypoints, and runtime boundaries.
+- Except for the documented soft-wrap parity corrections, Renma 0.24.3
+  preserves public diagnostics, evidence, ordering, deduplication, policy
+  semantics, CLI behavior, schemas, package entrypoints, and runtime
+  boundaries.
 - Paragraph context remains a private polarity input only. Finding evidence,
   destination and logical-command analysis, fallback behavior, public schemas,
   diagnostic IDs, severities, ordering, deduplication, package entrypoints,
