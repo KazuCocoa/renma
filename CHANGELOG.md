@@ -17,9 +17,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   preventing `npx` from downloading a missing package, while retaining genuine
   workflow-wide policy contradictions.
 - Distinguished requirement language such as “not required,” “not needed,” and
-  “optional” from an actual workflow-wide prohibition.
+  “optional” from an actual workflow-wide prohibition, including bounded
+  `should`, `will`, `would`, and `may` requirement forms.
+- Kept explicit local setup, installation, validation, command, and phase
+  restrictions non-contradictory while retaining qualifiers that clearly name
+  the whole workflow, task, process, run, or operation.
 - Preserved bounded global prohibition grammar for network access, external
-  uploads, and secret use without broadening local safeguard detection.
+  uploads, and secret use without attempting general natural-language intent
+  classification.
 
 ### Changed
 

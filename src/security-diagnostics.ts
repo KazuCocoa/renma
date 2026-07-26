@@ -737,7 +737,23 @@ const FORBIDDEN_INPUT_ACTION_PATTERN =
 const SAFE_FORBIDDEN_INPUT_PATTERN =
   /\b(do\s+not|don't|never|avoid|exclude|without|redact|remove|omit|strip|skip)\b.{0,80}\b(secret|secrets|credential|credentials|token|password|private key|private keys|\.env|env files?|customer data)\b/i;
 const BODY_NO_REQUIREMENT_SUFFIX_RE =
-  /^\s+(?:is|are|was|were)\s+(?:not\s+)?(?:required|needed|necessary|unnecessary|optional)\b/i;
+  /^[ \t]+(?:(?:is|are|was|were)[ \t]+(?:not[ \t]+)?(?:required|needed|necessary|unnecessary|optional)|(?:should|will|would|may)[ \t]+(?:not[ \t]+)?be[ \t]+(?:required|needed))\b/i;
+const BODY_NO_ALLOWANCE_SUFFIX_RE =
+  /^[ \t]+(?:is|are|was|were)[ \t]+(?:allowed|permitted|available)\b/i;
+const BODY_SCOPE_QUALIFIER_PREFIX = String.raw`[ \t]+(?:for|throughout|during|within|in)[ \t]+`;
+const BODY_SCOPE_QUALIFIER_RE = new RegExp(
+  String.raw`^${BODY_SCOPE_QUALIFIER_PREFIX}`,
+  "i",
+);
+const BODY_WORKFLOW_SCOPE_QUALIFIER_RE = new RegExp(
+  String.raw`^${BODY_SCOPE_QUALIFIER_PREFIX}${WORKFLOW_SCOPE_TERMS}\b`,
+  "i",
+);
+const BODY_LOCAL_SCOPE_TERMS = String.raw`(?:local[ \t]+(?:setup|installation|validation|run|mode|step|phase|command)|(?:(?:this|the|a|an)[ \t]+)?(?:setup|installation|validation|command|step|phase)(?:[ \t]+(?:step|phase))?)`;
+const BODY_LOCAL_SCOPE_QUALIFIER_RE = new RegExp(
+  String.raw`^${BODY_SCOPE_QUALIFIER_PREFIX}${BODY_LOCAL_SCOPE_TERMS}\b`,
+  "i",
+);
 const BODY_NETWORK_DISALLOWED_PATTERNS = [
   /\b(?:no|without)\s+(?:(?:any|all)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b(?!\s+(?:access|use|usage|connectivity|to)\b)/i,
   /\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:(?:all|any)\s+)?(?:(?:use|allow|permit)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b(?!\s+(?:access|use|usage|connectivity|to)\b)/i,
@@ -1849,7 +1865,26 @@ function firstBodyPolicyPatternMatch(
   const matcher = new RegExp(pattern.source, flags);
   for (const match of text.matchAll(matcher)) {
     if (match.index === undefined) continue;
-    if (!bodyPolicyMatchExpressesNoRequirement(text, match)) return match;
+    const matchEnd = match.index + match[0].length;
+    if (bodyPolicyMatchExpressesNoRequirement(text, match)) continue;
+    const scopeQualifier = bodyPolicyScopeQualifierAfterMatch(
+      text,
+      match[0],
+      matchEnd,
+    );
+    if (
+      scopeQualifier?.kind === "local" ||
+      scopeQualifier?.kind === "ambiguous"
+    ) {
+      continue;
+    }
+    if (
+      scopeQualifier?.kind === "workflow" &&
+      scopeQualifier.endOffset > matchEnd
+    ) {
+      match[0] = text.slice(match.index, scopeQualifier.endOffset);
+    }
+    return match;
   }
   return undefined;
 }
@@ -1873,6 +1908,47 @@ function bodyPolicyMatchEndExpressesNoRequirement(
   if (!/\b(?:no|without)\b/i.test(matchedText)) return false;
   const suffix = text.slice(matchEnd);
   return BODY_NO_REQUIREMENT_SUFFIX_RE.test(suffix);
+}
+
+function bodyPolicyScopeQualifierAfterMatch(
+  text: string,
+  matchedText: string,
+  matchEnd: number,
+):
+  | {
+      readonly kind: "workflow" | "local" | "ambiguous";
+      readonly endOffset: number;
+    }
+  | undefined {
+  let qualifierStart = matchEnd;
+  if (/\bno\b/i.test(matchedText)) {
+    const allowance = BODY_NO_ALLOWANCE_SUFFIX_RE.exec(
+      text.slice(qualifierStart),
+    );
+    if (allowance !== null) qualifierStart += allowance[0].length;
+  }
+
+  const suffix = text.slice(qualifierStart);
+  const workflowScope = BODY_WORKFLOW_SCOPE_QUALIFIER_RE.exec(suffix);
+  if (workflowScope !== null) {
+    return {
+      kind: "workflow",
+      endOffset: qualifierStart + workflowScope[0].length,
+    };
+  }
+  const localScope = BODY_LOCAL_SCOPE_QUALIFIER_RE.exec(suffix);
+  if (localScope !== null) {
+    return {
+      kind: "local",
+      endOffset: qualifierStart + localScope[0].length,
+    };
+  }
+  const qualifier = BODY_SCOPE_QUALIFIER_RE.exec(suffix);
+  if (qualifier === null) return undefined;
+  return {
+    kind: "ambiguous",
+    endOffset: qualifierStart + qualifier[0].length,
+  };
 }
 
 function bodyPolicyContradictionDetections(
@@ -1927,15 +2003,42 @@ function bodyPolicyContradictionDetections(
       const match = firstBodyPolicyContradictionMatch(line, candidate.patterns);
       if (match === undefined) continue;
       const paragraphLineContext = securityParagraphContextByLine.get(index);
-      if (
-        paragraphLineContext !== undefined &&
-        bodyPolicyMatchEndExpressesNoRequirement(
-          paragraphLineContext.preparedParagraph.paragraph.text,
+      if (paragraphLineContext !== undefined) {
+        const { preparedParagraph, lineStartOffset, lineEndOffset } =
+          paragraphLineContext;
+        const paragraphMatchStart = lineStartOffset + match.index;
+        const paragraphMatchEnd = paragraphMatchStart + match[0].length;
+        const containingClause = preparedParagraph.clauseRanges.find(
+          (range) =>
+            range.start <= paragraphMatchStart &&
+            paragraphMatchStart < range.end,
+        );
+        const clauseBoundedText = preparedParagraph.paragraph.text.slice(
+          0,
+          containingClause?.end ?? lineEndOffset,
+        );
+        if (
+          bodyPolicyMatchEndExpressesNoRequirement(
+            clauseBoundedText,
+            match[0],
+            paragraphMatchEnd,
+          )
+        ) {
+          continue;
+        }
+        const scopeQualifier = bodyPolicyScopeQualifierAfterMatch(
+          clauseBoundedText,
           match[0],
-          paragraphLineContext.lineStartOffset + match.index + match[0].length,
-        )
-      ) {
-        continue;
+          paragraphMatchEnd,
+        );
+        if (
+          scopeQualifier?.kind === "local" ||
+          scopeQualifier?.kind === "ambiguous" ||
+          (scopeQualifier?.kind === "workflow" &&
+            scopeQualifier.endOffset > lineEndOffset)
+        ) {
+          continue;
+        }
       }
       selected.set(candidate.kind, {
         detection: {

@@ -570,8 +570,92 @@ require credentials.`,
   }
 });
 
+test("explicit local phase qualifiers stay non-contradictory across soft wraps", () => {
+  const fixtures = [
+    {
+      policy: "network_allowed: true",
+      oneLine: "Do not use network access during local setup.",
+      wrapped: `Do not use network access
+during local setup.`,
+    },
+    {
+      policy: "network_allowed: true",
+      oneLine: "Do not use network access for the installation step.",
+      wrapped: `Do not use network access for the
+installation step.`,
+    },
+    {
+      policy: "external_upload_allowed: true",
+      oneLine: "Never perform external uploads during local validation.",
+      wrapped: `Never perform external uploads
+during local validation.`,
+    },
+    {
+      policy: "secrets_allowed: true",
+      oneLine: "Never access credentials during local setup.",
+      wrapped: `Never access credentials
+during local setup.`,
+    },
+    {
+      policy: "secrets_allowed: true",
+      oneLine: "No secret access is allowed for the validation step.",
+      wrapped: `No secret access is allowed for the
+validation step.`,
+    },
+  ];
+
+  for (const fixture of fixtures) {
+    const oracle = project(fixture.oneLine, fixture.policy, BODY_POLICY_IDS);
+    const wrapped = project(fixture.wrapped, fixture.policy, BODY_POLICY_IDS);
+    assert.deepEqual(oracle, [], fixture.oneLine);
+    assert.deepEqual(wrapped, oracle, fixture.wrapped);
+  }
+});
+
+test("bounded requirement modal phrases stay non-contradictory across soft wraps", () => {
+  const fixtures = [
+    {
+      policy: "network_allowed: true",
+      oneLine: "No network access should be required for local validation.",
+      wrapped: `No network access should be
+required for local validation.`,
+    },
+    {
+      policy: "external_upload_allowed: true",
+      oneLine: "No external uploads will be needed for local validation.",
+      wrapped: `No external uploads will be
+needed for local validation.`,
+    },
+    {
+      policy: "secrets_allowed: true",
+      oneLine: "No secret access should be needed for this task.",
+      wrapped: `No secret access should be
+needed for this task.`,
+    },
+    {
+      policy: "network_allowed: true",
+      oneLine: "Network access may not be necessary for local validation.",
+      wrapped: `Network access may not be
+necessary for local validation.`,
+    },
+  ];
+
+  for (const fixture of fixtures) {
+    const oracle = project(fixture.oneLine, fixture.policy, BODY_POLICY_IDS);
+    const wrapped = project(fixture.wrapped, fixture.policy, BODY_POLICY_IDS);
+    assert.deepEqual(oracle, [], fixture.oneLine);
+    assert.deepEqual(wrapped, oracle, fixture.wrapped);
+  }
+});
+
 test("supported workflow prohibitions retain identity and bounded soft-wrap evidence", () => {
   const fixtures = [
+    {
+      policy: "network_allowed: true",
+      oneLine: "Do not use network access for this workflow.",
+      wrapped: `Do not use network access
+for this workflow.`,
+    },
     {
       policy: "network_allowed: true",
       oneLine: "Never allow any network access for this workflow.",
@@ -753,6 +837,34 @@ command arguments.`,
   }
 });
 
+test("corrected body-policy categories stay isolated by Markdown structures", () => {
+  for (const body of [
+    `Do not use network access during local setup.
+
+No network access should be required for local validation.`,
+    `- Do not use network access during local setup.
+- No network access should be required for local validation.`,
+    `> Do not use network access during local setup.
+>
+> No network access should be required for local validation.`,
+    `# Do not use network access during local setup.
+
+## No network access should be required for local validation.`,
+    `\`\`\`text
+Do not use network access for this workflow.
+No network access is allowed for this workflow.
+\`\`\``,
+    `printf '%s\\n' 'Do not use network access during local setup.' &&
+printf '%s\\n' 'No network access should be required for local validation.'`,
+  ]) {
+    assert.deepEqual(
+      project(body, "network_allowed: true", BODY_POLICY_IDS),
+      [],
+      body,
+    );
+  }
+});
+
 test("workflow bans survive local safeguards on the same line and across wraps", () => {
   const fixtures = [
     {
@@ -801,8 +913,8 @@ Never print secrets to logs.`,
 
 test("requirement language does not hide a later wrapped workflow prohibition", () => {
   const oneLine =
-    "Network access is not required for local validation. This workflow must run offline.";
-  const wrapped = `Network access is not required for local validation. This workflow
+    "No network access should be required for local validation. This workflow must run offline.";
+  const wrapped = `No network access should be required for local validation. This workflow
 must run offline.`;
   const oracle = project(oneLine, "network_allowed: true", BODY_POLICY_IDS);
   const wrappedFindings = project(
@@ -962,6 +1074,28 @@ Network access is required.`,
         BODY_POLICY_IDS,
       ),
       [],
+    );
+    assert.deepEqual(
+      identityProjection(
+        project(
+          `Do not use network access${breakMarker}
+during local setup.`,
+          "network_allowed: true",
+          BODY_POLICY_IDS,
+        ),
+      ),
+      [{ id: "SEC-BODY-POLICY-CONTRADICTION", severity: "high" }],
+    );
+    assert.deepEqual(
+      identityProjection(
+        project(
+          `No network access${breakMarker}
+should be required for local validation.`,
+          "network_allowed: true",
+          BODY_POLICY_IDS,
+        ),
+      ),
+      [{ id: "SEC-BODY-POLICY-CONTRADICTION", severity: "high" }],
     );
     assert.deepEqual(
       identityProjection(
