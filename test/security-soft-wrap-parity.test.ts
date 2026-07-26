@@ -120,20 +120,6 @@ https://example.com.`,
     project(fixtures[0] ?? "", ALLOWLIST_NETWORK_POLICY, NETWORK_IDS),
     [
       finding(
-        "SEC-BODY-POLICY-CONTRADICTION",
-        "high",
-        10,
-        10,
-        fixtures[0] ?? "",
-      ),
-      finding(
-        "SEC-BODY-POLICY-CONTRADICTION",
-        "high",
-        10,
-        10,
-        fixtures[0] ?? "",
-      ),
-      finding(
         "SEC-UNAPPROVED-NETWORK-DESTINATION",
         "high",
         10,
@@ -153,20 +139,6 @@ https://example.com.`,
     project(fixtures[1] ?? "", ALLOWLIST_NETWORK_POLICY, NETWORK_IDS),
     [
       finding(
-        "SEC-BODY-POLICY-CONTRADICTION",
-        "high",
-        10,
-        11,
-        fixtures[1] ?? "",
-      ),
-      finding(
-        "SEC-BODY-POLICY-CONTRADICTION",
-        "high",
-        10,
-        11,
-        fixtures[1] ?? "",
-      ),
-      finding(
         "SEC-UNAPPROVED-NETWORK-DESTINATION",
         "high",
         11,
@@ -185,20 +157,6 @@ https://example.com.`,
   assert.deepEqual(
     project(fixtures[2] ?? "", ALLOWLIST_NETWORK_POLICY, NETWORK_IDS),
     [
-      finding(
-        "SEC-BODY-POLICY-CONTRADICTION",
-        "high",
-        10,
-        11,
-        fixtures[2] ?? "",
-      ),
-      finding(
-        "SEC-BODY-POLICY-CONTRADICTION",
-        "high",
-        10,
-        10,
-        "Never upload the report to",
-      ),
       finding(
         "SEC-UNAPPROVED-NETWORK-DESTINATION",
         "high",
@@ -542,83 +500,33 @@ test("unfenced command-shaped paragraphs retain exact command results", () => {
 });
 
 test("body-policy contradictions retain one-line interpretation and physical evidence", () => {
-  const alreadyEquivalent = [
+  const fixtures = [
     {
       policy: "network_allowed: true",
       oneLine: "Do not use external network access.",
       wrapped: `Do not use external
 network access.`,
-      expectedWrapped: [
-        finding(
-          "SEC-BODY-POLICY-CONTRADICTION",
-          "high",
-          6,
-          6,
-          "Do not use external",
-        ),
-      ],
     },
     {
       policy: "external_upload_allowed: true",
       oneLine: "Never perform external uploads.",
       wrapped: `Never perform external
 uploads.`,
-      expectedWrapped: [],
     },
     {
       policy: "secrets_allowed: true",
-      oneLine: "Do not expose secret credentials.",
-      wrapped: `Do not expose secret
-credentials.`,
-      expectedWrapped: [
-        finding(
-          "SEC-BODY-POLICY-CONTRADICTION",
-          "high",
-          6,
-          6,
-          "Do not expose secret",
-        ),
-      ],
+      oneLine: "This workflow must run without access to secrets.",
+      wrapped: `This workflow must run without
+access to secrets.`,
     },
   ];
 
-  for (const fixture of alreadyEquivalent) {
+  for (const fixture of fixtures) {
     const oracle = project(fixture.oneLine, fixture.policy, BODY_POLICY_IDS);
     const wrapped = project(fixture.wrapped, fixture.policy, BODY_POLICY_IDS);
-    assert.deepEqual(identityProjection(wrapped), identityProjection(oracle));
-    assert.deepEqual(wrapped, fixture.expectedWrapped);
-  }
-
-  const reproducedMismatches = [
-    {
-      policy: "network_allowed: true",
-      oneLine: "Do not use external network access.",
-      wrapped: `Do
-not use external network access.`,
-    },
-    {
-      policy: "external_upload_allowed: true",
-      oneLine: "Never perform external upload.",
-      wrapped: `Never perform external
-upload.`,
-    },
-    {
-      policy: "secrets_allowed: true",
-      oneLine: "Do not expose secret credentials.",
-      wrapped: `Do
-not expose secret credentials.`,
-    },
-    {
-      policy: "network_allowed: true",
-      oneLine: "Do not use the Git remote API.",
-      wrapped: `Do not use the Git
-remote API.`,
-    },
-  ];
-
-  for (const fixture of reproducedMismatches) {
-    const oracle = project(fixture.oneLine, fixture.policy, BODY_POLICY_IDS);
-    const wrapped = project(fixture.wrapped, fixture.policy, BODY_POLICY_IDS);
+    assert.deepEqual(identityProjection(oracle), [
+      { id: "SEC-BODY-POLICY-CONTRADICTION", severity: "high" },
+    ]);
     assert.deepEqual(identityProjection(wrapped), identityProjection(oracle));
     assert.deepEqual(wrapped, [
       finding("SEC-BODY-POLICY-CONTRADICTION", "high", 6, 7, fixture.wrapped),
@@ -626,19 +534,22 @@ remote API.`,
   }
 });
 
-test("local npx download safeguards stay non-contradictory across soft wraps", () => {
+test("localized body-policy safeguards stay non-contradictory across soft wraps", () => {
   const fixtures = [
     {
+      policy: "network_allowed: true",
       oneLine: "Do not allow npx to download a missing package.",
       wrapped: `Do not allow npx to
 download a missing package.`,
     },
     {
+      policy: "network_allowed: true",
       oneLine: "Never let npx download a missing Appium package.",
       wrapped: `Never let npx
 download a missing Appium package.`,
     },
     {
+      policy: "network_allowed: true",
       oneLine:
         "Resolve command mode once. Use `appium` by default; when the user explicitly selects local mode, run from the project root and replace every `appium ...` invocation in this procedure with `npx --no-install appium ...`. Never mix global and local modes in one run or allow `npx` to download a missing Appium package.",
       wrapped: `Resolve command mode once. Use \`appium\` by default; when the user explicitly
@@ -647,26 +558,137 @@ invocation in this procedure with \`npx --no-install appium ...\`. Never mix glo
 and local modes in one run or allow \`npx\` to download a missing Appium package.`,
     },
     {
+      policy: "network_allowed: true",
       oneLine:
         "Do not allow npx to download a missing package from the internet.",
       wrapped: `Do not allow npx to download a missing package from the
 internet.`,
     },
+    {
+      policy: "network_allowed: true",
+      oneLine: "Do not use the Git remote API for authentication.",
+      wrapped: `Do not use the Git remote
+API for authentication.`,
+    },
+    {
+      policy: "network_allowed: true",
+      oneLine: "Never call https://untrusted.example.com from this step.",
+      wrapped: `Never call https://untrusted.example.com
+from this step.`,
+    },
+    {
+      policy: "network_allowed: true",
+      oneLine: "Avoid external webhooks when running locally.",
+      wrapped: `Avoid external webhooks when
+running locally.`,
+    },
+    {
+      policy: "network_allowed: true",
+      oneLine: "Do not use network access to production systems.",
+      wrapped: `Do not use network access to
+production systems.`,
+    },
+    {
+      policy: "external_upload_allowed: true",
+      oneLine: "Never upload debug logs to a public bucket.",
+      wrapped: `Never upload debug logs to
+a public bucket.`,
+    },
+    {
+      policy: "external_upload_allowed: true",
+      oneLine: "Never perform external uploads to public buckets.",
+      wrapped: `Never perform external uploads to
+public buckets.`,
+    },
+    {
+      policy: "external_upload_allowed: true",
+      oneLine: "Never upload anything to untrusted.example.com.",
+      wrapped: `Never upload anything to
+untrusted.example.com.`,
+    },
+    {
+      policy: "external_upload_allowed: true\nsecrets_allowed: true",
+      oneLine: "Do not upload secrets to third-party services.",
+      wrapped: `Do not upload secrets to third-party
+services.`,
+    },
+    {
+      policy: "secrets_allowed: true",
+      oneLine: "Never print secrets to logs.",
+      wrapped: `Never print secrets
+to logs.`,
+    },
+    {
+      policy: "secrets_allowed: true",
+      oneLine: "Do not include credentials in command arguments.",
+      wrapped: `Do not include credentials in
+command arguments.`,
+    },
+    {
+      policy: "secrets_allowed: true",
+      oneLine: "This workflow must not access credentials from production.",
+      wrapped: `This workflow must not access credentials from
+production.`,
+    },
+    {
+      policy: "secrets_allowed: true",
+      oneLine: "Secrets are forbidden in command arguments.",
+      wrapped: `Secrets are forbidden in
+command arguments.`,
+    },
   ];
 
   for (const fixture of fixtures) {
-    const oracle = project(
-      fixture.oneLine,
-      "network_allowed: true",
-      BODY_POLICY_IDS,
-    );
-    const wrapped = project(
-      fixture.wrapped,
-      "network_allowed: true",
-      BODY_POLICY_IDS,
-    );
+    const oracle = project(fixture.oneLine, fixture.policy, BODY_POLICY_IDS);
+    const wrapped = project(fixture.wrapped, fixture.policy, BODY_POLICY_IDS);
     assert.deepEqual(oracle, [], fixture.oneLine);
     assert.deepEqual(wrapped, oracle, fixture.wrapped);
+  }
+});
+
+test("workflow bans survive local safeguards on the same line and across wraps", () => {
+  const fixtures = [
+    {
+      policy: "network_allowed: true",
+      oneLine:
+        "Do not use network access for this workflow. Do not allow npx to download a missing package.",
+      wrapped: `Do not use network access for this workflow.
+Do not allow npx to download a missing package.`,
+    },
+    {
+      policy: "network_allowed: true",
+      oneLine:
+        "Do not allow npx to download a missing package. This workflow must run without internet access.",
+      wrapped: `Do not allow npx to download a missing package.
+This workflow must run without internet access.`,
+    },
+    {
+      policy: "external_upload_allowed: true",
+      oneLine:
+        "Never perform external uploads. Never upload debug logs to a public bucket.",
+      wrapped: `Never perform external uploads.
+Never upload debug logs to a public bucket.`,
+    },
+    {
+      policy: "secrets_allowed: true",
+      oneLine:
+        "This workflow must run without access to secrets. Never print secrets to logs.",
+      wrapped: `This workflow must run without access to secrets.
+Never print secrets to logs.`,
+    },
+  ];
+
+  for (const fixture of fixtures) {
+    const oracle = project(fixture.oneLine, fixture.policy, BODY_POLICY_IDS);
+    const wrapped = project(fixture.wrapped, fixture.policy, BODY_POLICY_IDS);
+    assert.deepEqual(identityProjection(oracle), [
+      { id: "SEC-BODY-POLICY-CONTRADICTION", severity: "high" },
+    ]);
+    assert.deepEqual(
+      identityProjection(wrapped),
+      identityProjection(oracle),
+      fixture.wrapped,
+    );
   }
 });
 

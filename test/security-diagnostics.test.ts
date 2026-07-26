@@ -4953,17 +4953,73 @@ Do not use network access for this workflow.
   assert.match(finding.evidence.snippet, /Do not use network access/);
 });
 
-test("body network policy contradictions distinguish workflow bans from local tool safeguards", () => {
-  for (const body of [
-    "Do not allow npx to download a missing package.",
-    "Never let npx download a missing Appium package.",
-    "Do not allow npx to download a missing package from the internet.",
+test("body policy contradictions distinguish workflow bans from local safeguards", () => {
+  for (const { policy, body } of [
+    {
+      policy: "network_allowed: true",
+      body: "Do not allow npx to download a missing package.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Never let npx download a missing Appium package.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Do not allow npx to download a missing package from the internet.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Do not use the Git remote API for authentication.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Never call https://untrusted.example.com from this step.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Avoid external webhooks when running locally.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Do not use network access to production systems.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "Never upload debug logs to a public bucket.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "Never perform external uploads to public buckets.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "Never upload anything to untrusted.example.com.",
+    },
+    {
+      policy: "external_upload_allowed: true\nsecrets_allowed: true",
+      body: "Do not upload secrets to third-party services.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "Never print secrets to logs.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "Do not include credentials in command arguments.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "This workflow must not access credentials from production.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "Secrets are forbidden in command arguments.",
+    },
   ]) {
     const findings = securityDiagnosticFindings([
       v2SecurityArtifact(`---
 allowed_data: disclosed
-network_allowed: true
-approved_network_destinations: registry.npmjs.org
+${policy}
 ---
 
 ${body}
@@ -4979,16 +5035,60 @@ ${body}
     );
   }
 
-  for (const body of [
-    "Do not use network access for this workflow.",
-    "This workflow must run without internet access.",
-    "Internet access is forbidden for this workflow.",
+  for (const { policy, body } of [
+    {
+      policy: "network_allowed: true",
+      body: "Do not use network access for this workflow.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "This workflow must run without internet access.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "Internet access is forbidden for this workflow.",
+    },
+    {
+      policy: "network_allowed: true",
+      body: "This workflow must run entirely offline.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "Never perform external uploads.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "This workflow must not upload anything externally.",
+    },
+    {
+      policy: "external_upload_allowed: true",
+      body: "External uploads are forbidden.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "This workflow must run without access to secrets.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "This workflow must not access any credentials.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "Secrets are forbidden for this workflow.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "No secrets are allowed for this workflow.",
+    },
+    {
+      policy: "secrets_allowed: true",
+      body: "This workflow must run without secrets.",
+    },
   ]) {
     const findings = securityDiagnosticFindings([
       v2SecurityArtifact(`---
 allowed_data: disclosed
-network_allowed: true
-approved_network_destinations: github.com
+${policy}
 ---
 
 ${body}

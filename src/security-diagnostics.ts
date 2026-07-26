@@ -728,14 +728,29 @@ const FORBIDDEN_INPUT_ACTION_PATTERN =
   /\b(copy|print|cat|echo|paste|upload|send|share|attach|include|dump|export|log|summari[sz]e|read|collect|provide|load|use)\b/i;
 const SAFE_FORBIDDEN_INPUT_PATTERN =
   /\b(do\s+not|don't|never|avoid|exclude|without|redact|remove|omit|strip|skip)\b.{0,80}\b(secret|secrets|credential|credentials|token|password|private key|private keys|\.env|env files?|customer data)\b/i;
-const BODY_NETWORK_DISALLOWED_RE =
-  /\b(no|without|avoid|exclude|disallow|forbid|forbidden|block|do\s+not|don't|never)\b.{0,80}\b(network|internet|external|remote|http|https|api|webhook)\b|\b(network|internet)(?:\s+(?:access|use|usage|connectivity))?\b.{0,80}\b(?:(?:is|are)\s+(?:not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled)|must\s+not\s+be\s+used|may\s+not\s+be\s+used)\b/i;
-const BODY_LOCAL_TOOL_NETWORK_ACTION_RE =
-  /\b(do\s+not|don't|never|avoid|exclude|disallow|forbid|forbidden|block)\b[^.!?\n]{0,160}\b(allow|let|permit|enable|use)\s+(?:the\s+)?(?:`[^`\r\n]+`|[a-z0-9_.-]+)\s+(?:to\s+)?(?:(?:implicitly|automatically)\s+)?(?:download|fetch)\b/i;
-const BODY_UPLOAD_DISALLOWED_RE =
-  /\b(no|without|avoid|exclude|disallow|forbid|forbidden|block|do\s+not|don't|never)\b.{0,80}\b(upload|send|post|share|attach|submit|sync|push|publish|external upload|third-party)\b/i;
-const BODY_SECRET_DISALLOWED_RE =
-  /\b(no|without|avoid|exclude|disallow|forbid|forbidden|block|do\s+not|don't|never)\b.{0,80}\b(secret|secrets|credential|credentials|token|password|private key|private keys|\.env|env files?|customer data)\b/i;
+const BODY_NETWORK_DISALLOWED_PATTERNS = [
+  /\b(?:no|without)\s+(?:(?:any|all)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b(?!\s+(?:access|use|usage|connectivity|to)\b)/i,
+  /\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:(?:all|any)\s+)?(?:(?:use|allow|permit)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b(?!\s+(?:access|use|usage|connectivity|to)\b)/i,
+  /\b(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\s+(?:(?:is|are)\s+(?:not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled)|(?:must|may|should)\s+not\s+be\s+(?:used|available|enabled))\b/i,
+  /\b(?:this|the)\s+(?:workflow|task|process|run|operation)\b[^.!?\n]{0,40}\b(?:must|shall|will|has\s+to|needs\s+to)\s+(?:run|operate|work)\s+(?:(?:entirely|completely)\s+)?(?:offline|air[- ]gapped)\b/i,
+  /\b(?:keep|run|operate)\s+(?:this|the)\s+(?:workflow|task|process|run|operation)\s+(?:(?:entirely|completely)\s+)?(?:offline|air[- ]gapped)\b/i,
+] as const;
+const BODY_UPLOAD_DISALLOWED_PATTERNS = [
+  /\b(?:no|without)\s+(?:(?:any|all)\s+)?(?:external\s+)?uploads\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)/i,
+  /\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:perform|allow|permit|make)\s+(?:(?:(?:any|all)\s+)?external\s+uploads?|(?:any|all)\s+uploads?|uploads)\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)/i,
+  /\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:upload|send|post|share|attach|submit|sync|push|publish)\s+(?:anything|everything|externally)\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)/i,
+  /\b(?:(?:all|any)\s+)?(?:external\s+)?uploads?\s+(?:are|is)\s+(?:not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled)\b/i,
+  /\b(?:this|the)\s+(?:workflow|task|process|run|operation)\b[^.!?\n]{0,40}\b(?:(?:must|shall|will|does)\s+not|cannot|can't|never)\s+(?:upload|send|post|share|attach|submit|sync|push|publish)\s+(?:anything|everything|externally)\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)/i,
+] as const;
+const BODY_SECRET_DISALLOWED_PATTERNS = [
+  /\bwithout\s+(?:(?:any|all)\s+)?(?:(?:access|permission)\s+to\s+|(?:the\s+)?use\s+of\s+)(?:secrets?|credentials?|tokens?|passwords?|private keys?|\.env files?)\b(?!\s+(?:from|through|via)\b)/i,
+  /\bno\s+(?:secret|credential|token|password|private[- ]key)\s+(?:access|use|usage)\b/i,
+  /\b(?:this|the)\s+(?:workflow|task|process|run|operation)\b[^.!?\n]{0,50}\b(?:(?:must|shall|will|does)\s+not|cannot|can't|never)\s+(?:access|read|load|use|accept|handle)\s+(?:any\s+)?(?:secrets?|credentials?|tokens?|passwords?|private keys?|\.env files?)\b(?!\s+(?:from|through|via)\b)/i,
+  /\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:access|read|load|use|accept|handle)\s+(?:any\s+)?(?:secrets?|credentials?|tokens?|passwords?|private keys?|\.env files?)\b[^.!?\n]{0,40}\b(?:for|throughout|during|within|in)\s+(?:this|the)\s+(?:workflow|task|process|run|operation)\b/i,
+  /\b(?:secrets?|credentials?|tokens?|passwords?|private keys?|\.env files?)\s+(?:are|is)\s+(?:not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled)(?:\s+(?:for|throughout|during|within|in)\s+(?:this|the)\s+(?:workflow|task|process|run|operation))?(?=[.!?]|$)/i,
+  /\bno\s+(?:secrets?|credentials?|tokens?|passwords?|private keys?|\.env files?)\s+(?:are|is)\s+(?:allowed|permitted|available)(?:\s+(?:for|throughout|during|within|in)\s+(?:this|the)\s+(?:workflow|task|process|run|operation))?(?=[.!?]|$)/i,
+  /\b(?:this|the)\s+(?:workflow|task|process|run|operation)\b[^.!?\n]{0,50}\bwithout\s+(?:any\s+)?(?:secrets?|credentials?|tokens?|passwords?|private keys?|\.env files?)\b(?!\s+(?:from|through|via)\b)/i,
+] as const;
 
 const EXTERNAL_UPLOAD_RE =
   /\b(upload|send|post|share|attach|submit|sync|push|publish)\b.*\b(external|remote|third[- ]party|pastebin|gist|slack|discord|s3|gcs|cloud|storage|bucket|drive|dropbox|notion|jira|github)\b|\b(post|put)\b.*https?:\/\//i;
@@ -1704,6 +1719,23 @@ function disallowedCommandDetections(
   ];
 }
 
+function firstBodyPolicyContradictionMatch(
+  text: string,
+  patterns: readonly RegExp[],
+): RegExpExecArray | undefined {
+  let selected: RegExpExecArray | undefined;
+  for (const pattern of patterns) {
+    const match = pattern.exec(text);
+    if (
+      match?.index !== undefined &&
+      (selected === undefined || match.index < selected.index)
+    ) {
+      selected = match;
+    }
+  }
+  return selected;
+}
+
 function bodyPolicyContradictionDetections(
   content: string,
   policy: SecurityPolicy,
@@ -1723,20 +1755,17 @@ function bodyPolicyContradictionDetections(
     {
       kind: "network",
       enabled: policy.networkAllowed === true,
-      pattern: BODY_NETWORK_DISALLOWED_RE,
-      localizedRestrictionPattern: BODY_LOCAL_TOOL_NETWORK_ACTION_RE,
+      patterns: BODY_NETWORK_DISALLOWED_PATTERNS,
     },
     {
       kind: "upload",
       enabled: policy.externalUploadAllowed === true,
-      pattern: BODY_UPLOAD_DISALLOWED_RE,
-      localizedRestrictionPattern: undefined,
+      patterns: BODY_UPLOAD_DISALLOWED_PATTERNS,
     },
     {
       kind: "secrets",
       enabled: policy.secretsAllowed === true,
-      pattern: BODY_SECRET_DISALLOWED_RE,
-      localizedRestrictionPattern: undefined,
+      patterns: BODY_SECRET_DISALLOWED_PATTERNS,
     },
   ] as const;
   const selected = new Map<
@@ -1754,14 +1783,9 @@ function bodyPolicyContradictionDetections(
 
     const lineNumber = index + 1;
     for (const [kindOrder, candidate] of kinds.entries()) {
-      if (
-        !candidate.enabled ||
-        selected.has(candidate.kind) ||
-        !candidate.pattern.test(line) ||
-        candidate.localizedRestrictionPattern?.test(line)
-      ) {
-        continue;
-      }
+      if (!candidate.enabled || selected.has(candidate.kind)) continue;
+      const match = firstBodyPolicyContradictionMatch(line, candidate.patterns);
+      if (match === undefined) continue;
       selected.set(candidate.kind, {
         detection: {
           metadata: RULES.bodyPolicyContradiction,
@@ -1785,12 +1809,11 @@ function bodyPolicyContradictionDetections(
       const clause = paragraph.text.slice(clauseRange.start, clauseRange.end);
       for (const [kindOrder, candidate] of kinds.entries()) {
         if (!candidate.enabled) continue;
-        const match = candidate.pattern.exec(clause);
-        if (
-          match?.index === undefined ||
-          candidate.localizedRestrictionPattern?.test(clause)
-        )
-          continue;
+        const match = firstBodyPolicyContradictionMatch(
+          clause,
+          candidate.patterns,
+        );
+        if (match?.index === undefined) continue;
         const matchStart = clauseRange.start + match.index;
         const matchEnd = matchStart + match[0].length;
         const evidence = paragraphEvidenceForRange(
