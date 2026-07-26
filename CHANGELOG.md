@@ -8,6 +8,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [0.25.0] - 2026-07-26
 
+### Fixed
+
+- Preserved the Renma 0.24.4 same-clause decision boundary by evaluating
+  coordinated requirement, local, qualified, safeguard, and workflow
+  prohibition candidates independently for each body-policy domain.
+- Kept affirmative requirement language distinct from genuinely negative
+  `not-required` facts so it cannot suppress a later workflow prohibition.
+
 ### Changed
 
 - Replaced growing sentence-level body-policy contradiction patterns with a

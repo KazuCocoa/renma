@@ -162,8 +162,11 @@ physical-line or logical-command evidence or analysis input.
 
 The private `src/security-body-policy/` classifier consumes those already
 prepared clause ranges. For each supported network, external-upload, or secret
-domain mentioned in one clause, it records modality, scope,
+candidate mentioned in one clause, it records modality, scope,
 supported-clause completeness, and normalized source offsets independently.
+One clause may therefore produce multiple facts for the same domain when
+coordinated statements carry independent requirement, scope, safeguard, or
+prohibition meaning.
 Only a complete `prohibited` fact with `workflow` scope can contradict an
 enabled permissive policy for the same domain. `unknown`, `not-required`,
 `local-safeguard`, local-step, specific-source, specific-target, and

@@ -22,6 +22,19 @@ interface CharacterizationCase {
   readonly expectedFinding: boolean;
 }
 
+interface SameClauseRegressionCase {
+  readonly name: string;
+  readonly domain: PolicyDomain;
+  readonly prefix: string;
+  readonly connector: " and " | ", and ";
+  readonly laterProhibition: string;
+  readonly wrappedLaterProhibition: string;
+  readonly prefixEvidence: string;
+  readonly prefixModality: BodyPolicyModality;
+  readonly prefixScope: BodyPolicyScope;
+  readonly prefixCompleteness: BodyPolicyClauseFacts["completeness"];
+}
+
 const BODY_POLICY_MATRIX: readonly CharacterizationCase[] = [
   {
     name: "network prohibited workflow complete",
@@ -160,6 +173,54 @@ const BODY_POLICY_MATRIX: readonly CharacterizationCase[] = [
   },
 ] as const;
 
+const SAME_CLAUSE_REGRESSIONS: readonly SameClauseRegressionCase[] = [
+  ...sameClauseDomainCases(
+    "network",
+    "this workflow must not use the network",
+    "this workflow must not use\nthe network",
+    {
+      notRequired: "Network access is not required",
+      affirmativeRequirement: "Network access is required",
+      localProhibition: "Do not use network access during local setup",
+      unsupportedProhibition: "No network access except to approved domains",
+      unsupportedEvidence: "No network access",
+      localSafeguard:
+        "Do not allow npx to download a missing package from the internet",
+      localSafeguardScope: "specific-source",
+    },
+  ),
+  ...sameClauseDomainCases(
+    "upload",
+    "this workflow must not upload files",
+    "this workflow must not upload\nfiles",
+    {
+      notRequired: "External uploads are not required",
+      affirmativeRequirement: "External uploads are required",
+      localProhibition:
+        "Never perform external uploads during local validation",
+      unsupportedProhibition: "No external uploads unless explicitly approved",
+      unsupportedEvidence: "No external uploads",
+      localSafeguard: "Do not upload secrets to third-party services",
+      localSafeguardScope: "specific-target",
+    },
+  ),
+  ...sameClauseDomainCases(
+    "secrets",
+    "credentials must not be used in this workflow",
+    "credentials must not be used\nin this workflow",
+    {
+      notRequired: "Secret access is not required",
+      affirmativeRequirement: "Secret access is required",
+      localProhibition: "Never access credentials during local setup",
+      unsupportedProhibition:
+        "No secret access except through the approved vault",
+      unsupportedEvidence: "No secret access",
+      localSafeguard: "Never print secrets to logs",
+      localSafeguardScope: "specific-target",
+    },
+  ),
+];
+
 test("body-policy characterization matrix preserves the 0.24.4 decision boundary", () => {
   for (const fixture of BODY_POLICY_MATRIX) {
     const findings = bodyPolicyFindings(fixture.body, fixture.domain);
@@ -224,6 +285,275 @@ test("one clause derives independent facts for every supported domain", () => {
     ],
   );
 });
+
+test("same-domain candidates remain independent before later workflow prohibitions", () => {
+  for (const fixture of SAME_CLAUSE_REGRESSIONS) {
+    for (const variant of [
+      {
+        name: "one line",
+        body: `${fixture.prefix}${fixture.connector}${fixture.laterProhibition}.`,
+        expectedSnippet: `${fixture.laterProhibition}.`,
+      },
+      {
+        name: "soft wrapped",
+        body: `${fixture.prefix}${fixture.connector}${fixture.wrappedLaterProhibition}.`,
+        expectedSnippet: `${fixture.wrappedLaterProhibition}.`,
+      },
+    ]) {
+      const normalizedClause = variant.body.replaceAll("\n", " ");
+      const normalizedLater = fixture.laterProhibition;
+      const facts = bodyPolicyClauseFacts(normalizedClause).filter(
+        ({ domain }) => domain === fixture.domain,
+      );
+      assert.equal(facts.length, 2, `${fixture.name}, ${variant.name}`);
+      assertFactEvidence(
+        facts[0],
+        normalizedClause,
+        fixture.prefixEvidence,
+        {
+          modality: fixture.prefixModality,
+          scope: fixture.prefixScope,
+          completeness: fixture.prefixCompleteness,
+        },
+        `${fixture.name}, ${variant.name}, prefix`,
+      );
+      assertFactEvidence(
+        facts[1],
+        normalizedClause,
+        normalizedLater,
+        {
+          modality: "prohibited",
+          scope: "workflow",
+          completeness: "complete",
+        },
+        `${fixture.name}, ${variant.name}, later prohibition`,
+      );
+
+      const findings = bodyPolicyFindings(variant.body, fixture.domain);
+      assert.equal(findings.length, 1, `${fixture.name}, ${variant.name}`);
+      assert.equal(
+        findings[0]?.evidence.snippet,
+        variant.expectedSnippet,
+        `${fixture.name}, ${variant.name}`,
+      );
+    }
+  }
+});
+
+test("affirmative requirements never become not-required facts or findings", () => {
+  for (const { domain, body } of [
+    { domain: "network", body: "Network access is required." },
+    { domain: "upload", body: "External uploads are required." },
+    { domain: "secrets", body: "Secret access is required." },
+  ] as const) {
+    const facts = bodyPolicyClauseFacts(body).filter(
+      (fact) => fact.domain === domain,
+    );
+    assert.equal(facts.length, 1, body);
+    assert.equal(facts[0]?.modality, "unknown", body);
+    assert.equal(bodyPolicyFindings(body, domain).length, 0, body);
+  }
+});
+
+test("candidate scope and safeguard facts ignore coordinated unrelated text", () => {
+  for (const { body, domain, evidence, completeness } of [
+    {
+      body: "Run npm validation and this workflow must not use the network.",
+      domain: "network",
+      evidence: "this workflow must not use the network",
+      completeness: "complete",
+    },
+    {
+      body: "This workflow must not upload files and run npm validation.",
+      domain: "upload",
+      evidence: "This workflow must not upload files",
+      completeness: "unsupported-remainder",
+    },
+    {
+      body: "Use npx locally and credentials must not be used in this workflow.",
+      domain: "secrets",
+      evidence: "credentials must not be used in this workflow",
+      completeness: "complete",
+    },
+  ] as const) {
+    const facts = bodyPolicyClauseFacts(body).filter(
+      (fact) => fact.domain === domain,
+    );
+    assert.equal(facts.length, 1, body);
+    assertFactEvidence(
+      facts[0],
+      body,
+      evidence,
+      {
+        modality: "prohibited",
+        scope: "workflow",
+        completeness,
+      },
+      body,
+    );
+    assert.equal(
+      bodyPolicyFindings(body, domain).length,
+      completeness === "complete" ? 1 : 0,
+      body,
+    );
+  }
+
+  const localText =
+    "Do not use network access during maintenance and run npm validation.";
+  const localFact = bodyPolicyClauseFacts(localText).find(
+    (fact) => fact.domain === "network",
+  );
+  assertFactEvidence(
+    localFact,
+    localText,
+    "Do not use network access during maintenance",
+    {
+      modality: "prohibited",
+      scope: "unknown",
+      completeness: "unsupported-remainder",
+    },
+    localText,
+  );
+  assert.equal(bodyPolicyFindings(localText, "network").length, 0, localText);
+});
+
+test("unrelated coordinated remainders do not become completeness boundaries", () => {
+  for (const { body, domain } of [
+    {
+      body: "No network access and only approved domains may be contacted.",
+      domain: "network",
+    },
+    {
+      body: "No external uploads and only approved transfers may proceed.",
+      domain: "upload",
+    },
+    {
+      body: "No secret access and use the approved vault when needed.",
+      domain: "secrets",
+    },
+  ] as const) {
+    const facts = bodyPolicyClauseFacts(body).filter(
+      (fact) => fact.domain === domain,
+    );
+    assert.equal(facts.length, 1, body);
+    assert.equal(facts[0]?.completeness, "unsupported-remainder", body);
+    assert.equal(bodyPolicyFindings(body, domain).length, 0, body);
+  }
+});
+
+function sameClauseDomainCases(
+  domain: PolicyDomain,
+  laterProhibition: string,
+  wrappedLaterProhibition: string,
+  prefixes: {
+    readonly notRequired: string;
+    readonly affirmativeRequirement: string;
+    readonly localProhibition: string;
+    readonly unsupportedProhibition: string;
+    readonly unsupportedEvidence: string;
+    readonly localSafeguard: string;
+    readonly localSafeguardScope: "specific-source" | "specific-target";
+  },
+): readonly SameClauseRegressionCase[] {
+  return [
+    {
+      name: `${domain} not-required then workflow prohibition`,
+      domain,
+      prefix: prefixes.notRequired,
+      connector: " and ",
+      laterProhibition,
+      wrappedLaterProhibition,
+      prefixEvidence: prefixes.notRequired,
+      prefixModality: "not-required",
+      prefixScope: "unknown",
+      prefixCompleteness: "complete",
+    },
+    {
+      name: `${domain} affirmative requirement then workflow prohibition`,
+      domain,
+      prefix: prefixes.affirmativeRequirement,
+      connector: " and ",
+      laterProhibition,
+      wrappedLaterProhibition,
+      prefixEvidence: prefixes.affirmativeRequirement,
+      prefixModality: "unknown",
+      prefixScope: "unknown",
+      prefixCompleteness: "complete",
+    },
+    {
+      name: `${domain} local prohibition then workflow prohibition`,
+      domain,
+      prefix: prefixes.localProhibition,
+      connector: ", and ",
+      laterProhibition,
+      wrappedLaterProhibition,
+      prefixEvidence: prefixes.localProhibition,
+      prefixModality: "prohibited",
+      prefixScope: "local-step",
+      prefixCompleteness: "complete",
+    },
+    {
+      name: `${domain} unsupported prohibition then workflow prohibition`,
+      domain,
+      prefix: prefixes.unsupportedProhibition,
+      connector: " and ",
+      laterProhibition,
+      wrappedLaterProhibition,
+      prefixEvidence: prefixes.unsupportedEvidence,
+      prefixModality: "prohibited",
+      prefixScope: "workflow",
+      prefixCompleteness: "unsupported-remainder",
+    },
+    {
+      name: `${domain} local safeguard then workflow prohibition`,
+      domain,
+      prefix: prefixes.localSafeguard,
+      connector: ", and ",
+      laterProhibition,
+      wrappedLaterProhibition,
+      prefixEvidence: prefixes.localSafeguard,
+      prefixModality: "local-safeguard",
+      prefixScope: prefixes.localSafeguardScope,
+      prefixCompleteness: "complete",
+    },
+  ];
+}
+
+function assertFactEvidence(
+  fact: BodyPolicyClauseFacts | undefined,
+  clause: string,
+  evidence: string,
+  expected: {
+    readonly modality: BodyPolicyModality;
+    readonly scope: BodyPolicyScope;
+    readonly completeness: BodyPolicyClauseFacts["completeness"];
+  },
+  message: string,
+): void {
+  assert.ok(fact, message);
+  const evidenceStart = clause.indexOf(evidence);
+  assert.notEqual(evidenceStart, -1, message);
+  assert.deepEqual(
+    {
+      modality: fact.modality,
+      scope: fact.scope,
+      completeness: fact.completeness,
+      evidenceStart: fact.evidenceStart,
+      evidenceEnd: fact.evidenceEnd,
+    },
+    {
+      ...expected,
+      evidenceStart,
+      evidenceEnd: evidenceStart + evidence.length,
+    },
+    message,
+  );
+  assert.equal(
+    clause.slice(fact.evidenceStart, fact.evidenceEnd),
+    evidence,
+    message,
+  );
+}
 
 function bodyPolicyFindings(body: string, domain: PolicyDomain): Finding[] {
   const policy = {

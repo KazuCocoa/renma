@@ -1209,6 +1209,34 @@ function paragraphEvidenceForRange(
   };
 }
 
+function clippedParagraphEvidenceForRange(
+  paragraph: SecurityParagraphContext,
+  rangeStart: number,
+  rangeEnd: number,
+): DetectionEvidence | undefined {
+  const occupied = paragraph.lines.filter(
+    ({ startOffset, endOffset }) =>
+      startOffset < rangeEnd && endOffset > rangeStart,
+  );
+  const first = occupied[0];
+  const last = occupied[occupied.length - 1];
+  if (first === undefined || last === undefined) return undefined;
+  return {
+    startLine: first.lineIndex + 1,
+    ...(last.lineIndex === first.lineIndex
+      ? {}
+      : { endLine: last.lineIndex + 1 }),
+    snippet: occupied
+      .map(({ text, startOffset, endOffset }) =>
+        text.slice(
+          Math.max(rangeStart, startOffset) - startOffset,
+          Math.min(rangeEnd, endOffset) - startOffset,
+        ),
+      )
+      .join("\n"),
+  };
+}
+
 function isStructurallyEligibleProseParagraph(
   paragraph: SecurityParagraphContext,
   markdownView: MarkdownSecurityView | undefined,
@@ -1745,6 +1773,33 @@ function bodyPolicyClauseEvidenceSnippet(
   return text.slice(clauseRange.start, end).trim();
 }
 
+function bodyPolicyFactEvidenceRange(
+  text: string,
+  clauseRange: SecurityParagraphClauseRange,
+  fact: BodyPolicyClauseFacts,
+): SecurityParagraphClauseRange {
+  const start = clauseRange.start + fact.evidenceStart;
+  const factEnd = clauseRange.start + fact.evidenceEnd;
+  const closingPunctuation = BODY_POLICY_CLOSING_PUNCTUATION_RE.exec(
+    text.slice(factEnd),
+  );
+  return {
+    start,
+    end: factEnd + (closingPunctuation?.[0].length ?? 0),
+  };
+}
+
+function hasEarlierBodyPolicyFact(
+  facts: readonly BodyPolicyClauseFacts[],
+  fact: BodyPolicyClauseFacts,
+): boolean {
+  return facts.some(
+    (candidate) =>
+      candidate.domain === fact.domain &&
+      candidate.evidenceStart < fact.evidenceStart,
+  );
+}
+
 function bodyPolicyContradictionDetections(
   prepared: PreparedSecurityDocumentAnalysis,
 ): Detection[] {
@@ -1786,8 +1841,18 @@ function bodyPolicyContradictionDetections(
         ) {
           continue;
         }
-        const evidence =
-          paragraph.startLine === paragraph.endLine
+        const factRange = bodyPolicyFactEvidenceRange(
+          paragraph.text,
+          clauseRange,
+          fact,
+        );
+        const evidence = hasEarlierBodyPolicyFact(facts, fact)
+          ? clippedParagraphEvidenceForRange(
+              paragraph,
+              factRange.start,
+              factRange.end,
+            )
+          : paragraph.startLine === paragraph.endLine
             ? {
                 startLine: paragraph.startLine,
                 snippet: bodyPolicyClauseEvidenceSnippet(
@@ -1846,6 +1911,7 @@ function bodyPolicyContradictionDetections(
         ) {
           continue;
         }
+        const factRange = bodyPolicyFactEvidenceRange(line, clauseRange, fact);
         candidates.push({
           domain,
           kindOrder,
@@ -1853,7 +1919,9 @@ function bodyPolicyContradictionDetections(
             metadata: RULES.bodyPolicyContradiction,
             severity: "high",
             startLine: lineIndex + 1,
-            snippet: bodyPolicyClauseEvidenceSnippet(line, clauseRange),
+            snippet: hasEarlierBodyPolicyFact(facts, fact)
+              ? line.slice(factRange.start, factRange.end)
+              : bodyPolicyClauseEvidenceSnippet(line, clauseRange),
             dedupeKey: `body-policy-contradiction:${domain}`,
           },
         });

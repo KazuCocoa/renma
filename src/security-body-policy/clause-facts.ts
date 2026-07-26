@@ -38,6 +38,16 @@ interface ScopeClassification {
   readonly supportedEnd: number;
 }
 
+type DomainCandidateKind =
+  | "not-required"
+  | "affirmative-requirement"
+  | "supported-prohibition"
+  | "generic-prohibition";
+
+interface DomainCandidate extends EvidenceRange {
+  readonly kind: DomainCandidateKind;
+}
+
 const DOMAIN_ORDER: readonly BodyPolicyDomain[] = [
   "network",
   "upload",
@@ -61,6 +71,12 @@ const NO_REQUIREMENT_PATTERNS = {
   network: noRequirementPatterns(NETWORK_SUBJECT),
   upload: noRequirementPatterns(UPLOAD_SUBJECT),
   secrets: noRequirementPatterns(SECRET_ACCESS_SUBJECT),
+} satisfies Record<BodyPolicyDomain, readonly RegExp[]>;
+
+const AFFIRMATIVE_REQUIREMENT_PATTERNS = {
+  network: affirmativeRequirementPatterns(NETWORK_SUBJECT),
+  upload: affirmativeRequirementPatterns(UPLOAD_SUBJECT),
+  secrets: affirmativeRequirementPatterns(SECRET_ACCESS_SUBJECT),
 } satisfies Record<BodyPolicyDomain, readonly RegExp[]>;
 
 const PROHIBITED_PATTERNS = {
@@ -149,13 +165,13 @@ const PROHIBITED_PATTERNS = {
 
 const GENERIC_PROHIBITION_PATTERNS = {
   network: new RegExp(
-    String.raw`\b(?:do\s+not|don't|never|must\s+not|cannot|can't|forbidden|not\s+allowed|no)\b[^.!?\n]{0,100}\b${NETWORK_SUBJECT}\b`,
+    String.raw`\b(?:do\s+not|don't|never|must\s+not|cannot|can't|forbidden|not\s+allowed|no)\b[^.!?\n]{0,100}?\b${NETWORK_SUBJECT}\b`,
     "i",
   ),
   upload:
-    /\b(?:do\s+not|don't|never|must\s+not|cannot|can't|forbidden|not\s+allowed|no)\b[^.!?\n]{0,100}\b(?:uploads?|uploading|uploaded)\b/i,
+    /\b(?:do\s+not|don't|never|must\s+not|cannot|can't|forbidden|not\s+allowed|no)\b[^.!?\n]{0,100}?\b(?:uploads?|uploading|uploaded)\b/i,
   secrets: new RegExp(
-    String.raw`\b(?:do\s+not|don't|never|must\s+not|cannot|can't|forbidden|not\s+allowed|no)\b[^.!?\n]{0,100}${SECRET_EVIDENCE}`,
+    String.raw`\b(?:do\s+not|don't|never|must\s+not|cannot|can't|forbidden|not\s+allowed|no)\b[^.!?\n]{0,100}?${SECRET_EVIDENCE}`,
     "i",
   ),
 } satisfies Record<BodyPolicyDomain, RegExp>;
@@ -194,13 +210,13 @@ export function bodyPolicyClauseFacts(
   const domains = DOMAIN_ORDER.filter((domain) =>
     DOMAIN_EVIDENCE_PATTERNS[domain].test(clause),
   );
-  return domains.map((domain) => classifyDomainFacts(clause, domain));
+  return domains.flatMap((domain) => classifyDomainFacts(clause, domain));
 }
 
 function classifyDomainFacts(
   clause: string,
   domain: BodyPolicyDomain,
-): BodyPolicyClauseFacts {
+): readonly BodyPolicyClauseFacts[] {
   const domainEvidence = evidenceForPattern(
     clause,
     DOMAIN_EVIDENCE_PATTERNS[domain],
@@ -208,42 +224,101 @@ function classifyDomainFacts(
     start: 0,
     end: 0,
   };
-  const requirement = firstEvidence(clause, NO_REQUIREMENT_PATTERNS[domain]);
-  if (requirement !== undefined) {
-    const scope = classifyScope(clause, domain, "not-required", requirement);
-    return facts(domain, "not-required", scope, requirement.start, clause);
-  }
-
-  const supportedProhibition = firstEvidence(
+  const requirements = candidateEvidence(
+    clause,
+    NO_REQUIREMENT_PATTERNS[domain],
+    "not-required",
+  );
+  const affirmativeRequirements = candidateEvidence(
+    clause,
+    AFFIRMATIVE_REQUIREMENT_PATTERNS[domain],
+    "affirmative-requirement",
+  ).filter(
+    (candidate) =>
+      !requirements.some((requirement) =>
+        evidenceOverlaps(candidate, requirement),
+      ),
+  );
+  const supportedProhibitions = candidateEvidence(
     clause,
     PROHIBITED_PATTERNS[domain],
+    "supported-prohibition",
+  ).filter(
+    (candidate) =>
+      !requirements.some((requirement) =>
+        evidenceOverlaps(candidate, requirement),
+      ),
   );
-  const genericProhibition = evidenceForPattern(
+  const genericProhibitions = candidateEvidence(
     clause,
-    GENERIC_PROHIBITION_PATTERNS[domain],
+    [GENERIC_PROHIBITION_PATTERNS[domain]],
+    "generic-prohibition",
+  ).filter(
+    (candidate) =>
+      !requirements.some((requirement) =>
+        evidenceOverlaps(candidate, requirement),
+      ) &&
+      !affirmativeRequirements.some((requirement) =>
+        evidenceOverlaps(candidate, requirement),
+      ) &&
+      !supportedProhibitions.some((prohibition) =>
+        evidenceOverlaps(candidate, prohibition),
+      ),
   );
-  const prohibition = supportedProhibition ?? genericProhibition;
-  if (prohibition === undefined) {
-    return {
-      domain,
-      modality: "unknown",
-      scope: WORKFLOW_SCOPE_RE.test(clause) ? "workflow" : "unknown",
-      completeness: "complete",
-      evidenceStart: domainEvidence.start,
-      evidenceEnd: domainEvidence.end,
-    };
+  const candidates = independentCandidates([
+    ...requirements,
+    ...affirmativeRequirements,
+    ...supportedProhibitions,
+    ...genericProhibitions,
+  ]);
+  if (candidates.length === 0) {
+    return [
+      {
+        domain,
+        modality: "unknown",
+        scope: WORKFLOW_SCOPE_RE.test(clause) ? "workflow" : "unknown",
+        completeness: "complete",
+        evidenceStart: domainEvidence.start,
+        evidenceEnd: domainEvidence.end,
+      },
+    ];
   }
 
-  const scope = classifyScope(clause, domain, "prohibited", prohibition);
-  const modality = isLocalSafeguard(clause, domain, scope.scope)
-    ? "local-safeguard"
-    : supportedProhibition !== undefined ||
-        scope.scope === "local-step" ||
-        scope.scope === "specific-target" ||
-        scope.scope === "specific-source"
-      ? "prohibited"
-      : "unknown";
-  return facts(domain, modality, scope, prohibition.start, clause);
+  return candidates.map((candidate, index) => {
+    const nextCandidate = candidates[index + 1];
+    const boundaryEnd = candidateBoundaryEnd(clause, candidate, nextCandidate);
+    const contextEnd = candidateContextEnd(clause, candidate, boundaryEnd);
+    const context = clause.slice(candidate.start, contextEnd);
+    const evidence = {
+      start: 0,
+      end: Math.min(candidate.end, contextEnd) - candidate.start,
+    };
+    const baseModality =
+      candidate.kind === "not-required"
+        ? "not-required"
+        : candidate.kind === "affirmative-requirement"
+          ? "unknown"
+          : "prohibited";
+    const scope = classifyScope(context, domain, baseModality, evidence);
+    const modality =
+      baseModality !== "prohibited"
+        ? baseModality
+        : isLocalSafeguard(context, domain, scope.scope)
+          ? "local-safeguard"
+          : candidate.kind === "supported-prohibition" ||
+              scope.scope === "local-step" ||
+              scope.scope === "specific-target" ||
+              scope.scope === "specific-source"
+            ? "prohibited"
+            : "unknown";
+    return facts(
+      domain,
+      modality,
+      scope,
+      candidate.start,
+      clause.slice(candidate.start, boundaryEnd),
+    );
+  });
 }
 
 function facts(
@@ -261,7 +336,7 @@ function facts(
       ? "complete"
       : "unsupported-remainder",
     evidenceStart,
-    evidenceEnd: scope.supportedEnd,
+    evidenceEnd: evidenceStart + scope.supportedEnd,
   };
 }
 
@@ -397,21 +472,110 @@ function semanticContentEnd(text: string): number {
   return closing === null ? text.trimEnd().length : closing.index;
 }
 
-function firstEvidence(
+function candidateEvidence(
   text: string,
   patterns: readonly RegExp[],
-): EvidenceRange | undefined {
-  let selected: EvidenceRange | undefined;
+  kind: DomainCandidateKind,
+): readonly DomainCandidate[] {
+  const candidates: DomainCandidate[] = [];
   for (const pattern of patterns) {
-    const evidence = evidenceForPattern(text, pattern);
-    if (
-      evidence !== undefined &&
-      (selected === undefined || evidence.start < selected.start)
-    ) {
-      selected = evidence;
+    const flags = pattern.flags.includes("g")
+      ? pattern.flags
+      : `${pattern.flags}g`;
+    for (const match of text.matchAll(new RegExp(pattern.source, flags))) {
+      if (match.index === undefined || match[0].length === 0) continue;
+      candidates.push({
+        kind,
+        start: match.index,
+        end: match.index + match[0].length,
+      });
     }
   }
-  return selected;
+  return candidates;
+}
+
+function independentCandidates(
+  candidates: readonly DomainCandidate[],
+): readonly DomainCandidate[] {
+  const ordered = [...candidates].sort(
+    (left, right) =>
+      left.start - right.start ||
+      candidateKindOrder(left.kind) - candidateKindOrder(right.kind) ||
+      right.end - left.end,
+  );
+  const selected: DomainCandidate[] = [];
+  for (const candidate of ordered) {
+    const duplicate = selected.find(
+      (existing) =>
+        existing.kind === candidate.kind &&
+        existing.start === candidate.start &&
+        existing.end === candidate.end,
+    );
+    if (duplicate !== undefined) continue;
+
+    const overlappingIndex = selected.findIndex((existing) =>
+      evidenceOverlaps(existing, candidate),
+    );
+    if (overlappingIndex < 0) {
+      selected.push(candidate);
+      continue;
+    }
+
+    const existing = selected[overlappingIndex];
+    if (
+      existing !== undefined &&
+      candidateKindOrder(candidate.kind) < candidateKindOrder(existing.kind)
+    ) {
+      selected[overlappingIndex] = candidate;
+    }
+  }
+  return selected.sort(
+    (left, right) =>
+      left.start - right.start ||
+      candidateKindOrder(left.kind) - candidateKindOrder(right.kind),
+  );
+}
+
+function candidateKindOrder(kind: DomainCandidateKind): number {
+  return {
+    "not-required": 0,
+    "affirmative-requirement": 1,
+    "supported-prohibition": 2,
+    "generic-prohibition": 3,
+  }[kind];
+}
+
+function evidenceOverlaps(left: EvidenceRange, right: EvidenceRange): boolean {
+  return left.start < right.end && right.start < left.end;
+}
+
+function candidateBoundaryEnd(
+  text: string,
+  candidate: DomainCandidate,
+  nextCandidate: DomainCandidate | undefined,
+): number {
+  // Only a recognized later candidate shortens the completeness boundary.
+  // Otherwise coordinated trailing prose remains an unsupported remainder.
+  if (nextCandidate === undefined) return semanticContentEnd(text);
+  const between = text.slice(candidate.end, nextCandidate.start);
+  const connector = /(?:,[ \t]*)?\band\b[ \t]*$/i.exec(between);
+  const untrimmedEnd =
+    connector === null ? nextCandidate.start : candidate.end + connector.index;
+  return text.slice(0, untrimmedEnd).trimEnd().length;
+}
+
+function candidateContextEnd(
+  text: string,
+  candidate: DomainCandidate,
+  boundaryEnd: number,
+): number {
+  // Scope and safeguard language belongs to this coordinated statement even
+  // when unrelated trailing prose must still count toward completeness.
+  const between = text.slice(candidate.end, boundaryEnd);
+  const connector = /(?:,[ \t]*)?\band\b/i.exec(between);
+  const untrimmedEnd =
+    connector === null ? boundaryEnd : candidate.end + connector.index;
+  return text.slice(0, untrimmedEnd).trimEnd().length;
 }
 
 function evidenceForPattern(
@@ -426,11 +590,11 @@ function evidenceForPattern(
 function noRequirementPatterns(subject: string): readonly RegExp[] {
   return [
     new RegExp(
-      String.raw`(?<![A-Za-z0-9_])(?:no[ \t]+)?${subject}[ \t]+(?:(?:is|are|was|were)[ \t]+(?:not[ \t]+)?(?:required|needed|necessary|unnecessary|optional)|(?:should|will|would|may)[ \t]+(?:not[ \t]+)?be[ \t]+(?:required|needed|necessary))\b`,
+      String.raw`(?<![A-Za-z0-9_])no[ \t]+${subject}[ \t]+(?:(?:is|are|was|were)[ \t]+(?:not[ \t]+)?(?:required|needed|necessary|unnecessary|optional)|(?:should|will|would|may)[ \t]+(?:not[ \t]+)?be[ \t]+(?:required|needed|necessary))\b`,
       "i",
     ),
     new RegExp(
-      String.raw`\b${subject}[ \t]+(?:is|are|was|were)[ \t]+(?:unnecessary|optional)\b`,
+      String.raw`\b${subject}[ \t]+(?:(?:is|are|was|were)[ \t]+(?:(?:not[ \t]+(?:required|needed|necessary))|unnecessary|optional)|(?:should|will|would|may)[ \t]+not[ \t]+be[ \t]+(?:required|needed|necessary))\b`,
       "i",
     ),
     new RegExp(
@@ -439,6 +603,19 @@ function noRequirementPatterns(subject: string): readonly RegExp[] {
     ),
     new RegExp(
       String.raw`\b${WORKFLOW_SCOPE_TERMS}[ \t]+does[ \t]+not[ \t]+require[ \t]+${subject}\b`,
+      "i",
+    ),
+  ];
+}
+
+function affirmativeRequirementPatterns(subject: string): readonly RegExp[] {
+  return [
+    new RegExp(
+      String.raw`\b${subject}[ \t]+(?:(?:is|are|was|were)[ \t]+(?:required|needed|necessary)|(?:should|will|would|may)[ \t]+be[ \t]+(?:required|needed|necessary))\b`,
+      "i",
+    ),
+    new RegExp(
+      String.raw`\b${WORKFLOW_SCOPE_TERMS}[ \t]+requires[ \t]+${subject}\b`,
       "i",
     ),
   ];
