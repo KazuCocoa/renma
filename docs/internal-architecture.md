@@ -124,7 +124,30 @@ Markdown/source eligibility
 
 `src/security-diagnostics.ts` owns Markdown eligibility, effective policy,
 guard application, fallback selection, evidence projection, ordering,
-deduplication, and conversion into the existing public Finding model.
+deduplication, and conversion into the existing public Finding model. Its
+private orchestration has explicit document preparation, policy-prelude,
+physical-line, semantic-unit, policy-contradiction, and final projection
+stages:
+
+```text
+artifact eligibility
+  -> prepared policy, Markdown view, visible lines, and logical commands
+  -> policy prelude
+  -> physical-line detections
+  -> semantic-unit detections
+  -> policy contradictions
+  -> deduplication and Finding projection
+```
+
+Document preparation resolves the parsed and effective policies once, creates
+one `MarkdownSecurityView`, and prepares one destination and security analysis
+for each logical command. The physical-line stage keeps one lazy analysis
+accessor for a line outside a logical command. It intentionally runs line-local
+checks on physical continuation members while limiting destination, sensitive
+data, and upload checks over the complete command to the logical-command start.
+Only human-approval and command-risk guard history is mutable across physical
+lines; the current line is evaluated before either history is updated, and
+blockquoted prose cannot update them.
 `MarkdownSecurityView.associatedGuardEvidence()` supplies exact source ranges
 for the same instruction, same list item, preceding paragraph, and active
 safety section without crossing unrelated headings, thematic breaks, sibling

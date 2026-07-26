@@ -6,6 +6,34 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.24.3] - 2026-07-25
+
+### Changed
+
+- Made security-diagnostics document preparation explicit while retaining one
+  parsed local policy, one effective policy, one Markdown structural view, and
+  the existing visible-line and scan-start projections.
+- Prepared one document-scoped logical-command analysis set, with one
+  destination analysis and one security-command analysis per logical command
+  plus the established physical-member-line index.
+- Isolated the intentionally mutable human-approval and command-risk guard
+  histories from immutable document facts, preserving current-line evaluation
+  before history updates.
+- Separated the document policy prelude, physical-line pass, semantic-unit
+  pass, policy-contradiction pass, and final deduplication and Finding
+  projection.
+- Preserved the single lazy line analysis accessor and the deliberate
+  distinction between line-local checks on physical members and
+  command-scoped checks at logical-command starts.
+
+### Compatibility
+
+- Renma 0.24.3 is a behavior-preserving internal maintainability release. It
+  does not intentionally change public diagnostics, evidence, ordering,
+  deduplication, policy semantics, CLI behavior, schemas, package entrypoints,
+  or runtime boundaries. Normal package-version-derived values advance to
+  0.24.3.
+
 ## [0.24.2] - 2026-07-25
 
 ### Changed
@@ -1514,7 +1542,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.24.1...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.24.3...HEAD
+[0.24.3]: https://github.com/KazuCocoa/renma/compare/v0.24.2...v0.24.3
 [0.24.2]: https://github.com/KazuCocoa/renma/compare/v0.24.1...v0.24.2
 [0.24.1]: https://github.com/KazuCocoa/renma/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/KazuCocoa/renma/compare/v0.23.5...v0.24.0
