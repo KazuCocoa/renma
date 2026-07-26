@@ -1515,6 +1515,7 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
 [Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.24.1...HEAD
+[0.24.2]: https://github.com/KazuCocoa/renma/compare/v0.24.1...v0.24.2
 [0.24.1]: https://github.com/KazuCocoa/renma/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/KazuCocoa/renma/compare/v0.23.5...v0.24.0
 [0.23.5]: https://github.com/KazuCocoa/renma/compare/v0.23.4...v0.23.5
