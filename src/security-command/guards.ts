@@ -129,6 +129,17 @@ export function disclosureRangeIsExplicitlyProhibited(
   return hasNegatedAction && !hasPositiveAction;
 }
 
+/** @internal Return existing disclosure-clause ranges that intersect a source range. */
+export function disclosureClauseRangesIntersectingRange(
+  text: string,
+  rangeStart: number,
+  rangeEnd: number,
+): Array<{ start: number; end: number }> {
+  return disclosureClauses(text)
+    .filter(({ start, end }) => start < rangeEnd && end > rangeStart)
+    .map(({ start, end }) => ({ start, end }));
+}
+
 function classifyDisclosureActions(text: string): ClassifiedDisclosureAction[] {
   const actions: ClassifiedDisclosureAction[] = [];
   for (const clause of disclosureClauses(text)) {

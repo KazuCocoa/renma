@@ -32,7 +32,10 @@ import {
   positiveDisclosureActions,
   type SecurityCommandAnalysis,
 } from "./security-command/index.js";
-import { disclosureRangeIsExplicitlyProhibited } from "./security-command/guards.js";
+import {
+  disclosureClauseRangesIntersectingRange,
+  disclosureRangeIsExplicitlyProhibited,
+} from "./security-command/guards.js";
 import {
   analyzeDestinations,
   analyzeLogicalShellCommands,
@@ -748,6 +751,12 @@ const NO_REDACTION_RE =
   /\b(do not|don't|without|no|never)\b.{0,30}\b(redact|redaction|sanitize|mask|obfuscate)\b|\b(redact|sanitize|mask|obfuscate)\b.{0,30}\b(disabled|false|off)\b/i;
 const UNREDACTED_SENSITIVE_DATA_RE =
   /\b(raw|unredacted|unsanitized|unmasked|unfiltered)\b.{0,60}\b(logs?|environment variables|env vars|credentials?|secrets?|tokens?|customer data|personal data|repository|context)\b|\b(logs?|environment variables|env vars|credentials?|secrets?|tokens?|customer data|personal data|repository|context)\b.{0,60}\b(raw|unredacted|unsanitized|unmasked|unfiltered)\b/i;
+const PARAGRAPH_DESTINATION_TARGET_RE =
+  /\b(?:https?|external|remote|third[- ]party|pastebin|gist|slack|discord|s3|gcs|cloud|storage|bucket|drive|dropbox|notion|jira|github)\b|(?:^|[\s(])(?:[a-z0-9-]+\.)+[a-z]{2,}(?=[/:\s).,]|$)/i;
+const BULK_DATA_TARGET_RE =
+  /\b(repo|repository|workspace|codebase|project|context|logs?|files?|history|dataset|environment variables|env vars|process\.env|credentials?|credential (?:directory|folder|store)|secrets?)\b/i;
+const REDACTION_TARGET_RE =
+  /\b(redact|redaction|sanitize|mask|obfuscate|raw|unredacted|unsanitized|unmasked|unfiltered)\b/i;
 const APPROVAL_RE =
   /\b(ask|prompt|require|obtain|wait for)\b.{0,50}\b(human|user|owner|maintainer|reviewer|security)?\s*(approval|confirmation|consent|authorization|review)\b|\b(human|user|owner|maintainer|reviewer|security)\b.{0,50}\b(approve|approval|confirm|confirmation|review|consent|authorize|authorization)\b|\bonly\b.{0,20}\b(after|with)\b.{0,40}\b(explicit\s+)?(human|user|owner|maintainer|reviewer|security)?\s*(approval|confirmation|review|authorization)\b|\bdo\s+not\s+run\s+automatically\b.{0,60}\b(human|user|maintainer|review|approval|confirmation)\b/i;
 const WEAK_OR_NEGATED_APPROVAL_RE =
@@ -878,6 +887,14 @@ interface SecurityParagraphContext {
   readonly startLine: number;
   readonly endLine: number;
   readonly text: string;
+  readonly lines: readonly SecurityParagraphSourceLine[];
+}
+
+interface SecurityParagraphSourceLine {
+  readonly lineIndex: number;
+  readonly text: string;
+  readonly startOffset: number;
+  readonly endOffset: number;
 }
 
 interface SecurityParagraphLineContext {
@@ -893,6 +910,7 @@ interface SecurityLineContext {
   readonly paragraphText?: string;
   readonly paragraphLineStartOffset?: number;
   readonly paragraphLineEndOffset?: number;
+  readonly paragraphClauseText?: string;
   readonly quotedProse: boolean;
   readonly commandLine: boolean;
   readonly evidence: DetectionEvidence;
@@ -904,6 +922,9 @@ interface SecurityLineContext {
   readonly logicalSecurityAnalysis: SecurityCommandAnalysis | undefined;
   readonly lineSecurityAnalysis: () => SecurityCommandAnalysis;
   readonly lineDestinationAnalysis: () => DestinationAnalysis;
+  readonly paragraphClauseSecurityAnalysis: () =>
+    | SecurityCommandAnalysis
+    | undefined;
 }
 
 export function securityDiagnosticFindings(
@@ -1026,10 +1047,17 @@ function prepareSecurityParagraphContexts(
       text += `${separator}${line.text}`;
     }
     if (!text) continue;
+    const paragraphLines = normalizedLines.map((line, index) => ({
+      lineIndex: line.lineIndex,
+      text: line.text,
+      startOffset: lineStartOffsets[index] ?? 0,
+      endOffset: lineEndOffsets[index] ?? 0,
+    }));
     const paragraph: SecurityParagraphContext = {
       startLine: unit.startLine,
       endLine: unit.endLine,
       text,
+      lines: paragraphLines,
     };
     for (const [index, line] of normalizedLines.entries()) {
       contextByLine.set(line.lineIndex, {
@@ -1040,6 +1068,72 @@ function prepareSecurityParagraphContexts(
     }
   }
   return contextByLine;
+}
+
+function paragraphClausesIntersectingLine(
+  context: SecurityParagraphLineContext,
+): string | undefined {
+  if (context.paragraph.startLine === context.paragraph.endLine) {
+    return undefined;
+  }
+  const ranges = disclosureClauseRangesIntersectingRange(
+    context.paragraph.text,
+    context.lineStartOffset,
+    context.lineEndOffset,
+  );
+  const first = ranges[0];
+  const last = ranges[ranges.length - 1];
+  if (first === undefined || last === undefined) return undefined;
+  const text = context.paragraph.text.slice(first.start, last.end);
+  return text ===
+    context.paragraph.text.slice(context.lineStartOffset, context.lineEndOffset)
+    ? undefined
+    : text;
+}
+
+function preparedSecurityParagraphs(
+  contextByLine: ReadonlyMap<number, SecurityParagraphLineContext>,
+): SecurityParagraphContext[] {
+  const paragraphs: SecurityParagraphContext[] = [];
+  const seen = new Set<SecurityParagraphContext>();
+  for (const { paragraph } of contextByLine.values()) {
+    if (seen.has(paragraph)) continue;
+    seen.add(paragraph);
+    paragraphs.push(paragraph);
+  }
+  return paragraphs.sort((left, right) => left.startLine - right.startLine);
+}
+
+function paragraphEvidenceForRange(
+  paragraph: SecurityParagraphContext,
+  rangeStart: number,
+  rangeEnd: number,
+): DetectionEvidence | undefined {
+  const occupied = paragraph.lines.filter(
+    ({ startOffset, endOffset }) =>
+      startOffset < rangeEnd && endOffset > rangeStart,
+  );
+  const first = occupied[0];
+  const last = occupied[occupied.length - 1];
+  if (first === undefined || last === undefined) return undefined;
+  return {
+    startLine: first.lineIndex + 1,
+    ...(last.lineIndex === first.lineIndex
+      ? {}
+      : { endLine: last.lineIndex + 1 }),
+    snippet: occupied.map(({ text }) => text).join("\n"),
+  };
+}
+
+function isOrdinaryProseParagraph(
+  paragraph: SecurityParagraphContext,
+): boolean {
+  return paragraph.lines.every(
+    ({ text }) =>
+      !isCommandLike(text) &&
+      !CREDENTIAL_ARG_ANY_RE.test(text) &&
+      !CREDENTIAL_HEADER_RE.test(text),
+  );
 }
 
 function prepareLogicalCommandAnalysis(
@@ -1123,6 +1217,7 @@ function collectPolicyPreludeDetections(
       artifact.content,
       artifact.markdownParserEligible,
       markdownView,
+      prepared.securityParagraphContextByLine,
     ),
   ];
   if (
@@ -1145,6 +1240,7 @@ function collectPolicyPreludeDetections(
       effectivePolicy,
       artifact.markdownParserEligible,
       markdownView,
+      prepared.securityParagraphContextByLine,
     ),
   );
 
@@ -1249,6 +1345,10 @@ function prepareSecurityLineContext(
   const paragraphText = securityParagraphContext?.paragraph.text;
   const paragraphLineStartOffset = securityParagraphContext?.lineStartOffset;
   const paragraphLineEndOffset = securityParagraphContext?.lineEndOffset;
+  const paragraphClauseText =
+    securityParagraphContext === undefined
+      ? undefined
+      : paragraphClausesIntersectingLine(securityParagraphContext);
   let cachedLineSecurityAnalysis: SecurityCommandAnalysis | undefined;
   const lineSecurityAnalysis = (): SecurityCommandAnalysis => {
     const language = markdownView.languageAt(index);
@@ -1267,6 +1367,24 @@ function prepareSecurityLineContext(
   const lineDestinationAnalysis = (): DestinationAnalysis => {
     return lineSecurityAnalysis().destinationAnalysis;
   };
+  let cachedParagraphClauseSecurityAnalysis:
+    | SecurityCommandAnalysis
+    | undefined;
+  const paragraphClauseSecurityAnalysis = ():
+    | SecurityCommandAnalysis
+    | undefined => {
+    if (paragraphClauseText === undefined) return undefined;
+    cachedParagraphClauseSecurityAnalysis ??= analyzeSecurityCommand({
+      source: {
+        text: paragraphClauseText,
+        startLine: lineNumber,
+        endLine: lineNumber,
+        lines: [paragraphClauseText],
+      },
+      guards: markdownView.associatedGuardEvidence(index),
+    });
+    return cachedParagraphClauseSecurityAnalysis;
+  };
 
   return {
     index,
@@ -1277,6 +1395,7 @@ function prepareSecurityLineContext(
       ? {}
       : { paragraphLineStartOffset }),
     ...(paragraphLineEndOffset === undefined ? {} : { paragraphLineEndOffset }),
+    ...(paragraphClauseText === undefined ? {} : { paragraphClauseText }),
     quotedProse,
     commandLine,
     evidence,
@@ -1288,6 +1407,7 @@ function prepareSecurityLineContext(
     logicalSecurityAnalysis,
     lineSecurityAnalysis,
     lineDestinationAnalysis,
+    paragraphClauseSecurityAnalysis,
   };
 }
 
@@ -1302,6 +1422,7 @@ function securityLineDetections(
     paragraphText,
     paragraphLineStartOffset,
     paragraphLineEndOffset,
+    paragraphClauseText,
     quotedProse,
     commandLine,
     evidence,
@@ -1313,8 +1434,25 @@ function securityLineDetections(
     logicalSecurityAnalysis,
     lineSecurityAnalysis,
     lineDestinationAnalysis,
+    paragraphClauseSecurityAnalysis,
   } = context;
   const detections: Detection[] = [];
+  const proseParagraphClauseText =
+    logicalCommand === undefined && !commandLine && !quotedProse
+      ? paragraphClauseText
+      : undefined;
+  const currentLineDestinationAnalysis =
+    logicalCommand === undefined && !quotedProse
+      ? lineDestinationAnalysis()
+      : undefined;
+  const paragraphDestinationAnchor =
+    proseParagraphClauseText !== undefined &&
+    currentLineDestinationAnalysis !== undefined &&
+    lineHasParagraphDestinationTarget(line, currentLineDestinationAnalysis);
+  const proseDestinationAnalysis = paragraphDestinationAnchor
+    ? (paragraphClauseSecurityAnalysis()?.destinationAnalysis ??
+      currentLineDestinationAnalysis)
+    : currentLineDestinationAnalysis;
 
   if (!quotedProse) {
     if (logicalCommand === undefined) {
@@ -1326,11 +1464,12 @@ function securityLineDetections(
           hasHumanApprovalGuard,
           {
             scope: "all",
-            analysis: lineDestinationAnalysis(),
+            analysis: proseDestinationAnalysis ?? lineDestinationAnalysis(),
           },
           paragraphText,
           paragraphLineStartOffset,
           paragraphLineEndOffset,
+          proseParagraphClauseText,
         ),
       );
     } else {
@@ -1384,14 +1523,16 @@ function securityLineDetections(
       if (
         !commandLine ||
         policy.declared.size > 0 ||
-        isUploadInstruction(lineDestinationAnalysis())
+        (proseDestinationAnalysis !== undefined &&
+          isUploadInstruction(proseDestinationAnalysis))
       ) {
         detections.push(
           ...networkAndUploadDetections(
             line,
             evidence,
             policy,
-            lineDestinationAnalysis(),
+            proseDestinationAnalysis ?? lineDestinationAnalysis(),
+            proseParagraphClauseText,
           ),
         );
       }
@@ -1413,7 +1554,9 @@ function securityLineDetections(
         ),
       );
     }
-    detections.push(...contextScopeDetections(line, lineNumber));
+    detections.push(
+      ...contextScopeDetections(line, lineNumber, proseParagraphClauseText),
+    );
     detections.push(...predictableTempDetections(line, lineNumber));
   }
 
@@ -1511,14 +1654,37 @@ function bodyPolicyContradictionDetections(
   policy: SecurityPolicy,
   markdownParserEligible: boolean,
   markdownView?: MarkdownSecurityView,
+  securityParagraphContextByLine: ReadonlyMap<
+    number,
+    SecurityParagraphLineContext
+  > = new Map(),
 ): Detection[] {
-  const detections: Detection[] = [];
   const sourceLines = content.split(/\r?\n/);
   const scanStart = securityContentStart(markdownParserEligible, markdownView);
   const lines = markdownView
     ? sourceLines.map((_, index) => markdownView.visibleLine(index))
     : sourceLines;
-  const emitted = new Set<string>();
+  const kinds = [
+    {
+      kind: "network",
+      enabled: policy.networkAllowed === true,
+      pattern: BODY_NETWORK_DISALLOWED_RE,
+    },
+    {
+      kind: "upload",
+      enabled: policy.externalUploadAllowed === true,
+      pattern: BODY_UPLOAD_DISALLOWED_RE,
+    },
+    {
+      kind: "secrets",
+      enabled: policy.secretsAllowed === true,
+      pattern: BODY_SECRET_DISALLOWED_RE,
+    },
+  ] as const;
+  const selected = new Map<
+    string,
+    { detection: Detection; kindOrder: number; lineLocal: boolean }
+  >();
 
   for (let index = scanStart; index < lines.length; index += 1) {
     const line = lines[index] ?? "";
@@ -1529,36 +1695,87 @@ function bodyPolicyContradictionDetections(
       continue;
 
     const lineNumber = index + 1;
-    const candidates: Array<[string, boolean]> = [
-      [
-        "network",
-        policy.networkAllowed === true && BODY_NETWORK_DISALLOWED_RE.test(line),
-      ],
-      [
-        "upload",
-        policy.externalUploadAllowed === true &&
-          BODY_UPLOAD_DISALLOWED_RE.test(line),
-      ],
-      [
-        "secrets",
-        policy.secretsAllowed === true && BODY_SECRET_DISALLOWED_RE.test(line),
-      ],
-    ];
-
-    for (const [kind, matched] of candidates) {
-      if (!matched || emitted.has(kind)) continue;
-      emitted.add(kind);
-      detections.push({
-        metadata: RULES.bodyPolicyContradiction,
-        severity: "high",
-        startLine: lineNumber,
-        snippet: line.trim(),
-        dedupeKey: `body-policy-contradiction:${kind}`,
+    for (const [kindOrder, candidate] of kinds.entries()) {
+      if (
+        !candidate.enabled ||
+        selected.has(candidate.kind) ||
+        !candidate.pattern.test(line)
+      ) {
+        continue;
+      }
+      selected.set(candidate.kind, {
+        detection: {
+          metadata: RULES.bodyPolicyContradiction,
+          severity: "high",
+          startLine: lineNumber,
+          snippet: line.trim(),
+          dedupeKey: `body-policy-contradiction:${candidate.kind}`,
+        },
+        kindOrder,
+        lineLocal: true,
       });
     }
   }
 
-  return detections;
+  for (const paragraph of preparedSecurityParagraphs(
+    securityParagraphContextByLine,
+  )) {
+    if (!isOrdinaryProseParagraph(paragraph)) continue;
+    const clauseRanges = disclosureClauseRangesIntersectingRange(
+      paragraph.text,
+      0,
+      paragraph.text.length,
+    );
+    for (const clauseRange of clauseRanges) {
+      const clause = paragraph.text.slice(clauseRange.start, clauseRange.end);
+      for (const [kindOrder, candidate] of kinds.entries()) {
+        if (!candidate.enabled) continue;
+        const match = candidate.pattern.exec(clause);
+        if (match?.index === undefined) continue;
+        const matchStart = clauseRange.start + match.index;
+        const matchEnd = matchStart + match[0].length;
+        const evidence = paragraphEvidenceForRange(
+          paragraph,
+          matchStart,
+          matchEnd,
+        );
+        if (
+          evidence === undefined ||
+          evidence.endLine === undefined ||
+          evidence.endLine === evidence.startLine
+        ) {
+          continue;
+        }
+        const existing = selected.get(candidate.kind);
+        if (
+          existing !== undefined &&
+          (existing.detection.startLine < evidence.startLine ||
+            (existing.detection.startLine === evidence.startLine &&
+              existing.lineLocal))
+        ) {
+          continue;
+        }
+        selected.set(candidate.kind, {
+          detection: {
+            metadata: RULES.bodyPolicyContradiction,
+            severity: "high",
+            ...evidence,
+            dedupeKey: `body-policy-contradiction:${candidate.kind}`,
+          },
+          kindOrder,
+          lineLocal: false,
+        });
+      }
+    }
+  }
+
+  return [...selected.values()]
+    .sort(
+      (left, right) =>
+        left.detection.startLine - right.detection.startLine ||
+        left.kindOrder - right.kindOrder,
+    )
+    .map(({ detection }) => detection);
 }
 
 function policyDetections(
@@ -1570,19 +1787,21 @@ function policyDetections(
   paragraphText?: string,
   paragraphLineStartOffset?: number,
   paragraphLineEndOffset?: number,
+  paragraphClauseText?: string,
 ): Detection[] {
   const detections: Detection[] = [];
   const shouldAnalyzeDestinations = input.scope !== "line-local";
   const analyzeLineLocal = input.scope !== "destination";
   const analysis = input.scope === "line-local" ? undefined : input.analysis;
-  const positiveActions = positiveDisclosureActions(line);
+  const semanticLine = paragraphClauseText ?? line;
+  const positiveActions = positiveDisclosureActions(semanticLine);
   const positiveDestinationAction = positiveActions.some(
     ({ kind }) => kind === "network" || kind === "external-upload",
   );
   const defensiveAction =
-    isDefensiveActionInstruction(line) && positiveActions.length === 0;
+    isDefensiveActionInstruction(semanticLine) && positiveActions.length === 0;
   const safeOrGuarded =
-    GUARDED_ACTION_RE.test(line) ||
+    GUARDED_ACTION_RE.test(semanticLine) ||
     (defensiveAction && !positiveDestinationAction);
   const invalidNetworkAllowlist = policy.invalidDeclared.has(
     "approvedNetworkDestinations",
@@ -1698,9 +1917,17 @@ function policyDetections(
     policy.humanApprovalRequired === true &&
     ((shouldAnalyzeDestinations &&
       analysis !== undefined &&
-      requiresDestinationApprovalGuard(line, analysis)) ||
-      (analyzeLineLocal && requiresLineLocalApprovalGuard(line))) &&
-    !hasHumanApprovalGuard &&
+      requiresDestinationApprovalGuard(semanticLine, analysis)) ||
+      (analyzeLineLocal &&
+        (requiresLineLocalApprovalGuard(line) ||
+          (paragraphClauseText !== undefined &&
+            lineHasSensitiveApprovalTarget(line) &&
+            requiresLineLocalApprovalGuard(paragraphClauseText))))) &&
+    !(
+      hasHumanApprovalGuard ||
+      (paragraphClauseText !== undefined &&
+        hasExplicitHumanApprovalGuard(paragraphClauseText))
+    ) &&
     !defensiveAction;
   if (needsApproval) {
     detections.push({
@@ -1926,14 +2153,16 @@ function networkAndUploadDetections(
   evidence: DetectionEvidence,
   policy: SecurityPolicy,
   analysis: DestinationAnalysis,
+  paragraphClauseText?: string,
 ): Detection[] {
   const detections: Detection[] = [];
-  const positiveDestinationAction = positiveDisclosureActions(line).some(
-    ({ kind }) => kind === "network" || kind === "external-upload",
-  );
+  const semanticLine = paragraphClauseText ?? line;
+  const positiveDestinationAction = positiveDisclosureActions(
+    semanticLine,
+  ).some(({ kind }) => kind === "network" || kind === "external-upload");
   if (
-    GUARDED_ACTION_RE.test(line) ||
-    (isDefensiveActionInstruction(line) && !positiveDestinationAction)
+    GUARDED_ACTION_RE.test(semanticLine) ||
+    (isDefensiveActionInstruction(semanticLine) && !positiveDestinationAction)
   ) {
     return detections;
   }
@@ -1946,7 +2175,12 @@ function networkAndUploadDetections(
     });
   }
 
-  if (isBulkDataSharingInstruction(line)) {
+  if (
+    isBulkDataSharingInstruction(line) ||
+    (paragraphClauseText !== undefined &&
+      BULK_DATA_TARGET_RE.test(line) &&
+      isBulkDataSharingInstruction(paragraphClauseText))
+  ) {
     detections.push({
       metadata: RULES.bulkDataSharingInstruction,
       severity: "medium",
@@ -1954,7 +2188,14 @@ function networkAndUploadDetections(
     });
   }
 
-  if (CLOUD_UPLOAD_RE.test(line) || CLOUD_DESTINATION_RE.test(line)) {
+  if (
+    CLOUD_UPLOAD_RE.test(line) ||
+    CLOUD_DESTINATION_RE.test(line) ||
+    (paragraphClauseText !== undefined &&
+      PARAGRAPH_DESTINATION_TARGET_RE.test(line) &&
+      (CLOUD_UPLOAD_RE.test(paragraphClauseText) ||
+        CLOUD_DESTINATION_RE.test(paragraphClauseText)))
+  ) {
     detections.push({
       metadata: RULES.cloudUploadInstruction,
       severity: "medium",
@@ -1965,10 +2206,21 @@ function networkAndUploadDetections(
   return detections;
 }
 
-function contextScopeDetections(line: string, lineNumber: number): Detection[] {
+function contextScopeDetections(
+  line: string,
+  lineNumber: number,
+  paragraphClauseText?: string,
+): Detection[] {
   const detections: Detection[] = [];
+  const semanticLine = paragraphClauseText ?? line;
 
-  if (OVERBROAD_CONTEXT_RE.test(line) && !isDefensiveActionInstruction(line)) {
+  if (
+    (OVERBROAD_CONTEXT_RE.test(line) ||
+      (paragraphClauseText !== undefined &&
+        BULK_DATA_TARGET_RE.test(line) &&
+        OVERBROAD_CONTEXT_RE.test(paragraphClauseText))) &&
+    !isDefensiveActionInstruction(semanticLine)
+  ) {
     detections.push({
       metadata: RULES.overbroadContextInstruction,
       severity: "medium",
@@ -1980,8 +2232,13 @@ function contextScopeDetections(line: string, lineNumber: number): Detection[] {
   if (
     (NO_REDACTION_RE.test(line) ||
       (UNREDACTED_SENSITIVE_DATA_RE.test(line) &&
-        DATA_DISCLOSURE_ACTION_RE.test(line))) &&
-    !isDefensiveActionInstruction(line)
+        DATA_DISCLOSURE_ACTION_RE.test(line)) ||
+      (paragraphClauseText !== undefined &&
+        REDACTION_TARGET_RE.test(line) &&
+        (NO_REDACTION_RE.test(paragraphClauseText) ||
+          (UNREDACTED_SENSITIVE_DATA_RE.test(paragraphClauseText) &&
+            DATA_DISCLOSURE_ACTION_RE.test(paragraphClauseText))))) &&
+    !isDefensiveActionInstruction(semanticLine)
   ) {
     detections.push({
       metadata: RULES.noRedactionInstruction,
@@ -2110,6 +2367,10 @@ function securityPolicyResolutionDetections(
   content: string,
   markdownParserEligible: boolean,
   markdownView?: MarkdownSecurityView,
+  securityParagraphContextByLine: ReadonlyMap<
+    number,
+    SecurityParagraphLineContext
+  > = new Map(),
 ): Detection[] {
   const detections: Detection[] = [];
   if (parsedPolicy.securityProfile === undefined) {
@@ -2119,6 +2380,7 @@ function securityPolicyResolutionDetections(
       content,
       markdownParserEligible,
       markdownView,
+      securityParagraphContextByLine,
     );
     return detections;
   }
@@ -2244,6 +2506,7 @@ function securityPolicyResolutionDetections(
     content,
     markdownParserEligible,
     markdownView,
+    securityParagraphContextByLine,
   );
 
   return detections;
@@ -2255,6 +2518,10 @@ function addForbiddenInputDetections(
   content: string,
   markdownParserEligible: boolean,
   markdownView?: MarkdownSecurityView,
+  securityParagraphContextByLine: ReadonlyMap<
+    number,
+    SecurityParagraphLineContext
+  > = new Map(),
 ): void {
   for (const forbiddenInput of policy.forbiddenInputs) {
     const detection = forbiddenInputDetection(
@@ -2262,6 +2529,7 @@ function addForbiddenInputDetections(
       forbiddenInput,
       markdownParserEligible,
       markdownView,
+      securityParagraphContextByLine,
     );
     if (detection !== undefined) detections.push(detection);
   }
@@ -2380,6 +2648,10 @@ function forbiddenInputDetection(
   forbiddenInput: string,
   markdownParserEligible: boolean,
   markdownView?: MarkdownSecurityView,
+  securityParagraphContextByLine: ReadonlyMap<
+    number,
+    SecurityParagraphLineContext
+  > = new Map(),
 ): Detection | undefined {
   const needle = forbiddenInput.trim();
   if (needle.length === 0) return undefined;
@@ -2390,20 +2662,61 @@ function forbiddenInputDetection(
     ? sourceLines.map((_, index) => markdownView.visibleLine(index))
     : sourceLines;
   const scanStart = securityContentStart(markdownParserEligible, markdownView);
+  let lineLocalDetection: Detection | undefined;
   for (let index = scanStart; index < lines.length; index += 1) {
     const line = lines[index] ?? "";
     if (!pattern.test(line)) continue;
     if (SAFE_FORBIDDEN_INPUT_PATTERN.test(line)) continue;
     if (!FORBIDDEN_INPUT_ACTION_PATTERN.test(line)) continue;
-    return {
+    lineLocalDetection = {
       metadata: RULES.forbiddenInputInstruction,
       severity: "high",
       startLine: index + 1,
       snippet: line.trim(),
       dedupeKey: `forbidden-input:${needle.toLowerCase()}`,
     };
+    break;
   }
-  return undefined;
+
+  const paragraphPattern = new RegExp(`\\b${escapeRegExp(needle)}\\b`, "giu");
+  let paragraphDetection: Detection | undefined;
+  paragraphSearch: for (const paragraph of preparedSecurityParagraphs(
+    securityParagraphContextByLine,
+  )) {
+    if (!isOrdinaryProseParagraph(paragraph)) continue;
+    for (const match of paragraph.text.matchAll(paragraphPattern)) {
+      if (match.index === undefined) continue;
+      const matchStart = match.index;
+      const matchEnd = matchStart + match[0].length;
+      const clauseRange = disclosureClauseRangesIntersectingRange(
+        paragraph.text,
+        matchStart,
+        matchEnd,
+      )[0];
+      if (clauseRange === undefined) continue;
+      const clause = paragraph.text.slice(clauseRange.start, clauseRange.end);
+      if (SAFE_FORBIDDEN_INPUT_PATTERN.test(clause)) continue;
+      if (!FORBIDDEN_INPUT_ACTION_PATTERN.test(clause)) continue;
+      const evidence = paragraphEvidenceForRange(
+        paragraph,
+        matchStart,
+        matchEnd,
+      );
+      if (evidence === undefined) continue;
+      paragraphDetection = {
+        metadata: RULES.forbiddenInputInstruction,
+        severity: "high",
+        ...evidence,
+        dedupeKey: `forbidden-input:${needle.toLowerCase()}`,
+      };
+      break paragraphSearch;
+    }
+  }
+  if (lineLocalDetection === undefined) return paragraphDetection;
+  if (paragraphDetection === undefined) return lineLocalDetection;
+  return paragraphDetection.startLine < lineLocalDetection.startLine
+    ? paragraphDetection
+    : lineLocalDetection;
 }
 
 function securityContentStart(
@@ -2891,6 +3204,26 @@ function requiresDestinationApprovalGuard(
     CLOUD_UPLOAD_RE.test(line) ||
     networkDestinations(analysis).length > 0
   );
+}
+
+function lineHasParagraphDestinationTarget(
+  line: string,
+  analysis: DestinationAnalysis,
+): boolean {
+  return (
+    analysis.candidates.some(
+      ({ destination, kind }) =>
+        destination !== undefined ||
+        kind === "explicit-url" ||
+        kind === "network-share" ||
+        kind === "bare-host" ||
+        kind === "unsupported-host",
+    ) || PARAGRAPH_DESTINATION_TARGET_RE.test(line)
+  );
+}
+
+function lineHasSensitiveApprovalTarget(line: string): boolean {
+  return SECRET_WORD_RE.test(line) || referencesSensitiveFile(line);
 }
 
 function requiresLineLocalApprovalGuard(line: string): boolean {

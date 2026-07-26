@@ -24,6 +24,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Paragraph-local negation remains clause-aware and does not cross paragraph,
   list-item, blockquote, heading, thematic-break, hidden-comment, or code
   boundaries. Genuine positive disclosure instructions remain detected.
+- Extended Markdown soft-wrap parity to adjacent security checks where actions,
+  sensitive targets, configured forbidden inputs, or policy-prohibition
+  phrases span physical lines within one clause. Explicit Markdown hard breaks
+  remain clause boundaries, and genuine positive instructions remain detected.
 
 ### Changed
 
@@ -1562,7 +1566,7 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
 [Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.24.3...HEAD
-[0.24.3]: https://github.com/KazuCocoa/renma/compare/v0.24.3...v0.24.3
+[0.24.3]: https://github.com/KazuCocoa/renma/compare/v0.24.2...v0.24.3
 [0.24.2]: https://github.com/KazuCocoa/renma/compare/v0.24.1...v0.24.2
 [0.24.1]: https://github.com/KazuCocoa/renma/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/KazuCocoa/renma/compare/v0.23.5...v0.24.0
