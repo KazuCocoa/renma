@@ -160,166 +160,99 @@ projection never crosses paragraph, list-item, blockquote, heading,
 thematic-break, hidden comment, or code boundaries, and it does not replace
 physical-line or logical-command evidence or analysis input.
 
-The private `src/security-body-policy/` classifier consumes those already
-prepared clause ranges through one bounded statement-group layer:
+The private `src/security-body-policy/` classifier consumes prepared clause
+ranges through an explicitly layered, bounded pipeline:
 
 ```text
-prepared paragraph or eligible fallback line
-  -> statement groups with source ranges and separator classes
-  -> predicate segments with independent subject and policy state
-  -> domain-local modality, scope, completeness, and pattern support
-  -> private clause facts
-  -> public contradiction evidence
+lexical recognition
+  -> bounded source components and enclosure ranges
+  -> statement-group segmentation
+  -> statement-state transitions
+  -> predicate semantic classification
+  -> domain-local facts
+  -> evidence projection and deduplication
+  -> public contradiction findings
 ```
 
-Statement grouping recognizes only the existing workflow subject vocabulary and
-a small coordination grammar. It carries the nearest explicit subject through
-ordinary coordination, `but`, `yet`, `however`, `; however,`, bare semicolons,
-and `then`. Consecutive predicate starts are classified as an explicit workflow
-subject, a supported subjectless predicate, an explicit changed subject, a
-conditional or subordinate prefix, or unsupported syntax. Supported
-subjectless starts include copular and auxiliary or modal predicates plus a
-curated ordinary-verb vocabulary; this keeps subject state through three or
-more predicates without treating arbitrary words as verbs. One private subject
-extractor recognizes either a range-leading workflow subject or the same
-subject after a supported directive or policy-label prefix; its range and
-evidence origin establish active state for ordinary and contrastive
-continuations, paired modifiers, and direct proof. The shared bounded prefix
-grammar covers `also`, `still`, `therefore`, `always`, `explicitly`, `directly`,
-`strictly`, `categorically`, and the complete `modal + never` syntax family before
-strong changed-subject classification. Bare semicolons and `then` otherwise use
-the strict 0.24.4 compatibility behavior, but an unenclosed bare semicolon with
-no active workflow subject proves an independent later standalone policy even
-when the preceding imperative is outside the curated vocabulary. A supported
-directive or policy label after an active subject likewise starts an
-independent subjectless policy. The supported prefix parser also establishes
-private policy-context state independently from workflow-subject state. That
-context can prove standalone workflow scope and promote recommendation modals
-across supported same-statement connectors without manufacturing a grammatical
-subject. Before segmentation, straight or curly quote pairs, including
-backslash-escaped visible delimiters, produce private enclosure ranges.
-Technical ranges split only by an enclosed separator are merged before
-statement segmentation. Technical-clause boundaries, hard sentence boundaries,
-contrastive connectors, ordinary `and`, commas, active-subject and active-policy
-state, standalone proof, and evidence construction all consume that
-provenance. Enclosed predicates cannot inherit or establish workflow proof, but
-an opaque quoted span does not clear outer state needed after its closing
-delimiter. Word-internal and plural-possessive apostrophes remain unenclosed.
-Unquoted sentence endings, Markdown hard breaks, structural boundaries,
-explicit changed subjects, conditional or subordinate prefixes, and
-unsupported syntax reset the applicable subject and policy state.
+`model.ts` owns the internal vocabulary shared by those layers: physical source
+and evidence ranges, enclosure provenance, statement boundaries, workflow
+subjects, policy context, predicate-start classification, subject
+relationships, domains, modalities, scopes, completeness, and pattern
+provenance. These contracts remain private implementation details rather than a
+public schema or configuration surface.
 
-Existing domain patterns may also produce a direct workflow-prefix
-prohibition. Its subject-to-predicate bridge is classified as one bounded
-sequence: optional colon or dash punctuation, short adverbial or modal
-modifiers, and an optional relative, parenthetical, or paired-comma modifier.
-Explicit changed subjects, conditional or subordinate instructions, quoted or
-descriptive text, and unsupported bridges are rejected. Local-step, specific
-source/target, exception, and allowance language inside a bridge is preserved
-as a qualification instead of being erased. Relative components are parsed
-before those semantics: descriptive, conditional, local, source, and target
-wording inside a bounded `that` or `which` predicate stays attached to that
-relative predicate instead of qualifying the later prohibition. The same
-wording in a naked parenthetical, paired-comma component, or main-predicate
-bridge still qualifies or rejects the prohibition. In particular, `during
-deterministic validation` in a naked bridge is local rather than workflow-wide.
-The paired-comma form additionally creates one bounded relative component and
-classifies its subject relationship. A subject-relative component beginning
-with a supported predicate inherits the main workflow subject and active policy
-context, then reuses the normal statement-group analyzer within the comma
-range. Two or more inner predicates therefore share and clear state through the
-same connector, changed-subject, quote, scope, and completeness rules as outer
-predicates. An object-relative noun phrase plus finite or curated predicate is
-a changed subject, so its inner instruction cannot acquire workflow scope; the
-original subject remains available to an independently classified main
-predicate after the closing comma. Candidates cannot cross between those
-components, and the equivalent unpaired object-relative form remains
-unsupported.
+`lexical-recognition.ts` owns the bounded regular expressions and produces
+lexical candidates, evidence ranges, and modal-negation syntax. A lexical match
+does not imply a fact or finding. `policy-context.ts` separately recognizes the
+bounded directive and policy-label prefixes that may establish policy context;
+that context never creates a grammatical workflow subject.
+`clause-facts.ts` assigns modal meaning, proves workflow scope, classifies
+local-step or specific source/target scope, checks supported completeness, and
+decides final fact eligibility. Modal-negation syntax therefore stays separate
+from deontic, commitment, recommendation, capability, epistemic, hypothetical,
+permission, and availability semantics.
 
-Every direct prohibited fact with apparent workflow scope is also evaluated
-against one private statement-level proof class: standalone default, explicit
-workflow subject, prefixed workflow subject, inherited workflow subject,
-active policy context, explicit workflow qualifier, or no workflow proof. Only the
-last class removes workflow scope. A supported domain pattern inside a changed-subject,
-conditional, descriptive, or unsupported segment therefore cannot escape
-through the clause-facts default. An outer prefix parser accepts plain start,
-one policy label, one bounded directive or safety component, or one label
-followed by one such component. It rejects repeated components and arbitrary
-leading prose. The composed result is shared by standalone proof, embedded
-workflow-subject extraction, paired-comma protection, policy-modal context, and
-projected evidence origins; an embedded workflow subject must still
-independently pass the candidate-local subject bridge classifier. The
-standalone default applies only
-to candidates without their own workflow subject and to independent directly
-supported predicates after bounded subjectless coordination.
+`statement-components.ts` owns physical source components, straight and curly
+quote enclosures, ordinary and contrastive separator classes, predicate
+segmentation, paired relative components, and statement groups. Enclosed
+predicates cannot inherit or establish workflow proof. Opaque quoted spans
+preserve outer state for an unquoted continuation after the closing delimiter,
+while unquoted sentence endings, Markdown hard breaks and structural
+boundaries remain hard boundaries. Ordinary Markdown soft wraps continue to be
+prepared as logical prose before this layer; physical projection is preserved
+for final evidence.
 
-For each supported network, external-upload, or secret candidate in a predicate
-segment, the classifier retains its local source range, explicit or inherited
-subject range, proof-derived scope, domain, modality, supported-clause
-completeness, and whether the existing domain grammar directly supported it.
-One statement group may therefore produce multiple facts for the same domain
-while every predicate keeps local scope, safeguard, source/target, remainder,
-and evidence decisions. Base and third-person forms of the curated policy verbs
-continue a proven subject; strong noun phrases followed by copular, auxiliary,
-finite, or negative modal heads clear it before noun/verb homographs can
-inherit workflow scope. A domain-aware strong form also clears the subject for
-noun-like homographs followed by compatible finite network, secret, or upload
-actions, while `audits logs`, `reviews results`, and `checks use cases` remain
-genuine subjectless predicates. One private modal-negation representation
-covers all nine recognized modals followed by `never`, active `not`, passive
-`not`, and permission or availability states. `must` and `shall` are deontic
-prohibitions, and `will` is a policy commitment. Plain `should` and `may`
-remain non-emitting but become supported policy denials under a bounded active
-policy context. Epistemic `might`, capability `can` or `could`, and
-hypothetical `would` remain `unknown` even under that context. Availability
-states such as `may not be available` also remain `unknown`; a nearby label
-cannot turn capability or availability evidence into a denial. Lexical
-`cannot` and `can't` retain their existing supported-denial compatibility
-grammar, distinct from separated `can not`. Directive proof accepts optional
-`that` only after bounded `ensure`, `please ensure`, or `make sure` forms.
-Only a complete `prohibited` fact with `workflow` scope can contradict an
-enabled permissive policy for the same domain. `unknown`, `not-required`,
-`local-safeguard`, local-step, specific-source, specific-target, and
-unsupported-remainder states fail open by producing no contradiction. Facts
-are computed once per statement group through the same analyzer for prepared
-paragraphs and eligible fallback lines such as headings. Finding construction
-maps normalized offsets back to bounded physical source lines without crossing
-Markdown structure.
+`statement-state.ts` is the single owner of subject and policy-context
+retention. Its deterministic transition takes the previous state plus the
+classified segment boundary, enclosure, predicate start, explicit subject, and
+explicit policy context. It reports the resulting state, the subject and
+context available to the segment, and explicit retention or clearing reasons.
+Explicit subjects replace inherited subjects. Supported subjectless predicates
+may inherit across the existing ordinary or contrastive connectors. Explicit
+policy context can apply without a subject. Changed subjects, conditional or
+subordinate starts, unsupported syntax, and hard boundaries clear the
+applicable state. Opaque quoted components receive no inherited proof and do
+not mutate the outer state.
 
-Clause-fact composition remains separate from lexical sharing.
-`src/security-prose-vocabulary.ts` may supply exact terms used identically by
-multiple detectors, but the body-policy module owns the semantic relationship
-between domain, modality, scope, and completeness. It is not a public schema,
-configuration surface, or general natural-language parser.
+Paired relatives are normal bounded sub-analyses. A subject-relative component
+inherits the outer workflow subject and policy context and reuses the same
+statement-group analyzer inside the comma range. An object-relative component
+has an explicit changed subject and receives no inherited workflow proof.
+Unsupported relatives do not inherit. For supported subject- or object-relative
+forms, the main predicate after the closing comma resumes the outer subject and
+policy context. Candidate recognition and evidence ends are clipped to the
+relative or main component so no candidate crosses that boundary.
 
-Compatibility tests freeze 241 exact bodies and public finding projections from
-Renma 0.24.4 commit `9e72e1adddd588ea72cba1c3e06ed1d07de330d9`.
-The test consumes those bodies directly; legacy code is not installed or run in
-CI. Thirty-two frozen cases cover every requested pair across first predicate
-kind and later scope, earlier and later domain, connector and layout, connector
-and implicit or changed subject, and predicate count and middle-predicate
-category. Deterministic current-only matrices additionally cover predicate
-start classification, direct provenance, all scope-proof classes, directive
-prefixes, separators with and without an active subject, composed and qualified
-bridges, paired-comma and inline-relative attachment, base and third-person
-middle verbs, single- and multiword changed subjects, one-line and soft-wrap
-prose, heading fallback, domain order, and deduplication. Additional exact
-cross-product matrices cover outer prefix and candidate bridge, separator and
-previous-predicate classification, modal and domain, relative or naked modifier
-and qualification, and homograph and following predicate-head category.
-Composed matrices further cross outer prefixes with continuation connectors;
-modifier or semantic modal classes with subject mode, policy context, and
-domain; every technical and ordinary separator with quote style and independent
-active subject or policy state; opaque quoted spans with outer continuations;
-paired subject/object relatives with inner predicate count, inner and main
-domain, scope, prefix, changed subjects, and main-predicate presence; and modal
-semantic class with `never`, active `not`, passive `not`, permission, and
-availability forms. Each matrix includes one-line, ordinary soft-wrap, and
-heading fallback. Exact projections retain domain order, evidence, and
-same-domain deduplication. Compatibility means
-equality with the frozen corpus except for named, exact-current-output allowlist
-entries covering intentional precision, statement-group recovery, and
-bounded-evidence changes.
+Direct and inherited facts share the same domain-local semantic classifier.
+Inherited subject projection synthesizes only the bounded subject-plus-predicate
+input required by the existing grammar, then projects the classified evidence
+back to physical source offsets. Candidate-local evidence belongs to the
+semantic classifier; subject and policy-prefix evidence origins belong to
+statement state; relative evidence belongs to its bounded sub-analysis; and
+physical line/snippet projection remains owned by
+`src/security-diagnostics.ts`. `fact-projection.ts` alone owns exact fact
+identity, deduplication, and deterministic source/domain ordering. Evidence
+ranges remain ordered, non-negative, reproducible, and within their source.
+
+Only a complete `prohibited` fact with proven `workflow` scope can contradict
+an enabled permissive policy in the same network, upload, or secrets domain.
+Unknown modality, not-required language, local safeguards, local-step scope,
+specific sources or targets, unsupported remainders, changed subjects,
+conditional syntax, quoted examples, and unsupported grammar continue to fail
+open. The refactor does not add vocabulary, grammar, domains, diagnostics, or a
+general natural-language parser.
+
+Compatibility remains projection-first. The immutable test fixture freezes 241
+exact bodies and public finding projections from Renma 0.24.4 commit
+`9e72e1adddd588ea72cba1c3e06ed1d07de330d9`. Exact intentional differences
+remain named in the allowlist, every entry must still differ from its legacy
+projection, and orphaned entries fail the suite. Current-only matrices preserve
+predicate starts, proof classes, prefixes, separators, enclosures, relative
+relationships, modal forms, layouts, evidence, domain order, and
+deduplication. Focused deterministic fast-check properties use a fixed seed for
+range safety, no-throw handling, determinism, deduplication idempotence,
+ordering, enclosure safety, relative-component containment, and ordinary
+soft-wrap equivalence after physical evidence projection.
 
 The physical-line stage keeps one lazy analysis accessor for a line outside a
 logical command. It intentionally runs line-local checks on physical
