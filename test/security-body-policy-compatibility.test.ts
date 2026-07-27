@@ -266,6 +266,30 @@ const INTENTIONAL_COMPATIBILITY_CHANGES: Readonly<
   "bounded-changed-subject-reviews": noFindingChange(
     "The one-word plural noun reviews is a changed subject before a modal prohibition, so later predicates cannot inherit workflow scope through it.",
   ),
+  "stabilization2-directive-conditional-secrets": noFindingChange(
+    "A supported outer directive cannot bypass the embedded workflow subject's conditional bridge.",
+  ),
+  "stabilization2-directive-local-upload": noFindingChange(
+    "A supported policy label cannot erase local scope inside the embedded workflow subject bridge.",
+  ),
+  "stabilization2-directive-changed-helper-secrets": noFindingChange(
+    "A supported outer policy label cannot bypass an explicit helper subject between the embedded workflow subject and prohibition.",
+  ),
+  "stabilization2-semicolon-unknown-network": findingChange(
+    "never use the network.",
+    "A bare semicolon proves an independent standalone policy boundary even when the preceding imperative is outside the curated predicate vocabulary.",
+  ),
+  "stabilization2-semicolon-unknown-secrets": findingChange(
+    "never use credentials.",
+    "A directly supported secret prohibition after a bare semicolon remains independent of the unknown preceding imperative.",
+  ),
+  "stabilization2-relative-target-network": findingChange(
+    "This workflow that documents network access to production must not use the network.",
+    "The network target belongs to the bounded relative predicate and no longer qualifies the later workflow prohibition.",
+  ),
+  "stabilization2-homograph-finite-reviews": noFindingChange(
+    "Reviews followed by the finite head require is a changed subject, so it clears workflow-subject inheritance before the later prohibition.",
+  ),
 };
 
 const PAIRWISE_CASES = BODY_POLICY_0244_GOLDEN_CASES.filter(
@@ -700,9 +724,13 @@ const CURRENT_BOUNDED_STATEMENT_MATRIX = [
     },
   },
   {
-    name: "inline relative domain-specific target",
+    name: "inline relative domain-specific attachment",
     body: "This workflow that uploads reports to a public bucket must not upload files.",
-    expected: [],
+    expected: [
+      finding(
+        "This workflow that uploads reports to a public bucket must not upload files.",
+      ),
+    ],
     coverage: {
       directivePrefix: "none",
       separator: "none",
@@ -757,6 +785,224 @@ const CURRENT_BOUNDED_STATEMENT_MATRIX = [
   },
 ] as const;
 
+const CURRENT_DIRECTIVE_BRIDGE_MATRIX = [
+  { prefix: "Policy:", prefixClass: "policy-label" },
+  { prefix: "For safety,", prefixClass: "directive" },
+].flatMap(({ prefix, prefixClass }) =>
+  [
+    {
+      bridgeClass: "immediate",
+      suffix: "this workflow must not use the network.",
+      emits: true,
+    },
+    {
+      bridgeClass: "descriptive",
+      suffix: "this workflow says do not use the network.",
+      emits: false,
+    },
+    {
+      bridgeClass: "conditional",
+      suffix: "this workflow when offline must not use the network.",
+      emits: false,
+    },
+    {
+      bridgeClass: "local",
+      suffix: "this workflow (during local setup) must not use the network.",
+      emits: false,
+    },
+    {
+      bridgeClass: "changed-subject",
+      suffix: "this workflow: the helper must not use the network.",
+      emits: false,
+    },
+  ].map(({ bridgeClass, suffix, emits }) => {
+    const body = `${prefix} ${suffix}`;
+    return {
+      name: `${prefixClass} × ${bridgeClass}`,
+      body,
+      expected: emits ? [finding(body)] : [],
+      coverage: { prefixClass, bridgeClass },
+    };
+  }),
+);
+
+const CURRENT_SEPARATOR_PREVIOUS_MATRIX = [
+  { previousClass: "known", previous: "Validate inputs", eligible: true },
+  {
+    previousClass: "unknown",
+    previous: "Clean the workspace",
+    eligible: false,
+  },
+  {
+    previousClass: "changed-subject",
+    previous: "The helper validates inputs",
+    eligible: false,
+  },
+  {
+    previousClass: "conditional",
+    previous: "If requested validate inputs",
+    eligible: false,
+  },
+  {
+    previousClass: "descriptive",
+    previous: "Documentation says validate inputs",
+    eligible: false,
+  },
+].flatMap(({ previousClass, previous, eligible }) =>
+  [
+    { separatorClass: "and", separator: " and ", fullEvidence: true },
+    { separatorClass: "comma", separator: ", ", fullEvidence: true },
+    { separatorClass: "but", separator: " but ", fullEvidence: false },
+    { separatorClass: "yet", separator: " yet ", fullEvidence: false },
+    { separatorClass: "then", separator: " then ", fullEvidence: false },
+    {
+      separatorClass: "semicolon",
+      separator: "; ",
+      fullEvidence: false,
+    },
+  ].map(({ separatorClass, separator, fullEvidence }) => {
+    const body = `${previous}${separator}never use the network.`;
+    const emits = separatorClass === "semicolon" || eligible;
+    return {
+      name: `${separatorClass} × ${previousClass}`,
+      body,
+      expected: emits
+        ? [finding(fullEvidence ? body : "never use the network.")]
+        : [],
+      coverage: { separatorClass, previousClass },
+    };
+  }),
+);
+
+const CURRENT_MODAL_DOMAIN_MATRIX = [
+  {
+    domain: "network",
+    subject: "This workflow",
+    predicate: "use the network",
+  },
+  { domain: "upload", subject: "This task", predicate: "upload files" },
+  {
+    domain: "secrets",
+    subject: "The process",
+    predicate: "use credentials",
+  },
+].flatMap(({ domain, subject, predicate }) =>
+  [
+    "must",
+    "shall",
+    "will",
+    "should",
+    "would",
+    "may",
+    "might",
+    "can",
+    "could",
+  ].map((modal) => {
+    const body = `${subject} ${modal} never ${predicate}.`;
+    return {
+      name: `${modal} × ${domain}`,
+      body,
+      expected: [finding(body)],
+      coverage: { modal, domain },
+    };
+  }),
+);
+
+const CURRENT_MODIFIER_QUALIFICATION_MATRIX = [
+  {
+    modifierClass: "relative",
+    qualificationClass: "descriptive",
+    body: "This workflow that documents logs must not use the network.",
+    emits: true,
+  },
+  {
+    modifierClass: "relative",
+    qualificationClass: "local",
+    body: "This workflow that validates inputs during setup must not use the network.",
+    emits: true,
+  },
+  {
+    modifierClass: "relative",
+    qualificationClass: "conditional",
+    body: "This workflow that runs when scheduled must not use the network.",
+    emits: true,
+  },
+  {
+    modifierClass: "relative",
+    qualificationClass: "specific-target",
+    body: "This workflow that documents network access to production must not use the network.",
+    emits: true,
+  },
+  {
+    modifierClass: "relative",
+    qualificationClass: "specific-source",
+    body: "This workflow that uses credentials from production must not use credentials.",
+    emits: true,
+  },
+  {
+    modifierClass: "naked",
+    qualificationClass: "descriptive",
+    body: "This workflow says must not use the network.",
+    emits: false,
+  },
+  {
+    modifierClass: "naked",
+    qualificationClass: "local",
+    body: "This workflow (during local setup) must not use the network.",
+    emits: false,
+  },
+  {
+    modifierClass: "naked",
+    qualificationClass: "conditional",
+    body: "This workflow when offline must not use the network.",
+    emits: false,
+  },
+  {
+    modifierClass: "naked",
+    qualificationClass: "specific-target",
+    body: "This workflow, to a public bucket, must not upload files.",
+    emits: false,
+  },
+  {
+    modifierClass: "naked",
+    qualificationClass: "specific-source",
+    body: "This workflow (from production) must not use credentials.",
+    emits: false,
+  },
+].map(({ modifierClass, qualificationClass, body, emits }) => ({
+  name: `${modifierClass} × ${qualificationClass}`,
+  body,
+  expected: emits ? [finding(body)] : [],
+  coverage: { modifierClass, qualificationClass },
+}));
+
+const CURRENT_HOMOGRAPH_HEAD_MATRIX = ["audits", "reviews", "logs"].flatMap(
+  (homograph) =>
+    [
+      { headClass: "copular", predicate: `${homograph} are reviewed` },
+      { headClass: "auxiliary", predicate: `${homograph} have approval` },
+      {
+        headClass: "finite",
+        predicate:
+          homograph === "reviews"
+            ? "reviews require approval"
+            : `${homograph} contain entries`,
+      },
+      {
+        headClass: "negative-modal",
+        predicate: `${homograph} must not use the network`,
+      },
+    ].map(({ headClass, predicate }) => {
+      const body = `This workflow checks inputs but ${predicate}, yet must not upload files.`;
+      return {
+        name: `${homograph} × ${headClass}`,
+        body,
+        expected: [],
+        coverage: { homograph, headClass },
+      };
+    }),
+);
+
 test("0.24.4 body-policy golden cases are self-contained and immutable", () => {
   assert.equal(BODY_POLICY_0244_GOLDEN_SOURCE.tag, "v0.24.4");
   assert.equal(
@@ -767,7 +1013,7 @@ test("0.24.4 body-policy golden cases are self-contained and immutable", () => {
     BODY_POLICY_0244_GOLDEN_SOURCE.generatedBy,
     /securityDiagnosticFindings/u,
   );
-  assert.equal(BODY_POLICY_0244_GOLDEN_CASES.length, 135);
+  assert.equal(BODY_POLICY_0244_GOLDEN_CASES.length, 157);
   assert.equal(
     new Set(BODY_POLICY_0244_GOLDEN_CASES.map(({ name }) => name)).size,
     BODY_POLICY_0244_GOLDEN_CASES.length,
@@ -1038,6 +1284,77 @@ test("current bounded statement matrix has exact output and complete dimensions"
   ]);
 });
 
+test("current stabilization matrices cover every requested cross-product", () => {
+  const matrices = [
+    CURRENT_DIRECTIVE_BRIDGE_MATRIX,
+    CURRENT_SEPARATOR_PREVIOUS_MATRIX,
+    CURRENT_MODAL_DOMAIN_MATRIX,
+    CURRENT_MODIFIER_QUALIFICATION_MATRIX,
+    CURRENT_HOMOGRAPH_HEAD_MATRIX,
+  ] as const;
+  for (const matrix of matrices) {
+    for (const fixture of matrix) {
+      assert.deepEqual(
+        bodyPolicyFindingProjections(fixture.body),
+        fixture.expected,
+        fixture.name,
+      );
+    }
+  }
+
+  assertMatrixCrossProduct(
+    CURRENT_DIRECTIVE_BRIDGE_MATRIX,
+    "prefixClass",
+    ["policy-label", "directive"],
+    "bridgeClass",
+    ["immediate", "descriptive", "conditional", "local", "changed-subject"],
+  );
+  assertMatrixCrossProduct(
+    CURRENT_SEPARATOR_PREVIOUS_MATRIX,
+    "separatorClass",
+    ["and", "comma", "but", "yet", "then", "semicolon"],
+    "previousClass",
+    ["known", "unknown", "changed-subject", "conditional", "descriptive"],
+  );
+  assertMatrixCrossProduct(
+    CURRENT_MODAL_DOMAIN_MATRIX,
+    "modal",
+    [
+      "must",
+      "shall",
+      "will",
+      "should",
+      "would",
+      "may",
+      "might",
+      "can",
+      "could",
+    ],
+    "domain",
+    ["network", "upload", "secrets"],
+  );
+  assertMatrixCrossProduct(
+    CURRENT_MODIFIER_QUALIFICATION_MATRIX,
+    "modifierClass",
+    ["relative", "naked"],
+    "qualificationClass",
+    [
+      "descriptive",
+      "local",
+      "conditional",
+      "specific-target",
+      "specific-source",
+    ],
+  );
+  assertMatrixCrossProduct(
+    CURRENT_HOMOGRAPH_HEAD_MATRIX,
+    "homograph",
+    ["audits", "reviews", "logs"],
+    "headClass",
+    ["copular", "auxiliary", "finite", "negative-modal"],
+  );
+});
+
 function assertPairwiseCoverage(
   label: string,
   fixtures: typeof PAIRWISE_CASES,
@@ -1058,6 +1375,30 @@ function assertPairwiseCoverage(
     ),
   );
   assert.deepEqual(actual, expected, label);
+}
+
+function assertMatrixCrossProduct<
+  Fixture extends {
+    readonly coverage: Readonly<Record<string, string>>;
+  },
+>(
+  fixtures: readonly Fixture[],
+  leftKey: string,
+  leftValues: readonly string[],
+  rightKey: string,
+  rightValues: readonly string[],
+): void {
+  const actual = new Set(
+    fixtures.map(
+      ({ coverage }) => `${coverage[leftKey]}:${coverage[rightKey]}`,
+    ),
+  );
+  const expected = new Set(
+    leftValues.flatMap((left) =>
+      rightValues.map((right) => `${left}:${right}`),
+    ),
+  );
+  assert.deepEqual(actual, expected, `${leftKey} × ${rightKey}`);
 }
 
 function assertMatrixCoverage<

@@ -182,12 +182,14 @@ subjectless starts include copular and auxiliary or modal predicates plus a
 curated ordinary-verb vocabulary; this keeps subject state through three or
 more predicates without treating arbitrary words as verbs. The bounded `also`,
 `still`, and `therefore` modifiers remain supported. Bare semicolons and `then`
-deliberately use the strict 0.24.4 compatibility behavior. Sentence endings,
-Markdown hard breaks, structural boundaries, explicit changed subjects,
-conditional or subordinate prefixes, and unsupported syntax reset inheritance.
-A subject is established from the grammatical statement segment before domain
-facts exist, so a domain-free, local, specific, or cross-domain first predicate
-cannot discard it.
+otherwise use the strict 0.24.4 compatibility behavior, but a bare semicolon
+with no active workflow subject proves an independent later standalone policy
+even when the preceding imperative is outside the curated vocabulary. Sentence
+endings, Markdown hard breaks, structural boundaries, explicit changed
+subjects, conditional or subordinate prefixes, and unsupported syntax reset
+inheritance. A subject is established from the grammatical statement segment
+before domain facts exist, so a domain-free, local, specific, or cross-domain
+first predicate cannot discard it.
 
 Existing domain patterns may also produce a direct workflow-prefix
 prohibition. Its subject-to-predicate bridge is classified as one bounded
@@ -196,20 +198,25 @@ modifiers, and an optional relative, parenthetical, or paired-comma modifier.
 Explicit changed subjects, conditional or subordinate instructions, quoted or
 descriptive text, and unsupported bridges are rejected. Local-step, specific
 source/target, exception, and allowance language inside a bridge is preserved
-as a qualification instead of being erased. A preposition inside an inline
-relative modifier qualifies the prohibition only when it is attached to the
-same domain action or phrase. In particular, `during deterministic validation`
-and other bounded validation phases are local rather than workflow-wide.
+as a qualification instead of being erased. Relative components are parsed
+before those semantics: descriptive, conditional, local, source, and target
+wording inside a bounded `that` or `which` predicate stays attached to that
+relative predicate instead of qualifying the later prohibition. The same
+wording in a naked parenthetical, paired-comma component, or main-predicate
+bridge still qualifies or rejects the prohibition. In particular, `during
+deterministic validation` in a naked bridge is local rather than workflow-wide.
 
 Every direct prohibited fact with apparent workflow scope is also evaluated
 against one private statement-level proof class: standalone default, explicit
-workflow subject, inherited workflow subject, explicit workflow qualifier, or
-no workflow proof. Only the first four preserve workflow scope. A supported
-domain pattern inside a changed-subject, conditional, descriptive, or
-unsupported segment therefore cannot escape through the clause-facts default.
-The standalone default accepts a small directive or policy-label prefix and an
-independent directly supported predicate after bounded subjectless
-coordination; neither form manufactures an inherited workflow subject.
+workflow subject, prefixed workflow subject, inherited workflow subject,
+explicit workflow qualifier, or no workflow proof. Only the last class removes
+workflow scope. A supported domain pattern inside a changed-subject,
+conditional, descriptive, or unsupported segment therefore cannot escape
+through the clause-facts default. An outer directive or policy label proves only
+its own prefix; an embedded workflow subject must independently pass the
+candidate-local subject bridge classifier. The standalone default applies only
+to candidates without their own workflow subject and to independent directly
+supported predicates after bounded subjectless coordination.
 
 For each supported network, external-upload, or secret candidate in a predicate
 segment, the classifier retains its local source range, explicit or inherited
@@ -217,10 +224,12 @@ subject range, proof-derived scope, domain, modality, supported-clause
 completeness, and whether the existing domain grammar directly supported it.
 One statement group may therefore produce multiple facts for the same domain
 while every predicate keeps local scope, safeguard, source/target, remainder,
-and evidence decisions. Base and third-person forms of the curated policy
-verbs continue a proven subject; strong noun phrases followed by modal or
-prohibition heads clear it before noun/verb homographs can inherit workflow
-scope.
+and evidence decisions. Base and third-person forms of the curated policy verbs
+continue a proven subject; strong noun phrases followed by copular, auxiliary,
+finite, or negative modal heads clear it before noun/verb homographs can
+inherit workflow scope. Each of the nine supported modals followed by `never`
+is classified as one prohibition predicate rather than a subject-bridge
+modifier.
 Only a complete `prohibited` fact with `workflow` scope can contradict an
 enabled permissive policy for the same domain. `unknown`, `not-required`,
 `local-safeguard`, local-step, specific-source, specific-target, and
@@ -236,7 +245,7 @@ multiple detectors, but the body-policy module owns the semantic relationship
 between domain, modality, scope, and completeness. It is not a public schema,
 configuration surface, or general natural-language parser.
 
-Compatibility tests freeze 135 exact bodies and public finding projections from
+Compatibility tests freeze 157 exact bodies and public finding projections from
 Renma 0.24.4 commit `9e72e1adddd588ea72cba1c3e06ed1d07de330d9`.
 The test consumes those bodies directly; legacy code is not installed or run in
 CI. Thirty-two frozen cases cover every requested pair across first predicate
@@ -247,10 +256,13 @@ start classification, direct provenance, all scope-proof classes, directive
 prefixes, separators with and without an active subject, composed and qualified
 bridges, paired-comma and inline-relative attachment, base and third-person
 middle verbs, single- and multiword changed subjects, one-line and soft-wrap
-prose, heading fallback, domain order, and deduplication. Compatibility means
-equality with the frozen corpus except for named, exact-current-output allowlist
-entries covering intentional precision, statement-group recovery, and
-bounded-evidence changes.
+prose, heading fallback, domain order, and deduplication. Additional exact
+cross-product matrices cover outer prefix and candidate bridge, separator and
+previous-predicate classification, modal and domain, relative or naked modifier
+and qualification, and homograph and following predicate-head category.
+Compatibility means equality with the frozen corpus except for named,
+exact-current-output allowlist entries covering intentional precision,
+statement-group recovery, and bounded-evidence changes.
 
 The physical-line stage keeps one lazy analysis accessor for a line outside a
 logical command. It intentionally runs line-local checks on physical

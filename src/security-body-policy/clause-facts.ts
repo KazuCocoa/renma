@@ -60,6 +60,7 @@ const NETWORK_SUBJECT = String.raw`(?:external\s+)?(?:network|internet)(?:\s+(?:
 const UPLOAD_SUBJECT = String.raw`(?:external\s+)?uploads?`;
 const SECRET_ACCESS_SUBJECT = String.raw`(?:(?:secret|credential|token|password|private[- ]key)\s+(?:access|use|usage)|${BODY_SECRET_TARGET_TERMS})`;
 const SECRET_EVIDENCE = String.raw`(?<![A-Za-z0-9_])(?:${BODY_SECRET_TARGET_TERMS})\b`;
+const MODAL_NEVER = String.raw`(?:must|shall|will|should|would|may|might|can|could)[ \t]+never`;
 
 const DOMAIN_EVIDENCE_PATTERNS = {
   network:
@@ -84,14 +85,17 @@ const AFFIRMATIVE_REQUIREMENT_PATTERNS = {
 const PROHIBITED_PATTERNS = {
   network: [
     /\b(?:no|without)\s+(?:(?:any|all)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b(?!\s+(?:access|use|usage|connectivity|to)\b)/i,
-    /\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:(?:all|any)\s+)?(?:(?:use|allow|permit)\s+)?(?:the\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b(?!\s+(?:access|use|usage|connectivity|to)\b)/i,
+    new RegExp(
+      String.raw`\b(?:do[ \t]+not|don't|${MODAL_NEVER}|never|avoid|exclude|disallow|forbid|block)[ \t]+(?:(?:all|any)[ \t]+)?(?:(?:use|allow|permit)[ \t]+)?(?:the[ \t]+)?(?:external[ \t]+)?(?:network|internet)(?:[ \t]+(?:access|use|usage|connectivity))?\b(?![ \t]+(?:access|use|usage|connectivity|to)\b)`,
+      "i",
+    ),
     /\b(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\s+(?:(?:is|are)\s+(?:not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled)|(?:must|may|should)\s+not\s+be\s+(?:used|available|enabled))\b/i,
     new RegExp(
       String.raw`\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:allow|permit)\s+(?:any|all)\s+(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b[^.!?\n]{0,40}\b(?:for|throughout|during|within|in)\s+${WORKFLOW_SCOPE_TERMS}\b`,
       "i",
     ),
     new RegExp(
-      String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,40}\b(?:(?:must|shall|will|does|do)\s+not|cannot|can't|never)\s+(?:use|access)\s+(?:(?:any|all|the)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b`,
+      String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,80}\b(?:${MODAL_NEVER}|(?:must|shall|will|does|do)[ \t]+not|cannot|can't|never)[ \t]+(?:use|access)[ \t]+(?:(?:any|all|the)[ \t]+)?(?:external[ \t]+)?(?:network|internet)(?:[ \t]+(?:access|use|usage|connectivity))?\b`,
       "i",
     ),
     new RegExp(
@@ -105,18 +109,21 @@ const PROHIBITED_PATTERNS = {
   ],
   upload: [
     /\b(?:no|without)\s+(?:(?:any|all)\s+)?(?:external\s+)?uploads\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)/i,
-    /\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:perform|allow|permit|make)\s+(?:(?:(?:any|all)\s+)?external\s+uploads?|(?:any|all)\s+uploads?|uploads)\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)/i,
     new RegExp(
-      String.raw`\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:${EXTERNAL_UPLOAD_ACTION_TERMS})\s+(?:(?:anything|everything)(?:\s+externally)?|externally)\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)`,
+      String.raw`\b(?:do[ \t]+not|don't|${MODAL_NEVER}|never|avoid|exclude|disallow|forbid|block)[ \t]+(?:perform|allow|permit|make)[ \t]+(?:(?:(?:any|all)[ \t]+)?external[ \t]+uploads?|(?:any|all)[ \t]+uploads?|uploads)\b(?![ \t]+(?:to|into|onto|of|from|with|containing)\b)`,
+      "i",
+    ),
+    new RegExp(
+      String.raw`\b(?:do[ \t]+not|don't|${MODAL_NEVER}|never|avoid|exclude|disallow|forbid|block)[ \t]+(?:${EXTERNAL_UPLOAD_ACTION_TERMS})[ \t]+(?:(?:anything|everything)(?:[ \t]+externally)?|externally)\b(?![ \t]+(?:to|into|onto|of|from|with|containing)\b)`,
       "i",
     ),
     /\b(?:(?:all|any)\s+)?(?:external\s+)?uploads?\s+(?:are|is)\s+(?:not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled)\b/i,
     new RegExp(
-      String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,40}\b(?:(?:must|shall|will|does)\s+not|cannot|can't|never)\s+(?:${EXTERNAL_UPLOAD_ACTION_TERMS})\s+(?:(?:anything|everything)(?:\s+externally)?|externally)\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)`,
+      String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,80}\b(?:${MODAL_NEVER}|(?:must|shall|will|does)[ \t]+not|cannot|can't|never)[ \t]+(?:${EXTERNAL_UPLOAD_ACTION_TERMS})[ \t]+(?:(?:anything|everything)(?:[ \t]+externally)?|externally)\b(?![ \t]+(?:to|into|onto|of|from|with|containing)\b)`,
       "i",
     ),
     new RegExp(
-      String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,40}\b(?:(?:must|shall|will|does)\s+not|cannot|can't|never)\s+(?:${EXTERNAL_UPLOAD_ACTION_TERMS})\s+(?:files?|artifacts?|data)\b`,
+      String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,80}\b(?:${MODAL_NEVER}|(?:must|shall|will|does)[ \t]+not|cannot|can't|never)[ \t]+(?:${EXTERNAL_UPLOAD_ACTION_TERMS})[ \t]+(?:files?|artifacts?|data)\b`,
       "i",
     ),
     new RegExp(
@@ -130,12 +137,16 @@ const PROHIBITED_PATTERNS = {
   ],
   secrets: [
     new RegExp(
+      String.raw`\b(?:do[ \t]+not|don't|${MODAL_NEVER}|never|avoid|exclude|disallow|forbid|block)[ \t]+(?:access|read|load|use|accept|handle)[ \t]+(?:any[ \t]+)?(?:${BODY_SECRET_TARGET_TERMS})\b(?![ \t]+(?:from|through|via)\b)`,
+      "i",
+    ),
+    new RegExp(
       String.raw`\bwithout\s+(?:(?:any|all)\s+)?(?:(?:access|permission)\s+to\s+|(?:the\s+)?use\s+of\s+)(?:${BODY_SECRET_TARGET_TERMS})\b(?!\s+(?:from|through|via)\b)`,
       "i",
     ),
     /\bno\s+(?:secret|credential|token|password|private[- ]key)\s+(?:access|use|usage)\b/i,
     new RegExp(
-      String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,50}\b(?:(?:must|shall|will|does)\s+not|cannot|can't|never)\s+(?:access|read|load|use|accept|handle)\s+(?:any\s+)?(?:${BODY_SECRET_TARGET_TERMS})\b(?!\s+(?:from|through|via)\b)`,
+      String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,80}\b(?:${MODAL_NEVER}|(?:must|shall|will|does)[ \t]+not|cannot|can't|never)[ \t]+(?:access|read|load|use|accept|handle)[ \t]+(?:any[ \t]+)?(?:${BODY_SECRET_TARGET_TERMS})\b(?![ \t]+(?:from|through|via)\b)`,
       "i",
     ),
     new RegExp(
@@ -167,13 +178,15 @@ const PROHIBITED_PATTERNS = {
 
 const GENERIC_PROHIBITION_PATTERNS = {
   network: new RegExp(
-    String.raw`\b(?:do\s+not|don't|never|must\s+not|cannot|can't|forbidden|not\s+allowed|no)\b[^.!?\n]{0,100}?\b${NETWORK_SUBJECT}\b`,
+    String.raw`\b(?:do[ \t]+not|don't|${MODAL_NEVER}|never|must[ \t]+not|cannot|can't|forbidden|not[ \t]+allowed|no)\b[^.!?\n]{0,100}?\b${NETWORK_SUBJECT}\b`,
     "i",
   ),
-  upload:
-    /\b(?:do\s+not|don't|never|must\s+not|cannot|can't|forbidden|not\s+allowed|no)\b[^.!?\n]{0,100}?\b(?:uploads?|uploading|uploaded)\b/i,
+  upload: new RegExp(
+    String.raw`\b(?:do[ \t]+not|don't|${MODAL_NEVER}|never|must[ \t]+not|cannot|can't|forbidden|not[ \t]+allowed|no)\b[^.!?\n]{0,100}?\b(?:uploads?|uploading|uploaded)\b`,
+    "i",
+  ),
   secrets: new RegExp(
-    String.raw`\b(?:do\s+not|don't|never|must\s+not|cannot|can't|forbidden|not\s+allowed|no)\b[^.!?\n]{0,100}?${SECRET_EVIDENCE}`,
+    String.raw`\b(?:do[ \t]+not|don't|${MODAL_NEVER}|never|must[ \t]+not|cannot|can't|forbidden|not[ \t]+allowed|no)\b[^.!?\n]{0,100}?${SECRET_EVIDENCE}`,
     "i",
   ),
 } satisfies Record<BodyPolicyDomain, RegExp>;
@@ -208,8 +221,10 @@ const NOT_REQUIREMENT_PREDICATE_RE =
   /\b(?:does\s+not\s+require|(?:is|are|was|were)\s+(?:not\s+(?:required|needed|necessary)|unnecessary|optional)|(?:should|will|would|may)\s+not\s+be\s+(?:required|needed|necessary)|no\s+requirement|no)\b/gi;
 const AFFIRMATIVE_REQUIREMENT_PREDICATE_RE =
   /\b(?:requires|(?:is|are|was|were)\s+(?:required|needed|necessary)|(?:should|will|would|may)\s+be\s+(?:required|needed|necessary))\b/gi;
-const PROHIBITION_PREDICATE_RE =
-  /\b(?:do\s+not|don't|never|must\s+not|shall\s+not|will\s+not|does\s+not|cannot|can't|not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled|without|no|(?:must|shall|will|has\s+to|needs\s+to)\s+(?:run|operate|work)(?:\s+without)?|keep|run|operate)\b/gi;
+const PROHIBITION_PREDICATE_RE = new RegExp(
+  String.raw`\b(?:do[ \t]+not|don't|${MODAL_NEVER}|never|must[ \t]+not|shall[ \t]+not|will[ \t]+not|does[ \t]+not|cannot|can't|not[ \t]+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled|without|no|(?:must|shall|will|has[ \t]+to|needs[ \t]+to)[ \t]+(?:run|operate|work)(?:[ \t]+without)?|keep|run|operate)\b`,
+  "gi",
+);
 const STATEMENT_MODIFIER = String.raw`(?:also|still|therefore)`;
 const SUBJECTLESS_AUXILIARY_HEAD = String.raw`(?:is|are|was|were|has|have|had|does|do|did|will|would|shall|should|can|could|may|might|must|cannot|can't|needs|requires)`;
 const SUBJECTLESS_ORDINARY_VERB_HEAD = String.raw`(?:accepts?|adapts?|analyzes?|applies|audits?|builds?|checks?|classifies|collects?|compares?|compiles?|completes?|configures?|creates?|detects?|documents?|emits?|evaluates?|executes?|generates?|handles?|inspects?|loads?|logs?|maps?|normalizes?|parses?|prepares?|processes|produces?|reads?|records?|reports?|resolves?|reviews?|runs?|scans?|selects?|stores?|summarizes?|tracks?|transforms?|updates?|uses?|validates?|verifies|writes?)`;
@@ -232,8 +247,10 @@ const EXPLICIT_CHANGED_SUBJECT_START_RE = new RegExp(
   String.raw`^[ \t]*(?:(?:the|a|an|this|that|these|those|each|every|another|offline|online|local|remote)[ \t]+)?[A-Za-z][A-Za-z0-9_-]*(?:[ \t]+[A-Za-z][A-Za-z0-9_-]*){0,3}[ \t]+${SUBJECTLESS_PREDICATE_HEAD}\b`,
   "i",
 );
-const STRONG_CHANGED_SUBJECT_START_RE =
-  /^[ \t]*(?!(?:it|also|still|therefore)\b)(?:(?:the|a|an|this|that|these|those|each|every|another|offline|online|local|remote)[ \t]+)?[A-Za-z][A-Za-z0-9_-]*(?:[ \t]+[A-Za-z][A-Za-z0-9_-]*){0,3}[ \t]+(?:(?:must|shall|should|will|would|may|might|can|could|does|do|did)[ \t]+(?:not|never)|cannot|can't|never)\b/i;
+const STRONG_CHANGED_SUBJECT_START_RE = new RegExp(
+  String.raw`^[ \t]*(?!(?:it|${STATEMENT_MODIFIER})\b)(?:(?:the|a|an|this|that|these|those|each|every|another|offline|online|local|remote)[ \t]+)?[A-Za-z][A-Za-z0-9_-]*(?:[ \t]+[A-Za-z][A-Za-z0-9_-]*){0,3}[ \t]+(?:${SUBJECTLESS_AUXILIARY_HEAD}|requires?|needs?|contains?|includes?|never)\b`,
+  "i",
+);
 const DOMAIN_PREDICATE_START_RE = new RegExp(
   String.raw`^[ \t]*(?:,[ \t]*)?(?:(?:${STATEMENT_MODIFIER})[ \t]+)*(?:${NETWORK_SUBJECT}|${UPLOAD_SUBJECT}|${SECRET_ACCESS_SUBJECT})[ \t]+(?:(?:is|are|was|were)[ \t]+|(?:must|shall|should|may|can|will|would)[ \t]+)`,
   "i",
@@ -284,6 +301,7 @@ type DirectSubjectBridgeClassification =
 type WorkflowScopeProof =
   | "standalone-default"
   | "explicit-workflow-subject"
+  | "prefixed-workflow-subject"
   | "inherited-workflow-subject"
   | "explicit-workflow-qualifier"
   | "no-workflow-proof";
@@ -376,6 +394,7 @@ export function bodyPolicyStatementGroupFacts(
           explicitSubject !== undefined
             ? Math.min(scopedFact.evidenceStart, explicitSubject.start)
             : scopeProof === "standalone-default" ||
+                scopeProof === "prefixed-workflow-subject" ||
                 scopeProof === "explicit-workflow-qualifier"
               ? 0
               : scopedFact.evidenceStart;
@@ -931,7 +950,8 @@ function bodyPolicyStatementGroups(
       boundary === "inherited" &&
       activeSubject === undefined &&
       previousPredicate !== undefined &&
-      predicateAllowsIndependentPolicyContinuation(text, previousPredicate);
+      (bareSemicolonSeparatesIndependentPolicies(separatorText) ||
+        predicateAllowsIndependentPolicyContinuation(text, previousPredicate));
     if (boundary === "hard") {
       if (predicates.length > 0) {
         groups.push(
@@ -1003,6 +1023,10 @@ function predicateAllowsIndependentPolicyContinuation(
   return directlySupportedProhibitionStartsText(
     text.slice(predicate.range.start, predicate.range.end),
   );
+}
+
+function bareSemicolonSeparatesIndependentPolicies(separator: string): boolean {
+  return !separator.includes("\n") && /^[ \t]*;[ \t]*$/u.test(separator);
 }
 
 function splitOrdinaryPredicateRanges(
@@ -1202,6 +1226,31 @@ function standalonePolicyPrefixSupportsScope(
   );
 }
 
+function outerPrefixSupportsEmbeddedWorkflowSubject(
+  classification: StandalonePolicyPrefixClassification,
+): boolean {
+  return (
+    classification === "directive-prefix" || classification === "policy-label"
+  );
+}
+
+function candidateHasSupportedDirectWorkflowBridge(
+  predicate: string,
+  candidate: DomainCandidate,
+  domain: BodyPolicyDomain,
+): boolean {
+  const subject = candidate.directWorkflowSubject;
+  return (
+    subject !== undefined &&
+    directSubjectBridgeSupportsProhibition(
+      classifyDirectSubjectBridge(
+        predicate.slice(subject.end, candidate.predicateStart),
+        domain,
+      ),
+    )
+  );
+}
+
 function directFactWorkflowScopeProof(
   predicate: string,
   segment: BodyPolicyPredicateSegment,
@@ -1218,10 +1267,14 @@ function directFactWorkflowScopeProof(
   }
 
   const candidates = supportedCandidatesForFact(predicate, fact);
-  const standaloneCandidates = candidates.filter((candidate) =>
-    standalonePolicyPrefixSupportsScope(
-      standalonePolicyPrefixClassification(predicate.slice(0, candidate.start)),
-    ),
+  const standaloneCandidates = candidates.filter(
+    (candidate) =>
+      candidate.directWorkflowSubject === undefined &&
+      standalonePolicyPrefixSupportsScope(
+        standalonePolicyPrefixClassification(
+          predicate.slice(0, candidate.start),
+        ),
+      ),
   );
   if (
     standaloneCandidates.length > 0 &&
@@ -1241,6 +1294,20 @@ function directFactWorkflowScopeProof(
     )
   ) {
     return "explicit-workflow-subject";
+  }
+  if (
+    explicitSubject === undefined &&
+    candidates.some(
+      (candidate) =>
+        outerPrefixSupportsEmbeddedWorkflowSubject(
+          standalonePolicyPrefixClassification(
+            predicate.slice(0, candidate.start),
+          ),
+        ) &&
+        candidateHasSupportedDirectWorkflowBridge(predicate, candidate, domain),
+    )
+  ) {
+    return "prefixed-workflow-subject";
   }
 
   if (
@@ -1335,50 +1402,40 @@ function isBoundedRelativeModifier(modifier: string): boolean {
   );
 }
 
+function bridgeQualificationClassification(
+  bridge: string,
+  domain: BodyPolicyDomain,
+  nakedPreposition: boolean,
+): DirectSubjectBridgeClassification | undefined {
+  if (/["'“”‘’`]/u.test(bridge) || DESCRIPTIVE_SUBJECT_BRIDGE_RE.test(bridge)) {
+    return "quoted-or-descriptive";
+  }
+  if (CONDITIONAL_SUBJECT_BRIDGE_RE.test(bridge)) {
+    return "conditional-or-subordinate";
+  }
+  if (
+    /\b(?:except|excluding|unless|only|allow(?:ed|ance)?|permit(?:ted|s)?)\b/i.test(
+      bridge,
+    )
+  ) {
+    return "exception-or-allowance";
+  }
+  if (bridgeHasLocalScope(bridge)) {
+    return "local-step-scope";
+  }
+  if (modifierHasSpecificScope(bridge, domain, nakedPreposition)) {
+    return "specific-source-or-target";
+  }
+  return undefined;
+}
+
 function classifyDirectSubjectBridge(
   bridge: string,
   domain: BodyPolicyDomain,
 ): DirectSubjectBridgeClassification {
   let remainder = bridge.trimStart();
   if (remainder.trim().length === 0) return "immediate";
-  if (
-    /["'“”‘’`]/u.test(remainder) ||
-    DESCRIPTIVE_SUBJECT_BRIDGE_RE.test(remainder)
-  ) {
-    return "quoted-or-descriptive";
-  }
-  if (CONDITIONAL_SUBJECT_BRIDGE_RE.test(remainder)) {
-    return "conditional-or-subordinate";
-  }
-  if (
-    /\b(?:except|excluding|unless|only|allow(?:ed|ance)?|permit(?:ted|s)?)\b/i.test(
-      remainder,
-    )
-  ) {
-    return "exception-or-allowance";
-  }
-  if (bridgeHasLocalScope(remainder)) {
-    return "local-step-scope";
-  }
   let consumedComponent = false;
-  const pairedComma = DIRECT_SUBJECT_PAIRED_COMMA_MODIFIER_RE.exec(remainder);
-  if (pairedComma?.groups?.content !== undefined) {
-    const content = pairedComma.groups.content.trim();
-    if (!isBoundedRelativeModifier(content)) {
-      if (modifierHasSpecificScope(content, domain, true)) {
-        return "specific-source-or-target";
-      }
-      return classifyPredicateStart(content, false) ===
-        "explicit-changed-subject"
-        ? "explicit-changed-subject"
-        : "unsupported";
-    }
-    if (modifierHasSpecificScope(content, domain, false)) {
-      return "specific-source-or-target";
-    }
-    remainder = remainder.slice(pairedComma[0].length);
-    consumedComponent = true;
-  }
   const punctuation = DIRECT_SUBJECT_PUNCTUATION_RE.exec(remainder);
   if (punctuation !== null) {
     remainder = remainder.slice(punctuation[0].length);
@@ -1396,34 +1453,57 @@ function classifyDirectSubjectBridge(
     consumedComponent = true;
   }
 
-  const relative = DIRECT_SUBJECT_RELATIVE_MODIFIER_RE.exec(remainder);
-  if (relative !== null) {
-    if (modifierHasSpecificScope(relative[0], domain, false)) {
-      return "specific-source-or-target";
+  const pairedComma = DIRECT_SUBJECT_PAIRED_COMMA_MODIFIER_RE.exec(remainder);
+  if (pairedComma?.groups?.content !== undefined) {
+    const content = pairedComma.groups.content.trim();
+    if (!isBoundedRelativeModifier(content)) {
+      const qualification = bridgeQualificationClassification(
+        content,
+        domain,
+        true,
+      );
+      if (qualification !== undefined) return qualification;
+      return classifyPredicateStart(content, false) ===
+        "explicit-changed-subject"
+        ? "explicit-changed-subject"
+        : "unsupported";
     }
-    remainder = remainder.slice(relative[0].length).trim();
+    remainder = remainder.slice(pairedComma[0].length).trimStart();
     consumedComponent = true;
   } else {
-    const parenthetical = DIRECT_SUBJECT_PARENTHETICAL_RE.exec(remainder);
-    if (
-      parenthetical?.groups?.content !== undefined &&
-      !new RegExp(PROHIBITION_PREDICATE_RE.source, "i").test(
-        parenthetical.groups.content,
-      )
-    ) {
-      if (
-        modifierHasSpecificScope(parenthetical.groups.content, domain, true)
-      ) {
-        return "specific-source-or-target";
-      }
-      remainder = remainder.slice(parenthetical[0].length).trimStart();
+    const relative = DIRECT_SUBJECT_RELATIVE_MODIFIER_RE.exec(remainder);
+    if (relative !== null) {
+      remainder = remainder.slice(relative[0].length).trim();
       consumedComponent = true;
+    } else {
+      const parenthetical = DIRECT_SUBJECT_PARENTHETICAL_RE.exec(remainder);
+      if (
+        parenthetical?.groups?.content !== undefined &&
+        !new RegExp(PROHIBITION_PREDICATE_RE.source, "i").test(
+          parenthetical.groups.content,
+        )
+      ) {
+        const qualification = bridgeQualificationClassification(
+          parenthetical.groups.content,
+          domain,
+          true,
+        );
+        if (qualification !== undefined) return qualification;
+        remainder = remainder.slice(parenthetical[0].length).trimStart();
+        consumedComponent = true;
+      }
     }
   }
 
   if (consumedComponent && remainder.trim().length === 0) {
     return "composed";
   }
+  const qualification = bridgeQualificationClassification(
+    remainder,
+    domain,
+    true,
+  );
+  if (qualification !== undefined) return qualification;
   return CHANGED_SUBJECT_BRIDGE_RE.test(bridge)
     ? "explicit-changed-subject"
     : "unsupported";

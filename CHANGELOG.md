@@ -25,21 +25,27 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   independent subjectless coordination. Paired-comma modifiers remain attached
   to their prohibition, while prepositions in inline relative clauses qualify
   only the nearest bounded action or domain phrase.
+- Kept outer directive proof separate from an embedded workflow subject's local
+  bridge proof, accepted unknown imperatives only across an independent bare
+  semicolon, and modeled every bounded `modal + never` form as a prohibition
+  predicate.
 - Required explicit statement-level scope proof for direct facts, preventing a
   supported subjectless prohibition under descriptive, changed-subject,
   conditional, or unsupported syntax from receiving default workflow scope.
 - Restored subject continuation through base and third-person policy verbs
-  while recognizing strong noun-phrase-plus-modal shapes such as `audit jobs`
-  before their first word can be treated as a subjectless verb.
+  while recognizing strong noun phrases followed by copular, auxiliary, finite,
+  or negative modal heads before their first word can be treated as a
+  subjectless verb.
 - Kept affirmative requirement language distinct from genuinely negative
   `not-required` facts so it cannot suppress a later workflow prohibition.
-- Added 135 immutable, self-contained test-only 0.24.4 golden cases generated
+- Added 157 immutable, self-contained test-only 0.24.4 golden cases generated
   from the full tagged commit. The exact legacy bodies and public projections
   cover subjects, predicate kinds, connectors, domains, scopes, layouts,
   evidence, ordering, and deduplication; a 32-case matrix proves the requested
   pairwise interactions, deterministic current-only matrices cover scope proof,
-  bridge precision, directives, coordination, modifier attachment, and changed
-  subjects, and every observed difference is explicitly allowlisted.
+  bridge precision and the directive/bridge, separator/previous-predicate,
+  modal/domain, modifier/qualification, and homograph/predicate-head
+  cross-products, and every observed difference is explicitly allowlisted.
 
 ### Changed
 

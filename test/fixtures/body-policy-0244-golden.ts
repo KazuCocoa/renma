@@ -2328,6 +2328,388 @@ const RAW_BODY_POLICY_0244_GOLDEN_CASES = [
       layout: "one-line",
     },
   },
+  {
+    name: "stabilization2-directive-descriptive-network",
+    body: "Policy: this workflow says do not use the network.",
+    expected: [],
+    coverage: {
+      group: "stabilization-cross-products",
+      outerPrefix: "policy-label",
+      candidateBridge: "descriptive",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-directive-conditional-secrets",
+    body: "For safety, this workflow when offline must not use credentials.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          "For safety, this workflow when offline must not use credentials.",
+      },
+    ],
+    coverage: {
+      group: "stabilization-cross-products",
+      outerPrefix: "directive",
+      candidateBridge: "conditional",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-directive-local-upload",
+    body: "Requirement: this workflow (during local setup) must not upload files.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          "Requirement: this workflow (during local setup) must not upload files.",
+      },
+    ],
+    coverage: {
+      group: "stabilization-cross-products",
+      outerPrefix: "policy-label",
+      candidateBridge: "local",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-directive-changed-helper-secrets",
+    body: "Policy: this workflow: the helper must not use credentials.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "Policy: this workflow: the helper must not use credentials.",
+      },
+    ],
+    coverage: {
+      group: "stabilization-cross-products",
+      outerPrefix: "policy-label",
+      candidateBridge: "changed-subject",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-directive-supported-network",
+    body: "Policy: this workflow must not use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "Policy: this workflow must not use the network.",
+      },
+    ],
+    coverage: {
+      group: "stabilization-cross-products",
+      outerPrefix: "policy-label",
+      candidateBridge: "immediate",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-directive-supported-upload",
+    body: "For safety, this workflow must not upload files.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "For safety, this workflow must not upload files.",
+      },
+    ],
+    coverage: {
+      group: "stabilization-cross-products",
+      outerPrefix: "directive",
+      candidateBridge: "immediate",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-directive-supported-secrets",
+    body: "Requirement: this workflow must not use credentials.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "Requirement: this workflow must not use credentials.",
+      },
+    ],
+    coverage: {
+      group: "stabilization-cross-products",
+      outerPrefix: "policy-label",
+      candidateBridge: "immediate",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-semicolon-unknown-upload",
+    body: "Finish validation; no external uploads.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "no external uploads.",
+      },
+    ],
+    coverage: {
+      group: "stabilization-cross-products",
+      separator: "semicolon",
+      previousPredicate: "unknown",
+      domain: "upload",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-semicolon-unknown-network",
+    body: "Clean the workspace; never use the network.",
+    expected: [],
+    coverage: {
+      group: "stabilization-cross-products",
+      separator: "semicolon",
+      previousPredicate: "unknown",
+      domain: "network",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-semicolon-unknown-secrets",
+    body: "Rotate the logs; never use credentials.",
+    expected: [],
+    coverage: {
+      group: "stabilization-cross-products",
+      separator: "semicolon",
+      previousPredicate: "unknown",
+      domain: "secrets",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-modal-never-network",
+    body: "This workflow must never use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow must never use the network.",
+      },
+    ],
+    coverage: {
+      group: "stabilization-cross-products",
+      predicateFamily: "modal-never",
+      modal: "must",
+      domain: "network",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-modal-never-upload",
+    body: "This task must never upload files.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This task must never upload files.",
+      },
+    ],
+    coverage: {
+      group: "stabilization-cross-products",
+      predicateFamily: "modal-never",
+      modal: "must",
+      domain: "upload",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-modal-never-secrets",
+    body: "The process must never use credentials.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "The process must never use credentials.",
+      },
+    ],
+    coverage: {
+      group: "stabilization-cross-products",
+      predicateFamily: "modal-never",
+      modal: "must",
+      domain: "secrets",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-relative-descriptive-network",
+    body: "This workflow that documents logs must not use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow that documents logs must not use the network.",
+      },
+    ],
+    coverage: {
+      group: "stabilization-cross-products",
+      modifier: "relative",
+      qualification: "descriptive",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-relative-local-network",
+    body: "This workflow, which validates inputs during setup, must not use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          "This workflow, which validates inputs during setup, must not use the network.",
+      },
+    ],
+    coverage: {
+      group: "stabilization-cross-products",
+      modifier: "paired-relative",
+      qualification: "local",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-relative-target-network",
+    body: "This workflow that documents network access to production must not use the network.",
+    expected: [],
+    coverage: {
+      group: "stabilization-cross-products",
+      modifier: "relative",
+      qualification: "specific-target",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-relative-source-secrets",
+    body: "This workflow that uses credentials from production must not use credentials.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          "This workflow that uses credentials from production must not use credentials.",
+      },
+    ],
+    coverage: {
+      group: "stabilization-cross-products",
+      modifier: "relative",
+      qualification: "specific-source",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-relative-target-upload",
+    body: "This workflow, which uploads to a bucket, must not upload files.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          "This workflow, which uploads to a bucket, must not upload files.",
+      },
+    ],
+    coverage: {
+      group: "stabilization-cross-products",
+      modifier: "paired-relative",
+      qualification: "specific-target",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-relative-conditional-secrets",
+    body: "This workflow that runs when scheduled must not use credentials.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          "This workflow that runs when scheduled must not use credentials.",
+      },
+    ],
+    coverage: {
+      group: "stabilization-cross-products",
+      modifier: "relative",
+      qualification: "conditional",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-homograph-copular-audits",
+    body: "This workflow checks inputs but audits are reviewed, yet must not upload files.",
+    expected: [],
+    coverage: {
+      group: "stabilization-cross-products",
+      homograph: "audits",
+      predicateHead: "copular",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-homograph-finite-reviews",
+    body: "This workflow checks inputs but reviews require approval, yet must not use credentials.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow checks inputs",
+      },
+    ],
+    coverage: {
+      group: "stabilization-cross-products",
+      homograph: "reviews",
+      predicateHead: "finite",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "stabilization2-homograph-finite-logs",
+    body: "This workflow validates inputs but logs contain credentials, yet must not use the network.",
+    expected: [],
+    coverage: {
+      group: "stabilization-cross-products",
+      homograph: "logs",
+      predicateHead: "finite",
+      layout: "one-line",
+    },
+  },
 ] as const satisfies readonly LegacyBodyPolicyGoldenCase[];
 
 export const BODY_POLICY_0244_GOLDEN_CASES: readonly LegacyBodyPolicyGoldenCase[] =
