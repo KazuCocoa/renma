@@ -57,8 +57,7 @@ import {
   EXTERNAL_UPLOAD_DESTINATION_TERMS,
 } from "./security-prose-vocabulary.js";
 import {
-  bodyPolicyClauseFacts,
-  bodyPolicyContrastiveClauseFacts,
+  bodyPolicyStatementGroupFacts,
   type BodyPolicyClauseFacts,
   type BodyPolicyDomain,
 } from "./security-body-policy/clause-facts.js";
@@ -1776,11 +1775,10 @@ function bodyPolicyClauseEvidenceSnippet(
 
 function bodyPolicyFactEvidenceRange(
   text: string,
-  clauseRange: SecurityParagraphClauseRange,
   fact: BodyPolicyClauseFacts,
 ): SecurityParagraphClauseRange {
-  const start = clauseRange.start + fact.evidenceStart;
-  const factEnd = clauseRange.start + fact.evidenceEnd;
+  const start = fact.evidenceStart;
+  const factEnd = fact.evidenceEnd;
   const closingPunctuation = BODY_POLICY_CLOSING_PUNCTUATION_RE.exec(
     text.slice(factEnd),
   );
@@ -1801,45 +1799,35 @@ function hasEarlierBodyPolicyFact(
   );
 }
 
-function bodyPolicyContrastiveFactRanges(
+function bodyPolicyStatementFactRanges(
   text: string,
   clauseRanges: readonly SecurityParagraphClauseRange[],
 ): ReadonlyArray<{
   readonly fact: BodyPolicyClauseFacts;
   readonly range: SecurityParagraphClauseRange;
+  readonly clauseRange: SecurityParagraphClauseRange;
+  readonly crossesClauseBoundary: boolean;
 }> {
   const meaningfulRanges = clauseRanges.filter(
     ({ start, end }) => text.slice(start, end).trim().length > 0,
   );
-  const projected: Array<{
-    fact: BodyPolicyClauseFacts;
-    range: SecurityParagraphClauseRange;
-  }> = [];
-  for (let index = 1; index < meaningfulRanges.length; index += 1) {
-    const earlierRange = meaningfulRanges[index - 1];
-    const laterRange = meaningfulRanges[index];
-    if (earlierRange === undefined || laterRange === undefined) continue;
-    const earlierClause = text.slice(earlierRange.start, earlierRange.end);
-    const separator = text.slice(earlierRange.end, laterRange.start);
-    const laterClause = text.slice(laterRange.start, laterRange.end);
-    const laterOffset = earlierClause.length + separator.length;
-    for (const fact of bodyPolicyContrastiveClauseFacts(
-      earlierClause,
-      separator,
-      laterClause,
-    )) {
-      if (fact.evidenceEnd <= laterOffset) continue;
-      projected.push({
-        fact,
-        range: bodyPolicyFactEvidenceRange(
-          text,
-          { start: earlierRange.start, end: laterRange.end },
+  return bodyPolicyStatementGroupFacts(text, meaningfulRanges).flatMap(
+    (fact) => {
+      const clauseRange = meaningfulRanges.find(
+        ({ start, end }) =>
+          start <= fact.evidenceStart && fact.evidenceStart < end,
+      );
+      if (clauseRange === undefined) return [];
+      return [
+        {
           fact,
-        ),
-      });
-    }
-  }
-  return projected;
+          range: bodyPolicyFactEvidenceRange(text, fact),
+          clauseRange,
+          crossesClauseBoundary: fact.evidenceEnd > clauseRange.end,
+        },
+      ];
+    },
+  );
 }
 
 function bodyPolicyContradictionDetections(
@@ -1870,60 +1858,17 @@ function bodyPolicyContradictionDetections(
     for (const { lineIndex } of paragraph.lines) {
       preparedParagraphLineIndexes.add(lineIndex);
     }
-    for (const clauseRange of clauseRanges) {
-      const clause = paragraph.text.slice(clauseRange.start, clauseRange.end);
-      const facts = bodyPolicyClauseFacts(clause);
-      for (const fact of facts) {
-        const domain = fact.domain;
-        if (domain === undefined) continue;
-        const kindOrder = enabledDomainOrder.get(domain);
-        if (
-          kindOrder === undefined ||
-          !bodyPolicyFactEmitsContradiction(fact, domain)
-        ) {
-          continue;
-        }
-        const factRange = bodyPolicyFactEvidenceRange(
-          paragraph.text,
-          clauseRange,
-          fact,
-        );
-        const evidence = hasEarlierBodyPolicyFact(facts, fact)
-          ? clippedParagraphEvidenceForRange(
-              paragraph,
-              factRange.start,
-              factRange.end,
-            )
-          : paragraph.startLine === paragraph.endLine
-            ? {
-                startLine: paragraph.startLine,
-                snippet: bodyPolicyClauseEvidenceSnippet(
-                  paragraph.text,
-                  clauseRange,
-                ),
-              }
-            : paragraphEvidenceForRange(
-                paragraph,
-                clauseRange.start + fact.evidenceStart,
-                clauseRange.start + fact.evidenceEnd,
-              );
-        if (evidence === undefined) continue;
-        candidates.push({
-          domain,
-          kindOrder,
-          detection: {
-            metadata: RULES.bodyPolicyContradiction,
-            severity: "high",
-            ...evidence,
-            dedupeKey: `body-policy-contradiction:${domain}`,
-          },
-        });
-      }
-    }
-    for (const { fact, range } of bodyPolicyContrastiveFactRanges(
+    const statementFacts = bodyPolicyStatementFactRanges(
       paragraph.text,
       clauseRanges,
-    )) {
+    );
+    const facts = statementFacts.map(({ fact }) => fact);
+    for (const {
+      fact,
+      range,
+      clauseRange,
+      crossesClauseBoundary,
+    } of statementFacts) {
       const domain = fact.domain;
       if (domain === undefined) continue;
       const kindOrder = enabledDomainOrder.get(domain);
@@ -1934,12 +1879,21 @@ function bodyPolicyContradictionDetections(
         continue;
       }
       const evidence =
-        paragraph.startLine === paragraph.endLine
-          ? {
-              startLine: paragraph.startLine,
-              snippet: paragraph.text.slice(range.start, range.end),
-            }
-          : clippedParagraphEvidenceForRange(paragraph, range.start, range.end);
+        crossesClauseBoundary || hasEarlierBodyPolicyFact(facts, fact)
+          ? clippedParagraphEvidenceForRange(paragraph, range.start, range.end)
+          : paragraph.startLine === paragraph.endLine
+            ? {
+                startLine: paragraph.startLine,
+                snippet: bodyPolicyClauseEvidenceSnippet(
+                  paragraph.text,
+                  clauseRange,
+                ),
+              }
+            : paragraphEvidenceForRange(
+                paragraph,
+                fact.evidenceStart,
+                fact.evidenceEnd,
+              );
       if (evidence === undefined) continue;
       candidates.push({
         domain,
@@ -1967,39 +1921,53 @@ function bodyPolicyContradictionDetections(
     ) {
       continue;
     }
+    const fallbackStatement = bodyPolicyFallbackStatement(line);
+    const statementText = fallbackStatement.text;
     const clauseRanges = disclosureClauseRangesIntersectingRange(
-      line,
+      statementText,
       0,
-      line.length,
+      statementText.length,
     );
-    for (const clauseRange of clauseRanges) {
-      const clause = line.slice(clauseRange.start, clauseRange.end);
-      const facts = bodyPolicyClauseFacts(clause);
-      for (const fact of facts) {
-        const domain = fact.domain;
-        if (domain === undefined) continue;
-        const kindOrder = enabledDomainOrder.get(domain);
-        if (
-          kindOrder === undefined ||
-          !bodyPolicyFactEmitsContradiction(fact, domain)
-        ) {
-          continue;
-        }
-        const factRange = bodyPolicyFactEvidenceRange(line, clauseRange, fact);
-        candidates.push({
-          domain,
-          kindOrder,
-          detection: {
-            metadata: RULES.bodyPolicyContradiction,
-            severity: "high",
-            startLine: lineIndex + 1,
-            snippet: hasEarlierBodyPolicyFact(facts, fact)
-              ? line.slice(factRange.start, factRange.end)
-              : bodyPolicyClauseEvidenceSnippet(line, clauseRange),
-            dedupeKey: `body-policy-contradiction:${domain}`,
-          },
-        });
+    const statementFacts = bodyPolicyStatementFactRanges(
+      statementText,
+      clauseRanges,
+    );
+    const facts = statementFacts.map(({ fact }) => fact);
+    for (const {
+      fact,
+      range,
+      clauseRange,
+      crossesClauseBoundary,
+    } of statementFacts) {
+      const domain = fact.domain;
+      if (domain === undefined) continue;
+      const kindOrder = enabledDomainOrder.get(domain);
+      if (
+        kindOrder === undefined ||
+        !bodyPolicyFactEmitsContradiction(fact, domain)
+      ) {
+        continue;
       }
+      candidates.push({
+        domain,
+        kindOrder,
+        detection: {
+          metadata: RULES.bodyPolicyContradiction,
+          severity: "high",
+          startLine: lineIndex + 1,
+          snippet: bodyPolicyFallbackEvidenceSnippet(
+            line,
+            fallbackStatement,
+            crossesClauseBoundary || hasEarlierBodyPolicyFact(facts, fact)
+              ? statementText.slice(range.start, range.end)
+              : bodyPolicyClauseEvidenceSnippet(statementText, clauseRange),
+            crossesClauseBoundary || hasEarlierBodyPolicyFact(facts, fact)
+              ? range.start
+              : clauseRange.start,
+          ),
+          dedupeKey: `body-policy-contradiction:${domain}`,
+        },
+      });
     }
   }
 
@@ -2014,6 +1982,28 @@ function bodyPolicyContradictionDetections(
     selectedDomains.add(domain);
     return [detection];
   });
+}
+
+function bodyPolicyFallbackStatement(line: string): {
+  readonly text: string;
+  readonly sourceOffset: number;
+} {
+  const heading =
+    /^[ \t]{0,3}#{1,6}[ \t]+(?<content>.*?)(?:[ \t]+#+[ \t]*)?$/u.exec(line);
+  const content = heading?.groups?.content;
+  if (content === undefined) return { text: line, sourceOffset: 0 };
+  return { text: content, sourceOffset: line.indexOf(content) };
+}
+
+function bodyPolicyFallbackEvidenceSnippet(
+  line: string,
+  statement: { readonly sourceOffset: number },
+  snippet: string,
+  snippetStart: number,
+): string {
+  return statement.sourceOffset > 0 && snippetStart === 0
+    ? `${line.slice(0, statement.sourceOffset)}${snippet}`
+    : snippet;
 }
 
 function bodyPolicyFactEmitsContradiction(

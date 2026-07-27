@@ -13,19 +13,27 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Preserved the Renma 0.24.4 same-clause decision boundary by evaluating
   coordinated requirement, local, qualified, safeguard, and workflow
   prohibition predicates independently for each body-policy domain, including
-  predicates that share an explicit workflow subject across ordinary
-  coordination or the body-policy-only contrastive `but`, `yet`, `however`,
-  and `; however,` boundaries, including when the coordinated predicates
-  mention different body-policy domains. Sentence endings, hard breaks, bare
-  semicolons, and `then` remain subject-isolation boundaries.
+  predicates that share an explicit workflow subject across ordinary,
+  contrastive, bare-semicolon, or `then` coordination, including when earlier
+  predicates have no body-policy domain, have local or specific scope, or
+  mention a different domain.
 - Kept affirmative requirement language distinct from genuinely negative
   `not-required` facts so it cannot suppress a later workflow prohibition.
+- Added a deterministic test-only 0.24.4 golden corpus covering subjects,
+  predicate kinds, connectors, domains, scopes, layouts, evidence, ordering,
+  and deduplication, with every intentional difference explicitly allowlisted.
 
 ### Changed
 
 - Replaced growing sentence-level body-policy contradiction patterns with a
-  private clause-facts model that separates security domain, modality, scope,
-  and supported-clause completeness.
+  private statement-group and clause-facts model that establishes grammatical
+  workflow-subject inheritance before separating security domain, modality,
+  scope, and supported-clause completeness.
+- Reused the same statement-group analyzer for prepared prose and eligible
+  fallback lines such as headings. Subject inheritance supports multiple
+  consecutive predicates and the bounded `also`, `still`, and `therefore`
+  modifier grammar, but stops at sentence endings, Markdown hard breaks,
+  structural boundaries, changed subjects, and unsupported syntax.
 - Preserved precision-first handling: only complete, high-confidence
   workflow-wide prohibitions contradict permissive policy metadata; local
   safeguards, requirement language, specific sources or targets, unknown
@@ -39,9 +47,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 ### Compatibility
 
 - Preserved diagnostic IDs, titles, severities, confidence, risk classes,
-  remediation, LLM hints, evidence, ordering, deduplication, policy resolution,
-  CLI behavior, Diagnostics v2, review bundles, public types, schemas, package
-  entrypoints, and supported deep imports.
+  remediation, LLM hints, bounded physical evidence, ordering, deduplication,
+  policy resolution, CLI behavior, Diagnostics v2, review bundles, public
+  types, schemas, package entrypoints, and supported deep imports. Evidence for
+  inherited prohibitions now includes the supported later predicate rather than
+  ending at an earlier subject-bearing predicate.
 - Added no dependencies, public diagnostics, public configuration, or public
   clause-fact output.
 

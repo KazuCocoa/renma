@@ -210,20 +210,59 @@ const AFFIRMATIVE_REQUIREMENT_PREDICATE_RE =
   /\b(?:requires|(?:is|are|was|were)\s+(?:required|needed|necessary)|(?:should|will|would|may)\s+be\s+(?:required|needed|necessary))\b/gi;
 const PROHIBITION_PREDICATE_RE =
   /\b(?:do\s+not|don't|never|must\s+not|shall\s+not|will\s+not|does\s+not|cannot|can't|not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled|without|no|(?:must|shall|will|has\s+to|needs\s+to)\s+(?:run|operate|work)(?:\s+without)?|keep|run|operate)\b/gi;
-const COORDINATED_PREDICATE_RE = /(?:,[ \t]*)?\band\b[ \t]*$/i;
-const SHARED_SUBJECT_PREDICATE_BRIDGE_RE =
-  /(?:,[ \t]*(?:and(?:[ \t]+(?:also|still|therefore))?)?|[ \t]+and(?:[ \t]+(?:also|still|therefore))?)[ \t]*$/i;
-// The shared technical splitter also recognizes semicolons, sentence endings,
-// newlines, but, however, yet, and then. Body-policy subject inheritance may
-// cross only but, yet, however, or a semicolon immediately followed by
-// however. Bare semicolons, sentence endings, hard breaks, and then stay hard
-// boundaries.
-const CONTRASTIVE_CLAUSE_BRIDGE_RE =
-  /^[ \t]*(?:but|yet|however|;[ \t]*however)[ \t]*$/i;
-const CONTRASTIVE_PREDICATE_PREFIX_RE = /^[ \t]*(?:,[ \t]*)?(?:it[ \t]+)?$/i;
+const STATEMENT_MODIFIER = String.raw`(?:also|still|therefore)`;
+const ORDINARY_STATEMENT_SEPARATOR_RE =
+  /(?:,[ \t]*and\b|[ \t]+and\b|,)(?=[ \t]+)/gi;
+const INHERITED_STATEMENT_SEPARATOR_RE = new RegExp(
+  String.raw`^[ \t]*(?:(?:,[ \t]*)?and|,|(?:,[ \t]*)?(?:but|yet|however[ \t]*,?)|;[ \t]*however[ \t]*,|;|then)[ \t]*$`,
+  "i",
+);
+const INHERITED_PREDICATE_PREFIX_RE = new RegExp(
+  String.raw`^[ \t]*(?:,[ \t]*)?(?:(?:it|${STATEMENT_MODIFIER})[ \t]+){0,4}$`,
+  "i",
+);
+const DIRECT_WORKFLOW_PROHIBITION_START_RE = new RegExp(
+  String.raw`^[ \t]*(?:(?:${STATEMENT_MODIFIER})[ \t]+){0,4}(?:(?:(?:must|shall|will|does)[ \t]+not|cannot|can't|never)\b|(?:must|shall|will|has[ \t]+to|needs[ \t]+to)[ \t]+(?:run|operate|work)\b|without\b)`,
+  "i",
+);
+const SUBJECTLESS_PREDICATE_START_RE = new RegExp(
+  String.raw`^[ \t]*(?:,[ \t]*)?(?:(?:it|${STATEMENT_MODIFIER})[ \t]+){0,4}(?:must|shall|will|would|does|do|cannot|can't|never|may|might|can|could|should|has|needs|requires|checks|validates|prepares|writes?|reads?|runs?|operates?|works?|uses?|accesses?|loads?|accepts?|handles?|uploads?|sends?|posts?|shares?|attaches?|submits?|syncs?|pushes?|publishes?|keeps?)\b`,
+  "i",
+);
+const DOMAIN_PREDICATE_START_RE = new RegExp(
+  String.raw`^[ \t]*(?:,[ \t]*)?(?:(?:${STATEMENT_MODIFIER})[ \t]+)*(?:${NETWORK_SUBJECT}|${UPLOAD_SUBJECT}|${SECRET_ACCESS_SUBJECT})[ \t]+(?:(?:is|are|was|were)[ \t]+|(?:must|shall|should|may|can|will|would)[ \t]+)`,
+  "i",
+);
+const LEADING_WORKFLOW_SUBJECT_RE = new RegExp(
+  String.raw`^[ \t]*(?:,[ \t]*)?(?:(?:${STATEMENT_MODIFIER})[ \t]+)*(?<subject>${WORKFLOW_SCOPE_TERMS})\b`,
+  "i",
+);
+
+interface BodyPolicyPredicateSegment {
+  readonly range: EvidenceRange;
+  readonly separator: EvidenceRange;
+  readonly boundary: "start" | "inherited" | "hard";
+  readonly explicitSubject: EvidenceRange | undefined;
+  readonly inheritedSubject: EvidenceRange | undefined;
+}
+
+interface BodyPolicyStatementGroup {
+  readonly sourceText: string;
+  readonly range: EvidenceRange;
+  readonly explicitSubject: EvidenceRange | undefined;
+  readonly predicates: readonly BodyPolicyPredicateSegment[];
+}
+
+interface ClassifiedBodyPolicyPredicate {
+  readonly predicateRange: EvidenceRange;
+  readonly explicitSubject: EvidenceRange | undefined;
+  readonly inheritedSubject: EvidenceRange | undefined;
+  readonly directlySupportedDomainPattern: boolean;
+  readonly fact: BodyPolicyClauseFacts;
+}
 
 /** @internal Extract bounded semantic facts from one prepared Markdown clause. */
-export function bodyPolicyClauseFacts(
+function bodyPolicyClauseFacts(
   clause: string,
 ): readonly BodyPolicyClauseFacts[] {
   const domains = DOMAIN_ORDER.filter((domain) =>
@@ -232,50 +271,97 @@ export function bodyPolicyClauseFacts(
   return domains.flatMap((domain) => classifyDomainFacts(clause, domain));
 }
 
-/** @internal Project a proven workflow subject across one contrastive boundary. */
-export function bodyPolicyContrastiveClauseFacts(
-  earlierClause: string,
-  separator: string,
-  laterClause: string,
+/**
+ * @internal Build body-policy facts only after bounded statement groups have
+ * established explicit and inherited workflow subjects.
+ */
+export function bodyPolicyStatementGroupFacts(
+  text: string,
+  clauseRanges: readonly EvidenceRange[],
 ): readonly BodyPolicyClauseFacts[] {
-  const earlierSemanticClause = CONTRASTIVE_CLAUSE_BRIDGE_RE.test(separator)
-    ? earlierClause.replace(/[ \t]*,[ \t]*$/u, "")
-    : earlierClause;
-  const earlierFacts = bodyPolicyClauseFacts(earlierSemanticClause);
-  if (
-    separator.includes("\n") ||
-    !CONTRASTIVE_CLAUSE_BRIDGE_RE.test(separator)
-  ) {
-    return earlierFacts;
-  }
-
-  const laterOffset = earlierClause.length + separator.length;
-  const workflowSubjects = workflowSubjectsWithinFacts(
-    earlierSemanticClause,
-    earlierFacts,
-  );
-  const projectedFacts: BodyPolicyClauseFacts[] = [];
-  for (const domain of DOMAIN_ORDER) {
-    for (const workflowSubject of workflowSubjects) {
-      const projectedFact = contrastiveProjectionFact(
-        earlierSemanticClause.slice(workflowSubject.start, workflowSubject.end),
-        laterClause,
-        domain,
-        /;[ \t]*however/i.test(separator),
+  const classified: ClassifiedBodyPolicyPredicate[] = [];
+  for (const group of bodyPolicyStatementGroups(text, clauseRanges)) {
+    for (const predicate of group.predicates) {
+      const predicateText = text.slice(
+        predicate.range.start,
+        predicate.range.end,
       );
-      if (projectedFact === undefined) continue;
-      const projectionPrefixLength =
-        workflowSubject.end - workflowSubject.start + 1;
-      projectedFacts.push({
-        ...projectedFact,
-        evidenceStart: workflowSubject.start,
-        evidenceEnd:
-          laterOffset +
-          Math.max(0, projectedFact.evidenceEnd - projectionPrefixLength),
-      });
+      const directFacts = bodyPolicyClauseFacts(predicateText).flatMap(
+        (fact) => {
+          const explicitSubject =
+            predicate.explicitSubject === undefined
+              ? undefined
+              : {
+                  start:
+                    predicate.explicitSubject.start - predicate.range.start,
+                  end: predicate.explicitSubject.end - predicate.range.start,
+                };
+          if (
+            !directFactHasSupportedSubjectBridge(
+              predicateText,
+              fact,
+              explicitSubject,
+            )
+          ) {
+            return [];
+          }
+          const projectedFact = {
+            ...fact,
+            evidenceStart: predicate.range.start + fact.evidenceStart,
+            evidenceEnd: predicate.range.start + fact.evidenceEnd,
+          };
+          const classifiedFact = {
+            predicateRange: predicate.range,
+            explicitSubject: predicate.explicitSubject,
+            inheritedSubject: predicate.inheritedSubject,
+            directlySupportedDomainPattern: factDirectlyUsesSupportedPattern(
+              predicateText,
+              fact,
+            ),
+            fact: projectedFact,
+          } satisfies ClassifiedBodyPolicyPredicate;
+          return [classifiedFact];
+        },
+      );
+      const inheritedSubject = predicate.inheritedSubject;
+      const projectedFacts =
+        inheritedSubject === undefined
+          ? []
+          : DOMAIN_ORDER.flatMap((domain) => {
+              const projected = projectedStatementFact(
+                text,
+                predicate,
+                inheritedSubject,
+                domain,
+              );
+              return projected === undefined
+                ? []
+                : [
+                    {
+                      predicateRange: predicate.range,
+                      explicitSubject: predicate.explicitSubject,
+                      inheritedSubject,
+                      directlySupportedDomainPattern: true,
+                      fact: projected,
+                    } satisfies ClassifiedBodyPolicyPredicate,
+                  ];
+            });
+      const projectedDomains = new Set(
+        projectedFacts.flatMap(({ fact: { domain } }) =>
+          domain === undefined ? [] : [domain],
+        ),
+      );
+      for (const direct of directFacts) {
+        const { fact } = direct;
+        if (fact.domain !== undefined && projectedDomains.has(fact.domain)) {
+          continue;
+        }
+        classified.push(direct);
+      }
+      classified.push(...projectedFacts);
     }
   }
-  return [...earlierFacts, ...projectedFacts];
+  return deduplicateStatementFacts(classified.map(({ fact }) => fact));
 }
 
 function classifyDomainFacts(
@@ -314,15 +400,12 @@ function classifyDomainFacts(
     [GENERIC_PROHIBITION_PATTERNS[domain]],
     "generic-prohibition",
   );
-  const candidates = independentCandidates(
-    [
-      ...requirements,
-      ...affirmativeRequirements,
-      ...supportedProhibitions,
-      ...genericProhibitions,
-    ],
-    clause,
-  );
+  const candidates = independentCandidates([
+    ...requirements,
+    ...affirmativeRequirements,
+    ...supportedProhibitions,
+    ...genericProhibitions,
+  ]);
   if (candidates.length === 0) {
     return [
       {
@@ -341,9 +424,10 @@ function classifyDomainFacts(
     const boundaryEnd = candidateBoundaryEnd(clause, candidate, nextCandidate);
     const contextEnd = candidateContextEnd(clause, candidate, boundaryEnd);
     const context = clause.slice(candidate.predicateStart, contextEnd);
-    const candidateWorkflowSubject =
-      inheritedWorkflowSubject(clause, candidate) ??
-      coordinatedWorkflowSubject(clause, candidates[index - 1], candidate);
+    const candidateWorkflowSubject = inheritedWorkflowSubject(
+      clause,
+      candidate,
+    );
     const projectedSupportedEnd =
       candidate.kind === "generic-prohibition" &&
       candidateWorkflowSubject !== undefined
@@ -588,7 +672,6 @@ function candidateEvidence(
 
 function independentCandidates(
   candidates: readonly DomainCandidate[],
-  text: string,
 ): readonly DomainCandidate[] {
   const ordered = [...candidates].sort(
     (left, right) =>
@@ -604,11 +687,7 @@ function independentCandidates(
     );
     if (samePredicateIndex < 0) {
       const previous = selected[selected.length - 1];
-      if (
-        previous !== undefined &&
-        evidenceOverlaps(previous, candidate) &&
-        !hasCoordinatedPredicateBoundary(text, previous, candidate)
-      ) {
+      if (previous !== undefined && evidenceOverlaps(previous, candidate)) {
         continue;
       }
       selected.push(candidate);
@@ -685,24 +764,6 @@ function projectedSupportedPredicateEnd(
   return selectedEnd;
 }
 
-function hasCoordinatedPredicateBoundary(
-  text: string,
-  earlier: DomainCandidate,
-  later: DomainCandidate,
-): boolean {
-  if (
-    later.kind === "supported-prohibition" &&
-    later.directWorkflowSubject !== undefined &&
-    later.predicateStart > earlier.predicateStart
-  ) {
-    return true;
-  }
-  if (later.predicateStart < earlier.end) return false;
-  return COORDINATED_PREDICATE_RE.test(
-    text.slice(earlier.end, later.predicateStart),
-  );
-}
-
 function inheritedWorkflowSubject(
   text: string,
   candidate: DomainCandidate,
@@ -731,26 +792,6 @@ function inheritedWorkflowSubject(
   return selected;
 }
 
-function coordinatedWorkflowSubject(
-  text: string,
-  earlier: DomainCandidate | undefined,
-  later: DomainCandidate,
-): EvidenceRange | undefined {
-  // Generic projection may borrow a subject only from the immediately
-  // preceding same-domain fact across this small, explicit bridge grammar.
-  if (
-    earlier === undefined ||
-    later.predicateStart <= earlier.predicateStart ||
-    later.predicateStart < earlier.end ||
-    !SHARED_SUBJECT_PREDICATE_BRIDGE_RE.test(
-      text.slice(earlier.end, later.predicateStart),
-    )
-  ) {
-    return undefined;
-  }
-  return inheritedWorkflowSubject(text, earlier);
-}
-
 function candidateKindOrder(kind: DomainCandidateKind): number {
   return {
     "not-required": 0,
@@ -772,14 +813,8 @@ function candidateBoundaryEnd(
   // Only a recognized later candidate shortens the completeness boundary.
   // Otherwise coordinated trailing prose remains an unsupported remainder.
   if (nextCandidate === undefined) return semanticContentEnd(text);
-  const coordinatedNextWorkflowSubject = coordinatedWorkflowSubject(
-    text,
-    candidate,
-    nextCandidate,
-  );
   const nextWorkflowSubject =
     nextCandidate.directWorkflowSubject ??
-    coordinatedNextWorkflowSubject ??
     inheritedWorkflowSubject(text, nextCandidate);
   const nextStatementStart =
     nextCandidate.start >= candidate.end
@@ -788,15 +823,7 @@ function candidateBoundaryEnd(
           nextWorkflowSubject.start >= candidate.end
         ? nextWorkflowSubject.start
         : nextCandidate.predicateStart;
-  const between = text.slice(candidate.end, nextStatementStart);
-  const connector =
-    nextCandidate.directWorkflowSubject === undefined &&
-    coordinatedNextWorkflowSubject === undefined
-      ? COORDINATED_PREDICATE_RE.exec(between)
-      : SHARED_SUBJECT_PREDICATE_BRIDGE_RE.exec(between);
-  const untrimmedEnd =
-    connector === null ? nextStatementStart : candidate.end + connector.index;
-  return text.slice(0, untrimmedEnd).trimEnd().length;
+  return text.slice(0, nextStatementStart).trimEnd().length;
 }
 
 function candidateContextEnd(
@@ -822,56 +849,222 @@ function evidenceForPattern(
   return { start: match.index, end: match.index + match[0].length };
 }
 
-function workflowSubjectWithinFact(
-  clause: string,
-  fact: BodyPolicyClauseFacts,
-): EvidenceRange | undefined {
-  const matcher = new RegExp(
-    WORKFLOW_SCOPE_RE.source,
-    WORKFLOW_SCOPE_RE.flags.includes("g")
-      ? WORKFLOW_SCOPE_RE.flags
-      : `${WORKFLOW_SCOPE_RE.flags}g`,
-  );
-  for (const match of clause.matchAll(matcher)) {
-    if (match.index === undefined) continue;
-    const evidence = {
-      start: match.index,
-      end: match.index + match[0].length,
+function bodyPolicyStatementGroups(
+  text: string,
+  clauseRanges: readonly EvidenceRange[],
+): readonly BodyPolicyStatementGroup[] {
+  const predicateRanges = clauseRanges
+    .flatMap((range) => splitOrdinaryPredicateRanges(text, range))
+    .map((range) => trimPredicateRange(text, range))
+    .filter(({ start, end }) => start < end)
+    .sort((left, right) => left.start - right.start || left.end - right.end);
+  const groups: BodyPolicyStatementGroup[] = [];
+  let activeSubject: EvidenceRange | undefined;
+  let predicates: BodyPolicyPredicateSegment[] = [];
+  let groupStart = 0;
+  for (const [index, range] of predicateRanges.entries()) {
+    const previous = predicateRanges[index - 1];
+    const separator = {
+      start: previous?.end ?? range.start,
+      end: range.start,
     };
-    if (
-      evidence.start >= fact.evidenceStart &&
-      evidence.end <= fact.evidenceEnd
-    ) {
-      return evidence;
+    const separatorText = text.slice(separator.start, separator.end);
+    const boundary =
+      previous === undefined
+        ? "start"
+        : statementSeparatorSupportsInheritance(separatorText)
+          ? "inherited"
+          : "hard";
+    const explicitSubject = leadingWorkflowSubjectInRange(text, range);
+    const inheritsSubject =
+      explicitSubject === undefined &&
+      boundary === "inherited" &&
+      activeSubject !== undefined &&
+      SUBJECTLESS_PREDICATE_START_RE.test(text.slice(range.start, range.end));
+    if (boundary === "hard") {
+      if (predicates.length > 0) {
+        groups.push(
+          statementGroup(text, predicates, groupStart, previous?.end),
+        );
+      }
+      predicates = [];
+      groupStart = range.start;
+      activeSubject = undefined;
+    } else if (predicates.length === 0) {
+      groupStart = range.start;
     }
+    const inheritedSubject = inheritsSubject ? activeSubject : undefined;
+    predicates.push({
+      range,
+      separator,
+      boundary,
+      explicitSubject,
+      inheritedSubject,
+    });
+    activeSubject =
+      explicitSubject ??
+      (inheritedSubject === undefined ? undefined : activeSubject);
   }
-  return undefined;
+  if (predicates.length > 0) {
+    groups.push(
+      statementGroup(
+        text,
+        predicates,
+        groupStart,
+        predicateRanges[predicateRanges.length - 1]?.end,
+      ),
+    );
+  }
+  return groups;
 }
 
-function workflowSubjectsWithinFacts(
-  clause: string,
-  facts: readonly BodyPolicyClauseFacts[],
+function statementGroup(
+  text: string,
+  predicates: readonly BodyPolicyPredicateSegment[],
+  start: number,
+  end: number | undefined,
+): BodyPolicyStatementGroup {
+  const range = { start, end: end ?? start };
+  return {
+    sourceText: text.slice(range.start, range.end),
+    range,
+    explicitSubject: [...predicates]
+      .reverse()
+      .find(({ explicitSubject }) => explicitSubject !== undefined)
+      ?.explicitSubject,
+    predicates,
+  };
+}
+
+function splitOrdinaryPredicateRanges(
+  text: string,
+  sourceRange: EvidenceRange,
 ): readonly EvidenceRange[] {
-  const subjects = new Map<string, EvidenceRange>();
-  for (const fact of facts) {
-    if (fact.scope !== "workflow") continue;
-    const subject = workflowSubjectWithinFact(clause, fact);
-    if (subject === undefined) continue;
-    subjects.set(`${subject.start}:${subject.end}`, subject);
+  const ranges: EvidenceRange[] = [];
+  let start = sourceRange.start;
+  const source = text.slice(sourceRange.start, sourceRange.end);
+  for (const match of source.matchAll(ORDINARY_STATEMENT_SEPARATOR_RE)) {
+    if (match.index === undefined) continue;
+    const separatorStart = sourceRange.start + match.index;
+    const separatorEnd = separatorStart + match[0].length;
+    if (!startsStatementPredicate(text.slice(separatorEnd, sourceRange.end))) {
+      continue;
+    }
+    if (separatorStart > start) ranges.push({ start, end: separatorStart });
+    start = separatorEnd;
   }
-  return [...subjects.values()].sort(
-    (left, right) => left.start - right.start || left.end - right.end,
+  if (start < sourceRange.end) ranges.push({ start, end: sourceRange.end });
+  return ranges;
+}
+
+function startsStatementPredicate(text: string): boolean {
+  return (
+    LEADING_WORKFLOW_SUBJECT_RE.test(text) ||
+    DOMAIN_PREDICATE_START_RE.test(text) ||
+    (SUBJECTLESS_PREDICATE_START_RE.test(text) &&
+      DOMAIN_ORDER.some((domain) =>
+        DOMAIN_EVIDENCE_PATTERNS[domain].test(text),
+      ))
   );
 }
 
-function contrastiveProjectionFact(
-  workflowSubject: string,
-  laterClause: string,
+function trimPredicateRange(text: string, range: EvidenceRange): EvidenceRange {
+  const source = text.slice(range.start, range.end);
+  const leading = /^[ \t]*/u.exec(source)?.[0].length ?? 0;
+  const trailing = /(?:,[ \t]*|[ \t]+)$/u.exec(source)?.[0].length ?? 0;
+  return {
+    start: range.start + leading,
+    end: Math.max(range.start + leading, range.end - trailing),
+  };
+}
+
+function statementSeparatorSupportsInheritance(separator: string): boolean {
+  return (
+    !separator.includes("\n") &&
+    INHERITED_STATEMENT_SEPARATOR_RE.test(separator)
+  );
+}
+
+function leadingWorkflowSubjectInRange(
+  text: string,
+  range: EvidenceRange,
+): EvidenceRange | undefined {
+  const match = LEADING_WORKFLOW_SUBJECT_RE.exec(
+    text.slice(range.start, range.end),
+  );
+  const subject = match?.groups?.subject;
+  if (match === null || subject === undefined) return undefined;
+  const subjectOffset = match[0]
+    .toLowerCase()
+    .lastIndexOf(subject.toLowerCase());
+  if (subjectOffset < 0) return undefined;
+  const start = range.start + subjectOffset;
+  return { start, end: start + subject.length };
+}
+
+function factDirectlyUsesSupportedPattern(
+  predicate: string,
+  fact: BodyPolicyClauseFacts,
+): boolean {
+  const domain = fact.domain;
+  if (domain === undefined) return false;
+  return candidateEvidence(
+    predicate,
+    PROHIBITED_PATTERNS[domain],
+    "supported-prohibition",
+  ).some(
+    (candidate) =>
+      candidate.start >= fact.evidenceStart &&
+      candidate.end <= fact.evidenceEnd,
+  );
+}
+
+function directFactHasSupportedSubjectBridge(
+  predicate: string,
+  fact: BodyPolicyClauseFacts,
+  explicitSubject: EvidenceRange | undefined,
+): boolean {
+  const domain = fact.domain;
+  if (
+    domain === undefined ||
+    explicitSubject === undefined ||
+    fact.modality !== "prohibited" ||
+    fact.scope !== "workflow"
+  ) {
+    return true;
+  }
+  const subjectCandidates = candidateEvidence(
+    predicate,
+    PROHIBITED_PATTERNS[domain],
+    "supported-prohibition",
+  ).filter(
+    (candidate) =>
+      candidate.directWorkflowSubject?.start === explicitSubject.start &&
+      candidate.directWorkflowSubject.end === explicitSubject.end &&
+      candidate.start >= fact.evidenceStart &&
+      candidate.end <= fact.evidenceEnd,
+  );
+  return (
+    subjectCandidates.length === 0 ||
+    DIRECT_WORKFLOW_PROHIBITION_START_RE.test(
+      predicate.slice(explicitSubject.end),
+    )
+  );
+}
+
+function projectedStatementFact(
+  source: string,
+  predicate: BodyPolicyPredicateSegment,
+  workflowSubject: EvidenceRange,
   domain: BodyPolicyDomain,
-  requiresLeadingComma: boolean,
 ): BodyPolicyClauseFacts | undefined {
-  const prefix = `${workflowSubject} `;
-  const projection = `${prefix}${laterClause}`;
+  const subject = source.slice(workflowSubject.start, workflowSubject.end);
+  const predicateText = source.slice(
+    predicate.range.start,
+    predicate.range.end,
+  );
+  const prefix = `${subject} `;
+  const projection = `${prefix}${predicateText}`;
   const supportedCandidate = candidateEvidence(
     projection,
     PROHIBITED_PATTERNS[domain],
@@ -884,17 +1077,52 @@ function contrastiveProjectionFact(
     return (
       candidate.directWorkflowSubject !== undefined &&
       candidate.predicateStart >= prefix.length &&
-      CONTRASTIVE_PREDICATE_PREFIX_RE.test(predicatePrefix) &&
-      (!requiresLeadingComma || /^[ \t]*,/u.test(predicatePrefix))
+      INHERITED_PREDICATE_PREFIX_RE.test(predicatePrefix)
     );
   });
   if (supportedCandidate === undefined) return undefined;
-  return bodyPolicyClauseFacts(projection).find(
+  const fact = bodyPolicyClauseFacts(projection).find(
     (fact) =>
       fact.domain === domain &&
       fact.evidenceStart === 0 &&
       fact.evidenceEnd >= supportedCandidate.end,
   );
+  if (fact === undefined) return undefined;
+  return {
+    ...fact,
+    evidenceStart: workflowSubject.start,
+    evidenceEnd:
+      predicate.range.start + Math.max(0, fact.evidenceEnd - prefix.length),
+  };
+}
+
+function deduplicateStatementFacts(
+  facts: readonly BodyPolicyClauseFacts[],
+): readonly BodyPolicyClauseFacts[] {
+  const selected = new Map<string, BodyPolicyClauseFacts>();
+  for (const fact of facts) {
+    const key = [
+      fact.domain ?? "",
+      fact.modality,
+      fact.scope,
+      fact.completeness,
+      fact.evidenceStart,
+      fact.evidenceEnd,
+    ].join(":");
+    selected.set(key, fact);
+  }
+  return [...selected.values()].sort(
+    (left, right) =>
+      left.evidenceStart - right.evidenceStart ||
+      left.evidenceEnd - right.evidenceEnd ||
+      domainOrder(left.domain) - domainOrder(right.domain),
+  );
+}
+
+function domainOrder(domain: BodyPolicyDomain | undefined): number {
+  return domain === undefined
+    ? DOMAIN_ORDER.length
+    : DOMAIN_ORDER.indexOf(domain);
 }
 
 function leadingWorkflowSubject(

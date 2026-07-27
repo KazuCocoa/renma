@@ -161,19 +161,42 @@ thematic-break, hidden comment, or code boundaries, and it does not replace
 physical-line or logical-command evidence or analysis input.
 
 The private `src/security-body-policy/` classifier consumes those already
-prepared clause ranges. For each supported network, external-upload, or secret
-candidate mentioned in one clause, it records modality, scope,
-supported-clause completeness, and normalized source offsets independently.
-One clause may therefore produce multiple facts for the same domain when
-coordinated statements carry independent requirement, scope, safeguard, or
-prohibition meaning. Coordinated predicates may inherit one explicit workflow
-subject while retaining predicate-local classification and evidence.
+prepared clause ranges through one bounded statement-group layer:
+
+```text
+prepared paragraph or eligible fallback line
+  -> statement groups with source ranges and separator classes
+  -> predicate segments with explicit or inherited workflow subjects
+  -> domain-local modality, scope, completeness, and pattern support
+  -> private clause facts
+  -> public contradiction evidence
+```
+
+Statement grouping recognizes only the existing workflow subject vocabulary and
+a small coordination grammar. It carries the nearest explicit subject through
+ordinary coordination, `but`, `yet`, `however`, `; however,`, bare semicolons,
+and `then`, including multiple consecutive predicates and the bounded `also`,
+`still`, and `therefore` modifiers. Bare semicolons and `then` deliberately use
+the strict 0.24.4 compatibility behavior. Sentence endings, Markdown hard
+breaks, structural boundaries, explicit changed subjects, and unsupported
+syntax reset inheritance. A subject is established from the grammatical
+statement segment before domain facts exist, so a domain-free, local, specific,
+or cross-domain first predicate cannot discard it.
+
+For each supported network, external-upload, or secret candidate in a predicate
+segment, the classifier retains its local source range, explicit or inherited
+subject range, domain, modality, scope, supported-clause completeness, and
+whether the existing domain grammar directly supported it. One statement group
+may therefore produce multiple facts for the same domain while every predicate
+keeps local scope, safeguard, source/target, remainder, and evidence decisions.
 Only a complete `prohibited` fact with `workflow` scope can contradict an
 enabled permissive policy for the same domain. `unknown`, `not-required`,
 `local-safeguard`, local-step, specific-source, specific-target, and
 unsupported-remainder states fail open by producing no contradiction. Facts
-are computed once per prepared clause, while Finding construction maps their
-offsets back to the occupied physical source lines.
+are computed once per statement group through the same analyzer for prepared
+paragraphs and eligible fallback lines such as headings. Finding construction
+maps normalized offsets back to bounded physical source lines without crossing
+Markdown structure.
 
 Clause-fact composition remains separate from lexical sharing.
 `src/security-prose-vocabulary.ts` may supply exact terms used identically by
