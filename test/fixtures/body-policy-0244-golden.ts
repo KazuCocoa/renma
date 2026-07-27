@@ -1976,6 +1976,358 @@ const RAW_BODY_POLICY_0244_GOLDEN_CASES = [
       layout: "one-line",
     },
   },
+  {
+    name: "bounded-directive-please-network",
+    body: "Please do not use the network.",
+    expected: [],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "directive-prefix",
+      directivePrefix: "please",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-directive-for-safety-upload",
+    body: "For safety, no external uploads.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "For safety, no external uploads.",
+      },
+    ],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "directive-prefix",
+      directivePrefix: "for-safety",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-directive-policy-label-upload",
+    body: "Policy: no external uploads.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "Policy: no external uploads.",
+      },
+    ],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "directive-prefix",
+      directivePrefix: "policy-label",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-directive-ensure-upload",
+    body: "Ensure no external uploads.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "Ensure no external uploads.",
+      },
+    ],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "directive-prefix",
+      directivePrefix: "ensure",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-coordination-semicolon-network",
+    body: "Validate inputs; never use the network.",
+    expected: [],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "subjectless-coordination",
+      separator: "semicolon",
+      activeSubject: "none",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-coordination-and-upload",
+    body: "Validate inputs and no external uploads.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "Validate inputs and no external uploads.",
+      },
+    ],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "subjectless-coordination",
+      separator: "and",
+      activeSubject: "none",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-coordination-two-domains-and",
+    body: "No external uploads and never use the network.",
+    expected: [],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "subjectless-coordination",
+      separator: "and",
+      activeSubject: "none",
+      domainBehavior: "two-domain",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-coordination-two-domains-semicolon",
+    body: "Never use the network; no external uploads.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "no external uploads.",
+      },
+    ],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "subjectless-coordination",
+      separator: "semicolon",
+      activeSubject: "none",
+      domainBehavior: "two-domain",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-paired-relative-secrets",
+    body: "This workflow, which validates inputs, must not use credentials.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          "This workflow, which validates inputs, must not use credentials.",
+      },
+    ],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "paired-comma-modifier",
+      pairedModifier: "relative",
+      qualification: "none",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-paired-relative-upload",
+    body: "This workflow, which is deterministic, must not upload files.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          "This workflow, which is deterministic, must not upload files.",
+      },
+    ],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "paired-comma-modifier",
+      pairedModifier: "relative",
+      qualification: "none",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-paired-local-network",
+    body: "This workflow, during local setup, must not use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow, during local setup, must not use the network.",
+      },
+    ],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "paired-comma-modifier",
+      pairedModifier: "parenthetical",
+      qualification: "local",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-paired-exception-network",
+    body: "This workflow, except for approved domains, must not use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          "This workflow, except for approved domains, must not use the network.",
+      },
+    ],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "paired-comma-modifier",
+      pairedModifier: "parenthetical",
+      qualification: "exception",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-paired-target-upload",
+    body: "This workflow, to a public bucket, must not upload files.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow, to a public bucket, must not upload files.",
+      },
+    ],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "paired-comma-modifier",
+      pairedModifier: "parenthetical",
+      qualification: "specific-target",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-inline-relative-to-network",
+    body: "This workflow that is designed to validate inputs must not use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          "This workflow that is designed to validate inputs must not use the network.",
+      },
+    ],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "inline-relative",
+      preposition: "to",
+      qualification: "unrelated-action",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-inline-relative-to-disk-upload",
+    body: "This workflow that writes logs to disk must not upload files.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          "This workflow that writes logs to disk must not upload files.",
+      },
+    ],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "inline-relative",
+      preposition: "to",
+      qualification: "unrelated-action",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-inline-relative-from-disk-secrets",
+    body: "This workflow that loads configuration from disk must not use credentials.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          "This workflow that loads configuration from disk must not use credentials.",
+      },
+    ],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "inline-relative",
+      preposition: "from",
+      qualification: "unrelated-action",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-changed-subject-audits",
+    body: "This workflow checks inputs but audits must not use the network, yet must not upload files.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow checks inputs",
+      },
+    ],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "changed-subject",
+      subjectShape: "single-word",
+      homograph: "audits",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-changed-subject-reviews",
+    body: "This workflow checks inputs but reviews must not use credentials, yet must not upload files.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow checks inputs",
+      },
+    ],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "changed-subject",
+      subjectShape: "single-word",
+      homograph: "reviews",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bounded-changed-subject-logs",
+    body: "This workflow validates inputs but logs must not contain credentials, yet must not use the network.",
+    expected: [],
+    coverage: {
+      group: "bounded-statement-groups",
+      boundary: "changed-subject",
+      subjectShape: "single-word",
+      homograph: "logs",
+      layout: "one-line",
+    },
+  },
 ] as const satisfies readonly LegacyBodyPolicyGoldenCase[];
 
 export const BODY_POLICY_0244_GOLDEN_CASES: readonly LegacyBodyPolicyGoldenCase[] =

@@ -21,6 +21,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   or unqualified parenthetical modifiers. Composed bridges preserve local-step,
   source/target, exception, and allowance qualifications; phase-local
   parentheticals no longer become workflow-wide prohibitions.
+- Preserved standalone policy scope through bounded directive prefixes and
+  independent subjectless coordination. Paired-comma modifiers remain attached
+  to their prohibition, while prepositions in inline relative clauses qualify
+  only the nearest bounded action or domain phrase.
 - Required explicit statement-level scope proof for direct facts, preventing a
   supported subjectless prohibition under descriptive, changed-subject,
   conditional, or unsupported syntax from receiving default workflow scope.
@@ -29,13 +33,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   before their first word can be treated as a subjectless verb.
 - Kept affirmative requirement language distinct from genuinely negative
   `not-required` facts so it cannot suppress a later workflow prohibition.
-- Added 116 immutable, self-contained test-only 0.24.4 golden cases generated
+- Added 135 immutable, self-contained test-only 0.24.4 golden cases generated
   from the full tagged commit. The exact legacy bodies and public projections
   cover subjects, predicate kinds, connectors, domains, scopes, layouts,
   evidence, ordering, and deduplication; a 32-case matrix proves the requested
-  pairwise interactions, a deterministic current-only matrix covers scope
-  proof and bridge precision, and every observed difference is explicitly
-  allowlisted.
+  pairwise interactions, deterministic current-only matrices cover scope proof,
+  bridge precision, directives, coordination, modifier attachment, and changed
+  subjects, and every observed difference is explicitly allowlisted.
 
 ### Changed
 

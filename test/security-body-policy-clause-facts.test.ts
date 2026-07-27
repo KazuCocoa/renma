@@ -1234,6 +1234,334 @@ test("statement-level scope proof constrains every direct prohibition fact", () 
   }
 });
 
+test("bounded directive prefixes preserve standalone policy scope", () => {
+  for (const { domain, body } of [
+    {
+      domain: "network",
+      body: "Please do not use the network.",
+    },
+    {
+      domain: "upload",
+      body: "For safety, no external uploads.",
+    },
+    {
+      domain: "upload",
+      body: "Ensure no external uploads.",
+    },
+    {
+      domain: "upload",
+      body: "Make sure no external uploads.",
+    },
+    {
+      domain: "network",
+      body: "As a rule, never use the network.",
+    },
+    {
+      domain: "upload",
+      body: "Policy: no external uploads.",
+    },
+    {
+      domain: "network",
+      body: "Requirement: never use the network.",
+    },
+    {
+      domain: "network",
+      body: "Please do not use the network for this workflow.",
+    },
+  ] as const) {
+    for (const layout of ["one-line", "soft-wrap", "heading"] as const) {
+      const renderedBody =
+        layout === "soft-wrap"
+          ? softWrapAfterDirectivePrefix(body)
+          : layout === "heading"
+            ? `## ${body}`
+            : body;
+      const findings = bodyPolicyFindings(renderedBody, domain);
+      assert.equal(findings.length, 1, `${body}, ${layout}`);
+      assert.equal(findings[0]?.evidence.snippet, renderedBody);
+
+      if (layout !== "heading") {
+        const normalizedBody = renderedBody.replaceAll("\n", " ");
+        const fact = statementGroupFacts(normalizedBody).find(
+          (candidate) =>
+            candidate.domain === domain &&
+            candidate.modality === "prohibited" &&
+            candidate.scope === "workflow" &&
+            candidate.completeness === "complete",
+        );
+        assert.ok(fact, `${body}, ${layout}`);
+        assert.equal(
+          normalizedBody.slice(fact.evidenceStart, fact.evidenceEnd),
+          normalizedBody.slice(0, -1),
+        );
+      }
+    }
+  }
+
+  for (const { domain, body } of [
+    {
+      domain: "network",
+      body: "The helper says do not use the network.",
+    },
+    {
+      domain: "upload",
+      body: "Documentation states no external uploads.",
+    },
+    {
+      domain: "secrets",
+      body: 'The example quotes "never use credentials".',
+    },
+  ] as const) {
+    for (const layout of ["one-line", "soft-wrap", "heading"] as const) {
+      const renderedBody =
+        layout === "soft-wrap"
+          ? body.replace(/ (?=(?:do|no|never)\b)/u, "\n")
+          : layout === "heading"
+            ? `## ${body}`
+            : body;
+      assert.equal(
+        bodyPolicyFindings(renderedBody, domain).length,
+        0,
+        `${body}, ${layout}`,
+      );
+    }
+  }
+});
+
+test("subjectless coordination preserves independent standalone policies", () => {
+  for (const { body, softBody, expectedFacts, expectedSnippets } of [
+    {
+      body: "Validate inputs; never use the network.",
+      softBody: "Validate inputs;\nnever use the network.",
+      expectedFacts: [{ domain: "network", evidence: "never use the network" }],
+      expectedSnippets: {
+        network: ["never use the network.", "never use the network."],
+      },
+    },
+    {
+      body: "Validate inputs and no external uploads.",
+      softBody: "Validate inputs\nand no external uploads.",
+      expectedFacts: [{ domain: "upload", evidence: "no external uploads" }],
+      expectedSnippets: {
+        upload: ["body", "and no external uploads."],
+      },
+    },
+    {
+      body: "Validate inputs but never use the network.",
+      softBody: "Validate inputs\nbut never use the network.",
+      expectedFacts: [{ domain: "network", evidence: "never use the network" }],
+      expectedSnippets: {
+        network: ["never use the network.", "but never use the network."],
+      },
+    },
+    {
+      body: "Validate inputs yet never use the network.",
+      softBody: "Validate inputs\nyet never use the network.",
+      expectedFacts: [{ domain: "network", evidence: "never use the network" }],
+      expectedSnippets: {
+        network: ["never use the network.", "yet never use the network."],
+      },
+    },
+    {
+      body: "Validate inputs then never use the network.",
+      softBody: "Validate inputs\nthen never use the network.",
+      expectedFacts: [{ domain: "network", evidence: "never use the network" }],
+      expectedSnippets: {
+        network: ["never use the network.", "then never use the network."],
+      },
+    },
+    {
+      body: "Validate inputs, never use the network.",
+      softBody: "Validate inputs,\nnever use the network.",
+      expectedFacts: [{ domain: "network", evidence: "never use the network" }],
+      expectedSnippets: {
+        network: ["body", "never use the network."],
+      },
+    },
+    {
+      body: "No external uploads and never use the network.",
+      softBody: "No external uploads\nand never use the network.",
+      expectedFacts: [
+        { domain: "upload", evidence: "No external uploads" },
+        { domain: "network", evidence: "never use the network" },
+      ],
+      expectedSnippets: {
+        network: ["body", "and never use the network."],
+        upload: ["body", "No external uploads"],
+      },
+    },
+    {
+      body: "Never use the network; no external uploads.",
+      softBody: "Never use the network;\nno external uploads.",
+      expectedFacts: [
+        { domain: "network", evidence: "Never use the network" },
+        { domain: "upload", evidence: "no external uploads" },
+      ],
+      expectedSnippets: {
+        network: ["Never use the network", "Never use the network;"],
+        upload: ["no external uploads.", "no external uploads."],
+      },
+    },
+  ] as const) {
+    for (const softWrapped of [false, true]) {
+      const renderedBody = softWrapped ? softBody : body;
+      const normalizedBody = renderedBody.replaceAll("\n", " ");
+      const facts = statementGroupFacts(normalizedBody).filter(
+        (fact) =>
+          fact.domain !== undefined &&
+          fact.modality === "prohibited" &&
+          fact.scope === "workflow" &&
+          fact.completeness === "complete",
+      );
+      assert.deepEqual(
+        facts.map((fact) => ({
+          domain: fact.domain,
+          evidence: normalizedBody.slice(fact.evidenceStart, fact.evidenceEnd),
+        })),
+        expectedFacts,
+        renderedBody,
+      );
+      for (const [domain, expectedSnippetsByLayout] of Object.entries(
+        expectedSnippets,
+      ) as [PolicyDomain, readonly [string, string]][]) {
+        const findings = bodyPolicyFindings(renderedBody, domain);
+        assert.equal(
+          findings.length,
+          1,
+          `${body}, ${domain}, ${softWrapped ? "soft wrap" : "one line"}`,
+        );
+        assert.equal(
+          findings[0]?.evidence.snippet,
+          expectedSnippetsByLayout[softWrapped ? 1 : 0] === "body"
+            ? renderedBody
+            : expectedSnippetsByLayout[softWrapped ? 1 : 0],
+        );
+      }
+    }
+  }
+});
+
+test("paired-comma and inline relative modifiers retain attached scope", () => {
+  for (const { domain, body, paired } of [
+    {
+      domain: "secrets",
+      body: "This workflow, which validates inputs, must not use credentials.",
+      paired: true,
+    },
+    {
+      domain: "upload",
+      body: "This workflow, which is deterministic, must not upload files.",
+      paired: true,
+    },
+    {
+      domain: "network",
+      body: "This workflow that is designed to validate inputs must not use the network.",
+      paired: false,
+    },
+    {
+      domain: "upload",
+      body: "This workflow that writes logs to disk must not upload files.",
+      paired: false,
+    },
+    {
+      domain: "secrets",
+      body: "This workflow that loads configuration from disk must not use credentials.",
+      paired: false,
+    },
+  ] as const) {
+    for (const layout of ["one-line", "soft-wrap", "heading"] as const) {
+      const renderedBody =
+        layout === "soft-wrap"
+          ? paired
+            ? body.replace(/, (?=(?:must|cannot)\b)/u, ",\n")
+            : softWrapAfterWorkflowSubject(body)
+          : layout === "heading"
+            ? `## ${body}`
+            : body;
+      const findings = bodyPolicyFindings(renderedBody, domain);
+      assert.equal(findings.length, 1, `${body}, ${layout}`);
+      assert.equal(findings[0]?.evidence.snippet, renderedBody);
+      if (layout !== "heading") {
+        const normalizedBody = renderedBody.replaceAll("\n", " ");
+        const fact = statementGroupFacts(normalizedBody).find(
+          (candidate) =>
+            candidate.domain === domain &&
+            candidate.modality === "prohibited" &&
+            candidate.scope === "workflow" &&
+            candidate.completeness === "complete",
+        );
+        assert.ok(fact, `${body}, ${layout}`);
+        assert.equal(
+          normalizedBody.slice(fact.evidenceStart, fact.evidenceEnd),
+          normalizedBody.slice(0, -1),
+        );
+      }
+    }
+  }
+
+  for (const { domain, body } of [
+    {
+      domain: "network",
+      body: "This workflow, during local setup, must not use the network.",
+    },
+    {
+      domain: "network",
+      body: "This workflow, except for approved domains, must not use the network.",
+    },
+    {
+      domain: "upload",
+      body: "This workflow, to a public bucket, must not upload files.",
+    },
+    {
+      domain: "upload",
+      body: "This workflow (to a public bucket) must not upload files.",
+    },
+    {
+      domain: "network",
+      body: "This workflow (except for approved domains) must not use the network.",
+    },
+  ] as const) {
+    for (const layout of ["one-line", "soft-wrap", "heading"] as const) {
+      const renderedBody =
+        layout === "soft-wrap"
+          ? body.replace(/, (?=(?:must|cannot)\b)/u, ",\n")
+          : layout === "heading"
+            ? `## ${body}`
+            : body;
+      assert.equal(
+        bodyPolicyFindings(renderedBody, domain).length,
+        0,
+        `${body}, ${layout}`,
+      );
+      if (layout !== "heading") {
+        const normalizedBody = renderedBody.replaceAll("\n", " ");
+        const facts = statementGroupFacts(normalizedBody).filter(
+          (fact) => fact.domain === domain,
+        );
+        assert.ok(facts.length > 0, `${body}, ${layout}`);
+        assert.equal(
+          facts.some(
+            (fact) =>
+              fact.modality === "prohibited" &&
+              fact.scope === "workflow" &&
+              fact.completeness === "complete",
+          ),
+          false,
+          `${body}, ${layout}`,
+        );
+        assert.ok(
+          facts.every(
+            (fact) =>
+              normalizedBody.slice(fact.evidenceStart, fact.evidenceEnd) ===
+              normalizedBody.slice(0, -1),
+          ),
+          `${body}, ${layout}`,
+        );
+      }
+    }
+  }
+});
+
 test("statement groups retain subjects through curated middle predicate categories", () => {
   const cases = [
     {
@@ -1423,6 +1751,18 @@ test("changed subjects stop multi-predicate workflow inheritance", () => {
     {
       domain: "upload",
       body: "This workflow validates inputs but log processors must never perform external uploads.",
+    },
+    {
+      domain: "upload",
+      body: "This workflow checks inputs but audits must not use the network, yet must not upload files.",
+    },
+    {
+      domain: "upload",
+      body: "This workflow checks inputs but reviews must not use credentials, yet must not upload files.",
+    },
+    {
+      domain: "network",
+      body: "This workflow validates inputs but logs must not contain credentials, yet must not use the network.",
     },
   ] as const) {
     for (const softWrapped of [false, true]) {
@@ -2075,6 +2415,15 @@ function softWrapAfterWorkflowSubject(text: string): string {
   const subject = new RegExp(`^${WORKFLOW_SCOPE_TERMS}\\b`, "i").exec(text);
   assert.ok(subject, text);
   return `${subject[0]}\n${text.slice(subject[0].length).trimStart()}`;
+}
+
+function softWrapAfterDirectivePrefix(text: string): string {
+  const prefix =
+    /^(?:please|for safety,|ensure|make sure|as a rule,|policy:|requirement:)\s+/iu.exec(
+      text,
+    );
+  assert.ok(prefix, text);
+  return `${prefix[0].trimEnd()}\n${text.slice(prefix[0].length)}`;
 }
 
 function renderStatementPredicateChain(input: {

@@ -233,7 +233,7 @@ const EXPLICIT_CHANGED_SUBJECT_START_RE = new RegExp(
   "i",
 );
 const STRONG_CHANGED_SUBJECT_START_RE =
-  /^[ \t]*(?!(?:it|also|still|therefore)\b)(?:(?:the|a|an|this|that|these|those|each|every|another|offline|online|local|remote)[ \t]+)?[A-Za-z][A-Za-z0-9_-]*(?:[ \t]+[A-Za-z][A-Za-z0-9_-]*){1,3}[ \t]+(?:(?:must|shall|should|will|would|may|might|can|could|does|do|did)[ \t]+(?:not|never)|cannot|can't|never)\b/i;
+  /^[ \t]*(?!(?:it|also|still|therefore)\b)(?:(?:the|a|an|this|that|these|those|each|every|another|offline|online|local|remote)[ \t]+)?[A-Za-z][A-Za-z0-9_-]*(?:[ \t]+[A-Za-z][A-Za-z0-9_-]*){0,3}[ \t]+(?:(?:must|shall|should|will|would|may|might|can|could|does|do|did)[ \t]+(?:not|never)|cannot|can't|never)\b/i;
 const DOMAIN_PREDICATE_START_RE = new RegExp(
   String.raw`^[ \t]*(?:,[ \t]*)?(?:(?:${STATEMENT_MODIFIER})[ \t]+)*(?:${NETWORK_SUBJECT}|${UPLOAD_SUBJECT}|${SECRET_ACCESS_SUBJECT})[ \t]+(?:(?:is|are|was|were)[ \t]+|(?:must|shall|should|may|can|will|would)[ \t]+)`,
   "i",
@@ -254,6 +254,8 @@ const DIRECT_SUBJECT_RELATIVE_MODIFIER_RE = new RegExp(
   "i",
 );
 const DIRECT_SUBJECT_PARENTHETICAL_RE = /^\((?<content>[^()"'\n]{1,64})\)/u;
+const DIRECT_SUBJECT_PAIRED_COMMA_MODIFIER_RE =
+  /^,[ \t]*(?<content>[^,()"'\n]{1,80}?)[ \t]*,[ \t]*/u;
 const DESCRIPTIVE_SUBJECT_BRIDGE_RE =
   /\b(?:says?|states?|documents?|describes?|quotes?|notes?|explains?|mentions?|reports?|shows?|lists?)\b/i;
 const CONDITIONAL_SUBJECT_BRIDGE_RE =
@@ -273,7 +275,8 @@ type DirectSubjectBridgeClassification =
   | "composed"
   | "explicit-changed-subject"
   | "conditional-or-subordinate"
-  | "local-or-specific-scope"
+  | "local-step-scope"
+  | "specific-source-or-target"
   | "exception-or-allowance"
   | "quoted-or-descriptive"
   | "unsupported";
@@ -285,6 +288,14 @@ type WorkflowScopeProof =
   | "explicit-workflow-qualifier"
   | "no-workflow-proof";
 
+type StandalonePolicyPrefixClassification =
+  | "plain-start"
+  | "directive-prefix"
+  | "policy-label"
+  | "descriptive-prefix"
+  | "changed-subject-prefix"
+  | "unsupported-prefix";
+
 interface BodyPolicyPredicateSegment {
   readonly range: EvidenceRange;
   readonly separator: EvidenceRange;
@@ -292,6 +303,7 @@ interface BodyPolicyPredicateSegment {
   readonly startClassification: PredicateStartClassification;
   readonly explicitSubject: EvidenceRange | undefined;
   readonly inheritedSubject: EvidenceRange | undefined;
+  readonly independentStandaloneBoundary: boolean;
 }
 
 interface BodyPolicyStatementGroup {
@@ -363,7 +375,10 @@ export function bodyPolicyStatementGroupFacts(
           scopeProof === "explicit-workflow-subject" &&
           explicitSubject !== undefined
             ? Math.min(scopedFact.evidenceStart, explicitSubject.start)
-            : scopedFact.evidenceStart;
+            : scopeProof === "standalone-default" ||
+                scopeProof === "explicit-workflow-qualifier"
+              ? 0
+              : scopedFact.evidenceStart;
         return {
           ...scopedFact,
           evidenceStart: predicate.range.start + evidenceStart,
@@ -910,6 +925,13 @@ function bodyPolicyStatementGroups(
       boundary === "inherited" &&
       activeSubject !== undefined &&
       startClassification === "supported-subjectless";
+    const previousPredicate = predicates[predicates.length - 1];
+    const independentStandaloneBoundary =
+      explicitSubject === undefined &&
+      boundary === "inherited" &&
+      activeSubject === undefined &&
+      previousPredicate !== undefined &&
+      predicateAllowsIndependentPolicyContinuation(text, previousPredicate);
     if (boundary === "hard") {
       if (predicates.length > 0) {
         groups.push(
@@ -930,6 +952,7 @@ function bodyPolicyStatementGroups(
       startClassification,
       explicitSubject,
       inheritedSubject,
+      independentStandaloneBoundary,
     });
     activeSubject =
       explicitSubject ??
@@ -966,6 +989,22 @@ function statementGroup(
   };
 }
 
+function predicateAllowsIndependentPolicyContinuation(
+  text: string,
+  predicate: BodyPolicyPredicateSegment,
+): boolean {
+  if (
+    predicate.explicitSubject !== undefined ||
+    predicate.inheritedSubject !== undefined
+  ) {
+    return false;
+  }
+  if (predicate.startClassification === "supported-subjectless") return true;
+  return directlySupportedProhibitionStartsText(
+    text.slice(predicate.range.start, predicate.range.end),
+  );
+}
+
 function splitOrdinaryPredicateRanges(
   text: string,
   sourceRange: EvidenceRange,
@@ -973,10 +1012,31 @@ function splitOrdinaryPredicateRanges(
   const ranges: EvidenceRange[] = [];
   let start = sourceRange.start;
   const source = text.slice(sourceRange.start, sourceRange.end);
+  const pairedCommaModifier = leadingPairedCommaModifierRange(
+    text,
+    sourceRange,
+  );
   for (const match of source.matchAll(ORDINARY_STATEMENT_SEPARATOR_RE)) {
     if (match.index === undefined) continue;
     const separatorStart = sourceRange.start + match.index;
     const separatorEnd = separatorStart + match[0].length;
+    if (
+      pairedCommaModifier !== undefined &&
+      separatorStart >= pairedCommaModifier.start &&
+      separatorStart < pairedCommaModifier.end
+    ) {
+      continue;
+    }
+    const commaPrefixClassification = standalonePolicyPrefixClassification(
+      source.slice(0, match.index),
+    );
+    if (
+      /^,[ \t]*$/u.test(match[0]) &&
+      (commaPrefixClassification === "directive-prefix" ||
+        commaPrefixClassification === "policy-label")
+    ) {
+      continue;
+    }
     if (!startsStatementPredicate(text.slice(separatorEnd, sourceRange.end))) {
       continue;
     }
@@ -987,6 +1047,22 @@ function splitOrdinaryPredicateRanges(
   return ranges;
 }
 
+function leadingPairedCommaModifierRange(
+  text: string,
+  sourceRange: EvidenceRange,
+): EvidenceRange | undefined {
+  const subject = leadingWorkflowSubjectInRange(text, sourceRange);
+  if (subject === undefined) return undefined;
+  const match = DIRECT_SUBJECT_PAIRED_COMMA_MODIFIER_RE.exec(
+    text.slice(subject.end, sourceRange.end),
+  );
+  if (match === null) return undefined;
+  return {
+    start: subject.end,
+    end: subject.end + match[0].length,
+  };
+}
+
 function startsStatementPredicate(text: string): boolean {
   const startClassification = classifyPredicateStart(
     text,
@@ -994,12 +1070,23 @@ function startsStatementPredicate(text: string): boolean {
   );
   return (
     startClassification === "explicit-workflow-subject" ||
+    directlySupportedProhibitionStartsText(text) ||
     DOMAIN_PREDICATE_START_RE.test(text) ||
     ((startClassification === "supported-subjectless" ||
       startClassification === "explicit-changed-subject") &&
       DOMAIN_ORDER.some((domain) =>
         DOMAIN_EVIDENCE_PATTERNS[domain].test(text),
       ))
+  );
+}
+
+function directlySupportedProhibitionStartsText(text: string): boolean {
+  return DOMAIN_ORDER.some((domain) =>
+    candidateEvidence(
+      text,
+      PROHIBITED_PATTERNS[domain],
+      "supported-prohibition",
+    ).some((candidate) => text.slice(0, candidate.start).trim().length === 0),
   );
 }
 
@@ -1074,6 +1161,47 @@ function supportedCandidatesForFact(
   );
 }
 
+function standalonePolicyPrefixClassification(
+  prefix: string,
+): StandalonePolicyPrefixClassification {
+  const normalized = prefix.trim();
+  if (normalized.length === 0) return "plain-start";
+  if (
+    /["'“”‘’`]/u.test(normalized) ||
+    DESCRIPTIVE_SUBJECT_BRIDGE_RE.test(normalized)
+  ) {
+    return "descriptive-prefix";
+  }
+  if (/^(?:policy|requirement)[ \t]*:[ \t]*$/i.test(normalized)) {
+    return "policy-label";
+  }
+  if (
+    /^(?:please|for[ \t]+safety|ensure|make[ \t]+sure|as[ \t]+a[ \t]+rule)[ \t]*[:,–—-]?[ \t]*$/iu.test(
+      normalized,
+    )
+  ) {
+    return "directive-prefix";
+  }
+  if (
+    /^(?:(?:the|a|an|this|that|these|those|each|every|another|offline|online|local|remote)[ \t]+)?[A-Za-z][A-Za-z0-9_-]*(?:[ \t]+[A-Za-z][A-Za-z0-9_-]*){0,3}(?:[ \t]+(?:must|shall|should|will|would|may|might|can|could|does|do|did))?[ \t]*$/i.test(
+      normalized,
+    )
+  ) {
+    return "changed-subject-prefix";
+  }
+  return "unsupported-prefix";
+}
+
+function standalonePolicyPrefixSupportsScope(
+  classification: StandalonePolicyPrefixClassification,
+): boolean {
+  return (
+    classification === "plain-start" ||
+    classification === "directive-prefix" ||
+    classification === "policy-label"
+  );
+}
+
 function directFactWorkflowScopeProof(
   predicate: string,
   segment: BodyPolicyPredicateSegment,
@@ -1090,10 +1218,15 @@ function directFactWorkflowScopeProof(
   }
 
   const candidates = supportedCandidatesForFact(predicate, fact);
-  const startsSegment = candidates.some(
-    (candidate) => predicate.slice(0, candidate.start).trim().length === 0,
+  const standaloneCandidates = candidates.filter((candidate) =>
+    standalonePolicyPrefixSupportsScope(
+      standalonePolicyPrefixClassification(predicate.slice(0, candidate.start)),
+    ),
   );
-  if (startsSegment && factHasExplicitWorkflowQualifier(predicate, fact)) {
+  if (
+    standaloneCandidates.length > 0 &&
+    factHasExplicitWorkflowQualifier(predicate, fact)
+  ) {
     return "explicit-workflow-qualifier";
   }
   if (
@@ -1113,10 +1246,11 @@ function directFactWorkflowScopeProof(
   if (
     explicitSubject === undefined &&
     segment.inheritedSubject === undefined &&
-    startsSegment &&
+    standaloneCandidates.length > 0 &&
     (segment.boundary === "start" ||
+      segment.independentStandaloneBoundary ||
       (segment.boundary === "hard" &&
-        candidates.some((candidate) =>
+        standaloneCandidates.some((candidate) =>
           candidateSupportsIndependentStatementDefault(predicate, candidate),
         )))
   ) {
@@ -1163,25 +1297,42 @@ function applyWorkflowScopeProof(
   };
 }
 
-function bridgeHasLocalOrSpecificScope(
-  bridge: string,
-  domain: BodyPolicyDomain,
-): boolean {
-  if (
+function bridgeHasLocalScope(bridge: string): boolean {
+  return (
     LOCAL_SCOPE_RE.test(bridge) ||
     /\b(?:during|within|for|only[ \t]+for)[ \t]+[^()"'\n]{0,32}\b(?:validation|setup|installation|command|step|phase)\b/i.test(
       bridge,
     )
+  );
+}
+
+function modifierHasSpecificScope(
+  modifier: string,
+  domain: BodyPolicyDomain,
+  nakedPreposition: boolean,
+): boolean {
+  if (
+    hasSpecificSourceScope(modifier, domain) ||
+    hasSpecificTargetScope(modifier, domain)
   ) {
     return true;
   }
+  if (!nakedPreposition) return false;
   if (domain === "upload") {
-    return /\b(?:to|into|onto)\b/i.test(bridge);
+    return /^(?:to|into|onto)\b/i.test(modifier.trim());
   }
   if (domain === "secrets") {
-    return /\b(?:from|through|via|to|into|onto)\b/i.test(bridge);
+    return /^(?:from|through|via|to|into|onto)\b/i.test(modifier.trim());
   }
-  return /\b(?:to|from|through|via)\b/i.test(bridge);
+  return /^(?:to|from|through|via)\b/i.test(modifier.trim());
+}
+
+function isBoundedRelativeModifier(modifier: string): boolean {
+  const relative = DIRECT_SUBJECT_RELATIVE_MODIFIER_RE.exec(modifier.trim());
+  return (
+    relative !== null &&
+    modifier.trim().slice(relative[0].length).trim().length === 0
+  );
 }
 
 function classifyDirectSubjectBridge(
@@ -1206,10 +1357,28 @@ function classifyDirectSubjectBridge(
   ) {
     return "exception-or-allowance";
   }
-  if (bridgeHasLocalOrSpecificScope(remainder, domain)) {
-    return "local-or-specific-scope";
+  if (bridgeHasLocalScope(remainder)) {
+    return "local-step-scope";
   }
   let consumedComponent = false;
+  const pairedComma = DIRECT_SUBJECT_PAIRED_COMMA_MODIFIER_RE.exec(remainder);
+  if (pairedComma?.groups?.content !== undefined) {
+    const content = pairedComma.groups.content.trim();
+    if (!isBoundedRelativeModifier(content)) {
+      if (modifierHasSpecificScope(content, domain, true)) {
+        return "specific-source-or-target";
+      }
+      return classifyPredicateStart(content, false) ===
+        "explicit-changed-subject"
+        ? "explicit-changed-subject"
+        : "unsupported";
+    }
+    if (modifierHasSpecificScope(content, domain, false)) {
+      return "specific-source-or-target";
+    }
+    remainder = remainder.slice(pairedComma[0].length);
+    consumedComponent = true;
+  }
   const punctuation = DIRECT_SUBJECT_PUNCTUATION_RE.exec(remainder);
   if (punctuation !== null) {
     remainder = remainder.slice(punctuation[0].length);
@@ -1229,6 +1398,9 @@ function classifyDirectSubjectBridge(
 
   const relative = DIRECT_SUBJECT_RELATIVE_MODIFIER_RE.exec(remainder);
   if (relative !== null) {
+    if (modifierHasSpecificScope(relative[0], domain, false)) {
+      return "specific-source-or-target";
+    }
     remainder = remainder.slice(relative[0].length).trim();
     consumedComponent = true;
   } else {
@@ -1239,6 +1411,11 @@ function classifyDirectSubjectBridge(
         parenthetical.groups.content,
       )
     ) {
+      if (
+        modifierHasSpecificScope(parenthetical.groups.content, domain, true)
+      ) {
+        return "specific-source-or-target";
+      }
       remainder = remainder.slice(parenthetical[0].length).trimStart();
       consumedComponent = true;
     }

@@ -232,6 +232,40 @@ const INTENTIONAL_COMPATIBILITY_CHANGES: Readonly<
   "middle-changed-log-processors": noFindingChange(
     "Log processors is a strong changed subject rather than the subjectless verb logs.",
   ),
+  "bounded-directive-please-network": findingChange(
+    "Please do not use the network.",
+    "A bounded directive prefix preserves the standalone policy scope of the supported prohibition.",
+  ),
+  "bounded-coordination-semicolon-network": findingChange(
+    "never use the network.",
+    "A directly supported prohibition after subjectless semicolon coordination receives an independent standalone policy default.",
+  ),
+  "bounded-coordination-two-domains-and": compatibilityChange(
+    [
+      finding("No external uploads and never use the network."),
+      finding("No external uploads and never use the network."),
+    ],
+    "Independent subjectless prohibitions preserve one ordered finding for each enabled domain.",
+  ),
+  "bounded-coordination-two-domains-semicolon": compatibilityChange(
+    [finding("Never use the network"), finding("no external uploads.")],
+    "The independently supported first predicate adds the missing network finding while retaining the legacy upload evidence.",
+  ),
+  "bounded-paired-local-network": noFindingChange(
+    "A comma-delimited local modifier remains attached to the prohibition and prevents workflow-wide scope.",
+  ),
+  "bounded-paired-exception-network": noFindingChange(
+    "A comma-delimited exception remains attached to the prohibition and prevents complete workflow-wide scope.",
+  ),
+  "bounded-paired-target-upload": noFindingChange(
+    "A comma-delimited upload target remains attached to the prohibition and preserves target-specific scope.",
+  ),
+  "bounded-changed-subject-audits": noFindingChange(
+    "The one-word plural noun audits is a changed subject before a modal prohibition, so later predicates cannot inherit workflow scope through it.",
+  ),
+  "bounded-changed-subject-reviews": noFindingChange(
+    "The one-word plural noun reviews is a changed subject before a modal prohibition, so later predicates cannot inherit workflow scope through it.",
+  ),
 };
 
 const PAIRWISE_CASES = BODY_POLICY_0244_GOLDEN_CASES.filter(
@@ -487,6 +521,242 @@ const CURRENT_BODY_POLICY_PRECISION_MATRIX = [
   },
 ] as const;
 
+const CURRENT_BOUNDED_STATEMENT_MATRIX = [
+  {
+    name: "directive one-line",
+    body: "Please do not use the network.",
+    expected: [finding("Please do not use the network.")],
+    coverage: {
+      directivePrefix: "directive",
+      separator: "start",
+      pairedModifier: "none",
+      relativeAttachment: "none",
+      subjectShape: "none",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "directive soft wrap",
+    body: "For safety,\nno external uploads.",
+    expected: [finding("For safety,\nno external uploads.", 12)],
+    coverage: {
+      directivePrefix: "directive",
+      separator: "start",
+      pairedModifier: "none",
+      relativeAttachment: "none",
+      subjectShape: "none",
+      layout: "soft-wrap",
+    },
+  },
+  {
+    name: "policy label heading fallback",
+    body: "## Policy: no external uploads.",
+    expected: [finding("## Policy: no external uploads.")],
+    coverage: {
+      directivePrefix: "policy-label",
+      separator: "start",
+      pairedModifier: "none",
+      relativeAttachment: "none",
+      subjectShape: "none",
+      layout: "heading",
+    },
+  },
+  {
+    name: "subjectless and coordination",
+    body: "Validate inputs and no external uploads.",
+    expected: [finding("Validate inputs and no external uploads.")],
+    coverage: {
+      directivePrefix: "none",
+      separator: "and-without-active-subject",
+      pairedModifier: "none",
+      relativeAttachment: "none",
+      subjectShape: "none",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "subjectless semicolon coordination soft wrap",
+    body: "Validate inputs;\nnever use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 12,
+        endLine: 12,
+        snippet: "never use the network.",
+      },
+    ],
+    coverage: {
+      directivePrefix: "none",
+      separator: "semicolon-without-active-subject",
+      pairedModifier: "none",
+      relativeAttachment: "none",
+      subjectShape: "none",
+      layout: "soft-wrap",
+    },
+  },
+  {
+    name: "coordination with active workflow subject",
+    body: "This workflow validates inputs and never use the network.",
+    expected: [
+      finding("This workflow validates inputs and never use the network."),
+    ],
+    coverage: {
+      directivePrefix: "none",
+      separator: "and-with-active-subject",
+      pairedModifier: "none",
+      relativeAttachment: "none",
+      subjectShape: "workflow",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "subjectless two-domain ordering",
+    body: "Never use the network; no external uploads.",
+    expected: [
+      finding("Never use the network"),
+      finding("no external uploads."),
+    ],
+    coverage: {
+      directivePrefix: "plain-start",
+      separator: "semicolon-without-active-subject",
+      pairedModifier: "none",
+      relativeAttachment: "none",
+      subjectShape: "none",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "paired relative modifier",
+    body: "This workflow, which validates inputs, must not use credentials.",
+    expected: [
+      finding(
+        "This workflow, which validates inputs, must not use credentials.",
+      ),
+    ],
+    coverage: {
+      directivePrefix: "none",
+      separator: "none",
+      pairedModifier: "relative",
+      relativeAttachment: "unqualified",
+      subjectShape: "workflow",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "paired local modifier soft wrap",
+    body: "This workflow, during local setup,\nmust not use the network.",
+    expected: [],
+    coverage: {
+      directivePrefix: "none",
+      separator: "none",
+      pairedModifier: "local",
+      relativeAttachment: "none",
+      subjectShape: "workflow",
+      layout: "soft-wrap",
+    },
+  },
+  {
+    name: "paired exception heading fallback",
+    body: "## This workflow, except for approved domains, must not use the network.",
+    expected: [],
+    coverage: {
+      directivePrefix: "none",
+      separator: "none",
+      pairedModifier: "exception",
+      relativeAttachment: "none",
+      subjectShape: "workflow",
+      layout: "heading",
+    },
+  },
+  {
+    name: "paired specific target",
+    body: "This workflow, to a public bucket, must not upload files.",
+    expected: [],
+    coverage: {
+      directivePrefix: "none",
+      separator: "none",
+      pairedModifier: "specific-target",
+      relativeAttachment: "none",
+      subjectShape: "workflow",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "inline relative unrelated preposition",
+    body: "This workflow that is designed to validate inputs must not use the network.",
+    expected: [
+      finding(
+        "This workflow that is designed to validate inputs must not use the network.",
+      ),
+    ],
+    coverage: {
+      directivePrefix: "none",
+      separator: "none",
+      pairedModifier: "none",
+      relativeAttachment: "unrelated-preposition",
+      subjectShape: "workflow",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "inline relative domain-specific target",
+    body: "This workflow that uploads reports to a public bucket must not upload files.",
+    expected: [],
+    coverage: {
+      directivePrefix: "none",
+      separator: "none",
+      pairedModifier: "none",
+      relativeAttachment: "domain-specific-preposition",
+      subjectShape: "workflow",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "single-word changed subject",
+    body: "This workflow checks inputs but audits must not use the network, yet must not upload files.",
+    expected: [],
+    coverage: {
+      directivePrefix: "none",
+      separator: "contrastive-with-active-subject",
+      pairedModifier: "none",
+      relativeAttachment: "none",
+      subjectShape: "single-word-changed",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "multiword changed subject soft wrap",
+    body: "This workflow checks inputs\nbut audit jobs must not use the network,\nyet must not upload files.",
+    expected: [],
+    coverage: {
+      directivePrefix: "none",
+      separator: "contrastive-with-active-subject",
+      pairedModifier: "none",
+      relativeAttachment: "none",
+      subjectShape: "multiword-changed",
+      layout: "soft-wrap",
+    },
+  },
+  {
+    name: "subjectless homograph predicate heading fallback",
+    body: "## This workflow checks inputs but audits logs, yet must not upload files.",
+    expected: [
+      finding(
+        "## This workflow checks inputs but audits logs, yet must not upload files.",
+      ),
+    ],
+    coverage: {
+      directivePrefix: "none",
+      separator: "contrastive-with-active-subject",
+      pairedModifier: "none",
+      relativeAttachment: "none",
+      subjectShape: "subjectless-homograph",
+      layout: "heading",
+    },
+  },
+] as const;
+
 test("0.24.4 body-policy golden cases are self-contained and immutable", () => {
   assert.equal(BODY_POLICY_0244_GOLDEN_SOURCE.tag, "v0.24.4");
   assert.equal(
@@ -497,7 +767,7 @@ test("0.24.4 body-policy golden cases are self-contained and immutable", () => {
     BODY_POLICY_0244_GOLDEN_SOURCE.generatedBy,
     /securityDiagnosticFindings/u,
   );
-  assert.equal(BODY_POLICY_0244_GOLDEN_CASES.length, 116);
+  assert.equal(BODY_POLICY_0244_GOLDEN_CASES.length, 135);
   assert.equal(
     new Set(BODY_POLICY_0244_GOLDEN_CASES.map(({ name }) => name)).size,
     BODY_POLICY_0244_GOLDEN_CASES.length,
@@ -718,6 +988,56 @@ test("current body-policy precision matrix has exact bounded public output", () 
   );
 });
 
+test("current bounded statement matrix has exact output and complete dimensions", () => {
+  for (const fixture of CURRENT_BOUNDED_STATEMENT_MATRIX) {
+    assert.deepEqual(
+      bodyPolicyFindingProjections(fixture.body),
+      fixture.expected,
+      fixture.name,
+    );
+  }
+
+  assertMatrixCoverage(CURRENT_BOUNDED_STATEMENT_MATRIX, "directivePrefix", [
+    "directive",
+    "policy-label",
+    "plain-start",
+    "none",
+  ]);
+  assertMatrixCoverage(CURRENT_BOUNDED_STATEMENT_MATRIX, "separator", [
+    "start",
+    "and-without-active-subject",
+    "semicolon-without-active-subject",
+    "and-with-active-subject",
+    "contrastive-with-active-subject",
+    "none",
+  ]);
+  assertMatrixCoverage(CURRENT_BOUNDED_STATEMENT_MATRIX, "pairedModifier", [
+    "none",
+    "relative",
+    "local",
+    "exception",
+    "specific-target",
+  ]);
+  assertMatrixCoverage(CURRENT_BOUNDED_STATEMENT_MATRIX, "relativeAttachment", [
+    "none",
+    "unqualified",
+    "unrelated-preposition",
+    "domain-specific-preposition",
+  ]);
+  assertMatrixCoverage(CURRENT_BOUNDED_STATEMENT_MATRIX, "subjectShape", [
+    "none",
+    "workflow",
+    "single-word-changed",
+    "multiword-changed",
+    "subjectless-homograph",
+  ]);
+  assertMatrixCoverage(CURRENT_BOUNDED_STATEMENT_MATRIX, "layout", [
+    "one-line",
+    "soft-wrap",
+    "heading",
+  ]);
+});
+
 function assertPairwiseCoverage(
   label: string,
   fixtures: typeof PAIRWISE_CASES,
@@ -738,6 +1058,22 @@ function assertPairwiseCoverage(
     ),
   );
   assert.deepEqual(actual, expected, label);
+}
+
+function assertMatrixCoverage<
+  Fixture extends {
+    readonly coverage: Readonly<Record<string, string>>;
+  },
+>(
+  fixtures: readonly Fixture[],
+  key: string,
+  expectedValues: readonly string[],
+): void {
+  assert.deepEqual(
+    new Set(fixtures.map(({ coverage }) => coverage[key])),
+    new Set(expectedValues),
+    key,
+  );
 }
 
 function compatibilityChange(
