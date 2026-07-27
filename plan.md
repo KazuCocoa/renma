@@ -2,12 +2,13 @@
 
 ## Current Checkpoint
 
-Renma 0.24.1 is a focused maintenance checkpoint after the 0.24.0
-structure-aware security-analysis release.
+Renma 0.25.0 is a focused internal security-analysis checkpoint after the
+precision corrections completed in 0.24.4.
 
-The checkpoint aligns implementation, tests, CLI help, examples, code comments,
-and repository documentation. It does not add a product feature or intentionally
-change public behavior.
+The checkpoint replaces body-policy sentence orchestration with private clause
+facts for domain, modality, scope, and completeness. It preserves the
+high-confidence public diagnostic boundary and does not add a product feature
+or intentionally change public behavior.
 
 The current product remains a single-repository, deterministic Context
 Repository governance CLI:
@@ -30,6 +31,8 @@ The current stabilization phase prioritizes:
   state;
 - keeping static Skill Discovery, security analysis, composition, impact,
   Readiness, diff, CI, Trust Graph, and BOM boundaries explicit;
+- keeping body-policy clause semantics private, precision-first, clause-bounded,
+  and separate from shared lexical vocabulary;
 - removing obsolete chronology and duplicated contract lists from evergreen
   documentation;
 - protecting documented deep imports and compatibility re-exports;

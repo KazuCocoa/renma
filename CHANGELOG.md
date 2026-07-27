@@ -6,6 +6,121 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-07-26
+
+### Fixed
+
+- Preserved the Renma 0.24.4 body-policy boundary for every frozen golden case
+  except explicitly allowlisted precision and evidence changes. Coordinated
+  requirement, local, qualified, safeguard, and workflow prohibition
+  predicates remain independent for each domain, including when an earlier
+  predicate has no body-policy domain, has local or specific scope, or mentions
+  another domain.
+- Restored directly supported workflow-prefix prohibitions across bounded short
+  modifiers, modal bridges, colon or dash punctuation, and bounded relative
+  or unqualified parenthetical modifiers. Composed bridges preserve local-step,
+  source/target, exception, and allowance qualifications; phase-local
+  parentheticals no longer become workflow-wide prohibitions.
+- Preserved standalone policy scope through bounded directive prefixes and
+  independent subjectless coordination. Paired-comma modifiers remain attached
+  to their prohibition, while prepositions in inline relative clauses qualify
+  only the nearest bounded action or domain phrase.
+- Kept outer directive proof separate from an embedded workflow subject's local
+  bridge proof, accepted unknown imperatives only across an independent bare
+  semicolon, and modeled bounded `modal + never` and `modal + not` forms as
+  semantically classified prohibition candidates.
+- Promoted workflow subjects after supported directive and policy-label
+  prefixes into statement-group state, unified bounded modifier and
+  `modal + never` predicate prefixes across direct and inherited facts, and
+  retained the prefix in projected evidence.
+- Made bare-semicolon standalone proof quote-enclosure-aware, supported bounded
+  paired-comma object-relative clauses without attributing their inner
+  prohibitions to the main workflow, and added bounded `ensure that` and
+  `make sure that` directive forms.
+- Carried private quote-enclosure provenance through technical-clause,
+  sentence, contrastive, ordinary `and`, and comma segmentation so quoted
+  examples cannot inherit workflow scope or receive standalone policy scope.
+  Enclosed separators are opaque but no longer clear an outer subject or policy
+  context needed by an unquoted continuation after the closing quote.
+- Classified bounded paired subject-relative predicates independently while
+  retaining object-relative changed subjects for the later main predicate.
+  Multi-predicate subject-relative components reuse the same statement-group
+  state machine within their comma bounds.
+- Added policy context as private statement-group state independent of workflow
+  subject state, allowing supported labels and directives to scope and promote
+  later subjectless predicates without manufacturing a grammatical subject.
+- Separated deontic and commitment modal negation from recommendation,
+  epistemic, capability, hypothetical, and availability language for both
+  `modal + never` and active or passive `modal + not`. Plain `must`, `shall`,
+  and `will` remain emitting; bounded policy or directive context additionally
+  supports `should` and `may`, while availability states and `might`, `can`,
+  `could`, and `would` remain non-emitting.
+- Composed at most one supported policy label with one bounded directive or
+  safety component for standalone proof, embedded subjects, paired modifiers,
+  and evidence origins.
+- Required explicit statement-level scope proof for direct facts, preventing a
+  supported subjectless prohibition under descriptive, changed-subject,
+  conditional, or unsupported syntax from receiving default workflow scope.
+- Restored subject continuation through base and third-person policy verbs
+  while recognizing strong noun phrases followed by copular, auxiliary, finite,
+  or negative modal heads before their first word can be treated as a
+  subjectless verb.
+- Recognized noun/verb homographs followed by compatible finite security
+  actions as changed subjects while preserving genuine subjectless forms such
+  as `audits logs`, `reviews results`, and `checks use cases`.
+- Kept affirmative requirement language distinct from genuinely negative
+  `not-required` facts so it cannot suppress a later workflow prohibition.
+- Added 241 immutable, self-contained test-only 0.24.4 golden cases generated
+  from the full tagged commit. The exact legacy bodies and public projections
+  cover subjects, predicate kinds, connectors, domains, scopes, layouts,
+  evidence, ordering, and deduplication; a 32-case matrix proves the requested
+  pairwise interactions, deterministic current-only matrices cover scope proof,
+  bridge precision and the directive/bridge, separator/previous-predicate,
+  modal/domain, modifier/qualification, and homograph/predicate-head
+  cross-products. Composed matrices additionally cover outer prefixes,
+  continuation connectors, inherited modifiers, all separator quote
+  enclosures and outer continuations, independent subject and policy state,
+  multi-predicate subject-relative shapes, active/passive/state modal-negation
+  semantics, composed prefixes, layouts, evidence, ordering, and deduplication;
+  every observed difference is explicitly allowlisted.
+
+### Changed
+
+- Replaced growing sentence-level body-policy contradiction patterns with a
+  private statement-group and clause-facts model that establishes grammatical
+  workflow-subject inheritance before separating security domain, modality,
+  scope, and supported-clause completeness.
+- Reused the same statement-group analyzer for prepared prose and eligible
+  fallback lines such as headings. Subject inheritance supports multiple
+  consecutive copular, auxiliary or modal, and curated ordinary-verb
+  predicates, as well as the bounded `also`, `still`, and `therefore` modifier
+  grammar. It stops at sentence endings, Markdown hard breaks, structural
+  boundaries, changed subjects, conditional or subordinate prefixes, and
+  unsupported syntax.
+- Preserved precision-first handling: only complete, high-confidence
+  workflow-wide prohibitions contradict permissive policy metadata; local
+  safeguards, requirement language, specific sources or targets, unknown
+  states, and unsupported clauses remain unreported.
+- Reused prepared Markdown clauses and retained physical source offsets so
+  ordinary soft wraps preserve meaning, explicit hard breaks remain
+  boundaries, and mixed-clause evidence stays bounded.
+- Kept exact shared lexical vocabulary separate from classifier-specific
+  semantic fact composition.
+
+### Compatibility
+
+- Preserved diagnostic IDs, titles, severities, confidence, risk classes,
+  remediation, LLM hints, bounded physical evidence, ordering, deduplication,
+  policy resolution, CLI behavior, Diagnostics v2, review bundles, public
+  types, schemas, package entrypoints, and supported deep imports. Compatibility
+  means exact frozen 0.24.4 output plus the named allowlist: inherited evidence
+  may include the supported later predicate, independent facts may restore a
+  previously suppressed finding, and descriptive, changed-subject,
+  destination-specific, conditional, or unsupported syntax may intentionally
+  suppress a legacy false positive.
+- Added no dependencies, public diagnostics, public configuration, or public
+  clause-fact output.
+
 ## [0.24.4] - 2026-07-26
 
 ### Fixed

@@ -51,13 +51,16 @@ import {
   type NetworkDestination,
 } from "./security-destination/index.js";
 import {
-  BODY_SECRET_TARGET_TERMS,
   CLOUD_UPLOAD_ACTION_TERMS,
   CLOUD_UPLOAD_DESTINATION_TERMS,
   EXTERNAL_UPLOAD_ACTION_TERMS,
   EXTERNAL_UPLOAD_DESTINATION_TERMS,
-  WORKFLOW_SCOPE_TERMS,
 } from "./security-prose-vocabulary.js";
+import {
+  bodyPolicyStatementGroupFacts,
+  type BodyPolicyClauseFacts,
+  type BodyPolicyDomain,
+} from "./security-body-policy/clause-facts.js";
 
 // Preserve the established destination-analysis deep imports while the
 // implementation remains owned by security-destination.
@@ -736,108 +739,7 @@ const FORBIDDEN_INPUT_ACTION_PATTERN =
   /\b(copy|print|cat|echo|paste|upload|send|share|attach|include|dump|export|log|summari[sz]e|read|collect|provide|load|use)\b/i;
 const SAFE_FORBIDDEN_INPUT_PATTERN =
   /\b(do\s+not|don't|never|avoid|exclude|without|redact|remove|omit|strip|skip)\b.{0,80}\b(secret|secrets|credential|credentials|token|password|private key|private keys|\.env|env files?|customer data)\b/i;
-const BODY_NO_REQUIREMENT_SUFFIX_RE =
-  /^[ \t]+(?:(?:is|are|was|were)[ \t]+(?:not[ \t]+)?(?:required|needed|necessary|unnecessary|optional)|(?:should|will|would|may)[ \t]+(?:not[ \t]+)?be[ \t]+(?:required|needed))\b/i;
-const BODY_NO_ALLOWANCE_SUFFIX_RE =
-  /^[ \t]+(?:is|are|was|were)[ \t]+(?:allowed|permitted|available)\b/i;
-const BODY_SCOPE_QUALIFIER_PREFIX = String.raw`[ \t]+(?:for|throughout|during|within|in)[ \t]+`;
-const BODY_SCOPE_QUALIFIER_RE = new RegExp(
-  String.raw`^${BODY_SCOPE_QUALIFIER_PREFIX}`,
-  "i",
-);
-const BODY_WORKFLOW_SCOPE_QUALIFIER_RE = new RegExp(
-  String.raw`^${BODY_SCOPE_QUALIFIER_PREFIX}${WORKFLOW_SCOPE_TERMS}\b`,
-  "i",
-);
-const BODY_LOCAL_SCOPE_TERMS = String.raw`(?:local[ \t]+(?:setup|installation|validation|run|mode|step|phase|command)|(?:(?:this|the|a|an)[ \t]+)?(?:setup|installation|validation|command|step|phase)(?:[ \t]+(?:step|phase))?)`;
-const BODY_LOCAL_SCOPE_QUALIFIER_RE = new RegExp(
-  String.raw`^${BODY_SCOPE_QUALIFIER_PREFIX}${BODY_LOCAL_SCOPE_TERMS}\b`,
-  "i",
-);
-const BODY_POLICY_TRIVIAL_REMAINDER_RE =
-  /^[ \t]*(?:[.!?…]+)?[)"'\]}>*_~`\\]*[ \t]*$/u;
 const BODY_POLICY_CLOSING_PUNCTUATION_RE = /^[.!?…]+[)"'\]}>*_~`]*/u;
-const BODY_NETWORK_DISALLOWED_PATTERNS = [
-  /\b(?:no|without)\s+(?:(?:any|all)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b(?!\s+(?:access|use|usage|connectivity|to)\b)/i,
-  /\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:(?:all|any)\s+)?(?:(?:use|allow|permit)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b(?!\s+(?:access|use|usage|connectivity|to)\b)/i,
-  /\b(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\s+(?:(?:is|are)\s+(?:not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled)|(?:must|may|should)\s+not\s+be\s+(?:used|available|enabled))\b/i,
-  new RegExp(
-    String.raw`\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:allow|permit)\s+(?:any|all)\s+(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b[^.!?\n]{0,40}\b(?:for|throughout|during|within|in)\s+${WORKFLOW_SCOPE_TERMS}\b`,
-    "i",
-  ),
-  new RegExp(
-    String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,40}\b(?:(?:must|shall|will|does)\s+not|cannot|can't|never)\s+(?:use|access)\s+(?:(?:any|all|the)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b`,
-    "i",
-  ),
-  new RegExp(
-    String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,40}\b(?:must|shall|will|has\s+to|needs\s+to)\s+(?:run|operate|work)\s+(?:(?:entirely|completely)\s+)?(?:offline|air[- ]gapped)\b`,
-    "i",
-  ),
-  new RegExp(
-    String.raw`\b(?:keep|run|operate)\s+${WORKFLOW_SCOPE_TERMS}\s+(?:(?:entirely|completely)\s+)?(?:offline|air[- ]gapped)\b`,
-    "i",
-  ),
-] as const;
-const BODY_UPLOAD_DISALLOWED_PATTERNS = [
-  /\b(?:no|without)\s+(?:(?:any|all)\s+)?(?:external\s+)?uploads\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)/i,
-  /\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:perform|allow|permit|make)\s+(?:(?:(?:any|all)\s+)?external\s+uploads?|(?:any|all)\s+uploads?|uploads)\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)/i,
-  new RegExp(
-    String.raw`\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:${EXTERNAL_UPLOAD_ACTION_TERMS})\s+(?:(?:anything|everything)(?:\s+externally)?|externally)\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)`,
-    "i",
-  ),
-  /\b(?:(?:all|any)\s+)?(?:external\s+)?uploads?\s+(?:are|is)\s+(?:not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled)\b/i,
-  new RegExp(
-    String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,40}\b(?:(?:must|shall|will|does)\s+not|cannot|can't|never)\s+(?:${EXTERNAL_UPLOAD_ACTION_TERMS})\s+(?:(?:anything|everything)(?:\s+externally)?|externally)\b(?!\s+(?:to|into|onto|of|from|with|containing)\b)`,
-    "i",
-  ),
-  new RegExp(
-    String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,40}\b(?:(?:must|shall|will|does)\s+not|cannot|can't|never)\s+(?:${EXTERNAL_UPLOAD_ACTION_TERMS})\s+(?:files?|artifacts?|data)\b`,
-    "i",
-  ),
-  new RegExp(
-    String.raw`\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:${EXTERNAL_UPLOAD_ACTION_TERMS})\s+(?:any\s+|all\s+)?files?\s+externally\b`,
-    "i",
-  ),
-  new RegExp(
-    String.raw`\b(?:(?:all|any)\s+)?(?:external\s+)?uploads?\s+(?:must|shall|should|may)\s+not\s+be\s+(?:performed|made|allowed|permitted)\s+(?:for|throughout|during|within|in)\s+${WORKFLOW_SCOPE_TERMS}\b`,
-    "i",
-  ),
-] as const;
-const BODY_SECRET_DISALLOWED_PATTERNS = [
-  new RegExp(
-    String.raw`\bwithout\s+(?:(?:any|all)\s+)?(?:(?:access|permission)\s+to\s+|(?:the\s+)?use\s+of\s+)(?:${BODY_SECRET_TARGET_TERMS})\b(?!\s+(?:from|through|via)\b)`,
-    "i",
-  ),
-  /\bno\s+(?:secret|credential|token|password|private[- ]key)\s+(?:access|use|usage)\b/i,
-  new RegExp(
-    String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,50}\b(?:(?:must|shall|will|does)\s+not|cannot|can't|never)\s+(?:access|read|load|use|accept|handle)\s+(?:any\s+)?(?:${BODY_SECRET_TARGET_TERMS})\b(?!\s+(?:from|through|via)\b)`,
-    "i",
-  ),
-  new RegExp(
-    String.raw`\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:access|read|load|use|accept|handle)\s+(?:any\s+)?(?:${BODY_SECRET_TARGET_TERMS})\b[^.!?\n]{0,40}\b(?:for|throughout|during|within|in)\s+${WORKFLOW_SCOPE_TERMS}\b`,
-    "i",
-  ),
-  new RegExp(
-    String.raw`\b(?:${BODY_SECRET_TARGET_TERMS})\s+(?:are|is)\s+(?:not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled)(?:\s+(?:for|throughout|during|within|in)\s+${WORKFLOW_SCOPE_TERMS})?(?=[.!?]|$)`,
-    "i",
-  ),
-  new RegExp(
-    String.raw`\bno\s+(?:${BODY_SECRET_TARGET_TERMS})\s+(?:are|is)\s+(?:allowed|permitted|available)(?:\s+(?:for|throughout|during|within|in)\s+${WORKFLOW_SCOPE_TERMS})?(?=[.!?]|$)`,
-    "i",
-  ),
-  new RegExp(
-    String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,50}\bwithout\s+(?:any\s+)?(?:${BODY_SECRET_TARGET_TERMS})\b(?!\s+(?:from|through|via)\b)`,
-    "i",
-  ),
-  new RegExp(
-    String.raw`\b(?:${BODY_SECRET_TARGET_TERMS})\s+(?:must|shall|should|may)\s+not\s+be\s+(?:accessed|read|loaded|used|accepted|handled)\s+(?:for|throughout|during|within|in)\s+${WORKFLOW_SCOPE_TERMS}\b`,
-    "i",
-  ),
-  new RegExp(
-    String.raw`\bno\s+(?:${BODY_SECRET_TARGET_TERMS})\s+(?:may|must|should|can)\s+be\s+(?:accessed|read|loaded|used|accepted|handled)\s+(?:for|throughout|during|within|in)\s+${WORKFLOW_SCOPE_TERMS}\b`,
-    "i",
-  ),
-] as const;
 
 const EXTERNAL_UPLOAD_RE = new RegExp(
   String.raw`\b(${EXTERNAL_UPLOAD_ACTION_TERMS})\b.*\b(${EXTERNAL_UPLOAD_DESTINATION_TERMS})\b|\b(post|put)\b.*https?:\/\/`,
@@ -1307,6 +1209,34 @@ function paragraphEvidenceForRange(
   };
 }
 
+function clippedParagraphEvidenceForRange(
+  paragraph: SecurityParagraphContext,
+  rangeStart: number,
+  rangeEnd: number,
+): DetectionEvidence | undefined {
+  const occupied = paragraph.lines.filter(
+    ({ startOffset, endOffset }) =>
+      startOffset < rangeEnd && endOffset > rangeStart,
+  );
+  const first = occupied[0];
+  const last = occupied[occupied.length - 1];
+  if (first === undefined || last === undefined) return undefined;
+  return {
+    startLine: first.lineIndex + 1,
+    ...(last.lineIndex === first.lineIndex
+      ? {}
+      : { endLine: last.lineIndex + 1 }),
+    snippet: occupied
+      .map(({ text, startOffset, endOffset }) =>
+        text.slice(
+          Math.max(rangeStart, startOffset) - startOffset,
+          Math.min(rangeEnd, endOffset) - startOffset,
+        ),
+      )
+      .join("\n"),
+  };
+}
+
 function isStructurallyEligibleProseParagraph(
   paragraph: SecurityParagraphContext,
   markdownView: MarkdownSecurityView | undefined,
@@ -1433,16 +1363,7 @@ function collectPolicyPreludeDetections(
     });
   }
 
-  detections.push(
-    ...bodyPolicyContradictionDetections(
-      artifact.content,
-      effectivePolicy,
-      artifact.markdownParserEligible,
-      markdownView,
-      prepared.securityParagraphs,
-      prepared.securityParagraphContextByLine,
-    ),
-  );
+  detections.push(...bodyPolicyContradictionDetections(prepared));
 
   return detections;
 }
@@ -1841,165 +1762,6 @@ function disallowedCommandDetections(
   ];
 }
 
-function firstBodyPolicyContradictionMatch(
-  text: string,
-  patterns: readonly RegExp[],
-  clauseRanges: readonly SecurityParagraphClauseRange[] = [
-    { start: 0, end: text.length },
-  ],
-): RegExpExecArray | undefined {
-  let selected: RegExpExecArray | undefined;
-  for (const pattern of patterns) {
-    const match = firstBodyPolicyPatternMatch(text, pattern, clauseRanges);
-    if (
-      match?.index !== undefined &&
-      (selected === undefined || match.index < selected.index)
-    ) {
-      selected = match;
-    }
-  }
-  return selected;
-}
-
-function firstBodyPolicyPatternMatch(
-  text: string,
-  pattern: RegExp,
-  clauseRanges: readonly SecurityParagraphClauseRange[],
-): RegExpExecArray | undefined {
-  const flags = pattern.flags.includes("g")
-    ? pattern.flags
-    : `${pattern.flags}g`;
-  const matcher = new RegExp(pattern.source, flags);
-  for (const match of text.matchAll(matcher)) {
-    if (match.index === undefined) continue;
-    const matchEnd = match.index + match[0].length;
-    if (bodyPolicyMatchExpressesNoRequirement(text, match)) continue;
-    const allowanceEnd = bodyPolicyAllowanceBridgeEnd(text, match[0], matchEnd);
-    const scopeQualifier = bodyPolicyScopeQualifierAfterMatch(
-      text,
-      match[0],
-      matchEnd,
-    );
-    if (
-      scopeQualifier?.kind === "local" ||
-      scopeQualifier?.kind === "ambiguous"
-    ) {
-      continue;
-    }
-    const supportedEnd =
-      scopeQualifier?.kind === "workflow"
-        ? scopeQualifier.endOffset
-        : allowanceEnd;
-    const containingClause = bodyPolicyContainingClauseRange(
-      clauseRanges,
-      match.index,
-      text.length,
-    );
-    if (
-      !bodyPolicyRemainderIsTrivial(text, supportedEnd, containingClause.end)
-    ) {
-      continue;
-    }
-    if (supportedEnd > matchEnd) {
-      match[0] = text.slice(match.index, supportedEnd);
-    }
-    return match;
-  }
-  return undefined;
-}
-
-function bodyPolicyMatchExpressesNoRequirement(
-  text: string,
-  match: RegExpExecArray,
-): boolean {
-  return bodyPolicyMatchEndExpressesNoRequirement(
-    text,
-    match[0],
-    match.index + match[0].length,
-  );
-}
-
-function bodyPolicyMatchEndExpressesNoRequirement(
-  text: string,
-  matchedText: string,
-  matchEnd: number,
-): boolean {
-  if (!/\b(?:no|without)\b/i.test(matchedText)) return false;
-  const suffix = text.slice(matchEnd);
-  return BODY_NO_REQUIREMENT_SUFFIX_RE.test(suffix);
-}
-
-function bodyPolicyScopeQualifierAfterMatch(
-  text: string,
-  matchedText: string,
-  matchEnd: number,
-):
-  | {
-      readonly kind: "workflow" | "local" | "ambiguous";
-      readonly endOffset: number;
-    }
-  | undefined {
-  const qualifierStart = bodyPolicyAllowanceBridgeEnd(
-    text,
-    matchedText,
-    matchEnd,
-  );
-
-  const suffix = text.slice(qualifierStart);
-  const workflowScope = BODY_WORKFLOW_SCOPE_QUALIFIER_RE.exec(suffix);
-  if (workflowScope !== null) {
-    return {
-      kind: "workflow",
-      endOffset: qualifierStart + workflowScope[0].length,
-    };
-  }
-  const localScope = BODY_LOCAL_SCOPE_QUALIFIER_RE.exec(suffix);
-  if (localScope !== null) {
-    return {
-      kind: "local",
-      endOffset: qualifierStart + localScope[0].length,
-    };
-  }
-  const qualifier = BODY_SCOPE_QUALIFIER_RE.exec(suffix);
-  if (qualifier === null) return undefined;
-  return {
-    kind: "ambiguous",
-    endOffset: qualifierStart + qualifier[0].length,
-  };
-}
-
-function bodyPolicyAllowanceBridgeEnd(
-  text: string,
-  matchedText: string,
-  matchEnd: number,
-): number {
-  if (!/\bno\b/i.test(matchedText)) return matchEnd;
-  const allowance = BODY_NO_ALLOWANCE_SUFFIX_RE.exec(text.slice(matchEnd));
-  return allowance === null ? matchEnd : matchEnd + allowance[0].length;
-}
-
-function bodyPolicyContainingClauseRange(
-  clauseRanges: readonly SecurityParagraphClauseRange[],
-  matchStart: number,
-  textLength: number,
-): SecurityParagraphClauseRange {
-  return (
-    clauseRanges.find(
-      (range) => range.start <= matchStart && matchStart < range.end,
-    ) ?? { start: 0, end: textLength }
-  );
-}
-
-function bodyPolicyRemainderIsTrivial(
-  text: string,
-  supportedEnd: number,
-  clauseEnd: number,
-): boolean {
-  return BODY_POLICY_TRIVIAL_REMAINDER_RE.test(
-    text.slice(supportedEnd, clauseEnd),
-  );
-}
-
 function bodyPolicyClauseEvidenceSnippet(
   text: string,
   clauseRange: SecurityParagraphClauseRange,
@@ -2011,197 +1773,249 @@ function bodyPolicyClauseEvidenceSnippet(
   return text.slice(clauseRange.start, end).trim();
 }
 
+function bodyPolicyFactEvidenceRange(
+  text: string,
+  fact: BodyPolicyClauseFacts,
+): SecurityParagraphClauseRange {
+  const start = fact.evidenceStart;
+  const factEnd = fact.evidenceEnd;
+  const closingPunctuation = BODY_POLICY_CLOSING_PUNCTUATION_RE.exec(
+    text.slice(factEnd),
+  );
+  return {
+    start,
+    end: factEnd + (closingPunctuation?.[0].length ?? 0),
+  };
+}
+
+function hasEarlierBodyPolicyFact(
+  facts: readonly BodyPolicyClauseFacts[],
+  fact: BodyPolicyClauseFacts,
+): boolean {
+  return facts.some(
+    (candidate) =>
+      candidate.domain === fact.domain &&
+      candidate.evidenceStart < fact.evidenceStart,
+  );
+}
+
+function bodyPolicyStatementFactRanges(
+  text: string,
+  clauseRanges: readonly SecurityParagraphClauseRange[],
+): ReadonlyArray<{
+  readonly fact: BodyPolicyClauseFacts;
+  readonly range: SecurityParagraphClauseRange;
+  readonly clauseRange: SecurityParagraphClauseRange;
+  readonly crossesClauseBoundary: boolean;
+}> {
+  const meaningfulRanges = clauseRanges.filter(
+    ({ start, end }) => text.slice(start, end).trim().length > 0,
+  );
+  return bodyPolicyStatementGroupFacts(text, meaningfulRanges).flatMap(
+    (fact) => {
+      const clauseRange = meaningfulRanges.find(
+        ({ start, end }) =>
+          start <= fact.evidenceStart && fact.evidenceStart < end,
+      );
+      if (clauseRange === undefined) return [];
+      return [
+        {
+          fact,
+          range: bodyPolicyFactEvidenceRange(text, fact),
+          clauseRange,
+          crossesClauseBoundary: fact.evidenceEnd > clauseRange.end,
+        },
+      ];
+    },
+  );
+}
+
 function bodyPolicyContradictionDetections(
-  content: string,
-  policy: SecurityPolicy,
-  markdownParserEligible: boolean,
-  markdownView?: MarkdownSecurityView,
-  securityParagraphs: readonly PreparedSecurityParagraphContext[] = [],
-  securityParagraphContextByLine: ReadonlyMap<
-    number,
-    SecurityParagraphLineContext
-  > = new Map(),
+  prepared: PreparedSecurityDocumentAnalysis,
 ): Detection[] {
-  const sourceLines = content.split(/\r?\n/);
-  const scanStart = securityContentStart(markdownParserEligible, markdownView);
-  const lines = markdownView
-    ? sourceLines.map((_, index) => markdownView.visibleLine(index))
-    : sourceLines;
-  const kinds = [
-    {
-      kind: "network",
-      enabled: policy.networkAllowed === true,
-      patterns: BODY_NETWORK_DISALLOWED_PATTERNS,
-    },
-    {
-      kind: "upload",
-      enabled: policy.externalUploadAllowed === true,
-      patterns: BODY_UPLOAD_DISALLOWED_PATTERNS,
-    },
-    {
-      kind: "secrets",
-      enabled: policy.secretsAllowed === true,
-      patterns: BODY_SECRET_DISALLOWED_PATTERNS,
-    },
+  const enabledDomains = [
+    ["network", prepared.effectivePolicy.networkAllowed === true],
+    ["upload", prepared.effectivePolicy.externalUploadAllowed === true],
+    ["secrets", prepared.effectivePolicy.secretsAllowed === true],
   ] as const;
-  const selected = new Map<
-    string,
-    { detection: Detection; kindOrder: number; lineLocal: boolean }
-  >();
+  const enabledDomainOrder = new Map<BodyPolicyDomain, number>(
+    enabledDomains.flatMap(([domain, enabled], kindOrder) =>
+      enabled ? [[domain, kindOrder] as const] : [],
+    ),
+  );
+  if (enabledDomainOrder.size === 0) return [];
 
-  for (let index = scanStart; index < lines.length; index += 1) {
-    const line = lines[index] ?? "";
-    if (
-      (markdownView?.isCodeBlockLine(index) ?? false) ||
-      (markdownParserEligible && isPolicyLine(line))
-    )
-      continue;
+  const candidates: Array<{
+    domain: BodyPolicyDomain;
+    kindOrder: number;
+    detection: Detection;
+  }> = [];
+  const preparedParagraphLineIndexes = new Set<number>();
 
-    const lineNumber = index + 1;
-    const lineClauseRanges = disclosureClauseRangesIntersectingRange(
-      line,
-      0,
-      line.length,
+  for (const preparedParagraph of prepared.securityParagraphs) {
+    if (!preparedParagraph.structurallyEligible) continue;
+    const { paragraph, clauseRanges } = preparedParagraph;
+    for (const { lineIndex } of paragraph.lines) {
+      preparedParagraphLineIndexes.add(lineIndex);
+    }
+    const statementFacts = bodyPolicyStatementFactRanges(
+      paragraph.text,
+      clauseRanges,
     );
-    for (const [kindOrder, candidate] of kinds.entries()) {
-      if (!candidate.enabled || selected.has(candidate.kind)) continue;
-      const match = firstBodyPolicyContradictionMatch(
-        line,
-        candidate.patterns,
-        lineClauseRanges,
-      );
-      if (match === undefined) continue;
-      const lineClauseRange = bodyPolicyContainingClauseRange(
-        lineClauseRanges,
-        match.index,
-        line.length,
-      );
-      const paragraphLineContext = securityParagraphContextByLine.get(index);
-      if (paragraphLineContext !== undefined) {
-        const { preparedParagraph, lineStartOffset, lineEndOffset } =
-          paragraphLineContext;
-        const paragraphMatchStart = lineStartOffset + match.index;
-        const paragraphMatchEnd = paragraphMatchStart + match[0].length;
-        const containingClause = preparedParagraph.clauseRanges.find(
-          (range) =>
-            range.start <= paragraphMatchStart &&
-            paragraphMatchStart < range.end,
-        );
-        const clauseBoundedText = preparedParagraph.paragraph.text.slice(
-          0,
-          containingClause?.end ?? lineEndOffset,
-        );
-        if (
-          bodyPolicyMatchEndExpressesNoRequirement(
-            clauseBoundedText,
-            match[0],
-            paragraphMatchEnd,
-          )
-        ) {
-          continue;
-        }
-        const scopeQualifier = bodyPolicyScopeQualifierAfterMatch(
-          clauseBoundedText,
-          match[0],
-          paragraphMatchEnd,
-        );
-        const allowanceEnd = bodyPolicyAllowanceBridgeEnd(
-          clauseBoundedText,
-          match[0],
-          paragraphMatchEnd,
-        );
-        if (
-          scopeQualifier?.kind === "local" ||
-          scopeQualifier?.kind === "ambiguous" ||
-          (scopeQualifier?.kind === "workflow" &&
-            scopeQualifier.endOffset > lineEndOffset)
-        ) {
-          continue;
-        }
-        const supportedEnd =
-          scopeQualifier?.kind === "workflow"
-            ? scopeQualifier.endOffset
-            : allowanceEnd;
-        if (
-          !bodyPolicyRemainderIsTrivial(
-            clauseBoundedText,
-            supportedEnd,
-            containingClause?.end ?? lineEndOffset,
-          )
-        ) {
-          continue;
-        }
+    const facts = statementFacts.map(({ fact }) => fact);
+    for (const {
+      fact,
+      range,
+      clauseRange,
+      crossesClauseBoundary,
+    } of statementFacts) {
+      const domain = fact.domain;
+      if (domain === undefined) continue;
+      const kindOrder = enabledDomainOrder.get(domain);
+      if (
+        kindOrder === undefined ||
+        !bodyPolicyFactEmitsContradiction(fact, domain)
+      ) {
+        continue;
       }
-      selected.set(candidate.kind, {
+      const evidence =
+        crossesClauseBoundary || hasEarlierBodyPolicyFact(facts, fact)
+          ? clippedParagraphEvidenceForRange(paragraph, range.start, range.end)
+          : paragraph.startLine === paragraph.endLine
+            ? {
+                startLine: paragraph.startLine,
+                snippet: bodyPolicyClauseEvidenceSnippet(
+                  paragraph.text,
+                  clauseRange,
+                ),
+              }
+            : paragraphEvidenceForRange(
+                paragraph,
+                fact.evidenceStart,
+                fact.evidenceEnd,
+              );
+      if (evidence === undefined) continue;
+      candidates.push({
+        domain,
+        kindOrder,
         detection: {
           metadata: RULES.bodyPolicyContradiction,
           severity: "high",
-          startLine: lineNumber,
-          snippet: bodyPolicyClauseEvidenceSnippet(line, lineClauseRange),
-          dedupeKey: `body-policy-contradiction:${candidate.kind}`,
+          ...evidence,
+          dedupeKey: `body-policy-contradiction:${domain}`,
         },
-        kindOrder,
-        lineLocal: true,
       });
     }
   }
 
-  for (const preparedParagraph of securityParagraphs) {
-    if (!preparedParagraph.structurallyEligible) continue;
-    const { paragraph, clauseRanges } = preparedParagraph;
-    for (const clauseRange of clauseRanges) {
-      const clause = paragraph.text.slice(clauseRange.start, clauseRange.end);
-      for (const [kindOrder, candidate] of kinds.entries()) {
-        if (!candidate.enabled) continue;
-        const match = firstBodyPolicyContradictionMatch(
-          clause,
-          candidate.patterns,
-        );
-        if (match?.index === undefined) continue;
-        const matchStart = clauseRange.start + match.index;
-        const matchEnd = matchStart + match[0].length;
-        const evidence = paragraphEvidenceForRange(
-          paragraph,
-          matchStart,
-          matchEnd,
-        );
-        if (
-          evidence === undefined ||
-          evidence.endLine === undefined ||
-          evidence.endLine === evidence.startLine
-        ) {
-          continue;
-        }
-        const existing = selected.get(candidate.kind);
-        if (
-          existing !== undefined &&
-          (existing.detection.startLine < evidence.startLine ||
-            (existing.detection.startLine === evidence.startLine &&
-              existing.lineLocal))
-        ) {
-          continue;
-        }
-        selected.set(candidate.kind, {
-          detection: {
-            metadata: RULES.bodyPolicyContradiction,
-            severity: "high",
-            ...evidence,
-            dedupeKey: `body-policy-contradiction:${candidate.kind}`,
-          },
-          kindOrder,
-          lineLocal: false,
-        });
+  for (
+    let lineIndex = prepared.scanStart;
+    lineIndex < prepared.visibleLines.length;
+    lineIndex += 1
+  ) {
+    if (preparedParagraphLineIndexes.has(lineIndex)) continue;
+    const line = prepared.visibleLines[lineIndex] ?? "";
+    if (
+      prepared.markdownView.isCodeBlockLine(lineIndex) ||
+      isPolicyLine(line)
+    ) {
+      continue;
+    }
+    const fallbackStatement = bodyPolicyFallbackStatement(line);
+    const statementText = fallbackStatement.text;
+    const clauseRanges = disclosureClauseRangesIntersectingRange(
+      statementText,
+      0,
+      statementText.length,
+    );
+    const statementFacts = bodyPolicyStatementFactRanges(
+      statementText,
+      clauseRanges,
+    );
+    const facts = statementFacts.map(({ fact }) => fact);
+    for (const {
+      fact,
+      range,
+      clauseRange,
+      crossesClauseBoundary,
+    } of statementFacts) {
+      const domain = fact.domain;
+      if (domain === undefined) continue;
+      const kindOrder = enabledDomainOrder.get(domain);
+      if (
+        kindOrder === undefined ||
+        !bodyPolicyFactEmitsContradiction(fact, domain)
+      ) {
+        continue;
       }
+      candidates.push({
+        domain,
+        kindOrder,
+        detection: {
+          metadata: RULES.bodyPolicyContradiction,
+          severity: "high",
+          startLine: lineIndex + 1,
+          snippet: bodyPolicyFallbackEvidenceSnippet(
+            line,
+            fallbackStatement,
+            crossesClauseBoundary || hasEarlierBodyPolicyFact(facts, fact)
+              ? statementText.slice(range.start, range.end)
+              : bodyPolicyClauseEvidenceSnippet(statementText, clauseRange),
+            crossesClauseBoundary || hasEarlierBodyPolicyFact(facts, fact)
+              ? range.start
+              : clauseRange.start,
+          ),
+          dedupeKey: `body-policy-contradiction:${domain}`,
+        },
+      });
     }
   }
 
-  return [...selected.values()]
-    .sort(
-      (left, right) =>
-        left.detection.startLine - right.detection.startLine ||
-        left.kindOrder - right.kindOrder,
-    )
-    .map(({ detection }) => detection);
+  candidates.sort(
+    (left, right) =>
+      left.detection.startLine - right.detection.startLine ||
+      left.kindOrder - right.kindOrder,
+  );
+  const selectedDomains = new Set<BodyPolicyDomain>();
+  return candidates.flatMap(({ domain, detection }) => {
+    if (selectedDomains.has(domain)) return [];
+    selectedDomains.add(domain);
+    return [detection];
+  });
+}
+
+function bodyPolicyFallbackStatement(line: string): {
+  readonly text: string;
+  readonly sourceOffset: number;
+} {
+  const heading =
+    /^[ \t]{0,3}#{1,6}[ \t]+(?<content>.*?)(?:[ \t]+#+[ \t]*)?$/u.exec(line);
+  const content = heading?.groups?.content;
+  if (content === undefined) return { text: line, sourceOffset: 0 };
+  return { text: content, sourceOffset: line.indexOf(content) };
+}
+
+function bodyPolicyFallbackEvidenceSnippet(
+  line: string,
+  statement: { readonly sourceOffset: number },
+  snippet: string,
+  snippetStart: number,
+): string {
+  return statement.sourceOffset > 0 && snippetStart === 0
+    ? `${line.slice(0, statement.sourceOffset)}${snippet}`
+    : snippet;
+}
+
+function bodyPolicyFactEmitsContradiction(
+  facts: BodyPolicyClauseFacts,
+  enabledPermissivePolicyDomain: BodyPolicyDomain,
+): boolean {
+  return (
+    facts.domain === enabledPermissivePolicyDomain &&
+    facts.modality === "prohibited" &&
+    facts.scope === "workflow" &&
+    facts.completeness === "complete"
+  );
 }
 
 function policyDetections(
