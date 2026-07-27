@@ -6,6 +6,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-07-27
+
 ### Changed
 
 - Refactored body-policy analysis into private lexical recognition, bounded
@@ -1745,7 +1747,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.25.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.25.1...HEAD
+[0.25.1]: https://github.com/KazuCocoa/renma/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/KazuCocoa/renma/compare/v0.24.4...v0.25.0
 [0.24.4]: https://github.com/KazuCocoa/renma/compare/v0.24.3...v0.24.4
 [0.24.3]: https://github.com/KazuCocoa/renma/compare/v0.24.2...v0.24.3
