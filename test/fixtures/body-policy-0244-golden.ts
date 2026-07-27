@@ -3497,6 +3497,413 @@ const RAW_BODY_POLICY_0244_GOLDEN_CASES = [
       prefix: "policy-safety",
     },
   },
+  {
+    name: "stabilization5-quote-continuation-semicolon-network",
+    body: 'This workflow documents "example; text" and must not use the network.',
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: 'This workflow documents "example',
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "quote-outer-continuation",
+      variant: "semicolon-network",
+    },
+  },
+  {
+    name: "stabilization5-quote-continuation-period-upload",
+    body: 'This workflow explains "first step. second step" and must not upload files.',
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "quote-outer-continuation",
+      variant: "period-upload",
+    },
+  },
+  {
+    name: "stabilization5-quote-continuation-but-secrets",
+    body: 'This workflow records "check this but not that", then must not use credentials.',
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: 'This workflow records "check this',
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "quote-outer-continuation",
+      variant: "but-secrets",
+    },
+  },
+  {
+    name: "stabilization5-quote-policy-continuation-network",
+    body: 'Policy: documents "example; never use the network" and should never use the network.',
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "quote-outer-continuation",
+      variant: "policy-network",
+    },
+  },
+  {
+    name: "stabilization5-policy-context-upload",
+    body: "Policy: validate inputs and no external uploads.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "Policy: validate inputs and no external uploads.",
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "policy-context-state",
+      variant: "upload",
+    },
+  },
+  {
+    name: "stabilization5-requirement-context-network",
+    body: "Requirement: check configuration but never use the network.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "policy-context-state",
+      variant: "network",
+    },
+  },
+  {
+    name: "stabilization5-policy-context-recommendation-secrets",
+    body: "Policy: validate inputs and should never use credentials.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "policy-context-state",
+      variant: "recommendation-secrets",
+    },
+  },
+  {
+    name: "stabilization5-policy-context-two-recommendations",
+    body: "Policy: should never use the network and may never upload files.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "policy-context-state",
+      variant: "two-recommendations",
+    },
+  },
+  {
+    name: "stabilization5-directive-context-upload",
+    body: "Please validate inputs then no external uploads.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "no external uploads.",
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "policy-context-state",
+      variant: "directive-upload",
+    },
+  },
+  {
+    name: "stabilization5-policy-context-hard-stop",
+    body: "Policy: validate inputs. Should never use the network.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "policy-context-state",
+      variant: "hard-stop",
+    },
+  },
+  {
+    name: "stabilization5-relative-two-network",
+    body: "This workflow, which validates inputs and must not use the network, prepares the report.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "relative-statement-group",
+      variant: "two-network",
+    },
+  },
+  {
+    name: "stabilization5-relative-two-upload",
+    body: "This task, which checks results but cannot upload files, creates the artifact.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This task, which checks results",
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "relative-statement-group",
+      variant: "two-upload",
+    },
+  },
+  {
+    name: "stabilization5-relative-three-secrets",
+    body: "The process, which is deterministic yet must never use credentials, continues locally.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "The process, which is deterministic",
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "relative-statement-group",
+      variant: "three-secrets",
+    },
+  },
+  {
+    name: "stabilization5-relative-changed-subject",
+    body: "This workflow, which validates inputs and the helper must not use the network, prepares the report.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "relative-statement-group",
+      variant: "changed-subject",
+    },
+  },
+  {
+    name: "stabilization5-relative-cross-domain",
+    body: "This workflow, which must not use the network and cannot upload files, prepares the report.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "relative-statement-group",
+      variant: "cross-domain",
+    },
+  },
+  {
+    name: "stabilization5-relative-quoted-inner-main",
+    body: 'This workflow, which documents "must never use credentials" and validates inputs, must never use credentials.',
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "relative-statement-group",
+      variant: "quoted-inner-main",
+    },
+  },
+  {
+    name: "stabilization5-relative-local",
+    body: "This workflow, which validates inputs and must not use the network during local setup, prepares the report.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "relative-statement-group",
+      variant: "local",
+    },
+  },
+  {
+    name: "stabilization5-modal-not-availability-network",
+    body: "Network access may not be available in this workflow.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "Network access may not be available in this workflow.",
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "modal-not-semantics",
+      variant: "availability-network",
+    },
+  },
+  {
+    name: "stabilization5-modal-not-recommendation-network",
+    body: "Network access should not be used in this workflow.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "Network access should not be used in this workflow.",
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "modal-not-semantics",
+      variant: "recommendation-network",
+    },
+  },
+  {
+    name: "stabilization5-modal-not-recommendation-upload",
+    body: "External uploads should not be performed during this workflow.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          "External uploads should not be performed during this workflow.",
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "modal-not-semantics",
+      variant: "recommendation-upload",
+    },
+  },
+  {
+    name: "stabilization5-modal-not-deontic-network",
+    body: "Network access must not be used in this workflow.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "Network access must not be used in this workflow.",
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "modal-not-semantics",
+      variant: "deontic-network",
+    },
+  },
+  {
+    name: "stabilization5-modal-not-deontic-upload",
+    body: "External uploads shall not be performed in this workflow.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "External uploads shall not be performed in this workflow.",
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "modal-not-semantics",
+      variant: "deontic-upload",
+    },
+  },
+  {
+    name: "stabilization5-modal-not-plain-should",
+    body: "This workflow should not use the network.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "modal-not-semantics",
+      variant: "plain-should",
+    },
+  },
+  {
+    name: "stabilization5-modal-not-policy-should",
+    body: "Policy: this workflow should not use the network.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "modal-not-semantics",
+      variant: "policy-should",
+    },
+  },
+  {
+    name: "stabilization5-modal-not-plain-may",
+    body: "This workflow may not upload files.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "modal-not-semantics",
+      variant: "plain-may",
+    },
+  },
+  {
+    name: "stabilization5-modal-not-policy-may",
+    body: "Policy: this workflow may not upload files.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "modal-not-semantics",
+      variant: "policy-may",
+    },
+  },
+  {
+    name: "stabilization5-modal-not-might",
+    body: "This workflow might not use credentials.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "modal-not-semantics",
+      variant: "might",
+    },
+  },
+  {
+    name: "stabilization5-modal-not-can",
+    body: "Credentials can not be used in this workflow.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "modal-not-semantics",
+      variant: "can",
+    },
+  },
+  {
+    name: "stabilization5-modal-not-could",
+    body: "External uploads could not be allowed in this workflow.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "modal-not-semantics",
+      variant: "could",
+    },
+  },
+  {
+    name: "stabilization5-modal-not-would",
+    body: "Credentials would not be used in this workflow.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "modal-not-semantics",
+      variant: "would",
+    },
+  },
+  {
+    name: "stabilization5-modal-not-will",
+    body: "This workflow will not use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow will not use the network.",
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "modal-not-semantics",
+      variant: "will",
+    },
+  },
 ] as const satisfies readonly LegacyBodyPolicyGoldenCase[];
 
 export const BODY_POLICY_0244_GOLDEN_CASES: readonly LegacyBodyPolicyGoldenCase[] =

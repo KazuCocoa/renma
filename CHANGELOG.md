@@ -27,8 +27,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   only the nearest bounded action or domain phrase.
 - Kept outer directive proof separate from an embedded workflow subject's local
   bridge proof, accepted unknown imperatives only across an independent bare
-  semicolon, and modeled every bounded `modal + never` form as a prohibition
-  predicate.
+  semicolon, and modeled bounded `modal + never` and `modal + not` forms as
+  semantically classified prohibition candidates.
 - Promoted workflow subjects after supported directive and policy-label
   prefixes into statement-group state, unified bounded modifier and
   `modal + never` predicate prefixes across direct and inherited facts, and
@@ -40,13 +40,21 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Carried private quote-enclosure provenance through technical-clause,
   sentence, contrastive, ordinary `and`, and comma segmentation so quoted
   examples cannot inherit workflow scope or receive standalone policy scope.
+  Enclosed separators are opaque but no longer clear an outer subject or policy
+  context needed by an unquoted continuation after the closing quote.
 - Classified bounded paired subject-relative predicates independently while
   retaining object-relative changed subjects for the later main predicate.
-- Separated deontic and commitment `modal + never` forms from recommendation,
-  epistemic, capability, and hypothetical language. Plain `must`, `shall`, and
-  `will` remain emitting; bounded policy or directive context additionally
-  supports `should` and `may`, while `might`, `can`, `could`, and `would`
-  remain non-emitting.
+  Multi-predicate subject-relative components reuse the same statement-group
+  state machine within their comma bounds.
+- Added policy context as private statement-group state independent of workflow
+  subject state, allowing supported labels and directives to scope and promote
+  later subjectless predicates without manufacturing a grammatical subject.
+- Separated deontic and commitment modal negation from recommendation,
+  epistemic, capability, hypothetical, and availability language for both
+  `modal + never` and active or passive `modal + not`. Plain `must`, `shall`,
+  and `will` remain emitting; bounded policy or directive context additionally
+  supports `should` and `may`, while availability states and `might`, `can`,
+  `could`, and `would` remain non-emitting.
 - Composed at most one supported policy label with one bounded directive or
   safety component for standalone proof, embedded subjects, paired modifiers,
   and evidence origins.
@@ -62,7 +70,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   as `audits logs`, `reviews results`, and `checks use cases`.
 - Kept affirmative requirement language distinct from genuinely negative
   `not-required` facts so it cannot suppress a later workflow prohibition.
-- Added 210 immutable, self-contained test-only 0.24.4 golden cases generated
+- Added 241 immutable, self-contained test-only 0.24.4 golden cases generated
   from the full tagged commit. The exact legacy bodies and public projections
   cover subjects, predicate kinds, connectors, domains, scopes, layouts,
   evidence, ordering, and deduplication; a 32-case matrix proves the requested
@@ -71,9 +79,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   modal/domain, modifier/qualification, and homograph/predicate-head
   cross-products. Composed matrices additionally cover outer prefixes,
   continuation connectors, inherited modifiers, all separator quote
-  enclosures, subject- and object-relative shapes, modal semantics, composed
-  prefixes, layouts, evidence, ordering, and deduplication; every observed
-  difference is explicitly allowlisted.
+  enclosures and outer continuations, independent subject and policy state,
+  multi-predicate subject-relative shapes, active/passive/state modal-negation
+  semantics, composed prefixes, layouts, evidence, ordering, and deduplication;
+  every observed difference is explicitly allowlisted.
 
 ### Changed
 

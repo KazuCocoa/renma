@@ -422,6 +422,89 @@ const INTENTIONAL_COMPATIBILITY_CHANGES: Readonly<
     "For safety, please do not use the network.",
     "The bounded safety preamble and directive compose into standalone policy proof.",
   ),
+  "stabilization5-quote-continuation-semicolon-network": findingChange(
+    'This workflow documents "example; text" and must not use the network.',
+    "An enclosed technical semicolon is opaque to classification but transparent to the outer workflow subject; evidence now reaches the later unquoted prohibition.",
+  ),
+  "stabilization5-quote-continuation-period-upload": findingChange(
+    'This workflow explains "first step. second step" and must not upload files.',
+    "An enclosed sentence boundary no longer clears the outer workflow subject before the unquoted upload continuation.",
+  ),
+  "stabilization5-quote-continuation-but-secrets": findingChange(
+    'This workflow records "check this but not that", then must not use credentials.',
+    "An enclosed contrastive separator remains non-executable without clearing the subject needed by the outer then predicate.",
+  ),
+  "stabilization5-quote-policy-continuation-network": findingChange(
+    'Policy: documents "example; never use the network" and should never use the network.',
+    "Quote content remains non-executable while the outer policy context promotes only the later unquoted recommendation.",
+  ),
+  "stabilization5-requirement-context-network": findingChange(
+    "Requirement: check configuration but never use the network.",
+    "Requirement context is statement-group state independent of a workflow subject and scopes the later supported prohibition.",
+  ),
+  "stabilization5-policy-context-recommendation-secrets": findingChange(
+    "Policy: validate inputs and should never use credentials.",
+    "Inherited policy context promotes the later recommendation without manufacturing a workflow subject.",
+  ),
+  "stabilization5-policy-context-two-recommendations": compatibilityChange(
+    [
+      finding(
+        "Policy: should never use the network and may never upload files.",
+      ),
+      finding(
+        "Policy: should never use the network and may never upload files.",
+      ),
+    ],
+    "One policy context independently promotes both coordinated recommendation predicates while preserving domain ordering.",
+  ),
+  "stabilization5-directive-context-upload": findingChange(
+    "Please validate inputs then no external uploads.",
+    "Directive context now retains its evidence origin across a supported then continuation.",
+  ),
+  "stabilization5-relative-two-network": findingChange(
+    "This workflow, which validates inputs and must not use the network, prepares the report.",
+    "The subject-relative component is analyzed as a bounded statement group so its second predicate inherits the outer workflow subject.",
+  ),
+  "stabilization5-relative-two-upload": findingChange(
+    "This task, which checks results but cannot upload files",
+    "Bounded relative evidence now includes the inherited upload prohibition instead of ending before the contrastive separator.",
+  ),
+  "stabilization5-relative-three-secrets": findingChange(
+    "The process, which is deterministic yet must never use credentials",
+    "Bounded relative evidence now includes the inherited credentials prohibition instead of ending at the earlier copular predicate.",
+  ),
+  "stabilization5-relative-cross-domain": compatibilityChange(
+    [
+      finding(
+        "This workflow, which must not use the network and cannot upload files, prepares the report.",
+      ),
+      finding(
+        "This workflow, which must not use the network and cannot upload files, prepares the report.",
+      ),
+    ],
+    "Independent cross-domain predicates inside one subject-relative component inherit the outer subject and retain domain ordering.",
+  ),
+  "stabilization5-relative-quoted-inner-main": findingChange(
+    'This workflow, which documents "must never use credentials" and validates inputs, must never use credentials.',
+    "Quoted relative content remains non-executable while the main predicate retains the outer workflow subject.",
+  ),
+  "stabilization5-modal-not-availability-network": noFindingChange(
+    "May-not-be-available is an availability state, not a high-confidence policy denial, even with an explicit workflow qualifier.",
+  ),
+  "stabilization5-modal-not-recommendation-network": noFindingChange(
+    "Plain should-not passive language is a recommendation and requires bounded policy context.",
+  ),
+  "stabilization5-modal-not-recommendation-upload": noFindingChange(
+    "Plain should-not passive upload language is a recommendation rather than a high-confidence prohibition.",
+  ),
+  "stabilization5-modal-not-policy-should": findingChange(
+    "Policy: this workflow should not use the network.",
+    "A bounded policy label promotes should-not action language through the shared modal-negation classifier.",
+  ),
+  "stabilization5-modal-not-policy-may": findingChange(
+    "Policy: this workflow may not upload files.",
+    "A bounded policy label promotes may-not permission language while plain may-not remains conservative.",
+  ),
 };
 
 const PAIRWISE_CASES = BODY_POLICY_0244_GOLDEN_CASES.filter(
@@ -1145,7 +1228,7 @@ test("0.24.4 body-policy golden cases are self-contained and immutable", () => {
     BODY_POLICY_0244_GOLDEN_SOURCE.generatedBy,
     /securityDiagnosticFindings/u,
   );
-  assert.equal(BODY_POLICY_0244_GOLDEN_CASES.length, 210);
+  assert.equal(BODY_POLICY_0244_GOLDEN_CASES.length, 241);
   assert.equal(
     new Set(BODY_POLICY_0244_GOLDEN_CASES.map(({ name }) => name)).size,
     BODY_POLICY_0244_GOLDEN_CASES.length,
@@ -1232,6 +1315,33 @@ test("frozen 0.24.4 cases cover every required pairwise interaction", () => {
     "middleCategory",
     ["copular", "auxiliary", "ordinary", "established"],
   );
+});
+
+test("frozen structural corpus covers every stabilization relationship", () => {
+  const stabilization = BODY_POLICY_0244_GOLDEN_CASES.filter(({ name }) =>
+    name.startsWith("stabilization5-"),
+  );
+  assert.equal(stabilization.length, 31);
+  const dimensions = stabilization.reduce<Record<string, number>>(
+    (counts, fixture) => {
+      const dimension = fixture.coverage.dimension;
+      if (typeof dimension !== "string") {
+        assert.fail(`${fixture.name} must declare a string dimension`);
+      }
+      counts[dimension] = (counts[dimension] ?? 0) + 1;
+      return counts;
+    },
+    {},
+  );
+  assert.deepEqual(dimensions, {
+    "quote-outer-continuation": 4,
+    "policy-context-state": 6,
+    "relative-statement-group": 7,
+    "modal-not-semantics": 14,
+  });
+  for (const fixture of stabilization) {
+    assert.equal(typeof fixture.coverage.variant, "string", fixture.name);
+  }
 });
 
 test("public body-policy findings match each frozen 0.24.4 body except explicit changes", () => {
