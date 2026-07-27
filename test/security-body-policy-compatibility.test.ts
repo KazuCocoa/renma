@@ -290,6 +290,66 @@ const INTENTIONAL_COMPATIBILITY_CHANGES: Readonly<
   "stabilization2-homograph-finite-reviews": noFindingChange(
     "Reviews followed by the finite head require is a changed subject, so it clears workflow-subject inheritance before the later prohibition.",
   ),
+  "stabilization3-prefixed-network": findingChange(
+    "Policy: this workflow validates inputs but must not use the network.",
+    "The supported policy prefix now installs the embedded workflow subject in statement-group state, so the later predicate inherits it with complete evidence.",
+  ),
+  "stabilization3-prefixed-secrets": findingChange(
+    "Requirement: the process checks configuration, yet must not use credentials.",
+    "A policy-label-prefixed process subject remains active across the contrastive continuation.",
+  ),
+  "stabilization3-later-directive": findingChange(
+    "For safety, never use the network.",
+    "A supported directive after a bare semicolon starts an independent standalone policy instead of retaining evidence from the earlier active subject.",
+  ),
+  "stabilization3-modal-shared-network": findingChange(
+    "This workflow validates inputs but must never use the network.",
+    "Modal-never is classified as a subjectless prohibition before the strong changed-subject matcher.",
+  ),
+  "stabilization3-modifier-shared-secrets": findingChange(
+    "The process checks configuration but explicitly cannot use credentials.",
+    "The shared bounded modifier vocabulary recognizes explicitly as an inherited predicate prefix.",
+  ),
+  "stabilization3-modifier-shared-secret-verb": findingChange(
+    "This task checks inputs but directly never uses credentials.",
+    "The shared prefix grammar and bounded third-person secret action preserve the explicit task subject.",
+  ),
+  "stabilization3-modal-hard-network": findingChange(
+    "Must never use the network.",
+    "A directly supported modal-never prohibition receives standalone scope after a hard sentence boundary.",
+  ),
+  "stabilization3-modal-hard-upload": findingChange(
+    "Shall never upload files.",
+    "The complete modal-never family is supported for standalone upload prohibitions after a hard boundary.",
+  ),
+  "stabilization3-quoted-single": noFindingChange(
+    "A bare semicolon inside a bounded straight-single-quoted example cannot create an independent policy or retain only the closing quote in evidence.",
+  ),
+  "stabilization3-prefixed-paired-local": noFindingChange(
+    "A supported outer policy label does not erase a naked local paired-comma qualification.",
+  ),
+  "stabilization3-prefixed-paired-exception": noFindingChange(
+    "A supported directive does not erase a naked paired-comma exception.",
+  ),
+  "stabilization3-prefixed-paired-target": noFindingChange(
+    "A supported policy label does not erase a destination-specific paired-comma upload qualification.",
+  ),
+  "stabilization3-relative-inner-prohibition": findingChange(
+    "This workflow,\nwhich the helper says must not use the network,\nmust not upload files.",
+    "The bounded object-relative clause remains attached while only the main upload prohibition receives workflow scope.",
+    13,
+  ),
+  "stabilization3-homograph-upload": noFindingChange(
+    "Reports followed by the compatible finite security action upload is a changed subject and clears workflow-subject inheritance.",
+  ),
+  "stabilization3-subjectless-audits": findingChange(
+    "This workflow audits logs, then must not upload files.",
+    "The genuine subjectless audits predicate retains the workflow subject through a comma-then continuation.",
+  ),
+  "stabilization3-make-sure-that": findingChange(
+    "Make sure that this workflow never uses credentials.",
+    "Optional that after a recognized make-sure directive and a bounded third-person action remain an instruction.",
+  ),
 };
 
 const PAIRWISE_CASES = BODY_POLICY_0244_GOLDEN_CASES.filter(
@@ -1013,7 +1073,7 @@ test("0.24.4 body-policy golden cases are self-contained and immutable", () => {
     BODY_POLICY_0244_GOLDEN_SOURCE.generatedBy,
     /securityDiagnosticFindings/u,
   );
-  assert.equal(BODY_POLICY_0244_GOLDEN_CASES.length, 157);
+  assert.equal(BODY_POLICY_0244_GOLDEN_CASES.length, 184);
   assert.equal(
     new Set(BODY_POLICY_0244_GOLDEN_CASES.map(({ name }) => name)).size,
     BODY_POLICY_0244_GOLDEN_CASES.length,
@@ -1353,6 +1413,38 @@ test("current stabilization matrices cover every requested cross-product", () =>
     "headClass",
     ["copular", "auxiliary", "finite", "negative-modal"],
   );
+});
+
+test("composed cross-product boundaries keep exact evidence, order, and deduplication", () => {
+  const orderingBody =
+    "Policy: this workflow validates inputs but must never use the network, yet must never upload files, and directly never uses credentials and still never uses credentials.";
+  assert.deepEqual(bodyPolicyFindingProjections(orderingBody), [
+    finding(
+      "Policy: this workflow validates inputs but must never use the network",
+    ),
+    finding(
+      "Policy: this workflow validates inputs but must never use the network, yet must never upload files",
+    ),
+    finding(
+      "Policy: this workflow validates inputs but must never use the network, yet must never upload files, and directly never uses credentials",
+    ),
+  ]);
+
+  const relativeBody =
+    "This workflow,\nwhich the helper says must not use the network,\nmust not upload files.";
+  assert.deepEqual(bodyPolicyFindingProjections(relativeBody), [
+    finding(relativeBody, 13),
+  ]);
+
+  for (const quoted of [
+    'Documentation says "validate inputs; never use the network."',
+    "The example reads 'clean the workspace; no external uploads.'",
+    "The guide shows “rotate the logs; never use credentials.”",
+    'Documentation says \\"validate inputs; never use the network.\\"',
+    'Documentation says "validate \\"inputs; never use the network\\" carefully."',
+  ]) {
+    assert.deepEqual(bodyPolicyFindingProjections(quoted), [], quoted);
+  }
 });
 
 function assertPairwiseCoverage(

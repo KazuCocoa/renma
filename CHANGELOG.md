@@ -29,6 +29,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   bridge proof, accepted unknown imperatives only across an independent bare
   semicolon, and modeled every bounded `modal + never` form as a prohibition
   predicate.
+- Promoted workflow subjects after supported directive and policy-label
+  prefixes into statement-group state, unified bounded modifier and
+  `modal + never` predicate prefixes across direct and inherited facts, and
+  retained the prefix in projected evidence.
+- Made bare-semicolon standalone proof quote-enclosure-aware, supported bounded
+  paired-comma object-relative clauses without attributing their inner
+  prohibitions to the main workflow, and added bounded `ensure that` and
+  `make sure that` directive forms.
 - Required explicit statement-level scope proof for direct facts, preventing a
   supported subjectless prohibition under descriptive, changed-subject,
   conditional, or unsupported syntax from receiving default workflow scope.
@@ -36,16 +44,22 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   while recognizing strong noun phrases followed by copular, auxiliary, finite,
   or negative modal heads before their first word can be treated as a
   subjectless verb.
+- Recognized noun/verb homographs followed by compatible finite security
+  actions as changed subjects while preserving genuine subjectless forms such
+  as `audits logs`, `reviews results`, and `checks use cases`.
 - Kept affirmative requirement language distinct from genuinely negative
   `not-required` facts so it cannot suppress a later workflow prohibition.
-- Added 157 immutable, self-contained test-only 0.24.4 golden cases generated
+- Added 184 immutable, self-contained test-only 0.24.4 golden cases generated
   from the full tagged commit. The exact legacy bodies and public projections
   cover subjects, predicate kinds, connectors, domains, scopes, layouts,
   evidence, ordering, and deduplication; a 32-case matrix proves the requested
   pairwise interactions, deterministic current-only matrices cover scope proof,
   bridge precision and the directive/bridge, separator/previous-predicate,
   modal/domain, modifier/qualification, and homograph/predicate-head
-  cross-products, and every observed difference is explicitly allowlisted.
+  cross-products. Composed matrices additionally cover outer prefixes,
+  continuation connectors, inherited modifiers, quote enclosures,
+  object-relative subject shapes, layouts, evidence, ordering, and
+  deduplication; every observed difference is explicitly allowlisted.
 
 ### Changed
 

@@ -180,16 +180,23 @@ subject, a supported subjectless predicate, an explicit changed subject, a
 conditional or subordinate prefix, or unsupported syntax. Supported
 subjectless starts include copular and auxiliary or modal predicates plus a
 curated ordinary-verb vocabulary; this keeps subject state through three or
-more predicates without treating arbitrary words as verbs. The bounded `also`,
-`still`, and `therefore` modifiers remain supported. Bare semicolons and `then`
-otherwise use the strict 0.24.4 compatibility behavior, but a bare semicolon
-with no active workflow subject proves an independent later standalone policy
-even when the preceding imperative is outside the curated vocabulary. Sentence
+more predicates without treating arbitrary words as verbs. One private subject
+extractor recognizes either a range-leading workflow subject or the same
+subject after a supported directive or policy-label prefix; its range and
+evidence origin establish active state for ordinary and contrastive
+continuations, paired modifiers, and direct proof. The shared bounded prefix
+grammar covers `also`, `still`, `therefore`, `always`, `explicitly`, `directly`,
+`strictly`, `categorically`, and the complete `modal + never` family before
+strong changed-subject classification. Bare semicolons and `then` otherwise use
+the strict 0.24.4 compatibility behavior, but an unenclosed bare semicolon with
+no active workflow subject proves an independent later standalone policy even
+when the preceding imperative is outside the curated vocabulary. A supported
+directive or policy label after an active subject likewise starts an
+independent subjectless policy. Straight or curly quote pairs, including
+backslash-escaped visible delimiters, prevent that semicolon proof. Sentence
 endings, Markdown hard breaks, structural boundaries, explicit changed
 subjects, conditional or subordinate prefixes, and unsupported syntax reset
-inheritance. A subject is established from the grammatical statement segment
-before domain facts exist, so a domain-free, local, specific, or cross-domain
-first predicate cannot discard it.
+inheritance.
 
 Existing domain patterns may also produce a direct workflow-prefix
 prohibition. Its subject-to-predicate bridge is classified as one bounded
@@ -205,6 +212,11 @@ relative predicate instead of qualifying the later prohibition. The same
 wording in a naked parenthetical, paired-comma component, or main-predicate
 bridge still qualifies or rejects the prohibition. In particular, `during
 deterministic validation` in a naked bridge is local rather than workflow-wide.
+The paired-comma form additionally accepts a bounded object-relative noun
+phrase plus finite or curated predicate. Candidates that begin inside that
+relative component cannot cross its closing comma, so an inner helper
+prohibition cannot suppress or acquire the scope of the later main predicate;
+the equivalent unpaired object-relative form remains unsupported.
 
 Every direct prohibited fact with apparent workflow scope is also evaluated
 against one private statement-level proof class: standalone default, explicit
@@ -227,9 +239,14 @@ while every predicate keeps local scope, safeguard, source/target, remainder,
 and evidence decisions. Base and third-person forms of the curated policy verbs
 continue a proven subject; strong noun phrases followed by copular, auxiliary,
 finite, or negative modal heads clear it before noun/verb homographs can
-inherit workflow scope. Each of the nine supported modals followed by `never`
-is classified as one prohibition predicate rather than a subject-bridge
-modifier.
+inherit workflow scope. A domain-aware strong form also clears the subject for
+noun-like homographs followed by compatible finite network, secret, or upload
+actions, while `audits logs`, `reviews results`, and `checks use cases` remain
+genuine subjectless predicates. Each of the nine supported modals followed by
+`never` is classified as one prohibition predicate rather than a
+subject-bridge modifier, including after a hard sentence boundary. Directive
+proof accepts optional `that` only after bounded `ensure`, `please ensure`, or
+`make sure` forms.
 Only a complete `prohibited` fact with `workflow` scope can contradict an
 enabled permissive policy for the same domain. `unknown`, `not-required`,
 `local-safeguard`, local-step, specific-source, specific-target, and
@@ -245,7 +262,7 @@ multiple detectors, but the body-policy module owns the semantic relationship
 between domain, modality, scope, and completeness. It is not a public schema,
 configuration surface, or general natural-language parser.
 
-Compatibility tests freeze 157 exact bodies and public finding projections from
+Compatibility tests freeze 184 exact bodies and public finding projections from
 Renma 0.24.4 commit `9e72e1adddd588ea72cba1c3e06ed1d07de330d9`.
 The test consumes those bodies directly; legacy code is not installed or run in
 CI. Thirty-two frozen cases cover every requested pair across first predicate
@@ -260,9 +277,14 @@ prose, heading fallback, domain order, and deduplication. Additional exact
 cross-product matrices cover outer prefix and candidate bridge, separator and
 previous-predicate classification, modal and domain, relative or naked modifier
 and qualification, and homograph and following predicate-head category.
-Compatibility means equality with the frozen corpus except for named,
-exact-current-output allowlist entries covering intentional precision,
-statement-group recovery, and bounded-evidence changes.
+Composed matrices further cross outer prefixes with continuation connectors,
+modifier or modal prefixes with connector and domain, semicolons with quote
+enclosures, paired relatives with subject shape and domain, and each with
+one-line, ordinary soft-wrap, and heading fallback. Exact projections retain
+domain order, evidence, and same-domain deduplication. Compatibility means
+equality with the frozen corpus except for named, exact-current-output allowlist
+entries covering intentional precision, statement-group recovery, and
+bounded-evidence changes.
 
 The physical-line stage keeps one lazy analysis accessor for a line outside a
 logical command. It intentionally runs line-local checks on physical
