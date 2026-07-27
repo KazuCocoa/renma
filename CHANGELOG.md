@@ -1732,7 +1732,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.24.4...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/KazuCocoa/renma/compare/v0.24.4...v0.25.0
 [0.24.4]: https://github.com/KazuCocoa/renma/compare/v0.24.3...v0.24.4
 [0.24.3]: https://github.com/KazuCocoa/renma/compare/v0.24.2...v0.24.3
 [0.24.2]: https://github.com/KazuCocoa/renma/compare/v0.24.1...v0.24.2
