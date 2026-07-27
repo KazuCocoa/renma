@@ -6,6 +6,19 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Changed
+
+- Refactored body-policy analysis into private lexical recognition, bounded
+  statement components, centralized subject and policy-context transitions,
+  predicate semantics, and fact projection layers without changing supported
+  grammar or public diagnostic projections. Reorganized the compatibility
+  suites and added deterministic structural properties for ranges,
+  determinism, ordering, deduplication, enclosures, relative components, and
+  Markdown soft wraps. Added an explicit package subpath allowlist that
+  preserves established deep imports while keeping the package root, CLI
+  implementation entrypoint, and separated body-policy modules unavailable as
+  library imports. The installed CLI remains available through `bin.renma`.
+
 ## [0.25.0] - 2026-07-26
 
 ### Fixed
