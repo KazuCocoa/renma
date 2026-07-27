@@ -37,6 +37,19 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   paired-comma object-relative clauses without attributing their inner
   prohibitions to the main workflow, and added bounded `ensure that` and
   `make sure that` directive forms.
+- Carried private quote-enclosure provenance through technical-clause,
+  sentence, contrastive, ordinary `and`, and comma segmentation so quoted
+  examples cannot inherit workflow scope or receive standalone policy scope.
+- Classified bounded paired subject-relative predicates independently while
+  retaining object-relative changed subjects for the later main predicate.
+- Separated deontic and commitment `modal + never` forms from recommendation,
+  epistemic, capability, and hypothetical language. Plain `must`, `shall`, and
+  `will` remain emitting; bounded policy or directive context additionally
+  supports `should` and `may`, while `might`, `can`, `could`, and `would`
+  remain non-emitting.
+- Composed at most one supported policy label with one bounded directive or
+  safety component for standalone proof, embedded subjects, paired modifiers,
+  and evidence origins.
 - Required explicit statement-level scope proof for direct facts, preventing a
   supported subjectless prohibition under descriptive, changed-subject,
   conditional, or unsupported syntax from receiving default workflow scope.
@@ -49,7 +62,7 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   as `audits logs`, `reviews results`, and `checks use cases`.
 - Kept affirmative requirement language distinct from genuinely negative
   `not-required` facts so it cannot suppress a later workflow prohibition.
-- Added 184 immutable, self-contained test-only 0.24.4 golden cases generated
+- Added 210 immutable, self-contained test-only 0.24.4 golden cases generated
   from the full tagged commit. The exact legacy bodies and public projections
   cover subjects, predicate kinds, connectors, domains, scopes, layouts,
   evidence, ordering, and deduplication; a 32-case matrix proves the requested
@@ -57,9 +70,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   bridge precision and the directive/bridge, separator/previous-predicate,
   modal/domain, modifier/qualification, and homograph/predicate-head
   cross-products. Composed matrices additionally cover outer prefixes,
-  continuation connectors, inherited modifiers, quote enclosures,
-  object-relative subject shapes, layouts, evidence, ordering, and
-  deduplication; every observed difference is explicitly allowlisted.
+  continuation connectors, inherited modifiers, all separator quote
+  enclosures, subject- and object-relative shapes, modal semantics, composed
+  prefixes, layouts, evidence, ordering, and deduplication; every observed
+  difference is explicitly allowlisted.
 
 ### Changed
 

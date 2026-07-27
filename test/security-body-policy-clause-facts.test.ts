@@ -1041,10 +1041,6 @@ test("direct workflow subjects retain supported bounded prohibition bridges", ()
     },
     {
       domain: "secrets",
-      body: "The process may never use credentials.",
-    },
-    {
-      domain: "secrets",
       body: "This workflow: must not use credentials.",
     },
     {
@@ -1610,7 +1606,7 @@ test("independent standalone policy scope is separator-aware", () => {
   }
 });
 
-test("modal-never prohibition predicates cover every policy domain", () => {
+test("plain modal-never predicates preserve only deontic and commitment semantics", () => {
   const domains = [
     {
       domain: "network",
@@ -1629,19 +1625,19 @@ test("modal-never prohibition predicates cover every policy domain", () => {
     },
   ] as const;
   const modals = [
-    "must",
-    "shall",
-    "will",
-    "should",
-    "would",
-    "may",
-    "might",
-    "can",
-    "could",
+    { modal: "must", emits: true },
+    { modal: "shall", emits: true },
+    { modal: "will", emits: true },
+    { modal: "should", emits: false },
+    { modal: "would", emits: false },
+    { modal: "may", emits: false },
+    { modal: "might", emits: false },
+    { modal: "can", emits: false },
+    { modal: "could", emits: false },
   ] as const;
 
   for (const { domain, subject, predicate } of domains) {
-    for (const modal of modals) {
+    for (const { modal, emits } of modals) {
       const body = `${subject} ${modal} never ${predicate}.`;
       for (const layout of ["one-line", "soft-wrap", "heading"] as const) {
         const renderedBody =
@@ -1651,8 +1647,14 @@ test("modal-never prohibition predicates cover every policy domain", () => {
               ? `## ${body}`
               : body;
         const findings = bodyPolicyFindings(renderedBody, domain);
-        assert.equal(findings.length, 1, `${domain}, ${modal}, ${layout}`);
-        assert.equal(findings[0]?.evidence.snippet, renderedBody);
+        assert.equal(
+          findings.length,
+          emits ? 1 : 0,
+          `${domain}, ${modal}, ${layout}`,
+        );
+        if (emits) {
+          assert.equal(findings[0]?.evidence.snippet, renderedBody);
+        }
         if (layout !== "heading") {
           const normalizedBody = renderedBody.replaceAll("\n", " ");
           const fact = statementGroupFacts(normalizedBody).find(
@@ -1662,11 +1664,17 @@ test("modal-never prohibition predicates cover every policy domain", () => {
               candidate.scope === "workflow" &&
               candidate.completeness === "complete",
           );
-          assert.ok(fact, `${domain}, ${modal}, ${layout}`);
           assert.equal(
-            normalizedBody.slice(fact.evidenceStart, fact.evidenceEnd),
-            normalizedBody.slice(0, -1),
+            fact !== undefined,
+            emits,
+            `${domain}, ${modal}, ${layout}`,
           );
+          if (fact !== undefined) {
+            assert.equal(
+              normalizedBody.slice(fact.evidenceStart, fact.evidenceEnd),
+              normalizedBody.slice(0, -1),
+            );
+          }
         }
       }
     }
@@ -2337,62 +2345,6 @@ test("inherited prohibition prefixes cover connectors and domains", () => {
     }
   }
 
-  const modals = [
-    "must",
-    "shall",
-    "will",
-    "should",
-    "would",
-    "may",
-    "might",
-    "can",
-    "could",
-  ] as const;
-  for (const { domain, action } of domains) {
-    for (const modal of modals) {
-      for (const mode of [
-        "direct",
-        "shared-ordinary",
-        "shared-contrastive",
-        "hard-boundary",
-      ] as const) {
-        const body = {
-          direct: `This workflow ${modal} never ${action}.`,
-          "shared-ordinary": `This workflow validates inputs and ${modal} never ${action}.`,
-          "shared-contrastive": `This workflow validates inputs but ${modal} never ${action}.`,
-          "hard-boundary": `Validate inputs. ${titleCase(modal)} never ${action}.`,
-        }[mode];
-        for (const layout of ["one-line", "soft-wrap", "heading"] as const) {
-          const prose =
-            layout === "soft-wrap"
-              ? body.replace(
-                  mode === "hard-boundary"
-                    ? ". "
-                    : mode === "direct"
-                      ? " workflow "
-                      : mode === "shared-ordinary"
-                        ? " and "
-                        : " but ",
-                  mode === "hard-boundary"
-                    ? ".\n"
-                    : mode === "direct"
-                      ? " workflow\n"
-                      : mode === "shared-ordinary"
-                        ? " and\n"
-                        : " but\n",
-                )
-              : body;
-          const renderedBody = layout === "heading" ? `## ${prose}` : prose;
-          assert.equal(
-            bodyPolicyFindings(renderedBody, domain).length,
-            1,
-            `${modal}, ${domain}, ${mode}, ${layout}`,
-          );
-        }
-      }
-    }
-  }
-
   for (const body of [
     "audits are reviewed",
     "reviews require approval",
@@ -3054,6 +3006,399 @@ test("candidate scope and safeguard facts ignore coordinated unrelated text", ()
     localText,
   );
   assert.equal(bodyPolicyFindings(localText, "network").length, 0, localText);
+});
+
+test("quote provenance blocks every enclosed statement separator", () => {
+  const quoteStyles = [
+    { style: "straight-double", open: '"', close: '"' },
+    { style: "straight-single", open: "'", close: "'" },
+    { style: "curly-double", open: "“", close: "”" },
+    { style: "curly-single", open: "‘", close: "’" },
+    { style: "escaped-visible", open: '\\"', close: '\\"' },
+  ] as const;
+  const separators = [
+    { name: "semicolon", text: "; " },
+    { name: "period", text: ". " },
+    { name: "exclamation", text: "! " },
+    { name: "question", text: "? " },
+    { name: "and", text: " and " },
+    { name: "comma", text: ", " },
+    { name: "but", text: " but " },
+    { name: "yet", text: " yet " },
+    { name: "however", text: " however, " },
+    { name: "then", text: " then " },
+  ] as const;
+  const domains = [
+    { domain: "network", prohibition: "never use the network" },
+    { domain: "upload", prohibition: "no external uploads" },
+    { domain: "secrets", prohibition: "never use credentials" },
+  ] as const;
+
+  for (const { domain, prohibition } of domains) {
+    for (const { name: separatorName, text: separator } of separators) {
+      for (const activeSubject of [true, false]) {
+        const outsidePrefix = activeSubject
+          ? "This workflow documents "
+          : "Documentation says ";
+        const unquotedPrefix = activeSubject
+          ? "This workflow validates inputs"
+          : "Validate inputs";
+        for (const layout of ["one-line", "soft-wrap", "heading"] as const) {
+          const renderedSeparator =
+            layout === "soft-wrap" ? `${separator.trimEnd()}\n` : separator;
+          const unquoted = `${unquotedPrefix}${renderedSeparator}${prohibition}.`;
+          const renderedUnquoted =
+            layout === "heading" ? `## ${unquoted}` : unquoted;
+          assert.equal(
+            bodyPolicyFindings(renderedUnquoted, domain).length,
+            1,
+            `${domain}, ${separatorName}, ${activeSubject ? "active" : "standalone"}, ${layout}, unquoted`,
+          );
+
+          for (const { style, open, close } of quoteStyles) {
+            const prose = `${outsidePrefix}${open}validate inputs${renderedSeparator}${prohibition}.${close}`;
+            const body = layout === "heading" ? `## ${prose}` : prose;
+            const message = `${domain}, ${style}, ${separatorName}, ${activeSubject ? "active" : "standalone"}, ${layout}`;
+            assert.equal(bodyPolicyFindings(body, domain).length, 0, message);
+
+            const normalized = prose.replaceAll("\n", " ");
+            assert.equal(
+              statementGroupFacts(normalized).some(
+                (fact) =>
+                  fact.domain === domain &&
+                  fact.modality === "prohibited" &&
+                  fact.scope === "workflow" &&
+                  fact.completeness === "complete",
+              ),
+              false,
+              `${message}, private facts`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  for (const apostropheControl of [
+    "The helper's notes say validate inputs; never use the network.",
+    "The helpers' notes say validate inputs; never use the network.",
+  ]) {
+    assert.equal(
+      bodyPolicyFindings(apostropheControl, "network").length,
+      1,
+      apostropheControl,
+    );
+  }
+});
+
+test("paired relatives classify their own subject relationship and bounded policy", () => {
+  const domains = [
+    {
+      domain: "network",
+      complete: "must not use the network",
+      local: "must not use the network during local setup",
+      specific: "must not use network access to production systems",
+    },
+    {
+      domain: "upload",
+      complete: "cannot upload files",
+      local: "cannot upload files during local setup",
+      specific: "cannot upload files to a public bucket",
+    },
+    {
+      domain: "secrets",
+      complete: "must never use credentials",
+      local: "must never use credentials during local setup",
+      specific: "must not access credentials from production",
+    },
+  ] as const;
+  const prefixes = [
+    { name: "plain", text: "" },
+    { name: "directive", text: "Please " },
+    { name: "policy-label", text: "Policy: " },
+  ] as const;
+
+  for (const [innerIndex, inner] of domains.entries()) {
+    for (const relationship of [
+      "subject-relative",
+      "object-relative",
+    ] as const) {
+      for (const scope of ["complete", "local", "specific"] as const) {
+        for (const mainRelation of ["same", "different"] as const) {
+          const main: (typeof domains)[number] =
+            mainRelation === "same"
+              ? inner
+              : (domains[(innerIndex + 1) % domains.length] ?? inner);
+          for (const mainProhibitionPresent of [false, true]) {
+            for (const prefix of prefixes) {
+              const relativePredicate = inner[scope];
+              const relative =
+                relationship === "subject-relative"
+                  ? `which ${relativePredicate}`
+                  : `which the helper says ${relativePredicate}`;
+              const mainPredicate: string = mainProhibitionPresent
+                ? main.complete
+                : "validates inputs";
+              const oneLine: string = `${prefix.text}this workflow, ${relative}, ${mainPredicate}.`;
+              for (const layout of [
+                "one-line",
+                "soft-wrap",
+                "heading",
+              ] as const) {
+                const prose: string =
+                  layout === "soft-wrap"
+                    ? oneLine
+                        .replace(`, ${relative}`, `,\n${relative}`)
+                        .replace(`, ${mainPredicate}`, `,\n${mainPredicate}`)
+                    : oneLine;
+                const body: string =
+                  layout === "heading" ? `## ${prose}` : prose;
+                const innerExpected: boolean =
+                  (relationship === "subject-relative" &&
+                    scope === "complete") ||
+                  (mainProhibitionPresent && main.domain === inner.domain);
+                const mainExpected: boolean =
+                  mainProhibitionPresent ||
+                  (relationship === "subject-relative" &&
+                    scope === "complete" &&
+                    main.domain === inner.domain);
+                const message = `${relationship}, ${inner.domain}, ${scope}, ${mainRelation}, ${mainProhibitionPresent ? "main-prohibition" : "main-prose"}, ${prefix.name}, ${layout}`;
+                assert.equal(
+                  bodyPolicyFindings(body, inner.domain).length,
+                  innerExpected ? 1 : 0,
+                  `${message}, inner`,
+                );
+                assert.equal(
+                  bodyPolicyFindings(body, main.domain).length,
+                  mainExpected ? 1 : 0,
+                  `${message}, main`,
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  for (const { domain, body, evidence } of [
+    {
+      domain: "network",
+      body: "This workflow, which must not use the network, validates inputs.",
+      evidence: "This workflow, which must not use the network",
+    },
+    {
+      domain: "upload",
+      body: "This task, which cannot upload files, prepares the report.",
+      evidence: "This task, which cannot upload files",
+    },
+    {
+      domain: "secrets",
+      body: "Policy: the process, which must never use credentials, checks configuration.",
+      evidence: "Policy: the process, which must never use credentials",
+    },
+  ] as const) {
+    const fact = statementGroupFacts(body).find(
+      (candidate) =>
+        candidate.domain === domain &&
+        candidate.modality === "prohibited" &&
+        candidate.scope === "workflow" &&
+        candidate.completeness === "complete",
+    );
+    assertFactEvidence(
+      fact,
+      body,
+      evidence,
+      {
+        modality: "prohibited",
+        scope: "workflow",
+        completeness: "complete",
+      },
+      body,
+    );
+  }
+
+  for (const unsupported of [
+    "This workflow, which apparently must not use the network, validates inputs.",
+    "Policy: this workflow, which perhaps cannot upload files, prepares the report.",
+    "Please this workflow, which reportedly must not use credentials, checks configuration.",
+  ]) {
+    for (const domain of ["network", "upload", "secrets"] as const) {
+      assert.equal(
+        bodyPolicyFindings(unsupported, domain).length,
+        0,
+        unsupported,
+      );
+    }
+  }
+});
+
+test("modal-never semantics compose subject mode, policy context, domain, and layout", () => {
+  const modals = [
+    { modal: "must", classification: "deontic", plain: true, policy: true },
+    { modal: "shall", classification: "deontic", plain: true, policy: true },
+    { modal: "will", classification: "commitment", plain: true, policy: true },
+    {
+      modal: "should",
+      classification: "recommendation",
+      plain: false,
+      policy: true,
+    },
+    {
+      modal: "may",
+      classification: "epistemic",
+      plain: false,
+      policy: true,
+    },
+    {
+      modal: "might",
+      classification: "epistemic",
+      plain: false,
+      policy: false,
+    },
+    {
+      modal: "can",
+      classification: "capability",
+      plain: false,
+      policy: false,
+    },
+    {
+      modal: "could",
+      classification: "capability",
+      plain: false,
+      policy: false,
+    },
+    {
+      modal: "would",
+      classification: "hypothetical",
+      plain: false,
+      policy: false,
+    },
+  ] as const;
+  const domains = [
+    { domain: "network", action: "use the network" },
+    { domain: "upload", action: "upload files" },
+    { domain: "secrets", action: "use credentials" },
+  ] as const;
+  const prefixes = [
+    { name: "plain", text: "", policyContext: false },
+    { name: "policy-label", text: "Policy: ", policyContext: true },
+    { name: "directive", text: "Please ", policyContext: true },
+  ] as const;
+
+  for (const modal of modals) {
+    for (const { domain, action } of domains) {
+      for (const prefix of prefixes) {
+        for (const subjectMode of [
+          "explicit",
+          "inherited",
+          "standalone",
+        ] as const) {
+          const oneLine = {
+            explicit: `${prefix.text}this workflow ${modal.modal} never ${action}.`,
+            inherited: `${prefix.text}this workflow validates inputs but ${modal.modal} never ${action}.`,
+            standalone: `${prefix.text}${titleCase(modal.modal)} never ${action}.`,
+          }[subjectMode];
+          const expected = prefix.policyContext ? modal.policy : modal.plain;
+          for (const layout of ["one-line", "soft-wrap", "heading"] as const) {
+            const prose =
+              layout === "soft-wrap"
+                ? subjectMode === "inherited"
+                  ? oneLine.replace(" but ", "\nbut ")
+                  : subjectMode === "explicit"
+                    ? oneLine.replace(" workflow ", " workflow\n")
+                    : prefix.text.length > 0
+                      ? oneLine.replace(
+                          prefix.text,
+                          prefix.text.trimEnd() + "\n",
+                        )
+                      : oneLine.replace(` never ${action}`, ` never\n${action}`)
+                : oneLine;
+            const body = layout === "heading" ? `## ${prose}` : prose;
+            assert.equal(
+              bodyPolicyFindings(body, domain).length,
+              expected ? 1 : 0,
+              `${modal.classification}, ${modal.modal}, ${domain}, ${prefix.name}, ${subjectMode}, ${layout}`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  for (const { domain, body } of [
+    {
+      domain: "network",
+      body: "This workflow might never use the network.",
+    },
+    { domain: "upload", body: "This task could never upload files." },
+    { domain: "secrets", body: "The process can never use credentials." },
+    {
+      domain: "network",
+      body: "This workflow would never use the network.",
+    },
+  ] as const) {
+    const fact = statementGroupFacts(body).find(
+      (candidate) => candidate.domain === domain,
+    );
+    assert.ok(fact, body);
+    assert.equal(fact.modality, "unknown", body);
+    assert.equal(bodyPolicyFindings(body, domain).length, 0, body);
+  }
+});
+
+test("supported outer prefixes compose one label and one directive component", () => {
+  for (const { domain, body } of [
+    { domain: "network", body: "Policy: please do not use the network." },
+    {
+      domain: "upload",
+      body: "Requirement: ensure that no external uploads are allowed.",
+    },
+    {
+      domain: "secrets",
+      body: "Policy: please ensure that this workflow never uses credentials.",
+    },
+    { domain: "network", body: "For safety, please do not use the network." },
+    { domain: "upload", body: "Policy: for safety, no external uploads." },
+  ] as const) {
+    for (const layout of ["one-line", "soft-wrap", "heading"] as const) {
+      const prose =
+        layout === "soft-wrap"
+          ? body.replace(/^(Policy:|Requirement:|For safety,)[ \t]+/u, "$1\n")
+          : body;
+      const rendered = layout === "heading" ? `## ${prose}` : prose;
+      assert.equal(
+        bodyPolicyFindings(rendered, domain).length,
+        1,
+        `${body}, ${layout}`,
+      );
+      const normalized = prose.replaceAll("\n", " ");
+      const fact = statementGroupFacts(normalized).find(
+        (candidate) =>
+          candidate.domain === domain &&
+          candidate.modality === "prohibited" &&
+          candidate.scope === "workflow" &&
+          candidate.completeness === "complete",
+      );
+      assert.ok(fact, `${body}, ${layout}, private fact`);
+      assert.equal(
+        normalized.slice(fact.evidenceStart, fact.evidenceEnd),
+        normalized.slice(0, -1),
+      );
+    }
+  }
+
+  for (const body of [
+    "Documentation policy: please do not use the network.",
+    "The helper's requirement: no external uploads.",
+    "Policy notes say please do not use credentials.",
+    "Policy: Requirement: please do not use the network.",
+    "Please make sure that ensure no external uploads.",
+  ]) {
+    for (const domain of ["network", "upload", "secrets"] as const) {
+      assert.equal(bodyPolicyFindings(body, domain).length, 0, body);
+    }
+  }
 });
 
 test("unrelated coordinated remainders do not become completeness boundaries", () => {

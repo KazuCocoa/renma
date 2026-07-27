@@ -38,6 +38,18 @@ interface WorkflowSubjectMatch {
   readonly evidenceStart: number;
 }
 
+type QuoteEnclosureProvenance =
+  | "unenclosed"
+  | "straight-double-quoted"
+  | "straight-single-quoted"
+  | "curly-double-quoted"
+  | "curly-single-quoted"
+  | "escaped-visible-quoted";
+
+interface QuoteEnclosureRange extends EvidenceRange {
+  readonly provenance: Exclude<QuoteEnclosureProvenance, "unenclosed">;
+}
+
 interface ScopeClassification {
   readonly scope: BodyPolicyScope;
   readonly supportedEnd: number;
@@ -66,6 +78,10 @@ const UPLOAD_SUBJECT = String.raw`(?:external\s+)?uploads?`;
 const SECRET_ACCESS_SUBJECT = String.raw`(?:(?:secret|credential|token|password|private[- ]key)\s+(?:access|use|usage)|${BODY_SECRET_TARGET_TERMS})`;
 const SECRET_EVIDENCE = String.raw`(?<![A-Za-z0-9_])(?:${BODY_SECRET_TARGET_TERMS})\b`;
 const MODAL_NEVER = String.raw`(?:must|shall|will|should|would|may|might|can|could)[ \t]+never`;
+const MODAL_NEVER_RE = new RegExp(
+  String.raw`\b(?<modal>must|shall|will|should|would|may|might|can|could)[ \t]+never\b`,
+  "i",
+);
 const FINITE_EXTERNAL_UPLOAD_ACTION = String.raw`(?:uploads|sends|posts|shares|attaches|submits|syncs|pushes|publishes)`;
 const FINITE_SECRET_ACTION = String.raw`(?:accesses|reads|loads|uses|accepts|handles)`;
 
@@ -247,7 +263,7 @@ const PROHIBITION_PREDICATE_RE = new RegExp(
 const STATEMENT_SHORT_MODIFIER = String.raw`(?:also|still|therefore|always|explicitly|directly|strictly|categorically)`;
 const SUBJECTLESS_AUXILIARY_HEAD = String.raw`(?:is|are|was|were|has|have|had|does|do|did|will|would|shall|should|can|could|may|might|must|cannot|can't|needs|requires)`;
 const SUBJECTLESS_ORDINARY_VERB_HEAD = String.raw`(?:accepts?|adapts?|analyzes?|applies|audits?|builds?|checks?|classifies|collects?|compares?|compiles?|completes?|configures?|creates?|detects?|documents?|emits?|evaluates?|executes?|generates?|handles?|inspects?|loads?|logs?|maps?|normalizes?|parses?|prepares?|processes|produces?|reads?|records?|reports?|resolves?|reviews?|runs?|scans?|selects?|stores?|summarizes?|tracks?|transforms?|updates?|uses?|validates?|verifies|writes?)`;
-const SUBJECTLESS_POLICY_VERB_HEAD = String.raw`(?:never|without|don't|keep|operates?|works?|access(?:es)?|attach(?:es)?|handles?|loads?|posts?|publish(?:es)?|push(?:es)?|reads?|sends?|shares?|submits?|syncs?|uploads?|uses?)`;
+const SUBJECTLESS_POLICY_VERB_HEAD = String.raw`(?:never|no|without|don't|keep|operates?|works?|access(?:es)?|attach(?:es)?|handles?|loads?|posts?|publish(?:es)?|push(?:es)?|reads?|sends?|shares?|submits?|syncs?|uploads?|uses?)`;
 const SUBJECTLESS_PREDICATE_HEAD = String.raw`(?:${SUBJECTLESS_AUXILIARY_HEAD}|${SUBJECTLESS_ORDINARY_VERB_HEAD}|${SUBJECTLESS_POLICY_VERB_HEAD})`;
 const SUBJECTLESS_PREDICATE_PREFIX = String.raw`(?:[ \t]*(?:,[ \t]*)?)(?:(?:it|${STATEMENT_SHORT_MODIFIER})[ \t]+){0,4}`;
 const ORDINARY_STATEMENT_SEPARATOR_RE =
@@ -314,6 +330,31 @@ const SUPPORTED_POLICY_LABEL_PREFIX_RE =
   /^(?:policy|requirement)[ \t]*:[ \t]*$/i;
 const SUPPORTED_DIRECTIVE_PREFIX_RE =
   /^(?:please|for[ \t]+safety|as[ \t]+a[ \t]+rule|(?:please[ \t]+)?ensure(?:[ \t]+that)?|make[ \t]+sure(?:[ \t]+that)?)[ \t]*[:,–—-]?[ \t]*$/iu;
+const SUPPORTED_COMPOSED_DIRECTIVE_PREFIX_RE =
+  /^(?:for[ \t]+safety|as[ \t]+a[ \t]+rule)[ \t]*,[ \t]*(?:please(?:[ \t]+ensure(?:[ \t]+that)?)?|ensure(?:[ \t]+that)?|make[ \t]+sure(?:[ \t]+that)?)[ \t]*[:,–—-]?[ \t]*$/iu;
+const SUPPORTED_COMPOSED_PREFIX_RE = new RegExp(
+  String.raw`^(?:(?<label>(?:policy|requirement)[ \t]*:[ \t]*))?(?:(?<directive>(?:(?:for[ \t]+safety|as[ \t]+a[ \t]+rule)[ \t]*,[ \t]*(?:(?:please)(?:[ \t]+ensure(?:[ \t]+that)?)?|ensure(?:[ \t]+that)?|make[ \t]+sure(?:[ \t]+that)?)|(?:for[ \t]+safety|as[ \t]+a[ \t]+rule)|(?:please)(?:[ \t]+ensure(?:[ \t]+that)?)?|ensure(?:[ \t]+that)?|make[ \t]+sure(?:[ \t]+that)?)[ \t]*[:,–—-]?[ \t]*))?$`,
+  "iu",
+);
+
+type ModalNeverClassification =
+  | "deontic-prohibition"
+  | "policy-commitment"
+  | "recommendation"
+  | "epistemic"
+  | "capability"
+  | "hypothetical";
+
+type ModalNeverWord =
+  | "must"
+  | "shall"
+  | "will"
+  | "should"
+  | "would"
+  | "may"
+  | "might"
+  | "can"
+  | "could";
 
 type PredicateStartClassification =
   | "explicit-workflow-subject"
@@ -345,6 +386,7 @@ type StandalonePolicyPrefixClassification =
   | "plain-start"
   | "directive-prefix"
   | "policy-label"
+  | "composed-policy-prefix"
   | "descriptive-prefix"
   | "changed-subject-prefix"
   | "unsupported-prefix";
@@ -352,6 +394,7 @@ type StandalonePolicyPrefixClassification =
 interface BodyPolicyPredicateSegment {
   readonly range: EvidenceRange;
   readonly separator: EvidenceRange;
+  readonly enclosure: QuoteEnclosureProvenance;
   readonly boundary: "start" | "inherited" | "hard";
   readonly startClassification: PredicateStartClassification;
   readonly explicitSubject: WorkflowSubjectMatch | undefined;
@@ -364,6 +407,17 @@ interface BodyPolicyStatementGroup {
   readonly range: EvidenceRange;
   readonly explicitSubject: WorkflowSubjectMatch | undefined;
   readonly predicates: readonly BodyPolicyPredicateSegment[];
+}
+
+type PairedRelativeSubjectRelationship =
+  | "subject-relative"
+  | "object-relative"
+  | "unsupported";
+
+interface PairedRelativePredicateComponent {
+  readonly relationship: PairedRelativeSubjectRelationship;
+  readonly predicateRange: EvidenceRange | undefined;
+  readonly mainPredicateRange: EvidenceRange | undefined;
 }
 
 /** @internal Extract bounded semantic facts from one prepared Markdown clause. */
@@ -387,10 +441,70 @@ export function bodyPolicyStatementGroupFacts(
   const classified: BodyPolicyClauseFacts[] = [];
   for (const group of bodyPolicyStatementGroups(text, clauseRanges)) {
     for (const predicate of group.predicates) {
+      if (predicate.enclosure !== "unenclosed") continue;
       const predicateText = text.slice(
         predicate.range.start,
         predicate.range.end,
       );
+      const relativeComponent = pairedRelativePredicateComponent(
+        text,
+        predicate.range,
+      );
+      if (
+        relativeComponent?.relationship === "subject-relative" &&
+        relativeComponent.predicateRange !== undefined &&
+        predicate.explicitSubject !== undefined
+      ) {
+        const relativePredicate: BodyPolicyPredicateSegment = {
+          ...predicate,
+          range: relativeComponent.predicateRange,
+          explicitSubject: undefined,
+          inheritedSubject: predicate.explicitSubject,
+          boundary: "inherited",
+          startClassification: "supported-subjectless",
+          independentStandaloneBoundary: false,
+        };
+        for (const domain of DOMAIN_ORDER) {
+          const relativeFact = projectedStatementFact(
+            text,
+            relativePredicate,
+            predicate.explicitSubject,
+            domain,
+          );
+          if (relativeFact !== undefined) classified.push(relativeFact);
+        }
+      }
+      if (
+        relativeComponent !== undefined &&
+        relativeComponent.relationship !== "unsupported" &&
+        relativeComponent.mainPredicateRange !== undefined &&
+        predicate.explicitSubject !== undefined
+      ) {
+        const mainPredicate: BodyPolicyPredicateSegment = {
+          ...predicate,
+          range: relativeComponent.mainPredicateRange,
+          explicitSubject: undefined,
+          inheritedSubject: predicate.explicitSubject,
+          boundary: "inherited",
+          startClassification: classifyPredicateStart(
+            text.slice(
+              relativeComponent.mainPredicateRange.start,
+              relativeComponent.mainPredicateRange.end,
+            ),
+            false,
+          ),
+          independentStandaloneBoundary: false,
+        };
+        for (const domain of DOMAIN_ORDER) {
+          const mainFact = projectedStatementFact(
+            text,
+            mainPredicate,
+            predicate.explicitSubject,
+            domain,
+          );
+          if (mainFact !== undefined) classified.push(mainFact);
+        }
+      }
       const explicitSubject =
         predicate.explicitSubject === undefined
           ? undefined
@@ -553,12 +667,21 @@ function classifyDomainFacts(
     const supportedProhibition =
       candidate.kind === "supported-prohibition" ||
       projectedSupportedEnd !== undefined;
+    const modalNever = classifyCandidateModalNever(clause, candidate);
+    const modalSupportsProhibition =
+      modalNever === undefined ||
+      modalNeverSupportsProhibition(
+        modalNever,
+        candidateHasSupportedPolicyContext(clause, candidate),
+      );
     const baseModality =
       candidate.kind === "not-required"
         ? "not-required"
         : candidate.kind === "affirmative-requirement"
           ? "unknown"
-          : "prohibited";
+          : modalSupportsProhibition
+            ? "prohibited"
+            : "unknown";
     const scopeModality =
       baseModality === "prohibited" && !supportedProhibition
         ? "unknown"
@@ -769,6 +892,56 @@ function candidateEvidence(
   return candidates;
 }
 
+function classifyCandidateModalNever(
+  text: string,
+  candidate: DomainCandidate,
+): ModalNeverClassification | undefined {
+  const modal = MODAL_NEVER_RE.exec(
+    text.slice(candidate.predicateStart, candidate.end),
+  )?.groups?.modal?.toLowerCase() as ModalNeverWord | undefined;
+  switch (modal) {
+    case "must":
+    case "shall":
+      return "deontic-prohibition";
+    case "will":
+      return "policy-commitment";
+    case "should":
+      return "recommendation";
+    case "may":
+      return "recommendation";
+    case "might":
+      return "epistemic";
+    case "can":
+    case "could":
+      return "capability";
+    case "would":
+      return "hypothetical";
+    case undefined:
+      return undefined;
+  }
+}
+
+function modalNeverSupportsProhibition(
+  classification: ModalNeverClassification,
+  supportedPolicyContext: boolean,
+): boolean {
+  return (
+    classification === "deontic-prohibition" ||
+    classification === "policy-commitment" ||
+    (supportedPolicyContext && classification === "recommendation")
+  );
+}
+
+function candidateHasSupportedPolicyContext(
+  text: string,
+  candidate: DomainCandidate,
+): boolean {
+  const prefixEnd = candidate.directWorkflowSubject?.start ?? candidate.start;
+  return prefixClassificationProvidesPolicyContext(
+    standalonePolicyPrefixClassification(text.slice(0, prefixEnd)),
+  );
+}
+
 function independentCandidates(
   candidates: readonly DomainCandidate[],
 ): readonly DomainCandidate[] {
@@ -952,12 +1125,13 @@ function bodyPolicyStatementGroups(
   text: string,
   clauseRanges: readonly EvidenceRange[],
 ): readonly BodyPolicyStatementGroup[] {
+  const enclosures = quoteEnclosureRanges(text);
   const predicateRanges = clauseRanges
     .filter(
       ({ start, end }) =>
         !/^[ \t]*[;:,.!?–—-]+[ \t]*$/u.test(text.slice(start, end)),
     )
-    .flatMap((range) => splitOrdinaryPredicateRanges(text, range))
+    .flatMap((range) => splitOrdinaryPredicateRanges(text, range, enclosures))
     .map((range) => trimPredicateRange(text, range))
     .filter(({ start, end }) => start < end)
     .sort((left, right) => left.start - right.start || left.end - right.end);
@@ -972,19 +1146,30 @@ function bodyPolicyStatementGroups(
       end: range.start,
     };
     const separatorText = text.slice(separator.start, separator.end);
+    const enclosure = rangeStartEnclosureProvenance(text, range, enclosures);
+    const separatorEnclosure = rangeStartEnclosureProvenance(
+      text,
+      separator,
+      enclosures,
+    );
     const boundary =
       previous === undefined
         ? "start"
-        : statementSeparatorSupportsInheritance(separatorText)
+        : separatorEnclosure === "unenclosed" &&
+            statementSeparatorSupportsInheritance(separatorText)
           ? "inherited"
           : "hard";
-    const explicitSubject = supportedWorkflowSubjectInRange(text, range);
+    const explicitSubject =
+      enclosure === "unenclosed"
+        ? supportedWorkflowSubjectInRange(text, range)
+        : undefined;
     const startClassification = classifyPredicateStart(
       text.slice(range.start, range.end),
       explicitSubject !== undefined,
     );
     const inheritsSubject =
       explicitSubject === undefined &&
+      enclosure === "unenclosed" &&
       boundary === "inherited" &&
       activeSubject !== undefined &&
       startClassification === "supported-subjectless";
@@ -999,6 +1184,7 @@ function bodyPolicyStatementGroups(
       );
     const independentStandaloneBoundary =
       explicitSubject === undefined &&
+      enclosure === "unenclosed" &&
       boundary === "inherited" &&
       previousPredicate !== undefined &&
       (independentPrefixedPolicy ||
@@ -1024,6 +1210,7 @@ function bodyPolicyStatementGroups(
     predicates.push({
       range,
       separator,
+      enclosure,
       boundary,
       startClassification,
       explicitSubject,
@@ -1098,6 +1285,7 @@ function bareSemicolonSeparatesIndependentPolicies(
 function splitOrdinaryPredicateRanges(
   text: string,
   sourceRange: EvidenceRange,
+  enclosures: readonly QuoteEnclosureRange[],
 ): readonly EvidenceRange[] {
   const ranges: EvidenceRange[] = [];
   let start = sourceRange.start;
@@ -1111,6 +1299,15 @@ function splitOrdinaryPredicateRanges(
     const separatorStart = sourceRange.start + match.index;
     const separatorEnd = separatorStart + match[0].length;
     if (
+      rangeStartEnclosureProvenance(
+        text,
+        { start: separatorStart, end: separatorEnd },
+        enclosures,
+      ) !== "unenclosed"
+    ) {
+      continue;
+    }
+    if (
       pairedCommaModifier !== undefined &&
       separatorStart >= pairedCommaModifier.start &&
       separatorStart < pairedCommaModifier.end
@@ -1122,8 +1319,7 @@ function splitOrdinaryPredicateRanges(
     );
     if (
       /^,[ \t]*$/u.test(match[0]) &&
-      (commaPrefixClassification === "directive-prefix" ||
-        commaPrefixClassification === "policy-label")
+      prefixClassificationProvidesPolicyContext(commaPrefixClassification)
     ) {
       continue;
     }
@@ -1174,6 +1370,73 @@ function leadingBoundedPairedRelativeRange(
   };
 }
 
+function pairedRelativePredicateComponent(
+  text: string,
+  sourceRange: EvidenceRange,
+): PairedRelativePredicateComponent | undefined {
+  const subject = supportedWorkflowSubjectInRange(text, sourceRange);
+  if (subject === undefined) return undefined;
+  const paired = DIRECT_SUBJECT_PAIRED_COMMA_MODIFIER_RE.exec(
+    text.slice(subject.range.end, sourceRange.end),
+  );
+  const content = paired?.groups?.content;
+  if (paired === null || content === undefined) return undefined;
+  const normalized = content.trim();
+  const relativePrefix = /^(?:that|which)[ \t]+/iu.exec(normalized);
+  const mainRange = trimPredicateRange(text, {
+    start: subject.range.end + paired[0].length,
+    end: sourceRange.end,
+  });
+  const mainPredicateRange =
+    mainRange.start < mainRange.end ? mainRange : undefined;
+  if (relativePrefix === null) {
+    return {
+      relationship: "unsupported",
+      predicateRange: undefined,
+      mainPredicateRange,
+    };
+  }
+  const predicateText = normalized.slice(relativePrefix[0].length);
+  if (
+    classifyPredicateStart(predicateText, false) !== "supported-subjectless"
+  ) {
+    if (PAIRED_OBJECT_RELATIVE_MODIFIER_RE.test(normalized)) {
+      return {
+        relationship: "object-relative",
+        predicateRange: undefined,
+        mainPredicateRange,
+      };
+    }
+    return {
+      relationship: "unsupported",
+      predicateRange: undefined,
+      mainPredicateRange,
+    };
+  }
+  const contentOffset = paired[0].indexOf(content);
+  const normalizedOffset = content.indexOf(normalized);
+  if (contentOffset < 0 || normalizedOffset < 0) {
+    return {
+      relationship: "unsupported",
+      predicateRange: undefined,
+      mainPredicateRange,
+    };
+  }
+  const predicateStart =
+    subject.range.end +
+    contentOffset +
+    normalizedOffset +
+    relativePrefix[0].length;
+  return {
+    relationship: "subject-relative",
+    predicateRange: {
+      start: predicateStart,
+      end: predicateStart + predicateText.trimEnd().length,
+    },
+    mainPredicateRange,
+  };
+}
+
 function startsStatementPredicate(text: string): boolean {
   const range = { start: 0, end: text.length };
   const startClassification = classifyPredicateStart(
@@ -1217,7 +1480,8 @@ function directlySupportedPrefixedProhibitionStartsText(text: string): boolean {
   );
 }
 
-function quotePairEnclosesOffset(text: string, offset: number): boolean {
+function quoteEnclosureRanges(text: string): readonly QuoteEnclosureRange[] {
+  const ranges: QuoteEnclosureRange[] = [];
   let straightDoubleStart:
     | { readonly index: number; readonly escaped: boolean }
     | undefined;
@@ -1235,7 +1499,14 @@ function quotePairEnclosesOffset(text: string, offset: number): boolean {
       } else if (escaped && !straightDoubleStart.escaped) {
         continue;
       } else {
-        if (straightDoubleStart.index < offset && offset < index) return true;
+        ranges.push({
+          start: straightDoubleStart.index,
+          end: index + 1,
+          provenance:
+            straightDoubleStart.escaped || escaped
+              ? "escaped-visible-quoted"
+              : "straight-double-quoted",
+        });
         straightDoubleStart = undefined;
       }
       continue;
@@ -1255,7 +1526,14 @@ function quotePairEnclosesOffset(text: string, offset: number): boolean {
       } else if (escaped && !straightSingleStart.escaped) {
         continue;
       } else {
-        if (straightSingleStart.index < offset && offset < index) return true;
+        ranges.push({
+          start: straightSingleStart.index,
+          end: index + 1,
+          provenance:
+            straightSingleStart.escaped || escaped
+              ? "escaped-visible-quoted"
+              : "straight-single-quoted",
+        });
         straightSingleStart = undefined;
       }
       continue;
@@ -1265,7 +1543,11 @@ function quotePairEnclosesOffset(text: string, offset: number): boolean {
       continue;
     }
     if (character === "”" && curlyDoubleStart !== undefined) {
-      if (curlyDoubleStart < offset && offset < index) return true;
+      ranges.push({
+        start: curlyDoubleStart,
+        end: index + 1,
+        provenance: "curly-double-quoted",
+      });
       curlyDoubleStart = undefined;
       continue;
     }
@@ -1274,11 +1556,45 @@ function quotePairEnclosesOffset(text: string, offset: number): boolean {
       continue;
     }
     if (character === "’" && curlySingleStart !== undefined) {
-      if (curlySingleStart < offset && offset < index) return true;
+      ranges.push({
+        start: curlySingleStart,
+        end: index + 1,
+        provenance: "curly-single-quoted",
+      });
       curlySingleStart = undefined;
     }
   }
-  return false;
+  return ranges.sort((left, right) => left.start - right.start);
+}
+
+function quoteEnclosureProvenanceAtOffset(
+  enclosures: readonly QuoteEnclosureRange[],
+  offset: number,
+): QuoteEnclosureProvenance {
+  return (
+    enclosures.find(({ start, end }) => start < offset && offset < end - 1)
+      ?.provenance ?? "unenclosed"
+  );
+}
+
+function quotePairEnclosesOffset(text: string, offset: number): boolean {
+  return (
+    quoteEnclosureProvenanceAtOffset(quoteEnclosureRanges(text), offset) !==
+    "unenclosed"
+  );
+}
+
+function rangeStartEnclosureProvenance(
+  text: string,
+  range: EvidenceRange,
+  enclosures: readonly QuoteEnclosureRange[],
+): QuoteEnclosureProvenance {
+  const leading = /^[ \t]*/u.exec(text.slice(range.start, range.end))?.[0]
+    .length;
+  return quoteEnclosureProvenanceAtOffset(
+    enclosures,
+    range.start + (leading ?? 0),
+  );
 }
 
 function asciiWordCharacter(character: string | undefined): boolean {
@@ -1408,8 +1724,18 @@ function standalonePolicyPrefixClassification(
   if (SUPPORTED_POLICY_LABEL_PREFIX_RE.test(normalized)) {
     return "policy-label";
   }
-  if (SUPPORTED_DIRECTIVE_PREFIX_RE.test(normalized)) {
+  if (
+    SUPPORTED_DIRECTIVE_PREFIX_RE.test(normalized) ||
+    SUPPORTED_COMPOSED_DIRECTIVE_PREFIX_RE.test(normalized)
+  ) {
     return "directive-prefix";
+  }
+  const composed = SUPPORTED_COMPOSED_PREFIX_RE.exec(normalized);
+  if (
+    composed?.groups?.label !== undefined &&
+    composed.groups.directive !== undefined
+  ) {
+    return "composed-policy-prefix";
   }
   if (
     /^(?:(?:the|a|an|this|that|these|those|each|every|another|offline|online|local|remote)[ \t]+)?[A-Za-z][A-Za-z0-9_-]*(?:[ \t]+[A-Za-z][A-Za-z0-9_-]*){0,3}(?:[ \t]+(?:must|shall|should|will|would|may|might|can|could|does|do|did))?[ \t]*$/i.test(
@@ -1427,7 +1753,8 @@ function standalonePolicyPrefixSupportsScope(
   return (
     classification === "plain-start" ||
     classification === "directive-prefix" ||
-    classification === "policy-label"
+    classification === "policy-label" ||
+    classification === "composed-policy-prefix"
   );
 }
 
@@ -1435,7 +1762,19 @@ function outerPrefixSupportsEmbeddedWorkflowSubject(
   classification: StandalonePolicyPrefixClassification,
 ): boolean {
   return (
-    classification === "directive-prefix" || classification === "policy-label"
+    classification === "directive-prefix" ||
+    classification === "policy-label" ||
+    classification === "composed-policy-prefix"
+  );
+}
+
+function prefixClassificationProvidesPolicyContext(
+  classification: StandalonePolicyPrefixClassification,
+): boolean {
+  return (
+    classification === "directive-prefix" ||
+    classification === "policy-label" ||
+    classification === "composed-policy-prefix"
   );
 }
 
@@ -1754,8 +2093,9 @@ function projectedStatementFact(
       candidate.predicateStart,
     );
     return (
-      candidate.directWorkflowSubject !== undefined &&
       candidate.predicateStart >= prefix.length &&
+      (candidate.directWorkflowSubject !== undefined ||
+        candidate.start >= prefix.length) &&
       directSubjectBridgeSupportsProhibition(
         classifyDirectSubjectBridge(predicatePrefix, domain),
       )
@@ -1769,8 +2109,23 @@ function projectedStatementFact(
       fact.evidenceEnd >= supportedCandidate.end,
   );
   if (fact === undefined) return undefined;
+  const modalNever = classifyCandidateModalNever(
+    projection,
+    supportedCandidate,
+  );
+  const policyContext = prefixClassificationProvidesPolicyContext(
+    standalonePolicyPrefixClassification(
+      source.slice(workflowSubject.evidenceStart, workflowSubject.range.start),
+    ),
+  );
+  const semanticallyClassifiedFact =
+    fact.modality === "unknown" &&
+    modalNever !== undefined &&
+    modalNeverSupportsProhibition(modalNever, policyContext)
+      ? { ...fact, modality: "prohibited" as const }
+      : fact;
   const inheritedFact = applyWorkflowScopeProof(
-    fact,
+    semanticallyClassifiedFact,
     "inherited-workflow-subject",
   );
   return {

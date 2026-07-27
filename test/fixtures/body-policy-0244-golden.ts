@@ -3139,6 +3139,364 @@ const RAW_BODY_POLICY_0244_GOLDEN_CASES = [
       layout: "one-line",
     },
   },
+  {
+    name: "stabilization4-quote-active-semicolon-network",
+    body: 'This workflow documents "validate inputs; never use the network."',
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: 'This workflow documents "validate inputs',
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "quote-active-subject",
+      separator: "semicolon",
+    },
+  },
+  {
+    name: "stabilization4-quote-active-but-secrets",
+    body: 'This workflow explains "check configuration but never use credentials."',
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: 'This workflow explains "check configuration',
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "quote-active-subject",
+      separator: "but",
+    },
+  },
+  {
+    name: "stabilization4-quote-active-and-upload",
+    body: 'This workflow quotes "prepare the report and no external uploads."',
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          'This workflow quotes "prepare the report and no external uploads."',
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "quote-active-subject",
+      separator: "and",
+    },
+  },
+  {
+    name: "stabilization4-quote-active-comma-network",
+    body: 'This workflow records "validate inputs, never use the network."',
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          'This workflow records "validate inputs, never use the network."',
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "quote-active-subject",
+      separator: "comma",
+    },
+  },
+  {
+    name: "stabilization4-quote-standalone-period-network",
+    body: 'Documentation says "Validate inputs. Never use the network."',
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "quote-standalone",
+      separator: "period",
+    },
+  },
+  {
+    name: "stabilization4-quote-standalone-exclamation-upload",
+    body: 'The example reads "Clean the workspace! No external uploads."',
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: 'No external uploads."',
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "quote-standalone",
+      separator: "exclamation",
+    },
+  },
+  {
+    name: "stabilization4-quote-standalone-question-secrets",
+    body: "The guide shows “Rotate the logs? Never use credentials.”",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "quote-standalone",
+      separator: "question",
+    },
+  },
+  {
+    name: "stabilization4-quote-curly-however-upload",
+    body: "The guide shows ‘Prepare the report however, no external uploads.’",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "quote-standalone",
+      separator: "however",
+    },
+  },
+  {
+    name: "stabilization4-relative-subject-network",
+    body: "This workflow, which must not use the network, validates inputs.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "subject-relative",
+      domain: "network",
+    },
+  },
+  {
+    name: "stabilization4-relative-subject-upload-soft-wrap",
+    body: "This task,\nwhich cannot upload files,\nprepares the report.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "subject-relative",
+      domain: "upload",
+    },
+  },
+  {
+    name: "stabilization4-relative-subject-secrets-heading",
+    body: "## The process, which must never use credentials, checks configuration.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "subject-relative",
+      domain: "secrets",
+    },
+  },
+  {
+    name: "stabilization4-relative-subject-local-network",
+    body: "This workflow, which must not use the network during local setup, validates inputs.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "subject-relative-local",
+      domain: "network",
+    },
+  },
+  {
+    name: "stabilization4-relative-subject-specific-upload",
+    body: "This task, which cannot upload files to a public bucket, prepares the report.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "subject-relative-specific",
+      domain: "upload",
+    },
+  },
+  {
+    name: "stabilization4-modal-might-network",
+    body: "This workflow might never use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow might never use the network.",
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "epistemic-modal",
+      modal: "might",
+    },
+  },
+  {
+    name: "stabilization4-modal-could-upload",
+    body: "This task could never upload files.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This task could never upload files.",
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "capability-modal",
+      modal: "could",
+    },
+  },
+  {
+    name: "stabilization4-modal-can-secrets",
+    body: "The process can never use credentials.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "The process can never use credentials.",
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "capability-modal",
+      modal: "can",
+    },
+  },
+  {
+    name: "stabilization4-modal-would-network",
+    body: "This workflow would never use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow would never use the network.",
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "hypothetical-modal",
+      modal: "would",
+    },
+  },
+  {
+    name: "stabilization4-modal-should-upload",
+    body: "This task should never upload files.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This task should never upload files.",
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "recommendation-modal",
+      modal: "should",
+    },
+  },
+  {
+    name: "stabilization4-modal-policy-may-upload",
+    body: "Policy: may never upload files.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "policy-modal",
+      modal: "may",
+    },
+  },
+  {
+    name: "stabilization4-modal-policy-should-network",
+    body: "Policy: should never use the network.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "policy-modal",
+      modal: "should",
+    },
+  },
+  {
+    name: "stabilization4-modal-policy-can-secrets",
+    body: "Policy: can never use credentials.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "policy-modal",
+      modal: "can",
+    },
+  },
+  {
+    name: "stabilization4-prefix-policy-please-network",
+    body: "Policy: please do not use the network.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "composed-prefix",
+      prefix: "policy-please",
+    },
+  },
+  {
+    name: "stabilization4-prefix-requirement-ensure-upload",
+    body: "Requirement: ensure that no external uploads are allowed.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "Requirement: ensure that no external uploads are allowed.",
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "composed-prefix",
+      prefix: "requirement-ensure",
+    },
+  },
+  {
+    name: "stabilization4-prefix-policy-ensure-subject-secrets",
+    body: "Policy: please ensure that this workflow never uses credentials.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "composed-prefix",
+      prefix: "policy-please-ensure",
+    },
+  },
+  {
+    name: "stabilization4-prefix-safety-please-network",
+    body: "For safety, please do not use the network.",
+    expected: [],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "composed-prefix",
+      prefix: "safety-please",
+    },
+  },
+  {
+    name: "stabilization4-prefix-policy-safety-upload",
+    body: "Policy: for safety, no external uploads.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "Policy: for safety, no external uploads.",
+      },
+    ],
+    coverage: {
+      group: "structural-stabilization",
+      dimension: "composed-prefix",
+      prefix: "policy-safety",
+    },
+  },
 ] as const satisfies readonly LegacyBodyPolicyGoldenCase[];
 
 export const BODY_POLICY_0244_GOLDEN_CASES: readonly LegacyBodyPolicyGoldenCase[] =

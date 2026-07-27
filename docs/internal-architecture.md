@@ -186,17 +186,21 @@ subject after a supported directive or policy-label prefix; its range and
 evidence origin establish active state for ordinary and contrastive
 continuations, paired modifiers, and direct proof. The shared bounded prefix
 grammar covers `also`, `still`, `therefore`, `always`, `explicitly`, `directly`,
-`strictly`, `categorically`, and the complete `modal + never` family before
+`strictly`, `categorically`, and the complete `modal + never` syntax family before
 strong changed-subject classification. Bare semicolons and `then` otherwise use
 the strict 0.24.4 compatibility behavior, but an unenclosed bare semicolon with
 no active workflow subject proves an independent later standalone policy even
 when the preceding imperative is outside the curated vocabulary. A supported
 directive or policy label after an active subject likewise starts an
-independent subjectless policy. Straight or curly quote pairs, including
-backslash-escaped visible delimiters, prevent that semicolon proof. Sentence
-endings, Markdown hard breaks, structural boundaries, explicit changed
-subjects, conditional or subordinate prefixes, and unsupported syntax reset
-inheritance.
+independent subjectless policy. Before segmentation, straight or curly quote
+pairs, including backslash-escaped visible delimiters, produce private
+enclosure ranges. Technical-clause boundaries, hard sentence boundaries,
+contrastive connectors, ordinary `and`, commas, active-subject inheritance,
+standalone proof, and evidence construction all consume that provenance.
+Enclosed predicates cannot inherit or establish workflow proof. Word-internal
+and plural-possessive apostrophes remain unenclosed. Unquoted sentence endings,
+Markdown hard breaks, structural boundaries, explicit changed subjects,
+conditional or subordinate prefixes, and unsupported syntax reset inheritance.
 
 Existing domain patterns may also produce a direct workflow-prefix
 prohibition. Its subject-to-predicate bridge is classified as one bounded
@@ -212,11 +216,15 @@ relative predicate instead of qualifying the later prohibition. The same
 wording in a naked parenthetical, paired-comma component, or main-predicate
 bridge still qualifies or rejects the prohibition. In particular, `during
 deterministic validation` in a naked bridge is local rather than workflow-wide.
-The paired-comma form additionally accepts a bounded object-relative noun
-phrase plus finite or curated predicate. Candidates that begin inside that
-relative component cannot cross its closing comma, so an inner helper
-prohibition cannot suppress or acquire the scope of the later main predicate;
-the equivalent unpaired object-relative form remains unsupported.
+The paired-comma form additionally creates one bounded relative component and
+classifies its subject relationship. A subject-relative component beginning
+with a supported predicate inherits the main workflow subject and is classified
+independently within the comma range. An object-relative noun phrase plus
+finite or curated predicate is a changed subject, so its inner instruction
+cannot acquire workflow scope; the original subject remains available to an
+independently classified main predicate after the closing comma. Candidates
+cannot cross between those components, and the equivalent unpaired
+object-relative form remains unsupported.
 
 Every direct prohibited fact with apparent workflow scope is also evaluated
 against one private statement-level proof class: standalone default, explicit
@@ -224,9 +232,14 @@ workflow subject, prefixed workflow subject, inherited workflow subject,
 explicit workflow qualifier, or no workflow proof. Only the last class removes
 workflow scope. A supported domain pattern inside a changed-subject,
 conditional, descriptive, or unsupported segment therefore cannot escape
-through the clause-facts default. An outer directive or policy label proves only
-its own prefix; an embedded workflow subject must independently pass the
-candidate-local subject bridge classifier. The standalone default applies only
+through the clause-facts default. An outer prefix parser accepts plain start,
+one policy label, one bounded directive or safety component, or one label
+followed by one such component. It rejects repeated components and arbitrary
+leading prose. The composed result is shared by standalone proof, embedded
+workflow-subject extraction, paired-comma protection, policy-modal context, and
+projected evidence origins; an embedded workflow subject must still
+independently pass the candidate-local subject bridge classifier. The
+standalone default applies only
 to candidates without their own workflow subject and to independent directly
 supported predicates after bounded subjectless coordination.
 
@@ -242,10 +255,14 @@ finite, or negative modal heads clear it before noun/verb homographs can
 inherit workflow scope. A domain-aware strong form also clears the subject for
 noun-like homographs followed by compatible finite network, secret, or upload
 actions, while `audits logs`, `reviews results`, and `checks use cases` remain
-genuine subjectless predicates. Each of the nine supported modals followed by
-`never` is classified as one prohibition predicate rather than a
-subject-bridge modifier, including after a hard sentence boundary. Directive
-proof accepts optional `that` only after bounded `ensure`, `please ensure`, or
+genuine subjectless predicates. Each of the nine recognized modals followed by
+`never` is parsed as one predicate and then classified semantically. `must` and
+`shall` are deontic prohibitions, and `will` is a policy commitment. Plain
+`should` and `may` remain non-emitting but become supported policy denials under
+a bounded policy-label or directive context. Epistemic `might`, capability
+`can` or `could`, and hypothetical `would` remain `unknown` even under those
+prefixes unless another bounded grammar proves a denial. Directive proof
+accepts optional `that` only after bounded `ensure`, `please ensure`, or
 `make sure` forms.
 Only a complete `prohibited` fact with `workflow` scope can contradict an
 enabled permissive policy for the same domain. `unknown`, `not-required`,
@@ -262,7 +279,7 @@ multiple detectors, but the body-policy module owns the semantic relationship
 between domain, modality, scope, and completeness. It is not a public schema,
 configuration surface, or general natural-language parser.
 
-Compatibility tests freeze 184 exact bodies and public finding projections from
+Compatibility tests freeze 210 exact bodies and public finding projections from
 Renma 0.24.4 commit `9e72e1adddd588ea72cba1c3e06ed1d07de330d9`.
 The test consumes those bodies directly; legacy code is not installed or run in
 CI. Thirty-two frozen cases cover every requested pair across first predicate
@@ -278,10 +295,12 @@ cross-product matrices cover outer prefix and candidate bridge, separator and
 previous-predicate classification, modal and domain, relative or naked modifier
 and qualification, and homograph and following predicate-head category.
 Composed matrices further cross outer prefixes with continuation connectors,
-modifier or modal prefixes with connector and domain, semicolons with quote
-enclosures, paired relatives with subject shape and domain, and each with
-one-line, ordinary soft-wrap, and heading fallback. Exact projections retain
-domain order, evidence, and same-domain deduplication. Compatibility means
+modifier or semantic modal classes with subject mode, policy context, and
+domain; every technical and ordinary separator with quote style and active
+subject state; paired subject/object relatives with inner and main domain,
+scope, prefix, and main-predicate presence; and each with one-line, ordinary
+soft-wrap, and heading fallback. Exact projections retain domain order,
+evidence, and same-domain deduplication. Compatibility means
 equality with the frozen corpus except for named, exact-current-output allowlist
 entries covering intentional precision, statement-group recovery, and
 bounded-evidence changes.

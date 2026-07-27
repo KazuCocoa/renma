@@ -350,6 +350,78 @@ const INTENTIONAL_COMPATIBILITY_CHANGES: Readonly<
     "Make sure that this workflow never uses credentials.",
     "Optional that after a recognized make-sure directive and a bounded third-person action remain an instruction.",
   ),
+  "direct-modal-secret-one-line": noFindingChange(
+    "Plain may-never language is epistemically ambiguous and no longer receives high-confidence prohibition modality.",
+  ),
+  "direct-modal-secret-soft-wrap": noFindingChange(
+    "Ordinary Markdown soft wrapping preserves the conservative may-never modal classification.",
+  ),
+  "direct-modal-secret-heading": noFindingChange(
+    "Heading fallback uses the same conservative may-never modal classification.",
+  ),
+  "stabilization4-quote-active-semicolon-network": noFindingChange(
+    "Quote provenance prevents an enclosed semicolon from projecting the outer workflow subject into example text.",
+  ),
+  "stabilization4-quote-active-but-secrets": noFindingChange(
+    "An enclosed contrastive boundary cannot create a workflow-scoped credentials policy.",
+  ),
+  "stabilization4-quote-active-and-upload": noFindingChange(
+    "Ordinary and-splitting ignores quoted example text instead of inheriting the outer workflow subject.",
+  ),
+  "stabilization4-quote-active-comma-network": noFindingChange(
+    "Ordinary comma-splitting ignores quoted example text instead of inheriting the outer workflow subject.",
+  ),
+  "stabilization4-quote-standalone-exclamation-upload": noFindingChange(
+    "Text after an enclosed hard sentence boundary cannot receive standalone policy scope.",
+  ),
+  "stabilization4-relative-subject-network": findingChange(
+    "This workflow, which must not use the network, validates inputs.",
+    "The bounded subject-relative predicate now independently inherits its workflow subject and emits.",
+  ),
+  "stabilization4-relative-subject-upload-soft-wrap": findingChange(
+    "This task,\nwhich cannot upload files,",
+    "The bounded subject-relative upload predicate is classified independently across ordinary Markdown soft wrapping.",
+    12,
+  ),
+  "stabilization4-relative-subject-secrets-heading": findingChange(
+    "## The process, which must never use credentials, checks configuration.",
+    "Heading fallback classifies the bounded subject-relative credentials predicate independently.",
+  ),
+  "stabilization4-modal-might-network": noFindingChange(
+    "Might-never is epistemic rather than a high-confidence deontic prohibition.",
+  ),
+  "stabilization4-modal-could-upload": noFindingChange(
+    "Could-never is capability language rather than a high-confidence deontic prohibition.",
+  ),
+  "stabilization4-modal-can-secrets": noFindingChange(
+    "Can-never is capability language rather than a high-confidence deontic prohibition.",
+  ),
+  "stabilization4-modal-would-network": noFindingChange(
+    "Would-never is hypothetical rather than a high-confidence deontic prohibition.",
+  ),
+  "stabilization4-modal-should-upload": noFindingChange(
+    "Plain should-never is a recommendation and requires bounded policy context before it can contradict metadata.",
+  ),
+  "stabilization4-modal-policy-may-upload": findingChange(
+    "Policy: may never upload files.",
+    "A bounded policy label supplies the deontic context needed for otherwise ambiguous may-never language.",
+  ),
+  "stabilization4-modal-policy-should-network": findingChange(
+    "Policy: should never use the network.",
+    "A bounded policy label upgrades the recommendation to explicit policy evidence.",
+  ),
+  "stabilization4-prefix-policy-please-network": findingChange(
+    "Policy: please do not use the network.",
+    "One policy label and one bounded directive compose into standalone policy proof.",
+  ),
+  "stabilization4-prefix-policy-ensure-subject-secrets": findingChange(
+    "Policy: please ensure that this workflow never uses credentials.",
+    "The composed prefix establishes the embedded workflow subject and retains the complete evidence origin.",
+  ),
+  "stabilization4-prefix-safety-please-network": findingChange(
+    "For safety, please do not use the network.",
+    "The bounded safety preamble and directive compose into standalone policy proof.",
+  ),
 };
 
 const PAIRWISE_CASES = BODY_POLICY_0244_GOLDEN_CASES.filter(
@@ -948,21 +1020,21 @@ const CURRENT_MODAL_DOMAIN_MATRIX = [
   },
 ].flatMap(({ domain, subject, predicate }) =>
   [
-    "must",
-    "shall",
-    "will",
-    "should",
-    "would",
-    "may",
-    "might",
-    "can",
-    "could",
-  ].map((modal) => {
+    { modal: "must", emits: true },
+    { modal: "shall", emits: true },
+    { modal: "will", emits: true },
+    { modal: "should", emits: false },
+    { modal: "would", emits: false },
+    { modal: "may", emits: false },
+    { modal: "might", emits: false },
+    { modal: "can", emits: false },
+    { modal: "could", emits: false },
+  ].map(({ modal, emits }) => {
     const body = `${subject} ${modal} never ${predicate}.`;
     return {
       name: `${modal} × ${domain}`,
       body,
-      expected: [finding(body)],
+      expected: emits ? [finding(body)] : [],
       coverage: { modal, domain },
     };
   }),
@@ -1073,7 +1145,7 @@ test("0.24.4 body-policy golden cases are self-contained and immutable", () => {
     BODY_POLICY_0244_GOLDEN_SOURCE.generatedBy,
     /securityDiagnosticFindings/u,
   );
-  assert.equal(BODY_POLICY_0244_GOLDEN_CASES.length, 184);
+  assert.equal(BODY_POLICY_0244_GOLDEN_CASES.length, 210);
   assert.equal(
     new Set(BODY_POLICY_0244_GOLDEN_CASES.map(({ name }) => name)).size,
     BODY_POLICY_0244_GOLDEN_CASES.length,
