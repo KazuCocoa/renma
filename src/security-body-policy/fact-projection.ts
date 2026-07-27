@@ -1,10 +1,8 @@
-import type { BodyPolicyClauseFacts, BodyPolicyDomain } from "./model.js";
-
-export const BODY_POLICY_DOMAIN_ORDER: readonly BodyPolicyDomain[] = [
-  "network",
-  "upload",
-  "secrets",
-];
+import {
+  BODY_POLICY_DOMAIN_ORDER,
+  type BodyPolicyClauseFacts,
+  type BodyPolicyDomain,
+} from "./model.js";
 
 /** @internal Own final fact identity and deterministic source/domain order. */
 export function deduplicateBodyPolicyFacts(

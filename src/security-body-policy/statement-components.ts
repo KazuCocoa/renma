@@ -1,4 +1,3 @@
-import { BODY_POLICY_DOMAIN_ORDER } from "./fact-projection.js";
 import {
   CONDITIONAL_OR_SUBORDINATE_PREDICATE_START_RE,
   DOMAIN_EVIDENCE_PATTERNS,
@@ -30,6 +29,7 @@ import type {
   SubjectRelationship,
   WorkflowSubjectMatch,
 } from "./model.js";
+import { BODY_POLICY_DOMAIN_ORDER } from "./model.js";
 import {
   outerPrefixSupportsEmbeddedWorkflowSubject,
   prefixClassificationProvidesPolicyContext,

@@ -24,6 +24,104 @@
   "bin": {
     "renma": "./dist/index.js"
   },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json",
+    "./dist/index.js": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./dist/types.js": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js",
+      "default": "./dist/types.js"
+    },
+    "./dist/types/artifact.js": {
+      "types": "./dist/types/artifact.d.ts",
+      "import": "./dist/types/artifact.js",
+      "default": "./dist/types/artifact.js"
+    },
+    "./dist/types/classification.js": {
+      "types": "./dist/types/classification.d.ts",
+      "import": "./dist/types/classification.js",
+      "default": "./dist/types/classification.js"
+    },
+    "./dist/types/configuration.js": {
+      "types": "./dist/types/configuration.d.ts",
+      "import": "./dist/types/configuration.js",
+      "default": "./dist/types/configuration.js"
+    },
+    "./dist/types/decision.js": {
+      "types": "./dist/types/decision.d.ts",
+      "import": "./dist/types/decision.js",
+      "default": "./dist/types/decision.js"
+    },
+    "./dist/types/diagnostics.js": {
+      "types": "./dist/types/diagnostics.d.ts",
+      "import": "./dist/types/diagnostics.js",
+      "default": "./dist/types/diagnostics.js"
+    },
+    "./dist/types/governance.js": {
+      "types": "./dist/types/governance.d.ts",
+      "import": "./dist/types/governance.js",
+      "default": "./dist/types/governance.js"
+    },
+    "./dist/types/metadata.js": {
+      "types": "./dist/types/metadata.d.ts",
+      "import": "./dist/types/metadata.js",
+      "default": "./dist/types/metadata.js"
+    },
+    "./dist/types/scan-result.js": {
+      "types": "./dist/types/scan-result.d.ts",
+      "import": "./dist/types/scan-result.js",
+      "default": "./dist/types/scan-result.js"
+    },
+    "./dist/discovery.js": {
+      "types": "./dist/discovery.d.ts",
+      "import": "./dist/discovery.js",
+      "default": "./dist/discovery.js"
+    },
+    "./dist/commands/inspect.js": {
+      "types": "./dist/commands/inspect.d.ts",
+      "import": "./dist/commands/inspect.js",
+      "default": "./dist/commands/inspect.js"
+    },
+    "./dist/commands/skill-index.js": {
+      "types": "./dist/commands/skill-index.d.ts",
+      "import": "./dist/commands/skill-index.js",
+      "default": "./dist/commands/skill-index.js"
+    },
+    "./dist/commands/guide.js": {
+      "types": "./dist/commands/guide.d.ts",
+      "import": "./dist/commands/guide.js",
+      "default": "./dist/commands/guide.js"
+    },
+    "./dist/guidance/skill-authoring.js": {
+      "types": "./dist/guidance/skill-authoring.d.ts",
+      "import": "./dist/guidance/skill-authoring.js",
+      "default": "./dist/guidance/skill-authoring.js"
+    },
+    "./dist/renderers/guide.js": {
+      "types": "./dist/renderers/guide.d.ts",
+      "import": "./dist/renderers/guide.js",
+      "default": "./dist/renderers/guide.js"
+    },
+    "./dist/commands/suggest-metadata.js": {
+      "types": "./dist/commands/suggest-metadata.d.ts",
+      "import": "./dist/commands/suggest-metadata.js",
+      "default": "./dist/commands/suggest-metadata.js"
+    },
+    "./dist/skill-migration.js": {
+      "types": "./dist/skill-migration.d.ts",
+      "import": "./dist/skill-migration.js",
+      "default": "./dist/skill-migration.js"
+    }
+  },
   "files": [
     "dist",
     "scripts",

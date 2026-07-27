@@ -34,10 +34,7 @@ import {
   recognizeEvidenceRange,
   recognizeModalNegation,
 } from "./lexical-recognition.js";
-import {
-  BODY_POLICY_DOMAIN_ORDER,
-  deduplicateBodyPolicyFacts,
-} from "./fact-projection.js";
+import { deduplicateBodyPolicyFacts } from "./fact-projection.js";
 import type {
   BodyPolicyClauseFacts,
   BodyPolicyDomain,
@@ -56,6 +53,7 @@ import type {
   WorkflowScopeProof,
   WorkflowSubjectMatch,
 } from "./model.js";
+import { BODY_POLICY_DOMAIN_ORDER } from "./model.js";
 import {
   outerPrefixSupportsEmbeddedWorkflowSubject,
   prefixClassificationProvidesPolicyContext,

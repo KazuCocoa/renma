@@ -389,6 +389,27 @@ test("security command modules remain in the pure analysis layer", () => {
   );
 });
 
+test("body-policy statement components do not depend on fact projection", async () => {
+  const fixtures = await readProductionFixtures();
+  const byPath = new Map(
+    fixtures.map((fixture) => [fixture.filePath, fixture]),
+  );
+  const componentPath = "src/security-body-policy/statement-components.ts";
+  const component = byPath.get(componentPath);
+  assert.ok(component);
+  const dependencies = readRelativeDependencies(
+    componentPath,
+    component.sourceText,
+    new Set(byPath.keys()),
+  ).map(({ targetPath }) => targetPath);
+
+  assert.ok(dependencies.includes("src/security-body-policy/model.ts"));
+  assert.equal(
+    dependencies.includes("src/security-body-policy/fact-projection.ts"),
+    false,
+  );
+});
+
 async function readProductionFixtures(): Promise<SourceFileFixture[]> {
   const sourceFiles = await readTypeScriptFiles(
     path.join(process.cwd(), "src"),

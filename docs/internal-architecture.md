@@ -825,12 +825,16 @@ compatibility facades. `src/types.ts`,
 `src/context-language-diagnostics.ts`, and the destination-analysis exports
 from `src/security-diagnostics.ts` serve the same bounded purpose.
 
-The package publishes `dist` without an exports map, but filesystem
-reachability is not a promise that every emitted module is a stable deep
-import. Only entrypoints explicitly documented or verified by package
-compatibility tests are supported. Internal modules such as
-`security-command/*` remain implementation details even when the package
-layout makes them physically importable.
+The package publishes the compiled `dist` tree but uses an explicit `exports`
+allowlist for supported package-specifier deep imports. The package root, CLI,
+and every established command, guidance, discovery, migration, renderer, and
+type subpath named by package verification remain available.
+Package-internal relative imports continue to resolve normally. Other emitted
+modules, including `security-body-policy/*` and `security-command/*`, remain
+implementation details and package-specifier imports are rejected. Clean
+consumer verification imports every supported subpath, resolves its
+declarations, exercises the packaged CLI, and requires private body-policy
+runtime and declaration subpaths to remain unavailable.
 
 Human-readable reasons and prompts may evolve unless a test intentionally
 protects exact wording. Stable branching must use typed fields such as

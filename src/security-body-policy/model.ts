@@ -7,7 +7,13 @@ export interface SourceRange {
 /** @internal Physical offsets owned by a fact or projected finding. */
 export type EvidenceRange = SourceRange;
 
-export type BodyPolicyDomain = "network" | "upload" | "secrets";
+export const BODY_POLICY_DOMAIN_ORDER = Object.freeze([
+  "network",
+  "upload",
+  "secrets",
+] as const);
+
+export type BodyPolicyDomain = (typeof BODY_POLICY_DOMAIN_ORDER)[number];
 
 export type BodyPolicyModality =
   | "prohibited"

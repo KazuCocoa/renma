@@ -13,6 +13,7 @@ import type {
   BodyPolicyModality,
   BodyPolicyScope,
 } from "../src/security-body-policy/model.js";
+import { BODY_POLICY_DOMAIN_ORDER } from "../src/security-body-policy/model.js";
 import {
   assertFactRangesWithinSource,
   bodyPolicyFacts,
@@ -30,6 +31,24 @@ const relativePredicateArbitrary = fc.constantFrom(
   { domain: "upload" as const, text: "must not upload files" },
   { domain: "secrets" as const, text: "must not access credentials" },
 );
+
+test("body-policy domain order is runtime immutable", () => {
+  assert.equal(Object.isFrozen(BODY_POLICY_DOMAIN_ORDER), true);
+  assert.deepEqual(BODY_POLICY_DOMAIN_ORDER, ["network", "upload", "secrets"]);
+  assert.equal(Reflect.set(BODY_POLICY_DOMAIN_ORDER, 0, "secrets"), false);
+  assert.throws(
+    () => Reflect.apply(Array.prototype.reverse, BODY_POLICY_DOMAIN_ORDER, []),
+    TypeError,
+  );
+  assert.deepEqual(BODY_POLICY_DOMAIN_ORDER, ["network", "upload", "secrets"]);
+
+  const source =
+    "This workflow must not use the network and also must not use the network, must not upload files, yet must not use credentials.";
+  assert.deepEqual(
+    bodyPolicyFacts(source).map(({ domain }) => domain),
+    ["network", "network", "upload", "secrets"],
+  );
+});
 
 test("body-policy analysis is total and source ranges remain bounded", () => {
   fc.assert(
