@@ -5,9 +5,7 @@ import { spawnSync } from "node:child_process";
 
 const PACKAGE_NAME = "renma";
 const PACKAGE_JSON_SPECIFIER = "renma/package.json";
-const ROOT_PACKAGE_IMPORT = ["renma", "dist/index.js", "dist/index.d.ts"];
 const PUBLIC_DEEP_IMPORTS = [
-  ["renma/dist/index.js", "dist/index.js", "dist/index.d.ts"],
   ["renma/dist/types.js", "dist/types.js", "dist/types.d.ts"],
   [
     "renma/dist/types/artifact.js",
@@ -95,13 +93,15 @@ const PRIVATE_BODY_POLICY_SPECIFIERS = [
   "renma/dist/security-body-policy/fact-projection.js",
   "renma/dist/security-body-policy/policy-context.js",
 ];
-const PUBLIC_MODULE_IMPORTS = [ROOT_PACKAGE_IMPORT, ...PUBLIC_DEEP_IMPORTS];
+const CLI_ONLY_PACKAGE_SPECIFIERS = ["renma", "renma/dist/index.js"];
+const PUBLIC_MODULE_IMPORTS = [...PUBLIC_DEEP_IMPORTS];
 const PRIVATE_DECLARATION_SPECIFIERS = [
   ...PRIVATE_BODY_POLICY_SPECIFIERS,
   ...PRIVATE_BODY_POLICY_SPECIFIERS.map((specifier) =>
     specifier.replace(/\.js$/u, ".d.ts"),
   ),
 ];
+const CLI_ONLY_DECLARATION_SPECIFIERS = [...CLI_ONLY_PACKAGE_SPECIFIERS];
 
 const temporaryRoot = await mkdtemp(
   path.join(os.tmpdir(), "renma package verification-"),
@@ -153,6 +153,8 @@ try {
   for (const required of [
     "package.json",
     "README.md",
+    "dist/index.js",
+    "dist/index.d.ts",
     ...PUBLIC_MODULE_IMPORTS.flatMap(([, modulePath, declarationPath]) => [
       modulePath,
       declarationPath,
@@ -212,7 +214,7 @@ try {
   verifyPackagedCli(consumerDirectory);
 
   process.stdout.write(
-    `Verified ${files.size} packaged files, ${PUBLIC_MODULE_IMPORTS.length + 1} supported package specifiers, ${PUBLIC_MODULE_IMPORTS.length} supported declaration paths, ${PRIVATE_BODY_POLICY_SPECIFIERS.length} private body-policy subpaths, ${PRIVATE_DECLARATION_SPECIFIERS.length} private declaration paths, CLI behavior, inspect declaration compatibility, and every README-relative target.\n`,
+    `Verified ${files.size} packaged files, ${PUBLIC_MODULE_IMPORTS.length + 1} supported package specifiers, ${PUBLIC_MODULE_IMPORTS.length} supported declaration paths, ${PRIVATE_BODY_POLICY_SPECIFIERS.length} private body-policy subpaths, ${PRIVATE_DECLARATION_SPECIFIERS.length} private declaration paths, ${CLI_ONLY_PACKAGE_SPECIFIERS.length} CLI-only module paths, CLI behavior, inspect declaration compatibility, and every README-relative target.\n`,
   );
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
@@ -289,7 +291,6 @@ async function verifyInstalledExports(packageRoot) {
 
   const expectedKeys = new Set([
     packageExportKey(PACKAGE_JSON_SPECIFIER),
-    packageExportKey(ROOT_PACKAGE_IMPORT[0]),
     ...PUBLIC_DEEP_IMPORTS.map(([specifier]) => packageExportKey(specifier)),
   ]);
   assertSameStrings(
@@ -331,6 +332,7 @@ async function verifyPackageSpecifierPolicy(consumerDirectory) {
       PUBLIC_MODULE_IMPORTS.map(([specifier]) => specifier),
     )};
 const privateImports = ${JSON.stringify(PRIVATE_BODY_POLICY_SPECIFIERS)};
+const cliOnlyImports = ${JSON.stringify(CLI_ONLY_PACKAGE_SPECIFIERS)};
 
 for (const specifier of publicImports) {
   try {
@@ -359,6 +361,21 @@ for (const specifier of privateImports) {
   }
   if (!rejected) {
     throw new Error(\`Private package import unexpectedly succeeded for \${specifier}\`);
+  }
+}
+
+for (const specifier of cliOnlyImports) {
+  let rejected = false;
+  try {
+    await import(specifier);
+  } catch (error) {
+    if (error?.code !== "ERR_PACKAGE_PATH_NOT_EXPORTED") {
+      throw new Error(\`CLI-only package import failed with \${error?.code ?? "no error code"} instead of ERR_PACKAGE_PATH_NOT_EXPORTED for \${specifier}\`, { cause: error });
+    }
+    rejected = true;
+  }
+  if (!rejected) {
+    throw new Error(\`CLI-only package import unexpectedly succeeded for \${specifier}\`);
   }
 }
 `,
@@ -421,6 +438,7 @@ export {};
   }
 
   await verifyPrivatePackageSpecifierDeclarations(consumerDirectory);
+  await verifyCliOnlyPackageSpecifierDeclarations(consumerDirectory);
 }
 
 async function verifyPrivatePackageSpecifierDeclarations(consumerDirectory) {
@@ -470,6 +488,58 @@ export {};
     ) {
       throw new Error(
         `Private package declaration did not fail with TS2307 for ${specifier}: ${diagnostics.trim()}`,
+      );
+    }
+  }
+}
+
+async function verifyCliOnlyPackageSpecifierDeclarations(consumerDirectory) {
+  const verificationSource = path.join(
+    consumerDirectory,
+    "verify-cli-only-package-declarations.ts",
+  );
+  await writeFile(
+    verificationSource,
+    `${CLI_ONLY_DECLARATION_SPECIFIERS.map(
+      (specifier, index) =>
+        `type CliOnlyPackageImport${index} = typeof import(${JSON.stringify(specifier)});`,
+    ).join("\n")}
+export {};
+`,
+  );
+  const typescriptBin = path.resolve("node_modules/typescript/bin/tsc");
+  const verified = spawnSync(
+    process.execPath,
+    [
+      typescriptBin,
+      "--noEmit",
+      "--module",
+      "NodeNext",
+      "--moduleResolution",
+      "NodeNext",
+      "--target",
+      "ES2022",
+      verificationSource,
+    ],
+    { cwd: consumerDirectory, encoding: "utf8" },
+  );
+  if (verified.error) {
+    throw new Error(
+      `CLI-only package declaration verification failed: ${verified.error.message}`,
+    );
+  }
+  if (verified.status === 0) {
+    throw new Error(
+      "CLI-only package declaration verification unexpectedly succeeded.",
+    );
+  }
+  const diagnostics = `${verified.stdout}\n${verified.stderr}`;
+  for (const specifier of CLI_ONLY_DECLARATION_SPECIFIERS) {
+    if (
+      !diagnostics.includes(`error TS2307: Cannot find module '${specifier}'`)
+    ) {
+      throw new Error(
+        `CLI-only package declaration did not fail with TS2307 for ${specifier}: ${diagnostics.trim()}`,
       );
     }
   }
@@ -528,7 +598,6 @@ async function verifyInspectDeclarationCompatibility(packageRoot) {
 }
 
 function packageExportKey(specifier) {
-  if (specifier === PACKAGE_NAME) return ".";
   const prefix = `${PACKAGE_NAME}/`;
   if (!specifier.startsWith(prefix)) {
     throw new Error(`Package specifier has an unexpected name: ${specifier}`);

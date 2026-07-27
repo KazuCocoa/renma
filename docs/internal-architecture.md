@@ -826,15 +826,17 @@ compatibility facades. `src/types.ts`,
 from `src/security-diagnostics.ts` serve the same bounded purpose.
 
 The package publishes the compiled `dist` tree but uses an explicit `exports`
-allowlist for supported package-specifier deep imports. The package root, CLI,
-and every established command, guidance, discovery, migration, renderer, and
-type subpath named by package verification remain available.
-Package-internal relative imports continue to resolve normally. Other emitted
-modules, including `security-body-policy/*` and `security-command/*`, remain
-implementation details and package-specifier imports are rejected. Clean
-consumer verification imports every supported subpath, resolves its
-declarations, exercises the packaged CLI, and requires private body-policy
-runtime and declaration subpaths to remain unavailable.
+allowlist for supported package-specifier deep imports. Every established
+command, guidance, discovery, migration, renderer, and type subpath named by
+package verification remains available. The package root and `dist/index.js`
+are not library imports: `dist/index.js` remains available exclusively through
+the `bin.renma` CLI contract. Package-internal relative imports continue to
+resolve normally. Other emitted modules, including `security-body-policy/*`
+and `security-command/*`, remain implementation details and package-specifier
+imports are rejected. Clean consumer verification imports every supported
+subpath, resolves its declarations, rejects the two CLI-only module paths,
+exercises the installed CLI, and requires private body-policy runtime and
+declaration subpaths to remain unavailable.
 
 Human-readable reasons and prompts may evolve unless a test intentionally
 protects exact wording. Stable branching must use typed fields such as

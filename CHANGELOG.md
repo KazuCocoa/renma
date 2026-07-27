@@ -15,8 +15,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   suites and added deterministic structural properties for ranges,
   determinism, ordering, deduplication, enclosures, relative components, and
   Markdown soft wraps. Added an explicit package subpath allowlist that
-  preserves the package root, established deep imports, and the CLI while
-  keeping the separated body-policy implementation modules private.
+  preserves established deep imports while keeping the package root, CLI
+  implementation entrypoint, and separated body-policy modules unavailable as
+  library imports. The installed CLI remains available through `bin.renma`.
 
 ## [0.25.0] - 2026-07-26
 
