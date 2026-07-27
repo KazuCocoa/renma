@@ -17,16 +17,24 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   predicate has no body-policy domain, has local or specific scope, or mentions
   another domain.
 - Restored directly supported workflow-prefix prohibitions across bounded short
-  modifiers, modal bridges, colon or dash punctuation, and bounded relative or
-  parenthetical modifiers without accepting descriptive, quoted, conditional,
-  changed-subject, or otherwise unsupported bridge syntax.
+  modifiers, modal bridges, colon or dash punctuation, and bounded relative
+  or unqualified parenthetical modifiers. Composed bridges preserve local-step,
+  source/target, exception, and allowance qualifications; phase-local
+  parentheticals no longer become workflow-wide prohibitions.
+- Required explicit statement-level scope proof for direct facts, preventing a
+  supported subjectless prohibition under descriptive, changed-subject,
+  conditional, or unsupported syntax from receiving default workflow scope.
+- Restored subject continuation through base and third-person policy verbs
+  while recognizing strong noun-phrase-plus-modal shapes such as `audit jobs`
+  before their first word can be treated as a subjectless verb.
 - Kept affirmative requirement language distinct from genuinely negative
   `not-required` facts so it cannot suppress a later workflow prohibition.
-- Added 97 immutable, self-contained test-only 0.24.4 golden cases generated
+- Added 116 immutable, self-contained test-only 0.24.4 golden cases generated
   from the full tagged commit. The exact legacy bodies and public projections
   cover subjects, predicate kinds, connectors, domains, scopes, layouts,
   evidence, ordering, and deduplication; a 32-case matrix proves the requested
-  pairwise interactions, and every observed difference is explicitly
+  pairwise interactions, a deterministic current-only matrix covers scope
+  proof and bridge precision, and every observed difference is explicitly
   allowlisted.
 
 ### Changed

@@ -1607,6 +1607,375 @@ const RAW_BODY_POLICY_0244_GOLDEN_CASES = [
       group: "precision-and-structure",
     },
   },
+  {
+    name: "scope-proof-descriptive-lists-upload",
+    body: "This workflow lists no external uploads.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow lists no external uploads.",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      predicateStart: "explicit-workflow-subject",
+      provenance: "supported-subjectless",
+      subjectProof: "descriptive",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "scope-proof-changed-helper-network",
+    body: "This workflow validates inputs but the helper must never use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow validates inputs",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      predicateStart: "explicit-changed-subject",
+      provenance: "supported-subjectless",
+      subjectProof: "changed",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "scope-proof-changed-helper-upload",
+    body: "This workflow validates inputs but the helper must never perform external uploads.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "the helper must never perform external uploads.",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      predicateStart: "explicit-changed-subject",
+      provenance: "supported-subjectless",
+      subjectProof: "changed",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "scope-proof-conditional-network",
+    body: "This workflow validates inputs but if offline, never use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow validates inputs",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      predicateStart: "conditional-or-subordinate",
+      provenance: "supported-subjectless",
+      subjectProof: "conditional",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bridge-will-never-network",
+    body: "This workflow will never use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow will never use the network.",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      bridge: "modal",
+      subjectProof: "explicit-workflow-subject",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bridge-shall-never-secrets",
+    body: "This workflow shall never access credentials.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow shall never access credentials.",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      bridge: "modal",
+      subjectProof: "explicit-workflow-subject",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bridge-punctuation-modifier-network",
+    body: "This workflow: always must not use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow: always must not use the network.",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      bridge: "punctuation-plus-modifier",
+      subjectProof: "explicit-workflow-subject",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bridge-dash-modifier-upload",
+    body: "This task — explicitly cannot upload files.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This task — explicitly cannot upload files.",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      bridge: "punctuation-plus-modifier",
+      subjectProof: "explicit-workflow-subject",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bridge-relative-secrets",
+    body: "This workflow that validates inputs must not use credentials.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          "This workflow that validates inputs must not use credentials.",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      bridge: "bounded-relative",
+      subjectProof: "explicit-workflow-subject",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bridge-parenthetical-deterministic-validation",
+    body: "This task (during deterministic validation) cannot upload files.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          "This task (during deterministic validation) cannot upload files.",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      bridge: "bounded-parenthetical",
+      bridgeScope: "local-step",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bridge-parenthetical-local-network",
+    body: "This workflow (during local setup) must not use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow (during local setup) must not use the network.",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      bridge: "bounded-parenthetical",
+      bridgeScope: "local-step",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bridge-parenthetical-validation-upload",
+    body: "This workflow (only for the validation step) must not upload files.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          "This workflow (only for the validation step) must not upload files.",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      bridge: "bounded-parenthetical",
+      bridgeScope: "local-step",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bridge-parenthetical-exception-network",
+    body: "This workflow (except for approved domains) must not use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet:
+          "This workflow (except for approved domains) must not use the network.",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      bridge: "bounded-parenthetical",
+      bridgeScope: "exception",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "bridge-parenthetical-target-upload",
+    body: "This workflow (to a public bucket) must not upload files.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow (to a public bucket) must not upload files.",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      bridge: "bounded-parenthetical",
+      bridgeScope: "specific-target",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "middle-inflected-uploads",
+    body: "This workflow checks inputs but uploads files, yet must not use credentials.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow checks inputs",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      middleVerb: "uploads",
+      verbForm: "third-person",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "middle-inflected-operates",
+    body: "This workflow validates inputs but operates offline, yet must not use credentials.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow validates inputs",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      middleVerb: "operates",
+      verbForm: "third-person",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "middle-changed-audit-jobs",
+    body: "This workflow validates inputs but audit jobs must never use the network.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow validates inputs",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      middleVerb: "audit",
+      predicateStart: "explicit-changed-subject",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "middle-changed-review-tasks",
+    body: "This workflow validates inputs but review tasks must never upload files.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow validates inputs",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      middleVerb: "review",
+      predicateStart: "explicit-changed-subject",
+      layout: "one-line",
+    },
+  },
+  {
+    name: "middle-changed-log-processors",
+    body: "This workflow validates inputs but log processors must never access credentials.",
+    expected: [
+      {
+        id: "SEC-BODY-POLICY-CONTRADICTION",
+        severity: "high",
+        startLine: 11,
+        endLine: 11,
+        snippet: "This workflow validates inputs",
+      },
+    ],
+    coverage: {
+      group: "scope-proof-and-bridges",
+      middleVerb: "log",
+      predicateStart: "explicit-changed-subject",
+      layout: "one-line",
+    },
+  },
 ] as const satisfies readonly LegacyBodyPolicyGoldenCase[];
 
 export const BODY_POLICY_0244_GOLDEN_CASES: readonly LegacyBodyPolicyGoldenCase[] =

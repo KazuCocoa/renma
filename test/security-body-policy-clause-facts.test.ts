@@ -1016,8 +1016,28 @@ test("direct workflow subjects retain supported bounded prohibition bridges", ()
       body: "This workflow always must not use the network.",
     },
     {
+      domain: "network",
+      body: "This workflow will never use the network.",
+    },
+    {
+      domain: "network",
+      body: "This workflow shall never use the network.",
+    },
+    {
+      domain: "network",
+      body: "This workflow: always must not use the network.",
+    },
+    {
+      domain: "network",
+      body: "This workflow: always must run without internet access.",
+    },
+    {
       domain: "upload",
       body: "This task explicitly cannot upload files.",
+    },
+    {
+      domain: "upload",
+      body: "This task — explicitly cannot upload files.",
     },
     {
       domain: "secrets",
@@ -1034,10 +1054,6 @@ test("direct workflow subjects retain supported bounded prohibition bridges", ()
     {
       domain: "secrets",
       body: "This workflow that validates inputs must not use credentials.",
-    },
-    {
-      domain: "upload",
-      body: "This task (during deterministic validation) cannot upload files.",
     },
   ] as const) {
     for (const layout of ["one-line", "soft-wrap", "heading"] as const) {
@@ -1073,8 +1089,16 @@ test("direct workflow subjects retain supported bounded prohibition bridges", ()
   }
 });
 
-test("direct workflow subjects reject changed, descriptive, quoted, and conditional bridges", () => {
+test("direct workflow subjects reject changed, descriptive, quoted, conditional, and qualified bridges", () => {
   for (const { domain, body } of [
+    {
+      domain: "network",
+      body: "This workflow says do not use the network.",
+    },
+    {
+      domain: "upload",
+      body: "This workflow lists no external uploads.",
+    },
     {
       domain: "secrets",
       body: "This workflow says the helper must not use credentials.",
@@ -1099,6 +1123,26 @@ test("direct workflow subjects reject changed, descriptive, quoted, and conditio
       domain: "secrets",
       body: "This workflow: the helper must not use credentials.",
     },
+    {
+      domain: "network",
+      body: "This workflow (during local setup) must not use the network.",
+    },
+    {
+      domain: "upload",
+      body: "This workflow (only for the validation step) must not upload files.",
+    },
+    {
+      domain: "network",
+      body: "This workflow (except for approved domains) must not use the network.",
+    },
+    {
+      domain: "upload",
+      body: "This workflow (to a public bucket) must not upload files.",
+    },
+    {
+      domain: "upload",
+      body: "This task (during deterministic validation) cannot upload files.",
+    },
   ] as const) {
     for (const layout of ["one-line", "soft-wrap", "heading"] as const) {
       const renderedBody =
@@ -1112,6 +1156,80 @@ test("direct workflow subjects reject changed, descriptive, quoted, and conditio
         0,
         `${body}, ${layout}`,
       );
+    }
+  }
+});
+
+test("statement-level scope proof constrains every direct prohibition fact", () => {
+  for (const { domain, body } of [
+    {
+      domain: "network",
+      body: "Do not use the network.",
+    },
+    {
+      domain: "upload",
+      body: "No external uploads.",
+    },
+    {
+      domain: "network",
+      body: "This workflow: do not use the network.",
+    },
+  ] as const) {
+    const facts = statementGroupFacts(body);
+    const fact = facts.find(
+      (candidate) =>
+        candidate.domain === domain &&
+        candidate.modality === "prohibited" &&
+        candidate.scope === "workflow" &&
+        candidate.completeness === "complete",
+    );
+    assert.ok(fact, body);
+    assert.equal(
+      body.slice(fact.evidenceStart, fact.evidenceEnd),
+      body.slice(0, -1),
+      body,
+    );
+    assert.equal(bodyPolicyFindings(body, domain).length, 1, body);
+  }
+  assert.equal(
+    bodyPolicyFindings("Use local validation. No external uploads.", "upload")
+      .length,
+    1,
+    "an independent imperative policy keeps its standalone default after a hard sentence boundary",
+  );
+
+  for (const { domain, body } of [
+    {
+      domain: "network",
+      body: "This workflow validates inputs but the helper must never use the network.",
+    },
+    {
+      domain: "upload",
+      body: "This workflow validates inputs but the helper must never perform external uploads.",
+    },
+    {
+      domain: "network",
+      body: "This workflow validates inputs but if offline, never use the network.",
+    },
+  ] as const) {
+    for (const softWrapped of [false, true]) {
+      const renderedBody = softWrapped ? body.replace(" but ", "\nbut ") : body;
+      const normalizedBody = renderedBody.replaceAll("\n", " ");
+      const facts = statementGroupFacts(normalizedBody).filter(
+        (fact) => fact.domain === domain,
+      );
+      assert.ok(facts.length > 0, renderedBody);
+      assert.equal(
+        facts.some(
+          (fact) =>
+            fact.modality === "prohibited" &&
+            fact.scope === "workflow" &&
+            fact.completeness === "complete",
+        ),
+        false,
+        renderedBody,
+      );
+      assert.equal(bodyPolicyFindings(renderedBody, domain).length, 0);
     }
   }
 });
@@ -1189,6 +1307,101 @@ test("statement groups retain subjects through curated middle predicate categori
   }
 });
 
+test("base and third-person policy verbs preserve middle-predicate subjects", () => {
+  for (const { domain, body } of [
+    {
+      domain: "secrets",
+      body: "This workflow checks inputs but uploads files, yet must not use credentials.",
+    },
+    {
+      domain: "secrets",
+      body: "This workflow validates inputs but operates offline, yet must not use credentials.",
+    },
+    {
+      domain: "network",
+      body: "This task checks configuration but sends reports, yet must not use the network.",
+    },
+  ] as const) {
+    for (const softWrapped of [false, true]) {
+      const renderedBody = softWrapped
+        ? body.replace(" but ", "\nbut ").replace(", yet ", ",\nyet ")
+        : body;
+      const findings = bodyPolicyFindings(renderedBody, domain);
+      assert.equal(findings.length, 1, renderedBody);
+      assert.equal(findings[0]?.evidence.snippet, renderedBody);
+    }
+  }
+
+  const verbFamilies = [
+    ["operate offline", "operates offline"],
+    ["work offline", "works offline"],
+    ["access logs", "accesses logs"],
+    ["attach reports", "attaches reports"],
+    ["post reports", "posts reports"],
+    ["publish reports", "publishes reports"],
+    ["push reports", "pushes reports"],
+    ["send reports", "sends reports"],
+    ["share reports", "shares reports"],
+    ["submit reports", "submits reports"],
+    ["sync reports", "syncs reports"],
+    ["upload reports", "uploads reports"],
+  ] as const;
+
+  for (const middlePredicate of verbFamilies.flat()) {
+    const body = `This workflow checks inputs but ${middlePredicate}, yet must not use the network.`;
+    for (const softWrapped of [false, true]) {
+      const renderedBody = softWrapped
+        ? body.replace(" but ", "\nbut ").replace(", yet ", ",\nyet ")
+        : body;
+      const findings = bodyPolicyFindings(renderedBody, "network");
+      assert.equal(
+        findings.length,
+        1,
+        `${middlePredicate}, ${softWrapped ? "soft wrapped" : "one line"}`,
+      );
+      assert.equal(findings[0]?.evidence.snippet, renderedBody);
+    }
+  }
+});
+
+test("private facts retain candidate evidence and domain order before public deduplication", () => {
+  const body =
+    "This workflow must not use the network and also must not use the network, must not upload files, yet must not use credentials.";
+  const facts = statementGroupFacts(body).filter(
+    (fact) =>
+      fact.modality === "prohibited" &&
+      fact.scope === "workflow" &&
+      fact.completeness === "complete",
+  );
+
+  assert.deepEqual(
+    facts.map((fact) => ({
+      domain: fact.domain,
+      evidence: body.slice(fact.evidenceStart, fact.evidenceEnd),
+    })),
+    [
+      {
+        domain: "network",
+        evidence: "This workflow must not use the network",
+      },
+      {
+        domain: "network",
+        evidence:
+          "This workflow must not use the network and also must not use the network",
+      },
+      {
+        domain: "upload",
+        evidence:
+          "This workflow must not use the network and also must not use the network, must not upload files",
+      },
+      {
+        domain: "secrets",
+        evidence: body.slice(0, -1),
+      },
+    ],
+  );
+});
+
 test("changed subjects stop multi-predicate workflow inheritance", () => {
   for (const { domain, body } of [
     {
@@ -1198,6 +1411,18 @@ test("changed subjects stop multi-predicate workflow inheritance", () => {
     {
       domain: "upload",
       body: "This workflow validates inputs but validation is delegated, yet the helper must not upload files.",
+    },
+    {
+      domain: "upload",
+      body: "This workflow checks inputs but audit jobs must never use the network, yet must not upload files.",
+    },
+    {
+      domain: "upload",
+      body: "This workflow checks inputs but review tasks must not use credentials, yet must not upload files.",
+    },
+    {
+      domain: "upload",
+      body: "This workflow validates inputs but log processors must never perform external uploads.",
     },
   ] as const) {
     for (const softWrapped of [false, true]) {

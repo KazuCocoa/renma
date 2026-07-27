@@ -84,14 +84,14 @@ const AFFIRMATIVE_REQUIREMENT_PATTERNS = {
 const PROHIBITED_PATTERNS = {
   network: [
     /\b(?:no|without)\s+(?:(?:any|all)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b(?!\s+(?:access|use|usage|connectivity|to)\b)/i,
-    /\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:(?:all|any)\s+)?(?:(?:use|allow|permit)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b(?!\s+(?:access|use|usage|connectivity|to)\b)/i,
+    /\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:(?:all|any)\s+)?(?:(?:use|allow|permit)\s+)?(?:the\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b(?!\s+(?:access|use|usage|connectivity|to)\b)/i,
     /\b(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\s+(?:(?:is|are)\s+(?:not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled)|(?:must|may|should)\s+not\s+be\s+(?:used|available|enabled))\b/i,
     new RegExp(
       String.raw`\b(?:do\s+not|don't|never|avoid|exclude|disallow|forbid|block)\s+(?:allow|permit)\s+(?:any|all)\s+(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b[^.!?\n]{0,40}\b(?:for|throughout|during|within|in)\s+${WORKFLOW_SCOPE_TERMS}\b`,
       "i",
     ),
     new RegExp(
-      String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,40}\b(?:(?:must|shall|will|does)\s+not|cannot|can't|never)\s+(?:use|access)\s+(?:(?:any|all|the)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b`,
+      String.raw`\b${WORKFLOW_SCOPE_TERMS}\b[^.!?\n]{0,40}\b(?:(?:must|shall|will|does|do)\s+not|cannot|can't|never)\s+(?:use|access)\s+(?:(?:any|all|the)\s+)?(?:external\s+)?(?:network|internet)(?:\s+(?:access|use|usage|connectivity))?\b`,
       "i",
     ),
     new RegExp(
@@ -213,7 +213,7 @@ const PROHIBITION_PREDICATE_RE =
 const STATEMENT_MODIFIER = String.raw`(?:also|still|therefore)`;
 const SUBJECTLESS_AUXILIARY_HEAD = String.raw`(?:is|are|was|were|has|have|had|does|do|did|will|would|shall|should|can|could|may|might|must|cannot|can't|needs|requires)`;
 const SUBJECTLESS_ORDINARY_VERB_HEAD = String.raw`(?:accepts?|adapts?|analyzes?|applies|audits?|builds?|checks?|classifies|collects?|compares?|compiles?|completes?|configures?|creates?|detects?|documents?|emits?|evaluates?|executes?|generates?|handles?|inspects?|loads?|logs?|maps?|normalizes?|parses?|prepares?|processes|produces?|reads?|records?|reports?|resolves?|reviews?|runs?|scans?|selects?|stores?|summarizes?|tracks?|transforms?|updates?|uses?|validates?|verifies|writes?)`;
-const SUBJECTLESS_POLICY_VERB_HEAD = String.raw`(?:never|without|don't|keep|operate|work|access|attach|handle|load|post|publish|push|read|send|share|submit|sync|upload|use)`;
+const SUBJECTLESS_POLICY_VERB_HEAD = String.raw`(?:never|without|don't|keep|operates?|works?|access(?:es)?|attach(?:es)?|handles?|loads?|posts?|publish(?:es)?|push(?:es)?|reads?|sends?|shares?|submits?|syncs?|uploads?|uses?)`;
 const SUBJECTLESS_PREDICATE_HEAD = String.raw`(?:${SUBJECTLESS_AUXILIARY_HEAD}|${SUBJECTLESS_ORDINARY_VERB_HEAD}|${SUBJECTLESS_POLICY_VERB_HEAD})`;
 const SUBJECTLESS_PREDICATE_PREFIX = String.raw`(?:[ \t]*(?:,[ \t]*)?)(?:(?:it|${STATEMENT_MODIFIER})[ \t]+){0,4}`;
 const ORDINARY_STATEMENT_SEPARATOR_RE =
@@ -232,6 +232,8 @@ const EXPLICIT_CHANGED_SUBJECT_START_RE = new RegExp(
   String.raw`^[ \t]*(?:(?:the|a|an|this|that|these|those|each|every|another|offline|online|local|remote)[ \t]+)?[A-Za-z][A-Za-z0-9_-]*(?:[ \t]+[A-Za-z][A-Za-z0-9_-]*){0,3}[ \t]+${SUBJECTLESS_PREDICATE_HEAD}\b`,
   "i",
 );
+const STRONG_CHANGED_SUBJECT_START_RE =
+  /^[ \t]*(?!(?:it|also|still|therefore)\b)(?:(?:the|a|an|this|that|these|those|each|every|another|offline|online|local|remote)[ \t]+)?[A-Za-z][A-Za-z0-9_-]*(?:[ \t]+[A-Za-z][A-Za-z0-9_-]*){1,3}[ \t]+(?:(?:must|shall|should|will|would|may|might|can|could|does|do|did)[ \t]+(?:not|never)|cannot|can't|never)\b/i;
 const DOMAIN_PREDICATE_START_RE = new RegExp(
   String.raw`^[ \t]*(?:,[ \t]*)?(?:(?:${STATEMENT_MODIFIER})[ \t]+)*(?:${NETWORK_SUBJECT}|${UPLOAD_SUBJECT}|${SECRET_ACCESS_SUBJECT})[ \t]+(?:(?:is|are|was|were)[ \t]+|(?:must|shall|should|may|can|will|would)[ \t]+)`,
   "i",
@@ -241,16 +243,17 @@ const LEADING_WORKFLOW_SUBJECT_RE = new RegExp(
   "i",
 );
 const DIRECT_SUBJECT_SHORT_MODIFIER_RE = new RegExp(
-  String.raw`^[ \t]*(?:(?:it|${STATEMENT_MODIFIER}|always|explicitly|directly|strictly|categorically|may|might|can|could|should|would)[ \t]+){1,4}$`,
+  String.raw`^(?:(?:it|${STATEMENT_MODIFIER}|always|explicitly|directly|strictly|categorically|may|might|can|could|should|would|will|shall)[ \t]+)`,
   "i",
 );
-const DIRECT_SUBJECT_PUNCTUATION_RE = /^[ \t]*(?::|--?|[–—])[ \t]*$/u;
+const DIRECT_SUBJECT_OFFLINE_AUXILIARY_RE =
+  /^(?:(?:must|shall|will|has[ \t]+to|needs[ \t]+to)[ \t]+)?(?:run|operate|work)[ \t]+/i;
+const DIRECT_SUBJECT_PUNCTUATION_RE = /^(?::|--?|[–—])[ \t]*/u;
 const DIRECT_SUBJECT_RELATIVE_MODIFIER_RE = new RegExp(
-  String.raw`^[ \t]*(?:that|which)[ \t]+${SUBJECTLESS_PREDICATE_HEAD}\b(?:[ \t]+[A-Za-z][A-Za-z0-9_-]*){0,5}[ \t]*$`,
+  String.raw`^(?:that|which)[ \t]+${SUBJECTLESS_PREDICATE_HEAD}\b(?:[ \t]+[A-Za-z][A-Za-z0-9_-]*){0,5}`,
   "i",
 );
-const DIRECT_SUBJECT_PARENTHETICAL_RE =
-  /^[ \t]*\((?<content>[^()"'\n]{1,64})\)[ \t]*$/u;
+const DIRECT_SUBJECT_PARENTHETICAL_RE = /^\((?<content>[^()"'\n]{1,64})\)/u;
 const DESCRIPTIVE_SUBJECT_BRIDGE_RE =
   /\b(?:says?|states?|documents?|describes?|quotes?|notes?|explains?|mentions?|reports?|shows?|lists?)\b/i;
 const CONDITIONAL_SUBJECT_BRIDGE_RE =
@@ -267,14 +270,20 @@ type PredicateStartClassification =
 
 type DirectSubjectBridgeClassification =
   | "immediate"
-  | "short-modifier"
-  | "punctuation"
-  | "bounded-relative"
-  | "bounded-parenthetical"
+  | "composed"
   | "explicit-changed-subject"
   | "conditional-or-subordinate"
+  | "local-or-specific-scope"
+  | "exception-or-allowance"
   | "quoted-or-descriptive"
   | "unsupported";
+
+type WorkflowScopeProof =
+  | "standalone-default"
+  | "explicit-workflow-subject"
+  | "inherited-workflow-subject"
+  | "explicit-workflow-qualifier"
+  | "no-workflow-proof";
 
 interface BodyPolicyPredicateSegment {
   readonly range: EvidenceRange;
@@ -317,34 +326,13 @@ export function bodyPolicyStatementGroupFacts(
         predicate.range.start,
         predicate.range.end,
       );
-      const directFacts = bodyPolicyClauseFacts(predicateText).flatMap(
-        (fact) => {
-          const explicitSubject =
-            predicate.explicitSubject === undefined
-              ? undefined
-              : {
-                  start:
-                    predicate.explicitSubject.start - predicate.range.start,
-                  end: predicate.explicitSubject.end - predicate.range.start,
-                };
-          if (
-            !directFactHasSupportedSubjectBridge(
-              predicateText,
-              fact,
-              explicitSubject,
-              factDirectlyUsesSupportedPattern(predicateText, fact),
-            )
-          ) {
-            return [];
-          }
-          const projectedFact = {
-            ...fact,
-            evidenceStart: predicate.range.start + fact.evidenceStart,
-            evidenceEnd: predicate.range.start + fact.evidenceEnd,
-          };
-          return [projectedFact];
-        },
-      );
+      const explicitSubject =
+        predicate.explicitSubject === undefined
+          ? undefined
+          : {
+              start: predicate.explicitSubject.start - predicate.range.start,
+              end: predicate.explicitSubject.end - predicate.range.start,
+            };
       const inheritedSubject = predicate.inheritedSubject;
       const projectedFacts =
         inheritedSubject === undefined
@@ -363,6 +351,25 @@ export function bodyPolicyStatementGroupFacts(
           domain === undefined ? [] : [domain],
         ),
       );
+      const directFacts = bodyPolicyClauseFacts(predicateText).map((fact) => {
+        const scopeProof = directFactWorkflowScopeProof(
+          predicateText,
+          predicate,
+          fact,
+          explicitSubject,
+        );
+        const scopedFact = applyWorkflowScopeProof(fact, scopeProof);
+        const evidenceStart =
+          scopeProof === "explicit-workflow-subject" &&
+          explicitSubject !== undefined
+            ? Math.min(scopedFact.evidenceStart, explicitSubject.start)
+            : scopedFact.evidenceStart;
+        return {
+          ...scopedFact,
+          evidenceStart: predicate.range.start + evidenceStart,
+          evidenceEnd: predicate.range.start + scopedFact.evidenceEnd,
+        };
+      });
       for (const direct of directFacts) {
         if (
           direct.domain !== undefined &&
@@ -868,6 +875,10 @@ function bodyPolicyStatementGroups(
   clauseRanges: readonly EvidenceRange[],
 ): readonly BodyPolicyStatementGroup[] {
   const predicateRanges = clauseRanges
+    .filter(
+      ({ start, end }) =>
+        !/^[ \t]*[;:,.!?–—-]+[ \t]*$/u.test(text.slice(start, end)),
+    )
     .flatMap((range) => splitOrdinaryPredicateRanges(text, range))
     .map((range) => trimPredicateRange(text, range))
     .filter(({ start, end }) => start < end)
@@ -1000,6 +1011,9 @@ function classifyPredicateStart(
   if (CONDITIONAL_OR_SUBORDINATE_PREDICATE_START_RE.test(text)) {
     return "conditional-or-subordinate";
   }
+  if (STRONG_CHANGED_SUBJECT_START_RE.test(text)) {
+    return "explicit-changed-subject";
+  }
   if (SUBJECTLESS_PREDICATE_START_RE.test(text)) {
     return "supported-subjectless";
   }
@@ -1043,106 +1057,205 @@ function leadingWorkflowSubjectInRange(
   return { start, end: start + subject.length };
 }
 
-function factDirectlyUsesSupportedPattern(
+function supportedCandidatesForFact(
   predicate: string,
   fact: BodyPolicyClauseFacts,
-): boolean {
+): readonly DomainCandidate[] {
   const domain = fact.domain;
-  if (domain === undefined) return false;
+  if (domain === undefined) return [];
   return candidateEvidence(
-    predicate,
-    PROHIBITED_PATTERNS[domain],
-    "supported-prohibition",
-  ).some(
-    (candidate) =>
-      candidate.start >= fact.evidenceStart &&
-      candidate.end <= fact.evidenceEnd,
-  );
-}
-
-function directFactHasSupportedSubjectBridge(
-  predicate: string,
-  fact: BodyPolicyClauseFacts,
-  explicitSubject: EvidenceRange | undefined,
-  directlySupportedDomainPattern: boolean,
-): boolean {
-  const domain = fact.domain;
-  if (
-    domain === undefined ||
-    explicitSubject === undefined ||
-    !directlySupportedDomainPattern ||
-    fact.modality !== "prohibited" ||
-    fact.scope !== "workflow"
-  ) {
-    return true;
-  }
-  const subjectCandidates = candidateEvidence(
     predicate,
     PROHIBITED_PATTERNS[domain],
     "supported-prohibition",
   ).filter(
     (candidate) =>
-      candidate.directWorkflowSubject?.start === explicitSubject.start &&
-      candidate.directWorkflowSubject.end === explicitSubject.end &&
-      candidate.start >= fact.evidenceStart &&
+      candidate.predicateStart >= fact.evidenceStart &&
       candidate.end <= fact.evidenceEnd,
   );
-  return (
-    subjectCandidates.length === 0 ||
-    subjectCandidates.some((candidate) =>
+}
+
+function directFactWorkflowScopeProof(
+  predicate: string,
+  segment: BodyPolicyPredicateSegment,
+  fact: BodyPolicyClauseFacts,
+  explicitSubject: EvidenceRange | undefined,
+): WorkflowScopeProof {
+  const domain = fact.domain;
+  if (
+    domain === undefined ||
+    fact.modality !== "prohibited" ||
+    fact.scope !== "workflow"
+  ) {
+    return "no-workflow-proof";
+  }
+
+  const candidates = supportedCandidatesForFact(predicate, fact);
+  const startsSegment = candidates.some(
+    (candidate) => predicate.slice(0, candidate.start).trim().length === 0,
+  );
+  if (startsSegment && factHasExplicitWorkflowQualifier(predicate, fact)) {
+    return "explicit-workflow-qualifier";
+  }
+  if (
+    explicitSubject !== undefined &&
+    candidates.some((candidate) =>
       directSubjectBridgeSupportsProhibition(
         classifyDirectSubjectBridge(
           predicate.slice(explicitSubject.end, candidate.predicateStart),
+          domain,
         ),
       ),
     )
+  ) {
+    return "explicit-workflow-subject";
+  }
+
+  if (
+    explicitSubject === undefined &&
+    segment.inheritedSubject === undefined &&
+    startsSegment &&
+    (segment.boundary === "start" ||
+      (segment.boundary === "hard" &&
+        candidates.some((candidate) =>
+          candidateSupportsIndependentStatementDefault(predicate, candidate),
+        )))
+  ) {
+    return "standalone-default";
+  }
+
+  return "no-workflow-proof";
+}
+
+function candidateSupportsIndependentStatementDefault(
+  predicate: string,
+  candidate: DomainCandidate,
+): boolean {
+  if (candidate.predicateStart > candidate.start) return true;
+  return /^(?:no|without|do[ \t]+not|don't|never|avoid|exclude|disallow|forbid|block)\b/i.test(
+    predicate.slice(candidate.start, candidate.end),
   );
+}
+
+function factHasExplicitWorkflowQualifier(
+  predicate: string,
+  fact: BodyPolicyClauseFacts,
+): boolean {
+  return new RegExp(
+    String.raw`\b(?:for|throughout|during|within|in)[ \t]+${WORKFLOW_SCOPE_TERMS}\b`,
+    "i",
+  ).test(predicate.slice(fact.evidenceStart, fact.evidenceEnd));
+}
+
+function applyWorkflowScopeProof(
+  fact: BodyPolicyClauseFacts,
+  proof: WorkflowScopeProof,
+): BodyPolicyClauseFacts {
+  if (
+    fact.modality !== "prohibited" ||
+    fact.scope !== "workflow" ||
+    proof !== "no-workflow-proof"
+  ) {
+    return fact;
+  }
+  return {
+    ...fact,
+    scope: "unknown",
+  };
+}
+
+function bridgeHasLocalOrSpecificScope(
+  bridge: string,
+  domain: BodyPolicyDomain,
+): boolean {
+  if (
+    LOCAL_SCOPE_RE.test(bridge) ||
+    /\b(?:during|within|for|only[ \t]+for)[ \t]+[^()"'\n]{0,32}\b(?:validation|setup|installation|command|step|phase)\b/i.test(
+      bridge,
+    )
+  ) {
+    return true;
+  }
+  if (domain === "upload") {
+    return /\b(?:to|into|onto)\b/i.test(bridge);
+  }
+  if (domain === "secrets") {
+    return /\b(?:from|through|via|to|into|onto)\b/i.test(bridge);
+  }
+  return /\b(?:to|from|through|via)\b/i.test(bridge);
 }
 
 function classifyDirectSubjectBridge(
   bridge: string,
+  domain: BodyPolicyDomain,
 ): DirectSubjectBridgeClassification {
-  if (/^[ \t]*$/u.test(bridge)) return "immediate";
-  if (/["'“”‘’`]/u.test(bridge) || DESCRIPTIVE_SUBJECT_BRIDGE_RE.test(bridge)) {
+  let remainder = bridge.trimStart();
+  if (remainder.trim().length === 0) return "immediate";
+  if (
+    /["'“”‘’`]/u.test(remainder) ||
+    DESCRIPTIVE_SUBJECT_BRIDGE_RE.test(remainder)
+  ) {
     return "quoted-or-descriptive";
   }
-  if (CONDITIONAL_SUBJECT_BRIDGE_RE.test(bridge)) {
+  if (CONDITIONAL_SUBJECT_BRIDGE_RE.test(remainder)) {
     return "conditional-or-subordinate";
   }
-  if (DIRECT_SUBJECT_SHORT_MODIFIER_RE.test(bridge)) {
-    return "short-modifier";
-  }
-  if (DIRECT_SUBJECT_PUNCTUATION_RE.test(bridge)) return "punctuation";
-  if (DIRECT_SUBJECT_RELATIVE_MODIFIER_RE.test(bridge)) {
-    return "bounded-relative";
-  }
-  const parenthetical = DIRECT_SUBJECT_PARENTHETICAL_RE.exec(bridge);
   if (
-    parenthetical?.groups?.content !== undefined &&
-    !CONDITIONAL_SUBJECT_BRIDGE_RE.test(parenthetical.groups.content) &&
-    !DESCRIPTIVE_SUBJECT_BRIDGE_RE.test(parenthetical.groups.content) &&
-    !new RegExp(PROHIBITION_PREDICATE_RE.source, "i").test(
-      parenthetical.groups.content,
+    /\b(?:except|excluding|unless|only|allow(?:ed|ance)?|permit(?:ted|s)?)\b/i.test(
+      remainder,
     )
   ) {
-    return "bounded-parenthetical";
+    return "exception-or-allowance";
   }
-  if (CHANGED_SUBJECT_BRIDGE_RE.test(bridge)) {
-    return "explicit-changed-subject";
+  if (bridgeHasLocalOrSpecificScope(remainder, domain)) {
+    return "local-or-specific-scope";
   }
-  return "unsupported";
+  let consumedComponent = false;
+  const punctuation = DIRECT_SUBJECT_PUNCTUATION_RE.exec(remainder);
+  if (punctuation !== null) {
+    remainder = remainder.slice(punctuation[0].length);
+    consumedComponent = true;
+  }
+  for (let count = 0; count < 4; count += 1) {
+    const modifier = DIRECT_SUBJECT_SHORT_MODIFIER_RE.exec(remainder);
+    if (modifier === null) break;
+    remainder = remainder.slice(modifier[0].length);
+    consumedComponent = true;
+  }
+  const offlineAuxiliary = DIRECT_SUBJECT_OFFLINE_AUXILIARY_RE.exec(remainder);
+  if (offlineAuxiliary !== null) {
+    remainder = remainder.slice(offlineAuxiliary[0].length);
+    consumedComponent = true;
+  }
+
+  const relative = DIRECT_SUBJECT_RELATIVE_MODIFIER_RE.exec(remainder);
+  if (relative !== null) {
+    remainder = remainder.slice(relative[0].length).trim();
+    consumedComponent = true;
+  } else {
+    const parenthetical = DIRECT_SUBJECT_PARENTHETICAL_RE.exec(remainder);
+    if (
+      parenthetical?.groups?.content !== undefined &&
+      !new RegExp(PROHIBITION_PREDICATE_RE.source, "i").test(
+        parenthetical.groups.content,
+      )
+    ) {
+      remainder = remainder.slice(parenthetical[0].length).trimStart();
+      consumedComponent = true;
+    }
+  }
+
+  if (consumedComponent && remainder.trim().length === 0) {
+    return "composed";
+  }
+  return CHANGED_SUBJECT_BRIDGE_RE.test(bridge)
+    ? "explicit-changed-subject"
+    : "unsupported";
 }
 
 function directSubjectBridgeSupportsProhibition(
   classification: DirectSubjectBridgeClassification,
 ): boolean {
-  return (
-    classification === "immediate" ||
-    classification === "short-modifier" ||
-    classification === "punctuation" ||
-    classification === "bounded-relative" ||
-    classification === "bounded-parenthetical"
-  );
+  return classification === "immediate" || classification === "composed";
 }
 
 function projectedStatementFact(
@@ -1171,7 +1284,7 @@ function projectedStatementFact(
       candidate.directWorkflowSubject !== undefined &&
       candidate.predicateStart >= prefix.length &&
       directSubjectBridgeSupportsProhibition(
-        classifyDirectSubjectBridge(predicatePrefix),
+        classifyDirectSubjectBridge(predicatePrefix, domain),
       )
     );
   });
@@ -1183,11 +1296,16 @@ function projectedStatementFact(
       fact.evidenceEnd >= supportedCandidate.end,
   );
   if (fact === undefined) return undefined;
+  const inheritedFact = applyWorkflowScopeProof(
+    fact,
+    "inherited-workflow-subject",
+  );
   return {
-    ...fact,
+    ...inheritedFact,
     evidenceStart: workflowSubject.start,
     evidenceEnd:
-      predicate.range.start + Math.max(0, fact.evidenceEnd - prefix.length),
+      predicate.range.start +
+      Math.max(0, inheritedFact.evidenceEnd - prefix.length),
   };
 }
 

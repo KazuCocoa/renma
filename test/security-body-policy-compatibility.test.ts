@@ -188,11 +188,304 @@ const INTENTIONAL_COMPATIBILITY_CHANGES: Readonly<
     "This task runs but reviews results, yet must not use the network.",
     "Statement groups intentionally retain the explicit task subject through a curated ordinary middle predicate.",
   ),
+  "scope-proof-descriptive-lists-upload": noFindingChange(
+    "A descriptive lists bridge does not turn quoted or summarized upload policy text into a workflow prohibition.",
+  ),
+  "scope-proof-changed-helper-network": noFindingChange(
+    "A supported subjectless network prohibition cannot borrow workflow scope after an explicit helper subject.",
+  ),
+  "scope-proof-changed-helper-upload": noFindingChange(
+    "A supported subjectless upload prohibition remains attached to its explicit helper subject.",
+  ),
+  "scope-proof-conditional-network": noFindingChange(
+    "A conditional predicate segment cannot receive the clause-facts standalone workflow default.",
+  ),
+  "bridge-parenthetical-deterministic-validation": noFindingChange(
+    "During deterministic validation establishes phase-local scope just as other bounded validation phases do.",
+  ),
+  "bridge-parenthetical-local-network": noFindingChange(
+    "Local setup scope inside a subject bridge is preserved instead of erased before fact classification.",
+  ),
+  "bridge-parenthetical-validation-upload": noFindingChange(
+    "A validation-step-only bridge is local and therefore does not contradict workflow-wide upload permission.",
+  ),
+  "bridge-parenthetical-exception-network": noFindingChange(
+    "An exception inside a subject bridge prevents classification as a complete workflow prohibition.",
+  ),
+  "bridge-parenthetical-target-upload": noFindingChange(
+    "A destination inside a subject bridge preserves specific-target upload scope.",
+  ),
+  "middle-inflected-uploads": findingChange(
+    "This workflow checks inputs but uploads files, yet must not use credentials.",
+    "The third-person upload predicate retains the grammatical workflow subject and bounds evidence through the final prohibition.",
+  ),
+  "middle-inflected-operates": findingChange(
+    "This workflow validates inputs but operates offline, yet must not use credentials.",
+    "The third-person operates predicate retains the grammatical workflow subject and bounds evidence through the final prohibition.",
+  ),
+  "middle-changed-audit-jobs": noFindingChange(
+    "Audit jobs is a strong noun phrase with its own modal predicate, so it clears workflow-subject state.",
+  ),
+  "middle-changed-review-tasks": noFindingChange(
+    "Review tasks is a strong changed subject rather than the subjectless verb reviews.",
+  ),
+  "middle-changed-log-processors": noFindingChange(
+    "Log processors is a strong changed subject rather than the subjectless verb logs.",
+  ),
 };
 
 const PAIRWISE_CASES = BODY_POLICY_0244_GOLDEN_CASES.filter(
   ({ coverage }) => coverage.group === "pairwise",
 );
+
+const CURRENT_BODY_POLICY_PRECISION_MATRIX = [
+  {
+    name: "standalone subjectless default",
+    body: "Do not use the network.",
+    expected: [finding("Do not use the network.")],
+    coverage: {
+      predicateStart: "supported-subjectless",
+      provenance: "supported-subjectless",
+      subjectProof: "standalone-default",
+      bridgeSequence: "immediate",
+      bridgeQualification: "none",
+      verbForm: "none",
+      layout: "one-line",
+      domainBehavior: "single",
+    },
+  },
+  {
+    name: "explicit workflow qualifier",
+    body: "Network access is forbidden for this workflow.",
+    expected: [finding("Network access is forbidden for this workflow.")],
+    coverage: {
+      predicateStart: "unsupported",
+      provenance: "supported-domain-subject",
+      subjectProof: "explicit-workflow-qualifier",
+      bridgeSequence: "immediate",
+      bridgeQualification: "none",
+      verbForm: "none",
+      layout: "one-line",
+      domainBehavior: "single",
+    },
+  },
+  {
+    name: "composed direct punctuation and modifier",
+    body: "This workflow: always must not use the network.",
+    expected: [finding("This workflow: always must not use the network.")],
+    coverage: {
+      predicateStart: "explicit-workflow-subject",
+      provenance: "supported-workflow-prefix",
+      subjectProof: "explicit-workflow-subject",
+      bridgeSequence: "punctuation-plus-modifier",
+      bridgeQualification: "none",
+      verbForm: "none",
+      layout: "one-line",
+      domainBehavior: "single",
+    },
+  },
+  {
+    name: "bounded direct relative",
+    body: "This workflow that validates inputs must not use credentials.",
+    expected: [
+      finding("This workflow that validates inputs must not use credentials."),
+    ],
+    coverage: {
+      predicateStart: "explicit-workflow-subject",
+      provenance: "supported-workflow-prefix",
+      subjectProof: "explicit-workflow-subject",
+      bridgeSequence: "bounded-relative",
+      bridgeQualification: "none",
+      verbForm: "none",
+      layout: "one-line",
+      domainBehavior: "single",
+    },
+  },
+  {
+    name: "base middle policy verb",
+    body: "This workflow checks inputs but upload reports, yet must not use the network.",
+    expected: [
+      finding(
+        "This workflow checks inputs but upload reports, yet must not use the network.",
+      ),
+    ],
+    coverage: {
+      predicateStart: "supported-subjectless",
+      provenance: "projected-supported",
+      subjectProof: "inherited-workflow-subject",
+      bridgeSequence: "immediate",
+      bridgeQualification: "none",
+      verbForm: "base",
+      layout: "one-line",
+      domainBehavior: "single",
+    },
+  },
+  {
+    name: "third-person middle policy verb soft wrap",
+    body: "This workflow validates inputs\nbut uploads files,\nyet must not use credentials.",
+    expected: [
+      finding(
+        "This workflow validates inputs\nbut uploads files,\nyet must not use credentials.",
+        13,
+      ),
+    ],
+    coverage: {
+      predicateStart: "supported-subjectless",
+      provenance: "projected-supported",
+      subjectProof: "inherited-workflow-subject",
+      bridgeSequence: "immediate",
+      bridgeQualification: "none",
+      verbForm: "third-person",
+      layout: "soft-wrap",
+      domainBehavior: "single",
+    },
+  },
+  {
+    name: "heading fallback direct bridge",
+    body: "## This task — explicitly cannot upload files.",
+    expected: [finding("## This task — explicitly cannot upload files.")],
+    coverage: {
+      predicateStart: "explicit-workflow-subject",
+      provenance: "supported-workflow-prefix",
+      subjectProof: "explicit-workflow-subject",
+      bridgeSequence: "punctuation-plus-modifier",
+      bridgeQualification: "none",
+      verbForm: "none",
+      layout: "heading",
+      domainBehavior: "single",
+    },
+  },
+  {
+    name: "descriptive direct bridge",
+    body: "This workflow lists no external uploads.",
+    expected: [],
+    coverage: {
+      predicateStart: "explicit-workflow-subject",
+      provenance: "supported-subjectless",
+      subjectProof: "no-workflow-proof",
+      bridgeSequence: "unsupported",
+      bridgeQualification: "descriptive",
+      verbForm: "none",
+      layout: "one-line",
+      domainBehavior: "clean",
+    },
+  },
+  {
+    name: "explicit changed subject",
+    body: "This workflow checks inputs but audit jobs must never use the network, yet must not upload files.",
+    expected: [],
+    coverage: {
+      predicateStart: "explicit-changed-subject",
+      provenance: "supported-subjectless",
+      subjectProof: "no-workflow-proof",
+      bridgeSequence: "unsupported",
+      bridgeQualification: "changed-subject",
+      verbForm: "none",
+      layout: "one-line",
+      domainBehavior: "clean",
+    },
+  },
+  {
+    name: "conditional predicate segment",
+    body: "This workflow validates inputs\nbut if offline, never use the network.",
+    expected: [],
+    coverage: {
+      predicateStart: "conditional-or-subordinate",
+      provenance: "supported-subjectless",
+      subjectProof: "no-workflow-proof",
+      bridgeSequence: "unsupported",
+      bridgeQualification: "conditional",
+      verbForm: "none",
+      layout: "soft-wrap",
+      domainBehavior: "clean",
+    },
+  },
+  {
+    name: "unsupported predicate start",
+    body: "This workflow unexpectedly must not use credentials.",
+    expected: [],
+    coverage: {
+      predicateStart: "unsupported",
+      provenance: "supported-subjectless",
+      subjectProof: "no-workflow-proof",
+      bridgeSequence: "unsupported",
+      bridgeQualification: "unsupported",
+      verbForm: "none",
+      layout: "one-line",
+      domainBehavior: "clean",
+    },
+  },
+  {
+    name: "parenthetical local scope",
+    body: "This workflow (during local setup) must not use the network.",
+    expected: [],
+    coverage: {
+      predicateStart: "explicit-workflow-subject",
+      provenance: "supported-workflow-prefix",
+      subjectProof: "no-workflow-proof",
+      bridgeSequence: "bounded-parenthetical",
+      bridgeQualification: "local-step",
+      verbForm: "none",
+      layout: "one-line",
+      domainBehavior: "clean",
+    },
+  },
+  {
+    name: "parenthetical exception",
+    body: "This workflow (except for approved domains) must not use the network.",
+    expected: [],
+    coverage: {
+      predicateStart: "explicit-workflow-subject",
+      provenance: "supported-workflow-prefix",
+      subjectProof: "no-workflow-proof",
+      bridgeSequence: "bounded-parenthetical",
+      bridgeQualification: "exception",
+      verbForm: "none",
+      layout: "one-line",
+      domainBehavior: "clean",
+    },
+  },
+  {
+    name: "parenthetical specific target",
+    body: "This workflow (to a public bucket) must not upload files.",
+    expected: [],
+    coverage: {
+      predicateStart: "explicit-workflow-subject",
+      provenance: "supported-workflow-prefix",
+      subjectProof: "no-workflow-proof",
+      bridgeSequence: "bounded-parenthetical",
+      bridgeQualification: "specific-target",
+      verbForm: "none",
+      layout: "one-line",
+      domainBehavior: "clean",
+    },
+  },
+  {
+    name: "domain ordering and deduplication",
+    body: "This workflow must not use the network and also must not use the network, must not upload files, yet must not use credentials.",
+    expected: [
+      finding(
+        "This workflow must not use the network and also must not use the network, must not upload files,",
+      ),
+      finding(
+        "This workflow must not use the network and also must not use the network, must not upload files,",
+      ),
+      finding(
+        "This workflow must not use the network and also must not use the network, must not upload files, yet must not use credentials.",
+      ),
+    ],
+    coverage: {
+      predicateStart: "explicit-workflow-subject",
+      provenance: "mixed-supported",
+      subjectProof: "inherited-workflow-subject",
+      bridgeSequence: "modifier",
+      bridgeQualification: "none",
+      verbForm: "none",
+      layout: "one-line",
+      domainBehavior: "ordered-deduplicated",
+    },
+  },
+] as const;
 
 test("0.24.4 body-policy golden cases are self-contained and immutable", () => {
   assert.equal(BODY_POLICY_0244_GOLDEN_SOURCE.tag, "v0.24.4");
@@ -204,7 +497,7 @@ test("0.24.4 body-policy golden cases are self-contained and immutable", () => {
     BODY_POLICY_0244_GOLDEN_SOURCE.generatedBy,
     /securityDiagnosticFindings/u,
   );
-  assert.equal(BODY_POLICY_0244_GOLDEN_CASES.length, 97);
+  assert.equal(BODY_POLICY_0244_GOLDEN_CASES.length, 116);
   assert.equal(
     new Set(BODY_POLICY_0244_GOLDEN_CASES.map(({ name }) => name)).size,
     BODY_POLICY_0244_GOLDEN_CASES.length,
@@ -317,6 +610,112 @@ test("public body-policy findings match each frozen 0.24.4 body except explicit 
     assert.notDeepEqual(intentional.current, fixture.expected, fixture.name);
     assert.deepEqual(current, intentional.current, fixture.name);
   }
+});
+
+test("current body-policy precision matrix has exact bounded public output", () => {
+  for (const fixture of CURRENT_BODY_POLICY_PRECISION_MATRIX) {
+    assert.deepEqual(
+      bodyPolicyFindingProjections(fixture.body),
+      fixture.expected,
+      fixture.name,
+    );
+  }
+
+  assert.deepEqual(
+    new Set(
+      CURRENT_BODY_POLICY_PRECISION_MATRIX.map(
+        ({ coverage }) => coverage.predicateStart,
+      ),
+    ),
+    new Set([
+      "supported-subjectless",
+      "explicit-workflow-subject",
+      "explicit-changed-subject",
+      "conditional-or-subordinate",
+      "unsupported",
+    ]),
+  );
+  assert.deepEqual(
+    new Set(
+      CURRENT_BODY_POLICY_PRECISION_MATRIX.map(
+        ({ coverage }) => coverage.subjectProof,
+      ),
+    ),
+    new Set([
+      "standalone-default",
+      "explicit-workflow-subject",
+      "inherited-workflow-subject",
+      "explicit-workflow-qualifier",
+      "no-workflow-proof",
+    ]),
+  );
+  assert.deepEqual(
+    new Set(
+      CURRENT_BODY_POLICY_PRECISION_MATRIX.map(
+        ({ coverage }) => coverage.provenance,
+      ),
+    ),
+    new Set([
+      "supported-subjectless",
+      "supported-domain-subject",
+      "supported-workflow-prefix",
+      "projected-supported",
+      "mixed-supported",
+    ]),
+  );
+  assert.deepEqual(
+    new Set(
+      CURRENT_BODY_POLICY_PRECISION_MATRIX.map(
+        ({ coverage }) => coverage.bridgeSequence,
+      ),
+    ),
+    new Set([
+      "immediate",
+      "punctuation-plus-modifier",
+      "bounded-relative",
+      "bounded-parenthetical",
+      "modifier",
+      "unsupported",
+    ]),
+  );
+  assert.deepEqual(
+    new Set(
+      CURRENT_BODY_POLICY_PRECISION_MATRIX.map(
+        ({ coverage }) => coverage.bridgeQualification,
+      ),
+    ),
+    new Set([
+      "none",
+      "descriptive",
+      "changed-subject",
+      "conditional",
+      "unsupported",
+      "local-step",
+      "exception",
+      "specific-target",
+    ]),
+  );
+  assert.deepEqual(
+    new Set(
+      CURRENT_BODY_POLICY_PRECISION_MATRIX.map(
+        ({ coverage }) => coverage.verbForm,
+      ),
+    ),
+    new Set(["none", "base", "third-person"]),
+  );
+  assert.deepEqual(
+    new Set(
+      CURRENT_BODY_POLICY_PRECISION_MATRIX.map(
+        ({ coverage }) => coverage.layout,
+      ),
+    ),
+    new Set(["one-line", "soft-wrap", "heading"]),
+  );
+  assert.equal(
+    CURRENT_BODY_POLICY_PRECISION_MATRIX.at(-1)?.expected.length,
+    3,
+    "one public finding remains for each enabled domain after same-domain deduplication",
+  );
 });
 
 function assertPairwiseCoverage(

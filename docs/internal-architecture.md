@@ -190,20 +190,33 @@ facts exist, so a domain-free, local, specific, or cross-domain first predicate
 cannot discard it.
 
 Existing domain patterns may also produce a direct workflow-prefix
-prohibition. Its subject-to-predicate bridge is classified separately:
-immediate whitespace, bounded short adverbial or modal modifiers, colon or dash
-punctuation, and bounded relative or parenthetical modifiers are supported.
-Explicit changed subjects, conditional or subordinate instructions, quoted or
-descriptive text, and unsupported bridges are rejected. This preserves clear
-legacy instructions without granting workflow scope to arbitrary intervening
-text.
+prohibition. Its subject-to-predicate bridge is classified as one bounded
+sequence: optional colon or dash punctuation, short adverbial or modal
+modifiers, and an optional relative or parenthetical modifier. Explicit changed
+subjects, conditional or subordinate instructions, quoted or descriptive text,
+and unsupported bridges are rejected. Local-step, specific source/target,
+exception, and allowance language inside a bridge is preserved as a
+qualification instead of being erased. In particular, `during deterministic
+validation` and other bounded validation phases are local rather than
+workflow-wide.
+
+Every direct prohibited fact with apparent workflow scope is also evaluated
+against one private statement-level proof class: standalone default, explicit
+workflow subject, inherited workflow subject, explicit workflow qualifier, or
+no workflow proof. Only the first four preserve workflow scope. A supported
+domain pattern inside a changed-subject, conditional, descriptive, or
+unsupported segment therefore cannot escape through the clause-facts default.
 
 For each supported network, external-upload, or secret candidate in a predicate
 segment, the classifier retains its local source range, explicit or inherited
-subject range, domain, modality, scope, supported-clause completeness, and
-whether the existing domain grammar directly supported it. One statement group
-may therefore produce multiple facts for the same domain while every predicate
-keeps local scope, safeguard, source/target, remainder, and evidence decisions.
+subject range, proof-derived scope, domain, modality, supported-clause
+completeness, and whether the existing domain grammar directly supported it.
+One statement group may therefore produce multiple facts for the same domain
+while every predicate keeps local scope, safeguard, source/target, remainder,
+and evidence decisions. Base and third-person forms of the curated policy
+verbs continue a proven subject; strong noun phrases followed by modal or
+prohibition heads clear it before noun/verb homographs can inherit workflow
+scope.
 Only a complete `prohibited` fact with `workflow` scope can contradict an
 enabled permissive policy for the same domain. `unknown`, `not-required`,
 `local-safeguard`, local-step, specific-source, specific-target, and
@@ -219,14 +232,18 @@ multiple detectors, but the body-policy module owns the semantic relationship
 between domain, modality, scope, and completeness. It is not a public schema,
 configuration surface, or general natural-language parser.
 
-Compatibility tests freeze 97 exact bodies and public finding projections from
+Compatibility tests freeze 116 exact bodies and public finding projections from
 Renma 0.24.4 commit `9e72e1adddd588ea72cba1c3e06ed1d07de330d9`.
 The test consumes those bodies directly; legacy code is not installed or run in
 CI. Thirty-two frozen cases cover every requested pair across first predicate
 kind and later scope, earlier and later domain, connector and layout, connector
 and implicit or changed subject, and predicate count and middle-predicate
-category. Compatibility means equality with that corpus except for named,
-exact-current-output allowlist entries covering intentional precision,
+category. A deterministic current-only matrix additionally covers predicate
+start classification, direct provenance, all scope-proof classes, composed and
+qualified bridges, base and third-person middle verbs, changed subjects,
+one-line and soft-wrap prose, heading fallback, domain order, and
+deduplication. Compatibility means equality with the frozen corpus except for
+named, exact-current-output allowlist entries covering intentional precision,
 statement-group recovery, and bounded-evidence changes.
 
 The physical-line stage keeps one lazy analysis accessor for a line outside a
