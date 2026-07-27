@@ -175,13 +175,28 @@ prepared paragraph or eligible fallback line
 Statement grouping recognizes only the existing workflow subject vocabulary and
 a small coordination grammar. It carries the nearest explicit subject through
 ordinary coordination, `but`, `yet`, `however`, `; however,`, bare semicolons,
-and `then`, including multiple consecutive predicates and the bounded `also`,
-`still`, and `therefore` modifiers. Bare semicolons and `then` deliberately use
-the strict 0.24.4 compatibility behavior. Sentence endings, Markdown hard
-breaks, structural boundaries, explicit changed subjects, and unsupported
-syntax reset inheritance. A subject is established from the grammatical
-statement segment before domain facts exist, so a domain-free, local, specific,
-or cross-domain first predicate cannot discard it.
+and `then`. Consecutive predicate starts are classified as an explicit workflow
+subject, a supported subjectless predicate, an explicit changed subject, a
+conditional or subordinate prefix, or unsupported syntax. Supported
+subjectless starts include copular and auxiliary or modal predicates plus a
+curated ordinary-verb vocabulary; this keeps subject state through three or
+more predicates without treating arbitrary words as verbs. The bounded `also`,
+`still`, and `therefore` modifiers remain supported. Bare semicolons and `then`
+deliberately use the strict 0.24.4 compatibility behavior. Sentence endings,
+Markdown hard breaks, structural boundaries, explicit changed subjects,
+conditional or subordinate prefixes, and unsupported syntax reset inheritance.
+A subject is established from the grammatical statement segment before domain
+facts exist, so a domain-free, local, specific, or cross-domain first predicate
+cannot discard it.
+
+Existing domain patterns may also produce a direct workflow-prefix
+prohibition. Its subject-to-predicate bridge is classified separately:
+immediate whitespace, bounded short adverbial or modal modifiers, colon or dash
+punctuation, and bounded relative or parenthetical modifiers are supported.
+Explicit changed subjects, conditional or subordinate instructions, quoted or
+descriptive text, and unsupported bridges are rejected. This preserves clear
+legacy instructions without granting workflow scope to arbitrary intervening
+text.
 
 For each supported network, external-upload, or secret candidate in a predicate
 segment, the classifier retains its local source range, explicit or inherited
@@ -203,6 +218,16 @@ Clause-fact composition remains separate from lexical sharing.
 multiple detectors, but the body-policy module owns the semantic relationship
 between domain, modality, scope, and completeness. It is not a public schema,
 configuration surface, or general natural-language parser.
+
+Compatibility tests freeze 97 exact bodies and public finding projections from
+Renma 0.24.4 commit `9e72e1adddd588ea72cba1c3e06ed1d07de330d9`.
+The test consumes those bodies directly; legacy code is not installed or run in
+CI. Thirty-two frozen cases cover every requested pair across first predicate
+kind and later scope, earlier and later domain, connector and layout, connector
+and implicit or changed subject, and predicate count and middle-predicate
+category. Compatibility means equality with that corpus except for named,
+exact-current-output allowlist entries covering intentional precision,
+statement-group recovery, and bounded-evidence changes.
 
 The physical-line stage keeps one lazy analysis accessor for a line outside a
 logical command. It intentionally runs line-local checks on physical

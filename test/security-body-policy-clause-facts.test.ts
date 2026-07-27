@@ -8,6 +8,7 @@ import {
 } from "../src/security-body-policy/clause-facts.js";
 import { disclosureClauseRangesIntersectingRange } from "../src/security-command/guards.js";
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
+import { WORKFLOW_SCOPE_TERMS } from "../src/security-prose-vocabulary.js";
 import type { Finding } from "../src/types/diagnostics.js";
 import { canonicalSkillFixture } from "./canonical-skill-fixture.js";
 
@@ -1008,6 +1009,210 @@ test("statement groups accept only the bounded predicate modifier grammar", () =
   );
 });
 
+test("direct workflow subjects retain supported bounded prohibition bridges", () => {
+  for (const { domain, body } of [
+    {
+      domain: "network",
+      body: "This workflow always must not use the network.",
+    },
+    {
+      domain: "upload",
+      body: "This task explicitly cannot upload files.",
+    },
+    {
+      domain: "secrets",
+      body: "The process may never use credentials.",
+    },
+    {
+      domain: "secrets",
+      body: "This workflow: must not use credentials.",
+    },
+    {
+      domain: "network",
+      body: "This workflow — must not use the network.",
+    },
+    {
+      domain: "secrets",
+      body: "This workflow that validates inputs must not use credentials.",
+    },
+    {
+      domain: "upload",
+      body: "This task (during deterministic validation) cannot upload files.",
+    },
+  ] as const) {
+    for (const layout of ["one-line", "soft-wrap", "heading"] as const) {
+      const renderedBody =
+        layout === "soft-wrap"
+          ? softWrapAfterWorkflowSubject(body)
+          : layout === "heading"
+            ? `## ${body}`
+            : body;
+      const message = `${body}, ${layout}`;
+      const findings = bodyPolicyFindings(renderedBody, domain);
+
+      assert.equal(findings.length, 1, message);
+      assert.equal(findings[0]?.id, "SEC-BODY-POLICY-CONTRADICTION", message);
+      assert.equal(findings[0]?.evidence.snippet, renderedBody, message);
+      if (layout !== "heading") {
+        const normalizedBody = renderedBody.replaceAll("\n", " ");
+        const fact = statementGroupFacts(normalizedBody).find(
+          (candidate) =>
+            candidate.domain === domain &&
+            candidate.modality === "prohibited" &&
+            candidate.scope === "workflow" &&
+            candidate.completeness === "complete",
+        );
+        assert.ok(fact, message);
+        assert.equal(
+          normalizedBody.slice(fact.evidenceStart, fact.evidenceEnd),
+          normalizedBody.slice(0, -1),
+          message,
+        );
+      }
+    }
+  }
+});
+
+test("direct workflow subjects reject changed, descriptive, quoted, and conditional bridges", () => {
+  for (const { domain, body } of [
+    {
+      domain: "secrets",
+      body: "This workflow says the helper must not use credentials.",
+    },
+    {
+      domain: "upload",
+      body: "This workflow documents that the helper must not upload files.",
+    },
+    {
+      domain: "network",
+      body: 'This workflow quotes "must not use the network" as example wording.',
+    },
+    {
+      domain: "secrets",
+      body: "This workflow must not use credentials if offline mode is selected.",
+    },
+    {
+      domain: "secrets",
+      body: "This workflow when offline must not use credentials.",
+    },
+    {
+      domain: "secrets",
+      body: "This workflow: the helper must not use credentials.",
+    },
+  ] as const) {
+    for (const layout of ["one-line", "soft-wrap", "heading"] as const) {
+      const renderedBody =
+        layout === "soft-wrap"
+          ? softWrapAfterWorkflowSubject(body)
+          : layout === "heading"
+            ? `## ${body}`
+            : body;
+      assert.equal(
+        bodyPolicyFindings(renderedBody, domain).length,
+        0,
+        `${body}, ${layout}`,
+      );
+    }
+  }
+});
+
+test("statement groups retain subjects through curated middle predicate categories", () => {
+  const cases = [
+    {
+      subject: "This workflow",
+      firstPredicate: "validates inputs",
+      middles: ["is deterministic"],
+      connectors: [" but ", ", yet "],
+      domain: "secrets",
+      laterPredicate: "must not use credentials",
+    },
+    {
+      subject: "This workflow",
+      firstPredicate: "validates inputs",
+      middles: ["audits logs"],
+      connectors: [" but ", ", yet "],
+      domain: "upload",
+      laterPredicate: "must not upload files",
+    },
+    {
+      subject: "This task",
+      firstPredicate: "runs",
+      middles: ["reviews results"],
+      connectors: [" but ", ", yet "],
+      domain: "network",
+      laterPredicate: "must not use the network",
+    },
+    {
+      subject: "The process",
+      firstPredicate: "prepares inputs",
+      middles: ["may write local logs", "checks results"],
+      connectors: ["; however, it ", ", yet ", " but "],
+      domain: "secrets",
+      laterPredicate: "must not use credentials",
+    },
+    {
+      subject: "The operation",
+      firstPredicate: "checks configuration",
+      middles: ["is deterministic", "audits logs"],
+      connectors: [" and ", ", yet ", " then "],
+      domain: "upload",
+      laterPredicate: "must not upload files",
+    },
+  ] as const;
+
+  for (const fixture of cases) {
+    const body = renderStatementPredicateChain(fixture);
+    for (const softWrapped of [false, true]) {
+      const renderedBody = softWrapped
+        ? softWrapStatementPredicateChain(body, fixture.connectors)
+        : body;
+      const normalizedBody = renderedBody.replaceAll("\n", " ");
+      const message = `${body}, ${softWrapped ? "soft wrapped" : "one line"}`;
+      const fact = statementGroupFacts(normalizedBody).find(
+        (candidate) =>
+          candidate.domain === fixture.domain &&
+          candidate.modality === "prohibited" &&
+          candidate.scope === "workflow" &&
+          candidate.completeness === "complete",
+      );
+
+      assert.ok(fact, message);
+      assert.equal(
+        normalizedBody.slice(fact.evidenceStart, fact.evidenceEnd),
+        normalizedBody.slice(0, -1),
+        message,
+      );
+      const findings = bodyPolicyFindings(renderedBody, fixture.domain);
+      assert.equal(findings.length, 1, message);
+      assert.equal(findings[0]?.evidence.snippet, renderedBody, message);
+    }
+  }
+});
+
+test("changed subjects stop multi-predicate workflow inheritance", () => {
+  for (const { domain, body } of [
+    {
+      domain: "secrets",
+      body: "This workflow validates inputs but the helper audits logs, yet must not use credentials.",
+    },
+    {
+      domain: "upload",
+      body: "This workflow validates inputs but validation is delegated, yet the helper must not upload files.",
+    },
+  ] as const) {
+    for (const softWrapped of [false, true]) {
+      const renderedBody = softWrapped
+        ? body.replaceAll(/ (?=(?:but|yet)\b)/gu, "\n")
+        : body;
+      assert.equal(
+        bodyPolicyFindings(renderedBody, domain).length,
+        0,
+        `${body}, ${softWrapped ? "soft wrapped" : "one line"}`,
+      );
+    }
+  }
+});
+
 test("fallback visible lines use the statement-group analyzer", () => {
   const body =
     "## This workflow requires network access but must not use credentials";
@@ -1639,6 +1844,44 @@ function softWrapBeforeStatementConnector(text: string): string {
   return text.includes("; however,")
     ? text.replace("; however,", ";\nhowever,")
     : text.replace(/ (?=(?:but|yet)\b)/u, "\n");
+}
+
+function softWrapAfterWorkflowSubject(text: string): string {
+  const subject = new RegExp(`^${WORKFLOW_SCOPE_TERMS}\\b`, "i").exec(text);
+  assert.ok(subject, text);
+  return `${subject[0]}\n${text.slice(subject[0].length).trimStart()}`;
+}
+
+function renderStatementPredicateChain(input: {
+  readonly subject: string;
+  readonly firstPredicate: string;
+  readonly middles: readonly string[];
+  readonly connectors: readonly string[];
+  readonly laterPredicate: string;
+}): string {
+  const predicates = [
+    input.firstPredicate,
+    ...input.middles,
+    input.laterPredicate,
+  ];
+  assert.equal(input.connectors.length, predicates.length - 1);
+  return `${input.subject} ${predicates
+    .map(
+      (predicate, index) =>
+        `${index === 0 ? "" : input.connectors[index - 1]}${predicate}`,
+    )
+    .join("")}.`;
+}
+
+function softWrapStatementPredicateChain(
+  body: string,
+  connectors: readonly string[],
+): string {
+  return connectors.reduce(
+    (rendered, connector) =>
+      rendered.replace(connector, `${connector.trimEnd()}\n`),
+    body,
+  );
 }
 
 function statementGroupFacts(text: string): readonly BodyPolicyClauseFacts[] {

@@ -211,22 +211,25 @@ const AFFIRMATIVE_REQUIREMENT_PREDICATE_RE =
 const PROHIBITION_PREDICATE_RE =
   /\b(?:do\s+not|don't|never|must\s+not|shall\s+not|will\s+not|does\s+not|cannot|can't|not\s+(?:allowed|permitted|available)|disallowed|forbidden|blocked|prohibited|disabled|without|no|(?:must|shall|will|has\s+to|needs\s+to)\s+(?:run|operate|work)(?:\s+without)?|keep|run|operate)\b/gi;
 const STATEMENT_MODIFIER = String.raw`(?:also|still|therefore)`;
+const SUBJECTLESS_AUXILIARY_HEAD = String.raw`(?:is|are|was|were|has|have|had|does|do|did|will|would|shall|should|can|could|may|might|must|cannot|can't|needs|requires)`;
+const SUBJECTLESS_ORDINARY_VERB_HEAD = String.raw`(?:accepts?|adapts?|analyzes?|applies|audits?|builds?|checks?|classifies|collects?|compares?|compiles?|completes?|configures?|creates?|detects?|documents?|emits?|evaluates?|executes?|generates?|handles?|inspects?|loads?|logs?|maps?|normalizes?|parses?|prepares?|processes|produces?|reads?|records?|reports?|resolves?|reviews?|runs?|scans?|selects?|stores?|summarizes?|tracks?|transforms?|updates?|uses?|validates?|verifies|writes?)`;
+const SUBJECTLESS_POLICY_VERB_HEAD = String.raw`(?:never|without|don't|keep|operate|work|access|attach|handle|load|post|publish|push|read|send|share|submit|sync|upload|use)`;
+const SUBJECTLESS_PREDICATE_HEAD = String.raw`(?:${SUBJECTLESS_AUXILIARY_HEAD}|${SUBJECTLESS_ORDINARY_VERB_HEAD}|${SUBJECTLESS_POLICY_VERB_HEAD})`;
+const SUBJECTLESS_PREDICATE_PREFIX = String.raw`(?:[ \t]*(?:,[ \t]*)?)(?:(?:it|${STATEMENT_MODIFIER})[ \t]+){0,4}`;
 const ORDINARY_STATEMENT_SEPARATOR_RE =
   /(?:,[ \t]*and\b|[ \t]+and\b|,)(?=[ \t]+)/gi;
 const INHERITED_STATEMENT_SEPARATOR_RE = new RegExp(
   String.raw`^[ \t]*(?:(?:,[ \t]*)?and|,|(?:,[ \t]*)?(?:but|yet|however[ \t]*,?)|;[ \t]*however[ \t]*,|;|then)[ \t]*$`,
   "i",
 );
-const INHERITED_PREDICATE_PREFIX_RE = new RegExp(
-  String.raw`^[ \t]*(?:,[ \t]*)?(?:(?:it|${STATEMENT_MODIFIER})[ \t]+){0,4}$`,
-  "i",
-);
-const DIRECT_WORKFLOW_PROHIBITION_START_RE = new RegExp(
-  String.raw`^[ \t]*(?:(?:${STATEMENT_MODIFIER})[ \t]+){0,4}(?:(?:(?:must|shall|will|does)[ \t]+not|cannot|can't|never)\b|(?:must|shall|will|has[ \t]+to|needs[ \t]+to)[ \t]+(?:run|operate|work)\b|without\b)`,
-  "i",
-);
 const SUBJECTLESS_PREDICATE_START_RE = new RegExp(
-  String.raw`^[ \t]*(?:,[ \t]*)?(?:(?:it|${STATEMENT_MODIFIER})[ \t]+){0,4}(?:must|shall|will|would|does|do|cannot|can't|never|may|might|can|could|should|has|needs|requires|checks|validates|prepares|writes?|reads?|runs?|operates?|works?|uses?|accesses?|loads?|accepts?|handles?|uploads?|sends?|posts?|shares?|attaches?|submits?|syncs?|pushes?|publishes?|keeps?)\b`,
+  String.raw`^${SUBJECTLESS_PREDICATE_PREFIX}${SUBJECTLESS_PREDICATE_HEAD}\b`,
+  "i",
+);
+const CONDITIONAL_OR_SUBORDINATE_PREDICATE_START_RE =
+  /^[ \t]*(?:if|unless|when|whenever|while|although|because|before|after|once|whereas|despite|provided|assuming)\b/i;
+const EXPLICIT_CHANGED_SUBJECT_START_RE = new RegExp(
+  String.raw`^[ \t]*(?:(?:the|a|an|this|that|these|those|each|every|another|offline|online|local|remote)[ \t]+)?[A-Za-z][A-Za-z0-9_-]*(?:[ \t]+[A-Za-z][A-Za-z0-9_-]*){0,3}[ \t]+${SUBJECTLESS_PREDICATE_HEAD}\b`,
   "i",
 );
 const DOMAIN_PREDICATE_START_RE = new RegExp(
@@ -237,11 +240,47 @@ const LEADING_WORKFLOW_SUBJECT_RE = new RegExp(
   String.raw`^[ \t]*(?:,[ \t]*)?(?:(?:${STATEMENT_MODIFIER})[ \t]+)*(?<subject>${WORKFLOW_SCOPE_TERMS})\b`,
   "i",
 );
+const DIRECT_SUBJECT_SHORT_MODIFIER_RE = new RegExp(
+  String.raw`^[ \t]*(?:(?:it|${STATEMENT_MODIFIER}|always|explicitly|directly|strictly|categorically|may|might|can|could|should|would)[ \t]+){1,4}$`,
+  "i",
+);
+const DIRECT_SUBJECT_PUNCTUATION_RE = /^[ \t]*(?::|--?|[–—])[ \t]*$/u;
+const DIRECT_SUBJECT_RELATIVE_MODIFIER_RE = new RegExp(
+  String.raw`^[ \t]*(?:that|which)[ \t]+${SUBJECTLESS_PREDICATE_HEAD}\b(?:[ \t]+[A-Za-z][A-Za-z0-9_-]*){0,5}[ \t]*$`,
+  "i",
+);
+const DIRECT_SUBJECT_PARENTHETICAL_RE =
+  /^[ \t]*\((?<content>[^()"'\n]{1,64})\)[ \t]*$/u;
+const DESCRIPTIVE_SUBJECT_BRIDGE_RE =
+  /\b(?:says?|states?|documents?|describes?|quotes?|notes?|explains?|mentions?|reports?|shows?|lists?)\b/i;
+const CONDITIONAL_SUBJECT_BRIDGE_RE =
+  /\b(?:if|unless|when|whenever|while|although|because|before|after|once|whereas|provided|assuming)\b/i;
+const CHANGED_SUBJECT_BRIDGE_RE =
+  /\b(?:the|a|an|this|that|these|those|each|every|another|offline|online|local|remote)[ \t]+[A-Za-z][A-Za-z0-9_-]*(?:[ \t]+[A-Za-z][A-Za-z0-9_-]*){0,2}[ \t]*$/i;
+
+type PredicateStartClassification =
+  | "explicit-workflow-subject"
+  | "supported-subjectless"
+  | "explicit-changed-subject"
+  | "conditional-or-subordinate"
+  | "unsupported";
+
+type DirectSubjectBridgeClassification =
+  | "immediate"
+  | "short-modifier"
+  | "punctuation"
+  | "bounded-relative"
+  | "bounded-parenthetical"
+  | "explicit-changed-subject"
+  | "conditional-or-subordinate"
+  | "quoted-or-descriptive"
+  | "unsupported";
 
 interface BodyPolicyPredicateSegment {
   readonly range: EvidenceRange;
   readonly separator: EvidenceRange;
   readonly boundary: "start" | "inherited" | "hard";
+  readonly startClassification: PredicateStartClassification;
   readonly explicitSubject: EvidenceRange | undefined;
   readonly inheritedSubject: EvidenceRange | undefined;
 }
@@ -251,14 +290,6 @@ interface BodyPolicyStatementGroup {
   readonly range: EvidenceRange;
   readonly explicitSubject: EvidenceRange | undefined;
   readonly predicates: readonly BodyPolicyPredicateSegment[];
-}
-
-interface ClassifiedBodyPolicyPredicate {
-  readonly predicateRange: EvidenceRange;
-  readonly explicitSubject: EvidenceRange | undefined;
-  readonly inheritedSubject: EvidenceRange | undefined;
-  readonly directlySupportedDomainPattern: boolean;
-  readonly fact: BodyPolicyClauseFacts;
 }
 
 /** @internal Extract bounded semantic facts from one prepared Markdown clause. */
@@ -279,7 +310,7 @@ export function bodyPolicyStatementGroupFacts(
   text: string,
   clauseRanges: readonly EvidenceRange[],
 ): readonly BodyPolicyClauseFacts[] {
-  const classified: ClassifiedBodyPolicyPredicate[] = [];
+  const classified: BodyPolicyClauseFacts[] = [];
   for (const group of bodyPolicyStatementGroups(text, clauseRanges)) {
     for (const predicate of group.predicates) {
       const predicateText = text.slice(
@@ -301,6 +332,7 @@ export function bodyPolicyStatementGroupFacts(
               predicateText,
               fact,
               explicitSubject,
+              factDirectlyUsesSupportedPattern(predicateText, fact),
             )
           ) {
             return [];
@@ -310,17 +342,7 @@ export function bodyPolicyStatementGroupFacts(
             evidenceStart: predicate.range.start + fact.evidenceStart,
             evidenceEnd: predicate.range.start + fact.evidenceEnd,
           };
-          const classifiedFact = {
-            predicateRange: predicate.range,
-            explicitSubject: predicate.explicitSubject,
-            inheritedSubject: predicate.inheritedSubject,
-            directlySupportedDomainPattern: factDirectlyUsesSupportedPattern(
-              predicateText,
-              fact,
-            ),
-            fact: projectedFact,
-          } satisfies ClassifiedBodyPolicyPredicate;
-          return [classifiedFact];
+          return [projectedFact];
         },
       );
       const inheritedSubject = predicate.inheritedSubject;
@@ -334,26 +356,18 @@ export function bodyPolicyStatementGroupFacts(
                 inheritedSubject,
                 domain,
               );
-              return projected === undefined
-                ? []
-                : [
-                    {
-                      predicateRange: predicate.range,
-                      explicitSubject: predicate.explicitSubject,
-                      inheritedSubject,
-                      directlySupportedDomainPattern: true,
-                      fact: projected,
-                    } satisfies ClassifiedBodyPolicyPredicate,
-                  ];
+              return projected === undefined ? [] : [projected];
             });
       const projectedDomains = new Set(
-        projectedFacts.flatMap(({ fact: { domain } }) =>
+        projectedFacts.flatMap(({ domain }) =>
           domain === undefined ? [] : [domain],
         ),
       );
       for (const direct of directFacts) {
-        const { fact } = direct;
-        if (fact.domain !== undefined && projectedDomains.has(fact.domain)) {
+        if (
+          direct.domain !== undefined &&
+          projectedDomains.has(direct.domain)
+        ) {
           continue;
         }
         classified.push(direct);
@@ -361,7 +375,7 @@ export function bodyPolicyStatementGroupFacts(
       classified.push(...projectedFacts);
     }
   }
-  return deduplicateStatementFacts(classified.map(({ fact }) => fact));
+  return deduplicateStatementFacts(classified);
 }
 
 function classifyDomainFacts(
@@ -876,11 +890,15 @@ function bodyPolicyStatementGroups(
           ? "inherited"
           : "hard";
     const explicitSubject = leadingWorkflowSubjectInRange(text, range);
+    const startClassification = classifyPredicateStart(
+      text.slice(range.start, range.end),
+      explicitSubject !== undefined,
+    );
     const inheritsSubject =
       explicitSubject === undefined &&
       boundary === "inherited" &&
       activeSubject !== undefined &&
-      SUBJECTLESS_PREDICATE_START_RE.test(text.slice(range.start, range.end));
+      startClassification === "supported-subjectless";
     if (boundary === "hard") {
       if (predicates.length > 0) {
         groups.push(
@@ -898,6 +916,7 @@ function bodyPolicyStatementGroups(
       range,
       separator,
       boundary,
+      startClassification,
       explicitSubject,
       inheritedSubject,
     });
@@ -958,19 +977,41 @@ function splitOrdinaryPredicateRanges(
 }
 
 function startsStatementPredicate(text: string): boolean {
+  const startClassification = classifyPredicateStart(
+    text,
+    LEADING_WORKFLOW_SUBJECT_RE.test(text),
+  );
   return (
-    LEADING_WORKFLOW_SUBJECT_RE.test(text) ||
+    startClassification === "explicit-workflow-subject" ||
     DOMAIN_PREDICATE_START_RE.test(text) ||
-    (SUBJECTLESS_PREDICATE_START_RE.test(text) &&
+    ((startClassification === "supported-subjectless" ||
+      startClassification === "explicit-changed-subject") &&
       DOMAIN_ORDER.some((domain) =>
         DOMAIN_EVIDENCE_PATTERNS[domain].test(text),
       ))
   );
 }
 
+function classifyPredicateStart(
+  text: string,
+  hasExplicitWorkflowSubject: boolean,
+): PredicateStartClassification {
+  if (hasExplicitWorkflowSubject) return "explicit-workflow-subject";
+  if (CONDITIONAL_OR_SUBORDINATE_PREDICATE_START_RE.test(text)) {
+    return "conditional-or-subordinate";
+  }
+  if (SUBJECTLESS_PREDICATE_START_RE.test(text)) {
+    return "supported-subjectless";
+  }
+  if (EXPLICIT_CHANGED_SUBJECT_START_RE.test(text)) {
+    return "explicit-changed-subject";
+  }
+  return "unsupported";
+}
+
 function trimPredicateRange(text: string, range: EvidenceRange): EvidenceRange {
   const source = text.slice(range.start, range.end);
-  const leading = /^[ \t]*/u.exec(source)?.[0].length ?? 0;
+  const leading = /^[ \t]*(?:,[ \t]*)?/u.exec(source)?.[0].length ?? 0;
   const trailing = /(?:,[ \t]*|[ \t]+)$/u.exec(source)?.[0].length ?? 0;
   return {
     start: range.start + leading,
@@ -1023,11 +1064,13 @@ function directFactHasSupportedSubjectBridge(
   predicate: string,
   fact: BodyPolicyClauseFacts,
   explicitSubject: EvidenceRange | undefined,
+  directlySupportedDomainPattern: boolean,
 ): boolean {
   const domain = fact.domain;
   if (
     domain === undefined ||
     explicitSubject === undefined ||
+    !directlySupportedDomainPattern ||
     fact.modality !== "prohibited" ||
     fact.scope !== "workflow"
   ) {
@@ -1046,9 +1089,59 @@ function directFactHasSupportedSubjectBridge(
   );
   return (
     subjectCandidates.length === 0 ||
-    DIRECT_WORKFLOW_PROHIBITION_START_RE.test(
-      predicate.slice(explicitSubject.end),
+    subjectCandidates.some((candidate) =>
+      directSubjectBridgeSupportsProhibition(
+        classifyDirectSubjectBridge(
+          predicate.slice(explicitSubject.end, candidate.predicateStart),
+        ),
+      ),
     )
+  );
+}
+
+function classifyDirectSubjectBridge(
+  bridge: string,
+): DirectSubjectBridgeClassification {
+  if (/^[ \t]*$/u.test(bridge)) return "immediate";
+  if (/["'“”‘’`]/u.test(bridge) || DESCRIPTIVE_SUBJECT_BRIDGE_RE.test(bridge)) {
+    return "quoted-or-descriptive";
+  }
+  if (CONDITIONAL_SUBJECT_BRIDGE_RE.test(bridge)) {
+    return "conditional-or-subordinate";
+  }
+  if (DIRECT_SUBJECT_SHORT_MODIFIER_RE.test(bridge)) {
+    return "short-modifier";
+  }
+  if (DIRECT_SUBJECT_PUNCTUATION_RE.test(bridge)) return "punctuation";
+  if (DIRECT_SUBJECT_RELATIVE_MODIFIER_RE.test(bridge)) {
+    return "bounded-relative";
+  }
+  const parenthetical = DIRECT_SUBJECT_PARENTHETICAL_RE.exec(bridge);
+  if (
+    parenthetical?.groups?.content !== undefined &&
+    !CONDITIONAL_SUBJECT_BRIDGE_RE.test(parenthetical.groups.content) &&
+    !DESCRIPTIVE_SUBJECT_BRIDGE_RE.test(parenthetical.groups.content) &&
+    !new RegExp(PROHIBITION_PREDICATE_RE.source, "i").test(
+      parenthetical.groups.content,
+    )
+  ) {
+    return "bounded-parenthetical";
+  }
+  if (CHANGED_SUBJECT_BRIDGE_RE.test(bridge)) {
+    return "explicit-changed-subject";
+  }
+  return "unsupported";
+}
+
+function directSubjectBridgeSupportsProhibition(
+  classification: DirectSubjectBridgeClassification,
+): boolean {
+  return (
+    classification === "immediate" ||
+    classification === "short-modifier" ||
+    classification === "punctuation" ||
+    classification === "bounded-relative" ||
+    classification === "bounded-parenthetical"
   );
 }
 
@@ -1077,7 +1170,9 @@ function projectedStatementFact(
     return (
       candidate.directWorkflowSubject !== undefined &&
       candidate.predicateStart >= prefix.length &&
-      INHERITED_PREDICATE_PREFIX_RE.test(predicatePrefix)
+      directSubjectBridgeSupportsProhibition(
+        classifyDirectSubjectBridge(predicatePrefix),
+      )
     );
   });
   if (supportedCandidate === undefined) return undefined;

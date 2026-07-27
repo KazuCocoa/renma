@@ -3,302 +3,300 @@ import test from "node:test";
 
 import { securityDiagnosticFindings } from "../src/security-diagnostics.js";
 import {
-  BODY_POLICY_0244_FINDINGS_BY_CASE,
+  BODY_POLICY_0244_GOLDEN_CASES,
   BODY_POLICY_0244_GOLDEN_SOURCE,
   type LegacyBodyPolicyFindingProjection,
 } from "./fixtures/body-policy-0244-golden.js";
-
-type PolicyDomain = "network" | "upload" | "secrets";
-type FirstPredicateKind =
-  | "unrelated"
-  | "requirement"
-  | "not-required"
-  | "local"
-  | "specific"
-  | "workflow-prohibition";
-type LaterScope = "workflow" | "local" | "specific" | "unsupported";
-type CorpusLayout = "one-line" | "soft-wrap" | "hard-break" | "heading";
-
-interface CompatibilityCorpusCase {
-  readonly name: string;
-  readonly body: string;
-  readonly coverage: {
-    readonly subject: string;
-    readonly firstKind: string;
-    readonly connector: string;
-    readonly laterDomain: string;
-    readonly scope: string;
-    readonly layout: string;
-    readonly domainRelationship: string;
-    readonly predicateCount: number;
-  };
-}
 
 interface IntentionalCompatibilityChange {
   readonly reason: string;
   readonly current: readonly LegacyBodyPolicyFindingProjection[];
 }
 
-const SUBJECTS = [
-  "This workflow",
-  "This task",
-  "The process",
-  "This run",
-  "The operation",
-] as const;
-const DOMAINS = ["network", "upload", "secrets"] as const;
-const FIRST_KINDS: readonly FirstPredicateKind[] = [
-  "unrelated",
-  "requirement",
-  "not-required",
-  "local",
-  "specific",
-  "workflow-prohibition",
-];
-const CONNECTORS = [
-  " and ",
-  " and also ",
-  " but ",
-  ", yet ",
-  "; however, it ",
-  "; ",
-  " then ",
-  ". ",
-] as const;
-const LATER_SCOPES: readonly LaterScope[] = [
-  "workflow",
-  "local",
-  "specific",
-  "unsupported",
-];
-const LAYOUTS: readonly CorpusLayout[] = [
-  "one-line",
-  "soft-wrap",
-  "hard-break",
-  "heading",
-];
-
 const INTENTIONAL_COMPATIBILITY_CHANGES: Readonly<
   Record<string, IntentionalCompatibilityChange>
 > = {
-  "two-03-one-line-requirement-same-secrets": compatibilityChange(
-    "The process requires credentials but must not use credentials.",
-    "Statement-group evidence includes the inherited prohibition instead of ending at the earlier subject-bearing predicate.",
+  "pairwise-01-ordinary-one-line": findingChange(
+    "This workflow validates inputs and is deterministic, yet must not use the network.",
+    "Statement groups intentionally retain the explicit workflow subject through a supported copular middle predicate.",
   ),
-  "two-13-soft-wrap-unrelated-same-network": compatibilityChange(
-    "The process validates inputs; however, it\nmust not use the network.",
-    "Ordinary Markdown soft wrapping now uses the same statement-group subject inheritance as one-line prose.",
-    12,
+  "pairwise-05-modified-ordinary-one-line": findingChange(
+    "The operation requires external uploads and also may write local logs, yet must not upload files.",
+    "Statement groups intentionally retain the explicit operation subject through a supported auxiliary middle predicate.",
   ),
-  "two-14-soft-wrap-unrelated-cross-upload": compatibilityChange(
-    "This run validates inputs;\nmust not upload files.",
-    "Strict semicolon compatibility now applies consistently after ordinary Markdown soft wrapping.",
-    12,
+  "pairwise-09-but-one-line": findingChange(
+    "This run does not require credential access but audits logs, yet must not use credentials.",
+    "Statement groups intentionally retain the explicit run subject through a supported ordinary middle predicate.",
   ),
-  "two-15-soft-wrap-requirement-same-secrets": compatibilityChange(
-    "The operation requires credentials then\nmust not use credentials.",
-    "Strict then-boundary compatibility now applies consistently after ordinary Markdown soft wrapping.",
-    12,
+  "pairwise-13-yet-one-line": findingChange(
+    "The process must not upload files during local setup, yet checks configuration, yet must not use the network.",
+    "A local first predicate no longer discards the grammatical process subject before a complete later workflow prohibition.",
   ),
-  "two-23-soft-wrap-workflow-prohibition-same-upload": compatibilityChange(
-    "The process must not upload files then",
-    "Physical-line evidence retains the visible connector on the occupied source line.",
+  "pairwise-17-however-one-line": findingChange(
+    "This task must not access credentials from production; however, it is deterministic, yet must not upload files.",
+    "A specific-source first predicate no longer discards the grammatical task subject through a supported copular predicate.",
   ),
-  "two-35-hard-break-workflow-prohibition-same-upload": compatibilityChange(
-    "The operation must not upload files but",
-    "Physical-line evidence retains the visible connector before the Markdown hard break.",
+  "pairwise-21-semicolon-one-line": compatibilityChange(
+    [
+      finding("This workflow must not use the network"),
+      finding(
+        "This workflow must not use the network; may write local logs, yet must not use credentials.",
+      ),
+    ],
+    "Strict semicolon compatibility preserves the first-domain finding while statement-group continuation adds the independently supported later domain.",
   ),
-  "two-36-hard-break-workflow-prohibition-cross-secrets": compatibilityChange(
-    "This workflow must not use the network, yet",
-    "An independently complete prohibition before a Markdown hard break remains reportable even though its subject is not inherited afterward.",
+  "pairwise-22-semicolon-soft-wrap": findingChange(
+    "This task must not upload files;",
+    "Physical-line evidence intentionally retains the visible semicolon before an ordinary Markdown soft wrap.",
   ),
-  "two-37-heading-unrelated-same-network": compatibilityChange(
-    "## This task validates inputs; however, it must not use the network.",
-    "Fallback heading evidence now includes the supported inherited prohibition.",
+  "pairwise-23-semicolon-hard-break": findingChange(
+    "The process must not upload files; may write local logs, yet audits logs but",
+    "An independently complete first-domain prohibition remains reportable with evidence bounded to the physical line before a Markdown hard break.",
   ),
-  "two-38-heading-unrelated-cross-upload": compatibilityChange(
-    "## The process validates inputs; must not upload files.",
-    "Strict semicolon compatibility is shared by fallback headings and prose paragraphs.",
+  "pairwise-25-then-one-line": findingChange(
+    "The operation validates inputs then audits logs, yet must not use the network.",
+    "Strict then compatibility carries the explicit operation subject through the supported ordinary middle predicate.",
   ),
-  "two-39-heading-requirement-same-secrets": compatibilityChange(
-    "## This run requires credentials then must not use credentials.",
-    "Strict then-boundary compatibility is shared by fallback headings and prose paragraphs.",
+  "descriptive-says-helper-one-line": noFindingChange(
+    "Precision tightening rejects a descriptive bridge that assigns the prohibition to a helper rather than the workflow.",
   ),
-  "three-01-one-line-unrelated-network": compatibilityChange(
-    "This workflow validates inputs but checks local logs, yet must not use the network.",
-    "Statement-group subject state intentionally spans three supported predicates.",
+  "descriptive-says-helper-soft-wrap": noFindingChange(
+    "The descriptive changed-subject precision boundary is identical for ordinary Markdown soft wrapping.",
   ),
-  "three-05-one-line-specific-upload": compatibilityChange(
-    "The operation must not access credentials from production but checks local logs yet must not upload files.",
-    "A specific-source first predicate no longer prevents three-predicate subject inheritance.",
+  "descriptive-says-helper-heading": noFindingChange(
+    "Fallback headings use the same descriptive changed-subject precision boundary as prepared prose.",
   ),
-  "three-06-soft-wrap-workflow-prohibition-secrets": compatibilityChange(
-    "This workflow must not use the network, but",
-    "An independently complete first-domain prohibition remains reportable before later soft-wrapped predicates.",
+  "descriptive-documents-helper-one-line": noFindingChange(
+    "Precision tightening rejects documentation about a helper prohibition as a workflow-wide instruction.",
   ),
-  "three-09-one-line-not-required-secrets": compatibilityChange(
-    "This run does not require network access but checks local logs yet must not use credentials.",
-    "A not-required first predicate no longer prevents three-predicate subject inheritance.",
+  "descriptive-documents-helper-soft-wrap": noFindingChange(
+    "The descriptive helper precision boundary is identical for ordinary Markdown soft wrapping.",
   ),
-  "three-12-heading-workflow-prohibition-secrets": compatibilityChange(
-    "## This task must not use the network,",
-    "Fallback statement segmentation preserves an independently supported first-domain prohibition.",
+  "descriptive-documents-helper-heading": noFindingChange(
+    "Fallback headings use the same descriptive helper precision boundary as prepared prose.",
   ),
-  "three-13-one-line-unrelated-network": compatibilityChange(
-    "The process validates inputs but checks local logs, yet must not use the network.",
-    "Statement-group subject state intentionally spans three supported predicates.",
+  "conditional-subject-bridge-one-line": noFindingChange(
+    "A conditional subject-to-predicate bridge is not treated as an unconditional workflow prohibition.",
   ),
-  "stabilization-unrelated-workflow": compatibilityChange(
+  "conditional-subject-bridge-soft-wrap": noFindingChange(
+    "The conditional bridge precision boundary is identical for ordinary Markdown soft wrapping.",
+  ),
+  "conditional-subject-bridge-heading": noFindingChange(
+    "Fallback headings use the same conditional bridge precision boundary as prepared prose.",
+  ),
+  "changed-subject-bridge-one-line": noFindingChange(
+    "A helper introduced between the workflow subject and prohibition is an explicit changed subject.",
+  ),
+  "changed-subject-bridge-soft-wrap": noFindingChange(
+    "The direct changed-subject precision boundary is identical for ordinary Markdown soft wrapping.",
+  ),
+  "changed-subject-bridge-heading": noFindingChange(
+    "Fallback headings use the same direct changed-subject precision boundary as prepared prose.",
+  ),
+  "changed-middle-helper-one-line": noFindingChange(
+    "An explicit helper subject clears inherited workflow scope before the later implicit predicate.",
+  ),
+  "precision-unexpected-modifier": noFindingChange(
+    "An unrecognized adverb is unsupported bridge syntax rather than evidence of workflow-subject inheritance.",
+  ),
+  "precision-changed-helper": noFindingChange(
+    "An explicit helper subject prevents the later prohibition from inheriting workflow scope.",
+  ),
+  "precision-unsupported-although": noFindingChange(
+    "An unsupported subordinate connector does not inherit workflow scope.",
+  ),
+  "precision-offline-helper": noFindingChange(
+    "An explicit offline-helper subject prevents workflow-subject inheritance.",
+  ),
+  "precision-specific-upload-target": noFindingChange(
+    "A destination-specific upload restriction does not contradict workflow-wide permissive upload metadata.",
+  ),
+  "precision-unsupported-network-remainder": noFindingChange(
+    "An exception clause leaves the prohibition incomplete and therefore non-emitting.",
+  ),
+  "precision-semicolon-however-without-comma": noFindingChange(
+    "The malformed semicolon-however boundary is unsupported syntax and does not inherit workflow scope.",
+  ),
+  "precision-changed-helper-chain": noFindingChange(
+    "A changed helper subject clears subject state across the remainder of a contrastive chain.",
+  ),
+  "independent-earlier-network-prohibition": findingChange(
+    "No network access and this workflow requires network access",
+    "Independent same-domain facts retain the earlier complete prohibition instead of allowing the later requirement to suppress it.",
+  ),
+  "stabilization-unrelated-workflow": findingChange(
     "This workflow validates inputs but must not use credentials.",
-    "Evidence now includes the inherited prohibition for a domain-free first predicate.",
+    "Statement-group evidence includes the inherited prohibition instead of ending at the earlier domain-free predicate.",
   ),
-  "stabilization-unrelated-task": compatibilityChange(
+  "stabilization-unrelated-task": findingChange(
     "This task prepares the report, yet must not upload files.",
-    "Evidence now includes the inherited prohibition for a domain-free first predicate.",
+    "Statement-group evidence includes the inherited prohibition instead of ending at the earlier domain-free task predicate.",
   ),
-  "stabilization-unrelated-process": compatibilityChange(
+  "stabilization-unrelated-process": findingChange(
     "The process checks configuration; however, it must not use the network.",
-    "Evidence now includes the inherited prohibition for a domain-free first predicate.",
+    "Statement-group evidence includes the inherited prohibition instead of ending at the earlier domain-free process predicate.",
   ),
-  "stabilization-specific-network": compatibilityChange(
+  "stabilization-specific-network": findingChange(
     "This workflow must not use network access to production systems but must not use credentials.",
-    "Subject proof is intentionally independent of a specific-target first fact.",
+    "A specific-target first predicate no longer prevents an independent later-domain workflow prohibition.",
   ),
-  "stabilization-specific-secret": compatibilityChange(
+  "stabilization-specific-secret": findingChange(
     "This workflow must not access credentials from production yet must not upload files.",
-    "Subject proof is intentionally independent of a specific-source first fact.",
+    "A specific-source first predicate no longer prevents an independent later-domain workflow prohibition.",
   ),
-  "stabilization-three-secrets": compatibilityChange(
+  "stabilization-three-secrets": findingChange(
     "This workflow requires network access but checks logs, yet must not use credentials.",
-    "Evidence now spans the complete three-predicate statement group.",
+    "Statement-group subject state and evidence intentionally span three supported predicates.",
   ),
-  "stabilization-three-upload": compatibilityChange(
+  "stabilization-three-upload": findingChange(
     "This workflow requires network access, but may write local logs, yet must not upload files.",
-    "Statement-group subject state intentionally spans three supported predicates beyond the legacy regex distance.",
+    "Statement-group subject state intentionally spans an auxiliary middle predicate beyond the legacy matcher distance.",
   ),
-  "stabilization-modifier-still": compatibilityChange(
+  "stabilization-modifier-still": findingChange(
     "This workflow requires network access but still must not use credentials.",
     "Evidence includes the supported bounded modifier and inherited prohibition.",
   ),
-  "stabilization-modifier-also": compatibilityChange(
+  "stabilization-modifier-also": findingChange(
     "This workflow requires credentials yet also must not upload files.",
-    "Evidence includes the supported bounded modifier and inherited prohibition.",
+    "Evidence includes the supported bounded modifier and inherited cross-domain prohibition.",
   ),
-  "stabilization-modifier-therefore": compatibilityChange(
+  "stabilization-modifier-therefore": findingChange(
     "This workflow requires external uploads; however, it therefore must not use the network.",
-    "The bounded statement modifier grammar intentionally supports therefore without enumerating arbitrary adverbs.",
+    "The bounded statement modifier grammar intentionally supports therefore across a contrastive boundary.",
   ),
-  "stabilization-heading": compatibilityChange(
+  "stabilization-heading": findingChange(
     "## This workflow requires network access but must not use credentials",
-    "Fallback heading evidence now includes the inherited prohibition.",
+    "Fallback heading evidence includes the supported inherited prohibition.",
   ),
-  "stabilization-bare-semicolon": compatibilityChange(
+  "stabilization-bare-semicolon": findingChange(
     "This workflow requires network access; must not use credentials.",
-    "Strict semicolon compatibility retains the finding while evidence now includes its prohibition.",
+    "Strict semicolon compatibility retains the finding while evidence includes its prohibition.",
   ),
-  "stabilization-then": compatibilityChange(
+  "stabilization-then": findingChange(
     "This workflow requires network access then must not use credentials.",
-    "Strict then-boundary compatibility retains the finding while evidence now includes its prohibition.",
+    "Strict then compatibility retains the finding while evidence includes its prohibition.",
+  ),
+  "stabilization-middle-copular": findingChange(
+    "This workflow validates inputs but is deterministic, yet must not use credentials.",
+    "Statement groups intentionally retain the explicit subject through a supported copular middle predicate.",
+  ),
+  "stabilization-middle-audits": findingChange(
+    "This workflow validates inputs but audits logs, yet must not upload files.",
+    "Statement groups intentionally retain the explicit subject through a curated ordinary middle predicate.",
+  ),
+  "stabilization-middle-reviews": findingChange(
+    "This task runs but reviews results, yet must not use the network.",
+    "Statement groups intentionally retain the explicit task subject through a curated ordinary middle predicate.",
   ),
 };
 
-const COMPATIBILITY_CORPUS = bodyPolicyCompatibilityCorpus();
+const PAIRWISE_CASES = BODY_POLICY_0244_GOLDEN_CASES.filter(
+  ({ coverage }) => coverage.group === "pairwise",
+);
 
-test("0.24.4 body-policy golden corpus spans the supported compatibility axes", () => {
+test("0.24.4 body-policy golden cases are self-contained and immutable", () => {
   assert.equal(BODY_POLICY_0244_GOLDEN_SOURCE.tag, "v0.24.4");
-  assert.equal(BODY_POLICY_0244_GOLDEN_SOURCE.commit, "9e72e1a");
-  assert.equal(COMPATIBILITY_CORPUS.length, 79);
-  assert.deepEqual(
-    new Set(
-      COMPATIBILITY_CORPUS.flatMap(({ coverage }) =>
-        SUBJECTS.includes(coverage.subject as (typeof SUBJECTS)[number])
-          ? [coverage.subject]
-          : [],
-      ),
-    ),
-    new Set(SUBJECTS),
+  assert.equal(
+    BODY_POLICY_0244_GOLDEN_SOURCE.commit,
+    "9e72e1adddd588ea72cba1c3e06ed1d07de330d9",
   );
-  assert.deepEqual(
-    new Set(
-      COMPATIBILITY_CORPUS.flatMap(({ coverage }) =>
-        FIRST_KINDS.includes(coverage.firstKind as FirstPredicateKind)
-          ? [coverage.firstKind]
-          : [],
-      ),
-    ),
-    new Set(FIRST_KINDS),
+  assert.match(
+    BODY_POLICY_0244_GOLDEN_SOURCE.generatedBy,
+    /securityDiagnosticFindings/u,
   );
-  assert.deepEqual(
-    new Set(
-      COMPATIBILITY_CORPUS.flatMap(({ coverage }) =>
-        DOMAINS.includes(coverage.laterDomain as PolicyDomain)
-          ? [coverage.laterDomain]
-          : [],
-      ),
-    ),
-    new Set(DOMAINS),
+  assert.equal(BODY_POLICY_0244_GOLDEN_CASES.length, 97);
+  assert.equal(
+    new Set(BODY_POLICY_0244_GOLDEN_CASES.map(({ name }) => name)).size,
+    BODY_POLICY_0244_GOLDEN_CASES.length,
   );
-  assert.deepEqual(
-    new Set(
-      COMPATIBILITY_CORPUS.flatMap(({ coverage }) =>
-        LATER_SCOPES.includes(coverage.scope as LaterScope)
-          ? [coverage.scope]
-          : [],
-      ),
-    ),
-    new Set(LATER_SCOPES),
+  assert.ok(Object.isFrozen(BODY_POLICY_0244_GOLDEN_SOURCE));
+  assert.ok(Object.isFrozen(BODY_POLICY_0244_GOLDEN_CASES));
+
+  for (const fixture of BODY_POLICY_0244_GOLDEN_CASES) {
+    assert.ok(fixture.name.length > 0);
+    assert.ok(fixture.body.length > 0);
+    assert.ok(Object.isFrozen(fixture), fixture.name);
+    assert.ok(Object.isFrozen(fixture.coverage), fixture.name);
+    assert.ok(Object.isFrozen(fixture.expected), fixture.name);
+    for (const findingProjection of fixture.expected) {
+      assert.ok(Object.isFrozen(findingProjection), fixture.name);
+    }
+  }
+});
+
+test("frozen 0.24.4 cases cover every required pairwise interaction", () => {
+  assert.equal(PAIRWISE_CASES.length, 32);
+  assertPairwiseCoverage(
+    "first predicate kind × later scope",
+    PAIRWISE_CASES,
+    "firstKind",
+    [
+      "unrelated",
+      "requirement",
+      "not-required",
+      "local",
+      "specific",
+      "workflow-prohibition",
+    ],
+    "laterScope",
+    ["workflow", "local", "specific", "unsupported"],
   );
-  assert.deepEqual(
-    new Set(
-      COMPATIBILITY_CORPUS.flatMap(({ coverage }) =>
-        LAYOUTS.includes(coverage.layout as CorpusLayout)
-          ? [coverage.layout]
-          : [],
-      ),
-    ),
-    new Set(LAYOUTS),
+  assertPairwiseCoverage(
+    "earlier domain × later domain",
+    PAIRWISE_CASES,
+    "earlierDomain",
+    ["network", "upload", "secrets"],
+    "laterDomain",
+    ["network", "upload", "secrets"],
   );
-  assert.deepEqual(
-    new Set(
-      COMPATIBILITY_CORPUS.map(
-        ({ coverage }) => coverage.domainRelationship,
-      ).filter(
-        (relationship) => relationship === "same" || relationship === "cross",
-      ),
-    ),
-    new Set(["same", "cross"]),
+  assertPairwiseCoverage(
+    "connector × layout",
+    PAIRWISE_CASES,
+    "connector",
+    [
+      "ordinary",
+      "modified-ordinary",
+      "but",
+      "yet",
+      "however",
+      "semicolon",
+      "then",
+      "sentence",
+    ],
+    "layout",
+    ["one-line", "soft-wrap", "hard-break", "heading"],
   );
-  assert.deepEqual(
-    new Set(
-      COMPATIBILITY_CORPUS.map(
-        ({ coverage }) => coverage.predicateCount,
-      ).filter((count) => count === 2 || count === 3),
-    ),
-    new Set([2, 3]),
+  assertPairwiseCoverage(
+    "connector × implicit or changed subject",
+    PAIRWISE_CASES,
+    "connector",
+    [
+      "ordinary",
+      "modified-ordinary",
+      "but",
+      "yet",
+      "however",
+      "semicolon",
+      "then",
+      "sentence",
+    ],
+    "subjectMode",
+    ["implicit", "changed"],
   );
-  assert.ok(
-    COMPATIBILITY_CORPUS.some(({ coverage }) =>
-      coverage.connector.includes("+"),
-    ),
-  );
-  assert.ok(
-    COMPATIBILITY_CORPUS.some(
-      ({ coverage }) =>
-        coverage.connector === "." ||
-        coverage.layout === "hard-break" ||
-        coverage.layout === "hard-boundary",
-    ),
+  assertPairwiseCoverage(
+    "predicate count × middle predicate category",
+    PAIRWISE_CASES,
+    "predicateCount",
+    [3, 4],
+    "middleCategory",
+    ["copular", "auxiliary", "ordinary", "established"],
   );
 });
 
-test("public body-policy findings match 0.24.4 except explicit allowlisted changes", () => {
-  const corpusNames = new Set(COMPATIBILITY_CORPUS.map(({ name }) => name));
-  for (const goldenName of Object.keys(BODY_POLICY_0244_FINDINGS_BY_CASE)) {
-    assert.ok(
-      corpusNames.has(goldenName),
-      `orphaned golden case ${goldenName}`,
-    );
-  }
+test("public body-policy findings match each frozen 0.24.4 body except explicit changes", () => {
+  const corpusNames = new Set(
+    BODY_POLICY_0244_GOLDEN_CASES.map(({ name }) => name),
+  );
   for (const allowlistedName of Object.keys(
     INTENTIONAL_COMPATIBILITY_CHANGES,
   )) {
@@ -308,291 +306,71 @@ test("public body-policy findings match 0.24.4 except explicit allowlisted chang
     );
   }
 
-  for (const fixture of COMPATIBILITY_CORPUS) {
-    const legacy = BODY_POLICY_0244_FINDINGS_BY_CASE[fixture.name] ?? [];
+  for (const fixture of BODY_POLICY_0244_GOLDEN_CASES) {
     const current = bodyPolicyFindingProjections(fixture.body);
     const intentional = INTENTIONAL_COMPATIBILITY_CHANGES[fixture.name];
     if (intentional === undefined) {
-      assert.deepEqual(current, legacy, fixture.name);
+      assert.deepEqual(current, fixture.expected, fixture.name);
       continue;
     }
     assert.ok(intentional.reason.trim().length > 0, fixture.name);
+    assert.notDeepEqual(intentional.current, fixture.expected, fixture.name);
     assert.deepEqual(current, intentional.current, fixture.name);
   }
 });
 
-function bodyPolicyCompatibilityCorpus(): readonly CompatibilityCorpusCase[] {
-  const cases: CompatibilityCorpusCase[] = [];
-  for (let index = 0; index < 48; index += 1) {
-    const laterDomain = DOMAINS[index % DOMAINS.length];
-    assert.ok(laterDomain);
-    const sameDomain = index % 2 === 0;
-    const earlierDomain = sameDomain
-      ? laterDomain
-      : DOMAINS[(index + 1) % DOMAINS.length];
-    const subject = SUBJECTS[index % SUBJECTS.length];
-    const firstKind = FIRST_KINDS[Math.floor(index / 2) % FIRST_KINDS.length];
-    const connector = CONNECTORS[index % CONNECTORS.length];
-    const scope = LATER_SCOPES[Math.floor(index / 3) % LATER_SCOPES.length];
-    const layout = LAYOUTS[Math.floor(index / 12) % LAYOUTS.length];
-    assert.ok(
-      earlierDomain && subject && firstKind && connector && scope && layout,
-    );
-    cases.push({
-      name: `two-${String(index + 1).padStart(2, "0")}-${layout}-${firstKind}-${sameDomain ? "same" : "cross"}-${laterDomain}`,
-      coverage: {
-        subject,
-        firstKind,
-        connector: connector.trim(),
-        laterDomain,
-        scope,
-        layout,
-        domainRelationship: sameDomain ? "same" : "cross",
-        predicateCount: 2,
-      },
-      body: renderBody({
-        subject,
-        firstPredicate: firstPredicate(firstKind, earlierDomain),
-        connector,
-        laterPredicate: laterPredicate(laterDomain, scope),
-        layout,
-      }),
-    });
-  }
-
-  for (let index = 0; index < 15; index += 1) {
-    const subject = SUBJECTS[index % SUBJECTS.length];
-    const laterDomain = DOMAINS[index % DOMAINS.length];
-    const earlierDomain = DOMAINS[(index + 1) % DOMAINS.length];
-    const firstKind = FIRST_KINDS[index % FIRST_KINDS.length];
-    const scope = LATER_SCOPES[index % LATER_SCOPES.length];
-    const layout = LAYOUTS[index % LAYOUTS.length];
-    assert.ok(
-      subject && laterDomain && earlierDomain && firstKind && scope && layout,
-    );
-    const firstConnector = index % 2 === 0 ? " but " : ", but ";
-    const secondConnector = index % 3 === 0 ? ", yet " : " yet ";
-    cases.push({
-      name: `three-${String(index + 1).padStart(2, "0")}-${layout}-${firstKind}-${laterDomain}`,
-      coverage: {
-        subject,
-        firstKind,
-        connector: `${firstConnector.trim()} + ${secondConnector.trim()}`,
-        laterDomain,
-        scope,
-        layout,
-        domainRelationship: "cross",
-        predicateCount: 3,
-      },
-      body: renderThreePredicateBody({
-        subject,
-        firstPredicate: firstPredicate(firstKind, earlierDomain),
-        firstConnector,
-        middlePredicate:
-          index % 2 === 0 ? "checks local logs" : "may write local logs",
-        secondConnector,
-        laterPredicate: laterPredicate(laterDomain, scope),
-        layout,
-      }),
-    });
-  }
-
-  cases.push(
-    compatibilityCase(
-      "domain-order-and-deduplication",
-      [
-        "This workflow must not use credentials.",
-        "This workflow must not upload files.",
-        "This workflow must not use the network.",
-        "This workflow must not use credentials.",
-        "This workflow must not use the network.",
-      ].join(" "),
-      5,
-    ),
-    compatibilityCase(
-      "paragraph-boundary-isolation",
-      "This workflow validates inputs.\n\nMust not use credentials.",
-      2,
-      "hard-boundary",
-    ),
-    compatibilityCase(
-      "list-item-boundary-isolation",
-      "- This task requires network access\n- Must not upload files.",
-      2,
-      "hard-boundary",
+function assertPairwiseCoverage(
+  label: string,
+  fixtures: typeof PAIRWISE_CASES,
+  leftKey: string,
+  leftValues: readonly (string | number)[],
+  rightKey: string,
+  rightValues: readonly (string | number)[],
+): void {
+  const actual = new Set(
+    fixtures.map(
+      ({ coverage }) =>
+        `${String(coverage[leftKey])}:${String(coverage[rightKey])}`,
     ),
   );
-
-  for (const [name, body] of Object.entries({
-    "stabilization-unrelated-workflow":
-      "This workflow validates inputs but must not use credentials.",
-    "stabilization-unrelated-task":
-      "This task prepares the report, yet must not upload files.",
-    "stabilization-unrelated-process":
-      "The process checks configuration; however, it must not use the network.",
-    "stabilization-specific-network":
-      "This workflow must not use network access to production systems but must not use credentials.",
-    "stabilization-specific-secret":
-      "This workflow must not access credentials from production yet must not upload files.",
-    "stabilization-three-secrets":
-      "This workflow requires network access but checks logs, yet must not use credentials.",
-    "stabilization-three-upload":
-      "This workflow requires network access, but may write local logs, yet must not upload files.",
-    "stabilization-modifier-still":
-      "This workflow requires network access but still must not use credentials.",
-    "stabilization-modifier-also":
-      "This workflow requires credentials yet also must not upload files.",
-    "stabilization-modifier-therefore":
-      "This workflow requires external uploads; however, it therefore must not use the network.",
-    "stabilization-heading":
-      "## This workflow requires network access but must not use credentials",
-    "stabilization-bare-semicolon":
-      "This workflow requires network access; must not use credentials.",
-    "stabilization-then":
-      "This workflow requires network access then must not use credentials.",
-  })) {
-    cases.push(
-      compatibilityCase(
-        name,
-        body,
-        name.includes("three") ? 3 : 2,
-        name.endsWith("heading") ? "heading" : "one-line",
-      ),
-    );
-  }
-  return cases;
-}
-
-function compatibilityCase(
-  name: string,
-  body: string,
-  predicateCount: number,
-  layout = "one-line",
-): CompatibilityCorpusCase {
-  return {
-    name,
-    body,
-    coverage: {
-      subject: "stabilization",
-      firstKind: "stabilization",
-      connector: "stabilization",
-      laterDomain: "stabilization",
-      scope: "stabilization",
-      layout,
-      domainRelationship: "mixed",
-      predicateCount,
-    },
-  };
+  const expected = new Set(
+    leftValues.flatMap((left) =>
+      rightValues.map((right) => `${String(left)}:${String(right)}`),
+    ),
+  );
+  assert.deepEqual(actual, expected, label);
 }
 
 function compatibilityChange(
+  current: readonly LegacyBodyPolicyFindingProjection[],
+  reason: string,
+): IntentionalCompatibilityChange {
+  return { reason, current };
+}
+
+function findingChange(
   snippet: string,
   reason: string,
   endLine = 11,
 ): IntentionalCompatibilityChange {
+  return compatibilityChange([finding(snippet, endLine)], reason);
+}
+
+function noFindingChange(reason: string): IntentionalCompatibilityChange {
+  return compatibilityChange([], reason);
+}
+
+function finding(
+  snippet: string,
+  endLine = 11,
+): LegacyBodyPolicyFindingProjection {
   return {
-    reason,
-    current: [
-      {
-        id: "SEC-BODY-POLICY-CONTRADICTION",
-        severity: "high",
-        startLine: 11,
-        endLine,
-        snippet,
-      },
-    ],
+    id: "SEC-BODY-POLICY-CONTRADICTION",
+    severity: "high",
+    startLine: 11,
+    endLine,
+    snippet,
   };
-}
-
-function firstPredicate(
-  kind: FirstPredicateKind,
-  domain: PolicyDomain,
-): string {
-  if (kind === "unrelated") return "validates inputs";
-  return {
-    network: {
-      requirement: "requires network access",
-      "not-required": "does not require network access",
-      local: "must not use the network during local setup",
-      specific: "must not use network access to production systems",
-      "workflow-prohibition": "must not use the network",
-    },
-    upload: {
-      requirement: "requires external uploads",
-      "not-required": "does not require external uploads",
-      local: "must not upload files during local setup",
-      specific: "must not upload files to a staging bucket",
-      "workflow-prohibition": "must not upload files",
-    },
-    secrets: {
-      requirement: "requires credentials",
-      "not-required": "does not require credential access",
-      local: "must not use credentials during local setup",
-      specific: "must not access credentials from production",
-      "workflow-prohibition": "must not use credentials",
-    },
-  }[domain][kind];
-}
-
-function laterPredicate(domain: PolicyDomain, scope: LaterScope): string {
-  return {
-    network: {
-      workflow: "must not use the network",
-      local: "must not use the network during local setup",
-      specific: "must not use network access to production systems",
-      unsupported: "must not use the network except for approved domains",
-    },
-    upload: {
-      workflow: "must not upload files",
-      local: "must not upload files during local setup",
-      specific: "must not upload files to a public bucket",
-      unsupported: "must not upload files except to approved storage",
-    },
-    secrets: {
-      workflow: "must not use credentials",
-      local: "must not use credentials during local setup",
-      specific: "must not access credentials from production",
-      unsupported: "must not use credentials unless explicitly approved",
-    },
-  }[domain][scope];
-}
-
-function renderBody(input: {
-  readonly subject: string;
-  readonly firstPredicate: string;
-  readonly connector: string;
-  readonly laterPredicate: string;
-  readonly layout: CorpusLayout;
-}): string {
-  if (input.layout === "hard-break") {
-    return `${input.subject} ${input.firstPredicate}${input.connector.trimEnd()}  \n${input.laterPredicate}.`;
-  }
-  const statement = `${input.subject} ${input.firstPredicate}${input.connector}${input.laterPredicate}.`;
-  if (input.layout === "soft-wrap") {
-    return statement.replace(input.connector, `${input.connector.trimEnd()}\n`);
-  }
-  return input.layout === "heading" ? `## ${statement}` : statement;
-}
-
-function renderThreePredicateBody(input: {
-  readonly subject: string;
-  readonly firstPredicate: string;
-  readonly firstConnector: string;
-  readonly middlePredicate: string;
-  readonly secondConnector: string;
-  readonly laterPredicate: string;
-  readonly layout: CorpusLayout;
-}): string {
-  if (input.layout === "hard-break") {
-    return `${input.subject} ${input.firstPredicate}${input.firstConnector}${input.middlePredicate}${input.secondConnector.trimEnd()}  \n${input.laterPredicate}.`;
-  }
-  const statement = `${input.subject} ${input.firstPredicate}${input.firstConnector}${input.middlePredicate}${input.secondConnector}${input.laterPredicate}.`;
-  if (input.layout === "soft-wrap") {
-    return statement
-      .replace(input.firstConnector, `${input.firstConnector.trimEnd()}\n`)
-      .replace(input.secondConnector, `${input.secondConnector.trimEnd()}\n`);
-  }
-  return input.layout === "heading" ? `## ${statement}` : statement;
 }
 
 function bodyPolicyFindingProjections(
@@ -624,11 +402,13 @@ function bodyPolicyFindingProjections(
     },
   ])
     .filter(({ id }) => id === "SEC-BODY-POLICY-CONTRADICTION")
-    .map((finding) => ({
-      id: finding.id,
-      severity: finding.severity,
-      startLine: finding.evidence.startLine,
-      endLine: finding.evidence.endLine ?? finding.evidence.startLine,
-      snippet: finding.evidence.snippet,
+    .map((findingProjection) => ({
+      id: findingProjection.id,
+      severity: findingProjection.severity,
+      startLine: findingProjection.evidence.startLine,
+      endLine:
+        findingProjection.evidence.endLine ??
+        findingProjection.evidence.startLine,
+      snippet: findingProjection.evidence.snippet,
     }));
 }

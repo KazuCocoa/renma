@@ -10,18 +10,24 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Fixed
 
-- Preserved the Renma 0.24.4 same-clause decision boundary by evaluating
-  coordinated requirement, local, qualified, safeguard, and workflow
-  prohibition predicates independently for each body-policy domain, including
-  predicates that share an explicit workflow subject across ordinary,
-  contrastive, bare-semicolon, or `then` coordination, including when earlier
-  predicates have no body-policy domain, have local or specific scope, or
-  mention a different domain.
+- Preserved the Renma 0.24.4 body-policy boundary for every frozen golden case
+  except explicitly allowlisted precision and evidence changes. Coordinated
+  requirement, local, qualified, safeguard, and workflow prohibition
+  predicates remain independent for each domain, including when an earlier
+  predicate has no body-policy domain, has local or specific scope, or mentions
+  another domain.
+- Restored directly supported workflow-prefix prohibitions across bounded short
+  modifiers, modal bridges, colon or dash punctuation, and bounded relative or
+  parenthetical modifiers without accepting descriptive, quoted, conditional,
+  changed-subject, or otherwise unsupported bridge syntax.
 - Kept affirmative requirement language distinct from genuinely negative
   `not-required` facts so it cannot suppress a later workflow prohibition.
-- Added a deterministic test-only 0.24.4 golden corpus covering subjects,
-  predicate kinds, connectors, domains, scopes, layouts, evidence, ordering,
-  and deduplication, with every intentional difference explicitly allowlisted.
+- Added 97 immutable, self-contained test-only 0.24.4 golden cases generated
+  from the full tagged commit. The exact legacy bodies and public projections
+  cover subjects, predicate kinds, connectors, domains, scopes, layouts,
+  evidence, ordering, and deduplication; a 32-case matrix proves the requested
+  pairwise interactions, and every observed difference is explicitly
+  allowlisted.
 
 ### Changed
 
@@ -31,9 +37,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   scope, and supported-clause completeness.
 - Reused the same statement-group analyzer for prepared prose and eligible
   fallback lines such as headings. Subject inheritance supports multiple
-  consecutive predicates and the bounded `also`, `still`, and `therefore`
-  modifier grammar, but stops at sentence endings, Markdown hard breaks,
-  structural boundaries, changed subjects, and unsupported syntax.
+  consecutive copular, auxiliary or modal, and curated ordinary-verb
+  predicates, as well as the bounded `also`, `still`, and `therefore` modifier
+  grammar. It stops at sentence endings, Markdown hard breaks, structural
+  boundaries, changed subjects, conditional or subordinate prefixes, and
+  unsupported syntax.
 - Preserved precision-first handling: only complete, high-confidence
   workflow-wide prohibitions contradict permissive policy metadata; local
   safeguards, requirement language, specific sources or targets, unknown
@@ -49,9 +57,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 - Preserved diagnostic IDs, titles, severities, confidence, risk classes,
   remediation, LLM hints, bounded physical evidence, ordering, deduplication,
   policy resolution, CLI behavior, Diagnostics v2, review bundles, public
-  types, schemas, package entrypoints, and supported deep imports. Evidence for
-  inherited prohibitions now includes the supported later predicate rather than
-  ending at an earlier subject-bearing predicate.
+  types, schemas, package entrypoints, and supported deep imports. Compatibility
+  means exact frozen 0.24.4 output plus the named allowlist: inherited evidence
+  may include the supported later predicate, independent facts may restore a
+  previously suppressed finding, and descriptive, changed-subject,
+  destination-specific, conditional, or unsupported syntax may intentionally
+  suppress a legacy false positive.
 - Added no dependencies, public diagnostics, public configuration, or public
   clause-fact output.
 
