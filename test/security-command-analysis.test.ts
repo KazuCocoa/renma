@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { parseFloatingDependencyAllowance } from "../src/dependency-selectors.js";
 import { MarkdownSecurityView } from "../src/markdown-security-view.js";
 import { parseMarkdownSyntax } from "../src/markdown-syntax.js";
 import {
@@ -11,7 +12,7 @@ import {
 
 test("npm-style installs retain explicit deterministic pinning classifications", () => {
   const fixtures = [
-    ["npm install -g appium", "appium", "unpinned"],
+    ["npm install -g appium", "appium", "floating-literal"],
     ["npm install -g appium@3.0.0", "appium", "pinned-literal"],
     ["npm install @scope/driver@2.4.1", "@scope/driver", "pinned-literal"],
     [
@@ -24,7 +25,7 @@ test("npm-style installs retain explicit deterministic pinning classifications",
       "appium",
       "pinned-variable-guarded",
     ],
-    ["pnpm add webdriverio", "webdriverio", "unpinned"],
+    ["pnpm add webdriverio", "webdriverio", "floating-literal"],
     ["yarn global add detox@20.0.0", "detox", "pinned-literal"],
   ] as const;
 
@@ -39,6 +40,268 @@ test("npm-style installs retain explicit deterministic pinning classifications",
     );
     assert.equal(analysis.dependencyInstalls[0]?.pinning, pinning, input);
   }
+});
+
+test("npm selectors distinguish exact registry versions from every floating form", () => {
+  const fixtures = [
+    ["appium@3.0.0", "exact", "pinned-literal"],
+    ["appium@3.0.0-beta.1", "exact", "pinned-literal"],
+    ["appium@3.0.0+build.1", "exact", "pinned-literal"],
+    ["@scope/driver@2.4.1", "exact", "pinned-literal"],
+    ["appium", "bare", "floating-literal"],
+    ["appium@latest", "dist-tag", "floating-literal"],
+    ["appium@next", "dist-tag", "floating-literal"],
+    ["appium@arbitrary-tag", "dist-tag", "floating-literal"],
+    ["appium@^3", "range", "floating-literal"],
+    ["appium@~3.0.0", "range", "floating-literal"],
+    ["appium@3", "range", "floating-literal"],
+    ["appium@3.0", "range", "floating-literal"],
+    ["appium@3.x", "wildcard", "floating-literal"],
+    ["appium@*", "wildcard", "floating-literal"],
+    ["appium>=3 <4", "range", "floating-literal"],
+  ] as const;
+
+  for (const [reference, selectorKind, pinning] of fixtures) {
+    const analysis = shellAnalysis(`npm install "${reference}"`);
+    assert.equal(analysis.support, "supported", reference);
+    assert.equal(analysis.dependencyInstalls[0]?.ecosystem, "npm", reference);
+    assert.equal(
+      analysis.dependencyInstalls[0]?.selectorKind,
+      selectorKind,
+      reference,
+    );
+    assert.equal(analysis.dependencyInstalls[0]?.pinning, pinning, reference);
+  }
+});
+
+test("pip-style commands use bounded Python equality and range semantics", () => {
+  const exactRequirements = [
+    "requests==2.32.4",
+    "requests==2.32",
+    "package==1",
+    "package==1!2.0",
+    "package==2.0rc1",
+    "package==2.0.post1",
+    "package==2.0.dev3",
+    "package==1.0+company.4",
+    "package===internal-version",
+    "requests[security]==2.32.4",
+  ];
+  for (const requirement of exactRequirements) {
+    const analysis = shellAnalysis(`pip install "${requirement}"`);
+    assert.equal(analysis.support, "supported", requirement);
+    assert.equal(analysis.dependencyInstallCommand, true, requirement);
+    assert.equal(analysis.npmStyleInstallCommand, false, requirement);
+    assert.equal(analysis.dependencyInstalls[0]?.ecosystem, "pypi");
+    assert.equal(analysis.dependencyInstalls[0]?.selectorKind, "exact");
+    assert.equal(analysis.dependencyInstalls[0]?.pinning, "pinned-literal");
+    assert.equal(analysis.dependencyInstalls[0]?.reference, requirement);
+  }
+
+  const floatingRequirements = [
+    ["requests", "bare"],
+    ["requests>=2", "range"],
+    ["requests>=2,<3", "range"],
+    ["requests~=2.32", "range"],
+    ["requests!=2.32.0", "range"],
+    ["requests==2.32.*", "wildcard"],
+    ["requests<3", "range"],
+  ] as const;
+  for (const [requirement, selectorKind] of floatingRequirements) {
+    const analysis = shellAnalysis(`pip install "${requirement}"`);
+    assert.equal(analysis.support, "supported", requirement);
+    assert.equal(
+      analysis.dependencyInstalls[0]?.selectorKind,
+      selectorKind,
+      requirement,
+    );
+    assert.equal(
+      analysis.dependencyInstalls[0]?.pinning,
+      "floating-literal",
+      requirement,
+    );
+  }
+});
+
+test("pip, versioned module, py, and uv command spellings share one analysis model", () => {
+  const fixtures = [
+    ["pip install requests==2.32.4", "pip"],
+    ["pip3 install requests==2.32.4", "pip"],
+    ["python -m pip install requests==2.32.4", "pip"],
+    ["python3 -m pip install requests==2.32.4", "pip"],
+    ["python3.12 -m pip install requests==2.32.4", "pip"],
+    ["py -m pip install requests==2.32.4", "pip"],
+    ["uv pip install requests==2.32.4", "uv"],
+  ] as const;
+  for (const [command, packageManager] of fixtures) {
+    const analysis = shellAnalysis(command);
+    assert.equal(analysis.support, "supported", command);
+    assert.equal(
+      analysis.dependencyInstalls[0]?.packageManager,
+      packageManager,
+      command,
+    );
+    assert.equal(analysis.dependencyInstalls.length, 1, command);
+  }
+});
+
+test("Python variables and indirect sources stay fail-closed", () => {
+  const guarded = shellAnalysis('pip install "requests==${REQUESTS_VERSION}"', [
+    guardEvidence(
+      ': "${REQUESTS_VERSION:?Set an approved version}"',
+      8,
+      "same-instruction",
+    ),
+  ]);
+  const unguarded = shellAnalysis(
+    'pip install "requests==${REQUESTS_VERSION}"',
+  );
+  const guardedRange = shellAnalysis('pip install "requests>=${MIN_VERSION}"', [
+    guardEvidence(
+      ': "${MIN_VERSION:?Set a minimum version}"',
+      8,
+      "same-instruction",
+    ),
+  ]);
+  const wholeRequirement = shellAnalysis('pip install "${FULL_REQUIREMENT}"');
+
+  assert.equal(
+    guarded.dependencyInstalls[0]?.pinning,
+    "pinned-variable-guarded",
+  );
+  assert.equal(unguarded.dependencyInstalls[0]?.pinning, "variable-unverified");
+  assert.equal(
+    guardedRange.dependencyInstalls[0]?.pinning,
+    "variable-unverified",
+  );
+  assert.equal(
+    wholeRequirement.dependencyInstalls[0]?.pinning,
+    "variable-unverified",
+  );
+
+  const indirect = shellAnalysis(
+    "uv pip install -r requirements.txt -c constraints.txt requests==2.32.4",
+  );
+  assert.deepEqual(
+    indirect.dependencyInstalls.map(({ selectorKind, pinning }) => ({
+      selectorKind,
+      pinning,
+    })),
+    [
+      { selectorKind: "indirect-file", pinning: "unpinned" },
+      { selectorKind: "indirect-file", pinning: "unpinned" },
+      { selectorKind: "exact", pinning: "pinned-literal" },
+    ],
+  );
+
+  for (const command of [
+    "pip install -rrequirements.txt",
+    "pip install --requirement=requirements.txt",
+    "pip install -cconstraints.txt requests==2.32.4",
+    "uv pip install --constraint=constraints.txt requests==2.32.4",
+  ]) {
+    assert.ok(
+      shellAnalysis(command).dependencyInstalls.some(
+        ({ selectorKind }) => selectorKind === "indirect-file",
+      ),
+      command,
+    );
+  }
+});
+
+test("unsupported Python sources and ambiguous options never become exact", () => {
+  const fixtures = [
+    ["pip install https://example.com/package.whl", "direct-reference"],
+    ["pip install git+https://example.com/repository.git", "direct-reference"],
+    ["pip install ./local-package", "direct-reference"],
+    ["pip install -e ./editable-package", "direct-reference"],
+    [
+      "pip install 'package @ https://example.com/package.whl'",
+      "direct-reference",
+    ],
+  ] as const;
+  for (const [command, selectorKind] of fixtures) {
+    const analysis = shellAnalysis(command);
+    assert.equal(
+      analysis.dependencyInstalls.at(-1)?.selectorKind,
+      selectorKind,
+      command,
+    );
+    assert.notEqual(
+      analysis.dependencyInstalls.at(-1)?.pinning,
+      "pinned-literal",
+      command,
+    );
+  }
+
+  for (const command of [
+    "pip install --requirement",
+    "pip install --index-url",
+    "pip install --unknown=value requests",
+  ]) {
+    assert.equal(shellAnalysis(command).support, "fallback-required", command);
+  }
+});
+
+test("selector allowances retain floating classification and exact matching", () => {
+  assert.equal(parseFloatingDependencyAllowance("npm:app*"), undefined);
+  assert.equal(parseFloatingDependencyAllowance("pypi:requests*"), undefined);
+  const allowances = [
+    parseFloatingDependencyAllowance("npm:appium@latest"),
+    parseFloatingDependencyAllowance("pypi:my-package>=2,<3"),
+  ].filter((value) => value !== undefined);
+  const npm = shellAnalysis(
+    "npm install appium@latest appium@next",
+    [],
+    allowances,
+  );
+  const pypi = shellAnalysis(
+    'pip install "My_Package>=2,<3" "my.package>=3"',
+    [],
+    allowances,
+  );
+
+  assert.deepEqual(
+    npm.dependencyInstalls.map(
+      ({ pinning, selectorKind, floatingAllowed }) => ({
+        pinning,
+        selectorKind,
+        floatingAllowed,
+      }),
+    ),
+    [
+      {
+        pinning: "floating-literal",
+        selectorKind: "dist-tag",
+        floatingAllowed: true,
+      },
+      {
+        pinning: "floating-literal",
+        selectorKind: "dist-tag",
+        floatingAllowed: false,
+      },
+    ],
+  );
+  assert.deepEqual(npm.dependencyInstalls[0]?.allowance, {
+    raw: "npm:appium@latest",
+    normalized: "npm:appium@latest",
+  });
+  assert.deepEqual(
+    pypi.dependencyInstalls.map(
+      ({ normalizedPackageName, floatingAllowed }) => ({
+        normalizedPackageName,
+        floatingAllowed,
+      }),
+    ),
+    [
+      { normalizedPackageName: "my-package", floatingAllowed: true },
+      { normalizedPackageName: "my-package", floatingAllowed: false },
+    ],
+  );
+  assert.deepEqual(pypi.dependencyInstalls[0]?.allowance, {
+    raw: "pypi:my-package>=2,<3",
+    normalized: "pypi:my-package>=2,<3",
+  });
 });
 
 test("associated fail-closed guards require exact variable identity", () => {
@@ -160,8 +423,11 @@ test("manager-level option projection preserves pinning and fallback evidence", 
     assert.equal(analysis.support, "fallback-required");
     assert.equal(analysis.npmStyleInstallCommand, true);
   }
-  assert.equal(missingValue.dependencyInstalls[0]?.pinning, "unpinned");
-  assert.equal(unknownAttached.dependencyInstalls[0]?.pinning, "unpinned");
+  assert.equal(missingValue.dependencyInstalls[0]?.pinning, "floating-literal");
+  assert.equal(
+    unknownAttached.dependencyInstalls[0]?.pinning,
+    "floating-literal",
+  );
   assert.equal(
     unknownAttachedVariable.dependencyInstalls[0]?.pinning,
     "variable-unverified",
@@ -183,15 +449,15 @@ test("manager-level option analysis is deterministic across continuations", () =
       pinning,
     })),
     [
-      { packageName: "webdriverio", pinning: "unpinned" },
+      { packageName: "webdriverio", pinning: "floating-literal" },
       { packageName: "appium", pinning: "variable-unverified" },
     ],
   );
   assert.equal(first.dependencyInstalls[0]?.sourceSpan.startLine, 11);
 });
 
-test("incomplete npm-style candidate projection requires conservative fallback", () => {
-  const unclassified = shellAnalysis(
+test("unsupported npm references are explicit while ambiguous syntax requires fallback", () => {
+  const directReference = shellAnalysis(
     "npm install appium github:owner/repository",
   );
   const ambiguousOption = shellAnalysis(
@@ -199,14 +465,19 @@ test("incomplete npm-style candidate projection requires conservative fallback",
   );
   const missingOptionValue = shellAnalysis("npm install --registry");
 
-  for (const analysis of [unclassified, ambiguousOption, missingOptionValue]) {
+  for (const analysis of [ambiguousOption, missingOptionValue]) {
     assert.equal(analysis.npmStyleInstallCommand, true);
     assert.equal(analysis.support, "fallback-required");
     assert.ok(
       analysis.fallbackReasons.includes("unsupported-dependency-command"),
     );
   }
-  assert.equal(unclassified.dependencyInstalls[0]?.pinning, "unpinned");
+  assert.equal(directReference.support, "supported");
+  assert.equal(
+    directReference.dependencyInstalls[1]?.selectorKind,
+    "direct-reference",
+  );
+  assert.equal(directReference.dependencyInstalls[1]?.pinning, "unpinned");
 });
 
 test("associated version guards must be exact executable fail-closed statements", () => {
@@ -266,7 +537,11 @@ test("multiple package references preserve each package classification", () => {
         pinning: "variable-unverified",
         startLine: 10,
       },
-      { packageName: "unpinned", pinning: "unpinned", startLine: 10 },
+      {
+        packageName: "unpinned",
+        pinning: "floating-literal",
+        startLine: 10,
+      },
     ],
   );
 });
@@ -588,6 +863,9 @@ test("ambiguous substitution remains fallback-required and cannot become local-o
 function shellAnalysis(
   text: string,
   guards: Parameters<typeof analyzeSecurityCommand>[0]["guards"] = [],
+  allowedFloatingDependencies: NonNullable<
+    Parameters<typeof analyzeSecurityCommand>[0]["allowedFloatingDependencies"]
+  > = [],
 ): SecurityCommandAnalysis {
   const lines = text.split("\n");
   return analyzeSecurityCommand({
@@ -599,6 +877,7 @@ function shellAnalysis(
       language: "bash",
     },
     guards,
+    allowedFloatingDependencies,
   });
 }
 

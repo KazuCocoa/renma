@@ -1,8 +1,15 @@
 import type { SecurityGuardEvidence } from "../markdown-security-view.js";
 import type {
+  DependencyEcosystem,
+  DependencySelectorKind,
+  FloatingDependencyAllowance,
+} from "../dependency-selectors.js";
+import type {
   DestinationAnalysis,
   SourceSpan,
 } from "../security-destination/index.js";
+
+export type { DependencyEcosystem, DependencySelectorKind };
 
 export type SecuritySourceEvidence = {
   text: string;
@@ -14,16 +21,23 @@ export type SecuritySourceEvidence = {
 
 export type DependencyPinningKind =
   | "pinned-literal"
+  | "floating-literal"
   | "pinned-variable-guarded"
   | "variable-unverified"
   | "unpinned";
 
 export type DependencyInstallAnalysis = {
-  packageManager: "npm" | "pnpm" | "yarn";
-  packageName: string;
+  ecosystem: DependencyEcosystem;
+  packageManager: "npm" | "pnpm" | "yarn" | "pip" | "uv";
+  packageName?: string;
+  normalizedPackageName?: string;
   reference: string;
+  selector: string;
+  selectorKind: DependencySelectorKind;
   pinning: DependencyPinningKind;
   variableNames: readonly string[];
+  floatingAllowed: boolean;
+  allowance?: Readonly<FloatingDependencyAllowance>;
   sourceSpan: SourceSpan;
 };
 
@@ -66,6 +80,7 @@ export type SecurityCommandAnalysis = {
   sensitiveSources: readonly Readonly<SensitiveSourceAnalysis>[];
   sinks: readonly Readonly<SensitiveSinkAnalysis>[];
   destinationAnalysis: DestinationAnalysis;
+  dependencyInstallCommand: boolean;
   npmStyleInstallCommand: boolean;
   noDisclosureGuards: readonly Readonly<SecurityGuardEvidence>[];
   localOnlySensitiveOperation: boolean;
@@ -77,4 +92,5 @@ export type SecurityCommandInput = {
   source: SecuritySourceEvidence;
   guards?: readonly SecurityGuardEvidence[];
   destinationAnalysis?: DestinationAnalysis;
+  allowedFloatingDependencies?: readonly FloatingDependencyAllowance[];
 };

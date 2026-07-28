@@ -352,15 +352,64 @@ come from an unrelated code block, or become operational from a block quote.
 Generic wording such as “handle this carefully” is not an approval or
 no-disclosure guard.
 
-For npm, pnpm, and yarn package references, a literal version remains pinned.
-A variable version must use the exact fail-closed form `${NAME:?message}` at the
-use site or have that form in an associated guard for the same case-sensitive
-variable:
+`SEC-UNPINNED-DEPENDENCY-INSTALL` performs bounded deterministic analysis of
+direct package-install commands. Exactness is ecosystem-specific:
+
+| Ecosystem | Supported commands |
+| --- | --- |
+| npm | `npm install`/`i`/`add`, `pnpm install`/`add`, and `yarn add`/`yarn global add` |
+| Python | `pip`/`pip3 install`, `pythonN[.N...] -m pip install`, `py -m pip install`, and `uv pip install` |
+| Other package managers | Not currently analyzed by this diagnostic |
+
+npm-family exact literals must be complete npm registry versions, including
+valid prerelease or build metadata when present. Bare packages, dist-tags,
+ranges, partial versions, and wildcards remain floating:
+
+```bash
+npm install appium@3.0.0
+npm install appium@3.0.0-beta.1
+npm install @scope/driver@2.4.1
+
+# Findings by default
+npm install appium
+npm install appium@latest
+npm install appium@^3
+npm install appium@3.x
+```
+
+Python analysis uses bounded PEP 440/508-inspired requirement semantics rather
+than npm version rules. One literal `==` or `===` selector is exact when its
+right-hand value is non-empty and has no wildcard, unresolved variable, or
+additional range clause. Python exact values do not need three numeric
+segments. Bare requirements, ranges, exclusions, compatible-release selectors,
+and wildcard equality remain floating:
+
+```bash
+pip install requests==2.32.4
+python -m pip install package==1!2.0
+uv pip install package===internal-version
+
+# Findings by default
+pip install requests
+pip install "requests>=2,<3"
+pip install "requests==2.32.*"
+```
+
+For npm-family selectors, a variable version may use the exact fail-closed form
+`${NAME:?message}` at the use site or have that form in an associated guard for
+the same case-sensitive variable:
 
 ```bash
 : "${APPIUM_VERSION:?Set an approved exact version}"
 npm install -g "appium@${APPIUM_VERSION}"
 ```
+
+This proves that an externally supplied value is required; Renma does not claim
+to have parsed the runtime value as an exact registry version. Python permits
+the same guard only around an exact-equality-shaped selector such as
+`requests==${REQUESTS_VERSION}`. A guard does not turn
+`requests>=${MIN_VERSION}`, `requests${REQUIREMENT_SPEC}`, or
+`${FULL_REQUIREMENT}` into a pinned requirement.
 
 An unguarded `${APPIUM_VERSION}`, a default such as
 `${APPIUM_VERSION:-latest}`, a differently named guard, an assignment elsewhere,
@@ -372,11 +421,46 @@ instruction. Comments, prose examples, single-quoted literals, later guards,
 and guards inside conditional or unsupported control flow do not verify the
 variable.
 
+An asset may explicitly approve one intentionally floating selector without
+reclassifying it as pinned. Canonical Agent Skills use a JSON-array string:
+
+```yaml
+metadata:
+  renma.allowed-floating-dependencies: '["npm:appium@latest","pypi:requests","pypi:ruff>=0.6,<1"]'
+```
+
+Other Markdown assets use an asset-local top-level list:
+
+```yaml
+allowed_floating_dependencies:
+  - npm:appium@latest
+  - pypi:requests
+  - pypi:ruff>=0.6,<1
+```
+
+Every entry requires the exact `npm:` or `pypi:` ecosystem, one normalized
+package name, and one selector. PyPI project names are compared after
+lowercasing and collapsing runs of `-`, `_`, and `.` to `-`. Selectors are not
+globbed or fuzzily matched: `npm:appium@latest` does not approve
+`npm:appium@next`, and an npm approval never approves a PyPI requirement.
+Invalid canonical encoding emits
+`SEC-INVALID-CANONICAL-POLICY-METADATA` and fails closed. These approvals are
+asset-local; they are not inherited from profiles or repository defaults.
+
 Bounded pnpm `--filter`/`-F` and Yarn `--cwd` options may precede the supported
 `add` or `install` subcommand. Attached and separated values are distinct;
 repeated pnpm filters are supported. Unknown, missing, or ambiguous
 manager-level options fail closed and cannot hide a package already classified
 as unpinned or variable-unverified.
+
+Python `-r`/`--requirement` and `-c`/`--constraint` options are recognized as
+indirect file evidence, but the referenced files are not parsed. Direct URLs,
+VCS references, editable or local installs, archives, npm aliases, workspace
+references, and other unsupported sources are never accepted as exact.
+Renma does not inspect manifests, lockfiles, requirements files, constraints
+files, or `pyproject.toml` for this check. No finding means only that supported
+deterministic checks found no unapproved floating dependency evidence; it is
+not proof that dependency resolution is reproducible.
 
 Environment-variable API access such as `process.env.ANDROID_HOME` and
 `process.env["ANDROID_HOME"]` is not an `.env` file. Literal reads such as
@@ -635,4 +719,4 @@ Use this table to choose the right kind of fix. For full finding definitions, se
 | `SEC-DESTRUCTIVE-COMMAND` | A destructive command appears without enough local safety context. | Remove it, scope it tightly, or add explicit approval and recovery guidance. | Body text |
 | `SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD` | `sudo` or similar privileged action lacks guardrails. | Add prerequisites, confirmation, rollback, and verification guidance. | Body text |
 | `SEC-UNPINNED-REMOTE-SCRIPT` | A remote script is executed without an immutable source or verification. | Pin and verify the source, or avoid remote execution. | Body text |
-| `SEC-UNPINNED-DEPENDENCY-INSTALL` | An install example lacks pinning or uses an unverified npm-style version variable. | Use a reviewed literal version, the exact `${NAME:?message}` guard for the same variable, or a reproducible lockfile source; do not invent a version. | Body text |
+| `SEC-UNPINNED-DEPENDENCY-INSTALL` | A supported npm-family or Python install example uses an unapproved floating selector, indirect source, unsupported reference, or unverified version variable. | Use a reviewed ecosystem-specific exact selector, an accepted fail-closed variable form, or an exact asset-local floating-selector approval; do not invent a version or claim uninspected files were verified. | Body text or asset-local metadata |

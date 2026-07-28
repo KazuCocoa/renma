@@ -12,6 +12,17 @@ const LETTERS = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"] as [string, ...string[]];
 const variableArbitrary = fc
   .array(fc.constantFrom(...LETTERS), { minLength: 2, maxLength: 12 })
   .map((characters) => `${characters.join("")}_VERSION`);
+const LOWERCASE = [..."abcdefghijklmnopqrstuvwxyz"] as [string, ...string[]];
+const npmDistTagArbitrary = fc
+  .array(fc.constantFrom(...LOWERCASE), { minLength: 1, maxLength: 16 })
+  .map((characters) => characters.join(""));
+const npmExactVersionArbitrary = fc
+  .tuple(
+    fc.integer({ min: 0, max: 1000 }),
+    fc.integer({ min: 0, max: 1000 }),
+    fc.integer({ min: 0, max: 1000 }),
+  )
+  .map(([major, minor, patch]) => `${major}.${minor}.${patch}`);
 
 test("security command analysis is deterministic and does not mutate input", () => {
   fc.assert(
@@ -45,6 +56,78 @@ test("security command analysis is deterministic and does not mutate input", () 
       assert.equal(Object.isFrozen(input.source), false);
       assert.equal(Object.isFrozen(input.guards), false);
     }),
+    PROPERTY_PARAMETERS,
+  );
+});
+
+test("arbitrary npm dist-tags and range prefixes never become pinned literals", () => {
+  fc.assert(
+    fc.property(
+      npmDistTagArbitrary,
+      fc.constantFrom("^", "~", ">=", "<"),
+      fc.integer({ min: 0, max: 1000 }),
+      (tag, prefix, version) => {
+        const tagged = commandAnalysis(`npm install package@${tag}`);
+        const ranged = commandAnalysis(
+          `npm install "package@${prefix}${version}"`,
+        );
+        assert.equal(tagged.dependencyInstalls[0]?.selectorKind, "dist-tag");
+        assert.equal(tagged.dependencyInstalls[0]?.pinning, "floating-literal");
+        assert.equal(ranged.dependencyInstalls[0]?.pinning, "floating-literal");
+      },
+    ),
+    PROPERTY_PARAMETERS,
+  );
+});
+
+test("supported exact npm versions remain deterministic", () => {
+  fc.assert(
+    fc.property(npmExactVersionArbitrary, (version) => {
+      const first = commandAnalysis(`npm install package@${version}`);
+      const second = commandAnalysis(`npm install package@${version}`);
+      assert.deepEqual(first, second);
+      assert.equal(first.dependencyInstalls[0]?.selectorKind, "exact");
+      assert.equal(first.dependencyInstalls[0]?.pinning, "pinned-literal");
+    }),
+    PROPERTY_PARAMETERS,
+  );
+});
+
+test("Python wildcard and range operators never become pinned literals", () => {
+  fc.assert(
+    fc.property(
+      fc.constantFrom(">=", "<=", "~=", "!=", "<", ">"),
+      fc.integer({ min: 0, max: 1000 }),
+      (operator, version) => {
+        const range = commandAnalysis(
+          `pip install "package${operator}${version}"`,
+        );
+        const wildcard = commandAnalysis(`pip install "package==${version}.*"`);
+        assert.equal(range.dependencyInstalls[0]?.pinning, "floating-literal");
+        assert.equal(
+          wildcard.dependencyInstalls[0]?.pinning,
+          "floating-literal",
+        );
+      },
+    ),
+    PROPERTY_PARAMETERS,
+  );
+});
+
+test("Python exact-equality literals remain deterministic", () => {
+  fc.assert(
+    fc.property(
+      fc.integer({ min: 0, max: 1000 }),
+      fc.integer({ min: 0, max: 1000 }),
+      (major, minor) => {
+        const input = `pip install package==${major}.${minor}`;
+        const first = commandAnalysis(input);
+        const second = commandAnalysis(input);
+        assert.deepEqual(first, second);
+        assert.equal(first.dependencyInstalls[0]?.selectorKind, "exact");
+        assert.equal(first.dependencyInstalls[0]?.pinning, "pinned-literal");
+      },
+    ),
     PROPERTY_PARAMETERS,
   );
 });
@@ -376,5 +459,17 @@ function markdownCommandAnalysis(source: string) {
       language: "bash",
     },
     guards: view.associatedGuardEvidence(commandIndex),
+  });
+}
+
+function commandAnalysis(text: string) {
+  return analyzeSecurityCommand({
+    source: {
+      text,
+      startLine: 1,
+      endLine: 1,
+      lines: [text],
+      language: "bash",
+    },
   });
 }

@@ -115,7 +115,7 @@ Markdown/source eligibility
   -> one relevant logical command or line-local instruction
   -> exact structural guard evidence
   -> bounded shell/JavaScript recognition
-  +-> npm-style dependency pinning
+  +-> ecosystem-specific dependency command and selector classification
   +-> sensitive source and sink classification
   \-> existing destination analysis and normalization
   -> supported structured projection or conservative fallback
@@ -266,13 +266,19 @@ for the same instruction, same list item, preceding paragraph, and active
 safety section without crossing unrelated headings, thematic breaks, sibling
 items, code blocks, or quoted examples.
 
-The internal `src/security-command/` analysis modules own bounded tokenization,
-npm-style dependency pinning, sensitive-source classification, sink
-classification, shared disclosure-action extraction and clause polarity,
-no-disclosure guard matching, and the cohesive immutable command result. One
-result is cached for each relevant line-local instruction. Each logical shell
-command receives one result that reuses its existing `DestinationAnalysis`;
-physical continuation members do not independently reanalyze that command.
+The low-level `src/dependency-selectors.ts` module owns pure npm registry and
+bounded PEP 440/508-inspired selector classification plus normalized
+floating-allowance keys. The internal `src/security-command/` analysis modules
+separately own bounded npm-family and pip-style command recognition, option and
+indirect-file projection, fail-closed variable guards, allowance governance,
+tokenization, sensitive-source classification, sink classification, shared
+disclosure-action extraction and clause polarity, no-disclosure guard matching,
+and the cohesive immutable command result. Selector classification is computed
+before governance, so an allowed floating selector is never reclassified as
+pinned. One result is cached for each relevant line-local instruction. Each
+logical shell command receives one result that reuses its existing
+`DestinationAnalysis`; physical continuation members do not independently
+reanalyze that command.
 
 The internal `src/security-destination/` modules continue to own the pure
 destination stages. `analyzeDestinations` projects one input, classifies its

@@ -40,6 +40,7 @@ export function analyzeSecurityCommand(
     shellProjection,
     source.text.length,
     guards,
+    input.allowedFloatingDependencies,
   );
   const sensitive = classifySensitiveData(
     shellProjection.projection,
@@ -74,6 +75,7 @@ export function analyzeSecurityCommand(
     sensitiveSources: freezeSources(sensitive.sources),
     sinks: freezeSinks(sensitive.sinks),
     destinationAnalysis,
+    dependencyInstallCommand: dependencies.dependencyInstallCommand,
     npmStyleInstallCommand: dependencies.npmStyleInstallCommand,
     noDisclosureGuards: Object.freeze(
       noDisclosureGuards.map((guard) => Object.freeze({ ...guard })),
@@ -92,6 +94,9 @@ function freezeDependencies(
       Object.freeze({
         ...dependency,
         variableNames: Object.freeze([...dependency.variableNames]),
+        ...(dependency.allowance === undefined
+          ? {}
+          : { allowance: Object.freeze({ ...dependency.allowance }) }),
         sourceSpan: Object.freeze({ ...dependency.sourceSpan }),
       }),
     ),
