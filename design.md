@@ -202,6 +202,13 @@ This scope complements rather than replaces full language parsing, SAST, secret
 scanning, dependency analysis, runtime controls, and human security review. See
 the [Security Policy](docs/security-policy.md).
 
+Renma may eventually govern external-review requirements and whether generated
+evidence is current, complete, and applicable. It does not become the external
+reviewer, reinterpret native findings, or treat an external report as proof of
+runtime behavior. Generated review evidence remains separate from authored
+repository metadata. See the candidate
+[External Review Governance](docs/external-review-governance.md) direction.
+
 ## Authoring Guidance
 
 Authoring guidance separates a normative interaction protocol from
@@ -249,6 +256,7 @@ rewrite files.
 - Keep shared Context first-class and independently governable.
 - Preserve focused Skills rather than reducing them to thin routers.
 - Keep runtime selection, execution, and telemetry outside core.
+- Govern external-review evidence without becoming the external reviewer.
 - Preserve exact compatibility boundaries instead of inferring migrations.
 - Keep semantic repair and meaningful repository design under human review.
 - Add fields or projections only when a concrete deterministic consumer exists.

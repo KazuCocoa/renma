@@ -223,6 +223,11 @@ stable repository evidence such as an asset ID, content hash, or BOM digest.
 Signal production, collection, storage, runtime tracing, and dashboards remain
 outside Renma.
 
+External review receipts may eventually be validated against that same stable
+repository evidence. Review execution and provider-specific report parsing
+remain outside core. The candidate boundary and first experiment are described
+in [External Review Governance](docs/external-review-governance.md).
+
 ## Change Discipline
 
 Public JSON fields, diagnostic identities, schema identifiers, CLI behavior,

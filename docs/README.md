@@ -71,6 +71,9 @@ document.
   facades, invariants, and implementation rationale.
 - [Product Design](../design.md) owns durable product decisions and distinctions,
   including capabilities intentionally outside Renma core.
+- [External Review Governance](external-review-governance.md) records a
+  candidate design direction and SkillSpector experiment plan, not a current
+  CLI, metadata, schema, or configuration contract.
 - [Current Roadmap](https://github.com/KazuCocoa/renma/blob/main/plan.md) owns
   the current stabilization checkpoint, open candidates, deferred ecosystem
   concerns, and explicit non-commitments.
