@@ -116,34 +116,63 @@ documentation contract.
 ## Candidate External-Review Evidence
 
 A future provider-neutral receipt should be compact and bind one review to
-stable repository evidence. Before publishing a schema, experiments should
-determine whether the following candidate information is both available and
-useful:
+stable repository evidence. The logical subject and the exact reviewed scope
+are different evidence:
+
+```text
+subject
+  The logical root of the review, such as one Skill.
+
+reviewed scope
+  The exact component set that the producer inspected.
+```
+
+A Skill review may include `SKILL.md`, scripts, assets, references,
+configuration, and other support files. The root `SKILL.md` content hash alone
+must not make that review current when an inspected support script changed. An
+exact repository revision is useful coarse binding, but it does not replace
+component-level scope when Renma eventually claims asset-scoped freshness. If
+the producer or adapter cannot prove the exact reviewed component set, scope
+binding remains `partial` or `unknown`.
+
+Before publishing a schema, experiments should determine whether the following
+candidate information is both available and useful:
 
 - review kind, such as `security` or `effectiveness`;
-- subject asset ID, repository-relative source path, and content hash;
+- logical subject asset ID, repository-relative source path, and root content
+  hash;
+- repository-relative reviewed component paths;
+- per-component content hashes, when available;
+- a deterministic review-scope digest derived from ordered component
+  identities;
+- producer-observed component count;
+- scope binding state such as `exact`, `partial`, or `unknown`;
 - optional exact repository revision;
 - producer name and version;
 - adapter name and version;
 - assessment-profile ID and digest;
 - execution status and scan mode;
-- completeness or coverage;
-- limitations and skipped work;
+- producer-native completeness, status, coverage, limitations, and skipped work
+  preserved without reinterpretation;
+- required-profile completeness;
 - assessment outcome;
 - raw report format and digest;
 - suppression or baseline digest, when applicable;
 - suppressed finding count;
 - completion timestamp.
 
-This is a concept list, not a field list for a stable JSON schema. Experiments
+This is a concept list, not a field list for a stable JSON schema. This
+direction does not define a stable review-scope digest algorithm. Experiments
 must also separate information Renma may eventually interpret from opaque,
 namespaced producer extensions:
 
 ```text
 Renma-interpreted
   producer
-  subject binding
-  execution completeness
+  logical subject binding
+  reviewed-scope binding
+  producer execution
+  required-profile completeness
   profile identity
   assessment outcome
   report digest
@@ -160,6 +189,35 @@ Renma must not convert a SkillSpector risk score into a Renma Readiness score,
 reclassify native findings as Renma findings, or translate them into Renma
 diagnostic IDs.
 
+## Completeness Layers
+
+The candidate model preserves at least three distinct concepts:
+
+```text
+producer-native completeness
+  The external tool's unmodified completeness, status, and limitations.
+
+required-profile completeness
+  Whether every analyzer or inspection class required by the named,
+  digest-bound assessment profile completed successfully.
+
+requirement satisfaction
+  The final governance result after binding, freshness,
+  required-profile completeness, and assessment are evaluated.
+```
+
+Producer-native completeness must always be retained without reinterpretation.
+An analyzer disabled because an explicitly selected profile excludes it differs
+from a required analyzer that failed, was skipped, or was unavailable.
+`disabled-by-configuration` is acceptable for required-profile completeness
+only when the identified assessment profile explicitly excludes that analyzer.
+Missing, failed, skipped, or unknown required work keeps required-profile
+completeness false or unknown.
+
+A native passing verdict never repairs incomplete required work. This direction
+does not implement an assessment profile, profile digest, or completeness
+evaluator.
+
 ## Candidate Derived Review State
 
 Renma may eventually derive governance states such as `satisfied`, `missing`,
@@ -169,16 +227,19 @@ are candidates only and are not implemented by this experiment.
 The underlying dimensions must remain distinguishable:
 
 ```text
-binding: current | stale | invalid
-execution: complete | partial | failed
+subject binding: current | stale | invalid
+scope binding: exact | partial | unknown | invalid
+producer execution: completed | failed | unknown
+producer-native completeness: preserved without reinterpretation
+required-profile completeness: complete | incomplete | unknown
 freshness: current | expired
 assessment: pass | warn | fail | unknown
 requirement: satisfied | unsatisfied
 ```
 
-A passing assessment with incomplete execution must not become a satisfied
+A passing assessment with incomplete required work must not become a satisfied
 review. Likewise, current evidence may still be unsatisfied, and a favorable
-native outcome cannot repair an invalid subject binding.
+native outcome cannot repair invalid subject or scope binding.
 
 ## Adapter Boundary
 
@@ -225,6 +286,9 @@ BOM v2 or create:
 - a Trust Graph node or edge;
 - a Renma security finding family.
 
+Logical-subject, reviewed-scope, and completeness concepts in this document do
+not add BOM v2 fields, product types, or another repository model.
+
 ## Relationship To Renma Security Diagnostics
 
 Renma continues to own governance-oriented checks over repository declarations
@@ -268,7 +332,8 @@ Product implementation should wait until evidence shows that:
 - published output versions can be parsed reliably;
 - producer version, execution mode, completeness, skipped work, and limitations
   are visible;
-- results can be bound to exact repository assets and content;
+- the logical subject and exact reviewed component scope can be bound to stable
+  repository evidence;
 - false-positive and suppression behavior is understood;
 - raw evidence can remain separate from Renma findings;
 - the provider-neutral core remains useful for a second producer.

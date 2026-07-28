@@ -81,15 +81,22 @@ Common observations:
 - Requested and observed configuration: static-only; `llm_requested` and
   `llm_available` were both `false`, and the three semantic analyzers were
   reported as `disabled`.
-- Both executions returned success and reported all discovered components as
-  scanned with `coverage_percent: 100.0`, but both also reported
-  `is_complete: false`. A favorable assessment therefore cannot be treated as
-  a satisfied complete review.
+- Both producer executions succeeded and reported all discovered components as
+  scanned with `coverage_percent: 100.0`. Both also reported
+  `is_complete: false` because the requested static-only mode intentionally
+  disabled the semantic analyzers.
+- These were not complete all-analyzer reviews. Whether the same evidence could
+  satisfy a future explicitly static-only requirement remains unresolved until
+  profile-relative completeness is defined.
 - Both reports contained zero issues before and after filtering, zero
   suppressions, and producer-specific assessment values of score `0`, severity
   `LOW`, and recommendation `SAFE`. These observations are not proof of safety
   and are not Renma findings or Readiness evidence.
 - No baseline or suppression was used or needed for these runs.
+- The two different zero-finding targets produced the same SARIF digest:
+  `ac048bad24d7a13a9578dd60e770347cc4750647e521991754dd117fe59ef8d4`.
+  An empty native SARIF report therefore does not independently establish
+  subject or reviewed-scope identity.
 
 ### `example-spec-review`
 
@@ -104,7 +111,7 @@ Requested scan mode: static-only
 Actual scan mode: static analyzers enabled; semantic analyzers disabled
 JSON report SHA-256: 63dee2696270954ebc81933940f896a04ced6903c7785e3bfaa01181cb0dcd6b
 SARIF report SHA-256: ac048bad24d7a13a9578dd60e770347cc4750647e521991754dd117fe59ef8d4
-Completion status: execution successful; 1/1 components scanned; producer is_complete false
+Completion status: producer execution successful; 1/1 components scanned; producer is_complete false
 Finding counts by rule and severity: none
 Actionable findings: none observed
 False-positive candidates: none observed
@@ -128,7 +135,7 @@ Requested scan mode: static-only
 Actual scan mode: static analyzers enabled; semantic analyzers disabled
 JSON report SHA-256: 5773753bc66498baff59b0245b6c07a933c038b568cfd5e90ae6ae6848c04534
 SARIF report SHA-256: ac048bad24d7a13a9578dd60e770347cc4750647e521991754dd117fe59ef8d4
-Completion status: execution successful; 1/1 components scanned; producer is_complete false
+Completion status: producer execution successful; 1/1 components scanned; producer is_complete false
 Finding counts by rule and severity: none
 Actionable findings: none observed
 False-positive candidates: none observed
@@ -141,22 +148,27 @@ Human notes: allowed-tools behavior was not evaluated because this Skill does no
 
 ### Adapter Contract Observations
 
-The raw JSON exposes producer version, absolute source path, component paths,
-execution success, coverage, analyzer-level completed/disabled/not-applicable
-states, limitations, assessment, and suppressed count. SARIF exposes producer
-version, execution success, limitations as notifications, and native results.
+The raw JSON exposes producer version, absolute source path, reviewed component
+paths, execution success, coverage, analyzer-level
+completed/disabled/not-applicable states, limitations, assessment, and
+suppressed count. It does not expose per-component content hashes. SARIF
+exposes producer version, execution success, limitations as notifications, and
+native results.
 
 The raw JSON does not expose an explicit report-schema version, Renma asset ID,
 subject content hash, repository revision, assessment-profile digest, or raw
 report digest. This evaluation recorded repository revision and report digests
-separately, but exact subject binding would still need public Renma evidence
-such as BOM data. This supports keeping binding in a future adapter and keeping
-the native report separate.
+separately, but exact subject and reviewed-scope binding would still need public
+Renma evidence such as BOM data. The identical empty SARIF reports reinforce
+that a future adapter must add binding from stable Renma repository evidence
+rather than infer identity from the native report digest. This supports keeping
+binding in a future adapter and keeping the native report separate.
 
 The report distinguishes disabled, not-applicable, and completed analyzers, and
 has counters for skipped, failed, and unaccounted work. The observed
 `coverage_percent: 100.0` plus `is_complete: false` is important contract
-evidence: coverage, execution, and assessment must remain separate dimensions.
-Reliability across producer versions, behavior with findings and suppressions,
-`allowed-tools` interpretation, repository-probe behavior, and comparison with
-optional LLM output remain unresolved.
+evidence: producer-native completeness, required-profile completeness,
+execution, and assessment must remain separate dimensions. Reliability across
+producer versions, behavior with findings and suppressions, `allowed-tools`
+interpretation, repository-probe behavior, future static-only requirement
+satisfaction, and comparison with optional LLM output remain unresolved.

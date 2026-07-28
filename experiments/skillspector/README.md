@@ -81,9 +81,30 @@ experiments/skillspector/generated/<mode>/<target-id>/run.json
 ```
 
 `run.json` records the requested mode, captured SkillSpector version when
-available, exact argument arrays, target identity, timestamps, and exit status.
-The raw JSON report must be inspected to determine the mode and completeness
-that SkillSpector actually reported.
+available, exact argument arrays, target identity, timestamps, native exit
+status, and an experiment-only command classification. The raw JSON and SARIF
+remain the authoritative producer output; the runner does not parse findings
+or reproduce SkillSpector's risk calculation.
+
+The run record keeps four questions separate:
+
+- **Harness execution:** Did the runner start the process and receive every
+  newly written report?
+- **Producer execution:** Did SkillSpector report that its inspection
+  completed?
+- **Native assessment:** Did the completed inspection pass SkillSpector's own
+  risk threshold?
+- **Report availability:** Was the requested raw format actually written?
+
+For the evaluated SkillSpector 2.5.0 behavior, exit `0` with a report is
+`completed-threshold-passed`, while exit `1` with a report is
+`completed-threshold-not-passed`. Both are completed evidence-collection runs,
+so the experiment runner exits successfully. Exit `2` is
+`producer-execution-failed`; a report written before that failure is preserved.
+Spawn errors and missing reports are `harness-failed`, and any other exit code
+is `unsupported-exit-code`. Those classifications make the runner fail closed.
+The producer version is stored in each run record so this mapping can be
+reevaluated when SkillSpector changes.
 
 The complete `generated/` directory is ignored by Git. Reports are local
 artifacts and are not committed by default; a small report should become a

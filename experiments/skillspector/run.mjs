@@ -13,6 +13,10 @@ const experimentRoot = import.meta.dirname;
 const repositoryRoot = path.resolve(experimentRoot, "../..");
 const generatedRoot = path.join(experimentRoot, "generated");
 const supportedKinds = new Set(["canonical-skill", "repository-probe"]);
+const completedClassifications = new Set([
+  "completed-threshold-passed",
+  "completed-threshold-not-passed",
+]);
 const executable = process.env.RENMA_SKILLSPECTOR_EXECUTABLE ?? "skillspector";
 
 const options = parseOptions(process.argv.slice(2));
@@ -219,6 +223,7 @@ async function scanTarget(target, mode, versionProbeResult) {
     } catch {
       reportWritten = false;
     }
+    const outcome = classifyCommand(result, reportWritten);
     commands.push({
       executable,
       args,
@@ -229,11 +234,14 @@ async function scanTarget(target, mode, versionProbeResult) {
       signal: result.signal,
       error: result.error?.message,
       reportWritten,
+      ...outcome,
     });
-    if (result.exitCode !== 0 || result.error || !reportWritten) {
+    if (!completedClassifications.has(outcome.classification)) {
       scanFailed = true;
-      process.stderr.write(
-        `No successful ${format} report for ${target.id}.\n`,
+      reportFailure(target.id, format, result.exitCode, outcome);
+    } else if (outcome.classification === "completed-threshold-not-passed") {
+      process.stdout.write(
+        `SkillSpector completed ${format} for ${target.id}; its native risk threshold was not passed.\n`,
       );
     }
   }
@@ -259,6 +267,76 @@ async function scanTarget(target, mode, versionProbeResult) {
     )}\n`,
   );
   return scanFailed;
+}
+
+function classifyCommand(result, reportWritten) {
+  const reportAvailability = reportWritten ? "written" : "missing";
+  if (result.error) {
+    return {
+      classification: "harness-failed",
+      harnessExecution: "failed",
+      producerExecution: "not-started",
+      nativeAssessment: "unknown",
+      reportAvailability,
+      failureReason: "spawn-error",
+    };
+  }
+
+  let classification;
+  let producerExecution;
+  let nativeAssessment;
+  if (result.exitCode === 0) {
+    classification = "completed-threshold-passed";
+    producerExecution = "completed";
+    nativeAssessment = "threshold-passed";
+  } else if (result.exitCode === 1) {
+    classification = "completed-threshold-not-passed";
+    producerExecution = "completed";
+    nativeAssessment = "threshold-not-passed";
+  } else if (result.exitCode === 2) {
+    classification = "producer-execution-failed";
+    producerExecution = "failed";
+    nativeAssessment = "unavailable";
+  } else {
+    classification = "unsupported-exit-code";
+    producerExecution = "unknown";
+    nativeAssessment = "unknown";
+  }
+
+  if (!reportWritten) {
+    return {
+      classification: "harness-failed",
+      harnessExecution: "failed",
+      producerExecution,
+      nativeAssessment,
+      reportAvailability,
+      failureReason: "missing-report",
+    };
+  }
+  return {
+    classification,
+    harnessExecution: "completed",
+    producerExecution,
+    nativeAssessment,
+    reportAvailability,
+    failureReason: null,
+  };
+}
+
+function reportFailure(targetId, format, exitCode, outcome) {
+  if (outcome.classification === "producer-execution-failed") {
+    process.stderr.write(
+      `SkillSpector reported unsuccessful producer execution for ${format} on ${targetId} (exit ${exitCode}); the written report was preserved.\n`,
+    );
+  } else if (outcome.classification === "unsupported-exit-code") {
+    process.stderr.write(
+      `SkillSpector returned unsupported exit code ${exitCode} for ${format} on ${targetId}; the written report was preserved.\n`,
+    );
+  } else {
+    process.stderr.write(
+      `SkillSpector harness failed for ${format} on ${targetId}: ${outcome.failureReason}.\n`,
+    );
+  }
 }
 
 function run(command, args, mirror = false) {

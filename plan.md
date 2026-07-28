@@ -82,7 +82,8 @@ Evidence is required before product implementation. Decision gates include:
 - published output can be parsed reliably;
 - producer version and actual execution mode are available;
 - completeness, skipped work, and limitations are visible;
-- evidence can be bound to exact repository assets and content;
+- the logical subject and exact reviewed component scope can be bound to stable
+  repository evidence;
 - false-positive and suppression behavior is understood;
 - raw evidence can remain separate from Renma findings;
 - a provider-neutral core remains useful for a second producer.
