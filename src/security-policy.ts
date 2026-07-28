@@ -1,4 +1,8 @@
 import { inspectAgentSkill } from "./agent-skills.js";
+import {
+  parseFloatingDependencyAllowance,
+  type FloatingDependencyAllowance,
+} from "./dependency-selectors.js";
 import { parseDocument } from "./markdown.js";
 import type { Artifact } from "./types/artifact.js";
 import type { ParsedDocument } from "./types/metadata.js";
@@ -22,6 +26,7 @@ export interface SecurityPolicy {
   forbiddenInputs: string[];
   approvedNetworkDestinations: string[];
   approvedUploadDestinations: string[];
+  allowedFloatingDependencies: FloatingDependencyAllowance[];
   disallowedCommands: string[];
   declared: Set<string>;
   invalidDeclared: Set<string>;
@@ -48,6 +53,7 @@ export type CanonicalSecurityOperationalField =
   | "forbiddenInputs"
   | "approvedNetworkDestinations"
   | "approvedUploadDestinations"
+  | "allowedFloatingDependencies"
   | "securityProfile";
 
 export interface CanonicalSecurityMetadataIssue {
@@ -89,6 +95,9 @@ const UPLOAD_DESTINATION_POLICY_FIELDS = new Set([
 
 const ALLOWED_DATA_POLICY_FIELDS = new Set(["allowed_data"]);
 const FORBIDDEN_INPUT_POLICY_FIELDS = new Set(["forbidden_inputs"]);
+const ALLOWED_FLOATING_DEPENDENCY_POLICY_FIELDS = new Set([
+  "allowed_floating_dependencies",
+]);
 const SECURITY_PROFILE_POLICY_FIELDS = new Set(["security_profile"]);
 
 type CanonicalSecurityFieldDefinition =
@@ -107,7 +116,8 @@ type CanonicalSecurityFieldDefinition =
         | "allowedData"
         | "forbiddenInputs"
         | "approvedNetworkDestinations"
-        | "approvedUploadDestinations";
+        | "approvedUploadDestinations"
+        | "allowedFloatingDependencies";
       encoding: "list";
     }
   | {
@@ -155,6 +165,11 @@ const CANONICAL_SECURITY_FIELD_DEFINITIONS = [
   {
     key: "renma.approved-upload-destinations",
     operationalField: "approvedUploadDestinations",
+    encoding: "list",
+  },
+  {
+    key: "renma.allowed-floating-dependencies",
+    operationalField: "allowedFloatingDependencies",
     encoding: "list",
   },
   {
@@ -252,6 +267,28 @@ export function parseSecurityPolicy(content: string): SecurityPolicy {
       continue;
     }
 
+    if (ALLOWED_FLOATING_DEPENDENCY_POLICY_FIELDS.has(key)) {
+      const rawValues =
+        value.length === 0
+          ? parseRawBlockList(lines, index, scanEnd)
+          : {
+              values: parseRawList(value),
+              nextIndex: index + 1,
+            };
+      policy.allowedFloatingDependencies.push(
+        ...rawValues.values.flatMap((raw) => {
+          const allowance = parseFloatingDependencyAllowance(raw);
+          return allowance === undefined ? [] : [allowance];
+        }),
+      );
+      policy.declared.add("allowedFloatingDependencies");
+      policy.lineByField.set("allowedFloatingDependencies", index + 1);
+      if (value.length === 0 && rawValues.values.length > 0) {
+        index = rawValues.nextIndex - 1;
+      }
+      continue;
+    }
+
     if (SECURITY_PROFILE_POLICY_FIELDS.has(key)) {
       policy.securityProfile = value;
       policy.declared.add("securityProfile");
@@ -324,17 +361,33 @@ export function validateCanonicalSecurityMetadata(
       }
     } else if (definition.encoding === "list") {
       const values = canonicalStringArray(field.value);
-      if (values === undefined) {
+      const floatingAllowances =
+        definition.operationalField === "allowedFloatingDependencies"
+          ? canonicalFloatingDependencyAllowances(field.value)
+          : undefined;
+      if (
+        values === undefined ||
+        (definition.operationalField === "allowedFloatingDependencies" &&
+          floatingAllowances === undefined)
+      ) {
         recordCanonicalSecurityIssue(
           document,
           policy,
           issues,
           definition,
           field,
-          "expected a JSON-array string containing strings only",
+          definition.operationalField === "allowedFloatingDependencies"
+            ? 'expected a JSON-array string of selector-specific "npm:" or "pypi:" floating dependency entries'
+            : "expected a JSON-array string containing strings only",
         );
       } else {
-        policy[definition.operationalField].push(...values);
+        if (definition.operationalField === "allowedFloatingDependencies") {
+          policy.allowedFloatingDependencies.push(
+            ...(floatingAllowances ?? []),
+          );
+        } else {
+          policy[definition.operationalField].push(...values);
+        }
         recordCanonicalPolicyField(
           document,
           policy,
@@ -393,6 +446,7 @@ export function resolveSecurityConfig(
     forbiddenInputs: [...policy.forbiddenInputs],
     approvedNetworkDestinations: [...policy.approvedNetworkDestinations],
     approvedUploadDestinations: [...policy.approvedUploadDestinations],
+    allowedFloatingDependencies: [...policy.allowedFloatingDependencies],
     disallowedCommands: [...policy.disallowedCommands],
     declared,
     invalidDeclared,
@@ -561,6 +615,7 @@ function emptySecurityPolicy(): SecurityPolicy {
     forbiddenInputs: [],
     approvedNetworkDestinations: [],
     approvedUploadDestinations: [],
+    allowedFloatingDependencies: [],
     disallowedCommands: [],
     declared: new Set(),
     invalidDeclared: new Set(),
@@ -586,6 +641,26 @@ function canonicalStringArray(value: unknown): string[] | undefined {
   if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "string"))
     return undefined;
   return parsed.map((item) => item.trim()).filter(Boolean);
+}
+
+function canonicalFloatingDependencyAllowances(
+  value: unknown,
+): FloatingDependencyAllowance[] | undefined {
+  if (typeof value !== "string") return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+  if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "string"))
+    return undefined;
+  const allowances = parsed.map((item) =>
+    parseFloatingDependencyAllowance(item.trim()),
+  );
+  return allowances.some((allowance) => allowance === undefined)
+    ? undefined
+    : (allowances as FloatingDependencyAllowance[]);
 }
 
 function recordCanonicalSecurityIssue(
@@ -776,6 +851,7 @@ export function isSecurityPolicyLine(line: string): boolean {
       UPLOAD_DESTINATION_POLICY_FIELDS.has(key) ||
       ALLOWED_DATA_POLICY_FIELDS.has(key) ||
       FORBIDDEN_INPUT_POLICY_FIELDS.has(key) ||
+      ALLOWED_FLOATING_DEPENDENCY_POLICY_FIELDS.has(key) ||
       SECURITY_PROFILE_POLICY_FIELDS.has(key))
   );
 }
@@ -798,6 +874,47 @@ function parseBlockList(
   }
 
   return { values, nextIndex: index };
+}
+
+function parseRawBlockList(
+  lines: string[],
+  startIndex: number,
+  scanEnd: number,
+): ParsedBlockList {
+  const values: string[] = [];
+  let index = startIndex + 1;
+  for (; index < scanEnd; index += 1) {
+    const line = lines[index] ?? "";
+    if (line.trim().length === 0) break;
+    const match = line.match(/^\s*-\s*(.*?)\s*$/u);
+    if (!match) break;
+    const value = stripMatchingQuotes((match[1] ?? "").trim());
+    if (value.length > 0) values.push(value);
+  }
+  return { values, nextIndex: index };
+}
+
+function parseRawList(value: string): string[] {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("[")) return [stripMatchingQuotes(trimmed)];
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    return Array.isArray(parsed) &&
+      parsed.every((item) => typeof item === "string")
+      ? parsed
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function stripMatchingQuotes(value: string): string {
+  const first = value[0];
+  return first !== undefined &&
+    (first === '"' || first === "'") &&
+    value.at(-1) === first
+    ? value.slice(1, -1)
+    : value;
 }
 
 function policyListValues(value: string, blockList: ParsedBlockList): string[] {

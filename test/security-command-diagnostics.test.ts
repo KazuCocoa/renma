@@ -68,6 +68,187 @@ yarn global add detox
   );
 });
 
+test("npm floating selectors regress to findings while exact versions remain accepted", () => {
+  const findings = dependencyFindings(`
+\`\`\`bash
+npm install appium
+npm install appium@3.0.0
+npm install appium@3.0.0-beta.1
+npm install appium@3.0.0+build.1
+npm install appium@latest
+npm install appium@next
+npm install appium@^3
+npm install appium@~3.0.0
+npm install appium@3
+npm install appium@3.0
+npm install appium@3.x
+npm install appium@*
+npm install "appium>=3 <4"
+npm install @scope/driver@latest
+\`\`\`
+`);
+
+  assert.deepEqual(
+    findings.map(({ evidence }) => evidence.snippet),
+    [
+      "npm install appium",
+      "npm install appium@latest",
+      "npm install appium@next",
+      "npm install appium@^3",
+      "npm install appium@~3.0.0",
+      "npm install appium@3",
+      "npm install appium@3.0",
+      "npm install appium@3.x",
+      "npm install appium@*",
+      'npm install "appium>=3 <4"',
+      "npm install @scope/driver@latest",
+    ],
+  );
+});
+
+test("Python direct installs share the existing diagnostic and preserve evidence", () => {
+  const findings = dependencyFindings(`
+\`\`\`bash
+pip install requests
+pip install requests==2.32.4
+pip3 install "requests>=2"
+python -m pip install requests
+python3.12 -m pip install requests==2.32
+py -m pip install "requests==2.32.*"
+uv pip install "ruff>=0.6"
+uv pip install ruff===internal-version
+pip install -r requirements.txt
+pip install -c constraints.txt requests==2.32.4
+\`\`\`
+`);
+
+  assert.deepEqual(
+    findings.map(({ evidence }) => evidence.snippet),
+    [
+      "pip install requests",
+      'pip3 install "requests>=2"',
+      "python -m pip install requests",
+      'py -m pip install "requests==2.32.*"',
+      'uv pip install "ruff>=0.6"',
+      "pip install -r requirements.txt",
+      "pip install -c constraints.txt requests==2.32.4",
+    ],
+  );
+  assert.equal(findings[0]?.id, "SEC-UNPINNED-DEPENDENCY-INSTALL");
+  assert.equal(findings[0]?.severity, "medium");
+  assert.equal(findings[0]?.confidence, "medium");
+  assert.equal(findings[0]?.riskClass, "suspicious");
+  assert.deepEqual(findings[0]?.details?.ecosystem, "pypi");
+  assert.deepEqual(findings[0]?.details?.selectorKind, "bare");
+  assert.deepEqual(findings[0]?.details?.pinning, "floating-literal");
+});
+
+test("pip globals, requirement whitespace, option arity, and equality stay diagnostic-safe", () => {
+  const findings = dependencyFindings(`
+\`\`\`bash
+python -m pip --python .venv install requests
+python -m pip --python .venv install requests==2.32.4
+pip --isolated install requests
+pip install "SomeProject == 1.3"
+pip install "SomeProject >= 1.2, < 2.0"
+pip install "requests [security] == 2.32.4"
+pip install --only-binary :all: requests==2.32.4
+pip install --no-binary :none: requests==2.32.4
+pip install -i https://example.invalid/simple requests==2.32.4
+pip install -f https://example.invalid/wheels requests==2.32.4
+pip install --only-binary :all: requests
+pip install --no-binary :none: requests
+pip install -i https://pypi.org/simple requests
+pip install -f https://wheels.example.invalid requests
+pip install package==latest
+pip install package===latest
+pip install "package==2.0.*"
+pip install "package===legacy*"
+npm install package@v1.2.3
+npm install package@=1.2.3
+npm install package@v1.2
+\`\`\`
+`);
+
+  assert.deepEqual(
+    findings.map(({ evidence }) => evidence.snippet),
+    [
+      "python -m pip --python .venv install requests",
+      "pip --isolated install requests",
+      'pip install "SomeProject >= 1.2, < 2.0"',
+      "pip install --only-binary :all: requests",
+      "pip install --no-binary :none: requests",
+      "pip install -i https://pypi.org/simple requests",
+      "pip install -f https://wheels.example.invalid requests",
+      "pip install package==latest",
+      'pip install "package==2.0.*"',
+      "npm install package@v1.2",
+    ],
+  );
+});
+
+test("asset-local floating dependency metadata is exact and ecosystem-specific", () => {
+  const content = `---
+allowed_data: public
+allowed_floating_dependencies:
+  - npm:appium@latest
+  - pypi:My_Package>=2,<3
+---
+
+\`\`\`bash
+npm install appium@latest
+npm install appium@next
+npm install my-package@latest
+pip install "my.package>=2,<3"
+pip install "my-package>=3"
+pip install appium
+\`\`\`
+`;
+  const findings = securityDiagnosticFindings([
+    {
+      ...contextArtifact("placeholder"),
+      sizeBytes: Buffer.byteLength(content),
+      content,
+    },
+  ]).filter(({ id }) => id === "SEC-UNPINNED-DEPENDENCY-INSTALL");
+
+  assert.deepEqual(
+    findings.map(({ evidence }) => evidence.snippet),
+    [
+      "npm install appium@next",
+      "npm install my-package@latest",
+      'pip install "my-package>=3"',
+      "pip install appium",
+    ],
+  );
+});
+
+test("canonical Skill floating dependency metadata validates and fails closed", () => {
+  const validContent = canonicalSkillContent(
+    `'["npm:appium@latest","pypi:requests"]'`,
+  );
+  const invalidContent = canonicalSkillContent("[npm:appium@latest]");
+  const validFindings = securityDiagnosticFindings([
+    skillArtifact(validContent),
+  ]);
+  const invalidFindings = securityDiagnosticFindings([
+    skillArtifact(invalidContent),
+  ]);
+
+  assert.equal(
+    validFindings.some(({ id }) => id === "SEC-UNPINNED-DEPENDENCY-INSTALL"),
+    false,
+  );
+  assert.ok(
+    invalidFindings.some(
+      ({ id }) => id === "SEC-INVALID-CANONICAL-POLICY-METADATA",
+    ),
+  );
+  assert.ok(
+    invalidFindings.some(({ id }) => id === "SEC-UNPINNED-DEPENDENCY-INSTALL"),
+  );
+});
+
 test("attached and separated npm-style option values preserve package findings", () => {
   const findings = dependencyFindings(`
 \`\`\`bash
@@ -767,9 +948,8 @@ security cms -D -i "$PROFILE_PATH" > "$LOCAL_PLIST"
 `).content,
   );
 
-  const findings = (await scan(root)).findings.filter(({ id }) =>
-    id.startsWith("SEC-"),
-  );
+  const result = await scan(root);
+  const findings = result.findings.filter(({ id }) => id.startsWith("SEC-"));
   assert.deepEqual(
     findings.map(({ id }) => id),
     ["SEC-UNPINNED-DEPENDENCY-INSTALL"],
@@ -791,6 +971,86 @@ security cms -D -i "$PROFILE_PATH" > "$LOCAL_PLIST"
     "verificationSteps",
     "whyItMatters",
   ]);
+  const diagnosticV2 = result.diagnosticsV2.find(
+    ({ code }) => code === "SEC-UNPINNED-DEPENDENCY-INSTALL",
+  );
+  assert.equal(diagnosticV2?.details?.ecosystem, "npm");
+  assert.equal(diagnosticV2?.details?.selectorKind, "variable");
+  assert.ok(
+    result.reviewBundles.some(({ diagnosticCodes }) =>
+      diagnosticCodes.includes("SEC-UNPINNED-DEPENDENCY-INSTALL"),
+    ),
+  );
+});
+
+test("fallback dependency findings retain diagnostics v2, bundles, and suppressions", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-fallback-scan-"));
+  const relativePath = "contexts/fallback.md";
+  await mkdir(path.join(root, ".git"));
+  await mkdir(path.join(root, "contexts"), { recursive: true });
+  await writeFile(path.join(root, "renma.config.json"), "{}\n");
+  await writeFile(
+    path.join(root, relativePath),
+    contextArtifact(`
+\`\`\`bash
+brew install jq
+docker pull ubuntu
+docker run ubuntu
+\`\`\`
+`).content,
+  );
+
+  const result = await scan(root);
+  const dependencyFindings = result.findings.filter(
+    ({ id }) => id === "SEC-UNPINNED-DEPENDENCY-INSTALL",
+  );
+  assert.deepEqual(
+    dependencyFindings.map(({ evidence }) => evidence.snippet),
+    ["brew install jq", "docker pull ubuntu", "docker run ubuntu"],
+  );
+  assert.equal(
+    result.diagnosticsV2.filter(
+      ({ code }) => code === "SEC-UNPINNED-DEPENDENCY-INSTALL",
+    ).length,
+    3,
+  );
+  assert.ok(
+    result.reviewBundles.some(({ diagnosticCodes }) =>
+      diagnosticCodes.includes("SEC-UNPINNED-DEPENDENCY-INSTALL"),
+    ),
+  );
+
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({
+      suppressions: [
+        {
+          id: "SEC-UNPINNED-DEPENDENCY-INSTALL",
+          paths: [relativePath],
+          reason: "Compatibility fixture verifies audited suppression flow.",
+        },
+      ],
+    }),
+  );
+  const suppressed = await scan(root);
+  assert.equal(
+    suppressed.findings.some(
+      ({ id }) => id === "SEC-UNPINNED-DEPENDENCY-INSTALL",
+    ),
+    false,
+  );
+  assert.equal(
+    suppressed.diagnosticsV2.some(
+      ({ code }) => code === "SEC-UNPINNED-DEPENDENCY-INSTALL",
+    ),
+    false,
+  );
+  assert.equal(
+    suppressed.reviewBundles.some(({ diagnosticCodes }) =>
+      diagnosticCodes.includes("SEC-UNPINNED-DEPENDENCY-INSTALL"),
+    ),
+    false,
+  );
 });
 
 function dependencyFindings(body: string) {
@@ -827,6 +1087,34 @@ ${body.trim()}
     path: "contexts/security-command.md",
     absolutePath: "/repo/contexts/security-command.md",
     kind: "context",
+    sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: true,
+    content,
+  };
+}
+
+function canonicalSkillContent(allowanceValue: string): string {
+  return `---
+name: dependency-review
+description: Review bounded dependency installation instructions.
+metadata:
+  renma.allowed-data: '["public"]'
+  renma.allowed-floating-dependencies: ${allowanceValue}
+---
+
+\`\`\`bash
+npm install appium@latest
+pip install requests
+\`\`\`
+`;
+}
+
+function skillArtifact(content: string): Artifact {
+  return {
+    path: "skills/dependency-review/SKILL.md",
+    absolutePath: "/repo/skills/dependency-review/SKILL.md",
+    kind: "skill",
     sizeBytes: Buffer.byteLength(content),
     contentClassification: "text",
     markdownParserEligible: true,

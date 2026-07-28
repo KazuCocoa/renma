@@ -421,6 +421,193 @@ test("skill and context without policy metadata are counted as missing", () => {
   ]);
 });
 
+test("floating allowances are visible as local policy metadata with exact evidence", () => {
+  const nonSkillContent = [
+    "---",
+    "allowed_floating_dependencies:",
+    "  - npm:appium@latest",
+    "---",
+    "# Context",
+  ].join("\n");
+  const canonicalSkillContent = [
+    "---",
+    "name: demo",
+    "description: Use this skill for deterministic floating allowance inventory checks when local governance evidence must remain auditable.",
+    "metadata:",
+    `  renma.allowed-floating-dependencies: '["npm:appium@latest"]'`,
+    "---",
+    "# Demo",
+  ].join("\n");
+  const evidence = collectSecurityPolicyAssetEvidence([
+    exactArtifact("contexts/allowance.md", "context", nonSkillContent),
+    exactArtifact("skills/demo/SKILL.md", "skill", canonicalSkillContent),
+  ]);
+  const nonSkill = evidence.find(
+    ({ path }) => path === "contexts/allowance.md",
+  );
+  const canonicalSkill = evidence.find(
+    ({ path }) => path === "skills/demo/SKILL.md",
+  );
+
+  assert.equal(nonSkill?.hasLocalPolicyMetadata, true);
+  assert.equal(nonSkill?.hasEffectivePolicy, false);
+  assert.deepEqual(nonSkill?.policySources, []);
+  assert.deepEqual(nonSkill?.evidence.policyFields, [
+    {
+      path: "contexts/allowance.md",
+      startLine: 2,
+      endLine: 2,
+      snippet: "allowed_floating_dependencies:",
+    },
+  ]);
+
+  assert.equal(canonicalSkill?.hasLocalPolicyMetadata, true);
+  assert.equal(canonicalSkill?.hasEffectivePolicy, false);
+  assert.deepEqual(canonicalSkill?.policySources, []);
+  assert.deepEqual(canonicalSkill?.evidence.policyFields, [
+    {
+      path: "skills/demo/SKILL.md",
+      startLine: 5,
+      endLine: 5,
+      snippet: `  renma.allowed-floating-dependencies: '["npm:appium@latest"]'`,
+    },
+  ]);
+});
+
+test("floating allowance inventory stays asset-local and fingerprint-neutral", () => {
+  const allowance = (selector: string) =>
+    [
+      "---",
+      "allowed_floating_dependencies:",
+      `  - ${selector}`,
+      "---",
+      "# Context",
+    ].join("\n");
+  const evidence = collectSecurityPolicyAssetEvidence([
+    exactArtifact(
+      "contexts/latest.md",
+      "context",
+      allowance("npm:appium@latest"),
+    ),
+    exactArtifact("contexts/next.md", "context", allowance("npm:appium@next")),
+    exactArtifact("contexts/plain.md", "context", "# Plain\n"),
+  ]);
+  const latest = evidence.find(({ path }) => path === "contexts/latest.md");
+  const next = evidence.find(({ path }) => path === "contexts/next.md");
+  const plain = evidence.find(({ path }) => path === "contexts/plain.md");
+
+  assert.equal(latest?.hasLocalPolicyMetadata, true);
+  assert.equal(next?.hasLocalPolicyMetadata, true);
+  assert.equal(plain?.hasLocalPolicyMetadata, false);
+  assert.equal(
+    latest?.effectivePolicy.fingerprint,
+    next?.effectivePolicy.fingerprint,
+  );
+  assert.equal(
+    latest?.effectivePolicy.fingerprint,
+    plain?.effectivePolicy.fingerprint,
+  );
+  assert.equal(
+    "allowedFloatingDependencies" in (latest?.effectivePolicy ?? {}),
+    false,
+  );
+  assert.deepEqual(plain?.evidence.policyFields, []);
+
+  const summary = summarizeSecurityPolicyAssetEvidence(evidence);
+  assert.equal(summary.totalPolicyAssets, 3);
+  assert.equal(summary.assetsWithLocalPolicyMetadata, 2);
+  assert.equal(summary.assetsWithEffectivePolicy, 0);
+  assert.equal(summary.assetsWithoutEffectivePolicy, 3);
+  assert.deepEqual(summary.networkAllowed, {
+    true: 0,
+    false: 0,
+    unspecified: 3,
+  });
+  assert.equal(summary.approvedNetworkDestinationCount, 0);
+  assert.equal(summary.approvedUploadDestinationCount, 0);
+  assert.equal(summary.forbiddenInputCount, 0);
+  assert.equal(summary.disallowedCommandCount, 0);
+  assert.deepEqual(
+    Object.keys(summary),
+    Object.keys(zeroSecurityPolicyInventorySummary()),
+  );
+  assert.deepEqual(Object.keys(latest?.effectivePolicy ?? {}), [
+    "fingerprint",
+    "allowedData",
+    "forbiddenInputs",
+    "networkAllowed",
+    "externalUploadAllowed",
+    "secretsAllowed",
+    "humanApprovalRequired",
+    "approvedNetworkDestinations",
+    "approvedUploadDestinations",
+    "disallowedCommands",
+  ]);
+});
+
+test("profiles and repository config cannot supply or accumulate floating allowances", () => {
+  const unsupportedConfig = {
+    ...baseSecurityConfig(),
+    allowedFloatingDependencies: ["npm:repository-only@latest"],
+    profiles: {
+      strict: {
+        ...profile({ networkAllowed: false }),
+        allowedFloatingDependencies: ["npm:profile-only@latest"],
+      },
+    },
+  } as unknown as SecurityConfig;
+  const localContent = [
+    "---",
+    "security_profile: strict",
+    "allowed_floating_dependencies:",
+    "  - npm:appium@latest",
+    "---",
+    "# Local",
+  ].join("\n");
+  const evidence = collectSecurityPolicyAssetEvidence(
+    [
+      exactArtifact("contexts/local.md", "context", localContent),
+      exactArtifact(
+        "contexts/profile.md",
+        "context",
+        "---\nsecurity_profile: strict\n---\n# Profile\n",
+      ),
+      exactArtifact("contexts/repository.md", "context", "# Repository\n"),
+    ],
+    unsupportedConfig,
+  );
+  const local = evidence.find(({ path }) => path === "contexts/local.md");
+  const profileOnly = evidence.find(
+    ({ path }) => path === "contexts/profile.md",
+  );
+  const repositoryOnly = evidence.find(
+    ({ path }) => path === "contexts/repository.md",
+  );
+
+  assert.deepEqual(
+    local?.evidence.policyFields.map(({ snippet }) => snippet),
+    ["security_profile: strict", "allowed_floating_dependencies:"],
+  );
+  assert.deepEqual(
+    profileOnly?.evidence.policyFields.map(({ snippet }) => snippet),
+    ["security_profile: strict"],
+  );
+  assert.deepEqual(repositoryOnly?.evidence.policyFields, []);
+  assert.equal(
+    local?.effectivePolicy.fingerprint,
+    profileOnly?.effectivePolicy.fingerprint,
+  );
+  assert.deepEqual(local?.policySources, ["security_profile"]);
+  assert.deepEqual(profileOnly?.policySources, ["security_profile"]);
+  assert.equal(repositoryOnly?.hasLocalPolicyMetadata, false);
+  assert.equal(repositoryOnly?.hasEffectivePolicy, false);
+  assert.equal(JSON.stringify(evidence).includes("profile-only@latest"), false);
+  assert.equal(
+    JSON.stringify(evidence).includes("repository-only@latest"),
+    false,
+  );
+});
+
 test("asset-local booleans count true false and unspecified effective values", () => {
   const summary = summarizeSecurityPolicyInventory([
     artifact(
@@ -780,6 +967,22 @@ function artifact(path: string, kind: ArtifactKind, content: string): Artifact {
     contentClassification: "text",
     markdownParserEligible: true,
     content: operationalContent,
+  };
+}
+
+function exactArtifact(
+  path: string,
+  kind: ArtifactKind,
+  content: string,
+): Artifact {
+  return {
+    path,
+    absolutePath: `/repo/${path}`,
+    kind,
+    sizeBytes: Buffer.byteLength(content),
+    contentClassification: "text",
+    markdownParserEligible: true,
+    content,
   };
 }
 

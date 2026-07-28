@@ -1,6 +1,10 @@
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import type { DiagnosticId } from "./diagnostic-ids.js";
 import {
+  classifyNpmSelector,
+  classifyPythonSelector,
+} from "./dependency-selectors.js";
+import {
   applySecurityConfig,
   effectiveAllowedDataClass,
   effectiveAllowedDataList,
@@ -97,6 +101,7 @@ type Detection = {
   endLine?: number;
   snippet: string;
   dedupeKey?: string;
+  details?: Record<string, unknown>;
 };
 
 type DetectionEvidence = Pick<Detection, "startLine" | "endLine" | "snippet">;
@@ -612,17 +617,21 @@ const RULES = {
     whyItMatters:
       "Unpinned dependencies make agent setup non-reproducible and can unexpectedly pull compromised or breaking packages.",
     remediation:
-      "Pin package, image, and formula versions, use an accepted fail-closed guard for npm-style version variables, or refer to the repository lockfile.",
+      "Use repository evidence and established ecosystem conventions to choose a reviewed exact package selector, a supported Homebrew formula version, or an explicit non-floating container image tag or immutable digest. Use an accepted fail-closed variable form only where Renma structurally supports it; exact asset-local floating-selector allowances apply only to supported npm: or pypi: selectors.",
     constraints: [
-      "Do not pick arbitrary versions without checking the repository's intended support matrix.",
-      "Preserve existing package manager conventions.",
+      "Check repository evidence and the intended support matrix before selecting a package version, formula version, image tag, or digest; never invent one.",
+      "Preserve existing package-manager, Homebrew, and container-image conventions.",
+      "Use fail-closed variables only in structurally supported forms, and never use npm/PyPI floating-selector allowances to suppress Homebrew or Docker findings.",
+      "Do not claim that uninspected manifests, lockfiles, requirements files, constraints files, or other dependency sources were verified.",
     ],
     verificationSteps: [
       "Run renma scan.",
-      "Confirm dependency install instructions are literal-pinned, fail-closed variable-guarded, or lockfile-based.",
+      "Confirm structured npm/PyPI installs use reviewed exact selectors, structurally accepted fail-closed variables, or exact asset-local npm:/pypi: floating-selector approvals.",
+      "Confirm Homebrew formulas use a supported versioned formula when repository conventions permit it, and container images use an explicit non-floating tag or immutable digest.",
+      "Confirm no value was invented and no uninspected dependency source is described as verified.",
     ],
     llmHint:
-      "Use a reviewed literal version, an exact ${NAME:?message} guard for the same npm-style version variable, or the repository's lockfile command. Do not invent a version.",
+      "Check repository evidence first. Use a reviewed ecosystem-specific exact package selector; a supported versioned Homebrew formula where conventions permit; or an explicit non-floating image tag or immutable digest. Use ${NAME:?message} only where Renma structurally supports that variable form, and use asset-local floating allowances only for exact npm: or pypi: selectors. Never invent a package version, formula version, image tag, or digest, or claim uninspected dependency sources were verified.",
     confidence: "medium",
     riskClass: "suspicious",
   },
@@ -1029,6 +1038,7 @@ function prepareSecurityDocumentAnalysis(
     visibleLines,
     scanStart,
     markdownView,
+    parsedPolicy,
   );
   const securityParagraphAnalysis = prepareSecurityParagraphContexts(
     markdownView,
@@ -1270,6 +1280,7 @@ function prepareLogicalCommandAnalysis(
   visibleLines: string[],
   scanStart: number,
   markdownView: MarkdownSecurityView,
+  policy: SecurityPolicy,
 ): PreparedLogicalCommandAnalysis {
   const commands = logicalShellCommands(sourceLines, visibleLines, scanStart, {
     isLineEligible: (lineIndex) =>
@@ -1307,6 +1318,7 @@ function prepareLogicalCommandAnalysis(
           },
           guards: markdownView.associatedGuardEvidence(startLineIndex),
           destinationAnalysis,
+          allowedFloatingDependencies: policy.allowedFloatingDependencies,
         }),
       ] as const;
     }),
@@ -1482,6 +1494,8 @@ function prepareSecurityLineContext(
         ...(language === undefined ? {} : { language }),
       },
       guards: markdownView.associatedGuardEvidence(index),
+      allowedFloatingDependencies:
+        prepared.parsedPolicy.allowedFloatingDependencies,
     });
     return cachedLineSecurityAnalysis;
   };
@@ -2514,16 +2528,21 @@ function commandDetections(
     });
   }
 
+  const unapprovedDependencies =
+    analysis?.dependencyInstalls.filter(
+      ({ pinning, floatingAllowed }) =>
+        !floatingAllowed &&
+        (pinning === "unpinned" ||
+          pinning === "floating-literal" ||
+          pinning === "variable-unverified"),
+    ) ?? [];
   const structuredUnpinnedInstall =
-    analysis?.npmStyleInstallCommand === true &&
-    analysis.dependencyInstalls.some(
-      ({ pinning }) =>
-        pinning === "unpinned" || pinning === "variable-unverified",
-    );
+    analysis?.dependencyInstallCommand === true &&
+    unapprovedDependencies.length > 0;
   const requiresDependencyFallback =
     analysis === undefined ||
     analysis.support === "fallback-required" ||
-    !analysis.npmStyleInstallCommand;
+    !analysis.dependencyInstallCommand;
   const unpinnedInstall =
     structuredUnpinnedInstall ||
     (requiresDependencyFallback && unpinnedDependencyInstall(line));
@@ -2533,6 +2552,9 @@ function commandDetections(
       severity: "medium",
       startLine: lineNumber,
       snippet: line,
+      ...(structuredUnpinnedInstall
+        ? { details: dependencyFindingDetails(unapprovedDependencies) }
+        : {}),
     });
   }
 
@@ -2572,6 +2594,36 @@ function commandDetections(
   }
 
   return detections;
+}
+
+function dependencyFindingDetails(
+  dependencies: SecurityCommandAnalysis["dependencyInstalls"],
+): Record<string, unknown> {
+  const projected = dependencies.map(
+    ({
+      ecosystem,
+      packageManager,
+      packageName,
+      normalizedPackageName,
+      reference,
+      selector,
+      selectorKind,
+      pinning,
+    }) => ({
+      ecosystem,
+      packageManager,
+      ...(packageName === undefined ? {} : { packageName }),
+      ...(normalizedPackageName === undefined ? {} : { normalizedPackageName }),
+      reference,
+      selector,
+      selectorKind,
+      pinning,
+      floatingAllowed: false,
+    }),
+  );
+  return projected.length === 1
+    ? { ...projected[0], dependencies: projected }
+    : { dependencies: projected };
 }
 
 function predictableTempDetections(
@@ -3367,7 +3419,7 @@ function isShellCommentLine(
 }
 
 function isCommandLike(line: string): boolean {
-  return /\b(npm|pnpm|yarn|pip3?|brew|docker|curl|wget|sudo|chmod|chown|git|gh|aws|gcloud|az|kubectl|echo|cat|cp|mv|rm|touch|mkdir)\b/i.test(
+  return /\b(npm|pnpm|yarn|pip3?|python(?:\d+(?:\.\d+)*)?|py|uv|brew|docker|curl|wget|sudo|chmod|chown|git|gh|aws|gcloud|az|kubectl|echo|cat|cp|mv|rm|touch|mkdir)\b/i.test(
     line,
   );
 }
@@ -3499,7 +3551,9 @@ function unpinnedDependencyInstall(line: string): boolean {
     return true;
   }
 
-  const pip = line.match(/\bpip3?\s+install\s+([^\n#]+)/i);
+  const pip = line.match(
+    /\b(?:pip3?|(?:python(?:\d+(?:\.\d+)*)?|py)\s+-m\s+pip|uv\s+pip)\s+install\s+([^\n#]+)/i,
+  );
   if (pip && splitCommandArgs(pip[1] ?? "").some(isUnpinnedPythonPackage)) {
     return true;
   }
@@ -3522,11 +3576,7 @@ function splitCommandArgs(value: string): string[] {
     .split(/\s+/)
     .map((arg) => arg.trim())
     .filter(
-      (arg) =>
-        arg.length > 0 &&
-        !arg.startsWith("-") &&
-        !arg.includes("=") &&
-        !/[|;&]/.test(arg),
+      (arg) => arg.length > 0 && !arg.startsWith("-") && !/[|;&]/.test(arg),
     );
 }
 
@@ -3539,20 +3589,19 @@ function isUnpinnedNpmPackage(arg: string): boolean {
   ) {
     return false;
   }
-  if (normalized.includes("$(")) return true;
-  const packageName = normalized.startsWith("@")
-    ? normalized.split("@").slice(0, 2).join("@")
-    : normalized.split("@")[0];
-  if (packageName === normalized) return true;
-  const version = normalized.slice(packageName?.length ?? 0);
-  return version.includes("$");
+  return classifyNpmSelector(normalized).selectorKind !== "exact";
 }
 
 function isUnpinnedPythonPackage(arg: string): boolean {
-  if (isPlaceholder(arg) || arg.startsWith("-") || arg.startsWith(".")) {
+  const normalized = arg.replace(/^(['"])(.*)\1$/u, "$2");
+  if (
+    isPlaceholder(normalized) ||
+    normalized.startsWith("-") ||
+    normalized.startsWith(".")
+  ) {
     return false;
   }
-  return !/[=<>~!]=|===/.test(arg);
+  return classifyPythonSelector(normalized).selectorKind !== "exact";
 }
 
 function isUnpinnedBrewFormula(arg: string): boolean {
@@ -3620,6 +3669,7 @@ function findingFromDetection(
     llmHint: detection.metadata.llmHint,
     confidence: detection.metadata.confidence,
     riskClass: detection.metadata.riskClass,
+    ...(detection.details === undefined ? {} : { details: detection.details }),
   };
 }
 

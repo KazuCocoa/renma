@@ -107,6 +107,89 @@ docker pull selenium/standalone-chrome:latest
   );
 });
 
+test("Homebrew and Docker fallback dependency detections remain compatible", async () => {
+  const findings = (
+    await securityFindings(`
+\`\`\`bash
+brew install jq
+brew install jq
+brew install jq@1.7
+docker pull ubuntu
+docker pull ubuntu:24.04
+docker pull ubuntu@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+docker run ubuntu
+docker run ubuntu:24.04
+\`\`\`
+`)
+  ).filter(({ id }) => id === "SEC-UNPINNED-DEPENDENCY-INSTALL");
+
+  assert.deepEqual(
+    findings.map(({ id, severity, confidence, riskClass, evidence }) => ({
+      id,
+      severity,
+      confidence,
+      riskClass,
+      evidence,
+    })),
+    [
+      {
+        id: "SEC-UNPINNED-DEPENDENCY-INSTALL",
+        severity: "medium",
+        confidence: "medium",
+        riskClass: "suspicious",
+        evidence: {
+          path: "skills/security/SKILL.md",
+          startLine: 4,
+          endLine: 4,
+          snippet: "brew install jq",
+        },
+      },
+      {
+        id: "SEC-UNPINNED-DEPENDENCY-INSTALL",
+        severity: "medium",
+        confidence: "medium",
+        riskClass: "suspicious",
+        evidence: {
+          path: "skills/security/SKILL.md",
+          startLine: 7,
+          endLine: 7,
+          snippet: "docker pull ubuntu",
+        },
+      },
+      {
+        id: "SEC-UNPINNED-DEPENDENCY-INSTALL",
+        severity: "medium",
+        confidence: "medium",
+        riskClass: "suspicious",
+        evidence: {
+          path: "skills/security/SKILL.md",
+          startLine: 10,
+          endLine: 10,
+          snippet: "docker run ubuntu",
+        },
+      },
+    ],
+  );
+
+  const guidance = findings[0];
+  assert.ok(guidance);
+  assert.ok(guidance.constraints);
+  assert.ok(guidance.llmHint);
+  assert.match(guidance.remediation, /Homebrew formula version/u);
+  assert.match(guidance.remediation, /image tag or immutable digest/u);
+  assert.ok(
+    guidance.constraints.some((constraint) =>
+      constraint.includes("never invent"),
+    ),
+  );
+  assert.ok(
+    guidance.constraints.some((constraint) =>
+      constraint.includes("npm/PyPI floating-selector allowances"),
+    ),
+  );
+  assert.match(guidance.llmHint, /asset-local floating allowances only for/u);
+});
+
 test("privileged commands require nearby guardrails", async () => {
   const unguarded = await securityFindings(`
 \`\`\`bash

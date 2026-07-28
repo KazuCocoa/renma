@@ -114,6 +114,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
       [
         "command-invocation.ts",
         "config.ts",
+        "dependency-selectors.ts",
         "dependency-resolution.ts",
         "diagnostic-ids.ts",
         "freshness.ts",

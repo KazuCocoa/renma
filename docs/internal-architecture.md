@@ -115,7 +115,7 @@ Markdown/source eligibility
   -> one relevant logical command or line-local instruction
   -> exact structural guard evidence
   -> bounded shell/JavaScript recognition
-  +-> npm-style dependency pinning
+  +-> ecosystem-specific dependency command and selector classification
   +-> sensitive source and sink classification
   \-> existing destination analysis and normalization
   -> supported structured projection or conservative fallback
@@ -266,13 +266,31 @@ for the same instruction, same list item, preceding paragraph, and active
 safety section without crossing unrelated headings, thematic breaks, sibling
 items, code blocks, or quoted examples.
 
-The internal `src/security-command/` analysis modules own bounded tokenization,
-npm-style dependency pinning, sensitive-source classification, sink
-classification, shared disclosure-action extraction and clause polarity,
-no-disclosure guard matching, and the cohesive immutable command result. One
-result is cached for each relevant line-local instruction. Each logical shell
-command receives one result that reuses its existing `DestinationAnalysis`;
-physical continuation members do not independently reanalyze that command.
+The low-level `src/dependency-selectors.ts` module owns pure npm registry and
+bounded PEP 440/508-inspired selector classification, a raw-evidence-preserving
+Python specifier normalization layer, and normalized floating-allowance keys.
+The internal `src/security-command/` analysis modules separately own bounded
+npm-family and pip-style command recognition, pre-subcommand pip general
+options, post-subcommand option arity, and
+indirect-file projection, fail-closed variable guards, allowance governance,
+tokenization, sensitive-source classification, sink classification, shared
+disclosure-action extraction and clause polarity, no-disclosure guard matching,
+and the cohesive immutable command result. Selector classification is computed
+before governance, so an allowed floating selector is never reclassified as
+pinned. One result is cached for each relevant line-local instruction. Each
+logical shell command receives one result that reuses its existing
+`DestinationAnalysis`; physical continuation members do not independently
+reanalyze that command.
+
+`SEC-UNPINNED-DEPENDENCY-INSTALL` also retains its older bounded line-level
+fallback for Homebrew formula installs and Docker image pull/run commands.
+Structured npm/PyPI analysis suppresses that fallback only when the structured
+result is authoritative; unsupported or unrecognized forms remain
+conservative. Floating allowances are asset-local npm/PyPI governance.
+Security Policy Inventory exposes their local declaration evidence, while
+effective policy, profile/repository resolution, provenance, fingerprints,
+owning-Skill inheritance, and existing inventory counts intentionally omit
+them.
 
 The internal `src/security-destination/` modules continue to own the pure
 destination stages. `analyzeDestinations` projects one input, classifies its
