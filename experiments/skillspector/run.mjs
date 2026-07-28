@@ -199,6 +199,7 @@ async function captureVersion() {
 
 async function scanTarget(target, mode, versionProbeResult) {
   const outputDirectory = path.join(generatedRoot, mode, target.id);
+  await rm(outputDirectory, { recursive: true, force: true });
   await mkdir(outputDirectory, { recursive: true });
   const startedAt = new Date().toISOString();
   const commands = [];
@@ -210,7 +211,6 @@ async function scanTarget(target, mode, versionProbeResult) {
       outputDirectory,
       format === "json" ? "report.json" : "report.sarif",
     );
-    await rm(reportPath, { force: true });
     const args = ["scan", target.absolutePath];
     if (mode === "static-only") args.push("--no-llm");
     args.push("--format", format, "--output", reportPath);

@@ -88,8 +88,9 @@ SkillSpector version X inspected this exact asset content using profile Y,
 completed Z percent of the applicable inspection, and produced outcome P.
 ```
 
-Dynamic scanner output must not be stored in `SKILL.md` metadata. In
-particular, patterns such as these are rejected:
+This direction rejects storing generated scanner results as authored Renma
+governance metadata. In particular, patterns such as these are not operational
+or recommended Renma metadata:
 
 ```yaml
 metadata:
@@ -97,6 +98,11 @@ metadata:
   renma.last-skillspector-scan: "2026-07-27"
   renma.skillspector-result: "safe"
 ```
+
+The current Agent Skills compatibility layer may still accept unknown
+string-valued `renma.*` keys and preserve them without interpretation. That
+does not make those keys operational, documented, or recommended Renma
+metadata.
 
 Those values become stale when the source content, scanner version, assessment
 profile, baseline, suppression set, or execution mode changes. They also blur
@@ -109,9 +115,10 @@ metadata:
   renma.review-requirements: '["security.core"]'
 ```
 
-This is a non-operational illustration only. It is not accepted canonical
-metadata, and this experiment does not add it to Renma's implementation or
-documentation contract.
+This is a non-operational illustration only. It is not a recognized or
+documented operational Renma metadata field. As an unknown string-valued
+metadata key it may remain specification-valid and be preserved without
+interpretation, but this experiment adds no semantics for it.
 
 ## Candidate External-Review Evidence
 

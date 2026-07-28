@@ -80,6 +80,9 @@ experiments/skillspector/generated/<mode>/<target-id>/report.sarif
 experiments/skillspector/generated/<mode>/<target-id>/run.json
 ```
 
+Rerunning the same target and mode replaces its previous local generated
+artifacts; the `generated/` directory is not an archive.
+
 `run.json` records the requested mode, captured SkillSpector version when
 available, exact argument arrays, target identity, timestamps, native exit
 status, and an experiment-only command classification. The raw JSON and SARIF
