@@ -14,6 +14,12 @@ or invoke a script or asset remain eligible for diagnostics. Analyze the script
 or asset itself independently with project-selected tools such as ShellCheck,
 Bandit, Semgrep, ESLint security rules, CodeQL, and dependency scanners.
 
+Specialized scanners can complement this bounded policy and instruction
+analysis without becoming Renma dependencies or Renma findings. Renma does not
+bundle, require, or invoke SkillSpector or any other external scanner. See
+[External Review Governance](external-review-governance.md) for the candidate
+governance boundary and opt-in experiment plan.
+
 ## Security Policy Quickstart
 
 Add small security policy metadata to agent-facing Skills or context assets when

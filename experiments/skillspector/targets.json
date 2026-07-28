@@ -1,0 +1,29 @@
+{
+  "targets": [
+    {
+      "id": "root-release-prep",
+      "kind": "canonical-skill",
+      "path": "skills/release-prep"
+    },
+    {
+      "id": "example-spec-review",
+      "kind": "canonical-skill",
+      "path": "examples/context-repo/skills/testing/spec-review"
+    },
+    {
+      "id": "example-context-repo",
+      "kind": "repository-probe",
+      "path": "examples/context-repo"
+    },
+    {
+      "id": "example-context-lens",
+      "kind": "repository-probe",
+      "path": "examples/context-lens"
+    },
+    {
+      "id": "example-interactive-placeholder",
+      "kind": "repository-probe",
+      "path": "examples/interactive-placeholder"
+    }
+  ]
+}

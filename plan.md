@@ -59,6 +59,35 @@ None is a commitment. A candidate becomes product work only after its user
 problem, deterministic inputs, output contract, compatibility effect, and
 non-goals are reviewed.
 
+### External review governance experiment
+
+This unassigned candidate evaluates whether Renma can govern external-review
+requirements and generated receipts without depending on or becoming an
+external reviewer. SkillSpector is the first evaluation producer, and current
+repository Skills plus separately classified example-repository probes are the
+initial corpus. The methodology lives in the
+[SkillSpector experiment](experiments/skillspector/README.md), and the durable
+boundary is in
+[External Review Governance](docs/external-review-governance.md).
+
+The candidate separates stable review requirements from generated receipts.
+Future `renma-<tool>-adapter` companion tools may parse supported published
+reports and bind them to public Renma repository evidence. Renma core would not
+load those adapters or depend on the producers. There is no commitment yet to a
+public receipt schema, metadata field, CLI, configuration field, adapter
+package, or release.
+
+Evidence is required before product implementation. Decision gates include:
+
+- published output can be parsed reliably;
+- producer version and actual execution mode are available;
+- completeness, skipped work, and limitations are visible;
+- the logical subject and exact reviewed component scope can be bound to stable
+  repository evidence;
+- false-positive and suppression behavior is understood;
+- raw evidence can remain separate from Renma findings;
+- a provider-neutral core remains useful for a second producer.
+
 ## Adjacent or External Capabilities
 
 Some useful capabilities should remain outside Renma core unless a future

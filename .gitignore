@@ -37,6 +37,9 @@ pnpm-debug.log*
 .npm/
 .pnpm-store/
 
+# Opt-in experiment output
+experiments/skillspector/generated/
+
 # Editor and OS files
 .DS_Store
 Thumbs.db
