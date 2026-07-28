@@ -26,6 +26,15 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   Diagnostics v2, and review-bundle behavior remain compatible, with additive
   npm/PyPI dependency details.
 
+## [0.25.2] - 2026-07-28
+
+### Changed
+
+- Added a candidate external-review governance design and a SkillSpector
+  experiment harness for evaluating provider-neutral review evidence. These
+  additions are planning and experimental artifacts only; they do not change
+  the current CLI, metadata, schema, configuration, or plugin contracts.
+
 ## [0.25.1] - 2026-07-27
 
 ### Changed
@@ -1767,7 +1776,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.25.1...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.25.2...HEAD
+[0.25.2]: https://github.com/KazuCocoa/renma/compare/v0.25.1...v0.25.2
 [0.25.1]: https://github.com/KazuCocoa/renma/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/KazuCocoa/renma/compare/v0.24.4...v0.25.0
 [0.24.4]: https://github.com/KazuCocoa/renma/compare/v0.24.3...v0.24.4
