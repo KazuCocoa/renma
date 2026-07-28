@@ -362,11 +362,14 @@ direct package-install commands. Exactness is ecosystem-specific:
 | Other package managers | Not currently analyzed by this diagnostic |
 
 npm-family exact literals must be complete npm registry versions, including
-valid prerelease or build metadata when present. Bare packages, dist-tags,
-ranges, partial versions, and wildcards remain floating:
+valid prerelease or build metadata when present. A leading `v` or `=` is
+accepted only when the remaining selector is a complete exact version. Bare
+packages, dist-tags, ranges, partial versions, and wildcards remain floating:
 
 ```bash
 npm install appium@3.0.0
+npm install appium@v3.0.0
+npm install appium@=3.0.0
 npm install appium@3.0.0-beta.1
 npm install @scope/driver@2.4.1
 
@@ -378,22 +381,33 @@ npm install appium@3.x
 ```
 
 Python analysis uses bounded PEP 440/508-inspired requirement semantics rather
-than npm version rules. One literal `==` or `===` selector is exact when its
-right-hand value is non-empty and has no wildcard, unresolved variable, or
-additional range clause. Python exact values do not need three numeric
-segments. Bare requirements, ranges, exclusions, compatible-release selectors,
-and wildcard equality remain floating:
+than npm version rules. One literal `==` selector is exact only when its
+right-hand value is a supported PEP 440 version identifier. `===` instead
+accepts one non-empty arbitrary equality value, so a literal `*` there is not
+wildcard syntax. Python exact values do not need three numeric segments. Bare
+requirements, ranges, exclusions, compatible-release selectors, and `==`
+wildcard equality remain floating; malformed or unsupported equality values
+fail closed:
 
 ```bash
 pip install requests==2.32.4
 python -m pip install package==1!2.0
 uv pip install package===internal-version
+pip install "SomeProject == 1.3"
+pip install "requests [security] == 2.32.4"
 
 # Findings by default
 pip install requests
-pip install "requests>=2,<3"
+pip install "requests >= 2, < 3"
 pip install "requests==2.32.*"
+pip install package==latest
 ```
+
+Name-based Python requirements accept optional horizontal whitespace around
+the project name, extras, operators, version identifiers, and commas. Renma
+removes only that syntactically insignificant whitespace for classification
+and allowance matching; raw evidence is retained, and URL, marker, arbitrary,
+or unsupported whitespace is not broadly collapsed.
 
 For npm-family selectors, a variable version may use the exact fail-closed form
 `${NAME:?message}` at the use site or have that form in an associated guard for
@@ -440,8 +454,9 @@ allowed_floating_dependencies:
 
 Every entry requires the exact `npm:` or `pypi:` ecosystem, one normalized
 package name, and one selector. PyPI project names are compared after
-lowercasing and collapsing runs of `-`, `_`, and `.` to `-`. Selectors are not
-globbed or fuzzily matched: `npm:appium@latest` does not approve
+lowercasing and collapsing runs of `-`, `_`, and `.` to `-`. Valid Python
+specifier lists also ignore only the documented insignificant whitespace.
+Selectors are not globbed or fuzzily matched: `npm:appium@latest` does not approve
 `npm:appium@next`, and an npm approval never approves a PyPI requirement.
 Invalid canonical encoding emits
 `SEC-INVALID-CANONICAL-POLICY-METADATA` and fails closed. These approvals are
@@ -452,6 +467,14 @@ Bounded pnpm `--filter`/`-F` and Yarn `--cwd` options may precede the supported
 repeated pnpm filters are supported. Unknown, missing, or ambiguous
 manager-level options fail closed and cannot hide a package already classified
 as unpinned or variable-unverified.
+
+Bounded pip general options may also precede `install`, including the documented
+flag forms and attached or separated values for common value-taking options.
+Unknown, missing, or ambiguous general options retain the recognized install
+and safely recoverable package evidence but require conservative fallback.
+After `install`, Renma consumes only its bounded option table; options such as
+`--only-binary`, `--no-binary`, `-i`, and `-f` consume their required values
+instead of projecting those values as dependencies.
 
 Python `-r`/`--requirement` and `-c`/`--constraint` options are recognized as
 indirect file evidence, but the referenced files are not parsed. Direct URLs,

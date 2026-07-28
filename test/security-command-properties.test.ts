@@ -3,6 +3,7 @@ import test from "node:test";
 
 import fc from "fast-check";
 
+import { classifyPythonSelector } from "../src/dependency-selectors.js";
 import { MarkdownSecurityView } from "../src/markdown-security-view.js";
 import { parseMarkdownSyntax } from "../src/markdown-syntax.js";
 import { analyzeSecurityCommand } from "../src/security-command/index.js";
@@ -93,6 +94,30 @@ test("supported exact npm versions remain deterministic", () => {
   );
 });
 
+test("npm exact-version prefixes preserve full SemVer strictness", () => {
+  fc.assert(
+    fc.property(
+      npmExactVersionArbitrary,
+      fc.constantFrom("", "v", "="),
+      (version, prefix) => {
+        const exact = commandAnalysis(
+          `npm install package@${prefix}${version}`,
+        );
+        const partial = commandAnalysis(
+          `npm install package@${prefix}${version.split(".").slice(0, 2).join(".")}`,
+        );
+        assert.equal(exact.dependencyInstalls[0]?.selectorKind, "exact");
+        assert.equal(exact.dependencyInstalls[0]?.pinning, "pinned-literal");
+        assert.notEqual(
+          partial.dependencyInstalls[0]?.pinning,
+          "pinned-literal",
+        );
+      },
+    ),
+    PROPERTY_PARAMETERS,
+  );
+});
+
 test("Python wildcard and range operators never become pinned literals", () => {
   fc.assert(
     fc.property(
@@ -114,6 +139,18 @@ test("Python wildcard and range operators never become pinned literals", () => {
   );
 });
 
+test("non-version Python equality values never become pinned literals", () => {
+  fc.assert(
+    fc.property(npmDistTagArbitrary, (tag) => {
+      const analysis = commandAnalysis(`pip install package==tag-${tag}`);
+      assert.equal(analysis.dependencyInstalls[0]?.selectorKind, "unknown");
+      assert.equal(analysis.dependencyInstalls[0]?.pinning, "unpinned");
+      assert.equal(analysis.support, "fallback-required");
+    }),
+    PROPERTY_PARAMETERS,
+  );
+});
+
 test("Python exact-equality literals remain deterministic", () => {
   fc.assert(
     fc.property(
@@ -126,6 +163,72 @@ test("Python exact-equality literals remain deterministic", () => {
         assert.deepEqual(first, second);
         assert.equal(first.dependencyInstalls[0]?.selectorKind, "exact");
         assert.equal(first.dependencyInstalls[0]?.pinning, "pinned-literal");
+      },
+    ),
+    PROPERTY_PARAMETERS,
+  );
+});
+
+test("Python specifier whitespace has one stable normalized identity", () => {
+  fc.assert(
+    fc.property(
+      fc.integer({ min: 0, max: 1000 }),
+      fc.integer({ min: 0, max: 1000 }),
+      (major, minor) => {
+        const compact = commandAnalysis(
+          `pip install "Some_Project==${major}.${minor}"`,
+        );
+        const spaced = commandAnalysis(
+          `pip install "Some.Project == ${major}.${minor}"`,
+        );
+        assert.equal(
+          compact.dependencyInstalls[0]?.normalizedPackageName,
+          spaced.dependencyInstalls[0]?.normalizedPackageName,
+        );
+        assert.equal(
+          classifyPythonSelector(`Some_Project==${major}.${minor}`)
+            .normalizedSelector,
+          classifyPythonSelector(`Some.Project == ${major}.${minor}`)
+            .normalizedSelector,
+        );
+        assert.equal(
+          spaced.dependencyInstalls[0]?.reference.includes(" "),
+          true,
+        );
+        assert.equal(spaced.dependencyInstalls[0]?.pinning, "pinned-literal");
+      },
+    ),
+    PROPERTY_PARAMETERS,
+  );
+});
+
+test("pip option values remain outside dependency projection", () => {
+  fc.assert(
+    fc.property(
+      fc.constantFrom(
+        "--only-binary",
+        "--no-binary",
+        "--index-url",
+        "--find-links",
+        "-i",
+        "-f",
+      ),
+      npmExactVersionArbitrary,
+      (option, version) => {
+        const value =
+          option === "--only-binary"
+            ? ":all:"
+            : option === "--no-binary"
+              ? ":none:"
+              : "https://packages.example.invalid/simple";
+        const analysis = commandAnalysis(
+          `pip install ${option} ${value} package==${version}`,
+        );
+        assert.equal(analysis.support, "supported");
+        assert.deepEqual(
+          analysis.dependencyInstalls.map(({ reference }) => reference),
+          [`package==${version}`],
+        );
       },
     ),
     PROPERTY_PARAMETERS,

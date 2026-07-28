@@ -267,9 +267,11 @@ safety section without crossing unrelated headings, thematic breaks, sibling
 items, code blocks, or quoted examples.
 
 The low-level `src/dependency-selectors.ts` module owns pure npm registry and
-bounded PEP 440/508-inspired selector classification plus normalized
-floating-allowance keys. The internal `src/security-command/` analysis modules
-separately own bounded npm-family and pip-style command recognition, option and
+bounded PEP 440/508-inspired selector classification, a raw-evidence-preserving
+Python specifier normalization layer, and normalized floating-allowance keys.
+The internal `src/security-command/` analysis modules separately own bounded
+npm-family and pip-style command recognition, pre-subcommand pip general
+options, post-subcommand option arity, and
 indirect-file projection, fail-closed variable guards, allowance governance,
 tokenization, sensitive-source classification, sink classification, shared
 disclosure-action extraction and clause polarity, no-disclosure guard matching,

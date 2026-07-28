@@ -781,12 +781,23 @@ separate from governance: an explicitly allowed floating selector stays
 | Other package managers | Not currently analyzed by this diagnostic |
 
 npm registry versions are exact only when the complete selector is a bounded
-exact version, including valid prerelease and build metadata. Bare packages,
+exact version, including valid prerelease and build metadata; a leading `v` or
+`=` is accepted only for an otherwise complete exact version. Bare packages,
 arbitrary dist-tags, comparator or caret/tilde ranges, partial versions, and
-wildcards are floating. Python uses bounded PEP 440/508-inspired semantics: one
-literal `==` or `===` selector is exact when its value is non-empty and contains
-no wildcard, unresolved variable, or additional range clause. The Python rule
-does not require `major.minor.patch`.
+wildcards are floating. Python uses bounded PEP 440/508-inspired semantics:
+literal `==` requires one supported PEP 440 version, while literal `===`
+accepts one non-empty arbitrary equality value and does not give `*` wildcard
+meaning. The Python rule does not require `major.minor.patch`; malformed or
+unsupported `==` values fail closed.
+
+Python name-based requirements accept optional horizontal whitespace around
+names, extras, operators, version identifiers, and commas. Classification and
+allowance keys remove only that insignificant whitespace while retaining the
+raw reference. URL, marker, arbitrary, and unsupported whitespace is not
+collapsed. Bounded pip general options may precede `install`, and the bounded
+post-install option table consumes known required values. Unknown, missing, or
+ambiguous options require fallback while retaining safely recoverable install
+and package evidence.
 
 `${NAME:?message}` remains the accepted fail-closed variable form when it is at
 the use site or in an exact structurally associated guard for the same
@@ -800,9 +811,10 @@ Canonical Skills may declare the asset-local JSON-array string
 `metadata.renma.allowed-floating-dependencies`; non-Skill assets use
 `allowed_floating_dependencies`. Every entry has an exact `npm:` or `pypi:`
 prefix and one package-selector pair. PyPI project names use standard
-lowercase-and-collapse normalization for `-`, `_`, and `.`, while selectors,
-ecosystems, and package identities match exactly. No wildcard, glob, fuzzy, or
-cross-ecosystem approval exists. Invalid canonical encoding fails closed with
+lowercase-and-collapse normalization for `-`, `_`, and `.`, and valid
+specifier lists use only the documented insignificant-whitespace
+normalization. Selectors, ecosystems, and package identities otherwise match
+exactly. No wildcard, glob, fuzzy, or cross-ecosystem approval exists. Invalid canonical encoding fails closed with
 `SEC-INVALID-CANONICAL-POLICY-METADATA`. The field is not profile-inherited and
 does not alter policy fingerprints.
 

@@ -143,6 +143,50 @@ pip install -c constraints.txt requests==2.32.4
   assert.deepEqual(findings[0]?.details?.pinning, "floating-literal");
 });
 
+test("pip globals, requirement whitespace, option arity, and equality stay diagnostic-safe", () => {
+  const findings = dependencyFindings(`
+\`\`\`bash
+python -m pip --python .venv install requests
+python -m pip --python .venv install requests==2.32.4
+pip --isolated install requests
+pip install "SomeProject == 1.3"
+pip install "SomeProject >= 1.2, < 2.0"
+pip install "requests [security] == 2.32.4"
+pip install --only-binary :all: requests==2.32.4
+pip install --no-binary :none: requests==2.32.4
+pip install -i https://example.invalid/simple requests==2.32.4
+pip install -f https://example.invalid/wheels requests==2.32.4
+pip install --only-binary :all: requests
+pip install --no-binary :none: requests
+pip install -i https://pypi.org/simple requests
+pip install -f https://wheels.example.invalid requests
+pip install package==latest
+pip install package===latest
+pip install "package==2.0.*"
+pip install "package===legacy*"
+npm install package@v1.2.3
+npm install package@=1.2.3
+npm install package@v1.2
+\`\`\`
+`);
+
+  assert.deepEqual(
+    findings.map(({ evidence }) => evidence.snippet),
+    [
+      "python -m pip --python .venv install requests",
+      "pip --isolated install requests",
+      'pip install "SomeProject >= 1.2, < 2.0"',
+      "pip install --only-binary :all: requests",
+      "pip install --no-binary :none: requests",
+      "pip install -i https://pypi.org/simple requests",
+      "pip install -f https://wheels.example.invalid requests",
+      "pip install package==latest",
+      'pip install "package==2.0.*"',
+      "npm install package@v1.2",
+    ],
+  );
+});
+
 test("asset-local floating dependency metadata is exact and ecosystem-specific", () => {
   const content = `---
 allowed_data: public

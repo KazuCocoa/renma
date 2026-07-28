@@ -76,6 +76,8 @@ const NPM_MANAGER_OPTION_WITH_VALUE: Readonly<
   yarn: new Set(["--cwd"]),
 };
 const PYTHON_OPTION_WITH_VALUE = new Set([
+  "-f",
+  "-i",
   "--abi",
   "--cache-dir",
   "--config-settings",
@@ -83,32 +85,40 @@ const PYTHON_OPTION_WITH_VALUE = new Set([
   "--find-links",
   "--implementation",
   "--index-url",
+  "--no-binary",
+  "--only-binary",
   "--platform",
   "--prefix",
+  "--progress-bar",
   "--proxy",
   "--python",
+  "--python-version",
   "--root",
   "--src",
   "--target",
   "--timeout",
   "--trusted-host",
+  "--upgrade-strategy",
 ]);
 const PYTHON_OPTION_WITHOUT_VALUE = new Set([
   "--break-system-packages",
+  "--check-build-dependencies",
   "--compile",
   "--disable-pip-version-check",
   "--dry-run",
   "--force-reinstall",
   "--ignore-installed",
+  "--ignore-requires-python",
   "--no-build-isolation",
   "--no-cache-dir",
   "--no-compile",
   "--no-deps",
   "--no-index",
   "--no-input",
-  "--only-binary",
   "--pre",
+  "--prefer-binary",
   "--quiet",
+  "--require-hashes",
   "--upgrade",
   "--user",
   "--verbose",
@@ -116,6 +126,26 @@ const PYTHON_OPTION_WITHOUT_VALUE = new Set([
   "-U",
   "-v",
 ]);
+const PYTHON_GLOBAL_OPTION_WITH_VALUE = new Set([
+  "--cache-dir",
+  "--cert",
+  "--client-cert",
+  "--proxy",
+  "--python",
+  "--retries",
+  "--timeout",
+  "--trusted-host",
+]);
+const PYTHON_GLOBAL_OPTION_WITHOUT_VALUE = new Set([
+  "--disable-pip-version-check",
+  "--isolated",
+  "--no-input",
+  "--quiet",
+  "--verbose",
+  "-q",
+  "-v",
+]);
+const MAX_PYTHON_GLOBAL_ARGUMENTS = 32;
 const VARIABLE_RE =
   /\$(?:\{([A-Za-z_][A-Za-z0-9_]*)(?:(:)([-?])([^}]*))?\}|([A-Za-z_][A-Za-z0-9_]*))/gu;
 const PYTHON_EXECUTABLE_RE = /^python\d*(?:\.\d+)*$/iu;
@@ -213,6 +243,7 @@ function classifyCommandArguments(
                   ecosystem: command.ecosystem,
                   reference: option.evidence.token.value,
                   selector: option.evidence.token.value,
+                  normalizedSelector: option.evidence.token.value,
                   selectorKind: "indirect-file",
                   normalizedReference: option.evidence.token.value,
                 }
@@ -348,6 +379,15 @@ function consumeOrdinaryOption(
 ): { nextIndex: number; supported: boolean; evidence?: never } | undefined {
   const option = tokens[optionIndex];
   if (option?.kind !== "word") return undefined;
+  const attachedShortOption = [...optionsWithValue].find(
+    (optionName) =>
+      /^-[^-]$/u.test(optionName) &&
+      option.value.startsWith(optionName) &&
+      option.value.length > optionName.length,
+  );
+  if (attachedShortOption !== undefined) {
+    return { nextIndex: optionIndex + 1, supported: true };
+  }
   const equalsAt = option.value.indexOf("=");
   const optionName =
     equalsAt < 0 ? option.value : option.value.slice(0, equalsAt);
@@ -447,7 +487,7 @@ function pythonDependencyCommand(
     ) {
       return undefined;
     }
-    return directPythonInstallCommand(tokens, index + 1, "pip");
+    return pythonInstallCommand(tokens, index + 1, "pip");
   }
   if (PYTHON_EXECUTABLE_RE.test(value) || value === "py") {
     const moduleFlag = tokens[index + 1];
@@ -460,32 +500,111 @@ function pythonDependencyCommand(
     ) {
       return undefined;
     }
-    return directPythonInstallCommand(tokens, index + 3, "pip");
+    return pythonInstallCommand(tokens, index + 3, "pip");
   }
   if (value === "uv") {
     const pip = tokens[index + 1];
     if (pip?.kind !== "word" || pip.value.toLowerCase() !== "pip") {
       return undefined;
     }
-    return directPythonInstallCommand(tokens, index + 2, "uv");
+    return pythonInstallCommand(tokens, index + 2, "uv");
   }
   return undefined;
 }
 
-function directPythonInstallCommand(
+function pythonInstallCommand(
   tokens: readonly ShellToken[],
   commandIndex: number,
   packageManager: "pip" | "uv",
 ): DependencyCommand | undefined {
-  const install = tokens[commandIndex];
-  return install?.kind === "word" && install.value.toLowerCase() === "install"
-    ? {
+  const directInstall = tokens[commandIndex];
+  if (
+    directInstall?.kind === "word" &&
+    directInstall.value.toLowerCase() === "install"
+  ) {
+    return {
+      ecosystem: "pypi",
+      packageManager,
+      argumentsStart: commandIndex + 1,
+      supported: true,
+    };
+  }
+  if (packageManager !== "pip") {
+    return undefined;
+  }
+
+  let cursor = commandIndex;
+  while (cursor - commandIndex < MAX_PYTHON_GLOBAL_ARGUMENTS) {
+    const token = tokens[cursor];
+    if (token?.kind !== "word") {
+      return undefined;
+    }
+    if (token.value.toLowerCase() === "install") {
+      return {
         ecosystem: "pypi",
         packageManager,
-        argumentsStart: commandIndex + 1,
+        argumentsStart: cursor + 1,
         supported: true,
-      }
-    : undefined;
+      };
+    }
+    if (!token.value.startsWith("-")) {
+      return recoverPythonInstallCommand(tokens, cursor + 1, packageManager);
+    }
+
+    const optionName = token.value.split("=", 1)[0] ?? token.value;
+    if (
+      PYTHON_GLOBAL_OPTION_WITH_VALUE.has(optionName) &&
+      !token.value.includes("=") &&
+      tokens[cursor + 1]?.kind === "word" &&
+      tokens[cursor + 1]?.value.toLowerCase() === "install"
+    ) {
+      return {
+        ecosystem: "pypi",
+        packageManager,
+        argumentsStart: cursor + 2,
+        supported: false,
+      };
+    }
+
+    const option = consumeOrdinaryOption(
+      tokens,
+      cursor,
+      PYTHON_GLOBAL_OPTION_WITH_VALUE,
+      PYTHON_GLOBAL_OPTION_WITHOUT_VALUE,
+    );
+    if (option === undefined || !option.supported) {
+      return recoverPythonInstallCommand(tokens, cursor + 1, packageManager);
+    }
+    cursor = option.nextIndex;
+  }
+
+  return recoverPythonInstallCommand(tokens, cursor, packageManager);
+}
+
+function recoverPythonInstallCommand(
+  tokens: readonly ShellToken[],
+  searchStart: number,
+  packageManager: "pip" | "uv",
+): DependencyCommand | undefined {
+  const searchEnd = Math.min(
+    tokens.length,
+    searchStart + MAX_PYTHON_GLOBAL_ARGUMENTS,
+  );
+  for (let cursor = searchStart; cursor < searchEnd; cursor += 1) {
+    const token = tokens[cursor];
+    if (token?.kind === "operator") {
+      break;
+    }
+    if (token?.kind === "word" && token.value.toLowerCase() === "install") {
+      return {
+        ecosystem: "pypi",
+        packageManager,
+        argumentsStart: cursor + 1,
+        supported: false,
+      };
+    }
+  }
+  return undefined;
 }
 
 function supportedNpmDependencyCommand(
@@ -551,7 +670,7 @@ function dependencyFromSelector(
   sourceLength: number,
 ): DependencyInstallAnalysis {
   const variables = variableEvidence(
-    selector.selector,
+    selector.normalizedSelector,
     token,
     associatedGuards,
   );
@@ -591,7 +710,7 @@ function pinningForSelector(
   if (selector.selectorKind === "variable") {
     const guardShapeAccepted =
       selector.ecosystem === "npm" ||
-      PYTHON_EXACT_VARIABLE_SELECTOR_RE.test(selector.selector);
+      PYTHON_EXACT_VARIABLE_SELECTOR_RE.test(selector.normalizedSelector);
     return guardShapeAccepted && variables.allVariablesFailClosed
       ? "pinned-variable-guarded"
       : "variable-unverified";

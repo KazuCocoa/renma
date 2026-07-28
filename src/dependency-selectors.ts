@@ -17,6 +17,7 @@ export interface DependencySelectorAnalysis {
   normalizedPackageName?: string;
   reference: string;
   selector: string;
+  normalizedSelector: string;
   selectorKind: DependencySelectorKind;
   normalizedReference: string;
 }
@@ -30,11 +31,18 @@ const NPM_PACKAGE_NAME_RE = /^(?:@[A-Za-z0-9._~-]+\/)?[A-Za-z0-9._~-]+$/u;
 const NPM_PRERELEASE_IDENTIFIER = String.raw`(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)`;
 const NPM_BUILD_IDENTIFIER = String.raw`[0-9A-Za-z-]+`;
 const NPM_EXACT_VERSION_RE = new RegExp(
-  String.raw`^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-${NPM_PRERELEASE_IDENTIFIER}(?:\.${NPM_PRERELEASE_IDENTIFIER})*)?(?:\+${NPM_BUILD_IDENTIFIER}(?:\.${NPM_BUILD_IDENTIFIER})*)?$`,
+  String.raw`^(?:v|=)?(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-${NPM_PRERELEASE_IDENTIFIER}(?:\.${NPM_PRERELEASE_IDENTIFIER})*)?(?:\+${NPM_BUILD_IDENTIFIER}(?:\.${NPM_BUILD_IDENTIFIER})*)?$`,
   "u",
 );
-const PYTHON_PROJECT_RE =
-  /^([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)(\[[A-Za-z0-9._,-]+\])?(.*)$/u;
+const PYTHON_PROJECT_NAME_RE = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?/u;
+const PYTHON_EXTRA_NAME_RE = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/u;
+const PYTHON_PEP440_EXACT_VERSION_RE =
+  /^v?(?:\d+!)?\d+(?:\.\d+)*(?:[._-]?(?:a|b|c|rc|alpha|beta|pre|preview)[._-]?\d*)?(?:(?:-\d+)|(?:[._-]?(?:post|rev|r)[._-]?\d*))?(?:[._-]?dev[._-]?\d*)?(?:\+[0-9A-Za-z]+(?:[._-][0-9A-Za-z]+)*)?$/iu;
+const PYTHON_PEP440_WILDCARD_PREFIX_RE = /^v?(?:\d+!)?\d+(?:\.\d+)*$/iu;
+const PYTHON_NORMALIZED_SPECIFIER_LIST_RE =
+  /^(?:===|==|~=|!=|<=|>=|<|>)[^\s,]+(?:,(?:===|==|~=|!=|<=|>=|<|>)[^\s,]+)+$/u;
+const PYTHON_NORMALIZED_SINGLE_SPECIFIER_RE =
+  /^(?:===|==|~=|!=|<=|>=|<|>)[^\s,]+$/u;
 
 export function classifyNpmSelector(
   reference: string,
@@ -58,6 +66,7 @@ export function classifyNpmSelector(
     normalizedPackageName,
     reference,
     selector,
+    normalizedSelector: selector,
     selectorKind,
     normalizedReference:
       selector.length === 0
@@ -73,17 +82,14 @@ export function classifyPythonSelector(
     return unsupportedSelector("pypi", reference, "direct-reference");
   }
   if (reference.includes("$")) {
-    const variableName = PYTHON_PROJECT_RE.exec(reference)?.[1];
+    const variableName = PYTHON_PROJECT_NAME_RE.exec(reference)?.[0];
     if (variableName === undefined || reference.startsWith("$")) {
       return unsupportedSelector("pypi", reference, "variable");
     }
   }
 
-  const parsed = PYTHON_PROJECT_RE.exec(reference);
-  const packageName = parsed?.[1];
-  const extras = parsed?.[2] ?? "";
-  const selector = parsed?.[3] ?? "";
-  if (packageName === undefined) {
+  const parsed = parsePythonRequirement(reference);
+  if (parsed === undefined) {
     return unsupportedSelector(
       "pypi",
       reference,
@@ -91,18 +97,99 @@ export function classifyPythonSelector(
     );
   }
 
+  const { packageName, normalizedExtras, selector, normalizedSelector } =
+    parsed;
   const normalizedPackageName = normalizePythonProjectName(packageName);
-  const normalizedExtras = extras.toLowerCase();
-  const selectorKind = pythonSelectorKind(selector);
+  const selectorKind = pythonSelectorKind(normalizedSelector);
   return {
     ecosystem: "pypi",
     packageName,
     normalizedPackageName,
     reference,
     selector,
+    normalizedSelector,
     selectorKind,
-    normalizedReference: `${normalizedPackageName}${normalizedExtras}${selector}`,
+    normalizedReference: `${normalizedPackageName}${normalizedExtras}${normalizedSelector}`,
   };
+}
+
+interface ParsedPythonRequirement {
+  packageName: string;
+  normalizedExtras: string;
+  selector: string;
+  normalizedSelector: string;
+}
+
+function parsePythonRequirement(
+  reference: string,
+): ParsedPythonRequirement | undefined {
+  const nameMatch = PYTHON_PROJECT_NAME_RE.exec(reference);
+  if (!nameMatch) {
+    return undefined;
+  }
+
+  const packageName = nameMatch[0];
+  let cursor = packageName.length;
+  let extrasCursor = cursor;
+  while (/[ \t]/u.test(reference[extrasCursor] ?? "")) {
+    extrasCursor += 1;
+  }
+
+  let normalizedExtras = "";
+  if (reference[extrasCursor] === "[") {
+    const extrasEnd = reference.indexOf("]", extrasCursor + 1);
+    if (extrasEnd === -1) {
+      return undefined;
+    }
+    const extras = reference
+      .slice(extrasCursor + 1, extrasEnd)
+      .split(",")
+      .map(trimHorizontalWhitespace);
+    if (
+      extras.length === 0 ||
+      extras.some((extra) => !PYTHON_EXTRA_NAME_RE.test(extra))
+    ) {
+      return undefined;
+    }
+    normalizedExtras = `[${extras
+      .map((extra) => extra.toLowerCase())
+      .join(",")}]`;
+    cursor = extrasEnd + 1;
+  }
+
+  const selector = reference.slice(cursor);
+  return {
+    packageName,
+    normalizedExtras,
+    selector,
+    normalizedSelector: normalizePythonSpecifierList(selector) ?? selector,
+  };
+}
+
+function normalizePythonSpecifierList(selector: string): string | undefined {
+  const trimmed = trimHorizontalWhitespace(selector);
+  if (trimmed.length === 0) {
+    return "";
+  }
+  if (trimmed.startsWith("@") || trimmed.includes(";")) {
+    return undefined;
+  }
+
+  const normalizedClauses: string[] = [];
+  for (const clause of selector.split(",")) {
+    const match = /^[ \t]*(===|==|~=|!=|<=|>=|<|>)[ \t]*([^\s,]+)[ \t]*$/u.exec(
+      clause,
+    );
+    if (!match?.[1] || !match[2]) {
+      return undefined;
+    }
+    normalizedClauses.push(`${match[1]}${match[2]}`);
+  }
+  return normalizedClauses.join(",");
+}
+
+function trimHorizontalWhitespace(value: string): string {
+  return value.replace(/^[ \t]+|[ \t]+$/gu, "");
 }
 
 export function parseFloatingDependencyAllowance(
@@ -206,17 +293,40 @@ function pythonSelectorKind(selector: string): DependencySelectorKind {
   ) {
     return "direct-reference";
   }
-  if (/^(?:==|!=).*\*/u.test(selector)) return "wildcard";
-  const equality = /^(===|==)(.+)$/u.exec(selector);
-  if (
-    equality !== null &&
-    equality[2] !== undefined &&
-    equality[2].length > 0 &&
-    !/[,$;<>~=]/u.test(equality[2])
-  ) {
+  if (PYTHON_NORMALIZED_SPECIFIER_LIST_RE.test(selector)) {
+    return "range";
+  }
+
+  const arbitraryEquality = /^===([^\s,;]+)$/u.exec(selector);
+  if (arbitraryEquality?.[1]) {
     return "exact";
   }
-  if (/(?:~=|!=|<=|>=|<|>|==|===)/u.test(selector)) return "range";
+
+  const equality = /^==(.+)$/u.exec(selector);
+  if (equality?.[1]) {
+    if (equality[1].endsWith(".*")) {
+      return PYTHON_PEP440_WILDCARD_PREFIX_RE.test(equality[1].slice(0, -2))
+        ? "wildcard"
+        : "unknown";
+    }
+    return PYTHON_PEP440_EXACT_VERSION_RE.test(equality[1])
+      ? "exact"
+      : "unknown";
+  }
+
+  const exclusion = /^!=(.+)$/u.exec(selector);
+  if (exclusion?.[1]?.endsWith(".*")) {
+    return PYTHON_PEP440_WILDCARD_PREFIX_RE.test(exclusion[1].slice(0, -2))
+      ? "wildcard"
+      : "unknown";
+  }
+  if (selector.includes("*")) return "unknown";
+  if (
+    PYTHON_NORMALIZED_SINGLE_SPECIFIER_RE.test(selector) &&
+    /^(?:~=|!=|<=|>=|<|>)/u.test(selector)
+  ) {
+    return "range";
+  }
   return "unknown";
 }
 
@@ -229,6 +339,7 @@ function unsupportedSelector(
     ecosystem,
     reference,
     selector: reference,
+    normalizedSelector: reference,
     selectorKind,
     normalizedReference: reference,
   };
