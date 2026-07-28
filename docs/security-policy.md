@@ -352,14 +352,21 @@ come from an unrelated code block, or become operational from a block quote.
 Generic wording such as “handle this carefully” is not an approval or
 no-disclosure guard.
 
-`SEC-UNPINNED-DEPENDENCY-INSTALL` performs bounded deterministic analysis of
-direct package-install commands. Exactness is ecosystem-specific:
+`SEC-UNPINNED-DEPENDENCY-INSTALL` combines structured command and selector
+analysis with established bounded compatibility fallback:
 
-| Ecosystem | Supported commands |
+| Dependency form | Analysis level |
 | --- | --- |
-| npm | `npm install`/`i`/`add`, `pnpm install`/`add`, and `yarn add`/`yarn global add` |
-| Python | `pip`/`pip3 install`, `pythonN[.N...] -m pip install`, `py -m pip install`, and `uv pip install` |
-| Other package managers | Not currently analyzed by this diagnostic |
+| npm, pnpm, and Yarn direct install/add commands | Structured command and selector analysis |
+| pip-style and `uv pip` direct install commands | Structured command and selector analysis |
+| Homebrew formula installs | Existing bounded compatibility fallback |
+| Docker image pull/run commands | Existing bounded compatibility fallback |
+| Other forms | Not currently analyzed |
+
+npm and PyPI findings receive structured dependency details. Homebrew and
+Docker retain their established conservative fallback behavior; this extension
+does not intentionally remove any previously detected command. A form does not
+become accepted merely because it lacks structured selector analysis.
 
 npm-family exact literals must be complete npm registry versions, including
 valid prerelease or build metadata when present. A leading `v` or `=` is
@@ -408,6 +415,12 @@ the project name, extras, operators, version identifiers, and commas. Renma
 removes only that syntactically insignificant whitespace for classification
 and allowance matching; raw evidence is retained, and URL, marker, arbitrary,
 or unsupported whitespace is not broadly collapsed.
+
+The compatibility fallback continues to flag unversioned Homebrew formulas and
+Docker images without an explicit non-floating tag or immutable digest,
+including `latest`. Versioned formula syntax and explicitly tagged or digested
+images retain their established outcomes. Renma does not broaden or redesign
+Homebrew or Docker selector semantics here.
 
 For npm-family selectors, a variable version may use the exact fail-closed form
 `${NAME:?message}` at the use site or have that form in an associated guard for
@@ -460,7 +473,11 @@ Selectors are not globbed or fuzzily matched: `npm:appium@latest` does not appro
 `npm:appium@next`, and an npm approval never approves a PyPI requirement.
 Invalid canonical encoding emits
 `SEC-INVALID-CANONICAL-POLICY-METADATA` and fails closed. These approvals are
-asset-local; they are not inherited from profiles or repository defaults.
+asset-local; they are not inherited from profiles or repository defaults and
+cannot suppress Homebrew or Docker findings. Security Policy Inventory reports
+the declaration as local metadata with field evidence, but the allowance is
+intentionally excluded from effective policy, policy provenance and
+fingerprints, inventory policy counts, and owning-Skill inheritance.
 
 Bounded pnpm `--filter`/`-F` and Yarn `--cwd` options may precede the supported
 `add` or `install` subcommand. Attached and separated values are distinct;
@@ -481,9 +498,10 @@ indirect file evidence, but the referenced files are not parsed. Direct URLs,
 VCS references, editable or local installs, archives, npm aliases, workspace
 references, and other unsupported sources are never accepted as exact.
 Renma does not inspect manifests, lockfiles, requirements files, constraints
-files, or `pyproject.toml` for this check. No finding means only that supported
-deterministic checks found no unapproved floating dependency evidence; it is
-not proof that dependency resolution is reproducible.
+files, or `pyproject.toml` for this check. No finding means only that Renma
+found no matching evidence within its documented structured and compatibility
+fallback boundaries; it is not proof that dependency resolution is
+reproducible.
 
 Environment-variable API access such as `process.env.ANDROID_HOME` and
 `process.env["ANDROID_HOME"]` is not an `.env` file. Literal reads such as
@@ -742,4 +760,4 @@ Use this table to choose the right kind of fix. For full finding definitions, se
 | `SEC-DESTRUCTIVE-COMMAND` | A destructive command appears without enough local safety context. | Remove it, scope it tightly, or add explicit approval and recovery guidance. | Body text |
 | `SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD` | `sudo` or similar privileged action lacks guardrails. | Add prerequisites, confirmation, rollback, and verification guidance. | Body text |
 | `SEC-UNPINNED-REMOTE-SCRIPT` | A remote script is executed without an immutable source or verification. | Pin and verify the source, or avoid remote execution. | Body text |
-| `SEC-UNPINNED-DEPENDENCY-INSTALL` | A supported npm-family or Python install example uses an unapproved floating selector, indirect source, unsupported reference, or unverified version variable. | Use a reviewed ecosystem-specific exact selector, an accepted fail-closed variable form, or an exact asset-local floating-selector approval; do not invent a version or claim uninspected files were verified. | Body text or asset-local metadata |
+| `SEC-UNPINNED-DEPENDENCY-INSTALL` | A structured npm/PyPI install or compatibility-fallback Homebrew/Docker command contains floating or unresolved dependency evidence. | Use repository evidence and established conventions for a reviewed exact package selector, supported versioned formula, or explicit non-floating image tag/digest. Fail-closed variables apply only where structurally supported, and asset-local allowances apply only to exact `npm:`/`pypi:` selectors. Never invent a value or claim uninspected sources were verified. | Body text or npm/PyPI asset-local metadata |

@@ -282,6 +282,16 @@ logical shell command receives one result that reuses its existing
 `DestinationAnalysis`; physical continuation members do not independently
 reanalyze that command.
 
+`SEC-UNPINNED-DEPENDENCY-INSTALL` also retains its older bounded line-level
+fallback for Homebrew formula installs and Docker image pull/run commands.
+Structured npm/PyPI analysis suppresses that fallback only when the structured
+result is authoritative; unsupported or unrecognized forms remain
+conservative. Floating allowances are asset-local npm/PyPI governance.
+Security Policy Inventory exposes their local declaration evidence, while
+effective policy, profile/repository resolution, provenance, fingerprints,
+owning-Skill inheritance, and existing inventory counts intentionally omit
+them.
+
 The internal `src/security-destination/` modules continue to own the pure
 destination stages. `analyzeDestinations` projects one input, classifies its
 candidates once, masks candidate text once, and records network and upload

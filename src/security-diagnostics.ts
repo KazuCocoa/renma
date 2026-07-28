@@ -617,18 +617,21 @@ const RULES = {
     whyItMatters:
       "Unpinned dependencies make agent setup non-reproducible and can unexpectedly pull compromised or breaking packages.",
     remediation:
-      "Use a reviewed ecosystem-specific exact selector, an accepted fail-closed variable form, an explicitly approved floating selector when floating resolution is intentional, or repository dependency evidence that Renma actually analyzes.",
+      "Use repository evidence and established ecosystem conventions to choose a reviewed exact package selector, a supported Homebrew formula version, or an explicit non-floating container image tag or immutable digest. Use an accepted fail-closed variable form only where Renma structurally supports it; exact asset-local floating-selector allowances apply only to supported npm: or pypi: selectors.",
     constraints: [
-      "Do not pick arbitrary versions without checking the repository's intended support matrix.",
-      "Preserve existing package manager conventions.",
-      "Do not claim that manifests, lockfiles, requirements files, constraints files, or unsupported references were verified.",
+      "Check repository evidence and the intended support matrix before selecting a package version, formula version, image tag, or digest; never invent one.",
+      "Preserve existing package-manager, Homebrew, and container-image conventions.",
+      "Use fail-closed variables only in structurally supported forms, and never use npm/PyPI floating-selector allowances to suppress Homebrew or Docker findings.",
+      "Do not claim that uninspected manifests, lockfiles, requirements files, constraints files, or other dependency sources were verified.",
     ],
     verificationSteps: [
       "Run renma scan.",
-      "Confirm supported dependency install instructions use reviewed exact selectors, accepted fail-closed variables, or exact asset-local floating-selector approvals.",
+      "Confirm structured npm/PyPI installs use reviewed exact selectors, structurally accepted fail-closed variables, or exact asset-local npm:/pypi: floating-selector approvals.",
+      "Confirm Homebrew formulas use a supported versioned formula when repository conventions permit it, and container images use an explicit non-floating tag or immutable digest.",
+      "Confirm no value was invented and no uninspected dependency source is described as verified.",
     ],
     llmHint:
-      "Use a reviewed exact npm registry version or Python equality selector, an accepted ${NAME:?message} variable form where supported, or an exact asset-local floating-selector approval. Do not invent a version or claim uninspected dependency files were verified.",
+      "Check repository evidence first. Use a reviewed ecosystem-specific exact package selector; a supported versioned Homebrew formula where conventions permit; or an explicit non-floating image tag or immutable digest. Use ${NAME:?message} only where Renma structurally supports that variable form, and use asset-local floating allowances only for exact npm: or pypi: selectors. Never invent a package version, formula version, image tag, or digest, or claim uninspected dependency sources were verified.",
     confidence: "medium",
     riskClass: "suspicious",
   },

@@ -983,6 +983,76 @@ security cms -D -i "$PROFILE_PATH" > "$LOCAL_PLIST"
   );
 });
 
+test("fallback dependency findings retain diagnostics v2, bundles, and suppressions", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-fallback-scan-"));
+  const relativePath = "contexts/fallback.md";
+  await mkdir(path.join(root, ".git"));
+  await mkdir(path.join(root, "contexts"), { recursive: true });
+  await writeFile(path.join(root, "renma.config.json"), "{}\n");
+  await writeFile(
+    path.join(root, relativePath),
+    contextArtifact(`
+\`\`\`bash
+brew install jq
+docker pull ubuntu
+docker run ubuntu
+\`\`\`
+`).content,
+  );
+
+  const result = await scan(root);
+  const dependencyFindings = result.findings.filter(
+    ({ id }) => id === "SEC-UNPINNED-DEPENDENCY-INSTALL",
+  );
+  assert.deepEqual(
+    dependencyFindings.map(({ evidence }) => evidence.snippet),
+    ["brew install jq", "docker pull ubuntu", "docker run ubuntu"],
+  );
+  assert.equal(
+    result.diagnosticsV2.filter(
+      ({ code }) => code === "SEC-UNPINNED-DEPENDENCY-INSTALL",
+    ).length,
+    3,
+  );
+  assert.ok(
+    result.reviewBundles.some(({ diagnosticCodes }) =>
+      diagnosticCodes.includes("SEC-UNPINNED-DEPENDENCY-INSTALL"),
+    ),
+  );
+
+  await writeFile(
+    path.join(root, "renma.config.json"),
+    JSON.stringify({
+      suppressions: [
+        {
+          id: "SEC-UNPINNED-DEPENDENCY-INSTALL",
+          paths: [relativePath],
+          reason: "Compatibility fixture verifies audited suppression flow.",
+        },
+      ],
+    }),
+  );
+  const suppressed = await scan(root);
+  assert.equal(
+    suppressed.findings.some(
+      ({ id }) => id === "SEC-UNPINNED-DEPENDENCY-INSTALL",
+    ),
+    false,
+  );
+  assert.equal(
+    suppressed.diagnosticsV2.some(
+      ({ code }) => code === "SEC-UNPINNED-DEPENDENCY-INSTALL",
+    ),
+    false,
+  );
+  assert.equal(
+    suppressed.reviewBundles.some(({ diagnosticCodes }) =>
+      diagnosticCodes.includes("SEC-UNPINNED-DEPENDENCY-INSTALL"),
+    ),
+    false,
+  );
+});
+
 function dependencyFindings(body: string) {
   return securityDiagnosticFindings([contextArtifact(body)]).filter(
     ({ id }) => id === "SEC-UNPINNED-DEPENDENCY-INSTALL",

@@ -767,18 +767,25 @@ defensive redaction wording are excluded.
 
 ### Dependency installation boundaries
 
-Supported dependency commands project npm-family and Python requirements into
-one analysis model while retaining ecosystem, package manager, normalized
-package name, raw reference, selector kind, pinning kind, variables, source
-span, and exact asset-local allowance evidence. Selector classification remains
-separate from governance: an explicitly allowed floating selector stays
-`floating-literal`.
+Dependency detection combines structured command and selector analysis with
+established bounded compatibility fallback:
 
-| Ecosystem | Supported commands |
+| Dependency form | Analysis level |
 | --- | --- |
-| npm | npm, pnpm, and Yarn direct install/add commands |
-| Python | pip, pip3, `python -m pip`, versioned Python `-m pip`, `py -m pip`, and `uv pip` direct install commands |
-| Other package managers | Not currently analyzed by this diagnostic |
+| npm, pnpm, and Yarn direct install/add commands | Structured command and selector analysis |
+| pip-style and `uv pip` direct install commands | Structured command and selector analysis |
+| Homebrew formula installs | Existing bounded compatibility fallback |
+| Docker image pull/run commands | Existing bounded compatibility fallback |
+| Other forms | Not currently analyzed |
+
+npm and PyPI requirements retain ecosystem, package manager, normalized package
+name, raw reference, selector kind, pinning kind, variables, source span, and
+exact asset-local allowance evidence. Selector classification remains separate
+from governance: an explicitly allowed floating selector stays
+`floating-literal`. Homebrew formula and Docker image commands retain their
+established conservative fallback behavior and do not receive npm/PyPI
+structured details. A form cannot become accepted merely because structured
+analysis does not cover it.
 
 npm registry versions are exact only when the complete selector is a bounded
 exact version, including valid prerelease and build metadata; a leading `v` or
@@ -814,9 +821,14 @@ prefix and one package-selector pair. PyPI project names use standard
 lowercase-and-collapse normalization for `-`, `_`, and `.`, and valid
 specifier lists use only the documented insignificant-whitespace
 normalization. Selectors, ecosystems, and package identities otherwise match
-exactly. No wildcard, glob, fuzzy, or cross-ecosystem approval exists. Invalid canonical encoding fails closed with
+exactly. No wildcard, glob, fuzzy, or cross-ecosystem approval exists, and an
+npm/PyPI allowance cannot suppress Homebrew or Docker fallback findings.
+Invalid canonical encoding fails closed with
 `SEC-INVALID-CANONICAL-POLICY-METADATA`. The field is not profile-inherited and
-does not alter policy fingerprints.
+does not alter effective policy or policy fingerprints. Security Policy
+Inventory exposes it as local metadata and field evidence without adding it to
+effective-policy provenance, inheritance, repository configuration, or
+existing policy counts.
 
 Requirement and constraint files are retained as indirect evidence but are not
 parsed. URLs, VCS sources, editable or local installs, archives, npm aliases,
@@ -830,8 +842,9 @@ emit the existing `SEC-UNPINNED-DEPENDENCY-INSTALL`; no new diagnostic ID is
 introduced. Severity, confidence, risk class, evidence boundaries, source
 ordering, deduplication, suppression behavior, Diagnostics v2, and review
 bundles retain their compatibility behavior. Additive finding details describe
-the dependency classifications. No finding means only that these supported
-deterministic checks found no unapproved floating dependency evidence.
+the npm/PyPI structured classifications. No finding means only that Renma found
+no matching evidence within the documented structured and compatibility
+fallback boundaries.
 
 ### Security Policy Metadata
 
@@ -996,7 +1009,7 @@ examples by asset kind.
 | `SEC-UNBOUNDED-EXTERNAL-SOURCE-TRAVERSAL`        | Recursive external traversal has no local boundary.  | Content recursively follows links, issues, pages, or attachments without any stated scope or termination control. | Add source, relevance, visited/cycle, cap, failure-stop, and unresolved-scope guidance in the same section. |
 | `SEC-UNAPPROVED-NETWORK-DESTINATION`             | Network destination is not approved.                 | Instructions contact a host outside the allowed list.                                              | Enumerate the actual required domains in approved network destinations after review.                   |
 | `SEC-UNAPPROVED-UPLOAD-DESTINATION`              | Upload destination is not approved.                  | Instructions upload data to an unapproved service or host.                                         | Use an approved destination or update policy intentionally.                                            |
-| `SEC-UNPINNED-DEPENDENCY-INSTALL`                | Dependency install is not pinned.                    | A supported npm-family or Python install uses an unapproved floating selector, indirect source, unsupported reference, or unverified variable. | Use a reviewed ecosystem-specific exact selector, an accepted fail-closed variable form, or an exact asset-local floating-selector approval; do not invent a version or claim uninspected files were verified. |
+| `SEC-UNPINNED-DEPENDENCY-INSTALL`                | Dependency install is not pinned.                    | A structured npm/PyPI install or compatibility-fallback Homebrew/Docker command contains floating or unresolved dependency evidence. | Use repository evidence and established conventions for a reviewed exact package selector, supported versioned formula, or explicit non-floating image tag/digest. Fail-closed variables apply only where structurally supported, and allowances only to exact asset-local `npm:`/`pypi:` selectors. Never invent a value or claim uninspected sources were verified. |
 | `SEC-UNPINNED-REMOTE-SCRIPT`                     | Remote script execution is unpinned.                 | Commands pipe or execute remote scripts without an immutable reference.                            | Pin the script source and verify it before execution.                                                  |
 | `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION`           | Untrusted source content becomes executable guidance. | Content follows fetched, downloaded, attached, logged, or tool-produced instructions as authority without review. | Treat the content as data, preserve provenance, validate facts, and use reviewed local authority for actions. |
 

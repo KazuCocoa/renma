@@ -150,6 +150,7 @@ const LOCAL_POLICY_METADATA_FIELDS = new Set([
   "forbiddenInputs",
   "approvedNetworkDestinations",
   "approvedUploadDestinations",
+  "allowedFloatingDependencies",
 ]);
 
 export function summarizeSecurityPolicyInventory(
@@ -607,6 +608,7 @@ function policyFieldEvidenceList(
     "securityProfile",
     "approvedNetworkDestinations",
     "approvedUploadDestinations",
+    "allowedFloatingDependencies",
   ]
     .map((field) => policyFieldEvidence(artifact, policy, field))
     .filter((evidence): evidence is Evidence => evidence !== undefined)

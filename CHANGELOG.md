@@ -17,9 +17,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   pip general options before `install`, corrects post-install option arity,
   normalizes valid PEP 508 requirement whitespace, validates `==` separately
   from arbitrary `===`, and accepts `v`/`=` only on complete exact npm versions.
-  Existing diagnostic identity, severity, confidence, risk class, evidence,
-  ordering, suppression, Diagnostics v2, and review-bundle behavior remain
-  compatible, with additive dependency details.
+  Existing bounded Homebrew formula and Docker image fallback detection remains
+  unchanged, and shared remediation now covers every detected ecosystem.
+  Floating allowances are visible as asset-local Security Policy Inventory
+  evidence while remaining excluded from effective policy, inheritance,
+  provenance, fingerprints, and existing policy counts. Existing diagnostic
+  identity, severity, confidence, risk class, evidence, ordering, suppression,
+  Diagnostics v2, and review-bundle behavior remain compatible, with additive
+  npm/PyPI dependency details.
 
 ## [0.25.1] - 2026-07-27
 
