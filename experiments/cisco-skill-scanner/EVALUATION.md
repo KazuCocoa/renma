@@ -540,6 +540,10 @@ classification.
 | all 11 `appium-<skill-name>` individual scans | exact | partial | native names/paths match Renma catalog; selected support-file inventories and hashes are absent |
 | `appium-all` | partial | partial | all 11 result subjects are exact, but the aggregate invocation root and complete per-Skill inventories are absent |
 
+A future conceptual receipt must distinguish an individual logical subject, a
+set of per-result subjects, and the aggregate invocation scope. Exact
+per-result subjects do not make an omitted aggregate invocation root exact.
+
 ## Completeness and profile analysis
 
 | Layer | Cisco 2.0.12 evidence |
@@ -652,7 +656,7 @@ a generic framework.
 | actual analyzer profile is available | partially met | JSON lists analyzers used and policy identity, but not planned/disabled/applicability states |
 | execution status is available | partially met | process status plus SARIF success; JSON lacks execution state and failed core work may yield no report |
 | completeness and limitations are visible | not met | no serialized completeness or limitations ledger |
-| logical subject can be bound | met | current individual names and paths bind to Renma catalog subjects |
+| logical subject can be bound | partially met | individual result subjects bind exactly through native Skill names and absolute paths, but combined and Appium aggregate reports omit an explicit aggregate subject and invocation root |
 | exact reviewed scope can be bound | not met | no complete inventory or hashes |
 | findings have usable stable identity | partially met | cross-run/cross-format stability observed, but same ID collides across subjects and is not content-bound |
 | raw report digest is useful | met | useful exact-artifact integrity evidence; not semantic/cross-run identity |
