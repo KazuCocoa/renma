@@ -6,6 +6,16 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added deterministic raw-source findings for suspicious bidirectional controls
+  and conservative invisible/deprecated Unicode characters across every
+  already-discovered UTF-8 text artifact, including scripts, configuration, and
+  non-Markdown assets. Findings preserve original source lines, aggregate by
+  diagnostic and line, escape hidden evidence, retain existing suppression and
+  Diagnostics v2 behavior, and exclude binary files and ordinary multilingual
+  or emoji text.
+
 ## [0.25.3] - 2026-07-28
 
 ### Fixed

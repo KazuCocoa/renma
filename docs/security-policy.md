@@ -14,6 +14,35 @@ or invoke a script or asset remain eligible for diagnostics. Analyze the script
 or asset itself independently with project-selected tools such as ShellCheck,
 Bandit, Semgrep, ESLint security rules, CodeQL, and dependency scanners.
 
+Separately, Renma checks the original content of every discovered UTF-8 text
+artifact for conservative hidden-Unicode source-integrity signals before any
+Markdown filtering or normalization. This raw check includes frontmatter,
+comments, code, text scripts, configuration, and non-Markdown assets; it does
+not interpret scripts as executable code, include binary artifacts, or widen
+repository discovery.
+
+`SEC-SUSPICIOUS-BIDI-CONTROL` (`high` severity, `high` confidence,
+`suspicious`) covers `U+202A`–`U+202E` and `U+2066`–`U+2069`.
+`SEC-SUSPICIOUS-INVISIBLE-CHARACTER` (`medium` severity, `high` confidence,
+`suspicious`) covers `U+0000`–`U+0008`, `U+000B`–`U+000C`,
+`U+000E`–`U+001F`, `U+007F`–`U+009F`, `U+00AD`, `U+034F`, `U+180E`,
+`U+200B`, `U+2060`, `U+206A`–`U+206F`, `U+FFF9`–`U+FFFB`, and
+`U+E0000`–`U+E007F`. One leading `U+FEFF` is allowed; it is reported anywhere
+else. `U+200C` and `U+200D` are reported only with immediate ASCII-like token
+characters on both sides: letters, digits, `_`, `-`, `.`, `/`, `:`, `@`, `%`,
+`+`, or `=`.
+
+This is not a general non-ASCII check. Renma does not report Japanese or other
+multilingual text, ordinary RTL text, `U+200E`, `U+200F`, `U+061C`, emoji
+variation selectors or ordinary ZWJ sequences, combining marks in general,
+non-breaking spaces, narrow non-breaking spaces, ideographic spaces, full-width
+characters, Unicode normalization differences, or confusable characters solely
+because they exist. Inspect the escaped code point and change only the
+suspicious character while preserving legitimate multilingual content.
+Intentional cases use the existing narrowly path-scoped suppression with a
+documented reason, and intentional bidirectional formatting requires human
+confirmation.
+
 Specialized scanners can complement this bounded policy and instruction
 analysis without becoming Renma dependencies or Renma findings. Renma does not
 bundle, require, or invoke SkillSpector or any other external scanner. See
@@ -746,6 +775,8 @@ Use this table to choose the right kind of fix. For full finding definitions, se
 
 | Finding | Usually means | What to change | Fix area |
 | --- | --- | --- | --- |
+| `SEC-SUSPICIOUS-BIDI-CONTROL` | Original source contains a bidi formatting control that can change displayed order. | Inspect the escaped code point and make the smallest character-level fix; require human confirmation if it is intentional. | Any discovered UTF-8 text artifact |
+| `SEC-SUSPICIOUS-INVISIBLE-CHARACTER` | Original source contains a high-signal invisible/deprecated control, non-leading BOM, or ASCII-token-internal ZWJ/ZWNJ. | Remove or visibly replace only the reported character while preserving legitimate multilingual text, or use a narrow reasoned suppression if verified necessary. | Any discovered UTF-8 text artifact |
 | `SEC-INVALID-CANONICAL-POLICY-METADATA` | A recognized Skill `metadata.renma.*` security value has an invalid encoding. | Confirm the intended policy, then replace it with the exact documented string encoding; do not guess a permissive value. | Skill metadata |
 | `SEC-MISSING-POLICY-METADATA` | Sensitive instructions lack a declared policy. | Add local policy fields or select a configured security profile using the syntax for that asset kind. | Metadata |
 | `SEC-INSTRUCTION-VIOLATES-POLICY` | Body text asks for behavior denied by policy. | Rewrite the instruction or adjust policy only after review. | Body text and metadata |

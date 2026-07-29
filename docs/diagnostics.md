@@ -657,7 +657,18 @@ Integrations may group or filter on them without parsing human-readable titles o
 messages. Renaming or removing an identifier requires an intentional
 compatibility decision and a documented migration.
 
-Security diagnostics focus on high-signal heuristics for agent-facing or context-bearing artifacts Renma already discovers, such as skills, contexts, `AGENTS.md`, references, profiles, examples, and Markdown tool guidance. Defensive wording and nearby human approval, dry-run, backup, or rollback guidance may reduce or avoid command-risk findings when they are local to the risky instruction. When the effective human-approval policy is true, dry-run, backup, rollback, or restore guidance does not replace explicit human approval. Renma does not scan `package.json`, GitHub Actions workflows, Dockerfiles, dependency manifests, or repository-wide supply-chain metadata by default.
+Security diagnostics focus on high-signal heuristics for artifacts Renma already
+discovers. Raw hidden-Unicode analysis covers every discovered UTF-8 text
+artifact, including text scripts, configuration, and non-Markdown assets.
+Semantic instruction and command checks retain their narrower agent-facing
+Markdown boundary, such as skills, contexts, `AGENTS.md`, references, profiles,
+examples, and Markdown tool guidance. Defensive wording and nearby human
+approval, dry-run, backup, or rollback guidance may reduce or avoid command-risk
+findings when they are local to the risky instruction. When the effective
+human-approval policy is true, dry-run, backup, rollback, or restore guidance
+does not replace explicit human approval. Renma does not widen discovery to scan
+`package.json`, GitHub Actions workflows, Dockerfiles, dependency manifests, or
+repository-wide supply-chain metadata by default.
 
 Renma analyzes the security posture of LLM-facing Markdown instructions and
 metadata. It does not perform language-specific analysis of referenced or
@@ -672,6 +683,55 @@ SAST, dependency scanning, a safety proof, runtime monitoring, sandboxing,
 permission enforcement, or telemetry collection. A scan with no findings means
 only that the enabled deterministic checks found no matching evidence; it does
 not establish that an agent workflow is safe.
+
+### Hidden Unicode source-integrity boundaries
+
+Hidden-Unicode checks inspect original `artifact.content` before Markdown
+visibility filtering, normalization, paragraph reconstruction, or command
+analysis. Frontmatter, prose, code fences, inline code, comments, scripts,
+configuration, and other discovered text assets use the same raw-source check.
+Binary artifacts remain excluded. Findings are aggregated at most once per
+diagnostic ID per source line, and evidence escapes reported characters as
+visible code points instead of retaining the raw hidden character.
+
+`SEC-SUSPICIOUS-BIDI-CONTROL` is `high` severity, `high` confidence, and
+`suspicious` risk class. It reports `U+202A`–`U+202E` and
+`U+2066`–`U+2069`: the bidirectional embedding, override, pop, and isolate
+controls that can visually reorder source. A finding requires explicit review;
+it does not assert that an occurrence is malicious.
+
+`SEC-SUSPICIOUS-INVISIBLE-CHARACTER` is `medium` severity, `high` confidence,
+and `suspicious` risk class. It always reports:
+
+- `U+0000`–`U+0008`, `U+000B`–`U+000C`, `U+000E`–`U+001F`, and
+  `U+007F`–`U+009F`;
+- `U+00AD`, `U+034F`, `U+180E`, `U+200B`, and `U+2060`;
+- deprecated directional formatting controls `U+206A`–`U+206F`;
+- interlinear annotation controls `U+FFF9`–`U+FFFB`; and
+- Unicode tag characters `U+E0000`–`U+E007F`.
+
+A single `U+FEFF` is allowed only at the beginning of the file; every other
+occurrence is reported. `U+200C` ZERO WIDTH NON-JOINER and `U+200D` ZERO WIDTH
+JOINER are reported only when the character immediately before and after is in
+the exact ASCII-like token set `A-Z`, `a-z`, `0-9`, `_`, `-`, `.`, `/`, `:`,
+`@`, `%`, `+`, or `=`. This catches insertions in commands, identifiers, URLs,
+metadata keys, and dependency names without reporting ordinary emoji joining or
+complex-script shaping.
+
+The detector is not a general non-ASCII, normalization, or confusable-character
+rule. Japanese and other multilingual text, ordinary RTL text, `U+200E`,
+`U+200F`, `U+061C`, emoji variation selectors and ZWJ sequences, combining
+marks in general, non-breaking and narrow non-breaking spaces, ideographic
+spaces, full-width characters, normalization differences, and homoglyphs are
+not reported solely because they exist. Normal tab, LF, and CR characters are
+also allowed.
+
+Repair only the exact reported code point or replace it with the intended
+visible text; do not normalize or rewrite the file or remove legitimate
+multilingual content. Intentional bidirectional formatting requires human
+confirmation. A verified necessary occurrence can use the existing
+path-scoped suppression mechanism with a documented reason; Renma does not add
+a Unicode-specific allowlist.
 
 ### Instruction-integrity boundaries
 
@@ -1006,6 +1066,8 @@ examples by asset kind.
 | `SEC-SAFEGUARD-BYPASS-INSTRUCTION`               | Instructions explicitly bypass a security safeguard. | Content disables checks, weakens policy, skips approval, suppresses warnings, or uses a riskier fallback. | Preserve the safeguard, stop and report missing authority, and verify again without policy relaxation. |
 | `SEC-SECRET-MATERIAL-INSTRUCTION`                | Instructions expose or request secret material.      | Content includes or asks for private keys, tokens, or credentials.                                 | Remove secret material and describe secure handling instead.                                           |
 | `SEC-SENSITIVE-FILE-REFERENCE`                   | Instructions reference sensitive files.              | Content points at credentials, keys, or local secret paths.                                        | Replace with safe examples or redacted placeholders.                                                   |
+| `SEC-SUSPICIOUS-BIDI-CONTROL`                    | Bidirectional formatting control requires review.    | Original source contains a bidi embedding, override, pop, or isolate control that can reorder displayed text. | Inspect the escaped code point and make the smallest character-level correction; require human confirmation if intentional. |
+| `SEC-SUSPICIOUS-INVISIBLE-CHARACTER`             | Invisible Unicode character requires review.         | Original source contains a high-signal invisible/deprecated format control, a non-leading BOM, or token-internal ZWJ/ZWNJ. | Inspect the escaped code point and remove or visibly replace only that character while preserving legitimate multilingual text. |
 | `SEC-UNBOUNDED-EXTERNAL-SOURCE-TRAVERSAL`        | Recursive external traversal has no local boundary.  | Content recursively follows links, issues, pages, or attachments without any stated scope or termination control. | Add source, relevance, visited/cycle, cap, failure-stop, and unresolved-scope guidance in the same section. |
 | `SEC-UNAPPROVED-NETWORK-DESTINATION`             | Network destination is not approved.                 | Instructions contact a host outside the allowed list.                                              | Enumerate the actual required domains in approved network destinations after review.                   |
 | `SEC-UNAPPROVED-UPLOAD-DESTINATION`              | Upload destination is not approved.                  | Instructions upload data to an unapproved service or host.                                         | Use an approved destination or update policy intentionally.                                            |
