@@ -581,3 +581,587 @@ path. This PR does not add that fixture or perform that experiment.
 | Raw evidence can remain separate from Renma findings | met | Generated reports remained ignored and uncommitted; Markdown preserves native IDs and observations without creating Renma diagnostics |
 | A provider-neutral core appears useful | partially met | Binding, provenance, digest, execution, completeness, limitations, and outcome remain distinct and useful, but only one producer has supplied evidence |
 | Evidence from a second producer exists | not evaluated | SkillSpector remains the only evaluated producer |
+
+## Controlled Fixture And Appium Corpus Execution Status
+
+Executed the controlled finding, repeatability, and suppression corpus and the
+read-only Appium Skills corpus on 2026-07-29 UTC. These records are additive to
+the historical canonical Skill and repository-probe records above; those
+records were not rerun or rewritten.
+
+Common provenance:
+
+- Renma revision:
+  `91ec7d1bdc474783b3e7033d704bd7d8d4145594`, the fetched
+  `origin/main` revision containing PR #139.
+- SkillSpector executable: `/Users/kazu/.local/bin/skillspector`.
+- SkillSpector version: `2.5.0`.
+- Installed package source:
+  `/Users/kazu/.local/share/uv/tools/skillspector/lib/python3.14/site-packages/skillspector`.
+- Requested and actual mode: static-only. Every scan command contained
+  `--no-llm`; JSON reported `llm_requested: false` and
+  `llm_available: false`.
+- Execution: direct producer commands, not the contained Renma runner. Every
+  JSON and SARIF command completed with exit `0` and wrote its requested
+  report.
+- Raw reports, the generated controlled source, the baseline, and generated
+  Renma evidence remained under `experiments/skillspector/generated/`, which is
+  ignored and uncommitted.
+
+The producer CLI and installed source were inspected before using suppression:
+
+```text
+/Users/kazu/.local/bin/skillspector --version
+/Users/kazu/.local/bin/skillspector --help
+/Users/kazu/.local/bin/skillspector scan --help
+/Users/kazu/.local/bin/skillspector baseline --help
+```
+
+The help exposed `baseline`, `scan --baseline`, and `--show-suppressed`.
+Installed `suppression.py` documented version 2 fingerprints bound to scanner
+version, complete component content, rule, severity, location, and emitted
+evidence. No suppression syntax was invented.
+
+### Controlled fixture evidence
+
+The committed fixture is inert scanner test data. Its three source files end
+in `.template`, no committed fixture is named `SKILL.md`, every description
+labels the content inert, and the instruction-like trigger says not to execute
+it. The built-in-only preparation helper copies the templates into the ignored
+generated area:
+
+```text
+node experiments/skillspector/prepare-controlled.mjs
+```
+
+Materialized targets:
+
+| Case | Generated target | Design |
+| --- | --- | --- |
+| Intentional positive | `experiments/skillspector/generated/controlled-fixture/source/intentional-positive` | One inert sentence directs enumeration of installed Skills in the agent Skills directory and opening each discovered `SKILL.md` |
+| Link false-positive candidate | `experiments/skillspector/generated/controlled-fixture/source/link-false-positive` | One normal same-repository Markdown link has `skills/Example/SKILL.md` as both visible text and destination |
+| Clean control | `experiments/skillspector/generated/controlled-fixture/source/clean-control` | One bounded summarization instruction with no peer-Skill or path trigger |
+| Combined | `experiments/skillspector/generated/controlled-fixture/source/combined` | One generated copy of each case under a distinct subdirectory |
+
+Exact unsuppressed commands followed this form, with each shown target and
+output directory used once for `json`/`report.json` and once for
+`sarif`/`report.sarif`:
+
+```text
+/Users/kazu/.local/bin/skillspector scan experiments/skillspector/generated/controlled-fixture/source/intentional-positive --no-llm --format <json|sarif> --output experiments/skillspector/generated/controlled-fixture/reports/intentional-positive/<report.json|report.sarif>
+/Users/kazu/.local/bin/skillspector scan experiments/skillspector/generated/controlled-fixture/source/link-false-positive --no-llm --format <json|sarif> --output experiments/skillspector/generated/controlled-fixture/reports/link-false-positive/<report.json|report.sarif>
+/Users/kazu/.local/bin/skillspector scan experiments/skillspector/generated/controlled-fixture/source/clean-control --no-llm --format <json|sarif> --output experiments/skillspector/generated/controlled-fixture/reports/clean-control/<report.json|report.sarif>
+/Users/kazu/.local/bin/skillspector scan experiments/skillspector/generated/controlled-fixture/source/combined --no-llm --format <json|sarif> --output experiments/skillspector/generated/controlled-fixture/reports/combined-run-1/<report.json|report.sarif>
+/Users/kazu/.local/bin/skillspector scan experiments/skillspector/generated/controlled-fixture/source/combined --no-llm --format <json|sarif> --output experiments/skillspector/generated/controlled-fixture/reports/combined-run-2/<report.json|report.sarif>
+```
+
+| Case | JSON SHA-256 | SARIF SHA-256 | Native findings | Native assessment |
+| --- | --- | --- | --- | --- |
+| Intentional positive | `fbd3ccf742397001b678654e6e3e09366c57458c7a824e8292da5a53a9761633` | `59e7dc8db9d56a8d73c33221acdc39b63f7d6255fd21b9d89c542a4abe662a4e` | one `AS3`/`MEDIUM`, `SKILL.md:10`, matched text `Enumerate installed skills` | score 8, `LOW`, `SAFE` |
+| Link candidate | `f7f488e5499e67ae8d41187eaec5e86fe68ac7c8b2be4c15f31d7fb4dcb59aff` | `545b49567f8b4768f1c6dd6d28baf0c7c0d930408a5bbdd2185a85ba0699b692` | two `AS3`/`MEDIUM`, both `SKILL.md:9`, same matched text and explanation | score 8, `LOW`, `SAFE` |
+| Clean control | `738a22e0ba9015a0c62501a0289b753803a8301ab910f4b4b47071018f431a7e` | `ac048bad24d7a13a9578dd60e770347cc4750647e521991754dd117fe59ef8d4` | none | score 0, `LOW`, `SAFE` |
+| Combined run 1 | `c12c9a4a119b2b433dba64a922fab523bb71f4744ff356ac18ac55468edac6f1` | `eb3670a8982849858be25b510df5933e66b178048576d56a78ebd9653429d6a3` | three `AS3`/`MEDIUM` | score 12, `LOW`, `SAFE` |
+| Combined run 2 | `545a686eef28b07faf1a7f35089bb12cf50d049d71f120ce4a2a3adf61af5282` | `e176f1c24023ad25b5bb5ccdc64c6e5b478fe8a0916069e147591d72341ac11c` | three `AS3`/`MEDIUM` | score 12, `LOW`, `SAFE` |
+
+Every case reported `coverage_percent: 100.0`,
+`execution_successful: true`, and `is_complete: false`. Static pattern and
+YARA analyzers completed; semantic analyzers were disabled by configuration.
+No required assessment profile or required-analyzer set was identified, so
+required-profile completeness remains unknown.
+
+The intentional-positive result is actionable within the fixture's deliberate
+threat model: the native AS3 explanation is exactly about enumerating or
+reading peer installed Skills. The committed template remains inert test data,
+so no operational asset should be changed in response.
+
+The link candidate reproduced the PR #139 false-positive mechanism more
+narrowly. The producer emitted one result for the Markdown label and one for
+the identical destination. Both results have the same rule, severity, file,
+line, matched text, snippet, explanation, remediation, and confidence, but
+different generated IDs. Human review classifies both as duplicate
+false-positive candidates for this fixture, not as evidence that every AS3
+result is false.
+
+The producer published both duplicate issues and reported
+`findings_before_filtering: 2` and `findings_after_filtering: 2`, but assigned
+the same score 8 as the one-finding intentional target. Installed `report.py`
+applies `deduplicate(active_findings)` only to scoring while rendering the
+active finding list. The combined target likewise published all three issues
+while scoring the two distinct matched-text causes.
+
+### Cross-run and cross-format finding identity
+
+The combined source did not change between runs. JSON and SARIF each preserved
+the same three semantic results in this order:
+
+```text
+intentional-positive/SKILL.md:10 AS3 Enumerate installed skills
+link-false-positive/SKILL.md:9 AS3 skills/Example/SKILL.md
+link-false-positive/SKILL.md:9 AS3 skills/Example/SKILL.md
+```
+
+Rule IDs, native severities, locations, snippets, explanations, confidence,
+assessment, component order, analyzer states, coverage, completion, and result
+ordering were equal across the two runs. Producer-generated IDs were not:
+
+```text
+combined run 1 JSON:
+  finding-3f79032e7e3e4064a1a367039a656ac6
+  finding-a83f06584bf641d1938b629e4b6b18fd
+  finding-50519696a4ed41e6923287c41765ccc1
+combined run 2 JSON:
+  finding-e2167f7015204d4f8ff138eb1c080bd9
+  finding-2060ea9f18e444a89b419de901f4919b
+  finding-c9d798099e1644df8f632791ef5942c5
+combined run 1 SARIF:
+  finding-77cf1a6dc3504731becc89b65ac5357e
+  finding-a0c361d834d34eb3bfab94b914823786
+  finding-72bfd73429c145818d037150bedbb5da
+combined run 2 SARIF:
+  finding-369462480fd7459283c5f39b2107aff4
+  finding-875e327a2c6a4be68229566cf4a30d29
+  finding-322850edb2d84a8a90b2b7fa77c0af40
+```
+
+The same format-to-format distinction appeared in the single cases. The
+intentional-positive JSON/SARIF IDs were
+`finding-93de6910897e46a1bb424d271d55ea51` and
+`finding-a4d93583d5b0498ea14380644f2d78e2`; the link JSON IDs were
+`finding-2d15d544907c434d9681ecf550c6a843` and
+`finding-39f6d43dd3d9492ea0aef8bcc61199d9`, while SARIF used
+`finding-eba01dff87bd45d2be4cd76e99bc5e64` and
+`finding-553ddf11cba744308b5993f02589df17`.
+
+The raw combined digests differed in both formats. After removing only
+`skill.scanned_at` and every JSON `finding_id`, the two JSON objects were equal
+and both had experiment-comparison SHA-256
+`316001db1146e5a0923855abd2e862507f7a641db0b6a5e8fca4291c24f71445`.
+After removing only SARIF `properties.findingId`, the two SARIF objects were
+equal and both had experiment-comparison SHA-256
+`8003409d2031a6f191e71d72a7dd119727626424b2189f92305545e158fa1f63`.
+These normalization digests are observations, not a proposed canonical report
+or finding-identity contract.
+
+The evidence therefore keeps these concepts separate:
+
+- semantic finding identity was stable for two unchanged runs;
+- producer-generated finding ID was deliberately run-unique and unstable;
+- cross-format semantic identity was available from native evidence fields,
+  but cross-format generated IDs did not match;
+- cross-run semantic identity was available for this fixture and version;
+- raw report digest identity was not stable because JSON timestamps and both
+  formats' generated IDs changed.
+
+### Suppression or baseline observations
+
+The narrow selected finding was the sole intentional-positive AS3 result. The
+exact supported baseline commands were:
+
+```text
+/Users/kazu/.local/bin/skillspector baseline experiments/skillspector/generated/controlled-fixture/source/intentional-positive --no-llm --output experiments/skillspector/generated/controlled-fixture/baseline/intentional-positive.json --reason 'Controlled experiment: suppress only the intentional AS3 finding'
+/Users/kazu/.local/bin/skillspector scan experiments/skillspector/generated/controlled-fixture/source/intentional-positive --no-llm --baseline experiments/skillspector/generated/controlled-fixture/baseline/intentional-positive.json --show-suppressed --format json --output experiments/skillspector/generated/controlled-fixture/reports/intentional-positive-suppressed/report.json
+/Users/kazu/.local/bin/skillspector scan experiments/skillspector/generated/controlled-fixture/source/intentional-positive --no-llm --baseline experiments/skillspector/generated/controlled-fixture/baseline/intentional-positive.json --show-suppressed --format sarif --output experiments/skillspector/generated/controlled-fixture/reports/intentional-positive-suppressed/report.sarif
+```
+
+The local version 2 baseline SHA-256 was
+`b82a96bb13ee540ab7b5bc5a69f18c219b3104cf71ee62b37610240d89be4563`.
+It contained one scanner-version-bound fingerprint,
+`sha256:433c160590f33f55ec646cb46067d2188215441bc36a14b91af8b754d119bfa7`,
+for `AS3` in `SKILL.md`, with the recorded reason. It remained ignored and
+uncommitted.
+
+Suppressed report SHA-256 values were
+`5333c7cd618b737b7e120245d1bb68e58f40586af3c0b1218cccf8cae47a810e`
+for JSON and
+`6f5066f02d9ca7fe626b3b9f5511c92ef2d868d373b560dd91f1978c4a851a61`
+for SARIF.
+
+Before suppression, JSON had one active issue, `suppressed_count: 0`, score 8,
+and generated ID `finding-93de6910897e46a1bb424d271d55ea51`.
+After suppression:
+
+- JSON had zero active `issues`, `suppressed_count: 1`, and retained the full
+  finding in `suppressed` with `suppressed: true`, the human reason, and a new
+  ID `finding-e67d0f729d9f463ab863370ca5c5c568`;
+- SARIF retained the result with an external suppression and the human reason,
+  and used another new ID,
+  `finding-84b98fee23054a738ad837b291916a04`;
+- score changed from 8 to 0; native severity `LOW`, recommendation `SAFE`, and
+  exit `0` did not change;
+- `findings_before_filtering: 1` and `findings_after_filtering: 1` did not
+  change because baseline suppression occurs after producer filtering;
+- execution success, `coverage_percent: 100.0`, `is_complete: false`,
+  component counts, analyzer states, and limitations did not change.
+
+The native outputs include the suppression reason but not the baseline digest,
+baseline fingerprint, or another suppression-set identity. A future adapter
+would have to preserve the separately calculated baseline digest if governance
+needs suppression identity. No unrelated finding existed in this one-finding
+target; the controlled link and clean targets were not passed the baseline.
+
+### Appium repository identity and inventory
+
+The external corpus remained read-only:
+
+```text
+origin: git@github.com:appium/skills.git
+revision: 86bb4cdf59f6aa21e5d8d179058333e5a00d1f72
+status before scans: ?? view.md
+```
+
+Because the checkout was dirty before evaluation, this record does not claim
+commit-exact content binding or full revision freshness. The untracked
+`view.md` was not created or modified by this experiment.
+
+The deterministic canonical inventory command found 11 Skills under one
+repository Skill root:
+
+```text
+skills/appium-troubleshooting/SKILL.md
+skills/prepare-development-environment/SKILL.md
+skills/setup-chromium/SKILL.md
+skills/setup-espresso/SKILL.md
+skills/setup-gecko/SKILL.md
+skills/setup-mac2/SKILL.md
+skills/setup-safari/SKILL.md
+skills/setup-uiautomator2/SKILL.md
+skills/setup-xcuitest/SKILL.md
+skills/setup/SKILL.md
+skills/xcuitest-real-device-config/SKILL.md
+```
+
+Support inventory was 85 files under `contexts/`, 13 `.mjs` files under
+`tools/appium/setup/scripts/`, and seven `skills/*/agents/openai.yaml` files.
+Repository configuration consisted of `renma.config.json`, Renovate and
+Dependabot configuration, and one GitHub workflow. No `.skillspector` config
+or baseline was present. SkillSpector's installed walker used its built-in
+directory and hidden-file exclusions; it did not use `renma.config.json` or
+interpret `.gitignore` rules for scope.
+
+No `allowed-tools` declaration appeared in any canonical Skill or elsewhere in
+the checkout. That is a corpus fact only, not evidence that SkillSpector
+supports or rejects the syntax.
+
+### Appium repository-root evidence
+
+The exact root command form was:
+
+```text
+/Users/kazu/.local/bin/skillspector scan /Users/kazu/github/skills --no-llm --format <json|sarif> --output experiments/skillspector/generated/appium/root/<report.json|report.sarif>
+```
+
+JSON SHA-256 was
+`62e16d01649cff3a20828295242eb4acae7e145dfe466775c8fe7140961f5d58`;
+SARIF SHA-256 was
+`18f9f68173670b2d8a6c0e7bab415279481b9c9efed0c2a26c8accf84f568d77`.
+The producer reported:
+
+```text
+subject name: unknown
+subject source: /Users/kazu/github/skills
+components: 124 discovered / 124 scanned
+coverage_percent: 100.0
+is_complete: false
+execution_successful: true
+findings_before_filtering: 102
+findings_after_filtering: 86
+published issues: 86
+suppressed_count: 0
+risk assessment: score 33 / MEDIUM / CAUTION
+native exit: 0
+```
+
+The exact component categories were all 85 Context files, all 11 canonical
+Skill paths, all seven agent YAML files, all 13 setup scripts, and these eight
+repository files:
+
+```text
+.github/dependabot.yml
+.github/workflows/pr-title.yml
+AGENTS.md
+LICENSE
+README.md
+renma.config.json
+renovate.json
+view.md
+```
+
+Scope exclusions were `.git/` (`excluded_directory`), `.gitignore`
+(`hidden_file`), and `.DS_Store` (`hidden_file`). The untracked `view.md` was a
+selected component and therefore prevents a clean revision-bound root-scope
+claim.
+
+Root native findings were `AS3/MEDIUM` 62, `RP1/MEDIUM` 21, `EA3/LOW` 2, and
+`P1/HIGH` 1. Human review found no source change justified by this experiment:
+
+- AS3 matched legitimate same-repository routing and Context links;
+- RP1 matched prose about explicit local `npx appium` mode, including the
+  repository's `npx --no-install appium` boundary, rather than an instruction
+  to fetch an unpinned MCP server;
+- both EA3 results matched `not limited to` in the Apache license;
+- P1 matched the heading `Enable Developer Mode` at confidence `0.21`, while
+  the adjacent procedure requires local state confirmation and explicit human
+  approval before any change.
+
+These are adjudicated false-positive or governance-context candidates for this
+corpus, not a claim that these native rules are generally false. AS3, RP1,
+EA3, and P1 remain specialized producer rules and were not translated into
+Renma diagnostic IDs. The ordered 86-ID JSON list had SHA-256
+`01398014e579a13d2ec5b3c8ea310af1f02e70dcc45440eddc4388bcd9328990`;
+the IDs remain opaque run-local values, not finding identities.
+
+The root labeled every `.mjs` script as `type: other`,
+`executable: false`, and reported `has_executable_scripts: false`.
+Behavioral AST and taint were therefore `not_applicable` with
+`no_applicable_files`. MCP least privilege and tool poisoning were
+`not_applicable` with `manifest_absent`; meta and all three semantic analyzers
+were disabled; static pattern, YARA, and MCP rug-pull work completed. Thus
+`coverage_percent: 100.0` did not mean the selected JavaScript received AST or
+taint analysis.
+
+Logical-subject binding was `unknown`: the absolute invocation root and dirty
+Git evidence identify the requested checkout, but native name `unknown` does
+not represent one logical Skill. Reviewed-scope binding was `partial`: JSON
+listed selected and excluded paths, but native output supplied no content
+hashes or repository revision and SARIF supplied no complete inventory.
+
+### Appium per-Skill evidence
+
+For every row below, the exact command was:
+
+```text
+/Users/kazu/.local/bin/skillspector scan <absolute-target> --no-llm --format <json|sarif> --output experiments/skillspector/generated/appium/<target-id>/<report.json|report.sarif>
+```
+
+`<absolute-target>` is `/Users/kazu/github/skills/skills/<target-id>` for each
+listed target. Every command exited `0`, wrote its report, reported
+`execution_successful: true`, `coverage_percent: 100.0`,
+`is_complete: false`, and `suppressed_count: 0`, with no scope exclusions.
+
+| Target | Components | Native findings | Before/after | Assessment | JSON SHA-256 | SARIF SHA-256 |
+| --- | ---: | --- | --- | --- | --- | --- |
+| `appium-troubleshooting` | 1 | RP1/MEDIUM 1; AS3/MEDIUM 3 | 4/4 | 21/MEDIUM/CAUTION | `fb6b6999aa93acf8e6171fcd89bca24758d05776b5db48ecf49daef0f8543a22` | `90d15631f96d3aede257aa1d2eb92c8598ab3a1d7e00fc1078af6d76918b7a92` |
+| `prepare-development-environment` | 1 | AS3/MEDIUM 3 | 3/3 | 14/LOW/SAFE | `f565f95b1472bdafb2c069ac5ba90ad4ba7c152a016fece2bf19f4f71d904f1d` | `9bfbfc0a0427ab7cb4d2687106cea5c04f5f95f3ad4b2445b2f5627e1f641546` |
+| `setup` | 1 | RP1/MEDIUM 1; AS3/MEDIUM 6 | 7/7 | 21/MEDIUM/CAUTION | `354a43a3c5239336d6dfe16a701e0e3d865b4c814f7afc48bd04108923d31876` | `755cd897d5578dd42f53187c2de04964096e3028f09513d460594919a64fd7a9` |
+| `setup-chromium` | 2 | RP1/MEDIUM 1 | 1/1 | 7/LOW/SAFE | `1e4b29c1e70d0e0c808231eb75af933e9ca4bf96db058581577d15f3a8149e31` | `af388316166cfc5a650a3a21ff33b546999f2a15f620f4994d64aeaa1eb37e9e` |
+| `setup-espresso` | 2 | RP1/MEDIUM 1 | 1/1 | 7/LOW/SAFE | `9ba7c6b27382af8c92273fedbcdfbf818cf662ea311b36df3af698aad583a68c` | `18c6b57e0dbe2c7a31617b76f52df874f1bf0a5e0aaa42213fc5410712bdcec5` |
+| `setup-gecko` | 2 | RP1/MEDIUM 1 | 1/1 | 7/LOW/SAFE | `1e1471cc8d43967d2ea189ca802e95d084ff9ddeac05bab3052355ceed2e8a4b` | `b724520ed3fadd15abd0da52d9178b33c195a0a1ea69b0bfc513202095e5c428` |
+| `setup-mac2` | 2 | RP1/MEDIUM 1 | 1/1 | 7/LOW/SAFE | `ce6e783878c1442d45f4232462a3aeed67be46eb536d10ae055a32b405142b4a` | `70a639821e474b13cfb5b95985e626af95ffb4cde719ded1ccc39b99c59231a4` |
+| `setup-safari` | 2 | RP1/MEDIUM 1 | 1/1 | 7/LOW/SAFE | `e61fe1165b23da57a548b4ba1ab8116301d4829dd9adc3bd1e69fb1194d19a98` | `e4d4c1cc3343483bc527ccec303ec14ec10f4e936398581ee1899c5fcffa4187` |
+| `setup-uiautomator2` | 2 | RP1/MEDIUM 1; AS3/MEDIUM 1 | 2/2 | 15/LOW/SAFE | `1c3b48e98d550610bb99dccd137d43ab86b6ac5fca0368a7ab00a1141ca50736` | `e52697c8465a9b37f33f0c999740182bb6fa166c9d03f199be24d3b41325ac02` |
+| `setup-xcuitest` | 2 | RP1/MEDIUM 1; AS3/MEDIUM 2 | 3/3 | 19/LOW/SAFE | `46acbd8dada6b36a058c72da71194b4caafb01b635f9409b64257fa9f1bc72d1` | `c4b389e79db3dfcc0348b311350edb2ec71b86b855b128478f7cccf2b65b96bd` |
+| `xcuitest-real-device-config` | 1 | RP1/MEDIUM 2; AS3/MEDIUM 3 | 5/5 | 19/LOW/SAFE | `1af034710bfbed8cb0648934b78647c74172dff881dbbddec0c43ea345a95630` | `b40a056048b72f4a9124b07b5825badf899c6e65645c444a2bcce6cbd3dd6fcd` |
+
+One-component inventories contained only `SKILL.md`. Every two-component
+inventory contained `SKILL.md` and `agents/openai.yaml`. Per-Skill JSON native
+names matched the canonical Skill names; sources were absolute.
+
+Common analyzer states were: behavioral AST, behavioral taint, and MCP least
+privilege `not_applicable/no_applicable_files`; MCP rug pull and MCP tool
+poisoning completed; meta and three semantic analyzers disabled; static
+patterns and YARA completed. The repeated disabled-analyzer messages were the
+only reported limitations.
+
+Human review classified every per-Skill AS3 result as a legitimate
+same-repository routing or continuation link and every RP1 result as prose
+about explicitly selected local `npx appium` mode. No Appium source change was
+actionable from this experiment. Renma represents the routing relationships
+as declared composition, but that is not a Renma diagnostic overlap with AS3;
+RP1 is also specialized-scanner-only.
+
+The per-Skill JSON generated IDs were:
+
+```text
+appium-troubleshooting: finding-8abee247300749b8a0f2851d8522feb8, finding-3f45f41439f14e2fa9a9d4e3199c7c36, finding-b2ea5a0350c94fecbb5980e449cefc47, finding-ac068888a4f248cd85ab5fc50878d7a2
+prepare-development-environment: finding-6fdd9c65d9cf435699990eac401f6b99, finding-c44e245b07fd4a298ea4a90887422c22, finding-7b0a72cf9761415ea23115e222eb227f
+setup: finding-00d081e5b77143958f9e535d1c6388a9, finding-3dbef337faa7448e850746f11806d02d, finding-c51b644e614d472f8cbc6e0d4525a7ab, finding-7f56643f240141029e58e01268cb8032, finding-e60877af4c72401086a80a2b912204c6, finding-0fbf792a8ff64176a3f58dd539f8d0c0, finding-f509f8af20a34379b4946d7aa84b0e13
+setup-chromium: finding-4c43865f55ad4eb689ebd07e0f5a86e7
+setup-espresso: finding-412ef8f0b4ff4222aa385641687dd90b
+setup-gecko: finding-25f5f6b8e677404ea629afb03bab6dde
+setup-mac2: finding-f269a84f427d4eb78cb6a76319aaf9f0
+setup-safari: finding-9fcdeb8cee5c410f899475b43a4f9969
+setup-uiautomator2: finding-7c09e76eaa9247ec853af78a7915e3b2, finding-cc8d861d6b994bec94032108190a5e1c
+setup-xcuitest: finding-c1ab4b627dcd41248314856ef45067b5, finding-52ea5bd21693474c9a9f8033109f877d, finding-f7a3c325127f43c9a6bc90880be1c753
+xcuitest-real-device-config: finding-72d13aca326249ae85faaa309d99d6cd, finding-6b710d81831749a482a650f26340190f, finding-05a2336c2b5b4b168851df3db2bb6d82, finding-c7b2201a568849ec8eeb7f8d41da1105, finding-94a755a44dee4cd2bd42e34417ead802
+```
+
+The `setup-xcuitest` list above preserves the native report's exact IDs; as
+with every other target, the separate SARIF execution used different IDs.
+Across all 12 Appium targets, JSON and SARIF preserved the same semantic
+finding order, count, rule, severity, location, matched evidence, and
+explanation, while no same-position generated ID matched across formats.
+
+### Root versus per-Skill comparison
+
+All 29 per-Skill findings appeared semantically in the repository-root JSON
+after making their locations root-relative. The root added 57 findings from
+repository and support files. It therefore broadened scope and native
+assessment; it did not preserve separate per-Skill subjects.
+
+| Dimension | Repository root | Per-Skill |
+| --- | --- | --- |
+| Subject | name `unknown`; absolute repository source | canonical Skill name; absolute Skill-directory source |
+| Components | 124 visible files across Skills, Contexts, configs, scripts, repository docs, and dirty `view.md` | one `SKILL.md`, plus `agents/openai.yaml` in seven targets |
+| Findings | 86 after heuristic filtering | 29 total across 11 reports |
+| Duplicate behavior | 102 before and 86 after producer filtering; repeated path causes remained in different files/lines | repeated path causes within each Skill remained when locations differed |
+| Analyzer applicability | JavaScript still labeled non-executable; MCP manifest absent | agent YAML selected in seven targets; MCP tool poisoning completed, least privilege remained not applicable |
+| Completeness | 124/124, 100%, `is_complete: false` | all components scanned, 100%, `is_complete: false` |
+| SARIF scope | findings and three exclusion notifications, no full inventory | findings and limitations, no full inventory |
+
+The root scan did not represent one logical Skill. Repository-root and
+per-Skill report digests were all distinct, but raw digest identity does not
+provide subject or scope binding.
+
+### `allowed-tools` observations
+
+No evaluated Appium Skill declares `allowed-tools`, so no native result can
+show whether SkillSpector exposes, recognizes, models, or analyzes that field.
+Per-Skill MCP least-privilege status was
+`not_applicable/no_applicable_files`; root status was
+`not_applicable/manifest_absent`. MCP tool-poisoning completion on per-Skill
+frontmatter is not evidence that `allowed-tools` was understood. This decision
+gate remains `not evaluated`.
+
+### Renma BOM binding comparison
+
+The public commands used were:
+
+```text
+node dist/index.js catalog /Users/kazu/github/skills --format json
+node dist/index.js bom /Users/kazu/github/skills --format json --omit-generated-at
+node dist/index.js scan /Users/kazu/github/skills --format json
+```
+
+Generated evidence remained ignored. Renma 0.25.3 reported 11 canonical valid
+Agent Skills, no Renma scan findings or diagnostics, and BOM v2 with 96 assets:
+11 Skills and 85 Contexts. BOM JSON SHA-256 was
+`a986bf4025f0f116dc6f05ad9f82a1a60f60fd4bcdb1e5cd88773a723b73d3b7`.
+
+Every one of the 96 SkillSpector components that was also a BOM asset matched
+the BOM `sourcePath`, and an independent byte hash matched every BOM
+`contentHash`. Root-scope classification was:
+
+| Binding class | Count | Evidence |
+| --- | ---: | --- |
+| Renma BOM asset with content hash | 96 | all 11 `SKILL.md` files and all 85 Context files |
+| Path without content hash | 0 | no such BOM representation |
+| `configPath` only | 1 | `renma.config.json` |
+| Not represented by BOM v2 | 27 | repository docs/config, seven agent YAML files, 13 scripts, and dirty `view.md` |
+| Ambiguous | 0 | no path collisions observed |
+
+The exact 27 unmatched components were:
+
+```text
+.github/dependabot.yml
+.github/workflows/pr-title.yml
+AGENTS.md
+LICENSE
+README.md
+renovate.json
+skills/setup-chromium/agents/openai.yaml
+skills/setup-espresso/agents/openai.yaml
+skills/setup-gecko/agents/openai.yaml
+skills/setup-mac2/agents/openai.yaml
+skills/setup-safari/agents/openai.yaml
+skills/setup-uiautomator2/agents/openai.yaml
+skills/setup-xcuitest/agents/openai.yaml
+tools/appium/setup/scripts/check-android-env.mjs
+tools/appium/setup/scripts/check-bundletool-env.mjs
+tools/appium/setup/scripts/check-chromium-env.mjs
+tools/appium/setup/scripts/check-espresso-env.mjs
+tools/appium/setup/scripts/check-ffmpeg-env.mjs
+tools/appium/setup/scripts/check-gecko-env.mjs
+tools/appium/setup/scripts/check-mac2-env.mjs
+tools/appium/setup/scripts/check-node-env.mjs
+tools/appium/setup/scripts/check-safari-env.mjs
+tools/appium/setup/scripts/check-uiautomator2-env.mjs
+tools/appium/setup/scripts/check-xcuitest-env.mjs
+tools/appium/setup/scripts/env-check-helpers.mjs
+tools/appium/setup/scripts/smoke-chromium-session.mjs
+view.md
+```
+
+Per-Skill subject binding was `exact` to the current Renma evidence snapshot:
+native name and scan-root path mapped to one canonical Renma Skill ID, source
+path, and content hash. The four one-component targets
+`appium-troubleshooting`, `prepare-development-environment`, `setup`, and
+`xcuitest-real-device-config` also had `exact` current-snapshot reviewed-scope
+binding because the only component was the hashed Skill asset. The other seven
+targets had `partial` reviewed-scope binding because
+`agents/openai.yaml` was selected but not represented by BOM v2. Root subject
+binding was `unknown` and root reviewed-scope binding was `partial`.
+
+These `exact` classifications bind the producer paths to the generated BOM
+snapshot, not to Git commit
+`86bb4cdf59f6aa21e5d8d179058333e5a00d1f72`; dirty checkout status keeps
+commit-exact freshness unestablished. Native JSON has no component hashes or
+revision, and native SARIF has no complete component inventory. BOM v2 does not
+hash arbitrary external-review components, and this experiment creates no
+general file-manifest contract.
+
+### Provider-neutral candidate concepts
+
+The new evidence supports keeping all of these concepts distinct:
+
+- producer provenance and adapter provenance: the producer version is native,
+  while no adapter exists;
+- logical subject and reviewed scope: canonical per-Skill subjects could still
+  include unrepresented agent YAML, while the root had broad scope but no
+  logical subject;
+- per-component identity and per-component content evidence: native paths were
+  joinable, but only BOM assets had hashes;
+- raw report digest and finding identity: raw digests changed while semantic
+  findings remained stable;
+- producer execution, producer-native completeness, and required-profile
+  completeness: every command executed, native `is_complete` remained false,
+  and no required profile existed;
+- analyzer limitations and native assessment: favorable `SAFE` results and
+  exit `0` coexisted with disabled/not-applicable analyzers, while root
+  `CAUTION` also exited `0`;
+- suppression or baseline identity and suppressed count: native count and
+  rationale were visible, but baseline identity required a separate digest;
+- freshness, repository revision, and dirty-state qualification: revision was
+  available externally, but dirty `view.md` prevented commit-exact binding.
+
+These observations do not define a provider-neutral schema.
+
+### SkillSpector-specific extensions
+
+Native score, recommendation, severity, rule IDs, analyzer names,
+`coverage_percent`, `is_complete`, generated finding IDs, heuristic
+before/after counts, and baseline filtering semantics remain
+SkillSpector-specific. In particular:
+
+- `AS3`, `RP1`, `EA3`, and `P1` are not Renma diagnostics;
+- the producer's scoring deduplication differs from its published issue list;
+- generated finding IDs are run-unique rather than stable identities;
+- `coverage_percent: 100.0` can coexist with selected `.mjs` files receiving no
+  AST or taint analysis;
+- a suppressed finding is still visible in JSON and SARIF, but is removed from
+  scoring.
+
+### Updated decision gates and next recommendation
+
+| Decision gate | Status | Evidence |
+| --- | --- | --- |
+| Published output parsing reliability | partially met | JSON and SARIF were structurally consistent across controlled and 12 Appium targets, but native JSON has no schema version and SARIF omits complete subject/scope inventory |
+| Producer-version availability | met | 2.5.0 appeared in native output and the executable probe |
+| Actual execution-mode availability | met | exact args and native LLM flags established static-only mode |
+| Native completeness visibility | met | JSON exposed execution, coverage, `is_complete`, analyzer states, limitations, exclusions, and filtering counts |
+| Required-profile completeness | not met | no profile ID, digest, or required-analyzer set existed |
+| Logical-subject binding | partially met | all per-Skill subjects bound to canonical Renma assets; repository root remained native `unknown` |
+| Exact reviewed-scope binding | partially met | four one-component scans bound exactly to the current BOM snapshot; seven per-Skill scans and the root included unhashed components |
+| Finding-identity stability | partially met | semantic identity and order were stable across two controlled runs, but producer IDs and raw digests were not |
+| Duplicate behavior | partially met | one Markdown cause predictably produced two published results while scoring deduplicated them; broader rule/version behavior remains untested |
+| False-positive understanding | partially met | controlled link duplication and Appium path, `npx`, license, and Developer Mode contexts were adjudicated, but only one producer/version was evaluated |
+| Suppression behavior | met | one exact v2 fingerprint moved one finding out of active scoring while preserving JSON/SARIF audit evidence and reason |
+| `allowed-tools` interpretation | not evaluated | the Appium corpus contains no declaration and no controlled declaration was added |
+| Raw evidence remains separate from Renma findings | met | raw artifacts stayed ignored; no native result became a Renma diagnostic |
+| Provider-neutral core usefulness | partially met | provenance, binding, component evidence, digest, execution, completeness, limitations, assessment, suppression, freshness, revision, and dirty state remained independently useful |
+| Evidence from a second producer | not evaluated | SkillSpector remains the only producer evaluated |
+
+The next evidence step is a separate controlled `allowed-tools` interpretation
+experiment. It should test supported Agent Skills syntax and inspect native
+component and analyzer evidence before any non-production adapter parsing
+spike. Observation should continue without production integration, schema,
+metadata, CLI, BOM, dependency, CI, or adapter implementation.

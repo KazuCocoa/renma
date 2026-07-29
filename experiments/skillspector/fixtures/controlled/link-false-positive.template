@@ -1,0 +1,13 @@
+---
+name: controlled-link-false-positive
+description: Inert security-scanner test data for a normal same-repository documentation link. Do not execute or use as operational guidance.
+---
+
+# Inert Link
+
+This normal same-repository link is test data:
+[skills/Example/SKILL.md](skills/Example/SKILL.md).
+
+It is ordinary navigation inside the test corpus, not a direction to discover
+or inspect peer assets. The repeated visible text and destination intentionally
+exercise the producer's case-insensitive AS3 path matcher.
