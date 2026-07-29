@@ -158,11 +158,13 @@ native results.
 The raw JSON does not expose an explicit report-schema version, Renma asset ID,
 subject content hash, repository revision, assessment-profile digest, or raw
 report digest. This evaluation recorded repository revision and report digests
-separately, but exact subject and reviewed-scope binding would still need public
-Renma evidence such as BOM data. The identical empty SARIF reports reinforce
-that a future adapter must add binding from stable Renma repository evidence
-rather than infer identity from the native report digest. This supports keeping
-binding in a future adapter and keeping the native report separate.
+separately. Public Renma BOM evidence can contribute stable paths and hashes
+only for reviewed components represented in `assets[]`; exact binding for other
+reviewed files would need additional file-level evidence. The identical empty
+SARIF reports reinforce that a future adapter must add binding from stable
+repository evidence rather than infer identity from the native report digest.
+This supports keeping binding in a future adapter and keeping the native report
+separate.
 
 The report distinguishes disabled, not-applicable, and completed analyzers, and
 has counters for skipped, failed, and unaccounted work. The observed
@@ -377,6 +379,16 @@ do not match across the separately executed formats. A parser can preserve
 these producer IDs, but this run provides no evidence that they are stable
 identities or suitable deduplication keys.
 
+The cited README line is a normal Markdown documentation link to this example's
+own `skills/replace-placeholder/SKILL.md`. SkillSpector 2.5.0's installed AS3
+static patterns include a case-insensitive path matcher for
+`skills/<name>/SKILL.md`. Markdown repeats that path once as the link text and
+once as the link destination, and the producer emitted one result for each
+match. Because both results cite the same line, rule, snippet, and explanation,
+this is evidence for classifying them as likely duplicate false-positive
+candidates in this corpus. It is not evidence that all AS3 findings are false
+positives.
+
 ## Repository-Probe Scope Analysis
 
 The repository probes expose materially different scope behavior from a
@@ -410,10 +422,21 @@ canonical Skill scan:
 The experiment conclusion for reviewed-scope binding is **partial** for all
 three probes. The harness knows the configured repository-relative target and
 Renma commit, while native JSON supplies the scan-root-relative component paths
-and an explicit exclusion in one case. Combining those paths with public Renma
-BOM evidence could bind paths and content hashes without having the adapter
-rescan source bytes. The native report alone cannot establish exact content
-identity, and SARIF alone cannot establish the complete reviewed component set.
+and an explicit exclusion in one case. BOM v2 can supply stable
+repository-relative identity and content hashes for reviewed components that
+are represented as Renma assets, but it does not promise a hash inventory for
+every file an external reviewer may select. In particular, the context-repo and
+interactive probe inventories both include `renma.config.json`; their
+configured globs do not include that file, and BOM v2's optional `configPath`
+does not carry its content hash.
+
+Exact full reviewed-scope binding therefore needs additional file-level
+evidence for components outside hashed BOM assets. Candidate sources include
+producer-supplied component hashes, a separate deterministic repository file
+manifest, or a future additive Renma evidence contract. This experiment does
+not choose or implement any of those sources. The native report alone cannot
+establish exact content identity, and SARIF alone cannot establish the complete
+reviewed component set.
 
 Logical-subject binding is also partial. The harness target is a stable
 experiment ID and repository-relative path, but SkillSpector reports the native
@@ -432,7 +455,7 @@ logical subjects.
 | Report structure | JSON carries scope; empty SARIF carries no subject/scope | Same format asymmetry; SARIF only adds locations when findings or exclusions exist |
 | Empty-report identity | The two empty SARIF reports were identical | The two empty repository SARIF reports were identical to each other and to both historical canonical reports |
 | Native findings | Zero | Zero for two probes; two duplicate `AS3`/`MEDIUM` results for the interactive README |
-| Adapter binding feasibility | Native Skill name helps identify a candidate subject, but hashes and revision are absent | Harness target plus JSON paths can be joined to Renma evidence, but native logical-subject boundaries and content identity are absent |
+| Adapter binding feasibility | Native Skill name helps identify a candidate subject, but hashes and revision are absent | Harness target plus JSON paths can be joined to BOM identity and hashes only for represented Renma assets; non-asset reviewed files need additional file-level evidence |
 
 Repository probing answers which visible files SkillSpector selected, but it
 does not mean the example root was recognized as one Skill or one logical
@@ -455,7 +478,8 @@ They do not define a receipt schema or adapter implementation.
 | Logical subject identity | ambiguous | Repository roots use native name `unknown`; absolute source identifies an invocation root, not a stable Renma subject |
 | Repository-relative subject path | requires Renma BOM evidence | Native source is absolute; the harness target is repository-relative, but stable repository binding must come from Renma evidence |
 | Exact reviewed component paths | available directly | JSON lists paths relative to the scan root; SARIF does not carry the full inventory |
-| Per-component content hashes | requires Renma BOM evidence | Native components have sizes and line counts but no hashes |
+| BOM-asset component hashes | requires Renma BOM evidence | Available only when the reviewed component is represented in BOM `assets[]` |
+| Full reviewed-scope component hashes | missing | Native SkillSpector output has no component hashes, and BOM v2 does not hash every possible reviewed file; observed `renma.config.json` components demonstrate the gap |
 | Component count | available directly | JSON exposes total and scanned counts |
 | Stable component ordering | ambiguous | All observed lists are unique and lexicographically ordered, but no producer contract or repeatability evidence establishes stability |
 | Repository revision | requires Renma BOM evidence | The evaluation records Git revision externally; native reports do not |
@@ -472,9 +496,14 @@ They do not define a receipt schema or adapter implementation.
 
 An adapter parsing spike could consume the JSON component paths, raw report
 digest, producer metadata, outcome, completeness, and limitations without
-rescanning. Exact scope freshness would still require public Renma evidence for
-the repository-relative component identities and hashes. SARIF is useful for
-native finding interchange but is insufficient as the only binding input.
+rescanning source content. That parse alone would not establish exact binding.
+BOM v2 could bind repository-relative identity and hashes for components
+represented in `assets[]`, but it could not bind the full observed scope
+because the reviewed `renma.config.json` files are not hashed BOM assets.
+Full-scope freshness would require producer-supplied hashes, a separate
+deterministic repository file manifest, or a future additive Renma evidence
+contract. This PR does not choose or implement one. SARIF is useful for native
+finding interchange but is insufficient as the only binding input.
 
 ## Generalizable Renma Concepts
 
@@ -486,6 +515,9 @@ producer execution, producer-native completeness, required-profile
 completeness, limitations, freshness, assessment outcome, and suppression or
 baseline identity as distinct concepts. The identical empty SARIF reports make
 raw digest and subject/scope binding especially important to keep separate.
+Reviewed-scope binding must also preserve whether file-level content evidence
+covers every producer-selected component rather than infer full coverage from
+the subset represented as BOM assets.
 
 ### SkillSpector-specific information
 
@@ -502,8 +534,11 @@ Renma already owns deterministic repository discovery, canonical Skill
 identity and metadata, repository-relative paths, declared composition,
 security-policy declarations and consistency, bounded agent-facing instruction
 checks, and repository evidence such as BOM identity and content hashes where
-the public BOM provides them. The `AS3` result does not map to an existing
-Renma diagnostic and should not create one through an adapter.
+the public BOM provides them. BOM v2 does not provide a hash for `configPath` or
+promise hashes for every arbitrary reviewed file, so that existing coverage
+cannot establish the full SkillSpector probe scope. The `AS3` result does not
+map to an existing Renma diagnostic and should not create one through an
+adapter.
 
 ### Specialized-scanner responsibility
 
@@ -516,13 +551,14 @@ not-applicable.
 ### Insufficient evidence
 
 The corpus does not establish stable component ordering across runs or
-versions, exact content binding from native evidence, required-profile
-completeness, suppression or baseline behavior, broad false-positive behavior,
-or cross-format finding-ID stability. It also does not evaluate
-`allowed-tools`: each actually reviewed canonical Skill in the probe corpus
-lacks that declaration, and absence of a finding cannot imply support. Optional
-LLM behavior, a safely approved static/LLM comparison, and evidence from a
-second producer remain unevaluated.
+versions, exact content binding from native evidence, a file-level hash source
+for reviewed files outside BOM `assets[]`, required-profile completeness,
+suppression or baseline behavior, broad false-positive behavior, or
+cross-format finding-ID stability. It also does not evaluate `allowed-tools`:
+each actually reviewed canonical Skill in the probe corpus lacks that
+declaration, and absence of a finding cannot imply support. Optional LLM
+behavior, a safely approved static/LLM comparison, and evidence from a second
+producer remain unevaluated.
 
 ## Decision-Gate Conclusion
 
@@ -539,7 +575,7 @@ path. This PR does not add that fixture or perform that experiment.
 | Actual execution mode is available | met | Harness args contain `--no-llm`; native LLM flags and disabled semantic analyzer states confirm static-only execution |
 | Completeness and limitations are visible | met | JSON exposes `is_complete: false`, coverage, per-analyzer states and work counters, limitations, and scope exclusions |
 | Logical subject can be bound | partially met | Harness target path and commit identify the requested root, but native repository subject name is `unknown` and no stable logical asset ID is present |
-| Exact reviewed scope can be bound | partially met | JSON exposes included paths and one excluded path, but content hashes and repository revision require separate Renma evidence; SARIF lacks the full inventory |
+| Exact reviewed scope can be bound | partially met | JSON exposes included paths and one excluded path; BOM v2 can hash reviewed components represented in `assets[]`, but the observed `renma.config.json` components are not hashed BOM assets, other non-asset files may also be selected, and SARIF lacks the full inventory |
 | False-positive behavior is understood | partially met | One likely false-positive pattern and exact duplicate were observed, but the corpus is too small for general behavior or stable adjudication |
 | Suppression behavior is understood | not evaluated | No suppression or baseline was used; count zero only establishes the observed absence of suppression |
 | Raw evidence can remain separate from Renma findings | met | Generated reports remained ignored and uncommitted; Markdown preserves native IDs and observations without creating Renma diagnostics |
