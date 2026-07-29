@@ -39,6 +39,7 @@ pnpm-debug.log*
 
 # Opt-in experiment output
 experiments/skillspector/generated/
+experiments/cisco-skill-scanner/generated/
 
 # Editor and OS files
 .DS_Store
