@@ -92,6 +92,29 @@ external path to `targets.json` or weaken the runner's repository-containment
 validation. Keep all external repositories read-only and write their generated
 reports under this experiment's ignored `generated/` directory.
 
+## Controlled `allowed-tools` Fixture
+
+The isolated `allowed-tools` corpus is also committed only as inert templates.
+Its dedicated built-in-only helper materializes seven repository-shaped cases
+under the ignored generated root:
+
+```bash
+node experiments/skillspector/prepare-allowed-tools.mjs
+```
+
+The cases compare an omitted field, portable single-tool and space-separated
+Agent Skills strings, the specification's qualified-selector example, one
+intentionally non-standard comma-delimited producer contrast, and a portable
+docs-only control. Six cases contain the same uncalled Python function with
+static file-read and network patterns. The function must never be executed.
+
+Scan each generated canonical Skill directory directly with SkillSpector and
+use the generated repository root for public Renma validation. Do not add these
+targets to `targets.json`, add the helper to `package.json`, or treat a lack of
+findings as proof that the producer interpreted the field. The fixture
+classifications and paths are documented in
+[`fixtures/allowed-tools/README.md`](fixtures/allowed-tools/README.md).
+
 ## Generated Reports
 
 For each selected target, the runner invokes the already-installed executable
