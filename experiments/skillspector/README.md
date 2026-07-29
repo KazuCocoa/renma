@@ -80,8 +80,9 @@ node experiments/skillspector/prepare-controlled.mjs
 ```
 
 The materialized cases are one intentional AS3 positive, one same-repository
-Markdown-link false-positive candidate, one clean control, and a combined copy
-of all three. Invoke the externally installed SkillSpector executable directly
+Markdown-link false-positive candidate with an inert clean destination, one
+clean control, and a combined copy of all three root cases plus the link
+destination. Invoke the externally installed SkillSpector executable directly
 for these disposable targets. Do not add the controlled targets to
 `targets.json`, add the helper to `package.json`, or execute instruction-like
 fixture text.

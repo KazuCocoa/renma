@@ -14,6 +14,10 @@ const cases = [
   ["link-false-positive", "link-false-positive.template"],
   ["clean-control", "clean-control.template"],
 ];
+const linkedTargetContent = await readFile(
+  path.join(fixtureRoot, "linked-target.template"),
+  "utf8",
+);
 
 await rm(generatedRoot, { recursive: true, force: true });
 
@@ -29,6 +33,27 @@ for (const [caseName, templateName] of cases) {
   }
 }
 
+for (const destination of [
+  path.join(
+    generatedRoot,
+    "link-false-positive",
+    "skills",
+    "Example",
+    "SKILL.md",
+  ),
+  path.join(
+    generatedRoot,
+    "combined",
+    "link-false-positive",
+    "skills",
+    "Example",
+    "SKILL.md",
+  ),
+]) {
+  await mkdir(path.dirname(destination), { recursive: true });
+  await writeFile(destination, linkedTargetContent);
+}
+
 process.stdout.write(
-  `Materialized ${cases.length} inert controlled cases and one combined corpus under ${generatedRoot}\n`,
+  `Materialized ${cases.length} inert controlled cases, the link destination, and one combined corpus under ${generatedRoot}\n`,
 );

@@ -624,10 +624,10 @@ evidence. No suppression syntax was invented.
 
 ### Controlled fixture evidence
 
-The committed fixture is inert scanner test data. Its three source files end
-in `.template`, no committed fixture is named `SKILL.md`, every description
-labels the content inert, and the instruction-like trigger says not to execute
-it. The built-in-only preparation helper copies the templates into the ignored
+The committed fixture is inert scanner test data. Its four source files end in
+`.template`, no committed fixture is named `SKILL.md`, every description labels
+the content inert, and the instruction-like trigger says not to execute it.
+The built-in-only preparation helper copies the templates into the ignored
 generated area:
 
 ```text
@@ -639,9 +639,9 @@ Materialized targets:
 | Case | Generated target | Design |
 | --- | --- | --- |
 | Intentional positive | `experiments/skillspector/generated/controlled-fixture/source/intentional-positive` | One inert sentence directs enumeration of installed Skills in the agent Skills directory and opening each discovered `SKILL.md` |
-| Link false-positive candidate | `experiments/skillspector/generated/controlled-fixture/source/link-false-positive` | One normal same-repository Markdown link has `skills/Example/SKILL.md` as both visible text and destination |
+| Link false-positive candidate | `experiments/skillspector/generated/controlled-fixture/source/link-false-positive` | One normal same-repository Markdown link has `skills/Example/SKILL.md` as both visible text and destination; the destination is materialized from a separate inert clean template |
 | Clean control | `experiments/skillspector/generated/controlled-fixture/source/clean-control` | One bounded summarization instruction with no peer-Skill or path trigger |
-| Combined | `experiments/skillspector/generated/controlled-fixture/source/combined` | One generated copy of each case under a distinct subdirectory |
+| Combined | `experiments/skillspector/generated/controlled-fixture/source/combined` | One generated copy of each root case under a distinct subdirectory, plus the link case's inert nested destination |
 
 Exact unsuppressed commands followed this form, with each shown target and
 output directory used once for `json`/`report.json` and once for
@@ -658,16 +658,31 @@ output directory used once for `json`/`report.json` and once for
 | Case | JSON SHA-256 | SARIF SHA-256 | Native findings | Native assessment |
 | --- | --- | --- | --- | --- |
 | Intentional positive | `fbd3ccf742397001b678654e6e3e09366c57458c7a824e8292da5a53a9761633` | `59e7dc8db9d56a8d73c33221acdc39b63f7d6255fd21b9d89c542a4abe662a4e` | one `AS3`/`MEDIUM`, `SKILL.md:10`, matched text `Enumerate installed skills` | score 8, `LOW`, `SAFE` |
-| Link candidate | `f7f488e5499e67ae8d41187eaec5e86fe68ac7c8b2be4c15f31d7fb4dcb59aff` | `545b49567f8b4768f1c6dd6d28baf0c7c0d930408a5bbdd2185a85ba0699b692` | two `AS3`/`MEDIUM`, both `SKILL.md:9`, same matched text and explanation | score 8, `LOW`, `SAFE` |
+| Link candidate | `91721fd87f4f96606f92e07de582a061cd091ed929a369ecb9b5bffc8d5a2ab1` | `43e4758e95c1dec05ebfbe4bfd9d9fc986ec9240327fe73851676c4500d5c122` | two `AS3`/`MEDIUM`, both `SKILL.md:9`, same matched text and explanation | score 8, `LOW`, `SAFE` |
 | Clean control | `738a22e0ba9015a0c62501a0289b753803a8301ab910f4b4b47071018f431a7e` | `ac048bad24d7a13a9578dd60e770347cc4750647e521991754dd117fe59ef8d4` | none | score 0, `LOW`, `SAFE` |
-| Combined run 1 | `c12c9a4a119b2b433dba64a922fab523bb71f4744ff356ac18ac55468edac6f1` | `eb3670a8982849858be25b510df5933e66b178048576d56a78ebd9653429d6a3` | three `AS3`/`MEDIUM` | score 12, `LOW`, `SAFE` |
-| Combined run 2 | `545a686eef28b07faf1a7f35089bb12cf50d049d71f120ce4a2a3adf61af5282` | `e176f1c24023ad25b5bb5ccdc64c6e5b478fe8a0916069e147591d72341ac11c` | three `AS3`/`MEDIUM` | score 12, `LOW`, `SAFE` |
+| Combined run 1 | `65bdd5b94ab6e8d09e233df85042683a54a13c1942936a861aa0eb54646fb086` | `c3a06287bbc95afa9d02856e543f1565af396302a65ee41cc97d238d03a38569` | three `AS3`/`MEDIUM` | score 12, `LOW`, `SAFE` |
+| Combined run 2 | `d3255c7d446d25f32dd57c3168d032a2d6ccb20e5e400ef517b85dd58d4038c3` | `87a0bff5a9e0c431b10ff3d35d44bf58f54979568af6755c351c1959f6346466` | three `AS3`/`MEDIUM` | score 12, `LOW`, `SAFE` |
 
 Every case reported `coverage_percent: 100.0`,
 `execution_successful: true`, and `is_complete: false`. Static pattern and
 YARA analyzers completed; semantic analyzers were disabled by configuration.
 No required assessment profile or required-analyzer set was identified, so
 required-profile completeness remains unknown.
+
+The updated link target reported two components: the root `SKILL.md` candidate
+and `skills/Example/SKILL.md`, the inert clean destination. The combined target
+reported four components: the three root-case `SKILL.md` files and
+`link-false-positive/skills/Example/SKILL.md`. The linked target produced no
+finding. Its committed template has only valid minimal `name` and `description`
+Agent Skills frontmatter plus inert body text. For the standalone link target,
+behavioral AST, behavioral taint, and MCP least privilege were not applicable
+with `no_applicable_files`; MCP rug pull and tool poisoning completed. For the
+combined target, behavioral AST and taint were not applicable with
+`no_applicable_files`, MCP least privilege and tool poisoning were not
+applicable with `manifest_absent`, and MCP rug pull completed. Meta analysis and
+all three semantic analyzers were disabled in both scopes; all static pattern
+and YARA work completed for both components or all four components,
+respectively.
 
 The intentional-positive result is actionable within the fixture's deliberate
 threat model: the native AS3 explanation is exactly about enumerating or
@@ -676,11 +691,12 @@ so no operational asset should be changed in response.
 
 The link candidate reproduced the PR #139 false-positive mechanism more
 narrowly. The producer emitted one result for the Markdown label and one for
-the identical destination. Both results have the same rule, severity, file,
-line, matched text, snippet, explanation, remediation, and confidence, but
-different generated IDs. Human review classifies both as duplicate
-false-positive candidates for this fixture, not as evidence that every AS3
-result is false.
+the identical destination even though that relative path now resolves to the
+materialized inert clean target. Both results have the same rule, severity,
+file, line, matched text, snippet, explanation, remediation, and confidence,
+but different generated IDs. Human review classifies both as duplicate
+false-positive candidates for this valid benign link, not as evidence that
+every AS3 result is false.
 
 The producer published both duplicate issues and reported
 `findings_before_filtering: 2` and `findings_after_filtering: 2`, but assigned
@@ -706,39 +722,40 @@ ordering were equal across the two runs. Producer-generated IDs were not:
 
 ```text
 combined run 1 JSON:
-  finding-3f79032e7e3e4064a1a367039a656ac6
-  finding-a83f06584bf641d1938b629e4b6b18fd
-  finding-50519696a4ed41e6923287c41765ccc1
+  finding-9d55e8b9965d478a9a1edc5b83f11613
+  finding-56d48b3f9a9e471d8c0b09881badaaa9
+  finding-b2859732ba954bb784ae4438355c259d
 combined run 2 JSON:
-  finding-e2167f7015204d4f8ff138eb1c080bd9
-  finding-2060ea9f18e444a89b419de901f4919b
-  finding-c9d798099e1644df8f632791ef5942c5
+  finding-05e7d0b8158e4b15bb48b14f67c7cfeb
+  finding-28004cab4407456b99a6d1c04c0c4e63
+  finding-6496eab0974f4b6e8aa853982dfa0b0e
 combined run 1 SARIF:
-  finding-77cf1a6dc3504731becc89b65ac5357e
-  finding-a0c361d834d34eb3bfab94b914823786
-  finding-72bfd73429c145818d037150bedbb5da
+  finding-ad39da308ff94b7c900744d9079727e0
+  finding-7b0ef374cad446ba806926126edd7115
+  finding-3149adefe1fa4699a0920c87f668857a
 combined run 2 SARIF:
-  finding-369462480fd7459283c5f39b2107aff4
-  finding-875e327a2c6a4be68229566cf4a30d29
-  finding-322850edb2d84a8a90b2b7fa77c0af40
+  finding-7f8637b6562c4d29a5a74ad827ac3f0b
+  finding-524577e76e5d432385b5d2a85b768d5d
+  finding-290207935eec417a8f6c4ae1286b3160
 ```
 
 The same format-to-format distinction appeared in the single cases. The
 intentional-positive JSON/SARIF IDs were
 `finding-93de6910897e46a1bb424d271d55ea51` and
 `finding-a4d93583d5b0498ea14380644f2d78e2`; the link JSON IDs were
-`finding-2d15d544907c434d9681ecf550c6a843` and
-`finding-39f6d43dd3d9492ea0aef8bcc61199d9`, while SARIF used
-`finding-eba01dff87bd45d2be4cd76e99bc5e64` and
-`finding-553ddf11cba744308b5993f02589df17`.
+`finding-4014c21cf6e2443490cad574d9227dac` and
+`finding-e1beec42bb704e639e19caf6301271bd`, while SARIF used
+`finding-f3d28ca7a1b34bdeba25654a30d7fff2` and
+`finding-05e2ad330a0a492d93100de1a39a1c07`.
 
 The raw combined digests differed in both formats. After removing only
-`skill.scanned_at` and every JSON `finding_id`, the two JSON objects were equal
-and both had experiment-comparison SHA-256
-`316001db1146e5a0923855abd2e862507f7a641db0b6a5e8fca4291c24f71445`.
-After removing only SARIF `properties.findingId`, the two SARIF objects were
-equal and both had experiment-comparison SHA-256
-`8003409d2031a6f191e71d72a7dd119727626424b2189f92305545e158fa1f63`.
+`skill.scanned_at` and every JSON `finding_id`, then serializing with sorted
+keys, the two JSON objects were equal and both had experiment-comparison SHA-256
+`84cb5fa18f0f1ffaaf7076d2b604f119d94e81babb075877c9e8849d73da2a17`.
+After removing only SARIF `properties.findingId` and serializing with sorted
+keys, the two SARIF objects were equal and both had experiment-comparison
+SHA-256
+`29e1cc3dc5138a533c0a9d2c8a30be12a760c88e98fd1c01c1ec8176a8008705`.
 These normalization digests are observations, not a proposed canonical report
 or finding-identity contract.
 
@@ -753,6 +770,8 @@ The evidence therefore keeps these concepts separate:
   formats' generated IDs changed.
 
 ### Suppression or baseline observations
+
+#### Single-finding suppression mechanics
 
 The narrow selected finding was the sole intentional-positive AS3 result. The
 exact supported baseline commands were:
@@ -798,6 +817,83 @@ baseline fingerprint, or another suppression-set identity. A future adapter
 would have to preserve the separately calculated baseline digest if governance
 needs suppression identity. No unrelated finding existed in this one-finding
 target; the controlled link and clean targets were not passed the baseline.
+
+#### Multi-finding suppression selectivity
+
+The selective experiment used the updated, unchanged four-component combined
+target. The producer-native version 2 baseline command was:
+
+```text
+/Users/kazu/.local/bin/skillspector baseline experiments/skillspector/generated/controlled-fixture/source/combined --no-llm --output experiments/skillspector/generated/controlled-fixture/baseline/combined-selective.full.json --reason 'Controlled experiment: suppress only the benign Markdown-link false-positive cause'
+```
+
+SkillSpector reported three suppressible findings, but serialized two exact
+fingerprints: one for the intentional positive and one shared by both duplicate
+link findings. Human review removed the intentional-positive entry and retained
+only the producer-generated link entry:
+
+```text
+version: 2
+scanner_version: 2.5.0
+rule_id: AS3
+file: link-false-positive/SKILL.md
+fingerprint: sha256:6372a25537b41af0a1be584274ac867f838dac733b2be538357b103547a6dbf8
+reason: Controlled experiment: suppress only the benign Markdown-link false-positive cause
+```
+
+The narrowed baseline SHA-256 was
+`633fa77a9e7cad0a31b365b78d85743d7e6756327424571a46ac852f9f3270bd`.
+Both the full generated baseline and the narrowed baseline remained ignored and
+uncommitted. The selective scan commands were:
+
+```text
+/Users/kazu/.local/bin/skillspector scan experiments/skillspector/generated/controlled-fixture/source/combined --no-llm --baseline experiments/skillspector/generated/controlled-fixture/baseline/combined-selective.json --show-suppressed --format json --output experiments/skillspector/generated/controlled-fixture/reports/combined-selective/report.json
+/Users/kazu/.local/bin/skillspector scan experiments/skillspector/generated/controlled-fixture/source/combined --no-llm --baseline experiments/skillspector/generated/controlled-fixture/baseline/combined-selective.json --show-suppressed --format sarif --output experiments/skillspector/generated/controlled-fixture/reports/combined-selective/report.sarif
+```
+
+Selective report SHA-256 values were
+`330719ef1520e893d7a81f5765da7611d1a04a1478321b5a9c825c11e621484c`
+for JSON and
+`8273f167b5aacd4d190b73d541255ff352d1c3f6e46877fbd493cfb02c866bfb`
+for SARIF. Both commands exited `0`.
+
+The unsuppressed combined report had three active issues, zero suppressed
+findings, score 12, native severity `LOW`, and recommendation `SAFE`. With the
+narrowed exact fingerprint:
+
+- the intentional `AS3` positive remained the one active JSON issue, at
+  `intentional-positive/SKILL.md:10`, with generated ID
+  `finding-bc7d9922e962434d9b692a2d7e6090e6`;
+- both duplicate link findings moved into JSON `suppressed`, each with
+  `suppressed: true`, the retained human reason, and generated IDs
+  `finding-3234533feab649dab10a9e10ff484e51` and
+  `finding-14a0377930744fb7a3f977f8ae26c1f8`;
+- active issue count was 1 and `suppressed_count` was 2;
+- SARIF retained the intentional result as active with generated ID
+  `finding-13132cc996a941729fb4192e5c238ecc`, and retained both link results
+  with `external` suppressions, the same reason, and generated IDs
+  `finding-9bc1ce782b814057a88e0c8e8a613199` and
+  `finding-f1e0f5046ac5451190903e6bbc5984cc`;
+- score changed from 12 to 8 while native severity `LOW`, recommendation
+  `SAFE`, and exit `0` remained unchanged;
+- `findings_before_filtering: 3` and `findings_after_filtering: 3` remained
+  unchanged because exact baseline suppression occurred after producer
+  filtering.
+
+Execution remained successful with four of four components scanned,
+`coverage_percent: 100.0`, and `is_complete: false`. Component inventory,
+analyzer states, limitations, ledger state, exclusions, and all completeness
+counts were byte-equal as a JSON subtree before and after suppression. The
+unrelated intentional positive therefore remained visible in both formats
+while the one shared exact link fingerprint selectively suppressed both
+duplicate results.
+
+As in the single-finding case, native JSON and SARIF exposed the suppression
+reason but neither the narrowed baseline digest nor its fingerprint identity.
+This establishes exact v2 mechanics and selectivity for this unchanged corpus
+under SkillSpector 2.5.0. It does not establish rule-based suppression,
+source-change invalidation, scanner-version mismatch behavior, or behavior
+across producer versions.
 
 ### Appium repository identity and inventory
 
@@ -1154,7 +1250,7 @@ SkillSpector-specific. In particular:
 | Finding-identity stability | partially met | semantic identity and order were stable across two controlled runs, but producer IDs and raw digests were not |
 | Duplicate behavior | partially met | one Markdown cause predictably produced two published results while scoring deduplicated them; broader rule/version behavior remains untested |
 | False-positive understanding | partially met | controlled link duplication and Appium path, `npx`, license, and Developer Mode contexts were adjudicated, but only one producer/version was evaluated |
-| Suppression behavior | met | one exact v2 fingerprint moved one finding out of active scoring while preserving JSON/SARIF audit evidence and reason |
+| Suppression behavior | partially met | exact v2 fingerprint mechanics and selectivity were observed for SkillSpector 2.5.0: one shared link fingerprint suppressed both duplicates while the unrelated intentional finding remained active; rule-based suppression, source-change invalidation, scanner-version mismatch, and cross-version behavior remain untested |
 | `allowed-tools` interpretation | not evaluated | the Appium corpus contains no declaration and no controlled declaration was added |
 | Raw evidence remains separate from Renma findings | met | raw artifacts stayed ignored; no native result became a Renma diagnostic |
 | Provider-neutral core usefulness | partially met | provenance, binding, component evidence, digest, execution, completeness, limitations, assessment, suppression, freshness, revision, and dirty state remained independently useful |

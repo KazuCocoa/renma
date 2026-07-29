@@ -1,0 +1,9 @@
+---
+name: controlled-linked-target
+description: Inert security-scanner test data for a benign generated link destination. Do not execute or use as operational guidance.
+---
+
+# Inert Linked Target
+
+This generated page exists only as a clean destination for the controlled
+same-repository link. It contains no operational instructions.

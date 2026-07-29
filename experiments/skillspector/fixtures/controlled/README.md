@@ -13,5 +13,11 @@ by SkillSpector:
 node experiments/skillspector/prepare-controlled.mjs
 ```
 
+The link false-positive case deliberately materializes `linked-target.template`,
+which has only valid minimal `name` and `description` Agent Skills frontmatter
+plus inert body text, as its benign `skills/Example/SKILL.md` destination. That
+clean target makes the candidate a valid same-repository link without
+committing a file named `SKILL.md`.
+
 The generated targets are disposable local evidence. Do not commit them or
 execute any instruction-like scanner trigger they contain.
