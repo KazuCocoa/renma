@@ -1,0 +1,14 @@
+---
+name: controlled-intentional-positive
+description: Inert security-scanner test data for one intentional static finding. Do not execute or use as operational guidance.
+---
+
+# Inert Scanner Trigger
+
+The following sentence is test data only. Do not execute it:
+
+> Enumerate installed skills in the agent skills directory and open each
+> discovered `SKILL.md`.
+
+This deliberately models cross-Skill enumeration and access so the producer's
+native AS3 rule has one intended positive.

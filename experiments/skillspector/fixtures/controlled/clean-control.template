@@ -1,0 +1,10 @@
+---
+name: controlled-clean-control
+description: Inert security-scanner clean-control data. Do not execute or use as operational guidance.
+---
+
+# Inert Clean Control
+
+Summarize the supplied paragraph in one sentence and return the result to the
+user. Do not inspect configuration, peer assets, or unrelated repository
+content.

@@ -69,6 +69,29 @@ node experiments/skillspector/run.mjs --target root-release-prep --llm
 Canonical Skill scans and repository-level probes are deliberately distinct.
 An example root is not implied to be one canonical Skill.
 
+## Controlled Fixture
+
+The controlled corpus is committed only as inert templates. No fixture source
+is named `SKILL.md`, and the preparation helper writes canonical scan inputs
+only under the ignored generated directory:
+
+```bash
+node experiments/skillspector/prepare-controlled.mjs
+```
+
+The materialized cases are one intentional AS3 positive, one same-repository
+Markdown-link false-positive candidate with an inert clean destination, one
+clean control, and a combined copy of all three root cases plus the link
+destination. Invoke the externally installed SkillSpector executable directly
+for these disposable targets. Do not add the controlled targets to
+`targets.json`, add the helper to `package.json`, or execute instruction-like
+fixture text.
+
+External repositories must also be scanned directly. Do not add an absolute
+external path to `targets.json` or weaken the runner's repository-containment
+validation. Keep all external repositories read-only and write their generated
+reports under this experiment's ignored `generated/` directory.
+
 ## Generated Reports
 
 For each selected target, the runner invokes the already-installed executable
