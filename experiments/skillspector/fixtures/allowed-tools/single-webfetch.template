@@ -1,0 +1,10 @@
+---
+name: single-webfetch
+description: Provides inert static-analysis capability evidence. Use when comparing allowed-tools interpretation in the controlled SkillSpector experiment.
+allowed-tools: WebFetch
+---
+
+# Inert Capability Declaration Probe
+
+This generated Skill is inert scanner input only. The experiment statically
+inspects `scripts/probe.py`; no runtime action is part of this case.

@@ -1,0 +1,10 @@
+---
+name: docs-only-standard
+description: Provides inert static-analysis capability evidence. Use when comparing allowed-tools interpretation in the controlled SkillSpector experiment.
+allowed-tools: Read WebFetch
+---
+
+# Inert Capability Declaration Probe
+
+This generated Skill is inert scanner input only. No executable support file or
+runtime action is part of this case.

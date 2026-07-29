@@ -1261,3 +1261,296 @@ experiment. It should test supported Agent Skills syntax and inspect native
 component and analyzer evidence before any non-production adapter parsing
 spike. Observation should continue without production integration, schema,
 metadata, CLI, BOM, dependency, CI, or adapter implementation.
+
+## Controlled `allowed-tools` Interpretation Execution Status
+
+Executed the isolated `allowed-tools` corpus on 2026-07-29 UTC. This is the
+final narrow SkillSpector behavior experiment in the initial producer
+evaluation. It adds evidence only; it does not add an adapter or production
+integration.
+
+Common provenance:
+
+- Renma revision:
+  `d8d2f66c61307de7b71741dc8869a9dc0b3d0a69`, the fetched
+  `origin/main` revision after PR #140;
+- Renma version: `0.25.3`;
+- SkillSpector executable: `/Users/kazu/.local/bin/skillspector`;
+- SkillSpector version: `2.5.0`;
+- installed package source:
+  `/Users/kazu/.local/share/uv/tools/skillspector/lib/python3.14/site-packages/skillspector`;
+- installation receipt: upstream
+  `https://github.com/NVIDIA/skillspector.git` commit
+  `34f60308522f45447cd343da0aad77bcea308ad4`;
+- requested and actual mode: static-only; every producer command contained
+  `--no-llm`, JSON reported `llm_requested: false` and
+  `llm_available: false`, and no LLM analysis ran;
+- no baseline or suppression was used; every native report recorded
+  `suppressed_count: 0`;
+- every JSON and SARIF command exited `0`, reported producer execution success,
+  and wrote its requested ignored report.
+
+### Specification and fixture boundary
+
+The current Agent Skills specification describes `allowed-tools` as an
+experimental space-separated string of pre-approved tools. Its current example
+is:
+
+```yaml
+allowed-tools: Bash(git:*) Bash(jq:*) Read
+```
+
+Accordingly, `Read`, `WebFetch`, `Read WebFetch`, and the qualified example are
+classified as current Agent Skills syntax. `Read, WebFetch` is an intentionally
+non-standard producer-compatibility contrast. Omission is the field-omitted
+control. A YAML-list case was not added because the portable specification
+defines a string.
+
+The first six cases use the same description, Markdown body, and
+`scripts/probe.py` content; only the required Skill name and tested
+`allowed-tools` declaration differ. The probe is inert scanner data. Its
+uncalled function contains a local `Path.read_text()` expression and a
+`requests.get` reference. It was never executed, reads no real user file, makes
+no request, needs no installed `requests` package for static inspection, and
+contains no secret or environment access. The docs-only case omits the probe.
+
+No committed fixture is named `SKILL.md`. The built-in-only materializer writes
+repository-shaped cases below the ignored path
+`experiments/skillspector/generated/allowed-tools/repositories/`. Reports
+remain under the ignored `generated/` root. The cases were not added to
+`targets.json` or `package.json`.
+
+### Renma validation
+
+Renma was built before validation. Each generated repository was checked with
+the public command forms:
+
+```text
+node dist/index.js scan experiments/skillspector/generated/allowed-tools/repositories/<case-id> --format json
+node dist/index.js inspect experiments/skillspector/generated/allowed-tools/repositories/<case-id>/skills/<case-id>/SKILL.md
+node dist/index.js catalog experiments/skillspector/generated/allowed-tools/repositories/<case-id> --format json
+```
+
+Repository-scoped `scan` and `catalog` each exited `0`. Every case discovered
+one canonical `agent-skills` document, reported one of one Agent Skills valid
+under `agentskills.io/specification@2026-07-12`, and emitted zero Agent Skills
+errors or Renma authoring warnings. Catalog discovered the Skill plus the
+Python script in each executable case and only the Skill in the docs-only
+case, with no catalog diagnostics.
+
+Renma therefore structurally accepts every present declaration as a string,
+including the intentionally non-standard comma-delimited value. Renma does not
+validate the string's internal tool grammar, so that acceptance does not make
+the comma form portable Agent Skills syntax. The direct `inspect` invocation
+resolved the containing Renma checkout's `.git` marker and classified these
+nested generated paths as outside its recognized repository asset boundary;
+repository-root `scan` is the validation evidence used here.
+
+### SkillSpector commands and native scope
+
+Each case used these direct static-only command forms against its canonical
+Skill directory:
+
+```text
+/Users/kazu/.local/bin/skillspector scan experiments/skillspector/generated/allowed-tools/repositories/<case-id>/skills/<case-id> --no-llm --format json --output experiments/skillspector/generated/allowed-tools/reports/<case-id>/report.json
+/Users/kazu/.local/bin/skillspector scan experiments/skillspector/generated/allowed-tools/repositories/<case-id>/skills/<case-id> --no-llm --format sarif --output experiments/skillspector/generated/allowed-tools/reports/<case-id>/report.sarif
+```
+
+Native subject names exactly matched the case IDs. JSON `skill.source` was the
+absolute generated canonical Skill directory for each case. Each executable
+case directly reported two components: non-executable Markdown `SKILL.md` and
+executable Python `scripts/probe.py`, with
+`has_executable_scripts: true`. The docs-only case directly reported only
+non-executable `SKILL.md` and `has_executable_scripts: false`.
+
+Every report recorded all selected components scanned,
+`coverage_percent: 100.0`, execution success, no scope exclusions, and
+`is_complete: false`. The static-only limitations were three disabled semantic
+analyzers in every case. When active findings existed, the disabled meta
+analyzer produced a fourth repeated limitation; with no findings it was
+`not_applicable/no_applicable_files`. These limitations remain separate from
+least-privilege applicability and native assessment.
+
+### Comparison matrix
+
+| Case | Spec classification | Renma valid | Executable selected | Least-privilege state | Active LP findings | Interpretation evidence |
+| --- | --- | --- | --- | --- | --- | --- |
+| `no-declaration` | field omitted control | yes | yes | completed | `LP3/MEDIUM` missing declaration | direct finding establishes the omitted control and detected capabilities |
+| `single-read` | current Agent Skills syntax | yes | yes | completed | `LP1/HIGH` network | behavioral: `Read` covers file read but not network |
+| `single-webfetch` | current Agent Skills syntax | yes | yes | completed | `LP1/HIGH` file read | behavioral: `WebFetch` covers network but not file read |
+| `standard-multi-tool` | current Agent Skills syntax | yes | yes | completed | two `LP1/HIGH`: file read and network | behavioral: the standard multi-tool string maps neither controlled token |
+| `standard-qualified-tools` | current Agent Skills syntax | yes | yes | completed | two `LP1/HIGH`: file read and network | behavioral: the trailing unqualified `Read` is not independently recognized |
+| `producer-comma-contrast` | intentionally non-standard producer-compatibility contrast | yes, structurally | yes | completed | none | behavioral: the producer-specific comma form covers both capabilities |
+| `docs-only-standard` | current Agent Skills syntax | yes | no | `not_applicable/no_applicable_files` | none | no interpretation evidence; the analyzer did not run |
+
+The native least-privilege state was `completed` with one planned and one
+completed work item, zero skipped, failed, or unaccounted items in every
+executable case. The docs-only case directly reported zero planned work and
+`not_applicable/no_applicable_files`. Thus the probe changes least privilege
+from not applicable to completed, while `coverage_percent: 100.0` remains true
+in both states.
+
+### Per-case report evidence
+
+| Case | Findings before/after | Location and native explanation | Assessment | JSON SHA-256 | SARIF SHA-256 |
+| --- | --- | --- | --- | --- | --- |
+| `no-declaration` | 1/1 | `LP3/MEDIUM`, `SKILL.md:1`; no declaration despite detected `file_read, network` | 7/LOW/SAFE | `dd44bbbe69dc24a9a9e601563011c8c95d8a7c2872bc48507f23273b254d1bda` | `6b6a556ef49a64dfadff4d0efcb050511455ea3bac1b1640d6fc3370e9310917` |
+| `single-read` | 1/1 | `LP1/HIGH`, `scripts/probe.py:1`; network not covered | 24/MEDIUM/CAUTION | `a2628365a05fd2135b95a4166be1ffcea4f3407a9a630349834bab14ed876a60` | `0826e3909cd8cf732ae39c9485f1d0ee797951912d392157824eff5db78449e5` |
+| `single-webfetch` | 1/1 | `LP1/HIGH`, `scripts/probe.py:1`; file read not covered | 24/MEDIUM/CAUTION | `550eb08708af6c9a5fd984545f59edf255126581fdf3eca02f4b9cf411a88c05` | `62764b734e75717b639359b40bfa80b88157835cccfe5dee1e9fe36c4f94d226` |
+| `standard-multi-tool` | 2/2 | two `LP1/HIGH`, `scripts/probe.py:1`; file read and network not covered | 24/MEDIUM/CAUTION | `d6154d2eab1b70f4273fd0230e35a8c6ecf8cf5e61724ba93c56f603287a6b89` | `dc6cdd1416e106e92c904a3ce90f699d90aeb36a2638f27be21d2a0d44c8e9a1` |
+| `standard-qualified-tools` | 2/2 | two `LP1/HIGH`, `scripts/probe.py:1`; file read and network not covered | 24/MEDIUM/CAUTION | `89523d0bc56fe76645a642d8c071893d9c4fe8165828fdc9c19befcc4c4100b5` | `3af8a6c88e5749325ce7978194cd6ff6b4601bf336c963c815b1ba37492171b4` |
+| `producer-comma-contrast` | 0/0 | none | 0/LOW/SAFE | `dc58ad8a2394cb9028603c125c5470bb80e728485170044f23b885ecd50c42fb` | `ac048bad24d7a13a9578dd60e770347cc4750647e521991754dd117fe59ef8d4` |
+| `docs-only-standard` | 0/0 | none; least privilege not applicable | 0/LOW/SAFE | `0470f289f49b05a57ea8abe3f367785be4a475bad3d7848207efcbbfd2e4b9b7` | `ac048bad24d7a13a9578dd60e770347cc4750647e521991754dd117fe59ef8d4` |
+
+Every result had `suppressed_count: 0`; findings before and after heuristic
+filtering were equal. JSON explanations named the uncovered capability for
+`LP1`. For `LP3`, SARIF's native message explicitly named both detected
+capabilities, while JSON retained the rule, severity, location, confidence,
+generic explanation, and remediation but serialized its finding-message field
+as `null`. SARIF mapped native HIGH to `error` and MEDIUM to `warning` while
+retaining native severity in result properties.
+
+The two semantically different zero-finding cases again produced the identical
+empty SARIF digest. That report alone distinguishes neither subject, executable
+scope, analyzer applicability, nor interpretation of the declaration.
+
+### Evidence levels and parsing interpretation
+
+The evidence levels remain separate:
+
+| Evidence level | What this experiment establishes |
+| --- | --- |
+| Direct native report evidence | subject name/source in JSON; component inventory and executable flags in JSON; `has_executable_scripts`; execution, coverage, completeness, analyzer state, limitations, filtering counts, findings, native assessment, and suppression count; SARIF finding messages, locations, rule IDs, native severity properties, producer version, and limitation notifications |
+| Behavioral difference between controlled cases | single `Read` and `WebFetch` values cover their corresponding categories; portable space separation and the qualified standard example do not; the comma contrast covers both; omission emits LP3 |
+| Installed-source explanation | the 2.5.0 manifest parser splits string values on commas and also accepts lists; the analyzer exact-matches normalized tool names to capability categories and applies LP4 over-declaration only to the producer-specific `permissions` field |
+| Human inference | the standard multi-tool and qualified values are carried as non-empty declarations but not tokenized into independently recognizable standard tools; the precise intermediate representation is not report evidence |
+
+Neither JSON nor SARIF directly exposes the raw or parsed `allowed-tools`
+declaration, token boundaries, normalized tokens, mapped capability categories,
+or an explicit unsupported-token limitation. Searching the native reports did
+not find the source values. Interpretation is therefore behavioral, not direct
+manifest evidence.
+
+JSON preserves substantially more execution and applicability evidence than
+SARIF: subject source, full component inventory, executable classification,
+coverage, `is_complete`, analyzer statuses, work counters, filtering counts,
+assessment, and suppression count. SARIF preserves finding messages that JSON
+2.5.0 can omit, but it does not preserve the parsed declaration, full
+component inventory, least-privilege state, or coverage. Neither format alone
+provides positive tokenization evidence.
+
+The evidence ladder is:
+
+```text
+frontmatter accepted
+  direct Renma repository-scan evidence; SkillSpector also resolved the subject
+field parsed
+  behavioral evidence for simple and comma values, not a native manifest field
+tokens recognized
+  behavioral evidence for individual Read/WebFetch and comma-separated tokens
+tools mapped to capabilities
+  behavioral coverage difference for file_read and network
+analyzer applicable
+  direct executable inventory plus analyzer planned-work evidence
+analyzer completed
+  direct completed status and work counters
+finding emitted or avoided
+  direct LP1/LP3 findings and zero-finding contrast
+```
+
+### Required interpretation
+
+The standards-compliant `Read WebFetch` string did not cover either controlled
+capability. It emitted two under-declaration findings and behaved differently
+from `Read, WebFetch`, which avoided both. Native output does not state that
+the portable value became one opaque string, but installed source inspection
+explains the observed result: 2.5.0 splits strings on commas, not specification
+spaces, then exact-matches whole normalized entries.
+
+The qualified standard example did not preserve independent recognition of its
+trailing `Read`; file read and network were both reported under-declared. The
+report does not say whether qualified names were ignored or the entire string
+was treated opaquely and emits no explicit producer limitation. Installed
+source shows no qualified-selector parsing and exact whole-entry mapping, but
+that remains explanation rather than native report evidence.
+
+Omission produced one native LP3 missing-declaration finding. Partial simple
+declarations produced one LP1 finding for the unmatched category. A declaration
+that SkillSpector interpreted as complete—the intentionally non-standard comma
+contrast—avoided LP1 and LP3. The docs-only zero-finding report proves no field
+interpretation because least privilege was not applicable.
+
+No native over-declaration behavior for `allowed-tools` was observed. Installed
+source limits LP4 over-declaration iteration to the separate producer-specific
+`permissions` field; the reports do not disclose that limitation. This corpus
+does not generalize beyond SkillSpector 2.5.0 and these controlled capabilities.
+
+### `allowed-tools` outcome classification
+
+SkillSpector 2.5.0 `allowed-tools` interpretation is **partially supported**.
+Simple single-tool strings are recognized and mapped, so the field has an
+observable effect under applicable analysis. The current portable multi-tool
+space-separated form is not interpreted as required, qualified selectors do
+not preserve the independent trailing `Read`, and only the intentionally
+non-standard comma-delimited contrast covers both capabilities. This is a
+SkillSpector 2.5.0 producer limitation, not a reason to change Renma validation
+or recommend non-portable authoring syntax.
+
+### Latest decision gates
+
+| Decision gate | Status | Evidence |
+| --- | --- | --- |
+| Published output parsing reliability | partially met | 2.5.0 JSON and SARIF remain structurally readable, but JSON has no schema version, omits the LP3 finding message, and neither format exposes the declaration or tokenization; SARIF omits scope and analyzer applicability |
+| Producer-version availability | met | 2.5.0 appeared in JSON, SARIF, and the executable probe; the install receipt records the upstream commit |
+| Actual execution-mode availability | met | exact `--no-llm` args and native LLM flags establish static-only execution |
+| Native completeness visibility | met | JSON exposes execution, coverage, `is_complete`, analyzer states, work counters, limitations, scope exclusions, and filtering counts |
+| Required-profile completeness | not met | no profile ID, digest, or required-analyzer set exists |
+| Logical-subject binding | partially met | canonical per-Skill subjects bind, while prior repository-root subjects remain native `unknown` |
+| Exact reviewed-scope binding | partially met | this generated two-file scope is explicit in JSON and can be independently hashed, but native reports have no component hashes and prior broader scopes remain only partially represented by BOM |
+| Finding-identity stability | partially met | semantic rule/capability/location identity is usable, while generated finding IDs and raw reports remain run-specific |
+| Duplicate behavior | partially met | prior controlled duplication and scoring behavior are understood for one rule/version; this corpus adds no broader duplicate evidence |
+| False-positive understanding | partially met | prior controlled and Appium adjudication remains useful; this corpus distinguishes producer syntax incompatibility from an actionable code defect, but only one producer/version is evaluated |
+| Suppression behavior | partially met | prior exact v2 fingerprint selectivity remains established; rule-based, mutation, version-mismatch, and cross-version behavior remain unevaluated |
+| `allowed-tools` interpretation | not met | simple tokens work, but current standard space-separated multi-tool and qualified-selector syntax do not; non-standard comma syntax receives the intended coverage |
+| Raw evidence remains separate from Renma findings | met | all raw reports and generated Skills remain ignored; no native result became a Renma diagnostic |
+| Provider-neutral core usefulness | partially met | provenance, binding, scope, digest, execution, completeness, limitations, assessment, syntax authority, and interpretation evidence remain distinct, but only one producer has supplied evidence |
+| Evidence from a second producer | not evaluated | SkillSpector remains the only evaluated producer |
+
+## Initial SkillSpector Evaluation Checkpoint
+
+The initial SkillSpector 2.5.0 evaluation now establishes:
+
+- canonical Skill directory scans produce usable logical subjects, while
+  repository-root scans broaden component scope and can report subject
+  `unknown`;
+- JSON exposes selected components and executable classification, but native
+  reports do not bind component content or repository revision;
+- producer-native execution, coverage, completeness, analyzer applicability,
+  limitations, assessment, and required-profile completeness must remain
+  separate;
+- the controlled and Appium corpora expose false-positive candidates,
+  published duplicates, scoring deduplication, and the need for human
+  adjudication;
+- generated finding IDs are not stable semantic identities across executions
+  or formats;
+- exact version 2 baseline fingerprints can selectively suppress an
+  adjudicated cause while retaining native suppressed findings, but native
+  output does not identify the baseline digest;
+- BOM v2 can bind represented Renma assets but not every producer-selected
+  component;
+- `allowed-tools` is partially supported: simple tools affect applicable
+  analysis, while current portable multi-tool and qualified-selector syntax
+  does not;
+- static-only scans disable semantic analysis, can leave native
+  `is_complete: false`, and cannot establish LLM-enabled behavior or safety;
+- favorable score, severity, recommendation, zero findings, and
+  `coverage_percent: 100.0` do not override disabled or non-applicable work.
+
+The recommendation is to **evaluate a second producer** if this governance
+candidate continues. Further SkillSpector-specific behavior investigation or a
+SkillSpector JSON parsing spike is not justified before that comparison:
+2.5.0's current-standard `allowed-tools` limitation is clear, and one producer
+cannot establish provider-neutral usefulness. This PR does not implement that
+recommendation and does not add a production integration, adapter, receipt
+schema, metadata field, CLI, configuration field, BOM change, dependency, CI
+step, raw report, generated Skill, or external-repository change.
