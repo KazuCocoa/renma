@@ -99,15 +99,17 @@ function collectImport(
     }
     if (token.kind === "identifier" && token.value === "from") {
       const specifier = tokens[cursor + 1];
-      return specifier?.kind === "string"
-        ? dependencyCandidate(
-            sourcePath,
-            content,
-            keyword,
-            specifier,
-            "static-import",
-          )
-        : undefined;
+      if (specifier?.kind !== "string") continue;
+      if (isPureInlineTypeOnlyNamedClause(tokens, index, cursor)) {
+        return undefined;
+      }
+      return dependencyCandidate(
+        sourcePath,
+        content,
+        keyword,
+        specifier,
+        "static-import",
+      );
     }
   }
   return undefined;
@@ -139,18 +141,70 @@ function collectExport(
     }
     if (token.kind === "identifier" && token.value === "from") {
       const specifier = tokens[cursor + 1];
-      return specifier?.kind === "string"
-        ? dependencyCandidate(
-            sourcePath,
-            content,
-            keyword,
-            specifier,
-            "static-reexport",
-          )
-        : undefined;
+      if (specifier?.kind !== "string") continue;
+      if (isPureInlineTypeOnlyNamedClause(tokens, index, cursor)) {
+        return undefined;
+      }
+      return dependencyCandidate(
+        sourcePath,
+        content,
+        keyword,
+        specifier,
+        "static-reexport",
+      );
     }
   }
   return undefined;
+}
+
+function isPureInlineTypeOnlyNamedClause(
+  tokens: readonly Token[],
+  declarationIndex: number,
+  fromIndex: number,
+): boolean {
+  const open = tokens[declarationIndex + 1];
+  if (
+    open?.kind !== "punctuator" ||
+    open.value !== "{" ||
+    tokens[fromIndex - 1]?.kind !== "punctuator" ||
+    tokens[fromIndex - 1]?.value !== "}"
+  ) {
+    return false;
+  }
+  const specifiers: Token[][] = [];
+  let current: Token[] = [];
+  for (let cursor = declarationIndex + 2; cursor < fromIndex - 1; cursor += 1) {
+    const token = tokens[cursor]!;
+    if (token.kind === "punctuator" && token.value === ",") {
+      if (current.length > 0) specifiers.push(current);
+      current = [];
+      continue;
+    }
+    current.push(token);
+  }
+  if (current.length > 0) specifiers.push(current);
+  return (
+    specifiers.length > 0 && specifiers.every(isInlineTypeOnlyNamedSpecifier)
+  );
+}
+
+function isInlineTypeOnlyNamedSpecifier(tokens: readonly Token[]): boolean {
+  if (tokens.length !== 2 && tokens.length !== 4) return false;
+  const [modifier, importedName, aliasKeyword, localName] = tokens;
+  if (
+    modifier?.kind !== "identifier" ||
+    modifier.value !== "type" ||
+    importedName?.kind !== "identifier" ||
+    importedName.value === "as"
+  ) {
+    return false;
+  }
+  if (tokens.length === 2) return true;
+  return (
+    aliasKeyword?.kind === "identifier" &&
+    aliasKeyword.value === "as" &&
+    localName?.kind === "identifier"
+  );
 }
 
 function dependencyCandidate(

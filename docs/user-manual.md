@@ -788,12 +788,16 @@ Dependency analysis is deliberately limited to two private built-ins:
 The JS/TS collector ignores `.cjs` sources, `.jsx`, `.tsx`, dynamic `import()`,
 CommonJS `require`, packages, `node:` built-ins, absolute paths, template
 specifiers, query/fragment suffixes, extensionless imports, TypeScript
-type-only syntax, `import = require`, compiler substitution, directory indexes,
-aliases, package exports, project references, and import maps. The Python
-collector ignores `.pyi`, `.pyc`, absolute imports, dynamic import helpers,
-package metadata, virtual environments, `PYTHONPATH`, runtime `sys.path`
-changes, and implicit containing-package edges. Neither collector executes
-code or implements a complete parser.
+declaration-level type-only syntax, and named import or re-export clauses made
+entirely of inline `type Binding` or `type Binding as Alias` specifiers. Mixed
+type/runtime clauses, default imports, namespace imports, and bindings
+literally named `type` remain runtime evidence. `import = require`, compiler
+substitution, directory indexes, aliases, package exports, project references,
+and import maps are also excluded. The Python collector ignores `.pyi`, `.pyc`,
+absolute imports, dynamic import helpers, package metadata, virtual
+environments, `PYTHONPATH`, runtime `sys.path` changes, and implicit
+containing-package edges. Neither collector executes code or implements a
+complete parser.
 
 Dependency targets resolve only to surfaces already in the inventory.
 `not-inventory` means the exact parsed repository file exists but is outside
@@ -802,13 +806,20 @@ that surface boundary. Other states are `resolved`, `missing`, `unsafe`,
 `symlink`, and `unreadable`. Python preserves every candidate and sets
 `normalizedTarget` only when selection is deterministic.
 
-Graph edges come only from `resolved` and `noncanonical` rows. Directly invoked
-surfaces have minimum dependency depth `0`; a reachable imported surface is
-`transitive` at its minimum breadth-first depth; otherwise it is `unreached`.
-Cycles terminate, direct wins over transitive, and imports from unreached
-sources do not seed reachability. `invokedSurfaces` remains the direct count,
-so `uninvokedSurfaces` may include both transitive and unreached surfaces.
-“Uninvoked” does not mean unused, and transitive evidence is not runtime proof.
+Every recognized declaration remains an auditable dependency row and
+contributes to `totalDependencies`. Graph topology instead contains one edge
+per unique source path and normalized target for `resolved` and `noncanonical`
+rows. Analyzer, relation, line, raw specifier, and occurrence ordinal do not
+distinguish graph edges. Incoming/outgoing counts, adjacency, reachability, and
+semantic diff graph signatures share this unique edge set.
+
+Directly invoked surfaces have minimum dependency depth `0`; a reachable
+imported surface is `transitive` at its minimum breadth-first depth; otherwise
+it is `unreached`. Cycles terminate, direct wins over transitive, and imports
+from unreached sources do not seed reachability. `invokedSurfaces` remains the
+direct count, so `uninvokedSurfaces` may include both transitive and unreached
+surfaces. “Uninvoked” does not mean unused, and transitive evidence is not
+runtime proof.
 
 Surface policy evidence and invocation-context policy evidence have different
 meanings. Surface evidence belongs to or is inherited by the executable surface

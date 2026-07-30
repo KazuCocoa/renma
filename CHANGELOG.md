@@ -19,6 +19,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   reachability with minimum depths and cycle termination. Existing direct
   invocation counts retain their established meaning, and invocation-context
   policy does not propagate through dependency edges.
+- Preserved every recognized dependency declaration as an auditable row while
+  deduplicating graph topology by source path and normalized target. Duplicate
+  declarations no longer multiply edge counts, alter reachability or depth, or
+  create dependency-graph diff reasons.
+- Excluded declaration-level and pure inline TypeScript type-only named imports
+  and re-exports from runtime dependency evidence. Mixed clauses, default and
+  namespace imports, and bindings literally named `type` remain included.
 - Added complete dependency evidence to scan and BOM output plus
   line-insensitive semantic diff and bounded neutral CI review. Repository
   Context BOM remains v2 and the inventory remains v1; new published-schema

@@ -20,6 +20,7 @@ import {
   type ExecutableDependencyRelation,
 } from "./executable-dependency-analyzer.js";
 import {
+  canonicalExecutableDependencyGraphEdges,
   resolveExecutableDependencies,
   type ExecutableSurfaceDependency,
   type ExecutableSurfaceDependencyResolution,
@@ -1049,27 +1050,21 @@ function projectDependencyEvidence(
   const incoming = new Map<string, number>();
   const outgoing = new Map<string, number>();
   const adjacency = new Map<string, Set<string>>();
-  for (const dependency of dependencies) {
+  for (const edge of canonicalExecutableDependencyGraphEdges(dependencies)) {
     if (
-      (dependency.resolution !== "resolved" &&
-        dependency.resolution !== "noncanonical") ||
-      !dependency.normalizedTarget ||
-      !surfacePaths.has(dependency.sourcePath) ||
-      !surfacePaths.has(dependency.normalizedTarget)
+      !surfacePaths.has(edge.sourcePath) ||
+      !surfacePaths.has(edge.normalizedTarget)
     ) {
       continue;
     }
-    outgoing.set(
-      dependency.sourcePath,
-      (outgoing.get(dependency.sourcePath) ?? 0) + 1,
-    );
+    outgoing.set(edge.sourcePath, (outgoing.get(edge.sourcePath) ?? 0) + 1);
     incoming.set(
-      dependency.normalizedTarget,
-      (incoming.get(dependency.normalizedTarget) ?? 0) + 1,
+      edge.normalizedTarget,
+      (incoming.get(edge.normalizedTarget) ?? 0) + 1,
     );
-    const targets = adjacency.get(dependency.sourcePath) ?? new Set<string>();
-    targets.add(dependency.normalizedTarget);
-    adjacency.set(dependency.sourcePath, targets);
+    const targets = adjacency.get(edge.sourcePath) ?? new Set<string>();
+    targets.add(edge.normalizedTarget);
+    adjacency.set(edge.sourcePath, targets);
   }
 
   const depth = new Map<string, number>();

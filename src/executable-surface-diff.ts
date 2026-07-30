@@ -9,6 +9,7 @@ import type {
   ExecutableSurfaceDependencyResolution,
   StaticInvocationReachability,
 } from "./executable-surface-inventory.js";
+import { canonicalExecutableDependencyGraphEdges } from "./executable-dependency-resolution.js";
 
 export type ExecutableSurfaceChangeReason =
   | "content"
@@ -554,14 +555,9 @@ function dependencyGraphSignatures(
       { incoming: [], outgoing: [] },
     ]),
   );
-  for (const dependency of inventory.dependencies) {
-    if (
-      (dependency.resolution !== "resolved" &&
-        dependency.resolution !== "noncanonical") ||
-      !dependency.normalizedTarget
-    ) {
-      continue;
-    }
+  for (const dependency of canonicalExecutableDependencyGraphEdges(
+    inventory.dependencies,
+  )) {
     evidence
       .get(dependency.sourcePath)
       ?.outgoing.push(dependency.normalizedTarget);

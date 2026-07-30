@@ -460,9 +460,13 @@ imports and export-from declarations with explicit relative `.js`, `.mjs`,
 `.cjs`, `.ts`, `.mts`, `.cts`, `.py`, `.sh`, or `.bash` targets. It skips
 comments, unrelated strings, template literals, dynamic imports, CommonJS
 `require`, `import.meta`, packages, absolute paths, query/fragment specifiers,
-extensionless paths, TypeScript type-only syntax, and `import = require`.
-Resolution is exact; compiler substitution, indexes, aliases, package exports,
-and import maps are not simulated.
+extensionless paths, declaration-level TypeScript type-only syntax, named
+import or re-export clauses whose every specifier uses the inline
+`type Binding` or `type Binding as Alias` form, and `import = require`. Mixed
+type/runtime clauses, default imports, namespace imports, and bindings
+literally named `type` remain runtime dependency evidence. Resolution is exact;
+compiler substitution, indexes, aliases, package exports, and import maps are
+not simulated.
 
 The Python collector supports only `.py` sources and explicit relative
 `from ... import ...` statements. A relative module yields its exact `.py` and
@@ -495,14 +499,19 @@ counts and static invocation reachability. Repository tools do not inherit
 policy from their callers: surface policy remains evidence attached to or
 inherited by the surface itself.
 
-Only `resolved` and `noncanonical` dependency rows create graph edges.
-Breadth-first traversal starts at directly invoked surfaces, assigns them depth
-`0`, assigns reachable targets their deterministic minimum dependency depth,
-and terminates across cycles. `direct` wins over `transitive`; an import from
-an unreached source does not seed reachability. Existing `staticallyInvoked`,
-`invocationCount`, `invokedSurfaces`, and `uninvokedSurfaces` retain their
-direct-only meanings. Dependency reachability is repository visibility, not
-proof of runtime execution or a claim that an uninvoked surface is unused.
+Every recognized declaration remains a dependency row with a stable occurrence
+ordinal. Only `resolved` and `noncanonical` rows contribute graph topology, and
+one canonical edge is constructed for each unique source path and normalized
+target regardless of analyzer, relation, line, raw specifier, or occurrence.
+Incoming/outgoing counts, adjacency, breadth-first reachability, and semantic
+diff graph signatures all consume that same edge set. Breadth-first traversal
+starts at directly invoked surfaces, assigns them depth `0`, assigns reachable
+targets their deterministic minimum dependency depth, and terminates across
+cycles. `direct` wins over `transitive`; an import from an unreached source
+does not seed reachability. Existing `staticallyInvoked`, `invocationCount`,
+`invokedSurfaces`, and `uninvokedSurfaces` retain their direct-only meanings.
+Dependency reachability is repository visibility, not proof of runtime
+execution or a claim that an uninvoked surface is unused.
 
 Each recognized invocation separately correlates its exact source path and,
 when structurally resolved, its owning Skill entrypoint with already prepared

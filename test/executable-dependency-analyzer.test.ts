@@ -12,7 +12,10 @@ import {
 } from "../src/executable-dependency-analyzer.js";
 import { JS_TS_EXECUTABLE_DEPENDENCY_ANALYZER } from "../src/executable-dependency-js-ts.js";
 import { PYTHON_EXECUTABLE_DEPENDENCY_ANALYZER } from "../src/executable-dependency-python.js";
-import { resolveExecutableDependencies } from "../src/executable-dependency-resolution.js";
+import {
+  canonicalExecutableDependencyGraphEdges,
+  resolveExecutableDependencies,
+} from "../src/executable-dependency-resolution.js";
 import { buildExecutableSurfaceDiff } from "../src/executable-surface-diff.js";
 import { parseDocument } from "../src/markdown.js";
 import { collectRepositorySnapshot } from "../src/repository-evidence.js";
@@ -169,6 +172,65 @@ test("JS and TypeScript collector recognizes only bounded static declarations", 
   assert.ok(candidates.every((candidate) => candidate.snippet.length <= 240));
 });
 
+test("JS and TypeScript collector excludes only pure inline type-only named clauses", () => {
+  const typeOnlyDeclarations = [
+    'import { type Foo } from "./one-import.ts";',
+    'import { type Foo, type Bar as Alias } from "./many-imports.ts";',
+    'export { type Foo } from "./one-export.ts";',
+    'export { type Foo, type Bar as Alias } from "./many-exports.ts";',
+    [
+      "import {",
+      "  type Foo,",
+      "  type Bar as Alias,",
+      '} from "./multiline-import.ts";',
+    ].join("\n"),
+    [
+      "export {",
+      "  type Foo,",
+      "  type Bar as Alias,",
+      '} from "./multiline-export.ts";',
+    ].join("\n"),
+  ];
+  for (const content of typeOnlyDeclarations) {
+    assert.deepEqual(
+      JS_TS_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+        path: "tools/check.ts",
+        content,
+      }),
+      [],
+    );
+  }
+
+  const runtimeDeclarations = [
+    'import { type Foo, runtimeValue } from "./mixed-import.ts";',
+    'export { type Foo, runtimeValue } from "./mixed-export.ts";',
+    'import runtimeDefault, { type Foo } from "./default-import.ts";',
+    'import * as runtimeNamespace from "./namespace-import.ts";',
+    'import { type } from "./literal-type.ts";',
+    'import { type as renamed } from "./renamed-type.ts";',
+  ].join("\n");
+  const first = JS_TS_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/check.ts",
+    content: runtimeDeclarations,
+  });
+  const second = JS_TS_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+    path: "tools/check.ts",
+    content: runtimeDeclarations,
+  });
+  assert.deepEqual(
+    first.map((candidate) => [candidate.relation, candidate.rawSpecifier]),
+    [
+      ["static-import", "./mixed-import.ts"],
+      ["static-reexport", "./mixed-export.ts"],
+      ["static-import", "./default-import.ts"],
+      ["static-import", "./namespace-import.ts"],
+      ["static-import", "./literal-type.ts"],
+      ["static-import", "./renamed-type.ts"],
+    ],
+  );
+  assert.deepEqual(first, second);
+});
+
 test("JS and TypeScript normalization rejects repository escape without substitution", () => {
   const candidates = JS_TS_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
     path: "tools/check.mjs",
@@ -317,6 +379,196 @@ test("repeated dependency declarations retain stable occurrence ordinals", () =>
   assert.deepEqual(
     dependencies.map((dependency) => dependency.occurrenceOrdinal),
     [1, 2],
+  );
+});
+
+test("pure inline type-only imports do not create transitive reachability", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-inline-types-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(path.join(root, "skills", "demo"), { recursive: true });
+  await mkdir(path.join(root, "tools"), { recursive: true });
+  await writeFile(
+    path.join(root, "skills", "demo", "SKILL.md"),
+    [
+      "---",
+      "name: demo",
+      "description: Check inline type imports. Use when dependency evidence needs review.",
+      "---",
+      "# Demo",
+      "```sh",
+      "node tools/check.ts",
+      "```",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(root, "tools", "check.ts"),
+    'import { type Foo, type Bar as Alias } from "./types.ts";\n',
+  );
+  await writeFile(
+    path.join(root, "tools", "types.ts"),
+    "export interface Foo {}\nexport interface Bar {}\n",
+  );
+
+  const typeOnly = (await collectRepositorySnapshot(root))
+    .executableSurfaceInventory;
+  assert.equal(typeOnly.dependencies.length, 0);
+  assert.equal(
+    surface(typeOnly, "tools/types.ts").dependencyEvidence
+      .staticInvocationReachability,
+    "unreached",
+  );
+
+  await writeFile(
+    path.join(root, "tools", "check.ts"),
+    'import { type Foo, runtimeValue } from "./types.ts";\nvoid runtimeValue;\n',
+  );
+  const mixed = (await collectRepositorySnapshot(root))
+    .executableSurfaceInventory;
+  assert.equal(mixed.dependencies.length, 1);
+  assert.equal(mixed.dependencies[0]?.rawSpecifier, "./types.ts");
+  assert.equal(
+    surface(mixed, "tools/types.ts").dependencyEvidence
+      .staticInvocationReachability,
+    "transitive",
+  );
+});
+
+test("dependency declarations remain auditable while graph edges are unique", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-unique-edges-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(path.join(root, "skills", "demo"), { recursive: true });
+  await mkdir(path.join(root, "tools"), { recursive: true });
+  await writeFile(
+    path.join(root, "skills", "demo", "SKILL.md"),
+    [
+      "---",
+      "name: demo",
+      "description: Check unique dependency edges. Use when graph evidence needs review.",
+      "---",
+      "# Demo",
+      "```sh",
+      "node tools/source.mjs",
+      "```",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(root, "tools", "source.mjs"),
+    'import "./target.mjs";\n',
+  );
+  await writeFile(path.join(root, "tools", "target.mjs"), "export {};\n");
+
+  const single = (await collectRepositorySnapshot(root))
+    .executableSurfaceInventory;
+  await writeFile(
+    path.join(root, "tools", "source.mjs"),
+    'import "./target.mjs";\nimport "./target.mjs";\n',
+  );
+  const duplicate = (await collectRepositorySnapshot(root))
+    .executableSurfaceInventory;
+  assert.equal(duplicate.dependencies.length, 2);
+  assert.equal(duplicate.summary.totalDependencies, 2);
+  assert.deepEqual(
+    duplicate.dependencies.map((dependency) => dependency.occurrenceOrdinal),
+    [1, 2],
+  );
+  assert.deepEqual(
+    canonicalExecutableDependencyGraphEdges(duplicate.dependencies),
+    [
+      {
+        sourcePath: "tools/source.mjs",
+        normalizedTarget: "tools/target.mjs",
+      },
+    ],
+  );
+  assert.deepEqual(surface(duplicate, "tools/source.mjs").dependencyEvidence, {
+    incomingResolvedDependencyCount: 0,
+    outgoingResolvedDependencyCount: 1,
+    staticInvocationReachability: "direct",
+    minimumInvocationDependencyDepth: 0,
+  });
+  assert.deepEqual(surface(duplicate, "tools/target.mjs").dependencyEvidence, {
+    incomingResolvedDependencyCount: 1,
+    outgoingResolvedDependencyCount: 0,
+    staticInvocationReachability: "transitive",
+    minimumInvocationDependencyDepth: 1,
+  });
+
+  const addedDuplicate = buildExecutableSurfaceDiff(single, duplicate);
+  assert.equal(addedDuplicate.addedDependencies.length, 1);
+  assert.ok(
+    addedDuplicate.changedSurfaces.some(
+      (change) =>
+        change.path === "tools/source.mjs" &&
+        change.reasons.includes("content") &&
+        !change.reasons.includes("dependency-graph") &&
+        !change.reasons.includes("invocation-reachability"),
+    ),
+  );
+  assert.equal(
+    addedDuplicate.changedSurfaces.some(
+      (change) => change.path === "tools/target.mjs",
+    ),
+    false,
+  );
+
+  await writeFile(
+    path.join(root, "tools", "source.mjs"),
+    'import "./target.mjs";\nexport * from "./target.mjs";\n',
+  );
+  const importAndReexport = (await collectRepositorySnapshot(root))
+    .executableSurfaceInventory;
+  assert.equal(importAndReexport.dependencies.length, 2);
+  assert.deepEqual(
+    importAndReexport.dependencies.map((dependency) => dependency.relation),
+    ["static-import", "static-reexport"],
+  );
+  assert.equal(
+    surface(importAndReexport, "tools/source.mjs").dependencyEvidence
+      .outgoingResolvedDependencyCount,
+    1,
+  );
+  assert.equal(
+    surface(importAndReexport, "tools/target.mjs").dependencyEvidence
+      .incomingResolvedDependencyCount,
+    1,
+  );
+
+  await writeFile(
+    path.join(root, "tools", "source.mjs"),
+    'import "./target.mjs";\n',
+  );
+  const oneRemaining = (await collectRepositorySnapshot(root))
+    .executableSurfaceInventory;
+  const removedDuplicate = buildExecutableSurfaceDiff(duplicate, oneRemaining);
+  assert.equal(removedDuplicate.removedDependencies.length, 1);
+  assert.equal(
+    removedDuplicate.changedSurfaces.some((change) =>
+      change.reasons.includes("dependency-graph"),
+    ),
+    false,
+  );
+  assert.equal(
+    surface(oneRemaining, "tools/target.mjs").dependencyEvidence
+      .minimumInvocationDependencyDepth,
+    1,
+  );
+
+  await writeFile(path.join(root, "tools", "source.mjs"), "export {};\n");
+  const noneRemaining = (await collectRepositorySnapshot(root))
+    .executableSurfaceInventory;
+  const removedFinal = buildExecutableSurfaceDiff(oneRemaining, noneRemaining);
+  assert.equal(removedFinal.removedDependencies.length, 1);
+  assert.ok(
+    removedFinal.changedSurfaces.some(
+      (change) =>
+        change.path === "tools/source.mjs" &&
+        change.reasons.includes("dependency-graph"),
+    ),
+  );
+  assert.equal(
+    surface(noneRemaining, "tools/target.mjs").dependencyEvidence
+      .staticInvocationReachability,
+    "unreached",
   );
 });
 

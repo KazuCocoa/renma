@@ -34,6 +34,11 @@ export interface ExecutableSurfaceDependency {
   occurrenceOrdinal: number;
 }
 
+export interface ExecutableDependencyGraphEdge {
+  sourcePath: string;
+  normalizedTarget: string;
+}
+
 /** Resolve analyzer-neutral candidates through immutable Renma path evidence. */
 export function resolveExecutableDependencies(
   candidates: readonly ExecutableDependencyCandidate[],
@@ -61,6 +66,35 @@ export function resolveExecutableDependencies(
       ordinals.set(key, occurrenceOrdinal);
       return { ...dependency, occurrenceOrdinal };
     });
+}
+
+/** Collapse declaration evidence into deterministic source-target graph edges. */
+export function canonicalExecutableDependencyGraphEdges(
+  dependencies: readonly ExecutableSurfaceDependency[],
+): ExecutableDependencyGraphEdge[] {
+  const uniqueEdges = new Map<string, ExecutableDependencyGraphEdge>();
+  for (const dependency of dependencies) {
+    if (
+      (dependency.resolution !== "resolved" &&
+        dependency.resolution !== "noncanonical") ||
+      !dependency.normalizedTarget
+    ) {
+      continue;
+    }
+    const edge = {
+      sourcePath: dependency.sourcePath,
+      normalizedTarget: dependency.normalizedTarget,
+    };
+    uniqueEdges.set(
+      JSON.stringify([edge.sourcePath, edge.normalizedTarget]),
+      edge,
+    );
+  }
+  return [...uniqueEdges.values()].sort(
+    (left, right) =>
+      left.sourcePath.localeCompare(right.sourcePath) ||
+      left.normalizedTarget.localeCompare(right.normalizedTarget),
+  );
 }
 
 function resolveCandidate(
