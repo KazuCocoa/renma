@@ -12,7 +12,9 @@
     "scripts",
     "CHANGELOG.md",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "experiments",
+    "docs"
   ],
   "skill_discovery": {
     "adopted": true
