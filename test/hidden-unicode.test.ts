@@ -123,18 +123,65 @@ test("aggregates by diagnostic and line with sorted structured code points", () 
   assert.equal(findings[1]?.riskClass, "suspicious");
 });
 
-test("escapes detected characters in bounded evidence without raw controls", () => {
-  const content = `${"a".repeat(300)}${RLO}tail${ZWSP}`;
-  const findings = hiddenUnicodeFindings(artifact(content));
+test("bounded evidence preserves context around a late suspicious character", () => {
+  const target = `command=curl https://exa${ZWSP}mple.test/path suffix`;
+  const [finding] = hiddenUnicodeFindings(
+    artifact(`${"a".repeat(400)}${target}`),
+  );
+  assert.ok(finding);
 
-  assert.equal(findings.length, 2);
-  for (const finding of findings) {
-    assert.ok(finding.evidence.snippet.length <= 240);
-    assert.doesNotMatch(finding.evidence.snippet, /[\u202e\u200b]/u);
-    assert.doesNotMatch(JSON.stringify(finding), /[\u202e\u200b]/u);
-  }
-  assert.match(findings[0]?.evidence.snippet ?? "", /U\+202E/);
-  assert.match(findings[1]?.evidence.snippet ?? "", /U\+200B/);
+  assert.ok(finding.evidence.snippet.length <= 240);
+  assert.ok(
+    finding.evidence.snippet.startsWith("<U+200B ZERO WIDTH SPACE> | …"),
+  );
+  assert.ok(
+    finding.evidence.snippet.includes(
+      "command=curl https://exa<U+200B ZERO WIDTH SPACE>mple.test/path suffix",
+    ),
+  );
+  assert.equal(finding.evidence.snippet.endsWith("…"), false);
+  assert.equal(JSON.stringify(finding).includes(ZWSP), false);
+  assertCompleteEscapedMarkers(finding.evidence.snippet);
+});
+
+test("bounded evidence localizes a middle token with both omission markers", () => {
+  const token = `dependency=https://registry.example.test/@scope/pack${ZWJ}age@1.2.3`;
+  const [finding] = hiddenUnicodeFindings(
+    artifact(`${"p".repeat(350)} ${token} ${"s".repeat(350)}`),
+  );
+  assert.ok(finding);
+
+  assert.ok(finding.evidence.snippet.length <= 240);
+  assert.ok(
+    finding.evidence.snippet.startsWith("<U+200D ZERO WIDTH JOINER> | …"),
+  );
+  assert.ok(finding.evidence.snippet.endsWith("…"));
+  assert.ok(
+    finding.evidence.snippet.includes(
+      "dependency=https://registry.example.test/@scope/pack<U+200D ZERO WIDTH JOINER>age@1.2.3",
+    ),
+  );
+  assert.equal(JSON.stringify(finding).includes(ZWJ), false);
+  assertCompleteEscapedMarkers(finding.evidence.snippet);
+});
+
+test("bounded evidence is deterministic and preserves surrounding non-BMP scalars", () => {
+  const content = [
+    "a".repeat(260),
+    "😀".repeat(20),
+    `pkg${ZWJ}name`,
+    "🧪".repeat(20),
+    "z".repeat(260),
+  ].join("");
+  const first = hiddenUnicodeFindings(artifact(content));
+  const second = hiddenUnicodeFindings(artifact(content));
+  const snippet = first[0]?.evidence.snippet ?? "";
+
+  assert.deepEqual(first, second);
+  assert.ok(snippet.includes("😀"));
+  assert.ok(snippet.includes("🧪"));
+  assertNoLoneSurrogates(snippet);
+  assertCompleteEscapedMarkers(snippet);
 });
 
 test("reports ZWJ and ZWNJ only inside an ASCII-like token", () => {
@@ -154,8 +201,8 @@ test("reports ZWJ and ZWNJ only inside an ASCII-like token", () => {
     `ن${ZWNJ}ص`,
     `👩${ZWJ}💻 👨${ZWJ}👩${ZWJ}👧${ZWJ}👦`,
     "©️ ✈️",
-    "\u200e\u200f\u061c",
-    "\u00a0\u202f\u3000",
+    String.fromCodePoint(0x200e, 0x200f, 0x061c),
+    String.fromCodePoint(0x00a0, 0x202f, 0x3000),
   ].join("\n");
   assert.deepEqual(hiddenUnicodeFindings(artifact(legitimate)), []);
 });
@@ -379,6 +426,25 @@ function hiddenFindings(findings: Finding[]): Finding[] {
 
 function codePointRange(start: number, end: number): number[] {
   return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+}
+
+function assertCompleteEscapedMarkers(snippet: string): void {
+  const starts = snippet.match(/<U\+/gu) ?? [];
+  const complete = snippet.match(/<U\+[0-9A-F]{4,6} [^<>]+>/gu) ?? [];
+  assert.equal(complete.length, starts.length, snippet);
+}
+
+function assertNoLoneSurrogates(value: string): void {
+  for (let index = 0; index < value.length; index += 1) {
+    const codeUnit = value.charCodeAt(index);
+    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      assert.ok(next >= 0xdc00 && next <= 0xdfff, value);
+      index += 1;
+    } else {
+      assert.ok(codeUnit < 0xdc00 || codeUnit > 0xdfff, value);
+    }
+  }
 }
 
 function artifact(

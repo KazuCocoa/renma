@@ -21,6 +21,11 @@ interface CharacterDetail {
   readonly count: number;
 }
 
+interface EvidenceToken {
+  readonly scalarIndex: number;
+  readonly text: string;
+}
+
 const MAX_SNIPPET_LENGTH = 240;
 const ASCII_TOKEN_CHARACTER = /^[A-Za-z0-9_.\-/:@%+=]$/u;
 
@@ -418,14 +423,8 @@ function escapedEvidenceSnippet(
   const byIndex = new Map(
     allOccurrences.map((occurrence) => [occurrence.scalarIndex, occurrence]),
   );
-  const escapedLine = normalizeEvidenceWhitespace(
-    scalars
-      .map((scalar, scalarIndex) => {
-        const occurrence = byIndex.get(scalarIndex);
-        return occurrence ? escapedCharacter(occurrence.character) : scalar;
-      })
-      .join(""),
-  );
+  const tokens = evidenceTokens(scalars, byIndex);
+  const escapedLine = tokens.map(({ text }) => text).join("");
   if (escapedLine.length <= MAX_SNIPPET_LENGTH) return escapedLine;
 
   const summary = characterDetails(categoryOccurrences)
@@ -434,18 +433,107 @@ function escapedEvidenceSnippet(
         `<${codePoint} ${name}>${count > 1 ? ` x${count}` : ""}`,
     )
     .join(" ");
-  const contextLength = Math.max(
-    0,
-    MAX_SNIPPET_LENGTH - summary.length - " | …".length,
+  const firstCategoryOccurrence = categoryOccurrences[0];
+  if (firstCategoryOccurrence === undefined) return escapedLine;
+  const focusIndex = tokens.findIndex(
+    ({ scalarIndex }) => scalarIndex === firstCategoryOccurrence.scalarIndex,
   );
-  return `${summary} | ${escapedLine.slice(0, contextLength)}…`.slice(
-    0,
-    MAX_SNIPPET_LENGTH,
-  );
+  if (focusIndex < 0) return escapedLine;
+
+  const focusToken = tokens[focusIndex] as EvidenceToken;
+  const summaryPrefix =
+    summary.length + " | ".length + focusToken.text.length + 2 <=
+    MAX_SNIPPET_LENGTH
+      ? `${summary} | `
+      : "";
+  return `${summaryPrefix}${boundedEvidenceWindow(
+    tokens,
+    focusIndex,
+    MAX_SNIPPET_LENGTH - summaryPrefix.length,
+  )}`;
 }
 
-function normalizeEvidenceWhitespace(value: string): string {
-  return value.replace(/[ \t]+/gu, " ").replace(/^[ \t]+|[ \t]+$/gu, "");
+function evidenceTokens(
+  scalars: string[],
+  occurrencesByIndex: ReadonlyMap<number, Occurrence>,
+): EvidenceToken[] {
+  const tokens: EvidenceToken[] = [];
+  for (const [scalarIndex, scalar] of scalars.entries()) {
+    const occurrence = occurrencesByIndex.get(scalarIndex);
+    const text = occurrence ? escapedCharacter(occurrence.character) : scalar;
+    if (/^[ \t]$/u.test(text)) {
+      if (tokens.length > 0 && tokens.at(-1)?.text !== " ") {
+        tokens.push({ scalarIndex, text: " " });
+      }
+      continue;
+    }
+    tokens.push({ scalarIndex, text });
+  }
+  if (tokens.at(-1)?.text === " ") tokens.pop();
+  return tokens;
+}
+
+function boundedEvidenceWindow(
+  tokens: EvidenceToken[],
+  focusIndex: number,
+  budget: number,
+): string {
+  const focus = tokens[focusIndex];
+  if (focus === undefined || focus.text.length > budget) return "";
+
+  let start = focusIndex;
+  let end = focusIndex + 1;
+  let contentLength = focus.text.length;
+  let leftLength = 0;
+  let rightLength = 0;
+
+  while (true) {
+    const leadingOmitted = start > 0;
+    const trailingOmitted = end < tokens.length;
+    const markerLength =
+      (leadingOmitted ? "…".length : 0) + (trailingOmitted ? "…".length : 0);
+    const contentBudget = budget - markerLength;
+    const preferLeft = leftLength <= rightLength;
+    const expanded = preferLeft
+      ? expandEvidenceWindow("left", contentBudget)
+      : expandEvidenceWindow("right", contentBudget);
+    if (expanded) continue;
+    const fallbackExpanded = preferLeft
+      ? expandEvidenceWindow("right", contentBudget)
+      : expandEvidenceWindow("left", contentBudget);
+    if (!fallbackExpanded) break;
+  }
+
+  const leadingOmitted = start > 0;
+  const trailingOmitted = end < tokens.length;
+  return [
+    leadingOmitted ? "…" : "",
+    ...tokens.slice(start, end).map(({ text }) => text),
+    trailingOmitted ? "…" : "",
+  ].join("");
+
+  function expandEvidenceWindow(
+    direction: "left" | "right",
+    contentBudget: number,
+  ): boolean {
+    const candidateIndex = direction === "left" ? start - 1 : end;
+    const candidate = tokens[candidateIndex];
+    if (
+      candidate === undefined ||
+      contentLength + candidate.text.length > contentBudget
+    ) {
+      return false;
+    }
+    contentLength += candidate.text.length;
+    if (direction === "left") {
+      start = candidateIndex;
+      leftLength += candidate.text.length;
+    } else {
+      end = candidateIndex + 1;
+      rightLength += candidate.text.length;
+    }
+    return true;
+  }
 }
 
 function escapedCharacter(character: SuspiciousCharacter): string {
