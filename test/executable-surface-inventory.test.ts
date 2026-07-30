@@ -87,6 +87,20 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
   assert.equal(binary.shebang, undefined);
   assert.deepEqual(binary.interpreterHints, ["python"]);
 
+  const indentedShebang = requiredSurface(
+    inventory,
+    "skills/demo/scripts/indented.py",
+  );
+  assert.equal(indentedShebang.shebang, undefined);
+  assert.deepEqual(indentedShebang.interpreterHints, ["python"]);
+
+  const bomPrefixedShebang = requiredSurface(
+    inventory,
+    "skills/demo/scripts/bom-prefixed.sh",
+  );
+  assert.equal(bomPrefixedShebang.shebang, undefined);
+  assert.deepEqual(bomPrefixedShebang.interpreterHints, ["sh"]);
+
   assert.deepEqual(
     inventory.invocations.map((invocation) => invocation.resolution),
     [
@@ -97,8 +111,8 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
       "resolved",
       "missing",
       "unsafe",
-      "resolved",
       "noncanonical",
+      "unsupported",
     ],
   );
   assert.deepEqual(
@@ -139,6 +153,69 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
     summary.reachableSkillLocalSurfaces + summary.unreachableSkillLocalSurfaces,
   );
   assert.equal(summary.totalInvocations, inventory.invocations.length);
+  assert.equal(
+    summary.totalInvocations,
+    summary.resolvedInvocations +
+      summary.missingInvocations +
+      summary.unsafeInvocations +
+      summary.unscopedInvocations +
+      summary.noncanonicalInvocations +
+      summary.unavailableInvocations,
+  );
+  for (const invocation of inventory.invocations.filter(
+    (candidate) => candidate.resolution === "resolved",
+  )) {
+    assert.ok(invocation.normalizedTarget);
+    const surface = inventory.surfaces.find(
+      (candidate) => candidate.path === invocation.normalizedTarget,
+    );
+    assert.ok(surface, invocation.normalizedTarget);
+    assert.ok(
+      surface.scope === "skill-local" || surface.scope === "repository-tool",
+      `${surface.path}: ${surface.scope}`,
+    );
+  }
+
+  assert.deepEqual(
+    first.findings
+      .filter(
+        (finding) =>
+          finding.id === "PATH-HELPER-COMMAND-UNRESOLVED" &&
+          finding.evidence.path === "skills/demo/SKILL.md",
+      )
+      .map((finding) => ({
+        id: finding.id,
+        severity: finding.severity,
+        evidence: finding.evidence,
+        remediation: finding.remediation,
+      })),
+    [
+      {
+        id: "PATH-HELPER-COMMAND-UNRESOLVED",
+        severity: "medium",
+        evidence: {
+          path: "skills/demo/SKILL.md",
+          startLine: 18,
+          endLine: 18,
+          snippet: "node tools/missing.mjs",
+        },
+        remediation:
+          "Create `tools/missing.mjs` or update this command to the correct local helper path.",
+      },
+      {
+        id: "PATH-HELPER-COMMAND-UNRESOLVED",
+        severity: "medium",
+        evidence: {
+          path: "skills/demo/SKILL.md",
+          startLine: 19,
+          endLine: 19,
+          snippet: "node ../tools/unsafe.mjs",
+        },
+        remediation:
+          "Update this command to a path inside the owning Skill's scripts/** directory or to a repository-root tools/** helper; do not escape the Skill with `..`.",
+      },
+    ],
+  );
 
   const text = formatText(first);
   assert.match(text, /Executable Surface Inventory/);
@@ -201,6 +278,97 @@ test("helper resolution preserves exact unavailable states and bounded evidence"
   );
 });
 
+test("helper resolution preserves noncanonical repository availability before parsed scope", () => {
+  const source = artifact(
+    "skills/demo/SKILL.md",
+    [
+      "```sh",
+      "node contexts/demo/scripts/parsed.js",
+      "node contexts/demo/scripts/absent.js",
+      "node contexts/demo/scripts/missing.js",
+      "node contexts/demo/scripts/excluded.js",
+      "node contexts/demo/scripts/deep.js",
+      "node contexts/demo/scripts/oversize.js",
+      "node contexts/demo/scripts/unsupported.js",
+      "node contexts/demo/scripts/symlink.js",
+      "node contexts/demo/scripts/unreadable.js",
+      "```",
+    ].join("\n"),
+  );
+  const evidence = collectHelperCommandEvidence([parseDocument(source)]);
+  const states = new Map([
+    ["contexts/demo/scripts/parsed.js", "parsed"],
+    ["contexts/demo/scripts/absent.js", "absent"],
+    ["contexts/demo/scripts/excluded.js", "excluded"],
+    ["contexts/demo/scripts/deep.js", "deep"],
+    ["contexts/demo/scripts/oversize.js", "oversize"],
+    ["contexts/demo/scripts/unsupported.js", "unsupported"],
+    ["contexts/demo/scripts/symlink.js", "symlink"],
+    ["contexts/demo/scripts/unreadable.js", "unreadable"],
+  ] as const);
+
+  assert.deepEqual(
+    evidence.map(
+      (command) => resolveHelperCommandEvidence(command, states).resolution,
+    ),
+    [
+      "noncanonical",
+      "missing",
+      "missing",
+      "excluded",
+      "deep",
+      "oversize",
+      "unsupported",
+      "symlink",
+      "unreadable",
+    ],
+  );
+});
+
+test("inventory requires one unambiguous owning Skill before resolving a Skill-local invocation", () => {
+  const source = artifact(
+    "README.md",
+    "```sh\nnode skills/demo/scripts/run.mjs\n```\n",
+  );
+  const script = {
+    ...artifact("skills/demo/scripts/run.mjs", "console.log('run');\n"),
+    kind: "script" as const,
+    markdownParserEligible: false,
+  };
+  const inventory = buildExecutableSurfaceInventory({
+    artifacts: [source, script],
+    documents: [parseDocument(source), parseDocument(script)],
+    repositoryPaths: new Set([source.path, script.path]),
+    repositoryPathStates: new Map([[script.path, "parsed"]]),
+    skillParents: new Map([
+      [
+        "skills/demo",
+        [
+          {
+            owner: "one",
+            id: "skill.demo.one",
+            sourcePath: "skills/demo/SKILL.md",
+          },
+          {
+            owner: "two",
+            id: "skill.demo.two",
+            sourcePath: "skills/demo/skill.md",
+          },
+        ],
+      ],
+    ]),
+    securityPolicies: [],
+  });
+  const invocation = inventory.invocations.find(
+    (candidate) => candidate.normalizedTarget === "skills/demo/scripts/run.mjs",
+  );
+  assert.equal(invocation?.resolution, "noncanonical");
+  assert.equal(
+    requiredSurface(inventory, "skills/demo/scripts/run.mjs").scope,
+    "noncanonical",
+  );
+});
+
 test("inventory creation adds no finding or exit-status policy", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-surface-policy-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -244,6 +412,41 @@ test("surface diff uses path identity, reason sets, and line-insensitive invocat
     ["content"],
   );
   assert.equal(diff.invocationResolutionChanges.length, 0);
+});
+
+test("surface diff deterministically exposes ownership-corrected invocation resolution", async (t) => {
+  const root = await inventoryFixture();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const withoutOwner = (await collectRepositorySnapshot(root))
+    .executableSurfaceInventory;
+  await writeFile(
+    path.join(root, "skills", "orphan", "SKILL.md"),
+    `---
+name: orphan
+description: Own an orphan fixture helper. Use when surface scope changes need validation.
+---
+# Orphan
+`,
+  );
+  const withOwner = (await collectRepositorySnapshot(root))
+    .executableSurfaceInventory;
+
+  const diff = buildExecutableSurfaceDiff(withOwner, withoutOwner);
+  assert.deepEqual(
+    diff.invocationResolutionChanges.map((change) => ({
+      target: change.target,
+      fromResolution: change.fromResolution,
+      toResolution: change.toResolution,
+    })),
+    [
+      {
+        target: "skills/orphan/scripts/orphan.py",
+        fromResolution: "resolved",
+        toResolution: "noncanonical",
+      },
+    ],
+  );
+  assert.deepEqual(diff, buildExecutableSurfaceDiff(withOwner, withoutOwner));
 });
 
 test("zero inventory remains a valid deterministic composed projection", () => {
@@ -316,6 +519,14 @@ async function inventoryFixture(): Promise<string> {
   await writeFile(
     path.join(root, "skills", "demo", "scripts", "binary.py"),
     Buffer.from([0, 1, 2, 3]),
+  );
+  await writeFile(
+    path.join(root, "skills", "demo", "scripts", "indented.py"),
+    "  #!/usr/bin/env node\nprint('indented')\n",
+  );
+  await writeFile(
+    path.join(root, "skills", "demo", "scripts", "bom-prefixed.sh"),
+    "\uFEFF#!/usr/bin/env bash\necho bom\n",
   );
   await writeFile(
     path.join(root, "skills", "orphan", "scripts", "orphan.py"),

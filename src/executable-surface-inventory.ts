@@ -343,6 +343,13 @@ function inventoryInvocations(
       evidence,
       input.repositoryPathStates,
     );
+    const resolution =
+      resolved.resolution === "resolved" &&
+      resolved.normalizedTarget &&
+      surfaceScope(resolved.normalizedTarget, input.skillParents) ===
+        "noncanonical"
+        ? "noncanonical"
+        : resolved.resolution;
     const invocation = {
       sourcePath: resolved.sourcePath,
       line: resolved.line,
@@ -355,7 +362,7 @@ function inventoryInvocations(
       ...(resolved.sourceSkillDirectory
         ? { sourceSkillDirectory: resolved.sourceSkillDirectory }
         : {}),
-      resolution: resolved.resolution,
+      resolution,
       ...(resolved.targetPathState
         ? { targetPathState: resolved.targetPathState }
         : {}),
@@ -530,7 +537,7 @@ function owningSkill(
 
 function artifactShebang(artifact: Artifact): string | undefined {
   if (artifact.contentClassification !== "text") return undefined;
-  const firstLine = artifact.content.split(/\r?\n/, 1)[0]?.trim();
+  const firstLine = artifact.content.split(/\r?\n/, 1)[0]?.trimEnd();
   if (!firstLine?.startsWith("#!")) return undefined;
   return firstLine.slice(0, 160);
 }

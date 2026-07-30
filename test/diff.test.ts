@@ -8,6 +8,10 @@ import { promisify } from "node:util";
 import { buildCiReportFromDiff } from "../src/commands/ci-report.js";
 import { buildDiffReport, diff, formatDiff } from "../src/commands/diff.js";
 import {
+  type ExecutableSurfaceInventory,
+  zeroExecutableSurfaceInventory,
+} from "../src/executable-surface-inventory.js";
+import {
   zeroSecurityPolicyInventorySummary,
   type SecurityPolicyInventorySummary,
 } from "../src/security-policy-inventory.js";
@@ -818,6 +822,31 @@ test("formatDiff renders markdown summaries", () => {
   assert.equal(parsed.security.policyInventory.totalPolicyAssets, 2);
 });
 
+test("formatDiff deterministically exposes corrected invocation states", () => {
+  const report = buildDiffReport(
+    "/repo",
+    snapshot("base", {
+      executableSurfaceInventory: inventoryWithInvocation("resolved"),
+    }),
+    snapshot("head", {
+      executableSurfaceInventory: inventoryWithInvocation("noncanonical"),
+    }),
+  );
+
+  const markdown = formatDiff(report, "markdown");
+  const parsed = JSON.parse(formatDiff(report, "json"));
+
+  assert.equal(markdown, formatDiff(report, "markdown"));
+  assert.match(
+    markdown,
+    /node `skills\/orphan\/scripts\/run\.mjs` #1: resolved -> noncanonical/,
+  );
+  assert.equal(
+    parsed.executableSurface.invocationResolutionChanges[0].toResolution,
+    "noncanonical",
+  );
+});
+
 test("formatDiff renders legacy reports without a Discovery section", () => {
   const fullReport = buildDiffReport(
     "/repo",
@@ -1013,6 +1042,7 @@ function snapshot(ref: string, overrides: Partial<SnapshotInput>) {
       nodes: input.nodes,
       edges: input.edges,
     },
+    executableSurfaceInventory: input.executableSurfaceInventory,
     discovery: emptySkillDiscoveryIndex(),
   } as unknown as Parameters<typeof buildDiffReport>[1];
 }
@@ -1077,6 +1107,32 @@ interface SnapshotInput {
   checks: Array<ReturnType<typeof check>>;
   findings: Array<ReturnType<typeof finding>>;
   securityPolicyInventory?: SecurityPolicyInventorySummary | undefined;
+  executableSurfaceInventory?: ExecutableSurfaceInventory | undefined;
+}
+
+function inventoryWithInvocation(
+  resolution: "resolved" | "noncanonical",
+): ExecutableSurfaceInventory {
+  const inventory = zeroExecutableSurfaceInventory();
+  inventory.invocations = [
+    {
+      sourcePath: "skills/demo/SKILL.md",
+      line: 7,
+      snippet: "node skills/orphan/scripts/run.mjs",
+      launcher: "node",
+      rawTarget: "skills/orphan/scripts/run.mjs",
+      normalizedTarget: "skills/orphan/scripts/run.mjs",
+      sourceSkillDirectory: "skills/demo",
+      resolution,
+      targetPathState: "parsed",
+      occurrenceOrdinal: 1,
+    },
+  ];
+  inventory.summary.totalInvocations = 1;
+  inventory.summary.resolvedInvocations = resolution === "resolved" ? 1 : 0;
+  inventory.summary.noncanonicalInvocations =
+    resolution === "noncanonical" ? 1 : 0;
+  return inventory;
 }
 
 interface PolicyInventoryInput {

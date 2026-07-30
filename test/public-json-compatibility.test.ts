@@ -106,6 +106,18 @@ test("representative public JSON matches fixed compatibility baselines", async (
     assert.ok(diagnosticV2Codes.includes(findingId), String(findingId));
   }
 
+  const bomOutput = parseOutput(outputs, "bom");
+  const executableSurfaceInventory = record(
+    bomOutput.executableSurfaceInventory,
+  );
+  assert.equal(
+    executableSurfaceInventory.schema,
+    "renma.executable-surface-inventory.v1",
+  );
+  assert.ok(Array.isArray(executableSurfaceInventory.surfaces));
+  assert.ok(Array.isArray(executableSurfaceInventory.invocations));
+  assert.equal(typeof executableSurfaceInventory.summary, "object");
+
   const readinessOutput = parseOutput(outputs, "readiness");
   const readinessSummary = record(readinessOutput.summary);
   assert.equal(readinessSummary.totalAssets, 7);

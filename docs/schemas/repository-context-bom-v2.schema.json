@@ -16,7 +16,6 @@
     "readiness",
     "securityPosture",
     "securityPolicyInventory",
-    "executableSurfaceInventory",
     "diagnostics"
   ],
   "properties": {

@@ -110,10 +110,13 @@ The published [BOM v2 JSON Schema](schemas/repository-context-bom-v2.schema.json
 is the machine-readable contract. `generatedAt` is required when `outputMode`
 is `default` and forbidden when `outputMode` is `omit_generated_at`.
 `configPath` remains optional and is absent when no configuration file was
-loaded. Every other top-level field is required. Optional lifecycle, version,
-status, target-resolution, and inherited-ownership fields appear only when
-their evidence exists. Owner values are explicitly nullable; missing optional
-fields are omitted rather than serialized as `null`.
+loaded. `executableSurfaceInventory` is also optional at the BOM v2
+schema-compatibility boundary. Current Renma versions emit it unconditionally,
+but older valid BOM v2 documents without it remain valid. All other top-level
+fields are required. Optional lifecycle, version, status, target-resolution,
+and inherited-ownership fields appear only when their evidence exists. Owner
+values are explicitly nullable; missing optional fields are omitted rather
+than serialized as `null`.
 
 Arrays are deterministically ordered by their identity/path keys, and count
 fields are non-negative integers. Count maps contain every declared enum
@@ -129,6 +132,12 @@ fingerprints, reachability depth, interpreter hints, and bounded effective
 policy correlation are complete in JSON. The Markdown BOM renders a compact
 review table. Surface rows are sorted by repository path; invocation rows are
 sorted by source path, line, launcher, and target.
+
+BOM consumers must first branch on the presence of
+`executableSurfaceInventory`, then inspect its nested `schema` identifier
+before consuming its strict nested fields. Omitting the complete field is the
+only compatibility allowance: whenever it is present, `schema`, `summary`,
+`surfaces`, and `invocations` and their nested contracts remain required.
 
 The Readiness summary is a closed contract for asset, ownership, graph,
 diagnostic, workflow, Context Lens, security posture, and security policy

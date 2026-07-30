@@ -161,11 +161,12 @@ export function resolveHelperCommandEvidence(
 
   const normalizedTarget = pathResolution.path;
   const targetPathState = repositoryPathStates.get(normalizedTarget);
-  if (!isCanonicalHelperTarget(normalizedTarget)) {
+  const stateResolution = repositoryStateResolution(targetPathState);
+  if (stateResolution !== "resolved") {
     return {
       ...evidence,
       normalizedTarget,
-      resolution: "noncanonical",
+      resolution: stateResolution,
       ...(targetPathState ? { targetPathState } : {}),
     };
   }
@@ -173,7 +174,9 @@ export function resolveHelperCommandEvidence(
   return {
     ...evidence,
     normalizedTarget,
-    resolution: repositoryStateResolution(targetPathState),
+    resolution: isCanonicalHelperTarget(normalizedTarget)
+      ? "resolved"
+      : "noncanonical",
     ...(targetPathState ? { targetPathState } : {}),
   };
 }

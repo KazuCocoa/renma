@@ -782,8 +782,17 @@ execution decision.
 Invocation resolution distinguishes `resolved`, `missing`, `unsafe`,
 `unscoped`, `noncanonical`, `excluded`, `deep`, `oversize`, `unsupported`,
 `symlink`, and `unreadable`. Unavailable targets never become invented surface
-rows. Renma does not follow symlinks, inspect executable permission bits,
-execute/import/compile/sandbox files, or classify ordinary external commands.
+rows. Path safety and scope are resolved first, then exact repository
+availability; canonical surface scope is considered only for parsed targets,
+so a non-canonical path never hides missing or unavailable evidence. A parsed
+Skill-local target is resolved only with exactly one owning Skill.
+
+Shebang evidence requires `#!` at offset zero of the original first line.
+Indented or byte-order-mark-prefixed text is not a shebang; recognized
+invocation launchers and supported file extensions remain independent
+interpreter hints. Renma does not follow symlinks, inspect executable permission
+bits, execute/import/compile/sandbox files, or classify ordinary external
+commands.
 
 ### `catalog`
 

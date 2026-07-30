@@ -18,6 +18,11 @@ import {
 } from "../src/commands/ci-report.js";
 import type { DiffReport } from "../src/commands/diff.js";
 import { zeroContextLensSummary } from "../src/context-lens.js";
+import { buildExecutableSurfaceDiff } from "../src/executable-surface-diff.js";
+import {
+  type ExecutableSurfaceInventory,
+  zeroExecutableSurfaceInventory,
+} from "../src/executable-surface-inventory.js";
 import { scan } from "../src/scanner.js";
 import {
   summarizeSecurityPosture,
@@ -109,6 +114,38 @@ test("formatCiReport renders structured JSON", () => {
     parsed.to.securityPolicyInventory?.assetsWithLocalPolicyMetadata,
     3,
   );
+});
+
+test("formatCiReport deterministically exposes corrected invocation states without changing policy", () => {
+  const report = sampleReport();
+  report.diff.executableSurface = buildExecutableSurfaceDiff(
+    inventoryWithInvocation("resolved"),
+    inventoryWithInvocation("noncanonical"),
+  );
+
+  const markdown = formatCiReport(report, "markdown");
+  const parsed = JSON.parse(formatCiReport(report, "json")) as CiReport;
+
+  assert.equal(markdown, formatCiReport(report, "markdown"));
+  assert.match(
+    markdown,
+    /`skills\/demo\/SKILL\.md:L7` node `skills\/orphan\/scripts\/run\.mjs`: noncanonical/,
+  );
+  assert.deepEqual(
+    parsed.diff.executableSurface.invocationResolutionChanges.map((change) => ({
+      target: change.target,
+      fromResolution: change.fromResolution,
+      toResolution: change.toResolution,
+    })),
+    [
+      {
+        target: "skills/orphan/scripts/run.mjs",
+        fromResolution: "resolved",
+        toResolution: "noncanonical",
+      },
+    ],
+  );
+  assert.equal(parsed.status, report.status);
 });
 
 test("formatCiReport includes security posture summaries", () => {
@@ -1446,6 +1483,31 @@ function sampleReport(): CiReport {
       }),
     } as unknown as CiReport["diff"],
   };
+}
+
+function inventoryWithInvocation(
+  resolution: "resolved" | "noncanonical",
+): ExecutableSurfaceInventory {
+  const inventory = zeroExecutableSurfaceInventory();
+  inventory.invocations = [
+    {
+      sourcePath: "skills/demo/SKILL.md",
+      line: 7,
+      snippet: "node skills/orphan/scripts/run.mjs",
+      launcher: "node",
+      rawTarget: "skills/orphan/scripts/run.mjs",
+      normalizedTarget: "skills/orphan/scripts/run.mjs",
+      sourceSkillDirectory: "skills/demo",
+      resolution,
+      targetPathState: "parsed",
+      occurrenceOrdinal: 1,
+    },
+  ];
+  inventory.summary.totalInvocations = 1;
+  inventory.summary.resolvedInvocations = resolution === "resolved" ? 1 : 0;
+  inventory.summary.noncanonicalInvocations =
+    resolution === "noncanonical" ? 1 : 0;
+  return inventory;
 }
 
 function completeDiffReport(discovery: CiReport["skillDiscovery"]): DiffReport {
