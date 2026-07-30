@@ -281,6 +281,10 @@
       }
     },
     "nonNegativeInteger": { "type": "integer", "minimum": 0 },
+    "sha256Fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
     "percentage": { "type": "number", "minimum": 0, "maximum": 100 },
     "stringArray": { "type": "array", "items": { "type": "string" } },
     "workflowReadinessSummary": {
@@ -692,6 +696,30 @@
         "unavailableInvocations": {
           "$ref": "#/$defs/nonNegativeInteger"
         },
+        "invocationsWithEffectivePolicyEvidence": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "invocationsWithoutEffectivePolicyEvidence": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "resolvedInvocationsWithEffectivePolicyEvidence": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "resolvedInvocationsWithoutEffectivePolicyEvidence": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "invocationsWithMultipleEffectivePolicyFingerprints": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "invocationPolicyEvidenceRelations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sourceArtifact", "owningSkill"],
+          "properties": {
+            "sourceArtifact": { "$ref": "#/$defs/nonNegativeInteger" },
+            "owningSkill": { "$ref": "#/$defs/nonNegativeInteger" }
+          }
+        },
         "interpreterHints": {
           "type": "array",
           "items": {
@@ -794,6 +822,9 @@
             "fingerprint": { "type": "string" }
           }
         },
+        "invocationGovernance": {
+          "$ref": "#/$defs/executableSurfaceInvocationGovernanceSummary"
+        },
         "fingerprint": { "type": "string" }
       }
     },
@@ -846,7 +877,87 @@
             "absent"
           ]
         },
-        "occurrenceOrdinal": { "type": "integer", "minimum": 1 }
+        "occurrenceOrdinal": { "type": "integer", "minimum": 1 },
+        "governance": {
+          "$ref": "#/$defs/executableInvocationGovernance"
+        }
+      }
+    },
+    "executableSurfaceInvocationGovernanceSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invocationsWithEffectivePolicyEvidence",
+        "invocationsWithoutEffectivePolicyEvidence",
+        "distinctEffectivePolicyFingerprints"
+      ],
+      "properties": {
+        "invocationsWithEffectivePolicyEvidence": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "invocationsWithoutEffectivePolicyEvidence": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "distinctEffectivePolicyFingerprints": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sha256Fingerprint" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "executableInvocationGovernance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owningSkillResolution",
+        "policyEvidence",
+        "hasEffectivePolicyEvidence",
+        "distinctEffectivePolicyFingerprints",
+        "fingerprint"
+      ],
+      "properties": {
+        "owningSkillResolution": {
+          "enum": ["not-applicable", "resolved", "missing", "ambiguous"]
+        },
+        "policyEvidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/executableInvocationPolicyEvidence"
+          },
+          "uniqueItems": true
+        },
+        "hasEffectivePolicyEvidence": { "type": "boolean" },
+        "distinctEffectivePolicyFingerprints": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sha256Fingerprint" },
+          "uniqueItems": true
+        },
+        "fingerprint": { "$ref": "#/$defs/sha256Fingerprint" }
+      }
+    },
+    "executableInvocationPolicyEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relation", "path", "hasEffectivePolicy", "policySources"],
+      "properties": {
+        "relation": {
+          "enum": ["source-artifact", "owning-skill"]
+        },
+        "path": { "type": "string" },
+        "hasEffectivePolicy": { "type": "boolean" },
+        "policySources": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "local",
+              "security_profile",
+              "repository_config",
+              "owning_skill"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "fingerprint": { "$ref": "#/$defs/sha256Fingerprint" }
       }
     },
     "booleanCounts": {

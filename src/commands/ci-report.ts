@@ -18,7 +18,10 @@ import {
   zeroSecurityPolicyInventorySummary,
   type SecurityPolicyInventorySummary,
 } from "../security-policy-inventory.js";
-import { buildExecutableSurfaceDiff } from "../executable-surface-diff.js";
+import {
+  buildExecutableSurfaceDiff,
+  type ExecutableSurfaceDiff,
+} from "../executable-surface-diff.js";
 import { zeroExecutableSurfaceInventory } from "../executable-surface-inventory.js";
 import type { ConfigOverrides } from "../config.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
@@ -39,6 +42,22 @@ import {
 
 export type CiReportFormat = DiffFormat;
 export type CiReportStatus = "pass" | "warn" | "fail";
+type CiCompatibleExecutableSurfaceDiff = Omit<
+  ExecutableSurfaceDiff,
+  "newInvocationsWithMultipleEffectivePolicyFingerprints"
+> &
+  Partial<
+    Pick<
+      ExecutableSurfaceDiff,
+      "newInvocationsWithMultipleEffectivePolicyFingerprints"
+    >
+  >;
+type CiFormatCompatibleDiffReport = Omit<
+  DiffReportWithoutSkillDiscovery,
+  "executableSurface"
+> & {
+  executableSurface: CiCompatibleExecutableSurfaceDiff;
+};
 export type CiCompatibleDiffReport = DiffReportWithoutSkillDiscovery;
 
 export interface CiReport {
@@ -59,8 +78,12 @@ export interface CiReport {
 
 export type CiReportFormatInput =
   | CiReport
-  | Omit<CiReport, "skillDiscoveryPolicy">
-  | Omit<CiReport, "skillDiscovery" | "skillDiscoveryPolicy">;
+  | (Omit<CiReport, "diff" | "skillDiscoveryPolicy"> & {
+      diff: CiFormatCompatibleDiffReport;
+    })
+  | (Omit<CiReport, "diff" | "skillDiscovery" | "skillDiscoveryPolicy"> & {
+      diff: CiFormatCompatibleDiffReport;
+    });
 
 interface CiReportOptions {
   fromRef: string;
@@ -203,7 +226,7 @@ function hasBlockingContextLensDiagnostics(
 }
 
 function newUnresolvedRequiredEdgeCount(
-  report: CiCompatibleDiffReport,
+  report: Pick<CiCompatibleDiffReport, "graph">,
 ): number {
   return report.graph.newUnresolvedEdges.filter(isRequiredEdge).length;
 }
@@ -362,17 +385,36 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
 }
 
 function formatExecutableSurfaceChanges(
-  executableSurface: CiCompatibleDiffReport["executableSurface"],
+  executableSurface: CiCompatibleExecutableSurfaceDiff,
 ): string[] {
+  const newWithout =
+    executableSurface.newInvocationsWithoutEffectivePolicyEvidence ?? [];
+  const newMultiple =
+    executableSurface.newInvocationsWithMultipleEffectivePolicyFingerprints ??
+    [];
+  const gained =
+    executableSurface.invocationsGainedEffectivePolicyEvidence ?? [];
+  const lost = executableSurface.invocationsLostEffectivePolicyEvidence ?? [];
+  const multiple =
+    executableSurface.invocationGovernanceChangesWithMultipleEffectivePolicyFingerprints ??
+    [];
   const lines = [
     `- Total surfaces: ${executableSurface.fromSummary.totalSurfaces} -> ${executableSurface.toSummary.totalSurfaces} (${formatDelta(executableSurface.summary.totalSurfacesDelta)})`,
     `- Added surfaces: ${executableSurface.addedSurfacePaths.length}`,
     `- Removed surfaces: ${executableSurface.removedSurfacePaths.length}`,
     `- Changed surfaces: ${executableSurface.changedSurfaces.length}`,
     `- New problematic invocation evidence: ${executableSurface.newProblematicInvocations.length}`,
+    `- Invocation-context policy evidence: ${executableSurface.fromSummary.invocationsWithEffectivePolicyEvidence ?? 0} -> ${executableSurface.toSummary.invocationsWithEffectivePolicyEvidence ?? 0} (${formatDelta(executableSurface.summary.invocationsWithEffectivePolicyEvidenceDelta ?? 0)})`,
+    `- Resolved invocation policy evidence: ${executableSurface.fromSummary.resolvedInvocationsWithEffectivePolicyEvidence ?? 0} -> ${executableSurface.toSummary.resolvedInvocationsWithEffectivePolicyEvidence ?? 0} (${formatDelta(executableSurface.summary.resolvedInvocationsWithEffectivePolicyEvidenceDelta ?? 0)})`,
+    `- New invocations without effective policy evidence: ${newWithout.length}`,
+    `- Invocations that gained effective policy evidence: ${gained.length}`,
+    `- Invocations that lost effective policy evidence: ${lost.length}`,
+    `- Invocations with multiple effective fingerprints: ${executableSurface.fromSummary.invocationsWithMultipleEffectivePolicyFingerprints ?? 0} -> ${executableSurface.toSummary.invocationsWithMultipleEffectivePolicyFingerprints ?? 0} (${formatDelta(executableSurface.summary.invocationsWithMultipleEffectivePolicyFingerprintsDelta ?? 0)})`,
+    `- New invocations with multiple effective fingerprints: ${newMultiple.length}`,
+    `- Governance changes with multiple effective fingerprints: ${multiple.length}`,
     `- Newly reachable Skill-local scripts: ${executableSurface.newlyReachableSkillLocalPaths.length}`,
     `- Newly unreachable Skill-local scripts: ${executableSurface.newlyUnreachableSkillLocalPaths.length}`,
-    `- Effective-policy coverage: ${formatDelta(executableSurface.summary.effectivePolicyCoverageDelta)} pp`,
+    `- Surface policy-evidence coverage: ${formatDelta(executableSurface.summary.effectivePolicyCoverageDelta)} pp`,
   ];
   if (executableSurface.addedSurfacePaths.length > 0) {
     lines.push(
@@ -423,7 +465,93 @@ function formatExecutableSurfaceChanges(
       ...formatOverflow(executableSurface.newProblematicInvocations.length),
     );
   }
+  appendInvocationGovernanceDeltas(
+    lines,
+    "New invocations without effective policy evidence",
+    newWithout,
+  );
+  appendInvocationGovernanceChanges(
+    lines,
+    "Invocations that gained effective policy evidence",
+    gained,
+  );
+  appendInvocationGovernanceChanges(
+    lines,
+    "Invocations that lost effective policy evidence",
+    lost,
+  );
+  appendNewMultipleFingerprintInvocations(lines, newMultiple);
+  appendInvocationGovernanceChanges(
+    lines,
+    "Invocation governance changes with multiple effective fingerprints",
+    multiple,
+  );
   return lines;
+}
+
+function appendNewMultipleFingerprintInvocations(
+  lines: string[],
+  invocations: NonNullable<
+    CiCompatibleDiffReport["executableSurface"]["newInvocationsWithMultipleEffectivePolicyFingerprints"]
+  >,
+): void {
+  if (invocations.length === 0) return;
+  lines.push(
+    "",
+    "### New invocations with multiple effective fingerprints",
+    "",
+    ...invocations
+      .slice(0, MAX_LIST_ITEMS)
+      .map(
+        (invocation) =>
+          `- \`${invocation.sourcePath}:L${invocation.line}\` ${invocation.launcher} \`${invocation.target}\`: owning Skill ${invocation.owningSkillResolution}; effective fingerprints ${invocation.distinctEffectivePolicyFingerprints.length}`,
+      ),
+    ...formatOverflow(invocations.length),
+  );
+}
+
+function appendInvocationGovernanceDeltas(
+  lines: string[],
+  heading: string,
+  invocations: NonNullable<
+    CiCompatibleDiffReport["executableSurface"]["newInvocationsWithoutEffectivePolicyEvidence"]
+  >,
+): void {
+  if (invocations.length === 0) return;
+  lines.push(
+    "",
+    `### ${heading}`,
+    "",
+    ...invocations
+      .slice(0, MAX_LIST_ITEMS)
+      .map(
+        (invocation) =>
+          `- \`${invocation.sourcePath}:L${invocation.line}\` ${invocation.launcher} \`${invocation.target}\`: without effective policy evidence; owning Skill ${invocation.owningSkillResolution}; effective fingerprints ${invocation.distinctEffectivePolicyFingerprints.length}`,
+      ),
+    ...formatOverflow(invocations.length),
+  );
+}
+
+function appendInvocationGovernanceChanges(
+  lines: string[],
+  heading: string,
+  invocations: NonNullable<
+    CiCompatibleDiffReport["executableSurface"]["invocationGovernanceChanges"]
+  >,
+): void {
+  if (invocations.length === 0) return;
+  lines.push(
+    "",
+    `### ${heading}`,
+    "",
+    ...invocations
+      .slice(0, MAX_LIST_ITEMS)
+      .map(
+        (invocation) =>
+          `- \`${invocation.sourcePath}:L${invocation.toLine}\` ${invocation.launcher} \`${invocation.target}\`: policy evidence ${invocation.fromHasEffectivePolicyEvidence ? "with" : "without"} -> ${invocation.toHasEffectivePolicyEvidence ? "with" : "without"}; owning Skill ${invocation.fromOwningSkillResolution} -> ${invocation.toOwningSkillResolution}; effective fingerprints ${invocation.fromDistinctEffectivePolicyFingerprints.length} -> ${invocation.toDistinctEffectivePolicyFingerprints.length}`,
+      ),
+    ...formatOverflow(invocations.length),
+  );
 }
 
 function formatOwnershipSummary(

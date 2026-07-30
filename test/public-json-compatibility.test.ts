@@ -117,6 +117,12 @@ test("representative public JSON matches fixed compatibility baselines", async (
   assert.ok(Array.isArray(executableSurfaceInventory.surfaces));
   assert.ok(Array.isArray(executableSurfaceInventory.invocations));
   assert.equal(typeof executableSurfaceInventory.summary, "object");
+  const executableSummary = record(executableSurfaceInventory.summary);
+  assert.equal(executableSummary.invocationsWithEffectivePolicyEvidence, 0);
+  assert.deepEqual(executableSummary.invocationPolicyEvidenceRelations, {
+    sourceArtifact: 0,
+    owningSkill: 0,
+  });
 
   const readinessOutput = parseOutput(outputs, "readiness");
   const readinessSummary = record(readinessOutput.summary);

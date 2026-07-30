@@ -20,6 +20,7 @@ import type { DiffReport } from "../src/commands/diff.js";
 import { zeroContextLensSummary } from "../src/context-lens.js";
 import { buildExecutableSurfaceDiff } from "../src/executable-surface-diff.js";
 import {
+  summarizeExecutableSurfaceInventory,
   type ExecutableSurfaceInventory,
   zeroExecutableSurfaceInventory,
 } from "../src/executable-surface-inventory.js";
@@ -146,6 +147,138 @@ test("formatCiReport deterministically exposes corrected invocation states witho
     ],
   );
   assert.equal(parsed.status, report.status);
+});
+
+test("formatCiReport renders bounded invocation-governance evidence without changing the verdict", () => {
+  const report = sampleReport();
+  const baselineStatus = report.status;
+  report.diff.executableSurface = buildExecutableSurfaceDiff(
+    inventoryWithInvocation("resolved"),
+    inventoryWithInvocation("resolved", [
+      `sha256:${"a".repeat(64)}`,
+      `sha256:${"b".repeat(64)}`,
+    ]),
+  );
+
+  const markdown = formatCiReport(report, "markdown");
+  const parsed = JSON.parse(formatCiReport(report, "json")) as CiReport;
+
+  assert.match(
+    markdown,
+    /- Invocation-context policy evidence: 0 -> 1 \(\+1\)/,
+  );
+  assert.match(
+    markdown,
+    /- Resolved invocation policy evidence: 0 -> 1 \(\+1\)/,
+  );
+  assert.match(
+    markdown,
+    /- New invocations without effective policy evidence: 0/,
+  );
+  assert.match(
+    markdown,
+    /- Invocations that gained effective policy evidence: 1/,
+  );
+  assert.match(
+    markdown,
+    /- Governance changes with multiple effective fingerprints: 1/,
+  );
+  assert.match(
+    markdown,
+    /^### Invocations that gained effective policy evidence$/m,
+  );
+  assert.match(markdown, /effective fingerprints 0 -> 2/);
+  assert.doesNotMatch(markdown, /sha256:[a-f0-9]{64}/);
+  assert.deepEqual(parsed.diff.executableSurface.newProblematicInvocations, []);
+  assert.equal(parsed.status, baselineStatus);
+
+  report.diff.executableSurface = buildExecutableSurfaceDiff(
+    inventoryWithInvocation("resolved", [`sha256:${"a".repeat(64)}`]),
+    inventoryWithInvocation("resolved"),
+  );
+  const lostMarkdown = formatCiReport(report, "markdown");
+  assert.match(
+    lostMarkdown,
+    /^### Invocations that lost effective policy evidence$/m,
+  );
+  assert.match(lostMarkdown, /policy evidence with -> without/);
+
+  report.diff.executableSurface = buildExecutableSurfaceDiff(
+    zeroExecutableSurfaceInventory(),
+    inventoryWithInvocation("resolved"),
+  );
+  const newWithoutMarkdown = formatCiReport(report, "markdown");
+  assert.match(
+    newWithoutMarkdown,
+    /^### New invocations without effective policy evidence$/m,
+  );
+  assert.match(
+    newWithoutMarkdown,
+    /without effective policy evidence; owning Skill missing/,
+  );
+  assert.doesNotMatch(
+    newWithoutMarkdown,
+    /unprotected|noncompliant|policy violation/i,
+  );
+  assert.equal(report.status, baselineStatus);
+});
+
+test("formatCiReport reports newly added multi-fingerprint invocations with bounded neutral detail", () => {
+  const report = sampleReport();
+  const baselineStatus = report.status;
+  report.diff.executableSurface = buildExecutableSurfaceDiff(
+    zeroExecutableSurfaceInventory(),
+    inventoryWithInvocations(12, [
+      `sha256:${"a".repeat(64)}`,
+      `sha256:${"b".repeat(64)}`,
+    ]),
+  );
+
+  const markdown = formatCiReport(report, "markdown");
+  const parsed = JSON.parse(formatCiReport(report, "json")) as CiReport;
+
+  assert.match(
+    markdown,
+    /- Invocations with multiple effective fingerprints: 0 -> 12 \(\+12\)/,
+  );
+  assert.match(
+    markdown,
+    /- New invocations with multiple effective fingerprints: 12/,
+  );
+  assert.match(
+    markdown,
+    /^### New invocations with multiple effective fingerprints$/m,
+  );
+  assert.match(
+    markdown,
+    /`skills\/demo\/references\/run-01\.md:L1` node `tools\/run-01\.mjs`: owning Skill resolved; effective fingerprints 2/,
+  );
+  assert.match(markdown, /2 more not shown; see JSON for the full list/);
+  assert.doesNotMatch(markdown, /run-11\.md|run-12\.md/);
+  assert.doesNotMatch(markdown, /sha256:[a-f0-9]{64}/);
+  assert.equal(
+    parsed.diff.executableSurface
+      .newInvocationsWithMultipleEffectivePolicyFingerprints?.length,
+    12,
+  );
+  assert.deepEqual(
+    parsed.diff.executableSurface.newInvocationsWithoutEffectivePolicyEvidence,
+    [],
+  );
+  assert.deepEqual(parsed.diff.executableSurface.newProblematicInvocations, []);
+  assert.equal(parsed.status, baselineStatus);
+  assert.equal(markdown, formatCiReport(report, "markdown"));
+
+  const legacyReport = structuredClone(report) as unknown as {
+    diff: {
+      executableSurface: Record<string, unknown>;
+    };
+  };
+  delete legacyReport.diff.executableSurface
+    .newInvocationsWithMultipleEffectivePolicyFingerprints;
+  assert.doesNotThrow(() =>
+    formatCiReport(legacyReport as unknown as CiReportFormatInput, "markdown"),
+  );
 });
 
 test("formatCiReport includes security posture summaries", () => {
@@ -1487,8 +1620,19 @@ function sampleReport(): CiReport {
 
 function inventoryWithInvocation(
   resolution: "resolved" | "noncanonical",
+  policyFingerprints: string[] = [],
 ): ExecutableSurfaceInventory {
   const inventory = zeroExecutableSurfaceInventory();
+  const hasEffectivePolicyEvidence = policyFingerprints.length > 0;
+  const policyEvidence = policyFingerprints.map((fingerprint, index) => ({
+    relation:
+      index === 0 ? ("source-artifact" as const) : ("owning-skill" as const),
+    path:
+      index === 0 ? "skills/demo/SKILL.md" : "skills/demo/references/owner.md",
+    hasEffectivePolicy: true,
+    policySources: ["local" as const],
+    fingerprint,
+  }));
   inventory.invocations = [
     {
       sourcePath: "skills/demo/SKILL.md",
@@ -1501,12 +1645,67 @@ function inventoryWithInvocation(
       resolution,
       targetPathState: "parsed",
       occurrenceOrdinal: 1,
+      governance: {
+        owningSkillResolution: hasEffectivePolicyEvidence
+          ? "resolved"
+          : "missing",
+        policyEvidence,
+        hasEffectivePolicyEvidence,
+        distinctEffectivePolicyFingerprints: [...policyFingerprints].sort(),
+        fingerprint: hasEffectivePolicyEvidence
+          ? `sha256:${"f".repeat(64)}`
+          : `sha256:${"0".repeat(64)}`,
+      },
     },
   ];
   inventory.summary.totalInvocations = 1;
   inventory.summary.resolvedInvocations = resolution === "resolved" ? 1 : 0;
   inventory.summary.noncanonicalInvocations =
     resolution === "noncanonical" ? 1 : 0;
+  inventory.summary.invocationsWithEffectivePolicyEvidence =
+    hasEffectivePolicyEvidence ? 1 : 0;
+  inventory.summary.invocationsWithoutEffectivePolicyEvidence =
+    hasEffectivePolicyEvidence ? 0 : 1;
+  inventory.summary.resolvedInvocationsWithEffectivePolicyEvidence =
+    resolution === "resolved" && hasEffectivePolicyEvidence ? 1 : 0;
+  inventory.summary.resolvedInvocationsWithoutEffectivePolicyEvidence =
+    resolution === "resolved" && !hasEffectivePolicyEvidence ? 1 : 0;
+  inventory.summary.invocationsWithMultipleEffectivePolicyFingerprints =
+    policyFingerprints.length > 1 ? 1 : 0;
+  inventory.summary.invocationPolicyEvidenceRelations = {
+    sourceArtifact: policyEvidence.filter(
+      (evidence) => evidence.relation === "source-artifact",
+    ).length,
+    owningSkill: policyEvidence.filter(
+      (evidence) => evidence.relation === "owning-skill",
+    ).length,
+  };
+  return inventory;
+}
+
+function inventoryWithInvocations(
+  count: number,
+  policyFingerprints: string[],
+): ExecutableSurfaceInventory {
+  const inventory = inventoryWithInvocation("resolved", policyFingerprints);
+  const template = inventory.invocations[0]!;
+  inventory.invocations = Array.from({ length: count }, (_, index) => {
+    const ordinal = String(index + 1).padStart(2, "0");
+    const target = `tools/run-${ordinal}.mjs`;
+    return {
+      ...template,
+      sourcePath: `skills/demo/references/run-${ordinal}.md`,
+      line: index + 1,
+      snippet: `node ${target}`,
+      rawTarget: target,
+      normalizedTarget: target,
+      governance: structuredClone(template.governance),
+    };
+  });
+  inventory.summary = summarizeExecutableSurfaceInventory(
+    inventory.surfaces,
+    inventory.invocations,
+  );
   return inventory;
 }
 

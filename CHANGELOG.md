@@ -6,6 +6,32 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Extended `renma.executable-surface-inventory.v1` with deterministic
+  invocation-context governance evidence from already prepared source-artifact
+  and owning-Skill policy rows, plus per-surface aggregates, summary counts,
+  semantic diff changes, and bounded informational CI rendering. Surface policy
+  remains separate; caller policy is not inherited by shared tools, evidence is
+  not merged or given precedence, and multiple fingerprints are visibility
+  rather than conflict or enforcement.
+- Kept the extension compatible with Repository Context BOM v2: current output
+  emits the additive governance fields, while the published schema accepts
+  Renma 0.27.0 BOMs that omit them and strictly validates each new object when
+  present. No package version, finding, diagnostic, readiness check, policy
+  inventory semantic, Trust Graph edge, or CI verdict changed.
+
+### Changed
+
+- Compacted healthy default scan text to one executable-surface summary and
+  expanded only bounded evidence relevant to resolution, scope, reachability,
+  missing context-policy evidence, or multiple fingerprints. Complete scan JSON
+  and BOM output remain unchanged.
+- Added explicit diff and CI visibility for newly introduced invocations that
+  already have multiple effective policy fingerprints, including total deltas
+  and bounded neutral detail without changing path-problem evidence or CI
+  verdicts.
+
 ## [0.27.0] - 2026-07-30
 
 ### Added

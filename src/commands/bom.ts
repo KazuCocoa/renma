@@ -715,14 +715,16 @@ function formatExecutableSurfaceInventoryMarkdown(
     `- Scope: ${summary.skillLocalSurfaces} Skill-local, ${summary.repositoryToolSurfaces} repository tools, ${summary.noncanonicalSurfaces} non-canonical`,
     `- Skill-local reachability: ${summary.reachableSkillLocalSurfaces} reachable, ${summary.unreachableSkillLocalSurfaces} unreachable`,
     `- Referenced/invoked: ${summary.referencedSurfaces}/${summary.invokedSurfaces}`,
-    `- Effective-policy coverage: ${summary.surfacesWithEffectivePolicy}/${summary.totalSurfaces}`,
+    `- Surface policy evidence: ${summary.surfacesWithEffectivePolicy} with, ${summary.surfacesWithoutEffectivePolicy} without`,
+    `- Invocation-context policy evidence: ${summary.invocationsWithEffectivePolicyEvidence} with, ${summary.invocationsWithoutEffectivePolicyEvidence} without`,
+    `- Invocations with multiple policy variants: ${summary.invocationsWithMultipleEffectivePolicyFingerprints}`,
     `- Invocations: ${summary.totalInvocations} total, ${summary.resolvedInvocations} resolved, ${summary.missingInvocations} missing, ${summary.unsafeInvocations} unsafe, ${summary.unscopedInvocations} unscoped, ${summary.noncanonicalInvocations} non-canonical, ${summary.unavailableInvocations} unavailable`,
     "",
-    "| Path | Scope | Interpreters | Reachability | Invocations | Effective policy |",
-    "| --- | --- | --- | --- | ---: | --- |",
+    "| Path | Scope | Interpreters | Reachability | Invocations | Surface policy | Invocation policy | Policy variants |",
+    "| --- | --- | --- | --- | ---: | --- | ---: | ---: |",
   ];
   if (inventory.surfaces.length === 0) {
-    lines.push("| (none) |  |  |  | 0 |  |");
+    lines.push("| (none) |  |  |  | 0 |  | 0/0 | 0 |");
     return lines;
   }
   for (const surface of inventory.surfaces) {
@@ -733,7 +735,7 @@ function formatExecutableSurfaceInventoryMarkdown(
           ? `reachable (${surface.reachabilityDepth})`
           : "unreachable";
     lines.push(
-      `| ${escapeTableCell(surface.path)} | ${surface.scope} | ${escapeTableCell(surface.interpreterHints.join(", "))} | ${reachability} | ${surface.invocationCount} | ${surface.securityPolicy.hasEffectivePolicy ? "yes" : "no"} |`,
+      `| ${escapeTableCell(surface.path)} | ${surface.scope} | ${escapeTableCell(surface.interpreterHints.join(", "))} | ${reachability} | ${surface.invocationCount} | ${surface.securityPolicy.hasEffectivePolicy ? "yes" : "no"} | ${surface.invocationGovernance.invocationsWithEffectivePolicyEvidence}/${surface.invocationCount} | ${surface.invocationGovernance.distinctEffectivePolicyFingerprints.length} |`,
     );
   }
   return lines;
