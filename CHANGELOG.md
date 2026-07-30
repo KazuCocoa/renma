@@ -6,17 +6,24 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-07-30
+
 ### Added
 
-- Added the provider-neutral, non-executing Executable Surface Inventory under
-  `executableSurfaceInventory` in scan JSON and Repository Context BOM v2.
-  Inventory evidence covers already-discovered Skill-local scripts,
-  repository-root `tools/**` helpers, non-canonical discovered scripts, static
-  helper invocations, Skill-local reachability depth, interpreter hints,
+- Added the provider-neutral, non-executing
+  `renma.executable-surface-inventory.v1` projection to scan output and
+  Repository Context BOM v2. It reports already-discovered Skill-local
+  scripts, repository-root `tools/**` helpers, non-canonical discovered
+  scripts, bounded static helper invocations, reachability, interpreter hints,
   content identity, and effective security-policy correlation. Semantic diff
-  and CI reports now expose informational executable-surface changes without
-  changing diagnostics, readiness, CI status, failure thresholds, discovery,
-  or Trust Graph semantics.
+  and CI reports expose its changes as informational evidence.
+- The inventory does not widen repository discovery or execute, import,
+  compile, or sandbox source. It adds no finding, readiness rule, CI blocker,
+  failure threshold, or Trust Graph semantic; presence does not classify a
+  file as safe, unsafe, malicious, or actively executed, and missing effective
+  policy is visibility evidence rather than an automatic violation.
+  Package-manager scripts, workflow files, Dockerfiles, Git hooks, import
+  graphs, dynamic invocations, and runtime telemetry remain out of scope.
 
 ## [0.26.0] - 2026-07-30
 
@@ -1802,7 +1809,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.26.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.27.0...HEAD
+[0.27.0]: https://github.com/KazuCocoa/renma/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/KazuCocoa/renma/compare/v0.25.3...v0.26.0
 [0.25.3]: https://github.com/KazuCocoa/renma/compare/v0.25.2...v0.25.3
 [0.25.2]: https://github.com/KazuCocoa/renma/compare/v0.25.1...v0.25.2
