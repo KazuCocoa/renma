@@ -630,6 +630,10 @@ function formatExecutableSurfaceChanges(
     `- Added surfaces: ${executableSurface.addedSurfacePaths.length}`,
     `- Removed surfaces: ${executableSurface.removedSurfacePaths.length}`,
     `- Changed surfaces: ${executableSurface.changedSurfaces.length}`,
+    `- Dependencies: ${executableSurface.fromSummary.totalDependencies} -> ${executableSurface.toSummary.totalDependencies} (${signed(executableSurface.summary.totalDependenciesDelta)})`,
+    `- Resolved dependencies: ${executableSurface.fromSummary.resolvedDependencies} -> ${executableSurface.toSummary.resolvedDependencies} (${signed(executableSurface.summary.resolvedDependenciesDelta)})`,
+    `- Dependency resolution changes: ${executableSurface.dependencyResolutionChanges.length}`,
+    `- Static invocation reachability: ${executableSurface.toSummary.directlyInvokedSurfaces} direct, ${executableSurface.toSummary.transitivelyReachableSurfaces} transitive, ${executableSurface.toSummary.unreachedFromInvocationSurfaces} unreached`,
     `- Invocation resolution changes: ${executableSurface.invocationResolutionChanges.length}`,
     `- Invocation governance changes: ${invocationGovernanceChanges.length}`,
     `- Invocation-context policy evidence: ${executableSurface.toSummary.invocationsWithEffectivePolicyEvidence ?? 0} with (${signed(executableSurface.summary.invocationsWithEffectivePolicyEvidenceDelta ?? 0)}), ${executableSurface.toSummary.invocationsWithoutEffectivePolicyEvidence ?? 0} without (${signed(executableSurface.summary.invocationsWithoutEffectivePolicyEvidenceDelta ?? 0)})`,
@@ -674,6 +678,70 @@ function formatExecutableSurfaceChanges(
       ...executableSurface.invocationResolutionChanges.map(
         (invocation) =>
           `- \`${invocation.sourcePath}\` ${invocation.launcher} \`${invocation.target}\` #${invocation.occurrenceOrdinal}: ${invocation.fromResolution} -> ${invocation.toResolution}`,
+      ),
+    );
+  }
+  if (executableSurface.addedDependencies.length > 0) {
+    lines.push(
+      "",
+      "### Added executable dependencies",
+      "",
+      ...executableSurface.addedDependencies.map(
+        (dependency) =>
+          `- \`${dependency.sourcePath}:L${dependency.line}\` ${dependency.analyzer} ${dependency.relation} \`${dependency.target}\` #${dependency.occurrenceOrdinal}: ${dependency.resolution}`,
+      ),
+    );
+  }
+  if (executableSurface.removedDependencies.length > 0) {
+    lines.push(
+      "",
+      "### Removed executable dependencies",
+      "",
+      ...executableSurface.removedDependencies.map(
+        (dependency) =>
+          `- \`${dependency.sourcePath}:L${dependency.line}\` ${dependency.analyzer} ${dependency.relation} \`${dependency.target}\` #${dependency.occurrenceOrdinal}: ${dependency.resolution}`,
+      ),
+    );
+  }
+  if (executableSurface.dependencyResolutionChanges.length > 0) {
+    lines.push(
+      "",
+      "### Executable dependency resolution changes",
+      "",
+      ...executableSurface.dependencyResolutionChanges.map(
+        (dependency) =>
+          `- \`${dependency.sourcePath}\` ${dependency.analyzer} ${dependency.relation} \`${dependency.target}\` #${dependency.occurrenceOrdinal}: ${dependency.fromResolution} -> ${dependency.toResolution}`,
+      ),
+    );
+  }
+  if (executableSurface.newProblematicDependencies.length > 0) {
+    lines.push(
+      "",
+      "### New dependency evidence for review",
+      "",
+      ...executableSurface.newProblematicDependencies.map(
+        (dependency) =>
+          `- \`${dependency.sourcePath}:L${dependency.line}\` ${dependency.analyzer} ${dependency.relation} \`${dependency.target}\`: ${dependency.resolution}`,
+      ),
+    );
+  }
+  if (executableSurface.newlyTransitivelyReachableSurfacePaths.length > 0) {
+    lines.push(
+      "",
+      "### Newly transitively reachable executable surfaces",
+      "",
+      ...executableSurface.newlyTransitivelyReachableSurfacePaths.map(
+        (surfacePath) => `- \`${surfacePath}\``,
+      ),
+    );
+  }
+  if (executableSurface.surfacesLostStaticInvocationReachability.length > 0) {
+    lines.push(
+      "",
+      "### Executable surfaces that lost static invocation reachability",
+      "",
+      ...executableSurface.surfacesLostStaticInvocationReachability.map(
+        (surfacePath) => `- \`${surfacePath}\``,
       ),
     );
   }

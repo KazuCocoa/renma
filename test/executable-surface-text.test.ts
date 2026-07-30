@@ -41,7 +41,7 @@ test("healthy Appium-like scan text is one concise line without surface paths", 
   const rendered = formatText(result);
   assert.match(
     rendered,
-    /^Executable surfaces: 13; invocations 12\/12 resolved; invocation-context policy evidence 12\/12$/m,
+    /^Executable surfaces: 13; static reachability 1 direct, 0 transitive; invocations 12\/12 resolved; invocation-context policy evidence 12\/12$/m,
   );
   assert.doesNotMatch(rendered, /Executable Surface (Inventory|Review)/);
   assert.doesNotMatch(rendered, /tools\/check-/);
@@ -63,7 +63,7 @@ test("surfaces without recognized invocations stay compact", () => {
   const lines = formatExecutableSurfaceInventoryText(inventory(surfaces, []));
 
   assert.deepEqual(lines, [
-    "Executable surfaces: 13; no recognized invocations",
+    "Executable surfaces: 13; no recognized invocations; 0 transitively reachable",
   ]);
   assert.doesNotMatch(lines.join("\n"), /tools\/uninvoked-/);
 });
@@ -194,7 +194,7 @@ test("repository-tool surface-policy absence does not trigger expanded review", 
     ),
   );
   assert.deepEqual(lines, [
-    "Executable surfaces: 1; invocations 1/1 resolved; invocation-context policy evidence 1/1",
+    "Executable surfaces: 1; static reachability 1 direct, 0 transitive; invocations 1/1 resolved; invocation-context policy evidence 1/1",
   ]);
 });
 
@@ -276,6 +276,7 @@ function inventory(
     summary: summarizeExecutableSurfaceInventory(surfaces, invocations),
     surfaces,
     invocations,
+    dependencies: [],
   };
 }
 
@@ -328,6 +329,13 @@ function repositoryTool(
       invocationsWithoutEffectivePolicyEvidence:
         invocationCount - withPolicyEvidence,
       distinctEffectivePolicyFingerprints: fingerprints,
+    },
+    dependencyEvidence: {
+      incomingResolvedDependencyCount: 0,
+      outgoingResolvedDependencyCount: 0,
+      staticInvocationReachability:
+        invocationCount > 0 ? "direct" : "unreached",
+      ...(invocationCount > 0 ? { minimumInvocationDependencyDepth: 0 } : {}),
     },
     fingerprint: INVENTORY_FP,
   };

@@ -764,12 +764,59 @@ path, scope, content classification and hash, conservative interpreter hints,
 static references and invocations, Skill-local reachability, and bounded
 security-policy correlation. Invocation rows retain launcher, target, source
 line, exact resolution state, and invocation-context governance evidence.
+Current rows also include bounded static executable dependency evidence and a
+per-surface `direct`, `transitive`, or `unreached` projection.
+
+Executable TypeScript surface extensions are `.ts`, `.mts`, and `.cts`, in
+addition to the established JavaScript, Python, and shell extensions. `.tsx`
+and `.jsx` are not executable surfaces in this release. This is static
+repository evidence and does not claim that every Node configuration executes
+TypeScript.
+
+Dependency analysis is deliberately limited to two private built-ins:
+
+- `js-ts` analyzes text `.js`, `.mjs`, `.ts`, `.mts`, and `.cts` surfaces. It
+  recognizes static string-literal ESM imports and `export ... from`
+  declarations, including multiline, semicolonless, and import-attribute forms.
+  Targets must start with `./` or `../` and explicitly end in `.js`, `.mjs`,
+  `.cjs`, `.ts`, `.mts`, `.cts`, `.py`, `.sh`, or `.bash`.
+- `python` analyzes text `.py` surfaces. It recognizes only explicit relative
+  `from` imports. A module produces exact `.py` and `/__init__.py` candidates;
+  `from . import helper, parser` produces separate candidate sets. Multiple
+  parsed candidates are `ambiguous`.
+
+The JS/TS collector ignores `.cjs` sources, `.jsx`, `.tsx`, dynamic `import()`,
+CommonJS `require`, packages, `node:` built-ins, absolute paths, template
+specifiers, query/fragment suffixes, extensionless imports, TypeScript
+type-only syntax, `import = require`, compiler substitution, directory indexes,
+aliases, package exports, project references, and import maps. The Python
+collector ignores `.pyi`, `.pyc`, absolute imports, dynamic import helpers,
+package metadata, virtual environments, `PYTHONPATH`, runtime `sys.path`
+changes, and implicit containing-package edges. Neither collector executes
+code or implements a complete parser.
+
+Dependency targets resolve only to surfaces already in the inventory.
+`not-inventory` means the exact parsed repository file exists but is outside
+that surface boundary. Other states are `resolved`, `missing`, `unsafe`,
+`ambiguous`, `noncanonical`, `excluded`, `deep`, `oversize`, `unsupported`,
+`symlink`, and `unreadable`. Python preserves every candidate and sets
+`normalizedTarget` only when selection is deterministic.
+
+Graph edges come only from `resolved` and `noncanonical` rows. Directly invoked
+surfaces have minimum dependency depth `0`; a reachable imported surface is
+`transitive` at its minimum breadth-first depth; otherwise it is `unreached`.
+Cycles terminate, direct wins over transitive, and imports from unreached
+sources do not seed reachability. `invokedSurfaces` remains the direct count,
+so `uninvokedSurfaces` may include both transitive and unreached surfaces.
+“Uninvoked” does not mean unused, and transitive evidence is not runtime proof.
 
 Surface policy evidence and invocation-context policy evidence have different
 meanings. Surface evidence belongs to or is inherited by the executable surface
 itself. Invocation-context evidence records prepared policy rows associated
 with the instruction artifact and its structurally resolved owning Skill.
 Calling-Skill policy is never assigned to a shared repository tool.
+Invocation-context policy is not propagated, merged, intersected, or checked
+for conflicts across executable dependency edges.
 
 Invocation governance retains `source-artifact` and `owning-skill`
 relationships separately, including useful negative evidence. Renma does not
@@ -780,19 +827,24 @@ Multiple distinct fingerprints describe visible policy variants; they are not
 a conflict, safety result, or compliance verdict.
 
 Default scan text is action-oriented. A healthy inventory renders one compact
-line with total surfaces, resolved invocation coverage, and
+line with total surfaces, direct/transitive static reachability, resolved invocation coverage, and
 invocation-context policy-evidence coverage; a surface-only inventory reports
-that no invocations were recognized. Scan JSON and BOM JSON/Markdown retain the
-complete inventory.
+that no invocations were recognized and reports zero transitive reachability.
+Scan JSON and BOM JSON/Markdown retain the complete inventory.
 
 Scan text expands to `Executable Surface Review` only for missing, unsafe,
 unscoped, non-canonical, or unavailable invocations; non-canonical surfaces;
 unreachable Skill-local surfaces; invocations without effective context-policy
-evidence; or invocations with multiple effective fingerprints. Expanded output
-is bounded and includes only relevant surface and invocation evidence.
+evidence; invocations with multiple effective fingerprints; or dependency rows
+that are not `resolved`. Expanded output includes a bounded
+`Review dependencies:` section with source line, analyzer, relation, target
+candidates, and exact resolution. It does not print complete source files.
+Output is bounded and includes only relevant surface, invocation, and
+dependency evidence.
 Repository-tool surface-policy absence, unreferenced tools, and uninvoked tools
-do not trigger review by themselves. The review is informational and uses
-neutral evidence terminology.
+do not trigger review by themselves. Dependency `unreached` state also does not
+trigger review by itself. The review is informational and uses neutral evidence
+terminology.
 
 Canonical scopes are `skill-local` for a script under the resolved owning
 Skill's `scripts/**`, and `repository-tool` for a helper under repository-root
@@ -860,12 +912,14 @@ JSON is the source of truth for automation. Markdown is a compact pull-request r
 Renma derives each BOM from one in-memory repository snapshot: configuration, discovered artifacts, parsed documents, catalog, graph evidence, diagnostics, readiness, and security summaries all come from the same collected state.
 
 BOM v2 additively includes the complete `executableSurfaceInventory`
-projection—schema, summary, surface rows, and invocation rows—so consumers can
+projection—schema, summary, surface, invocation, and dependency rows—so consumers can
 audit and diff the same evidence emitted by scan. No standalone executable BOM
 command is needed. Current output includes invocation governance and per-surface
-invocation aggregates unconditionally. The published BOM v2 schema keeps those
-new fields optional at the compatibility boundary so 0.27.0 BOMs remain valid;
-each governance object is strict when present.
+invocation aggregates, dependency rows, and per-surface dependency summaries
+unconditionally. The published BOM v2 schema keeps those additive fields
+optional at the compatibility boundary so earlier 0.27.x BOMs remain valid;
+each new object is strict when present. BOM v2 and executable-surface inventory
+v1 versions are unchanged.
 
 By default, `generatedAt` records when the BOM was produced. Add `--omit-generated-at` when CI or review automation needs to avoid clock-based diffs. With the same checkout path, config path, repository contents, Renma version, and UTC evaluation date, repeated `--omit-generated-at` runs should produce byte-identical JSON. The option does not remove metadata freshness dates, suppress freshness diagnostics, normalize absolute `root` or `configPath`, hide file moves, or guarantee portable byte-for-byte output across runners.
 
@@ -1169,7 +1223,13 @@ changes, added or removed findings, and an additive
 `renma.skill-discovery-diff.v1` section. It also includes an
 `executableSurface` section with count deltas, added/removed/changed surface
 paths, concise change reasons, semantic invocation-resolution changes, and
-line-insensitive invocation-governance changes. Caller-only aggregate changes
+line-insensitive invocation-governance changes. It reports line-insensitive
+added/removed executable dependencies, dependency resolution changes, new
+dependency evidence for review, newly transitive surfaces, lost static
+invocation reachability, and meaningful minimum-depth changes. Dependency edge
+count changes use `dependency-graph`; reachability/depth changes use
+`invocation-reachability`. Import-only changes are not classified as
+`invocations`, `invocation-governance`, or `security-policy`. Caller-only aggregate changes
 use `invocation-governance`; `security-policy` remains reserved for changes to
 the surface's own policy evidence. These governance changes are informational:
 no combined policy, conflict classification, or enforcement decision is
@@ -1214,7 +1274,10 @@ changes, surface policy-evidence coverage, invocation-context policy-evidence
 deltas, newly observed invocations without effective policy evidence, gained
 or lost evidence, total before/after multiple-fingerprint counts, newly added
 multi-fingerprint invocations, and governance changes involving multiple
-effective fingerprints. The bounded governance lists use neutral evidence
+effective fingerprints. It also reports dependency totals, resolved counts,
+analyzer counts, new dependency evidence for review, dependency resolution
+changes, newly transitive surfaces, and surfaces that lost static invocation
+reachability. The bounded dependency and governance lists use neutral evidence
 terminology, omit complete fingerprints, and do not enter
 `newProblematicInvocations`. They do not affect the CI verdict,
 readiness score, failure threshold, or review policy. Newly generated JSON includes the complete

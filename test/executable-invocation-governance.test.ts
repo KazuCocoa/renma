@@ -469,7 +469,7 @@ test("text rendering expands only neutral invocation-governance review evidence"
   assert.match(lines, /^Executable Surface Review$/m);
   assert.match(
     lines,
-    /Executable surfaces: 6; invocations 15\/19 resolved; invocation-context policy evidence 14\/19/,
+    /Executable surfaces: 6; static reachability 5 direct, 0 transitive; invocations 15\/19 resolved; invocation-context policy evidence 14\/19/,
   );
   assert.match(lines, /tools\/mixed\.mjs/);
   assert.match(lines, /policy-variants 2/);

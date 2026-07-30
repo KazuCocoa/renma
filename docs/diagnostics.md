@@ -542,17 +542,21 @@ Readiness and CI reports may include two security summaries: security posture fr
 Semantic diff and CI reports may include security deltas, including added/resolved security findings grouped by `riskClass` and effective policy inventory count changes. These summaries are reporting-only and do not change scan `fail_on`, readiness scoring, or CI status.
 
 The Executable Surface Inventory is also reporting-only and does not define a
-diagnostic ID. A surface being uninvoked, unreachable, non-canonical, or without
-an effective policy does not by itself introduce a finding or change an exit
-status. Existing path, support-reachability, symlink, and security diagnostics
-remain authoritative when their independent conditions match.
+diagnostic ID. A surface being uninvoked, dependency-unreached,
+dependency-transitive, non-canonical, or without an effective policy does not
+by itself introduce a finding or change an exit status. Missing, unsafe,
+ambiguous, non-canonical, not-inventory, or unavailable executable dependency
+rows expand informational review output but do not become findings. Existing
+path, support-reachability, symlink, and security diagnostics remain
+authoritative when their independent conditions match.
 
 The inventory correlates existing effective-policy fingerprints but does not
 replace security findings or claim a file is safe or malicious. Dangerous
 commands, remote scripts, destructive actions, dependency installation,
 network destinations, secrets, multilingual content checks, and hidden-Unicode
 checks remain separate diagnostic analyses. Enforcement and Trust Graph
-integration are intentionally deferred.
+integration are intentionally deferred. Executable dependency rows do not
+become normal BOM Context Asset dependencies or Trust Graph edges.
 
 Invocation-context policy evidence is also informational. A recognized
 invocation may retain separate `source-artifact` and `owning-skill` policy
@@ -560,7 +564,8 @@ relationships, no effective relationship, or multiple distinct effective
 fingerprints. None creates a diagnostic, readiness check, suppression
 requirement, policy requirement, or CI blocker. Caller evidence is not
 inherited by the target surface, and multiple fingerprints are not classified
-as a conflict.
+as a conflict. Invocation policy is never propagated through static executable
+dependency edges.
 
 ### Finding and evidence JSON contract
 
@@ -692,9 +697,11 @@ does not replace explicit human approval. Renma does not widen discovery to scan
 repository-wide supply-chain metadata by default.
 
 Renma analyzes the security posture of LLM-facing Markdown instructions and
-metadata. It does not perform language-specific analysis of referenced or
-embedded executable scripts; use appropriate SAST and dependency-scanning tools
-for executable code. Markdown instructions that tell an agent to fetch, trust,
+metadata. Separately, the reporting-only Executable Surface Inventory uses
+bounded JS/TS and Python lexical collectors for explicit relative static import
+evidence. Those collectors do not contribute security findings or analyze
+executable behavior; use appropriate SAST and dependency-scanning tools for
+executable code. Markdown instructions that tell an agent to fetch, trust,
 execute, or invoke a script remain within this diagnostic boundary.
 
 These checks inspect repository knowledge and operational instructions.

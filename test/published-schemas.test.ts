@@ -70,6 +70,7 @@ test("published Draft 2020-12 schemas validate representative generated reports"
     summary: Record<string, unknown>;
     surfaces: Array<Record<string, unknown>>;
     invocations: Array<Record<string, unknown>>;
+    dependencies?: Array<Record<string, unknown>>;
   };
   for (const field of [
     "invocationsWithEffectivePolicyEvidence",
@@ -78,9 +79,25 @@ test("published Draft 2020-12 schemas validate representative generated reports"
     "resolvedInvocationsWithoutEffectivePolicyEvidence",
     "invocationsWithMultipleEffectivePolicyFingerprints",
     "invocationPolicyEvidenceRelations",
+    "totalDependencies",
+    "resolvedDependencies",
+    "missingDependencies",
+    "unsafeDependencies",
+    "ambiguousDependencies",
+    "noncanonicalDependencies",
+    "notInventoryDependencies",
+    "unavailableDependencies",
+    "surfacesWithIncomingDependencies",
+    "surfacesWithOutgoingDependencies",
+    "directlyInvokedSurfaces",
+    "transitivelyReachableSurfaces",
+    "unreachedFromInvocationSurfaces",
+    "dependencyAnalyzers",
+    "dependencyRelations",
   ]) {
     delete v027Inventory.summary[field];
   }
+  delete v027Inventory.dependencies;
   v027Inventory.surfaces = [schemaSurface(false)];
   v027Inventory.invocations = [schemaInvocation(false)];
   assertValid(validateBom, v027StyleBom);
@@ -290,6 +307,67 @@ test("BOM schema enforces output modes, timestamps, formats, and score bounds", 
     }
   ).governance.distinctEffectivePolicyFingerprints = [sha256("a"), sha256("a")];
   assertInvalid(validateBom, duplicateGovernanceFingerprints, "uniqueItems");
+
+  const currentDependencyBom = structuredClone(defaultBom);
+  const currentDependencyInventory =
+    currentDependencyBom.executableSurfaceInventory as unknown as {
+      surfaces: Array<Record<string, unknown>>;
+      dependencies: Array<Record<string, unknown>>;
+    };
+  currentDependencyInventory.surfaces = [
+    {
+      ...schemaSurface(true),
+      dependencyEvidence: {
+        incomingResolvedDependencyCount: 1,
+        outgoingResolvedDependencyCount: 1,
+        staticInvocationReachability: "direct",
+        minimumInvocationDependencyDepth: 0,
+      },
+    },
+  ];
+  currentDependencyInventory.dependencies = [schemaDependency()];
+  assertValid(validateBom, currentDependencyBom);
+
+  for (const field of [
+    "incomingResolvedDependencyCount",
+    "outgoingResolvedDependencyCount",
+    "staticInvocationReachability",
+  ]) {
+    const incomplete = structuredClone(currentDependencyBom);
+    const evidence = (
+      incomplete.executableSurfaceInventory.surfaces[0] as unknown as {
+        dependencyEvidence: Record<string, unknown>;
+      }
+    ).dependencyEvidence;
+    delete evidence[field];
+    assertInvalid(validateBom, incomplete, "required");
+  }
+
+  for (const field of [
+    "analyzer",
+    "sourcePath",
+    "line",
+    "snippet",
+    "relation",
+    "rawSpecifier",
+    "normalizedTargetCandidates",
+    "resolution",
+    "occurrenceOrdinal",
+  ]) {
+    const incomplete = structuredClone(currentDependencyBom);
+    delete (
+      incomplete.executableSurfaceInventory
+        .dependencies[0] as unknown as Record<string, unknown>
+    )[field];
+    assertInvalid(validateBom, incomplete, "required");
+  }
+
+  const extendedDependency = structuredClone(currentDependencyBom);
+  (
+    extendedDependency.executableSurfaceInventory
+      .dependencies[0] as unknown as Record<string, unknown>
+  ).unexpected = true;
+  assertInvalid(validateBom, extendedDependency, "additionalProperties");
 
   const negativeReadinessCount = structuredClone(defaultBom);
   negativeReadinessCount.readiness.summary.totalAssets = -1;
@@ -580,6 +658,22 @@ function schemaInvocation(includeGovernance: boolean): Record<string, unknown> {
           },
         }
       : {}),
+  };
+}
+
+function schemaDependency(): Record<string, unknown> {
+  return {
+    analyzer: "js-ts",
+    sourcePath: "tools/check.mjs",
+    line: 1,
+    snippet: 'import "./helper.mjs"',
+    relation: "static-import",
+    rawSpecifier: "./helper.mjs",
+    normalizedTargetCandidates: ["tools/helper.mjs"],
+    normalizedTarget: "tools/helper.mjs",
+    resolution: "resolved",
+    targetPathState: "parsed",
+    occurrenceOrdinal: 1,
   };
 }
 

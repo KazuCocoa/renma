@@ -719,26 +719,73 @@ function formatExecutableSurfaceInventoryMarkdown(
     `- Invocation-context policy evidence: ${summary.invocationsWithEffectivePolicyEvidence} with, ${summary.invocationsWithoutEffectivePolicyEvidence} without`,
     `- Invocations with multiple policy variants: ${summary.invocationsWithMultipleEffectivePolicyFingerprints}`,
     `- Invocations: ${summary.totalInvocations} total, ${summary.resolvedInvocations} resolved, ${summary.missingInvocations} missing, ${summary.unsafeInvocations} unsafe, ${summary.unscopedInvocations} unscoped, ${summary.noncanonicalInvocations} non-canonical, ${summary.unavailableInvocations} unavailable`,
+    `- Dependencies: ${summary.totalDependencies} total; ${summary.dependencyAnalyzers.map(({ analyzer, count }) => `${analyzer} ${count}`).join(", ") || "no analyzer evidence"}`,
+    `- Dependency resolutions: ${dependencyResolutionSummary(inventory)}`,
+    `- Static invocation reachability: ${summary.directlyInvokedSurfaces} direct, ${summary.transitivelyReachableSurfaces} transitive, ${summary.unreachedFromInvocationSurfaces} unreached`,
     "",
-    "| Path | Scope | Interpreters | Reachability | Invocations | Surface policy | Invocation policy | Policy variants |",
-    "| --- | --- | --- | --- | ---: | --- | ---: | ---: |",
+    "| Path | Scope | Interpreters | Skill reachability | Static reachability | Dependencies in/out | Invocations | Surface policy | Invocation policy | Policy variants |",
+    "| --- | --- | --- | --- | --- | ---: | ---: | --- | ---: | ---: |",
   ];
   if (inventory.surfaces.length === 0) {
-    lines.push("| (none) |  |  |  | 0 |  | 0/0 | 0 |");
-    return lines;
+    lines.push("| (none) |  |  |  |  | 0/0 | 0 |  | 0/0 | 0 |");
+  } else {
+    for (const surface of inventory.surfaces) {
+      const reachability =
+        surface.scope !== "skill-local"
+          ? "n/a"
+          : surface.reachableFromOwningSkill
+            ? `reachable (${surface.reachabilityDepth})`
+            : "unreachable";
+      const dependencyReachability =
+        surface.dependencyEvidence.staticInvocationReachability === "unreached"
+          ? "unreached"
+          : `${surface.dependencyEvidence.staticInvocationReachability} (${surface.dependencyEvidence.minimumInvocationDependencyDepth})`;
+      lines.push(
+        `| ${escapeTableCell(surface.path)} | ${surface.scope} | ${escapeTableCell(surface.interpreterHints.join(", "))} | ${reachability} | ${dependencyReachability} | ${surface.dependencyEvidence.incomingResolvedDependencyCount}/${surface.dependencyEvidence.outgoingResolvedDependencyCount} | ${surface.invocationCount} | ${surface.securityPolicy.hasEffectivePolicy ? "yes" : "no"} | ${surface.invocationGovernance.invocationsWithEffectivePolicyEvidence}/${surface.invocationCount} | ${surface.invocationGovernance.distinctEffectivePolicyFingerprints.length} |`,
+      );
+    }
   }
-  for (const surface of inventory.surfaces) {
-    const reachability =
-      surface.scope !== "skill-local"
-        ? "n/a"
-        : surface.reachableFromOwningSkill
-          ? `reachable (${surface.reachabilityDepth})`
-          : "unreachable";
-    lines.push(
-      `| ${escapeTableCell(surface.path)} | ${surface.scope} | ${escapeTableCell(surface.interpreterHints.join(", "))} | ${reachability} | ${surface.invocationCount} | ${surface.securityPolicy.hasEffectivePolicy ? "yes" : "no"} | ${surface.invocationGovernance.invocationsWithEffectivePolicyEvidence}/${surface.invocationCount} | ${surface.invocationGovernance.distinctEffectivePolicyFingerprints.length} |`,
-    );
+  lines.push(
+    "",
+    "### Executable dependencies",
+    "",
+    "| Source | Analyzer | Relation | Target candidates | Resolution |",
+    "| --- | --- | --- | --- | --- |",
+  );
+  if (inventory.dependencies.length === 0) {
+    lines.push("| (none) |  |  |  |  |");
+  } else {
+    for (const dependency of inventory.dependencies) {
+      const candidates = dependency.normalizedTargetCandidates.join(", ");
+      const target =
+        dependency.normalizedTarget ?? (candidates || dependency.rawSpecifier);
+      lines.push(
+        `| ${escapeTableCell(`${dependency.sourcePath}:L${dependency.line}`)} | ${dependency.analyzer} | ${dependency.relation} | ${escapeTableCell(target)} | ${dependency.resolution} |`,
+      );
+    }
   }
   return lines;
+}
+
+function dependencyResolutionSummary(
+  inventory: ExecutableSurfaceInventory,
+): string {
+  const counts = new Map<string, number>();
+  for (const dependency of inventory.dependencies) {
+    counts.set(
+      dependency.resolution,
+      (counts.get(dependency.resolution) ?? 0) + 1,
+    );
+  }
+  return (
+    [...counts]
+      .sort(
+        ([leftName, leftCount], [rightName, rightCount]) =>
+          rightCount - leftCount || leftName.localeCompare(rightName),
+      )
+      .map(([resolution, count]) => `${resolution} ${count}`)
+      .join(", ") || "none"
+  );
 }
 
 function shortHash(hash: string): string {

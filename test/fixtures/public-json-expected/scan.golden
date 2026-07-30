@@ -91,10 +91,26 @@
         "sourceArtifact": 0,
         "owningSkill": 0
       },
+      "totalDependencies": 0,
+      "resolvedDependencies": 0,
+      "missingDependencies": 0,
+      "unsafeDependencies": 0,
+      "ambiguousDependencies": 0,
+      "noncanonicalDependencies": 0,
+      "notInventoryDependencies": 0,
+      "unavailableDependencies": 0,
+      "surfacesWithIncomingDependencies": 0,
+      "surfacesWithOutgoingDependencies": 0,
+      "directlyInvokedSurfaces": 0,
+      "transitivelyReachableSurfaces": 0,
+      "unreachedFromInvocationSurfaces": 0,
+      "dependencyAnalyzers": [],
+      "dependencyRelations": [],
       "interpreterHints": []
     },
     "surfaces": [],
-    "invocations": []
+    "invocations": [],
+    "dependencies": []
   },
   "securityPolicyInventory": {
     "totalPolicyAssets": 7,

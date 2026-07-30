@@ -429,12 +429,54 @@ facts.
 `renma.executable-surface-inventory.v1` result. It never reads or executes
 source. It joins only one collected snapshot's artifacts, parsed Markdown,
 immutable repository path states, parent-Skill index, and prepared
-`SecurityPolicyAssetEvidence` rows.
+`SecurityPolicyAssetEvidence` rows. Dependency candidates are collected once
+from the snapshot's already-read artifacts before repository path states are
+prepared, then reused by scan, BOM, diff, and CI projections without rereading
+source or rerunning an analyzer.
+
+`src/executable-dependency-analyzer.ts` owns the private, fixed built-in
+analyzer registry and the language-neutral candidate contract.
+`src/executable-dependency-js-ts.ts` and
+`src/executable-dependency-python.ts` are bounded lexical collectors.
+`src/executable-dependency-resolution.ts` owns the single Renma repository
+resolver. The analyzers interpret supplied text only; repository discovery,
+exclusions, depth, size, symlink safety, path states, surface identity,
+ordering, and graph construction remain Renma responsibilities.
+
+The registry order is `js-ts`, then `python`. It dynamically loads nothing,
+executes no subprocess, has no configuration or package export, and is not a
+public plugin system. The boundary permits a future external provider without
+coupling language syntax to inventory construction, but provider discovery,
+installation, permissions, and version negotiation are deliberately absent.
+
+Dependency sources are only text surfaces already eligible for the inventory:
+Skill-local scripts, repository-root tools, and non-canonical discovered or
+statically invoked scripts. A parsed import target that is not one of those
+surfaces resolves as `not-inventory`; it never creates a surface.
+
+The JS/TS collector supports `.js`, `.mjs`, `.ts`, `.mts`, and `.cts` sources,
+but not `.cjs`, `.jsx`, or `.tsx` sources. It recognizes string-literal ESM
+imports and export-from declarations with explicit relative `.js`, `.mjs`,
+`.cjs`, `.ts`, `.mts`, `.cts`, `.py`, `.sh`, or `.bash` targets. It skips
+comments, unrelated strings, template literals, dynamic imports, CommonJS
+`require`, `import.meta`, packages, absolute paths, query/fragment specifiers,
+extensionless paths, TypeScript type-only syntax, and `import = require`.
+Resolution is exact; compiler substitution, indexes, aliases, package exports,
+and import maps are not simulated.
+
+The Python collector supports only `.py` sources and explicit relative
+`from ... import ...` statements. A relative module yields its exact `.py` and
+`/__init__.py` candidates; `from . import helper, parser` yields one candidate
+set per imported module. Absolute imports, dynamic import helpers,
+environment/package resolution, `PYTHONPATH`, and implicit `__init__.py` edges
+are excluded. Multiple parsed candidates are `ambiguous`; one parsed candidate
+is selected; repository escape is `unsafe`.
 
 `src/helper-command-evidence.ts` owns the bounded helper grammar shared by
 repository path candidate collection, existing path diagnostics, and the
 inventory. The recognized launchers remain `node`, `bash`, `sh`, `python`, and
-`python3`; the supported extensions and safe path boundaries are unchanged.
+`python3`; `.ts`, `.mts`, and `.cts` join the established helper extensions,
+while safe path boundaries are unchanged.
 The module retains source lines and exact path states without becoming a
 general shell parser. Existing diagnostics use the same recognition and
 resolution evidence but keep their established IDs, severity, remediation,
@@ -448,9 +490,19 @@ reachability graph is built.
 Surface identity is the normalized repository path. Each row carries a
 fingerprint over content identity, scope, interpreter hints, reachability,
 reference and invocation counts, the surface's own policy evidence, and its
-invocation-governance aggregate. Repository tools do not inherit policy from
-their callers: surface policy remains evidence attached to or inherited by the
-surface itself.
+invocation-governance aggregate, plus incoming/outgoing resolved dependency
+counts and static invocation reachability. Repository tools do not inherit
+policy from their callers: surface policy remains evidence attached to or
+inherited by the surface itself.
+
+Only `resolved` and `noncanonical` dependency rows create graph edges.
+Breadth-first traversal starts at directly invoked surfaces, assigns them depth
+`0`, assigns reachable targets their deterministic minimum dependency depth,
+and terminates across cycles. `direct` wins over `transitive`; an import from
+an unreached source does not seed reachability. Existing `staticallyInvoked`,
+`invocationCount`, `invokedSurfaces`, and `uninvokedSurfaces` retain their
+direct-only meanings. Dependency reachability is repository visibility, not
+proof of runtime execution or a claim that an uninvoked surface is unused.
 
 Each recognized invocation separately correlates its exact source path and,
 when structurally resolved, its owning Skill entrypoint with already prepared
@@ -458,7 +510,8 @@ when structurally resolved, its owning Skill entrypoint with already prepared
 relationships remain distinct. The inventory does not reparse policy, merge
 rows, apply precedence, or create a combined invocation policy. Multiple
 effective-policy fingerprints are visibility about distinct contexts, not a
-conflict or verdict.
+conflict or verdict. Invocation policy never propagates through dependency
+edges.
 
 Raw invocation rows retain source lines, while diff identity uses source path,
 launcher, normalized or raw target, and occurrence ordinal so unrelated
@@ -467,11 +520,13 @@ governance fingerprint covers only owning-Skill resolution and normalized
 policy relationships. It excludes line numbers, snippets, unrelated invocation
 resolution, absolute paths, and time-dependent values.
 
-The inventory is visibility evidence, not SAST, a safety verdict, or an
-enforcement policy. Diff and CI sections are informational. Findings,
+The inventory is visibility evidence, not general language analysis, SAST, a
+safety verdict, or an enforcement policy. Diff and CI sections are
+informational. Findings,
 diagnostics, Readiness, the Security Policy Inventory, and Trust Graph
-intentionally do not consume the invocation-governance relationships in this
-slice.
+intentionally do not consume dependency or invocation-governance relationships
+in this slice. Executable dependency edges never become normal BOM Context
+Asset dependencies or Trust Graph edges.
 
 Default scan text derives a private review projection from the complete
 inventory. Healthy state renders one compact summary; only established

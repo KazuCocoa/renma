@@ -5,6 +5,9 @@ import type {
   ExecutableSurfaceInventory,
   ExecutableSurfaceInventorySummary,
   ExecutableSurfaceInvocation,
+  ExecutableSurfaceDependency,
+  ExecutableSurfaceDependencyResolution,
+  StaticInvocationReachability,
 } from "./executable-surface-inventory.js";
 
 export type ExecutableSurfaceChangeReason =
@@ -15,6 +18,8 @@ export type ExecutableSurfaceChangeReason =
   | "references"
   | "invocations"
   | "invocation-governance"
+  | "dependency-graph"
+  | "invocation-reachability"
   | "security-policy";
 
 export interface ExecutableSurfaceChange {
@@ -42,6 +47,36 @@ export interface ExecutableSurfaceInvocationResolutionChange {
   toResolution: ExecutableSurfaceInvocation["resolution"];
   fromLine: number;
   toLine: number;
+}
+
+export interface ExecutableSurfaceDependencyDelta {
+  sourcePath: string;
+  analyzer: ExecutableSurfaceDependency["analyzer"];
+  relation: ExecutableSurfaceDependency["relation"];
+  target: string;
+  occurrenceOrdinal: number;
+  resolution: ExecutableSurfaceDependencyResolution;
+  line: number;
+}
+
+export interface ExecutableSurfaceDependencyResolutionChange {
+  sourcePath: string;
+  analyzer: ExecutableSurfaceDependency["analyzer"];
+  relation: ExecutableSurfaceDependency["relation"];
+  target: string;
+  occurrenceOrdinal: number;
+  fromResolution: ExecutableSurfaceDependencyResolution;
+  toResolution: ExecutableSurfaceDependencyResolution;
+  fromLine: number;
+  toLine: number;
+}
+
+export interface ExecutableSurfaceInvocationDepthChange {
+  path: string;
+  fromReachability: StaticInvocationReachability;
+  toReachability: StaticInvocationReachability;
+  fromDepth?: number;
+  toDepth?: number;
 }
 
 export interface ExecutableInvocationGovernanceDelta {
@@ -100,6 +135,17 @@ export interface ExecutableSurfaceDiff {
     sourceArtifactPolicyEvidenceRelationsDelta: number;
     owningSkillPolicyEvidenceRelationsDelta: number;
     effectivePolicyCoverageDelta: number;
+    totalDependenciesDelta: number;
+    resolvedDependenciesDelta: number;
+    missingDependenciesDelta: number;
+    unsafeDependenciesDelta: number;
+    ambiguousDependenciesDelta: number;
+    noncanonicalDependenciesDelta: number;
+    notInventoryDependenciesDelta: number;
+    unavailableDependenciesDelta: number;
+    directlyInvokedSurfacesDelta: number;
+    transitivelyReachableSurfacesDelta: number;
+    unreachedFromInvocationSurfacesDelta: number;
   };
   fromSummary: ExecutableSurfaceInventorySummary;
   toSummary: ExecutableSurfaceInventorySummary;
@@ -114,6 +160,13 @@ export interface ExecutableSurfaceDiff {
   invocationsLostEffectivePolicyEvidence: ExecutableInvocationGovernanceChange[];
   invocationGovernanceChangesWithMultipleEffectivePolicyFingerprints: ExecutableInvocationGovernanceChange[];
   newProblematicInvocations: ExecutableSurfaceInvocationDelta[];
+  addedDependencies: ExecutableSurfaceDependencyDelta[];
+  removedDependencies: ExecutableSurfaceDependencyDelta[];
+  dependencyResolutionChanges: ExecutableSurfaceDependencyResolutionChange[];
+  newProblematicDependencies: ExecutableSurfaceDependencyDelta[];
+  newlyTransitivelyReachableSurfacePaths: string[];
+  surfacesLostStaticInvocationReachability: string[];
+  invocationDependencyDepthChanges: ExecutableSurfaceInvocationDepthChange[];
   newlyReachableSkillLocalPaths: string[];
   newlyUnreachableSkillLocalPaths: string[];
 }
@@ -131,6 +184,10 @@ export function buildExecutableSurfaceDiff(
   );
   const fromInvocations = semanticInvocationMap(from.invocations);
   const toInvocations = semanticInvocationMap(to.invocations);
+  const fromDependencies = semanticDependencyMap(from.dependencies);
+  const toDependencies = semanticDependencyMap(to.dependencies);
+  const fromDependencyGraphSignatures = dependencyGraphSignatures(from);
+  const toDependencyGraphSignatures = dependencyGraphSignatures(to);
 
   const addedSurfacePaths = [...toSurfaces.keys()]
     .filter((surfacePath) => !fromSurfaces.has(surfacePath))
@@ -147,7 +204,12 @@ export function buildExecutableSurfaceDiff(
       return [
         {
           path: surfacePath,
-          reasons: surfaceChangeReasons(fromSurface, toSurface),
+          reasons: surfaceChangeReasons(
+            fromSurface,
+            toSurface,
+            fromDependencyGraphSignatures.get(surfacePath) ?? "",
+            toDependencyGraphSignatures.get(surfacePath) ?? "",
+          ),
           fromFingerprint: fromSurface.fingerprint,
           toFingerprint: toSurface.fingerprint,
         },
@@ -237,6 +299,48 @@ export function buildExecutableSurfaceDiff(
     })
     .map(([, invocation]) => invocation)
     .sort(compareInvocationDeltas);
+  const addedDependencies = [...toDependencies]
+    .filter(([key]) => !fromDependencies.has(key))
+    .map(([, dependency]) => dependencyDelta(dependency))
+    .sort(compareDependencyDeltas);
+  const removedDependencies = [...fromDependencies]
+    .filter(([key]) => !toDependencies.has(key))
+    .map(([, dependency]) => dependencyDelta(dependency))
+    .sort(compareDependencyDeltas);
+  const dependencyResolutionChanges = [...toDependencies]
+    .flatMap(([key, toDependency]) => {
+      const fromDependency = fromDependencies.get(key);
+      if (
+        !fromDependency ||
+        fromDependency.resolution === toDependency.resolution
+      ) {
+        return [];
+      }
+      return [
+        {
+          sourcePath: toDependency.sourcePath,
+          analyzer: toDependency.analyzer,
+          relation: toDependency.relation,
+          target: toDependency.target,
+          occurrenceOrdinal: toDependency.occurrenceOrdinal,
+          fromResolution: fromDependency.resolution,
+          toResolution: toDependency.resolution,
+          fromLine: fromDependency.line,
+          toLine: toDependency.line,
+        },
+      ];
+    })
+    .sort(compareDependencyChanges);
+  const newProblematicDependencies = [...toDependencies]
+    .filter(([key, dependency]) => {
+      const previous = fromDependencies.get(key);
+      return (
+        dependency.resolution !== "resolved" &&
+        previous?.resolution !== dependency.resolution
+      );
+    })
+    .map(([, dependency]) => dependencyDelta(dependency))
+    .sort(compareDependencyDeltas);
 
   return {
     summary: summaryDelta(from.summary, to.summary),
@@ -253,6 +357,23 @@ export function buildExecutableSurfaceDiff(
     invocationsLostEffectivePolicyEvidence,
     invocationGovernanceChangesWithMultipleEffectivePolicyFingerprints,
     newProblematicInvocations,
+    addedDependencies,
+    removedDependencies,
+    dependencyResolutionChanges,
+    newProblematicDependencies,
+    newlyTransitivelyReachableSurfacePaths: staticReachabilityChanges(
+      fromSurfaces,
+      toSurfaces,
+      "transitive",
+    ),
+    surfacesLostStaticInvocationReachability: lostStaticReachability(
+      fromSurfaces,
+      toSurfaces,
+    ),
+    invocationDependencyDepthChanges: invocationDepthChanges(
+      fromSurfaces,
+      toSurfaces,
+    ),
     newlyReachableSkillLocalPaths: reachabilityChanges(
       fromSurfaces,
       toSurfaces,
@@ -318,12 +439,33 @@ function summaryDelta(
       to.invocationPolicyEvidenceRelations.owningSkill -
       from.invocationPolicyEvidenceRelations.owningSkill,
     effectivePolicyCoverageDelta: coveragePercent(to) - coveragePercent(from),
+    totalDependenciesDelta: to.totalDependencies - from.totalDependencies,
+    resolvedDependenciesDelta:
+      to.resolvedDependencies - from.resolvedDependencies,
+    missingDependenciesDelta: to.missingDependencies - from.missingDependencies,
+    unsafeDependenciesDelta: to.unsafeDependencies - from.unsafeDependencies,
+    ambiguousDependenciesDelta:
+      to.ambiguousDependencies - from.ambiguousDependencies,
+    noncanonicalDependenciesDelta:
+      to.noncanonicalDependencies - from.noncanonicalDependencies,
+    notInventoryDependenciesDelta:
+      to.notInventoryDependencies - from.notInventoryDependencies,
+    unavailableDependenciesDelta:
+      to.unavailableDependencies - from.unavailableDependencies,
+    directlyInvokedSurfacesDelta:
+      to.directlyInvokedSurfaces - from.directlyInvokedSurfaces,
+    transitivelyReachableSurfacesDelta:
+      to.transitivelyReachableSurfaces - from.transitivelyReachableSurfaces,
+    unreachedFromInvocationSurfacesDelta:
+      to.unreachedFromInvocationSurfaces - from.unreachedFromInvocationSurfaces,
   };
 }
 
 function surfaceChangeReasons(
   from: ExecutableSurfaceEntry,
   to: ExecutableSurfaceEntry,
+  fromDependencyGraphSignature: string,
+  toDependencyGraphSignature: string,
 ): ExecutableSurfaceChangeReason[] {
   const reasons: ExecutableSurfaceChangeReason[] = [];
   if (
@@ -373,6 +515,23 @@ function surfaceChangeReasons(
     reasons.push("invocation-governance");
   }
   if (
+    fromDependencyGraphSignature !== toDependencyGraphSignature ||
+    from.dependencyEvidence.incomingResolvedDependencyCount !==
+      to.dependencyEvidence.incomingResolvedDependencyCount ||
+    from.dependencyEvidence.outgoingResolvedDependencyCount !==
+      to.dependencyEvidence.outgoingResolvedDependencyCount
+  ) {
+    reasons.push("dependency-graph");
+  }
+  if (
+    from.dependencyEvidence.staticInvocationReachability !==
+      to.dependencyEvidence.staticInvocationReachability ||
+    from.dependencyEvidence.minimumInvocationDependencyDepth !==
+      to.dependencyEvidence.minimumInvocationDependencyDepth
+  ) {
+    reasons.push("invocation-reachability");
+  }
+  if (
     from.securityPolicy.hasEffectivePolicy !==
       to.securityPolicy.hasEffectivePolicy ||
     from.securityPolicy.fingerprint !== to.securityPolicy.fingerprint ||
@@ -386,6 +545,45 @@ function surfaceChangeReasons(
   return reasons;
 }
 
+function dependencyGraphSignatures(
+  inventory: ExecutableSurfaceInventory,
+): ReadonlyMap<string, string> {
+  const evidence = new Map<string, { incoming: string[]; outgoing: string[] }>(
+    inventory.surfaces.map((surface) => [
+      surface.path,
+      { incoming: [], outgoing: [] },
+    ]),
+  );
+  for (const dependency of inventory.dependencies) {
+    if (
+      (dependency.resolution !== "resolved" &&
+        dependency.resolution !== "noncanonical") ||
+      !dependency.normalizedTarget
+    ) {
+      continue;
+    }
+    evidence
+      .get(dependency.sourcePath)
+      ?.outgoing.push(dependency.normalizedTarget);
+    evidence
+      .get(dependency.normalizedTarget)
+      ?.incoming.push(dependency.sourcePath);
+  }
+  return new Map(
+    [...evidence].map(([surfacePath, graph]) => [
+      surfacePath,
+      JSON.stringify({
+        incoming: graph.incoming.sort((left, right) =>
+          left.localeCompare(right),
+        ),
+        outgoing: graph.outgoing.sort((left, right) =>
+          left.localeCompare(right),
+        ),
+      }),
+    ]),
+  );
+}
+
 interface SemanticInvocation {
   sourcePath: string;
   launcher: string;
@@ -393,6 +591,17 @@ interface SemanticInvocation {
   occurrenceOrdinal: number;
   resolution: ExecutableSurfaceInvocation["resolution"];
   governance: ExecutableInvocationGovernance;
+  line: number;
+}
+
+interface SemanticDependency {
+  sourcePath: string;
+  analyzer: ExecutableSurfaceDependency["analyzer"];
+  relation: ExecutableSurfaceDependency["relation"];
+  target: string;
+  rawSpecifier: string;
+  occurrenceOrdinal: number;
+  resolution: ExecutableSurfaceDependencyResolution;
   line: number;
 }
 
@@ -428,6 +637,61 @@ function semanticInvocationMap(
         return [`${base}\0${occurrenceOrdinal}`, row] as const;
       }),
   );
+}
+
+function semanticDependencyMap(
+  dependencies: readonly ExecutableSurfaceDependency[],
+): Map<string, SemanticDependency> {
+  const ordinals = new Map<string, number>();
+  return new Map(
+    [...dependencies]
+      .sort(
+        (left, right) =>
+          left.sourcePath.localeCompare(right.sourcePath) ||
+          left.line - right.line ||
+          left.analyzer.localeCompare(right.analyzer) ||
+          left.relation.localeCompare(right.relation) ||
+          dependencyTarget(left).localeCompare(dependencyTarget(right)) ||
+          left.rawSpecifier.localeCompare(right.rawSpecifier),
+      )
+      .map((dependency) => {
+        const target = dependencyTarget(dependency);
+        const base = [
+          dependency.sourcePath,
+          dependency.analyzer,
+          dependency.relation,
+          target,
+          dependency.rawSpecifier,
+        ].join("\0");
+        const occurrenceOrdinal = (ordinals.get(base) ?? 0) + 1;
+        ordinals.set(base, occurrenceOrdinal);
+        const row = {
+          sourcePath: dependency.sourcePath,
+          analyzer: dependency.analyzer,
+          relation: dependency.relation,
+          target,
+          rawSpecifier: dependency.rawSpecifier,
+          occurrenceOrdinal,
+          resolution: dependency.resolution,
+          line: dependency.line,
+        };
+        return [`${base}\0${occurrenceOrdinal}`, row] as const;
+      }),
+  );
+}
+
+function dependencyDelta(
+  dependency: SemanticDependency,
+): ExecutableSurfaceDependencyDelta {
+  return {
+    sourcePath: dependency.sourcePath,
+    analyzer: dependency.analyzer,
+    relation: dependency.relation,
+    target: dependency.target,
+    occurrenceOrdinal: dependency.occurrenceOrdinal,
+    resolution: dependency.resolution,
+    line: dependency.line,
+  };
 }
 
 function governanceChange(
@@ -493,8 +757,95 @@ function reachabilityChanges(
     .sort((left, right) => left.localeCompare(right));
 }
 
+function staticReachabilityChanges(
+  from: ReadonlyMap<string, ExecutableSurfaceEntry>,
+  to: ReadonlyMap<string, ExecutableSurfaceEntry>,
+  reachability: StaticInvocationReachability,
+): string[] {
+  return [...to]
+    .filter(([surfacePath, surface]) => {
+      const current = surface.dependencyEvidence.staticInvocationReachability;
+      const previous =
+        from.get(surfacePath)?.dependencyEvidence.staticInvocationReachability;
+      return current === reachability && previous !== reachability;
+    })
+    .map(([surfacePath]) => surfacePath)
+    .sort((left, right) => left.localeCompare(right));
+}
+
+function lostStaticReachability(
+  from: ReadonlyMap<string, ExecutableSurfaceEntry>,
+  to: ReadonlyMap<string, ExecutableSurfaceEntry>,
+): string[] {
+  return [...from]
+    .filter(([surfacePath, surface]) => {
+      const previous = surface.dependencyEvidence.staticInvocationReachability;
+      const current =
+        to.get(surfacePath)?.dependencyEvidence.staticInvocationReachability;
+      return (
+        previous !== "unreached" &&
+        (current === undefined || current === "unreached")
+      );
+    })
+    .map(([surfacePath]) => surfacePath)
+    .sort((left, right) => left.localeCompare(right));
+}
+
+function invocationDepthChanges(
+  from: ReadonlyMap<string, ExecutableSurfaceEntry>,
+  to: ReadonlyMap<string, ExecutableSurfaceEntry>,
+): ExecutableSurfaceInvocationDepthChange[] {
+  return [...to]
+    .flatMap(([surfacePath, toSurface]) => {
+      const fromSurface = from.get(surfacePath);
+      if (!fromSurface) return [];
+      const fromEvidence = fromSurface.dependencyEvidence;
+      const toEvidence = toSurface.dependencyEvidence;
+      if (
+        fromEvidence.minimumInvocationDependencyDepth ===
+          toEvidence.minimumInvocationDependencyDepth &&
+        fromEvidence.staticInvocationReachability ===
+          toEvidence.staticInvocationReachability
+      ) {
+        return [];
+      }
+      if (
+        fromEvidence.minimumInvocationDependencyDepth === undefined &&
+        toEvidence.minimumInvocationDependencyDepth === undefined
+      ) {
+        return [];
+      }
+      return [
+        {
+          path: surfacePath,
+          fromReachability: fromEvidence.staticInvocationReachability,
+          toReachability: toEvidence.staticInvocationReachability,
+          ...(fromEvidence.minimumInvocationDependencyDepth !== undefined
+            ? {
+                fromDepth: fromEvidence.minimumInvocationDependencyDepth,
+              }
+            : {}),
+          ...(toEvidence.minimumInvocationDependencyDepth !== undefined
+            ? { toDepth: toEvidence.minimumInvocationDependencyDepth }
+            : {}),
+        },
+      ];
+    })
+    .sort((left, right) => left.path.localeCompare(right.path));
+}
+
 function invocationTarget(invocation: ExecutableSurfaceInvocation): string {
   return invocation.normalizedTarget ?? invocation.rawTarget;
+}
+
+function dependencyTarget(
+  dependency: Pick<
+    ExecutableSurfaceDependency,
+    "normalizedTarget" | "normalizedTargetCandidates" | "rawSpecifier"
+  >,
+): string {
+  const candidates = dependency.normalizedTargetCandidates.join("|");
+  return dependency.normalizedTarget ?? (candidates || dependency.rawSpecifier);
 }
 
 function coveragePercent(summary: ExecutableSurfaceInventorySummary): number {
@@ -530,6 +881,32 @@ function compareInvocationDeltas(
   return (
     left.sourcePath.localeCompare(right.sourcePath) ||
     left.launcher.localeCompare(right.launcher) ||
+    left.target.localeCompare(right.target) ||
+    left.occurrenceOrdinal - right.occurrenceOrdinal
+  );
+}
+
+function compareDependencyChanges(
+  left: ExecutableSurfaceDependencyResolutionChange,
+  right: ExecutableSurfaceDependencyResolutionChange,
+): number {
+  return (
+    left.sourcePath.localeCompare(right.sourcePath) ||
+    left.analyzer.localeCompare(right.analyzer) ||
+    left.relation.localeCompare(right.relation) ||
+    left.target.localeCompare(right.target) ||
+    left.occurrenceOrdinal - right.occurrenceOrdinal
+  );
+}
+
+function compareDependencyDeltas(
+  left: ExecutableSurfaceDependencyDelta,
+  right: ExecutableSurfaceDependencyDelta,
+): number {
+  return (
+    left.sourcePath.localeCompare(right.sourcePath) ||
+    left.analyzer.localeCompare(right.analyzer) ||
+    left.relation.localeCompare(right.relation) ||
     left.target.localeCompare(right.target) ||
     left.occurrenceOrdinal - right.occurrenceOrdinal
   );
