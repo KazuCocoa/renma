@@ -6,6 +6,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-07-30
+
 ### Added
 
 - Added deterministic raw-source findings for suspicious bidirectional controls
@@ -1788,7 +1790,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.25.3...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.26.0...HEAD
+[0.26.0]: https://github.com/KazuCocoa/renma/compare/v0.25.3...v0.26.0
 [0.25.3]: https://github.com/KazuCocoa/renma/compare/v0.25.2...v0.25.3
 [0.25.2]: https://github.com/KazuCocoa/renma/compare/v0.25.1...v0.25.2
 [0.25.1]: https://github.com/KazuCocoa/renma/compare/v0.25.0...v0.25.1
