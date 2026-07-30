@@ -21,6 +21,17 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   present. No package version, finding, diagnostic, readiness check, policy
   inventory semantic, Trust Graph edge, or CI verdict changed.
 
+### Changed
+
+- Compacted healthy default scan text to one executable-surface summary and
+  expanded only bounded evidence relevant to resolution, scope, reachability,
+  missing context-policy evidence, or multiple fingerprints. Complete scan JSON
+  and BOM output remain unchanged.
+- Added explicit diff and CI visibility for newly introduced invocations that
+  already have multiple effective policy fingerprints, including total deltas
+  and bounded neutral detail without changing path-problem evidence or CI
+  verdicts.
+
 ## [0.27.0] - 2026-07-30
 
 ### Added

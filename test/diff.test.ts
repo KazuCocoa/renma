@@ -880,6 +880,33 @@ test("formatDiff renders line-insensitive invocation governance changes separate
   assert.deepEqual(parsed.executableSurface.newProblematicInvocations, []);
 });
 
+test("formatDiff JSON unconditionally exposes newly added multi-fingerprint invocations", () => {
+  const report = buildDiffReport(
+    "/repo",
+    snapshot("base", {
+      executableSurfaceInventory: zeroExecutableSurfaceInventory(),
+    }),
+    snapshot("head", {
+      executableSurfaceInventory: inventoryWithInvocation("resolved", [
+        `sha256:${"a".repeat(64)}`,
+        `sha256:${"b".repeat(64)}`,
+      ]),
+    }),
+  );
+
+  const parsed = JSON.parse(formatDiff(report, "json"));
+  assert.equal(
+    parsed.executableSurface
+      .newInvocationsWithMultipleEffectivePolicyFingerprints.length,
+    1,
+  );
+  assert.deepEqual(
+    parsed.executableSurface.newInvocationsWithoutEffectivePolicyEvidence,
+    [],
+  );
+  assert.deepEqual(parsed.executableSurface.newProblematicInvocations, []);
+});
+
 test("formatDiff renders legacy reports without a Discovery section", () => {
   const fullReport = buildDiffReport(
     "/repo",

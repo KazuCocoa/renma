@@ -109,6 +109,7 @@ export interface ExecutableSurfaceDiff {
   invocationResolutionChanges: ExecutableSurfaceInvocationResolutionChange[];
   invocationGovernanceChanges: ExecutableInvocationGovernanceChange[];
   newInvocationsWithoutEffectivePolicyEvidence: ExecutableInvocationGovernanceDelta[];
+  newInvocationsWithMultipleEffectivePolicyFingerprints: ExecutableInvocationGovernanceDelta[];
   invocationsGainedEffectivePolicyEvidence: ExecutableInvocationGovernanceChange[];
   invocationsLostEffectivePolicyEvidence: ExecutableInvocationGovernanceChange[];
   invocationGovernanceChangesWithMultipleEffectivePolicyFingerprints: ExecutableInvocationGovernanceChange[];
@@ -198,6 +199,16 @@ export function buildExecutableSurfaceDiff(
     )
     .map(([, invocation]) => governanceDelta(invocation))
     .sort(compareGovernanceDeltas);
+  const newInvocationsWithMultipleEffectivePolicyFingerprints = [
+    ...toInvocations,
+  ]
+    .filter(
+      ([key, invocation]) =>
+        !fromInvocations.has(key) &&
+        invocation.governance.distinctEffectivePolicyFingerprints.length > 1,
+    )
+    .map(([, invocation]) => governanceDelta(invocation))
+    .sort(compareGovernanceDeltas);
   const invocationsGainedEffectivePolicyEvidence =
     invocationGovernanceChanges.filter(
       (change) =>
@@ -237,6 +248,7 @@ export function buildExecutableSurfaceDiff(
     invocationResolutionChanges,
     invocationGovernanceChanges,
     newInvocationsWithoutEffectivePolicyEvidence,
+    newInvocationsWithMultipleEffectivePolicyFingerprints,
     invocationsGainedEffectivePolicyEvidence,
     invocationsLostEffectivePolicyEvidence,
     invocationGovernanceChangesWithMultipleEffectivePolicyFingerprints,

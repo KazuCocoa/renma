@@ -393,22 +393,92 @@ test("diff classifies new, gained, and lost invocation policy evidence without p
       (candidate) => candidate.resolution !== "resolved",
     ).length,
   );
+  assert.equal(
+    added.newInvocationsWithMultipleEffectivePolicyFingerprints.length,
+    baseline.summary.invocationsWithMultipleEffectivePolicyFingerprints,
+  );
+  const newlyAddedMultiple =
+    added.newInvocationsWithMultipleEffectivePolicyFingerprints.find(
+      (candidate) =>
+        candidate.sourcePath === "skills/ref/references/run.md" &&
+        candidate.target === "tools/different.mjs",
+    );
+  assert.ok(newlyAddedMultiple);
+  assert.equal(
+    newlyAddedMultiple.distinctEffectivePolicyFingerprints.length,
+    2,
+  );
+  assert.equal(
+    added.newInvocationsWithoutEffectivePolicyEvidence.some(
+      (candidate) =>
+        candidate.sourcePath === newlyAddedMultiple.sourcePath &&
+        candidate.target === newlyAddedMultiple.target,
+    ),
+    false,
+  );
+  assert.equal(
+    added.newProblematicInvocations.some(
+      (candidate) =>
+        candidate.sourcePath === newlyAddedMultiple.sourcePath &&
+        candidate.target === newlyAddedMultiple.target,
+    ),
+    false,
+  );
+  assert.equal(
+    added.newInvocationsWithMultipleEffectivePolicyFingerprints.some(
+      (candidate) =>
+        candidate.sourcePath === "skills/local/SKILL.md" &&
+        candidate.target === "tools/same-policy.mjs",
+    ),
+    false,
+  );
+
+  const oneFingerprintReference = governanceFixture({
+    referenceSourceEffective: false,
+  }).inventory;
+  const oneToTwo = buildExecutableSurfaceDiff(
+    oneFingerprintReference,
+    baseline,
+  );
+  assert.equal(
+    oneToTwo.invocationGovernanceChangesWithMultipleEffectivePolicyFingerprints
+      .length,
+    3,
+  );
+  assert.deepEqual(
+    oneToTwo.newInvocationsWithMultipleEffectivePolicyFingerprints,
+    [],
+  );
+
+  const removed = buildExecutableSurfaceDiff(baseline, empty);
+  assert.equal(
+    removed.summary.invocationsWithMultipleEffectivePolicyFingerprintsDelta,
+    -baseline.summary.invocationsWithMultipleEffectivePolicyFingerprints,
+  );
+  assert.deepEqual(
+    removed.newInvocationsWithMultipleEffectivePolicyFingerprints,
+    [],
+  );
+  assert.deepEqual(removed, buildExecutableSurfaceDiff(baseline, empty));
 });
 
-test("text rendering uses separate neutral surface and invocation policy terminology", () => {
+test("text rendering expands only neutral invocation-governance review evidence", () => {
   const lines = formatExecutableSurfaceInventoryText(
     governanceFixture().inventory,
   ).join("\n");
-  assert.match(lines, /Surface policy evidence: 0 with, 6 without/);
-  assert.match(lines, /Invocation-context policy evidence: 14 with, 5 without/);
+  assert.match(lines, /^Executable Surface Review$/m);
   assert.match(
     lines,
-    /Invocation policy variants: 3 invocations with multiple effective fingerprints/,
+    /Executable surfaces: 6; invocations 15\/19 resolved; invocation-context policy evidence 14\/19/,
   );
+  assert.match(lines, /tools\/mixed\.mjs/);
+  assert.match(lines, /policy-variants 2/);
+  assert.doesNotMatch(lines, /tools\/same-policy\.mjs/);
   assert.match(
     lines,
-    /tools\/same-policy\.mjs.*surface-policy none; invocation-policy 2\/2; policy-variants 1/,
+    /skills\/ref\/references\/run\.md.*invocation-context policy evidence with/,
   );
+  assert.doesNotMatch(lines, /sha256:[a-f0-9]{64}/);
   assert.doesNotMatch(lines, /unprotected|unsafe policy|noncompliant/i);
 });
 

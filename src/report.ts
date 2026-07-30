@@ -1,5 +1,19 @@
 import type { ScanResult } from "./types/scan-result.js";
-import type { ExecutableSurfaceInventory } from "./executable-surface-inventory.js";
+import type {
+  ExecutableSurfaceEntry,
+  ExecutableSurfaceInventory,
+  ExecutableSurfaceInvocation,
+} from "./executable-surface-inventory.js";
+import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
+
+const EXECUTABLE_SURFACE_TEXT_LIMIT =
+  DEFAULT_QUALITY_PROFILE.presentation.topSummaryItemCap;
+
+interface ExecutableSurfaceTextReview {
+  requiresReview: boolean;
+  surfacePaths: string[];
+  invocations: ExecutableSurfaceInvocation[];
+}
 
 /** Format one complete JSON document with two-space indentation and one newline. */
 export function formatJsonDocument(value: unknown): string {
@@ -80,36 +94,144 @@ export function formatText(result: ScanResult): string {
   return `${lines.join("\n")}\n`;
 }
 
-/** Render the compact inventory section shared by terminal-facing reports. */
+/** Render the action-oriented executable-surface projection for scan text. */
 export function formatExecutableSurfaceInventoryText(
   inventory: ExecutableSurfaceInventory,
 ): string[] {
-  const summary = inventory.summary;
-  const lines = [
-    "",
-    "Executable Surface Inventory",
-    `  Surfaces: ${summary.totalSurfaces} (${summary.skillLocalSurfaces} Skill-local, ${summary.repositoryToolSurfaces} repository tools, ${summary.noncanonicalSurfaces} non-canonical)`,
-    `  Skill-local reachability: ${summary.reachableSkillLocalSurfaces} reachable, ${summary.unreachableSkillLocalSurfaces} unreachable`,
-    `  References/invocations: ${summary.referencedSurfaces} referenced, ${summary.invokedSurfaces} invoked`,
-    `  Surface policy evidence: ${summary.surfacesWithEffectivePolicy} with, ${summary.surfacesWithoutEffectivePolicy} without`,
-    `  Invocation-context policy evidence: ${summary.invocationsWithEffectivePolicyEvidence} with, ${summary.invocationsWithoutEffectivePolicyEvidence} without`,
-    `  Invocation policy variants: ${summary.invocationsWithMultipleEffectivePolicyFingerprints} invocations with multiple effective fingerprints`,
-    `  Invocation resolution: ${summary.resolvedInvocations} resolved, ${summary.missingInvocations} missing, ${summary.unsafeInvocations} unsafe, ${summary.unscopedInvocations} unscoped, ${summary.noncanonicalInvocations} non-canonical, ${summary.unavailableInvocations} unavailable`,
-  ];
-  if (inventory.surfaces.length === 0) {
-    lines.push("  Surfaces: (none)");
-    return lines;
-  }
-  for (const surface of inventory.surfaces) {
-    const reachability =
-      surface.scope === "skill-local"
-        ? surface.reachableFromOwningSkill
-          ? `reachable@${surface.reachabilityDepth}`
-          : "unreachable"
-        : "n/a";
+  const compactSummary = formatExecutableSurfaceCompactSummary(inventory);
+  const review = executableSurfaceTextReview(inventory);
+  if (!review.requiresReview) return [compactSummary];
+
+  const surfacesByPath = new Map(
+    inventory.surfaces.map((surface) => [surface.path, surface]),
+  );
+  const reviewSurfaces = review.surfacePaths.flatMap((surfacePath) => {
+    const surface = surfacesByPath.get(surfacePath);
+    return surface ? [surface] : [];
+  });
+  const lines = ["", "Executable Surface Review", `  ${compactSummary}`];
+  if (reviewSurfaces.length > 0) {
     lines.push(
-      `  - ${surface.path} [${surface.scope}; ${surface.interpreterHints.join(",")}; reachability ${reachability}; invocations ${surface.invocationCount}; surface-policy ${surface.securityPolicy.hasEffectivePolicy ? "effective" : "none"}; invocation-policy ${surface.invocationGovernance.invocationsWithEffectivePolicyEvidence}/${surface.invocationCount}; policy-variants ${surface.invocationGovernance.distinctEffectivePolicyFingerprints.length}]`,
+      "  Review surfaces:",
+      ...reviewSurfaces
+        .slice(0, EXECUTABLE_SURFACE_TEXT_LIMIT)
+        .map(formatExecutableSurfaceReviewRow),
+      ...formatExecutableSurfaceTextOverflow(reviewSurfaces.length),
+    );
+  }
+  if (review.invocations.length > 0) {
+    lines.push(
+      "  Review invocations:",
+      ...review.invocations
+        .slice(0, EXECUTABLE_SURFACE_TEXT_LIMIT)
+        .map(formatExecutableInvocationReviewRow),
+      ...formatExecutableSurfaceTextOverflow(review.invocations.length),
     );
   }
   return lines;
+}
+
+function formatExecutableSurfaceCompactSummary(
+  inventory: ExecutableSurfaceInventory,
+): string {
+  const summary = inventory.summary;
+  if (summary.totalSurfaces === 0) return "Executable surfaces: 0";
+  if (summary.totalInvocations === 0) {
+    return `Executable surfaces: ${summary.totalSurfaces}; no recognized invocations`;
+  }
+  return `Executable surfaces: ${summary.totalSurfaces}; invocations ${summary.resolvedInvocations}/${summary.totalInvocations} resolved; invocation-context policy evidence ${summary.invocationsWithEffectivePolicyEvidence}/${summary.totalInvocations}`;
+}
+
+function executableSurfaceTextReview(
+  inventory: ExecutableSurfaceInventory,
+): ExecutableSurfaceTextReview {
+  const reviewInvocations = inventory.invocations
+    .filter(invocationRequiresExecutableSurfaceReview)
+    .sort(compareExecutableSurfaceReviewInvocations);
+  const surfacePaths = new Set(
+    inventory.surfaces
+      .filter(surfaceRequiresExecutableSurfaceReview)
+      .map((surface) => surface.path),
+  );
+  const knownSurfacePaths = new Set(
+    inventory.surfaces.map((surface) => surface.path),
+  );
+  for (const invocation of reviewInvocations) {
+    if (
+      invocation.normalizedTarget &&
+      knownSurfacePaths.has(invocation.normalizedTarget)
+    ) {
+      surfacePaths.add(invocation.normalizedTarget);
+    }
+  }
+  const orderedSurfacePaths = [...surfacePaths].sort((left, right) =>
+    left.localeCompare(right),
+  );
+  return {
+    requiresReview:
+      orderedSurfacePaths.length > 0 || reviewInvocations.length > 0,
+    surfacePaths: orderedSurfacePaths,
+    invocations: reviewInvocations,
+  };
+}
+
+function surfaceRequiresExecutableSurfaceReview(
+  surface: ExecutableSurfaceEntry,
+): boolean {
+  return (
+    surface.scope === "noncanonical" ||
+    (surface.scope === "skill-local" &&
+      surface.reachableFromOwningSkill === false)
+  );
+}
+
+function invocationRequiresExecutableSurfaceReview(
+  invocation: ExecutableSurfaceInvocation,
+): boolean {
+  return (
+    invocation.resolution !== "resolved" ||
+    !invocation.governance.hasEffectivePolicyEvidence ||
+    invocation.governance.distinctEffectivePolicyFingerprints.length > 1
+  );
+}
+
+function formatExecutableSurfaceReviewRow(
+  surface: ExecutableSurfaceEntry,
+): string {
+  const reachability =
+    surface.scope === "skill-local"
+      ? surface.reachableFromOwningSkill
+        ? `reachable@${surface.reachabilityDepth}`
+        : "unreachable"
+      : "n/a";
+  return `  - ${surface.path} [${surface.scope}; ${surface.interpreterHints.join(",")}; reachability ${reachability}; invocations ${surface.invocationCount}; surface-policy ${surface.securityPolicy.hasEffectivePolicy ? "effective" : "none"}; invocation-policy ${surface.invocationGovernance.invocationsWithEffectivePolicyEvidence}/${surface.invocationCount}; policy-variants ${surface.invocationGovernance.distinctEffectivePolicyFingerprints.length}]`;
+}
+
+function formatExecutableInvocationReviewRow(
+  invocation: ExecutableSurfaceInvocation,
+): string {
+  const target = invocation.normalizedTarget ?? invocation.rawTarget;
+  return `  - ${invocation.sourcePath}:L${invocation.line} ${invocation.launcher} ${target} [resolution ${invocation.resolution}; invocation-context policy evidence ${invocation.governance.hasEffectivePolicyEvidence ? "with" : "without"}; policy-variants ${invocation.governance.distinctEffectivePolicyFingerprints.length}; owning-skill ${invocation.governance.owningSkillResolution}]`;
+}
+
+function compareExecutableSurfaceReviewInvocations(
+  left: ExecutableSurfaceInvocation,
+  right: ExecutableSurfaceInvocation,
+): number {
+  return (
+    left.sourcePath.localeCompare(right.sourcePath) ||
+    left.line - right.line ||
+    left.launcher.localeCompare(right.launcher) ||
+    (left.normalizedTarget ?? left.rawTarget).localeCompare(
+      right.normalizedTarget ?? right.rawTarget,
+    ) ||
+    left.occurrenceOrdinal - right.occurrenceOrdinal
+  );
+}
+
+function formatExecutableSurfaceTextOverflow(length: number): string[] {
+  if (length <= EXECUTABLE_SURFACE_TEXT_LIMIT) return [];
+  return [
+    `  - ${length - EXECUTABLE_SURFACE_TEXT_LIMIT} more not shown; use scan JSON for complete evidence.`,
+  ];
 }

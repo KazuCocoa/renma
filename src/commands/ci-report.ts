@@ -18,7 +18,10 @@ import {
   zeroSecurityPolicyInventorySummary,
   type SecurityPolicyInventorySummary,
 } from "../security-policy-inventory.js";
-import { buildExecutableSurfaceDiff } from "../executable-surface-diff.js";
+import {
+  buildExecutableSurfaceDiff,
+  type ExecutableSurfaceDiff,
+} from "../executable-surface-diff.js";
 import { zeroExecutableSurfaceInventory } from "../executable-surface-inventory.js";
 import type { ConfigOverrides } from "../config.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
@@ -39,6 +42,22 @@ import {
 
 export type CiReportFormat = DiffFormat;
 export type CiReportStatus = "pass" | "warn" | "fail";
+type CiCompatibleExecutableSurfaceDiff = Omit<
+  ExecutableSurfaceDiff,
+  "newInvocationsWithMultipleEffectivePolicyFingerprints"
+> &
+  Partial<
+    Pick<
+      ExecutableSurfaceDiff,
+      "newInvocationsWithMultipleEffectivePolicyFingerprints"
+    >
+  >;
+type CiFormatCompatibleDiffReport = Omit<
+  DiffReportWithoutSkillDiscovery,
+  "executableSurface"
+> & {
+  executableSurface: CiCompatibleExecutableSurfaceDiff;
+};
 export type CiCompatibleDiffReport = DiffReportWithoutSkillDiscovery;
 
 export interface CiReport {
@@ -59,8 +78,12 @@ export interface CiReport {
 
 export type CiReportFormatInput =
   | CiReport
-  | Omit<CiReport, "skillDiscoveryPolicy">
-  | Omit<CiReport, "skillDiscovery" | "skillDiscoveryPolicy">;
+  | (Omit<CiReport, "diff" | "skillDiscoveryPolicy"> & {
+      diff: CiFormatCompatibleDiffReport;
+    })
+  | (Omit<CiReport, "diff" | "skillDiscovery" | "skillDiscoveryPolicy"> & {
+      diff: CiFormatCompatibleDiffReport;
+    });
 
 interface CiReportOptions {
   fromRef: string;
@@ -203,7 +226,7 @@ function hasBlockingContextLensDiagnostics(
 }
 
 function newUnresolvedRequiredEdgeCount(
-  report: CiCompatibleDiffReport,
+  report: Pick<CiCompatibleDiffReport, "graph">,
 ): number {
   return report.graph.newUnresolvedEdges.filter(isRequiredEdge).length;
 }
@@ -362,10 +385,13 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
 }
 
 function formatExecutableSurfaceChanges(
-  executableSurface: CiCompatibleDiffReport["executableSurface"],
+  executableSurface: CiCompatibleExecutableSurfaceDiff,
 ): string[] {
   const newWithout =
     executableSurface.newInvocationsWithoutEffectivePolicyEvidence ?? [];
+  const newMultiple =
+    executableSurface.newInvocationsWithMultipleEffectivePolicyFingerprints ??
+    [];
   const gained =
     executableSurface.invocationsGainedEffectivePolicyEvidence ?? [];
   const lost = executableSurface.invocationsLostEffectivePolicyEvidence ?? [];
@@ -383,6 +409,8 @@ function formatExecutableSurfaceChanges(
     `- New invocations without effective policy evidence: ${newWithout.length}`,
     `- Invocations that gained effective policy evidence: ${gained.length}`,
     `- Invocations that lost effective policy evidence: ${lost.length}`,
+    `- Invocations with multiple effective fingerprints: ${executableSurface.fromSummary.invocationsWithMultipleEffectivePolicyFingerprints ?? 0} -> ${executableSurface.toSummary.invocationsWithMultipleEffectivePolicyFingerprints ?? 0} (${formatDelta(executableSurface.summary.invocationsWithMultipleEffectivePolicyFingerprintsDelta ?? 0)})`,
+    `- New invocations with multiple effective fingerprints: ${newMultiple.length}`,
     `- Governance changes with multiple effective fingerprints: ${multiple.length}`,
     `- Newly reachable Skill-local scripts: ${executableSurface.newlyReachableSkillLocalPaths.length}`,
     `- Newly unreachable Skill-local scripts: ${executableSurface.newlyUnreachableSkillLocalPaths.length}`,
@@ -452,12 +480,34 @@ function formatExecutableSurfaceChanges(
     "Invocations that lost effective policy evidence",
     lost,
   );
+  appendNewMultipleFingerprintInvocations(lines, newMultiple);
   appendInvocationGovernanceChanges(
     lines,
     "Invocation governance changes with multiple effective fingerprints",
     multiple,
   );
   return lines;
+}
+
+function appendNewMultipleFingerprintInvocations(
+  lines: string[],
+  invocations: NonNullable<
+    CiCompatibleDiffReport["executableSurface"]["newInvocationsWithMultipleEffectivePolicyFingerprints"]
+  >,
+): void {
+  if (invocations.length === 0) return;
+  lines.push(
+    "",
+    "### New invocations with multiple effective fingerprints",
+    "",
+    ...invocations
+      .slice(0, MAX_LIST_ITEMS)
+      .map(
+        (invocation) =>
+          `- \`${invocation.sourcePath}:L${invocation.line}\` ${invocation.launcher} \`${invocation.target}\`: owning Skill ${invocation.owningSkillResolution}; effective fingerprints ${invocation.distinctEffectivePolicyFingerprints.length}`,
+      ),
+    ...formatOverflow(invocations.length),
+  );
 }
 
 function appendInvocationGovernanceDeltas(

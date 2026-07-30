@@ -779,6 +779,21 @@ least one recorded relationship already has effective policy evidence.
 Multiple distinct fingerprints describe visible policy variants; they are not
 a conflict, safety result, or compliance verdict.
 
+Default scan text is action-oriented. A healthy inventory renders one compact
+line with total surfaces, resolved invocation coverage, and
+invocation-context policy-evidence coverage; a surface-only inventory reports
+that no invocations were recognized. Scan JSON and BOM JSON/Markdown retain the
+complete inventory.
+
+Scan text expands to `Executable Surface Review` only for missing, unsafe,
+unscoped, non-canonical, or unavailable invocations; non-canonical surfaces;
+unreachable Skill-local surfaces; invocations without effective context-policy
+evidence; or invocations with multiple effective fingerprints. Expanded output
+is bounded and includes only relevant surface and invocation evidence.
+Repository-tool surface-policy absence, unreferenced tools, and uninvoked tools
+do not trigger review by themselves. The review is informational and uses
+neutral evidence terminology.
+
 Canonical scopes are `skill-local` for a script under the resolved owning
 Skill's `scripts/**`, and `repository-tool` for a helper under repository-root
 `tools/**`. Discovered scripts without one of those supported placements remain
@@ -1158,7 +1173,9 @@ line-insensitive invocation-governance changes. Caller-only aggregate changes
 use `invocation-governance`; `security-policy` remains reserved for changes to
 the surface's own policy evidence. These governance changes are informational:
 no combined policy, conflict classification, or enforcement decision is
-derived.
+derived. Generated diff JSON also lists newly added invocations that already
+carry multiple effective fingerprints, separately from path/resolution
+problems and from governance changes to invocations present at both endpoints.
 The Discovery section reports exact
 adoption and coverage transitions, count deltas, published entrypoint changes,
 newly reachable/not-reached and newly/resolved unrouted Skill identities,
@@ -1195,9 +1212,11 @@ surface deltas, added/removed/changed paths, new unresolved, unsafe,
 non-canonical, or unavailable invocation evidence, Skill-local reachability
 changes, surface policy-evidence coverage, invocation-context policy-evidence
 deltas, newly observed invocations without effective policy evidence, gained
-or lost evidence, and governance changes involving multiple effective
-fingerprints. The bounded governance lists use neutral evidence terminology and
-do not enter `newProblematicInvocations`. They do not affect the CI verdict,
+or lost evidence, total before/after multiple-fingerprint counts, newly added
+multi-fingerprint invocations, and governance changes involving multiple
+effective fingerprints. The bounded governance lists use neutral evidence
+terminology, omit complete fingerprints, and do not enter
+`newProblematicInvocations`. They do not affect the CI verdict,
 readiness score, failure threshold, or review policy. Newly generated JSON includes the complete
 `renma.skill-discovery-diff.v1` value once at top-level `skillDiscovery` plus
 one `renma.skill-discovery-ci-policy.v1` evaluation at top-level

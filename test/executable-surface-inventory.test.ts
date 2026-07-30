@@ -291,11 +291,16 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
   );
 
   const text = formatText(first);
-  assert.match(text, /Executable Surface Inventory/);
-  assert.match(text, /Surface policy evidence:/);
-  assert.match(text, /Invocation-context policy evidence:/);
-  assert.match(text, /Invocation policy variants:/);
-  assert.match(text, /skills\/demo\/scripts\/direct\.sh/);
+  assert.match(text, /Executable Surface Review/);
+  assert.match(
+    text,
+    /Executable surfaces: \d+; invocations 4\/9 resolved; invocation-context policy evidence 8\/9/,
+  );
+  assert.match(
+    text,
+    /skills\/demo\/SKILL\.md:L18 node tools\/missing\.mjs \[resolution missing/,
+  );
+  assert.doesNotMatch(text, /skills\/demo\/scripts\/direct\.sh/);
   const manifest = await bom(root, {}, { omitGeneratedAt: true });
   assert.deepEqual(manifest.executableSurfaceInventory, inventory);
   const markdown = formatBomMarkdown(manifest);
@@ -304,6 +309,7 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
   assert.match(markdown, /- Invocation-context policy evidence:/);
   assert.match(markdown, /- Invocations with multiple policy variants:/);
   assert.match(markdown, /\| Surface policy \| Invocation policy \|/);
+  assert.match(markdown, /skills\/demo\/scripts\/direct\.sh/);
 });
 
 test("helper resolution preserves exact unavailable states and bounded evidence", () => {

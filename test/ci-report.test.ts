@@ -20,6 +20,7 @@ import type { DiffReport } from "../src/commands/diff.js";
 import { zeroContextLensSummary } from "../src/context-lens.js";
 import { buildExecutableSurfaceDiff } from "../src/executable-surface-diff.js";
 import {
+  summarizeExecutableSurfaceInventory,
   type ExecutableSurfaceInventory,
   zeroExecutableSurfaceInventory,
 } from "../src/executable-surface-inventory.js";
@@ -220,6 +221,64 @@ test("formatCiReport renders bounded invocation-governance evidence without chan
     /unprotected|noncompliant|policy violation/i,
   );
   assert.equal(report.status, baselineStatus);
+});
+
+test("formatCiReport reports newly added multi-fingerprint invocations with bounded neutral detail", () => {
+  const report = sampleReport();
+  const baselineStatus = report.status;
+  report.diff.executableSurface = buildExecutableSurfaceDiff(
+    zeroExecutableSurfaceInventory(),
+    inventoryWithInvocations(12, [
+      `sha256:${"a".repeat(64)}`,
+      `sha256:${"b".repeat(64)}`,
+    ]),
+  );
+
+  const markdown = formatCiReport(report, "markdown");
+  const parsed = JSON.parse(formatCiReport(report, "json")) as CiReport;
+
+  assert.match(
+    markdown,
+    /- Invocations with multiple effective fingerprints: 0 -> 12 \(\+12\)/,
+  );
+  assert.match(
+    markdown,
+    /- New invocations with multiple effective fingerprints: 12/,
+  );
+  assert.match(
+    markdown,
+    /^### New invocations with multiple effective fingerprints$/m,
+  );
+  assert.match(
+    markdown,
+    /`skills\/demo\/references\/run-01\.md:L1` node `tools\/run-01\.mjs`: owning Skill resolved; effective fingerprints 2/,
+  );
+  assert.match(markdown, /2 more not shown; see JSON for the full list/);
+  assert.doesNotMatch(markdown, /run-11\.md|run-12\.md/);
+  assert.doesNotMatch(markdown, /sha256:[a-f0-9]{64}/);
+  assert.equal(
+    parsed.diff.executableSurface
+      .newInvocationsWithMultipleEffectivePolicyFingerprints?.length,
+    12,
+  );
+  assert.deepEqual(
+    parsed.diff.executableSurface.newInvocationsWithoutEffectivePolicyEvidence,
+    [],
+  );
+  assert.deepEqual(parsed.diff.executableSurface.newProblematicInvocations, []);
+  assert.equal(parsed.status, baselineStatus);
+  assert.equal(markdown, formatCiReport(report, "markdown"));
+
+  const legacyReport = structuredClone(report) as unknown as {
+    diff: {
+      executableSurface: Record<string, unknown>;
+    };
+  };
+  delete legacyReport.diff.executableSurface
+    .newInvocationsWithMultipleEffectivePolicyFingerprints;
+  assert.doesNotThrow(() =>
+    formatCiReport(legacyReport as unknown as CiReportFormatInput, "markdown"),
+  );
 });
 
 test("formatCiReport includes security posture summaries", () => {
@@ -1621,6 +1680,32 @@ function inventoryWithInvocation(
       (evidence) => evidence.relation === "owning-skill",
     ).length,
   };
+  return inventory;
+}
+
+function inventoryWithInvocations(
+  count: number,
+  policyFingerprints: string[],
+): ExecutableSurfaceInventory {
+  const inventory = inventoryWithInvocation("resolved", policyFingerprints);
+  const template = inventory.invocations[0]!;
+  inventory.invocations = Array.from({ length: count }, (_, index) => {
+    const ordinal = String(index + 1).padStart(2, "0");
+    const target = `tools/run-${ordinal}.mjs`;
+    return {
+      ...template,
+      sourcePath: `skills/demo/references/run-${ordinal}.md`,
+      line: index + 1,
+      snippet: `node ${target}`,
+      rawTarget: target,
+      normalizedTarget: target,
+      governance: structuredClone(template.governance),
+    };
+  });
+  inventory.summary = summarizeExecutableSurfaceInventory(
+    inventory.surfaces,
+    inventory.invocations,
+  );
   return inventory;
 }
 

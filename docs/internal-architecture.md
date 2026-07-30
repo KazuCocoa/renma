@@ -473,6 +473,14 @@ diagnostics, Readiness, the Security Policy Inventory, and Trust Graph
 intentionally do not consume the invocation-governance relationships in this
 slice.
 
+Default scan text derives a private review projection from the complete
+inventory. Healthy state renders one compact summary; only established
+resolution, scope, reachability, missing-evidence, or multiple-fingerprint
+review conditions select bounded relevant rows. This projection never changes
+scan JSON or BOM rendering. Diff separately records newly introduced
+multi-fingerprint invocations, while CI renders their total delta and a bounded
+neutral detail list without adding them to path-problem evidence.
+
 CI calls `executeDiff()` once. It exposes the diff's Discovery projection at
 top level, evaluates the two snapshot policy modes as
 `skillDiscoveryPolicy`, and retains a compatibility-shaped nested diff. It
