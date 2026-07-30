@@ -14,6 +14,14 @@ import {
 } from "../security-diff.js";
 import type { ContextLensSummary } from "../context-lens.js";
 import type { SecurityPolicyInventorySummary } from "../security-policy-inventory.js";
+import {
+  buildExecutableSurfaceDiff,
+  type ExecutableSurfaceDiff,
+} from "../executable-surface-diff.js";
+import {
+  zeroExecutableSurfaceInventory,
+  type ExecutableSurfaceInventory,
+} from "../executable-surface-inventory.js";
 import type { ConfigOverrides } from "../config.js";
 import type { SkillDiscoveryCiPolicyMode } from "../types/configuration.js";
 import {
@@ -64,6 +72,7 @@ export interface DiffReport {
     checkChanges: ReadinessCheckChange[];
   };
   discovery: SkillDiscoveryDiff;
+  executableSurface: ExecutableSurfaceDiff;
   security: SecurityDiffSummary;
   findings: {
     added: FindingDelta[];
@@ -165,6 +174,7 @@ export interface DiffSnapshot {
   readiness: ReadinessReport;
   graph: GraphReport;
   discovery?: SkillDiscoveryIndex;
+  executableSurfaceInventory?: ExecutableSurfaceInventory;
 }
 
 export interface DiffCollectionInstrumentation {
@@ -434,6 +444,11 @@ function buildDiffReportProjection(
     },
   };
   const tail = {
+    executableSurface: buildExecutableSurfaceDiff(
+      fromSnapshot.executableSurfaceInventory ??
+        zeroExecutableSurfaceInventory(),
+      toSnapshot.executableSurfaceInventory ?? zeroExecutableSurfaceInventory(),
+    ),
     security: buildSecurityDiffSummary({
       addedFindings,
       removedFindings,
@@ -532,6 +547,8 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
     `- Removed findings: ${report.findings.removed.length}`,
   ];
 
+  lines.push("", ...formatExecutableSurfaceChanges(report.executableSurface));
+
   if (report.graph.newUnresolvedEdges.length > 0) {
     lines.push("", "### New unresolved edges", "");
     lines.push(
@@ -599,6 +616,63 @@ function neutralSkillDiscoveryDiff(): SkillDiscoveryDiff {
       resolved: [],
     },
   };
+}
+
+function formatExecutableSurfaceChanges(
+  executableSurface: ExecutableSurfaceDiff,
+): string[] {
+  const lines = [
+    "## Executable Surface Changes",
+    "",
+    `- Total surfaces: ${executableSurface.toSummary.totalSurfaces} (${signed(executableSurface.summary.totalSurfacesDelta)})`,
+    `- Added surfaces: ${executableSurface.addedSurfacePaths.length}`,
+    `- Removed surfaces: ${executableSurface.removedSurfacePaths.length}`,
+    `- Changed surfaces: ${executableSurface.changedSurfaces.length}`,
+    `- Invocation resolution changes: ${executableSurface.invocationResolutionChanges.length}`,
+    `- Effective-policy coverage: ${executableSurface.toSummary.surfacesWithEffectivePolicy}/${executableSurface.toSummary.totalSurfaces} (${signed(executableSurface.summary.surfacesWithEffectivePolicyDelta)} covered surfaces)`,
+  ];
+  if (executableSurface.addedSurfacePaths.length > 0) {
+    lines.push(
+      "",
+      "### Added executable surfaces",
+      "",
+      ...executableSurface.addedSurfacePaths.map(
+        (surfacePath) => `- \`${surfacePath}\``,
+      ),
+    );
+  }
+  if (executableSurface.removedSurfacePaths.length > 0) {
+    lines.push(
+      "",
+      "### Removed executable surfaces",
+      "",
+      ...executableSurface.removedSurfacePaths.map(
+        (surfacePath) => `- \`${surfacePath}\``,
+      ),
+    );
+  }
+  if (executableSurface.changedSurfaces.length > 0) {
+    lines.push(
+      "",
+      "### Changed executable surfaces",
+      "",
+      ...executableSurface.changedSurfaces.map(
+        (surface) => `- \`${surface.path}\`: ${surface.reasons.join(", ")}`,
+      ),
+    );
+  }
+  if (executableSurface.invocationResolutionChanges.length > 0) {
+    lines.push(
+      "",
+      "### Invocation resolution changes",
+      "",
+      ...executableSurface.invocationResolutionChanges.map(
+        (invocation) =>
+          `- \`${invocation.sourcePath}\` ${invocation.launcher} \`${invocation.target}\` #${invocation.occurrenceOrdinal}: ${invocation.fromResolution} -> ${invocation.toResolution}`,
+      ),
+    );
+  }
+  return lines;
 }
 
 const DIFF_DETAIL_LIMIT =
@@ -814,6 +888,7 @@ async function snapshot(
       ...(includeSkillDiscovery
         ? { discovery: repositorySnapshot.skillDiscovery }
         : {}),
+      executableSurfaceInventory: repositorySnapshot.executableSurfaceInventory,
     },
     skillDiscoveryCiPolicy: repositorySnapshot.config.skillDiscovery.ciPolicy,
   };

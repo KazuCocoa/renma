@@ -2,15 +2,21 @@ import path from "node:path";
 import {
   classifyRepositorySkillPath,
   isExcluded,
-  logicalSkillDirectory,
   repositoryPathDepth,
 } from "./discovery.js";
+import { collectHelperCommandEvidence } from "./helper-command-evidence.js";
 import type { Catalog } from "./model.js";
 import { staticSupportReferences } from "./static-support.js";
 import type { Artifact } from "./types/artifact.js";
 import type { ParsedDocument } from "./types/metadata.js";
 import type { ScanConfig } from "./types/configuration.js";
 import { safeRepositoryPath } from "./repository-boundary.js";
+
+export {
+  helperScriptPath,
+  resolveHelperScriptPath,
+  type HelperScriptPathResolution,
+} from "./helper-command-evidence.js";
 
 export type RepositoryPathState =
   | "parsed"
@@ -21,15 +27,6 @@ export type RepositoryPathState =
   | "symlink"
   | "unreadable"
   | "absent";
-
-export type HelperScriptPathResolution =
-  | {
-      kind: "candidate";
-      path: string;
-      source: "repository-root" | "skill-relative";
-    }
-  | { kind: "unsafe"; path: string }
-  | { kind: "unscoped"; path: string };
 
 /** Collect immutable repository-relative path existence evidence for rules. */
 export async function collectRepositoryPaths(
@@ -51,59 +48,6 @@ export async function collectRepositoryPaths(
   }
 
   return paths;
-}
-
-export function helperScriptPath(command: string): string | undefined {
-  const parts = command.split(/\s+/).slice(1);
-  const target = parts.find((part) => !part.startsWith("-"));
-  if (!target) return undefined;
-
-  const hasSupportedExtension = /\.(?:mjs|js|cjs|sh|bash|py)$/.test(target);
-  if (!hasSupportedExtension) return undefined;
-  const startsAtSupportedRoot = /^(?:(?:\.\.?\/)+)?(?:scripts|tools)\//.test(
-    target,
-  );
-  const isExplicitSkillScript = /(?:^|\/)scripts\//.test(target);
-  return startsAtSupportedRoot || isExplicitSkillScript ? target : undefined;
-}
-
-/** Resolve a helper command path without escaping an unambiguous owning Skill. */
-export function resolveHelperScriptPath(
-  sourcePath: string,
-  scriptPath: string,
-): HelperScriptPathResolution {
-  const rawPath = scriptPath.replace(/\\/g, "/");
-  const skillDirectory = logicalSkillDirectory(sourcePath);
-  const sourceSkill = skillDirectory ? { skillDirectory } : undefined;
-  const isSkillRelative = /^(?:\.\/)?scripts\//.test(rawPath);
-  const hasTraversal = rawPath.split("/").includes("..");
-
-  if (isSkillRelative) {
-    if (!sourceSkill) return { kind: "unscoped", path: rawPath };
-    if (hasTraversal) return { kind: "unsafe", path: rawPath };
-    const relativePath = rawPath.replace(/^\.\//, "");
-    const candidate = normalizeRepositoryPath(
-      path.posix.join(sourceSkill.skillDirectory, relativePath),
-    );
-    if (!candidate || !isWithinSkill(candidate, sourceSkill.skillDirectory)) {
-      return { kind: "unsafe", path: rawPath };
-    }
-    return { kind: "candidate", path: candidate, source: "skill-relative" };
-  }
-
-  if (hasTraversal) {
-    return sourceSkill
-      ? { kind: "unsafe", path: rawPath }
-      : { kind: "unscoped", path: rawPath };
-  }
-
-  const candidate = normalizeRepositoryPath(rawPath);
-  if (!candidate) {
-    return sourceSkill
-      ? { kind: "unsafe", path: rawPath }
-      : { kind: "unscoped", path: rawPath };
-  }
-  return { kind: "candidate", path: candidate, source: "repository-root" };
 }
 
 export function repositoryPathCandidates(
@@ -197,30 +141,13 @@ export async function collectRepositoryPathStates(
 }
 
 function helperCommandPathCandidates(documents: ParsedDocument[]): string[] {
-  return documents.flatMap((document) =>
-    document.codeFences.flatMap((fence) =>
-      fence.content
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((command) => /^(node|bash|sh|python|python3)\s+/.test(command))
-        .map(helperScriptPath)
-        .map((candidate) => {
-          if (!candidate) return undefined;
-          const resolution = resolveHelperScriptPath(
-            document.artifact.path,
-            candidate,
-          );
-          return resolution.kind === "candidate" ? resolution.path : undefined;
-        })
-        .filter((candidate): candidate is string => candidate !== undefined),
-    ),
-  );
-}
-
-function isWithinSkill(candidate: string, skillDirectory: string): boolean {
-  return (
-    candidate === skillDirectory || candidate.startsWith(`${skillDirectory}/`)
-  );
+  return collectHelperCommandEvidence(documents)
+    .map((evidence) =>
+      evidence.pathResolution.kind === "candidate"
+        ? evidence.pathResolution.path
+        : undefined,
+    )
+    .filter((candidate): candidate is string => candidate !== undefined);
 }
 
 function normalizeRepositoryPath(value: string): string | undefined {

@@ -6,6 +6,10 @@ import {
   type ReadinessReport,
 } from "./readiness.js";
 import { scanFromRepositorySnapshot } from "../scanner.js";
+import {
+  zeroExecutableSurfaceInventory,
+  type ExecutableSurfaceInventory,
+} from "../executable-surface-inventory.js";
 import type { ConfigOverrides } from "../config.js";
 import type {
   Asset,
@@ -77,6 +81,7 @@ export interface BomReport {
   };
   securityPosture: SecurityPostureSummary;
   securityPolicyInventory: SecurityPolicyInventorySummary;
+  executableSurfaceInventory: ExecutableSurfaceInventory;
   diagnostics: Diagnostic[];
 }
 
@@ -254,6 +259,8 @@ export function buildBomReport(
     },
     securityPosture: readinessReport.summary.securityPosture,
     securityPolicyInventory: readinessReport.summary.securityPolicyInventory,
+    executableSurfaceInventory:
+      scanResult.executableSurfaceInventory ?? zeroExecutableSurfaceInventory(),
     diagnostics,
   };
 }
@@ -366,6 +373,12 @@ export function formatBomMarkdown(report: BomReport): string {
     "## Security Policy Inventory",
     "",
     ...formatSecurityPolicyInventoryMarkdown(report.securityPolicyInventory),
+    "",
+    "## Executable Surface Inventory",
+    "",
+    ...formatExecutableSurfaceInventoryMarkdown(
+      report.executableSurfaceInventory,
+    ),
     "",
     "## Diagnostics",
     "",
@@ -690,6 +703,40 @@ function formatSecurityPolicyInventoryMarkdown(
     `| Approved upload destinations | ${inventory.approvedUploadDestinationCount} |`,
     `| Forbidden inputs | ${inventory.forbiddenInputCount} |`,
   ];
+}
+
+function formatExecutableSurfaceInventoryMarkdown(
+  inventory: ExecutableSurfaceInventory,
+): string[] {
+  const summary = inventory.summary;
+  const lines = [
+    `- Schema: ${inventory.schema}`,
+    `- Surfaces: ${summary.totalSurfaces}`,
+    `- Scope: ${summary.skillLocalSurfaces} Skill-local, ${summary.repositoryToolSurfaces} repository tools, ${summary.noncanonicalSurfaces} non-canonical`,
+    `- Skill-local reachability: ${summary.reachableSkillLocalSurfaces} reachable, ${summary.unreachableSkillLocalSurfaces} unreachable`,
+    `- Referenced/invoked: ${summary.referencedSurfaces}/${summary.invokedSurfaces}`,
+    `- Effective-policy coverage: ${summary.surfacesWithEffectivePolicy}/${summary.totalSurfaces}`,
+    `- Invocations: ${summary.totalInvocations} total, ${summary.resolvedInvocations} resolved, ${summary.missingInvocations} missing, ${summary.unsafeInvocations} unsafe, ${summary.unscopedInvocations} unscoped, ${summary.noncanonicalInvocations} non-canonical, ${summary.unavailableInvocations} unavailable`,
+    "",
+    "| Path | Scope | Interpreters | Reachability | Invocations | Effective policy |",
+    "| --- | --- | --- | --- | ---: | --- |",
+  ];
+  if (inventory.surfaces.length === 0) {
+    lines.push("| (none) |  |  |  | 0 |  |");
+    return lines;
+  }
+  for (const surface of inventory.surfaces) {
+    const reachability =
+      surface.scope !== "skill-local"
+        ? "n/a"
+        : surface.reachableFromOwningSkill
+          ? `reachable (${surface.reachabilityDepth})`
+          : "unreachable";
+    lines.push(
+      `| ${escapeTableCell(surface.path)} | ${surface.scope} | ${escapeTableCell(surface.interpreterHints.join(", "))} | ${reachability} | ${surface.invocationCount} | ${surface.securityPolicy.hasEffectivePolicy ? "yes" : "no"} |`,
+    );
+  }
+  return lines;
 }
 
 function shortHash(hash: string): string {

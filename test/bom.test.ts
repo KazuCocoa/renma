@@ -17,6 +17,7 @@ import {
   graphFromRepositorySnapshot,
 } from "../src/commands/graph.js";
 import { DIAGNOSTIC_IDS } from "../src/diagnostic-ids.js";
+import { zeroExecutableSurfaceInventory } from "../src/executable-surface-inventory.js";
 import {
   collectRepositoryEvidence,
   collectRepositorySnapshot,
@@ -1700,6 +1701,7 @@ function expectedBomContract(): BomReport {
       topForbiddenInputs: [],
       assetsWithoutEffectivePolicyList: [],
     },
+    executableSurfaceInventory: zeroExecutableSurfaceInventory(),
     diagnostics: [],
   };
 }

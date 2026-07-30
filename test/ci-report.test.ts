@@ -72,6 +72,8 @@ test("formatCiReport renders deterministic markdown review artifact", () => {
   );
   assert.match(markdown, /- Range: `main` -> `HEAD`/);
   assert.match(markdown, /- New unresolved required edges: 1/);
+  assert.match(markdown, /^## Executable Surface Changes$/m);
+  assert.match(markdown, /- Total surfaces: 0 -> 0 \(\+0\)/);
   assert.match(
     markdown,
     /- HIGH `MAINT-REPEATED-CODE-BLOCK` `docs\/guide.md:L12` — Repeated code block/,

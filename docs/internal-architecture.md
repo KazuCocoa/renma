@@ -97,8 +97,8 @@ import the cohesive owner under `src/types/`:
 - classification, governance, decision, diagnostic, and configuration
   contracts each have one dependency-bounded owner;
 - `ScanResult` lives in `src/types/scan-result.ts`, the only composed type module
-  permitted to import Agent Skills, Context Lens, Security Policy Inventory, and
-  Trust Graph result types.
+  permitted to import Agent Skills, Context Lens, Executable Surface Inventory,
+  Security Policy Inventory, and Trust Graph result types.
 
 The low-level type modules are in the `foundation` layer and cannot import
 feature reports, renderers, or commands. The composed scan-result module is in
@@ -383,6 +383,8 @@ input:
 - Agent Skills validation and the dependent Skill Discovery index;
 - structural classification evidence;
 - effective security-policy evidence;
+- executable-surface evidence composed from artifacts, helper commands, support
+  reachability, repository path states, and prepared security policies;
 - Context Lens summary and diagnostics.
 
 Repository path existence states are captured before
@@ -410,7 +412,8 @@ Index. An internal Discovery-free projection remains available to compatible
 consumers; it omits that access without triggering another collection or parse.
 
 BOM builds graph, scan, its intentionally Discovery-free Readiness subset,
-policy inventory, and diagnostics from the same snapshot and core. Scan
+policy inventory, executable-surface inventory, and diagnostics from the same
+snapshot and core. Scan
 constructs the inventory summary from the already prepared
 `snapshot.securityPolicies` rows, so policy selection, parsing, profile
 resolution, inheritance, and provenance preparation occur once for that
@@ -419,6 +422,39 @@ derives graph and the Discovery-free Readiness subset from it, and builds
 topology changes directly from the memoized Skill Discovery indexes. It does
 not invoke another command, reconstruct Discovery, or recollect repository
 facts.
+
+## Executable Surface Inventory
+
+`src/executable-surface-inventory.ts` owns the composed
+`renma.executable-surface-inventory.v1` result. It never reads or executes
+source. It joins only one collected snapshot's artifacts, parsed Markdown,
+immutable repository path states, parent-Skill index, and prepared
+`SecurityPolicyAssetEvidence` rows.
+
+`src/helper-command-evidence.ts` owns the bounded helper grammar shared by
+repository path candidate collection, existing path diagnostics, and the
+inventory. The recognized launchers remain `node`, `bash`, `sh`, `python`, and
+`python3`; the supported extensions and safe path boundaries are unchanged.
+The module retains source lines and exact path states without becoming a
+general shell parser. Existing diagnostics use the same recognition and
+resolution evidence but keep their established IDs, severity, remediation,
+and behavior.
+
+`src/static-support.ts` owns both exact support references and the minimum-depth
+reachability projection. `SUPPORT-UNREACHABLE-SCRIPT` and deep-reference
+diagnostics consume that projection, as does the inventory. No second
+reachability graph is built.
+
+Surface identity is the normalized repository path. Each row carries a
+fingerprint over content identity, scope, interpreter hints, reachability,
+reference and invocation counts, and bounded policy correlation. Raw invocation
+rows retain source lines, while diff identity uses source path, launcher,
+normalized or raw target, resolution, and occurrence ordinal so unrelated
+preceding-line edits are not semantic add/remove events.
+
+The inventory is visibility evidence, not SAST, a safety verdict, or an
+enforcement policy. Diff and CI sections are informational. Readiness and Trust
+Graph intentionally do not consume the new relationships in this slice.
 
 CI calls `executeDiff()` once. It exposes the diff's Discovery projection at
 top level, evaluates the two snapshot policy modes as

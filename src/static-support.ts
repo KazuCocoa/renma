@@ -97,6 +97,61 @@ export function staticSupportReferences(
   );
 }
 
+/**
+ * Resolve minimum static-reference depth from one owning SKILL.md.
+ * Rules and inventory projections share this graph without reinterpreting text.
+ */
+export function localSupportReachabilityDepth(
+  skill: ParsedDocument,
+  skillDirectory: string,
+  localSupportDocs: ParsedDocument[],
+  candidatePaths: string[],
+): Map<string, number> {
+  const reachable = new Map<string, number>();
+  const references = new Map(
+    [skill, ...localSupportDocs].map((document) => [
+      document.artifact.path,
+      new Set(
+        staticSupportReferences(document, skillDirectory, candidatePaths).map(
+          (reference) => reference.targetPath,
+        ),
+      ),
+    ]),
+  );
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    for (const document of localSupportDocs) {
+      if (reachable.has(document.artifact.path)) continue;
+      if (references.get(skill.artifact.path)?.has(document.artifact.path)) {
+        reachable.set(document.artifact.path, 1);
+        changed = true;
+        continue;
+      }
+      const parent = localSupportDocs
+        .filter((candidate) => reachable.has(candidate.artifact.path))
+        .sort(
+          (left, right) =>
+            (reachable.get(left.artifact.path) ?? 0) -
+            (reachable.get(right.artifact.path) ?? 0),
+        )
+        .find((candidate) =>
+          references.get(candidate.artifact.path)?.has(document.artifact.path),
+        );
+      if (parent) {
+        reachable.set(
+          document.artifact.path,
+          (reachable.get(parent.artifact.path) ?? 0) + 1,
+        );
+        changed = true;
+      }
+    }
+  }
+
+  return reachable;
+}
+
 function maskRawMatches(line: string, matches: string[]): string {
   let masked = line;
   for (const match of matches) {

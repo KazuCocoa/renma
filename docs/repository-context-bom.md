@@ -48,7 +48,7 @@ One BOM execution is derived from one in-memory repository snapshot:
 2. Discover and read repository artifacts once.
 3. Parse documents once.
 4. Build the catalog once.
-5. Derive graph, findings, diagnostics, Context Lens evidence, readiness, security posture, and security policy inventory from that same snapshot.
+5. Derive graph, findings, diagnostics, Context Lens evidence, readiness, security posture, security policy inventory, and executable-surface inventory from that same snapshot.
 6. Format JSON or Markdown only after the complete report has been built.
 
 Renma does not freeze the working tree while another process is modifying it. If files change during collection, the BOM reflects the artifacts Renma read for that execution; after collection, all report sections are derived from the collected snapshot.
@@ -122,6 +122,14 @@ member, including zero counts. Policy source ordering is `local`,
 relationships use `owns_local_resource`, `statically_references`,
 `inherits_owner`, and `inherits_policy`.
 
+The additive `executableSurfaceInventory` field retains its own explicit schema
+identifier, `renma.executable-surface-inventory.v1`. Its summary counts,
+path-identified surface rows, line-level invocation rows, content and inventory
+fingerprints, reachability depth, interpreter hints, and bounded effective
+policy correlation are complete in JSON. The Markdown BOM renders a compact
+review table. Surface rows are sorted by repository path; invocation rows are
+sorted by source path, line, launcher, and target.
+
 The Readiness summary is a closed contract for asset, ownership, graph,
 diagnostic, workflow, Context Lens, security posture, and security policy
 inventory evidence. Coverage and readiness percentages are constrained to
@@ -145,6 +153,7 @@ the schema defines every nested field):
   "readiness": { "score": 100, "level": "ready", "checks": [], "summary": {} },
   "securityPosture": { "totalSecurityFindings": 0, "riskClasses": { "violation": 0, "suspicious": 0, "advisory": 0, "unclassified": 0 }, "severities": { "critical": 0, "high": 0, "medium": 0, "low": 0 }, "highOrCritical": 0, "topFindingIds": [] },
   "securityPolicyInventory": {},
+  "executableSurfaceInventory": { "schema": "renma.executable-surface-inventory.v1", "summary": {}, "surfaces": [], "invocations": [] },
   "diagnostics": []
 }
 ```
@@ -162,7 +171,13 @@ BOM v2 provenance is deliberately repository-local:
 - per-asset content hashes;
 - generator name and version;
 - current absolute `root` and `configPath` information when available;
-- lifecycle, dependency, diagnostic, readiness, security posture, and security policy inventory evidence.
+- lifecycle, dependency, diagnostic, readiness, security posture, security policy inventory, and executable-surface evidence.
+
+Executable-surface evidence is static repository visibility, not a claim about
+runtime use or safety. It does not execute files, follow symbolic links, inspect
+permission bits, or scan package manifests, GitHub Actions, Dockerfiles, Git
+hooks, remote scripts, ordinary external commands, or unrelated repository
+files. Such sources remain intentionally unsupported in this inventory slice.
 
 Renma does not automatically invoke Git or add Git commit, branch, tag, or
 dirty-state fields. Git revision identity comes from the surrounding Git, CI,

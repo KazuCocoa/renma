@@ -752,9 +752,38 @@ renma scan . --format json
 renma scan . --fail-on high
 ```
 
-Use `--fail-on` in CI when findings at or above a severity should fail the job. The JSON output includes findings, evidence, diagnostics, `diagnosticsV2`, `reviewBundles`, `trustGraph`, and summary data that other tools can consume.
+Use `--fail-on` in CI when findings at or above a severity should fail the job. The JSON output includes findings, evidence, diagnostics, `diagnosticsV2`, `reviewBundles`, `trustGraph`, `executableSurfaceInventory`, and summary data that other tools can consume.
 
 Output includes scan findings, discovery or catalog diagnostics, the effective exit threshold, and evidence paths or snippets for each finding. `diagnosticsV2` adds typed repair constraints, structured verification steps, and concise LLM hints; `reviewBundles` groups related diagnostics for code review.
+
+`executableSurfaceInventory` uses schema
+`renma.executable-surface-inventory.v1`. An executable surface is an
+already-discovered repository-local Skill script or `tools/**` helper that
+falls within Renma's existing bounded helper evidence. Rows report normalized
+path, scope, content classification and hash, conservative interpreter hints,
+static references and invocations, Skill-local reachability, and bounded
+effective security-policy correlation. Invocation rows retain launcher, target,
+source line, and exact resolution state.
+
+Canonical scopes are `skill-local` for a script under the resolved owning
+Skill's `scripts/**`, and `repository-tool` for a helper under repository-root
+`tools/**`. Discovered scripts without one of those supported placements remain
+visible as `noncanonical`; the inventory does not silently discard them.
+Skill-local reachability uses the same static reference graph and minimum depth
+as existing support diagnostics. Repository tools have no invented owning
+Skill or Skill reachability state.
+
+The inventory recognizes only the existing `node`, `bash`, `sh`, `python`, and
+`python3` helper grammar and supported helper extensions. Interpreter hints
+come from recognized launchers, a bounded first-line shebang for text files,
+then a supported extension fallback. Hints are descriptive evidence, not an
+execution decision.
+
+Invocation resolution distinguishes `resolved`, `missing`, `unsafe`,
+`unscoped`, `noncanonical`, `excluded`, `deep`, `oversize`, `unsupported`,
+`symlink`, and `unreadable`. Unavailable targets never become invented surface
+rows. Renma does not follow symlinks, inspect executable permission bits,
+execute/import/compile/sandbox files, or classify ordinary external commands.
 
 ### `catalog`
 
@@ -791,6 +820,11 @@ The BOM is not a record of actual LLM runtime usage. Renma does not collect tele
 JSON is the source of truth for automation. Markdown is a compact pull-request review view.
 
 Renma derives each BOM from one in-memory repository snapshot: configuration, discovered artifacts, parsed documents, catalog, graph evidence, diagnostics, readiness, and security summaries all come from the same collected state.
+
+BOM v2 additively includes the complete `executableSurfaceInventory`
+projection—schema, summary, surface rows, and invocation rows—so consumers can
+audit and diff the same evidence emitted by scan. No standalone executable BOM
+command is needed.
 
 By default, `generatedAt` records when the BOM was produced. Add `--omit-generated-at` when CI or review automation needs to avoid clock-based diffs. With the same checkout path, config path, repository contents, Renma version, and UTC evaluation date, repeated `--omit-generated-at` runs should produce byte-identical JSON. The option does not remove metadata freshness dates, suppress freshness diagnostics, normalize absolute `root` or `configPath`, hide file moves, or guarantee portable byte-for-byte output across runners.
 
@@ -1091,7 +1125,10 @@ not a generic source-code diff.
 
 Output includes readiness deltas, changed assets, graph edge changes, check
 changes, added or removed findings, and an additive
-`renma.skill-discovery-diff.v1` section. The Discovery section reports exact
+`renma.skill-discovery-diff.v1` section. It also includes an
+`executableSurface` section with count deltas, added/removed/changed surface
+paths, concise change reasons, and semantic invocation-resolution changes.
+The Discovery section reports exact
 adoption and coverage transitions, count deltas, published entrypoint changes,
 newly reachable/not-reached and newly/resolved unrouted Skill identities,
 route additions/removals/state changes, and added/resolved cyclic components.
@@ -1122,7 +1159,11 @@ The report summarizes readiness deltas, graph-resolution changes, added and remo
 
 Output includes a CI status (`PASS`, `WARN`, or `FAIL`), a summary, readiness
 changes, graph changes, review-focused finding changes, and Skill Discovery
-topology changes. Newly generated JSON includes the complete
+topology changes. An informational `Executable Surface Changes` section reports
+surface deltas, added/removed/changed paths, new unresolved, unsafe,
+non-canonical, or unavailable invocation evidence, Skill-local reachability
+changes, and effective-policy coverage delta. It does not affect the CI verdict,
+readiness score, failure threshold, or review policy. Newly generated JSON includes the complete
 `renma.skill-discovery-diff.v1` value once at top-level `skillDiscovery` plus
 one `renma.skill-discovery-ci-policy.v1` evaluation at top-level
 `skillDiscoveryPolicy`; the existing nested `diff` remains Discovery- and

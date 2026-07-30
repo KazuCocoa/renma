@@ -16,6 +16,7 @@
     "readiness",
     "securityPosture",
     "securityPolicyInventory",
+    "executableSurfaceInventory",
     "diagnostics"
   ],
   "properties": {
@@ -52,6 +53,9 @@
     "readiness": { "$ref": "#/$defs/readiness" },
     "securityPosture": { "$ref": "#/$defs/securityPosture" },
     "securityPolicyInventory": { "$ref": "#/$defs/policyInventory" },
+    "executableSurfaceInventory": {
+      "$ref": "#/$defs/executableSurfaceInventory"
+    },
     "diagnostics": {
       "type": "array",
       "items": { "$ref": "#/$defs/diagnostic" }
@@ -606,6 +610,245 @@
         }
       },
       "additionalProperties": false
+    },
+    "executableSurfaceInventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "summary", "surfaces", "invocations"],
+      "properties": {
+        "schema": {
+          "const": "renma.executable-surface-inventory.v1"
+        },
+        "summary": {
+          "$ref": "#/$defs/executableSurfaceInventorySummary"
+        },
+        "surfaces": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/executableSurfaceEntry" }
+        },
+        "invocations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/executableSurfaceInvocation" }
+        }
+      }
+    },
+    "executableSurfaceInventorySummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "totalSurfaces",
+        "skillLocalSurfaces",
+        "repositoryToolSurfaces",
+        "noncanonicalSurfaces",
+        "textSurfaces",
+        "binarySurfaces",
+        "reachableSkillLocalSurfaces",
+        "unreachableSkillLocalSurfaces",
+        "referencedSurfaces",
+        "unreferencedSurfaces",
+        "invokedSurfaces",
+        "uninvokedSurfaces",
+        "surfacesWithEffectivePolicy",
+        "surfacesWithoutEffectivePolicy",
+        "totalInvocations",
+        "resolvedInvocations",
+        "missingInvocations",
+        "unsafeInvocations",
+        "unscopedInvocations",
+        "noncanonicalInvocations",
+        "unavailableInvocations",
+        "interpreterHints"
+      ],
+      "properties": {
+        "totalSurfaces": { "$ref": "#/$defs/nonNegativeInteger" },
+        "skillLocalSurfaces": { "$ref": "#/$defs/nonNegativeInteger" },
+        "repositoryToolSurfaces": { "$ref": "#/$defs/nonNegativeInteger" },
+        "noncanonicalSurfaces": { "$ref": "#/$defs/nonNegativeInteger" },
+        "textSurfaces": { "$ref": "#/$defs/nonNegativeInteger" },
+        "binarySurfaces": { "$ref": "#/$defs/nonNegativeInteger" },
+        "reachableSkillLocalSurfaces": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "unreachableSkillLocalSurfaces": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "referencedSurfaces": { "$ref": "#/$defs/nonNegativeInteger" },
+        "unreferencedSurfaces": { "$ref": "#/$defs/nonNegativeInteger" },
+        "invokedSurfaces": { "$ref": "#/$defs/nonNegativeInteger" },
+        "uninvokedSurfaces": { "$ref": "#/$defs/nonNegativeInteger" },
+        "surfacesWithEffectivePolicy": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "surfacesWithoutEffectivePolicy": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "totalInvocations": { "$ref": "#/$defs/nonNegativeInteger" },
+        "resolvedInvocations": { "$ref": "#/$defs/nonNegativeInteger" },
+        "missingInvocations": { "$ref": "#/$defs/nonNegativeInteger" },
+        "unsafeInvocations": { "$ref": "#/$defs/nonNegativeInteger" },
+        "unscopedInvocations": { "$ref": "#/$defs/nonNegativeInteger" },
+        "noncanonicalInvocations": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "unavailableInvocations": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "interpreterHints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["interpreter", "count"],
+            "properties": {
+              "interpreter": { "type": "string" },
+              "count": { "$ref": "#/$defs/nonNegativeInteger" }
+            }
+          }
+        }
+      }
+    },
+    "executableSurfaceEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "scope",
+        "origins",
+        "artifactKind",
+        "contentClassification",
+        "interpreterHints",
+        "staticallyReferenced",
+        "staticallyInvoked",
+        "referenceCount",
+        "invocationCount",
+        "securityPolicy",
+        "fingerprint"
+      ],
+      "properties": {
+        "path": { "type": "string" },
+        "scope": {
+          "enum": ["skill-local", "repository-tool", "noncanonical"]
+        },
+        "origins": {
+          "type": "array",
+          "items": {
+            "enum": ["discovered-script", "resolved-static-invocation"]
+          },
+          "uniqueItems": true
+        },
+        "artifactKind": {
+          "enum": [
+            "skill",
+            "agent",
+            "context",
+            "context_lens",
+            "profile",
+            "reference",
+            "example",
+            "script",
+            "asset",
+            "config",
+            "unknown"
+          ]
+        },
+        "contentClassification": { "enum": ["text", "binary"] },
+        "contentHash": { "type": "string" },
+        "owningSkill": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["skillDirectory"],
+          "properties": {
+            "skillDirectory": { "type": "string" },
+            "entrypointPath": { "type": "string" }
+          }
+        },
+        "interpreterHints": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "shebang": { "type": "string", "maxLength": 160 },
+        "reachableFromOwningSkill": { "type": "boolean" },
+        "reachabilityDepth": { "type": "integer", "minimum": 1 },
+        "staticallyReferenced": { "type": "boolean" },
+        "staticallyInvoked": { "type": "boolean" },
+        "referenceCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "invocationCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "securityPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["hasEffectivePolicy", "policySources"],
+          "properties": {
+            "hasEffectivePolicy": { "type": "boolean" },
+            "policySources": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "local",
+                  "security_profile",
+                  "repository_config",
+                  "owning_skill"
+                ]
+              },
+              "uniqueItems": true
+            },
+            "fingerprint": { "type": "string" }
+          }
+        },
+        "fingerprint": { "type": "string" }
+      }
+    },
+    "executableSurfaceInvocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourcePath",
+        "line",
+        "snippet",
+        "launcher",
+        "rawTarget",
+        "resolution",
+        "occurrenceOrdinal"
+      ],
+      "properties": {
+        "sourcePath": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "snippet": { "type": "string", "maxLength": 240 },
+        "launcher": {
+          "enum": ["node", "bash", "sh", "python", "python3"]
+        },
+        "rawTarget": { "type": "string" },
+        "normalizedTarget": { "type": "string" },
+        "sourceSkillDirectory": { "type": "string" },
+        "resolution": {
+          "enum": [
+            "resolved",
+            "missing",
+            "unsafe",
+            "unscoped",
+            "noncanonical",
+            "excluded",
+            "deep",
+            "oversize",
+            "unsupported",
+            "symlink",
+            "unreadable"
+          ]
+        },
+        "targetPathState": {
+          "enum": [
+            "parsed",
+            "excluded",
+            "oversize",
+            "deep",
+            "unsupported",
+            "symlink",
+            "unreadable",
+            "absent"
+          ]
+        },
+        "occurrenceOrdinal": { "type": "integer", "minimum": 1 }
+      }
     },
     "booleanCounts": {
       "type": "object",

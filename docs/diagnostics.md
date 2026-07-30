@@ -541,6 +541,19 @@ Readiness and CI reports may include two security summaries: security posture fr
 
 Semantic diff and CI reports may include security deltas, including added/resolved security findings grouped by `riskClass` and effective policy inventory count changes. These summaries are reporting-only and do not change scan `fail_on`, readiness scoring, or CI status.
 
+The Executable Surface Inventory is also reporting-only and does not define a
+diagnostic ID. A surface being uninvoked, unreachable, non-canonical, or without
+an effective policy does not by itself introduce a finding or change an exit
+status. Existing path, support-reachability, symlink, and security diagnostics
+remain authoritative when their independent conditions match.
+
+The inventory correlates existing effective-policy fingerprints but does not
+replace security findings or claim a file is safe or malicious. Dangerous
+commands, remote scripts, destructive actions, dependency installation,
+network destinations, secrets, multilingual content checks, and hidden-Unicode
+checks remain separate diagnostic analyses. Enforcement and Trust Graph
+integration are intentionally deferred.
+
 ### Finding and evidence JSON contract
 
 Each `findings` entry contains these required fields:

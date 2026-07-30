@@ -92,6 +92,18 @@ test("BOM schema enforces output modes, timestamps, formats, and score bounds", 
   negativePolicyCount.securityPolicyInventory.policySources.owning_skill = -1;
   assertInvalid(validateBom, negativePolicyCount, "minimum");
 
+  const negativeSurfaceCount = structuredClone(defaultBom);
+  negativeSurfaceCount.executableSurfaceInventory.summary.totalSurfaces = -1;
+  assertInvalid(validateBom, negativeSurfaceCount, "minimum");
+
+  const missingSurfaceSchema = structuredClone(defaultBom);
+  delete (
+    missingSurfaceSchema.executableSurfaceInventory as Partial<
+      typeof missingSurfaceSchema.executableSurfaceInventory
+    >
+  ).schema;
+  assertInvalid(validateBom, missingSurfaceSchema, "required");
+
   const negativeReadinessCount = structuredClone(defaultBom);
   negativeReadinessCount.readiness.summary.totalAssets = -1;
   assertInvalid(validateBom, negativeReadinessCount, "minimum");
