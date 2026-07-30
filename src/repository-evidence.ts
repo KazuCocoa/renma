@@ -15,6 +15,10 @@ import {
   type ContextLensSummary,
 } from "./context-lens.js";
 import { discoverArtifacts } from "./discovery.js";
+import {
+  buildExecutableSurfaceInventory,
+  type ExecutableSurfaceInventory,
+} from "./executable-surface-inventory.js";
 import { buildClassificationEvidenceIndex } from "./evidence/classification.js";
 import { parseDocument } from "./markdown.js";
 import type { Catalog } from "./model.js";
@@ -59,6 +63,7 @@ export type RepositoryProjectionName =
   | "skill-discovery"
   | "classifications"
   | "security-policies"
+  | "executable-surfaces"
   | "context-lens"
   | "repository-paths";
 
@@ -89,6 +94,7 @@ export interface RepositorySnapshot extends RepositoryEvidence {
   classifications: ReadonlyMap<string, AssetClassificationEvidence>;
   skillParents: SkillParentIndex;
   securityPolicies: SecurityPolicyAssetEvidence[];
+  executableSurfaceInventory: ExecutableSurfaceInventory;
   agentSkills: AgentSkillsValidationSummary;
   skillDiscovery: SkillDiscoveryIndex;
   skillDiscoveryDiagnostics: Diagnostic[];
@@ -221,6 +227,7 @@ export async function collectRepositorySnapshot(
     projections,
     immutableEvidenceGraph(repositoryPaths),
     immutableEvidenceGraph(repositoryPathStates),
+    instrumentation,
   );
 }
 
@@ -245,6 +252,9 @@ export function prepareRepositorySnapshotProjections(
         break;
       case "security-policies":
         void snapshot.securityPolicies;
+        break;
+      case "executable-surfaces":
+        void snapshot.executableSurfaceInventory;
         break;
       case "context-lens":
         void snapshot.contextLens;
@@ -319,8 +329,22 @@ function createRepositorySnapshot(
   projections: RepositoryProjections,
   repositoryPaths: ReadonlySet<string>,
   repositoryPathStates: ReadonlyMap<string, RepositoryPathState>,
+  instrumentation?: RepositoryCollectionInstrumentation,
 ): RepositorySnapshot {
   let combinedDiagnostics: Diagnostic[] | undefined;
+  const executableSurfaceInventory = memoizeProjection(
+    "executable-surfaces",
+    instrumentation,
+    () =>
+      buildExecutableSurfaceInventory({
+        artifacts: core.artifacts,
+        documents: core.documents,
+        repositoryPaths,
+        repositoryPathStates,
+        skillParents: projections.catalog().skillParents,
+        securityPolicies: projections.securityPolicies(),
+      }),
+  );
   return Object.freeze({
     core,
     root: core.root,
@@ -355,6 +379,9 @@ function createRepositorySnapshot(
     },
     get securityPolicies() {
       return projections.securityPolicies();
+    },
+    get executableSurfaceInventory() {
+      return executableSurfaceInventory();
     },
     get contextLens() {
       return projections.contextLens().summary;

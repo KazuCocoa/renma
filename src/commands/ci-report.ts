@@ -18,6 +18,8 @@ import {
   zeroSecurityPolicyInventorySummary,
   type SecurityPolicyInventorySummary,
 } from "../security-policy-inventory.js";
+import { buildExecutableSurfaceDiff } from "../executable-surface-diff.js";
+import { zeroExecutableSurfaceInventory } from "../executable-surface-inventory.js";
 import type { ConfigOverrides } from "../config.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import { formatJsonDocument } from "../report.js";
@@ -319,6 +321,16 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     ...formatReadinessCheckChanges(report.diff.readiness.checkChanges),
     ...skillDiscoveryLines,
     "",
+    "## Executable Surface Changes",
+    "",
+    ...formatExecutableSurfaceChanges(
+      report.diff.executableSurface ??
+        buildExecutableSurfaceDiff(
+          zeroExecutableSurfaceInventory(),
+          zeroExecutableSurfaceInventory(),
+        ),
+    ),
+    "",
     "## Security Posture",
     "",
     ...formatSecurityPostureSection(report.securityPosture),
@@ -347,6 +359,71 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
   ];
 
   return `${lines.join("\n")}\n`;
+}
+
+function formatExecutableSurfaceChanges(
+  executableSurface: CiCompatibleDiffReport["executableSurface"],
+): string[] {
+  const lines = [
+    `- Total surfaces: ${executableSurface.fromSummary.totalSurfaces} -> ${executableSurface.toSummary.totalSurfaces} (${formatDelta(executableSurface.summary.totalSurfacesDelta)})`,
+    `- Added surfaces: ${executableSurface.addedSurfacePaths.length}`,
+    `- Removed surfaces: ${executableSurface.removedSurfacePaths.length}`,
+    `- Changed surfaces: ${executableSurface.changedSurfaces.length}`,
+    `- New problematic invocation evidence: ${executableSurface.newProblematicInvocations.length}`,
+    `- Newly reachable Skill-local scripts: ${executableSurface.newlyReachableSkillLocalPaths.length}`,
+    `- Newly unreachable Skill-local scripts: ${executableSurface.newlyUnreachableSkillLocalPaths.length}`,
+    `- Effective-policy coverage: ${formatDelta(executableSurface.summary.effectivePolicyCoverageDelta)} pp`,
+  ];
+  if (executableSurface.addedSurfacePaths.length > 0) {
+    lines.push(
+      "",
+      "### Added executable surfaces",
+      "",
+      ...executableSurface.addedSurfacePaths
+        .slice(0, MAX_LIST_ITEMS)
+        .map((surfacePath) => `- \`${surfacePath}\``),
+      ...formatOverflow(executableSurface.addedSurfacePaths.length),
+    );
+  }
+  if (executableSurface.removedSurfacePaths.length > 0) {
+    lines.push(
+      "",
+      "### Removed executable surfaces",
+      "",
+      ...executableSurface.removedSurfacePaths
+        .slice(0, MAX_LIST_ITEMS)
+        .map((surfacePath) => `- \`${surfacePath}\``),
+      ...formatOverflow(executableSurface.removedSurfacePaths.length),
+    );
+  }
+  if (executableSurface.changedSurfaces.length > 0) {
+    lines.push(
+      "",
+      "### Changed executable surfaces",
+      "",
+      ...executableSurface.changedSurfaces
+        .slice(0, MAX_LIST_ITEMS)
+        .map(
+          (surface) => `- \`${surface.path}\`: ${surface.reasons.join(", ")}`,
+        ),
+      ...formatOverflow(executableSurface.changedSurfaces.length),
+    );
+  }
+  if (executableSurface.newProblematicInvocations.length > 0) {
+    lines.push(
+      "",
+      "### New unresolved or unavailable invocations",
+      "",
+      ...executableSurface.newProblematicInvocations
+        .slice(0, MAX_LIST_ITEMS)
+        .map(
+          (invocation) =>
+            `- \`${invocation.sourcePath}:L${invocation.line}\` ${invocation.launcher} \`${invocation.target}\`: ${invocation.resolution}`,
+        ),
+      ...formatOverflow(executableSurface.newProblematicInvocations.length),
+    );
+  }
+  return lines;
 }
 
 function formatOwnershipSummary(

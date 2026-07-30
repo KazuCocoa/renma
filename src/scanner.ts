@@ -51,6 +51,7 @@ export function scanFromRepositorySnapshot(
       : (["skill-discovery"] as const)),
     "classifications",
     "security-policies",
+    "executable-surfaces",
     "context-lens",
   ]);
   const securityPolicies = snapshot.securityPolicies;
@@ -127,6 +128,7 @@ export function scanFromRepositorySnapshot(
     format: snapshot.config.format,
     agentSkills: snapshot.agentSkills,
     contextLens: snapshot.contextLens,
+    executableSurfaceInventory: snapshot.executableSurfaceInventory,
     securityPolicyInventory,
     trustGraph,
     findings: suppressed.findings,

@@ -6,6 +6,18 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added the provider-neutral, non-executing Executable Surface Inventory under
+  `executableSurfaceInventory` in scan JSON and Repository Context BOM v2.
+  Inventory evidence covers already-discovered Skill-local scripts,
+  repository-root `tools/**` helpers, non-canonical discovered scripts, static
+  helper invocations, Skill-local reachability depth, interpreter hints,
+  content identity, and effective security-policy correlation. Semantic diff
+  and CI reports now expose informational executable-surface changes without
+  changing diagnostics, readiness, CI status, failure thresholds, discovery,
+  or Trust Graph semantics.
+
 ## [0.26.0] - 2026-07-30
 
 ### Added

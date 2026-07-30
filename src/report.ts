@@ -1,4 +1,5 @@
 import type { ScanResult } from "./types/scan-result.js";
+import type { ExecutableSurfaceInventory } from "./executable-surface-inventory.js";
 
 /** Format one complete JSON document with two-space indentation and one newline. */
 export function formatJsonDocument(value: unknown): string {
@@ -27,6 +28,9 @@ export function formatText(result: ScanResult): string {
     `Diagnostics: ${result.diagnostics.length}`,
     `Exit threshold: ${result.exitThreshold}`,
     `Findings: ${result.findings.length}`,
+    ...(result.executableSurfaceInventory
+      ? formatExecutableSurfaceInventoryText(result.executableSurfaceInventory)
+      : []),
   ];
 
   for (const skill of result.agentSkills.results) {
@@ -74,4 +78,36 @@ export function formatText(result: ScanResult): string {
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+/** Render the compact inventory section shared by terminal-facing reports. */
+export function formatExecutableSurfaceInventoryText(
+  inventory: ExecutableSurfaceInventory,
+): string[] {
+  const summary = inventory.summary;
+  const lines = [
+    "",
+    "Executable Surface Inventory",
+    `  Surfaces: ${summary.totalSurfaces} (${summary.skillLocalSurfaces} Skill-local, ${summary.repositoryToolSurfaces} repository tools, ${summary.noncanonicalSurfaces} non-canonical)`,
+    `  Skill-local reachability: ${summary.reachableSkillLocalSurfaces} reachable, ${summary.unreachableSkillLocalSurfaces} unreachable`,
+    `  References/invocations: ${summary.referencedSurfaces} referenced, ${summary.invokedSurfaces} invoked`,
+    `  Effective security policy: ${summary.surfacesWithEffectivePolicy} covered, ${summary.surfacesWithoutEffectivePolicy} without`,
+    `  Invocation resolution: ${summary.resolvedInvocations} resolved, ${summary.missingInvocations} missing, ${summary.unsafeInvocations} unsafe, ${summary.unscopedInvocations} unscoped, ${summary.noncanonicalInvocations} non-canonical, ${summary.unavailableInvocations} unavailable`,
+  ];
+  if (inventory.surfaces.length === 0) {
+    lines.push("  Surfaces: (none)");
+    return lines;
+  }
+  for (const surface of inventory.surfaces) {
+    const reachability =
+      surface.scope === "skill-local"
+        ? surface.reachableFromOwningSkill
+          ? `reachable@${surface.reachabilityDepth}`
+          : "unreachable"
+        : "n/a";
+    lines.push(
+      `  - ${surface.path} [${surface.scope}; ${surface.interpreterHints.join(",")}; reachability ${reachability}; invocations ${surface.invocationCount}; policy ${surface.securityPolicy.hasEffectivePolicy ? "effective" : "none"}]`,
+    );
+  }
+  return lines;
 }

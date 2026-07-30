@@ -58,6 +58,35 @@
     "scopeSummary": [],
     "lenses": []
   },
+  "executableSurfaceInventory": {
+    "schema": "renma.executable-surface-inventory.v1",
+    "summary": {
+      "totalSurfaces": 0,
+      "skillLocalSurfaces": 0,
+      "repositoryToolSurfaces": 0,
+      "noncanonicalSurfaces": 0,
+      "textSurfaces": 0,
+      "binarySurfaces": 0,
+      "reachableSkillLocalSurfaces": 0,
+      "unreachableSkillLocalSurfaces": 0,
+      "referencedSurfaces": 0,
+      "unreferencedSurfaces": 0,
+      "invokedSurfaces": 0,
+      "uninvokedSurfaces": 0,
+      "surfacesWithEffectivePolicy": 0,
+      "surfacesWithoutEffectivePolicy": 0,
+      "totalInvocations": 0,
+      "resolvedInvocations": 0,
+      "missingInvocations": 0,
+      "unsafeInvocations": 0,
+      "unscopedInvocations": 0,
+      "noncanonicalInvocations": 0,
+      "unavailableInvocations": 0,
+      "interpreterHints": []
+    },
+    "surfaces": [],
+    "invocations": []
+  },
   "securityPolicyInventory": {
     "totalPolicyAssets": 7,
     "assetsWithLocalPolicyMetadata": 7,

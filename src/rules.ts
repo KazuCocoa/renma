@@ -14,10 +14,7 @@ import {
   logicalSkillDirectory,
   normalizeRepositoryRelativePath,
 } from "./discovery.js";
-import {
-  helperScriptPath,
-  resolveHelperScriptPath,
-} from "./repository-paths.js";
+import { collectHelperCommandEvidence } from "./helper-command-evidence.js";
 import { parseAssetMetadata } from "./metadata.js";
 import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
@@ -26,7 +23,10 @@ import type { Evidence, Finding, Severity } from "./types/diagnostics.js";
 import type { MetadataValue, ParsedDocument } from "./types/metadata.js";
 import type { ScanConfig } from "./types/configuration.js";
 import type { RepositoryPathState } from "./repository-paths.js";
-import { staticSupportReferences } from "./static-support.js";
+import {
+  localSupportReachabilityDepth,
+  staticSupportReferences,
+} from "./static-support.js";
 
 type FindingDetails = Partial<
   Pick<
@@ -2113,57 +2113,6 @@ function referencedSymlinkBoundary(
   return undefined;
 }
 
-function localSupportReachabilityDepth(
-  skill: ParsedDocument,
-  skillDirectory: string,
-  localSupportDocs: ParsedDocument[],
-  candidatePaths: string[],
-): Map<string, number> {
-  const reachable = new Map<string, number>();
-  const references = new Map(
-    [skill, ...localSupportDocs].map((document) => [
-      document.artifact.path,
-      new Set(
-        staticSupportReferences(document, skillDirectory, candidatePaths).map(
-          (reference) => reference.targetPath,
-        ),
-      ),
-    ]),
-  );
-  let changed = true;
-
-  while (changed) {
-    changed = false;
-    for (const document of localSupportDocs) {
-      if (reachable.has(document.artifact.path)) continue;
-      if (references.get(skill.artifact.path)?.has(document.artifact.path)) {
-        reachable.set(document.artifact.path, 1);
-        changed = true;
-        continue;
-      }
-      const parent = localSupportDocs
-        .filter((candidate) => reachable.has(candidate.artifact.path))
-        .sort(
-          (left, right) =>
-            (reachable.get(left.artifact.path) ?? 0) -
-            (reachable.get(right.artifact.path) ?? 0),
-        )
-        .find((candidate) =>
-          references.get(candidate.artifact.path)?.has(document.artifact.path),
-        );
-      if (parent) {
-        reachable.set(
-          document.artifact.path,
-          (reachable.get(parent.artifact.path) ?? 0) + 1,
-        );
-        changed = true;
-      }
-    }
-  }
-
-  return reachable;
-}
-
 function localSupportPathReferences(
   document: ParsedDocument,
   skillDir: string,
@@ -2268,19 +2217,20 @@ function helperCommandFindings(
 ): Finding[] {
   const findings: Finding[] = [];
 
-  for (const command of executableCommands(document)) {
-    const commandPath = helperScriptPath(command.command);
-    if (!commandPath) continue;
-    const resolution = resolveHelperScriptPath(
-      document.artifact.path,
-      commandPath,
-    );
+  for (const command of collectHelperCommandEvidence([document])) {
+    const commandPath = command.rawTarget;
+    const resolution = command.pathResolution;
     if (resolution.kind === "unscoped") continue;
     if (resolution.kind === "unsafe") {
       findings.push(
-        unresolvedHelperCommandFinding(document, command, commandPath, {
-          details: { unsafePath: true },
-        }),
+        unresolvedHelperCommandFinding(
+          document,
+          { command: command.snippet, line: command.line },
+          commandPath,
+          {
+            details: { unsafePath: true },
+          },
+        ),
       );
       continue;
     }
@@ -2293,7 +2243,11 @@ function helperCommandFindings(
     ) {
       if (!paths.has(scriptPath)) {
         findings.push(
-          unresolvedHelperCommandFinding(document, command, scriptPath),
+          unresolvedHelperCommandFinding(
+            document,
+            { command: command.snippet, line: command.line },
+            scriptPath,
+          ),
         );
       }
       continue;
@@ -2308,7 +2262,7 @@ function helperCommandFindings(
           "structure",
           "low",
           command.line,
-          command.command,
+          command.snippet,
           "Update helper script commands to reference scripts under tools/**.",
           {
             whyItMatters:
@@ -2321,7 +2275,11 @@ function helperCommandFindings(
 
     if (scriptPath.startsWith("tools/") && !paths.has(scriptPath)) {
       findings.push(
-        unresolvedHelperCommandFinding(document, command, scriptPath),
+        unresolvedHelperCommandFinding(
+          document,
+          { command: command.snippet, line: command.line },
+          scriptPath,
+        ),
       );
     }
   }
@@ -2478,23 +2436,6 @@ function declaredDependencyLayoutFindings(
   }
 
   return findings;
-}
-
-function executableCommands(document: ParsedDocument): Array<{
-  command: string;
-  line: number;
-}> {
-  return document.codeFences.flatMap((fence) =>
-    fence.content
-      .split(/\r?\n/)
-      .map((line, index) => ({
-        command: line.trim(),
-        line: fence.startLine + index + 1,
-      }))
-      .filter(({ command }) =>
-        /^(node|bash|sh|python|python3)\s+/.test(command),
-      ),
-  );
 }
 
 function unresolvedHelperCommandFinding(

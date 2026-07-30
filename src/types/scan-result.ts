@@ -1,5 +1,6 @@
 import type { AgentSkillsValidationSummary } from "../agent-skills.js";
 import type { ContextLensSummary } from "../context-lens.js";
+import type { ExecutableSurfaceInventory } from "../executable-surface-inventory.js";
 import type { SecurityPolicyInventorySummary } from "../security-policy-inventory.js";
 import type { TrustGraph } from "../trust-graph.js";
 import type {
@@ -18,6 +19,7 @@ export interface ScanResult {
   format: "text" | "json";
   agentSkills: AgentSkillsValidationSummary;
   contextLens?: ContextLensSummary;
+  executableSurfaceInventory?: ExecutableSurfaceInventory;
   securityPolicyInventory?: SecurityPolicyInventorySummary;
   trustGraph?: TrustGraph;
   findings: Finding[];

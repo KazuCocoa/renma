@@ -93,11 +93,20 @@ const PRIVATE_BODY_POLICY_SPECIFIERS = [
   "renma/dist/security-body-policy/fact-projection.js",
   "renma/dist/security-body-policy/policy-context.js",
 ];
+const PRIVATE_EXECUTABLE_SURFACE_SPECIFIERS = [
+  "renma/dist/helper-command-evidence.js",
+  "renma/dist/executable-surface-inventory.js",
+  "renma/dist/executable-surface-diff.js",
+];
+const PRIVATE_PACKAGE_SPECIFIERS = [
+  ...PRIVATE_BODY_POLICY_SPECIFIERS,
+  ...PRIVATE_EXECUTABLE_SURFACE_SPECIFIERS,
+];
 const CLI_ONLY_PACKAGE_SPECIFIERS = ["renma", "renma/dist/index.js"];
 const PUBLIC_MODULE_IMPORTS = [...PUBLIC_DEEP_IMPORTS];
 const PRIVATE_DECLARATION_SPECIFIERS = [
-  ...PRIVATE_BODY_POLICY_SPECIFIERS,
-  ...PRIVATE_BODY_POLICY_SPECIFIERS.map((specifier) =>
+  ...PRIVATE_PACKAGE_SPECIFIERS,
+  ...PRIVATE_PACKAGE_SPECIFIERS.map((specifier) =>
     specifier.replace(/\.js$/u, ".d.ts"),
   ),
 ];
@@ -214,7 +223,7 @@ try {
   verifyPackagedCli(consumerDirectory);
 
   process.stdout.write(
-    `Verified ${files.size} packaged files, ${PUBLIC_MODULE_IMPORTS.length + 1} supported package specifiers, ${PUBLIC_MODULE_IMPORTS.length} supported declaration paths, ${PRIVATE_BODY_POLICY_SPECIFIERS.length} private body-policy subpaths, ${PRIVATE_DECLARATION_SPECIFIERS.length} private declaration paths, ${CLI_ONLY_PACKAGE_SPECIFIERS.length} CLI-only module paths, CLI behavior, inspect declaration compatibility, and every README-relative target.\n`,
+    `Verified ${files.size} packaged files, ${PUBLIC_MODULE_IMPORTS.length + 1} supported package specifiers, ${PUBLIC_MODULE_IMPORTS.length} supported declaration paths, ${PRIVATE_PACKAGE_SPECIFIERS.length} private module subpaths, ${PRIVATE_DECLARATION_SPECIFIERS.length} private declaration paths, ${CLI_ONLY_PACKAGE_SPECIFIERS.length} CLI-only module paths, CLI behavior, inspect declaration compatibility, and every README-relative target.\n`,
   );
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
@@ -314,7 +323,7 @@ async function verifyInstalledExports(packageRoot) {
     }
   }
 
-  for (const specifier of PRIVATE_BODY_POLICY_SPECIFIERS) {
+  for (const specifier of PRIVATE_PACKAGE_SPECIFIERS) {
     if (packageExportKey(specifier) in exportsMap) {
       throw new Error(`Private package path is exported: ${specifier}`);
     }
@@ -331,7 +340,7 @@ async function verifyPackageSpecifierPolicy(consumerDirectory) {
     `const publicImports = ${JSON.stringify(
       PUBLIC_MODULE_IMPORTS.map(([specifier]) => specifier),
     )};
-const privateImports = ${JSON.stringify(PRIVATE_BODY_POLICY_SPECIFIERS)};
+const privateImports = ${JSON.stringify(PRIVATE_PACKAGE_SPECIFIERS)};
 const cliOnlyImports = ${JSON.stringify(CLI_ONLY_PACKAGE_SPECIFIERS)};
 
 for (const specifier of publicImports) {

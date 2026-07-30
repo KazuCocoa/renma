@@ -35,10 +35,22 @@ test("published Draft 2020-12 schemas validate representative generated reports"
   assert.equal(omittedBom.outputMode, "omit_generated_at");
   assert.equal("generatedAt" in omittedBom, false);
   assert.ok(contextLensBom.readiness.summary.contextLens.totalLensCount > 0);
+  assert.equal(
+    defaultBom.executableSurfaceInventory.schema,
+    "renma.executable-surface-inventory.v1",
+  );
+  assert.ok(Array.isArray(defaultBom.executableSurfaceInventory.surfaces));
+  assert.ok(Array.isArray(defaultBom.executableSurfaceInventory.invocations));
 
   const withoutConfigPath = structuredClone(defaultBom);
   delete withoutConfigPath.configPath;
   assertValid(validateBom, withoutConfigPath);
+
+  const olderV2WithoutExecutableSurfaceInventory = structuredClone(defaultBom);
+  delete (
+    olderV2WithoutExecutableSurfaceInventory as Partial<typeof defaultBom>
+  ).executableSurfaceInventory;
+  assertValid(validateBom, olderV2WithoutExecutableSurfaceInventory);
 
   for (const type of [
     "owned_by",
@@ -91,6 +103,63 @@ test("BOM schema enforces output modes, timestamps, formats, and score bounds", 
   const negativePolicyCount = structuredClone(defaultBom);
   negativePolicyCount.securityPolicyInventory.policySources.owning_skill = -1;
   assertInvalid(validateBom, negativePolicyCount, "minimum");
+
+  const negativeSurfaceCount = structuredClone(defaultBom);
+  negativeSurfaceCount.executableSurfaceInventory.summary.totalSurfaces = -1;
+  assertInvalid(validateBom, negativeSurfaceCount, "minimum");
+
+  for (const field of [
+    "schema",
+    "summary",
+    "surfaces",
+    "invocations",
+  ] as const) {
+    const incompleteInventory = structuredClone(defaultBom);
+    delete (
+      incompleteInventory.executableSurfaceInventory as unknown as Record<
+        string,
+        unknown
+      >
+    )[field];
+    assertInvalid(validateBom, incompleteInventory, "required");
+  }
+
+  const invalidSurfaceScope = structuredClone(defaultBom);
+  invalidSurfaceScope.executableSurfaceInventory.surfaces = [
+    {
+      path: "tools/check.mjs",
+      scope: "external",
+      origins: ["discovered-script"],
+      artifactKind: "script",
+      contentClassification: "text",
+      interpreterHints: ["node"],
+      staticallyReferenced: false,
+      staticallyInvoked: false,
+      referenceCount: 0,
+      invocationCount: 0,
+      securityPolicy: {
+        hasEffectivePolicy: false,
+        policySources: [],
+      },
+      fingerprint: `sha256:${"0".repeat(64)}`,
+    },
+  ] as unknown as typeof invalidSurfaceScope.executableSurfaceInventory.surfaces;
+  assertInvalid(validateBom, invalidSurfaceScope, "enum");
+
+  const invalidInvocationResolution = structuredClone(defaultBom);
+  invalidInvocationResolution.executableSurfaceInventory.invocations = [
+    {
+      sourcePath: "skills/demo/SKILL.md",
+      line: 1,
+      snippet: "node tools/check.mjs",
+      launcher: "node",
+      rawTarget: "tools/check.mjs",
+      normalizedTarget: "tools/check.mjs",
+      resolution: "executed",
+      occurrenceOrdinal: 1,
+    },
+  ] as unknown as typeof invalidInvocationResolution.executableSurfaceInventory.invocations;
+  assertInvalid(validateBom, invalidInvocationResolution, "enum");
 
   const negativeReadinessCount = structuredClone(defaultBom);
   negativeReadinessCount.readiness.summary.totalAssets = -1;
