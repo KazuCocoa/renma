@@ -762,8 +762,22 @@ already-discovered repository-local Skill script or `tools/**` helper that
 falls within Renma's existing bounded helper evidence. Rows report normalized
 path, scope, content classification and hash, conservative interpreter hints,
 static references and invocations, Skill-local reachability, and bounded
-effective security-policy correlation. Invocation rows retain launcher, target,
-source line, and exact resolution state.
+security-policy correlation. Invocation rows retain launcher, target, source
+line, exact resolution state, and invocation-context governance evidence.
+
+Surface policy evidence and invocation-context policy evidence have different
+meanings. Surface evidence belongs to or is inherited by the executable surface
+itself. Invocation-context evidence records prepared policy rows associated
+with the instruction artifact and its structurally resolved owning Skill.
+Calling-Skill policy is never assigned to a shared repository tool.
+
+Invocation governance retains `source-artifact` and `owning-skill`
+relationships separately, including useful negative evidence. Renma does not
+merge their policy fields, select a precedence winner, or expose complete
+effective-policy values. “With effective policy evidence” means only that at
+least one recorded relationship already has effective policy evidence.
+Multiple distinct fingerprints describe visible policy variants; they are not
+a conflict, safety result, or compliance verdict.
 
 Canonical scopes are `skill-local` for a script under the resolved owning
 Skill's `scripts/**`, and `repository-tool` for a helper under repository-root
@@ -833,7 +847,10 @@ Renma derives each BOM from one in-memory repository snapshot: configuration, di
 BOM v2 additively includes the complete `executableSurfaceInventory`
 projection—schema, summary, surface rows, and invocation rows—so consumers can
 audit and diff the same evidence emitted by scan. No standalone executable BOM
-command is needed.
+command is needed. Current output includes invocation governance and per-surface
+invocation aggregates unconditionally. The published BOM v2 schema keeps those
+new fields optional at the compatibility boundary so 0.27.0 BOMs remain valid;
+each governance object is strict when present.
 
 By default, `generatedAt` records when the BOM was produced. Add `--omit-generated-at` when CI or review automation needs to avoid clock-based diffs. With the same checkout path, config path, repository contents, Renma version, and UTC evaluation date, repeated `--omit-generated-at` runs should produce byte-identical JSON. The option does not remove metadata freshness dates, suppress freshness diagnostics, normalize absolute `root` or `configPath`, hide file moves, or guarantee portable byte-for-byte output across runners.
 
@@ -1136,7 +1153,12 @@ Output includes readiness deltas, changed assets, graph edge changes, check
 changes, added or removed findings, and an additive
 `renma.skill-discovery-diff.v1` section. It also includes an
 `executableSurface` section with count deltas, added/removed/changed surface
-paths, concise change reasons, and semantic invocation-resolution changes.
+paths, concise change reasons, semantic invocation-resolution changes, and
+line-insensitive invocation-governance changes. Caller-only aggregate changes
+use `invocation-governance`; `security-policy` remains reserved for changes to
+the surface's own policy evidence. These governance changes are informational:
+no combined policy, conflict classification, or enforcement decision is
+derived.
 The Discovery section reports exact
 adoption and coverage transitions, count deltas, published entrypoint changes,
 newly reachable/not-reached and newly/resolved unrouted Skill identities,
@@ -1171,7 +1193,11 @@ changes, graph changes, review-focused finding changes, and Skill Discovery
 topology changes. An informational `Executable Surface Changes` section reports
 surface deltas, added/removed/changed paths, new unresolved, unsafe,
 non-canonical, or unavailable invocation evidence, Skill-local reachability
-changes, and effective-policy coverage delta. It does not affect the CI verdict,
+changes, surface policy-evidence coverage, invocation-context policy-evidence
+deltas, newly observed invocations without effective policy evidence, gained
+or lost evidence, and governance changes involving multiple effective
+fingerprints. The bounded governance lists use neutral evidence terminology and
+do not enter `newProblematicInvocations`. They do not affect the CI verdict,
 readiness score, failure threshold, or review policy. Newly generated JSON includes the complete
 `renma.skill-discovery-diff.v1` value once at top-level `skillDiscovery` plus
 one `renma.skill-discovery-ci-policy.v1` evaluation at top-level

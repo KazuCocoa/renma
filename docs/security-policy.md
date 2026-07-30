@@ -752,6 +752,22 @@ coverage; network/upload/secrets booleans; human approval requirements; approved
 destinations; forbidden inputs; disallowed commands; and profile resolution
 counts. It is reporting-only and does not enforce runtime behavior.
 
+The Executable Surface Inventory exposes a separate invocation-context view.
+For each recognized static helper invocation it correlates the already prepared
+policy row for the exact source artifact and, when structurally resolved, the
+prepared row for its owning Skill. Those relationships remain separate: Renma
+does not merge policy fields, apply policy precedence, or construct an effective
+invocation policy.
+
+Caller evidence does not become surface policy. In particular, a shared
+repository-root `tools/**` helper remains without surface policy unless policy
+evidence applies directly to that tool. Invocation rows, relation counts, and
+fingerprint variants do not add Security Policy Inventory assets or change its
+effective-policy totals. Different effective fingerprints are visibility about
+calling contexts, not a conflict, violation, or proof of safety. Findings,
+Readiness, CI enforcement, policy requirements, and Trust Graph integration are
+deferred.
+
 `renma trust-graph` also includes effective policy evidence. Each effective policy node uses a deterministic fingerprint over normalized allowed data, forbidden inputs, network/upload/secrets booleans, human approval requirement, approved destinations, and disallowed commands. Every `has_effective_policy` edge carries a deterministic `policySources` array containing each source that contributed to the fingerprint: `local`, `security_profile`, `repository_config`, and/or `owning_skill`. Owning-Skill inheritance retains `inheritedFrom`, and selected-profile evidence retains the selected profile and profile chain. The graph does not enforce policy at runtime.
 
 Contribution is recorded during effective-policy resolution with the same

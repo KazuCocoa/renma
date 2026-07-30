@@ -447,14 +447,31 @@ reachability graph is built.
 
 Surface identity is the normalized repository path. Each row carries a
 fingerprint over content identity, scope, interpreter hints, reachability,
-reference and invocation counts, and bounded policy correlation. Raw invocation
-rows retain source lines, while diff identity uses source path, launcher,
-normalized or raw target, resolution, and occurrence ordinal so unrelated
-preceding-line edits are not semantic add/remove events.
+reference and invocation counts, the surface's own policy evidence, and its
+invocation-governance aggregate. Repository tools do not inherit policy from
+their callers: surface policy remains evidence attached to or inherited by the
+surface itself.
+
+Each recognized invocation separately correlates its exact source path and,
+when structurally resolved, its owning Skill entrypoint with already prepared
+`SecurityPolicyAssetEvidence` rows. These `source-artifact` and `owning-skill`
+relationships remain distinct. The inventory does not reparse policy, merge
+rows, apply precedence, or create a combined invocation policy. Multiple
+effective-policy fingerprints are visibility about distinct contexts, not a
+conflict or verdict.
+
+Raw invocation rows retain source lines, while diff identity uses source path,
+launcher, normalized or raw target, and occurrence ordinal so unrelated
+preceding-line edits are not semantic add/remove events. The invocation
+governance fingerprint covers only owning-Skill resolution and normalized
+policy relationships. It excludes line numbers, snippets, unrelated invocation
+resolution, absolute paths, and time-dependent values.
 
 The inventory is visibility evidence, not SAST, a safety verdict, or an
-enforcement policy. Diff and CI sections are informational. Readiness and Trust
-Graph intentionally do not consume the new relationships in this slice.
+enforcement policy. Diff and CI sections are informational. Findings,
+diagnostics, Readiness, the Security Policy Inventory, and Trust Graph
+intentionally do not consume the invocation-governance relationships in this
+slice.
 
 CI calls `executeDiff()` once. It exposes the diff's Discovery projection at
 top level, evaluates the two snapshot policy modes as

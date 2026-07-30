@@ -1,4 +1,6 @@
 import type {
+  ExecutableInvocationGovernance,
+  ExecutableInvocationOwningSkillResolution,
   ExecutableSurfaceEntry,
   ExecutableSurfaceInventory,
   ExecutableSurfaceInventorySummary,
@@ -12,6 +14,7 @@ export type ExecutableSurfaceChangeReason =
   | "reachability"
   | "references"
   | "invocations"
+  | "invocation-governance"
   | "security-policy";
 
 export interface ExecutableSurfaceChange {
@@ -41,6 +44,35 @@ export interface ExecutableSurfaceInvocationResolutionChange {
   toLine: number;
 }
 
+export interface ExecutableInvocationGovernanceDelta {
+  sourcePath: string;
+  launcher: string;
+  target: string;
+  occurrenceOrdinal: number;
+  hasEffectivePolicyEvidence: boolean;
+  distinctEffectivePolicyFingerprints: string[];
+  owningSkillResolution: ExecutableInvocationOwningSkillResolution;
+  resolution: ExecutableSurfaceInvocation["resolution"];
+  line: number;
+}
+
+export interface ExecutableInvocationGovernanceChange {
+  sourcePath: string;
+  launcher: string;
+  target: string;
+  occurrenceOrdinal: number;
+  fromHasEffectivePolicyEvidence: boolean;
+  toHasEffectivePolicyEvidence: boolean;
+  fromDistinctEffectivePolicyFingerprints: string[];
+  toDistinctEffectivePolicyFingerprints: string[];
+  fromOwningSkillResolution: ExecutableInvocationOwningSkillResolution;
+  toOwningSkillResolution: ExecutableInvocationOwningSkillResolution;
+  fromGovernanceFingerprint: string;
+  toGovernanceFingerprint: string;
+  fromLine: number;
+  toLine: number;
+}
+
 export interface ExecutableSurfaceDiff {
   summary: {
     totalSurfacesDelta: number;
@@ -60,6 +92,13 @@ export interface ExecutableSurfaceDiff {
     unscopedInvocationsDelta: number;
     noncanonicalInvocationsDelta: number;
     unavailableInvocationsDelta: number;
+    invocationsWithEffectivePolicyEvidenceDelta: number;
+    invocationsWithoutEffectivePolicyEvidenceDelta: number;
+    resolvedInvocationsWithEffectivePolicyEvidenceDelta: number;
+    resolvedInvocationsWithoutEffectivePolicyEvidenceDelta: number;
+    invocationsWithMultipleEffectivePolicyFingerprintsDelta: number;
+    sourceArtifactPolicyEvidenceRelationsDelta: number;
+    owningSkillPolicyEvidenceRelationsDelta: number;
     effectivePolicyCoverageDelta: number;
   };
   fromSummary: ExecutableSurfaceInventorySummary;
@@ -68,6 +107,11 @@ export interface ExecutableSurfaceDiff {
   removedSurfacePaths: string[];
   changedSurfaces: ExecutableSurfaceChange[];
   invocationResolutionChanges: ExecutableSurfaceInvocationResolutionChange[];
+  invocationGovernanceChanges: ExecutableInvocationGovernanceChange[];
+  newInvocationsWithoutEffectivePolicyEvidence: ExecutableInvocationGovernanceDelta[];
+  invocationsGainedEffectivePolicyEvidence: ExecutableInvocationGovernanceChange[];
+  invocationsLostEffectivePolicyEvidence: ExecutableInvocationGovernanceChange[];
+  invocationGovernanceChangesWithMultipleEffectivePolicyFingerprints: ExecutableInvocationGovernanceChange[];
   newProblematicInvocations: ExecutableSurfaceInvocationDelta[];
   newlyReachableSkillLocalPaths: string[];
   newlyUnreachableSkillLocalPaths: string[];
@@ -133,6 +177,45 @@ export function buildExecutableSurfaceDiff(
       ];
     })
     .sort(compareInvocationChanges);
+  const invocationGovernanceChanges = [...toInvocations]
+    .flatMap(([key, toInvocation]) => {
+      const fromInvocation = fromInvocations.get(key);
+      if (
+        !fromInvocation ||
+        fromInvocation.governance.fingerprint ===
+          toInvocation.governance.fingerprint
+      ) {
+        return [];
+      }
+      return [governanceChange(fromInvocation, toInvocation)];
+    })
+    .sort(compareGovernanceChanges);
+  const newInvocationsWithoutEffectivePolicyEvidence = [...toInvocations]
+    .filter(
+      ([key, invocation]) =>
+        !fromInvocations.has(key) &&
+        !invocation.governance.hasEffectivePolicyEvidence,
+    )
+    .map(([, invocation]) => governanceDelta(invocation))
+    .sort(compareGovernanceDeltas);
+  const invocationsGainedEffectivePolicyEvidence =
+    invocationGovernanceChanges.filter(
+      (change) =>
+        !change.fromHasEffectivePolicyEvidence &&
+        change.toHasEffectivePolicyEvidence,
+    );
+  const invocationsLostEffectivePolicyEvidence =
+    invocationGovernanceChanges.filter(
+      (change) =>
+        change.fromHasEffectivePolicyEvidence &&
+        !change.toHasEffectivePolicyEvidence,
+    );
+  const invocationGovernanceChangesWithMultipleEffectivePolicyFingerprints =
+    invocationGovernanceChanges.filter(
+      (change) =>
+        change.fromDistinctEffectivePolicyFingerprints.length > 1 ||
+        change.toDistinctEffectivePolicyFingerprints.length > 1,
+    );
   const newProblematicInvocations = [...toInvocations]
     .filter(([key, invocation]) => {
       const previous = fromInvocations.get(key);
@@ -152,6 +235,11 @@ export function buildExecutableSurfaceDiff(
     removedSurfacePaths,
     changedSurfaces,
     invocationResolutionChanges,
+    invocationGovernanceChanges,
+    newInvocationsWithoutEffectivePolicyEvidence,
+    invocationsGainedEffectivePolicyEvidence,
+    invocationsLostEffectivePolicyEvidence,
+    invocationGovernanceChangesWithMultipleEffectivePolicyFingerprints,
     newProblematicInvocations,
     newlyReachableSkillLocalPaths: reachabilityChanges(
       fromSurfaces,
@@ -196,6 +284,27 @@ function summaryDelta(
       to.noncanonicalInvocations - from.noncanonicalInvocations,
     unavailableInvocationsDelta:
       to.unavailableInvocations - from.unavailableInvocations,
+    invocationsWithEffectivePolicyEvidenceDelta:
+      to.invocationsWithEffectivePolicyEvidence -
+      from.invocationsWithEffectivePolicyEvidence,
+    invocationsWithoutEffectivePolicyEvidenceDelta:
+      to.invocationsWithoutEffectivePolicyEvidence -
+      from.invocationsWithoutEffectivePolicyEvidence,
+    resolvedInvocationsWithEffectivePolicyEvidenceDelta:
+      to.resolvedInvocationsWithEffectivePolicyEvidence -
+      from.resolvedInvocationsWithEffectivePolicyEvidence,
+    resolvedInvocationsWithoutEffectivePolicyEvidenceDelta:
+      to.resolvedInvocationsWithoutEffectivePolicyEvidence -
+      from.resolvedInvocationsWithoutEffectivePolicyEvidence,
+    invocationsWithMultipleEffectivePolicyFingerprintsDelta:
+      to.invocationsWithMultipleEffectivePolicyFingerprints -
+      from.invocationsWithMultipleEffectivePolicyFingerprints,
+    sourceArtifactPolicyEvidenceRelationsDelta:
+      to.invocationPolicyEvidenceRelations.sourceArtifact -
+      from.invocationPolicyEvidenceRelations.sourceArtifact,
+    owningSkillPolicyEvidenceRelationsDelta:
+      to.invocationPolicyEvidenceRelations.owningSkill -
+      from.invocationPolicyEvidenceRelations.owningSkill,
     effectivePolicyCoverageDelta: coveragePercent(to) - coveragePercent(from),
   };
 }
@@ -240,6 +349,18 @@ function surfaceChangeReasons(
     reasons.push("invocations");
   }
   if (
+    from.invocationGovernance.invocationsWithEffectivePolicyEvidence !==
+      to.invocationGovernance.invocationsWithEffectivePolicyEvidence ||
+    from.invocationGovernance.invocationsWithoutEffectivePolicyEvidence !==
+      to.invocationGovernance.invocationsWithoutEffectivePolicyEvidence ||
+    !sameStrings(
+      from.invocationGovernance.distinctEffectivePolicyFingerprints,
+      to.invocationGovernance.distinctEffectivePolicyFingerprints,
+    )
+  ) {
+    reasons.push("invocation-governance");
+  }
+  if (
     from.securityPolicy.hasEffectivePolicy !==
       to.securityPolicy.hasEffectivePolicy ||
     from.securityPolicy.fingerprint !== to.securityPolicy.fingerprint ||
@@ -259,6 +380,7 @@ interface SemanticInvocation {
   target: string;
   occurrenceOrdinal: number;
   resolution: ExecutableSurfaceInvocation["resolution"];
+  governance: ExecutableInvocationGovernance;
   line: number;
 }
 
@@ -288,11 +410,57 @@ function semanticInvocationMap(
           target,
           occurrenceOrdinal,
           resolution: invocation.resolution,
+          governance: invocation.governance,
           line: invocation.line,
         };
         return [`${base}\0${occurrenceOrdinal}`, row] as const;
       }),
   );
+}
+
+function governanceChange(
+  from: SemanticInvocation,
+  to: SemanticInvocation,
+): ExecutableInvocationGovernanceChange {
+  return {
+    sourcePath: to.sourcePath,
+    launcher: to.launcher,
+    target: to.target,
+    occurrenceOrdinal: to.occurrenceOrdinal,
+    fromHasEffectivePolicyEvidence: from.governance.hasEffectivePolicyEvidence,
+    toHasEffectivePolicyEvidence: to.governance.hasEffectivePolicyEvidence,
+    fromDistinctEffectivePolicyFingerprints: [
+      ...from.governance.distinctEffectivePolicyFingerprints,
+    ],
+    toDistinctEffectivePolicyFingerprints: [
+      ...to.governance.distinctEffectivePolicyFingerprints,
+    ],
+    fromOwningSkillResolution: from.governance.owningSkillResolution,
+    toOwningSkillResolution: to.governance.owningSkillResolution,
+    fromGovernanceFingerprint: from.governance.fingerprint,
+    toGovernanceFingerprint: to.governance.fingerprint,
+    fromLine: from.line,
+    toLine: to.line,
+  };
+}
+
+function governanceDelta(
+  invocation: SemanticInvocation,
+): ExecutableInvocationGovernanceDelta {
+  return {
+    sourcePath: invocation.sourcePath,
+    launcher: invocation.launcher,
+    target: invocation.target,
+    occurrenceOrdinal: invocation.occurrenceOrdinal,
+    hasEffectivePolicyEvidence:
+      invocation.governance.hasEffectivePolicyEvidence,
+    distinctEffectivePolicyFingerprints: [
+      ...invocation.governance.distinctEffectivePolicyFingerprints,
+    ],
+    owningSkillResolution: invocation.governance.owningSkillResolution,
+    resolution: invocation.resolution,
+    line: invocation.line,
+  };
 }
 
 function reachabilityChanges(
@@ -346,6 +514,30 @@ function compareInvocationChanges(
 function compareInvocationDeltas(
   left: ExecutableSurfaceInvocationDelta,
   right: ExecutableSurfaceInvocationDelta,
+): number {
+  return (
+    left.sourcePath.localeCompare(right.sourcePath) ||
+    left.launcher.localeCompare(right.launcher) ||
+    left.target.localeCompare(right.target) ||
+    left.occurrenceOrdinal - right.occurrenceOrdinal
+  );
+}
+
+function compareGovernanceChanges(
+  left: ExecutableInvocationGovernanceChange,
+  right: ExecutableInvocationGovernanceChange,
+): number {
+  return (
+    left.sourcePath.localeCompare(right.sourcePath) ||
+    left.launcher.localeCompare(right.launcher) ||
+    left.target.localeCompare(right.target) ||
+    left.occurrenceOrdinal - right.occurrenceOrdinal
+  );
+}
+
+function compareGovernanceDeltas(
+  left: ExecutableInvocationGovernanceDelta,
+  right: ExecutableInvocationGovernanceDelta,
 ): number {
   return (
     left.sourcePath.localeCompare(right.sourcePath) ||

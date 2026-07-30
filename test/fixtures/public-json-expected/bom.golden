@@ -820,6 +820,15 @@
       "unscopedInvocations": 0,
       "noncanonicalInvocations": 0,
       "unavailableInvocations": 0,
+      "invocationsWithEffectivePolicyEvidence": 0,
+      "invocationsWithoutEffectivePolicyEvidence": 0,
+      "resolvedInvocationsWithEffectivePolicyEvidence": 0,
+      "resolvedInvocationsWithoutEffectivePolicyEvidence": 0,
+      "invocationsWithMultipleEffectivePolicyFingerprints": 0,
+      "invocationPolicyEvidenceRelations": {
+        "sourceArtifact": 0,
+        "owningSkill": 0
+      },
       "interpreterHints": []
     },
     "surfaces": [],

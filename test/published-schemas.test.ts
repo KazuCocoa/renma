@@ -41,6 +41,19 @@ test("published Draft 2020-12 schemas validate representative generated reports"
   );
   assert.ok(Array.isArray(defaultBom.executableSurfaceInventory.surfaces));
   assert.ok(Array.isArray(defaultBom.executableSurfaceInventory.invocations));
+  assert.equal(
+    typeof defaultBom.executableSurfaceInventory.summary
+      .invocationsWithEffectivePolicyEvidence,
+    "number",
+  );
+  assert.deepEqual(
+    defaultBom.executableSurfaceInventory.summary
+      .invocationPolicyEvidenceRelations,
+    {
+      sourceArtifact: 0,
+      owningSkill: 0,
+    },
+  );
 
   const withoutConfigPath = structuredClone(defaultBom);
   delete withoutConfigPath.configPath;
@@ -51,6 +64,26 @@ test("published Draft 2020-12 schemas validate representative generated reports"
     olderV2WithoutExecutableSurfaceInventory as Partial<typeof defaultBom>
   ).executableSurfaceInventory;
   assertValid(validateBom, olderV2WithoutExecutableSurfaceInventory);
+
+  const v027StyleBom = structuredClone(defaultBom);
+  const v027Inventory = v027StyleBom.executableSurfaceInventory as unknown as {
+    summary: Record<string, unknown>;
+    surfaces: Array<Record<string, unknown>>;
+    invocations: Array<Record<string, unknown>>;
+  };
+  for (const field of [
+    "invocationsWithEffectivePolicyEvidence",
+    "invocationsWithoutEffectivePolicyEvidence",
+    "resolvedInvocationsWithEffectivePolicyEvidence",
+    "resolvedInvocationsWithoutEffectivePolicyEvidence",
+    "invocationsWithMultipleEffectivePolicyFingerprints",
+    "invocationPolicyEvidenceRelations",
+  ]) {
+    delete v027Inventory.summary[field];
+  }
+  v027Inventory.surfaces = [schemaSurface(false)];
+  v027Inventory.invocations = [schemaInvocation(false)];
+  assertValid(validateBom, v027StyleBom);
 
   for (const type of [
     "owned_by",
@@ -108,6 +141,11 @@ test("BOM schema enforces output modes, timestamps, formats, and score bounds", 
   negativeSurfaceCount.executableSurfaceInventory.summary.totalSurfaces = -1;
   assertInvalid(validateBom, negativeSurfaceCount, "minimum");
 
+  const negativeInvocationPolicyCount = structuredClone(defaultBom);
+  negativeInvocationPolicyCount.executableSurfaceInventory.summary.invocationsWithEffectivePolicyEvidence =
+    -1;
+  assertInvalid(validateBom, negativeInvocationPolicyCount, "minimum");
+
   for (const field of [
     "schema",
     "summary",
@@ -160,6 +198,98 @@ test("BOM schema enforces output modes, timestamps, formats, and score bounds", 
     },
   ] as unknown as typeof invalidInvocationResolution.executableSurfaceInventory.invocations;
   assertInvalid(validateBom, invalidInvocationResolution, "enum");
+
+  const currentGovernanceBom = structuredClone(defaultBom);
+  const currentGovernanceInventory =
+    currentGovernanceBom.executableSurfaceInventory as unknown as {
+      surfaces: Array<Record<string, unknown>>;
+      invocations: Array<Record<string, unknown>>;
+    };
+  currentGovernanceInventory.surfaces = [schemaSurface(true)];
+  currentGovernanceInventory.invocations = [schemaInvocation(true)];
+  assertValid(validateBom, currentGovernanceBom);
+
+  for (const field of [
+    "invocationsWithEffectivePolicyEvidence",
+    "invocationsWithoutEffectivePolicyEvidence",
+    "distinctEffectivePolicyFingerprints",
+  ]) {
+    const incompleteSurfaceGovernance = structuredClone(currentGovernanceBom);
+    const surface = (
+      incompleteSurfaceGovernance.executableSurfaceInventory
+        .surfaces[0] as unknown as {
+        invocationGovernance: Record<string, unknown>;
+      }
+    ).invocationGovernance;
+    delete surface[field];
+    assertInvalid(validateBom, incompleteSurfaceGovernance, "required");
+  }
+
+  for (const field of [
+    "owningSkillResolution",
+    "policyEvidence",
+    "hasEffectivePolicyEvidence",
+    "distinctEffectivePolicyFingerprints",
+    "fingerprint",
+  ]) {
+    const incompleteInvocationGovernance =
+      structuredClone(currentGovernanceBom);
+    const governance = (
+      incompleteInvocationGovernance.executableSurfaceInventory
+        .invocations[0] as unknown as {
+        governance: Record<string, unknown>;
+      }
+    ).governance;
+    delete governance[field];
+    assertInvalid(validateBom, incompleteInvocationGovernance, "required");
+  }
+
+  const invalidOwningSkillResolution = structuredClone(currentGovernanceBom);
+  (
+    invalidOwningSkillResolution.executableSurfaceInventory
+      .invocations[0] as unknown as {
+      governance: { owningSkillResolution: string };
+    }
+  ).governance.owningSkillResolution = "nearest";
+  assertInvalid(validateBom, invalidOwningSkillResolution, "enum");
+
+  const invalidPolicyRelation = structuredClone(currentGovernanceBom);
+  (
+    invalidPolicyRelation.executableSurfaceInventory
+      .invocations[0] as unknown as {
+      governance: { policyEvidence: Array<{ relation: string }> };
+    }
+  ).governance.policyEvidence[0]!.relation = "target-surface";
+  assertInvalid(validateBom, invalidPolicyRelation, "enum");
+
+  const invalidInvocationPolicySource = structuredClone(currentGovernanceBom);
+  (
+    invalidInvocationPolicySource.executableSurfaceInventory
+      .invocations[0] as unknown as {
+      governance: {
+        policyEvidence: Array<{ policySources: string[] }>;
+      };
+    }
+  ).governance.policyEvidence[0]!.policySources = ["environment"];
+  assertInvalid(validateBom, invalidInvocationPolicySource, "enum");
+
+  const invalidGovernanceFingerprint = structuredClone(currentGovernanceBom);
+  (
+    invalidGovernanceFingerprint.executableSurfaceInventory
+      .invocations[0] as unknown as {
+      governance: { fingerprint: string };
+    }
+  ).governance.fingerprint = "sha256:not-a-fingerprint";
+  assertInvalid(validateBom, invalidGovernanceFingerprint, "pattern");
+
+  const duplicateGovernanceFingerprints = structuredClone(currentGovernanceBom);
+  (
+    duplicateGovernanceFingerprints.executableSurfaceInventory
+      .invocations[0] as unknown as {
+      governance: { distinctEffectivePolicyFingerprints: string[] };
+    }
+  ).governance.distinctEffectivePolicyFingerprints = [sha256("a"), sha256("a")];
+  assertInvalid(validateBom, duplicateGovernanceFingerprints, "uniqueItems");
 
   const negativeReadinessCount = structuredClone(defaultBom);
   negativeReadinessCount.readiness.summary.totalAssets = -1;
@@ -386,4 +516,73 @@ function assertInvalid(
     validate.errors?.some((error) => error.keyword === keyword),
     `expected ${keyword} error, received ${JSON.stringify(validate.errors, null, 2)}`,
   );
+}
+
+function schemaSurface(
+  includeInvocationGovernance: boolean,
+): Record<string, unknown> {
+  return {
+    path: "tools/check.mjs",
+    scope: "repository-tool",
+    origins: ["discovered-script", "resolved-static-invocation"],
+    artifactKind: "script",
+    contentClassification: "text",
+    interpreterHints: ["node"],
+    staticallyReferenced: true,
+    staticallyInvoked: true,
+    referenceCount: 1,
+    invocationCount: 1,
+    securityPolicy: {
+      hasEffectivePolicy: false,
+      policySources: [],
+    },
+    ...(includeInvocationGovernance
+      ? {
+          invocationGovernance: {
+            invocationsWithEffectivePolicyEvidence: 1,
+            invocationsWithoutEffectivePolicyEvidence: 0,
+            distinctEffectivePolicyFingerprints: [sha256("a")],
+          },
+        }
+      : {}),
+    fingerprint: sha256("b"),
+  };
+}
+
+function schemaInvocation(includeGovernance: boolean): Record<string, unknown> {
+  return {
+    sourcePath: "skills/demo/SKILL.md",
+    line: 7,
+    snippet: "node tools/check.mjs",
+    launcher: "node",
+    rawTarget: "tools/check.mjs",
+    normalizedTarget: "tools/check.mjs",
+    sourceSkillDirectory: "skills/demo",
+    resolution: "resolved",
+    targetPathState: "parsed",
+    occurrenceOrdinal: 1,
+    ...(includeGovernance
+      ? {
+          governance: {
+            owningSkillResolution: "resolved",
+            policyEvidence: [
+              {
+                relation: "source-artifact",
+                path: "skills/demo/SKILL.md",
+                hasEffectivePolicy: true,
+                policySources: ["local"],
+                fingerprint: sha256("a"),
+              },
+            ],
+            hasEffectivePolicyEvidence: true,
+            distinctEffectivePolicyFingerprints: [sha256("a")],
+            fingerprint: sha256("c"),
+          },
+        }
+      : {}),
+  };
+}
+
+function sha256(character: string): string {
+  return `sha256:${character.repeat(64)}`;
 }

@@ -17,7 +17,7 @@ import {
 } from "../src/helper-command-evidence.js";
 import { parseDocument } from "../src/markdown.js";
 import { collectRepositorySnapshot } from "../src/repository-evidence.js";
-import { formatText } from "../src/report.js";
+import { formatJson, formatText } from "../src/report.js";
 import { scan } from "../src/scanner.js";
 import type { Artifact } from "../src/types/artifact.js";
 
@@ -47,6 +47,13 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
   assert.equal(direct.invocationCount, 1);
   assert.equal(direct.securityPolicy.hasEffectivePolicy, true);
   assert.ok(direct.securityPolicy.policySources.includes("owning_skill"));
+  assert.deepEqual(direct.invocationGovernance, {
+    invocationsWithEffectivePolicyEvidence: 1,
+    invocationsWithoutEffectivePolicyEvidence: 0,
+    distinctEffectivePolicyFingerprints: [
+      direct.securityPolicy.fingerprint as string,
+    ],
+  });
   assert.match(direct.fingerprint, /^sha256:[a-f0-9]{64}$/);
 
   const oneHop = requiredSurface(inventory, "skills/demo/scripts/one-hop.js");
@@ -72,6 +79,19 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
   assert.equal(invokedTool.referenceCount, 3);
   assert.deepEqual(invokedTool.interpreterHints, ["node"]);
   assert.equal("owningSkill" in invokedTool, false);
+  assert.equal(invokedTool.securityPolicy.hasEffectivePolicy, false);
+  assert.equal(
+    invokedTool.invocationGovernance.invocationsWithEffectivePolicyEvidence,
+    3,
+  );
+  assert.equal(
+    invokedTool.invocationGovernance.invocationsWithoutEffectivePolicyEvidence,
+    0,
+  );
+  assert.equal(
+    invokedTool.invocationGovernance.distinctEffectivePolicyFingerprints.length,
+    1,
+  );
 
   const unreferencedTool = requiredSurface(inventory, "tools/unreferenced.sh");
   assert.equal(unreferencedTool.scope, "repository-tool");
@@ -123,6 +143,41 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
       .map((invocation) => invocation.occurrenceOrdinal),
     [1, 1, 2],
   );
+  const directInvocation = inventory.invocations.find(
+    (invocation) =>
+      invocation.sourcePath === "skills/demo/SKILL.md" &&
+      invocation.normalizedTarget === "skills/demo/scripts/direct.sh",
+  );
+  assert.ok(directInvocation);
+  assert.equal(directInvocation.governance.owningSkillResolution, "resolved");
+  assert.equal(directInvocation.governance.policyEvidence.length, 1);
+  assert.equal(
+    directInvocation.governance.policyEvidence[0]?.relation,
+    "source-artifact",
+  );
+  assert.equal(directInvocation.governance.hasEffectivePolicyEvidence, true);
+  const referenceInvocation = inventory.invocations.find(
+    (invocation) =>
+      invocation.sourcePath === "skills/demo/references/index.md" &&
+      invocation.normalizedTarget === "tools/invoked.mjs",
+  );
+  assert.ok(referenceInvocation);
+  assert.deepEqual(
+    referenceInvocation.governance.policyEvidence.map(
+      (evidence) => evidence.relation,
+    ),
+    ["source-artifact", "owning-skill"],
+  );
+  const jsonInventory = (
+    JSON.parse(formatJson(first)) as {
+      executableSurfaceInventory: ExecutableSurfaceInventory;
+    }
+  ).executableSurfaceInventory;
+  assert.deepEqual(jsonInventory, inventory);
+  assert.match(
+    jsonInventory.invocations[0]?.governance.fingerprint ?? "",
+    /^sha256:[a-f0-9]{64}$/,
+  );
 
   const summary = inventory.summary;
   assert.equal(
@@ -155,6 +210,16 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
   assert.equal(summary.totalInvocations, inventory.invocations.length);
   assert.equal(
     summary.totalInvocations,
+    summary.invocationsWithEffectivePolicyEvidence +
+      summary.invocationsWithoutEffectivePolicyEvidence,
+  );
+  assert.equal(
+    summary.resolvedInvocations,
+    summary.resolvedInvocationsWithEffectivePolicyEvidence +
+      summary.resolvedInvocationsWithoutEffectivePolicyEvidence,
+  );
+  assert.equal(
+    summary.totalInvocations,
     summary.resolvedInvocations +
       summary.missingInvocations +
       summary.unsafeInvocations +
@@ -173,6 +238,14 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
     assert.ok(
       surface.scope === "skill-local" || surface.scope === "repository-tool",
       `${surface.path}: ${surface.scope}`,
+    );
+  }
+  for (const surface of inventory.surfaces) {
+    assert.equal(
+      surface.invocationCount,
+      surface.invocationGovernance.invocationsWithEffectivePolicyEvidence +
+        surface.invocationGovernance.invocationsWithoutEffectivePolicyEvidence,
+      surface.path,
     );
   }
 
@@ -219,10 +292,18 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
 
   const text = formatText(first);
   assert.match(text, /Executable Surface Inventory/);
+  assert.match(text, /Surface policy evidence:/);
+  assert.match(text, /Invocation-context policy evidence:/);
+  assert.match(text, /Invocation policy variants:/);
   assert.match(text, /skills\/demo\/scripts\/direct\.sh/);
   const manifest = await bom(root, {}, { omitGeneratedAt: true });
   assert.deepEqual(manifest.executableSurfaceInventory, inventory);
-  assert.match(formatBomMarkdown(manifest), /## Executable Surface Inventory/);
+  const markdown = formatBomMarkdown(manifest);
+  assert.match(markdown, /## Executable Surface Inventory/);
+  assert.match(markdown, /- Surface policy evidence:/);
+  assert.match(markdown, /- Invocation-context policy evidence:/);
+  assert.match(markdown, /- Invocations with multiple policy variants:/);
+  assert.match(markdown, /\| Surface policy \| Invocation policy \|/);
 });
 
 test("helper resolution preserves exact unavailable states and bounded evidence", () => {
@@ -373,16 +454,25 @@ test("inventory creation adds no finding or exit-status policy", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-surface-policy-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   await writeSkill(root, "# Demo\n\nNo helper is required.\n");
-  const before = await scan(root);
   await mkdir(path.join(root, "tools"), { recursive: true });
   await writeFile(path.join(root, "tools", "unreferenced.mjs"), "// helper\n");
+  const before = await scan(root);
+  const beforeBom = await bom(root, {}, { omitGeneratedAt: true });
+  await writeSkill(root, "# Demo\n\n```sh\nnode tools/unreferenced.mjs\n```\n");
   const after = await scan(root);
+  const afterBom = await bom(root, {}, { omitGeneratedAt: true });
   assert.deepEqual(after.findings, before.findings);
+  assert.deepEqual(afterBom.readiness, beforeBom.readiness);
+  assert.deepEqual(
+    after.securityPolicyInventory,
+    before.securityPolicyInventory,
+  );
   assert.equal(after.exitThreshold, before.exitThreshold);
   assert.equal(
     after.executableSurfaceInventory?.summary.repositoryToolSurfaces,
     1,
   );
+  assert.equal(after.executableSurfaceInventory?.summary.totalInvocations, 1);
 });
 
 test("surface diff uses path identity, reason sets, and line-insensitive invocation identity", async (t) => {

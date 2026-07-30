@@ -129,15 +129,29 @@ The additive `executableSurfaceInventory` field retains its own explicit schema
 identifier, `renma.executable-surface-inventory.v1`. Its summary counts,
 path-identified surface rows, line-level invocation rows, content and inventory
 fingerprints, reachability depth, interpreter hints, and bounded effective
-policy correlation are complete in JSON. The Markdown BOM renders a compact
-review table. Surface rows are sorted by repository path; invocation rows are
-sorted by source path, line, launcher, and target.
+policy correlation are complete in JSON. Current output also includes
+invocation governance on every invocation and an invocation-governance
+aggregate on every surface. Surface policy evidence remains separate and is
+never replaced by caller evidence.
+
+Invocation governance retains prepared `source-artifact` and `owning-skill`
+policy relationships without merging fields or applying precedence. Its
+effective fingerprints are a sorted set of visible variants, not conflicts or
+safety verdicts. The Markdown BOM renders separate surface-policy,
+invocation-context-policy, and multiple-variant summaries plus compact
+per-surface counts; it does not print complete fingerprints. Surface rows are
+sorted by repository path; invocation rows are sorted by source path, line,
+launcher, and target.
 
 BOM consumers must first branch on the presence of
 `executableSurfaceInventory`, then inspect its nested `schema` identifier
-before consuming its strict nested fields. Omitting the complete field is the
-only compatibility allowance: whenever it is present, `schema`, `summary`,
-`surfaces`, and `invocations` and their nested contracts remain required.
+before consuming its nested fields. The inventory remains additive v1 and BOM
+remains v2. For compatibility with Renma 0.27.0, the new summary counts,
+surface `invocationGovernance`, and invocation `governance` fields are optional
+in the published schema. Current Renma output emits them unconditionally.
+Whenever a new governance object is present, all of its nested fields are
+required and unknown nested fields are rejected. Existing inventory fields
+retain their established requirements.
 
 The Readiness summary is a closed contract for asset, ownership, graph,
 diagnostic, workflow, Context Lens, security posture, and security policy

@@ -847,6 +847,39 @@ test("formatDiff deterministically exposes corrected invocation states", () => {
   );
 });
 
+test("formatDiff renders line-insensitive invocation governance changes separately from surface policy", () => {
+  const report = buildDiffReport(
+    "/repo",
+    snapshot("base", {
+      executableSurfaceInventory: inventoryWithInvocation("resolved"),
+    }),
+    snapshot("head", {
+      executableSurfaceInventory: inventoryWithInvocation("resolved", [
+        `sha256:${"a".repeat(64)}`,
+        `sha256:${"b".repeat(64)}`,
+      ]),
+    }),
+  );
+
+  const markdown = formatDiff(report, "markdown");
+  const parsed = JSON.parse(formatDiff(report, "json"));
+
+  assert.match(markdown, /- Invocation governance changes: 1/);
+  assert.match(
+    markdown,
+    /- Invocation-context policy evidence: 1 with \(\+1\), 0 without \(-1\)/,
+  );
+  assert.match(markdown, /policy evidence without -> with/);
+  assert.match(markdown, /effective fingerprints 0 -> 2/);
+  assert.doesNotMatch(markdown, /sha256:[a-f0-9]{64}/);
+  assert.equal(
+    parsed.executableSurface.invocationGovernanceChanges[0]
+      .toHasEffectivePolicyEvidence,
+    true,
+  );
+  assert.deepEqual(parsed.executableSurface.newProblematicInvocations, []);
+});
+
 test("formatDiff renders legacy reports without a Discovery section", () => {
   const fullReport = buildDiffReport(
     "/repo",
@@ -1112,8 +1145,19 @@ interface SnapshotInput {
 
 function inventoryWithInvocation(
   resolution: "resolved" | "noncanonical",
+  policyFingerprints: string[] = [],
 ): ExecutableSurfaceInventory {
   const inventory = zeroExecutableSurfaceInventory();
+  const hasEffectivePolicyEvidence = policyFingerprints.length > 0;
+  const policyEvidence = policyFingerprints.map((fingerprint, index) => ({
+    relation:
+      index === 0 ? ("source-artifact" as const) : ("owning-skill" as const),
+    path:
+      index === 0 ? "skills/demo/SKILL.md" : "skills/demo/references/owner.md",
+    hasEffectivePolicy: true,
+    policySources: ["local" as const],
+    fingerprint,
+  }));
   inventory.invocations = [
     {
       sourcePath: "skills/demo/SKILL.md",
@@ -1126,12 +1170,41 @@ function inventoryWithInvocation(
       resolution,
       targetPathState: "parsed",
       occurrenceOrdinal: 1,
+      governance: {
+        owningSkillResolution: hasEffectivePolicyEvidence
+          ? "resolved"
+          : "missing",
+        policyEvidence,
+        hasEffectivePolicyEvidence,
+        distinctEffectivePolicyFingerprints: [...policyFingerprints].sort(),
+        fingerprint: hasEffectivePolicyEvidence
+          ? `sha256:${"f".repeat(64)}`
+          : `sha256:${"0".repeat(64)}`,
+      },
     },
   ];
   inventory.summary.totalInvocations = 1;
   inventory.summary.resolvedInvocations = resolution === "resolved" ? 1 : 0;
   inventory.summary.noncanonicalInvocations =
     resolution === "noncanonical" ? 1 : 0;
+  inventory.summary.invocationsWithEffectivePolicyEvidence =
+    hasEffectivePolicyEvidence ? 1 : 0;
+  inventory.summary.invocationsWithoutEffectivePolicyEvidence =
+    hasEffectivePolicyEvidence ? 0 : 1;
+  inventory.summary.resolvedInvocationsWithEffectivePolicyEvidence =
+    resolution === "resolved" && hasEffectivePolicyEvidence ? 1 : 0;
+  inventory.summary.resolvedInvocationsWithoutEffectivePolicyEvidence =
+    resolution === "resolved" && !hasEffectivePolicyEvidence ? 1 : 0;
+  inventory.summary.invocationsWithMultipleEffectivePolicyFingerprints =
+    policyFingerprints.length > 1 ? 1 : 0;
+  inventory.summary.invocationPolicyEvidenceRelations = {
+    sourceArtifact: policyEvidence.filter(
+      (evidence) => evidence.relation === "source-artifact",
+    ).length,
+    owningSkill: policyEvidence.filter(
+      (evidence) => evidence.relation === "owning-skill",
+    ).length,
+  };
   return inventory;
 }
 

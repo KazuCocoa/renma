@@ -554,6 +554,14 @@ network destinations, secrets, multilingual content checks, and hidden-Unicode
 checks remain separate diagnostic analyses. Enforcement and Trust Graph
 integration are intentionally deferred.
 
+Invocation-context policy evidence is also informational. A recognized
+invocation may retain separate `source-artifact` and `owning-skill` policy
+relationships, no effective relationship, or multiple distinct effective
+fingerprints. None creates a diagnostic, readiness check, suppression
+requirement, policy requirement, or CI blocker. Caller evidence is not
+inherited by the target surface, and multiple fingerprints are not classified
+as a conflict.
+
 ### Finding and evidence JSON contract
 
 Each `findings` entry contains these required fields:

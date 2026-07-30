@@ -91,7 +91,9 @@ export function formatExecutableSurfaceInventoryText(
     `  Surfaces: ${summary.totalSurfaces} (${summary.skillLocalSurfaces} Skill-local, ${summary.repositoryToolSurfaces} repository tools, ${summary.noncanonicalSurfaces} non-canonical)`,
     `  Skill-local reachability: ${summary.reachableSkillLocalSurfaces} reachable, ${summary.unreachableSkillLocalSurfaces} unreachable`,
     `  References/invocations: ${summary.referencedSurfaces} referenced, ${summary.invokedSurfaces} invoked`,
-    `  Effective security policy: ${summary.surfacesWithEffectivePolicy} covered, ${summary.surfacesWithoutEffectivePolicy} without`,
+    `  Surface policy evidence: ${summary.surfacesWithEffectivePolicy} with, ${summary.surfacesWithoutEffectivePolicy} without`,
+    `  Invocation-context policy evidence: ${summary.invocationsWithEffectivePolicyEvidence} with, ${summary.invocationsWithoutEffectivePolicyEvidence} without`,
+    `  Invocation policy variants: ${summary.invocationsWithMultipleEffectivePolicyFingerprints} invocations with multiple effective fingerprints`,
     `  Invocation resolution: ${summary.resolvedInvocations} resolved, ${summary.missingInvocations} missing, ${summary.unsafeInvocations} unsafe, ${summary.unscopedInvocations} unscoped, ${summary.noncanonicalInvocations} non-canonical, ${summary.unavailableInvocations} unavailable`,
   ];
   if (inventory.surfaces.length === 0) {
@@ -106,7 +108,7 @@ export function formatExecutableSurfaceInventoryText(
           : "unreachable"
         : "n/a";
     lines.push(
-      `  - ${surface.path} [${surface.scope}; ${surface.interpreterHints.join(",")}; reachability ${reachability}; invocations ${surface.invocationCount}; policy ${surface.securityPolicy.hasEffectivePolicy ? "effective" : "none"}]`,
+      `  - ${surface.path} [${surface.scope}; ${surface.interpreterHints.join(",")}; reachability ${reachability}; invocations ${surface.invocationCount}; surface-policy ${surface.securityPolicy.hasEffectivePolicy ? "effective" : "none"}; invocation-policy ${surface.invocationGovernance.invocationsWithEffectivePolicyEvidence}/${surface.invocationCount}; policy-variants ${surface.invocationGovernance.distinctEffectivePolicyFingerprints.length}]`,
     );
   }
   return lines;

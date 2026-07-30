@@ -364,15 +364,29 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
 function formatExecutableSurfaceChanges(
   executableSurface: CiCompatibleDiffReport["executableSurface"],
 ): string[] {
+  const newWithout =
+    executableSurface.newInvocationsWithoutEffectivePolicyEvidence ?? [];
+  const gained =
+    executableSurface.invocationsGainedEffectivePolicyEvidence ?? [];
+  const lost = executableSurface.invocationsLostEffectivePolicyEvidence ?? [];
+  const multiple =
+    executableSurface.invocationGovernanceChangesWithMultipleEffectivePolicyFingerprints ??
+    [];
   const lines = [
     `- Total surfaces: ${executableSurface.fromSummary.totalSurfaces} -> ${executableSurface.toSummary.totalSurfaces} (${formatDelta(executableSurface.summary.totalSurfacesDelta)})`,
     `- Added surfaces: ${executableSurface.addedSurfacePaths.length}`,
     `- Removed surfaces: ${executableSurface.removedSurfacePaths.length}`,
     `- Changed surfaces: ${executableSurface.changedSurfaces.length}`,
     `- New problematic invocation evidence: ${executableSurface.newProblematicInvocations.length}`,
+    `- Invocation-context policy evidence: ${executableSurface.fromSummary.invocationsWithEffectivePolicyEvidence ?? 0} -> ${executableSurface.toSummary.invocationsWithEffectivePolicyEvidence ?? 0} (${formatDelta(executableSurface.summary.invocationsWithEffectivePolicyEvidenceDelta ?? 0)})`,
+    `- Resolved invocation policy evidence: ${executableSurface.fromSummary.resolvedInvocationsWithEffectivePolicyEvidence ?? 0} -> ${executableSurface.toSummary.resolvedInvocationsWithEffectivePolicyEvidence ?? 0} (${formatDelta(executableSurface.summary.resolvedInvocationsWithEffectivePolicyEvidenceDelta ?? 0)})`,
+    `- New invocations without effective policy evidence: ${newWithout.length}`,
+    `- Invocations that gained effective policy evidence: ${gained.length}`,
+    `- Invocations that lost effective policy evidence: ${lost.length}`,
+    `- Governance changes with multiple effective fingerprints: ${multiple.length}`,
     `- Newly reachable Skill-local scripts: ${executableSurface.newlyReachableSkillLocalPaths.length}`,
     `- Newly unreachable Skill-local scripts: ${executableSurface.newlyUnreachableSkillLocalPaths.length}`,
-    `- Effective-policy coverage: ${formatDelta(executableSurface.summary.effectivePolicyCoverageDelta)} pp`,
+    `- Surface policy-evidence coverage: ${formatDelta(executableSurface.summary.effectivePolicyCoverageDelta)} pp`,
   ];
   if (executableSurface.addedSurfacePaths.length > 0) {
     lines.push(
@@ -423,7 +437,71 @@ function formatExecutableSurfaceChanges(
       ...formatOverflow(executableSurface.newProblematicInvocations.length),
     );
   }
+  appendInvocationGovernanceDeltas(
+    lines,
+    "New invocations without effective policy evidence",
+    newWithout,
+  );
+  appendInvocationGovernanceChanges(
+    lines,
+    "Invocations that gained effective policy evidence",
+    gained,
+  );
+  appendInvocationGovernanceChanges(
+    lines,
+    "Invocations that lost effective policy evidence",
+    lost,
+  );
+  appendInvocationGovernanceChanges(
+    lines,
+    "Invocation governance changes with multiple effective fingerprints",
+    multiple,
+  );
   return lines;
+}
+
+function appendInvocationGovernanceDeltas(
+  lines: string[],
+  heading: string,
+  invocations: NonNullable<
+    CiCompatibleDiffReport["executableSurface"]["newInvocationsWithoutEffectivePolicyEvidence"]
+  >,
+): void {
+  if (invocations.length === 0) return;
+  lines.push(
+    "",
+    `### ${heading}`,
+    "",
+    ...invocations
+      .slice(0, MAX_LIST_ITEMS)
+      .map(
+        (invocation) =>
+          `- \`${invocation.sourcePath}:L${invocation.line}\` ${invocation.launcher} \`${invocation.target}\`: without effective policy evidence; owning Skill ${invocation.owningSkillResolution}; effective fingerprints ${invocation.distinctEffectivePolicyFingerprints.length}`,
+      ),
+    ...formatOverflow(invocations.length),
+  );
+}
+
+function appendInvocationGovernanceChanges(
+  lines: string[],
+  heading: string,
+  invocations: NonNullable<
+    CiCompatibleDiffReport["executableSurface"]["invocationGovernanceChanges"]
+  >,
+): void {
+  if (invocations.length === 0) return;
+  lines.push(
+    "",
+    `### ${heading}`,
+    "",
+    ...invocations
+      .slice(0, MAX_LIST_ITEMS)
+      .map(
+        (invocation) =>
+          `- \`${invocation.sourcePath}:L${invocation.toLine}\` ${invocation.launcher} \`${invocation.target}\`: policy evidence ${invocation.fromHasEffectivePolicyEvidence ? "with" : "without"} -> ${invocation.toHasEffectivePolicyEvidence ? "with" : "without"}; owning Skill ${invocation.fromOwningSkillResolution} -> ${invocation.toOwningSkillResolution}; effective fingerprints ${invocation.fromDistinctEffectivePolicyFingerprints.length} -> ${invocation.toDistinctEffectivePolicyFingerprints.length}`,
+      ),
+    ...formatOverflow(invocations.length),
+  );
 }
 
 function formatOwnershipSummary(

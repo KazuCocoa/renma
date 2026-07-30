@@ -43,6 +43,38 @@ export interface ExecutableSurfaceSecurityPolicy {
   fingerprint?: string;
 }
 
+export type ExecutableInvocationPolicyRelation =
+  | "source-artifact"
+  | "owning-skill";
+
+export interface ExecutableInvocationPolicyEvidence {
+  relation: ExecutableInvocationPolicyRelation;
+  path: string;
+  hasEffectivePolicy: boolean;
+  policySources: SecurityPolicySource[];
+  fingerprint?: string;
+}
+
+export type ExecutableInvocationOwningSkillResolution =
+  | "not-applicable"
+  | "resolved"
+  | "missing"
+  | "ambiguous";
+
+export interface ExecutableInvocationGovernance {
+  owningSkillResolution: ExecutableInvocationOwningSkillResolution;
+  policyEvidence: ExecutableInvocationPolicyEvidence[];
+  hasEffectivePolicyEvidence: boolean;
+  distinctEffectivePolicyFingerprints: string[];
+  fingerprint: string;
+}
+
+export interface ExecutableSurfaceInvocationGovernanceSummary {
+  invocationsWithEffectivePolicyEvidence: number;
+  invocationsWithoutEffectivePolicyEvidence: number;
+  distinctEffectivePolicyFingerprints: string[];
+}
+
 export interface ExecutableSurfaceEntry {
   path: string;
   scope: ExecutableSurfaceScope;
@@ -63,6 +95,7 @@ export interface ExecutableSurfaceEntry {
   referenceCount: number;
   invocationCount: number;
   securityPolicy: ExecutableSurfaceSecurityPolicy;
+  invocationGovernance: ExecutableSurfaceInvocationGovernanceSummary;
   fingerprint: string;
 }
 
@@ -77,6 +110,7 @@ export interface ExecutableSurfaceInvocation {
   resolution: HelperInvocationResolution;
   targetPathState?: RepositoryPathState;
   occurrenceOrdinal: number;
+  governance: ExecutableInvocationGovernance;
 }
 
 export interface ExecutableSurfaceInventorySummary {
@@ -101,6 +135,15 @@ export interface ExecutableSurfaceInventorySummary {
   unscopedInvocations: number;
   noncanonicalInvocations: number;
   unavailableInvocations: number;
+  invocationsWithEffectivePolicyEvidence: number;
+  invocationsWithoutEffectivePolicyEvidence: number;
+  resolvedInvocationsWithEffectivePolicyEvidence: number;
+  resolvedInvocationsWithoutEffectivePolicyEvidence: number;
+  invocationsWithMultipleEffectivePolicyFingerprints: number;
+  invocationPolicyEvidenceRelations: {
+    sourceArtifact: number;
+    owningSkill: number;
+  };
   interpreterHints: Array<{
     interpreter: string;
     count: number;
@@ -205,6 +248,8 @@ export function buildExecutableSurfaceInventory(
           ? { fingerprint: policy.effectivePolicy.fingerprint }
           : {}),
       };
+      const invocationGovernance =
+        summarizeSurfaceInvocationGovernance(matchingInvocations);
       const state = {
         path: artifact.path,
         scope,
@@ -226,6 +271,7 @@ export function buildExecutableSurfaceInventory(
         referenceCount,
         invocationCount: matchingInvocations.length,
         securityPolicy,
+        invocationGovernance,
       };
       return {
         ...state,
@@ -321,6 +367,33 @@ export function summarizeExecutableSurfaceInventory(
     unavailableInvocations: invocations.filter((invocation) =>
       unavailable.has(invocation.resolution),
     ).length,
+    invocationsWithEffectivePolicyEvidence: invocations.filter(
+      (invocation) => invocation.governance.hasEffectivePolicyEvidence,
+    ).length,
+    invocationsWithoutEffectivePolicyEvidence: invocations.filter(
+      (invocation) => !invocation.governance.hasEffectivePolicyEvidence,
+    ).length,
+    resolvedInvocationsWithEffectivePolicyEvidence: invocations.filter(
+      (invocation) =>
+        invocation.resolution === "resolved" &&
+        invocation.governance.hasEffectivePolicyEvidence,
+    ).length,
+    resolvedInvocationsWithoutEffectivePolicyEvidence: invocations.filter(
+      (invocation) =>
+        invocation.resolution === "resolved" &&
+        !invocation.governance.hasEffectivePolicyEvidence,
+    ).length,
+    invocationsWithMultipleEffectivePolicyFingerprints: invocations.filter(
+      (invocation) =>
+        invocation.governance.distinctEffectivePolicyFingerprints.length > 1,
+    ).length,
+    invocationPolicyEvidenceRelations: {
+      sourceArtifact: invocationPolicyRelationCount(
+        invocations,
+        "source-artifact",
+      ),
+      owningSkill: invocationPolicyRelationCount(invocations, "owning-skill"),
+    },
     interpreterHints: [...interpreterCounts]
       .map(([interpreter, count]) => ({ interpreter, count }))
       .sort(
@@ -334,6 +407,9 @@ export function summarizeExecutableSurfaceInventory(
 function inventoryInvocations(
   input: ExecutableSurfaceInventoryInput,
 ): ExecutableSurfaceInvocation[] {
+  const policiesByPath = new Map(
+    input.securityPolicies.map((policy) => [policy.path, policy]),
+  );
   const deduplicated = new Map<
     string,
     Omit<ExecutableSurfaceInvocation, "occurrenceOrdinal">
@@ -350,6 +426,11 @@ function inventoryInvocations(
         "noncanonical"
         ? "noncanonical"
         : resolved.resolution;
+    const governance = invocationGovernance(
+      resolved.sourcePath,
+      input.skillParents,
+      policiesByPath,
+    );
     const invocation = {
       sourcePath: resolved.sourcePath,
       line: resolved.line,
@@ -366,6 +447,7 @@ function inventoryInvocations(
       ...(resolved.targetPathState
         ? { targetPathState: resolved.targetPathState }
         : {}),
+      governance,
     };
     deduplicated.set(JSON.stringify(invocation), invocation);
   }
@@ -379,6 +461,143 @@ function inventoryInvocations(
       ordinalBySemanticEvidence.set(key, occurrenceOrdinal);
       return { ...invocation, occurrenceOrdinal };
     });
+}
+
+function invocationGovernance(
+  sourcePath: string,
+  skillParents: SkillParentIndex,
+  policiesByPath: ReadonlyMap<string, SecurityPolicyAssetEvidence>,
+): ExecutableInvocationGovernance {
+  const skillDirectory = logicalSkillDirectory(sourcePath);
+  const parents = skillDirectory
+    ? (skillParents.get(skillDirectory) ?? [])
+    : [];
+  const owningSkillResolution: ExecutableInvocationOwningSkillResolution =
+    skillDirectory === undefined
+      ? "not-applicable"
+      : parents.length === 0
+        ? "missing"
+        : parents.length === 1
+          ? "resolved"
+          : "ambiguous";
+  const policyEvidence: ExecutableInvocationPolicyEvidence[] = [];
+  const sourcePolicy = policiesByPath.get(sourcePath);
+  if (sourcePolicy) {
+    policyEvidence.push(
+      invocationPolicyEvidence("source-artifact", sourcePolicy),
+    );
+  }
+  const ownerPath =
+    owningSkillResolution === "resolved" ? parents[0]!.sourcePath : undefined;
+  if (ownerPath && ownerPath !== sourcePath) {
+    const owningSkillPolicy = policiesByPath.get(ownerPath);
+    if (owningSkillPolicy) {
+      policyEvidence.push(
+        invocationPolicyEvidence("owning-skill", owningSkillPolicy),
+      );
+    }
+  }
+  policyEvidence.sort(compareInvocationPolicyEvidence);
+  const distinctEffectivePolicyFingerprints = uniqueSorted(
+    policyEvidence.flatMap((evidence) =>
+      evidence.hasEffectivePolicy && evidence.fingerprint
+        ? [evidence.fingerprint]
+        : [],
+    ),
+  );
+  const fingerprintState = {
+    owningSkillResolution,
+    policyEvidence,
+  };
+  return {
+    owningSkillResolution,
+    policyEvidence,
+    hasEffectivePolicyEvidence: policyEvidence.some(
+      (evidence) => evidence.hasEffectivePolicy,
+    ),
+    distinctEffectivePolicyFingerprints,
+    fingerprint: inventoryFingerprint(fingerprintState),
+  };
+}
+
+function invocationPolicyEvidence(
+  relation: ExecutableInvocationPolicyRelation,
+  policy: SecurityPolicyAssetEvidence,
+): ExecutableInvocationPolicyEvidence {
+  return {
+    relation,
+    path: policy.path,
+    hasEffectivePolicy: policy.hasEffectivePolicy,
+    policySources: sortedPolicySources(policy.policySources),
+    ...(policy.hasEffectivePolicy && policy.effectivePolicy.fingerprint
+      ? { fingerprint: policy.effectivePolicy.fingerprint }
+      : {}),
+  };
+}
+
+function compareInvocationPolicyEvidence(
+  left: ExecutableInvocationPolicyEvidence,
+  right: ExecutableInvocationPolicyEvidence,
+): number {
+  return (
+    invocationPolicyRelationOrder(left.relation) -
+      invocationPolicyRelationOrder(right.relation) ||
+    left.path.localeCompare(right.path) ||
+    (left.fingerprint ?? "").localeCompare(right.fingerprint ?? "")
+  );
+}
+
+function invocationPolicyRelationOrder(
+  relation: ExecutableInvocationPolicyRelation,
+): number {
+  return relation === "source-artifact" ? 0 : 1;
+}
+
+function sortedPolicySources(
+  sources: readonly SecurityPolicySource[],
+): SecurityPolicySource[] {
+  const order: SecurityPolicySource[] = [
+    "local",
+    "security_profile",
+    "repository_config",
+    "owning_skill",
+  ];
+  return [...new Set(sources)].sort(
+    (left, right) => order.indexOf(left) - order.indexOf(right),
+  );
+}
+
+function summarizeSurfaceInvocationGovernance(
+  invocations: readonly ExecutableSurfaceInvocation[],
+): ExecutableSurfaceInvocationGovernanceSummary {
+  return {
+    invocationsWithEffectivePolicyEvidence: invocations.filter(
+      (invocation) => invocation.governance.hasEffectivePolicyEvidence,
+    ).length,
+    invocationsWithoutEffectivePolicyEvidence: invocations.filter(
+      (invocation) => !invocation.governance.hasEffectivePolicyEvidence,
+    ).length,
+    distinctEffectivePolicyFingerprints: uniqueSorted(
+      invocations.flatMap(
+        (invocation) =>
+          invocation.governance.distinctEffectivePolicyFingerprints,
+      ),
+    ),
+  };
+}
+
+function invocationPolicyRelationCount(
+  invocations: readonly ExecutableSurfaceInvocation[],
+  relation: ExecutableInvocationPolicyRelation,
+): number {
+  return invocations.reduce(
+    (count, invocation) =>
+      count +
+      invocation.governance.policyEvidence.filter(
+        (evidence) => evidence.relation === relation,
+      ).length,
+    0,
+  );
 }
 
 function collectStaticSurfaceReferences(
