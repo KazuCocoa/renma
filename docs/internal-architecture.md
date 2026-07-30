@@ -111,7 +111,9 @@ TypeScript deep imports without making the facade an internal dependency hub.
 Security command analysis is a deterministic, non-executing pipeline:
 
 ```text
-Markdown/source eligibility
+already-discovered Artifact.content
+  -> raw hidden-Unicode findings
+  -> Markdown/source eligibility
   -> one relevant logical command or line-local instruction
   -> exact structural guard evidence
   -> bounded shell/JavaScript recognition
@@ -121,6 +123,14 @@ Markdown/source eligibility
   -> supported structured projection or conservative fallback
   -> existing policy diagnostics
 ```
+
+`src/hidden-unicode.ts` owns the isolated raw-source check. It accepts one
+already-classified `Artifact`, returns no findings for binary content, and
+inspects text without Markdown parsing, visibility projection, normalization,
+or command analysis. `securityDiagnosticFindings()` appends those raw findings
+before entering the existing Markdown-specific pipeline. Discovery scope,
+artifact classification, suppression, Diagnostics v2, review bundles,
+ordering, and reporting remain owned by their existing layers.
 
 `src/security-diagnostics.ts` owns Markdown eligibility, effective policy,
 guard application, fallback selection, evidence projection, ordering,

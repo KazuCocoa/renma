@@ -1,5 +1,6 @@
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import type { DiagnosticId } from "./diagnostic-ids.js";
+import { hiddenUnicodeFindings } from "./hidden-unicode.js";
 import {
   classifyNpmSelector,
   classifyPythonSelector,
@@ -981,8 +982,13 @@ export function securityDiagnosticFindings(
   config: SecurityDiagnosticsConfig = {},
 ): Finding[] {
   return inputs.flatMap((input) => {
+    const artifact = "artifact" in input ? input.artifact : input;
+    const rawFindings = hiddenUnicodeFindings(artifact);
     const document = "artifact" in input ? input : parseDocument(input);
-    return securityFindingsForDocument(document, config.security);
+    return [
+      ...rawFindings,
+      ...securityFindingsForDocument(document, config.security),
+    ];
   });
 }
 
