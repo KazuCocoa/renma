@@ -173,3 +173,13 @@ fixture only after a separate deliberate review.
 Record actual runs using [EVALUATION.md](EVALUATION.md). Preserve what the
 producer reported, including partial, skipped, disabled, failed, or unknown
 analysis, instead of inferring completion from a favorable outcome.
+
+## Evidence Normalization And Correlation Extension
+
+The isolated
+[`evidence-correlation/`](evidence-correlation/README.md) extension evaluates
+whether native SkillSpector findings can be preserved losslessly and matched
+to exact Renma catalog paths without becoming Renma diagnostics. It contains
+its own inert templates, experiment-only tests, audited raw capture,
+experimental JSON projection, and human-readable report. It remains outside
+normal Renma commands, builds, tests, packages, readiness, and CI policy.

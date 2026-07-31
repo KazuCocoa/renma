@@ -1,0 +1,55 @@
+{
+  "experiment": "non-production-skillspector-evidence-correlation",
+  "captured": true,
+  "renmaRevision": "74c53ec71a782c045c2817c1fe7703efa7f05087",
+  "scanner": {
+    "executable": "/Users/kazu/.local/bin/skillspector",
+    "versionProbeOutput": "SkillSpector v2.5.0",
+    "args": [
+      "scan",
+      "/Users/kazu/github/renma/experiments/skillspector/generated/evidence-correlation/repository/skills/evidence-fixture",
+      "--no-llm",
+      "--format",
+      "json",
+      "--output",
+      "/Users/kazu/github/renma/experiments/skillspector/evidence-correlation/captured/fixture-run/skillspector-report.json"
+    ],
+    "exitCode": 0,
+    "stdout": "Report saved to: \n/Users/kazu/github/renma/experiments/skillspector/evidence-correlation/captured/\nfixture-run/skillspector-report.json\n",
+    "stderr": ""
+  },
+  "renmaCatalog": {
+    "executable": "/Users/kazu/.nvm/versions/node/v24.18.0/bin/node",
+    "args": [
+      "/Users/kazu/github/renma/dist/index.js",
+      "catalog",
+      "/Users/kazu/github/renma/experiments/skillspector/generated/evidence-correlation/repository",
+      "--format",
+      "json"
+    ],
+    "exitCode": 0,
+    "stderr": ""
+  },
+  "fixture": {
+    "id": "skillspector-evidence-correlation-v1",
+    "root": "experiments/skillspector/generated/evidence-correlation/repository",
+    "files": [
+      {
+        "path": "renma.config.json",
+        "sha256": "sha256:15fd82ee537f1ac403ab735a25c92881ea4b04c6d99cb2fa744f5b4ebc1ef0bc"
+      },
+      {
+        "path": "skills/evidence-fixture/README.md",
+        "sha256": "sha256:3631a27ed89cbbac960b4dc3327e53f541dad0a85bf4eba01b7b513a7fc977c6"
+      },
+      {
+        "path": "skills/evidence-fixture/scripts/probe.py",
+        "sha256": "sha256:3104627512b546e4edb5870a632a929f9e1549c390666bd4db91eed6d096d9ae"
+      },
+      {
+        "path": "skills/evidence-fixture/SKILL.md",
+        "sha256": "sha256:1ab74c950d09dc46aff12649e6bf66514998c24aa91edf3aa13a0e413e9db99a"
+      }
+    ]
+  }
+}

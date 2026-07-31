@@ -1,0 +1,535 @@
+{
+  "experimentalSchemaVersion": "renma.experiment.skillspector-evidence.v0",
+  "stability": "experimental-not-a-public-schema",
+  "boundary": {
+    "includes": ["scanner facts", "path normalization", "Renma correlation"],
+    "excludes": [
+      "Renma diagnostics",
+      "readiness interpretation",
+      "policy interpretation",
+      "cross-scanner severity comparison",
+      "stable finding fingerprints"
+    ]
+  },
+  "source": {
+    "scanner": {
+      "name": "SkillSpector",
+      "nameProvenance": "experiment-invocation",
+      "version": "2.5.0",
+      "versionProvenance": "scanner-output:/metadata/skillspector_version"
+    },
+    "fixture": {
+      "id": "skillspector-evidence-correlation-v1",
+      "scannerTargetPath": "skills/evidence-fixture"
+    },
+    "rawOutput": {
+      "referenceBase": "experiments/skillspector",
+      "reference": "evidence-correlation/captured/fixture-run/skillspector-report.json",
+      "sha256": "sha256:4770544e9260675d0abbb4da01b2c040f28346fe69d3da88847287d5ae2dc895"
+    },
+    "renmaCatalog": {
+      "referenceBase": "experiments/skillspector",
+      "reference": "evidence-correlation/captured/fixture-run/renma-catalog.json",
+      "sha256": "sha256:6a3e01e15d7bb1ac29203ea960cef407ef9846193c17d1e30a7ee8ddf7181338"
+    }
+  },
+  "counts": {
+    "rawFindingCount": 6,
+    "normalizedEvidenceCount": 6,
+    "correlatedCount": 4,
+    "unresolvedCount": 2,
+    "ambiguousCount": 0,
+    "duplicateGroupCount": 2,
+    "duplicateEvidenceCount": 4
+  },
+  "observations": {
+    "provenance": "experiment-normalization",
+    "duplicateComparison": "Exact equality of scanner-native fields after excluding only finding_id; this is an observation, not a fingerprint.",
+    "duplicateGroups": [
+      {
+        "evidenceIndexes": [2, 3],
+        "rawFindingIds": [
+          "finding-a75fd13db50542fbafd150af28549b4b",
+          "finding-660378aba3fd403b8348ebc979db4a01"
+        ],
+        "comparisonBasis": "same scanner-native fields except scanner-reported finding_id"
+      },
+      {
+        "evidenceIndexes": [4, 5],
+        "rawFindingIds": [
+          "finding-ce0f41f00e34447ea4777c7625363428",
+          "finding-016e63deabf24d5bb69d4afe0db7d900"
+        ],
+        "comparisonBasis": "same scanner-native fields except scanner-reported finding_id"
+      }
+    ]
+  },
+  "evidence": [
+    {
+      "evidenceIndex": 0,
+      "scannerFact": {
+        "provenance": "scanner-output",
+        "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/0",
+        "nativeFinding": {
+          "id": "LP1",
+          "finding_id": "finding-a704712c7e9f48c783a054fa24fff0f0",
+          "category": "MCP Least Privilege",
+          "pattern": null,
+          "severity": "HIGH",
+          "confidence": 0.75,
+          "location": {
+            "file": "scripts/probe.py",
+            "start_line": 1,
+            "end_line": null
+          },
+          "finding": null,
+          "explanation": "The skill uses 'file_read' capability that is not listed in its permissions. This may indicate deceptive intent or missing permission declarations.",
+          "remediation": "Add the 'file_read' permission to SKILL.md, or remove the code that requires it.",
+          "code_snippet": null,
+          "intent": null,
+          "tags": ["ASI02"]
+        }
+      },
+      "normalization": {
+        "provenance": "experiment-normalization",
+        "target": {
+          "status": "normalized",
+          "scannerPath": "scripts/probe.py",
+          "repositoryRelativePath": "skills/evidence-fixture/scripts/probe.py",
+          "explanation": "The scanner path was normalized relative to the recorded scan target."
+        },
+        "locationPrecision": "start-line-only"
+      },
+      "correlation": {
+        "provenance": "experiment-correlation",
+        "status": "correlated",
+        "reasonCode": "exact-repository-relative-path",
+        "explanation": "The normalized target exactly matches Renma asset sourcePath \"skills/evidence-fixture/scripts/probe.py\".",
+        "asset": {
+          "id": "skills/evidence-fixture/scripts/probe.py",
+          "kind": "script",
+          "sourcePath": "skills/evidence-fixture/scripts/probe.py",
+          "contentHash": "sha256:3104627512b546e4edb5870a632a929f9e1549c390666bd4db91eed6d096d9ae",
+          "ownership": {
+            "declaredOwner": null,
+            "effectiveOwner": "experiment-maintainers",
+            "source": "inherited",
+            "inheritedFrom": {
+              "id": "skill.experiment.evidence-correlation",
+              "sourcePath": "skills/evidence-fixture/SKILL.md"
+            }
+          }
+        },
+        "associatedEntrypoints": [
+          {
+            "id": "skill.experiment.evidence-correlation",
+            "kind": "skill",
+            "sourcePath": "skills/evidence-fixture/SKILL.md",
+            "contentHash": "sha256:1ab74c950d09dc46aff12649e6bf66514998c24aa91edf3aa13a0e413e9db99a",
+            "ownership": {
+              "declaredOwner": "experiment-maintainers",
+              "effectiveOwner": "experiment-maintainers",
+              "source": "declared"
+            }
+          }
+        ],
+        "relationships": [
+          {
+            "from": "skill.experiment.evidence-correlation",
+            "to": "skills/evidence-fixture/scripts/probe.py",
+            "kind": "owns_local_resource",
+            "sourcePath": "skills/evidence-fixture/SKILL.md"
+          },
+          {
+            "from": "skill.experiment.evidence-correlation",
+            "to": "skills/evidence-fixture/scripts/probe.py",
+            "kind": "statically_references",
+            "sourcePath": "skills/evidence-fixture/SKILL.md",
+            "evidence": {
+              "path": "skills/evidence-fixture/SKILL.md",
+              "startLine": 16,
+              "endLine": 16,
+              "snippet": "[scripts/probe.py](scripts/probe.py)"
+            }
+          },
+          {
+            "from": "skills/evidence-fixture/scripts/probe.py",
+            "to": "skill.experiment.evidence-correlation",
+            "kind": "inherits_owner",
+            "sourcePath": "skills/evidence-fixture/scripts/probe.py"
+          },
+          {
+            "from": "skills/evidence-fixture/scripts/probe.py",
+            "to": "skill.experiment.evidence-correlation",
+            "kind": "inherits_policy",
+            "sourcePath": "skills/evidence-fixture/scripts/probe.py"
+          }
+        ],
+        "candidates": []
+      }
+    },
+    {
+      "evidenceIndex": 1,
+      "scannerFact": {
+        "provenance": "scanner-output",
+        "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/1",
+        "nativeFinding": {
+          "id": "LP1",
+          "finding_id": "finding-ef30c984d0564f55913174dfc85ea9db",
+          "category": "MCP Least Privilege",
+          "pattern": null,
+          "severity": "HIGH",
+          "confidence": 0.75,
+          "location": {
+            "file": "scripts/probe.py",
+            "start_line": 1,
+            "end_line": null
+          },
+          "finding": null,
+          "explanation": "The skill uses 'network' capability that is not listed in its permissions. This may indicate deceptive intent or missing permission declarations.",
+          "remediation": "Add the 'network' permission to SKILL.md, or remove the code that requires it.",
+          "code_snippet": null,
+          "intent": null,
+          "tags": ["ASI02"]
+        }
+      },
+      "normalization": {
+        "provenance": "experiment-normalization",
+        "target": {
+          "status": "normalized",
+          "scannerPath": "scripts/probe.py",
+          "repositoryRelativePath": "skills/evidence-fixture/scripts/probe.py",
+          "explanation": "The scanner path was normalized relative to the recorded scan target."
+        },
+        "locationPrecision": "start-line-only"
+      },
+      "correlation": {
+        "provenance": "experiment-correlation",
+        "status": "correlated",
+        "reasonCode": "exact-repository-relative-path",
+        "explanation": "The normalized target exactly matches Renma asset sourcePath \"skills/evidence-fixture/scripts/probe.py\".",
+        "asset": {
+          "id": "skills/evidence-fixture/scripts/probe.py",
+          "kind": "script",
+          "sourcePath": "skills/evidence-fixture/scripts/probe.py",
+          "contentHash": "sha256:3104627512b546e4edb5870a632a929f9e1549c390666bd4db91eed6d096d9ae",
+          "ownership": {
+            "declaredOwner": null,
+            "effectiveOwner": "experiment-maintainers",
+            "source": "inherited",
+            "inheritedFrom": {
+              "id": "skill.experiment.evidence-correlation",
+              "sourcePath": "skills/evidence-fixture/SKILL.md"
+            }
+          }
+        },
+        "associatedEntrypoints": [
+          {
+            "id": "skill.experiment.evidence-correlation",
+            "kind": "skill",
+            "sourcePath": "skills/evidence-fixture/SKILL.md",
+            "contentHash": "sha256:1ab74c950d09dc46aff12649e6bf66514998c24aa91edf3aa13a0e413e9db99a",
+            "ownership": {
+              "declaredOwner": "experiment-maintainers",
+              "effectiveOwner": "experiment-maintainers",
+              "source": "declared"
+            }
+          }
+        ],
+        "relationships": [
+          {
+            "from": "skill.experiment.evidence-correlation",
+            "to": "skills/evidence-fixture/scripts/probe.py",
+            "kind": "owns_local_resource",
+            "sourcePath": "skills/evidence-fixture/SKILL.md"
+          },
+          {
+            "from": "skill.experiment.evidence-correlation",
+            "to": "skills/evidence-fixture/scripts/probe.py",
+            "kind": "statically_references",
+            "sourcePath": "skills/evidence-fixture/SKILL.md",
+            "evidence": {
+              "path": "skills/evidence-fixture/SKILL.md",
+              "startLine": 16,
+              "endLine": 16,
+              "snippet": "[scripts/probe.py](scripts/probe.py)"
+            }
+          },
+          {
+            "from": "skills/evidence-fixture/scripts/probe.py",
+            "to": "skill.experiment.evidence-correlation",
+            "kind": "inherits_owner",
+            "sourcePath": "skills/evidence-fixture/scripts/probe.py"
+          },
+          {
+            "from": "skills/evidence-fixture/scripts/probe.py",
+            "to": "skill.experiment.evidence-correlation",
+            "kind": "inherits_policy",
+            "sourcePath": "skills/evidence-fixture/scripts/probe.py"
+          }
+        ],
+        "candidates": []
+      }
+    },
+    {
+      "evidenceIndex": 2,
+      "scannerFact": {
+        "provenance": "scanner-output",
+        "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/2",
+        "nativeFinding": {
+          "id": "AS3",
+          "finding_id": "finding-a75fd13db50542fbafd150af28549b4b",
+          "category": "Agent Snooping",
+          "pattern": "Skill Enumeration",
+          "severity": "MEDIUM",
+          "confidence": 0.8,
+          "location": {
+            "file": "README.md",
+            "start_line": 8,
+            "end_line": null
+          },
+          "finding": "skills/Example/SKILL.md",
+          "explanation": "Skill enumerates or reads other installed skills. Access to other skills' SKILL.md files or the skills directory reveals prompt instructions, capabilities, and secrets that should be invisible to peer skills.",
+          "remediation": "Remove all code or instructions that list or read other skills' files or directories. Skills should operate independently; cross-skill access is a privilege escalation.",
+          "code_snippet": "\nThe following ordinary link is repeated as visible text and destination to\nexercise duplicate preservation:\n[skills/Example/SKILL.md](skills/Example/SKILL.md).",
+          "intent": null,
+          "tags": ["Agent Snooping"]
+        }
+      },
+      "normalization": {
+        "provenance": "experiment-normalization",
+        "target": {
+          "status": "normalized",
+          "scannerPath": "README.md",
+          "repositoryRelativePath": "skills/evidence-fixture/README.md",
+          "explanation": "The scanner path was normalized relative to the recorded scan target."
+        },
+        "locationPrecision": "start-line-only"
+      },
+      "correlation": {
+        "provenance": "experiment-correlation",
+        "status": "unresolved",
+        "reasonCode": "no-catalog-asset-at-path",
+        "explanation": "No Renma catalog asset has the exact source path \"skills/evidence-fixture/README.md\".",
+        "candidates": []
+      }
+    },
+    {
+      "evidenceIndex": 3,
+      "scannerFact": {
+        "provenance": "scanner-output",
+        "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/3",
+        "nativeFinding": {
+          "id": "AS3",
+          "finding_id": "finding-660378aba3fd403b8348ebc979db4a01",
+          "category": "Agent Snooping",
+          "pattern": "Skill Enumeration",
+          "severity": "MEDIUM",
+          "confidence": 0.8,
+          "location": {
+            "file": "README.md",
+            "start_line": 8,
+            "end_line": null
+          },
+          "finding": "skills/Example/SKILL.md",
+          "explanation": "Skill enumerates or reads other installed skills. Access to other skills' SKILL.md files or the skills directory reveals prompt instructions, capabilities, and secrets that should be invisible to peer skills.",
+          "remediation": "Remove all code or instructions that list or read other skills' files or directories. Skills should operate independently; cross-skill access is a privilege escalation.",
+          "code_snippet": "\nThe following ordinary link is repeated as visible text and destination to\nexercise duplicate preservation:\n[skills/Example/SKILL.md](skills/Example/SKILL.md).",
+          "intent": null,
+          "tags": ["Agent Snooping"]
+        }
+      },
+      "normalization": {
+        "provenance": "experiment-normalization",
+        "target": {
+          "status": "normalized",
+          "scannerPath": "README.md",
+          "repositoryRelativePath": "skills/evidence-fixture/README.md",
+          "explanation": "The scanner path was normalized relative to the recorded scan target."
+        },
+        "locationPrecision": "start-line-only"
+      },
+      "correlation": {
+        "provenance": "experiment-correlation",
+        "status": "unresolved",
+        "reasonCode": "no-catalog-asset-at-path",
+        "explanation": "No Renma catalog asset has the exact source path \"skills/evidence-fixture/README.md\".",
+        "candidates": []
+      }
+    },
+    {
+      "evidenceIndex": 4,
+      "scannerFact": {
+        "provenance": "scanner-output",
+        "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/4",
+        "nativeFinding": {
+          "id": "AS3",
+          "finding_id": "finding-ce0f41f00e34447ea4777c7625363428",
+          "category": "Agent Snooping",
+          "pattern": "Skill Enumeration",
+          "severity": "MEDIUM",
+          "confidence": 0.8,
+          "location": {
+            "file": "SKILL.md",
+            "start_line": 20,
+            "end_line": null
+          },
+          "finding": "skills/Example/SKILL.md",
+          "explanation": "Skill enumerates or reads other installed skills. Access to other skills' SKILL.md files or the skills directory reveals prompt instructions, capabilities, and secrets that should be invisible to peer skills.",
+          "remediation": "Remove all code or instructions that list or read other skills' files or directories. Skills should operate independently; cross-skill access is a privilege escalation.",
+          "code_snippet": "\nThe following ordinary link is repeated as visible text and destination to\nexercise duplicate preservation:\n[skills/Example/SKILL.md](skills/Example/SKILL.md).",
+          "intent": null,
+          "tags": ["Agent Snooping"]
+        }
+      },
+      "normalization": {
+        "provenance": "experiment-normalization",
+        "target": {
+          "status": "normalized",
+          "scannerPath": "SKILL.md",
+          "repositoryRelativePath": "skills/evidence-fixture/SKILL.md",
+          "explanation": "The scanner path was normalized relative to the recorded scan target."
+        },
+        "locationPrecision": "start-line-only"
+      },
+      "correlation": {
+        "provenance": "experiment-correlation",
+        "status": "correlated",
+        "reasonCode": "exact-repository-relative-path",
+        "explanation": "The normalized target exactly matches Renma asset sourcePath \"skills/evidence-fixture/SKILL.md\".",
+        "asset": {
+          "id": "skill.experiment.evidence-correlation",
+          "kind": "skill",
+          "sourcePath": "skills/evidence-fixture/SKILL.md",
+          "contentHash": "sha256:1ab74c950d09dc46aff12649e6bf66514998c24aa91edf3aa13a0e413e9db99a",
+          "ownership": {
+            "declaredOwner": "experiment-maintainers",
+            "effectiveOwner": "experiment-maintainers",
+            "source": "declared"
+          }
+        },
+        "associatedEntrypoints": [],
+        "relationships": [
+          {
+            "from": "skill.experiment.evidence-correlation",
+            "to": "skills/evidence-fixture/scripts/probe.py",
+            "kind": "owns_local_resource",
+            "sourcePath": "skills/evidence-fixture/SKILL.md"
+          },
+          {
+            "from": "skill.experiment.evidence-correlation",
+            "to": "skills/evidence-fixture/scripts/probe.py",
+            "kind": "statically_references",
+            "sourcePath": "skills/evidence-fixture/SKILL.md",
+            "evidence": {
+              "path": "skills/evidence-fixture/SKILL.md",
+              "startLine": 16,
+              "endLine": 16,
+              "snippet": "[scripts/probe.py](scripts/probe.py)"
+            }
+          },
+          {
+            "from": "skills/evidence-fixture/scripts/probe.py",
+            "to": "skill.experiment.evidence-correlation",
+            "kind": "inherits_owner",
+            "sourcePath": "skills/evidence-fixture/scripts/probe.py"
+          },
+          {
+            "from": "skills/evidence-fixture/scripts/probe.py",
+            "to": "skill.experiment.evidence-correlation",
+            "kind": "inherits_policy",
+            "sourcePath": "skills/evidence-fixture/scripts/probe.py"
+          }
+        ],
+        "candidates": []
+      }
+    },
+    {
+      "evidenceIndex": 5,
+      "scannerFact": {
+        "provenance": "scanner-output",
+        "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/5",
+        "nativeFinding": {
+          "id": "AS3",
+          "finding_id": "finding-016e63deabf24d5bb69d4afe0db7d900",
+          "category": "Agent Snooping",
+          "pattern": "Skill Enumeration",
+          "severity": "MEDIUM",
+          "confidence": 0.8,
+          "location": {
+            "file": "SKILL.md",
+            "start_line": 20,
+            "end_line": null
+          },
+          "finding": "skills/Example/SKILL.md",
+          "explanation": "Skill enumerates or reads other installed skills. Access to other skills' SKILL.md files or the skills directory reveals prompt instructions, capabilities, and secrets that should be invisible to peer skills.",
+          "remediation": "Remove all code or instructions that list or read other skills' files or directories. Skills should operate independently; cross-skill access is a privilege escalation.",
+          "code_snippet": "\nThe following ordinary link is repeated as visible text and destination to\nexercise duplicate preservation:\n[skills/Example/SKILL.md](skills/Example/SKILL.md).",
+          "intent": null,
+          "tags": ["Agent Snooping"]
+        }
+      },
+      "normalization": {
+        "provenance": "experiment-normalization",
+        "target": {
+          "status": "normalized",
+          "scannerPath": "SKILL.md",
+          "repositoryRelativePath": "skills/evidence-fixture/SKILL.md",
+          "explanation": "The scanner path was normalized relative to the recorded scan target."
+        },
+        "locationPrecision": "start-line-only"
+      },
+      "correlation": {
+        "provenance": "experiment-correlation",
+        "status": "correlated",
+        "reasonCode": "exact-repository-relative-path",
+        "explanation": "The normalized target exactly matches Renma asset sourcePath \"skills/evidence-fixture/SKILL.md\".",
+        "asset": {
+          "id": "skill.experiment.evidence-correlation",
+          "kind": "skill",
+          "sourcePath": "skills/evidence-fixture/SKILL.md",
+          "contentHash": "sha256:1ab74c950d09dc46aff12649e6bf66514998c24aa91edf3aa13a0e413e9db99a",
+          "ownership": {
+            "declaredOwner": "experiment-maintainers",
+            "effectiveOwner": "experiment-maintainers",
+            "source": "declared"
+          }
+        },
+        "associatedEntrypoints": [],
+        "relationships": [
+          {
+            "from": "skill.experiment.evidence-correlation",
+            "to": "skills/evidence-fixture/scripts/probe.py",
+            "kind": "owns_local_resource",
+            "sourcePath": "skills/evidence-fixture/SKILL.md"
+          },
+          {
+            "from": "skill.experiment.evidence-correlation",
+            "to": "skills/evidence-fixture/scripts/probe.py",
+            "kind": "statically_references",
+            "sourcePath": "skills/evidence-fixture/SKILL.md",
+            "evidence": {
+              "path": "skills/evidence-fixture/SKILL.md",
+              "startLine": 16,
+              "endLine": 16,
+              "snippet": "[scripts/probe.py](scripts/probe.py)"
+            }
+          },
+          {
+            "from": "skills/evidence-fixture/scripts/probe.py",
+            "to": "skill.experiment.evidence-correlation",
+            "kind": "inherits_owner",
+            "sourcePath": "skills/evidence-fixture/scripts/probe.py"
+          },
+          {
+            "from": "skills/evidence-fixture/scripts/probe.py",
+            "to": "skill.experiment.evidence-correlation",
+            "kind": "inherits_policy",
+            "sourcePath": "skills/evidence-fixture/scripts/probe.py"
+          }
+        ],
+        "candidates": []
+      }
+    }
+  ]
+}

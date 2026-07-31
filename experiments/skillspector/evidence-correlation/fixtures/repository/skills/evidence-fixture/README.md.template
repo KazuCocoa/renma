@@ -1,0 +1,8 @@
+# Inert Ungoverned Scanner Target
+
+This file is stable scanner test data and is deliberately outside the Renma
+fixture globs. It must remain visible when correlation cannot find an asset.
+
+The following ordinary link is repeated as visible text and destination to
+exercise duplicate preservation:
+[skills/Example/SKILL.md](skills/Example/SKILL.md).
