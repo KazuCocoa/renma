@@ -1350,13 +1350,20 @@ policy-free. Diff endpoints also expose the readiness ownership numerator,
 eligible-asset denominator, and coverage percentage while retaining the
 existing `summary.ownershipCoverageDelta` field.
 
-Markdown is a bounded review artifact. It shows before/after ownership counts
-and percentages, added and changed asset metadata with canonical declared and
-effective ownership, added and removed graph edges with resolution state,
-readiness check status/severity and summary changes, and concrete security
-policy inventory deltas. Each detail collection uses the shared presentation
-limit and directs reviewers to JSON when more items exist. JSON remains the
-complete, unbounded machine-readable report.
+Markdown is a bounded, progressively disclosed review artifact. Its always
+visible portion shows status, range, readiness, ownership coverage, non-zero
+summary deltas, and review notes so `WARN` and `FAIL` reasons remain immediately
+visible in a pull request. Readiness details, semantic changes,
+executable-surface evidence, security metrics, and unchanged inventory are
+grouped under a collapsed `Full report details` disclosure.
+
+The detailed Markdown shows before/after ownership counts and percentages,
+added and changed asset metadata with canonical declared and effective
+ownership, added and removed graph edges with resolution state, readiness check
+status/severity and summary changes, and concrete security policy inventory
+deltas. Each detail collection uses the shared presentation limit and directs
+reviewers to JSON when more items exist. JSON remains the complete, unbounded
+machine-readable report and is unaffected by Markdown disclosure.
 
 Asset details in diff and CI-report JSON use canonical `declaredOwner` and
 `effectiveOwner` values. CI-report Markdown always renders both values so

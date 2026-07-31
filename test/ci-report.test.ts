@@ -97,6 +97,65 @@ test("formatCiReport renders deterministic markdown review artifact", () => {
   assert.match(markdown, /Review new unresolved required edges before merge\./);
 });
 
+test("formatCiReport keeps review signal visible and collapses verbose details", () => {
+  const report = buildCiReportFromDiff({
+    ...policyDiffReport({}),
+    discovery: neutralSkillDiscoveryDiff(),
+  });
+  const markdown = formatCiReport(report, "markdown");
+  const detailsStart = markdown.indexOf("<details>");
+  const detailsEnd = markdown.indexOf("</details>");
+  const visible = markdown.slice(0, detailsStart);
+  const details = markdown.slice(detailsStart, detailsEnd);
+
+  assert.ok(detailsStart > 0);
+  assert.ok(detailsEnd > detailsStart);
+  assert.match(visible, /^## Summary$/m);
+  assert.match(
+    visible,
+    /- Status: PASS — no blocking CI review issues detected/,
+  );
+  assert.match(visible, /- Range: `main` -> `HEAD`/);
+  assert.match(visible, /^## Review Notes$/m);
+  assert.match(visible, /- No CI report regressions detected\./);
+  assert.doesNotMatch(visible, /- Total assets:/);
+  assert.doesNotMatch(visible, /- Graph resolution:/);
+  assert.doesNotMatch(visible, /- Findings:/);
+  assert.match(details, /<summary>Full report details<\/summary>/);
+  assert.match(details, /^## Readiness$/m);
+  assert.match(details, /^## Executable Surface Changes$/m);
+  assert.match(details, /^## Security Policy Inventory$/m);
+});
+
+test("formatCiReport surfaces non-zero warning metrics before details", () => {
+  const report = buildCiReportFromDiff({
+    ...policyDiffReport({
+      summary: {
+        readinessScoreDelta: -1,
+        ownershipCoverageDelta: -2,
+        graphResolutionDelta: -1,
+        findingsDelta: 1,
+      },
+    }),
+    discovery: neutralSkillDiscoveryDiff(),
+  });
+  const markdown = formatCiReport(report, "markdown");
+  const visible = markdown.slice(0, markdown.indexOf("<details>"));
+
+  assert.match(visible, /- Status: WARN — review recommended before merge/);
+  assert.match(
+    visible,
+    /- Readiness: needs_attention 80 -> needs_attention 80 \(-1\)/,
+  );
+  assert.match(
+    visible,
+    /- Ownership: 8\/10 \(80%\) -> 8\/10 \(80%\) \(-2 pp\)/,
+  );
+  assert.match(visible, /- Graph resolution: -1/);
+  assert.match(visible, /- Findings: \+1/);
+  assert.match(visible, /- Readiness score decreased\./);
+});
+
 test("formatCiReport renders structured JSON", () => {
   const json = formatCiReport(sampleReport(), "json");
   const parsed = JSON.parse(json) as CiReport;

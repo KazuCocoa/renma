@@ -307,28 +307,38 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
           ),
         ]
       : [];
-  const lines = [
-    "# Renma CI Report",
-    "",
-    "## Summary",
-    "",
+  const summaryLines = [
     `- Status: ${formatStatus(report.status)}`,
     `- Range: \`${report.from.ref}\` -> \`${report.to.ref}\``,
     `- Readiness: ${report.from.readinessLevel} ${report.from.readinessScore} -> ${report.to.readinessLevel} ${report.to.readinessScore} (${formatDelta(report.summary.readinessScoreDelta)})`,
-    `- Total assets: ${report.from.totalAssets} -> ${report.to.totalAssets} (${formatDelta(report.summary.totalAssetsDelta)})`,
     formatOwnershipSummary(
       report.from,
       report.to,
       report.summary.ownershipCoverageDelta,
     ),
-    `- Graph resolution: ${formatDelta(report.summary.graphResolutionDelta)}`,
-    `- Findings: ${formatDelta(report.summary.findingsDelta)}`,
-    `- High/critical findings: ${formatDelta(report.summary.highOrCriticalFindingsDelta)}`,
-    "",
-    "## Status",
-    "",
-    formatStatus(report.status),
-    "",
+  ];
+  if (report.summary.totalAssetsDelta !== 0) {
+    summaryLines.push(
+      `- Total assets: ${report.from.totalAssets} -> ${report.to.totalAssets} (${formatDelta(report.summary.totalAssetsDelta)})`,
+    );
+  }
+  if (report.summary.graphResolutionDelta !== 0) {
+    summaryLines.push(
+      `- Graph resolution: ${formatDelta(report.summary.graphResolutionDelta)}`,
+    );
+  }
+  if (report.summary.findingsDelta !== 0) {
+    summaryLines.push(
+      `- Findings: ${formatDelta(report.summary.findingsDelta)}`,
+    );
+  }
+  if (report.summary.highOrCriticalFindingsDelta !== 0) {
+    summaryLines.push(
+      `- High/critical findings: ${formatDelta(report.summary.highOrCriticalFindingsDelta)}`,
+    );
+  }
+
+  const detailLines = [
     "## Readiness",
     "",
     `- Target readiness: ${report.to.readinessLevel} (${report.to.readinessScore})`,
@@ -388,14 +398,37 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     "## Finding Count Changes",
     "",
     ...formatCountChanges(report.diff.findings.countById),
+  ];
+  const lines = [
+    "# Renma CI Report",
+    "",
+    "## Summary",
+    "",
+    ...summaryLines,
     "",
     "## Review Notes",
     "",
-    ...report.notes.map((note) => `- ${note}`),
+    ...formatReviewNotes(report),
+    "",
+    "<details>",
+    "<summary>Full report details</summary>",
+    "",
+    ...detailLines,
+    "",
+    "</details>",
     "",
   ];
 
   return `${lines.join("\n")}\n`;
+}
+
+function formatReviewNotes(report: CiReportFormatInput): string[] {
+  if (report.notes.length > 0) {
+    return report.notes.map((note) => `- ${note}`);
+  }
+  return report.status === "pass"
+    ? ["- No CI report regressions detected."]
+    : ["- Review the changed metrics and evidence in the full report details."];
 }
 
 function formatExecutableSurfaceChanges(
