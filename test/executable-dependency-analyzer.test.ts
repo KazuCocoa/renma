@@ -382,6 +382,49 @@ test("repeated dependency declarations retain stable occurrence ordinals", () =>
   );
 });
 
+test("identical same-line JS declarations retain separate public evidence rows", () => {
+  for (const [content, relation] of [
+    ['import "./helper.mjs"; import "./helper.mjs";', "static-import"],
+    [
+      'export * from "./helper.mjs"; export * from "./helper.mjs";',
+      "static-reexport",
+    ],
+  ] as const) {
+    const candidates = JS_TS_EXECUTABLE_DEPENDENCY_ANALYZER.collect({
+      path: "tools/check.mjs",
+      content,
+    });
+    const dependencies = resolveExecutableDependencies(
+      candidates,
+      new Map([["tools/helper.mjs", "parsed"]]),
+      new Map([["tools/helper.mjs", "repository-tool"]]),
+    );
+    assert.equal(candidates.length, 2);
+    assert.deepEqual(
+      dependencies.map((dependency) => ({
+        line: dependency.line,
+        relation: dependency.relation,
+        occurrenceOrdinal: dependency.occurrenceOrdinal,
+        exposesPrivateOffset: Object.hasOwn(dependency, "declarationOffset"),
+      })),
+      [
+        {
+          line: 1,
+          relation,
+          occurrenceOrdinal: 1,
+          exposesPrivateOffset: false,
+        },
+        {
+          line: 1,
+          relation,
+          occurrenceOrdinal: 2,
+          exposesPrivateOffset: false,
+        },
+      ],
+    );
+  }
+});
+
 test("pure inline type-only imports do not create transitive reachability", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-inline-types-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -461,10 +504,13 @@ test("dependency declarations remain auditable while graph edges are unique", as
     .executableSurfaceInventory;
   await writeFile(
     path.join(root, "tools", "source.mjs"),
-    'import "./target.mjs";\nimport "./target.mjs";\n',
+    'import "./target.mjs"; import "./target.mjs";\n',
   );
   const duplicate = (await collectRepositorySnapshot(root))
     .executableSurfaceInventory;
+  const duplicateAgain = (await collectRepositorySnapshot(root))
+    .executableSurfaceInventory;
+  assert.deepEqual(duplicateAgain, duplicate);
   assert.equal(duplicate.dependencies.length, 2);
   assert.equal(duplicate.summary.totalDependencies, 2);
   assert.deepEqual(
@@ -892,10 +938,12 @@ function pythonCandidate(
   rawSpecifier: string,
   normalizedTargetCandidates: string[],
   unsafe = false,
+  declarationOffset = 0,
 ) {
   return {
     analyzer: "python" as const,
     sourcePath,
+    declarationOffset,
     line: 1,
     snippet: `from ${rawSpecifier} import value`,
     relation: "static-import" as const,

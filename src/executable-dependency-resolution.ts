@@ -3,6 +3,7 @@ import type {
   ExecutableDependencyCandidate,
   ExecutableDependencyRelation,
 } from "./executable-dependency-analyzer.js";
+import { executableDependencyCandidateOccurrenceKey } from "./executable-dependency-analyzer.js";
 import type { ExecutableSurfaceScope } from "./executable-surface-inventory.js";
 import type { RepositoryPathState } from "./repository-paths.js";
 
@@ -45,22 +46,34 @@ export function resolveExecutableDependencies(
   repositoryPathStates: ReadonlyMap<string, RepositoryPathState>,
   inventorySurfaceScopes: ReadonlyMap<string, ExecutableSurfaceScope>,
 ): ExecutableSurfaceDependency[] {
-  const deduplicated = new Map<
+  const occurrences = new Map<
     string,
-    Omit<ExecutableSurfaceDependency, "occurrenceOrdinal">
+    {
+      declarationOffset: number;
+      dependency: Omit<ExecutableSurfaceDependency, "occurrenceOrdinal">;
+    }
   >();
   for (const candidate of candidates) {
+    const key = executableDependencyCandidateOccurrenceKey(candidate);
+    if (occurrences.has(key)) continue;
     const resolved = resolveCandidate(
       candidate,
       repositoryPathStates,
       inventorySurfaceScopes,
     );
-    deduplicated.set(JSON.stringify(resolved), resolved);
+    occurrences.set(key, {
+      declarationOffset: candidate.declarationOffset,
+      dependency: resolved,
+    });
   }
   const ordinals = new Map<string, number>();
-  return [...deduplicated.values()]
-    .sort(compareDependencies)
-    .map((dependency) => {
+  return [...occurrences.values()]
+    .sort(
+      (left, right) =>
+        compareDependencies(left.dependency, right.dependency) ||
+        left.declarationOffset - right.declarationOffset,
+    )
+    .map(({ dependency }) => {
       const key = semanticDependencyBaseKey(dependency);
       const occurrenceOrdinal = (ordinals.get(key) ?? 0) + 1;
       ordinals.set(key, occurrenceOrdinal);

@@ -227,6 +227,7 @@ function dependencyCandidate(
   return {
     analyzer: "js-ts",
     sourcePath,
+    declarationOffset: keyword.start,
     line: keyword.line,
     snippet: boundedSnippet(content.slice(keyword.start, specifierToken.end)),
     relation,

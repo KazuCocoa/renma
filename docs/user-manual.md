@@ -806,12 +806,15 @@ that surface boundary. Other states are `resolved`, `missing`, `unsafe`,
 `symlink`, and `unreadable`. Python preserves every candidate and sets
 `normalizedTarget` only when selection is deterministic.
 
-Every recognized declaration remains an auditable dependency row and
-contributes to `totalDependencies`. Graph topology instead contains one edge
-per unique source path and normalized target for `resolved` and `noncanonical`
-rows. Analyzer, relation, line, raw specifier, and occurrence ordinal do not
-distinguish graph edges. Incoming/outgoing counts, adjacency, reachability, and
-semantic diff graph signatures share this unique edge set.
+Every recognized syntactic declaration remains an auditable dependency row and
+contributes to `totalDependencies`, including identical declarations on the
+same source line. Public rows retain line numbers and occurrence ordinals; the
+private source offset used to distinguish declarations is not emitted. Graph
+topology instead contains one edge per unique source path and normalized target
+for `resolved` and `noncanonical` rows. Analyzer, relation, line, raw specifier,
+and occurrence ordinal do not distinguish graph edges. Incoming/outgoing
+counts, adjacency, reachability, and semantic diff graph signatures share this
+unique edge set.
 
 Directly invoked surfaces have minimum dependency depth `0`; a reachable
 imported surface is `transitive` at its minimum breadth-first depth; otherwise

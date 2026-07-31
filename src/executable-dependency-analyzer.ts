@@ -12,6 +12,7 @@ export type ExecutableDependencyRelation = "static-import" | "static-reexport";
 export interface ExecutableDependencyCandidate {
   analyzer: BuiltInExecutableDependencyAnalyzerId;
   sourcePath: string;
+  declarationOffset: number;
   line: number;
   snippet: string;
   relation: ExecutableDependencyRelation;
@@ -76,7 +77,7 @@ export function collectExecutableDependencyCandidates(
   artifacts: readonly Artifact[],
   documents: readonly ParsedDocument[],
 ): ExecutableDependencyCandidate[] {
-  const deduplicated = new Map<string, ExecutableDependencyCandidate>();
+  const occurrences = new Map<string, ExecutableDependencyCandidate>();
   for (const artifact of executableSurfaceArtifacts(artifacts, documents)) {
     for (const analyzer of BUILT_IN_EXECUTABLE_DEPENDENCY_ANALYZERS) {
       if (
@@ -91,11 +92,26 @@ export function collectExecutableDependencyCandidates(
         path: artifact.path,
         content: artifact.content,
       })) {
-        deduplicated.set(JSON.stringify(candidate), candidate);
+        const key = executableDependencyCandidateOccurrenceKey(candidate);
+        if (!occurrences.has(key)) occurrences.set(key, candidate);
       }
     }
   }
-  return [...deduplicated.values()].sort(compareDependencyCandidates);
+  return [...occurrences.values()].sort(compareDependencyCandidates);
+}
+
+/** Private syntactic-occurrence identity shared with dependency preparation. */
+export function executableDependencyCandidateOccurrenceKey(
+  candidate: ExecutableDependencyCandidate,
+): string {
+  return JSON.stringify([
+    candidate.sourcePath,
+    candidate.declarationOffset,
+    candidate.relation,
+    candidate.rawSpecifier,
+    candidate.normalizedTargetCandidates,
+    candidate.unsafe,
+  ]);
 }
 
 function compareDependencyCandidates(
@@ -110,6 +126,7 @@ function compareDependencyCandidates(
     left.normalizedTargetCandidates
       .join("\0")
       .localeCompare(right.normalizedTargetCandidates.join("\0")) ||
-    left.rawSpecifier.localeCompare(right.rawSpecifier)
+    left.rawSpecifier.localeCompare(right.rawSpecifier) ||
+    left.declarationOffset - right.declarationOffset
   );
 }

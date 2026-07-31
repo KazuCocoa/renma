@@ -23,6 +23,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   deduplicating graph topology by source path and normalized target. Duplicate
   declarations no longer multiply edge counts, alter reachability or depth, or
   create dependency-graph diff reasons.
+- Preserved textually identical declarations on the same source line as
+  distinct evidence rows with stable occurrence ordinals, using collection-only
+  source offsets that remain absent from scan and BOM JSON.
 - Excluded declaration-level and pure inline TypeScript type-only named imports
   and re-exports from runtime dependency evidence. Mixed clauses, default and
   namespace imports, and bindings literally named `type` remain included.

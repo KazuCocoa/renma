@@ -499,10 +499,14 @@ counts and static invocation reachability. Repository tools do not inherit
 policy from their callers: surface policy remains evidence attached to or
 inherited by the surface itself.
 
-Every recognized declaration remains a dependency row with a stable occurrence
-ordinal. Only `resolved` and `noncanonical` rows contribute graph topology, and
-one canonical edge is constructed for each unique source path and normalized
-target regardless of analyzer, relation, line, raw specifier, or occurrence.
+Every recognized syntactic declaration remains a dependency row with a stable
+occurrence ordinal, including textually identical declarations on one source
+line. An analyzer-private source offset preserves occurrence identity through
+candidate preparation and resolution, then is discarded before public
+inventory output. Only `resolved` and `noncanonical` rows contribute graph
+topology, and one canonical edge is constructed for each unique source path
+and normalized target regardless of analyzer, relation, line, raw specifier,
+or occurrence.
 Incoming/outgoing counts, adjacency, breadth-first reachability, and semantic
 diff graph signatures all consume that same edge set. Breadth-first traversal
 starts at directly invoked surfaces, assigns them depth `0`, assigns reachable

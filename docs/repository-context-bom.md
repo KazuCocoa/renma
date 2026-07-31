@@ -147,12 +147,14 @@ path; invocation rows are sorted by source path, line, launcher, and target;
 dependency rows are sorted by source path, line, analyzer, relation, target
 candidates, and raw specifier.
 
-Repeated declarations remain separate dependency rows and contribute
-separately to dependency totals. Per-surface incoming/outgoing counts and
-static reachability instead use one canonical graph edge for each unique source
-path and normalized target among `resolved` and `noncanonical` rows. Import and
-re-export syntax for the same source-target pair therefore stays auditable
-without multiplying graph topology.
+Repeated declarations, including identical declarations on one source line,
+remain separate dependency rows and contribute separately to dependency
+totals. Public BOM evidence exposes their shared line and distinct occurrence
+ordinals, not the private source offsets used during collection. Per-surface
+incoming/outgoing counts and static reachability instead use one canonical
+graph edge for each unique source path and normalized target among `resolved`
+and `noncanonical` rows. Import and re-export syntax for the same source-target
+pair therefore stays auditable without multiplying graph topology.
 
 BOM consumers must first branch on the presence of
 `executableSurfaceInventory`, then inspect its nested `schema` identifier

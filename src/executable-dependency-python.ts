@@ -138,6 +138,7 @@ function pythonCandidate(
   return {
     analyzer: "python",
     sourcePath,
+    declarationOffset: from.start,
     line: from.line,
     snippet: boundedSnippet(content.slice(from.start, end)),
     relation: "static-import",
