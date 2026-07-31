@@ -10,8 +10,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 - Compacted `ci-report` Markdown for pull-request review by keeping status,
   range, readiness, ownership coverage, non-zero summary deltas, and review
-  notes visible while grouping verbose and unchanged evidence under a collapsed
-  details section. Complete JSON output remains unchanged.
+  notes visible, and by surfacing compact non-zero groups for meaningful
+  underlying changes even when aggregate deltas remain neutral. Verbose and
+  unchanged evidence stays under a collapsed details section. Complete JSON
+  output remains unchanged.
 
 ## [0.28.0] - 2026-07-31
 

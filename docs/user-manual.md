@@ -1353,9 +1353,15 @@ existing `summary.ownershipCoverageDelta` field.
 Markdown is a bounded, progressively disclosed review artifact. Its always
 visible portion shows status, range, readiness, ownership coverage, non-zero
 summary deltas, and review notes so `WARN` and `FAIL` reasons remain immediately
-visible in a pull request. Readiness details, semantic changes,
-executable-surface evidence, security metrics, and unchanged inventory are
-grouped under a collapsed `Full report details` disclosure.
+visible in a pull request. When detailed evidence changes without affecting
+those net deltas, compact non-zero change groups also call out affected assets,
+graph edges, checks, Skill Discovery, executable surfaces and governance,
+findings, or security-policy metrics. A true no-change report omits this
+overview instead of printing a zero-filled inventory.
+
+Readiness details, semantic changes, executable-surface evidence, security
+metrics, and unchanged inventory are grouped under a collapsed
+`Full report details` disclosure.
 
 The detailed Markdown shows before/after ownership counts and percentages,
 added and changed asset metadata with canonical declared and effective
