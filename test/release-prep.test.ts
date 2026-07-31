@@ -15,8 +15,8 @@ test("release-prep routes broad and resumable release requests", () => {
   ]) {
     assert.ok(skill.includes(`"${trigger}"`), `missing trigger: ${trigger}`);
   }
-  assert.match(skill, /Resume from already verified release stages/);
-  assert.match(skill, /GitHub Release for an existing tag/);
+  assert.match(skill, /renma\.requires-context: '\["context\.release\.prep"\]'/);
+  assert.match(skill, /Treat that Context as authoritative/);
   assert.match(context, /resume at the earliest incomplete step/);
   assert.match(context, /GitHub-Release-only request on an existing tag/);
   assert.match(context, /Do not require the tag to be absent/);
@@ -26,11 +26,12 @@ test("release-prep routes release-notes-only requests without finalization", () 
   const skill = readFileSync("skills/release-prep/SKILL.md", "utf8");
   const context = readFileSync("contexts/release/prep.md", "utf8");
 
-  assert.match(skill, /generate or display GitHub Release notes/);
-  assert.match(skill, /--release-notes --version <version>/);
+  assert.match(skill, /release-note generation/);
+  assert.doesNotMatch(skill, /tools\/release-prep\.mjs/);
+  assert.match(context, /--release-notes --version <version>/);
   assert.match(
-    skill,
-    /stop before finalization, commits, tags, remote pushes/i,
+    context,
+    /Stop before editing release artifacts or creating commits, tags, pushes/,
   );
   assert.match(context, /For a release-notes-only request/);
   assert.match(context, /return the Markdown output directly/);
@@ -41,17 +42,16 @@ test("release-prep delegates npm publication to tag-triggered GitHub Actions", (
   const context = readFileSync("contexts/release/prep.md", "utf8");
   const workflow = readFileSync(".github/workflows/npm-publish.yml", "utf8");
 
-  assert.match(skill, /GitHub Actions trusted-publishing workflow/);
   assert.match(
-    skill,
-    /Keep the package release step inside.*trusted-publishing workflow/,
+    context,
+    /Keep the package release step inside.*trusted publishing/,
   );
   assert.match(context, /Ask for approval to push `origin\/main`/);
   assert.match(context, /push only `main:main`/);
   assert.match(context, /Ask separately for approval to push the tag/);
   assert.match(context, /push only that tag to trigger the workflow/);
   assert.match(context, /verify the version and integrity metadata/);
-  assert.match(skill, /Use exactly `Renma v<version>`/);
+  assert.doesNotMatch(skill, /tools\/release-prep\.mjs/);
   assert.match(
     context,
     /title must be exactly `Renma v<version>`, including the `v` prefix/,
@@ -63,7 +63,7 @@ test("release-prep delegates npm publication to tag-triggered GitHub Actions", (
     /ask separately for permission to write the approved content to GitHub/,
   );
   assert.match(
-    skill,
+    context,
     /One approval does not authorize the other|separate explicit approval/,
   );
   assert.match(workflow, /tags:\n {6}- "v\*\.\*\.\*"/);
