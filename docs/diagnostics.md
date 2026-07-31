@@ -570,7 +570,9 @@ dependency edges.
 Bounded inline helper recognition does not add a diagnostic family. A
 single-line mdast inline-code command immediately after the exact visible
 paragraph cue `Run` or `Run:` contributes the same invocation evidence as a
-fenced helper command. Unsupported inline prose, ordinary code spans,
+fenced helper command only when the cue is structurally textual. Link labels,
+image alt text, inline code, non-comment HTML, and other unsupported nodes
+cannot establish the cue. Unsupported inline prose, ordinary code spans,
 blockquotes, other verbs or languages, and secondary spans are silently outside
 the grammar; Renma does not diagnose their non-recognition. Recognized missing,
 unsafe, unscoped, non-canonical, or unavailable inline targets retain existing

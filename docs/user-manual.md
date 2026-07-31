@@ -888,8 +888,13 @@ direct mdast parent must be a paragraph, and the visible paragraph text before
 the code span must normalize to exactly case-sensitive `Run` or `Run:`.
 Top-level, ordered-list, unordered-list, and nested-list paragraphs qualify,
 including a soft source wrap between the cue and code span. Harmless formatting
-of the cue may qualify when its visible text remains exactly `Run`, but the
-command span itself must still be a direct paragraph child.
+of the cue with emphasis or strong may qualify when it contains only allowed
+textual cue content and its visible text remains exactly `Run`. Markdown line
+breaks are whitespace and HTML comments may be ignored. Links, images, inline
+code, non-comment HTML, reference-like nodes, and unsupported descendants
+cannot contribute cue text; in particular, a link label or image alt value of
+`Run` is not an imperative cue. The command span itself must still be a direct
+paragraph child.
 
 Headings, blockquotes, linked commands, emphasized or strongly formatted
 command spans, frontmatter, HTML-comment examples, multiline code spans, and

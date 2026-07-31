@@ -43,8 +43,18 @@ test("recognizes bounded inline Run helper invocations in eligible paragraphs", 
       expectedLine: 2,
     },
     {
-      name: "formatted visible cue",
+      name: "strong visible cue",
       source: `**Run** \`${command}\`.`,
+      expectedLine: 1,
+    },
+    {
+      name: "emphasized visible cue",
+      source: `*Run* \`${command}\`.`,
+      expectedLine: 1,
+    },
+    {
+      name: "comment-separated visible cue",
+      source: `Run <!-- explanation --> \`${command}\`.`,
       expectedLine: 1,
     },
   ] as const;
@@ -55,6 +65,20 @@ test("recognizes bounded inline Run helper invocations in eligible paragraphs", 
     assert.equal(evidence[0]?.snippet, command, fixture.name);
     assert.equal(evidence[0]?.line, fixture.expectedLine, fixture.name);
     assert.equal(evidence[0]?.rawTarget, "tools/check.mjs", fixture.name);
+  }
+});
+
+test("requires a structurally textual inline Run cue", () => {
+  const rejected = [
+    `[Run](https://example.com) \`${command}\`.`,
+    `![Run](run.png) \`${command}\`.`,
+    `**[Run](https://example.com)** \`${command}\`.`,
+    `Run ![](separator.png) \`${command}\`.`,
+    `Run <span></span> \`${command}\`.`,
+  ];
+
+  for (const source of rejected) {
+    assert.equal(collect(source).length, 0, source);
   }
 });
 
@@ -192,6 +216,14 @@ test("keeps fenced evidence stable and orders mixed occurrences deterministicall
       { line: 4, snippet: command },
     ],
   );
+  const deterministicSource = [
+    "**Run** `node tools/a.mjs`.",
+    "",
+    "```sh",
+    "node tools/b.mjs",
+    "```",
+  ].join("\n");
+  assert.deepEqual(collect(deterministicSource), collect(deterministicSource));
 });
 
 test("recognized inline targets retain exact resolution states", () => {

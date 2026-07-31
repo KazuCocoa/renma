@@ -490,10 +490,15 @@ heading, link, emphasis, strong, and other non-paragraph direct parents.
 
 Inline collection consumes `MarkdownSyntax` already attached by
 `parseDocument()`. It traverses the retained node records once, converts mdast
-positions through the shared body offset, and derives visible cue text through
-the shared node-text projection. It does not scan raw lines for backticks,
-reparse normal snapshot documents, or add inline-code projections to
-`ParsedDocument`.
+positions through the shared body offset, and validates the cue structure
+before deriving its text. Cue children may be text, emphasis or strong
+containers composed only of allowed cue children, Markdown line breaks, or
+HTML comments ignored consistently with shared Markdown text semantics. Links,
+images, inline code, non-comment HTML, reference-like nodes, and every other
+unsupported node reject the candidate, including when nested inside an allowed
+container. Link labels and image alt text therefore cannot establish the
+imperative cue. Collection does not scan raw lines for backticks, reparse normal
+snapshot documents, or add inline-code projections to `ParsedDocument`.
 
 Fenced and inline collectors both pass their complete command snippet through
 one evidence constructor. Launcher matching, `helperScriptPath()`, owning-Skill

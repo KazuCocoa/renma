@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { PhrasingContent } from "mdast";
 
 import {
   classifyRepositorySkillPath,
@@ -6,7 +7,6 @@ import {
 } from "./discovery.js";
 import {
   ensureMarkdownSyntaxForDocument,
-  markdownNodeText,
   markdownSourceColumnRange,
 } from "./markdown-syntax.js";
 import type { RepositoryPathState } from "./repository-paths.js";
@@ -272,12 +272,11 @@ function collectInlineRunHelperCommandEvidence(
     }
     const range = markdownSourceColumnRange(record.node, syntax.bodyStartLine);
     if (range.startLine !== range.endLine) return [];
-    const visiblePrefix = record.parent.children
-      .slice(0, record.index)
-      .map(markdownNodeText)
-      .join("")
-      .replace(/\s+/g, " ")
-      .trim();
+    const cueText = inlineRunCueText(
+      record.parent.children.slice(0, record.index),
+    );
+    if (cueText === undefined) return [];
+    const visiblePrefix = cueText.replace(/\s+/g, " ").trim();
     if (visiblePrefix !== "Run" && visiblePrefix !== "Run:") return [];
 
     const evidence = helperCommandEvidenceFromSnippet(
@@ -287,6 +286,41 @@ function collectInlineRunHelperCommandEvidence(
     );
     return evidence ? [evidence] : [];
   });
+}
+
+function inlineRunCueText(
+  nodes: readonly PhrasingContent[],
+): string | undefined {
+  let result = "";
+  for (const node of nodes) {
+    let text: string | undefined;
+    switch (node.type) {
+      case "text":
+        text = node.value;
+        break;
+      case "break":
+        text = " ";
+        break;
+      case "html":
+        text = node.value.trimStart().startsWith("<!--") ? "" : undefined;
+        break;
+      case "emphasis":
+      case "strong":
+        text = inlineRunCueText(node.children);
+        break;
+      case "delete":
+      case "footnoteReference":
+      case "image":
+      case "imageReference":
+      case "inlineCode":
+      case "link":
+      case "linkReference":
+        return undefined;
+    }
+    if (text === undefined) return undefined;
+    result += text;
+  }
+  return result;
 }
 
 function compareHelperCommandEvidence(
