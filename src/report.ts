@@ -1,6 +1,7 @@
 import type { ScanResult } from "./types/scan-result.js";
 import type {
   ExecutableSurfaceEntry,
+  ExecutableSurfaceDependency,
   ExecutableSurfaceInventory,
   ExecutableSurfaceInvocation,
 } from "./executable-surface-inventory.js";
@@ -13,6 +14,7 @@ interface ExecutableSurfaceTextReview {
   requiresReview: boolean;
   surfacePaths: string[];
   invocations: ExecutableSurfaceInvocation[];
+  dependencies: ExecutableSurfaceDependency[];
 }
 
 /** Format one complete JSON document with two-space indentation and one newline. */
@@ -128,6 +130,15 @@ export function formatExecutableSurfaceInventoryText(
       ...formatExecutableSurfaceTextOverflow(review.invocations.length),
     );
   }
+  if (review.dependencies.length > 0) {
+    lines.push(
+      "  Review dependencies:",
+      ...review.dependencies
+        .slice(0, EXECUTABLE_SURFACE_TEXT_LIMIT)
+        .map(formatExecutableDependencyReviewRow),
+      ...formatExecutableSurfaceTextOverflow(review.dependencies.length),
+    );
+  }
   return lines;
 }
 
@@ -137,9 +148,9 @@ function formatExecutableSurfaceCompactSummary(
   const summary = inventory.summary;
   if (summary.totalSurfaces === 0) return "Executable surfaces: 0";
   if (summary.totalInvocations === 0) {
-    return `Executable surfaces: ${summary.totalSurfaces}; no recognized invocations`;
+    return `Executable surfaces: ${summary.totalSurfaces}; no recognized invocations; ${summary.transitivelyReachableSurfaces} transitively reachable`;
   }
-  return `Executable surfaces: ${summary.totalSurfaces}; invocations ${summary.resolvedInvocations}/${summary.totalInvocations} resolved; invocation-context policy evidence ${summary.invocationsWithEffectivePolicyEvidence}/${summary.totalInvocations}`;
+  return `Executable surfaces: ${summary.totalSurfaces}; static reachability ${summary.directlyInvokedSurfaces} direct, ${summary.transitivelyReachableSurfaces} transitive; invocations ${summary.resolvedInvocations}/${summary.totalInvocations} resolved; invocation-context policy evidence ${summary.invocationsWithEffectivePolicyEvidence}/${summary.totalInvocations}`;
 }
 
 function executableSurfaceTextReview(
@@ -148,6 +159,9 @@ function executableSurfaceTextReview(
   const reviewInvocations = inventory.invocations
     .filter(invocationRequiresExecutableSurfaceReview)
     .sort(compareExecutableSurfaceReviewInvocations);
+  const reviewDependencies = inventory.dependencies
+    .filter((dependency) => dependency.resolution !== "resolved")
+    .sort(compareExecutableSurfaceReviewDependencies);
   const surfacePaths = new Set(
     inventory.surfaces
       .filter(surfaceRequiresExecutableSurfaceReview)
@@ -169,9 +183,12 @@ function executableSurfaceTextReview(
   );
   return {
     requiresReview:
-      orderedSurfacePaths.length > 0 || reviewInvocations.length > 0,
+      orderedSurfacePaths.length > 0 ||
+      reviewInvocations.length > 0 ||
+      reviewDependencies.length > 0,
     surfacePaths: orderedSurfacePaths,
     invocations: reviewInvocations,
+    dependencies: reviewDependencies,
   };
 }
 
@@ -212,6 +229,32 @@ function formatExecutableInvocationReviewRow(
 ): string {
   const target = invocation.normalizedTarget ?? invocation.rawTarget;
   return `  - ${invocation.sourcePath}:L${invocation.line} ${invocation.launcher} ${target} [resolution ${invocation.resolution}; invocation-context policy evidence ${invocation.governance.hasEffectivePolicyEvidence ? "with" : "without"}; policy-variants ${invocation.governance.distinctEffectivePolicyFingerprints.length}; owning-skill ${invocation.governance.owningSkillResolution}]`;
+}
+
+function formatExecutableDependencyReviewRow(
+  dependency: ExecutableSurfaceDependency,
+): string {
+  const candidates = dependency.normalizedTargetCandidates.join(", ");
+  const target =
+    dependency.normalizedTarget ?? (candidates || dependency.rawSpecifier);
+  return `  - ${dependency.sourcePath}:L${dependency.line} ${dependency.analyzer} ${dependency.relation} ${target} [resolution ${dependency.resolution}]`;
+}
+
+function compareExecutableSurfaceReviewDependencies(
+  left: ExecutableSurfaceDependency,
+  right: ExecutableSurfaceDependency,
+): number {
+  return (
+    left.sourcePath.localeCompare(right.sourcePath) ||
+    left.line - right.line ||
+    left.analyzer.localeCompare(right.analyzer) ||
+    left.relation.localeCompare(right.relation) ||
+    (
+      left.normalizedTarget ?? left.normalizedTargetCandidates.join("\0")
+    ).localeCompare(
+      right.normalizedTarget ?? right.normalizedTargetCandidates.join("\0"),
+    )
+  );
 }
 
 function compareExecutableSurfaceReviewInvocations(

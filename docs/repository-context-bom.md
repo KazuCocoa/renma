@@ -131,27 +131,43 @@ path-identified surface rows, line-level invocation rows, content and inventory
 fingerprints, reachability depth, interpreter hints, and bounded effective
 policy correlation are complete in JSON. Current output also includes
 invocation governance on every invocation and an invocation-governance
-aggregate on every surface. Surface policy evidence remains separate and is
-never replaced by caller evidence.
+aggregate on every surface, complete executable dependency rows, and strict
+per-surface incoming/outgoing and direct/transitive/unreached summaries.
+Surface policy evidence remains separate and is never replaced by caller or
+dependency evidence.
 
 Invocation governance retains prepared `source-artifact` and `owning-skill`
 policy relationships without merging fields or applying precedence. Its
 effective fingerprints are a sorted set of visible variants, not conflicts or
 safety verdicts. The Markdown BOM renders separate surface-policy,
 invocation-context-policy, and multiple-variant summaries plus compact
-per-surface counts; it does not print complete fingerprints. Surface rows are
-sorted by repository path; invocation rows are sorted by source path, line,
-launcher, and target.
+per-surface dependency counts and compact dependency rows; it does not print
+complete fingerprints or source content. Surface rows are sorted by repository
+path; invocation rows are sorted by source path, line, launcher, and target;
+dependency rows are sorted by source path, line, analyzer, relation, target
+candidates, and raw specifier.
+
+Repeated declarations, including identical declarations on one source line,
+remain separate dependency rows and contribute separately to dependency
+totals. Public BOM evidence exposes their shared line and distinct occurrence
+ordinals, not the private source offsets used during collection. Per-surface
+incoming/outgoing counts and static reachability instead use one canonical
+graph edge for each unique source path and normalized target among `resolved`
+and `noncanonical` rows. Import and re-export syntax for the same source-target
+pair therefore stays auditable without multiplying graph topology.
 
 BOM consumers must first branch on the presence of
 `executableSurfaceInventory`, then inspect its nested `schema` identifier
 before consuming its nested fields. The inventory remains additive v1 and BOM
 remains v2. For compatibility with Renma 0.27.0, the new summary counts,
 surface `invocationGovernance`, and invocation `governance` fields are optional
-in the published schema. Current Renma output emits them unconditionally.
-Whenever a new governance object is present, all of its nested fields are
-required and unknown nested fields are rejected. Existing inventory fields
-retain their established requirements.
+in the published schema. Executable `dependencies`, new dependency summary
+counts, and surface `dependencyEvidence` are likewise optional for earlier
+0.27.x BOM compatibility. Current Renma output emits all of them
+unconditionally. Whenever a new governance, dependency, analyzer-count,
+relation-count, or dependency-summary object is present, all of its nested
+fields are required and unknown nested fields are rejected. Existing inventory
+fields retain their established requirements.
 
 The Readiness summary is a closed contract for asset, ownership, graph,
 diagnostic, workflow, Context Lens, security posture, and security policy
@@ -176,7 +192,7 @@ the schema defines every nested field):
   "readiness": { "score": 100, "level": "ready", "checks": [], "summary": {} },
   "securityPosture": { "totalSecurityFindings": 0, "riskClasses": { "violation": 0, "suspicious": 0, "advisory": 0, "unclassified": 0 }, "severities": { "critical": 0, "high": 0, "medium": 0, "low": 0 }, "highOrCritical": 0, "topFindingIds": [] },
   "securityPolicyInventory": {},
-  "executableSurfaceInventory": { "schema": "renma.executable-surface-inventory.v1", "summary": {}, "surfaces": [], "invocations": [] },
+  "executableSurfaceInventory": { "schema": "renma.executable-surface-inventory.v1", "summary": {}, "surfaces": [], "invocations": [], "dependencies": [] },
   "diagnostics": []
 }
 ```
@@ -197,7 +213,9 @@ BOM v2 provenance is deliberately repository-local:
 - lifecycle, dependency, diagnostic, readiness, security posture, security policy inventory, and executable-surface evidence.
 
 Executable-surface evidence is static repository visibility, not a claim about
-runtime use or safety. It does not execute files, follow symbolic links, inspect
+runtime use or safety. Static dependency reachability does not prove runtime
+execution, and an uninvoked surface is not necessarily unused. It does not
+execute files, follow symbolic links, inspect
 permission bits, or scan package manifests, GitHub Actions, Dockerfiles, Git
 hooks, remote scripts, ordinary external commands, or unrelated repository
 files. Such sources remain intentionally unsupported in this inventory slice.

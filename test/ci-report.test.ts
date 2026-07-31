@@ -21,6 +21,7 @@ import { zeroContextLensSummary } from "../src/context-lens.js";
 import { buildExecutableSurfaceDiff } from "../src/executable-surface-diff.js";
 import {
   summarizeExecutableSurfaceInventory,
+  type ExecutableSurfaceDependency,
   type ExecutableSurfaceInventory,
   zeroExecutableSurfaceInventory,
 } from "../src/executable-surface-inventory.js";
@@ -279,6 +280,72 @@ test("formatCiReport reports newly added multi-fingerprint invocations with boun
   assert.doesNotThrow(() =>
     formatCiReport(legacyReport as unknown as CiReportFormatInput, "markdown"),
   );
+});
+
+test("formatCiReport renders bounded neutral executable dependency changes without changing the verdict", () => {
+  const report = sampleReport();
+  const baselineStatus = report.status;
+  const from = zeroExecutableSurfaceInventory();
+  const to = zeroExecutableSurfaceInventory();
+  to.dependencies = Array.from({ length: 12 }, (_, index) =>
+    dependency({
+      line: index + 1,
+      target: `tools/missing-${String(index + 1).padStart(2, "0")}.mjs`,
+      resolution: "missing",
+    }),
+  );
+  to.summary = summarizeExecutableSurfaceInventory(
+    to.surfaces,
+    to.invocations,
+    to.dependencies,
+  );
+  report.diff.executableSurface = buildExecutableSurfaceDiff(from, to);
+
+  const markdown = formatCiReport(report, "markdown");
+  const parsed = JSON.parse(formatCiReport(report, "json")) as CiReport;
+  assert.match(markdown, /- Dependencies: 0 -> 12 \(\+12\)/);
+  assert.match(markdown, /- New dependency evidence for review: 12/);
+  assert.match(
+    markdown,
+    /^### New executable dependency evidence for review$/m,
+  );
+  assert.match(markdown, /2 more not shown; see JSON for the full list/);
+  assert.doesNotMatch(markdown, /missing-11\.mjs|missing-12\.mjs/);
+  assert.doesNotMatch(
+    markdown,
+    /vulnerable|unsafe code|unprotected|noncompliant|policy violation/i,
+  );
+  assert.equal(
+    parsed.diff.executableSurface.newProblematicDependencies.length,
+    12,
+  );
+  assert.equal(report.status, baselineStatus);
+
+  const resolved = zeroExecutableSurfaceInventory();
+  resolved.dependencies = [
+    dependency({ target: "tools/helper.mjs", resolution: "resolved" }),
+  ];
+  resolved.summary = summarizeExecutableSurfaceInventory(
+    resolved.surfaces,
+    resolved.invocations,
+    resolved.dependencies,
+  );
+  const missing = structuredClone(resolved);
+  missing.dependencies[0]!.resolution = "missing";
+  missing.dependencies[0]!.targetPathState = "absent";
+  missing.summary = summarizeExecutableSurfaceInventory(
+    missing.surfaces,
+    missing.invocations,
+    missing.dependencies,
+  );
+  report.diff.executableSurface = buildExecutableSurfaceDiff(resolved, missing);
+  const resolutionMarkdown = formatCiReport(report, "markdown");
+  assert.match(
+    resolutionMarkdown,
+    /^### Executable dependency resolution changes$/m,
+  );
+  assert.match(resolutionMarkdown, /resolved -> missing/);
+  assert.equal(report.status, baselineStatus);
 });
 
 test("formatCiReport includes security posture summaries", () => {
@@ -1707,6 +1774,26 @@ function inventoryWithInvocations(
     inventory.invocations,
   );
   return inventory;
+}
+
+function dependency(options: {
+  target: string;
+  resolution: ExecutableSurfaceDependency["resolution"];
+  line?: number;
+}): ExecutableSurfaceDependency {
+  return {
+    analyzer: "js-ts",
+    sourcePath: "tools/check.mjs",
+    line: options.line ?? 1,
+    snippet: `import "./${options.target.split("/").at(-1)}"`,
+    relation: "static-import",
+    rawSpecifier: `./${options.target.split("/").at(-1)}`,
+    normalizedTargetCandidates: [options.target],
+    normalizedTarget: options.target,
+    resolution: options.resolution,
+    targetPathState: options.resolution === "missing" ? "absent" : "parsed",
+    occurrenceOrdinal: 1,
+  };
 }
 
 function completeDiffReport(discovery: CiReport["skillDiscovery"]): DiffReport {

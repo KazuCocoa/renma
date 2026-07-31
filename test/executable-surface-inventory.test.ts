@@ -294,7 +294,7 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
   assert.match(text, /Executable Surface Review/);
   assert.match(
     text,
-    /Executable surfaces: \d+; invocations 4\/9 resolved; invocation-context policy evidence 8\/9/,
+    /Executable surfaces: \d+; static reachability 3 direct, 0 transitive; invocations 4\/9 resolved; invocation-context policy evidence 8\/9/,
   );
   assert.match(
     text,

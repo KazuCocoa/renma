@@ -11,6 +11,7 @@ import type { Artifact } from "./types/artifact.js";
 import type { ParsedDocument } from "./types/metadata.js";
 import type { ScanConfig } from "./types/configuration.js";
 import { safeRepositoryPath } from "./repository-boundary.js";
+import type { ExecutableDependencyCandidate } from "./executable-dependency-analyzer.js";
 
 export {
   helperScriptPath,
@@ -35,6 +36,7 @@ export async function collectRepositoryPaths(
   documents: ParsedDocument[],
   catalog: Catalog,
   discoveredPaths: ReadonlySet<string> = new Set(),
+  executableDependencyCandidates: readonly ExecutableDependencyCandidate[] = [],
 ): Promise<ReadonlySet<string>> {
   const paths = new Set<string>(
     [...discoveredPaths, ...artifacts.map((artifact) => artifact.path)]
@@ -42,7 +44,11 @@ export async function collectRepositoryPaths(
       .filter((candidate): candidate is string => candidate !== undefined),
   );
 
-  for (const candidate of repositoryPathCandidates(documents, catalog)) {
+  for (const candidate of repositoryPathCandidates(
+    documents,
+    catalog,
+    executableDependencyCandidates,
+  )) {
     if (paths.has(candidate)) continue;
     if (await repositoryPathExists(root, candidate)) paths.add(candidate);
   }
@@ -53,6 +59,7 @@ export async function collectRepositoryPaths(
 export function repositoryPathCandidates(
   documents: ParsedDocument[],
   catalog: Catalog,
+  executableDependencyCandidates: readonly ExecutableDependencyCandidate[] = [],
 ): string[] {
   return [
     ...helperCommandPathCandidates(documents),
@@ -62,6 +69,9 @@ export function repositoryPathCandidates(
       .map(normalizeRepositoryPath)
       .filter((candidate): candidate is string => candidate !== undefined)
       .filter(isRepoPathLike),
+    ...executableDependencyCandidates.flatMap(
+      (candidate) => candidate.normalizedTargetCandidates,
+    ),
   ].filter(
     (candidate, index, candidates) => candidates.indexOf(candidate) === index,
   );

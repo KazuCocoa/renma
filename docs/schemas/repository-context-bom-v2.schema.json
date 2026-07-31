@@ -632,6 +632,10 @@
         "invocations": {
           "type": "array",
           "items": { "$ref": "#/$defs/executableSurfaceInvocation" }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/executableSurfaceDependency" }
         }
       }
     },
@@ -718,6 +722,61 @@
           "properties": {
             "sourceArtifact": { "$ref": "#/$defs/nonNegativeInteger" },
             "owningSkill": { "$ref": "#/$defs/nonNegativeInteger" }
+          }
+        },
+        "totalDependencies": { "$ref": "#/$defs/nonNegativeInteger" },
+        "resolvedDependencies": { "$ref": "#/$defs/nonNegativeInteger" },
+        "missingDependencies": { "$ref": "#/$defs/nonNegativeInteger" },
+        "unsafeDependencies": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ambiguousDependencies": { "$ref": "#/$defs/nonNegativeInteger" },
+        "noncanonicalDependencies": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "notInventoryDependencies": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "unavailableDependencies": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "surfacesWithIncomingDependencies": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "surfacesWithOutgoingDependencies": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "directlyInvokedSurfaces": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "transitivelyReachableSurfaces": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "unreachedFromInvocationSurfaces": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "dependencyAnalyzers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["analyzer", "count"],
+            "properties": {
+              "analyzer": { "enum": ["js-ts", "python"] },
+              "count": { "$ref": "#/$defs/nonNegativeInteger" }
+            }
+          }
+        },
+        "dependencyRelations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["relation", "count"],
+            "properties": {
+              "relation": {
+                "enum": ["static-import", "static-reexport"]
+              },
+              "count": { "$ref": "#/$defs/nonNegativeInteger" }
+            }
           }
         },
         "interpreterHints": {
@@ -825,7 +884,91 @@
         "invocationGovernance": {
           "$ref": "#/$defs/executableSurfaceInvocationGovernanceSummary"
         },
+        "dependencyEvidence": {
+          "$ref": "#/$defs/executableSurfaceDependencySummary"
+        },
         "fingerprint": { "type": "string" }
+      }
+    },
+    "executableSurfaceDependencySummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "incomingResolvedDependencyCount",
+        "outgoingResolvedDependencyCount",
+        "staticInvocationReachability"
+      ],
+      "properties": {
+        "incomingResolvedDependencyCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "outgoingResolvedDependencyCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "staticInvocationReachability": {
+          "enum": ["direct", "transitive", "unreached"]
+        },
+        "minimumInvocationDependencyDepth": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        }
+      }
+    },
+    "executableSurfaceDependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "analyzer",
+        "sourcePath",
+        "line",
+        "snippet",
+        "relation",
+        "rawSpecifier",
+        "normalizedTargetCandidates",
+        "resolution",
+        "occurrenceOrdinal"
+      ],
+      "properties": {
+        "analyzer": { "enum": ["js-ts", "python"] },
+        "sourcePath": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "snippet": { "type": "string", "maxLength": 240 },
+        "relation": { "enum": ["static-import", "static-reexport"] },
+        "rawSpecifier": { "type": "string" },
+        "normalizedTargetCandidates": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "normalizedTarget": { "type": "string" },
+        "resolution": {
+          "enum": [
+            "resolved",
+            "missing",
+            "unsafe",
+            "ambiguous",
+            "noncanonical",
+            "not-inventory",
+            "excluded",
+            "deep",
+            "oversize",
+            "unsupported",
+            "symlink",
+            "unreadable"
+          ]
+        },
+        "targetPathState": {
+          "enum": [
+            "parsed",
+            "excluded",
+            "oversize",
+            "deep",
+            "unsupported",
+            "symlink",
+            "unreadable",
+            "absent"
+          ]
+        },
+        "occurrenceOrdinal": { "type": "integer", "minimum": 1 }
       }
     },
     "executableSurfaceInvocation": {

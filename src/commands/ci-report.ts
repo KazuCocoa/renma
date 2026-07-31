@@ -44,12 +44,26 @@ export type CiReportFormat = DiffFormat;
 export type CiReportStatus = "pass" | "warn" | "fail";
 type CiCompatibleExecutableSurfaceDiff = Omit<
   ExecutableSurfaceDiff,
-  "newInvocationsWithMultipleEffectivePolicyFingerprints"
+  | "newInvocationsWithMultipleEffectivePolicyFingerprints"
+  | "addedDependencies"
+  | "removedDependencies"
+  | "dependencyResolutionChanges"
+  | "newProblematicDependencies"
+  | "newlyTransitivelyReachableSurfacePaths"
+  | "surfacesLostStaticInvocationReachability"
+  | "invocationDependencyDepthChanges"
 > &
   Partial<
     Pick<
       ExecutableSurfaceDiff,
-      "newInvocationsWithMultipleEffectivePolicyFingerprints"
+      | "newInvocationsWithMultipleEffectivePolicyFingerprints"
+      | "addedDependencies"
+      | "removedDependencies"
+      | "dependencyResolutionChanges"
+      | "newProblematicDependencies"
+      | "newlyTransitivelyReachableSurfacePaths"
+      | "surfacesLostStaticInvocationReachability"
+      | "invocationDependencyDepthChanges"
     >
   >;
 type CiFormatCompatibleDiffReport = Omit<
@@ -398,11 +412,30 @@ function formatExecutableSurfaceChanges(
   const multiple =
     executableSurface.invocationGovernanceChangesWithMultipleEffectivePolicyFingerprints ??
     [];
+  const dependencyResolutionChanges =
+    executableSurface.dependencyResolutionChanges ?? [];
+  const newProblematicDependencies =
+    executableSurface.newProblematicDependencies ?? [];
+  const newlyTransitive =
+    executableSurface.newlyTransitivelyReachableSurfacePaths ?? [];
+  const lostReachability =
+    executableSurface.surfacesLostStaticInvocationReachability ?? [];
+  const analyzerCounts =
+    executableSurface.toSummary.dependencyAnalyzers
+      ?.map(({ analyzer, count }) => `${analyzer} ${count}`)
+      .join(", ") || "none";
   const lines = [
     `- Total surfaces: ${executableSurface.fromSummary.totalSurfaces} -> ${executableSurface.toSummary.totalSurfaces} (${formatDelta(executableSurface.summary.totalSurfacesDelta)})`,
     `- Added surfaces: ${executableSurface.addedSurfacePaths.length}`,
     `- Removed surfaces: ${executableSurface.removedSurfacePaths.length}`,
     `- Changed surfaces: ${executableSurface.changedSurfaces.length}`,
+    `- Dependencies: ${executableSurface.fromSummary.totalDependencies ?? 0} -> ${executableSurface.toSummary.totalDependencies ?? 0} (${formatDelta(executableSurface.summary.totalDependenciesDelta ?? 0)})`,
+    `- Resolved dependencies: ${executableSurface.fromSummary.resolvedDependencies ?? 0} -> ${executableSurface.toSummary.resolvedDependencies ?? 0} (${formatDelta(executableSurface.summary.resolvedDependenciesDelta ?? 0)})`,
+    `- Dependency analyzers: ${analyzerCounts}`,
+    `- New dependency evidence for review: ${newProblematicDependencies.length}`,
+    `- Dependency resolution changes: ${dependencyResolutionChanges.length}`,
+    `- Newly transitively reachable surfaces: ${newlyTransitive.length}`,
+    `- Surfaces that lost static invocation reachability: ${lostReachability.length}`,
     `- New problematic invocation evidence: ${executableSurface.newProblematicInvocations.length}`,
     `- Invocation-context policy evidence: ${executableSurface.fromSummary.invocationsWithEffectivePolicyEvidence ?? 0} -> ${executableSurface.toSummary.invocationsWithEffectivePolicyEvidence ?? 0} (${formatDelta(executableSurface.summary.invocationsWithEffectivePolicyEvidenceDelta ?? 0)})`,
     `- Resolved invocation policy evidence: ${executableSurface.fromSummary.resolvedInvocationsWithEffectivePolicyEvidence ?? 0} -> ${executableSurface.toSummary.resolvedInvocationsWithEffectivePolicyEvidence ?? 0} (${formatDelta(executableSurface.summary.resolvedInvocationsWithEffectivePolicyEvidenceDelta ?? 0)})`,
@@ -465,6 +498,35 @@ function formatExecutableSurfaceChanges(
       ...formatOverflow(executableSurface.newProblematicInvocations.length),
     );
   }
+  appendDependencyDeltas(
+    lines,
+    "New executable dependency evidence for review",
+    newProblematicDependencies,
+  );
+  if (dependencyResolutionChanges.length > 0) {
+    lines.push(
+      "",
+      "### Executable dependency resolution changes",
+      "",
+      ...dependencyResolutionChanges
+        .slice(0, MAX_LIST_ITEMS)
+        .map(
+          (dependency) =>
+            `- \`${dependency.sourcePath}:L${dependency.toLine}\` ${dependency.analyzer} ${dependency.relation} \`${dependency.target}\`: ${dependency.fromResolution} -> ${dependency.toResolution}`,
+        ),
+      ...formatOverflow(dependencyResolutionChanges.length),
+    );
+  }
+  appendSurfacePaths(
+    lines,
+    "Newly transitively reachable executable surfaces",
+    newlyTransitive,
+  );
+  appendSurfacePaths(
+    lines,
+    "Executable surfaces that lost static invocation reachability",
+    lostReachability,
+  );
   appendInvocationGovernanceDeltas(
     lines,
     "New invocations without effective policy evidence",
@@ -487,6 +549,45 @@ function formatExecutableSurfaceChanges(
     multiple,
   );
   return lines;
+}
+
+function appendDependencyDeltas(
+  lines: string[],
+  heading: string,
+  dependencies: NonNullable<
+    CiCompatibleExecutableSurfaceDiff["newProblematicDependencies"]
+  >,
+): void {
+  if (dependencies.length === 0) return;
+  lines.push(
+    "",
+    `### ${heading}`,
+    "",
+    ...dependencies
+      .slice(0, MAX_LIST_ITEMS)
+      .map(
+        (dependency) =>
+          `- \`${dependency.sourcePath}:L${dependency.line}\` ${dependency.analyzer} ${dependency.relation} \`${dependency.target}\`: ${dependency.resolution}`,
+      ),
+    ...formatOverflow(dependencies.length),
+  );
+}
+
+function appendSurfacePaths(
+  lines: string[],
+  heading: string,
+  surfacePaths: readonly string[],
+): void {
+  if (surfacePaths.length === 0) return;
+  lines.push(
+    "",
+    `### ${heading}`,
+    "",
+    ...surfacePaths
+      .slice(0, MAX_LIST_ITEMS)
+      .map((surfacePath) => `- \`${surfacePath}\``),
+    ...formatOverflow(surfacePaths.length),
+  );
 }
 
 function appendNewMultipleFingerprintInvocations(

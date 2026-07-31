@@ -19,6 +19,10 @@ import {
   buildExecutableSurfaceInventory,
   type ExecutableSurfaceInventory,
 } from "./executable-surface-inventory.js";
+import {
+  collectExecutableDependencyCandidates,
+  type ExecutableDependencyCandidate,
+} from "./executable-dependency-analyzer.js";
 import { buildClassificationEvidenceIndex } from "./evidence/classification.js";
 import { parseDocument } from "./markdown.js";
 import type { Catalog } from "./model.js";
@@ -50,6 +54,7 @@ export interface RepositorySnapshotCore {
   readonly documents: ParsedDocument[];
   readonly discoveredPaths: ReadonlySet<string>;
   readonly discoveryDiagnostics: Diagnostic[];
+  readonly executableDependencyCandidates: ExecutableDependencyCandidate[];
 }
 
 type SnapshotObject = Record<PropertyKey, unknown>;
@@ -182,6 +187,10 @@ export async function collectRepositorySnapshotCore(
     instrumentation?.onDocumentParse?.(artifact.path);
     return parseDocument(artifact);
   });
+  const executableDependencyCandidates = collectExecutableDependencyCandidates(
+    artifacts,
+    documents,
+  );
   return immutableEvidenceGraph({
     root,
     config,
@@ -190,6 +199,7 @@ export async function collectRepositorySnapshotCore(
     documents,
     discoveredPaths,
     discoveryDiagnostics,
+    executableDependencyCandidates,
   });
 }
 
@@ -212,12 +222,17 @@ export async function collectRepositorySnapshot(
     core.documents,
     catalog.catalog,
     core.discoveredPaths,
+    core.executableDependencyCandidates,
   );
   const repositoryPathStates = await collectRepositoryPathStates(
     core.root,
     [
       ...repositoryPaths,
-      ...repositoryPathCandidates(core.documents, catalog.catalog),
+      ...repositoryPathCandidates(
+        core.documents,
+        catalog.catalog,
+        core.executableDependencyCandidates,
+      ),
     ],
     core.artifacts,
     core.config,
@@ -343,6 +358,7 @@ function createRepositorySnapshot(
         repositoryPathStates,
         skillParents: projections.catalog().skillParents,
         securityPolicies: projections.securityPolicies(),
+        dependencyCandidates: core.executableDependencyCandidates,
       }),
   );
   return Object.freeze({

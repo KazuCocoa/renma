@@ -63,7 +63,9 @@ export function helperScriptPath(command: string): string | undefined {
   const target = parts.find((part) => !part.startsWith("-"));
   if (!target) return undefined;
 
-  const hasSupportedExtension = /\.(?:mjs|js|cjs|sh|bash|py)$/.test(target);
+  const hasSupportedExtension = /\.(?:mjs|js|cjs|ts|mts|cts|sh|bash|py)$/.test(
+    target,
+  );
   if (!hasSupportedExtension) return undefined;
   const startsAtSupportedRoot = /^(?:(?:\.\.?\/)+)?(?:scripts|tools)\//.test(
     target,
@@ -190,7 +192,7 @@ export function isCanonicalHelperTarget(candidate: string): boolean {
 }
 
 export function hasSupportedHelperExtension(candidate: string): boolean {
-  return /\.(?:mjs|js|cjs|sh|bash|py)$/.test(candidate);
+  return /\.(?:mjs|js|cjs|ts|mts|cts|sh|bash|py)$/.test(candidate);
 }
 
 function repositoryStateResolution(

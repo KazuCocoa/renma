@@ -7,8 +7,12 @@ Renma security diagnostics are deterministic repository checks for agent-facing 
 Renma analyzes the security posture of LLM-facing Markdown instructions and
 metadata. It uses bounded structure-aware recognition for selected commands and
 JavaScript environment/file-access forms, not complete language
-interpretation. It does not analyze script or asset contents as executable
-code; use appropriate SAST and dependency-scanning tools for executable code.
+interpretation. Separately, the reporting-only Executable Surface Inventory
+collects bounded explicit relative static import evidence from eligible JS/TS
+and Python surfaces. That dependency projection does not analyze behavior,
+create security findings, or replace appropriate SAST and dependency-scanning
+tools for executable code. It does not analyze script or asset contents as executable
+code; it records only the documented static import relationship.
 Markdown instructions that direct an agent to reference, fetch, trust, execute,
 or invoke a script or asset remain eligible for diagnostics. Analyze the script
 or asset itself independently with project-selected tools such as ShellCheck,
@@ -766,7 +770,9 @@ fingerprint variants do not add Security Policy Inventory assets or change its
 effective-policy totals. Different effective fingerprints are visibility about
 calling contexts, not a conflict, violation, or proof of safety. Findings,
 Readiness, CI enforcement, policy requirements, and Trust Graph integration are
-deferred.
+deferred. Static executable dependency edges may make that helper transitively
+reachable, but they never propagate, merge, intersect, or union invocation
+policy evidence.
 
 `renma trust-graph` also includes effective policy evidence. Each effective policy node uses a deterministic fingerprint over normalized allowed data, forbidden inputs, network/upload/secrets booleans, human approval requirement, approved destinations, and disallowed commands. Every `has_effective_policy` edge carries a deterministic `policySources` array containing each source that contributed to the fingerprint: `local`, `security_profile`, `repository_config`, and/or `owning_skill`. Owning-Skill inheritance retains `inheritedFrom`, and selected-profile evidence retains the selected profile and profile chain. The graph does not enforce policy at runtime.
 

@@ -8,6 +8,37 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
+- Extended `renma.executable-surface-inventory.v1` with bounded, non-executing
+  static dependency evidence for JavaScript/TypeScript ESM declarations and
+  Python explicit relative imports. A fixed private analyzer boundary emits
+  language-neutral candidates into one Renma-owned repository resolver; no
+  public plugin API, dynamic loading, subprocess analyzer, configuration, or
+  runtime dependency was added.
+- Added deterministic executable dependency resolution, incoming/outgoing edge
+  counts, and breadth-first direct/transitive/unreached invocation
+  reachability with minimum depths and cycle termination. Existing direct
+  invocation counts retain their established meaning, and invocation-context
+  policy does not propagate through dependency edges.
+- Preserved every recognized dependency declaration as an auditable row while
+  deduplicating graph topology by source path and normalized target. Duplicate
+  declarations no longer multiply edge counts, alter reachability or depth, or
+  create dependency-graph diff reasons.
+- Preserved textually identical declarations on the same source line as
+  distinct evidence rows with stable occurrence ordinals, using collection-only
+  source offsets that remain absent from scan and BOM JSON.
+- Excluded declaration-level and pure inline TypeScript type-only named imports
+  and re-exports from runtime dependency evidence. Mixed clauses, default and
+  namespace imports, and bindings literally named `type` remain included.
+- Added complete dependency evidence to scan and BOM output plus
+  line-insensitive semantic diff and bounded neutral CI review. Repository
+  Context BOM remains v2 and the inventory remains v1; new published-schema
+  fields are optional for earlier 0.27.x compatibility and strict when present.
+- Added `.ts`, `.mts`, and `.cts` executable surfaces consistently for
+  Skill-local scripts, repository tools, direct `node` targets, and dependency
+  sources/targets. `.tsx`, `.jsx`, other languages, runtime imports, CommonJS
+  calls, compiler/package/environment resolution, role classification, public
+  plugin loading, findings, Readiness, enforcement, Trust Graph integration,
+  and policy propagation remain deferred.
 - Extended `renma.executable-surface-inventory.v1` with deterministic
   invocation-context governance evidence from already prepared source-artifact
   and owning-Skill policy rows, plus per-surface aggregates, summary counts,

@@ -13,6 +13,18 @@ import {
   type HelperCommandLauncher,
   type HelperInvocationResolution,
 } from "./helper-command-evidence.js";
+import {
+  executableSurfaceArtifacts,
+  type BuiltInExecutableDependencyAnalyzerId,
+  type ExecutableDependencyCandidate,
+  type ExecutableDependencyRelation,
+} from "./executable-dependency-analyzer.js";
+import {
+  canonicalExecutableDependencyGraphEdges,
+  resolveExecutableDependencies,
+  type ExecutableSurfaceDependency,
+  type ExecutableSurfaceDependencyResolution,
+} from "./executable-dependency-resolution.js";
 import type { RepositoryPathState } from "./repository-paths.js";
 import type {
   SecurityPolicyAssetEvidence,
@@ -24,6 +36,15 @@ import {
 } from "./static-support.js";
 import type { Artifact, ArtifactKind } from "./types/artifact.js";
 import type { ParsedDocument } from "./types/metadata.js";
+
+export type {
+  BuiltInExecutableDependencyAnalyzerId,
+  ExecutableDependencyRelation,
+} from "./executable-dependency-analyzer.js";
+export type {
+  ExecutableSurfaceDependency,
+  ExecutableSurfaceDependencyResolution,
+} from "./executable-dependency-resolution.js";
 
 export const EXECUTABLE_SURFACE_INVENTORY_SCHEMA =
   "renma.executable-surface-inventory.v1" as const;
@@ -75,6 +96,18 @@ export interface ExecutableSurfaceInvocationGovernanceSummary {
   distinctEffectivePolicyFingerprints: string[];
 }
 
+export type StaticInvocationReachability =
+  | "direct"
+  | "transitive"
+  | "unreached";
+
+export interface ExecutableSurfaceDependencySummary {
+  incomingResolvedDependencyCount: number;
+  outgoingResolvedDependencyCount: number;
+  staticInvocationReachability: StaticInvocationReachability;
+  minimumInvocationDependencyDepth?: number;
+}
+
 export interface ExecutableSurfaceEntry {
   path: string;
   scope: ExecutableSurfaceScope;
@@ -96,6 +129,7 @@ export interface ExecutableSurfaceEntry {
   invocationCount: number;
   securityPolicy: ExecutableSurfaceSecurityPolicy;
   invocationGovernance: ExecutableSurfaceInvocationGovernanceSummary;
+  dependencyEvidence: ExecutableSurfaceDependencySummary;
   fingerprint: string;
 }
 
@@ -144,6 +178,27 @@ export interface ExecutableSurfaceInventorySummary {
     sourceArtifact: number;
     owningSkill: number;
   };
+  totalDependencies: number;
+  resolvedDependencies: number;
+  missingDependencies: number;
+  unsafeDependencies: number;
+  ambiguousDependencies: number;
+  noncanonicalDependencies: number;
+  notInventoryDependencies: number;
+  unavailableDependencies: number;
+  surfacesWithIncomingDependencies: number;
+  surfacesWithOutgoingDependencies: number;
+  directlyInvokedSurfaces: number;
+  transitivelyReachableSurfaces: number;
+  unreachedFromInvocationSurfaces: number;
+  dependencyAnalyzers: Array<{
+    analyzer: BuiltInExecutableDependencyAnalyzerId;
+    count: number;
+  }>;
+  dependencyRelations: Array<{
+    relation: ExecutableDependencyRelation;
+    count: number;
+  }>;
   interpreterHints: Array<{
     interpreter: string;
     count: number;
@@ -155,6 +210,7 @@ export interface ExecutableSurfaceInventory {
   summary: ExecutableSurfaceInventorySummary;
   surfaces: ExecutableSurfaceEntry[];
   invocations: ExecutableSurfaceInvocation[];
+  dependencies: ExecutableSurfaceDependency[];
 }
 
 export interface ExecutableSurfaceInventoryInput {
@@ -164,6 +220,7 @@ export interface ExecutableSurfaceInventoryInput {
   repositoryPathStates: ReadonlyMap<string, RepositoryPathState>;
   skillParents: SkillParentIndex;
   securityPolicies: readonly SecurityPolicyAssetEvidence[];
+  dependencyCandidates?: readonly ExecutableDependencyCandidate[];
 }
 
 interface StaticSurfaceReference {
@@ -176,35 +233,18 @@ interface StaticSurfaceReference {
 export function buildExecutableSurfaceInventory(
   input: ExecutableSurfaceInventoryInput,
 ): ExecutableSurfaceInventory {
-  const artifactsByPath = new Map(
-    input.artifacts.map((artifact) => [artifact.path, artifact]),
-  );
   const invocations = inventoryInvocations(input);
-  const surfaceArtifacts = new Map<string, Artifact>();
-
-  for (const artifact of input.artifacts) {
-    if (
-      artifact.kind === "script" ||
-      (artifact.path.startsWith("tools/") &&
-        hasSupportedHelperExtension(artifact.path))
-    ) {
-      surfaceArtifacts.set(artifact.path, artifact);
-    }
-  }
-  for (const invocation of invocations) {
-    if (invocation.resolution !== "resolved" || !invocation.normalizedTarget) {
-      continue;
-    }
-    const artifact = artifactsByPath.get(invocation.normalizedTarget);
-    if (artifact) surfaceArtifacts.set(artifact.path, artifact);
-  }
+  const surfaceArtifacts = executableSurfaceArtifacts(
+    input.artifacts,
+    input.documents,
+  );
 
   const staticReferences = collectStaticSurfaceReferences(input);
   const policiesByPath = new Map(
     input.securityPolicies.map((policy) => [policy.path, policy]),
   );
   const reachabilityByPath = collectReachability(input);
-  const surfaces = [...surfaceArtifacts.values()]
+  const baseSurfaces = surfaceArtifacts
     .map((artifact) => {
       const scope = surfaceScope(artifact.path, input.skillParents);
       const matchingInvocations = invocations.filter(
@@ -273,33 +313,59 @@ export function buildExecutableSurfaceInventory(
         securityPolicy,
         invocationGovernance,
       };
-      return {
-        ...state,
-        fingerprint: inventoryFingerprint(state),
-      } satisfies ExecutableSurfaceEntry;
+      return state;
     })
     .sort((left, right) => left.path.localeCompare(right.path));
+  const scopesByPath = new Map(
+    baseSurfaces.map((surface) => [surface.path, surface.scope]),
+  );
+  const dependencies = resolveExecutableDependencies(
+    input.dependencyCandidates ?? [],
+    input.repositoryPathStates,
+    scopesByPath,
+  );
+  const dependencyEvidenceByPath = projectDependencyEvidence(
+    baseSurfaces,
+    dependencies,
+  );
+  const surfaces = baseSurfaces.map((surface) => {
+    const state = {
+      ...surface,
+      dependencyEvidence: dependencyEvidenceByPath.get(surface.path)!,
+    };
+    return {
+      ...state,
+      fingerprint: inventoryFingerprint(state),
+    } satisfies ExecutableSurfaceEntry;
+  });
 
   return {
     schema: EXECUTABLE_SURFACE_INVENTORY_SCHEMA,
-    summary: summarizeExecutableSurfaceInventory(surfaces, invocations),
+    summary: summarizeExecutableSurfaceInventory(
+      surfaces,
+      invocations,
+      dependencies,
+    ),
     surfaces,
     invocations,
+    dependencies,
   };
 }
 
 export function zeroExecutableSurfaceInventory(): ExecutableSurfaceInventory {
   return {
     schema: EXECUTABLE_SURFACE_INVENTORY_SCHEMA,
-    summary: summarizeExecutableSurfaceInventory([], []),
+    summary: summarizeExecutableSurfaceInventory([], [], []),
     surfaces: [],
     invocations: [],
+    dependencies: [],
   };
 }
 
 export function summarizeExecutableSurfaceInventory(
   surfaces: readonly ExecutableSurfaceEntry[],
   invocations: readonly ExecutableSurfaceInvocation[],
+  dependencies: readonly ExecutableSurfaceDependency[] = [],
 ): ExecutableSurfaceInventorySummary {
   const interpreterCounts = new Map<string, number>();
   for (const surface of surfaces) {
@@ -318,6 +384,15 @@ export function summarizeExecutableSurfaceInventory(
     "symlink",
     "unreadable",
   ]);
+  const unavailableDependencies =
+    new Set<ExecutableSurfaceDependencyResolution>([
+      "excluded",
+      "deep",
+      "oversize",
+      "unsupported",
+      "symlink",
+      "unreadable",
+    ]);
   const skillLocal = surfaces.filter(
     (surface) => surface.scope === "skill-local",
   );
@@ -394,6 +469,57 @@ export function summarizeExecutableSurfaceInventory(
       ),
       owningSkill: invocationPolicyRelationCount(invocations, "owning-skill"),
     },
+    totalDependencies: dependencies.length,
+    resolvedDependencies: dependencyResolutionCount(dependencies, "resolved"),
+    missingDependencies: dependencyResolutionCount(dependencies, "missing"),
+    unsafeDependencies: dependencyResolutionCount(dependencies, "unsafe"),
+    ambiguousDependencies: dependencyResolutionCount(dependencies, "ambiguous"),
+    noncanonicalDependencies: dependencyResolutionCount(
+      dependencies,
+      "noncanonical",
+    ),
+    notInventoryDependencies: dependencyResolutionCount(
+      dependencies,
+      "not-inventory",
+    ),
+    unavailableDependencies: dependencies.filter((dependency) =>
+      unavailableDependencies.has(dependency.resolution),
+    ).length,
+    surfacesWithIncomingDependencies: surfaces.filter(
+      (surface) =>
+        surface.dependencyEvidence.incomingResolvedDependencyCount > 0,
+    ).length,
+    surfacesWithOutgoingDependencies: surfaces.filter(
+      (surface) =>
+        surface.dependencyEvidence.outgoingResolvedDependencyCount > 0,
+    ).length,
+    directlyInvokedSurfaces: surfaces.filter(
+      (surface) =>
+        surface.dependencyEvidence.staticInvocationReachability === "direct",
+    ).length,
+    transitivelyReachableSurfaces: surfaces.filter(
+      (surface) =>
+        surface.dependencyEvidence.staticInvocationReachability ===
+        "transitive",
+    ).length,
+    unreachedFromInvocationSurfaces: surfaces.filter(
+      (surface) =>
+        surface.dependencyEvidence.staticInvocationReachability === "unreached",
+    ).length,
+    dependencyAnalyzers: countedDependencies(
+      dependencies,
+      "analyzer",
+    ) as Array<{
+      analyzer: BuiltInExecutableDependencyAnalyzerId;
+      count: number;
+    }>,
+    dependencyRelations: countedDependencies(
+      dependencies,
+      "relation",
+    ) as Array<{
+      relation: ExecutableDependencyRelation;
+      count: number;
+    }>,
     interpreterHints: [...interpreterCounts]
       .map(([interpreter, count]) => ({ interpreter, count }))
       .sort(
@@ -789,6 +915,9 @@ function extensionInterpreter(surfacePath: string): string {
     case ".mjs":
     case ".js":
     case ".cjs":
+    case ".ts":
+    case ".mts":
+    case ".cts":
       return "node";
     case ".bash":
       return "bash";
@@ -882,4 +1011,103 @@ function resolutionCount(
   return invocations.filter(
     (invocation) => invocation.resolution === resolution,
   ).length;
+}
+
+function dependencyResolutionCount(
+  dependencies: readonly ExecutableSurfaceDependency[],
+  resolution: ExecutableSurfaceDependencyResolution,
+): number {
+  return dependencies.filter(
+    (dependency) => dependency.resolution === resolution,
+  ).length;
+}
+
+function countedDependencies(
+  dependencies: readonly ExecutableSurfaceDependency[],
+  key: "analyzer" | "relation",
+): Array<Record<typeof key, string> & { count: number }> {
+  const counts = new Map<string, number>();
+  for (const dependency of dependencies) {
+    const value = dependency[key];
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  return [...counts]
+    .map(([value, count]) => ({ [key]: value, count }))
+    .sort(
+      (left, right) =>
+        right.count - left.count ||
+        String(left[key]).localeCompare(String(right[key])),
+    ) as Array<Record<typeof key, string> & { count: number }>;
+}
+
+function projectDependencyEvidence(
+  surfaces: ReadonlyArray<
+    Pick<ExecutableSurfaceEntry, "path" | "staticallyInvoked">
+  >,
+  dependencies: readonly ExecutableSurfaceDependency[],
+): ReadonlyMap<string, ExecutableSurfaceDependencySummary> {
+  const surfacePaths = new Set(surfaces.map((surface) => surface.path));
+  const incoming = new Map<string, number>();
+  const outgoing = new Map<string, number>();
+  const adjacency = new Map<string, Set<string>>();
+  for (const edge of canonicalExecutableDependencyGraphEdges(dependencies)) {
+    if (
+      !surfacePaths.has(edge.sourcePath) ||
+      !surfacePaths.has(edge.normalizedTarget)
+    ) {
+      continue;
+    }
+    outgoing.set(edge.sourcePath, (outgoing.get(edge.sourcePath) ?? 0) + 1);
+    incoming.set(
+      edge.normalizedTarget,
+      (incoming.get(edge.normalizedTarget) ?? 0) + 1,
+    );
+    const targets = adjacency.get(edge.sourcePath) ?? new Set<string>();
+    targets.add(edge.normalizedTarget);
+    adjacency.set(edge.sourcePath, targets);
+  }
+
+  const depth = new Map<string, number>();
+  const queue = surfaces
+    .filter((surface) => surface.staticallyInvoked)
+    .map((surface) => surface.path)
+    .sort((left, right) => left.localeCompare(right));
+  for (const surfacePath of queue) depth.set(surfacePath, 0);
+  for (let index = 0; index < queue.length; index += 1) {
+    const sourcePath = queue[index]!;
+    const sourceDepth = depth.get(sourcePath)!;
+    const targets = [...(adjacency.get(sourcePath) ?? [])].sort((left, right) =>
+      left.localeCompare(right),
+    );
+    for (const targetPath of targets) {
+      const nextDepth = sourceDepth + 1;
+      const currentDepth = depth.get(targetPath);
+      if (currentDepth !== undefined && currentDepth <= nextDepth) continue;
+      depth.set(targetPath, nextDepth);
+      queue.push(targetPath);
+    }
+  }
+
+  return new Map(
+    surfaces.map((surface) => {
+      const minimumInvocationDependencyDepth = depth.get(surface.path);
+      const staticInvocationReachability: StaticInvocationReachability =
+        minimumInvocationDependencyDepth === 0
+          ? "direct"
+          : minimumInvocationDependencyDepth === undefined
+            ? "unreached"
+            : "transitive";
+      return [
+        surface.path,
+        {
+          incomingResolvedDependencyCount: incoming.get(surface.path) ?? 0,
+          outgoingResolvedDependencyCount: outgoing.get(surface.path) ?? 0,
+          staticInvocationReachability,
+          ...(minimumInvocationDependencyDepth !== undefined
+            ? { minimumInvocationDependencyDepth }
+            : {}),
+        },
+      ];
+    }),
+  );
 }
