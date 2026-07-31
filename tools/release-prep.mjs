@@ -2,7 +2,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
-// code changes
 const RELEASE_FILES = ["package.json", "package-lock.json", "CHANGELOG.md"];
 const REPOSITORY_URL = "https://github.com/KazuCocoa/renma";
 
