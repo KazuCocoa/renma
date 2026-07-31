@@ -82,8 +82,10 @@ test("executable graph keeps invocation, containment, shared use, and evidence d
         normalizedTarget?: string;
       }>;
     };
+    diagnostics?: unknown[];
   };
   assert.equal(report.view, "executable");
+  assert.equal(report.diagnostics, undefined);
   assert.deepEqual(
     report.edges.map((edge) => [
       edge.from,
@@ -159,6 +161,7 @@ test("executable graph focuses a script as a stable reverse used-by view", async
   assert.match(result.stdout, /used by → skill\.alpha \(Skill\)/);
   assert.match(result.stdout, /used by → skill\.beta \(Skill\)/);
   assert.doesNotMatch(result.stdout, /belongs to →/);
+  assert.doesNotMatch(result.stdout, /## Diagnostics/);
 });
 
 test("executable graph focuses a Skill and distinguishes contains from invokes", async (t) => {
@@ -304,6 +307,79 @@ test("external executable targets stay distinct and never gain containment", asy
   assert.match(mermaid.stdout, /external executable: external:/);
   assert.match(mermaid.stdout, /classDef externalExecutable/);
   assert.doesNotMatch(mermaid.stdout, /\|contains\|/);
+  assert.doesNotMatch(mermaid.stdout, /%% Diagnostics:/);
+});
+
+test("executable graph human formats show retained diagnostics and preserve error exits", async (t) => {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-executable-diagnostics-",
+    testContext: t,
+  });
+  await fixture.skill("diagnostics", {
+    id: "skill.diagnostics",
+    body: ["# Diagnostics", "", "```bash", "bash tools/check.sh", "```"].join(
+      "\n",
+    ),
+  });
+  await fixture.write("tools/check.sh", "#!/bin/sh\nexit 0\n");
+  await fixture.contextLens("lenses/incomplete.md", {
+    id: "lens.incomplete",
+  });
+
+  const markdown = await captureGraph([
+    "graph",
+    fixture.root,
+    "--view",
+    "executable",
+    "--format",
+    "markdown",
+  ]);
+  assert.equal(markdown.code, 1);
+  assert.equal(markdown.stderr, "");
+  assert.match(markdown.stdout, /## Diagnostics/);
+  assert.match(
+    markdown.stdout,
+    /- error: lenses\/incomplete\.md: Context lens definition is missing required field "owner"\./,
+  );
+
+  const mermaid = await captureGraph([
+    "graph",
+    fixture.root,
+    "--view",
+    "executable",
+    "--format",
+    "mermaid",
+  ]);
+  assert.equal(mermaid.code, 1);
+  assert.equal(mermaid.stderr, "");
+  assert.match(mermaid.stdout, /%% Diagnostics:/);
+  assert.match(
+    mermaid.stdout,
+    /%% error: lenses\/incomplete\.md: Context lens definition is missing required field "owner"\./,
+  );
+
+  const json = await captureGraph([
+    "graph",
+    fixture.root,
+    "--view",
+    "executable",
+    "--format",
+    "json",
+  ]);
+  assert.equal(json.code, 1);
+  assert.equal(json.stderr, "");
+  const report = JSON.parse(json.stdout) as {
+    diagnostics?: Array<{ severity: string; path?: string; message: string }>;
+  };
+  assert.ok(
+    report.diagnostics?.some(
+      (diagnostic) =>
+        diagnostic.severity === "error" &&
+        diagnostic.path === "lenses/incomplete.md" &&
+        diagnostic.message ===
+          'Context lens definition is missing required field "owner".',
+    ),
+  );
 });
 
 test("executable empty state is actionable and ordinary graph output is unchanged", async (t) => {

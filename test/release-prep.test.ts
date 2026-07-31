@@ -15,7 +15,10 @@ test("release-prep routes broad and resumable release requests", () => {
   ]) {
     assert.ok(skill.includes(`"${trigger}"`), `missing trigger: ${trigger}`);
   }
-  assert.match(skill, /renma\.requires-context: '\["context\.release\.prep"\]'/);
+  assert.match(
+    skill,
+    /renma\.requires-context: '\["context\.release\.prep"\]'/,
+  );
   assert.match(skill, /Treat that Context as authoritative/);
   assert.match(context, /resume at the earliest incomplete step/);
   assert.match(context, /GitHub-Release-only request on an existing tag/);
