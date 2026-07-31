@@ -295,6 +295,12 @@ function reviewNotes(
 }
 
 function formatCiReportMarkdown(report: CiReportFormatInput): string {
+  const executableSurface =
+    report.diff.executableSurface ??
+    buildExecutableSurfaceDiff(
+      zeroExecutableSurfaceInventory(),
+      zeroExecutableSurfaceInventory(),
+    );
   const skillDiscoveryLines =
     "skillDiscovery" in report
       ? [
@@ -307,28 +313,38 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
           ),
         ]
       : [];
-  const lines = [
-    "# Renma CI Report",
-    "",
-    "## Summary",
-    "",
+  const summaryLines = [
     `- Status: ${formatStatus(report.status)}`,
     `- Range: \`${report.from.ref}\` -> \`${report.to.ref}\``,
     `- Readiness: ${report.from.readinessLevel} ${report.from.readinessScore} -> ${report.to.readinessLevel} ${report.to.readinessScore} (${formatDelta(report.summary.readinessScoreDelta)})`,
-    `- Total assets: ${report.from.totalAssets} -> ${report.to.totalAssets} (${formatDelta(report.summary.totalAssetsDelta)})`,
     formatOwnershipSummary(
       report.from,
       report.to,
       report.summary.ownershipCoverageDelta,
     ),
-    `- Graph resolution: ${formatDelta(report.summary.graphResolutionDelta)}`,
-    `- Findings: ${formatDelta(report.summary.findingsDelta)}`,
-    `- High/critical findings: ${formatDelta(report.summary.highOrCriticalFindingsDelta)}`,
-    "",
-    "## Status",
-    "",
-    formatStatus(report.status),
-    "",
+  ];
+  if (report.summary.totalAssetsDelta !== 0) {
+    summaryLines.push(
+      `- Total assets: ${report.from.totalAssets} -> ${report.to.totalAssets} (${formatDelta(report.summary.totalAssetsDelta)})`,
+    );
+  }
+  if (report.summary.graphResolutionDelta !== 0) {
+    summaryLines.push(
+      `- Graph resolution: ${formatDelta(report.summary.graphResolutionDelta)}`,
+    );
+  }
+  if (report.summary.findingsDelta !== 0) {
+    summaryLines.push(
+      `- Findings: ${formatDelta(report.summary.findingsDelta)}`,
+    );
+  }
+  if (report.summary.highOrCriticalFindingsDelta !== 0) {
+    summaryLines.push(
+      `- High/critical findings: ${formatDelta(report.summary.highOrCriticalFindingsDelta)}`,
+    );
+  }
+
+  const detailLines = [
     "## Readiness",
     "",
     `- Target readiness: ${report.to.readinessLevel} (${report.to.readinessScore})`,
@@ -360,13 +376,7 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     "",
     "## Executable Surface Changes",
     "",
-    ...formatExecutableSurfaceChanges(
-      report.diff.executableSurface ??
-        buildExecutableSurfaceDiff(
-          zeroExecutableSurfaceInventory(),
-          zeroExecutableSurfaceInventory(),
-        ),
-    ),
+    ...formatExecutableSurfaceChanges(executableSurface),
     "",
     "## Security Posture",
     "",
@@ -388,14 +398,209 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     "## Finding Count Changes",
     "",
     ...formatCountChanges(report.diff.findings.countById),
+  ];
+  const lines = [
+    "# Renma CI Report",
+    "",
+    "## Summary",
+    "",
+    ...summaryLines,
+    ...formatChangeOverview(report, executableSurface),
     "",
     "## Review Notes",
     "",
-    ...report.notes.map((note) => `- ${note}`),
+    ...formatReviewNotes(report),
+    "",
+    "<details>",
+    "<summary>Full report details</summary>",
+    "",
+    ...detailLines,
+    "",
+    "</details>",
     "",
   ];
 
   return `${lines.join("\n")}\n`;
+}
+
+function formatChangeOverview(
+  report: CiReportFormatInput,
+  executableSurface: CiCompatibleExecutableSurfaceDiff,
+): string[] {
+  const repositoryChanges = formatChangeGroups([
+    [
+      "assets",
+      report.diff.catalog.addedAssets.length,
+      report.diff.catalog.removedAssets.length,
+      report.diff.catalog.changedAssets.length,
+    ],
+    [
+      "graph edges",
+      report.diff.graph.addedEdges.length,
+      report.diff.graph.removedEdges.length,
+    ],
+    ["graph unresolved", report.diff.graph.newUnresolvedEdges.length],
+    ["graph resolved", report.diff.graph.resolvedEdges.length],
+    ["readiness checks", 0, 0, report.diff.readiness.checkChanges.length],
+    [
+      "Skill Discovery",
+      0,
+      0,
+      "skillDiscovery" in report
+        ? skillDiscoveryChangeCount(report.skillDiscovery)
+        : 0,
+    ],
+    [
+      "Skill Discovery policy matches",
+      "skillDiscoveryPolicy" in report
+        ? report.skillDiscoveryPolicy.matchCount
+        : 0,
+    ],
+  ]);
+  const executableChanges = formatChangeGroups([
+    [
+      "surfaces",
+      executableSurface.addedSurfacePaths.length,
+      executableSurface.removedSurfacePaths.length,
+      executableSurface.changedSurfaces.length,
+    ],
+    [
+      "dependencies",
+      executableSurface.addedDependencies?.length ?? 0,
+      executableSurface.removedDependencies?.length ?? 0,
+      executableSurface.dependencyResolutionChanges?.length ?? 0,
+    ],
+    [
+      "invocation resolution",
+      0,
+      0,
+      executableSurface.invocationResolutionChanges.length,
+    ],
+    [
+      "governance",
+      0,
+      0,
+      executableSurface.invocationGovernanceChanges.length +
+        executableSurface.newInvocationsWithoutEffectivePolicyEvidence.length +
+        (executableSurface.newInvocationsWithMultipleEffectivePolicyFingerprints
+          ?.length ?? 0),
+    ],
+    [
+      "invocation review evidence",
+      executableSurface.newProblematicInvocations.length,
+    ],
+    [
+      "dependency review evidence",
+      executableSurface.newProblematicDependencies?.length ?? 0,
+    ],
+    [
+      "reachability",
+      0,
+      0,
+      (executableSurface.newlyTransitivelyReachableSurfacePaths?.length ?? 0) +
+        (executableSurface.surfacesLostStaticInvocationReachability?.length ??
+          0) +
+        (executableSurface.invocationDependencyDepthChanges?.length ?? 0) +
+        executableSurface.newlyReachableSkillLocalPaths.length +
+        executableSurface.newlyUnreachableSkillLocalPaths.length,
+    ],
+  ]);
+  if (executableChanges.length === 0) {
+    executableChanges.push(
+      ...formatChangeGroups([
+        [
+          "inventory metrics",
+          0,
+          0,
+          countNonZeroNumbers(executableSurface.summary),
+        ],
+      ]),
+    );
+  }
+  const findingAndPolicyChanges = formatChangeGroups([
+    [
+      "findings",
+      report.diff.findings.added.length,
+      report.diff.findings.removed.length,
+    ],
+    [
+      "security policy metrics",
+      0,
+      0,
+      countNonZeroNumbers(report.diff.security?.policyInventory),
+    ],
+  ]);
+
+  return [
+    formatChangeOverviewLine("Changes", repositoryChanges),
+    formatChangeOverviewLine("Executable changes", executableChanges),
+    formatChangeOverviewLine("Finding/policy changes", findingAndPolicyChanges),
+  ].filter((line): line is string => line !== undefined);
+}
+
+type ChangeOverviewGroup = readonly [
+  label: string,
+  added?: number,
+  removed?: number,
+  changed?: number,
+];
+
+function formatChangeGroups(groups: ChangeOverviewGroup[]): string[] {
+  return groups.flatMap(([label, added = 0, removed = 0, changed = 0]) => {
+    const counts = [
+      ...(added > 0 ? [`+${added}`] : []),
+      ...(removed > 0 ? [`-${removed}`] : []),
+      ...(changed > 0 ? [`~${changed}`] : []),
+    ];
+    return counts.length > 0 ? [`${label} ${counts.join("/")}`] : [];
+  });
+}
+
+function formatChangeOverviewLine(
+  label: string,
+  groups: string[],
+): string | undefined {
+  return groups.length > 0 ? `- ${label}: ${groups.join("; ")}` : undefined;
+}
+
+function skillDiscoveryChangeCount(discovery: SkillDiscoveryDiff): number {
+  const detailedChangeCount =
+    Number(discovery.adoption.changed) +
+    Number(discovery.coverage.changed) +
+    discovery.publishedEntrypoints.added.length +
+    discovery.publishedEntrypoints.removed.length +
+    discovery.reachability.newlyReachable.length +
+    discovery.reachability.newlyNotReached.length +
+    discovery.unroutedSkills.newlyUnrouted.length +
+    discovery.unroutedSkills.resolvedUnrouted.length +
+    discovery.routes.added.length +
+    discovery.routes.removed.length +
+    discovery.routes.changed.length +
+    discovery.cycles.added.length +
+    discovery.cycles.resolved.length;
+  if (detailedChangeCount > 0) return detailedChangeCount;
+  return Object.values(discovery.summary).some((value) => value !== 0) ? 1 : 0;
+}
+
+function countNonZeroNumbers(value: unknown): number {
+  if (typeof value === "number") return value === 0 ? 0 : 1;
+  if (Array.isArray(value)) {
+    return value.reduce((count, item) => count + countNonZeroNumbers(item), 0);
+  }
+  if (!value || typeof value !== "object") return 0;
+  return Object.values(value).reduce(
+    (count, item) => count + countNonZeroNumbers(item),
+    0,
+  );
+}
+
+function formatReviewNotes(report: CiReportFormatInput): string[] {
+  if (report.notes.length > 0) {
+    return report.notes.map((note) => `- ${note}`);
+  }
+  return report.status === "pass"
+    ? ["- No CI report regressions detected."]
+    : ["- Review the changed metrics and evidence in the full report details."];
 }
 
 function formatExecutableSurfaceChanges(

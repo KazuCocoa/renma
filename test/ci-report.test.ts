@@ -71,10 +71,11 @@ test("formatCiReport renders deterministic markdown review artifact", () => {
   );
 
   const markdown = formatCiReport(report, "markdown");
+  const visible = markdown.slice(0, markdown.indexOf("<details>"));
 
   assert.match(markdown, /# Renma CI Report/);
   assert.match(
-    markdown,
+    visible,
     /- Status: FAIL — blocking repository-governance regression detected/,
   );
   assert.match(markdown, /- Range: `main` -> `HEAD`/);
@@ -94,7 +95,211 @@ test("formatCiReport renders deterministic markdown review artifact", () => {
     /- MEDIUM `DOC-NO-PATH` `unknown` — Finding without path/,
   );
   assert.match(markdown, /- 2 more not shown; see JSON for the full list\./);
-  assert.match(markdown, /Review new unresolved required edges before merge\./);
+  assert.match(visible, /Review new unresolved required edges before merge\./);
+});
+
+test("formatCiReport keeps review signal visible and collapses verbose details", () => {
+  const report = buildCiReportFromDiff({
+    ...policyDiffReport({}),
+    discovery: neutralSkillDiscoveryDiff(),
+  });
+  const markdown = formatCiReport(report, "markdown");
+  const detailsStart = markdown.indexOf("<details>");
+  const detailsEnd = markdown.indexOf("</details>");
+  const visible = markdown.slice(0, detailsStart);
+  const details = markdown.slice(detailsStart, detailsEnd);
+
+  assert.ok(detailsStart > 0);
+  assert.ok(detailsEnd > detailsStart);
+  assert.match(visible, /^## Summary$/m);
+  assert.match(
+    visible,
+    /- Status: PASS — no blocking CI review issues detected/,
+  );
+  assert.match(visible, /- Range: `main` -> `HEAD`/);
+  assert.match(visible, /^## Review Notes$/m);
+  assert.match(visible, /- No CI report regressions detected\./);
+  assert.doesNotMatch(visible, /- Total assets:/);
+  assert.doesNotMatch(visible, /- Graph resolution:/);
+  assert.doesNotMatch(visible, /- Findings:/);
+  assert.doesNotMatch(
+    visible,
+    /^- (?:Changes|Executable changes|Finding\/policy changes):/m,
+  );
+  assert.match(details, /<summary>Full report details<\/summary>/);
+  assert.match(details, /^## Readiness$/m);
+  assert.match(details, /^## Executable Surface Changes$/m);
+  assert.match(details, /^## Security Policy Inventory$/m);
+});
+
+test("formatCiReport surfaces non-zero warning metrics before details", () => {
+  const report = buildCiReportFromDiff({
+    ...policyDiffReport({
+      summary: {
+        readinessScoreDelta: -1,
+        ownershipCoverageDelta: -2,
+        graphResolutionDelta: -1,
+        findingsDelta: 1,
+      },
+    }),
+    discovery: neutralSkillDiscoveryDiff(),
+  });
+  const markdown = formatCiReport(report, "markdown");
+  const visible = markdown.slice(0, markdown.indexOf("<details>"));
+
+  assert.match(visible, /- Status: WARN — review recommended before merge/);
+  assert.match(
+    visible,
+    /- Readiness: needs_attention 80 -> needs_attention 80 \(-1\)/,
+  );
+  assert.match(
+    visible,
+    /- Ownership: 8\/10 \(80%\) -> 8\/10 \(80%\) \(-2 pp\)/,
+  );
+  assert.match(visible, /- Graph resolution: -1/);
+  assert.match(visible, /- Findings: \+1/);
+  assert.match(visible, /- Readiness score decreased\./);
+});
+
+test("formatCiReport surfaces a net-zero changed asset before details", () => {
+  const compatible = policyDiffReport({});
+  compatible.catalog.changedAssets = [
+    {
+      id: "context.owner-change",
+      path: "contexts/owner-change.md",
+      changedFields: ["declaredOwner", "effectiveOwner"],
+      from: {
+        id: "context.owner-change",
+        path: "contexts/owner-change.md",
+        declaredOwner: "team-a",
+        effectiveOwner: "team-a",
+      },
+      to: {
+        id: "context.owner-change",
+        path: "contexts/owner-change.md",
+        declaredOwner: "team-b",
+        effectiveOwner: "team-b",
+      },
+    },
+  ];
+  const report = buildCiReportFromDiff({
+    ...compatible,
+    discovery: neutralSkillDiscoveryDiff(),
+  });
+  const markdown = formatCiReport(report, "markdown");
+  const visible = markdown.slice(0, markdown.indexOf("<details>"));
+
+  assert.equal(report.status, "pass");
+  assert.equal(report.summary.totalAssetsDelta, 0);
+  assert.equal(report.summary.ownershipCoverageDelta, 0);
+  assert.match(visible, /- Changes: assets ~1/);
+  assert.match(visible, /- No CI report regressions detected\./);
+});
+
+test("formatCiReport surfaces a net-zero graph replacement before details", () => {
+  const compatible = policyDiffReport({});
+  compatible.graph.addedEdges = [
+    {
+      source: "skill.new",
+      target: "context.current",
+      kind: "requires",
+      resolved: true,
+    },
+  ];
+  compatible.graph.removedEdges = [
+    {
+      source: "skill.old",
+      target: "context.current",
+      kind: "requires",
+      resolved: true,
+    },
+  ];
+  compatible.graph.newUnresolvedEdges = [
+    {
+      source: "skill.new",
+      target: "context.missing",
+      kind: "optional",
+      resolved: false,
+    },
+  ];
+  compatible.graph.resolvedEdges = [
+    {
+      source: "skill.old",
+      target: "context.current",
+      kind: "requires",
+      resolved: true,
+    },
+  ];
+  const report = buildCiReportFromDiff({
+    ...compatible,
+    discovery: neutralSkillDiscoveryDiff(),
+  });
+  const markdown = formatCiReport(report, "markdown");
+  const visible = markdown.slice(0, markdown.indexOf("<details>"));
+
+  assert.equal(report.status, "pass");
+  assert.equal(report.summary.graphResolutionDelta, 0);
+  assert.match(
+    visible,
+    /- Changes: graph edges \+1\/-1; graph unresolved \+1; graph resolved \+1/,
+  );
+  assert.doesNotMatch(visible, /- Graph resolution:/);
+});
+
+test("formatCiReport surfaces executable additions, removals, and changes before details", () => {
+  const report = buildCiReportFromDiff({
+    ...policyDiffReport({}),
+    discovery: neutralSkillDiscoveryDiff(),
+  });
+  const executableSurface = buildExecutableSurfaceDiff(
+    zeroExecutableSurfaceInventory(),
+    zeroExecutableSurfaceInventory(),
+  );
+  executableSurface.addedSurfacePaths = ["tools/added.mjs"];
+  executableSurface.removedSurfacePaths = ["tools/removed.mjs"];
+  executableSurface.changedSurfaces = [
+    {
+      path: "tools/changed.mjs",
+      reasons: ["content"],
+      fromFingerprint: "sha256:from",
+      toFingerprint: "sha256:to",
+    },
+  ];
+  report.diff.executableSurface = executableSurface;
+
+  const markdown = formatCiReport(report, "markdown");
+  const visible = markdown.slice(0, markdown.indexOf("<details>"));
+
+  assert.equal(report.status, "pass");
+  assert.match(visible, /- Executable changes: surfaces \+1\/-1\/~1/);
+});
+
+test("formatCiReport change overview leaves JSON output byte-for-byte unchanged", () => {
+  const compatible = policyDiffReport({});
+  compatible.readiness.checkChanges = [
+    {
+      id: "ownership.coverage",
+      title: "Ownership coverage",
+      fromStatus: "pass",
+      toStatus: "pass",
+      fromSeverity: "info",
+      toSeverity: "info",
+      summaryChanged: true,
+    },
+  ];
+  const report = buildCiReportFromDiff({
+    ...compatible,
+    discovery: neutralSkillDiscoveryDiff(),
+  });
+  const before = formatCiReport(report, "json");
+
+  const markdown = formatCiReport(report, "markdown");
+
+  assert.match(
+    markdown.slice(0, markdown.indexOf("<details>")),
+    /- Changes: readiness checks ~1/,
+  );
+  assert.equal(formatCiReport(report, "json"), before);
 });
 
 test("formatCiReport renders structured JSON", () => {
@@ -183,6 +388,10 @@ test("formatCiReport renders bounded invocation-governance evidence without chan
   assert.match(
     markdown,
     /- Governance changes with multiple effective fingerprints: 1/,
+  );
+  assert.match(
+    markdown.slice(0, markdown.indexOf("<details>")),
+    /- Executable changes: governance ~1/,
   );
   assert.match(
     markdown,
@@ -305,6 +514,10 @@ test("formatCiReport renders bounded neutral executable dependency changes witho
   const parsed = JSON.parse(formatCiReport(report, "json")) as CiReport;
   assert.match(markdown, /- Dependencies: 0 -> 12 \(\+12\)/);
   assert.match(markdown, /- New dependency evidence for review: 12/);
+  assert.match(
+    markdown.slice(0, markdown.indexOf("<details>")),
+    /- Executable changes: dependencies \+12; dependency review evidence \+12/,
+  );
   assert.match(
     markdown,
     /^### New executable dependency evidence for review$/m,
@@ -457,6 +670,10 @@ test("formatCiReport includes security changes from the semantic diff", () => {
   assert.match(markdown, /- Human approval required: \+1/);
   assert.match(markdown, /- Forbidden inputs: \+1/);
   assert.match(markdown, /- Missing security profiles: \+1/);
+  assert.match(
+    markdown.slice(0, markdown.indexOf("<details>")),
+    /- Finding\/policy changes: findings \+1\/-1; security policy metrics ~9/,
+  );
 });
 
 test("formatCiReport renders ownership, asset, edge, and readiness governance details", () => {
@@ -1186,6 +1403,10 @@ test("enabled Discovery policy upgrades pass to warn with one review note", () =
   assert.match(
     markdown,
     /- Policy outcome: WARN — review requested; exit behavior unchanged/,
+  );
+  assert.match(
+    markdown.slice(0, markdown.indexOf("<details>")),
+    /- Changes: Skill Discovery ~1; Skill Discovery policy matches \+1/,
   );
   assert.match(markdown, /^### CI review policy matches$/m);
   assert.match(
