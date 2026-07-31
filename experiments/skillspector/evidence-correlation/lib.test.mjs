@@ -138,6 +138,10 @@ test("native fields, duplicates, provenance, and unresolved evidence survive", (
   assert.equal(normalized.counts.duplicateEvidenceCount, 2);
   assert.equal(normalized.counts.correlatedCount, 2);
   assert.equal(normalized.counts.unresolvedCount, 1);
+  assert.deepEqual(
+    normalized.source.scanner.reportedExecution.analysisCompleteness,
+    rawReport.analysis_completeness,
+  );
 });
 
 test("identical inputs produce byte-identical normalized JSON", () => {
@@ -330,6 +334,64 @@ test("incomplete or unsuccessful producer analysis cannot pass", async (t) => {
   });
 });
 
+test("analyzer completeness fails closed for incomplete or absent ledger states", async (t) => {
+  const zeroCounters = { skipped: 0, failed: 0, unaccounted: 0 };
+  const cases = [
+    {
+      name: "skipped status with zero counters",
+      statuses: [
+        { analyzer_id: "skipped-zero", status: "skipped", ...zeroCounters },
+      ],
+      reportPattern: /\| skipped-zero \| skipped \| 0 \| 0 \| 0 \|/u,
+    },
+    {
+      name: "unexpected status",
+      statuses: [
+        { analyzer_id: "future", status: "cancelled", ...zeroCounters },
+      ],
+      reportPattern: /\| future \| cancelled \| 0 \| 0 \| 0 \|/u,
+    },
+    {
+      name: "missing status",
+      statuses: [{ analyzer_id: "missing-status", ...zeroCounters }],
+      reportPattern: /\| missing-status \| \(missing\) \| 0 \| 0 \| 0 \|/u,
+    },
+    {
+      name: "empty analyzer-status array",
+      statuses: [],
+      reportPattern: /\| `\(no analyzer entries\)` \| \(missing\)/u,
+    },
+    {
+      name: "missing analyzer-status field",
+      statuses: undefined,
+      reportPattern: /\| `\(analyzer_statuses missing\)` \| \(missing\)/u,
+    },
+  ];
+
+  for (const testCase of cases) {
+    await t.test(testCase.name, () => {
+      const completeness = {
+        execution_successful: true,
+        is_complete: true,
+        limitations: [],
+      };
+      if (testCase.statuses !== undefined) {
+        completeness.analyzer_statuses = testCase.statuses;
+      }
+      const fixture = successfulFixture({ completeness });
+      const evaluation = evaluateExperimentEvidence(fixture);
+      const report = renderExperimentReport(fixture);
+
+      assert.ok(evaluation.failedCheckIds.includes("producer.completeness"));
+      assert.match(report, testCase.reportPattern);
+      assert.doesNotMatch(
+        report,
+        /Proceed toward a scanner-specific adapter prototype/u,
+      );
+    });
+  }
+});
+
 function successfulFixture(options = {}) {
   const skillPath = "skills/evidence-fixture/SKILL.md";
   const scriptPath = "skills/evidence-fixture/scripts/probe.py";
@@ -367,7 +429,15 @@ function successfulFixture(options = {}) {
   const completeness = options.completeness ?? {
     execution_successful: true,
     is_complete: true,
-    analyzer_statuses: [{ analyzer_id: "static", status: "completed" }],
+    analyzer_statuses: [
+      {
+        analyzer_id: "static",
+        status: "completed",
+        skipped: 0,
+        failed: 0,
+        unaccounted: 0,
+      },
+    ],
     limitations: [],
   };
   const fixtureReport = {

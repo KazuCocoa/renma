@@ -19,9 +19,9 @@ No result is converted to a Renma diagnostic or used for readiness.
 | --- | --- |
 | Renma CLI revision | `74c53ec71a782c045c2817c1fe7703efa7f05087` |
 | Renma CLI executable SHA-256 | `sha256:f0aacb4c2d48310c9fc9b44229819771166a562394ee887f35bc89bdb9c8498b` |
-| Git HEAD context | `30d3215a1a2a16f183aec436004d6cc4a10895bb` |
+| Git HEAD context | `b0eecaaf9f353dd3237cd6ae85529bec0c16681b` |
 | Git worktree state | dirty |
-| Experiment harness digest | `sha256:4c72cf9482a19c9dd567943605110e09b599610d567c08089a8d588792da8f3c` |
+| Experiment harness digest | `sha256:c1015a8f4e5dd3e88b4fbb1b9bb5250aa9d6eccd8fa7fd0cfc7ece07ec5a1c4b` |
 | Experiment harness files | 8 hashed file(s) |
 | Revision contains exact harness | false |
 | Fixture | `skillspector-evidence-correlation-v1` |
@@ -32,7 +32,7 @@ No result is converted to a Renma diagnostic or used for readiness.
 | Scanner exit | 0 |
 | Renma catalog arguments | `/Users/kazu/github/renma/dist/index.js catalog /Users/kazu/github/renma/experiments/skillspector/generated/evidence-correlation/repository --format json` |
 | Raw scanner output | `evidence-correlation/captured/fixture-run/skillspector-report.json` |
-| Raw scanner SHA-256 | `sha256:a2a7b455b355fe3c6fedc6c7753db12e38520d9dd3e7d32047001ae3c1370dec` |
+| Raw scanner SHA-256 | `sha256:d80d2c814b48591a381407b480b9df0129bca83f8b88dcc268768b831fe37807` |
 | Raw Renma catalog | `evidence-correlation/captured/fixture-run/renma-catalog.json` |
 | Catalog SHA-256 | `sha256:6a3e01e15d7bb1ac29203ea960cef407ef9846193c17d1e30a7ee8ddf7181338` |
 
@@ -58,6 +58,39 @@ These values retain SkillSpector's meaning. Disabled, partial, failed,
 skipped, unaccounted, or unknown analyzer work is not reclassified as complete
 coverage by the experiment.
 
+### Native analyzer ledger
+
+| Analyzer | Native status | Native skipped | Native failed | Native unaccounted |
+| --- | --- | --- | --- | --- |
+| behavioral_ast | completed | 0 | 0 | 0 |
+| behavioral_taint_tracking | completed | 0 | 0 | 0 |
+| mcp_least_privilege | completed | 0 | 0 | 0 |
+| mcp_rug_pull | completed | 0 | 0 | 0 |
+| mcp_tool_poisoning | completed | 0 | 0 | 0 |
+| meta_analyzer | disabled | 0 | 0 | 0 |
+| semantic_developer_intent | disabled | 0 | 0 | 0 |
+| semantic_quality_policy | disabled | 0 | 0 | 0 |
+| semantic_security_discovery | disabled | 0 | 0 | 0 |
+| static_patterns_agent_snooping | completed | 0 | 0 | 0 |
+| static_patterns_anti_refusal | completed | 0 | 0 | 0 |
+| static_patterns_data_exfiltration | completed | 0 | 0 | 0 |
+| static_patterns_excessive_agency | completed | 0 | 0 | 0 |
+| static_patterns_harmful_content | completed | 0 | 0 | 0 |
+| static_patterns_memory_poisoning | completed | 0 | 0 | 0 |
+| static_patterns_output_handling | completed | 0 | 0 | 0 |
+| static_patterns_privilege_escalation | completed | 0 | 0 | 0 |
+| static_patterns_prompt_injection | completed | 0 | 0 | 0 |
+| static_patterns_rogue_agent | completed | 0 | 0 | 0 |
+| static_patterns_ssrf | completed | 0 | 0 | 0 |
+| static_patterns_supply_chain | completed | 0 | 0 | 0 |
+| static_patterns_system_prompt_leakage | completed | 0 | 0 | 0 |
+| static_patterns_tool_misuse | completed | 0 | 0 | 0 |
+| static_yara | completed | 0 | 0 | 0 |
+
+Values are rendered directly from the native analyzer ledger. `(missing)`
+means the producer omitted that field. The experiment does not normalize an
+unfamiliar status into a recognized state.
+
 ## Results
 
 | Observation | Count or value |
@@ -81,7 +114,7 @@ with Renma severity or readiness.
 | --- | --- | --- |
 | Expected fixture identity | satisfied | skillspector-evidence-correlation-v1 |
 | Producer reported successful execution | satisfied | report=true, completeness=true, exit=0 |
-| Producer reported complete analysis with no disabled, failed, partial, skipped, or unknown analyzer work | not satisfied | is_complete=false, non-complete analyzer statuses=4 |
+| Producer reported complete analysis and a non-empty analyzer ledger where every status is completed with zero skipped, failed, and unaccounted work | not satisfied | is_complete=false, analyzer_statuses=24, non-complete analyzer statuses=4 |
 | At least one native finding | satisfied | 6 |
 | At least one exact asset correlation | satisfied | 4 |
 | Expected correlated skill target skills/evidence-fixture/SKILL.md | satisfied | 2 finding(s) |
@@ -126,7 +159,7 @@ The following object is copied from the authoritative scanner report:
 ```json
 {
   "id": "LP1",
-  "finding_id": "finding-8ebb5151de654864bd23bdd695746f37",
+  "finding_id": "finding-7e3e36a323314b679ceaeef37857eb04",
   "category": "MCP Least Privilege",
   "pattern": null,
   "severity": "HIGH",
@@ -159,7 +192,7 @@ This experimental record keeps the native object and labels every derived layer:
     "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/0",
     "nativeFinding": {
       "id": "LP1",
-      "finding_id": "finding-8ebb5151de654864bd23bdd695746f37",
+      "finding_id": "finding-7e3e36a323314b679ceaeef37857eb04",
       "category": "MCP Least Privilege",
       "pattern": null,
       "severity": "HIGH",
@@ -365,7 +398,7 @@ No owner, dependency, or policy heuristic is used to force a match:
     "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/2",
     "nativeFinding": {
       "id": "AS3",
-      "finding_id": "finding-bcdde5523c22425b88b55ab0576037e3",
+      "finding_id": "finding-8c26408b942e4c1b96af167c7776405a",
       "category": "Agent Snooping",
       "pattern": "Skill Enumeration",
       "severity": "MEDIUM",
@@ -407,8 +440,8 @@ No owner, dependency, or policy heuristic is used to force a match:
 
 ## Duplicate observations
 
-- Evidence 2, 3 have same scanner-native fields except scanner-reported finding_id. Raw IDs: `finding-bcdde5523c22425b88b55ab0576037e3`, `finding-a03b406dca3a4bb095986f0a37024b61`.
-- Evidence 4, 5 have same scanner-native fields except scanner-reported finding_id. Raw IDs: `finding-3bfa89e427e6485da6d883cd41ee0a3d`, `finding-3e521c49b3f24be3abeafd19d82078a7`.
+- Evidence 2, 3 have same scanner-native fields except scanner-reported finding_id. Raw IDs: `finding-8c26408b942e4c1b96af167c7776405a`, `finding-effcb965514045799956e475362434e5`.
+- Evidence 4, 5 have same scanner-native fields except scanner-reported finding_id. Raw IDs: `finding-514ff3afd5f64ab8ababc24ae0680d0a`, `finding-aa0ef4048b1a406eb016f0a47a31f64c`.
 
 This comparison is intentionally not a stable fingerprint. The experiment
 does not merge, suppress, or discard duplicates.

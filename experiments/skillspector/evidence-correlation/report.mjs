@@ -99,6 +99,16 @@ These values retain SkillSpector's meaning. Disabled, partial, failed,
 skipped, unaccounted, or unknown analyzer work is not reclassified as complete
 coverage by the experiment.
 
+### Native analyzer ledger
+
+| Analyzer | Native status | Native skipped | Native failed | Native unaccounted |
+| --- | --- | --- | --- | --- |
+${renderAnalyzerStatuses(completeness)}
+
+Values are rendered directly from the native analyzer ledger. \`(missing)\`
+means the producer omitted that field. The experiment does not normalize an
+unfamiliar status into a recognized state.
+
 ## Results
 
 | Observation | Count or value |
@@ -335,6 +345,25 @@ function renderDuplicateObservations(normalized) {
         `- Evidence ${group.evidenceIndexes.join(", ")} have ${group.comparisonBasis}. Raw IDs: ${group.rawFindingIds.map((id) => `\`${id}\``).join(", ")}.`,
     )
     .join("\n");
+}
+
+function renderAnalyzerStatuses(completeness) {
+  if (!Array.isArray(completeness?.analyzer_statuses)) {
+    return "| `(analyzer_statuses missing)` | (missing) | (missing) | (missing) | (missing) |";
+  }
+  if (completeness.analyzer_statuses.length === 0) {
+    return "| `(no analyzer entries)` | (missing) | (missing) | (missing) | (missing) |";
+  }
+  return completeness.analyzer_statuses
+    .map(
+      (status) =>
+        `| ${escapeTable(nativeField(status, "analyzer_id"))} | ${escapeTable(nativeField(status, "status"))} | ${escapeTable(nativeField(status, "skipped"))} | ${escapeTable(nativeField(status, "failed"))} | ${escapeTable(nativeField(status, "unaccounted"))} |`,
+    )
+    .join("\n");
+}
+
+function nativeField(object, key) {
+  return Object.hasOwn(object, key) ? String(object[key]) : "(missing)";
 }
 
 function renderConclusionReason(evaluation) {

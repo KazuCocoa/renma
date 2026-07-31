@@ -275,7 +275,7 @@
     "rawOutput": {
       "referenceBase": "experiments/skillspector",
       "reference": "evidence-correlation/captured/fixture-run/skillspector-report.json",
-      "sha256": "sha256:a2a7b455b355fe3c6fedc6c7753db12e38520d9dd3e7d32047001ae3c1370dec"
+      "sha256": "sha256:d80d2c814b48591a381407b480b9df0129bca83f8b88dcc268768b831fe37807"
     },
     "renmaCatalog": {
       "referenceBase": "experiments/skillspector",
@@ -299,16 +299,16 @@
       {
         "evidenceIndexes": [2, 3],
         "rawFindingIds": [
-          "finding-bcdde5523c22425b88b55ab0576037e3",
-          "finding-a03b406dca3a4bb095986f0a37024b61"
+          "finding-8c26408b942e4c1b96af167c7776405a",
+          "finding-effcb965514045799956e475362434e5"
         ],
         "comparisonBasis": "same scanner-native fields except scanner-reported finding_id"
       },
       {
         "evidenceIndexes": [4, 5],
         "rawFindingIds": [
-          "finding-3bfa89e427e6485da6d883cd41ee0a3d",
-          "finding-3e521c49b3f24be3abeafd19d82078a7"
+          "finding-514ff3afd5f64ab8ababc24ae0680d0a",
+          "finding-aa0ef4048b1a406eb016f0a47a31f64c"
         ],
         "comparisonBasis": "same scanner-native fields except scanner-reported finding_id"
       }
@@ -322,7 +322,7 @@
         "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/0",
         "nativeFinding": {
           "id": "LP1",
-          "finding_id": "finding-8ebb5151de654864bd23bdd695746f37",
+          "finding_id": "finding-7e3e36a323314b679ceaeef37857eb04",
           "category": "MCP Least Privilege",
           "pattern": null,
           "severity": "HIGH",
@@ -435,7 +435,7 @@
         "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/1",
         "nativeFinding": {
           "id": "LP1",
-          "finding_id": "finding-2197f96347bb4cf5bf6c08b51c12a0a7",
+          "finding_id": "finding-80e637fd9fb9454ea15e23c4534450ee",
           "category": "MCP Least Privilege",
           "pattern": null,
           "severity": "HIGH",
@@ -548,7 +548,7 @@
         "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/2",
         "nativeFinding": {
           "id": "AS3",
-          "finding_id": "finding-bcdde5523c22425b88b55ab0576037e3",
+          "finding_id": "finding-8c26408b942e4c1b96af167c7776405a",
           "category": "Agent Snooping",
           "pattern": "Skill Enumeration",
           "severity": "MEDIUM",
@@ -591,7 +591,7 @@
         "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/3",
         "nativeFinding": {
           "id": "AS3",
-          "finding_id": "finding-a03b406dca3a4bb095986f0a37024b61",
+          "finding_id": "finding-effcb965514045799956e475362434e5",
           "category": "Agent Snooping",
           "pattern": "Skill Enumeration",
           "severity": "MEDIUM",
@@ -634,7 +634,7 @@
         "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/4",
         "nativeFinding": {
           "id": "AS3",
-          "finding_id": "finding-3bfa89e427e6485da6d883cd41ee0a3d",
+          "finding_id": "finding-514ff3afd5f64ab8ababc24ae0680d0a",
           "category": "Agent Snooping",
           "pattern": "Skill Enumeration",
           "severity": "MEDIUM",
@@ -737,7 +737,7 @@
         "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/5",
         "nativeFinding": {
           "id": "AS3",
-          "finding_id": "finding-3e521c49b3f24be3abeafd19d82078a7",
+          "finding_id": "finding-aa0ef4048b1a406eb016f0a47a31f64c",
           "category": "Agent Snooping",
           "pattern": "Skill Enumeration",
           "severity": "MEDIUM",

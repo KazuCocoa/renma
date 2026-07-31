@@ -329,18 +329,18 @@ export function evaluateExperimentEvidence({
   expectations = fixtureExpectations,
 }) {
   const completeness = rawReport.analysis_completeness;
-  const analyzerStatuses = Array.isArray(completeness?.analyzer_statuses)
+  const analyzerStatusesReported = Array.isArray(
+    completeness?.analyzer_statuses,
+  );
+  const analyzerStatuses = analyzerStatusesReported
     ? completeness.analyzer_statuses
     : [];
   const incompleteAnalyzerStatuses = analyzerStatuses.filter(
     (status) =>
-      status.status === "disabled" ||
-      status.status === "failed" ||
-      status.status === "partial" ||
-      status.status === "unknown" ||
-      (status.skipped ?? 0) > 0 ||
-      (status.failed ?? 0) > 0 ||
-      (status.unaccounted ?? 0) > 0,
+      status.status !== "completed" ||
+      status.skipped !== 0 ||
+      status.failed !== 0 ||
+      status.unaccounted !== 0,
   );
   const correlatedTargets = targetCounts(normalized.evidence, "correlated");
   const unresolvedTargets = targetCounts(normalized.evidence, "unresolved");
@@ -382,10 +382,12 @@ export function evaluateExperimentEvidence({
     ),
     check(
       "producer.completeness",
-      "Producer reported complete analysis with no disabled, failed, partial, skipped, or unknown analyzer work",
+      "Producer reported complete analysis and a non-empty analyzer ledger where every status is completed with zero skipped, failed, and unaccounted work",
       completeness?.is_complete === true &&
+        analyzerStatusesReported &&
+        analyzerStatuses.length > 0 &&
         incompleteAnalyzerStatuses.length === 0,
-      `is_complete=${formatFact(completeness?.is_complete)}, non-complete analyzer statuses=${incompleteAnalyzerStatuses.length}`,
+      `is_complete=${formatFact(completeness?.is_complete)}, analyzer_statuses=${analyzerStatusesReported ? analyzerStatuses.length : "missing"}, non-complete analyzer statuses=${incompleteAnalyzerStatuses.length}`,
     ),
     check(
       "findings.present",
@@ -466,13 +468,9 @@ export function evaluateExperimentEvidence({
     observed: {
       locationPrecisions,
       duplicateStructures,
-      incompleteAnalyzerStatuses: incompleteAnalyzerStatuses.map((status) => ({
-        analyzerId: status.analyzer_id ?? null,
-        status: status.status ?? null,
-        skipped: status.skipped ?? 0,
-        failed: status.failed ?? 0,
-        unaccounted: status.unaccounted ?? 0,
-      })),
+      analyzerStatusesReported,
+      analyzerStatusCount: analyzerStatuses.length,
+      incompleteAnalyzerStatuses: structuredClone(incompleteAnalyzerStatuses),
     },
   };
 }

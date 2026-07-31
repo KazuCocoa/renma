@@ -8,33 +8,30 @@
     "executableSha256": "sha256:f0aacb4c2d48310c9fc9b44229819771166a562394ee887f35bc89bdb9c8498b"
   },
   "git": {
-    "headRevision": "30d3215a1a2a16f183aec436004d6cc4a10895bb",
+    "headRevision": "b0eecaaf9f353dd3237cd6ae85529bec0c16681b",
     "worktreeState": "dirty",
     "statusPorcelain": [
-      " D experiments/skillspector/evidence-correlation/PR-DESCRIPTION.md",
-      " M experiments/skillspector/evidence-correlation/README.md",
       " D experiments/skillspector/evidence-correlation/captured/fixture-run/EXPERIMENT-REPORT.md",
       " D experiments/skillspector/evidence-correlation/captured/fixture-run/invocation.json",
       " M experiments/skillspector/evidence-correlation/captured/fixture-run/normalized-evidence.json",
       " M experiments/skillspector/evidence-correlation/captured/fixture-run/skillspector-report.json",
       " M experiments/skillspector/evidence-correlation/lib.mjs",
       " M experiments/skillspector/evidence-correlation/lib.test.mjs",
-      " M experiments/skillspector/evidence-correlation/run-experiment.mjs",
-      "?? experiments/skillspector/evidence-correlation/report.mjs"
+      " M experiments/skillspector/evidence-correlation/report.mjs"
     ]
   },
   "experimentHarness": {
-    "revisionContext": "30d3215a1a2a16f183aec436004d6cc4a10895bb",
+    "revisionContext": "b0eecaaf9f353dd3237cd6ae85529bec0c16681b",
     "revisionContainsExactHarness": false,
-    "sha256": "sha256:4c72cf9482a19c9dd567943605110e09b599610d567c08089a8d588792da8f3c",
+    "sha256": "sha256:c1015a8f4e5dd3e88b4fbb1b9bb5250aa9d6eccd8fa7fd0cfc7ece07ec5a1c4b",
     "files": [
       {
         "path": "experiments/skillspector/evidence-correlation/lib.mjs",
-        "sha256": "sha256:b4d9cf84ce173c366e0b97861345476248d55a0cc1424aebfbb5dc11106e963c"
+        "sha256": "sha256:c734c8dace96f5d90e0157d2da9b4ac183622535ff74b380a2e56aa95f0f22d6"
       },
       {
         "path": "experiments/skillspector/evidence-correlation/report.mjs",
-        "sha256": "sha256:9cf794a207e77e8fcee9203dfad5fcab68267454bb46fea4a344d0be8d0d085b"
+        "sha256": "sha256:82c087ecfa889267feaa44b5b7702cff85b58bfa2bb43e3dfe797f1ccbce992f"
       },
       {
         "path": "experiments/skillspector/evidence-correlation/run-experiment.mjs",
