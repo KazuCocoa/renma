@@ -567,6 +567,17 @@ inherited by the target surface, and multiple fingerprints are not classified
 as a conflict. Invocation policy is never propagated through static executable
 dependency edges.
 
+Bounded inline helper recognition does not add a diagnostic family. A
+single-line mdast inline-code command immediately after the exact visible
+paragraph cue `Run` or `Run:` contributes the same invocation evidence as a
+fenced helper command. Unsupported inline prose, ordinary code spans,
+blockquotes, other verbs or languages, and secondary spans are silently outside
+the grammar; Renma does not diagnose their non-recognition. Recognized missing,
+unsafe, unscoped, non-canonical, or unavailable inline targets retain existing
+informational invocation resolution and review behavior. Findings, Readiness,
+Security Policy Inventory, CI verdicts, suppression metadata, and exit
+thresholds are unchanged.
+
 ### Finding and evidence JSON contract
 
 Each `findings` entry contains these required fields:

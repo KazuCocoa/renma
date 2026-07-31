@@ -1,0 +1,237 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  collectHelperCommandEvidence,
+  resolveHelperCommandEvidence,
+} from "../src/helper-command-evidence.js";
+import { parseDocument } from "../src/markdown.js";
+import type { Artifact } from "../src/types/artifact.js";
+
+const command = "node tools/check.mjs";
+
+test("recognizes bounded inline Run helper invocations in eligible paragraphs", () => {
+  const fixtures = [
+    {
+      name: "top-level cue",
+      source: `Run \`${command}\`.`,
+      expectedLine: 1,
+    },
+    {
+      name: "colon cue",
+      source: `Run: \`${command}\`.`,
+      expectedLine: 1,
+    },
+    {
+      name: "ordered-list paragraph",
+      source: `1. Run \`${command}\`; inspect the summary.`,
+      expectedLine: 1,
+    },
+    {
+      name: "unordered-list paragraph",
+      source: `- Run \`${command}\` before proceeding.`,
+      expectedLine: 1,
+    },
+    {
+      name: "nested-list paragraph",
+      source: `- Outer\n  - Run \`${command}\`.`,
+      expectedLine: 2,
+    },
+    {
+      name: "soft-wrapped cue",
+      source: `Run\n\`${command}\`; then inspect the output.`,
+      expectedLine: 2,
+    },
+    {
+      name: "formatted visible cue",
+      source: `**Run** \`${command}\`.`,
+      expectedLine: 1,
+    },
+  ] as const;
+
+  for (const fixture of fixtures) {
+    const evidence = collect(fixture.source);
+    assert.equal(evidence.length, 1, fixture.name);
+    assert.equal(evidence[0]?.snippet, command, fixture.name);
+    assert.equal(evidence[0]?.line, fixture.expectedLine, fixture.name);
+    assert.equal(evidence[0]?.rawTarget, "tools/check.mjs", fixture.name);
+  }
+});
+
+test("recognizes only the primary inline command span after the exact cue", () => {
+  const evidence = collect(
+    "Run `node tools/check.mjs`; pass `--local` only when requested.",
+  );
+
+  assert.deepEqual(
+    evidence.map(({ line, snippet, launcher, rawTarget }) => ({
+      line,
+      snippet,
+      launcher,
+      rawTarget,
+    })),
+    [
+      {
+        line: 1,
+        snippet: "node tools/check.mjs",
+        launcher: "node",
+        rawTarget: "tools/check.mjs",
+      },
+    ],
+  );
+  assert.equal(
+    collect("Run `/status` and\n`node tools/smoke.mjs`; inspect the session.")
+      .length,
+    0,
+  );
+});
+
+test("reuses the established launcher, extension, and options grammar", () => {
+  const recognized = [
+    "node tools/check.mjs",
+    "node tools/check.js",
+    "node tools/check.ts",
+    "node tools/check.mts",
+    "node tools/check.cts",
+    "bash scripts/check.sh",
+    "bash scripts/check.bash",
+    "python scripts/check.py",
+    "python3 scripts/check.py",
+    "node --no-warnings tools/check.mjs",
+  ];
+  const rejected = [
+    "npm test",
+    "npx appium",
+    "appium driver doctor xcuitest",
+    "tools/check.mjs",
+    "$ node tools/check.mjs",
+    "node -e \"console.log('test')\"",
+    "node tools/check.txt",
+  ];
+
+  for (const snippet of recognized) {
+    assert.equal(collect(`Run \`${snippet}\`.`).length, 1, snippet);
+  }
+  for (const snippet of rejected) {
+    assert.equal(collect(`Run \`${snippet}\`.`).length, 0, snippet);
+  }
+});
+
+test("rejects prose, structurally ineligible inline code, and hidden examples", () => {
+  const fixtures = [
+    `run \`${command}\`.`,
+    `RUN \`${command}\`.`,
+    `Rerun \`${command}\`.`,
+    `Then run \`${command}\`.`,
+    `You can run \`${command}\`.`,
+    `Before you run \`${command}\`, verify the configuration.`,
+    `Do not run \`${command}\`.`,
+    `To run the check, use \`${command}\`.`,
+    `Try \`${command}\`.`,
+    `Example: \`${command}\`.`,
+    `Run the command \`${command}\`.`,
+    `Run this: \`${command}\`.`,
+    `Use \`${command}\`.`,
+    `# Run \`${command}\``,
+    `> Run \`${command}\`.`,
+    `Run [\`${command}\`](https://example.com).`,
+    `Run **\`${command}\`**.`,
+    `Run \`node\n tools/check.mjs\`.`,
+    `<!-- Run \`${command}\`. -->`,
+  ];
+
+  for (const source of fixtures) {
+    assert.equal(collect(source).length, 0, source);
+  }
+});
+
+test("does not inspect frontmatter or Markdown-ineligible artifacts", () => {
+  const frontmatter = [
+    "---",
+    "name: demo",
+    `description: Run \`${command}\`.`,
+    "---",
+    "# Demo",
+  ].join("\n");
+  assert.equal(collect(frontmatter).length, 0);
+
+  const ineligible = parseDocument({
+    ...artifact(`Run \`${command}\`.`),
+    path: "tools/readme.txt",
+    kind: "unknown",
+    markdownParserEligible: false,
+  });
+  assert.equal(collectHelperCommandEvidence([ineligible]).length, 0);
+});
+
+test("keeps fenced evidence stable and orders mixed occurrences deterministically", () => {
+  const fenced = collect("```sh\nnode tools/check.mjs\n```");
+  assert.deepEqual(fenced, [
+    {
+      sourcePath: "skills/demo/SKILL.md",
+      line: 2,
+      snippet: "node tools/check.mjs",
+      launcher: "node",
+      rawTarget: "tools/check.mjs",
+      sourceSkillDirectory: "skills/demo",
+      pathResolution: {
+        kind: "candidate",
+        path: "tools/check.mjs",
+        source: "repository-root",
+      },
+    },
+  ]);
+
+  const mixed = collect(
+    ["Run `python tools/z.py`.", "", "```sh", command, "```"].join("\n"),
+  );
+  assert.deepEqual(
+    mixed.map(({ line, snippet }) => ({ line, snippet })),
+    [
+      { line: 1, snippet: "python tools/z.py" },
+      { line: 4, snippet: command },
+    ],
+  );
+});
+
+test("recognized inline targets retain exact resolution states", () => {
+  const evidence = collect(
+    [
+      "Run `node tools/check.mjs`.",
+      "",
+      "Run `node ../tools/unsafe.mjs`.",
+      "",
+      "Run `python scripts/local.py`.",
+    ].join("\n"),
+  );
+  const states = new Map([["tools/check.mjs", "absent"]] as const);
+
+  assert.deepEqual(
+    evidence.map((row) => resolveHelperCommandEvidence(row, states).resolution),
+    ["missing", "unsafe", "missing"],
+  );
+  assert.equal(evidence[2]?.pathResolution.kind, "candidate");
+  assert.equal(
+    evidence[2]?.pathResolution.kind === "candidate"
+      ? evidence[2].pathResolution.path
+      : undefined,
+    "skills/demo/scripts/local.py",
+  );
+});
+
+function collect(source: string) {
+  return collectHelperCommandEvidence([parseDocument(artifact(source))]);
+}
+
+function artifact(content: string): Artifact {
+  return {
+    path: "skills/demo/SKILL.md",
+    absolutePath: "/tmp/skills/demo/SKILL.md",
+    kind: "skill",
+    sizeBytes: Buffer.byteLength(content),
+    contentHash: "sha256:test",
+    contentClassification: "text",
+    markdownParserEligible: true,
+    content,
+  };
+}

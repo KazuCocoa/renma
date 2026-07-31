@@ -4,6 +4,11 @@ import {
   classifyRepositorySkillPath,
   logicalSkillDirectory,
 } from "./discovery.js";
+import {
+  ensureMarkdownSyntaxForDocument,
+  markdownNodeText,
+  markdownSourceColumnRange,
+} from "./markdown-syntax.js";
 import type { RepositoryPathState } from "./repository-paths.js";
 import type { ParsedDocument } from "./types/metadata.js";
 
@@ -117,35 +122,12 @@ export function resolveHelperScriptPath(
 export function collectHelperCommandEvidence(
   documents: readonly ParsedDocument[],
 ): HelperCommandEvidence[] {
-  return documents.flatMap((document) =>
-    document.codeFences.flatMap((fence) =>
-      fence.content.split(/\r?\n/).flatMap((line, index) => {
-        const snippet = line.trim();
-        const launcherMatch = HELPER_COMMAND_PATTERN.exec(snippet);
-        if (!launcherMatch) return [];
-        const rawTarget = helperScriptPath(snippet);
-        if (!rawTarget) return [];
-        const launcher = launcherMatch[1] as HelperCommandLauncher;
-        const sourceSkillDirectory = logicalSkillDirectory(
-          document.artifact.path,
-        );
-        return [
-          {
-            sourcePath: document.artifact.path,
-            line: fence.startLine + index + 1,
-            snippet,
-            launcher,
-            rawTarget,
-            ...(sourceSkillDirectory ? { sourceSkillDirectory } : {}),
-            pathResolution: resolveHelperScriptPath(
-              document.artifact.path,
-              rawTarget,
-            ),
-          },
-        ];
-      }),
-    ),
-  );
+  return documents
+    .flatMap((document) => [
+      ...collectFencedHelperCommandEvidence(document),
+      ...collectInlineRunHelperCommandEvidence(document),
+    ])
+    .sort(compareHelperCommandEvidence);
 }
 
 /** Correlate shared recognition evidence with immutable repository path states. */
@@ -234,4 +216,88 @@ function normalizeRepositoryPath(value: string): string | undefined {
   }
 
   return normalized;
+}
+
+function helperCommandEvidenceFromSnippet(
+  document: ParsedDocument,
+  line: number,
+  commandSnippet: string,
+): HelperCommandEvidence | undefined {
+  const snippet = commandSnippet.trim();
+  const launcherMatch = HELPER_COMMAND_PATTERN.exec(snippet);
+  if (!launcherMatch) return undefined;
+  const rawTarget = helperScriptPath(snippet);
+  if (!rawTarget) return undefined;
+  const launcher = launcherMatch[1] as HelperCommandLauncher;
+  const sourceSkillDirectory = logicalSkillDirectory(document.artifact.path);
+  return {
+    sourcePath: document.artifact.path,
+    line,
+    snippet,
+    launcher,
+    rawTarget,
+    ...(sourceSkillDirectory ? { sourceSkillDirectory } : {}),
+    pathResolution: resolveHelperScriptPath(document.artifact.path, rawTarget),
+  };
+}
+
+function collectFencedHelperCommandEvidence(
+  document: ParsedDocument,
+): HelperCommandEvidence[] {
+  return document.codeFences.flatMap((fence) =>
+    fence.content.split(/\r?\n/).flatMap((line, index) => {
+      const evidence = helperCommandEvidenceFromSnippet(
+        document,
+        fence.startLine + index + 1,
+        line,
+      );
+      return evidence ? [evidence] : [];
+    }),
+  );
+}
+
+function collectInlineRunHelperCommandEvidence(
+  document: ParsedDocument,
+): HelperCommandEvidence[] {
+  const syntax = ensureMarkdownSyntaxForDocument(document);
+  if (!syntax) return [];
+
+  return syntax.records.flatMap((record) => {
+    if (
+      record.node.type !== "inlineCode" ||
+      record.parent.type !== "paragraph" ||
+      record.ancestors.some((ancestor) => ancestor.type === "blockquote")
+    ) {
+      return [];
+    }
+    const range = markdownSourceColumnRange(record.node, syntax.bodyStartLine);
+    if (range.startLine !== range.endLine) return [];
+    const visiblePrefix = record.parent.children
+      .slice(0, record.index)
+      .map(markdownNodeText)
+      .join("")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (visiblePrefix !== "Run" && visiblePrefix !== "Run:") return [];
+
+    const evidence = helperCommandEvidenceFromSnippet(
+      document,
+      range.startLine,
+      record.node.value,
+    );
+    return evidence ? [evidence] : [];
+  });
+}
+
+function compareHelperCommandEvidence(
+  left: HelperCommandEvidence,
+  right: HelperCommandEvidence,
+): number {
+  return (
+    left.sourcePath.localeCompare(right.sourcePath) ||
+    left.line - right.line ||
+    left.launcher.localeCompare(right.launcher) ||
+    left.rawTarget.localeCompare(right.rawTarget) ||
+    left.snippet.localeCompare(right.snippet)
+  );
 }

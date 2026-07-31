@@ -464,7 +464,7 @@ test("inventory creation adds no finding or exit-status policy", async (t) => {
   await writeFile(path.join(root, "tools", "unreferenced.mjs"), "// helper\n");
   const before = await scan(root);
   const beforeBom = await bom(root, {}, { omitGeneratedAt: true });
-  await writeSkill(root, "# Demo\n\n```sh\nnode tools/unreferenced.mjs\n```\n");
+  await writeSkill(root, "# Demo\n\nRun `node tools/unreferenced.mjs`.\n");
   const after = await scan(root);
   const afterBom = await bom(root, {}, { omitGeneratedAt: true });
   assert.deepEqual(after.findings, before.findings);
@@ -479,6 +479,153 @@ test("inventory creation adds no finding or exit-status policy", async (t) => {
     1,
   );
   assert.equal(after.executableSurfaceInventory?.summary.totalInvocations, 1);
+  assert.equal(
+    afterBom.executableSurfaceInventory?.invocations[0]?.snippet,
+    "node tools/unreferenced.mjs",
+  );
+});
+
+test("inline Run evidence reuses reference, governance, and dependency reachability projections", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-inline-run-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(path.join(root, "skills", "demo"), { recursive: true });
+  await mkdir(path.join(root, "tools"), { recursive: true });
+  const skillBody = `---
+name: demo
+description: Exercise inline helper evidence. Use when reachability needs validation.
+metadata:
+  renma.allowed-data: '["public"]'
+  renma.network-allowed: "false"
+  renma.external-upload-allowed: "false"
+  renma.secrets-allowed: "false"
+---
+# Demo
+
+Run \`node tools/check.mjs\`; pass \`--local\` only when requested.
+`;
+  const skillPath = path.join(root, "skills", "demo", "SKILL.md");
+  await writeFile(
+    skillPath,
+    skillBody.replace(
+      "Run `node tools/check.mjs`; pass `--local` only when requested.",
+      "Inspect tools/check.mjs before proceeding.",
+    ),
+  );
+  await writeFile(
+    path.join(root, "tools", "check.mjs"),
+    'import "./helper.mjs";\n',
+  );
+  await writeFile(
+    path.join(root, "tools", "helper.mjs"),
+    "export const helper = true;\n",
+  );
+  const before = await scan(root);
+  await writeFile(skillPath, skillBody);
+
+  const result = await scan(root);
+  const inventory = result.executableSurfaceInventory;
+  const beforeInventory = before.executableSurfaceInventory;
+  assert.ok(inventory);
+  assert.ok(beforeInventory);
+  assert.equal(inventory.summary.totalInvocations, 1);
+  assert.equal(inventory.summary.resolvedInvocations, 1);
+  assert.equal(inventory.summary.directlyInvokedSurfaces, 1);
+  assert.equal(inventory.summary.transitivelyReachableSurfaces, 1);
+  assert.equal(inventory.summary.unreachedFromInvocationSurfaces, 0);
+
+  const invocation = inventory.invocations[0];
+  assert.ok(invocation);
+  assert.equal(invocation.sourcePath, "skills/demo/SKILL.md");
+  assert.equal(invocation.line, 12);
+  assert.equal(invocation.snippet, "node tools/check.mjs");
+  assert.equal(invocation.governance.owningSkillResolution, "resolved");
+  assert.equal(invocation.governance.hasEffectivePolicyEvidence, true);
+  assert.deepEqual(
+    invocation.governance.policyEvidence.map((evidence) => evidence.relation),
+    ["source-artifact"],
+  );
+
+  const direct = requiredSurface(inventory, "tools/check.mjs");
+  assert.equal(direct.staticallyReferenced, true);
+  assert.equal(direct.referenceCount, 1);
+  assert.equal(direct.staticallyInvoked, true);
+  assert.equal(direct.invocationCount, 1);
+  assert.equal(
+    direct.dependencyEvidence.staticInvocationReachability,
+    "direct",
+  );
+  assert.equal(direct.dependencyEvidence.minimumInvocationDependencyDepth, 0);
+
+  const transitive = requiredSurface(inventory, "tools/helper.mjs");
+  assert.equal(transitive.staticallyInvoked, false);
+  assert.equal(transitive.invocationCount, 0);
+  assert.equal(
+    transitive.dependencyEvidence.staticInvocationReachability,
+    "transitive",
+  );
+  assert.equal(
+    transitive.dependencyEvidence.minimumInvocationDependencyDepth,
+    1,
+  );
+  assert.equal(
+    transitive.invocationGovernance.invocationsWithEffectivePolicyEvidence,
+    0,
+  );
+  assert.equal(
+    transitive.invocationGovernance.invocationsWithoutEffectivePolicyEvidence,
+    0,
+  );
+  assert.deepEqual(result.findings, before.findings);
+  assert.deepEqual(
+    result.securityPolicyInventory,
+    before.securityPolicyInventory,
+  );
+  assert.equal(result.exitThreshold, before.exitThreshold);
+  assert.match(
+    formatText(result),
+    /Executable surfaces: 2; static reachability 1 direct, 1 transitive; invocations 1\/1 resolved; invocation-context policy evidence 1\/1/,
+  );
+  assert.doesNotMatch(formatText(result), /Inline invocations/);
+
+  const diff = buildExecutableSurfaceDiff(beforeInventory, inventory);
+  assert.equal(diff.summary.totalInvocationsDelta, 1);
+  assert.equal(diff.summary.directlyInvokedSurfacesDelta, 1);
+  assert.equal(diff.summary.transitivelyReachableSurfacesDelta, 1);
+  assert.equal(diff.summary.unreachedFromInvocationSurfacesDelta, -2);
+  assert.deepEqual(diff.newlyTransitivelyReachableSurfacePaths, [
+    "tools/helper.mjs",
+  ]);
+  assert.deepEqual(diff.newlyReachableSkillLocalPaths, []);
+});
+
+test("fenced-to-inline presentation changes preserve semantic invocation identity", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-inline-identity-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(path.join(root, "tools"), { recursive: true });
+  await writeFile(path.join(root, "tools", "check.mjs"), "// check\n");
+  await writeSkill(root, "# Demo\n\n```sh\nnode tools/check.mjs\n```\n");
+  const fenced = (await scan(root)).executableSurfaceInventory;
+  assert.ok(fenced);
+
+  await writeSkill(root, "# Demo\n\nRun `node tools/check.mjs`.\n");
+  const inline = (await scan(root)).executableSurfaceInventory;
+  assert.ok(inline);
+  const diff = buildExecutableSurfaceDiff(fenced, inline);
+
+  assert.deepEqual(
+    fenced.invocations.map(semanticInvocation),
+    inline.invocations.map(semanticInvocation),
+  );
+  assert.equal(diff.summary.totalInvocationsDelta, 0);
+  assert.equal(diff.summary.resolvedInvocationsDelta, 0);
+  assert.deepEqual(diff.invocationResolutionChanges, []);
+  assert.deepEqual(diff.invocationGovernanceChanges, []);
+  assert.equal(
+    diff.changedSurfaces.some((surface) =>
+      surface.reasons.includes("invocations"),
+    ),
+    false,
+  );
 });
 
 test("surface diff uses path identity, reason sets, and line-insensitive invocation identity", async (t) => {
@@ -702,6 +849,19 @@ function requiredSurface(
   );
   assert.ok(surface, surfacePath);
   return surface;
+}
+
+function semanticInvocation(
+  invocation: ExecutableSurfaceInventory["invocations"][number],
+) {
+  return {
+    sourcePath: invocation.sourcePath,
+    launcher: invocation.launcher,
+    target: invocation.normalizedTarget ?? invocation.rawTarget,
+    resolution: invocation.resolution,
+    occurrenceOrdinal: invocation.occurrenceOrdinal,
+    governance: invocation.governance,
+  };
 }
 
 function artifact(sourcePath: string, content: string): Artifact {
