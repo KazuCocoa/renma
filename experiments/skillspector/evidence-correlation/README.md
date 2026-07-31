@@ -23,15 +23,22 @@ only below the already ignored `experiments/skillspector/generated/` tree, so
 no committed fixture is a discoverable `SKILL.md` or executable Python asset.
 The script contains static patterns but is never imported or executed.
 
-The generated repository contains:
+The generated repository and explicit expectations are designed to exercise:
 
 - one governed Skill with an explicit Renma ID and owner;
 - one governed, referenced Python script with inherited ownership;
 - one scanner-visible README excluded from the Renma fixture globs;
-- native findings with severity and confidence;
+- scanner-native severity and confidence when reported;
 - multiple findings per governed asset;
-- exact duplicate findings with distinct scanner-native IDs; and
-- start-line-only locations with no reported end line.
+- duplicate findings without merging them; and
+- scanner-native location precision, including the captured start-line-only
+  case.
+
+The report validates these expectations against each input. Missing findings,
+correlations, target cases, expected precision, duplicate structure, successful
+execution, or complete analysis produce an inconclusive outcome instead of a
+stale positive conclusion. Scanner-native execution and completeness facts
+remain distinct from the experiment's preservation and correlation results.
 
 ## Reproduce locally
 
@@ -49,7 +56,8 @@ The disposable run is written under
 
 - the original SkillSpector JSON report;
 - the original Renma catalog JSON used for correlation;
-- invocation and fixture-hash evidence;
+- invocation, fixture-hash, exact harness-hash, Git revision, and dirty-state
+  evidence;
 - the experimental normalized evidence JSON; and
 - a generated human-readable report.
 
@@ -72,7 +80,14 @@ Every evidence record uses explicit containers:
 - `normalization` adds a safe repository-relative path and location-precision
   description without overwriting scanner fields; and
 - `correlation` records an exact path match, unresolved reason, or ambiguity,
-  plus catalog-derived asset, owner, entrypoint, and dependency context.
+  plus catalog-derived asset, owner, direct Skill association, and dependency
+  context.
+
+`directSkillAssociations` is intentionally narrow. A matched Skill associates
+to itself with `matched-asset-is-skill`; a non-Skill associates only through a
+direct `owns_local_resource` edge with
+`direct-owns-local-resource-edge`. The experiment does not infer transitive
+reachability, route membership, or general entrypoint association.
 
 Only exact normalized source paths correlate. Missing, unsafe, unmatched, and
 ambiguous targets are retained. Duplicate observations never merge records and

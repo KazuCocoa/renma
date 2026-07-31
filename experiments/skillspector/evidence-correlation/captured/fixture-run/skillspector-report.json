@@ -2,7 +2,7 @@
   "skill": {
     "name": "evidence-fixture",
     "source": "/Users/kazu/github/renma/experiments/skillspector/generated/evidence-correlation/repository/skills/evidence-fixture",
-    "scanned_at": "2026-07-31T10:30:06.960383+00:00"
+    "scanned_at": "2026-07-31T13:17:34.066918+00:00"
   },
   "risk_assessment": {
     "score": 32,
@@ -35,7 +35,7 @@
   "issues": [
     {
       "id": "LP1",
-      "finding_id": "finding-a704712c7e9f48c783a054fa24fff0f0",
+      "finding_id": "finding-8ebb5151de654864bd23bdd695746f37",
       "category": "MCP Least Privilege",
       "pattern": null,
       "severity": "HIGH",
@@ -56,7 +56,7 @@
     },
     {
       "id": "LP1",
-      "finding_id": "finding-ef30c984d0564f55913174dfc85ea9db",
+      "finding_id": "finding-2197f96347bb4cf5bf6c08b51c12a0a7",
       "category": "MCP Least Privilege",
       "pattern": null,
       "severity": "HIGH",
@@ -77,7 +77,7 @@
     },
     {
       "id": "AS3",
-      "finding_id": "finding-a75fd13db50542fbafd150af28549b4b",
+      "finding_id": "finding-bcdde5523c22425b88b55ab0576037e3",
       "category": "Agent Snooping",
       "pattern": "Skill Enumeration",
       "severity": "MEDIUM",
@@ -98,7 +98,7 @@
     },
     {
       "id": "AS3",
-      "finding_id": "finding-660378aba3fd403b8348ebc979db4a01",
+      "finding_id": "finding-a03b406dca3a4bb095986f0a37024b61",
       "category": "Agent Snooping",
       "pattern": "Skill Enumeration",
       "severity": "MEDIUM",
@@ -119,7 +119,7 @@
     },
     {
       "id": "AS3",
-      "finding_id": "finding-ce0f41f00e34447ea4777c7625363428",
+      "finding_id": "finding-3bfa89e427e6485da6d883cd41ee0a3d",
       "category": "Agent Snooping",
       "pattern": "Skill Enumeration",
       "severity": "MEDIUM",
@@ -140,7 +140,7 @@
     },
     {
       "id": "AS3",
-      "finding_id": "finding-016e63deabf24d5bb69d4afe0db7d900",
+      "finding_id": "finding-3e521c49b3f24be3abeafd19d82078a7",
       "category": "Agent Snooping",
       "pattern": "Skill Enumeration",
       "severity": "MEDIUM",

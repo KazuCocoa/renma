@@ -9,7 +9,8 @@ import {
   writeFile,
 } from "node:fs/promises";
 import path from "node:path";
-import { normalizeEvidence, renderExperimentReport } from "./lib.mjs";
+import { normalizeEvidence } from "./lib.mjs";
+import { renderExperimentReport } from "./report.mjs";
 
 const experimentRoot = import.meta.dirname;
 const repositoryRoot = path.resolve(experimentRoot, "../../..");
@@ -30,6 +31,16 @@ const outputRoot = capture
   : path.join(generatedExperimentRoot, "run");
 const scannerExecutable =
   process.env.RENMA_SKILLSPECTOR_EXECUTABLE ?? "skillspector";
+const harnessPaths = [
+  "experiments/skillspector/evidence-correlation/lib.mjs",
+  "experiments/skillspector/evidence-correlation/report.mjs",
+  "experiments/skillspector/evidence-correlation/run-experiment.mjs",
+  "experiments/skillspector/evidence-correlation/prepare-fixture.mjs",
+  "experiments/skillspector/evidence-correlation/fixtures/repository/renma.config.json.template",
+  "experiments/skillspector/evidence-correlation/fixtures/repository/skills/evidence-fixture/README.md.template",
+  "experiments/skillspector/evidence-correlation/fixtures/repository/skills/evidence-fixture/SKILL.md.template",
+  "experiments/skillspector/evidence-correlation/fixtures/repository/skills/evidence-fixture/scripts/probe.py.template",
+];
 
 if (capture) {
   try {
@@ -114,11 +125,62 @@ await writeFile(
   `${JSON.stringify(normalized, null, 2)}\n`,
 );
 
-const revision = await run("git", ["rev-parse", "HEAD"]);
+const [headRevision, renmaCliRevision, worktreeStatus] = await Promise.all([
+  run("git", ["rev-parse", "HEAD"]),
+  run("git", [
+    "log",
+    "-1",
+    "--format=%H",
+    "--",
+    "src",
+    "package.json",
+    "package-lock.json",
+    "scripts",
+    "tools",
+    "tsconfig.json",
+  ]),
+  run("git", ["status", "--porcelain=v1", "--untracked-files=all"]),
+]);
+const packageJson = JSON.parse(
+  await readFile(path.join(repositoryRoot, "package.json"), "utf8"),
+);
+const experimentHarnessFiles = await hashSelectedFiles(
+  repositoryRoot,
+  harnessPaths,
+);
+const statusPorcelain = worktreeStatus.stdout
+  .split(/\r?\n/u)
+  .filter((line) => line.length > 0);
 const invocation = {
   experiment: "non-production-skillspector-evidence-correlation",
   captured: capture,
-  renmaRevision: revision.exitCode === 0 ? revision.stdout.trim() : "unknown",
+  renmaCli: {
+    revision:
+      renmaCliRevision.exitCode === 0
+        ? renmaCliRevision.stdout.trim()
+        : "unknown",
+    version: packageJson.version,
+    executable: renmaCli,
+    executableSha256: await hashFile(renmaCli),
+  },
+  git: {
+    headRevision:
+      headRevision.exitCode === 0 ? headRevision.stdout.trim() : "unknown",
+    worktreeState:
+      worktreeStatus.exitCode === 0
+        ? statusPorcelain.length === 0
+          ? "clean"
+          : "dirty"
+        : "unknown",
+    statusPorcelain,
+  },
+  experimentHarness: {
+    revisionContext:
+      headRevision.exitCode === 0 ? headRevision.stdout.trim() : "unknown",
+    revisionContainsExactHarness: statusPorcelain.length === 0,
+    sha256: hashHarness(experimentHarnessFiles),
+    files: experimentHarnessFiles,
+  },
   scanner: {
     executable: scannerExecutable,
     versionProbeOutput:
@@ -173,6 +235,27 @@ async function hashFiles(root) {
       }
     }
   }
+}
+
+async function hashSelectedFiles(root, relativePaths) {
+  return Promise.all(
+    relativePaths.map(async (relativePath) => ({
+      path: relativePath,
+      sha256: await hashFile(path.join(root, relativePath)),
+    })),
+  );
+}
+
+async function hashFile(filePath) {
+  return `sha256:${createHash("sha256")
+    .update(await readFile(filePath))
+    .digest("hex")}`;
+}
+
+function hashHarness(files) {
+  return `sha256:${createHash("sha256")
+    .update(files.map((file) => `${file.path}\0${file.sha256}`).join("\n"))
+    .digest("hex")}`;
 }
 
 function run(command, args) {

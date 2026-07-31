@@ -16,7 +16,257 @@
       "name": "SkillSpector",
       "nameProvenance": "experiment-invocation",
       "version": "2.5.0",
-      "versionProvenance": "scanner-output:/metadata/skillspector_version"
+      "versionProvenance": "scanner-output:/metadata/skillspector_version",
+      "reportedExecution": {
+        "provenance": "scanner-output",
+        "executionSuccessful": true,
+        "analysisCompleteness": {
+          "total_components": 3,
+          "scanned_components": 3,
+          "coverage_percent": 100,
+          "is_complete": false,
+          "execution_successful": true,
+          "fully_inspected_files": 3,
+          "partially_inspected_files": 0,
+          "entirely_uninspected_files": 0,
+          "ledger_exceptions": [],
+          "scope_exclusions": [],
+          "analyzer_statuses": [
+            {
+              "analyzer_id": "behavioral_ast",
+              "status": "completed",
+              "planned_work": 1,
+              "completed": 1,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "behavioral_taint_tracking",
+              "status": "completed",
+              "planned_work": 1,
+              "completed": 1,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "mcp_least_privilege",
+              "status": "completed",
+              "planned_work": 1,
+              "completed": 1,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "mcp_rug_pull",
+              "status": "completed",
+              "planned_work": 1,
+              "completed": 1,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "mcp_tool_poisoning",
+              "status": "completed",
+              "planned_work": 1,
+              "completed": 1,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "meta_analyzer",
+              "status": "disabled",
+              "planned_work": 0,
+              "completed": 0,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0,
+              "reason_code": "disabled_by_configuration",
+              "message": "Analyzer was disabled by the requested configuration."
+            },
+            {
+              "analyzer_id": "semantic_developer_intent",
+              "status": "disabled",
+              "planned_work": 0,
+              "completed": 0,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0,
+              "reason_code": "disabled_by_configuration",
+              "message": "Analyzer was disabled by the requested configuration."
+            },
+            {
+              "analyzer_id": "semantic_quality_policy",
+              "status": "disabled",
+              "planned_work": 0,
+              "completed": 0,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0,
+              "reason_code": "disabled_by_configuration",
+              "message": "Analyzer was disabled by the requested configuration."
+            },
+            {
+              "analyzer_id": "semantic_security_discovery",
+              "status": "disabled",
+              "planned_work": 0,
+              "completed": 0,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0,
+              "reason_code": "disabled_by_configuration",
+              "message": "Analyzer was disabled by the requested configuration."
+            },
+            {
+              "analyzer_id": "static_patterns_agent_snooping",
+              "status": "completed",
+              "planned_work": 3,
+              "completed": 3,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_anti_refusal",
+              "status": "completed",
+              "planned_work": 3,
+              "completed": 3,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_data_exfiltration",
+              "status": "completed",
+              "planned_work": 3,
+              "completed": 3,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_excessive_agency",
+              "status": "completed",
+              "planned_work": 3,
+              "completed": 3,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_harmful_content",
+              "status": "completed",
+              "planned_work": 3,
+              "completed": 3,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_memory_poisoning",
+              "status": "completed",
+              "planned_work": 3,
+              "completed": 3,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_output_handling",
+              "status": "completed",
+              "planned_work": 3,
+              "completed": 3,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_privilege_escalation",
+              "status": "completed",
+              "planned_work": 3,
+              "completed": 3,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_prompt_injection",
+              "status": "completed",
+              "planned_work": 3,
+              "completed": 3,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_rogue_agent",
+              "status": "completed",
+              "planned_work": 3,
+              "completed": 3,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_ssrf",
+              "status": "completed",
+              "planned_work": 3,
+              "completed": 3,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_supply_chain",
+              "status": "completed",
+              "planned_work": 3,
+              "completed": 3,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_system_prompt_leakage",
+              "status": "completed",
+              "planned_work": 3,
+              "completed": 3,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_tool_misuse",
+              "status": "completed",
+              "planned_work": 3,
+              "completed": 3,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_yara",
+              "status": "completed",
+              "planned_work": 3,
+              "completed": 3,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            }
+          ],
+          "limitations": [
+            "Analyzer was disabled by the requested configuration.",
+            "Analyzer was disabled by the requested configuration.",
+            "Analyzer was disabled by the requested configuration.",
+            "Analyzer was disabled by the requested configuration."
+          ],
+          "findings_before_filtering": 6,
+          "findings_after_filtering": 6
+        }
+      }
     },
     "fixture": {
       "id": "skillspector-evidence-correlation-v1",
@@ -25,7 +275,7 @@
     "rawOutput": {
       "referenceBase": "experiments/skillspector",
       "reference": "evidence-correlation/captured/fixture-run/skillspector-report.json",
-      "sha256": "sha256:4770544e9260675d0abbb4da01b2c040f28346fe69d3da88847287d5ae2dc895"
+      "sha256": "sha256:a2a7b455b355fe3c6fedc6c7753db12e38520d9dd3e7d32047001ae3c1370dec"
     },
     "renmaCatalog": {
       "referenceBase": "experiments/skillspector",
@@ -49,16 +299,16 @@
       {
         "evidenceIndexes": [2, 3],
         "rawFindingIds": [
-          "finding-a75fd13db50542fbafd150af28549b4b",
-          "finding-660378aba3fd403b8348ebc979db4a01"
+          "finding-bcdde5523c22425b88b55ab0576037e3",
+          "finding-a03b406dca3a4bb095986f0a37024b61"
         ],
         "comparisonBasis": "same scanner-native fields except scanner-reported finding_id"
       },
       {
         "evidenceIndexes": [4, 5],
         "rawFindingIds": [
-          "finding-ce0f41f00e34447ea4777c7625363428",
-          "finding-016e63deabf24d5bb69d4afe0db7d900"
+          "finding-3bfa89e427e6485da6d883cd41ee0a3d",
+          "finding-3e521c49b3f24be3abeafd19d82078a7"
         ],
         "comparisonBasis": "same scanner-native fields except scanner-reported finding_id"
       }
@@ -72,7 +322,7 @@
         "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/0",
         "nativeFinding": {
           "id": "LP1",
-          "finding_id": "finding-a704712c7e9f48c783a054fa24fff0f0",
+          "finding_id": "finding-8ebb5151de654864bd23bdd695746f37",
           "category": "MCP Least Privilege",
           "pattern": null,
           "severity": "HIGH",
@@ -120,16 +370,26 @@
             }
           }
         },
-        "associatedEntrypoints": [
+        "directSkillAssociations": [
           {
-            "id": "skill.experiment.evidence-correlation",
-            "kind": "skill",
-            "sourcePath": "skills/evidence-fixture/SKILL.md",
-            "contentHash": "sha256:1ab74c950d09dc46aff12649e6bf66514998c24aa91edf3aa13a0e413e9db99a",
-            "ownership": {
-              "declaredOwner": "experiment-maintainers",
-              "effectiveOwner": "experiment-maintainers",
-              "source": "declared"
+            "basis": "direct-owns-local-resource-edge",
+            "explanation": "A direct owns_local_resource catalog edge links the matched asset to this Skill.",
+            "skill": {
+              "id": "skill.experiment.evidence-correlation",
+              "kind": "skill",
+              "sourcePath": "skills/evidence-fixture/SKILL.md",
+              "contentHash": "sha256:1ab74c950d09dc46aff12649e6bf66514998c24aa91edf3aa13a0e413e9db99a",
+              "ownership": {
+                "declaredOwner": "experiment-maintainers",
+                "effectiveOwner": "experiment-maintainers",
+                "source": "declared"
+              }
+            },
+            "relationship": {
+              "from": "skill.experiment.evidence-correlation",
+              "to": "skills/evidence-fixture/scripts/probe.py",
+              "kind": "owns_local_resource",
+              "sourcePath": "skills/evidence-fixture/SKILL.md"
             }
           }
         ],
@@ -175,7 +435,7 @@
         "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/1",
         "nativeFinding": {
           "id": "LP1",
-          "finding_id": "finding-ef30c984d0564f55913174dfc85ea9db",
+          "finding_id": "finding-2197f96347bb4cf5bf6c08b51c12a0a7",
           "category": "MCP Least Privilege",
           "pattern": null,
           "severity": "HIGH",
@@ -223,16 +483,26 @@
             }
           }
         },
-        "associatedEntrypoints": [
+        "directSkillAssociations": [
           {
-            "id": "skill.experiment.evidence-correlation",
-            "kind": "skill",
-            "sourcePath": "skills/evidence-fixture/SKILL.md",
-            "contentHash": "sha256:1ab74c950d09dc46aff12649e6bf66514998c24aa91edf3aa13a0e413e9db99a",
-            "ownership": {
-              "declaredOwner": "experiment-maintainers",
-              "effectiveOwner": "experiment-maintainers",
-              "source": "declared"
+            "basis": "direct-owns-local-resource-edge",
+            "explanation": "A direct owns_local_resource catalog edge links the matched asset to this Skill.",
+            "skill": {
+              "id": "skill.experiment.evidence-correlation",
+              "kind": "skill",
+              "sourcePath": "skills/evidence-fixture/SKILL.md",
+              "contentHash": "sha256:1ab74c950d09dc46aff12649e6bf66514998c24aa91edf3aa13a0e413e9db99a",
+              "ownership": {
+                "declaredOwner": "experiment-maintainers",
+                "effectiveOwner": "experiment-maintainers",
+                "source": "declared"
+              }
+            },
+            "relationship": {
+              "from": "skill.experiment.evidence-correlation",
+              "to": "skills/evidence-fixture/scripts/probe.py",
+              "kind": "owns_local_resource",
+              "sourcePath": "skills/evidence-fixture/SKILL.md"
             }
           }
         ],
@@ -278,7 +548,7 @@
         "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/2",
         "nativeFinding": {
           "id": "AS3",
-          "finding_id": "finding-a75fd13db50542fbafd150af28549b4b",
+          "finding_id": "finding-bcdde5523c22425b88b55ab0576037e3",
           "category": "Agent Snooping",
           "pattern": "Skill Enumeration",
           "severity": "MEDIUM",
@@ -321,7 +591,7 @@
         "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/3",
         "nativeFinding": {
           "id": "AS3",
-          "finding_id": "finding-660378aba3fd403b8348ebc979db4a01",
+          "finding_id": "finding-a03b406dca3a4bb095986f0a37024b61",
           "category": "Agent Snooping",
           "pattern": "Skill Enumeration",
           "severity": "MEDIUM",
@@ -364,7 +634,7 @@
         "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/4",
         "nativeFinding": {
           "id": "AS3",
-          "finding_id": "finding-ce0f41f00e34447ea4777c7625363428",
+          "finding_id": "finding-3bfa89e427e6485da6d883cd41ee0a3d",
           "category": "Agent Snooping",
           "pattern": "Skill Enumeration",
           "severity": "MEDIUM",
@@ -408,7 +678,23 @@
             "source": "declared"
           }
         },
-        "associatedEntrypoints": [],
+        "directSkillAssociations": [
+          {
+            "basis": "matched-asset-is-skill",
+            "explanation": "The exactly matched asset is itself a Skill entrypoint.",
+            "skill": {
+              "id": "skill.experiment.evidence-correlation",
+              "kind": "skill",
+              "sourcePath": "skills/evidence-fixture/SKILL.md",
+              "contentHash": "sha256:1ab74c950d09dc46aff12649e6bf66514998c24aa91edf3aa13a0e413e9db99a",
+              "ownership": {
+                "declaredOwner": "experiment-maintainers",
+                "effectiveOwner": "experiment-maintainers",
+                "source": "declared"
+              }
+            }
+          }
+        ],
         "relationships": [
           {
             "from": "skill.experiment.evidence-correlation",
@@ -451,7 +737,7 @@
         "rawFindingReference": "evidence-correlation/captured/fixture-run/skillspector-report.json#/issues/5",
         "nativeFinding": {
           "id": "AS3",
-          "finding_id": "finding-016e63deabf24d5bb69d4afe0db7d900",
+          "finding_id": "finding-3e521c49b3f24be3abeafd19d82078a7",
           "category": "Agent Snooping",
           "pattern": "Skill Enumeration",
           "severity": "MEDIUM",
@@ -495,7 +781,23 @@
             "source": "declared"
           }
         },
-        "associatedEntrypoints": [],
+        "directSkillAssociations": [
+          {
+            "basis": "matched-asset-is-skill",
+            "explanation": "The exactly matched asset is itself a Skill entrypoint.",
+            "skill": {
+              "id": "skill.experiment.evidence-correlation",
+              "kind": "skill",
+              "sourcePath": "skills/evidence-fixture/SKILL.md",
+              "contentHash": "sha256:1ab74c950d09dc46aff12649e6bf66514998c24aa91edf3aa13a0e413e9db99a",
+              "ownership": {
+                "declaredOwner": "experiment-maintainers",
+                "effectiveOwner": "experiment-maintainers",
+                "source": "declared"
+              }
+            }
+          }
+        ],
         "relationships": [
           {
             "from": "skill.experiment.evidence-correlation",

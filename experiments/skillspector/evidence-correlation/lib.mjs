@@ -4,6 +4,33 @@ import path from "node:path";
 export const experimentalSchemaVersion =
   "renma.experiment.skillspector-evidence.v0";
 
+export const fixtureExpectations = Object.freeze({
+  fixtureId: "skillspector-evidence-correlation-v1",
+  correlatedTargets: [
+    {
+      path: "skills/evidence-fixture/SKILL.md",
+      kind: "skill",
+      minimumFindings: 2,
+    },
+    {
+      path: "skills/evidence-fixture/scripts/probe.py",
+      kind: "script",
+      minimumFindings: 2,
+    },
+  ],
+  unresolvedTargets: [
+    {
+      path: "skills/evidence-fixture/README.md",
+      minimumFindings: 2,
+    },
+  ],
+  locationPrecision: "start-line-only",
+  duplicateGroups: [
+    { path: "skills/evidence-fixture/README.md", evidenceCount: 2 },
+    { path: "skills/evidence-fixture/SKILL.md", evidenceCount: 2 },
+  ],
+});
+
 /** Normalize one scanner-reported path without treating backslashes as separators. */
 export function normalizeScannerTarget(scannerTargetPath, scannerLocation) {
   const scannerPath = scannerLocation?.file;
@@ -144,16 +171,34 @@ export function correlateTarget(target, catalog) {
         dependency.from === asset.id || dependency.to === asset.id,
     )
     .map((dependency) => structuredClone(dependency));
-  const entrypoints = dependencies
-    .filter(
-      (dependency) =>
-        dependency.kind === "owns_local_resource" && dependency.to === asset.id,
-    )
-    .map((dependency) =>
-      assets.find((candidate) => candidate.id === dependency.from),
-    )
-    .filter((candidate) => candidate?.kind === "skill")
-    .map(projectAsset);
+  const directSkillAssociations =
+    asset.kind === "skill"
+      ? [
+          {
+            basis: "matched-asset-is-skill",
+            explanation:
+              "The exactly matched asset is itself a Skill entrypoint.",
+            skill: projectAsset(asset),
+          },
+        ]
+      : dependencies
+          .filter(
+            (dependency) =>
+              dependency.kind === "owns_local_resource" &&
+              dependency.to === asset.id,
+          )
+          .map((dependency) => ({
+            dependency,
+            skill: assets.find((candidate) => candidate.id === dependency.from),
+          }))
+          .filter(({ skill }) => skill?.kind === "skill")
+          .map(({ dependency, skill }) => ({
+            basis: "direct-owns-local-resource-edge",
+            explanation:
+              "A direct owns_local_resource catalog edge links the matched asset to this Skill.",
+            skill: projectAsset(skill),
+            relationship: structuredClone(dependency),
+          }));
 
   return {
     provenance: "experiment-correlation",
@@ -161,7 +206,7 @@ export function correlateTarget(target, catalog) {
     reasonCode: "exact-repository-relative-path",
     explanation: `The normalized target exactly matches Renma asset sourcePath "${asset.sourcePath}".`,
     asset: projectAsset(asset),
-    associatedEntrypoints: entrypoints,
+    directSkillAssociations,
     relationships,
     candidates: [],
   };
@@ -224,6 +269,14 @@ export function normalizeEvidence({
         nameProvenance: "experiment-invocation",
         version: rawReport.metadata?.skillspector_version ?? null,
         versionProvenance: "scanner-output:/metadata/skillspector_version",
+        reportedExecution: {
+          provenance: "scanner-output",
+          executionSuccessful: rawReport.execution_successful ?? null,
+          analysisCompleteness:
+            rawReport.analysis_completeness === undefined
+              ? null
+              : structuredClone(rawReport.analysis_completeness),
+        },
       },
       fixture: {
         id: fixtureId,
@@ -268,6 +321,162 @@ export function normalizeEvidence({
   };
 }
 
+/** Evaluate explicit fixture predicates without interpreting scanner policy. */
+export function evaluateExperimentEvidence({
+  normalized,
+  rawReport,
+  invocation,
+  expectations = fixtureExpectations,
+}) {
+  const completeness = rawReport.analysis_completeness;
+  const analyzerStatuses = Array.isArray(completeness?.analyzer_statuses)
+    ? completeness.analyzer_statuses
+    : [];
+  const incompleteAnalyzerStatuses = analyzerStatuses.filter(
+    (status) =>
+      status.status === "disabled" ||
+      status.status === "failed" ||
+      status.status === "partial" ||
+      status.status === "unknown" ||
+      (status.skipped ?? 0) > 0 ||
+      (status.failed ?? 0) > 0 ||
+      (status.unaccounted ?? 0) > 0,
+  );
+  const correlatedTargets = targetCounts(normalized.evidence, "correlated");
+  const unresolvedTargets = targetCounts(normalized.evidence, "unresolved");
+  const locationPrecisions = countBy(
+    normalized.evidence.map((item) => item.normalization.locationPrecision),
+  );
+  const duplicateStructures = normalized.observations.duplicateGroups.map(
+    (group) => {
+      const targetPaths = [
+        ...new Set(
+          group.evidenceIndexes.map(
+            (index) =>
+              normalized.evidence[index]?.normalization.target
+                .repositoryRelativePath ?? null,
+          ),
+        ),
+      ];
+      return {
+        targetPaths,
+        evidenceCount: group.evidenceIndexes.length,
+      };
+    },
+  );
+
+  const checks = [
+    check(
+      "fixture.identity",
+      "Expected fixture identity",
+      normalized.source.fixture.id === expectations.fixtureId,
+      normalized.source.fixture.id,
+    ),
+    check(
+      "producer.execution",
+      "Producer reported successful execution",
+      rawReport.execution_successful === true &&
+        completeness?.execution_successful === true &&
+        [0, 1].includes(invocation?.scanner?.exitCode),
+      `report=${formatFact(rawReport.execution_successful)}, completeness=${formatFact(completeness?.execution_successful)}, exit=${formatFact(invocation?.scanner?.exitCode)}`,
+    ),
+    check(
+      "producer.completeness",
+      "Producer reported complete analysis with no disabled, failed, partial, skipped, or unknown analyzer work",
+      completeness?.is_complete === true &&
+        incompleteAnalyzerStatuses.length === 0,
+      `is_complete=${formatFact(completeness?.is_complete)}, non-complete analyzer statuses=${incompleteAnalyzerStatuses.length}`,
+    ),
+    check(
+      "findings.present",
+      "At least one native finding",
+      normalized.counts.rawFindingCount > 0,
+      normalized.counts.rawFindingCount,
+    ),
+    check(
+      "correlations.present",
+      "At least one exact asset correlation",
+      normalized.counts.correlatedCount > 0,
+      normalized.counts.correlatedCount,
+    ),
+    ...expectations.correlatedTargets.map((expected) => {
+      const matches = correlatedTargets.get(expected.path) ?? [];
+      return check(
+        `target.correlated:${expected.path}`,
+        `Expected correlated ${expected.kind} target ${expected.path}`,
+        matches.length >= expected.minimumFindings &&
+          matches.every(
+            (item) => item.correlation.asset?.kind === expected.kind,
+          ),
+        `${matches.length} finding(s)`,
+      );
+    }),
+    ...expectations.unresolvedTargets.map((expected) => {
+      const matches = unresolvedTargets.get(expected.path) ?? [];
+      return check(
+        `target.unresolved:${expected.path}`,
+        `Expected unresolved target ${expected.path}`,
+        matches.length >= expected.minimumFindings,
+        `${matches.length} finding(s)`,
+      );
+    }),
+    check(
+      "locations.expected-precision",
+      `Every finding has ${expectations.locationPrecision} precision`,
+      normalized.evidence.length > 0 &&
+        Object.keys(locationPrecisions).length === 1 &&
+        locationPrecisions[expectations.locationPrecision] ===
+          normalized.evidence.length,
+      formatCounts(locationPrecisions),
+    ),
+    check(
+      "duplicates.expected-structure",
+      "Duplicate observations match the explicit fixture structure",
+      duplicateStructures.length === expectations.duplicateGroups.length &&
+        expectations.duplicateGroups.every((expected) =>
+          duplicateStructures.some(
+            (actual) =>
+              actual.targetPaths.length === 1 &&
+              actual.targetPaths[0] === expected.path &&
+              actual.evidenceCount === expected.evidenceCount,
+          ),
+        ),
+      duplicateStructures.length === 0
+        ? "none"
+        : duplicateStructures
+            .map(
+              (group) =>
+                `${group.targetPaths.join("+") || "missing target"}: ${group.evidenceCount}`,
+            )
+            .join(", "),
+    ),
+  ];
+  const allPredicatesSatisfied = checks.every((item) => item.passed);
+
+  return {
+    expectations: structuredClone(expectations),
+    checks,
+    allPredicatesSatisfied,
+    outcome: allPredicatesSatisfied
+      ? "proceed toward a scanner-specific adapter prototype"
+      : "run another experiment before defining an adapter boundary",
+    failedCheckIds: checks
+      .filter((item) => !item.passed)
+      .map((item) => item.id),
+    observed: {
+      locationPrecisions,
+      duplicateStructures,
+      incompleteAnalyzerStatuses: incompleteAnalyzerStatuses.map((status) => ({
+        analyzerId: status.analyzer_id ?? null,
+        status: status.status ?? null,
+        skipped: status.skipped ?? 0,
+        failed: status.failed ?? 0,
+        unaccounted: status.unaccounted ?? 0,
+      })),
+    },
+  };
+}
+
 export function observeDuplicates(evidence) {
   const groups = new Map();
   for (const item of evidence) {
@@ -291,251 +500,6 @@ export function observeDuplicates(evidence) {
     }));
 }
 
-export function renderExperimentReport({
-  normalized,
-  rawReport,
-  catalog,
-  invocation,
-}) {
-  const firstCorrelated = normalized.evidence.find(
-    (item) => item.correlation.status === "correlated",
-  );
-  const firstUnresolved = normalized.evidence.find(
-    (item) => item.correlation.status === "unresolved",
-  );
-  const firstScript = normalized.evidence.find(
-    (item) => item.correlation.asset?.kind === "script",
-  );
-  const counts = normalized.counts;
-  const nativeRisk = rawReport.risk_assessment ?? {};
-  const locationCounts = countBy(
-    normalized.evidence.map((item) => item.normalization.locationPrecision),
-  );
-  const opaqueFields = [
-    "risk_assessment.score/severity/recommendation",
-    "issue category and pattern",
-    "scanner-native severity and confidence",
-    "explanation and remediation",
-    "intent and tags",
-    "filtering_mode",
-    "analysis_completeness and analyzer statuses",
-  ];
-
-  return `# Experimental SkillSpector Evidence Correlation Report
-
-> Experimental only. This report is not a Renma product capability, public
-> schema, native diagnostic source, readiness input, or CI policy.
-
-## Research question and result
-
-Can Renma preserve external scanner evidence as auditable facts and correlate
-it with governed assets without treating the scanner's conclusions as native
-Renma diagnostics?
-
-For this fixture, **yes at the fact-and-correlation layers**. All
-${counts.rawFindingCount} scanner findings remain present as scanner-native
-objects, ${counts.correlatedCount} correlate to exactly one Renma asset by an
-exact repository-relative path, and ${counts.unresolvedCount} remain visible as
-unresolved evidence. No result is converted to a Renma diagnostic or used for
-readiness.
-
-## Invocation context
-
-| Evidence | Value |
-| --- | --- |
-| Renma revision | \`${invocation.renmaRevision ?? "unknown"}\` |
-| Fixture | \`${normalized.source.fixture.id}\` |
-| Fixture scanner target | \`${normalized.source.fixture.scannerTargetPath}\` |
-| Scanner | ${normalized.source.scanner.name} ${normalized.source.scanner.version ?? "unknown"} |
-| Scanner executable | \`${invocation.scanner.executable}\` |
-| Scanner arguments | \`${invocation.scanner.args.join(" ")}\` |
-| Scanner exit | ${invocation.scanner.exitCode} |
-| Renma catalog arguments | \`${invocation.renmaCatalog.args.join(" ")}\` |
-| Raw scanner output | \`${normalized.source.rawOutput.reference}\` |
-| Raw scanner SHA-256 | \`${normalized.source.rawOutput.sha256}\` |
-| Raw Renma catalog | \`${normalized.source.renmaCatalog.reference}\` |
-| Catalog SHA-256 | \`${normalized.source.renmaCatalog.sha256}\` |
-
-Raw artifact references above are relative to
-\`${normalized.source.rawOutput.referenceBase}\`. The fixture file hashes are
-recorded in \`invocation.json\`. The raw report's
-\`skill.scanned_at\`, scanner-generated finding IDs, absolute source path, and
-all scanner-wide metadata are preserved rather than made reproducible-looking.
-The same scanner version and fixture can reproduce the analysis, but byte-for-
-byte raw output is not expected because SkillSpector emits a timestamp and
-run-specific finding IDs.
-
-## Results
-
-| Observation | Count or value |
-| --- | --- |
-| Raw findings | ${counts.rawFindingCount} |
-| Normalized evidence records | ${counts.normalizedEvidenceCount} |
-| Exact asset correlations | ${counts.correlatedCount} |
-| Unresolved correlations | ${counts.unresolvedCount} |
-| Ambiguous correlations | ${counts.ambiguousCount} |
-| Duplicate groups | ${counts.duplicateGroupCount} |
-| Evidence records in duplicate groups | ${counts.duplicateEvidenceCount} |
-| Location precision | ${Object.entries(locationCounts)
-    .map(([key, value]) => `${key}: ${value}`)
-    .join(", ")} |
-| Scanner-native assessment | score ${nativeRisk.score ?? "unknown"}, severity ${nativeRisk.severity ?? "unknown"}, recommendation ${nativeRisk.recommendation ?? "unknown"} (opaque) |
-
-The scanner-native assessment is reported only for audit context. Renma does
-not compare it with Renma severity or readiness.
-
-## Fixture matrix
-
-| Required case | Concrete evidence |
-| --- | --- |
-| Direct asset mapping | Findings on \`SKILL.md\` normalize to \`skills/evidence-fixture/SKILL.md\` and exactly match the governed Skill asset. |
-| Multiple findings on one asset | Duplicate AS3 findings remain separate on the Skill; LP1 capability findings remain separate on the script. |
-| Referenced executable | ${firstScript ? `Evidence ${firstScript.evidenceIndex} correlates to \`${firstScript.correlation.asset.id}\`; exact \`owns_local_resource\` and \`statically_references\` edges are retained.` : "No correlated script finding was observed."} |
-| Outside governed assets | Findings on \`README.md\` normalize inside the Skill directory, have no exact catalog asset, and remain unresolved. |
-| No precise range | SkillSpector reported only a start line for every observed finding; each native \`end_line\` is null and the derived precision is \`start-line-only\`. |
-| Duplicate findings | ${counts.duplicateGroupCount} group(s) compare equal after excluding only scanner-generated \`finding_id\`; every raw ID and record is preserved. |
-| Native severity/confidence | Native values remain inside each unchanged \`nativeFinding\`; no common severity scale is created. |
-
-## Concrete raw evidence
-
-The following object is copied from the authoritative scanner report:
-
-\`\`\`json
-${JSON.stringify(rawReport.issues[0] ?? null, null, 2)}
-\`\`\`
-
-## Concrete normalized evidence
-
-This experimental record keeps the native object and labels every derived
-layer:
-
-\`\`\`json
-${JSON.stringify(firstCorrelated ?? null, null, 2)}
-\`\`\`
-
-## Concrete Renma asset context
-
-The correlation result is exact path evidence from the captured Renma catalog,
-not scanner policy interpretation:
-
-\`\`\`json
-${JSON.stringify(firstScript?.correlation ?? firstCorrelated?.correlation ?? null, null, 2)}
-\`\`\`
-
-## Unresolved evidence example
-
-No owner, dependency, or policy heuristic is used to force a match:
-
-\`\`\`json
-${JSON.stringify(firstUnresolved ?? null, null, 2)}
-\`\`\`
-
-## Duplicate observations
-
-${
-  normalized.observations.duplicateGroups.length === 0
-    ? "No duplicate group was observed."
-    : normalized.observations.duplicateGroups
-        .map(
-          (group) =>
-            `- Evidence ${group.evidenceIndexes.join(", ")} have ${group.comparisonBasis}. Raw IDs: ${group.rawFindingIds.map((id) => `\`${id}\``).join(", ")}.`,
-        )
-        .join("\n")
-}
-
-This comparison is intentionally not a stable fingerprint. The experiment
-does not merge, suppress, or discard duplicates.
-
-## Information lost or changed during normalization
-
-- No per-finding scanner field is lost: the complete issue object is copied
-  unchanged into \`scannerFact.nativeFinding\`, and the full raw report remains
-  authoritative.
-- Report-wide SkillSpector fields are not duplicated into every evidence
-  record. They remain in the referenced raw output.
-- The scanner-reported file path is not overwritten. A separate derived
-  repository-relative path is added with its normalization explanation.
-- A location-precision label is derived from the native location. Here,
-  \`end_line: null\` remains visible; the label does not invent an end line.
-- Renma context is projected from the captured catalog. It adds identity,
-  ownership, hashes, exact entrypoint relationships, and dependencies without
-  changing scanner semantics.
-
-## Scanner-specific fields that remain opaque
-
-${opaqueFields.map((field) => `- \`${field}\``).join("\n")}
-
-In particular, \`LOW\`, \`MEDIUM\`, \`HIGH\`, confidence numbers, score, and
-recommendation retain only SkillSpector's meaning. Another scanner may expose
-similar-looking values with incompatible semantics.
-
-## Fields that appeared useful across scanners
-
-- producer name and version with provenance;
-- immutable raw-output reference and digest;
-- raw finding locator and native payload;
-- reported target and location, including missing precision;
-- separately derived repository-relative target;
-- correlation status, reason code, and human-readable explanation;
-- exact Renma asset ID, path, content hash, kind, and ownership;
-- exact catalog relationships and associated Skill entrypoints.
-
-These are observations, not a universal schema. A different producer should
-not be forced to provide SkillSpector's rule, severity, confidence, or
-remediation model.
-
-## Limitations and unresolved questions
-
-- SkillSpector 2.5.0 generated run-specific finding IDs, so they are raw
-  identifiers rather than stable fingerprints.
-- The scanner did not report complete source ranges for these findings.
-- Exact path correlation cannot bind excluded files such as this fixture's
-  README, even though the scanner inspected them.
-- Only one fixture, scanner version, and JSON contract are exercised here.
-- The observed static-only run intentionally disables semantic analyzers, and
-  producer completeness remains distinct from evidence preservation.
-- The experiment does not establish how renamed assets, deleted files,
-  symlinks, multiple scan roots, suppressed findings, or cross-repository
-  targets should bind.
-- Catalog content hashes help identify matched assets, but SkillSpector does
-  not report matching per-component hashes for independent verification.
-
-## Implications for a possible future adapter
-
-A future SkillSpector-specific adapter could preserve the native report by
-reference, copy native findings losslessly, add explicit path-normalization
-provenance, and perform exact catalog correlation. It should keep unresolved
-and ambiguous records, treat raw finding IDs as opaque, and keep scanner
-assessment separate from any later Renma governance interpretation.
-
-This experiment does not justify a generic adapter framework, stable public
-schema, severity translation, or scanner-triggered policy. More versions and
-failure modes should be tested inside a scanner-specific prototype before any
-public boundary is proposed.
-
-## Why findings should not affect readiness yet
-
-- Correlation answers which asset is associated; it does not establish a
-  reviewed governance rule.
-- The fixture includes duplicate and deliberately false-positive-candidate
-  findings, so counts and severity cannot be consumed as readiness facts.
-- Static-only completeness is not equivalent to a complete review profile.
-- Scanner severity, confidence, score, remediation, and recommendation are
-  producer policy, not Renma policy.
-- No stable finding identity, suppression governance, lifecycle behavior, or
-  version-compatibility contract has been demonstrated.
-
-## Conclusion
-
-**Proceed toward a scanner-specific adapter prototype.** The evidence shows
-that lossless native finding preservation and exact Renma asset correlation
-can coexist without creating native Renma diagnostics. The prototype should
-remain non-production and should next exercise report-version changes,
-suppression, missing locations, unsafe paths, ambiguous catalog paths, and
-scanner failures before any adapter boundary is considered stable.
-`;
-}
-
 export function sha256(text) {
   return `sha256:${createHash("sha256").update(text).digest("hex")}`;
 }
@@ -554,4 +518,32 @@ function countBy(values) {
   const counts = {};
   for (const value of values) counts[value] = (counts[value] ?? 0) + 1;
   return counts;
+}
+
+function targetCounts(evidence, status) {
+  const targets = new Map();
+  for (const item of evidence) {
+    if (item.correlation.status !== status) continue;
+    const target = item.normalization.target.repositoryRelativePath;
+    if (target === null) continue;
+    const group = targets.get(target) ?? [];
+    group.push(item);
+    targets.set(target, group);
+  }
+  return targets;
+}
+
+function check(id, label, passed, observed) {
+  return { id, label, passed, observed: String(observed) };
+}
+
+function formatFact(value) {
+  return value === undefined || value === null ? "unknown" : String(value);
+}
+
+function formatCounts(counts) {
+  const entries = Object.entries(counts);
+  return entries.length === 0
+    ? "none reported"
+    : entries.map(([key, value]) => `${key}: ${value}`).join(", ");
 }
