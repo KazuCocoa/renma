@@ -8,6 +8,17 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
+- Extended bounded direct helper-invocation evidence from fenced command lines
+  to single-line inline code spans whose mdast paragraph prefix is exactly
+  `Run` or `Run:`. Top-level and nested list-item paragraphs are supported;
+  cue emphasis and strong formatting remain harmless only when they contain
+  textual cue content. Blockquotes, headings, links, images, non-comment HTML,
+  linked or emphasized command spans, broader prose, chained secondary spans,
+  other verbs, lowercase or multilingual cues, and arbitrary inline code remain
+  outside the grammar. Fenced and inline forms share the existing launcher,
+  target, resolution, governance, reference deduplication, semantic identity,
+  and dependency-reachability projections without a schema, finding, readiness,
+  CI, or package-version change.
 - Extended `renma.executable-surface-inventory.v1` with bounded, non-executing
   static dependency evidence for JavaScript/TypeScript ESM declarations and
   Python explicit relative imports. A fixed private analyzer boundary emits

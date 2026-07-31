@@ -481,9 +481,35 @@ repository path candidate collection, existing path diagnostics, and the
 inventory. The recognized launchers remain `node`, `bash`, `sh`, `python`, and
 `python3`; `.ts`, `.mts`, and `.cts` join the established helper extensions,
 while safe path boundaries are unchanged.
+The collector recognizes complete helper commands on fenced-code lines and one
+additional mdast-bounded form: a single-line `inlineCode` node directly owned
+by a paragraph whose preceding visible text, after whitespace normalization,
+is exactly `Run` or `Run:`. Paragraphs may be top-level or nested in ordered or
+unordered list items. A blockquote ancestor excludes the occurrence, as do
+heading, link, emphasis, strong, and other non-paragraph direct parents.
+
+Inline collection consumes `MarkdownSyntax` already attached by
+`parseDocument()`. It traverses the retained node records once, converts mdast
+positions through the shared body offset, and validates the cue structure
+before deriving its text. Cue children may be text, emphasis or strong
+containers composed only of allowed cue children, Markdown line breaks, or
+HTML comments ignored consistently with shared Markdown text semantics. Links,
+images, inline code, non-comment HTML, reference-like nodes, and every other
+unsupported node reject the candidate, including when nested inside an allowed
+container. Link labels and image alt text therefore cannot establish the
+imperative cue. Collection does not scan raw lines for backticks, reparse normal
+snapshot documents, or add inline-code projections to `ParsedDocument`.
+
+Fenced and inline collectors both pass their complete command snippet through
+one evidence constructor. Launcher matching, `helperScriptPath()`, owning-Skill
+directory derivation, and `resolveHelperScriptPath()` therefore cannot diverge.
 The module retains source lines and exact path states without becoming a
-general shell parser. Existing diagnostics use the same recognition and
-resolution evidence but keep their established IDs, severity, remediation,
+general shell or natural-language parser. Ordinary inline code is not
+invocation evidence. Quoted examples are excluded because a blockquote may be
+copied or external text; lowercase, other verbs, multilingual cues, secondary
+code spans after a first span, chained commands, and alternatives are
+intentional false negatives. Existing diagnostics use the same recognition
+and resolution evidence but keep their established IDs, severity, remediation,
 and behavior.
 
 `src/static-support.ts` owns both exact support references and the minimum-depth
@@ -528,7 +554,10 @@ edges.
 
 Raw invocation rows retain source lines, while diff identity uses source path,
 launcher, normalized or raw target, and occurrence ordinal so unrelated
-preceding-line edits are not semantic add/remove events. The invocation
+preceding-line edits and fenced-to-inline presentation changes are not semantic
+add/remove events. Invocation occurrences are deterministically ordered by
+source path, line, launcher, target, and snippet. Source columns and syntax
+origin are not public inventory fields. The invocation
 governance fingerprint covers only owning-Skill resolution and normalized
 policy relationships. It excludes line numbers, snippets, unrelated invocation
 resolution, absolute paths, and time-dependent values.

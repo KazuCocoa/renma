@@ -874,6 +874,54 @@ come from recognized launchers, a bounded first-line shebang for text files,
 then a supported extension fallback. Hints are descriptive evidence, not an
 execution decision.
 
+Direct helper commands remain recognized on fenced-code lines. Renma also
+recognizes this exact bounded inline form:
+
+```markdown
+Run `node tools/check.mjs`.
+Run: `python scripts/check.py`.
+- Run `bash scripts/check.sh` before proceeding.
+```
+
+The complete command must occupy one `inlineCode` node on one source line. Its
+direct mdast parent must be a paragraph, and the visible paragraph text before
+the code span must normalize to exactly case-sensitive `Run` or `Run:`.
+Top-level, ordered-list, unordered-list, and nested-list paragraphs qualify,
+including a soft source wrap between the cue and code span. Harmless formatting
+of the cue with emphasis or strong may qualify when it contains only allowed
+textual cue content and its visible text remains exactly `Run`. Markdown line
+breaks are whitespace and HTML comments may be ignored. Links, images, inline
+code, non-comment HTML, reference-like nodes, and unsupported descendants
+cannot contribute cue text; in particular, a link label or image alt value of
+`Run` is not an imperative cue. The command span itself must still be a direct
+paragraph child.
+
+Headings, blockquotes, linked commands, emphasized or strongly formatted
+command spans, frontmatter, HTML-comment examples, multiline code spans, and
+ordinary inline code are excluded structurally. Blockquotes are intentionally
+excluded because quoted material may be an example or copied external
+instruction. Lowercase or case-insensitive cues, other English verbs,
+multilingual cues, broad prose classification, and shell prompt stripping are
+not supported. For example, `Then run`, `Do not run`, `Try`, `Run this:`, and
+bare `` `node tools/check.mjs` `` remain outside the grammar.
+
+Only the span immediately following the exact cue can qualify. In
+`` Run `node tools/check.mjs`; pass `--local` when requested. ``, the command is
+one invocation and the option span is not another. In
+`` Run `/status` and `node tools/smoke.mjs`. ``, the second span is not
+recognized because its preceding visible paragraph text is no longer exactly
+the cue. Chained commands, alternatives, and secondary spans are deliberately
+deferred.
+
+Inline and fenced commands use the same helper parser, path resolver,
+invocation governance, and executable-dependency reachability. A path already
+visible as a static reference on the same source path and line remains one
+reference rather than being counted again when it becomes an invocation.
+Inline syntax adds no origin field or separate public schema: scan JSON and BOM
+use the established invocation rows. Recognition is deterministic,
+reporting-only, and does not execute the command or imply general
+natural-language understanding.
+
 Invocation resolution distinguishes `resolved`, `missing`, `unsafe`,
 `unscoped`, `noncanonical`, `excluded`, `deep`, `oversize`, `unsupported`,
 `symlink`, and `unreadable`. Unavailable targets never become invented surface

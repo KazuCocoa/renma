@@ -147,6 +147,23 @@ path; invocation rows are sorted by source path, line, launcher, and target;
 dependency rows are sorted by source path, line, analyzer, relation, target
 candidates, and raw specifier.
 
+Invocation rows combine the established fenced helper-command evidence with
+bounded inline `Run`/`Run:` evidence. The inline command must be a single-line
+mdast `inlineCode` node directly under a paragraph, immediately after the exact
+structurally textual cue, and outside blockquotes. Text plus text-only emphasis
+or strong formatting may form the cue; links, images, inline code, non-comment
+HTML, reference-like nodes, and unsupported descendants may not. Both forms use
+the same launcher, target resolution, occurrence ordinal, governance, and
+direct/transitive reachability semantics. BOM v2 adds no syntax-origin field
+and does not distinguish fenced from inline presentation. Ordinary inline code,
+quoted examples, broader prose, other verbs or languages, and chained secondary
+code spans do not create invocation rows.
+
+When a recognized command path is also a static text reference, reference
+evidence remains deduplicated by source path, source line, and target. One
+inline `Run` occurrence therefore contributes one reference and one invocation,
+not two references.
+
 Repeated declarations, including identical declarations on one source line,
 remain separate dependency rows and contribute separately to dependency
 totals. Public BOM evidence exposes their shared line and distinct occurrence
