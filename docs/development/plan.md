@@ -1,17 +1,27 @@
 # Renma Roadmap
 
-## Current Checkpoint
+## Current State
 
-Renma 0.25.0 is a focused internal security-analysis checkpoint after the
-precision corrections completed in 0.24.4.
+As of Renma 0.28.4, the stable core remains a single-repository,
+deterministic Context Repository governance CLI. The 0.25.x line completed the
+precision-first body-policy refactor and dependency-install hardening. Renma
+0.26.0 added raw-source hidden-Unicode evidence, and the 0.27.x–0.28.x line
+added the provider-neutral executable-surface inventory, bounded direct helper
+invocations, static JavaScript/TypeScript and Python dependency evidence,
+invocation reachability and governance correlation, semantic-diff and CI
+visibility, and the focused executable graph.
 
-The checkpoint replaces body-policy sentence orchestration with private clause
-facts for domain, modality, scope, and completeness. It preserves the
-high-confidence public diagnostic boundary and does not add a product feature
-or intentionally change public behavior.
+These additions remain non-executing static evidence. They do not classify a
+surface as safe, prove runtime execution, propagate caller policy through
+dependencies, or broaden Renma into a runtime, package resolver, or general
+language SAST system.
 
-The current product remains a single-repository, deterministic Context
-Repository governance CLI:
+The documentation site, visual identity, and package homepage are now shipped.
+The SkillSpector work remains an isolated evidence-correlation experiment; it
+has not added a Renma command, diagnostic, readiness rule, CI policy, runtime
+dependency, or public receipt schema.
+
+The product boundary remains:
 
 ```text
 LLM proposes. Renma verifies. Human approves.
@@ -32,11 +42,17 @@ The current stabilization phase prioritizes:
   state;
 - keeping static Skill Discovery, security analysis, composition, impact,
   Readiness, diff, CI, Trust Graph, and BOM boundaries explicit;
-- keeping body-policy clause semantics private, precision-first, clause-bounded,
-  and separate from shared lexical vocabulary;
+- preserving the executable-surface inventory and executable graph as bounded,
+  auditable, non-executing evidence with explicit unsupported states;
+- keeping body-policy semantics private, precision-first, clause-bounded, and
+  separate from shared lexical vocabulary;
 - removing obsolete chronology and duplicated contract lists from evergreen
   documentation;
 - protecting documented deep imports and compatibility re-exports;
+- keeping the VitePress site, source Markdown, README entrypoints, and packaged
+  documentation aligned;
+- evaluating external-review evidence without promoting experiment output into
+  a core contract prematurely;
 - improving maintainability without adding dependencies or broadening runtime
   responsibility.
 
@@ -47,13 +63,13 @@ contract review:
 
 - hard-fail Skill Discovery CI gating after operational experience with the
   existing opt-in warn-only policy;
-- broader source-to-sink analysis for additional languages or syntax, including
-  any separately versioned public evidence contract;
+- broader executable dependency or source-to-sink analysis beyond the current
+  bounded ESM and Python-relative-import grammar, including any separately
+  versioned public evidence contract;
 - observed Skill-reference evidence kept separate from authoritative declared
   continuation routes;
 - product or ownership projections derived only from stable IDs, exact tags,
   and existing Context or Lens relationships;
-- richer focused visualization over existing stable report data;
 - additive Trust Graph or BOM evidence whose compatibility impact is explicit.
 
 None is a commitment. A candidate becomes product work only after its user
@@ -64,9 +80,12 @@ non-goals are reviewed.
 
 This unassigned candidate evaluates whether Renma can govern external-review
 requirements and generated receipts without depending on or becoming an
-external reviewer. SkillSpector is the first evaluation producer, and current
-repository Skills plus separately classified example-repository probes are the
-initial corpus. The methodology lives in the
+external reviewer. SkillSpector is the first evaluation producer. The
+experiment now preserves scanner-native facts, correlates exact source paths
+with Renma catalog assets, validates one audited fixture capture, and compares
+exact scanner file evidence with the public executable graph. Invocation,
+containment, ownership, reachability, reviewed scope, producer completeness,
+and runtime impact remain distinct claims. The methodology lives in the
 [SkillSpector experiment](https://github.com/KazuCocoa/renma/blob/main/experiments/skillspector/README.md), and the durable
 boundary is in
 [External Review Governance](../external-review-governance.md).
@@ -78,7 +97,9 @@ load those adapters or depend on the producers. There is no commitment yet to a
 public receipt schema, metadata field, CLI, configuration field, adapter
 package, or release.
 
-Evidence is required before product implementation. Decision gates include:
+The experimental projection remains `renma.experiment.skillspector-evidence.v0`
+with no compatibility promise. Evidence is still required before product
+implementation. Remaining decision gates include:
 
 - published output can be parsed reliably;
 - producer version and actual execution mode are available;

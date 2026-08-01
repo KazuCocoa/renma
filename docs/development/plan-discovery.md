@@ -2,7 +2,18 @@
 
 ## Status
 
-Status: stable single-repository static Discovery core.
+Status: stable single-repository static Discovery core, fully implemented.
+
+As of Renma 0.28.4, the accepted Discovery design is shipped across the
+dedicated graph view, Skill Index, Readiness, semantic diff, and CI report. CI
+enforcement remains explicitly opt-in and warn-only. Route cycles are review
+evidence, and no Discovery condition can produce a CI failure.
+
+The newer executable-surface inventory and focused executable graph describe
+bounded Skill-to-script and script-to-script evidence. They do not create
+Skill continuation routes, publication, or Discovery reachability. Likewise,
+the isolated SkillSpector evidence-correlation experiment does not make
+scanner observations authoritative Discovery declarations.
 
 The authoritative current behavior, schemas, diagnostics, CLI projections,
 Readiness integration, semantic diff, and CI review policy are documented in
@@ -121,15 +132,17 @@ is required.
 
 ## Open Questions
 
-The following remain candidates, not commitments:
+The following remain candidates, not commitments. None has an assigned release:
 
-- whether observed local Skill references provide useful separate,
-  non-authoritative evidence;
+- whether observed local Skill references or external scanner correlations
+  provide useful separate, non-authoritative evidence without weakening exact
+  declared-route authority;
 - whether product views can be derived from existing exact tags and
   Context/Lens identity without adding a Product asset or ownership-derived
   product identity;
-- which focused visualization remains readable in large cyclic or shared-child
-  graphs;
+- which additional focused visualization, beyond the current bounded
+  JSON/Markdown/Mermaid projections and focus neighborhood, remains readable in
+  large cyclic or shared-child graphs;
 - whether operational experience justifies independently reviewed hard-fail CI
   gating.
 
