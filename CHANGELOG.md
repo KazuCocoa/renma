@@ -6,6 +6,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.28.2] - 2026-08-01
+
 ### Added
 
 - Added `renma graph --view executable` with optional Skill-or-script
@@ -1901,7 +1903,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.28.1...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.28.2...HEAD
+[0.28.2]: https://github.com/KazuCocoa/renma/compare/v0.28.1...v0.28.2
 [0.28.1]: https://github.com/KazuCocoa/renma/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/KazuCocoa/renma/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/KazuCocoa/renma/compare/v0.26.0...v0.27.0
