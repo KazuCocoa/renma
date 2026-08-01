@@ -1,8 +1,11 @@
 import { defineConfig } from "vitepress";
 
+import packageJson from "../../package.json" with { type: "json" };
+
 import { configureMermaidMarkdown } from "./mermaid.js";
 
 const repositoryUrl = "https://github.com/KazuCocoa/renma";
+const packageUrl = "https://npmjs.org/package/renma";
 const base = "/renma/";
 const cloudflareWebAnalyticsToken = "f11a01438b294ad2a0b56b3e8f607312";
 
@@ -51,6 +54,7 @@ export default defineConfig({
           { text: "Authoring Guide", link: "/authoring-guide" },
         ],
       },
+      { text: `v${packageJson.version}`, link: packageUrl },
     ],
     sidebar: [
       {
