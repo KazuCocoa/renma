@@ -29,6 +29,9 @@ jobs:
       - name: List installed packages
         run: npm list --depth=0
 
+      - name: Build documentation site
+        run: npm run docs:build
+
       - name: Run ESLint
         run: npm run lint
 

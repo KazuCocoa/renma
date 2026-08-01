@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 dist-test/
+docs/.vitepress/.temp/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
 *.tsbuildinfo
 
 # Test and coverage output
