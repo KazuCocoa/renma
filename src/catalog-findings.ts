@@ -201,7 +201,9 @@ const CATALOG_FINDING_DEFINITION_LIST = [
 type CatalogFindingDefinitionRegistry<
   Definitions extends readonly CatalogFindingDefinition[],
 > = {
-  readonly [Definition in Definitions[number] as Definition["code"]]: Definition;
+  readonly [
+    Definition in Definitions[number] as Definition["code"]
+  ]: Definition;
 };
 
 type CatalogFindingDefinitionCodes<

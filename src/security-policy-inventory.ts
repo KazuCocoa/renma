@@ -70,10 +70,7 @@ export interface EffectiveSecurityPolicyEvidence {
 }
 
 export type SecurityProfileResolution =
-  | "none"
-  | "resolved"
-  | "missing"
-  | "cyclic";
+  "none" | "resolved" | "missing" | "cyclic";
 
 export interface SecurityPolicyAssetEvidence {
   path: string;
@@ -93,10 +90,7 @@ export interface SecurityPolicyAssetEvidence {
 }
 
 export type SecurityPolicySource =
-  | "local"
-  | "security_profile"
-  | "repository_config"
-  | "owning_skill";
+  "local" | "security_profile" | "repository_config" | "owning_skill";
 
 const SECURITY_POLICY_SUMMARY_DETAIL = Symbol("security-policy-summary-detail");
 

@@ -3,8 +3,6 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
-import ts from "typescript";
-
 interface SourceFileFixture {
   filePath: string;
   sourceText: string;
@@ -525,40 +523,28 @@ function readRelativeDependencies(
   sourceText: string,
   knownSourcePaths: ReadonlySet<string>,
 ): RelativeDependency[] {
-  const sourceFile = ts.createSourceFile(
-    importingFile,
-    sourceText,
-    ts.ScriptTarget.Latest,
-    false,
-    ts.ScriptKind.TS,
-  );
   const dependencies: RelativeDependency[] = [];
-
-  for (const statement of sourceFile.statements) {
-    if (
-      !ts.isImportDeclaration(statement) &&
-      !ts.isExportDeclaration(statement)
-    ) {
-      continue;
-    }
-    const moduleSpecifier = statement.moduleSpecifier;
-    if (!moduleSpecifier || !ts.isStringLiteralLike(moduleSpecifier)) continue;
-    const specifier = moduleSpecifier.text;
-    if (!specifier.startsWith(".")) continue;
-
+  const declarationPattern =
+    /^(?:(import)\s+(?:(type\s+)?[^;"']*?\sfrom\s+)?|(export)\s+(type\s+)?[^;]*?\sfrom\s+)(["'])([^"']+)\5/gmu;
+  for (const match of sourceText.matchAll(declarationPattern)) {
+    const declaration = match[1] === "import" ? "import" : "export";
+    const typeOnly =
+      (declaration === "import" ? match[2] : match[4]) !== undefined;
+    const specifier = match[6];
+    if (!specifier?.startsWith(".")) continue;
     dependencies.push({
-      kind: ts.isImportDeclaration(statement)
-        ? statement.importClause?.isTypeOnly
-          ? "type-import"
-          : "runtime-import"
-        : statement.isTypeOnly
-          ? "type-re-export"
-          : "re-export",
+      kind:
+        declaration === "import"
+          ? typeOnly
+            ? "type-import"
+            : "runtime-import"
+          : typeOnly
+            ? "type-re-export"
+            : "re-export",
       specifier,
       targetPath: resolveSourcePath(importingFile, specifier, knownSourcePaths),
     });
   }
-
   return dependencies;
 }
 

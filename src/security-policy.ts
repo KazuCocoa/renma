@@ -35,9 +35,7 @@ export interface SecurityPolicy {
 }
 
 export type EffectivePolicySource =
-  | "local"
-  | "security_profile"
-  | "repository_config";
+  "local" | "security_profile" | "repository_config";
 
 export interface ResolvedSecurityPolicy {
   policy: SecurityPolicy;

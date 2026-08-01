@@ -8,6 +8,7 @@ import { bom, formatBomMarkdown } from "../src/commands/bom.js";
 import { buildExecutableSurfaceDiff } from "../src/executable-surface-diff.js";
 import {
   buildExecutableSurfaceInventory,
+  type ExecutableSurfaceEntry,
   type ExecutableSurfaceInventory,
   zeroExecutableSurfaceInventory,
 } from "../src/executable-surface-inventory.js";
@@ -231,7 +232,7 @@ test("inventory composes discovery, invocation, reachability, and policy evidenc
     (candidate) => candidate.resolution === "resolved",
   )) {
     assert.ok(invocation.normalizedTarget);
-    const surface = inventory.surfaces.find(
+    const surface: ExecutableSurfaceEntry | undefined = inventory.surfaces.find(
       (candidate) => candidate.path === invocation.normalizedTarget,
     );
     assert.ok(surface, invocation.normalizedTarget);

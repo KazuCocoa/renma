@@ -109,8 +109,7 @@ test("canonical Skill metadata is operational while pre-0.16 metadata is migrati
 
   const legacyTrustSkill = (
     legacy.trustGraph.nodes as
-      | Array<{ id?: string; properties?: Record<string, unknown> }>
-      | undefined
+      Array<{ id?: string; properties?: Record<string, unknown> }> | undefined
   )?.find((node) => node.id === "asset:skills/demo/SKILL.md");
   assert.ok(legacyTrustSkill);
   assert.deepEqual(legacyTrustSkill.properties?.ownership, {

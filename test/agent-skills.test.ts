@@ -501,7 +501,7 @@ test("authoring inspection ignores backtick and tilde fenced examples", () => {
         issue.code.startsWith("RN-SKILL-EXECUTION-CONSTRAINT"),
       ),
       false,
-      fenced[0],
+      fenced[0] ?? "fenced Markdown sample",
     );
   }
 });

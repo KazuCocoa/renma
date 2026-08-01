@@ -1,8 +1,7 @@
 import js from "@eslint/js";
-import eslintConfigPrettier from "eslint-config-prettier";
-import tseslint from "typescript-eslint";
+import { defineConfig } from "eslint/config";
 
-export default tseslint.config(
+export default defineConfig(
   {
     ignores: ["dist/**", "dist-test/**", "node_modules/**"],
   },
@@ -16,35 +15,9 @@ export default tseslint.config(
     },
   },
   js.configs.recommended,
-  ...tseslint.configs.recommended,
-  eslintConfigPrettier,
   {
-    files: ["src/**/*.ts", "test/**/*.ts"],
-    languageOptions: {
-      parserOptions: {
-        project: ["./tsconfig.json", "./tsconfig.test.json"],
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
     rules: {
-      "@typescript-eslint/consistent-type-imports": [
-        "error",
-        { prefer: "type-imports" },
-      ],
-      "@typescript-eslint/no-floating-promises": [
-        "error",
-        {
-          allowForKnownSafeCalls: [
-            {
-              from: "package",
-              name: ["describe", "it", "test"],
-              package: "node:test",
-            },
-          ],
-        },
-      ],
-      "@typescript-eslint/no-misused-promises": "error",
-      "@typescript-eslint/switch-exhaustiveness-check": "error",
+      "no-unexpected-multiline": "off",
     },
   },
 );

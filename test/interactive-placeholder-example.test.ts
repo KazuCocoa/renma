@@ -185,9 +185,11 @@ async function removeOutput(): Promise<void> {
   try {
     await unlink(OUTPUT_PATH);
   } catch (error) {
-    if (
-      !(error instanceof Error && "code" in error && error.code === "ENOENT")
-    ) {
+    if (!(
+      error instanceof Error &&
+      "code" in error &&
+      error.code === "ENOENT"
+    )) {
       throw error;
     }
   }

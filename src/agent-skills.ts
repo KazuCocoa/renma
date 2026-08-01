@@ -73,10 +73,7 @@ const MAX_DESCRIPTION_LENGTH = AGENT_SKILLS_LIMITS.descriptionMaxChars;
 const MAX_COMPATIBILITY_LENGTH = AGENT_SKILLS_LIMITS.compatibilityMaxChars;
 
 export type AgentSkillFormat =
-  | "agent-skills"
-  | "renma-legacy"
-  | "hybrid"
-  | "unknown";
+  "agent-skills" | "renma-legacy" | "hybrid" | "unknown";
 
 export interface AgentSkillValidationIssue {
   code: AgentSkillDiagnosticId;

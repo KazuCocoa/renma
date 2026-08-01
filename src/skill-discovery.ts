@@ -41,14 +41,10 @@ export type SkillRouteUsabilityReason =
   (typeof SKILL_ROUTE_USABILITY_REASONS)[number];
 
 export type SkillRouteResolutionState =
-  | "resolved"
-  | "unresolved"
-  | "ambiguous"
-  | "wrong-kind";
+  "resolved" | "unresolved" | "ambiguous" | "wrong-kind";
 
 export type SkillRouteNormalizationRejection =
-  | "absolute-path"
-  | "repository-escape";
+  "absolute-path" | "repository-escape";
 
 export interface SkillDiagnosticLink {
   code: string;
@@ -100,9 +96,7 @@ export interface SkillPublicationState {
 }
 
 export type SkillDiscoveryReachabilityState =
-  | "reachable"
-  | "not-reached"
-  | "not-evaluated";
+  "reachable" | "not-reached" | "not-evaluated";
 
 export type SkillDiscoveryReachabilityReason =
   | "published-entrypoint"
@@ -220,10 +214,7 @@ export interface SkillDiscoverySummary {
 }
 
 export type SkillDiscoveryAdoptionState =
-  | "not-adopted"
-  | "partial"
-  | "incomplete"
-  | "adopted";
+  "not-adopted" | "partial" | "incomplete" | "adopted";
 
 export interface SkillDiscoveryAdoption {
   state: SkillDiscoveryAdoptionState;

@@ -613,11 +613,9 @@ function directlySupportedPrefixedProhibitionStartsText(text: string): boolean {
 function quoteEnclosureRanges(text: string): readonly EnclosureRange[] {
   const ranges: EnclosureRange[] = [];
   let straightDoubleStart:
-    | { readonly index: number; readonly escaped: boolean }
-    | undefined;
+    { readonly index: number; readonly escaped: boolean } | undefined;
   let straightSingleStart:
-    | { readonly index: number; readonly escaped: boolean }
-    | undefined;
+    { readonly index: number; readonly escaped: boolean } | undefined;
   let curlyDoubleStart: number | undefined;
   let curlySingleStart: number | undefined;
   for (let index = 0; index < text.length; index += 1) {

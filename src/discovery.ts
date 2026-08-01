@@ -120,8 +120,7 @@ export type RepositoryClassificationPathResolution =
   | {
       state: "unresolved";
       reasonCode:
-        | "repository-boundary-unresolved"
-        | "repository-boundary-ambiguous";
+        "repository-boundary-unresolved" | "repository-boundary-ambiguous";
       reason: string;
       absolutePath: string;
       candidateRoots: string[];
