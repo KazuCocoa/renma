@@ -1,3 +1,12 @@
+<p align="center">
+  <img
+    src="docs/public/branding/renma-icon.png"
+    alt="Renma"
+    width="160"
+    height="160"
+  />
+</p>
+
 # Renma - 練磨 in Japanese
 
 [![NPM version](http://img.shields.io/npm/v/renma.svg)](https://npmjs.org/package/renma)

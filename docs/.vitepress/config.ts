@@ -1,13 +1,30 @@
 import { defineConfig } from "vitepress";
 
 const repositoryUrl = "https://github.com/KazuCocoa/renma";
+const base = "/renma/";
 
 export default defineConfig({
   title: "Renma",
   description:
     "A Git-native Context Repository and deterministic governance CLI for agent-facing knowledge.",
-  base: "/renma/",
+  base,
+  head: [
+    [
+      "link",
+      {
+        rel: "icon",
+        type: "image/png",
+        href: `${base}branding/favicon.png`,
+      },
+    ],
+  ],
   themeConfig: {
+    logo: {
+      src: "/branding/renma-icon.png",
+      alt: "Renma",
+      width: 24,
+      height: 24,
+    },
     nav: [
       { text: "Overview", link: "/" },
       { text: "Documentation Index", link: "/README" },

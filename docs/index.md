@@ -1,3 +1,12 @@
+<div class="renma-logo">
+  <img
+    src="/branding/renma-logo.png"
+    alt="Renma"
+    width="785"
+    height="323"
+  />
+</div>
+
 # Renma
 
 Renma is a Git-native Context Repository and deterministic governance CLI for
@@ -45,3 +54,19 @@ npx renma readiness . --format markdown
   defines canonical and migration-only Skill forms.
 - [Diagnostics Reference](diagnostics.md) and
   [Security Policy Guide](security-policy.md) explain findings and policy.
+
+<style scoped>
+.renma-logo {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 24px;
+  padding: 16px;
+  background: #f6f6f7;
+  border-radius: 12px;
+}
+
+.renma-logo img {
+  width: min(100%, 720px);
+  height: auto;
+}
+</style>
