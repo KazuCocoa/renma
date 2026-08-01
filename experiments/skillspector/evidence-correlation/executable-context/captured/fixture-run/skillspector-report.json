@@ -1,0 +1,490 @@
+{
+  "skill": {
+    "name": "shared-owner",
+    "source": "/Users/kazu/github/renma/experiments/skillspector/generated/evidence-correlation-executable-context/repository/skills/shared-owner",
+    "scanned_at": "2026-08-01T08:40:49.238494+00:00"
+  },
+  "risk_assessment": {
+    "score": 32,
+    "severity": "MEDIUM",
+    "recommendation": "CAUTION"
+  },
+  "components": [
+    {
+      "path": "README.md",
+      "type": "markdown",
+      "lines": 6,
+      "executable": false,
+      "size_bytes": 326
+    },
+    {
+      "path": "SKILL.md",
+      "type": "markdown",
+      "lines": 22,
+      "executable": false,
+      "size_bytes": 674
+    },
+    {
+      "path": "scripts/callee-probe.py",
+      "type": "python",
+      "lines": 12,
+      "executable": true,
+      "size_bytes": 389
+    },
+    {
+      "path": "scripts/caller-probe.mjs",
+      "type": "other",
+      "lines": 4,
+      "executable": false,
+      "size_bytes": 139
+    },
+    {
+      "path": "scripts/contained-probe.py",
+      "type": "python",
+      "lines": 12,
+      "executable": true,
+      "size_bytes": 389
+    },
+    {
+      "path": "scripts/direct-probe.py",
+      "type": "python",
+      "lines": 12,
+      "executable": true,
+      "size_bytes": 389
+    },
+    {
+      "path": "scripts/shared-probe.py",
+      "type": "python",
+      "lines": 12,
+      "executable": true,
+      "size_bytes": 389
+    }
+  ],
+  "issues": [
+    {
+      "id": "LP1",
+      "finding_id": "finding-9ff1bf7adab94eddb615542ce398cba9",
+      "category": "MCP Least Privilege",
+      "pattern": null,
+      "severity": "HIGH",
+      "confidence": 0.75,
+      "location": {
+        "file": "scripts/callee-probe.py",
+        "start_line": 1,
+        "end_line": null
+      },
+      "finding": null,
+      "explanation": "The skill uses 'file_read' capability that is not listed in its permissions. This may indicate deceptive intent or missing permission declarations.",
+      "remediation": "Add the 'file_read' permission to SKILL.md, or remove the code that requires it.",
+      "code_snippet": null,
+      "intent": null,
+      "tags": [
+        "ASI02"
+      ]
+    },
+    {
+      "id": "LP1",
+      "finding_id": "finding-1d8a42c7519d4214a0c94db1160c6ebf",
+      "category": "MCP Least Privilege",
+      "pattern": null,
+      "severity": "HIGH",
+      "confidence": 0.75,
+      "location": {
+        "file": "scripts/callee-probe.py",
+        "start_line": 1,
+        "end_line": null
+      },
+      "finding": null,
+      "explanation": "The skill uses 'network' capability that is not listed in its permissions. This may indicate deceptive intent or missing permission declarations.",
+      "remediation": "Add the 'network' permission to SKILL.md, or remove the code that requires it.",
+      "code_snippet": null,
+      "intent": null,
+      "tags": [
+        "ASI02"
+      ]
+    },
+    {
+      "id": "AS3",
+      "finding_id": "finding-d0150164f37e49ab8c794ec0ef113b77",
+      "category": "Agent Snooping",
+      "pattern": "Skill Enumeration",
+      "severity": "MEDIUM",
+      "confidence": 0.8,
+      "location": {
+        "file": "README.md",
+        "start_line": 6,
+        "end_line": null
+      },
+      "finding": "skills/Example/SKILL.md",
+      "explanation": "Skill enumerates or reads other installed skills. Access to other skills' SKILL.md files or the skills directory reveals prompt instructions, capabilities, and secrets that should be invisible to peer skills.",
+      "remediation": "Remove all code or instructions that list or read other skills' files or directories. Skills should operate independently; cross-skill access is a privilege escalation.",
+      "code_snippet": "This file is scanner-visible but deliberately excluded from the Renma catalog.\nThe following ordinary Markdown link is repeated as visible text and destination\nto preserve duplicate native evidence without creating an executable relation:\n[skills/Example/SKILL.md](skills/Example/SKILL.md).",
+      "intent": null,
+      "tags": [
+        "Agent Snooping"
+      ]
+    },
+    {
+      "id": "AS3",
+      "finding_id": "finding-c338ef318c8242a0949e798e4b77d11f",
+      "category": "Agent Snooping",
+      "pattern": "Skill Enumeration",
+      "severity": "MEDIUM",
+      "confidence": 0.8,
+      "location": {
+        "file": "README.md",
+        "start_line": 6,
+        "end_line": null
+      },
+      "finding": "skills/Example/SKILL.md",
+      "explanation": "Skill enumerates or reads other installed skills. Access to other skills' SKILL.md files or the skills directory reveals prompt instructions, capabilities, and secrets that should be invisible to peer skills.",
+      "remediation": "Remove all code or instructions that list or read other skills' files or directories. Skills should operate independently; cross-skill access is a privilege escalation.",
+      "code_snippet": "This file is scanner-visible but deliberately excluded from the Renma catalog.\nThe following ordinary Markdown link is repeated as visible text and destination\nto preserve duplicate native evidence without creating an executable relation:\n[skills/Example/SKILL.md](skills/Example/SKILL.md).",
+      "intent": null,
+      "tags": [
+        "Agent Snooping"
+      ]
+    },
+    {
+      "id": "AS3",
+      "finding_id": "finding-5a3ad7c290bf4a4d9ab617e4761b2462",
+      "category": "Agent Snooping",
+      "pattern": "Skill Enumeration",
+      "severity": "MEDIUM",
+      "confidence": 0.8,
+      "location": {
+        "file": "scripts/callee-probe.py",
+        "start_line": 1,
+        "end_line": null
+      },
+      "finding": "skills/Example/SKILL.md",
+      "explanation": "Skill enumerates or reads other installed skills. Access to other skills' SKILL.md files or the skills directory reveals prompt instructions, capabilities, and secrets that should be invisible to peer skills.",
+      "remediation": "Remove all code or instructions that list or read other skills' files or directories. Skills should operate independently; cross-skill access is a privilege escalation.",
+      "code_snippet": "\"\"\"Inert scanner token: skills/Example/SKILL.md.\"\"\"\n\nfrom pathlib import Path\n",
+      "intent": null,
+      "tags": [
+        "Agent Snooping"
+      ]
+    },
+    {
+      "id": "AS3",
+      "finding_id": "finding-b78538f844c84f1796c838749cad25db",
+      "category": "Agent Snooping",
+      "pattern": "Skill Enumeration",
+      "severity": "MEDIUM",
+      "confidence": 0.8,
+      "location": {
+        "file": "scripts/contained-probe.py",
+        "start_line": 1,
+        "end_line": null
+      },
+      "finding": "skills/Example/SKILL.md",
+      "explanation": "Skill enumerates or reads other installed skills. Access to other skills' SKILL.md files or the skills directory reveals prompt instructions, capabilities, and secrets that should be invisible to peer skills.",
+      "remediation": "Remove all code or instructions that list or read other skills' files or directories. Skills should operate independently; cross-skill access is a privilege escalation.",
+      "code_snippet": "\"\"\"Inert scanner token: skills/Example/SKILL.md.\"\"\"\n\nfrom pathlib import Path\n",
+      "intent": null,
+      "tags": [
+        "Agent Snooping"
+      ]
+    },
+    {
+      "id": "AS3",
+      "finding_id": "finding-2870308989824375a24f40fa9b0ffb44",
+      "category": "Agent Snooping",
+      "pattern": "Skill Enumeration",
+      "severity": "MEDIUM",
+      "confidence": 0.8,
+      "location": {
+        "file": "scripts/direct-probe.py",
+        "start_line": 1,
+        "end_line": null
+      },
+      "finding": "skills/Example/SKILL.md",
+      "explanation": "Skill enumerates or reads other installed skills. Access to other skills' SKILL.md files or the skills directory reveals prompt instructions, capabilities, and secrets that should be invisible to peer skills.",
+      "remediation": "Remove all code or instructions that list or read other skills' files or directories. Skills should operate independently; cross-skill access is a privilege escalation.",
+      "code_snippet": "\"\"\"Inert scanner token: skills/Example/SKILL.md.\"\"\"\n\nfrom pathlib import Path\n",
+      "intent": null,
+      "tags": [
+        "Agent Snooping"
+      ]
+    },
+    {
+      "id": "AS3",
+      "finding_id": "finding-18e96ec92e2e44bba30c99d406eac6ce",
+      "category": "Agent Snooping",
+      "pattern": "Skill Enumeration",
+      "severity": "MEDIUM",
+      "confidence": 0.8,
+      "location": {
+        "file": "scripts/shared-probe.py",
+        "start_line": 1,
+        "end_line": null
+      },
+      "finding": "skills/Example/SKILL.md",
+      "explanation": "Skill enumerates or reads other installed skills. Access to other skills' SKILL.md files or the skills directory reveals prompt instructions, capabilities, and secrets that should be invisible to peer skills.",
+      "remediation": "Remove all code or instructions that list or read other skills' files or directories. Skills should operate independently; cross-skill access is a privilege escalation.",
+      "code_snippet": "\"\"\"Inert scanner token: skills/Example/SKILL.md.\"\"\"\n\nfrom pathlib import Path\n",
+      "intent": null,
+      "tags": [
+        "Agent Snooping"
+      ]
+    }
+  ],
+  "suppressed_count": 0,
+  "suppressed": [],
+  "metadata": {
+    "has_executable_scripts": true,
+    "skillspector_version": "2.5.0",
+    "llm_requested": false,
+    "llm_available": false,
+    "meta_analysis_applied": false,
+    "filtering_mode": "heuristic"
+  },
+  "execution_successful": true,
+  "analysis_completeness": {
+    "total_components": 7,
+    "scanned_components": 7,
+    "coverage_percent": 100.0,
+    "is_complete": false,
+    "execution_successful": true,
+    "fully_inspected_files": 7,
+    "partially_inspected_files": 0,
+    "entirely_uninspected_files": 0,
+    "ledger_exceptions": [],
+    "scope_exclusions": [],
+    "analyzer_statuses": [
+      {
+        "analyzer_id": "behavioral_ast",
+        "status": "completed",
+        "planned_work": 4,
+        "completed": 4,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "behavioral_taint_tracking",
+        "status": "completed",
+        "planned_work": 4,
+        "completed": 4,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "mcp_least_privilege",
+        "status": "completed",
+        "planned_work": 1,
+        "completed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "mcp_rug_pull",
+        "status": "completed",
+        "planned_work": 1,
+        "completed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "mcp_tool_poisoning",
+        "status": "completed",
+        "planned_work": 1,
+        "completed": 1,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "meta_analyzer",
+        "status": "disabled",
+        "planned_work": 0,
+        "completed": 0,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0,
+        "reason_code": "disabled_by_configuration",
+        "message": "Analyzer was disabled by the requested configuration."
+      },
+      {
+        "analyzer_id": "semantic_developer_intent",
+        "status": "disabled",
+        "planned_work": 0,
+        "completed": 0,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0,
+        "reason_code": "disabled_by_configuration",
+        "message": "Analyzer was disabled by the requested configuration."
+      },
+      {
+        "analyzer_id": "semantic_quality_policy",
+        "status": "disabled",
+        "planned_work": 0,
+        "completed": 0,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0,
+        "reason_code": "disabled_by_configuration",
+        "message": "Analyzer was disabled by the requested configuration."
+      },
+      {
+        "analyzer_id": "semantic_security_discovery",
+        "status": "disabled",
+        "planned_work": 0,
+        "completed": 0,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0,
+        "reason_code": "disabled_by_configuration",
+        "message": "Analyzer was disabled by the requested configuration."
+      },
+      {
+        "analyzer_id": "static_patterns_agent_snooping",
+        "status": "completed",
+        "planned_work": 7,
+        "completed": 7,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "static_patterns_anti_refusal",
+        "status": "completed",
+        "planned_work": 7,
+        "completed": 7,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "static_patterns_data_exfiltration",
+        "status": "completed",
+        "planned_work": 7,
+        "completed": 7,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "static_patterns_excessive_agency",
+        "status": "completed",
+        "planned_work": 7,
+        "completed": 7,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "static_patterns_harmful_content",
+        "status": "completed",
+        "planned_work": 7,
+        "completed": 7,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "static_patterns_memory_poisoning",
+        "status": "completed",
+        "planned_work": 7,
+        "completed": 7,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "static_patterns_output_handling",
+        "status": "completed",
+        "planned_work": 7,
+        "completed": 7,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "static_patterns_privilege_escalation",
+        "status": "completed",
+        "planned_work": 7,
+        "completed": 7,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "static_patterns_prompt_injection",
+        "status": "completed",
+        "planned_work": 7,
+        "completed": 7,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "static_patterns_rogue_agent",
+        "status": "completed",
+        "planned_work": 7,
+        "completed": 7,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "static_patterns_ssrf",
+        "status": "completed",
+        "planned_work": 7,
+        "completed": 7,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "static_patterns_supply_chain",
+        "status": "completed",
+        "planned_work": 7,
+        "completed": 7,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "static_patterns_system_prompt_leakage",
+        "status": "completed",
+        "planned_work": 7,
+        "completed": 7,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "static_patterns_tool_misuse",
+        "status": "completed",
+        "planned_work": 7,
+        "completed": 7,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      },
+      {
+        "analyzer_id": "static_yara",
+        "status": "completed",
+        "planned_work": 7,
+        "completed": 7,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0
+      }
+    ],
+    "limitations": [
+      "Analyzer was disabled by the requested configuration.",
+      "Analyzer was disabled by the requested configuration.",
+      "Analyzer was disabled by the requested configuration.",
+      "Analyzer was disabled by the requested configuration."
+    ],
+    "findings_before_filtering": 8,
+    "findings_after_filtering": 8
+  }
+}

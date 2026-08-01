@@ -1,2 +1,5 @@
 # Preserve the byte-for-byte native scanner report used by the experiment.
 experiments/skillspector/evidence-correlation/captured/fixture-run/skillspector-report.json
+
+# Preserve raw inputs and deterministic projections from the executable-context capture.
+experiments/skillspector/evidence-correlation/executable-context/captured/fixture-run/*.json

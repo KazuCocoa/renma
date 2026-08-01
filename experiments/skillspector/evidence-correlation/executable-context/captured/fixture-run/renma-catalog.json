@@ -1,0 +1,790 @@
+{
+  "root": "/Users/kazu/github/renma/experiments/skillspector/generated/evidence-correlation-executable-context/repository",
+  "configPath": "renma.config.json",
+  "scannedFileCount": 8,
+  "catalog": {
+    "entries": [
+      {
+        "id": "skill.experiment.executable-alpha",
+        "sourcePath": "skills/alpha/SKILL.md",
+        "contentHash": "sha256:240abe3b16977767d6cdbc323012e0ce4b6ca7062aaf710892d005d1bdc9fb31",
+        "sizeBytes": 413,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "experiment-maintainers",
+          "effectiveOwner": "experiment-maintainers",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "skill.experiment.executable-alpha",
+          "owner": "experiment-maintainers",
+          "status": "experimental"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "skills/alpha/SKILL.md",
+            "key": "renma.id",
+            "startLine": 5,
+            "endLine": 5,
+            "raw": "  renma.id: skill.experiment.executable-alpha"
+          },
+          "owner": {
+            "path": "skills/alpha/SKILL.md",
+            "key": "renma.owner",
+            "startLine": 6,
+            "endLine": 6,
+            "raw": "  renma.owner: experiment-maintainers"
+          },
+          "status": {
+            "path": "skills/alpha/SKILL.md",
+            "key": "renma.status",
+            "startLine": 7,
+            "endLine": 7,
+            "raw": "  renma.status: experimental"
+          }
+        },
+        "metadataListItems": {
+          "id": [],
+          "owner": [],
+          "status": []
+        },
+        "kind": "skill",
+        "requiredContext": [],
+        "optionalContext": [],
+        "requiredLens": [],
+        "optionalLens": [],
+        "conflicts": []
+      },
+      {
+        "id": "skill.experiment.executable-beta",
+        "sourcePath": "skills/beta/SKILL.md",
+        "contentHash": "sha256:8d0e578538926c0ab7fa467f788bcb92e98a5379abf3d5fb5989a8467fd789ef",
+        "sizeBytes": 480,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "experiment-maintainers",
+          "effectiveOwner": "experiment-maintainers",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "skill.experiment.executable-beta",
+          "owner": "experiment-maintainers",
+          "status": "experimental"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "skills/beta/SKILL.md",
+            "key": "renma.id",
+            "startLine": 5,
+            "endLine": 5,
+            "raw": "  renma.id: skill.experiment.executable-beta"
+          },
+          "owner": {
+            "path": "skills/beta/SKILL.md",
+            "key": "renma.owner",
+            "startLine": 6,
+            "endLine": 6,
+            "raw": "  renma.owner: experiment-maintainers"
+          },
+          "status": {
+            "path": "skills/beta/SKILL.md",
+            "key": "renma.status",
+            "startLine": 7,
+            "endLine": 7,
+            "raw": "  renma.status: experimental"
+          }
+        },
+        "metadataListItems": {
+          "id": [],
+          "owner": [],
+          "status": []
+        },
+        "kind": "skill",
+        "requiredContext": [],
+        "optionalContext": [],
+        "requiredLens": [],
+        "optionalLens": [],
+        "conflicts": []
+      },
+      {
+        "id": "skill.experiment.executable-shared-owner",
+        "sourcePath": "skills/shared-owner/SKILL.md",
+        "contentHash": "sha256:f57a2479e6903d9596880c77b43cf7a561c9e9df2baff543a7036b85ba0b38cf",
+        "sizeBytes": 674,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "experiment-maintainers",
+          "effectiveOwner": "experiment-maintainers",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "skill.experiment.executable-shared-owner",
+          "owner": "experiment-maintainers",
+          "status": "experimental"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "skills/shared-owner/SKILL.md",
+            "key": "renma.id",
+            "startLine": 6,
+            "endLine": 6,
+            "raw": "  renma.id: skill.experiment.executable-shared-owner"
+          },
+          "owner": {
+            "path": "skills/shared-owner/SKILL.md",
+            "key": "renma.owner",
+            "startLine": 7,
+            "endLine": 7,
+            "raw": "  renma.owner: experiment-maintainers"
+          },
+          "status": {
+            "path": "skills/shared-owner/SKILL.md",
+            "key": "renma.status",
+            "startLine": 8,
+            "endLine": 8,
+            "raw": "  renma.status: experimental"
+          }
+        },
+        "metadataListItems": {
+          "id": [],
+          "owner": [],
+          "status": []
+        },
+        "kind": "skill",
+        "requiredContext": [],
+        "optionalContext": [],
+        "requiredLens": [],
+        "optionalLens": [],
+        "conflicts": []
+      },
+      {
+        "id": "skills/shared-owner/scripts/callee-probe.py",
+        "sourcePath": "skills/shared-owner/scripts/callee-probe.py",
+        "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+        "sizeBytes": 389,
+        "contentClassification": "text",
+        "markdownParserEligible": false,
+        "ownership": {
+          "declaredOwner": null,
+          "effectiveOwner": "experiment-maintainers",
+          "source": "inherited",
+          "inheritedFrom": {
+            "id": "skill.experiment.executable-shared-owner",
+            "sourcePath": "skills/shared-owner/SKILL.md"
+          }
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": []
+        },
+        "metadataFields": {},
+        "metadataListItems": {},
+        "kind": "script"
+      },
+      {
+        "id": "skills/shared-owner/scripts/caller-probe.mjs",
+        "sourcePath": "skills/shared-owner/scripts/caller-probe.mjs",
+        "contentHash": "sha256:2a72c84240f5d646c809492465a31a33be951d900a1ec5c8959107543f1d6e1a",
+        "sizeBytes": 139,
+        "contentClassification": "text",
+        "markdownParserEligible": false,
+        "ownership": {
+          "declaredOwner": null,
+          "effectiveOwner": "experiment-maintainers",
+          "source": "inherited",
+          "inheritedFrom": {
+            "id": "skill.experiment.executable-shared-owner",
+            "sourcePath": "skills/shared-owner/SKILL.md"
+          }
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": []
+        },
+        "metadataFields": {},
+        "metadataListItems": {},
+        "kind": "script"
+      },
+      {
+        "id": "skills/shared-owner/scripts/contained-probe.py",
+        "sourcePath": "skills/shared-owner/scripts/contained-probe.py",
+        "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+        "sizeBytes": 389,
+        "contentClassification": "text",
+        "markdownParserEligible": false,
+        "ownership": {
+          "declaredOwner": null,
+          "effectiveOwner": "experiment-maintainers",
+          "source": "inherited",
+          "inheritedFrom": {
+            "id": "skill.experiment.executable-shared-owner",
+            "sourcePath": "skills/shared-owner/SKILL.md"
+          }
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": []
+        },
+        "metadataFields": {},
+        "metadataListItems": {},
+        "kind": "script"
+      },
+      {
+        "id": "skills/shared-owner/scripts/direct-probe.py",
+        "sourcePath": "skills/shared-owner/scripts/direct-probe.py",
+        "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+        "sizeBytes": 389,
+        "contentClassification": "text",
+        "markdownParserEligible": false,
+        "ownership": {
+          "declaredOwner": null,
+          "effectiveOwner": "experiment-maintainers",
+          "source": "inherited",
+          "inheritedFrom": {
+            "id": "skill.experiment.executable-shared-owner",
+            "sourcePath": "skills/shared-owner/SKILL.md"
+          }
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": []
+        },
+        "metadataFields": {},
+        "metadataListItems": {},
+        "kind": "script"
+      },
+      {
+        "id": "skills/shared-owner/scripts/shared-probe.py",
+        "sourcePath": "skills/shared-owner/scripts/shared-probe.py",
+        "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+        "sizeBytes": 389,
+        "contentClassification": "text",
+        "markdownParserEligible": false,
+        "ownership": {
+          "declaredOwner": null,
+          "effectiveOwner": "experiment-maintainers",
+          "source": "inherited",
+          "inheritedFrom": {
+            "id": "skill.experiment.executable-shared-owner",
+            "sourcePath": "skills/shared-owner/SKILL.md"
+          }
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": []
+        },
+        "metadataFields": {},
+        "metadataListItems": {},
+        "kind": "script"
+      }
+    ],
+    "assets": [
+      {
+        "id": "skill.experiment.executable-alpha",
+        "sourcePath": "skills/alpha/SKILL.md",
+        "contentHash": "sha256:240abe3b16977767d6cdbc323012e0ce4b6ca7062aaf710892d005d1bdc9fb31",
+        "sizeBytes": 413,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "experiment-maintainers",
+          "effectiveOwner": "experiment-maintainers",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "skill.experiment.executable-alpha",
+          "owner": "experiment-maintainers",
+          "status": "experimental"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "skills/alpha/SKILL.md",
+            "key": "renma.id",
+            "startLine": 5,
+            "endLine": 5,
+            "raw": "  renma.id: skill.experiment.executable-alpha"
+          },
+          "owner": {
+            "path": "skills/alpha/SKILL.md",
+            "key": "renma.owner",
+            "startLine": 6,
+            "endLine": 6,
+            "raw": "  renma.owner: experiment-maintainers"
+          },
+          "status": {
+            "path": "skills/alpha/SKILL.md",
+            "key": "renma.status",
+            "startLine": 7,
+            "endLine": 7,
+            "raw": "  renma.status: experimental"
+          }
+        },
+        "metadataListItems": {
+          "id": [],
+          "owner": [],
+          "status": []
+        },
+        "kind": "skill",
+        "requiredContext": [],
+        "optionalContext": [],
+        "requiredLens": [],
+        "optionalLens": [],
+        "conflicts": []
+      },
+      {
+        "id": "skill.experiment.executable-beta",
+        "sourcePath": "skills/beta/SKILL.md",
+        "contentHash": "sha256:8d0e578538926c0ab7fa467f788bcb92e98a5379abf3d5fb5989a8467fd789ef",
+        "sizeBytes": 480,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "experiment-maintainers",
+          "effectiveOwner": "experiment-maintainers",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "skill.experiment.executable-beta",
+          "owner": "experiment-maintainers",
+          "status": "experimental"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "skills/beta/SKILL.md",
+            "key": "renma.id",
+            "startLine": 5,
+            "endLine": 5,
+            "raw": "  renma.id: skill.experiment.executable-beta"
+          },
+          "owner": {
+            "path": "skills/beta/SKILL.md",
+            "key": "renma.owner",
+            "startLine": 6,
+            "endLine": 6,
+            "raw": "  renma.owner: experiment-maintainers"
+          },
+          "status": {
+            "path": "skills/beta/SKILL.md",
+            "key": "renma.status",
+            "startLine": 7,
+            "endLine": 7,
+            "raw": "  renma.status: experimental"
+          }
+        },
+        "metadataListItems": {
+          "id": [],
+          "owner": [],
+          "status": []
+        },
+        "kind": "skill",
+        "requiredContext": [],
+        "optionalContext": [],
+        "requiredLens": [],
+        "optionalLens": [],
+        "conflicts": []
+      },
+      {
+        "id": "skill.experiment.executable-shared-owner",
+        "sourcePath": "skills/shared-owner/SKILL.md",
+        "contentHash": "sha256:f57a2479e6903d9596880c77b43cf7a561c9e9df2baff543a7036b85ba0b38cf",
+        "sizeBytes": 674,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "experiment-maintainers",
+          "effectiveOwner": "experiment-maintainers",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "skill.experiment.executable-shared-owner",
+          "owner": "experiment-maintainers",
+          "status": "experimental"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "skills/shared-owner/SKILL.md",
+            "key": "renma.id",
+            "startLine": 6,
+            "endLine": 6,
+            "raw": "  renma.id: skill.experiment.executable-shared-owner"
+          },
+          "owner": {
+            "path": "skills/shared-owner/SKILL.md",
+            "key": "renma.owner",
+            "startLine": 7,
+            "endLine": 7,
+            "raw": "  renma.owner: experiment-maintainers"
+          },
+          "status": {
+            "path": "skills/shared-owner/SKILL.md",
+            "key": "renma.status",
+            "startLine": 8,
+            "endLine": 8,
+            "raw": "  renma.status: experimental"
+          }
+        },
+        "metadataListItems": {
+          "id": [],
+          "owner": [],
+          "status": []
+        },
+        "kind": "skill",
+        "requiredContext": [],
+        "optionalContext": [],
+        "requiredLens": [],
+        "optionalLens": [],
+        "conflicts": []
+      },
+      {
+        "id": "skills/shared-owner/scripts/callee-probe.py",
+        "sourcePath": "skills/shared-owner/scripts/callee-probe.py",
+        "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+        "sizeBytes": 389,
+        "contentClassification": "text",
+        "markdownParserEligible": false,
+        "ownership": {
+          "declaredOwner": null,
+          "effectiveOwner": "experiment-maintainers",
+          "source": "inherited",
+          "inheritedFrom": {
+            "id": "skill.experiment.executable-shared-owner",
+            "sourcePath": "skills/shared-owner/SKILL.md"
+          }
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": []
+        },
+        "metadataFields": {},
+        "metadataListItems": {},
+        "kind": "script"
+      },
+      {
+        "id": "skills/shared-owner/scripts/caller-probe.mjs",
+        "sourcePath": "skills/shared-owner/scripts/caller-probe.mjs",
+        "contentHash": "sha256:2a72c84240f5d646c809492465a31a33be951d900a1ec5c8959107543f1d6e1a",
+        "sizeBytes": 139,
+        "contentClassification": "text",
+        "markdownParserEligible": false,
+        "ownership": {
+          "declaredOwner": null,
+          "effectiveOwner": "experiment-maintainers",
+          "source": "inherited",
+          "inheritedFrom": {
+            "id": "skill.experiment.executable-shared-owner",
+            "sourcePath": "skills/shared-owner/SKILL.md"
+          }
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": []
+        },
+        "metadataFields": {},
+        "metadataListItems": {},
+        "kind": "script"
+      },
+      {
+        "id": "skills/shared-owner/scripts/contained-probe.py",
+        "sourcePath": "skills/shared-owner/scripts/contained-probe.py",
+        "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+        "sizeBytes": 389,
+        "contentClassification": "text",
+        "markdownParserEligible": false,
+        "ownership": {
+          "declaredOwner": null,
+          "effectiveOwner": "experiment-maintainers",
+          "source": "inherited",
+          "inheritedFrom": {
+            "id": "skill.experiment.executable-shared-owner",
+            "sourcePath": "skills/shared-owner/SKILL.md"
+          }
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": []
+        },
+        "metadataFields": {},
+        "metadataListItems": {},
+        "kind": "script"
+      },
+      {
+        "id": "skills/shared-owner/scripts/direct-probe.py",
+        "sourcePath": "skills/shared-owner/scripts/direct-probe.py",
+        "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+        "sizeBytes": 389,
+        "contentClassification": "text",
+        "markdownParserEligible": false,
+        "ownership": {
+          "declaredOwner": null,
+          "effectiveOwner": "experiment-maintainers",
+          "source": "inherited",
+          "inheritedFrom": {
+            "id": "skill.experiment.executable-shared-owner",
+            "sourcePath": "skills/shared-owner/SKILL.md"
+          }
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": []
+        },
+        "metadataFields": {},
+        "metadataListItems": {},
+        "kind": "script"
+      },
+      {
+        "id": "skills/shared-owner/scripts/shared-probe.py",
+        "sourcePath": "skills/shared-owner/scripts/shared-probe.py",
+        "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+        "sizeBytes": 389,
+        "contentClassification": "text",
+        "markdownParserEligible": false,
+        "ownership": {
+          "declaredOwner": null,
+          "effectiveOwner": "experiment-maintainers",
+          "source": "inherited",
+          "inheritedFrom": {
+            "id": "skill.experiment.executable-shared-owner",
+            "sourcePath": "skills/shared-owner/SKILL.md"
+          }
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": []
+        },
+        "metadataFields": {},
+        "metadataListItems": {},
+        "kind": "script"
+      }
+    ],
+    "dependencies": [
+      {
+        "from": "skill.experiment.executable-shared-owner",
+        "to": "skills/shared-owner/scripts/callee-probe.py",
+        "kind": "owns_local_resource",
+        "sourcePath": "skills/shared-owner/SKILL.md"
+      },
+      {
+        "from": "skill.experiment.executable-shared-owner",
+        "to": "skills/shared-owner/scripts/caller-probe.mjs",
+        "kind": "owns_local_resource",
+        "sourcePath": "skills/shared-owner/SKILL.md"
+      },
+      {
+        "from": "skill.experiment.executable-shared-owner",
+        "to": "skills/shared-owner/scripts/caller-probe.mjs",
+        "kind": "statically_references",
+        "sourcePath": "skills/shared-owner/SKILL.md",
+        "evidence": {
+          "path": "skills/shared-owner/SKILL.md",
+          "startLine": 21,
+          "endLine": 21,
+          "snippet": "scripts/caller-probe.mjs"
+        }
+      },
+      {
+        "from": "skill.experiment.executable-shared-owner",
+        "to": "skills/shared-owner/scripts/contained-probe.py",
+        "kind": "owns_local_resource",
+        "sourcePath": "skills/shared-owner/SKILL.md"
+      },
+      {
+        "from": "skill.experiment.executable-shared-owner",
+        "to": "skills/shared-owner/scripts/direct-probe.py",
+        "kind": "owns_local_resource",
+        "sourcePath": "skills/shared-owner/SKILL.md"
+      },
+      {
+        "from": "skill.experiment.executable-shared-owner",
+        "to": "skills/shared-owner/scripts/direct-probe.py",
+        "kind": "statically_references",
+        "sourcePath": "skills/shared-owner/SKILL.md",
+        "evidence": {
+          "path": "skills/shared-owner/SKILL.md",
+          "startLine": 20,
+          "endLine": 20,
+          "snippet": "scripts/direct-probe.py"
+        }
+      },
+      {
+        "from": "skill.experiment.executable-shared-owner",
+        "to": "skills/shared-owner/scripts/shared-probe.py",
+        "kind": "owns_local_resource",
+        "sourcePath": "skills/shared-owner/SKILL.md"
+      },
+      {
+        "from": "skills/shared-owner/scripts/callee-probe.py",
+        "to": "skill.experiment.executable-shared-owner",
+        "kind": "inherits_owner",
+        "sourcePath": "skills/shared-owner/scripts/callee-probe.py"
+      },
+      {
+        "from": "skills/shared-owner/scripts/callee-probe.py",
+        "to": "skill.experiment.executable-shared-owner",
+        "kind": "inherits_policy",
+        "sourcePath": "skills/shared-owner/scripts/callee-probe.py"
+      },
+      {
+        "from": "skills/shared-owner/scripts/caller-probe.mjs",
+        "to": "skill.experiment.executable-shared-owner",
+        "kind": "inherits_owner",
+        "sourcePath": "skills/shared-owner/scripts/caller-probe.mjs"
+      },
+      {
+        "from": "skills/shared-owner/scripts/caller-probe.mjs",
+        "to": "skill.experiment.executable-shared-owner",
+        "kind": "inherits_policy",
+        "sourcePath": "skills/shared-owner/scripts/caller-probe.mjs"
+      },
+      {
+        "from": "skills/shared-owner/scripts/contained-probe.py",
+        "to": "skill.experiment.executable-shared-owner",
+        "kind": "inherits_owner",
+        "sourcePath": "skills/shared-owner/scripts/contained-probe.py"
+      },
+      {
+        "from": "skills/shared-owner/scripts/contained-probe.py",
+        "to": "skill.experiment.executable-shared-owner",
+        "kind": "inherits_policy",
+        "sourcePath": "skills/shared-owner/scripts/contained-probe.py"
+      },
+      {
+        "from": "skills/shared-owner/scripts/direct-probe.py",
+        "to": "skill.experiment.executable-shared-owner",
+        "kind": "inherits_owner",
+        "sourcePath": "skills/shared-owner/scripts/direct-probe.py"
+      },
+      {
+        "from": "skills/shared-owner/scripts/direct-probe.py",
+        "to": "skill.experiment.executable-shared-owner",
+        "kind": "inherits_policy",
+        "sourcePath": "skills/shared-owner/scripts/direct-probe.py"
+      },
+      {
+        "from": "skills/shared-owner/scripts/shared-probe.py",
+        "to": "skill.experiment.executable-shared-owner",
+        "kind": "inherits_owner",
+        "sourcePath": "skills/shared-owner/scripts/shared-probe.py"
+      },
+      {
+        "from": "skills/shared-owner/scripts/shared-probe.py",
+        "to": "skill.experiment.executable-shared-owner",
+        "kind": "inherits_policy",
+        "sourcePath": "skills/shared-owner/scripts/shared-probe.py"
+      }
+    ]
+  },
+  "contextLens": {
+    "enabled": true,
+    "detected": false,
+    "totalLensCount": 0,
+    "validLensCount": 0,
+    "invalidLensCount": 0,
+    "diagnosticCounts": {
+      "error": 0,
+      "warning": 0,
+      "info": 0
+    },
+    "definitionPaths": [],
+    "targetReferences": [],
+    "targetPaths": [],
+    "unresolvedTargetReferences": [],
+    "scopeSummary": [],
+    "lenses": []
+  },
+  "diagnostics": []
+}

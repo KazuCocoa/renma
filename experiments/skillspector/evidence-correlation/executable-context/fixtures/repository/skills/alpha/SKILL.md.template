@@ -1,0 +1,17 @@
+---
+name: alpha
+description: Inert fixture Skill that directly invokes the shared scanner target.
+metadata:
+  renma.id: skill.experiment.executable-alpha
+  renma.owner: experiment-maintainers
+  renma.status: experimental
+---
+
+# Executable Alpha Fixture
+
+This generated Skill is static graph input only. Do not execute the referenced
+fixture script.
+
+```bash
+python skills/shared-owner/scripts/shared-probe.py
+```

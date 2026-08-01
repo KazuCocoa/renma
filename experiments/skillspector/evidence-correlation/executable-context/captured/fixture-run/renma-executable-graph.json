@@ -1,0 +1,466 @@
+{
+  "root": "/Users/kazu/github/renma/experiments/skillspector/generated/evidence-correlation-executable-context/repository",
+  "configPath": "renma.config.json",
+  "scannedFileCount": 8,
+  "view": "executable",
+  "nodeCount": 8,
+  "edgeCount": 11,
+  "nodes": [
+    {
+      "id": "skill.experiment.executable-alpha",
+      "kind": "skill",
+      "sourcePath": "skills/alpha/SKILL.md",
+      "contentHash": "sha256:240abe3b16977767d6cdbc323012e0ce4b6ca7062aaf710892d005d1bdc9fb31",
+      "sizeBytes": 413,
+      "contentClassification": "text",
+      "markdownParserEligible": true,
+      "ownership": {
+        "declaredOwner": "experiment-maintainers",
+        "effectiveOwner": "experiment-maintainers",
+        "source": "declared"
+      },
+      "status": "experimental",
+      "tags": [],
+      "executableRole": "skill"
+    },
+    {
+      "id": "skill.experiment.executable-beta",
+      "kind": "skill",
+      "sourcePath": "skills/beta/SKILL.md",
+      "contentHash": "sha256:8d0e578538926c0ab7fa467f788bcb92e98a5379abf3d5fb5989a8467fd789ef",
+      "sizeBytes": 480,
+      "contentClassification": "text",
+      "markdownParserEligible": true,
+      "ownership": {
+        "declaredOwner": "experiment-maintainers",
+        "effectiveOwner": "experiment-maintainers",
+        "source": "declared"
+      },
+      "status": "experimental",
+      "tags": [],
+      "executableRole": "skill"
+    },
+    {
+      "id": "skills/shared-owner/scripts/callee-probe.py",
+      "kind": "script",
+      "sourcePath": "skills/shared-owner/scripts/callee-probe.py",
+      "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+      "sizeBytes": 389,
+      "contentClassification": "text",
+      "markdownParserEligible": false,
+      "ownership": {
+        "declaredOwner": null,
+        "effectiveOwner": "experiment-maintainers",
+        "source": "inherited",
+        "inheritedFrom": {
+          "id": "skill.experiment.executable-shared-owner",
+          "sourcePath": "skills/shared-owner/SKILL.md"
+        }
+      },
+      "tags": [],
+      "executableRole": "repository-script",
+      "executableScope": "skill-local",
+      "interpreterHints": [
+        "python"
+      ],
+      "invokedBySkillCount": 0
+    },
+    {
+      "id": "skills/shared-owner/scripts/caller-probe.mjs",
+      "kind": "script",
+      "sourcePath": "skills/shared-owner/scripts/caller-probe.mjs",
+      "contentHash": "sha256:2a72c84240f5d646c809492465a31a33be951d900a1ec5c8959107543f1d6e1a",
+      "sizeBytes": 139,
+      "contentClassification": "text",
+      "markdownParserEligible": false,
+      "ownership": {
+        "declaredOwner": null,
+        "effectiveOwner": "experiment-maintainers",
+        "source": "inherited",
+        "inheritedFrom": {
+          "id": "skill.experiment.executable-shared-owner",
+          "sourcePath": "skills/shared-owner/SKILL.md"
+        }
+      },
+      "tags": [],
+      "executableRole": "repository-script",
+      "executableScope": "skill-local",
+      "interpreterHints": [
+        "node"
+      ],
+      "invokedBySkillCount": 1
+    },
+    {
+      "id": "skills/shared-owner/scripts/contained-probe.py",
+      "kind": "script",
+      "sourcePath": "skills/shared-owner/scripts/contained-probe.py",
+      "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+      "sizeBytes": 389,
+      "contentClassification": "text",
+      "markdownParserEligible": false,
+      "ownership": {
+        "declaredOwner": null,
+        "effectiveOwner": "experiment-maintainers",
+        "source": "inherited",
+        "inheritedFrom": {
+          "id": "skill.experiment.executable-shared-owner",
+          "sourcePath": "skills/shared-owner/SKILL.md"
+        }
+      },
+      "tags": [],
+      "executableRole": "repository-script",
+      "executableScope": "skill-local",
+      "interpreterHints": [
+        "python"
+      ],
+      "invokedBySkillCount": 1
+    },
+    {
+      "id": "skills/shared-owner/scripts/direct-probe.py",
+      "kind": "script",
+      "sourcePath": "skills/shared-owner/scripts/direct-probe.py",
+      "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+      "sizeBytes": 389,
+      "contentClassification": "text",
+      "markdownParserEligible": false,
+      "ownership": {
+        "declaredOwner": null,
+        "effectiveOwner": "experiment-maintainers",
+        "source": "inherited",
+        "inheritedFrom": {
+          "id": "skill.experiment.executable-shared-owner",
+          "sourcePath": "skills/shared-owner/SKILL.md"
+        }
+      },
+      "tags": [],
+      "executableRole": "repository-script",
+      "executableScope": "skill-local",
+      "interpreterHints": [
+        "python"
+      ],
+      "invokedBySkillCount": 1
+    },
+    {
+      "id": "skills/shared-owner/scripts/shared-probe.py",
+      "kind": "script",
+      "sourcePath": "skills/shared-owner/scripts/shared-probe.py",
+      "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+      "sizeBytes": 389,
+      "contentClassification": "text",
+      "markdownParserEligible": false,
+      "ownership": {
+        "declaredOwner": null,
+        "effectiveOwner": "experiment-maintainers",
+        "source": "inherited",
+        "inheritedFrom": {
+          "id": "skill.experiment.executable-shared-owner",
+          "sourcePath": "skills/shared-owner/SKILL.md"
+        }
+      },
+      "tags": [],
+      "executableRole": "repository-script",
+      "executableScope": "skill-local",
+      "interpreterHints": [
+        "python"
+      ],
+      "invokedBySkillCount": 2
+    },
+    {
+      "id": "skill.experiment.executable-shared-owner",
+      "kind": "skill",
+      "sourcePath": "skills/shared-owner/SKILL.md",
+      "contentHash": "sha256:f57a2479e6903d9596880c77b43cf7a561c9e9df2baff543a7036b85ba0b38cf",
+      "sizeBytes": 674,
+      "contentClassification": "text",
+      "markdownParserEligible": true,
+      "ownership": {
+        "declaredOwner": "experiment-maintainers",
+        "effectiveOwner": "experiment-maintainers",
+        "source": "declared"
+      },
+      "status": "experimental",
+      "tags": [],
+      "executableRole": "skill"
+    }
+  ],
+  "edges": [
+    {
+      "from": "skill.experiment.executable-alpha",
+      "to": "skills/shared-owner/scripts/shared-probe.py",
+      "kind": "invokes",
+      "declaration": "executable-invocation",
+      "sourcePath": "skills/alpha/SKILL.md",
+      "resolved": true,
+      "targetId": "skills/shared-owner/scripts/shared-probe.py",
+      "targetKind": "script",
+      "targetPath": "skills/shared-owner/scripts/shared-probe.py",
+      "evidenceCount": 1
+    },
+    {
+      "from": "skill.experiment.executable-beta",
+      "to": "skills/shared-owner/scripts/contained-probe.py",
+      "kind": "invokes",
+      "declaration": "executable-invocation",
+      "sourcePath": "skills/beta/SKILL.md",
+      "resolved": true,
+      "targetId": "skills/shared-owner/scripts/contained-probe.py",
+      "targetKind": "script",
+      "targetPath": "skills/shared-owner/scripts/contained-probe.py",
+      "evidenceCount": 1
+    },
+    {
+      "from": "skill.experiment.executable-beta",
+      "to": "skills/shared-owner/scripts/shared-probe.py",
+      "kind": "invokes",
+      "declaration": "executable-invocation",
+      "sourcePath": "skills/beta/SKILL.md",
+      "resolved": true,
+      "targetId": "skills/shared-owner/scripts/shared-probe.py",
+      "targetKind": "script",
+      "targetPath": "skills/shared-owner/scripts/shared-probe.py",
+      "evidenceCount": 1
+    },
+    {
+      "from": "skill.experiment.executable-shared-owner",
+      "to": "skills/shared-owner/scripts/callee-probe.py",
+      "kind": "contains",
+      "declaration": "structural-skill-boundary",
+      "sourcePath": "skills/shared-owner/SKILL.md",
+      "resolved": true,
+      "targetId": "skills/shared-owner/scripts/callee-probe.py",
+      "targetKind": "script",
+      "targetPath": "skills/shared-owner/scripts/callee-probe.py"
+    },
+    {
+      "from": "skill.experiment.executable-shared-owner",
+      "to": "skills/shared-owner/scripts/caller-probe.mjs",
+      "kind": "contains",
+      "declaration": "structural-skill-boundary",
+      "sourcePath": "skills/shared-owner/SKILL.md",
+      "resolved": true,
+      "targetId": "skills/shared-owner/scripts/caller-probe.mjs",
+      "targetKind": "script",
+      "targetPath": "skills/shared-owner/scripts/caller-probe.mjs"
+    },
+    {
+      "from": "skill.experiment.executable-shared-owner",
+      "to": "skills/shared-owner/scripts/contained-probe.py",
+      "kind": "contains",
+      "declaration": "structural-skill-boundary",
+      "sourcePath": "skills/shared-owner/SKILL.md",
+      "resolved": true,
+      "targetId": "skills/shared-owner/scripts/contained-probe.py",
+      "targetKind": "script",
+      "targetPath": "skills/shared-owner/scripts/contained-probe.py"
+    },
+    {
+      "from": "skill.experiment.executable-shared-owner",
+      "to": "skills/shared-owner/scripts/direct-probe.py",
+      "kind": "contains",
+      "declaration": "structural-skill-boundary",
+      "sourcePath": "skills/shared-owner/SKILL.md",
+      "resolved": true,
+      "targetId": "skills/shared-owner/scripts/direct-probe.py",
+      "targetKind": "script",
+      "targetPath": "skills/shared-owner/scripts/direct-probe.py"
+    },
+    {
+      "from": "skill.experiment.executable-shared-owner",
+      "to": "skills/shared-owner/scripts/shared-probe.py",
+      "kind": "contains",
+      "declaration": "structural-skill-boundary",
+      "sourcePath": "skills/shared-owner/SKILL.md",
+      "resolved": true,
+      "targetId": "skills/shared-owner/scripts/shared-probe.py",
+      "targetKind": "script",
+      "targetPath": "skills/shared-owner/scripts/shared-probe.py"
+    },
+    {
+      "from": "skill.experiment.executable-shared-owner",
+      "to": "skills/shared-owner/scripts/caller-probe.mjs",
+      "kind": "invokes",
+      "declaration": "executable-invocation",
+      "sourcePath": "skills/shared-owner/SKILL.md",
+      "resolved": true,
+      "targetId": "skills/shared-owner/scripts/caller-probe.mjs",
+      "targetKind": "script",
+      "targetPath": "skills/shared-owner/scripts/caller-probe.mjs",
+      "evidenceCount": 1
+    },
+    {
+      "from": "skill.experiment.executable-shared-owner",
+      "to": "skills/shared-owner/scripts/direct-probe.py",
+      "kind": "invokes",
+      "declaration": "executable-invocation",
+      "sourcePath": "skills/shared-owner/SKILL.md",
+      "resolved": true,
+      "targetId": "skills/shared-owner/scripts/direct-probe.py",
+      "targetKind": "script",
+      "targetPath": "skills/shared-owner/scripts/direct-probe.py",
+      "evidenceCount": 1
+    },
+    {
+      "from": "skills/shared-owner/scripts/caller-probe.mjs",
+      "to": "skills/shared-owner/scripts/callee-probe.py",
+      "kind": "invokes",
+      "declaration": "executable-dependency",
+      "sourcePath": "skills/shared-owner/scripts/caller-probe.mjs",
+      "resolved": true,
+      "targetId": "skills/shared-owner/scripts/callee-probe.py",
+      "targetKind": "script",
+      "targetPath": "skills/shared-owner/scripts/callee-probe.py",
+      "evidenceCount": 1
+    }
+  ],
+  "executable": {
+    "invocationEvidence": [
+      {
+        "sourcePath": "skills/alpha/SKILL.md",
+        "line": 16,
+        "snippet": "python skills/shared-owner/scripts/shared-probe.py",
+        "launcher": "python",
+        "rawTarget": "skills/shared-owner/scripts/shared-probe.py",
+        "normalizedTarget": "skills/shared-owner/scripts/shared-probe.py",
+        "sourceSkillDirectory": "skills/alpha",
+        "resolution": "resolved",
+        "targetPathState": "parsed",
+        "governance": {
+          "owningSkillResolution": "resolved",
+          "policyEvidence": [
+            {
+              "relation": "source-artifact",
+              "path": "skills/alpha/SKILL.md",
+              "hasEffectivePolicy": false,
+              "policySources": []
+            }
+          ],
+          "hasEffectivePolicyEvidence": false,
+          "distinctEffectivePolicyFingerprints": [],
+          "fingerprint": "sha256:b57f4ebfb6d901a350a06d13f34421c6910d05b701feb91ad7cd2fdb17da72be"
+        },
+        "occurrenceOrdinal": 1
+      },
+      {
+        "sourcePath": "skills/beta/SKILL.md",
+        "line": 16,
+        "snippet": "python skills/shared-owner/scripts/shared-probe.py",
+        "launcher": "python",
+        "rawTarget": "skills/shared-owner/scripts/shared-probe.py",
+        "normalizedTarget": "skills/shared-owner/scripts/shared-probe.py",
+        "sourceSkillDirectory": "skills/beta",
+        "resolution": "resolved",
+        "targetPathState": "parsed",
+        "governance": {
+          "owningSkillResolution": "resolved",
+          "policyEvidence": [
+            {
+              "relation": "source-artifact",
+              "path": "skills/beta/SKILL.md",
+              "hasEffectivePolicy": false,
+              "policySources": []
+            }
+          ],
+          "hasEffectivePolicyEvidence": false,
+          "distinctEffectivePolicyFingerprints": [],
+          "fingerprint": "sha256:4b8ea1ecf3054158c6f990730b91074d525320120a76a784c7388a1dfd429d48"
+        },
+        "occurrenceOrdinal": 1
+      },
+      {
+        "sourcePath": "skills/beta/SKILL.md",
+        "line": 17,
+        "snippet": "python skills/shared-owner/scripts/contained-probe.py",
+        "launcher": "python",
+        "rawTarget": "skills/shared-owner/scripts/contained-probe.py",
+        "normalizedTarget": "skills/shared-owner/scripts/contained-probe.py",
+        "sourceSkillDirectory": "skills/beta",
+        "resolution": "resolved",
+        "targetPathState": "parsed",
+        "governance": {
+          "owningSkillResolution": "resolved",
+          "policyEvidence": [
+            {
+              "relation": "source-artifact",
+              "path": "skills/beta/SKILL.md",
+              "hasEffectivePolicy": false,
+              "policySources": []
+            }
+          ],
+          "hasEffectivePolicyEvidence": false,
+          "distinctEffectivePolicyFingerprints": [],
+          "fingerprint": "sha256:4b8ea1ecf3054158c6f990730b91074d525320120a76a784c7388a1dfd429d48"
+        },
+        "occurrenceOrdinal": 1
+      },
+      {
+        "sourcePath": "skills/shared-owner/SKILL.md",
+        "line": 20,
+        "snippet": "python scripts/direct-probe.py",
+        "launcher": "python",
+        "rawTarget": "scripts/direct-probe.py",
+        "normalizedTarget": "skills/shared-owner/scripts/direct-probe.py",
+        "sourceSkillDirectory": "skills/shared-owner",
+        "resolution": "resolved",
+        "targetPathState": "parsed",
+        "governance": {
+          "owningSkillResolution": "resolved",
+          "policyEvidence": [
+            {
+              "relation": "source-artifact",
+              "path": "skills/shared-owner/SKILL.md",
+              "hasEffectivePolicy": false,
+              "policySources": []
+            }
+          ],
+          "hasEffectivePolicyEvidence": false,
+          "distinctEffectivePolicyFingerprints": [],
+          "fingerprint": "sha256:1adffd844a89c9836947e28a9b6c94506bc7b8c15980b47c95da562d28358d68"
+        },
+        "occurrenceOrdinal": 1
+      },
+      {
+        "sourcePath": "skills/shared-owner/SKILL.md",
+        "line": 21,
+        "snippet": "node scripts/caller-probe.mjs",
+        "launcher": "node",
+        "rawTarget": "scripts/caller-probe.mjs",
+        "normalizedTarget": "skills/shared-owner/scripts/caller-probe.mjs",
+        "sourceSkillDirectory": "skills/shared-owner",
+        "resolution": "resolved",
+        "targetPathState": "parsed",
+        "governance": {
+          "owningSkillResolution": "resolved",
+          "policyEvidence": [
+            {
+              "relation": "source-artifact",
+              "path": "skills/shared-owner/SKILL.md",
+              "hasEffectivePolicy": false,
+              "policySources": []
+            }
+          ],
+          "hasEffectivePolicyEvidence": false,
+          "distinctEffectivePolicyFingerprints": [],
+          "fingerprint": "sha256:1adffd844a89c9836947e28a9b6c94506bc7b8c15980b47c95da562d28358d68"
+        },
+        "occurrenceOrdinal": 1
+      }
+    ],
+    "dependencyEvidence": [
+      {
+        "analyzer": "js-ts",
+        "sourcePath": "skills/shared-owner/scripts/caller-probe.mjs",
+        "line": 2,
+        "snippet": "import \"./callee-probe.py\"",
+        "relation": "static-import",
+        "rawSpecifier": "./callee-probe.py",
+        "normalizedTargetCandidates": [
+          "skills/shared-owner/scripts/callee-probe.py"
+        ],
+        "normalizedTarget": "skills/shared-owner/scripts/callee-probe.py",
+        "resolution": "resolved",
+        "targetPathState": "parsed",
+        "occurrenceOrdinal": 1
+      }
+    ]
+  }
+}

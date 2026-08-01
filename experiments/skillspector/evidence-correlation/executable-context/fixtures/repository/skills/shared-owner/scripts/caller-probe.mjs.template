@@ -1,0 +1,4 @@
+// Inert dependency syntax for graph parsing only. Never import this module.
+import "./callee-probe.py";
+
+export const fixtureOnly = true;

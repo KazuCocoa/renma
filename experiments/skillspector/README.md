@@ -183,3 +183,10 @@ to exact Renma catalog paths without becoming Renma diagnostics. It contains
 its own inert templates, experiment-only tests, audited raw capture,
 experimental JSON projection, and human-readable report. It remains outside
 normal Renma commands, builds, tests, packages, readiness, and CI policy.
+
+Its isolated
+[`executable-context/`](evidence-correlation/executable-context/README.md)
+extension additionally tests exact scanner-file correlation against the public
+executable graph. Direct invocation and structural containment remain separate
+evidence; no ownership, runtime impact, transitive reachability, reviewed
+scope, producer completeness, or adapter boundary is inferred.
