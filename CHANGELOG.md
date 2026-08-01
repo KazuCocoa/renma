@@ -6,6 +6,27 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.28.4] - 2026-08-01
+
+### Added
+
+- Added automatic, security-constrained Mermaid rendering to the VitePress
+  documentation site, with dedicated theme integration, rendering tests, and
+  maintainer guidance for diagram changes.
+- Added Cloudflare Web Analytics to the documentation site.
+- Added Dependabot configuration and updated GitHub Actions dependencies for
+  CI, documentation deployment, Renma reporting, and trusted npm publication.
+- Extended the isolated SkillSpector evidence-correlation experiment to compare
+  exact scanner file evidence with Renma's public executable graph while
+  preserving the boundaries between invocation, containment, ownership,
+  reachability, reviewed scope, and runtime impact.
+
+### Changed
+
+- Updated runtime and development dependencies, TypeScript, formatting, and
+  lint configuration for the current toolchain without changing Renma's public
+  commands or package schemas.
+
 ## [0.28.3] - 2026-08-01
 
 ### Added
@@ -1927,7 +1948,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.28.3...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.28.4...HEAD
+[0.28.4]: https://github.com/KazuCocoa/renma/compare/v0.28.3...v0.28.4
 [0.28.3]: https://github.com/KazuCocoa/renma/compare/v0.28.2...v0.28.3
 [0.28.2]: https://github.com/KazuCocoa/renma/compare/v0.28.1...v0.28.2
 [0.28.1]: https://github.com/KazuCocoa/renma/compare/v0.28.0...v0.28.1
