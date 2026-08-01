@@ -11,7 +11,7 @@ experiment use Renma's public executable graph to show which Skills or scripts
 directly invoke that script while keeping invocation, structural containment,
 ownership, and scanner assessment semantically separate?
 
-All 26 executable relationship predicates were satisfied. Direct Skill invokers, direct script invokers, structural containers, unresolved targets, duplicate evidence, and count consistency were observed without merging their meanings. Producer completeness and adapter readiness remain separate and blocked.
+All 29 executable relationship predicates were satisfied. Direct Skill invokers, direct script invokers, structural containers, unresolved targets, duplicate evidence, and count consistency were observed without merging their meanings. Adapter readiness remains separately blocked by producer-native completeness (incomplete or unknown) and unresolved producer-contract gaps.
 
 ## Invocation and provenance evidence
 
@@ -28,10 +28,17 @@ All 26 executable relationship predicates were satisfied. Direct Skill invokers,
 | Renma CLI revision | `8865fe43fccd4f4bfc1e15801e4807a66d459edc` |
 | Renma executable SHA-256 | `sha256:f0aacb4c2d48310c9fc9b44229819771166a562394ee887f35bc89bdb9c8498b` |
 | Catalog invocation | `/Users/kazu/github/renma/dist/index.js catalog /Users/kazu/github/renma/experiments/skillspector/generated/evidence-correlation-executable-context/repository --format json` |
+| Catalog exit | 0 |
+| Catalog stderr | empty |
 | Executable graph invocation | `/Users/kazu/github/renma/dist/index.js graph /Users/kazu/github/renma/experiments/skillspector/generated/evidence-correlation-executable-context/repository --view executable --format json` |
-| Git HEAD context | `5e5be7f94745df936ce23bb899793a33dfc96191` |
+| First executable graph exit | 0 |
+| First executable graph stderr | empty |
+| Repeated executable graph exit | 0 |
+| Repeated executable graph stderr | empty |
+| Repeated graph output byte-identical | true |
+| Git HEAD context | `584edbe6e2d73331c7f5a79fbec25b267ab6b5a6` |
 | Git worktree state | dirty |
-| Exact harness digest | `sha256:c6428c4a1a3a0f033c4c0eb1aec7485a7f7b3d81af684c2b38ac2db233416605` |
+| Exact harness digest | `sha256:15407ece2bd14d7b254648334cfa54dd9938a4b7d14912fd3e52b1fcebc731b3` |
 | Exact harness files | 17 |
 | Revision contains exact harness | false |
 | Exact fixture files | 10 |
@@ -44,7 +51,7 @@ worktree context; exact fixture and harness hashes qualify a dirty worktree.
 
 | Source | Reference | SHA-256 |
 | --- | --- | --- |
-| SkillSpector JSON | `evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json` | `sha256:04c2aa23395b21e846e0a947a0f527fdc630a9d11840c690102336e1b656f87e` |
+| SkillSpector JSON | `evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json` | `sha256:d1dcb58b05bdf5dac3aae6f1c7a71f01b3e1e5a63be68a3330cc493edab67569` |
 | Renma catalog JSON | `evidence-correlation/executable-context/captured/fixture-run/renma-catalog.json` | `sha256:87e9c415c32f2692f3905b2bb48a9e4a7adfcdbc7a6ac99195b59d2900e4ec04` |
 | Renma executable graph JSON | `evidence-correlation/executable-context/captured/fixture-run/renma-executable-graph.json` | `sha256:6adc278bd2ea0ad3a112a30683aa2d3a17a3f62778d7675ab4b28e4dec767d5f` |
 
@@ -61,11 +68,12 @@ the projection does not merge either into a new authoritative source.
 | Producer `is_complete` | false |
 | Analyzer statuses | completed: 20, disabled: 4 |
 | Non-complete analyzer entries | 4 |
+| Native completeness evidence | incomplete-or-unknown |
 | Reported limitations | 4 |
 
-Disabled, partial, failed, skipped, unaccounted, missing, or unknown analyzer
-work is not reclassified as complete. Executable relationship enrichment has a
-separate decision gate and does not weaken producer-native completeness.
+This input does not establish complete native analysis. Disabled, partial, failed, skipped, unaccounted, missing, or unknown analyzer work remains a producer-completeness blocker and is not reclassified as complete. Executable relationship
+enrichment has a separate decision gate and does not weaken or manufacture
+producer-native completeness.
 
 ## Exact fixture expectation matrix
 
@@ -139,7 +147,7 @@ The exact normalized scanner target has no catalog asset, so graph correlation r
     "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/2",
     "nativeFinding": {
       "id": "AS3",
-      "finding_id": "finding-78c19fbb9f0243029275f3ff375f4144",
+      "finding_id": "finding-d0150164f37e49ab8c794ec0ef113b77",
       "category": "Agent Snooping",
       "pattern": "Skill Enumeration",
       "severity": "MEDIUM",
@@ -191,7 +199,7 @@ The exact normalized scanner target has no catalog asset, so graph correlation r
 
 ## Duplicate preservation
 
-- Evidence 2, 3 remain separate for `skills/shared-owner/README.md`; native IDs `finding-78c19fbb9f0243029275f3ff375f4144`, `finding-92a0ccaf8eab499d9b7c9a222e8526ca`.
+- Evidence 2, 3 remain separate for `skills/shared-owner/README.md`; native IDs `finding-d0150164f37e49ab8c794ec0ef113b77`, `finding-c338ef318c8242a0949e798e4b77d11f`.
 
 Duplicates are observations, not stable fingerprints. They are not merged,
 suppressed, or converted into graph-edge counts.
@@ -203,7 +211,7 @@ The complete object below is copied unchanged from the authoritative scanner out
 ```json
 {
   "id": "LP1",
-  "finding_id": "finding-4c7b32732a1c437989670d1954c18e62",
+  "finding_id": "finding-9ff1bf7adab94eddb615542ce398cba9",
   "category": "MCP Least Privilege",
   "pattern": null,
   "severity": "HIGH",
@@ -234,7 +242,7 @@ The corresponding experimental record preserves the native object and adds separ
     "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/0",
     "nativeFinding": {
       "id": "LP1",
-      "finding_id": "finding-4c7b32732a1c437989670d1954c18e62",
+      "finding_id": "finding-9ff1bf7adab94eddb615542ce398cba9",
       "category": "MCP Least Privilege",
       "pattern": null,
       "severity": "HIGH",
@@ -458,8 +466,8 @@ risk score, or recommendation.
 
 | Gate | Result |
 | --- | --- |
-| Executable relationship experiment | **satisfied** (26/26 predicates) |
-| Adapter-boundary readiness | **still blocked by producer completeness and unresolved contract gaps** |
+| Executable relationship experiment | **satisfied** (29/29 predicates) |
+| Adapter-boundary readiness | **blocked** — producer-native completeness (incomplete or unknown); unresolved producer-contract gaps |
 
 Every executable relationship predicate passed. This does not alter the separate adapter-readiness gate.
 

@@ -22,8 +22,11 @@ digests.
 
 ## Narrow relationship meanings
 
-The experiment selects only canonical incoming graph edges to the one node
-whose repository-relative `sourcePath` exactly matches the catalog asset:
+The experiment proceeds only when exact catalog correlation produced an asset
+whose kind is `script` and exactly one graph node with the same
+repository-relative `sourcePath` has role `repository-script`. Skill and
+external-executable nodes are never candidates. It then selects only canonical
+incoming graph edges to that repository-script node:
 
 - `Skill --invokes--> repository script` becomes a direct Skill invoker with
   basis `direct-skill-invokes-edge`;
@@ -41,10 +44,13 @@ satisfaction. External executable nodes cannot correlate to repository file
 findings.
 
 Missing input, a non-executable graph view, malformed or duplicate canonical
-edges, absent edge endpoints, and unsupported node roles fail closed. Missing
-or multiple exact graph-node matches remain unresolved or ambiguous. A
-mismatch between `invokedBySkillCount` and distinct direct Skill edge
-identities is inconclusive; the count never manufactures identities.
+edges, absent edge endpoints, contradictory repository target fields, and
+unsupported node roles or repository-script scopes fail closed. A `contains`
+edge must resolve from a Skill to a skill-local repository script; an internal
+`invokes` edge must resolve from a Skill or repository script to a repository
+script. Missing or multiple exact graph-node matches remain unresolved or
+ambiguous. A mismatch between `invokedBySkillCount` and distinct direct Skill
+edge identities is inconclusive; the count never manufactures identities.
 
 ## Controlled inert fixture
 
@@ -84,7 +90,9 @@ directory. The runner records raw artifacts, invocation arrays, executable
 paths and versions, CLI revision and hash, exact fixture and harness hashes,
 raw digests, Git revision, dirty-state qualification, a deterministic
 experimental projection, and an input-driven Markdown report. It invokes the
-executable graph twice and requires byte-identical JSON.
+executable graph twice and requires both invocations, plus catalog generation,
+to exit `0` with empty stderr. The two graph JSON outputs must be
+byte-identical, and both invocation results are recorded independently.
 
 Run experiment-only tests with:
 
@@ -105,8 +113,10 @@ Capture mode refuses to overwrite an existing capture.
 ## Separate decision gates
 
 The report evaluates executable relationship predicates independently from
-producer completeness. A controlled fixture may satisfy direct executable
-enrichment while adapter-boundary readiness remains blocked by the producer's
-native incomplete analysis and unresolved contract gaps. This experiment does
-not create an adapter, integration point, diagnostic, readiness input, public
+producer completeness. Adapter-boundary readiness always remains blocked by
+unresolved producer-contract gaps. Producer completeness is included as an
+additional blocker only when the native input is incomplete or unknown; a
+complete non-empty all-completed analyzer ledger is not mislabeled as
+incomplete. This experiment does not define required-profile completeness or
+create an adapter, integration point, diagnostic, readiness input, public
 receipt, metadata field, dependency, policy, or production graph behavior.

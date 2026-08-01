@@ -106,8 +106,10 @@ try {
 
 const catalogArgs = [renmaCli, "catalog", fixtureRoot, "--format", "json"];
 const renmaCatalog = await run(process.execPath, catalogArgs);
-if (![0, 1].includes(renmaCatalog.exitCode)) {
-  fail(`Renma catalog failed (exit ${renmaCatalog.exitCode}).`);
+if (renmaCatalog.exitCode !== 0 || renmaCatalog.stderr !== "") {
+  fail(
+    `Renma catalog did not complete cleanly (exit ${renmaCatalog.exitCode}, stderr ${renmaCatalog.stderr === "" ? "empty" : "non-empty"}).`,
+  );
 }
 const catalogPath = path.join(outputRoot, "renma-catalog.json");
 await writeFile(catalogPath, renmaCatalog.stdout);
@@ -125,8 +127,15 @@ const [renmaGraph, repeatedRenmaGraph] = await Promise.all([
   run(process.execPath, graphArgs),
   run(process.execPath, graphArgs),
 ]);
-if (![0, 1].includes(renmaGraph.exitCode)) {
-  fail(`Renma executable graph failed (exit ${renmaGraph.exitCode}).`);
+if (renmaGraph.exitCode !== 0 || renmaGraph.stderr !== "") {
+  fail(
+    `First Renma executable graph invocation did not complete cleanly (exit ${renmaGraph.exitCode}, stderr ${renmaGraph.stderr === "" ? "empty" : "non-empty"}).`,
+  );
+}
+if (repeatedRenmaGraph.exitCode !== 0 || repeatedRenmaGraph.stderr !== "") {
+  fail(
+    `Repeated Renma executable graph invocation did not complete cleanly (exit ${repeatedRenmaGraph.exitCode}, stderr ${repeatedRenmaGraph.stderr === "" ? "empty" : "non-empty"}).`,
+  );
 }
 if (renmaGraph.stdout !== repeatedRenmaGraph.stdout) {
   fail("Repeated public executable graph invocations were not byte-identical.");
@@ -240,9 +249,16 @@ const invocation = {
   renmaExecutableGraph: {
     executable: process.execPath,
     args: graphArgs,
-    exitCode: renmaGraph.exitCode,
-    stderr: renmaGraph.stderr,
-    repeatedInvocationByteIdentical: true,
+    firstInvocation: {
+      exitCode: renmaGraph.exitCode,
+      stderr: renmaGraph.stderr,
+    },
+    repeatedInvocation: {
+      exitCode: repeatedRenmaGraph.exitCode,
+      stderr: repeatedRenmaGraph.stderr,
+      stdoutByteIdenticalToFirst:
+        repeatedRenmaGraph.stdout === renmaGraph.stdout,
+    },
   },
   fixture: {
     id: normalized.source.fixture.id,

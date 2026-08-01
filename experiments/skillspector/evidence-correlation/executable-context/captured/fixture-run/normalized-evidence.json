@@ -284,7 +284,7 @@
     "rawOutput": {
       "referenceBase": "experiments/skillspector",
       "reference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json",
-      "sha256": "sha256:04c2aa23395b21e846e0a947a0f527fdc630a9d11840c690102336e1b656f87e"
+      "sha256": "sha256:d1dcb58b05bdf5dac3aae6f1c7a71f01b3e1e5a63be68a3330cc493edab67569"
     },
     "renmaCatalog": {
       "referenceBase": "experiments/skillspector",
@@ -321,8 +321,8 @@
           3
         ],
         "rawFindingIds": [
-          "finding-78c19fbb9f0243029275f3ff375f4144",
-          "finding-92a0ccaf8eab499d9b7c9a222e8526ca"
+          "finding-d0150164f37e49ab8c794ec0ef113b77",
+          "finding-c338ef318c8242a0949e798e4b77d11f"
         ],
         "comparisonBasis": "same scanner-native fields except scanner-reported finding_id"
       }
@@ -336,7 +336,7 @@
         "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/0",
         "nativeFinding": {
           "id": "LP1",
-          "finding_id": "finding-4c7b32732a1c437989670d1954c18e62",
+          "finding_id": "finding-9ff1bf7adab94eddb615542ce398cba9",
           "category": "MCP Least Privilege",
           "pattern": null,
           "severity": "HIGH",
@@ -527,7 +527,7 @@
         "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/1",
         "nativeFinding": {
           "id": "LP1",
-          "finding_id": "finding-e3336755ed6146ea9c1d9682412098b7",
+          "finding_id": "finding-1d8a42c7519d4214a0c94db1160c6ebf",
           "category": "MCP Least Privilege",
           "pattern": null,
           "severity": "HIGH",
@@ -718,7 +718,7 @@
         "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/2",
         "nativeFinding": {
           "id": "AS3",
-          "finding_id": "finding-78c19fbb9f0243029275f3ff375f4144",
+          "finding_id": "finding-d0150164f37e49ab8c794ec0ef113b77",
           "category": "Agent Snooping",
           "pattern": "Skill Enumeration",
           "severity": "MEDIUM",
@@ -773,7 +773,7 @@
         "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/3",
         "nativeFinding": {
           "id": "AS3",
-          "finding_id": "finding-92a0ccaf8eab499d9b7c9a222e8526ca",
+          "finding_id": "finding-c338ef318c8242a0949e798e4b77d11f",
           "category": "Agent Snooping",
           "pattern": "Skill Enumeration",
           "severity": "MEDIUM",
@@ -828,7 +828,7 @@
         "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/4",
         "nativeFinding": {
           "id": "AS3",
-          "finding_id": "finding-a51420e703924ef7911c04afa76b2a1e",
+          "finding_id": "finding-5a3ad7c290bf4a4d9ab617e4761b2462",
           "category": "Agent Snooping",
           "pattern": "Skill Enumeration",
           "severity": "MEDIUM",
@@ -1019,7 +1019,7 @@
         "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/5",
         "nativeFinding": {
           "id": "AS3",
-          "finding_id": "finding-71b8e6a167bc4178be4fc3a81081febb",
+          "finding_id": "finding-b78538f844c84f1796c838749cad25db",
           "category": "Agent Snooping",
           "pattern": "Skill Enumeration",
           "severity": "MEDIUM",
@@ -1208,7 +1208,7 @@
         "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/6",
         "nativeFinding": {
           "id": "AS3",
-          "finding_id": "finding-d17f20a6cb504c5a9a1aa7eb0a273cbd",
+          "finding_id": "finding-2870308989824375a24f40fa9b0ffb44",
           "category": "Agent Snooping",
           "pattern": "Skill Enumeration",
           "severity": "MEDIUM",
@@ -1409,7 +1409,7 @@
         "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/7",
         "nativeFinding": {
           "id": "AS3",
-          "finding_id": "finding-a38d1913da4a48ddb76ccd55cf8aba5b",
+          "finding_id": "finding-18e96ec92e2e44bba30c99d406eac6ce",
           "category": "Agent Snooping",
           "pattern": "Skill Enumeration",
           "severity": "MEDIUM",

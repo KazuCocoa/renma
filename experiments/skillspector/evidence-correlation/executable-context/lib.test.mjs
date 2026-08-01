@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   correlateExecutableContext,
@@ -10,6 +11,7 @@ import {
 import { renderExecutableExperimentReport } from "./report.mjs";
 
 const paths = {
+  skill: "skills/shared-owner/SKILL.md",
   direct: "skills/shared-owner/scripts/direct-probe.py",
   shared: "skills/shared-owner/scripts/shared-probe.py",
   contained: "skills/shared-owner/scripts/contained-probe.py",
@@ -54,6 +56,38 @@ test("multiple nodes at one correlatable path remain ambiguous", () => {
   assert.equal(context.directSkillInvokers.length, 0);
 });
 
+test("an exact SKILL.md catalog correlation is not executable context", () => {
+  const normalized = normalizeFixture({
+    rawReport: reportWithIssues([nativeIssue("SKILL.md", "skill-one")]),
+  });
+  const { correlation, executableContext: context } = normalized.evidence[0];
+  assert.equal(correlation.status, "correlated");
+  assert.equal(correlation.asset.kind, "skill");
+  assert.equal(context.status, "unresolved");
+  assert.equal(context.reasonCode, "catalog-asset-is-not-repository-script");
+  assert.deepEqual(context.candidates, []);
+});
+
+test("a correlated catalog asset whose kind is not script is rejected", () => {
+  const context = correlateExecutableContext(
+    correlatedAsset(paths.direct, "context"),
+    executableGraph(),
+  );
+  assert.equal(context.status, "unresolved");
+  assert.equal(context.reasonCode, "catalog-asset-is-not-repository-script");
+  assert.equal(context.node, undefined);
+});
+
+test("a path matching only a Skill graph node cannot correlate as a script", () => {
+  const context = correlateExecutableContext(
+    correlatedAsset(paths.skill, "script"),
+    executableGraph(),
+  );
+  assert.equal(context.status, "unresolved");
+  assert.equal(context.reasonCode, "no-executable-node-at-exact-path");
+  assert.deepEqual(context.candidates, []);
+});
+
 test("an edge whose target node is absent fails closed", () => {
   const graph = executableGraph();
   graph.edges.push(edge("skill.alpha", "invokes", "absent-target"));
@@ -64,6 +98,86 @@ test("an edge whose source node is absent fails closed", () => {
   const graph = executableGraph();
   graph.edges.push(edge("absent-source", "invokes", paths.direct));
   assert.throws(() => validateExecutableGraph(graph), /absent source node/u);
+});
+
+test("contains cannot target a repository tool", () => {
+  const graph = executableGraph();
+  graph.nodes.find((node) => node.id === paths.direct).executableScope =
+    "repository-tool";
+  assert.throws(
+    () => validateExecutableGraph(graph),
+    /Skill-to-skill-local-repository-script/u,
+  );
+});
+
+test("contains cannot target a repository script without skill-local scope", () => {
+  const graph = executableGraph();
+  delete graph.nodes.find((node) => node.id === paths.direct).executableScope;
+  assert.throws(
+    () => validateExecutableGraph(graph),
+    /supported executableScope/u,
+  );
+});
+
+test("unresolved internal repository invocation fails closed", () => {
+  const graph = executableGraph();
+  graph.edges.find(
+    (item) => item.from === "skill.owner" && item.targetId === paths.direct,
+  ).resolved = false;
+  assert.throws(
+    () => validateExecutableGraph(graph),
+    /resolved Skill-or-script-to-repository-script/u,
+  );
+});
+
+test("targetId and to cannot identify different repository nodes", () => {
+  const graph = executableGraph();
+  graph.edges.find(
+    (item) => item.from === "skill.owner" && item.targetId === paths.direct,
+  ).to = paths.shared;
+  assert.throws(
+    () => validateExecutableGraph(graph),
+    /to does not identify target node/u,
+  );
+});
+
+test("targetPath must agree with the repository target sourcePath", () => {
+  const graph = executableGraph();
+  graph.edges.find(
+    (item) => item.from === "skill.owner" && item.targetId === paths.direct,
+  ).targetPath = paths.shared;
+  assert.throws(
+    () => validateExecutableGraph(graph),
+    /targetPath does not match target sourcePath/u,
+  );
+});
+
+test("repository-script nodes require scope and direct-Skill count", async (t) => {
+  for (const field of ["executableScope", "invokedBySkillCount"]) {
+    await t.test(`missing ${field}`, () => {
+      const graph = executableGraph();
+      delete graph.nodes.find((node) => node.id === paths.direct)[field];
+      assert.throws(
+        () => validateExecutableGraph(graph),
+        field === "executableScope"
+          ? /supported executableScope/u
+          : /non-negative integer invokedBySkillCount/u,
+      );
+    });
+  }
+});
+
+test("the reviewed captured executable graph satisfies focused invariants", () => {
+  const graph = JSON.parse(
+    readFileSync(
+      new URL(
+        "./captured/fixture-run/renma-executable-graph.json",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  assert.doesNotThrow(() => validateExecutableGraph(graph));
 });
 
 test("contains stays separate from invokes", () => {
@@ -256,23 +370,177 @@ test("external executable nodes cannot match repository scanner assets", () => {
   assert.equal(context.candidates.length, 0);
 });
 
+test("catalog exit 1 prevents a positive experiment conclusion", () => {
+  const evaluation = evaluationWithInvocation((invocation) => {
+    invocation.renmaCatalog.exitCode = 1;
+  });
+  assert.equal(evaluation.allPredicatesSatisfied, false);
+  assert.ok(evaluation.failedCheckIds.includes("renma.catalog.execution"));
+});
+
+test("non-empty catalog stderr prevents a positive experiment conclusion", () => {
+  const evaluation = evaluationWithInvocation((invocation) => {
+    invocation.renmaCatalog.stderr = "catalog warning";
+  });
+  assert.equal(evaluation.allPredicatesSatisfied, false);
+  assert.ok(evaluation.failedCheckIds.includes("renma.catalog.execution"));
+});
+
+test("first graph exit 1 prevents a positive experiment conclusion", () => {
+  const evaluation = evaluationWithInvocation((invocation) => {
+    invocation.renmaExecutableGraph.firstInvocation.exitCode = 1;
+  });
+  assert.equal(evaluation.allPredicatesSatisfied, false);
+  assert.ok(
+    evaluation.failedCheckIds.includes("renma.executable-graph.execution"),
+  );
+});
+
+test("repeated graph exit 1 prevents a positive experiment conclusion", () => {
+  const evaluation = evaluationWithInvocation((invocation) => {
+    invocation.renmaExecutableGraph.repeatedInvocation.exitCode = 1;
+    invocation.renmaExecutableGraph.repeatedInvocation.stdoutByteIdenticalToFirst = false;
+  });
+  assert.equal(evaluation.allPredicatesSatisfied, false);
+  assert.ok(
+    evaluation.failedCheckIds.includes("renma.executable-graph.repeatability"),
+  );
+});
+
+test("non-empty graph stderr prevents a positive experiment conclusion", () => {
+  const evaluation = evaluationWithInvocation((invocation) => {
+    invocation.renmaExecutableGraph.firstInvocation.stderr = "graph warning";
+  });
+  assert.equal(evaluation.allPredicatesSatisfied, false);
+  assert.ok(
+    evaluation.failedCheckIds.includes("renma.executable-graph.execution"),
+  );
+});
+
+test("non-empty repeated graph stderr prevents a positive conclusion", () => {
+  const evaluation = evaluationWithInvocation((invocation) => {
+    invocation.renmaExecutableGraph.repeatedInvocation.stderr =
+      "repeated graph warning";
+  });
+  assert.equal(evaluation.allPredicatesSatisfied, false);
+  assert.ok(
+    evaluation.failedCheckIds.includes("renma.executable-graph.repeatability"),
+  );
+});
+
+test("equal graph output cannot hide different invocation exits", () => {
+  const evaluation = evaluationWithInvocation((invocation) => {
+    invocation.renmaExecutableGraph.repeatedInvocation.exitCode = 1;
+    invocation.renmaExecutableGraph.repeatedInvocation.stdoutByteIdenticalToFirst = true;
+  });
+  assert.equal(evaluation.allPredicatesSatisfied, false);
+  assert.ok(
+    evaluation.failedCheckIds.includes("renma.executable-graph.repeatability"),
+  );
+});
+
+test("different repeated graph output prevents a positive conclusion", () => {
+  const evaluation = evaluationWithInvocation((invocation) => {
+    invocation.renmaExecutableGraph.repeatedInvocation.stdoutByteIdenticalToFirst = false;
+  });
+  assert.equal(evaluation.allPredicatesSatisfied, false);
+  assert.ok(
+    evaluation.failedCheckIds.includes("renma.executable-graph.repeatability"),
+  );
+});
+
+test("clean catalog and repeated graph execution passes all Renma predicates", () => {
+  const evaluation = evaluationWithInvocation(() => {});
+  assert.equal(evaluation.allPredicatesSatisfied, true);
+  assert.equal(
+    evaluation.checks.find((item) => item.id === "renma.catalog.execution")
+      .passed,
+    true,
+  );
+  assert.equal(
+    evaluation.checks.find(
+      (item) => item.id === "renma.executable-graph.execution",
+    ).passed,
+    true,
+  );
+  assert.equal(
+    evaluation.checks.find(
+      (item) => item.id === "renma.executable-graph.repeatability",
+    ).passed,
+    true,
+  );
+});
+
 test("fixture evaluation separates executable success from adapter readiness", () => {
   const normalized = normalizedFixture();
   const evaluation = evaluateExecutableExperiment({
     normalized,
     rawReport: rawReport(),
-    invocation: { scanner: { exitCode: 0 } },
+    invocation: reportInvocation(),
   });
   assert.equal(evaluation.allPredicatesSatisfied, true);
   assert.equal(
     evaluation.conclusions.executableRelationshipExperiment,
     "satisfied",
   );
-  assert.match(
-    evaluation.conclusions.adapterBoundaryReadiness,
-    /still blocked/u,
+  assert.equal(evaluation.conclusions.adapterBoundaryReadiness, "blocked");
+  assert.ok(
+    evaluation.conclusions.adapterBoundaryBlockers.includes(
+      "producer-native completeness (incomplete or unknown)",
+    ),
   );
   assert.equal(evaluation.producerCompleteness.isComplete, false);
+});
+
+test("complete native ledger is not misreported as an adapter blocker", () => {
+  const report = rawReport();
+  report.analysis_completeness = {
+    execution_successful: true,
+    is_complete: true,
+    analyzer_statuses: [
+      {
+        analyzer_id: "static",
+        status: "completed",
+        skipped: 0,
+        failed: 0,
+        unaccounted: 0,
+      },
+    ],
+  };
+  const normalized = normalizeFixture({ rawReport: report });
+  const invocation = reportInvocation();
+  const evaluation = evaluateExecutableExperiment({
+    normalized,
+    rawReport: report,
+    invocation,
+  });
+  const rendered = renderExecutableExperimentReport({
+    normalized,
+    rawReport: report,
+    invocation,
+  });
+
+  assert.equal(evaluation.allPredicatesSatisfied, true);
+  assert.equal(
+    evaluation.conclusions.executableRelationshipExperiment,
+    "satisfied",
+  );
+  assert.equal(evaluation.conclusions.adapterBoundaryReadiness, "blocked");
+  assert.deepEqual(evaluation.conclusions.adapterBoundaryBlockers, [
+    "unresolved producer-contract gaps",
+  ]);
+  assert.equal(
+    evaluation.producerCompleteness.satisfiesNativeCompletenessEvidence,
+    true,
+  );
+  assert.match(
+    rendered,
+    /Producer completeness is therefore not an adapter-readiness blocker/u,
+  );
+  assert.doesNotMatch(
+    rendered,
+    /producer-native completeness \(incomplete or unknown\)|does not establish complete native analysis/u,
+  );
 });
 
 test("relationship summaries deduplicate context without merging findings", () => {
@@ -294,7 +562,7 @@ test("report renders separate positive experiment and blocked adapter gates", ()
     rendered,
     /Executable relationship experiment \| \*\*satisfied/u,
   );
-  assert.match(rendered, /Adapter-boundary readiness \| \*\*still blocked/u);
+  assert.match(rendered, /Adapter-boundary readiness \| \*\*blocked/u);
   assert.match(rendered, /direct-skill-invokes-edge/u);
   assert.match(rendered, /direct-script-invokes-edge/u);
   assert.match(rendered, /direct-structural-contains-edge/u);
@@ -333,6 +601,16 @@ test("report conclusion changes when graph count evidence contradicts edges", ()
     /Direct executable relationship enrichment is feasible/u,
   );
 });
+
+function evaluationWithInvocation(mutate) {
+  const invocation = reportInvocation();
+  mutate(invocation);
+  return evaluateExecutableExperiment({
+    normalized: normalizedFixture(),
+    rawReport: rawReport(),
+    invocation,
+  });
+}
 
 function normalizedFixture() {
   return normalizeFixture({ rawReport: rawReport() });
@@ -431,14 +709,14 @@ function fixtureCatalog() {
   };
 }
 
-function correlatedAsset(sourcePath) {
+function correlatedAsset(sourcePath, kind = "script") {
   return {
     provenance: "experiment-correlation",
     status: "correlated",
     asset: {
       id: sourcePath,
       sourcePath,
-      kind: "script",
+      kind,
       contentHash: `sha256:${sourcePath}`,
       ownership: { source: "unowned" },
     },
@@ -519,9 +797,19 @@ function reportInvocation() {
       revision: "revision",
       executableSha256: "sha256:cli",
     },
-    renmaCatalog: { args: ["catalog", "/fixture", "--format", "json"] },
+    renmaCatalog: {
+      args: ["catalog", "/fixture", "--format", "json"],
+      exitCode: 0,
+      stderr: "",
+    },
     renmaExecutableGraph: {
       args: ["graph", "/fixture", "--view", "executable", "--format", "json"],
+      firstInvocation: { exitCode: 0, stderr: "" },
+      repeatedInvocation: {
+        exitCode: 0,
+        stderr: "",
+        stdoutByteIdenticalToFirst: true,
+      },
     },
     git: { headRevision: "head", worktreeState: "dirty" },
     experimentHarness: {

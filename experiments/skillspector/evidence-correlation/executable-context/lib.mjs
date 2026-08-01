@@ -1,8 +1,15 @@
+import path from "node:path";
 import { normalizeEvidence, sha256 } from "../lib.mjs";
 
 export const experimentalSchemaVersion =
   "renma.experiment.skillspector-executable-context.v0";
 export const experimentProvenance = "experiment-executable-correlation";
+
+const supportedRepositoryScriptScopes = new Set([
+  "skill-local",
+  "repository-tool",
+  "noncanonical",
+]);
 
 export const fixtureExpectations = Object.freeze({
   fixtureId: "skillspector-executable-context-v1",
@@ -94,7 +101,26 @@ export function validateExecutableGraph(graph) {
         `Executable graph node "${node.id}" has an unsupported executableRole`,
       );
     }
-    if (
+    if (node.executableRole === "repository-script") {
+      if (!isRepositoryRelativePath(node.sourcePath)) {
+        throw new Error(
+          `Repository-script node "${node.id}" must have a normalized repository-relative sourcePath`,
+        );
+      }
+      if (!supportedRepositoryScriptScopes.has(node.executableScope)) {
+        throw new Error(
+          `Repository-script node "${node.id}" must have a supported executableScope`,
+        );
+      }
+      if (
+        !Number.isInteger(node.invokedBySkillCount) ||
+        node.invokedBySkillCount < 0
+      ) {
+        throw new Error(
+          `Repository-script node "${node.id}" must have a non-negative integer invokedBySkillCount`,
+        );
+      }
+    } else if (
       node.invokedBySkillCount !== undefined &&
       (!Number.isInteger(node.invokedBySkillCount) ||
         node.invokedBySkillCount < 0)
@@ -136,17 +162,28 @@ export function validateExecutableGraph(graph) {
     if (edge.kind === "contains") {
       if (
         source.executableRole !== "skill" ||
-        target.executableRole !== "repository-script"
+        target.executableRole !== "repository-script" ||
+        target.executableScope !== "skill-local" ||
+        edge.resolved !== true
       ) {
         throw new Error(
-          `Executable graph contains edge ${index} has noncanonical node roles`,
+          `Executable graph contains edge ${index} must be a resolved Skill-to-skill-local-repository-script relationship`,
         );
       }
+      validateRepositoryTargetFields(edge, target, index);
+    } else if (target.executableRole === "repository-script") {
+      if (
+        !["skill", "repository-script"].includes(source.executableRole) ||
+        edge.resolved !== true
+      ) {
+        throw new Error(
+          `Executable graph invokes edge ${index} must be a resolved Skill-or-script-to-repository-script relationship`,
+        );
+      }
+      validateRepositoryTargetFields(edge, target, index);
     } else if (
-      !["skill", "repository-script"].includes(source.executableRole) ||
-      !["repository-script", "external-executable"].includes(
-        target.executableRole,
-      )
+      target.executableRole !== "external-executable" ||
+      !["skill", "repository-script"].includes(source.executableRole)
     ) {
       throw new Error(
         `Executable graph invokes edge ${index} has noncanonical node roles`,
@@ -162,6 +199,47 @@ export function validateExecutableGraph(graph) {
   }
 
   return { nodesById };
+}
+
+function validateRepositoryTargetFields(edge, target, index) {
+  if (edge.to !== target.id) {
+    throw new Error(
+      `Executable graph edge ${index} to does not identify target node "${target.id}"`,
+    );
+  }
+  if (edge.targetId !== undefined && edge.targetId !== target.id) {
+    throw new Error(
+      `Executable graph edge ${index} targetId does not identify target node "${target.id}"`,
+    );
+  }
+  if (edge.targetPath !== undefined && edge.targetPath !== target.sourcePath) {
+    throw new Error(
+      `Executable graph edge ${index} targetPath does not match target sourcePath "${target.sourcePath}"`,
+    );
+  }
+  if (edge.targetKind !== undefined && edge.targetKind !== "script") {
+    throw new Error(
+      `Executable graph edge ${index} targetKind does not match a repository script`,
+    );
+  }
+}
+
+function isRepositoryRelativePath(sourcePath) {
+  if (
+    sourcePath.includes("\0") ||
+    sourcePath.includes("\\") ||
+    path.posix.isAbsolute(sourcePath) ||
+    /^[A-Za-z]:/u.test(sourcePath)
+  ) {
+    return false;
+  }
+  const normalized = path.posix.normalize(sourcePath);
+  return (
+    normalized === sourcePath &&
+    normalized !== "." &&
+    normalized !== ".." &&
+    !normalized.startsWith("../")
+  );
 }
 
 /** Correlate one exact catalog asset to one graph node and only its incoming edges. */
@@ -181,10 +259,24 @@ export function correlateExecutableContext(correlation, graph) {
     };
   }
 
+  if (correlation.asset?.kind !== "script") {
+    return {
+      provenance: experimentProvenance,
+      status: "unresolved",
+      reasonCode: "catalog-asset-is-not-repository-script",
+      explanation:
+        "Executable correlation was not attempted because the exactly correlated catalog asset is not a repository script.",
+      candidates: [],
+      directSkillInvokers: [],
+      directScriptInvokers: [],
+      structuralContainers: [],
+    };
+  }
+
   const sourcePath = correlation.asset?.sourcePath;
   const matches = graph.nodes.filter(
     (node) =>
-      node.executableRole !== "external-executable" &&
+      node.executableRole === "repository-script" &&
       node.sourcePath === sourcePath,
   );
   if (matches.length === 0) {
@@ -192,7 +284,7 @@ export function correlateExecutableContext(correlation, graph) {
       provenance: experimentProvenance,
       status: "unresolved",
       reasonCode: "no-executable-node-at-exact-path",
-      explanation: `No repository executable graph node has exact sourcePath "${sourcePath}".`,
+      explanation: `No repository-script executable graph node has exact sourcePath "${sourcePath}".`,
       candidates: [],
       directSkillInvokers: [],
       directScriptInvokers: [],
@@ -204,7 +296,7 @@ export function correlateExecutableContext(correlation, graph) {
       provenance: experimentProvenance,
       status: "ambiguous",
       reasonCode: "multiple-executable-nodes-at-exact-path",
-      explanation: `${matches.length} repository executable graph nodes have exact sourcePath "${sourcePath}"; the experiment did not choose one.`,
+      explanation: `${matches.length} repository-script executable graph nodes have exact sourcePath "${sourcePath}"; the experiment did not choose one.`,
       candidates: matches.map(projectNode).sort(compareNodes),
       directSkillInvokers: [],
       directScriptInvokers: [],
@@ -371,6 +463,29 @@ export function evaluateExecutableExperiment({
       `report=${formatFact(rawReport.execution_successful)}, completeness=${formatFact(rawReport.analysis_completeness?.execution_successful)}, exit=${formatFact(invocation?.scanner?.exitCode)}`,
     ),
     check(
+      "renma.catalog.execution",
+      "Renma catalog completed cleanly",
+      invocation?.renmaCatalog?.exitCode === 0 &&
+        invocation?.renmaCatalog?.stderr === "",
+      `exit=${formatFact(invocation?.renmaCatalog?.exitCode)}, stderr=${formatStderr(invocation?.renmaCatalog?.stderr)}`,
+    ),
+    check(
+      "renma.executable-graph.execution",
+      "First Renma executable graph invocation completed cleanly",
+      invocation?.renmaExecutableGraph?.firstInvocation?.exitCode === 0 &&
+        invocation?.renmaExecutableGraph?.firstInvocation?.stderr === "",
+      `exit=${formatFact(invocation?.renmaExecutableGraph?.firstInvocation?.exitCode)}, stderr=${formatStderr(invocation?.renmaExecutableGraph?.firstInvocation?.stderr)}`,
+    ),
+    check(
+      "renma.executable-graph.repeatability",
+      "Repeated Renma executable graph invocation completed cleanly with byte-identical output",
+      invocation?.renmaExecutableGraph?.repeatedInvocation?.exitCode === 0 &&
+        invocation?.renmaExecutableGraph?.repeatedInvocation?.stderr === "" &&
+        invocation?.renmaExecutableGraph?.repeatedInvocation
+          ?.stdoutByteIdenticalToFirst === true,
+      `exit=${formatFact(invocation?.renmaExecutableGraph?.repeatedInvocation?.exitCode)}, stderr=${formatStderr(invocation?.renmaExecutableGraph?.repeatedInvocation?.stderr)}, byte-identical=${formatFact(invocation?.renmaExecutableGraph?.repeatedInvocation?.stdoutByteIdenticalToFirst)}`,
+    ),
+    check(
       "findings.present",
       "At least one scanner-native finding",
       normalized.evidence.length > 0,
@@ -507,15 +622,27 @@ export function evaluateExecutableExperiment({
 
   const allPredicatesSatisfied = checks.every((item) => item.passed);
   const completeness = rawReport.analysis_completeness;
-  const nonCompleteAnalyzers = Array.isArray(completeness?.analyzer_statuses)
-    ? completeness.analyzer_statuses.filter(
-        (item) =>
-          item.status !== "completed" ||
-          item.skipped !== 0 ||
-          item.failed !== 0 ||
-          item.unaccounted !== 0,
-      )
+  const analyzerStatuses = Array.isArray(completeness?.analyzer_statuses)
+    ? completeness.analyzer_statuses
     : [];
+  const nonCompleteAnalyzers = analyzerStatuses.filter(
+    (item) =>
+      item.status !== "completed" ||
+      item.skipped !== 0 ||
+      item.failed !== 0 ||
+      item.unaccounted !== 0,
+  );
+  const producerCompletenessComplete =
+    completeness?.execution_successful === true &&
+    completeness?.is_complete === true &&
+    analyzerStatuses.length > 0 &&
+    nonCompleteAnalyzers.length === 0;
+  const adapterBoundaryBlockers = [
+    ...(!producerCompletenessComplete
+      ? ["producer-native completeness (incomplete or unknown)"]
+      : []),
+    "unresolved producer-contract gaps",
+  ];
 
   return {
     checks,
@@ -528,15 +655,19 @@ export function evaluateExecutableExperiment({
       executableRelationshipExperiment: allPredicatesSatisfied
         ? "satisfied"
         : "not satisfied",
-      adapterBoundaryReadiness:
-        "still blocked by producer completeness and unresolved contract gaps",
+      adapterBoundaryReadiness: "blocked",
+      adapterBoundaryBlockers,
     },
     producerCompleteness: {
+      status: producerCompletenessComplete
+        ? "complete"
+        : "incomplete-or-unknown",
       isComplete: completeness?.is_complete ?? null,
       analyzerStatusCount: Array.isArray(completeness?.analyzer_statuses)
-        ? completeness.analyzer_statuses.length
+        ? analyzerStatuses.length
         : null,
       nonCompleteAnalyzerCount: nonCompleteAnalyzers.length,
+      satisfiesNativeCompletenessEvidence: producerCompletenessComplete,
     },
   };
 }
@@ -674,4 +805,9 @@ function formatCounts(counts) {
 
 function formatFact(value) {
   return value === undefined || value === null ? "unknown" : String(value);
+}
+
+function formatStderr(value) {
+  if (value === undefined || value === null) return "unknown";
+  return value.length === 0 ? "empty" : JSON.stringify(value);
 }
