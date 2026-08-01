@@ -105,3 +105,8 @@ npm run docs:dev
 npm run docs:build
 npm run docs:preview
 ```
+
+Fenced `mermaid` blocks under `docs/` render automatically, while their
+Mermaid source remains the canonical editable form. Test diagram changes with
+`npm run docs:build` and a local preview. Diagrams must not require loose
+security or executable click behavior.

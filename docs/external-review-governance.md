@@ -52,12 +52,17 @@ name nor specifies or implements it.
 ```mermaid
 flowchart TD
   Declarations["Renma repository declarations"]
-  Evidence["Stable repository evidence<br/>asset ID + path + content hash"]
+  Evidence["`Stable repository evidence
+asset ID + path + content hash`"]
   Reviewer["External reviewer"]
-  Native["Native report<br/>native findings + verdict"]
-  Adapter["Future companion adapter<br/>parse + bind"]
+  Native["`Native report
+native findings + verdict`"]
+  Adapter["`Future companion adapter
+parse + bind`"]
   Receipt["External-review receipt"]
-  Governance["Renma governance review<br/>applicable? complete? current?<br/>requirement satisfied?"]
+  Governance["`Renma governance review
+applicable? complete? current?
+requirement satisfied?`"]
   Declarations --> Evidence
   Declarations --> Reviewer
   Reviewer --> Native
