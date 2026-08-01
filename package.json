@@ -162,7 +162,7 @@
   },
   "dependencies": {
     "mdast-util-from-markdown": "^2.0.3",
-    "tldts": "7.4.9",
+    "tldts": "^7.4.10",
     "yaml": "^2.9.0"
   }
 }
