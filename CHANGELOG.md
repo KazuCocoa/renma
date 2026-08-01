@@ -6,6 +6,30 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.28.3] - 2026-08-01
+
+### Added
+
+- Added an isolated, non-production SkillSpector evidence-correlation
+  experiment that preserves scanner-native findings and deterministically
+  correlates exact source paths with Renma catalog assets. It includes inert
+  fixture templates, experiment-only tests, one audited captured run, and
+  explicit inconclusive-state handling without adding a Renma command,
+  diagnostic, readiness input, CI policy, runtime dependency, or public schema.
+- Added a VitePress documentation site deployed under the `/renma/` GitHub
+  Pages base, with structured navigation, local search, build and preview
+  scripts, and a dedicated Pages workflow.
+- Added the approved deep-indigo Renma visual identity to the documentation
+  header, favicon, landing page, and repository README, with stable PNG asset
+  names, accessible text, responsive sizing, and maintainer-facing provenance.
+
+### Changed
+
+- Updated the package homepage to the GitHub Pages documentation site and
+  constrained npm package contents to omit branding images and VitePress-only
+  configuration, cache, temporary, and generated output while retaining the
+  source documentation.
+
 ## [0.28.2] - 2026-08-01
 
 ### Added
@@ -1903,7 +1927,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.28.2...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.28.3...HEAD
+[0.28.3]: https://github.com/KazuCocoa/renma/compare/v0.28.2...v0.28.3
 [0.28.2]: https://github.com/KazuCocoa/renma/compare/v0.28.1...v0.28.2
 [0.28.1]: https://github.com/KazuCocoa/renma/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/KazuCocoa/renma/compare/v0.27.0...v0.28.0
