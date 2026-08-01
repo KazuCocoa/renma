@@ -179,7 +179,7 @@ node dist/index.js scan . --fail-on high
 | `init` | How can this repository record explicit Renma adoption? |
 | `scan` | What concrete problems should be fixed? |
 | `catalog` | What assets and metadata exist? |
-| `graph` | How are assets structurally connected? |
+| `graph` | How are assets and executable relationships connected? |
 | `skill-index` | Where can static Skill Discovery begin and continue? |
 | `trust-graph` | What trust-relevant evidence is connected to each asset? |
 | `readiness` | Is the repository broadly prepared for agent-facing use? |

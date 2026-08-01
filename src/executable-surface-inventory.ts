@@ -213,6 +213,40 @@ export interface ExecutableSurfaceInventory {
   dependencies: ExecutableSurfaceDependency[];
 }
 
+export interface ExecutableInvocationGraphEdge {
+  sourcePath: string;
+  normalizedTarget: string;
+}
+
+/** Collapse invocation declarations into deterministic source-target graph edges. */
+export function canonicalExecutableInvocationGraphEdges(
+  invocations: readonly ExecutableSurfaceInvocation[],
+): ExecutableInvocationGraphEdge[] {
+  const uniqueEdges = new Map<string, ExecutableInvocationGraphEdge>();
+  for (const invocation of invocations) {
+    if (
+      (invocation.resolution !== "resolved" &&
+        invocation.resolution !== "noncanonical") ||
+      !invocation.normalizedTarget
+    ) {
+      continue;
+    }
+    const edge = {
+      sourcePath: invocation.sourcePath,
+      normalizedTarget: invocation.normalizedTarget,
+    };
+    uniqueEdges.set(
+      JSON.stringify([edge.sourcePath, edge.normalizedTarget]),
+      edge,
+    );
+  }
+  return [...uniqueEdges.values()].sort(
+    (left, right) =>
+      left.sourcePath.localeCompare(right.sourcePath) ||
+      left.normalizedTarget.localeCompare(right.normalizedTarget),
+  );
+}
+
 export interface ExecutableSurfaceInventoryInput {
   artifacts: Artifact[];
   documents: ParsedDocument[];

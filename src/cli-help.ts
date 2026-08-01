@@ -31,7 +31,7 @@ const OPTION_HELP = {
   focus: {
     flags: "--focus <asset-id-or-path>",
     description:
-      "Focus one asset by stable ID or path; required by composition and impact, and optional for discovery and skill-index.",
+      "Focus one asset by stable ID or path; required by composition and impact, and optional for discovery, executable, and skill-index.",
   },
   format: {
     flags: "--format <format>",
@@ -101,7 +101,7 @@ const OPTION_HELP = {
   view: {
     flags: "--view <view>",
     description:
-      "Graph view: summary, workflow, full, layered, lens, composition, impact, or discovery.",
+      "Graph view: summary, workflow, full, layered, lens, composition, impact, discovery, or executable.",
   },
 } as const;
 
@@ -229,12 +229,13 @@ export const COMMAND_HELP = [
   {
     name: "graph",
     usage: "renma graph [path] [options]",
-    question: "How are assets structurally connected?",
+    question: "How are assets and executables connected?",
     purpose:
-      "Graph shows declared structural relationships between assets, including focused views around one asset.",
+      "Graph shows declared structural relationships between assets and an explicit executable relationship projection, including focused views around one node.",
     useWhen: [
       "You need to inspect dependencies, references, unresolved targets, or isolation.",
       "You want a one-hop neighborhood with --focus for one asset ID or path.",
+      "You want to inspect which scripts a Skill invokes or which Skills use a script.",
       "You need Markdown, JSON, or Mermaid evidence for review.",
     ],
     doNotUseFor: [
@@ -249,6 +250,8 @@ export const COMMAND_HELP = [
       "renma graph . --focus contexts/testing/boundary-value-analysis.md --view full",
       "renma graph . --focus skill.testing.spec-review --view composition --format json",
       "renma graph . --focus context.shared-api --view impact --format markdown",
+      "renma graph . --view executable --focus skill.release-prep --format markdown",
+      "renma graph . --view executable --focus tools/check-changelog.sh --format markdown",
     ],
     interpretation: [
       "Edges represent declared relationships Renma can resolve or report as unresolved.",
@@ -257,6 +260,7 @@ export const COMMAND_HELP = [
       "The composition view resolves the complete explicit required and optional closure and requires --focus.",
       "The impact view resolves reverse explicit composition to required and optional declared dependents; it reports neither runtime usage nor breakage and requires --focus.",
       "The discovery view derives cycle-safe reachability from explicit published entrypoints through usable declared continuations, with descriptive partial coverage and authoritative adopted coverage; optional focus keeps repository-wide adoption and coverage while filtering visible arrays and summary counts to one Skill's direct neighborhood.",
+      "The executable view shows canonical Skill/script invocation and script dependency edges separately from deterministic Skill-local structural containment; optional focus supports either a Skill ID/path or executable path.",
     ],
     nextSteps: [
       "Use catalog to inspect the assets behind graph nodes.",

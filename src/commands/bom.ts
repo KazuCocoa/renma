@@ -459,9 +459,13 @@ function assetLifecycle(asset: Asset): BomAssetLifecycle | undefined {
 }
 
 function toBomDependency(edge: GraphEdge): BomDependency {
-  if (edge.kind === "continues_with") {
+  if (
+    edge.kind === "continues_with" ||
+    edge.kind === "invokes" ||
+    edge.kind === "contains"
+  ) {
     throw new Error(
-      "Repository Context BOM dependencies cannot include Skill Discovery routes.",
+      "Repository Context BOM dependencies cannot include projection-only graph edges.",
     );
   }
   return {

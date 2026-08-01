@@ -21,6 +21,11 @@ import {
   resolveDependencyTarget,
 } from "../dependency-resolution.js";
 import type {
+  ExecutableSurfaceDependency,
+  ExecutableSurfaceInvocation,
+  ExecutableSurfaceScope,
+} from "../executable-surface-inventory.js";
+import type {
   Asset,
   AssetKind,
   AssetOwnership,
@@ -44,9 +49,18 @@ import {
   type SkillDiscoveryIndex,
 } from "../skill-discovery.js";
 import type { Diagnostic } from "../types/diagnostics.js";
+import {
+  executableGraphReport,
+  formatExecutableGraphMarkdown,
+  formatExecutableGraphMermaid,
+} from "./executable-graph.js";
 
 export type GraphFormat = "json" | "markdown" | "mermaid";
-export type GraphEdgeKind = DependencyKind | "continues_with";
+export type GraphEdgeKind =
+  | DependencyKind
+  | "continues_with"
+  | "invokes"
+  | "contains";
 export type GraphView =
   | "summary"
   | "workflow"
@@ -54,7 +68,23 @@ export type GraphView =
   | "layered"
   | "composition"
   | "impact"
-  | "discovery";
+  | "discovery"
+  | "executable";
+
+export type ExecutableGraphNodeRole =
+  | "skill"
+  | "repository-script"
+  | "external-executable";
+
+export interface ExecutableGraphProjection {
+  focus?: {
+    id: string;
+    role: ExecutableGraphNodeRole;
+    sourcePath: string;
+  };
+  invocationEvidence: ExecutableSurfaceInvocation[];
+  dependencyEvidence: ExecutableSurfaceDependency[];
+}
 
 export interface GraphReport {
   root: string;
@@ -68,6 +98,7 @@ export interface GraphReport {
   composition?: DeclaredCompositionReport;
   impact?: DeclaredImpactReport;
   discovery?: SkillDiscoveryIndex;
+  executable?: ExecutableGraphProjection;
   diagnostics?: Diagnostic[];
 }
 
@@ -83,6 +114,10 @@ export interface GraphNode {
   status?: AssetStatus;
   tags: string[];
   groupedCount?: number;
+  executableRole?: ExecutableGraphNodeRole;
+  executableScope?: ExecutableSurfaceScope;
+  invokedBySkillCount?: number;
+  interpreterHints?: string[];
 }
 
 export interface GraphEdge {
@@ -99,6 +134,7 @@ export interface GraphEdge {
   targetId?: string;
   targetKind?: AssetKind;
   targetPath?: string;
+  evidenceCount?: number;
 }
 
 export async function runGraphCommand(
@@ -117,7 +153,14 @@ export async function runGraphCommand(
   );
   const fullReport = graphFromRepositorySnapshot(snapshot);
   let report: GraphReport;
-  if (view === "discovery") {
+  if (view === "executable") {
+    report = executableGraphReport(
+      fullReport,
+      snapshot.executableSurfaceInventory,
+      snapshot.skillParents,
+      options.focus,
+    );
+  } else if (view === "discovery") {
     const discovery = options.focus
       ? focusSkillDiscoveryIndex(snapshot.skillDiscovery, options.focus)
       : snapshot.skillDiscovery;
@@ -388,6 +431,7 @@ export function formatGraphMermaid(
   report: GraphReport,
   view: GraphView = "summary",
 ): string {
+  if (view === "executable") return formatExecutableGraphMermaid(report);
   if (view === "discovery") return formatDiscoveryMermaid(report);
   if (view === "composition") return formatCompositionMermaid(report);
   if (view === "impact") return formatImpactMermaid(report);
@@ -521,6 +565,7 @@ export function formatGraphMarkdown(
   report: GraphReport,
   view: GraphView = "summary",
 ): string {
+  if (view === "executable") return formatExecutableGraphMarkdown(report);
   if (view === "discovery") return formatDiscoveryMarkdown(report);
   if (view === "composition") return formatCompositionMarkdown(report);
   if (view === "impact") return formatImpactMarkdown(report);
@@ -1484,9 +1529,14 @@ function defaultGraphView(format: GraphFormat): GraphView {
 
 function graphViewReport(report: GraphReport, view: GraphView): GraphReport {
   if (report.view === view) return report;
-  if (view === "composition" || view === "impact" || view === "discovery") {
+  if (
+    view === "composition" ||
+    view === "impact" ||
+    view === "discovery" ||
+    view === "executable"
+  ) {
     throw new Error(
-      `${view === "composition" ? "Composition" : view === "impact" ? "Impact" : "Discovery"} graph formatting requires a resolved ${view === "composition" ? "composition" : view === "impact" ? "declared impact" : "Skill Discovery"} report.`,
+      `${view === "composition" ? "Composition" : view === "impact" ? "Impact" : view === "discovery" ? "Discovery" : "Executable"} graph formatting requires a resolved ${view === "composition" ? "composition" : view === "impact" ? "declared impact" : view === "discovery" ? "Skill Discovery" : "executable"} report.`,
     );
   }
   if (view === "full" || view === "layered") return { ...report, view };
@@ -1574,7 +1624,10 @@ function graphViewReport(report: GraphReport, view: GraphView): GraphReport {
 
 function projectedNode(
   node: GraphNode,
-  view: Exclude<GraphView, "composition" | "impact" | "discovery">,
+  view: Exclude<
+    GraphView,
+    "composition" | "impact" | "discovery" | "executable"
+  >,
 ): GraphNode {
   if (view === "workflow" && keepWorkflowNode(node.sourcePath)) return node;
   const groupId = groupPath(node.sourcePath, view);

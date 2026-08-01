@@ -6,6 +6,17 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added `renma graph --view executable` with optional Skill-or-script
+  `--focus` for deterministic Skill-to-script, reverse `used by`,
+  script-to-script, shared-use, external-target, and independent structural
+  containment inspection across JSON, Markdown, and Mermaid. The topology
+  reuses normalized invocation evidence and canonical deduplicated executable
+  dependency edges while retaining detailed declaration rows for audit. Default
+  graph views, ownership semantics, CI reporting, and repository-wide orphan
+  discovery are unchanged.
+
 ## [0.28.1] - 2026-07-31
 
 ### Changed

@@ -1044,6 +1044,8 @@ renma graph . --view layered --format mermaid
 renma graph . --view discovery --format markdown
 renma graph . --view composition --focus skill.testing.spec-review --format json
 renma graph . --view impact --focus context.shared-api --format markdown
+renma graph . --view executable --focus skill.release-prep --format markdown
+renma graph . --view executable --focus tools/check-changelog.sh --format markdown
 ```
 
 Views are:
@@ -1060,8 +1062,49 @@ Views are:
 - `discovery`: exact declared Skill-to-Skill continuations, route
   eligibility/usability, declaration evidence, diagnostics, structural roots,
   and standalone Skills. Focus is optional and exact.
+- `executable`: normalized Skill-to-script and script-to-script invocation
+  relationships plus independent deterministic Skill-local structural
+  containment. Focus is optional and accepts either a Skill ID/path or an
+  executable path.
 
 Layered Mermaid output groups skills, context lenses, contexts, support assets, and unresolved targets into separate subgraphs. JSON and Markdown keep the same node and edge detail while reporting the selected view.
+
+#### Inspect executable relationships
+
+Use the executable view to answer either direction of the same canonical
+relationship:
+
+```bash
+# Scripts invoked by a Skill
+renma graph . --view executable --focus skill.release-prep --format markdown
+
+# Skills using a repository script
+renma graph . --view executable --focus tools/check-changelog.sh --format markdown
+```
+
+`invokes` edges come from normalized executable invocation evidence and the
+same canonical deduplicated script dependency topology used by inventory
+counts, adjacency, reachability, fingerprints, and diff signatures where
+applicable. Repeated declaration locations remain in the invocation and script
+dependency evidence tables while producing one graph edge. A script invoked by
+multiple Skills is labeled as shared, and focusing that script renders the
+canonical relationship in reverse as `used by`.
+
+`contains` is separate structural evidence: Renma emits it only for a script
+inside the canonical `scripts/**` boundary of one uniquely resolved Skill.
+The reverse human label is `belongs to`; it means structural placement only.
+Invocation does not imply ownership, containment does not imply exclusive use,
+and a shared or repository-root script may be invoked without being contained.
+Observed absolute external executable targets are labeled separately and never
+receive containment. Ordinary external-command discovery remains outside the
+bounded helper grammar.
+
+JSON preserves detailed evidence rows under `executable`; Markdown presents
+the relationship neighborhood and evidence tables; Mermaid distinguishes
+Skill, repository-script, and external-executable nodes and uses separate edge
+labels. If no canonical relationship is available, the view explains the
+normalization boundary and directs the reader to
+`scan --format json` → `executableSurfaceInventory` for unresolved evidence.
 
 The composition view expands only `requires_context`, `optional_context`,
 `requires_lens`, `optional_lens`, and Lens `applies_to`. It reports the root,
