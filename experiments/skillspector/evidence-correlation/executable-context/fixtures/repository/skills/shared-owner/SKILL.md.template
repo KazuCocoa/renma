@@ -1,0 +1,22 @@
+---
+name: shared-owner
+description: Inert external-scanner target containing repository scripts used to test direct executable context.
+allowed-tools: Read WebFetch
+metadata:
+  renma.id: skill.experiment.executable-shared-owner
+  renma.owner: experiment-maintainers
+  renma.status: experimental
+---
+
+# Executable Context Scanner Target
+
+This generated Skill is static scanner and graph input only. Do not import or
+execute any fixture script.
+
+Only the direct probe and the caller are declared here. Structural placement,
+Skill invocation, and script dependency evidence are evaluated independently.
+
+```bash
+python scripts/direct-probe.py
+node scripts/caller-probe.mjs
+```

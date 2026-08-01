@@ -1,0 +1,219 @@
+{
+  "experiment": "non-production-skillspector-executable-context-correlation",
+  "captured": true,
+  "renmaCli": {
+    "revision": "8865fe43fccd4f4bfc1e15801e4807a66d459edc",
+    "version": "0.28.3",
+    "executable": "/Users/kazu/github/renma/dist/index.js",
+    "executableSha256": "sha256:f0aacb4c2d48310c9fc9b44229819771166a562394ee887f35bc89bdb9c8498b"
+  },
+  "git": {
+    "headRevision": "5e5be7f94745df936ce23bb899793a33dfc96191",
+    "worktreeState": "dirty",
+    "statusPorcelain": [
+      " M .prettierignore",
+      " M experiments/skillspector/README.md",
+      " M experiments/skillspector/evidence-correlation/README.md",
+      "?? experiments/skillspector/evidence-correlation/executable-context/README.md",
+      "?? experiments/skillspector/evidence-correlation/executable-context/captured/fixture-run/normalized-evidence.json",
+      "?? experiments/skillspector/evidence-correlation/executable-context/captured/fixture-run/renma-catalog.json",
+      "?? experiments/skillspector/evidence-correlation/executable-context/captured/fixture-run/renma-executable-graph.json",
+      "?? experiments/skillspector/evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json",
+      "?? experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/renma.config.json.template",
+      "?? experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/alpha/SKILL.md.template",
+      "?? experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/beta/SKILL.md.template",
+      "?? experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/shared-owner/README.md.template",
+      "?? experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/shared-owner/SKILL.md.template",
+      "?? experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/shared-owner/scripts/callee-probe.py.template",
+      "?? experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/shared-owner/scripts/caller-probe.mjs.template",
+      "?? experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/shared-owner/scripts/contained-probe.py.template",
+      "?? experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/shared-owner/scripts/direct-probe.py.template",
+      "?? experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/shared-owner/scripts/shared-probe.py.template",
+      "?? experiments/skillspector/evidence-correlation/executable-context/lib.mjs",
+      "?? experiments/skillspector/evidence-correlation/executable-context/lib.test.mjs",
+      "?? experiments/skillspector/evidence-correlation/executable-context/prepare-fixture.mjs",
+      "?? experiments/skillspector/evidence-correlation/executable-context/report.mjs",
+      "?? experiments/skillspector/evidence-correlation/executable-context/run-experiment.mjs"
+    ]
+  },
+  "experimentHarness": {
+    "revisionContext": "5e5be7f94745df936ce23bb899793a33dfc96191",
+    "revisionContainsExactHarness": false,
+    "sha256": "sha256:c6428c4a1a3a0f033c4c0eb1aec7485a7f7b3d81af684c2b38ac2db233416605",
+    "files": [
+      {
+        "path": "experiments/skillspector/evidence-correlation/lib.mjs",
+        "sha256": "sha256:c734c8dace96f5d90e0157d2da9b4ac183622535ff74b380a2e56aa95f0f22d6"
+      },
+      {
+        "path": "experiments/skillspector/evidence-correlation/executable-context/README.md",
+        "sha256": "sha256:5955889d904c6154cc47c617c68bf32cb1c987a5c2da718a9eac1d0ae1c1f080"
+      },
+      {
+        "path": "experiments/skillspector/evidence-correlation/executable-context/lib.mjs",
+        "sha256": "sha256:4a4f6b4df2ecaae915030ee592b92ebfdb6fbf03695764b332835ab7ec78e4e9"
+      },
+      {
+        "path": "experiments/skillspector/evidence-correlation/executable-context/lib.test.mjs",
+        "sha256": "sha256:47f73882c6458021da479d55f7aff000ab35376feee6548bfc909f11fd3742af"
+      },
+      {
+        "path": "experiments/skillspector/evidence-correlation/executable-context/report.mjs",
+        "sha256": "sha256:461350aa8192b0af51aa96321b480daf6203994c3cd66be3100e966e0db3befd"
+      },
+      {
+        "path": "experiments/skillspector/evidence-correlation/executable-context/run-experiment.mjs",
+        "sha256": "sha256:245fa3618cb1d8eae254ccbf9b7cfab7437676391bcd4c85d0ba3cf7d1a2d750"
+      },
+      {
+        "path": "experiments/skillspector/evidence-correlation/executable-context/prepare-fixture.mjs",
+        "sha256": "sha256:f7a6b4c432ef201502a22762867969721045143b0de505ba253b02012a26ccff"
+      },
+      {
+        "path": "experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/renma.config.json.template",
+        "sha256": "sha256:15fd82ee537f1ac403ab735a25c92881ea4b04c6d99cb2fa744f5b4ebc1ef0bc"
+      },
+      {
+        "path": "experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/alpha/SKILL.md.template",
+        "sha256": "sha256:240abe3b16977767d6cdbc323012e0ce4b6ca7062aaf710892d005d1bdc9fb31"
+      },
+      {
+        "path": "experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/beta/SKILL.md.template",
+        "sha256": "sha256:8d0e578538926c0ab7fa467f788bcb92e98a5379abf3d5fb5989a8467fd789ef"
+      },
+      {
+        "path": "experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/shared-owner/README.md.template",
+        "sha256": "sha256:155ea6ef772c55f74904370a60df43594b2d296d4026b085430019b1bf29880d"
+      },
+      {
+        "path": "experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/shared-owner/SKILL.md.template",
+        "sha256": "sha256:f57a2479e6903d9596880c77b43cf7a561c9e9df2baff543a7036b85ba0b38cf"
+      },
+      {
+        "path": "experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/shared-owner/scripts/callee-probe.py.template",
+        "sha256": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc"
+      },
+      {
+        "path": "experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/shared-owner/scripts/caller-probe.mjs.template",
+        "sha256": "sha256:2a72c84240f5d646c809492465a31a33be951d900a1ec5c8959107543f1d6e1a"
+      },
+      {
+        "path": "experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/shared-owner/scripts/contained-probe.py.template",
+        "sha256": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc"
+      },
+      {
+        "path": "experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/shared-owner/scripts/direct-probe.py.template",
+        "sha256": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc"
+      },
+      {
+        "path": "experiments/skillspector/evidence-correlation/executable-context/fixtures/repository/skills/shared-owner/scripts/shared-probe.py.template",
+        "sha256": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc"
+      }
+    ]
+  },
+  "scanner": {
+    "requestedExecutable": "/Users/kazu/.local/bin/skillspector",
+    "executable": "/Users/kazu/.local/share/uv/tools/skillspector/bin/skillspector",
+    "versionProbeOutput": "SkillSpector v2.5.0",
+    "args": [
+      "scan",
+      "/Users/kazu/github/renma/experiments/skillspector/generated/evidence-correlation-executable-context/repository/skills/shared-owner",
+      "--no-llm",
+      "--format",
+      "json",
+      "--output",
+      "/Users/kazu/github/renma/experiments/skillspector/evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json"
+    ],
+    "exitCode": 0,
+    "stdout": "Report saved to: \n/Users/kazu/github/renma/experiments/skillspector/evidence-correlation/executabl\ne-context/captured/fixture-run/skillspector-report.json\n",
+    "stderr": ""
+  },
+  "renmaCatalog": {
+    "executable": "/Users/kazu/.nvm/versions/node/v24.18.0/bin/node",
+    "args": [
+      "/Users/kazu/github/renma/dist/index.js",
+      "catalog",
+      "/Users/kazu/github/renma/experiments/skillspector/generated/evidence-correlation-executable-context/repository",
+      "--format",
+      "json"
+    ],
+    "exitCode": 0,
+    "stderr": ""
+  },
+  "renmaExecutableGraph": {
+    "executable": "/Users/kazu/.nvm/versions/node/v24.18.0/bin/node",
+    "args": [
+      "/Users/kazu/github/renma/dist/index.js",
+      "graph",
+      "/Users/kazu/github/renma/experiments/skillspector/generated/evidence-correlation-executable-context/repository",
+      "--view",
+      "executable",
+      "--format",
+      "json"
+    ],
+    "exitCode": 0,
+    "stderr": "",
+    "repeatedInvocationByteIdentical": true
+  },
+  "fixture": {
+    "id": "skillspector-executable-context-v1",
+    "root": "experiments/skillspector/generated/evidence-correlation-executable-context/repository",
+    "scannerTarget": "experiments/skillspector/generated/evidence-correlation-executable-context/repository/skills/shared-owner",
+    "files": [
+      {
+        "path": "renma.config.json",
+        "sha256": "sha256:15fd82ee537f1ac403ab735a25c92881ea4b04c6d99cb2fa744f5b4ebc1ef0bc"
+      },
+      {
+        "path": "skills/alpha/SKILL.md",
+        "sha256": "sha256:240abe3b16977767d6cdbc323012e0ce4b6ca7062aaf710892d005d1bdc9fb31"
+      },
+      {
+        "path": "skills/beta/SKILL.md",
+        "sha256": "sha256:8d0e578538926c0ab7fa467f788bcb92e98a5379abf3d5fb5989a8467fd789ef"
+      },
+      {
+        "path": "skills/shared-owner/README.md",
+        "sha256": "sha256:155ea6ef772c55f74904370a60df43594b2d296d4026b085430019b1bf29880d"
+      },
+      {
+        "path": "skills/shared-owner/scripts/callee-probe.py",
+        "sha256": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc"
+      },
+      {
+        "path": "skills/shared-owner/scripts/caller-probe.mjs",
+        "sha256": "sha256:2a72c84240f5d646c809492465a31a33be951d900a1ec5c8959107543f1d6e1a"
+      },
+      {
+        "path": "skills/shared-owner/scripts/contained-probe.py",
+        "sha256": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc"
+      },
+      {
+        "path": "skills/shared-owner/scripts/direct-probe.py",
+        "sha256": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc"
+      },
+      {
+        "path": "skills/shared-owner/scripts/shared-probe.py",
+        "sha256": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc"
+      },
+      {
+        "path": "skills/shared-owner/SKILL.md",
+        "sha256": "sha256:f57a2479e6903d9596880c77b43cf7a561c9e9df2baff543a7036b85ba0b38cf"
+      }
+    ]
+  },
+  "rawArtifacts": {
+    "scanner": {
+      "reference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json",
+      "sha256": "sha256:04c2aa23395b21e846e0a947a0f527fdc630a9d11840c690102336e1b656f87e"
+    },
+    "catalog": {
+      "reference": "evidence-correlation/executable-context/captured/fixture-run/renma-catalog.json",
+      "sha256": "sha256:87e9c415c32f2692f3905b2bb48a9e4a7adfcdbc7a6ac99195b59d2900e4ec04"
+    },
+    "executableGraph": {
+      "reference": "evidence-correlation/executable-context/captured/fixture-run/renma-executable-graph.json",
+      "sha256": "sha256:6adc278bd2ea0ad3a112a30683aa2d3a17a3f62778d7675ab4b28e4dec767d5f"
+    }
+  }
+}

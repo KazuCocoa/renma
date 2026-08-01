@@ -92,3 +92,14 @@ reachability, route membership, or general entrypoint association.
 Only exact normalized source paths correlate. Missing, unsafe, unmatched, and
 ambiguous targets are retained. Duplicate observations never merge records and
 are explicitly not stable fingerprints.
+
+## Executable relationship extension
+
+The focused
+[`executable-context/`](executable-context/README.md) extension preserves these
+three layers and adds a separate experimental `executableContext` derived from
+the public `renma graph --view executable --format json` artifact. It tests
+direct Skill invokers, direct script invokers, and structural containers while
+keeping invocation and containment distinct. It does not infer ownership,
+transitive impact, runtime execution, reviewed scope, scanner coverage, or
+adapter readiness, and it does not modify the existing audited capture.

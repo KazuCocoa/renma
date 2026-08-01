@@ -1,0 +1,18 @@
+---
+name: beta
+description: Inert fixture Skill that invokes shared and structurally independent scanner targets.
+metadata:
+  renma.id: skill.experiment.executable-beta
+  renma.owner: experiment-maintainers
+  renma.status: experimental
+---
+
+# Executable Beta Fixture
+
+These generated references are static graph input only. Do not execute either
+fixture script.
+
+```bash
+python skills/shared-owner/scripts/shared-probe.py
+python skills/shared-owner/scripts/contained-probe.py
+```

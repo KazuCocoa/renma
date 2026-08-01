@@ -1,0 +1,1626 @@
+{
+  "experimentalSchemaVersion": "renma.experiment.skillspector-executable-context.v0",
+  "stability": "experimental-not-a-public-schema",
+  "boundary": {
+    "includes": [
+      "scanner facts",
+      "path normalization",
+      "Renma correlation",
+      "direct executable graph relationships"
+    ],
+    "excludes": [
+      "Renma diagnostics",
+      "readiness interpretation",
+      "policy interpretation",
+      "cross-scanner severity comparison",
+      "stable finding fingerprints",
+      "ownership inferred from executable relationships",
+      "runtime execution or impact",
+      "transitive executable reachability",
+      "scanner-reviewed Skill scope"
+    ]
+  },
+  "source": {
+    "scanner": {
+      "name": "SkillSpector",
+      "nameProvenance": "experiment-invocation",
+      "version": "2.5.0",
+      "versionProvenance": "scanner-output:/metadata/skillspector_version",
+      "reportedExecution": {
+        "provenance": "scanner-output",
+        "executionSuccessful": true,
+        "analysisCompleteness": {
+          "total_components": 7,
+          "scanned_components": 7,
+          "coverage_percent": 100,
+          "is_complete": false,
+          "execution_successful": true,
+          "fully_inspected_files": 7,
+          "partially_inspected_files": 0,
+          "entirely_uninspected_files": 0,
+          "ledger_exceptions": [],
+          "scope_exclusions": [],
+          "analyzer_statuses": [
+            {
+              "analyzer_id": "behavioral_ast",
+              "status": "completed",
+              "planned_work": 4,
+              "completed": 4,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "behavioral_taint_tracking",
+              "status": "completed",
+              "planned_work": 4,
+              "completed": 4,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "mcp_least_privilege",
+              "status": "completed",
+              "planned_work": 1,
+              "completed": 1,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "mcp_rug_pull",
+              "status": "completed",
+              "planned_work": 1,
+              "completed": 1,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "mcp_tool_poisoning",
+              "status": "completed",
+              "planned_work": 1,
+              "completed": 1,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "meta_analyzer",
+              "status": "disabled",
+              "planned_work": 0,
+              "completed": 0,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0,
+              "reason_code": "disabled_by_configuration",
+              "message": "Analyzer was disabled by the requested configuration."
+            },
+            {
+              "analyzer_id": "semantic_developer_intent",
+              "status": "disabled",
+              "planned_work": 0,
+              "completed": 0,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0,
+              "reason_code": "disabled_by_configuration",
+              "message": "Analyzer was disabled by the requested configuration."
+            },
+            {
+              "analyzer_id": "semantic_quality_policy",
+              "status": "disabled",
+              "planned_work": 0,
+              "completed": 0,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0,
+              "reason_code": "disabled_by_configuration",
+              "message": "Analyzer was disabled by the requested configuration."
+            },
+            {
+              "analyzer_id": "semantic_security_discovery",
+              "status": "disabled",
+              "planned_work": 0,
+              "completed": 0,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0,
+              "reason_code": "disabled_by_configuration",
+              "message": "Analyzer was disabled by the requested configuration."
+            },
+            {
+              "analyzer_id": "static_patterns_agent_snooping",
+              "status": "completed",
+              "planned_work": 7,
+              "completed": 7,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_anti_refusal",
+              "status": "completed",
+              "planned_work": 7,
+              "completed": 7,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_data_exfiltration",
+              "status": "completed",
+              "planned_work": 7,
+              "completed": 7,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_excessive_agency",
+              "status": "completed",
+              "planned_work": 7,
+              "completed": 7,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_harmful_content",
+              "status": "completed",
+              "planned_work": 7,
+              "completed": 7,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_memory_poisoning",
+              "status": "completed",
+              "planned_work": 7,
+              "completed": 7,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_output_handling",
+              "status": "completed",
+              "planned_work": 7,
+              "completed": 7,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_privilege_escalation",
+              "status": "completed",
+              "planned_work": 7,
+              "completed": 7,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_prompt_injection",
+              "status": "completed",
+              "planned_work": 7,
+              "completed": 7,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_rogue_agent",
+              "status": "completed",
+              "planned_work": 7,
+              "completed": 7,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_ssrf",
+              "status": "completed",
+              "planned_work": 7,
+              "completed": 7,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_supply_chain",
+              "status": "completed",
+              "planned_work": 7,
+              "completed": 7,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_system_prompt_leakage",
+              "status": "completed",
+              "planned_work": 7,
+              "completed": 7,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_patterns_tool_misuse",
+              "status": "completed",
+              "planned_work": 7,
+              "completed": 7,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            },
+            {
+              "analyzer_id": "static_yara",
+              "status": "completed",
+              "planned_work": 7,
+              "completed": 7,
+              "skipped": 0,
+              "failed": 0,
+              "unaccounted": 0
+            }
+          ],
+          "limitations": [
+            "Analyzer was disabled by the requested configuration.",
+            "Analyzer was disabled by the requested configuration.",
+            "Analyzer was disabled by the requested configuration.",
+            "Analyzer was disabled by the requested configuration."
+          ],
+          "findings_before_filtering": 8,
+          "findings_after_filtering": 8
+        }
+      }
+    },
+    "fixture": {
+      "id": "skillspector-executable-context-v1",
+      "scannerTargetPath": "skills/shared-owner"
+    },
+    "rawOutput": {
+      "referenceBase": "experiments/skillspector",
+      "reference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json",
+      "sha256": "sha256:04c2aa23395b21e846e0a947a0f527fdc630a9d11840c690102336e1b656f87e"
+    },
+    "renmaCatalog": {
+      "referenceBase": "experiments/skillspector",
+      "reference": "evidence-correlation/executable-context/captured/fixture-run/renma-catalog.json",
+      "sha256": "sha256:87e9c415c32f2692f3905b2bb48a9e4a7adfcdbc7a6ac99195b59d2900e4ec04"
+    },
+    "renmaExecutableGraph": {
+      "referenceBase": "experiments/skillspector",
+      "reference": "evidence-correlation/executable-context/captured/fixture-run/renma-executable-graph.json",
+      "sha256": "sha256:6adc278bd2ea0ad3a112a30683aa2d3a17a3f62778d7675ab4b28e4dec767d5f",
+      "view": "executable"
+    }
+  },
+  "counts": {
+    "rawFindingCount": 8,
+    "normalizedEvidenceCount": 8,
+    "correlatedCount": 6,
+    "unresolvedCount": 2,
+    "ambiguousCount": 0,
+    "duplicateGroupCount": 1,
+    "duplicateEvidenceCount": 2,
+    "executableCorrelatedCount": 6,
+    "executableUnresolvedCount": 2,
+    "executableAmbiguousCount": 0,
+    "executableInconclusiveCount": 0
+  },
+  "observations": {
+    "provenance": "experiment-normalization",
+    "duplicateComparison": "Exact equality of scanner-native fields after excluding only finding_id; this is an observation, not a fingerprint.",
+    "duplicateGroups": [
+      {
+        "evidenceIndexes": [
+          2,
+          3
+        ],
+        "rawFindingIds": [
+          "finding-78c19fbb9f0243029275f3ff375f4144",
+          "finding-92a0ccaf8eab499d9b7c9a222e8526ca"
+        ],
+        "comparisonBasis": "same scanner-native fields except scanner-reported finding_id"
+      }
+    ]
+  },
+  "evidence": [
+    {
+      "evidenceIndex": 0,
+      "scannerFact": {
+        "provenance": "scanner-output",
+        "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/0",
+        "nativeFinding": {
+          "id": "LP1",
+          "finding_id": "finding-4c7b32732a1c437989670d1954c18e62",
+          "category": "MCP Least Privilege",
+          "pattern": null,
+          "severity": "HIGH",
+          "confidence": 0.75,
+          "location": {
+            "file": "scripts/callee-probe.py",
+            "start_line": 1,
+            "end_line": null
+          },
+          "finding": null,
+          "explanation": "The skill uses 'file_read' capability that is not listed in its permissions. This may indicate deceptive intent or missing permission declarations.",
+          "remediation": "Add the 'file_read' permission to SKILL.md, or remove the code that requires it.",
+          "code_snippet": null,
+          "intent": null,
+          "tags": [
+            "ASI02"
+          ]
+        }
+      },
+      "normalization": {
+        "provenance": "experiment-normalization",
+        "target": {
+          "status": "normalized",
+          "scannerPath": "scripts/callee-probe.py",
+          "repositoryRelativePath": "skills/shared-owner/scripts/callee-probe.py",
+          "explanation": "The scanner path was normalized relative to the recorded scan target."
+        },
+        "locationPrecision": "start-line-only"
+      },
+      "correlation": {
+        "provenance": "experiment-correlation",
+        "status": "correlated",
+        "reasonCode": "exact-repository-relative-path",
+        "explanation": "The normalized target exactly matches Renma asset sourcePath \"skills/shared-owner/scripts/callee-probe.py\".",
+        "asset": {
+          "id": "skills/shared-owner/scripts/callee-probe.py",
+          "kind": "script",
+          "sourcePath": "skills/shared-owner/scripts/callee-probe.py",
+          "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+          "ownership": {
+            "declaredOwner": null,
+            "effectiveOwner": "experiment-maintainers",
+            "source": "inherited",
+            "inheritedFrom": {
+              "id": "skill.experiment.executable-shared-owner",
+              "sourcePath": "skills/shared-owner/SKILL.md"
+            }
+          }
+        },
+        "directSkillAssociations": [
+          {
+            "basis": "direct-owns-local-resource-edge",
+            "explanation": "A direct owns_local_resource catalog edge links the matched asset to this Skill.",
+            "skill": {
+              "id": "skill.experiment.executable-shared-owner",
+              "kind": "skill",
+              "sourcePath": "skills/shared-owner/SKILL.md",
+              "contentHash": "sha256:f57a2479e6903d9596880c77b43cf7a561c9e9df2baff543a7036b85ba0b38cf",
+              "ownership": {
+                "declaredOwner": "experiment-maintainers",
+                "effectiveOwner": "experiment-maintainers",
+                "source": "declared"
+              }
+            },
+            "relationship": {
+              "from": "skill.experiment.executable-shared-owner",
+              "to": "skills/shared-owner/scripts/callee-probe.py",
+              "kind": "owns_local_resource",
+              "sourcePath": "skills/shared-owner/SKILL.md"
+            }
+          }
+        ],
+        "relationships": [
+          {
+            "from": "skill.experiment.executable-shared-owner",
+            "to": "skills/shared-owner/scripts/callee-probe.py",
+            "kind": "owns_local_resource",
+            "sourcePath": "skills/shared-owner/SKILL.md"
+          },
+          {
+            "from": "skills/shared-owner/scripts/callee-probe.py",
+            "to": "skill.experiment.executable-shared-owner",
+            "kind": "inherits_owner",
+            "sourcePath": "skills/shared-owner/scripts/callee-probe.py"
+          },
+          {
+            "from": "skills/shared-owner/scripts/callee-probe.py",
+            "to": "skill.experiment.executable-shared-owner",
+            "kind": "inherits_policy",
+            "sourcePath": "skills/shared-owner/scripts/callee-probe.py"
+          }
+        ],
+        "candidates": []
+      },
+      "executableContext": {
+        "provenance": "experiment-executable-correlation",
+        "status": "correlated",
+        "reasonCode": "exact-executable-node-path",
+        "explanation": "The catalog asset exactly matches executable graph node sourcePath \"skills/shared-owner/scripts/callee-probe.py\"; only canonical incoming edges were projected.",
+        "node": {
+          "id": "skills/shared-owner/scripts/callee-probe.py",
+          "sourcePath": "skills/shared-owner/scripts/callee-probe.py",
+          "role": "repository-script",
+          "scope": "skill-local",
+          "invokedBySkillCount": 0
+        },
+        "candidates": [],
+        "invokedBySkillCountCheck": {
+          "reported": 0,
+          "observedDistinctDirectSkillInvokers": 0,
+          "agrees": true,
+          "usedToInferIdentities": false
+        },
+        "directSkillInvokers": [],
+        "directScriptInvokers": [
+          {
+            "provenance": "experiment-executable-correlation",
+            "basis": "direct-script-invokes-edge",
+            "explanation": "Included because this canonical incoming invokes edge starts at a repository-script node.",
+            "edge": {
+              "from": "skills/shared-owner/scripts/caller-probe.mjs",
+              "to": "skills/shared-owner/scripts/callee-probe.py",
+              "kind": "invokes",
+              "declaration": "executable-dependency",
+              "sourcePath": "skills/shared-owner/scripts/caller-probe.mjs",
+              "resolved": true,
+              "targetId": "skills/shared-owner/scripts/callee-probe.py",
+              "targetKind": "script",
+              "targetPath": "skills/shared-owner/scripts/callee-probe.py",
+              "evidenceCount": 1
+            },
+            "direction": {
+              "source": {
+                "id": "skills/shared-owner/scripts/caller-probe.mjs",
+                "sourcePath": "skills/shared-owner/scripts/caller-probe.mjs",
+                "role": "repository-script",
+                "scope": "skill-local",
+                "invokedBySkillCount": 1
+              },
+              "target": {
+                "id": "skills/shared-owner/scripts/callee-probe.py",
+                "sourcePath": "skills/shared-owner/scripts/callee-probe.py",
+                "role": "repository-script",
+                "scope": "skill-local",
+                "invokedBySkillCount": 0
+              }
+            }
+          }
+        ],
+        "structuralContainers": [
+          {
+            "provenance": "experiment-executable-correlation",
+            "basis": "direct-structural-contains-edge",
+            "explanation": "Included because this canonical incoming contains edge starts at a Skill node; the original direction is retained.",
+            "edge": {
+              "from": "skill.experiment.executable-shared-owner",
+              "to": "skills/shared-owner/scripts/callee-probe.py",
+              "kind": "contains",
+              "declaration": "structural-skill-boundary",
+              "sourcePath": "skills/shared-owner/SKILL.md",
+              "resolved": true,
+              "targetId": "skills/shared-owner/scripts/callee-probe.py",
+              "targetKind": "script",
+              "targetPath": "skills/shared-owner/scripts/callee-probe.py"
+            },
+            "direction": {
+              "source": {
+                "id": "skill.experiment.executable-shared-owner",
+                "sourcePath": "skills/shared-owner/SKILL.md",
+                "role": "skill"
+              },
+              "target": {
+                "id": "skills/shared-owner/scripts/callee-probe.py",
+                "sourcePath": "skills/shared-owner/scripts/callee-probe.py",
+                "role": "repository-script",
+                "scope": "skill-local",
+                "invokedBySkillCount": 0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "evidenceIndex": 1,
+      "scannerFact": {
+        "provenance": "scanner-output",
+        "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/1",
+        "nativeFinding": {
+          "id": "LP1",
+          "finding_id": "finding-e3336755ed6146ea9c1d9682412098b7",
+          "category": "MCP Least Privilege",
+          "pattern": null,
+          "severity": "HIGH",
+          "confidence": 0.75,
+          "location": {
+            "file": "scripts/callee-probe.py",
+            "start_line": 1,
+            "end_line": null
+          },
+          "finding": null,
+          "explanation": "The skill uses 'network' capability that is not listed in its permissions. This may indicate deceptive intent or missing permission declarations.",
+          "remediation": "Add the 'network' permission to SKILL.md, or remove the code that requires it.",
+          "code_snippet": null,
+          "intent": null,
+          "tags": [
+            "ASI02"
+          ]
+        }
+      },
+      "normalization": {
+        "provenance": "experiment-normalization",
+        "target": {
+          "status": "normalized",
+          "scannerPath": "scripts/callee-probe.py",
+          "repositoryRelativePath": "skills/shared-owner/scripts/callee-probe.py",
+          "explanation": "The scanner path was normalized relative to the recorded scan target."
+        },
+        "locationPrecision": "start-line-only"
+      },
+      "correlation": {
+        "provenance": "experiment-correlation",
+        "status": "correlated",
+        "reasonCode": "exact-repository-relative-path",
+        "explanation": "The normalized target exactly matches Renma asset sourcePath \"skills/shared-owner/scripts/callee-probe.py\".",
+        "asset": {
+          "id": "skills/shared-owner/scripts/callee-probe.py",
+          "kind": "script",
+          "sourcePath": "skills/shared-owner/scripts/callee-probe.py",
+          "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+          "ownership": {
+            "declaredOwner": null,
+            "effectiveOwner": "experiment-maintainers",
+            "source": "inherited",
+            "inheritedFrom": {
+              "id": "skill.experiment.executable-shared-owner",
+              "sourcePath": "skills/shared-owner/SKILL.md"
+            }
+          }
+        },
+        "directSkillAssociations": [
+          {
+            "basis": "direct-owns-local-resource-edge",
+            "explanation": "A direct owns_local_resource catalog edge links the matched asset to this Skill.",
+            "skill": {
+              "id": "skill.experiment.executable-shared-owner",
+              "kind": "skill",
+              "sourcePath": "skills/shared-owner/SKILL.md",
+              "contentHash": "sha256:f57a2479e6903d9596880c77b43cf7a561c9e9df2baff543a7036b85ba0b38cf",
+              "ownership": {
+                "declaredOwner": "experiment-maintainers",
+                "effectiveOwner": "experiment-maintainers",
+                "source": "declared"
+              }
+            },
+            "relationship": {
+              "from": "skill.experiment.executable-shared-owner",
+              "to": "skills/shared-owner/scripts/callee-probe.py",
+              "kind": "owns_local_resource",
+              "sourcePath": "skills/shared-owner/SKILL.md"
+            }
+          }
+        ],
+        "relationships": [
+          {
+            "from": "skill.experiment.executable-shared-owner",
+            "to": "skills/shared-owner/scripts/callee-probe.py",
+            "kind": "owns_local_resource",
+            "sourcePath": "skills/shared-owner/SKILL.md"
+          },
+          {
+            "from": "skills/shared-owner/scripts/callee-probe.py",
+            "to": "skill.experiment.executable-shared-owner",
+            "kind": "inherits_owner",
+            "sourcePath": "skills/shared-owner/scripts/callee-probe.py"
+          },
+          {
+            "from": "skills/shared-owner/scripts/callee-probe.py",
+            "to": "skill.experiment.executable-shared-owner",
+            "kind": "inherits_policy",
+            "sourcePath": "skills/shared-owner/scripts/callee-probe.py"
+          }
+        ],
+        "candidates": []
+      },
+      "executableContext": {
+        "provenance": "experiment-executable-correlation",
+        "status": "correlated",
+        "reasonCode": "exact-executable-node-path",
+        "explanation": "The catalog asset exactly matches executable graph node sourcePath \"skills/shared-owner/scripts/callee-probe.py\"; only canonical incoming edges were projected.",
+        "node": {
+          "id": "skills/shared-owner/scripts/callee-probe.py",
+          "sourcePath": "skills/shared-owner/scripts/callee-probe.py",
+          "role": "repository-script",
+          "scope": "skill-local",
+          "invokedBySkillCount": 0
+        },
+        "candidates": [],
+        "invokedBySkillCountCheck": {
+          "reported": 0,
+          "observedDistinctDirectSkillInvokers": 0,
+          "agrees": true,
+          "usedToInferIdentities": false
+        },
+        "directSkillInvokers": [],
+        "directScriptInvokers": [
+          {
+            "provenance": "experiment-executable-correlation",
+            "basis": "direct-script-invokes-edge",
+            "explanation": "Included because this canonical incoming invokes edge starts at a repository-script node.",
+            "edge": {
+              "from": "skills/shared-owner/scripts/caller-probe.mjs",
+              "to": "skills/shared-owner/scripts/callee-probe.py",
+              "kind": "invokes",
+              "declaration": "executable-dependency",
+              "sourcePath": "skills/shared-owner/scripts/caller-probe.mjs",
+              "resolved": true,
+              "targetId": "skills/shared-owner/scripts/callee-probe.py",
+              "targetKind": "script",
+              "targetPath": "skills/shared-owner/scripts/callee-probe.py",
+              "evidenceCount": 1
+            },
+            "direction": {
+              "source": {
+                "id": "skills/shared-owner/scripts/caller-probe.mjs",
+                "sourcePath": "skills/shared-owner/scripts/caller-probe.mjs",
+                "role": "repository-script",
+                "scope": "skill-local",
+                "invokedBySkillCount": 1
+              },
+              "target": {
+                "id": "skills/shared-owner/scripts/callee-probe.py",
+                "sourcePath": "skills/shared-owner/scripts/callee-probe.py",
+                "role": "repository-script",
+                "scope": "skill-local",
+                "invokedBySkillCount": 0
+              }
+            }
+          }
+        ],
+        "structuralContainers": [
+          {
+            "provenance": "experiment-executable-correlation",
+            "basis": "direct-structural-contains-edge",
+            "explanation": "Included because this canonical incoming contains edge starts at a Skill node; the original direction is retained.",
+            "edge": {
+              "from": "skill.experiment.executable-shared-owner",
+              "to": "skills/shared-owner/scripts/callee-probe.py",
+              "kind": "contains",
+              "declaration": "structural-skill-boundary",
+              "sourcePath": "skills/shared-owner/SKILL.md",
+              "resolved": true,
+              "targetId": "skills/shared-owner/scripts/callee-probe.py",
+              "targetKind": "script",
+              "targetPath": "skills/shared-owner/scripts/callee-probe.py"
+            },
+            "direction": {
+              "source": {
+                "id": "skill.experiment.executable-shared-owner",
+                "sourcePath": "skills/shared-owner/SKILL.md",
+                "role": "skill"
+              },
+              "target": {
+                "id": "skills/shared-owner/scripts/callee-probe.py",
+                "sourcePath": "skills/shared-owner/scripts/callee-probe.py",
+                "role": "repository-script",
+                "scope": "skill-local",
+                "invokedBySkillCount": 0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "evidenceIndex": 2,
+      "scannerFact": {
+        "provenance": "scanner-output",
+        "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/2",
+        "nativeFinding": {
+          "id": "AS3",
+          "finding_id": "finding-78c19fbb9f0243029275f3ff375f4144",
+          "category": "Agent Snooping",
+          "pattern": "Skill Enumeration",
+          "severity": "MEDIUM",
+          "confidence": 0.8,
+          "location": {
+            "file": "README.md",
+            "start_line": 6,
+            "end_line": null
+          },
+          "finding": "skills/Example/SKILL.md",
+          "explanation": "Skill enumerates or reads other installed skills. Access to other skills' SKILL.md files or the skills directory reveals prompt instructions, capabilities, and secrets that should be invisible to peer skills.",
+          "remediation": "Remove all code or instructions that list or read other skills' files or directories. Skills should operate independently; cross-skill access is a privilege escalation.",
+          "code_snippet": "This file is scanner-visible but deliberately excluded from the Renma catalog.\nThe following ordinary Markdown link is repeated as visible text and destination\nto preserve duplicate native evidence without creating an executable relation:\n[skills/Example/SKILL.md](skills/Example/SKILL.md).",
+          "intent": null,
+          "tags": [
+            "Agent Snooping"
+          ]
+        }
+      },
+      "normalization": {
+        "provenance": "experiment-normalization",
+        "target": {
+          "status": "normalized",
+          "scannerPath": "README.md",
+          "repositoryRelativePath": "skills/shared-owner/README.md",
+          "explanation": "The scanner path was normalized relative to the recorded scan target."
+        },
+        "locationPrecision": "start-line-only"
+      },
+      "correlation": {
+        "provenance": "experiment-correlation",
+        "status": "unresolved",
+        "reasonCode": "no-catalog-asset-at-path",
+        "explanation": "No Renma catalog asset has the exact source path \"skills/shared-owner/README.md\".",
+        "candidates": []
+      },
+      "executableContext": {
+        "provenance": "experiment-executable-correlation",
+        "status": "unresolved",
+        "reasonCode": "catalog-correlation-unresolved",
+        "explanation": "Executable correlation was not attempted because exact catalog correlation did not produce one asset.",
+        "candidates": [],
+        "directSkillInvokers": [],
+        "directScriptInvokers": [],
+        "structuralContainers": []
+      }
+    },
+    {
+      "evidenceIndex": 3,
+      "scannerFact": {
+        "provenance": "scanner-output",
+        "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/3",
+        "nativeFinding": {
+          "id": "AS3",
+          "finding_id": "finding-92a0ccaf8eab499d9b7c9a222e8526ca",
+          "category": "Agent Snooping",
+          "pattern": "Skill Enumeration",
+          "severity": "MEDIUM",
+          "confidence": 0.8,
+          "location": {
+            "file": "README.md",
+            "start_line": 6,
+            "end_line": null
+          },
+          "finding": "skills/Example/SKILL.md",
+          "explanation": "Skill enumerates or reads other installed skills. Access to other skills' SKILL.md files or the skills directory reveals prompt instructions, capabilities, and secrets that should be invisible to peer skills.",
+          "remediation": "Remove all code or instructions that list or read other skills' files or directories. Skills should operate independently; cross-skill access is a privilege escalation.",
+          "code_snippet": "This file is scanner-visible but deliberately excluded from the Renma catalog.\nThe following ordinary Markdown link is repeated as visible text and destination\nto preserve duplicate native evidence without creating an executable relation:\n[skills/Example/SKILL.md](skills/Example/SKILL.md).",
+          "intent": null,
+          "tags": [
+            "Agent Snooping"
+          ]
+        }
+      },
+      "normalization": {
+        "provenance": "experiment-normalization",
+        "target": {
+          "status": "normalized",
+          "scannerPath": "README.md",
+          "repositoryRelativePath": "skills/shared-owner/README.md",
+          "explanation": "The scanner path was normalized relative to the recorded scan target."
+        },
+        "locationPrecision": "start-line-only"
+      },
+      "correlation": {
+        "provenance": "experiment-correlation",
+        "status": "unresolved",
+        "reasonCode": "no-catalog-asset-at-path",
+        "explanation": "No Renma catalog asset has the exact source path \"skills/shared-owner/README.md\".",
+        "candidates": []
+      },
+      "executableContext": {
+        "provenance": "experiment-executable-correlation",
+        "status": "unresolved",
+        "reasonCode": "catalog-correlation-unresolved",
+        "explanation": "Executable correlation was not attempted because exact catalog correlation did not produce one asset.",
+        "candidates": [],
+        "directSkillInvokers": [],
+        "directScriptInvokers": [],
+        "structuralContainers": []
+      }
+    },
+    {
+      "evidenceIndex": 4,
+      "scannerFact": {
+        "provenance": "scanner-output",
+        "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/4",
+        "nativeFinding": {
+          "id": "AS3",
+          "finding_id": "finding-a51420e703924ef7911c04afa76b2a1e",
+          "category": "Agent Snooping",
+          "pattern": "Skill Enumeration",
+          "severity": "MEDIUM",
+          "confidence": 0.8,
+          "location": {
+            "file": "scripts/callee-probe.py",
+            "start_line": 1,
+            "end_line": null
+          },
+          "finding": "skills/Example/SKILL.md",
+          "explanation": "Skill enumerates or reads other installed skills. Access to other skills' SKILL.md files or the skills directory reveals prompt instructions, capabilities, and secrets that should be invisible to peer skills.",
+          "remediation": "Remove all code or instructions that list or read other skills' files or directories. Skills should operate independently; cross-skill access is a privilege escalation.",
+          "code_snippet": "\"\"\"Inert scanner token: skills/Example/SKILL.md.\"\"\"\n\nfrom pathlib import Path\n",
+          "intent": null,
+          "tags": [
+            "Agent Snooping"
+          ]
+        }
+      },
+      "normalization": {
+        "provenance": "experiment-normalization",
+        "target": {
+          "status": "normalized",
+          "scannerPath": "scripts/callee-probe.py",
+          "repositoryRelativePath": "skills/shared-owner/scripts/callee-probe.py",
+          "explanation": "The scanner path was normalized relative to the recorded scan target."
+        },
+        "locationPrecision": "start-line-only"
+      },
+      "correlation": {
+        "provenance": "experiment-correlation",
+        "status": "correlated",
+        "reasonCode": "exact-repository-relative-path",
+        "explanation": "The normalized target exactly matches Renma asset sourcePath \"skills/shared-owner/scripts/callee-probe.py\".",
+        "asset": {
+          "id": "skills/shared-owner/scripts/callee-probe.py",
+          "kind": "script",
+          "sourcePath": "skills/shared-owner/scripts/callee-probe.py",
+          "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+          "ownership": {
+            "declaredOwner": null,
+            "effectiveOwner": "experiment-maintainers",
+            "source": "inherited",
+            "inheritedFrom": {
+              "id": "skill.experiment.executable-shared-owner",
+              "sourcePath": "skills/shared-owner/SKILL.md"
+            }
+          }
+        },
+        "directSkillAssociations": [
+          {
+            "basis": "direct-owns-local-resource-edge",
+            "explanation": "A direct owns_local_resource catalog edge links the matched asset to this Skill.",
+            "skill": {
+              "id": "skill.experiment.executable-shared-owner",
+              "kind": "skill",
+              "sourcePath": "skills/shared-owner/SKILL.md",
+              "contentHash": "sha256:f57a2479e6903d9596880c77b43cf7a561c9e9df2baff543a7036b85ba0b38cf",
+              "ownership": {
+                "declaredOwner": "experiment-maintainers",
+                "effectiveOwner": "experiment-maintainers",
+                "source": "declared"
+              }
+            },
+            "relationship": {
+              "from": "skill.experiment.executable-shared-owner",
+              "to": "skills/shared-owner/scripts/callee-probe.py",
+              "kind": "owns_local_resource",
+              "sourcePath": "skills/shared-owner/SKILL.md"
+            }
+          }
+        ],
+        "relationships": [
+          {
+            "from": "skill.experiment.executable-shared-owner",
+            "to": "skills/shared-owner/scripts/callee-probe.py",
+            "kind": "owns_local_resource",
+            "sourcePath": "skills/shared-owner/SKILL.md"
+          },
+          {
+            "from": "skills/shared-owner/scripts/callee-probe.py",
+            "to": "skill.experiment.executable-shared-owner",
+            "kind": "inherits_owner",
+            "sourcePath": "skills/shared-owner/scripts/callee-probe.py"
+          },
+          {
+            "from": "skills/shared-owner/scripts/callee-probe.py",
+            "to": "skill.experiment.executable-shared-owner",
+            "kind": "inherits_policy",
+            "sourcePath": "skills/shared-owner/scripts/callee-probe.py"
+          }
+        ],
+        "candidates": []
+      },
+      "executableContext": {
+        "provenance": "experiment-executable-correlation",
+        "status": "correlated",
+        "reasonCode": "exact-executable-node-path",
+        "explanation": "The catalog asset exactly matches executable graph node sourcePath \"skills/shared-owner/scripts/callee-probe.py\"; only canonical incoming edges were projected.",
+        "node": {
+          "id": "skills/shared-owner/scripts/callee-probe.py",
+          "sourcePath": "skills/shared-owner/scripts/callee-probe.py",
+          "role": "repository-script",
+          "scope": "skill-local",
+          "invokedBySkillCount": 0
+        },
+        "candidates": [],
+        "invokedBySkillCountCheck": {
+          "reported": 0,
+          "observedDistinctDirectSkillInvokers": 0,
+          "agrees": true,
+          "usedToInferIdentities": false
+        },
+        "directSkillInvokers": [],
+        "directScriptInvokers": [
+          {
+            "provenance": "experiment-executable-correlation",
+            "basis": "direct-script-invokes-edge",
+            "explanation": "Included because this canonical incoming invokes edge starts at a repository-script node.",
+            "edge": {
+              "from": "skills/shared-owner/scripts/caller-probe.mjs",
+              "to": "skills/shared-owner/scripts/callee-probe.py",
+              "kind": "invokes",
+              "declaration": "executable-dependency",
+              "sourcePath": "skills/shared-owner/scripts/caller-probe.mjs",
+              "resolved": true,
+              "targetId": "skills/shared-owner/scripts/callee-probe.py",
+              "targetKind": "script",
+              "targetPath": "skills/shared-owner/scripts/callee-probe.py",
+              "evidenceCount": 1
+            },
+            "direction": {
+              "source": {
+                "id": "skills/shared-owner/scripts/caller-probe.mjs",
+                "sourcePath": "skills/shared-owner/scripts/caller-probe.mjs",
+                "role": "repository-script",
+                "scope": "skill-local",
+                "invokedBySkillCount": 1
+              },
+              "target": {
+                "id": "skills/shared-owner/scripts/callee-probe.py",
+                "sourcePath": "skills/shared-owner/scripts/callee-probe.py",
+                "role": "repository-script",
+                "scope": "skill-local",
+                "invokedBySkillCount": 0
+              }
+            }
+          }
+        ],
+        "structuralContainers": [
+          {
+            "provenance": "experiment-executable-correlation",
+            "basis": "direct-structural-contains-edge",
+            "explanation": "Included because this canonical incoming contains edge starts at a Skill node; the original direction is retained.",
+            "edge": {
+              "from": "skill.experiment.executable-shared-owner",
+              "to": "skills/shared-owner/scripts/callee-probe.py",
+              "kind": "contains",
+              "declaration": "structural-skill-boundary",
+              "sourcePath": "skills/shared-owner/SKILL.md",
+              "resolved": true,
+              "targetId": "skills/shared-owner/scripts/callee-probe.py",
+              "targetKind": "script",
+              "targetPath": "skills/shared-owner/scripts/callee-probe.py"
+            },
+            "direction": {
+              "source": {
+                "id": "skill.experiment.executable-shared-owner",
+                "sourcePath": "skills/shared-owner/SKILL.md",
+                "role": "skill"
+              },
+              "target": {
+                "id": "skills/shared-owner/scripts/callee-probe.py",
+                "sourcePath": "skills/shared-owner/scripts/callee-probe.py",
+                "role": "repository-script",
+                "scope": "skill-local",
+                "invokedBySkillCount": 0
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "evidenceIndex": 5,
+      "scannerFact": {
+        "provenance": "scanner-output",
+        "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/5",
+        "nativeFinding": {
+          "id": "AS3",
+          "finding_id": "finding-71b8e6a167bc4178be4fc3a81081febb",
+          "category": "Agent Snooping",
+          "pattern": "Skill Enumeration",
+          "severity": "MEDIUM",
+          "confidence": 0.8,
+          "location": {
+            "file": "scripts/contained-probe.py",
+            "start_line": 1,
+            "end_line": null
+          },
+          "finding": "skills/Example/SKILL.md",
+          "explanation": "Skill enumerates or reads other installed skills. Access to other skills' SKILL.md files or the skills directory reveals prompt instructions, capabilities, and secrets that should be invisible to peer skills.",
+          "remediation": "Remove all code or instructions that list or read other skills' files or directories. Skills should operate independently; cross-skill access is a privilege escalation.",
+          "code_snippet": "\"\"\"Inert scanner token: skills/Example/SKILL.md.\"\"\"\n\nfrom pathlib import Path\n",
+          "intent": null,
+          "tags": [
+            "Agent Snooping"
+          ]
+        }
+      },
+      "normalization": {
+        "provenance": "experiment-normalization",
+        "target": {
+          "status": "normalized",
+          "scannerPath": "scripts/contained-probe.py",
+          "repositoryRelativePath": "skills/shared-owner/scripts/contained-probe.py",
+          "explanation": "The scanner path was normalized relative to the recorded scan target."
+        },
+        "locationPrecision": "start-line-only"
+      },
+      "correlation": {
+        "provenance": "experiment-correlation",
+        "status": "correlated",
+        "reasonCode": "exact-repository-relative-path",
+        "explanation": "The normalized target exactly matches Renma asset sourcePath \"skills/shared-owner/scripts/contained-probe.py\".",
+        "asset": {
+          "id": "skills/shared-owner/scripts/contained-probe.py",
+          "kind": "script",
+          "sourcePath": "skills/shared-owner/scripts/contained-probe.py",
+          "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+          "ownership": {
+            "declaredOwner": null,
+            "effectiveOwner": "experiment-maintainers",
+            "source": "inherited",
+            "inheritedFrom": {
+              "id": "skill.experiment.executable-shared-owner",
+              "sourcePath": "skills/shared-owner/SKILL.md"
+            }
+          }
+        },
+        "directSkillAssociations": [
+          {
+            "basis": "direct-owns-local-resource-edge",
+            "explanation": "A direct owns_local_resource catalog edge links the matched asset to this Skill.",
+            "skill": {
+              "id": "skill.experiment.executable-shared-owner",
+              "kind": "skill",
+              "sourcePath": "skills/shared-owner/SKILL.md",
+              "contentHash": "sha256:f57a2479e6903d9596880c77b43cf7a561c9e9df2baff543a7036b85ba0b38cf",
+              "ownership": {
+                "declaredOwner": "experiment-maintainers",
+                "effectiveOwner": "experiment-maintainers",
+                "source": "declared"
+              }
+            },
+            "relationship": {
+              "from": "skill.experiment.executable-shared-owner",
+              "to": "skills/shared-owner/scripts/contained-probe.py",
+              "kind": "owns_local_resource",
+              "sourcePath": "skills/shared-owner/SKILL.md"
+            }
+          }
+        ],
+        "relationships": [
+          {
+            "from": "skill.experiment.executable-shared-owner",
+            "to": "skills/shared-owner/scripts/contained-probe.py",
+            "kind": "owns_local_resource",
+            "sourcePath": "skills/shared-owner/SKILL.md"
+          },
+          {
+            "from": "skills/shared-owner/scripts/contained-probe.py",
+            "to": "skill.experiment.executable-shared-owner",
+            "kind": "inherits_owner",
+            "sourcePath": "skills/shared-owner/scripts/contained-probe.py"
+          },
+          {
+            "from": "skills/shared-owner/scripts/contained-probe.py",
+            "to": "skill.experiment.executable-shared-owner",
+            "kind": "inherits_policy",
+            "sourcePath": "skills/shared-owner/scripts/contained-probe.py"
+          }
+        ],
+        "candidates": []
+      },
+      "executableContext": {
+        "provenance": "experiment-executable-correlation",
+        "status": "correlated",
+        "reasonCode": "exact-executable-node-path",
+        "explanation": "The catalog asset exactly matches executable graph node sourcePath \"skills/shared-owner/scripts/contained-probe.py\"; only canonical incoming edges were projected.",
+        "node": {
+          "id": "skills/shared-owner/scripts/contained-probe.py",
+          "sourcePath": "skills/shared-owner/scripts/contained-probe.py",
+          "role": "repository-script",
+          "scope": "skill-local",
+          "invokedBySkillCount": 1
+        },
+        "candidates": [],
+        "invokedBySkillCountCheck": {
+          "reported": 1,
+          "observedDistinctDirectSkillInvokers": 1,
+          "agrees": true,
+          "usedToInferIdentities": false
+        },
+        "directSkillInvokers": [
+          {
+            "provenance": "experiment-executable-correlation",
+            "basis": "direct-skill-invokes-edge",
+            "explanation": "Included because this canonical incoming invokes edge starts at a Skill node.",
+            "edge": {
+              "from": "skill.experiment.executable-beta",
+              "to": "skills/shared-owner/scripts/contained-probe.py",
+              "kind": "invokes",
+              "declaration": "executable-invocation",
+              "sourcePath": "skills/beta/SKILL.md",
+              "resolved": true,
+              "targetId": "skills/shared-owner/scripts/contained-probe.py",
+              "targetKind": "script",
+              "targetPath": "skills/shared-owner/scripts/contained-probe.py",
+              "evidenceCount": 1
+            },
+            "direction": {
+              "source": {
+                "id": "skill.experiment.executable-beta",
+                "sourcePath": "skills/beta/SKILL.md",
+                "role": "skill"
+              },
+              "target": {
+                "id": "skills/shared-owner/scripts/contained-probe.py",
+                "sourcePath": "skills/shared-owner/scripts/contained-probe.py",
+                "role": "repository-script",
+                "scope": "skill-local",
+                "invokedBySkillCount": 1
+              }
+            }
+          }
+        ],
+        "directScriptInvokers": [],
+        "structuralContainers": [
+          {
+            "provenance": "experiment-executable-correlation",
+            "basis": "direct-structural-contains-edge",
+            "explanation": "Included because this canonical incoming contains edge starts at a Skill node; the original direction is retained.",
+            "edge": {
+              "from": "skill.experiment.executable-shared-owner",
+              "to": "skills/shared-owner/scripts/contained-probe.py",
+              "kind": "contains",
+              "declaration": "structural-skill-boundary",
+              "sourcePath": "skills/shared-owner/SKILL.md",
+              "resolved": true,
+              "targetId": "skills/shared-owner/scripts/contained-probe.py",
+              "targetKind": "script",
+              "targetPath": "skills/shared-owner/scripts/contained-probe.py"
+            },
+            "direction": {
+              "source": {
+                "id": "skill.experiment.executable-shared-owner",
+                "sourcePath": "skills/shared-owner/SKILL.md",
+                "role": "skill"
+              },
+              "target": {
+                "id": "skills/shared-owner/scripts/contained-probe.py",
+                "sourcePath": "skills/shared-owner/scripts/contained-probe.py",
+                "role": "repository-script",
+                "scope": "skill-local",
+                "invokedBySkillCount": 1
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "evidenceIndex": 6,
+      "scannerFact": {
+        "provenance": "scanner-output",
+        "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/6",
+        "nativeFinding": {
+          "id": "AS3",
+          "finding_id": "finding-d17f20a6cb504c5a9a1aa7eb0a273cbd",
+          "category": "Agent Snooping",
+          "pattern": "Skill Enumeration",
+          "severity": "MEDIUM",
+          "confidence": 0.8,
+          "location": {
+            "file": "scripts/direct-probe.py",
+            "start_line": 1,
+            "end_line": null
+          },
+          "finding": "skills/Example/SKILL.md",
+          "explanation": "Skill enumerates or reads other installed skills. Access to other skills' SKILL.md files or the skills directory reveals prompt instructions, capabilities, and secrets that should be invisible to peer skills.",
+          "remediation": "Remove all code or instructions that list or read other skills' files or directories. Skills should operate independently; cross-skill access is a privilege escalation.",
+          "code_snippet": "\"\"\"Inert scanner token: skills/Example/SKILL.md.\"\"\"\n\nfrom pathlib import Path\n",
+          "intent": null,
+          "tags": [
+            "Agent Snooping"
+          ]
+        }
+      },
+      "normalization": {
+        "provenance": "experiment-normalization",
+        "target": {
+          "status": "normalized",
+          "scannerPath": "scripts/direct-probe.py",
+          "repositoryRelativePath": "skills/shared-owner/scripts/direct-probe.py",
+          "explanation": "The scanner path was normalized relative to the recorded scan target."
+        },
+        "locationPrecision": "start-line-only"
+      },
+      "correlation": {
+        "provenance": "experiment-correlation",
+        "status": "correlated",
+        "reasonCode": "exact-repository-relative-path",
+        "explanation": "The normalized target exactly matches Renma asset sourcePath \"skills/shared-owner/scripts/direct-probe.py\".",
+        "asset": {
+          "id": "skills/shared-owner/scripts/direct-probe.py",
+          "kind": "script",
+          "sourcePath": "skills/shared-owner/scripts/direct-probe.py",
+          "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+          "ownership": {
+            "declaredOwner": null,
+            "effectiveOwner": "experiment-maintainers",
+            "source": "inherited",
+            "inheritedFrom": {
+              "id": "skill.experiment.executable-shared-owner",
+              "sourcePath": "skills/shared-owner/SKILL.md"
+            }
+          }
+        },
+        "directSkillAssociations": [
+          {
+            "basis": "direct-owns-local-resource-edge",
+            "explanation": "A direct owns_local_resource catalog edge links the matched asset to this Skill.",
+            "skill": {
+              "id": "skill.experiment.executable-shared-owner",
+              "kind": "skill",
+              "sourcePath": "skills/shared-owner/SKILL.md",
+              "contentHash": "sha256:f57a2479e6903d9596880c77b43cf7a561c9e9df2baff543a7036b85ba0b38cf",
+              "ownership": {
+                "declaredOwner": "experiment-maintainers",
+                "effectiveOwner": "experiment-maintainers",
+                "source": "declared"
+              }
+            },
+            "relationship": {
+              "from": "skill.experiment.executable-shared-owner",
+              "to": "skills/shared-owner/scripts/direct-probe.py",
+              "kind": "owns_local_resource",
+              "sourcePath": "skills/shared-owner/SKILL.md"
+            }
+          }
+        ],
+        "relationships": [
+          {
+            "from": "skill.experiment.executable-shared-owner",
+            "to": "skills/shared-owner/scripts/direct-probe.py",
+            "kind": "owns_local_resource",
+            "sourcePath": "skills/shared-owner/SKILL.md"
+          },
+          {
+            "from": "skill.experiment.executable-shared-owner",
+            "to": "skills/shared-owner/scripts/direct-probe.py",
+            "kind": "statically_references",
+            "sourcePath": "skills/shared-owner/SKILL.md",
+            "evidence": {
+              "path": "skills/shared-owner/SKILL.md",
+              "startLine": 20,
+              "endLine": 20,
+              "snippet": "scripts/direct-probe.py"
+            }
+          },
+          {
+            "from": "skills/shared-owner/scripts/direct-probe.py",
+            "to": "skill.experiment.executable-shared-owner",
+            "kind": "inherits_owner",
+            "sourcePath": "skills/shared-owner/scripts/direct-probe.py"
+          },
+          {
+            "from": "skills/shared-owner/scripts/direct-probe.py",
+            "to": "skill.experiment.executable-shared-owner",
+            "kind": "inherits_policy",
+            "sourcePath": "skills/shared-owner/scripts/direct-probe.py"
+          }
+        ],
+        "candidates": []
+      },
+      "executableContext": {
+        "provenance": "experiment-executable-correlation",
+        "status": "correlated",
+        "reasonCode": "exact-executable-node-path",
+        "explanation": "The catalog asset exactly matches executable graph node sourcePath \"skills/shared-owner/scripts/direct-probe.py\"; only canonical incoming edges were projected.",
+        "node": {
+          "id": "skills/shared-owner/scripts/direct-probe.py",
+          "sourcePath": "skills/shared-owner/scripts/direct-probe.py",
+          "role": "repository-script",
+          "scope": "skill-local",
+          "invokedBySkillCount": 1
+        },
+        "candidates": [],
+        "invokedBySkillCountCheck": {
+          "reported": 1,
+          "observedDistinctDirectSkillInvokers": 1,
+          "agrees": true,
+          "usedToInferIdentities": false
+        },
+        "directSkillInvokers": [
+          {
+            "provenance": "experiment-executable-correlation",
+            "basis": "direct-skill-invokes-edge",
+            "explanation": "Included because this canonical incoming invokes edge starts at a Skill node.",
+            "edge": {
+              "from": "skill.experiment.executable-shared-owner",
+              "to": "skills/shared-owner/scripts/direct-probe.py",
+              "kind": "invokes",
+              "declaration": "executable-invocation",
+              "sourcePath": "skills/shared-owner/SKILL.md",
+              "resolved": true,
+              "targetId": "skills/shared-owner/scripts/direct-probe.py",
+              "targetKind": "script",
+              "targetPath": "skills/shared-owner/scripts/direct-probe.py",
+              "evidenceCount": 1
+            },
+            "direction": {
+              "source": {
+                "id": "skill.experiment.executable-shared-owner",
+                "sourcePath": "skills/shared-owner/SKILL.md",
+                "role": "skill"
+              },
+              "target": {
+                "id": "skills/shared-owner/scripts/direct-probe.py",
+                "sourcePath": "skills/shared-owner/scripts/direct-probe.py",
+                "role": "repository-script",
+                "scope": "skill-local",
+                "invokedBySkillCount": 1
+              }
+            }
+          }
+        ],
+        "directScriptInvokers": [],
+        "structuralContainers": [
+          {
+            "provenance": "experiment-executable-correlation",
+            "basis": "direct-structural-contains-edge",
+            "explanation": "Included because this canonical incoming contains edge starts at a Skill node; the original direction is retained.",
+            "edge": {
+              "from": "skill.experiment.executable-shared-owner",
+              "to": "skills/shared-owner/scripts/direct-probe.py",
+              "kind": "contains",
+              "declaration": "structural-skill-boundary",
+              "sourcePath": "skills/shared-owner/SKILL.md",
+              "resolved": true,
+              "targetId": "skills/shared-owner/scripts/direct-probe.py",
+              "targetKind": "script",
+              "targetPath": "skills/shared-owner/scripts/direct-probe.py"
+            },
+            "direction": {
+              "source": {
+                "id": "skill.experiment.executable-shared-owner",
+                "sourcePath": "skills/shared-owner/SKILL.md",
+                "role": "skill"
+              },
+              "target": {
+                "id": "skills/shared-owner/scripts/direct-probe.py",
+                "sourcePath": "skills/shared-owner/scripts/direct-probe.py",
+                "role": "repository-script",
+                "scope": "skill-local",
+                "invokedBySkillCount": 1
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "evidenceIndex": 7,
+      "scannerFact": {
+        "provenance": "scanner-output",
+        "rawFindingReference": "evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json#/issues/7",
+        "nativeFinding": {
+          "id": "AS3",
+          "finding_id": "finding-a38d1913da4a48ddb76ccd55cf8aba5b",
+          "category": "Agent Snooping",
+          "pattern": "Skill Enumeration",
+          "severity": "MEDIUM",
+          "confidence": 0.8,
+          "location": {
+            "file": "scripts/shared-probe.py",
+            "start_line": 1,
+            "end_line": null
+          },
+          "finding": "skills/Example/SKILL.md",
+          "explanation": "Skill enumerates or reads other installed skills. Access to other skills' SKILL.md files or the skills directory reveals prompt instructions, capabilities, and secrets that should be invisible to peer skills.",
+          "remediation": "Remove all code or instructions that list or read other skills' files or directories. Skills should operate independently; cross-skill access is a privilege escalation.",
+          "code_snippet": "\"\"\"Inert scanner token: skills/Example/SKILL.md.\"\"\"\n\nfrom pathlib import Path\n",
+          "intent": null,
+          "tags": [
+            "Agent Snooping"
+          ]
+        }
+      },
+      "normalization": {
+        "provenance": "experiment-normalization",
+        "target": {
+          "status": "normalized",
+          "scannerPath": "scripts/shared-probe.py",
+          "repositoryRelativePath": "skills/shared-owner/scripts/shared-probe.py",
+          "explanation": "The scanner path was normalized relative to the recorded scan target."
+        },
+        "locationPrecision": "start-line-only"
+      },
+      "correlation": {
+        "provenance": "experiment-correlation",
+        "status": "correlated",
+        "reasonCode": "exact-repository-relative-path",
+        "explanation": "The normalized target exactly matches Renma asset sourcePath \"skills/shared-owner/scripts/shared-probe.py\".",
+        "asset": {
+          "id": "skills/shared-owner/scripts/shared-probe.py",
+          "kind": "script",
+          "sourcePath": "skills/shared-owner/scripts/shared-probe.py",
+          "contentHash": "sha256:95b376b07c5f190a362f38eca789a965fd25a5812f9d42806759a571a3393fcc",
+          "ownership": {
+            "declaredOwner": null,
+            "effectiveOwner": "experiment-maintainers",
+            "source": "inherited",
+            "inheritedFrom": {
+              "id": "skill.experiment.executable-shared-owner",
+              "sourcePath": "skills/shared-owner/SKILL.md"
+            }
+          }
+        },
+        "directSkillAssociations": [
+          {
+            "basis": "direct-owns-local-resource-edge",
+            "explanation": "A direct owns_local_resource catalog edge links the matched asset to this Skill.",
+            "skill": {
+              "id": "skill.experiment.executable-shared-owner",
+              "kind": "skill",
+              "sourcePath": "skills/shared-owner/SKILL.md",
+              "contentHash": "sha256:f57a2479e6903d9596880c77b43cf7a561c9e9df2baff543a7036b85ba0b38cf",
+              "ownership": {
+                "declaredOwner": "experiment-maintainers",
+                "effectiveOwner": "experiment-maintainers",
+                "source": "declared"
+              }
+            },
+            "relationship": {
+              "from": "skill.experiment.executable-shared-owner",
+              "to": "skills/shared-owner/scripts/shared-probe.py",
+              "kind": "owns_local_resource",
+              "sourcePath": "skills/shared-owner/SKILL.md"
+            }
+          }
+        ],
+        "relationships": [
+          {
+            "from": "skill.experiment.executable-shared-owner",
+            "to": "skills/shared-owner/scripts/shared-probe.py",
+            "kind": "owns_local_resource",
+            "sourcePath": "skills/shared-owner/SKILL.md"
+          },
+          {
+            "from": "skills/shared-owner/scripts/shared-probe.py",
+            "to": "skill.experiment.executable-shared-owner",
+            "kind": "inherits_owner",
+            "sourcePath": "skills/shared-owner/scripts/shared-probe.py"
+          },
+          {
+            "from": "skills/shared-owner/scripts/shared-probe.py",
+            "to": "skill.experiment.executable-shared-owner",
+            "kind": "inherits_policy",
+            "sourcePath": "skills/shared-owner/scripts/shared-probe.py"
+          }
+        ],
+        "candidates": []
+      },
+      "executableContext": {
+        "provenance": "experiment-executable-correlation",
+        "status": "correlated",
+        "reasonCode": "exact-executable-node-path",
+        "explanation": "The catalog asset exactly matches executable graph node sourcePath \"skills/shared-owner/scripts/shared-probe.py\"; only canonical incoming edges were projected.",
+        "node": {
+          "id": "skills/shared-owner/scripts/shared-probe.py",
+          "sourcePath": "skills/shared-owner/scripts/shared-probe.py",
+          "role": "repository-script",
+          "scope": "skill-local",
+          "invokedBySkillCount": 2
+        },
+        "candidates": [],
+        "invokedBySkillCountCheck": {
+          "reported": 2,
+          "observedDistinctDirectSkillInvokers": 2,
+          "agrees": true,
+          "usedToInferIdentities": false
+        },
+        "directSkillInvokers": [
+          {
+            "provenance": "experiment-executable-correlation",
+            "basis": "direct-skill-invokes-edge",
+            "explanation": "Included because this canonical incoming invokes edge starts at a Skill node.",
+            "edge": {
+              "from": "skill.experiment.executable-alpha",
+              "to": "skills/shared-owner/scripts/shared-probe.py",
+              "kind": "invokes",
+              "declaration": "executable-invocation",
+              "sourcePath": "skills/alpha/SKILL.md",
+              "resolved": true,
+              "targetId": "skills/shared-owner/scripts/shared-probe.py",
+              "targetKind": "script",
+              "targetPath": "skills/shared-owner/scripts/shared-probe.py",
+              "evidenceCount": 1
+            },
+            "direction": {
+              "source": {
+                "id": "skill.experiment.executable-alpha",
+                "sourcePath": "skills/alpha/SKILL.md",
+                "role": "skill"
+              },
+              "target": {
+                "id": "skills/shared-owner/scripts/shared-probe.py",
+                "sourcePath": "skills/shared-owner/scripts/shared-probe.py",
+                "role": "repository-script",
+                "scope": "skill-local",
+                "invokedBySkillCount": 2
+              }
+            }
+          },
+          {
+            "provenance": "experiment-executable-correlation",
+            "basis": "direct-skill-invokes-edge",
+            "explanation": "Included because this canonical incoming invokes edge starts at a Skill node.",
+            "edge": {
+              "from": "skill.experiment.executable-beta",
+              "to": "skills/shared-owner/scripts/shared-probe.py",
+              "kind": "invokes",
+              "declaration": "executable-invocation",
+              "sourcePath": "skills/beta/SKILL.md",
+              "resolved": true,
+              "targetId": "skills/shared-owner/scripts/shared-probe.py",
+              "targetKind": "script",
+              "targetPath": "skills/shared-owner/scripts/shared-probe.py",
+              "evidenceCount": 1
+            },
+            "direction": {
+              "source": {
+                "id": "skill.experiment.executable-beta",
+                "sourcePath": "skills/beta/SKILL.md",
+                "role": "skill"
+              },
+              "target": {
+                "id": "skills/shared-owner/scripts/shared-probe.py",
+                "sourcePath": "skills/shared-owner/scripts/shared-probe.py",
+                "role": "repository-script",
+                "scope": "skill-local",
+                "invokedBySkillCount": 2
+              }
+            }
+          }
+        ],
+        "directScriptInvokers": [],
+        "structuralContainers": [
+          {
+            "provenance": "experiment-executable-correlation",
+            "basis": "direct-structural-contains-edge",
+            "explanation": "Included because this canonical incoming contains edge starts at a Skill node; the original direction is retained.",
+            "edge": {
+              "from": "skill.experiment.executable-shared-owner",
+              "to": "skills/shared-owner/scripts/shared-probe.py",
+              "kind": "contains",
+              "declaration": "structural-skill-boundary",
+              "sourcePath": "skills/shared-owner/SKILL.md",
+              "resolved": true,
+              "targetId": "skills/shared-owner/scripts/shared-probe.py",
+              "targetKind": "script",
+              "targetPath": "skills/shared-owner/scripts/shared-probe.py"
+            },
+            "direction": {
+              "source": {
+                "id": "skill.experiment.executable-shared-owner",
+                "sourcePath": "skills/shared-owner/SKILL.md",
+                "role": "skill"
+              },
+              "target": {
+                "id": "skills/shared-owner/scripts/shared-probe.py",
+                "sourcePath": "skills/shared-owner/scripts/shared-probe.py",
+                "role": "repository-script",
+                "scope": "skill-local",
+                "invokedBySkillCount": 2
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
