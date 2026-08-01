@@ -93,13 +93,22 @@ export default defineConfig({
         ],
       },
       {
-        text: "Architecture And Direction",
+        text: "Development",
         items: [
           {
-            text: "Public Architecture (GitHub)",
-            link: `${repositoryUrl}/blob/main/architecture.md`,
+            text: "Public Architecture",
+            link: "/development/architecture",
           },
-          { text: "Internal Architecture", link: "/internal-architecture" },
+          {
+            text: "Internal Architecture",
+            link: "/development/internal-architecture",
+          },
+          { text: "Product Design", link: "/development/design" },
+          { text: "Current Roadmap", link: "/development/plan" },
+          {
+            text: "Skill Discovery Design",
+            link: "/development/plan-discovery",
+          },
           {
             text: "External Review Governance (Candidate)",
             link: "/external-review-governance",

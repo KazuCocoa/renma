@@ -111,8 +111,8 @@ input where documented, but canonical Skills are directory-based `SKILL.md`
 entrypoints under the supported Skill roots.
 
 The exact current fields, encodings, paths, and migration behavior belong in the
-[Agent Skills compatibility contract](docs/agent-skills-compatibility.md) and
-[Authoring Guide](docs/authoring-guide.md), not in a second list here.
+[Agent Skills compatibility contract](../agent-skills-compatibility.md) and
+[Authoring Guide](../authoring-guide.md), not in a second list here.
 
 Supported lifecycle states are:
 
@@ -147,9 +147,9 @@ The distinctions matter:
 
 The [Architecture](architecture.md) defines the active relationship vocabulary.
 Focused contracts define
-[Declared Composition](docs/declared-composition.md),
-[Declared Impact](docs/declared-impact.md), and
-[Skill Discovery](docs/skill-discovery.md).
+[Declared Composition](../declared-composition.md),
+[Declared Impact](../declared-impact.md), and
+[Skill Discovery](../skill-discovery.md).
 
 ## Determinism and Fail-Closed Behavior
 
@@ -181,7 +181,7 @@ Detection does not imply deterministic repair. Repeated-context evidence,
 ambiguous ownership, boundary changes, conflicts, and source-of-truth choices
 require repository investigation and human review.
 
-The [Diagnostics Reference](docs/diagnostics.md) owns Finding fields,
+The [Diagnostics Reference](../diagnostics.md) owns Finding fields,
 diagnostic IDs, evidence conventions, severity, risk classification, and repair
 constraints. Keeping the exact contract there avoids a second example or field
 list drifting in product design.
@@ -200,14 +200,14 @@ data, secrets, network, external-upload, or human-approval policy values.
 
 This scope complements rather than replaces full language parsing, SAST, secret
 scanning, dependency analysis, runtime controls, and human security review. See
-the [Security Policy](docs/security-policy.md).
+the [Security Policy](../security-policy.md).
 
 Renma may eventually govern external-review requirements and whether generated
 evidence is current, complete, and applicable. It does not become the external
 reviewer, reinterpret native findings, or treat an external report as proof of
 runtime behavior. Generated review evidence remains separate from authored
 repository metadata. See the candidate
-[External Review Governance](docs/external-review-governance.md) direction.
+[External Review Governance](../external-review-governance.md) direction.
 
 ## Authoring Guidance
 
@@ -240,7 +240,7 @@ Report families remain separate because they answer different questions:
 - Repository Context BOM v2 records declared repository evidence, not runtime
   consumption.
 
-Exact command usage belongs in the [User Manual](docs/user-manual.md). Exact
+Exact command usage belongs in the [User Manual](../user-manual.md). Exact
 schemas belong in their focused contract documents.
 
 ## Optional LLM Assistance

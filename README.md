@@ -257,11 +257,11 @@ a trust score.
 - [Skill Discovery](docs/skill-discovery.md)
 - [Repository Context BOM v2](docs/repository-context-bom.md)
 - [Trust Graph v2](docs/trust-graph.md)
-- [Public Architecture](architecture.md)
-- [Internal Architecture](docs/internal-architecture.md)
-- [Product Design](design.md)
+- [Public Architecture](docs/development/architecture.md)
+- [Internal Architecture](docs/development/internal-architecture.md)
+- [Product Design](docs/development/design.md)
 - [Changelog](CHANGELOG.md)
-- [Current Roadmap](https://github.com/KazuCocoa/renma/blob/main/plan.md)
+- [Current Roadmap](docs/development/plan.md)
 - [Examples](https://github.com/KazuCocoa/renma/tree/main/examples)
 
 ```text

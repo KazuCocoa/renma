@@ -118,8 +118,6 @@
     "docs",
     "!docs/public/branding",
     "!docs/.vitepress/",
-    "architecture.md",
-    "design.md",
     "CHANGELOG.md",
     "LICENSE",
     "README.md"

@@ -77,6 +77,8 @@ test("documentation Mermaid inventory remains covered", async () => {
       Array.from(inventory, ([file, sources]) => [file, sources.length]).sort(),
     ),
     {
+      "docs/development/architecture.md": 1,
+      "docs/development/design.md": 1,
       "docs/external-review-governance.md": 1,
       "docs/repository-context-bom.md": 1,
       "docs/user-manual.md": 2,

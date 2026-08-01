@@ -63,22 +63,22 @@ document.
   contains the machine-readable BOM v2 and Trust Graph v2 contracts shipped in
   the npm package.
 
-## Architecture, Design, Direction, And History
+## Development
 
-- [Public Architecture](https://github.com/KazuCocoa/renma/blob/main/architecture.md) owns the high-level layers, data
+- [Public Architecture](development/architecture.md) owns the high-level layers, data
   flow, stable product boundaries, and public contract surfaces.
-- [Internal Architecture](internal-architecture.md) owns module
+- [Internal Architecture](development/internal-architecture.md) owns module
   responsibilities, dependency direction, shared projections, compatibility
   facades, invariants, and implementation rationale.
-- [Product Design](https://github.com/KazuCocoa/renma/blob/main/design.md) owns durable product decisions and distinctions,
+- [Product Design](development/design.md) owns durable product decisions and distinctions,
   including capabilities intentionally outside Renma core.
 - [External Review Governance](external-review-governance.md) records a
   candidate design direction and SkillSpector experiment plan, not a current
   CLI, metadata, schema, or configuration contract.
-- [Current Roadmap](https://github.com/KazuCocoa/renma/blob/main/plan.md) owns
+- [Current Roadmap](development/plan.md) owns
   the current stabilization checkpoint, open candidates, deferred ecosystem
   concerns, and explicit non-commitments.
-- [Skill Discovery Design](https://github.com/KazuCocoa/renma/blob/main/plan-discovery.md)
+- [Skill Discovery Design](development/plan-discovery.md)
   records the durable rationale behind the current static Discovery boundary;
   the current operational contract remains in
   [Skill Discovery](skill-discovery.md).

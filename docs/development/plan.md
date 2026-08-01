@@ -18,8 +18,9 @@ LLM proposes. Renma verifies. Human approves.
 ```
 
 Current contracts live in [architecture.md](architecture.md),
-[design.md](design.md), and the [documentation index](docs/README.md).
-Historical release detail belongs only in [CHANGELOG.md](CHANGELOG.md).
+[design.md](design.md), and the [documentation index](../README.md).
+Historical release detail belongs only in
+[CHANGELOG.md](https://github.com/KazuCocoa/renma/blob/main/CHANGELOG.md).
 
 ## Stabilization Priorities
 
@@ -66,9 +67,9 @@ requirements and generated receipts without depending on or becoming an
 external reviewer. SkillSpector is the first evaluation producer, and current
 repository Skills plus separately classified example-repository probes are the
 initial corpus. The methodology lives in the
-[SkillSpector experiment](experiments/skillspector/README.md), and the durable
+[SkillSpector experiment](https://github.com/KazuCocoa/renma/blob/main/experiments/skillspector/README.md), and the durable
 boundary is in
-[External Review Governance](docs/external-review-governance.md).
+[External Review Governance](../external-review-governance.md).
 
 The candidate separates stable review requirements from generated receipts.
 Future `renma-<tool>-adapter` companion tools may parse supported published

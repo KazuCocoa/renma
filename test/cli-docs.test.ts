@@ -344,7 +344,7 @@ test("Context Lens docs use canonical Skill metadata and explicit semantic bound
 });
 
 test("current Skill Discovery docs preserve the static contract and boundaries", async () => {
-  const rationale = await readRepoFile("plan-discovery.md");
+  const rationale = await readRepoFile("docs/development/plan-discovery.md");
   const contract = await readRepoFile("docs/skill-discovery.md");
 
   assert.match(
@@ -413,9 +413,9 @@ test("workflow docs keep orchestration policy in normal owning Skills", async ()
 test("authoritative current documentation describes only BOM and Trust Graph v2", async () => {
   const documents = [
     "README.md",
-    "architecture.md",
-    "design.md",
-    "plan.md",
+    "docs/development/architecture.md",
+    "docs/development/design.md",
+    "docs/development/plan.md",
     "docs/repository-context-bom.md",
     "docs/trust-graph.md",
     "docs/README.md",
@@ -435,10 +435,10 @@ test("authoritative current documentation describes only BOM and Trust Graph v2"
 test("Mermaid documentation blocks have supported GitHub entry directives", async () => {
   const documents = [
     "README.md",
-    "architecture.md",
-    "design.md",
-    "plan.md",
-    "plan-discovery.md",
+    "docs/development/architecture.md",
+    "docs/development/design.md",
+    "docs/development/plan.md",
+    "docs/development/plan-discovery.md",
     ...(await markdownFilesUnder("docs")),
     ...(await markdownFilesUnder("examples")),
   ];

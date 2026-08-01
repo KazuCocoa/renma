@@ -43,7 +43,7 @@ The architecture has four durable stages:
 One command execution collects one immutable repository snapshot per repository
 state. Derived projections share that snapshot so a report cannot combine facts
 from different filesystem moments. The
-[internal architecture](docs/internal-architecture.md) owns module-level
+[internal architecture](internal-architecture.md) owns module-level
 dependency direction, projection preparation, and compatibility seams.
 
 ## Repository Roles
@@ -80,8 +80,8 @@ does not become shared merely because of its path: independent ownership,
 lifecycle, source-of-truth status, or demonstrated cross-Skill reuse establishes
 the Context boundary.
 
-See the [Agent Skills compatibility contract](docs/agent-skills-compatibility.md)
-and [Authoring Guide](docs/authoring-guide.md) for exact paths and metadata.
+See the [Agent Skills compatibility contract](../agent-skills-compatibility.md)
+and [Authoring Guide](../authoring-guide.md) for exact paths and metadata.
 
 ## Relationships
 
@@ -108,7 +108,7 @@ implementation and compatibility decision makes them operational.
 Skill Discovery continuation is another separate contract. The Discovery graph
 projects exact `renma.continues-with` declarations as `continues_with` edges;
 those edges do not enter `catalog.dependencies` or ordinary graph views. See the
-[Skill Discovery contract](docs/skill-discovery.md).
+[Skill Discovery contract](../skill-discovery.md).
 
 Declared targets resolve by exact stable asset ID or normalized
 repository-relative path. Renma does not use fuzzy matching, embeddings,
@@ -129,8 +129,8 @@ original declaration direction.
 Composition order is review order, not precedence or prose merge order. A
 complete closure may still contain a cycle, so completeness and cycle freedom
 remain separate facts. See the
-[Declared Composition contract](docs/declared-composition.md) and
-[Declared Impact contract](docs/declared-impact.md).
+[Declared Composition contract](../declared-composition.md) and
+[Declared Impact contract](../declared-impact.md).
 
 ## Deterministic Evidence
 
@@ -153,13 +153,13 @@ cite one authoritative source.
 
 Diagnostics are repair evidence, not automatic edits. Public Finding semantics,
 diagnostic IDs, classification fields, evidence conventions, and remediation
-constraints are defined in the [Diagnostics Reference](docs/diagnostics.md).
+constraints are defined in the [Diagnostics Reference](../diagnostics.md).
 
 ## Report Boundaries
 
 The command registry and generated help are the source of truth for command
 names, arguments, options, and defaults. The
-[User Manual](docs/user-manual.md) owns the current command reference; this
+[User Manual](../user-manual.md) owns the current command reference; this
 architecture document does not duplicate it.
 
 The main report families answer different questions:
@@ -180,10 +180,10 @@ presentation is not an extra field on every JSON catalog entry.
 
 Versioned schemas and their focused documents own exact JSON contracts:
 
-- [Repository Context BOM](docs/repository-context-bom.md)
-- [Trust Graph](docs/trust-graph.md)
-- [Skill Discovery](docs/skill-discovery.md)
-- [Diagnostics](docs/diagnostics.md)
+- [Repository Context BOM](../repository-context-bom.md)
+- [Trust Graph](../trust-graph.md)
+- [Skill Discovery](../skill-discovery.md)
+- [Diagnostics](../diagnostics.md)
 
 ## Security Boundary
 
@@ -195,7 +195,7 @@ destination analysis, policy inheritance, and conservative fallback.
 It is not complete shell or JavaScript parsing, cross-command or cross-file
 taint analysis, a secret scanner, dependency scanner, SAST engine, runtime
 policy enforcement, or a proof of safety. Unsupported syntax stays on the
-conservative path. See the [Security Policy](docs/security-policy.md).
+conservative path. See the [Security Policy](../security-policy.md).
 
 ## Optional LLM Assistance
 
@@ -226,7 +226,7 @@ outside Renma.
 External review receipts may eventually be validated against that same stable
 repository evidence. Review execution and provider-specific report parsing
 remain outside core. The candidate boundary and first experiment are described
-in [External Review Governance](docs/external-review-governance.md).
+in [External Review Governance](../external-review-governance.md).
 
 ## Change Discipline
 
@@ -235,7 +235,8 @@ documented deep imports, and compatibility re-exports are compatibility-sensitiv
 New projections should reuse the shared repository snapshot and remain additive
 unless a separately reviewed contract permits a breaking change.
 
-Release history belongs in [CHANGELOG.md](CHANGELOG.md). Current open candidates
+Release history belongs in
+[CHANGELOG.md](https://github.com/KazuCocoa/renma/blob/main/CHANGELOG.md). Current open candidates
 and explicit non-commitments belong in [plan.md](plan.md).
 
 ```text

@@ -8,10 +8,10 @@ severities, exit behavior, and migration direction must not change as an
 incidental effect of an internal refactor.
 
 The high-level product boundary remains in
-[Architecture](https://github.com/KazuCocoa/renma/blob/main/architecture.md).
+[Architecture](architecture.md).
 Stable classification and decision fields are documented in the
-[Diagnostics Reference](diagnostics.md), and the versioned BOM contract is in
-[Repository Context BOM](repository-context-bom.md).
+[Diagnostics Reference](../diagnostics.md), and the versioned BOM contract is in
+[Repository Context BOM](../repository-context-bom.md).
 
 ## Dependency Flow
 

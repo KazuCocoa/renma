@@ -172,7 +172,7 @@ try {
       modulePath,
       declarationPath,
     ]),
-    "docs/internal-architecture.md",
+    "docs/development/internal-architecture.md",
     "docs/trust-graph.md",
     "docs/schemas/repository-context-bom-v2.schema.json",
     "docs/schemas/trust-graph-v2.schema.json",
