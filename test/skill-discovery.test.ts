@@ -939,8 +939,7 @@ test("published boundary diagnostics preserve deterministic RN evidence order an
         DIAGNOSTIC_IDS.DISCOVERY_ENTRYPOINT_WITHOUT_USABLE_BOUNDARIES,
     );
     const linked = diagnostic?.details?.linkedDiagnostics as
-      | Array<{ code: string; evidence?: { startLine: number } }>
-      | undefined;
+      Array<{ code: string; evidence?: { startLine: number } }> | undefined;
 
     assert.ok(diagnostic, item.name);
     assert.deepEqual(

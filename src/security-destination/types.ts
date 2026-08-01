@@ -47,9 +47,7 @@ export type DestinationEvaluation =
   | {
       kind: "not-evaluated";
       reason:
-        | "unsupported-host"
-        | "unsupported-shell-syntax"
-        | "ambiguous-token";
+        "unsupported-host" | "unsupported-shell-syntax" | "ambiguous-token";
     };
 
 export type OperationalDestination = {

@@ -10,10 +10,7 @@ export const INITIAL_CONFIG_CONTENT = `{
 `;
 
 export type InitState =
-  | "created"
-  | "primary-existing"
-  | "legacy-existing"
-  | "conflicting";
+  "created" | "primary-existing" | "legacy-existing" | "conflicting";
 
 export interface InitResult {
   state: InitState;

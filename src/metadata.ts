@@ -75,11 +75,7 @@ const CANONICAL_LIST_KEYS = new Set<CanonicalSkillOperationalKey>([
 ]);
 
 export type CanonicalSkillContinuationFieldState =
-  | "unsupported"
-  | "absent"
-  | "ambiguous"
-  | "invalid"
-  | "valid";
+  "unsupported" | "absent" | "ambiguous" | "invalid" | "valid";
 
 export interface CanonicalSkillContinuationItem {
   declarationIndex: number;
@@ -99,11 +95,7 @@ export interface CanonicalSkillContinuationField {
 }
 
 export type CanonicalSkillPublicationFieldState =
-  | "unsupported"
-  | "absent"
-  | "ambiguous"
-  | "invalid"
-  | "valid";
+  "unsupported" | "absent" | "ambiguous" | "invalid" | "valid";
 
 /** Canonical publication marker evidence retained independently from eligibility. */
 export interface CanonicalSkillPublicationField {
@@ -739,8 +731,7 @@ export function parseCanonicalSkillPublicationField(
 }
 
 type ContinuationValueParseResult =
-  | { valid: true; items: string[] }
-  | { valid: false; reason: string };
+  { valid: true; items: string[] } | { valid: false; reason: string };
 
 function parseContinuationValue(value: unknown): ContinuationValueParseResult {
   if (typeof value !== "string") {

@@ -50,13 +50,10 @@ export const EXECUTABLE_SURFACE_INVENTORY_SCHEMA =
   "renma.executable-surface-inventory.v1" as const;
 
 export type ExecutableSurfaceOrigin =
-  | "discovered-script"
-  | "resolved-static-invocation";
+  "discovered-script" | "resolved-static-invocation";
 
 export type ExecutableSurfaceScope =
-  | "skill-local"
-  | "repository-tool"
-  | "noncanonical";
+  "skill-local" | "repository-tool" | "noncanonical";
 
 export interface ExecutableSurfaceSecurityPolicy {
   hasEffectivePolicy: boolean;
@@ -65,8 +62,7 @@ export interface ExecutableSurfaceSecurityPolicy {
 }
 
 export type ExecutableInvocationPolicyRelation =
-  | "source-artifact"
-  | "owning-skill";
+  "source-artifact" | "owning-skill";
 
 export interface ExecutableInvocationPolicyEvidence {
   relation: ExecutableInvocationPolicyRelation;
@@ -77,10 +73,7 @@ export interface ExecutableInvocationPolicyEvidence {
 }
 
 export type ExecutableInvocationOwningSkillResolution =
-  | "not-applicable"
-  | "resolved"
-  | "missing"
-  | "ambiguous";
+  "not-applicable" | "resolved" | "missing" | "ambiguous";
 
 export interface ExecutableInvocationGovernance {
   owningSkillResolution: ExecutableInvocationOwningSkillResolution;
@@ -97,9 +90,7 @@ export interface ExecutableSurfaceInvocationGovernanceSummary {
 }
 
 export type StaticInvocationReachability =
-  | "direct"
-  | "transitive"
-  | "unreached";
+  "direct" | "transitive" | "unreached";
 
 export interface ExecutableSurfaceDependencySummary {
   incomingResolvedDependencyCount: number;

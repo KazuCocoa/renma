@@ -52,8 +52,7 @@ export interface SkillLocalSuggestionDecisionInput {
 export interface UnsupportedTargetSuggestionDecisionInput {
   matchedRule: "repository-tool" | "unknown";
   boundaryReasonCode?:
-    | "repository-boundary-unresolved"
-    | "repository-boundary-ambiguous";
+    "repository-boundary-unresolved" | "repository-boundary-ambiguous";
 }
 
 export interface MetadataCandidateSuggestionDecisionInput {

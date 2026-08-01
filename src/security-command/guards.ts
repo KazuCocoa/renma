@@ -1,10 +1,7 @@
 import type { SecurityGuardEvidence } from "../markdown-security-view.js";
 
 export type DisclosureActionKind =
-  | "stdout-or-log"
-  | "prompt-or-context"
-  | "external-upload"
-  | "network";
+  "stdout-or-log" | "prompt-or-context" | "external-upload" | "network";
 
 export type DisclosureAction = {
   action: string;

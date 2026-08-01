@@ -2,10 +2,7 @@ import type { ArtifactKind } from "./artifact.js";
 
 /** Repository governance boundary determined from a normalized asset path. */
 export type AssetScope =
-  | "independent"
-  | "skill-local"
-  | "repository-support"
-  | "unknown";
+  "independent" | "skill-local" | "repository-support" | "unknown";
 
 /** Stable registry of deterministic asset-classification rules. */
 export const ASSET_CLASSIFICATION_RULES = [
@@ -46,10 +43,7 @@ export type AssetClassificationReasonCode =
 
 /** Resolution state for the structurally implied parent of Skill-local support. */
 export type ParentAssetResolution =
-  | "structural-candidate"
-  | "resolved"
-  | "missing"
-  | "ambiguous";
+  "structural-candidate" | "resolved" | "missing" | "ambiguous";
 
 /** Stable negative evidence for a nearby classification rule. */
 export interface AssetCompetingRuleEvidence {

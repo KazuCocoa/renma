@@ -88,8 +88,7 @@ export interface DiffReport {
 
 export type DiffReportWithoutSkillDiscovery = Omit<DiffReport, "discovery">;
 export type DiffReportFormatInput =
-  | DiffReport
-  | DiffReportWithoutSkillDiscovery;
+  DiffReport | DiffReportWithoutSkillDiscovery;
 
 export interface DiffOwnershipEndpoint {
   ownedAssets: number;
@@ -256,9 +255,7 @@ async function executeDiffWithProjection(
   const relativeTarget = pathWithinRepo(repoRoot, absoluteTarget);
   const tempRoot = await mkdtemp(join(tmpdir(), "renma-diff-"));
   let result:
-    | DiffExecutionContext
-    | DiffReportWithoutSkillDiscovery
-    | undefined;
+    DiffExecutionContext | DiffReportWithoutSkillDiscovery | undefined;
   let primaryError: unknown;
 
   try {

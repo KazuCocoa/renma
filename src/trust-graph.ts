@@ -45,8 +45,7 @@ export type TrustGraphEdgeType =
 
 export type TrustGraphFindingSource = "finding" | "diagnostic";
 export type TrustGraphFindingSeverity =
-  | Finding["severity"]
-  | Diagnostic["severity"];
+  Finding["severity"] | Diagnostic["severity"];
 
 export interface TrustGraphSummary {
   assetCount: number;

@@ -968,8 +968,7 @@ interface SecurityLineContext {
   readonly lineSecurityAnalysis: () => SecurityCommandAnalysis;
   readonly lineDestinationAnalysis: () => DestinationAnalysis;
   readonly paragraphClauseDestinationAnalysis: () =>
-    | DestinationAnalysis
-    | undefined;
+    DestinationAnalysis | undefined;
 }
 
 const paragraphClauseDestinationAnalysisCache = new WeakMap<
@@ -1509,8 +1508,7 @@ function prepareSecurityLineContext(
     return lineSecurityAnalysis().destinationAnalysis;
   };
   const paragraphClauseDestinationAnalysis = ():
-    | DestinationAnalysis
-    | undefined => {
+    DestinationAnalysis | undefined => {
     return securityParagraphContext === undefined
       ? undefined
       : cachedParagraphClauseDestinationAnalysis(securityParagraphContext);

@@ -57,10 +57,7 @@ import {
 
 export type GraphFormat = "json" | "markdown" | "mermaid";
 export type GraphEdgeKind =
-  | DependencyKind
-  | "continues_with"
-  | "invokes"
-  | "contains";
+  DependencyKind | "continues_with" | "invokes" | "contains";
 export type GraphView =
   | "summary"
   | "workflow"
@@ -72,9 +69,7 @@ export type GraphView =
   | "executable";
 
 export type ExecutableGraphNodeRole =
-  | "skill"
-  | "repository-script"
-  | "external-executable";
+  "skill" | "repository-script" | "external-executable";
 
 export interface ExecutableGraphProjection {
   focus?: {
@@ -304,21 +299,19 @@ function discoveryGraphReport(
         route.representative &&
         route.resolvedTarget?.kind === "skill",
     )
-    .map(
-      (route): GraphEdge => ({
-        from: route.sourceId,
-        to: route.normalizedTarget,
-        kind: "continues_with",
-        declaration: "metadata.renma.continues-with",
-        declarationIndex: route.declarationIndex,
-        sourcePath: route.sourcePath,
-        evidence: route.evidence,
-        resolved: true,
-        targetId: route.resolvedTarget!.id,
-        targetKind: "skill",
-        targetPath: route.resolvedTarget!.sourcePath,
-      }),
-    );
+    .map((route): GraphEdge => ({
+      from: route.sourceId,
+      to: route.normalizedTarget,
+      kind: "continues_with",
+      declaration: "metadata.renma.continues-with",
+      declarationIndex: route.declarationIndex,
+      sourcePath: route.sourcePath,
+      evidence: route.evidence,
+      resolved: true,
+      targetId: route.resolvedTarget!.id,
+      targetKind: "skill",
+      targetPath: route.resolvedTarget!.sourcePath,
+    }));
   return {
     ...report,
     view: "discovery",

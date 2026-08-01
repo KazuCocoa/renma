@@ -55,21 +55,12 @@ interface SharedSubjectRegressionCase {
 
 interface ModifiedSharedSubjectRegressionCase extends SharedSubjectRegressionCase {
   readonly connector:
-    | " and also "
-    | ", and also "
-    | " and still "
-    | ", "
-    | " and therefore ";
+    " and also " | ", and also " | " and still " | ", " | " and therefore ";
 }
 
 interface ContrastiveSharedSubjectRegressionCase extends SharedSubjectRegressionCase {
   readonly connector:
-    | " but "
-    | ", but "
-    | " yet "
-    | ", yet "
-    | " however, "
-    | "; however, ";
+    " but " | ", but " | " yet " | ", yet " | " however, " | "; however, ";
   readonly laterSubject: "" | "it ";
 }
 

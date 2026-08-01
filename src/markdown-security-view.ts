@@ -44,13 +44,7 @@ export type SecurityGuardEvidence = MarkdownSourceRange & {
 type PositionedNode = Nodes;
 type NodeRecord = MarkdownNodeRecord;
 type SecurityNode =
-  | Blockquote
-  | Code
-  | Heading
-  | Html
-  | InlineCode
-  | Paragraph
-  | ThematicBreak;
+  Blockquote | Code | Heading | Html | InlineCode | Paragraph | ThematicBreak;
 type RecordForNode<T extends Nodes> = T extends Nodes
   ? NodeRecord & { node: T }
   : never;

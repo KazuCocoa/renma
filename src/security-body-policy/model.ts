@@ -16,17 +16,10 @@ export const BODY_POLICY_DOMAIN_ORDER = Object.freeze([
 export type BodyPolicyDomain = (typeof BODY_POLICY_DOMAIN_ORDER)[number];
 
 export type BodyPolicyModality =
-  | "prohibited"
-  | "not-required"
-  | "local-safeguard"
-  | "unknown";
+  "prohibited" | "not-required" | "local-safeguard" | "unknown";
 
 export type BodyPolicyScope =
-  | "workflow"
-  | "local-step"
-  | "specific-target"
-  | "specific-source"
-  | "unknown";
+  "workflow" | "local-step" | "specific-target" | "specific-source" | "unknown";
 
 export type BodyPolicyCompleteness = "complete" | "unsupported-remainder";
 
@@ -176,9 +169,7 @@ export interface StatementGroup {
 }
 
 export type SubjectRelationship =
-  | "subject-relative"
-  | "object-relative"
-  | "unsupported";
+  "subject-relative" | "object-relative" | "unsupported";
 
 export interface RelativePredicateComponent {
   readonly relationship: SubjectRelationship;

@@ -327,8 +327,7 @@ export function recognizeModalNegation(
 ): ModalNegationSyntax | undefined {
   const match = MODAL_NEGATION_RE.exec(text);
   const word = match?.groups?.modal?.toLowerCase() as
-    | ModalNegationWord
-    | undefined;
+    ModalNegationWord | undefined;
   if (word === undefined) return undefined;
   const after = match?.groups?.after?.trimStart() ?? "";
   const form: ModalNegationForm =
