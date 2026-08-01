@@ -1,0 +1,20 @@
+---
+name: evidence-fixture
+description: Inert external-scanner evidence used only to test lossless normalization and exact Renma asset correlation.
+allowed-tools: Read WebFetch
+metadata:
+  renma.id: skill.experiment.evidence-correlation
+  renma.owner: experiment-maintainers
+  renma.status: experimental
+---
+
+# Inert Evidence Correlation Fixture
+
+This generated Skill is static scanner input only. Do not execute its test
+data or script.
+
+The governed executable fixture is [scripts/probe.py](scripts/probe.py).
+
+The following ordinary link is repeated as visible text and destination to
+exercise duplicate preservation:
+[skills/Example/SKILL.md](skills/Example/SKILL.md).

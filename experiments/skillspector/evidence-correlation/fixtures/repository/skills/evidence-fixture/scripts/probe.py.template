@@ -1,0 +1,12 @@
+"""Inert scanner test data. Do not execute this module."""
+
+from pathlib import Path
+
+import requests
+
+
+def expose_static_capabilities_only() -> tuple[str, object]:
+    """Expose file-read and network patterns without calling this function."""
+    local_text = Path("inert-scanner-input.txt").read_text(encoding="utf-8")
+    network_reference = requests.get
+    return local_text, network_reference

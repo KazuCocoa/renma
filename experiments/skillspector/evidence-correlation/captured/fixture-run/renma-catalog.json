@@ -1,0 +1,238 @@
+{
+  "root": "/Users/kazu/github/renma/experiments/skillspector/generated/evidence-correlation/repository",
+  "configPath": "renma.config.json",
+  "scannedFileCount": 2,
+  "catalog": {
+    "entries": [
+      {
+        "id": "skill.experiment.evidence-correlation",
+        "sourcePath": "skills/evidence-fixture/SKILL.md",
+        "contentHash": "sha256:1ab74c950d09dc46aff12649e6bf66514998c24aa91edf3aa13a0e413e9db99a",
+        "sizeBytes": 673,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "experiment-maintainers",
+          "effectiveOwner": "experiment-maintainers",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "skill.experiment.evidence-correlation",
+          "owner": "experiment-maintainers",
+          "status": "experimental"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "skills/evidence-fixture/SKILL.md",
+            "key": "renma.id",
+            "startLine": 6,
+            "endLine": 6,
+            "raw": "  renma.id: skill.experiment.evidence-correlation"
+          },
+          "owner": {
+            "path": "skills/evidence-fixture/SKILL.md",
+            "key": "renma.owner",
+            "startLine": 7,
+            "endLine": 7,
+            "raw": "  renma.owner: experiment-maintainers"
+          },
+          "status": {
+            "path": "skills/evidence-fixture/SKILL.md",
+            "key": "renma.status",
+            "startLine": 8,
+            "endLine": 8,
+            "raw": "  renma.status: experimental"
+          }
+        },
+        "metadataListItems": {
+          "id": [],
+          "owner": [],
+          "status": []
+        },
+        "kind": "skill",
+        "requiredContext": [],
+        "optionalContext": [],
+        "requiredLens": [],
+        "optionalLens": [],
+        "conflicts": []
+      },
+      {
+        "id": "skills/evidence-fixture/scripts/probe.py",
+        "sourcePath": "skills/evidence-fixture/scripts/probe.py",
+        "contentHash": "sha256:3104627512b546e4edb5870a632a929f9e1549c390666bd4db91eed6d096d9ae",
+        "sizeBytes": 399,
+        "contentClassification": "text",
+        "markdownParserEligible": false,
+        "ownership": {
+          "declaredOwner": null,
+          "effectiveOwner": "experiment-maintainers",
+          "source": "inherited",
+          "inheritedFrom": {
+            "id": "skill.experiment.evidence-correlation",
+            "sourcePath": "skills/evidence-fixture/SKILL.md"
+          }
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": []
+        },
+        "metadataFields": {},
+        "metadataListItems": {},
+        "kind": "script"
+      }
+    ],
+    "assets": [
+      {
+        "id": "skill.experiment.evidence-correlation",
+        "sourcePath": "skills/evidence-fixture/SKILL.md",
+        "contentHash": "sha256:1ab74c950d09dc46aff12649e6bf66514998c24aa91edf3aa13a0e413e9db99a",
+        "sizeBytes": 673,
+        "contentClassification": "text",
+        "markdownParserEligible": true,
+        "ownership": {
+          "declaredOwner": "experiment-maintainers",
+          "effectiveOwner": "experiment-maintainers",
+          "source": "declared"
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": [],
+          "id": "skill.experiment.evidence-correlation",
+          "owner": "experiment-maintainers",
+          "status": "experimental"
+        },
+        "metadataFields": {
+          "id": {
+            "path": "skills/evidence-fixture/SKILL.md",
+            "key": "renma.id",
+            "startLine": 6,
+            "endLine": 6,
+            "raw": "  renma.id: skill.experiment.evidence-correlation"
+          },
+          "owner": {
+            "path": "skills/evidence-fixture/SKILL.md",
+            "key": "renma.owner",
+            "startLine": 7,
+            "endLine": 7,
+            "raw": "  renma.owner: experiment-maintainers"
+          },
+          "status": {
+            "path": "skills/evidence-fixture/SKILL.md",
+            "key": "renma.status",
+            "startLine": 8,
+            "endLine": 8,
+            "raw": "  renma.status: experimental"
+          }
+        },
+        "metadataListItems": {
+          "id": [],
+          "owner": [],
+          "status": []
+        },
+        "kind": "skill",
+        "requiredContext": [],
+        "optionalContext": [],
+        "requiredLens": [],
+        "optionalLens": [],
+        "conflicts": []
+      },
+      {
+        "id": "skills/evidence-fixture/scripts/probe.py",
+        "sourcePath": "skills/evidence-fixture/scripts/probe.py",
+        "contentHash": "sha256:3104627512b546e4edb5870a632a929f9e1549c390666bd4db91eed6d096d9ae",
+        "sizeBytes": 399,
+        "contentClassification": "text",
+        "markdownParserEligible": false,
+        "ownership": {
+          "declaredOwner": null,
+          "effectiveOwner": "experiment-maintainers",
+          "source": "inherited",
+          "inheritedFrom": {
+            "id": "skill.experiment.evidence-correlation",
+            "sourcePath": "skills/evidence-fixture/SKILL.md"
+          }
+        },
+        "metadata": {
+          "tags": [],
+          "whenToUse": [],
+          "whenNotToUse": [],
+          "requiresContext": [],
+          "optionalContext": [],
+          "conflicts": [],
+          "supersededBy": []
+        },
+        "metadataFields": {},
+        "metadataListItems": {},
+        "kind": "script"
+      }
+    ],
+    "dependencies": [
+      {
+        "from": "skill.experiment.evidence-correlation",
+        "to": "skills/evidence-fixture/scripts/probe.py",
+        "kind": "owns_local_resource",
+        "sourcePath": "skills/evidence-fixture/SKILL.md"
+      },
+      {
+        "from": "skill.experiment.evidence-correlation",
+        "to": "skills/evidence-fixture/scripts/probe.py",
+        "kind": "statically_references",
+        "sourcePath": "skills/evidence-fixture/SKILL.md",
+        "evidence": {
+          "path": "skills/evidence-fixture/SKILL.md",
+          "startLine": 16,
+          "endLine": 16,
+          "snippet": "[scripts/probe.py](scripts/probe.py)"
+        }
+      },
+      {
+        "from": "skills/evidence-fixture/scripts/probe.py",
+        "to": "skill.experiment.evidence-correlation",
+        "kind": "inherits_owner",
+        "sourcePath": "skills/evidence-fixture/scripts/probe.py"
+      },
+      {
+        "from": "skills/evidence-fixture/scripts/probe.py",
+        "to": "skill.experiment.evidence-correlation",
+        "kind": "inherits_policy",
+        "sourcePath": "skills/evidence-fixture/scripts/probe.py"
+      }
+    ]
+  },
+  "contextLens": {
+    "enabled": true,
+    "detected": false,
+    "totalLensCount": 0,
+    "validLensCount": 0,
+    "invalidLensCount": 0,
+    "diagnosticCounts": {
+      "error": 0,
+      "warning": 0,
+      "info": 0
+    },
+    "definitionPaths": [],
+    "targetReferences": [],
+    "targetPaths": [],
+    "unresolvedTargetReferences": [],
+    "scopeSummary": [],
+    "lenses": []
+  },
+  "diagnostics": []
+}
