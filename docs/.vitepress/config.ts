@@ -1,5 +1,7 @@
 import { defineConfig } from "vitepress";
 
+import { configureMermaidMarkdown } from "./mermaid.js";
+
 const repositoryUrl = "https://github.com/KazuCocoa/renma";
 const base = "/renma/";
 
@@ -18,6 +20,9 @@ export default defineConfig({
       },
     ],
   ],
+  markdown: {
+    config: configureMermaidMarkdown,
+  },
   themeConfig: {
     logo: {
       src: "/branding/renma-icon.png",

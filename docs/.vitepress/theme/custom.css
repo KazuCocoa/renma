@@ -1,0 +1,50 @@
+.mermaid-container {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  overflow-x: auto;
+  color: #1f2937;
+  background: #f8f8f8;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+}
+
+.mermaid-container .mermaid {
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  color: inherit;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  white-space: pre;
+  background: transparent;
+}
+
+.mermaid-container svg {
+  display: block;
+  height: auto;
+  max-width: none;
+  margin-inline: auto;
+  overflow: visible;
+}
+
+.mermaid-container.mermaid-render-error {
+  background: #fff8f2;
+  border-color: #c9824a;
+}
+
+.mermaid-container.mermaid-render-error .mermaid {
+  color: #7c2d12;
+}
+
+.dark .mermaid-container {
+  color: #1f2937;
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.dark .mermaid-container.mermaid-render-error {
+  color: #7c2d12;
+  background: #fff8f2;
+  border-color: #c9824a;
+}
