@@ -4,6 +4,7 @@ import { configureMermaidMarkdown } from "./mermaid.js";
 
 const repositoryUrl = "https://github.com/KazuCocoa/renma";
 const base = "/renma/";
+const cloudflareWebAnalyticsToken = "f11a01438b294ad2a0b56b3e8f607312";
 
 export default defineConfig({
   title: "Renma",
@@ -17,6 +18,16 @@ export default defineConfig({
         rel: "icon",
         type: "image/png",
         href: `${base}branding/favicon.png`,
+      },
+    ],
+    [
+      "script",
+      {
+        defer: "",
+        src: "https://static.cloudflareinsights.com/beacon.min.js",
+        "data-cf-beacon": JSON.stringify({
+          token: cloudflareWebAnalyticsToken,
+        }),
       },
     ],
   ],
