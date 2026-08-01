@@ -1,0 +1,47 @@
+# Renma
+
+Renma is a Git-native Context Repository and deterministic governance CLI for
+agent-facing knowledge. It keeps Skills, Context Assets, Context Lenses,
+ownership, lifecycle, relationships, security policy, and review evidence
+maintainable in Git without becoming an agent runtime.
+
+## Why A Context Repository?
+
+Agent-facing guidance is often copied across Skills, prompts, and repository
+instructions until its authority, owner, and lifecycle are unclear. A Context
+Repository gives reusable knowledge a Git-reviewed source of truth with stable
+identity and explicit relationships.
+
+## Product Boundary
+
+Renma discovers, validates, compares, and reports repository assets. It does
+not call an LLM for core analysis, assemble prompts, select live context,
+execute agents or Skills, or replace runtime security and language-specific
+analysis tools.
+
+The review boundary is:
+
+```text
+LLM proposes. Renma verifies. Human approves.
+```
+
+## Quick Start
+
+```bash
+npx renma scan . --fail-on high
+npx renma catalog . --format markdown
+npx renma graph . --format markdown
+npx renma readiness . --format markdown
+```
+
+## Read Next
+
+- [Documentation Index](README.md) maps each question to its authoritative
+  document.
+- [User Manual](user-manual.md) covers current CLI workflows and commands.
+- [Authoring Guide](authoring-guide.md) defines Skill and Context authoring
+  workflows.
+- [Agent Skills Compatibility and Migration](agent-skills-compatibility.md)
+  defines canonical and migration-only Skill forms.
+- [Diagnostics Reference](diagnostics.md) and
+  [Security Policy Guide](security-policy.md) explain findings and policy.

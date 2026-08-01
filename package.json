@@ -129,6 +129,9 @@
     "clean": "node -e \"const fs=require('node:fs'); for (const dir of ['dist','dist-test']) fs.rmSync(dir,{recursive:true,force:true});\"",
     "clean:test": "node -e \"require('node:fs').rmSync('dist-test',{recursive:true,force:true});\"",
     "build": "npm run clean && tsc -p tsconfig.json",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "test": "npm run clean:test && tsc -p tsconfig.test.json && node --test dist-test/test/*.test.js",
     "format": "prettier --write \"**/*.{ts,js,mjs,json}\"",
@@ -151,7 +154,8 @@
     "fast-check": "^4.9.0",
     "prettier": "^3.5.3",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.61.0"
+    "typescript-eslint": "^8.61.0",
+    "vitepress": "^1.6.4"
   },
   "dependencies": {
     "mdast-util-from-markdown": "^2.0.3",

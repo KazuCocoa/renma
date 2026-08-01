@@ -6,7 +6,7 @@ document.
 
 ## Start Here
 
-- [README](../README.md) is the product entrypoint: what Renma is, why a
+- [README](https://github.com/KazuCocoa/renma/blob/main/README.md) is the product entrypoint: what Renma is, why a
   Context Repository exists, the primary product boundary, installation, first
   use, and a short command overview.
 - [User Manual](user-manual.md) is authoritative for current CLI workflows,
@@ -59,17 +59,18 @@ document.
   and the declared-manifest boundary.
 - [Trust Graph v2](trust-graph.md) defines `renma.trustGraph.v2`, node and edge
   provenance, ordering, and the distinction between evidence and a trust score.
-- [Published JSON Schemas](schemas/) contains the machine-readable BOM v2 and
-  Trust Graph v2 contracts shipped in the npm package.
+- [Published JSON Schemas](https://github.com/KazuCocoa/renma/tree/main/docs/schemas)
+  contains the machine-readable BOM v2 and Trust Graph v2 contracts shipped in
+  the npm package.
 
 ## Architecture, Design, Direction, And History
 
-- [Public Architecture](../architecture.md) owns the high-level layers, data
+- [Public Architecture](https://github.com/KazuCocoa/renma/blob/main/architecture.md) owns the high-level layers, data
   flow, stable product boundaries, and public contract surfaces.
 - [Internal Architecture](internal-architecture.md) owns module
   responsibilities, dependency direction, shared projections, compatibility
   facades, invariants, and implementation rationale.
-- [Product Design](../design.md) owns durable product decisions and distinctions,
+- [Product Design](https://github.com/KazuCocoa/renma/blob/main/design.md) owns durable product decisions and distinctions,
   including capabilities intentionally outside Renma core.
 - [External Review Governance](external-review-governance.md) records a
   candidate design direction and SkillSpector experiment plan, not a current
@@ -81,7 +82,7 @@ document.
   records the durable rationale behind the current static Discovery boundary;
   the current operational contract remains in
   [Skill Discovery](skill-discovery.md).
-- [Changelog](../CHANGELOG.md) owns chronological release history,
+- [Changelog](https://github.com/KazuCocoa/renma/blob/main/CHANGELOG.md) owns chronological release history,
   version-specific changes, and compatibility notes.
 
 ## Examples
@@ -93,3 +94,14 @@ contents:
 - [Example Context Repository](https://github.com/KazuCocoa/renma/tree/main/examples/context-repo)
 - [Context Lens](https://github.com/KazuCocoa/renma/tree/main/examples/context-lens)
 - [GitHub Actions](https://github.com/KazuCocoa/renma/blob/main/examples/github-actions/renma-ci-report.yml)
+
+## Maintaining The Documentation Site
+
+The Markdown in this directory remains the documentation source of truth. Run
+the site locally from the repository root:
+
+```bash
+npm run docs:dev
+npm run docs:build
+npm run docs:preview
+```
