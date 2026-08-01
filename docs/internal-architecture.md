@@ -655,16 +655,10 @@ map lookups into those buckets, so it does not repeatedly scan the complete
 dependency or diagnostic arrays. Bucket accumulation preserves resolved and
 unresolved semantics, duplicates, and array order.
 
-ESLint uses both `tsconfig.json` and `tsconfig.test.json` for typed source and
-test linting. `no-floating-promises`, `no-misused-promises`, and
-`switch-exhaustiveness-check` are enforced. Calls registering tests with
-`node:test` are narrowly marked as known-safe floating calls because the test
-runner owns their returned promises. `no-unnecessary-condition` was evaluated
-but is intentionally deferred: assertion-based narrowing in tests and
-fail-closed defensive recovery in parsers and security analysis produce broad
-false-positive noise, and adopting it now would require a large unrelated
-rewrite. It should be reconsidered only with a scoped assertion/recovery policy,
-not blanket inline suppressions.
+TypeScript source and tests are checked by the TypeScript compiler. ESLint is
+limited to the JavaScript configuration and tooling files so the project can
+use the native TypeScript 7 compiler without retaining the TypeScript 6 compiler
+API required by `typescript-eslint`.
 
 Filesystem-backed tests can use `test/repository-fixture.ts` to create and
 clean up isolated repositories, write config and arbitrary files, create
