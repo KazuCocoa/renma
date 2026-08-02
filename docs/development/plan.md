@@ -17,9 +17,11 @@ dependencies, or broaden Renma into a runtime, package resolver, or general
 language SAST system.
 
 The documentation site, visual identity, and package homepage are now shipped.
-The SkillSpector work remains an isolated evidence-correlation experiment; it
-has not added a Renma command, diagnostic, readiness rule, CI policy, runtime
-dependency, or public receipt schema.
+The external-review research sequence is complete at the two-producer concept
+stage. SkillSpector evidence correlation, Cisco Skill Scanner evaluation, and
+the deliberately unstable receipt concept remain isolated experiments. They
+have not added a Renma command, diagnostic, Readiness rule, CI policy, runtime
+dependency, adapter, metadata field, or public receipt schema.
 
 The product boundary remains:
 
@@ -76,39 +78,54 @@ None is a commitment. A candidate becomes product work only after its user
 problem, deterministic inputs, output contract, compatibility effect, and
 non-goals are reviewed.
 
-### External review governance experiment
+### External review governance research status
 
-This unassigned candidate evaluates whether Renma can govern external-review
-requirements and generated receipts without depending on or becoming an
-external reviewer. SkillSpector is the first evaluation producer. The
-experiment now preserves scanner-native facts, correlates exact source paths
-with Renma catalog assets, validates one audited fixture capture, and compares
-exact scanner file evidence with the public executable graph. Invocation,
-containment, ownership, reachability, reviewed scope, producer completeness,
-and runtime impact remain distinct claims. The methodology lives in the
-[SkillSpector experiment](https://github.com/KazuCocoa/renma/blob/main/experiments/skillspector/README.md), and the durable
-boundary is in
+The non-production research sequence is complete for two producers. The
+[SkillSpector evidence-correlation experiment](https://github.com/KazuCocoa/renma/tree/main/experiments/skillspector/evidence-correlation)
+preserved scanner-native facts and correlated exact source paths with Renma
+catalog assets. Its executable-relationship extension kept invocation and
+containment evidence separate from scanner-reviewed scope. The
+[Cisco evaluation](https://github.com/KazuCocoa/renma/tree/main/experiments/cisco-skill-scanner)
+then evaluated a second producer, not a second adapter. Finally, the
+[external-review receipt concept](https://github.com/KazuCocoa/renma/tree/main/experiments/external-review-receipt-concept)
+tested a deliberately unstable projection across both producers without
+creating a production contract.
+
+The completed experiment resolves the former second-producer decision gate.
+Common conceptual dimensions are useful across both producers, including
+provenance, subject and reviewed-scope binding, execution, profile or policy
+identity, completeness and limitations, native findings and assessment,
+artifact integrity, freshness, and requirement satisfaction. Common questions
+do not make producer-native findings, severities, scores, or assessments
+interchangeable. Exact report digests are useful only for artifact integrity;
+they do not establish semantic identity, reviewed scope, content binding, or
+safety. Unavailable and contradictory evidence must remain first-class rather
+than being repaired through normalization.
+
+This result does not justify a production receipt, parser, adapter, public
+schema, generic framework, Renma metadata field, or runtime behavior.
+Production implementation remains blocked by untrustworthy or unversioned
+producer output contracts, incomplete exact reviewed-scope binding, missing
+component-content evidence, insufficient serialized completeness and
+limitations evidence, and the absence of an independently designed, named,
+digest-bound Renma required review profile. Additional projection-shaping
+experiments are paused.
+
+Revisit this candidate only when at least one bounded condition materially
+changes the available evidence:
+
+- a producer publishes a trustworthy, versioned report contract;
+- complete reviewed-component identity or content binding becomes available;
+- serialized completeness and limitation evidence materially improves;
+- Renma independently designs a required review profile; or
+- a third producer exposes a genuinely new evidence shape.
+
+External reviewers continue to own native inspection, findings, and
+assessment. A future separately installed adapter may preserve and bind
+published evidence if the necessary contracts become available. Renma core
+does not run scanners, load adapters, translate native findings, or infer
+safety. The durable boundary and experiment conclusions are recorded in
 [External Review Governance](../external-review-governance.md).
-
-The candidate separates stable review requirements from generated receipts.
-Future `renma-<tool>-adapter` companion tools may parse supported published
-reports and bind them to public Renma repository evidence. Renma core would not
-load those adapters or depend on the producers. There is no commitment yet to a
-public receipt schema, metadata field, CLI, configuration field, adapter
-package, or release.
-
-The experimental projection remains `renma.experiment.skillspector-evidence.v0`
-with no compatibility promise. Evidence is still required before product
-implementation. Remaining decision gates include:
-
-- published output can be parsed reliably;
-- producer version and actual execution mode are available;
-- completeness, skipped work, and limitations are visible;
-- the logical subject and exact reviewed component scope can be bound to stable
-  repository evidence;
-- false-positive and suppression behavior is understood;
-- raw evidence can remain separate from Renma findings;
-- a provider-neutral core remains useful for a second producer.
 
 ## Adjacent or External Capabilities
 
