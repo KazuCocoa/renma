@@ -1,0 +1,573 @@
+{
+  "concept": {
+    "label": "renma.experiment.external-review-receipt-concept.v0",
+    "stability": "deliberately-unstable-no-compatibility-promise",
+    "kind": "experiment-only-conceptual-projection",
+    "stateVocabulary": [
+      "known",
+      "unknown",
+      "unavailable",
+      "unsupported",
+      "contradictory",
+      "invalid"
+    ],
+    "nonContract": [
+      "not a public schema or exported type",
+      "not an adapter or parser contract",
+      "not a compatibility promise",
+      "not a Renma command or runtime input",
+      "not review-requirement metadata",
+      "not a safety, freshness, completeness, or requirement verdict"
+    ]
+  },
+  "sourceRegistry": {
+    "concept-boundary": {
+      "originClass": "experiment-only-interpretation",
+      "path": "experiments/external-review-receipt-concept/README.md"
+    },
+    "skillspector-native-json": {
+      "originClass": "native-producer-report",
+      "path": "experiments/skillspector/evidence-correlation/executable-context/captured/fixture-run/skillspector-report.json",
+      "sha256": "sha256:d1dcb58b05bdf5dac3aae6f1c7a71f01b3e1e5a63be68a3330cc493edab67569"
+    },
+    "skillspector-invocation": {
+      "originClass": "process-or-invocation-observation",
+      "path": "experiments/skillspector/evidence-correlation/executable-context/captured/fixture-run/invocation.json",
+      "sha256": "sha256:ee53c810bef368ab8101a06652a2f352afa60240e69a08662bc81a6555e63707"
+    },
+    "skillspector-renma-catalog": {
+      "originClass": "renma-catalog-evidence",
+      "path": "experiments/skillspector/evidence-correlation/executable-context/captured/fixture-run/renma-catalog.json",
+      "sha256": "sha256:87e9c415c32f2692f3905b2bb48a9e4a7adfcdbc7a6ac99195b59d2900e4ec04"
+    },
+    "skillspector-renma-executable-graph": {
+      "originClass": "renma-executable-graph-evidence",
+      "path": "experiments/skillspector/evidence-correlation/executable-context/captured/fixture-run/renma-executable-graph.json",
+      "sha256": "sha256:6adc278bd2ea0ad3a112a30683aa2d3a17a3f62778d7675ab4b28e4dec767d5f"
+    },
+    "skillspector-executable-projection": {
+      "originClass": "experiment-only-interpretation",
+      "path": "experiments/skillspector/evidence-correlation/executable-context/captured/fixture-run/normalized-evidence.json",
+      "sha256": "sha256:de8926aad2bf1f1c55fd09b5977e2149fb824cb51f1f8abdbf137dc94b5211e1"
+    },
+    "skillspector-evaluation": {
+      "originClass": "process-or-invocation-observation",
+      "path": "experiments/skillspector/EVALUATION.md"
+    },
+    "cisco-native-json": {
+      "originClass": "native-producer-report",
+      "availability": "documented-observation-only-raw-artifact-not-committed",
+      "observedArtifactReference": "experiments/cisco-skill-scanner/generated/local-core/renma-release-prep/report.json",
+      "observedSha256": "sha256:71ce26a288e7601be19375e7ba82ea4e61668393fbbfcb320bdff1b99c16dbba",
+      "evidenceRecordPath": "experiments/cisco-skill-scanner/EVALUATION.md",
+      "selector": "Canonical Renma Skills and Report SHA-256 inventory"
+    },
+    "cisco-native-sarif": {
+      "originClass": "native-producer-report",
+      "availability": "documented-observation-only-raw-artifact-not-committed",
+      "observedArtifactReference": "experiments/cisco-skill-scanner/generated/local-core/renma-release-prep/report.sarif",
+      "observedSha256": "sha256:7a3084411f208e1c13f8294ac4140907d2a2413ec9e6155bfa474526a1296009",
+      "evidenceRecordPath": "experiments/cisco-skill-scanner/EVALUATION.md",
+      "selector": "Native JSON and SARIF contract and Report SHA-256 inventory"
+    },
+    "cisco-invocation-observation": {
+      "originClass": "process-or-invocation-observation",
+      "path": "experiments/cisco-skill-scanner/EVALUATION.md",
+      "selector": "Exact command forms and Canonical Renma Skills"
+    },
+    "cisco-installation-receipt": {
+      "originClass": "installation-version-receipt",
+      "path": "experiments/cisco-skill-scanner/EVALUATION.md",
+      "selector": "Producer verification and installation"
+    },
+    "cisco-renma-catalog": {
+      "originClass": "renma-catalog-evidence",
+      "availability": "documented-observation-only-generated-artifact-not-committed",
+      "evidenceRecordPath": "experiments/cisco-skill-scanner/EVALUATION.md",
+      "selector": "Canonical Renma Skills"
+    },
+    "cisco-evaluation": {
+      "originClass": "experiment-only-interpretation",
+      "path": "experiments/cisco-skill-scanner/EVALUATION.md"
+    }
+  },
+  "projections": [
+    {
+      "caseId": "skillspector-executable-context-fixture",
+      "adapterProvenance": {
+        "state": "unsupported",
+        "reason": "This experiment has no adapter and deliberately defines no adapter contract.",
+        "sources": ["concept-boundary"]
+      },
+      "producer": {
+        "name": {
+          "state": "known",
+          "value": "SkillSpector",
+          "sources": ["skillspector-native-json", "skillspector-invocation"]
+        },
+        "version": {
+          "state": "known",
+          "value": "2.5.0",
+          "sources": ["skillspector-native-json", "skillspector-invocation"]
+        }
+      },
+      "rawReports": {
+        "state": "known",
+        "value": [
+          {
+            "format": "skillspector-native-json",
+            "source": "skillspector-native-json",
+            "sha256": "sha256:d1dcb58b05bdf5dac3aae6f1c7a71f01b3e1e5a63be68a3330cc493edab67569",
+            "schemaVersion": {
+              "state": "unavailable",
+              "reason": "The observed native JSON has no explicit producer report-schema version.",
+              "sources": ["skillspector-native-json"]
+            }
+          }
+        ],
+        "sources": ["skillspector-native-json", "skillspector-invocation"]
+      },
+      "logicalSubjectBinding": {
+        "state": "known",
+        "value": {
+          "status": "bound-logical-identity",
+          "producerName": "shared-owner",
+          "renmaAssetId": "skill.experiment.executable-shared-owner",
+          "sourcePath": "skills/shared-owner/SKILL.md",
+          "rootContentEvidence": {
+            "state": "known",
+            "value": "sha256:f57a2479e6903d9596880c77b43cf7a561c9e9df2baff543a7036b85ba0b38cf",
+            "qualification": "Renma catalog snapshot evidence; the producer report does not carry this hash.",
+            "sources": ["skillspector-renma-catalog"]
+          }
+        },
+        "sources": [
+          "skillspector-native-json",
+          "skillspector-renma-catalog",
+          "skillspector-invocation"
+        ]
+      },
+      "reviewedScopeBinding": {
+        "state": "known",
+        "value": {
+          "status": "partial",
+          "producerObservedComponentCount": 7,
+          "producerObservedPaths": [
+            "README.md",
+            "SKILL.md",
+            "scripts/callee-probe.py",
+            "scripts/caller-probe.mjs",
+            "scripts/contained-probe.py",
+            "scripts/direct-probe.py",
+            "scripts/shared-probe.py"
+          ],
+          "componentContentBinding": {
+            "state": "unavailable",
+            "reason": "The native report lists components but provides no per-component content hashes.",
+            "sources": ["skillspector-native-json"]
+          },
+          "scopeDigest": {
+            "state": "unsupported",
+            "reason": "This experiment defines no review-scope digest algorithm.",
+            "sources": ["concept-boundary"]
+          }
+        },
+        "sources": ["skillspector-native-json", "skillspector-invocation"]
+      },
+      "executionStatus": {
+        "state": "known",
+        "value": {
+          "processExitCode": 0,
+          "nativeExecutionSuccessful": true,
+          "classification": "completed"
+        },
+        "sources": ["skillspector-native-json", "skillspector-invocation"]
+      },
+      "producerNativeCompleteness": {
+        "state": "known",
+        "value": {
+          "preservation": "opaque-native-reference-with-selected-direct-facts",
+          "reference": "skillspector-native-json#/analysis_completeness",
+          "isComplete": false,
+          "coveragePercent": 100,
+          "completedAnalyzerCount": 20,
+          "disabledAnalyzerCount": 4
+        },
+        "sources": ["skillspector-native-json"]
+      },
+      "requiredProfileCompleteness": {
+        "state": "unknown",
+        "reason": "No required-profile identity, digest, or required-analyzer set exists; analyzer names and native coverage cannot answer this question.",
+        "sources": [
+          "skillspector-native-json",
+          "skillspector-invocation",
+          "concept-boundary"
+        ]
+      },
+      "profileOrPolicyIdentity": {
+        "state": "known",
+        "value": {
+          "requestedMode": "static-only",
+          "requestedModeBasis": "--no-llm invocation argument",
+          "profileIdentity": {
+            "state": "unavailable",
+            "reason": "The observation has no named, digest-bound assessment profile.",
+            "sources": ["skillspector-native-json", "skillspector-invocation"]
+          }
+        },
+        "sources": ["skillspector-native-json", "skillspector-invocation"]
+      },
+      "nativeAssessment": {
+        "state": "known",
+        "value": {
+          "preservation": "producer-native-only",
+          "reference": "skillspector-native-json#/risk_assessment",
+          "score": 32,
+          "severity": "MEDIUM",
+          "recommendation": "CAUTION"
+        },
+        "sources": ["skillspector-native-json"]
+      },
+      "nativeFindings": {
+        "state": "known",
+        "value": {
+          "preservation": "opaque-native-collection-reference",
+          "reference": "skillspector-native-json#/issues",
+          "count": 8,
+          "crossProducerNormalization": "none",
+          "crossProducerDeduplication": "none"
+        },
+        "sources": ["skillspector-native-json"]
+      },
+      "limitations": {
+        "state": "known",
+        "value": {
+          "preservation": "opaque-native-reference",
+          "reference": "skillspector-native-json#/analysis_completeness/limitations",
+          "count": 4
+        },
+        "sources": ["skillspector-native-json"]
+      },
+      "suppressionOrBaseline": {
+        "state": "known",
+        "value": {
+          "nativeSuppressedCount": 0,
+          "baselineApplied": false,
+          "baselineIdentity": {
+            "state": "unavailable",
+            "reason": "No baseline was supplied for this observed invocation.",
+            "sources": ["skillspector-invocation", "skillspector-native-json"]
+          }
+        },
+        "sources": ["skillspector-invocation", "skillspector-native-json"]
+      },
+      "repositoryRelationshipContext": {
+        "state": "known",
+        "value": {
+          "status": "available-separately",
+          "projectionReference": "skillspector-executable-projection#/evidence",
+          "graphReference": "skillspector-renma-executable-graph",
+          "relationshipKinds": ["invokes", "contains"],
+          "reviewedScopeEffect": "none",
+          "scannerCoverageEffect": "none"
+        },
+        "sources": [
+          "skillspector-renma-executable-graph",
+          "skillspector-executable-projection"
+        ]
+      },
+      "freshness": {
+        "state": "unknown",
+        "reason": "The report is not bound to exact per-component content and no freshness policy is defined.",
+        "sources": [
+          "skillspector-native-json",
+          "skillspector-renma-catalog",
+          "concept-boundary"
+        ]
+      },
+      "requirementSatisfaction": {
+        "state": "unknown",
+        "reason": "No Renma review requirement, required profile, or requirement evaluator exists in this experiment.",
+        "sources": ["concept-boundary"]
+      }
+    },
+    {
+      "caseId": "cisco-renma-release-prep",
+      "adapterProvenance": {
+        "state": "unsupported",
+        "reason": "This experiment has no adapter and deliberately defines no adapter contract.",
+        "sources": ["concept-boundary"]
+      },
+      "producer": {
+        "name": {
+          "state": "known",
+          "value": "Cisco Skill Scanner",
+          "qualification": "The native SARIF driver says skill-scanner; the product name is retained from the evaluated installation and experiment record.",
+          "sources": ["cisco-native-sarif", "cisco-installation-receipt"]
+        },
+        "version": {
+          "state": "contradictory",
+          "reason": "The observed installed version and the native SARIF driver version disagree, while native JSON omits producer version.",
+          "reportedValues": [
+            {
+              "state": "known",
+              "value": "2.0.12",
+              "qualification": "External installation receipt and executable probe; not native report evidence.",
+              "sources": ["cisco-installation-receipt"]
+            },
+            {
+              "state": "invalid",
+              "value": "1.0.0",
+              "reason": "The evaluation verified this hard-coded native SARIF value does not identify the observed installed package.",
+              "sources": ["cisco-native-sarif", "cisco-evaluation"]
+            },
+            {
+              "state": "unavailable",
+              "reason": "The native Cisco JSON report contains no producer-version field.",
+              "sources": ["cisco-native-json"]
+            }
+          ],
+          "resolution": {
+            "state": "known",
+            "value": "2.0.12",
+            "qualification": "externally-qualified-version-not-native-report-evidence",
+            "sources": ["cisco-installation-receipt"]
+          },
+          "sources": [
+            "cisco-native-json",
+            "cisco-native-sarif",
+            "cisco-installation-receipt",
+            "cisco-evaluation"
+          ]
+        }
+      },
+      "rawReports": {
+        "state": "known",
+        "value": [
+          {
+            "format": "cisco-native-json",
+            "source": "cisco-native-json",
+            "sha256": "sha256:71ce26a288e7601be19375e7ba82ea4e61668393fbbfcb320bdff1b99c16dbba",
+            "schemaVersion": {
+              "state": "unavailable",
+              "reason": "The observed native JSON has no explicit producer report-schema version.",
+              "sources": ["cisco-native-json"]
+            }
+          },
+          {
+            "format": "sarif",
+            "source": "cisco-native-sarif",
+            "sha256": "sha256:7a3084411f208e1c13f8294ac4140907d2a2413ec9e6155bfa474526a1296009",
+            "schemaVersion": {
+              "state": "known",
+              "value": "2.1.0",
+              "sources": ["cisco-native-sarif"]
+            }
+          }
+        ],
+        "sources": ["cisco-native-json", "cisco-native-sarif"]
+      },
+      "logicalSubjectBinding": {
+        "state": "known",
+        "value": {
+          "status": "bound-logical-identity",
+          "producerName": "release-prep",
+          "renmaAssetId": "skill.release-prep",
+          "sourcePath": "skills/release-prep/SKILL.md",
+          "rootContentEvidence": {
+            "state": "known",
+            "value": "sha256:03d7322b650e971dedfffa9e3c3bae5a4611f47dc6253bf8ceb5c5a97602491c",
+            "qualification": "Renma catalog snapshot evidence; the producer report does not carry this hash.",
+            "sources": ["cisco-renma-catalog"]
+          }
+        },
+        "sources": [
+          "cisco-native-json",
+          "cisco-renma-catalog",
+          "cisco-evaluation"
+        ]
+      },
+      "reviewedScopeBinding": {
+        "state": "known",
+        "value": {
+          "status": "partial",
+          "producerObservedSkillRoot": "/Users/kazu/github/renma/skills/release-prep",
+          "completeComponentInventory": {
+            "state": "unavailable",
+            "reason": "The native Cisco reports do not serialize the complete reviewed-file inventory.",
+            "sources": ["cisco-native-json", "cisco-native-sarif"]
+          },
+          "componentContentBinding": {
+            "state": "unavailable",
+            "reason": "The native Cisco reports provide no per-component content hashes.",
+            "sources": ["cisco-native-json", "cisco-native-sarif"]
+          },
+          "scopeDigest": {
+            "state": "unsupported",
+            "reason": "This experiment defines no review-scope digest algorithm.",
+            "sources": ["concept-boundary"]
+          }
+        },
+        "sources": [
+          "cisco-native-json",
+          "cisco-native-sarif",
+          "cisco-evaluation"
+        ]
+      },
+      "executionStatus": {
+        "state": "known",
+        "value": {
+          "processExitCode": 0,
+          "sarifExecutionSuccessful": true,
+          "classification": "completed"
+        },
+        "qualification": "Process exit is an invocation observation; executionSuccessful is native SARIF evidence.",
+        "sources": ["cisco-invocation-observation", "cisco-native-sarif"]
+      },
+      "producerNativeCompleteness": {
+        "state": "unavailable",
+        "reason": "Cisco 2.0.12 serializes no comparable planned/completed/skipped/failed/not-applicable work ledger or native completeness value.",
+        "sources": [
+          "cisco-native-json",
+          "cisco-native-sarif",
+          "cisco-evaluation"
+        ]
+      },
+      "requiredProfileCompleteness": {
+        "state": "unknown",
+        "reason": "Observed analyzer names and policy identity do not establish a required analyzer set or the completion of internal analyzer work.",
+        "sources": ["cisco-native-json", "cisco-evaluation", "concept-boundary"]
+      },
+      "profileOrPolicyIdentity": {
+        "state": "known",
+        "value": {
+          "experimentProfileLabel": {
+            "state": "known",
+            "value": "local-core",
+            "qualification": "Experiment-only label derived from the recorded environment and arguments.",
+            "sources": ["cisco-invocation-observation", "cisco-evaluation"]
+          },
+          "nativePolicy": {
+            "state": "known",
+            "value": {
+              "name": "default",
+              "version": "1.0",
+              "presetBase": "balanced",
+              "fingerprintSha256": "90696022f7fc8c307edfd13e2d4713f9d14042a147f48a3c7c7fde921dc2a686"
+            },
+            "sources": ["cisco-native-json"]
+          },
+          "nativeAnalyzersUsed": ["static_analyzer", "bytecode", "pipeline"]
+        },
+        "sources": ["cisco-native-json", "cisco-invocation-observation"]
+      },
+      "nativeAssessment": {
+        "state": "known",
+        "value": {
+          "preservation": "producer-native-only",
+          "reference": "cisco-native-json",
+          "isSafe": true,
+          "maxSeverity": "INFO"
+        },
+        "sources": ["cisco-native-json"]
+      },
+      "nativeFindings": {
+        "state": "known",
+        "value": {
+          "preservation": "opaque-native-collection-reference",
+          "reference": "cisco-native-json#/findings",
+          "count": 1,
+          "crossProducerNormalization": "none",
+          "crossProducerDeduplication": "none"
+        },
+        "sources": ["cisco-native-json"]
+      },
+      "limitations": {
+        "state": "known",
+        "value": {
+          "nativeLimitations": {
+            "state": "unavailable",
+            "reason": "The observed reports serialize no general limitation or analyzer-applicability ledger.",
+            "sources": ["cisco-native-json", "cisco-native-sarif"]
+          },
+          "externallyObservedContractLimitations": [
+            "native JSON has no producer or report-schema version",
+            "native SARIF reports an invalid producer version for the observed installation",
+            "complete reviewed-file inventory and component hashes are absent",
+            "producer-native completeness is absent"
+          ]
+        },
+        "sources": ["cisco-evaluation"]
+      },
+      "suppressionOrBaseline": {
+        "state": "known",
+        "value": {
+          "nativePolicyFingerprint": "90696022f7fc8c307edfd13e2d4713f9d14042a147f48a3c7c7fde921dc2a686",
+          "suppressedCount": {
+            "state": "unavailable",
+            "reason": "The native report does not expose an applied-suppression ledger or suppressed count.",
+            "sources": ["cisco-native-json", "cisco-native-sarif"]
+          },
+          "perFindingBaselineIdentity": {
+            "state": "unsupported",
+            "reason": "The evaluated CLI documents no per-finding baseline capability comparable to the SkillSpector baseline experiment.",
+            "sources": ["cisco-evaluation"]
+          }
+        },
+        "sources": ["cisco-native-json", "cisco-evaluation"]
+      },
+      "repositoryRelationshipContext": {
+        "state": "unavailable",
+        "reason": "No case-specific Renma executable-graph evidence was captured for this Cisco observation.",
+        "sources": ["cisco-evaluation"]
+      },
+      "freshness": {
+        "state": "unknown",
+        "reason": "The report is not bound to an exact reviewed component set and no freshness policy is defined.",
+        "sources": [
+          "cisco-native-json",
+          "cisco-renma-catalog",
+          "concept-boundary"
+        ]
+      },
+      "requirementSatisfaction": {
+        "state": "unknown",
+        "reason": "Native is_safe is not a Renma requirement result, and no review requirement or required-profile evaluator exists.",
+        "sources": ["cisco-native-json", "concept-boundary"]
+      }
+    }
+  ],
+  "crossCaseGuardrails": {
+    "emptySarifDigestCollision": {
+      "state": "known",
+      "value": {
+        "sha256": "sha256:ac048bad24d7a13a9578dd60e770347cc4750647e521991754dd117fe59ef8d4",
+        "observedDistinctSubjects": [
+          "root-release-prep",
+          "example-spec-review",
+          "example-context-lens",
+          "example-context-repo"
+        ],
+        "identityEffect": "none"
+      },
+      "sources": ["skillspector-evaluation"]
+    },
+    "explicitNonClaims": {
+      "state": "known",
+      "value": [
+        "A raw report digest does not establish logical subject or reviewed scope.",
+        "Successful execution does not establish exact reviewed scope.",
+        "Analyzer names do not establish required-profile completeness.",
+        "A native SAFE, is_safe, passing exit, score, severity, or recommendation does not establish Renma requirement satisfaction or safety.",
+        "Executable invocation and containment relationships do not establish reviewed scope, scanner coverage, ownership, runtime execution, freshness, or requirement satisfaction.",
+        "Producer-native findings remain independent collections; they are neither normalized nor deduplicated across producers."
+      ],
+      "sources": [
+        "concept-boundary",
+        "skillspector-evaluation",
+        "cisco-evaluation",
+        "skillspector-executable-projection"
+      ]
+    }
+  }
+}
