@@ -175,6 +175,6 @@ test("native findings and assessments remain opaque and cannot satisfy a Renma r
 
 test("an empty repeated SARIF digest has no subject or scope identity effect", () => {
   const collision = concept.crossCaseGuardrails.emptySarifDigestCollision.value;
-  assert.ok(collision.observedDistinctSubjects.length > 1);
+  assert.ok(collision.observedDistinctTargets.length > 1);
   assert.equal(collision.identityEffect, "none");
 });

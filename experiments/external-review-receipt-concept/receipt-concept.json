@@ -542,7 +542,7 @@
       "state": "known",
       "value": {
         "sha256": "sha256:ac048bad24d7a13a9578dd60e770347cc4750647e521991754dd117fe59ef8d4",
-        "observedDistinctSubjects": [
+        "observedDistinctTargets": [
           "root-release-prep",
           "example-spec-review",
           "example-context-lens",
