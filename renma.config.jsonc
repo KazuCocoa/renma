@@ -2,6 +2,9 @@
   "fail_on": "high",
   "format": "text",
   "globs": ["skills/**/SKILL.md", "contexts/**/*.md", "tools/**/*"],
+  // These exclude patterns are used to ignore files and directories 
+  // that are not relevant for the skill discovery process. 
+  // You can modify this list based on your project's structure and requirements.
   "exclude": [
     "node_modules",
     "dist",
