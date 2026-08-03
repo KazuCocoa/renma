@@ -93,6 +93,12 @@ generator against the same file.
 
 ## Declare Current Repository Relationships
 
+For the complete metadata mapping, value formats, applicability, and
+compatibility status, see the User Manual's
+[Authoritative Metadata Reference](user-manual.md#authoritative-metadata-reference).
+This section focuses on choosing and using relationship declarations during
+advanced Skill authoring.
+
 Use the shipped Context and Context Lens relationship fields. For example:
 
 ```yaml
