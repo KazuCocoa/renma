@@ -16,6 +16,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   documentation-drift coverage so catalog, Discovery, security, specialized
   non-Skill, and token-budget fields cannot silently diverge from the manual.
 
+### Changed
+
+- Updated the remaining diagnostic and authoring documentation to delegate
+  complete metadata inventory ownership to the User Manual while retaining
+  feature-specific semantics and practical guidance.
+
 ## [0.28.4] - 2026-08-01
 
 ### Added

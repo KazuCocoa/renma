@@ -950,8 +950,14 @@ metadata:
 ```
 
 Do not use a nested `metadata.renma` mapping, native YAML booleans for canonical
-security fields, or comma-separated canonical lists. See the compatibility and
-security guides for the complete contracts.
+security fields, or comma-separated canonical lists. The User Manual's
+[Authoritative Metadata Reference](user-manual.md#authoritative-metadata-reference)
+owns the complete field inventory, Skill/non-Skill mappings, value formats,
+applicability, and compatibility classification. The
+[Agent Skills compatibility guide](agent-skills-compatibility.md) owns canonical
+serialization and migration details, while the
+[Security Policy guide](security-policy.md) owns effective-policy semantics and
+security-specific examples.
 
 Start from the installed Renma scaffold and use only fields defined by that
 Renma version or the supported Agent Skills format. Do not infer future fields,

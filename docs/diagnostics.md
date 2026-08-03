@@ -949,32 +949,26 @@ fallback boundaries.
 
 ### Security Policy Metadata
 
-Security policy diagnostics use two explicit syntax boundaries. Skills must be
-specification-valid Agent Skills and declare policy through string-valued
-`metadata.renma.*` keys. Contexts and other non-Skill assets retain the
-top-level snake_case syntax.
+The User Manual's
+[Authoritative Metadata Reference](user-manual.md#authoritative-metadata-reference)
+owns the complete canonical Skill/non-Skill security field mapping, supported
+value formats, applicability, authoring and compatibility status, and primary
+consumer projections.
 
-Canonical Skill keys are `renma.allowed-data`, `renma.network-allowed`,
-`renma.external-upload-allowed`, `renma.secrets-allowed`,
-`renma.requires-human-approval`, `renma.forbidden-inputs`,
-`renma.approved-network-destinations`,
-`renma.approved-upload-destinations`,
-`renma.allowed-floating-dependencies`, and `renma.security-profile`. Skill
-booleans must be the exact strings `"true"` or `"false"`; Skill lists must be
-JSON-array strings containing strings only. Invalid recognized values emit
-`SEC-INVALID-CANONICAL-POLICY-METADATA` and fail closed. Renma preserves
-already-reviewed restrictive inherited policy while preventing permissive
-inheritance: allowed-data permissions remain unresolved, inherited forbidden
-inputs remain active, and invalid destination allowlists continue reporting
-concrete destinations as unapproved.
-
-Non-Skill assets continue to use `allowed_data`, `network_allowed`,
-`external_upload_allowed`, `secrets_allowed`, `requires_human_approval`,
-`forbidden_inputs`, `approved_network_destinations`,
-`approved_upload_destinations`, `allowed_floating_dependencies`, and
-`security_profile`. Their existing scalar,
+Security policy diagnostics use two serialization boundaries. Skills must be
+specification-valid Agent Skills and declare policy through flat,
+string-valued `metadata.renma.*` entries. Contexts and other non-Skill assets
+retain top-level snake_case security fields. Canonical Skill security booleans
+must use the exact strings `"true"` or `"false"`, and canonical Skill security
+lists must use JSON-array strings containing strings only. Non-Skill scalar,
 inline-list, and block-list behavior is unchanged. Pre-0.16 top-level Skill
 security fields are migration input only.
+
+Invalid recognized values emit `SEC-INVALID-CANONICAL-POLICY-METADATA` and fail
+closed. Renma preserves already-reviewed restrictive inherited policy while
+preventing permissive inheritance: allowed-data permissions remain unresolved,
+inherited forbidden inputs remain active, and invalid destination allowlists
+continue reporting concrete destinations as unapproved.
 
 Script and asset bytes never declare local policy. They participate in the
 security policy inventory even when they have no effective policy. Local
