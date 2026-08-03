@@ -140,6 +140,390 @@ Skill metadata. Contexts, context lenses, profiles, references,
 examples, agents, configuration files, and other non-Skill assets continue to
 use their existing top-level metadata syntax.
 
+## Authoritative Metadata Reference
+
+This section is the complete field inventory for frontmatter metadata consumed
+by Renma. Feature guides explain deeper semantics and edge cases, but this
+section owns the Skill/non-Skill mapping, value shape, applicability, authoring
+status, and primary projections.
+
+### Metadata model and source selection
+
+[Agent Skills](https://agentskills.io/specification) owns the portable Skill
+top-level fields. Renma extensions for a canonical `SKILL.md` are flat entries
+inside that portable `metadata` mapping:
+
+```yaml
+metadata:
+  renma.owner: platform-team
+  renma.tags: '["review","release"]'
+  renma.network-allowed: "false"
+```
+
+Every Agent Skills metadata value is a string. Canonical Renma Skill lists are
+therefore strings containing JSON arrays, and canonical booleans are quoted
+strings. A nested `metadata.renma` mapping and unprefixed keys such as
+`metadata.owner` are not canonical Renma Skill metadata.
+
+Contexts, Context Lenses, profiles, references, examples, and other non-Skill
+assets keep top-level Renma metadata. The normalized catalog accepts those
+fields only on Markdown-parser-eligible assets classified as Context, Context
+Lens, Profile, Reference, Example, Script, or Asset. Specialized non-Skill
+parsers have the narrower applicability stated in the table. Raw Script and
+Asset bytes cannot declare local security policy, although a uniquely resolved
+Skill-local Script or Asset can inherit its owning Skill's effective policy.
+
+Operational source selection is fail-closed:
+
+```text
+specification-valid canonical Skill
+  -> recognized flat metadata.renma.* fields are operational
+
+invalid, hybrid, or pre-0.16 Skill
+  -> no operational Skill metadata
+  -> recognized legacy fields are input only to suggest-metadata
+
+non-Skill asset
+  -> recognized top-level fields are operational for their stated parser
+```
+
+Unknown `renma.*` keys and other vendors' valid string metadata are preserved
+but uninterpreted unless a current Renma registry recognizes them. Unknown
+top-level non-Skill fields may remain in parsed source evidence, but they are
+outside Renma's operational model unless a current parser is listed below.
+Repository JSON configuration has its own schema and is not frontmatter
+metadata.
+
+Metadata is governance and static declaration evidence. It does not replace
+behavior-critical instructions, selection boundaries, permissions, stop
+conditions, or source-of-truth boundaries in the Skill or asset body. Generic
+Agent Skills clients may not expose vendor metadata to the model at all.
+
+### Portable Agent Skills top-level fields
+
+These are specification-owned fields, not `renma.*` extensions:
+
+<!-- agent-skills-portable-fields:start -->
+| Top-level field | Value format | Agent Skills requirement | Renma behavior |
+| --- | --- | --- | --- |
+| `name` | Non-empty string; Renma validates 1–64 Unicode code points, lowercase NFKC form, letters/digits/hyphens, no edge or repeated hyphen, and immediate-directory match | Required | Skill identity validation and Discovery presentation |
+| `description` | Non-empty string, at most 1,024 Unicode code points | Required; Renma recommends capability and usage boundaries | Portable Skill discovery text, quality and authoring diagnostics, and Discovery presentation |
+| `license` | String | Optional | Agent Skills validation; not projected into Renma catalog metadata |
+| `compatibility` | Non-empty string, at most 500 Unicode code points | Optional | Agent Skills validation; not a Renma lifecycle or dependency declaration |
+| `metadata` | Mapping from string keys to string values | Optional in Agent Skills; required only when Renma extensions are declared | Container for flat `renma.*` and other vendor metadata |
+| `allowed-tools` | String | Optional | Agent Skills validation; Renma does not treat it as a security-policy field |
+<!-- agent-skills-portable-fields:end -->
+
+`name` and `description` make a Skill portable; they do not make a hybrid or
+otherwise invalid document operational. Renma authoring warnings do not by
+themselves invalidate a specification-valid Skill.
+
+### Renma operational metadata table
+
+In the Skill column, a key means `metadata.<key>`. In the non-Skill column, a
+key is top-level frontmatter. `—` means Renma has no operational equivalent on
+that serialization surface. The markers delimit the rows checked against the
+implementation-owned registries.
+
+<!-- renma-operational-metadata:start -->
+| Skill key | Non-Skill key | Value format | Applies to | Requirement / authoring status | Primary Renma effects |
+| --- | --- | --- | --- | --- | --- |
+| `renma.id` | `id` | Trimmed non-empty text | Skill and cataloged non-Skill assets | Recommended for stable references; Context Lens requires `id` | Catalog identity, duplicate checks, inspect, graphs, BOM, Trust Graph, diff, and CI reporting |
+| `renma.title` | — | Trimmed non-empty text | Skill only | Optional | Normalized Skill catalog and inspect presentation; top-level non-Skill `title` is not an operational equivalent |
+| — | `type` | Trimmed text; `context_lens` is the supported Lens discriminator | Non-Skill assets; only Context/Context Lens for Lens validation | Conditional when a file under a Context root must be classified as a Context Lens | Classification evidence, catalog kind, inspect, and Context Lens diagnostics |
+| `renma.version` | `version` | Trimmed text; a Context Lens accepts only `1` when present | Skill and cataloged non-Skill assets | Optional | Catalog, Context Lens validation, BOM, semantic diff, and CI reporting |
+| `renma.owner` | `owner` | Trimmed non-empty text | Skill and cataloged non-Skill assets | Context Lens requires it; recommended for shared Context; optional elsewhere | Declared/effective ownership, ownership reports, Readiness, BOM, Trust Graph, diff, and CI reporting |
+| `renma.status` | `status` | `experimental`, `stable`, `deprecated`, or `archived` | Skill and cataloged non-Skill assets | Optional lifecycle declaration | Lifecycle/freshness findings, dependency review, Discovery publication eligibility, catalog, Readiness, BOM, Trust Graph, diff, and CI reporting |
+| `renma.purpose` | `purpose` | Trimmed non-empty text | Skill and cataloged non-Skill assets | Context Lens requires it; optional elsewhere | Catalog/inspect metadata and Context Lens governance diagnostics |
+| `renma.last-reviewed-at` | `last_reviewed_at` | Real ISO date `YYYY-MM-DD` | Skill and cataloged non-Skill assets | Optional; recommended when freshness is governed | Freshness diagnostics, catalog, Readiness, BOM, semantic diff, and CI reporting |
+| `renma.review-cycle` | `review_cycle` | `P<positive integer>D` | Skill and cataloged non-Skill assets | Conditional on cycle-based freshness review; meaningful with `last-reviewed-at` | Review-due calculation, freshness diagnostics, catalog, Readiness, BOM, diff, and CI reporting |
+| `renma.expires-at` | `expires_at` | Real ISO date `YYYY-MM-DD` | Skill and cataloged non-Skill assets | Optional | Expiration findings, lifecycle/dependency review, catalog, Readiness, BOM, diff, and CI reporting |
+| `renma.tags` | `tags` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Optional | Catalog, ownership grouping, graph/BOM/Trust Graph asset projections, semantic diff, and CI reporting |
+| `renma.when-to-use` | `when_to_use` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Skill: recognized but deprecated for new authoring; active shared Context: recommended | Catalog usage-boundary evidence and Context diagnostics; canonical Skill discovery belongs in portable `description` |
+| `renma.when-not-to-use` | `when_not_to_use` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Skill: recognized but deprecated for new authoring; active shared Context: recommended | Catalog negative-boundary evidence and Context diagnostics; canonical Skill selection exclusions belong in portable `description` |
+| `renma.requires-context` | `requires_context` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Optional; required only when the declared relationship exists | Required catalog dependency, graph/composition/impact, Readiness, BOM, Trust Graph, semantic diff, and CI reporting |
+| `renma.optional-context` | `optional_context` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Optional | Optional catalog dependency and the same static relationship projections |
+| `renma.requires-lens` | `requires_lens` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Optional; required only when the declared Lens relationship exists | Required Lens dependency, Lens usage diagnostics, graph/composition/impact, Readiness, BOM, Trust Graph, diff, and CI reporting |
+| `renma.optional-lens` | `optional_lens` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Optional | Optional Lens dependency and the same static relationship projections |
+| `renma.conflicts` | `conflicts` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Optional | Conflict diagnostics, catalog dependency graph, BOM, Trust Graph, semantic diff, and CI reporting |
+| `renma.superseded-by` | `superseded_by` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Recommended when an asset is deprecated because a replacement exists; otherwise optional | Lifecycle/supersession diagnostics, reference edges, catalog, BOM, Trust Graph, diff, and CI reporting |
+| `renma.continues-with` | — | JSON-array string of non-empty Skill IDs or repository-relative `SKILL.md` paths | Canonical Skill only | Optional | Parsed separately for prepared Skill Discovery, Skill Index, discovery graph, route/cycle diagnostics, Readiness evidence, semantic diff, and CI; never a catalog dependency |
+| — | `applies_to` | YAML list or comma-separated scalar of Context IDs/paths | Cataloged non-Skill assets via the general parser; supported authoring surface: Context Lens | Context Lens: required and target-validated; recommended authoring scope: Context Lens | Any catalog entry carrying a normalized value: metadata-declared `applies_to` dependency; Context Lens: requiredness, target resolution to Context Assets, Lens governance, inspect, graph, Readiness, BOM, Trust Graph, diff, and CI projections |
+| — | `focus` | YAML list or comma-separated scalar | Cataloged non-Skill assets via the general parser; supported authoring surface: Context Lens | Context Lens: optional; recommended authoring scope: Context Lens | General parser normalization and inspect presentation; Context Lens governance and meaningfulness checks; no dependency edge |
+| — | `expected_outputs` | YAML list or comma-separated scalar | Cataloged non-Skill assets via the general parser; supported authoring surface: Context Lens | Context Lens: optional; recommended authoring scope: Context Lens | General parser normalization and inspect presentation; Context Lens governance and meaningfulness checks; no dependency edge |
+| — | `token_budget_override` | Positive safe integer greater than the kind's default limit | Markdown assets initially classified as Context, Reference, Profile, or Example | Conditional; requires `token_budget_rationale` and is invalid when content is within the default limit | Scan token-budget decision and quality finding details only |
+| — | `token_budget_rationale` | Trimmed non-empty text | Same eligible support-asset kinds as `token_budget_override` | Required when an override is declared; otherwise non-operational | Scan token-budget decision evidence only |
+| — | `token_budget_reviewed_at` | Real ISO date `YYYY-MM-DD` | Same eligible support-asset kinds as `token_budget_override` | Optional only when an override is declared | Scan token-budget review provenance only; it does not create recurring freshness review |
+| `renma.published-entrypoint` | — | Exact string `"true"` only | Canonical Skill only | Optional one-state publication marker | Parsed outside catalog metadata for prepared Skill Discovery, Skill Index, discovery graph, publication diagnostics, Readiness evidence, semantic diff, and CI reporting; no catalog dependency |
+| `renma.network-allowed` | `network_allowed` | Skill: exact `"true"` or `"false"`; non-Skill: recognized boolean token | Canonical Skill or parser-eligible non-Skill Markdown | Conditional security governance | Effective security-policy resolution, instruction findings, Security Policy Inventory, BOM, Trust Graph, semantic diff, and CI reporting |
+| `renma.external-upload-allowed` | `external_upload_allowed` | Skill: exact `"true"` or `"false"`; non-Skill: recognized boolean token | Canonical Skill or parser-eligible non-Skill Markdown | Conditional security governance | Effective upload policy, destination/disclosure findings, inventory, BOM, Trust Graph, diff, and CI reporting |
+| `renma.secrets-allowed` | `secrets_allowed` | Skill: exact `"true"` or `"false"`; non-Skill: recognized boolean token | Canonical Skill or parser-eligible non-Skill Markdown | Conditional security governance | Effective secret-handling policy, findings, inventory, BOM, Trust Graph, diff, and CI reporting |
+| `renma.requires-human-approval` | `requires_human_approval` | Skill: exact `"true"` or `"false"`; non-Skill: recognized boolean token | Canonical Skill or parser-eligible non-Skill Markdown | Conditional security governance | Effective approval policy, nearby-approval findings, inventory, BOM, Trust Graph, diff, and CI reporting |
+| `renma.allowed-data` | `allowed_data` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Canonical Skill or parser-eligible non-Skill Markdown | Conditional security governance | Effective allowed-data policy, input findings, inventory, BOM, Trust Graph, diff, and CI reporting |
+| `renma.forbidden-inputs` | `forbidden_inputs` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Canonical Skill or parser-eligible non-Skill Markdown | Conditional security governance | Effective forbidden-input policy, findings, inventory, BOM, Trust Graph, diff, and CI reporting |
+| `renma.approved-network-destinations` | `approved_network_destinations` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Canonical Skill or parser-eligible non-Skill Markdown | Conditional when network access is declared or instructed | Effective destination policy, network findings, inventory, BOM, Trust Graph, diff, and CI reporting |
+| `renma.approved-upload-destinations` | `approved_upload_destinations` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Canonical Skill or parser-eligible non-Skill Markdown | Conditional when external upload is declared or instructed | Effective upload-destination policy, findings, inventory, BOM, Trust Graph, diff, and CI reporting |
+| `renma.allowed-floating-dependencies` | `allowed_floating_dependencies` | Skill: JSON-array string; non-Skill: YAML list or JSON-array scalar of valid `npm:`/`pypi:` selectors | Canonical Skill or parser-eligible non-Skill Markdown | Optional, exceptional asset-local allowance | Suppresses matching npm/PyPI floating-dependency findings only; recorded as local evidence but excluded from inheritance, effective-policy fingerprints/counts, and owning-Skill inheritance |
+| `renma.security-profile` | `security_profile` | Trimmed non-empty profile name | Canonical Skill or parser-eligible non-Skill Markdown | Optional reusable-policy selection | Profile-chain resolution and diagnostics, effective policy/inventory, BOM, Trust Graph, semantic diff, and CI reporting |
+| — | `scope` | Exact `context` when present; omission defaults to `context` | Context Lens only | Optional | Context Lens scope validation and summary only |
+| — | `target` | Presence is recognized; value is not selected as a target | Context Lens only | Deprecated; use `applies_to` | Deprecation diagnostic only |
+| — | `targets` | Presence is recognized; value is not selected as targets | Context Lens only | Deprecated; use `applies_to` | Deprecation diagnostic only |
+| — | `output` | Presence is recognized; value is not selected as output metadata | Context Lens only | Deprecated; use `expected_outputs` | Deprecation diagnostic only |
+| — | `outputs` | Presence is recognized; value is not selected as output metadata | Context Lens only | Deprecated; use `expected_outputs` | Deprecation diagnostic only |
+| — | `canonical_context` | Comma-separated scalar of Context paths | Skill-local Reference only | Recognized compatibility-only; do not add for new assets | Maintenance diagnosis for a deprecated local reference promoted to shared Context; not catalog metadata or a general dependency |
+<!-- renma-operational-metadata:end -->
+
+The table intentionally has no top-level non-Skill equivalent for
+`renma.title`, continuation, or publication. A scaffolded non-Skill `title`
+may remain useful to authors, and `suggest-metadata` may inspect it, but
+`parseAssetMetadata()` does not normalize it. Likewise, `allowed-tools` is not
+an alias for Renma security permission.
+
+### Consolidated value formats and rejection rules
+
+- Text fields become trimmed, non-empty strings where the parser defines text
+  semantics. Empty text is generally treated as absent; a field-specific
+  validator may also report it.
+- Every canonical Skill metadata value must first be a YAML string. Canonical
+  list fields contain JSON arrays whose members are strings. `[]` is valid.
+  Renma trims members and drops empty members for ordinary catalog lists;
+  `renma.continues-with` instead rejects an empty or whitespace-only member.
+- Canonical security booleans accept only the exact strings `"true"` and
+  `"false"`. The Discovery publication marker is one-state and accepts only
+  exact `"true"`; `"false"` means invalid, not unpublished. Omission means
+  unpublished.
+- Top-level non-Skill catalog/security lists accept ordinary YAML block lists
+  and the existing comma-separated scalar form. Top-level security booleans are
+  case-insensitive `true`, `yes`, `allowed`, `allow`, or `1`, and `false`,
+  `no`, `denied`, `deny`, or `0`. Prefer YAML `true`/`false` for new assets.
+- Dates must be real calendar dates in `YYYY-MM-DD` form. Review cycles support
+  only `P<positive integer>D`, such as `P90D`; months, years, zero, signs,
+  fractions, and composite ISO durations are unsupported.
+- `token_budget_override` must be a positive safe YAML integer, exceed the
+  eligible artifact kind's default limit, and be needed by the measured
+  content. It requires a non-empty rationale. `token_budget_reviewed_at` is
+  optional but valid only alongside an override and does not imply a recurring
+  review cycle.
+- Lifecycle status is exactly `experimental`, `stable`, `deprecated`, or
+  `archived`.
+- A security profile is a non-empty selected name. The name must resolve in
+  `security.profiles`; a missing or cyclic chain is diagnosed rather than
+  silently substituted.
+- Floating-dependency allowances have an exact lowercase `npm:` or `pypi:`
+  prefix followed by one supported package name and a selector classified as
+  bare, dist-tag, range, or wildcard. They do not accept exact versions,
+  variables, direct references, malformed selectors, Homebrew, or Docker.
+  Matching is normalized but exact, not globbed or fuzzy.
+
+Renma does not coerce comma-separated canonical lists, native YAML booleans for
+canonical metadata, alternate canonical boolean casing, non-string JSON-array
+members, malformed JSON, impossible dates, or unsupported duration forms.
+Duplicate top-level Skill fields, duplicate `metadata` mappings, and duplicate
+canonical child keys are ambiguous: Renma does not choose the first or last
+value. Invalid recognized canonical security declarations fail closed and can
+retain restrictive inherited policy while preventing permissive inheritance;
+the [Security Policy Guide](security-policy.md) defines the field-specific
+precedence and diagnostic behavior.
+
+### Consumer and inheritance boundaries
+
+Metadata-declared catalog dependencies come only from required/optional Context
+and Lens fields, `applies_to`, conflicts, and supersession references. Renma
+separately adds structurally derived static-support dependencies from
+deterministic Skill-local containment and static-reference evidence; those
+relationships are not frontmatter declarations. `continues-with` is a separate
+Skill Discovery route declaration. `published-entrypoint` is separate
+publication intent. Neither creates a catalog dependency or claims runtime
+selection, loading, or execution.
+
+Ownership inheritance is structural, not metadata merging: a Skill-local
+support asset with no declared owner inherits only when Renma resolves exactly
+one parent Skill with a declared owner. Missing or ambiguous parents remain
+unowned. Shared Context assets never inherit an owner by path.
+
+Security profile inheritance is a different mechanism. Valid asset-local
+scalars take precedence over the selected profile chain; a child profile takes
+precedence over its base. Allowed-data and forbidden-input lists use their
+documented replacement/fail-closed rules, while approved network/upload
+destinations accumulate from eligible profile and repository configuration
+sources. Repository disallowed commands also accumulate. Separately, only a
+uniquely resolved Skill-local Script or Asset inherits its owning Skill's
+effective policy. Ordinary Skill-local References, Profiles, and Examples can
+declare their own top-level policy but do not inherit the Skill's policy by
+placement. `allowed-floating-dependencies` is always asset-local and never
+participates in effective-policy inheritance or fingerprints.
+
+The BOM and Trust Graph project normalized metadata and effective governance;
+they do not make every declared field part of the same fingerprint. Discovery
+publication and continuation remain outside catalog/BOM dependency metadata,
+token-budget decisions remain quality-rule evidence, and compatibility-only
+fields remain limited to their named diagnostics.
+
+### Complete canonical Skill example
+
+Save this as `skills/review-public-json/SKILL.md`. Its required Context target
+is the complete Context example in the next section.
+
+```markdown
+---
+name: review-public-json
+description: Review a proposed public JSON change for compatibility and release risk. Use when a versioned Renma JSON contract may change; do not use for implementing the change or approving a release.
+license: MIT
+compatibility: Requires repository files and local Renma CLI output; no network access.
+metadata:
+  renma.id: skill.release.review-public-json
+  renma.title: Review Public JSON Compatibility
+  renma.version: "1.2.0"
+  renma.owner: release-engineering
+  renma.status: stable
+  renma.last-reviewed-at: "2026-08-01"
+  renma.review-cycle: P90D
+  renma.expires-at: "2027-08-01"
+  renma.tags: '["release","compatibility","json"]'
+  renma.requires-context: '["context.release.public-json-compatibility"]'
+  renma.optional-context: '[]'
+  renma.conflicts: '[]'
+  renma.continues-with: '[]'
+  renma.allowed-data: '["repo-local-files","skill-bundled-context"]'
+  renma.network-allowed: "false"
+  renma.external-upload-allowed: "false"
+  renma.secrets-allowed: "false"
+  renma.requires-human-approval: "true"
+  renma.forbidden-inputs: '["credentials","tokens","unsanitized-production-data"]'
+---
+
+# Review Public JSON Compatibility
+
+## Required inputs
+
+- The proposed JSON or schema diff.
+- The current repository contract and release notes.
+- `context.release.public-json-compatibility`.
+
+## Workflow
+
+1. Identify added, removed, renamed, or type-changed public fields.
+2. Compare each change with the Context's compatibility criteria.
+3. Separate compatible additions from breaking or unresolved changes.
+4. Produce a review report with evidence paths, compatibility classification,
+   release risk, and required follow-up.
+5. Obtain explicit human approval before recommending release of a breaking or
+   unresolved contract change.
+
+## Hard constraints
+
+- Do not fetch external sources, upload artifacts, or read secrets. Use the
+  repository inputs; if required evidence is absent, report it as unresolved.
+- Do not implement the change or approve the release. Return an evidence-backed
+  review for the owning team to decide.
+
+## Completion criteria
+
+The report accounts for every public-contract change, cites repository
+evidence, identifies unresolved facts, and records whether human approval is
+still required.
+```
+
+The body repeats behavior-critical constraints because the security metadata
+is governance evidence, not an instruction delivery mechanism. The empty
+continuation array is valid and creates no route.
+
+### Complete independent Context example
+
+Save this as `contexts/release/public-json-compatibility.md`. It is independent
+of the Skill: the Skill depends on the Context, while the Context retains its
+own identity, owner, lifecycle, usage boundaries, and source-of-truth scope.
+
+```markdown
+---
+id: context.release.public-json-compatibility
+version: 1.0.0
+owner: release-engineering
+status: stable
+purpose: Define the reviewed compatibility boundary for versioned public JSON contracts.
+last_reviewed_at: 2026-08-01
+review_cycle: P90D
+expires_at: 2027-08-01
+tags:
+  - release
+  - compatibility
+  - json
+when_to_use:
+  - Reviewing a change to a versioned public JSON document or schema
+when_not_to_use:
+  - Reviewing internal diagnostic payloads with no published compatibility contract
+allowed_data:
+  - repo-local-files
+network_allowed: false
+external_upload_allowed: false
+secrets_allowed: false
+requires_human_approval: true
+forbidden_inputs:
+  - credentials
+  - tokens
+  - unsanitized-production-data
+---
+
+# Public JSON Compatibility Context
+
+## Scope
+
+Use this Context to classify changes to a repository-declared, versioned public
+JSON contract. Additive optional fields are normally compatible. Removing a
+field, renaming it, narrowing its accepted values, or changing its type requires
+an explicit compatibility decision and release review.
+
+## Review guidance
+
+1. Compare the proposed and current contract from repository evidence.
+2. Record every externally observable change.
+3. Treat undocumented consumer assumptions as unresolved, not confirmed.
+4. Require human approval before classifying a breaking or unresolved change
+   as release-ready.
+
+## Source-of-truth boundary
+
+This Context is the maintained review policy for compatibility classification.
+The versioned JSON contract in the target repository remains authoritative for
+its actual fields and types, and release owners remain authoritative for
+approval. Do not use this Context to invent missing schema details or consumer
+requirements.
+```
+
+These two documents have matching IDs, dates, list encodings, policy, and body
+constraints. They make no network, upload, secret, or external source-of-truth
+claim and introduce no unresolved Lens or continuation target.
+
+### Compatibility classification
+
+- **Current canonical fields:** specification-valid Skills use the table's
+  `metadata.renma.*` fields; supported non-Skill assets use the mapped top-level
+  fields. Field omission remains allowed unless the table marks it required or
+  conditional.
+- **Recognized but discouraged:** `renma.when-to-use` and
+  `renma.when-not-to-use` remain operational and preserved, but new canonical
+  Skills should put portable discovery and exclusion semantics in
+  `description`. Their top-level Context forms remain current and recommended
+  for active shared Context usage boundaries. `canonical_context` is a narrow
+  compatibility input to one maintenance diagnostic, not general metadata for
+  new References.
+- **Deprecated but retained operationally:** Context Lens `target`, `targets`,
+  `output`, and `outputs` produce deprecation diagnostics and do not substitute
+  for `applies_to` or `expected_outputs`.
+- **Migration-only:** pre-0.16 top-level Skill governance and security fields
+  are accepted only as one-way `suggest-metadata` input. They never merge with,
+  override, or fall back from canonical metadata.
+- **Preserved but uninterpreted:** unknown canonical `renma.*` keys and other
+  vendors' valid string metadata remain portable metadata but have no Renma
+  projection. Unknown top-level non-Skill fields remain outside the operational
+  model unless added to a current parser registry.
+- **Invalid or ambiguous:** a specification-invalid, hybrid, or pre-0.16 Skill
+  contributes no operational Skill metadata. Duplicate canonical declarations
+  are not resolved by ordering. Malformed recognized catalog values are absent
+  or diagnosed by their field contract; malformed security, continuation, and
+  publication declarations retain exact evidence and fail closed for their
+  consumer.
+
 ## Quick Start
 
 For a new repository that wants to record explicit Renma adoption and pin its

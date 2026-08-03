@@ -204,7 +204,9 @@ node dist/index.js scan . --fail-on high
 
 Run `renma --help` and `renma <command> --help` for the authoritative usage,
 options, formats, examples, and exit behavior. The
-[User Manual](docs/user-manual.md) owns the operational command reference.
+[User Manual](docs/user-manual.md#authoritative-metadata-reference) owns the
+complete operational metadata reference, and the manual's command sections own
+the operational command reference.
 
 ## Repository Conventions
 

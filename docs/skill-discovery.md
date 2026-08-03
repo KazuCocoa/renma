@@ -38,6 +38,12 @@ execute a Skill.
 
 ## Canonical declarations
 
+The User Manual's
+[authoritative metadata table](user-manual.md#renma-operational-metadata-table)
+owns the complete Renma field inventory. This section intentionally covers
+only the Discovery-specific `renma.published-entrypoint` and
+`renma.continues-with` subset and its deeper routing semantics.
+
 Only a specification-valid, directory-based Agent Skill named exactly
 `SKILL.md` can contribute operational Discovery metadata:
 

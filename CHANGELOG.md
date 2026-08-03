@@ -6,6 +6,16 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added one authoritative User Manual metadata reference covering portable
+  Agent Skills fields, every operational Renma Skill/non-Skill mapping, exact
+  value formats, applicability, compatibility status, projections,
+  inheritance boundaries, and complete Skill and Context examples.
+- Added implementation-owned metadata definition registries and deterministic
+  documentation-drift coverage so catalog, Discovery, security, specialized
+  non-Skill, and token-budget fields cannot silently diverge from the manual.
+
 ## [0.28.4] - 2026-08-01
 
 ### Added

@@ -16,6 +16,7 @@ import {
 } from "./discovery.js";
 import { collectHelperCommandEvidence } from "./helper-command-evidence.js";
 import { parseAssetMetadata } from "./metadata.js";
+import { NON_SKILL_AUXILIARY_METADATA_KEYS } from "./metadata-definitions.js";
 import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { estimateTokens, markdownBody } from "./token-estimator.js";
@@ -1560,7 +1561,9 @@ function sharedContextTargets(document: ParsedDocument): string[] {
   const operationalMetadata = parseAssetMetadata(document).metadata;
   return [
     ...operationalMetadata.supersededBy,
-    ...listMetadataValue(document.metadata.canonical_context),
+    ...listMetadataValue(
+      document.metadata[NON_SKILL_AUXILIARY_METADATA_KEYS.canonical_context],
+    ),
   ].filter(
     (target, index, targets) =>
       /^contexts?\//u.test(target) && targets.indexOf(target) === index,

@@ -1,6 +1,11 @@
 # Renma Security Policy Guide
 
-Use this guide when writing security-sensitive skills or context assets. It is a practical policy-authoring companion to the [User Manual](user-manual.md). For full finding definitions, see the [Diagnostics Reference](diagnostics.md).
+Use this guide when writing security-sensitive skills or context assets. It is
+a practical policy-authoring companion to the User Manual's
+[authoritative metadata reference](user-manual.md#authoritative-metadata-reference),
+which owns the complete security field mapping and value inventory. This guide
+owns effective-policy semantics, examples, edge cases, and findings. For full
+finding definitions, see the [Diagnostics Reference](diagnostics.md).
 
 Renma security diagnostics are deterministic repository checks for agent-facing operational instructions. They do not execute commands, call an LLM, enforce runtime behavior, inject context, or turn Renma into a broad supply-chain scanner. They are not language-specific SAST, dependency scanning, runtime monitoring, sandboxing, permission enforcement, telemetry collection, or a proof that an agent workflow is safe. No findings means only that the enabled deterministic checks found no matching repository evidence.
 
@@ -59,6 +64,12 @@ Add small security policy metadata to agent-facing Skills or context assets when
 they include network, upload, secret-handling, command execution, or other
 sensitive operational instructions. Skills and non-Skill assets use different
 serialization boundaries.
+
+The examples below are feature-specific subsets. Use the
+[complete metadata table](user-manual.md#renma-operational-metadata-table) for
+all recognized Skill and non-Skill security fields, including
+`renma.allowed-floating-dependencies` and
+`allowed_floating_dependencies`.
 
 ### Canonical Skill security policy
 

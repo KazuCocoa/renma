@@ -1,5 +1,10 @@
 # Metadata Budget Guidance
 
+The User Manual's
+[authoritative metadata table](user-manual.md#renma-operational-metadata-table)
+owns the complete field inventory and exact support-asset applicability. This
+document retains the deeper token-budget decision semantics and examples.
+
 Renma intentionally keeps asset frontmatter small. Frontmatter should work as a deterministic index for cataloging, graph checks, readiness checks, and security diagnostics. It should not become a second copy of the asset body.
 
 Use frontmatter for concise fields such as `id`, `owner`, `status`, `tags`, `when_to_use`, `when_not_to_use`, and declared context relationships. Put detailed guidance, examples, procedures, policy rationale, and long routing prose in the markdown body or in referenced context assets.

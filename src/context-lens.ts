@@ -3,6 +3,13 @@ import { frontmatterRangeForArtifact } from "./frontmatter-envelope.js";
 import type { Catalog, CatalogEntry } from "./model.js";
 import type { Diagnostic, Evidence } from "./types/diagnostics.js";
 import type { ParsedDocument } from "./types/metadata.js";
+import {
+  CONTEXT_LENS_SUPPORTED_SCOPES,
+  CONTEXT_LENS_SUPPORTED_VERSIONS,
+  NON_SKILL_AUXILIARY_METADATA_DEFINITIONS,
+  NON_SKILL_AUXILIARY_METADATA_KEYS,
+  NON_SKILL_CATALOG_METADATA_KEYS,
+} from "./metadata-definitions.js";
 
 export const CONTEXT_LENS_DIAGNOSTIC_CODES = {
   DEPRECATED_FIELD: "CONTEXT-LENS-DEPRECATED-FIELD",
@@ -19,15 +26,23 @@ export const CONTEXT_LENS_DIAGNOSTIC_CODES = {
   UNSUPPORTED_VERSION: "CONTEXT-LENS-UNSUPPORTED-VERSION",
 } as const;
 
-const SUPPORTED_LENS_SCOPES = new Set(["context"]);
-const SUPPORTED_LENS_VERSIONS = new Set(["1"]);
-const DEPRECATED_LENS_FIELDS = new Map([
-  ["target", "applies_to"],
-  ["targets", "applies_to"],
-  ["output", "expected_outputs"],
-  ["outputs", "expected_outputs"],
-]);
-const REQUIRED_LENS_FIELDS = ["id", "owner", "purpose", "applies_to"];
+const SUPPORTED_LENS_SCOPES = new Set<string>(CONTEXT_LENS_SUPPORTED_SCOPES);
+const SUPPORTED_LENS_VERSIONS = new Set<string>(
+  CONTEXT_LENS_SUPPORTED_VERSIONS,
+);
+const DEPRECATED_LENS_FIELDS = new Map(
+  NON_SKILL_AUXILIARY_METADATA_DEFINITIONS.filter(
+    (definition) =>
+      definition.consumer === "context-lens" &&
+      definition.authoringStatus === "deprecated",
+  ).map((definition) => [definition.nonSkillKey, definition.replacement!]),
+);
+const REQUIRED_LENS_FIELDS = [
+  NON_SKILL_CATALOG_METADATA_KEYS.id,
+  NON_SKILL_CATALOG_METADATA_KEYS.owner,
+  NON_SKILL_CATALOG_METADATA_KEYS.purpose,
+  NON_SKILL_CATALOG_METADATA_KEYS.applies_to,
+];
 
 export interface ContextLensDiagnosticCounts {
   error: number;
@@ -91,9 +106,16 @@ export function summarizeContextLensGovernance(
       const entry = catalog.entries.find(
         (candidate) => candidate.sourcePath === document.artifact.path,
       );
-      const id = textMetadata(document, "id") ?? document.artifact.path;
-      const scope = textMetadata(document, "scope") ?? "context";
-      const targets = listMetadata(document, "applies_to");
+      const id =
+        textMetadata(document, NON_SKILL_CATALOG_METADATA_KEYS.id) ??
+        document.artifact.path;
+      const scope =
+        textMetadata(document, NON_SKILL_AUXILIARY_METADATA_KEYS.scope) ??
+        "context";
+      const targets = listMetadata(
+        document,
+        NON_SKILL_CATALOG_METADATA_KEYS.applies_to,
+      );
       const targetPaths = targets
         .map((target) => resolver.resolve(target)?.sourcePath)
         .filter((targetPath): targetPath is string => targetPath !== undefined)
@@ -204,12 +226,17 @@ function isLensDocument(document: ParsedDocument): boolean {
   if (document.artifact.kind === "context_lens") return true;
   return (
     document.artifact.kind === "context" &&
-    textMetadata(document, "type") === "context_lens"
+    textMetadata(document, NON_SKILL_CATALOG_METADATA_KEYS.type) ===
+      "context_lens"
   );
 }
 
 function unsupportedKindDiagnostics(document: ParsedDocument): Diagnostic[] {
-  if (textMetadata(document, "type") !== "context_lens") return [];
+  if (
+    textMetadata(document, NON_SKILL_CATALOG_METADATA_KEYS.type) !==
+    "context_lens"
+  )
+    return [];
   if (
     document.artifact.kind === "context_lens" ||
     document.artifact.kind === "context"
@@ -290,7 +317,7 @@ function unsupportedValueDiagnostics(document: ParsedDocument): Diagnostic[] {
     });
   }
 
-  const scope = textMetadata(document, "scope");
+  const scope = textMetadata(document, NON_SKILL_AUXILIARY_METADATA_KEYS.scope);
   if (scope !== undefined && !SUPPORTED_LENS_SCOPES.has(scope)) {
     diagnostics.push({
       code: CONTEXT_LENS_DIAGNOSTIC_CODES.UNSUPPORTED_SCOPE,
@@ -299,7 +326,10 @@ function unsupportedValueDiagnostics(document: ParsedDocument): Diagnostic[] {
       message: `Context lens definition uses unsupported scope "${scope}". Expected one of: ${[
         ...SUPPORTED_LENS_SCOPES,
       ].join(", ")}.`,
-      evidence: fieldEvidence(document, "scope"),
+      evidence: fieldEvidence(
+        document,
+        NON_SKILL_AUXILIARY_METADATA_KEYS.scope,
+      ),
     });
   }
 

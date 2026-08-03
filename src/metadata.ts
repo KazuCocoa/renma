@@ -15,6 +15,13 @@ import { isIsoDate, parseDayDuration } from "./freshness.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { estimateTokens } from "./token-estimator.js";
 import {
+  CANONICAL_SKILL_METADATA_KEYS,
+  CANONICAL_SKILL_PUBLICATION_METADATA_KEY,
+  NON_SKILL_CATALOG_METADATA_KEYS,
+  SUPPORT_ASSET_TOKEN_BUDGET_KINDS,
+  SUPPORT_ASSET_TOKEN_BUDGET_METADATA_KEYS,
+} from "./metadata-definitions.js";
+import {
   parseAgentSkillFrontmatter,
   type ParsedYamlFrontmatter,
   type YamlFrontmatterField,
@@ -27,32 +34,10 @@ const STATUSES: AssetStatus[] = [
   "archived",
 ];
 
-/** Canonical Agent Skills metadata keys understood by the installed Renma version. */
-export const CANONICAL_SKILL_METADATA_KEYS = {
-  id: "renma.id",
-  title: "renma.title",
-  version: "renma.version",
-  owner: "renma.owner",
-  status: "renma.status",
-  purpose: "renma.purpose",
-  last_reviewed_at: "renma.last-reviewed-at",
-  review_cycle: "renma.review-cycle",
-  expires_at: "renma.expires-at",
-  tags: "renma.tags",
-  when_to_use: "renma.when-to-use",
-  when_not_to_use: "renma.when-not-to-use",
-  requires_context: "renma.requires-context",
-  optional_context: "renma.optional-context",
-  requires_lens: "renma.requires-lens",
-  optional_lens: "renma.optional-lens",
-  conflicts: "renma.conflicts",
-  superseded_by: "renma.superseded-by",
-  continues_with: "renma.continues-with",
-} as const;
-
-/** Canonical one-state Skill publication marker, kept out of catalog metadata. */
-export const CANONICAL_SKILL_PUBLICATION_METADATA_KEY =
-  "renma.published-entrypoint" as const;
+export {
+  CANONICAL_SKILL_METADATA_KEYS,
+  CANONICAL_SKILL_PUBLICATION_METADATA_KEY,
+} from "./metadata-definitions.js";
 
 type CanonicalSkillOperationalKey = keyof typeof CANONICAL_SKILL_METADATA_KEYS;
 
@@ -126,13 +111,18 @@ export interface SupportAssetTokenBudgetDecision {
   evidence?: Evidence;
 }
 
-const TOKEN_BUDGET_KEYS = [
-  "token_budget_override",
-  "token_budget_rationale",
-  "token_budget_reviewed_at",
-] as const;
+type TokenBudgetKey = (typeof SUPPORT_ASSET_TOKEN_BUDGET_METADATA_KEYS)[number];
 
-type TokenBudgetKey = (typeof TOKEN_BUDGET_KEYS)[number];
+const NON_SKILL_CATALOG_KEY_SET = new Set<string>(
+  Object.values(NON_SKILL_CATALOG_METADATA_KEYS),
+);
+
+const SUPPORT_ASSET_TOKEN_BUDGET_KIND_SET = new Set<string>(
+  SUPPORT_ASSET_TOKEN_BUDGET_KINDS,
+);
+
+type SupportAssetTokenBudgetKind =
+  (typeof SUPPORT_ASSET_TOKEN_BUDGET_KINDS)[number];
 
 interface TokenBudgetDecisionIssue {
   reason: string;
@@ -145,10 +135,7 @@ export function parseSupportAssetTokenBudgetDecision(
 ): SupportAssetTokenBudgetDecision {
   if (
     document.artifact.markdownParserEligible !== true ||
-    (document.artifact.kind !== "context" &&
-      document.artifact.kind !== "reference" &&
-      document.artifact.kind !== "profile" &&
-      document.artifact.kind !== "example")
+    !isSupportAssetTokenBudgetKind(document.artifact.kind)
   ) {
     return { status: "absent", invalidReasons: [] };
   }
@@ -202,7 +189,7 @@ export function parseSupportAssetTokenBudgetDecision(
   }
 
   const fieldsByKey = new Map<TokenBudgetKey, YamlFrontmatterField[]>();
-  for (const key of TOKEN_BUDGET_KEYS) {
+  for (const key of SUPPORT_ASSET_TOKEN_BUDGET_METADATA_KEYS) {
     fieldsByKey.set(
       key,
       parsedFields.filter((field) => field.key === key),
@@ -339,10 +326,18 @@ export function parseSupportAssetTokenBudgetDecision(
   };
 }
 
+function isSupportAssetTokenBudgetKind(
+  kind: string,
+): kind is SupportAssetTokenBudgetKind {
+  return SUPPORT_ASSET_TOKEN_BUDGET_KIND_SET.has(kind);
+}
+
 function isTokenBudgetField(
   field: YamlFrontmatterField,
 ): field is YamlFrontmatterField & { key: TokenBudgetKey } {
-  return TOKEN_BUDGET_KEYS.includes(field.key as TokenBudgetKey);
+  return SUPPORT_ASSET_TOKEN_BUDGET_METADATA_KEYS.includes(
+    field.key as TokenBudgetKey,
+  );
 }
 
 function rawTokenBudgetFields(document: ParsedDocument): Array<{
@@ -826,7 +821,11 @@ function legacyMetadataSource(
   document: ParsedDocument,
 ): OperationalMetadataSource {
   return {
-    values: document.metadata,
+    values: Object.fromEntries(
+      Object.entries(document.metadata).filter(([key]) =>
+        NON_SKILL_CATALOG_KEY_SET.has(key),
+      ),
+    ),
     fields: document.metadataFields,
     listItems: document.metadataListItems,
     canonicalSkill: false,
