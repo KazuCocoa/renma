@@ -5,6 +5,7 @@ import { useRoute } from "vitepress";
 import { nextTick, onMounted, watch } from "vue";
 
 import { mermaidConfig } from "../mermaid.js";
+import { enhanceOperationalMetadataTable } from "./metadata-table.js";
 
 interface DiagramSource {
   element: HTMLElement;
@@ -92,10 +93,20 @@ async function renderMermaidDiagrams(): Promise<void> {
   }
 }
 
-function scheduleMermaidRender(): void {
+function schedulePageEnhancements(): void {
   renderQueue = renderQueue
     .then(async () => {
       await nextTick();
+
+      try {
+        enhanceOperationalMetadataTable();
+      } catch (error) {
+        console.error(
+          "[Renma metadata table] Unexpected enhancement failure.",
+          error,
+        );
+      }
+
       await renderMermaidDiagrams();
     })
     .catch((error: unknown) => {
@@ -103,8 +114,8 @@ function scheduleMermaidRender(): void {
     });
 }
 
-onMounted(scheduleMermaidRender);
-watch(() => route.path, scheduleMermaidRender, { flush: "post" });
+onMounted(schedulePageEnhancements);
+watch(() => route.path, schedulePageEnhancements, { flush: "post" });
 </script>
 
 <template>
