@@ -86,7 +86,7 @@ A Skill is an effective published entrypoint only when the marker is the exact
 string `"true"` and the Skill is:
 
 - a specification-valid canonical Agent Skill;
-- not deprecated or archived; and
+- lifecycle-usable: status is omitted, `experimental`, or `stable`; and
 - unique in effective asset ID across the repository catalog.
 
 Stable publication rejection reasons are `invalid-marker`,
@@ -94,6 +94,16 @@ Stable publication rejection reasons are `invalid-marker`,
 `duplicate-skill-id`. Existing `AS-SKILL-*` validity diagnostics and
 `META-DUPLICATE-ASSET-ID` evidence remain authoritative; Discovery links them
 instead of emitting competing validity or identity diagnostics.
+
+A suspended Skill remains in the visible Skill inventory with its current
+lifecycle reason and transition date, but it is not eligible for publication or
+routing. A valid publication marker on a suspended Skill emits the blocking
+`DISCOVERY-SUSPENDED-PUBLISHED-ENTRYPOINT` diagnostic. An active route that
+resolves exactly to a suspended Skill remains resolved and auditable, but is
+unusable and emits blocking `DISCOVERY-SUSPENDED-ROUTE-TARGET`. Suspended Skills
+and routes are excluded from effective entrypoints, route eligibility,
+reachability, coverage, and route-cycle analysis. Deprecated and archived
+publication and route attempts keep their established warning behavior.
 
 A published Skill may have an incoming route or no outgoing route. A Skill
 with no outgoing route can itself be a complete first-hop workflow. Graph

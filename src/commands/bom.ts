@@ -95,6 +95,8 @@ export interface BomAsset {
   markdownParserEligible: boolean;
   ownership: AssetOwnership;
   status?: AssetStatus;
+  statusReason?: string;
+  statusChangedAt?: string;
   version?: string;
   tags: string[];
   lifecycle?: BomAssetLifecycle;
@@ -105,6 +107,8 @@ export interface BomAsset {
 
 export interface BomAssetLifecycle {
   status?: AssetStatus;
+  statusReason?: string;
+  statusChangedAt?: string;
   lastReviewedAt?: string;
   reviewCycle?: string;
   expiresAt?: string;
@@ -286,6 +290,9 @@ export function formatBomJson(report: BomReport): string {
 
 export function formatBomMarkdown(report: BomReport): string {
   const diagnostics = report.summary.diagnosticCounts;
+  const hasStatusTransitionEvidence = report.assets.some(
+    (asset) => asset.statusReason || asset.statusChangedAt,
+  );
   const lines = [
     "# Repository Context BOM",
     "",
@@ -308,20 +315,31 @@ export function formatBomMarkdown(report: BomReport): string {
     "",
     "## Assets",
     "",
-    "| ID | Kind | Source | Hash | Owner | Status | Dependencies |",
-    "| --- | --- | --- | --- | --- | --- | ---: |",
+    hasStatusTransitionEvidence
+      ? "| ID | Kind | Source | Hash | Owner | Status | Status reason | Status changed at | Dependencies |"
+      : "| ID | Kind | Source | Hash | Owner | Status | Dependencies |",
+    hasStatusTransitionEvidence
+      ? "| --- | --- | --- | --- | --- | --- | --- | --- | ---: |"
+      : "| --- | --- | --- | --- | --- | --- | ---: |",
   ];
 
   if (report.assets.length === 0) {
-    lines.push("| (none) |  |  |  |  |  | 0 |");
+    lines.push(
+      hasStatusTransitionEvidence
+        ? "| (none) |  |  |  |  |  |  |  | 0 |"
+        : "| (none) |  |  |  |  |  | 0 |",
+    );
   } else {
     for (const asset of report.assets) {
+      const prefix = `| ${escapeTableCell(asset.id)} | ${escapeTableCell(asset.kind)} | ${escapeTableCell(
+        asset.sourcePath,
+      )} | ${shortHash(asset.contentHash)} | ${escapeTableCell(
+        bomAssetOwner(asset),
+      )} | ${escapeTableCell(asset.status ?? "")} |`;
       lines.push(
-        `| ${escapeTableCell(asset.id)} | ${escapeTableCell(asset.kind)} | ${escapeTableCell(
-          asset.sourcePath,
-        )} | ${shortHash(asset.contentHash)} | ${escapeTableCell(
-          bomAssetOwner(asset),
-        )} | ${escapeTableCell(asset.status ?? "")} | ${asset.dependencies.length} |`,
+        hasStatusTransitionEvidence
+          ? `${prefix} ${escapeTableCell(asset.statusReason ?? "")} | ${escapeTableCell(asset.statusChangedAt ?? "")} | ${asset.dependencies.length} |`
+          : `${prefix} ${asset.dependencies.length} |`,
       );
     }
   }
@@ -412,6 +430,12 @@ function toBomAsset(asset: Asset, associations: BomAssociationIndex): BomAsset {
     markdownParserEligible: asset.markdownParserEligible,
     ownership: asset.ownership,
     ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
+    ...(asset.metadata.statusReason
+      ? { statusReason: asset.metadata.statusReason }
+      : {}),
+    ...(asset.metadata.statusChangedAt
+      ? { statusChangedAt: asset.metadata.statusChangedAt }
+      : {}),
     ...(asset.metadata.version ? { version: asset.metadata.version } : {}),
     tags: [...asset.metadata.tags].sort((left, right) =>
       left.localeCompare(right),
@@ -445,6 +469,12 @@ function bomAssetOwner(asset: BomAsset): string {
 function assetLifecycle(asset: Asset): BomAssetLifecycle | undefined {
   const lifecycle: BomAssetLifecycle = {
     ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
+    ...(asset.metadata.statusReason
+      ? { statusReason: asset.metadata.statusReason }
+      : {}),
+    ...(asset.metadata.statusChangedAt
+      ? { statusChangedAt: asset.metadata.statusChangedAt }
+      : {}),
     ...(asset.metadata.lastReviewedAt
       ? { lastReviewedAt: asset.metadata.lastReviewedAt }
       : {}),

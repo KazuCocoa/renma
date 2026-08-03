@@ -446,6 +446,83 @@ test("buildDiffReport preserves readiness ownership behavior for an empty eligib
   assert.equal(report.summary.ownershipCoverageDelta, 0);
 });
 
+test("semantic diff compares lifecycle status, reason, and changed date independently", () => {
+  const fromNode = {
+    ...canonicalNode(
+      "context.lifecycle",
+      "contexts/lifecycle.md",
+      "context",
+      "qa",
+      "qa",
+      "stable",
+    ),
+    statusReason: "Initial stable review.",
+    statusChangedAt: "2026-08-01",
+  };
+  const toNode = {
+    ...fromNode,
+    status: "suspended",
+    statusReason: "Temporarily disabled while issue QE-1234 is corrected.",
+    statusChangedAt: "2026-08-03",
+  };
+  const transition = buildDiffReport(
+    "/repo",
+    snapshot("base", { totalAssets: 1, nodes: [fromNode] }),
+    snapshot("head", { totalAssets: 1, nodes: [toNode] }),
+  );
+
+  assert.deepEqual(transition.catalog.changedAssets[0]?.changedFields, [
+    "status",
+    "statusReason",
+    "statusChangedAt",
+  ]);
+  assert.equal(
+    transition.catalog.changedAssets[0]?.to.statusReason,
+    "Temporarily disabled while issue QE-1234 is corrected.",
+  );
+  assert.match(formatDiff(transition, "markdown"), /statusReason/);
+
+  const evidenceOnly = buildDiffReport(
+    "/repo",
+    snapshot("base", { totalAssets: 1, nodes: [toNode] }),
+    snapshot("head", {
+      totalAssets: 1,
+      nodes: [
+        {
+          ...toNode,
+          statusReason: "Corrective work is under independent review.",
+          statusChangedAt: "2026-08-04",
+        },
+      ],
+    }),
+  );
+  assert.deepEqual(evidenceOnly.catalog.changedAssets[0]?.changedFields, [
+    "statusReason",
+    "statusChangedAt",
+  ]);
+
+  const restored = buildDiffReport(
+    "/repo",
+    snapshot("base", { totalAssets: 1, nodes: [toNode] }),
+    snapshot("head", {
+      totalAssets: 1,
+      nodes: [
+        {
+          ...toNode,
+          status: "stable",
+          statusReason: "Fix for QE-1234 was validated and approved.",
+          statusChangedAt: "2026-08-06",
+        },
+      ],
+    }),
+  );
+  assert.deepEqual(restored.catalog.changedAssets[0]?.changedFields, [
+    "status",
+    "statusReason",
+    "statusChangedAt",
+  ]);
+});
+
 test("graph edge identity ignores source asset path moves", () => {
   const report = buildDiffReport(
     "/repo",

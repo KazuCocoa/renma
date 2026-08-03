@@ -26,6 +26,8 @@ export interface UnownedAsset {
   sourcePath: string;
   ownership: AssetOwnership;
   status?: AssetStatus;
+  statusReason?: string;
+  statusChangedAt?: string;
   tags: string[];
 }
 
@@ -35,6 +37,8 @@ export interface OwnedAsset {
   sourcePath: string;
   ownership: AssetOwnership;
   status: AssetStatus | null;
+  statusReason?: string;
+  statusChangedAt?: string;
   tags: string[];
 }
 
@@ -337,6 +341,12 @@ function toUnownedAsset(asset: Asset): UnownedAsset {
     sourcePath: asset.sourcePath,
     ownership: asset.ownership,
     ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
+    ...(asset.metadata.statusReason
+      ? { statusReason: asset.metadata.statusReason }
+      : {}),
+    ...(asset.metadata.statusChangedAt
+      ? { statusChangedAt: asset.metadata.statusChangedAt }
+      : {}),
     tags: asset.metadata.tags,
   };
 }
@@ -348,6 +358,12 @@ function toOwnedAsset(asset: Asset): OwnedAsset {
     sourcePath: asset.sourcePath,
     ownership: asset.ownership,
     status: asset.metadata.status ?? null,
+    ...(asset.metadata.statusReason
+      ? { statusReason: asset.metadata.statusReason }
+      : {}),
+    ...(asset.metadata.statusChangedAt
+      ? { statusChangedAt: asset.metadata.statusChangedAt }
+      : {}),
     tags: asset.metadata.tags,
   };
 }

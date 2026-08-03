@@ -163,6 +163,12 @@ function inspectRepositoryForTarget(
       kind: entry.kind,
       ...(entry.metadata.owner ? { owner: entry.metadata.owner } : {}),
       ...(entry.metadata.status ? { status: entry.metadata.status } : {}),
+      ...(entry.metadata.statusReason
+        ? { statusReason: entry.metadata.statusReason }
+        : {}),
+      ...(entry.metadata.statusChangedAt
+        ? { statusChangedAt: entry.metadata.statusChangedAt }
+        : {}),
       ...(entry.metadata.purpose ? { purpose: entry.metadata.purpose } : {}),
       appliesTo: entry.metadata.appliesTo ?? [],
       focus: entry.metadata.focus ?? [],

@@ -18,7 +18,9 @@ export interface SkillFixtureOptions {
   id?: string;
   description?: string;
   owner?: string;
-  status?: "experimental" | "stable" | "deprecated" | "archived";
+  status?: "experimental" | "stable" | "suspended" | "deprecated" | "archived";
+  statusReason?: string;
+  statusChangedAt?: string;
   continuesWith?: readonly string[];
   publishedEntrypoint?: boolean;
   metadata?: Readonly<Record<string, string>>;
@@ -29,6 +31,8 @@ export interface ContextFixtureOptions {
   id: string;
   owner?: string;
   status?: "experimental" | "stable" | "deprecated" | "archived" | string;
+  statusReason?: string;
+  statusChangedAt?: string;
   whenToUse?: readonly string[];
   whenNotToUse?: readonly string[];
   requiresContext?: readonly string[];
@@ -108,6 +112,14 @@ export class RepositoryFixture {
         ? [`  renma.continues-with: '${JSON.stringify(options.continuesWith)}'`]
         : []),
       ...(options.status ? [`  renma.status: ${options.status}`] : []),
+      ...(options.statusReason
+        ? [`  renma.status-reason: ${JSON.stringify(options.statusReason)}`]
+        : []),
+      ...(options.statusChangedAt
+        ? [
+            `  renma.status-changed-at: ${JSON.stringify(options.statusChangedAt)}`,
+          ]
+        : []),
       ...(options.owner ? [`  renma.owner: ${options.owner}`] : []),
       ...(options.publishedEntrypoint
         ? ['  renma.published-entrypoint: "true"']
@@ -145,6 +157,8 @@ export class RepositoryFixture {
       id: options.id,
       owner: options.owner,
       status: options.status,
+      status_reason: options.statusReason,
+      status_changed_at: options.statusChangedAt,
       when_to_use: options.whenToUse,
       when_not_to_use: options.whenNotToUse,
       requires_context: options.requiresContext,

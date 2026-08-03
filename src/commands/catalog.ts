@@ -118,6 +118,12 @@ export function formatCatalogMarkdown(
     );
     lines.push(`- Ownership source: ${entry.ownership.source}`);
     lines.push(`- Status: ${entry.metadata.status ?? "(unspecified)"}`);
+    if (entry.metadata.statusReason) {
+      lines.push(`- Status reason: ${entry.metadata.statusReason}`);
+    }
+    if (entry.metadata.statusChangedAt) {
+      lines.push(`- Status changed at: ${entry.metadata.statusChangedAt}`);
+    }
     lines.push(
       `- Last reviewed: ${entry.metadata.lastReviewedAt ?? "(unspecified)"}`,
     );

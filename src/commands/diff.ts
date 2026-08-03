@@ -114,6 +114,8 @@ export interface AssetDelta {
   declaredOwner: string | null;
   effectiveOwner: string | null;
   status?: string | undefined;
+  statusReason?: string | undefined;
+  statusChangedAt?: string | undefined;
 }
 
 const COMPARABLE_ASSET_FIELDS = [
@@ -122,6 +124,8 @@ const COMPARABLE_ASSET_FIELDS = [
   "declaredOwner",
   "effectiveOwner",
   "status",
+  "statusReason",
+  "statusChangedAt",
 ] as const;
 
 export type ComparableAssetField = (typeof COMPARABLE_ASSET_FIELDS)[number];
@@ -522,6 +526,20 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
     `- Added assets: ${report.catalog.addedAssets.length}`,
     `- Removed assets: ${report.catalog.removedAssets.length}`,
     `- Changed assets: ${report.catalog.changedAssets.length}`,
+    ...(report.catalog.changedAssets.length > 0
+      ? [
+          "",
+          "### Changed asset fields",
+          "",
+          ...report.catalog.changedAssets.flatMap((change) => [
+            `- \`${change.id}\` (${change.path ? `\`${change.path}\`` : "path unavailable"})`,
+            ...change.changedFields.map(
+              (field) =>
+                `  - ${field}: ${markdownValue(change.from[field])} -> ${markdownValue(change.to[field])}`,
+            ),
+          ]),
+        ]
+      : []),
     "",
     "## Graph",
     "",
@@ -1062,10 +1080,24 @@ function assetMap(nodes: unknown[]): Map<string, AssetDelta> {
         effectiveOwner:
           optionalNullableStringField(ownership, "effectiveOwner") ?? null,
         status: firstOptionalString(node, ["status"]),
+        ...(firstOptionalString(node, ["statusReason"])
+          ? { statusReason: firstOptionalString(node, ["statusReason"]) }
+          : {}),
+        ...(firstOptionalString(node, ["statusChangedAt"])
+          ? {
+              statusChangedAt: firstOptionalString(node, ["statusChangedAt"]),
+            }
+          : {}),
       };
       return [asset.id, asset] as const;
     }),
   );
+}
+
+function markdownValue(value: unknown): string {
+  return typeof value === "string" && value.length > 0
+    ? `\`${value.replaceAll("`", "\\`")}\``
+    : "(none)";
 }
 
 function edgeMap(edges: unknown[]): Map<string, EdgeDelta> {

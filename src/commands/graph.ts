@@ -107,6 +107,8 @@ export interface GraphNode {
   markdownParserEligible?: boolean;
   ownership: AssetOwnership;
   status?: AssetStatus;
+  statusReason?: string;
+  statusChangedAt?: string;
   tags: string[];
   groupedCount?: number;
   executableRole?: ExecutableGraphNodeRole;
@@ -1788,6 +1790,12 @@ function toNode(asset: Asset): GraphNode {
     markdownParserEligible: asset.markdownParserEligible,
     ownership: asset.ownership,
     ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
+    ...(asset.metadata.statusReason
+      ? { statusReason: asset.metadata.statusReason }
+      : {}),
+    ...(asset.metadata.statusChangedAt
+      ? { statusChangedAt: asset.metadata.statusChangedAt }
+      : {}),
     tags: asset.metadata.tags,
   };
 }

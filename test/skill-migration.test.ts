@@ -18,6 +18,8 @@ id: skill.demo
 title: Demo Review
 owner: qa-platform
 status: stable
+status_reason: Restored after compatibility review
+status_changed_at: "2026-08-03"
 tags:
   - demo
   - review
@@ -43,6 +45,14 @@ Use this skill when reviewing demo inputs before implementation.
   assert.equal(
     suggestion.agentSkills?.candidateRenmaMetadata["renma.tags"],
     '["demo","review"]',
+  );
+  assert.equal(
+    suggestion.agentSkills?.candidateRenmaMetadata["renma.status-reason"],
+    "Restored after compatibility review",
+  );
+  assert.equal(
+    suggestion.agentSkills?.candidateRenmaMetadata["renma.status-changed-at"],
+    "2026-08-03",
   );
   assert.match(
     suggestion.agentSkills?.canonicalFrontmatter ?? "",

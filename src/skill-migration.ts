@@ -41,6 +41,8 @@ const TEXT_SCALAR_LEGACY_FIELDS = new Set([
   "version",
   "owner",
   "status",
+  "status_reason",
+  "status_changed_at",
   "purpose",
   "last_reviewed_at",
   "review_cycle",

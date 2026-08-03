@@ -6,7 +6,8 @@ import type { MetadataFieldEvidence } from "./types/metadata.js";
 export type { AssetOwnership } from "./types/governance.js";
 
 /** Lifecycle state for a skill or context asset. */
-export type AssetStatus = "experimental" | "stable" | "deprecated" | "archived";
+export type AssetStatus =
+  "experimental" | "stable" | "suspended" | "deprecated" | "archived";
 
 /** Artifact kinds Renma keeps in the normalized model. */
 export type AssetKind = Exclude<ArtifactKind, "unknown">;
@@ -33,6 +34,8 @@ export interface AssetMetadata {
   version?: string;
   owner?: string;
   status?: AssetStatus;
+  statusReason?: string;
+  statusChangedAt?: string;
   purpose?: string;
   lastReviewedAt?: string;
   reviewCycle?: string;

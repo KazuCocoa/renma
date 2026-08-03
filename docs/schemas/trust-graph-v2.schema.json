@@ -185,6 +185,17 @@
           }
         },
         "ownershipSource": { "enum": ["declared", "inherited"] },
+        "status": {
+          "enum": [
+            "experimental",
+            "stable",
+            "suspended",
+            "deprecated",
+            "archived"
+          ]
+        },
+        "statusReason": { "type": "string", "minLength": 1 },
+        "statusChangedAt": { "type": "string" },
         "inheritedFrom": { "$ref": "#/$defs/inheritedFrom" }
       },
       "additionalProperties": true

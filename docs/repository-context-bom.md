@@ -124,6 +124,13 @@ and inherited-ownership fields appear only when their evidence exists. Owner
 values are explicitly nullable; missing optional fields are omitted rather
 than serialized as `null`.
 
+BOM v2 additively accepts `suspended` in lifecycle status enums. Asset and
+`lifecycle` projections may include optional `statusReason` and
+`statusChangedAt` strings adjacent to status. These are current declaration
+evidence only: BOM does not store transition history, infer dates, schedule
+expiry, or restore an asset. Existing v2 documents without the optional fields
+remain valid, and the BOM schema version stays unchanged.
+
 Arrays are deterministically ordered by their identity/path keys, and count
 fields are non-negative integers. Count maps contain every declared enum
 member, including zero counts. Policy source ordering is `local`,

@@ -1,8 +1,10 @@
 import type { AssetStatus, CatalogEntry } from "./model.js";
+import {
+  isDeclaredActiveLifecycleStatus,
+  isInactiveLifecycleStatus,
+} from "./lifecycle.js";
 import type { Diagnostic, Evidence } from "./types/diagnostics.js";
 
-const ACTIVE_STATUSES = new Set<AssetStatus>(["experimental", "stable"]);
-const INACTIVE_STATUSES = new Set<AssetStatus>(["deprecated", "archived"]);
 const MISSING_SUPERSEDED_BY_MESSAGE =
   "Deprecated shared context asset is missing superseded_by metadata.";
 
@@ -50,7 +52,7 @@ export function lifecycleDiagnostics(entries: CatalogEntry[]): Diagnostic[] {
         continue;
       }
 
-      if (isInactiveStatus(target.metadata.status)) {
+      if (isInactiveLifecycleStatus(target.metadata.status)) {
         diagnostics.push({
           severity: "warning",
           path: entry.sourcePath,
@@ -108,7 +110,7 @@ function firstCycleEntry(
   for (const targetId of entry.metadata.supersededBy) {
     const target = entriesById.get(targetId);
     if (!target || !isGovernedContext(target)) continue;
-    if (isActiveStatus(target.metadata.status)) continue;
+    if (isDeclaredActiveLifecycleStatus(target.metadata.status)) continue;
 
     const cycleEntry = firstCycleEntry(target, entriesById, path);
     if (cycleEntry) return cycleEntry;
@@ -126,14 +128,6 @@ function isGovernedContext(entry: CatalogEntry): boolean {
     entry.metadata.whenToUse.length > 0 &&
     entry.metadata.whenNotToUse.length > 0
   );
-}
-
-function isActiveStatus(status: AssetStatus | undefined): boolean {
-  return status !== undefined && ACTIVE_STATUSES.has(status);
-}
-
-function isInactiveStatus(status: AssetStatus | undefined): boolean {
-  return status !== undefined && INACTIVE_STATUSES.has(status);
 }
 
 function selfReferenceMessage(targetId: string): string {

@@ -148,6 +148,10 @@ function renderAssetSummary(asset: InspectAssetSummary): string[] {
     `- Kind: ${asset.kind}`,
     ...(asset.owner ? [`- Owner: ${asset.owner}`] : []),
     ...(asset.status ? [`- Status: ${asset.status}`] : []),
+    ...(asset.statusReason ? [`- Status reason: ${asset.statusReason}`] : []),
+    ...(asset.statusChangedAt
+      ? [`- Status changed at: ${asset.statusChangedAt}`]
+      : []),
     `- Tags: ${list(asset.tags)}`,
     ...(asset.kind === "context_lens"
       ? [

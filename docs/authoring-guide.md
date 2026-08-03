@@ -968,6 +968,19 @@ metadata compact and put detailed instructions in the body. Preserve unknown
 existing vendor metadata during review, but do not manufacture provider-specific
 metadata without a requirement.
 
+For a temporary lifecycle stop, preserve the asset and set
+`renma.status: suspended` together with a reviewed, non-blank
+`renma.status-reason` and real `YYYY-MM-DD` `renma.status-changed-at`. Non-Skill
+assets use `status`, `status_reason`, and `status_changed_at` at the top level.
+Suspension is static governance: it removes the asset from active dependency,
+composition, publication, and routing use while keeping inventory evidence.
+Required active declarations to the asset block; optional declarations warn.
+Restoration requires another reviewed status/reason/date change. Renma does not
+schedule, expire, or restore lifecycle state automatically, and
+`last_reviewed_at` remains the separate freshness-review date. See
+[Context Lifecycle Diagnostics](context-lifecycle-diagnostics.md) for the full
+dependency and evidence policy.
+
 ## Context Asset And Context Lens Authoring
 
 Create a Context Asset when knowledge is reusable across Skills, has independent

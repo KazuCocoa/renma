@@ -8,6 +8,7 @@ import {
   withDiagnosticId,
 } from "./diagnostic-ids.js";
 import type {
+  Asset,
   AssetMetadata,
   Catalog,
   CatalogEntry,
@@ -26,6 +27,8 @@ import type { AssetOwnership } from "./types/governance.js";
 import type { Diagnostic, Evidence } from "./types/diagnostics.js";
 import type { ParsedDocument } from "./types/metadata.js";
 import { buildStaticSupportDependencies } from "./static-support.js";
+import { isLifecycleUsable } from "./lifecycle.js";
+import { resolveUniqueDependencyTarget } from "./dependency-resolution.js";
 
 const QUALITY = DEFAULT_QUALITY_PROFILE;
 const PLACEHOLDER_USAGE_BOUNDARY_PATTERN =
@@ -465,9 +468,32 @@ function dependencyDiagnostics(
 
   for (const dependency of dependencies) {
     if (dependency.to.includes("*")) continue;
+
+    const sourceMatches = entries.filter(
+      (entry) => entry.sourcePath === dependency.sourcePath,
+    );
+    const source = sourceMatches.length === 1 ? sourceMatches[0] : undefined;
+    const uniqueTarget = resolveUniqueDependencyTarget(dependency, entries);
+    const suspensionMembership = suspensionDependencyMembership(dependency);
+    if (
+      source &&
+      uniqueTarget?.metadata.status === "suspended" &&
+      suspensionMembership &&
+      isLifecycleUsable(source.metadata.status)
+    ) {
+      diagnostics.push(
+        suspendedDependencyDiagnostic(
+          source,
+          uniqueTarget,
+          dependency,
+          suspensionMembership,
+        ),
+      );
+    }
+
     if (!shouldValidateDependencyTarget(dependency)) continue;
 
-    const target = entriesById.get(dependency.to);
+    const target = uniqueTarget ?? entriesById.get(dependency.to);
     if (!target) {
       if (dependency.kind === "conflicts") continue;
 
@@ -513,6 +539,88 @@ function dependencyDiagnostics(
   }
 
   return diagnostics;
+}
+
+function suspensionDependencyMembership(
+  dependency: Dependency,
+): "required" | "optional" | undefined {
+  if (dependency.kind === "optional") return "optional";
+  if (dependency.kind === "requires" || dependency.kind === "applies_to") {
+    return "required";
+  }
+  return undefined;
+}
+
+function suspendedDependencyDiagnostic(
+  source: CatalogEntry,
+  target: Asset,
+  dependency: Dependency,
+  membership: "required" | "optional",
+): Diagnostic {
+  const required = membership === "required";
+  const code = required
+    ? DIAGNOSTIC_IDS.META_REQUIRED_SUSPENDED_DEPENDENCY
+    : DIAGNOSTIC_IDS.META_OPTIONAL_SUSPENDED_DEPENDENCY;
+  const relationship = dependency.declaration ?? dependency.kind;
+  return withDiagnosticId(code, {
+    severity: required ? "error" : "warning",
+    path: dependency.sourcePath,
+    message: `${required ? "Required" : "Optional"} ${relationship} declaration "${dependency.to}" from "${dependency.from}" resolves to suspended asset "${target.id}".`,
+    ...(dependency.evidence ? { evidence: dependency.evidence } : {}),
+    repairConstraints: [
+      {
+        kind: "must_preserve",
+        text: "Preserve the suspended target and its lifecycle evidence while reviewing the direct declaration.",
+      },
+      {
+        kind: "must_not_change",
+        text: "Do not automatically restore, clone, delete, or bypass the suspended asset and do not invent a replacement.",
+      },
+      {
+        kind: "allowed_change",
+        text: required
+          ? "Retarget or remove the required declaration only when reviewed repository evidence supports that change, or restore the target through a separate reviewed lifecycle change."
+          : "Keep the optional declaration as review evidence, retarget or remove it when reviewed, or restore the target through a separate reviewed lifecycle change.",
+      },
+      {
+        kind: "requires_human_decision",
+        text: "Confirm whether the active source still needs this suspended asset and whether restoration or relationship repair is intended.",
+      },
+    ],
+    verificationSteps: [
+      {
+        text: "Review the direct declaration and rerun repository validation.",
+        command: "renma scan . --format json",
+        expected: `No ${code} diagnostic remains after an evidence-backed repair; unrelated lifecycle diagnostics remain visible.`,
+      },
+    ],
+    llmHint:
+      "Review only this direct declared relationship. Do not create transitive duplicate diagnostics, infer a replacement, or reactivate the target merely to make the relationship usable.",
+    details: {
+      sourceId: source.id,
+      sourcePath: source.sourcePath,
+      ...(source.metadata.status
+        ? { sourceStatus: source.metadata.status }
+        : {}),
+      targetId: target.id,
+      targetPath: target.sourcePath,
+      targetStatus: target.metadata.status,
+      ...(target.metadata.statusReason
+        ? { targetStatusReason: target.metadata.statusReason }
+        : {}),
+      ...(target.metadata.statusChangedAt
+        ? { targetStatusChangedAt: target.metadata.statusChangedAt }
+        : {}),
+      relationship,
+      dependencyKind: dependency.kind,
+      membership,
+      direct: true,
+      metadataKey: dependency.declaration ?? dependency.kind,
+      ...(dependency.declarationIndex !== undefined
+        ? { declarationIndex: dependency.declarationIndex }
+        : {}),
+    },
+  });
 }
 
 function shouldValidateDependencyTarget(dependency: Dependency): boolean {
@@ -633,7 +741,7 @@ function isCanonicalContextLens(metadata: AssetMetadata): boolean {
 }
 
 function isActiveAsset(metadata: AssetMetadata): boolean {
-  return metadata.status !== "deprecated" && metadata.status !== "archived";
+  return isLifecycleUsable(metadata.status);
 }
 
 function usageBoundaryDiagnostics(

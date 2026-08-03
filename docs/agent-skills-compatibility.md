@@ -120,9 +120,13 @@ does not embed Skill Index arrays or diagnostic payloads; semantic diff, CI
 report, Trust Graph, BOM, ownership, init, scaffold, guide, and suggestions do
 not gain Skill Index fields.
 
-Text values are trimmed strings, and `renma.status` retains the existing
-`experimental`, `stable`, `deprecated`, and `archived` lifecycle values. List
-values are JSON-array strings containing strings only:
+Text values are trimmed strings. `renma.status` accepts `experimental`,
+`stable`, `suspended`, `deprecated`, and `archived`. A suspended Skill also
+requires non-blank `renma.status-reason` and a real `YYYY-MM-DD`
+`renma.status-changed-at` string. These flat keys describe the latest reviewed
+lifecycle transition and are distinct from freshness field
+`renma.last-reviewed-at`. List values are JSON-array strings containing strings
+only:
 
 ```yaml
 metadata:
@@ -142,6 +146,13 @@ declaration index at the field's exact line evidence, and creates no routes for
 an empty array. It is operational only on canonical `SKILL.md` Agent Skills and
 does not enter `catalog.dependencies`. See the
 [Skill Discovery Graph and Index contract](skill-discovery.md).
+
+Historical pre-0.16 top-level `status_reason` and `status_changed_at` Skill
+fields are recognized only as one-way migration input. `suggest-metadata`
+preserves their exact reviewed string values as `renma.status-reason` and
+`renma.status-changed-at`; canonical and historical conflicts remain blocked
+for human review. Renma does not infer either value from Git history or file
+timestamps.
 
 `renma.published-entrypoint` is the explicit Skill-local publication marker.
 Its only valid value is the exact string `"true"`; omission means unpublished.

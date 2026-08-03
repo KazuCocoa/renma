@@ -902,11 +902,19 @@ function formatAssetList(heading: string, assets: AssetDelta[]): string[] {
 }
 
 function formatAssetDetails(asset: AssetDelta): string[] {
+  const lifecycleEvidence =
+    asset.statusReason !== undefined || asset.statusChangedAt !== undefined
+      ? [
+          `  - Status reason: ${formatPlainValue(asset.statusReason)}`,
+          `  - Status changed at: ${formatPlainValue(asset.statusChangedAt)}`,
+        ]
+      : [];
   return [
     `- \`${asset.id}\``,
     `  - Path: ${formatCodeValue(asset.path)}`,
     `  - Kind: ${formatPlainValue(asset.kind)}`,
     `  - Status: ${formatPlainValue(asset.status)}`,
+    ...lifecycleEvidence,
     `  - Declared owner: ${formatPlainValue(asset.declaredOwner)}`,
     `  - Effective owner: ${formatPlainValue(asset.effectiveOwner)}`,
   ];
@@ -941,6 +949,10 @@ function formatComparableAssetField(field: string): string {
       return "declared owner";
     case "effectiveOwner":
       return "effective owner";
+    case "statusReason":
+      return "status reason";
+    case "statusChangedAt":
+      return "status changed at";
     default:
       return field;
   }

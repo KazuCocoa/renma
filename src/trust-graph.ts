@@ -191,7 +191,24 @@ export function buildTrustGraph(input: TrustGraphInput): TrustGraph {
         from: assetNodeId(asset),
         to: lifecycleNodeId,
         type: "has_lifecycle_status",
-        evidence: metadataEvidence(asset, "status"),
+        ...(asset.metadata.statusReason || asset.metadata.statusChangedAt
+          ? {
+              properties: {
+                status: asset.metadata.status,
+                ...(asset.metadata.statusReason
+                  ? { statusReason: asset.metadata.statusReason }
+                  : {}),
+                ...(asset.metadata.statusChangedAt
+                  ? { statusChangedAt: asset.metadata.statusChangedAt }
+                  : {}),
+              },
+            }
+          : {}),
+        evidence: [
+          ...metadataEvidence(asset, "status"),
+          ...metadataEvidence(asset, "status_reason"),
+          ...metadataEvidence(asset, "status_changed_at"),
+        ],
       });
     }
   }
@@ -373,6 +390,12 @@ function assetNode(asset: Asset): TrustGraphNode {
       tags: asset.metadata.tags,
       ownership: asset.ownership,
       ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
+      ...(asset.metadata.statusReason
+        ? { statusReason: asset.metadata.statusReason }
+        : {}),
+      ...(asset.metadata.statusChangedAt
+        ? { statusChangedAt: asset.metadata.statusChangedAt }
+        : {}),
     },
     evidence: [
       {
