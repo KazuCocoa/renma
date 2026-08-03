@@ -1,5 +1,10 @@
 # Renma Quality Profile
 
+The User Manual's
+[authoritative metadata table](user-manual.md#renma-operational-metadata-table)
+owns the complete field inventory. This document owns the deterministic quality
+thresholds and the deeper token-budget decision policy.
+
 `renma-quality` is Renma's internal quality-profile family. Reports identify
 the active profile as `renma-quality@<Renma package version>`, derived from
 `package.json` at build time. The source is `src/quality-profile.ts`. The current

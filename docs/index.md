@@ -47,7 +47,8 @@ npx renma readiness . --format markdown
 
 - [Documentation Index](README.md) maps each question to its authoritative
   document.
-- [User Manual](user-manual.md) covers current CLI workflows and commands.
+- [User Manual](user-manual.md) contains the authoritative operational metadata
+  reference and covers current CLI workflows and commands.
 - [Authoring Guide](authoring-guide.md) defines Skill and Context authoring
   workflows.
 - [Agent Skills Compatibility and Migration](agent-skills-compatibility.md)

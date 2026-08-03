@@ -6,6 +6,7 @@ import {
   markdownBodyStartLineForArtifact,
   renmaFrontmatterEnvelope,
 } from "./frontmatter-envelope.js";
+import { NON_SKILL_LIST_METADATA_KEYS } from "./metadata-definitions.js";
 import type { Artifact } from "./types/artifact.js";
 import type {
   MetadataFieldEvidence,
@@ -72,20 +73,7 @@ export function parseDocument(artifact: Artifact): ParsedDocument {
   return document;
 }
 
-const LIST_METADATA_KEYS = new Set([
-  "tags",
-  "when_to_use",
-  "when_not_to_use",
-  "requires_context",
-  "optional_context",
-  "requires_lens",
-  "optional_lens",
-  "applies_to",
-  "focus",
-  "expected_outputs",
-  "conflicts",
-  "superseded_by",
-]);
+const LIST_METADATA_KEYS = new Set<string>(NON_SKILL_LIST_METADATA_KEYS);
 
 function parseFrontmatter(path: string, lines: string[]): ParsedMetadata {
   const values: Record<string, MetadataValue> = {};

@@ -87,6 +87,11 @@ Profile when they genuinely form an overlay or variant.
 Prefer compact, flat frontmatter. Detailed interpretation belongs in the
 Markdown body rather than turning metadata into a prompt template.
 
+The list below is the Context Lens-specific subset. The User Manual's
+[authoritative metadata table](user-manual.md#renma-operational-metadata-table)
+owns the complete cross-asset inventory, mappings, value formats, and consumer
+projections; this guide retains the Lens requirements and semantics.
+
 - `id`: required stable Lens ID. Prefer a `lens.<domain>.<purpose>` style.
 - `type`: recommended `context_lens` discriminator. It is optional under
   `lenses/**` and required when a Lens is stored under `context/**` or

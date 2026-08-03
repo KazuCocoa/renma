@@ -7,6 +7,12 @@ experimental pre-contract surface removed before broader adoption.
 
 The BOM is not a runtime usage report. It does not describe what an LLM actually consumed, assemble prompts, choose task-specific context, inject context into agents, execute agents, call an LLM, import consumed-context evidence, or collect telemetry.
 
+The User Manual's
+[authoritative metadata reference](user-manual.md#authoritative-metadata-reference)
+defines which declarations feed BOM projections. This document owns the BOM
+schema, snapshot, ordering, and reproducibility semantics rather than a
+separate metadata field inventory.
+
 ```mermaid
 flowchart TD
   Sources["Repository files and configuration"]

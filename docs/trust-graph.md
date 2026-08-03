@@ -5,6 +5,12 @@ contract. There is no v1 compatibility mode. The authoritative
 machine-readable definition is the
 [Trust Graph v2 JSON Schema](schemas/trust-graph-v2.schema.json).
 
+The User Manual's
+[authoritative metadata reference](user-manual.md#authoritative-metadata-reference)
+defines which declarations feed Trust Graph projections. This document owns
+node, edge, evidence, ordering, and schema semantics rather than a separate
+metadata field inventory.
+
 The required top-level fields are `schemaVersion`, `summary`, `nodes`, `edges`,
 and `findings`. Node `properties` and node and edge `evidence` are optional.
 Edge `properties` are optional except where an edge-specific provenance rule

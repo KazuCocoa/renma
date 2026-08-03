@@ -95,31 +95,11 @@ interpretation.
 
 ## Operational Renma Metadata
 
-Renma makes these governance and static continuation keys operational for
-specification-valid Agent Skills:
-
-```text
-renma.id
-renma.title
-renma.version
-renma.owner
-renma.status
-renma.purpose
-renma.last-reviewed-at
-renma.review-cycle
-renma.expires-at
-renma.tags
-renma.when-to-use
-renma.when-not-to-use
-renma.requires-context
-renma.optional-context
-renma.requires-lens
-renma.optional-lens
-renma.conflicts
-renma.superseded-by
-renma.continues-with
-renma.published-entrypoint
-```
+The [authoritative metadata reference](user-manual.md#authoritative-metadata-reference)
+owns the complete operational field inventory, Skill/non-Skill mappings, value
+formats, authoring status, and consumer projections. This compatibility guide
+focuses on canonical Skill serialization, the portable boundary, and migration
+behavior rather than maintaining a second field list.
 
 For new canonical Skills, `description` is the portable discovery source of
 truth for what the Skill does and when it should be selected. Existing
@@ -204,22 +184,11 @@ Contexts, context lenses, profiles, references, examples, agents,
 configuration files, and other non-Skill assets keep their existing metadata
 syntax and behavior.
 
-These security keys are also operational under `metadata`:
-
-```text
-renma.allowed-data
-renma.network-allowed
-renma.external-upload-allowed
-renma.secrets-allowed
-renma.requires-human-approval
-renma.forbidden-inputs
-renma.approved-network-destinations
-renma.approved-upload-destinations
-renma.security-profile
-```
-
-Boolean values must be the exact strings `"true"` or `"false"`. List values
-must be JSON-array strings containing strings only. Renma does not coerce YAML
+Canonical security fields use the same flat string-valued boundary. Boolean
+values must be the exact strings `"true"` or `"false"`, and list values must be
+JSON-array strings containing strings only. This includes the asset-local
+floating-dependency allowance documented in the authoritative table and the
+[Security Policy Guide](security-policy.md). Renma does not coerce YAML
 booleans, alternate boolean spellings, comma-separated lists, or non-string
 array members. Canonical child-key evidence is preserved for diagnostics,
 including multiline YAML values.

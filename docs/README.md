@@ -9,10 +9,10 @@ document.
 - [README](https://github.com/KazuCocoa/renma/blob/main/README.md) is the product entrypoint: what Renma is, why a
   Context Repository exists, the primary product boundary, installation, first
   use, and a short command overview.
-- [User Manual](user-manual.md) is authoritative for current CLI workflows,
-  command purposes, options, formats, examples, expected outputs, and next
-  steps. Emitted `renma --help` and `renma <command> --help` remain the
-  command-line authority.
+- [User Manual](user-manual.md) is authoritative for the complete operational
+  metadata reference and for current CLI workflows, command purposes, options,
+  formats, examples, expected outputs, and next steps. Emitted `renma --help`
+  and `renma <command> --help` remain the command-line authority.
 - [Authoring Guide](authoring-guide.md) is authoritative for new-Skill and
   existing-Skill authoring workflows, clarification, the creation gate, and the
   boundary between Renma and the consuming LLM.
@@ -23,10 +23,11 @@ document.
   interpretation, classification and evidence conventions,
   compatibility-sensitive identifiers, repair constraints, and verification
   expectations.
-- [Security Policy Guide](security-policy.md) defines supported security
-  metadata and bounded agent-facing instruction analysis. It also defines the
-  boundary between Renma, SAST, secret scanning, dependency scanning, and
-  runtime controls.
+- [Security Policy Guide](security-policy.md) defines effective-policy
+  semantics and bounded agent-facing instruction analysis; the User Manual
+  owns the complete security field mapping. The guide also defines the boundary
+  between Renma, SAST, secret scanning, dependency scanning, and runtime
+  controls.
 - [Renma Quality Profile](quality-profile.md) records the exact deterministic
   thresholds, units, provenance, rationale, and configuration status used by
   quality checks.

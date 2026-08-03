@@ -8,6 +8,13 @@ import type { Artifact } from "./types/artifact.js";
 import type { ParsedDocument } from "./types/metadata.js";
 import type { SecurityConfig } from "./types/configuration.js";
 import type { YamlFrontmatterField } from "./yaml-frontmatter.js";
+import {
+  SECURITY_METADATA_FIELD_DEFINITIONS,
+  type CanonicalSecurityOperationalField,
+  type SecurityMetadataFieldDefinition,
+} from "./metadata-definitions.js";
+
+export type { CanonicalSecurityOperationalField } from "./metadata-definitions.js";
 
 export interface SecurityPolicyFieldEvidence {
   startLine: number;
@@ -42,18 +49,6 @@ export interface ResolvedSecurityPolicy {
   policySources: EffectivePolicySource[];
 }
 
-export type CanonicalSecurityOperationalField =
-  | "networkAllowed"
-  | "externalUploadAllowed"
-  | "secretsAllowed"
-  | "humanApprovalRequired"
-  | "allowedData"
-  | "forbiddenInputs"
-  | "approvedNetworkDestinations"
-  | "approvedUploadDestinations"
-  | "allowedFloatingDependencies"
-  | "securityProfile";
-
 export interface CanonicalSecurityMetadataIssue {
   key: string;
   operationalField: CanonicalSecurityOperationalField;
@@ -79,113 +74,45 @@ export interface SecurityProfileChain {
   cycle?: string[];
 }
 
-const BOOLEAN_POLICY_FIELDS = new Map<string, keyof SecurityPolicy>([
-  ["network_allowed", "networkAllowed"],
-  ["external_upload_allowed", "externalUploadAllowed"],
-  ["secrets_allowed", "secretsAllowed"],
-  ["requires_human_approval", "humanApprovalRequired"],
-]);
+const BOOLEAN_POLICY_FIELDS = new Map<string, keyof SecurityPolicy>(
+  SECURITY_METADATA_FIELD_DEFINITIONS.filter(
+    (definition) => definition.encoding === "boolean",
+  ).map((definition) => [definition.nonSkillKey, definition.operationalField]),
+);
 
-const DESTINATION_POLICY_FIELDS = new Set(["approved_network_destinations"]);
-const UPLOAD_DESTINATION_POLICY_FIELDS = new Set([
-  "approved_upload_destinations",
-]);
-
-const ALLOWED_DATA_POLICY_FIELDS = new Set(["allowed_data"]);
-const FORBIDDEN_INPUT_POLICY_FIELDS = new Set(["forbidden_inputs"]);
-const ALLOWED_FLOATING_DEPENDENCY_POLICY_FIELDS = new Set([
-  "allowed_floating_dependencies",
-]);
-const SECURITY_PROFILE_POLICY_FIELDS = new Set(["security_profile"]);
-
-type CanonicalSecurityFieldDefinition =
-  | {
-      key: string;
-      operationalField:
-        | "networkAllowed"
-        | "externalUploadAllowed"
-        | "secretsAllowed"
-        | "humanApprovalRequired";
-      encoding: "boolean";
-    }
-  | {
-      key: string;
-      operationalField:
-        | "allowedData"
-        | "forbiddenInputs"
-        | "approvedNetworkDestinations"
-        | "approvedUploadDestinations"
-        | "allowedFloatingDependencies";
-      encoding: "list";
-    }
-  | {
-      key: string;
-      operationalField: "securityProfile";
-      encoding: "profile";
-    };
-
-const CANONICAL_SECURITY_FIELD_DEFINITIONS = [
-  {
-    key: "renma.network-allowed",
-    operationalField: "networkAllowed",
-    encoding: "boolean",
-  },
-  {
-    key: "renma.external-upload-allowed",
-    operationalField: "externalUploadAllowed",
-    encoding: "boolean",
-  },
-  {
-    key: "renma.secrets-allowed",
-    operationalField: "secretsAllowed",
-    encoding: "boolean",
-  },
-  {
-    key: "renma.requires-human-approval",
-    operationalField: "humanApprovalRequired",
-    encoding: "boolean",
-  },
-  {
-    key: "renma.allowed-data",
-    operationalField: "allowedData",
-    encoding: "list",
-  },
-  {
-    key: "renma.forbidden-inputs",
-    operationalField: "forbiddenInputs",
-    encoding: "list",
-  },
-  {
-    key: "renma.approved-network-destinations",
-    operationalField: "approvedNetworkDestinations",
-    encoding: "list",
-  },
-  {
-    key: "renma.approved-upload-destinations",
-    operationalField: "approvedUploadDestinations",
-    encoding: "list",
-  },
-  {
-    key: "renma.allowed-floating-dependencies",
-    operationalField: "allowedFloatingDependencies",
-    encoding: "list",
-  },
-  {
-    key: "renma.security-profile",
-    operationalField: "securityProfile",
-    encoding: "profile",
-  },
-] as const satisfies readonly CanonicalSecurityFieldDefinition[];
+const DESTINATION_POLICY_FIELDS = nonSkillSecurityFields(
+  "approvedNetworkDestinations",
+);
+const UPLOAD_DESTINATION_POLICY_FIELDS = nonSkillSecurityFields(
+  "approvedUploadDestinations",
+);
+const ALLOWED_DATA_POLICY_FIELDS = nonSkillSecurityFields("allowedData");
+const FORBIDDEN_INPUT_POLICY_FIELDS = nonSkillSecurityFields("forbiddenInputs");
+const ALLOWED_FLOATING_DEPENDENCY_POLICY_FIELDS = nonSkillSecurityFields(
+  "allowedFloatingDependencies",
+);
+const SECURITY_PROFILE_POLICY_FIELDS =
+  nonSkillSecurityFields("securityProfile");
 
 const CANONICAL_SECURITY_FIELDS: ReadonlyMap<
   string,
-  CanonicalSecurityFieldDefinition
+  SecurityMetadataFieldDefinition
 > = new Map(
-  CANONICAL_SECURITY_FIELD_DEFINITIONS.map((definition) => [
-    definition.key,
+  SECURITY_METADATA_FIELD_DEFINITIONS.map((definition) => [
+    definition.skillKey,
     definition,
   ]),
 );
+
+function nonSkillSecurityFields(
+  operationalField: CanonicalSecurityOperationalField,
+): Set<string> {
+  return new Set(
+    SECURITY_METADATA_FIELD_DEFINITIONS.filter(
+      (definition) => definition.operationalField === operationalField,
+    ).map((definition) => definition.nonSkillKey),
+  );
+}
 
 type ParsedBlockList = {
   values: string[];
@@ -665,13 +592,13 @@ function recordCanonicalSecurityIssue(
   document: ParsedDocument,
   policy: SecurityPolicy,
   issues: CanonicalSecurityMetadataIssue[],
-  definition: CanonicalSecurityFieldDefinition,
+  definition: SecurityMetadataFieldDefinition,
   field: YamlFrontmatterField,
   expectation: string,
 ): void {
   const evidence = canonicalFieldEvidence(document, field);
   const issue: CanonicalSecurityMetadataIssue = {
-    key: definition.key,
+    key: definition.skillKey,
     operationalField: definition.operationalField,
     reason: `${expectation}; rejected ${describeRejectedValue(field.value)}`,
     ...evidence,
