@@ -138,7 +138,9 @@
 }
 
 .vp-doc .renma-metadata-table tbody tr:hover td {
-  background: var(--vp-c-default-soft);
+  background:
+    linear-gradient(var(--vp-c-default-soft), var(--vp-c-default-soft)),
+    var(--vp-c-bg);
 }
 
 .vp-doc .renma-metadata-table :is(th, td):nth-child(1) {
