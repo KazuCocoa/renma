@@ -203,6 +203,7 @@ Agent Skills clients may not expose vendor metadata to the model at all.
 
 These are specification-owned fields, not `renma.*` extensions:
 
+<!-- agent-skills-portable-fields:start -->
 | Top-level field | Value format | Agent Skills requirement | Renma behavior |
 | --- | --- | --- | --- |
 | `name` | Non-empty string; Renma validates 1–64 Unicode code points, lowercase NFKC form, letters/digits/hyphens, no edge or repeated hyphen, and immediate-directory match | Required | Skill identity validation and Discovery presentation |
@@ -211,6 +212,7 @@ These are specification-owned fields, not `renma.*` extensions:
 | `compatibility` | Non-empty string, at most 500 Unicode code points | Optional | Agent Skills validation; not a Renma lifecycle or dependency declaration |
 | `metadata` | Mapping from string keys to string values | Optional in Agent Skills; required only when Renma extensions are declared | Container for flat `renma.*` and other vendor metadata |
 | `allowed-tools` | String | Optional | Agent Skills validation; Renma does not treat it as a security-policy field |
+<!-- agent-skills-portable-fields:end -->
 
 `name` and `description` make a Skill portable; they do not make a hybrid or
 otherwise invalid document operational. Renma authoring warnings do not by
@@ -246,9 +248,9 @@ implementation-owned registries.
 | `renma.conflicts` | `conflicts` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Optional | Conflict diagnostics, catalog dependency graph, BOM, Trust Graph, semantic diff, and CI reporting |
 | `renma.superseded-by` | `superseded_by` | Skill: JSON-array string; non-Skill: YAML list or comma-separated scalar | Skill and cataloged non-Skill assets | Recommended when an asset is deprecated because a replacement exists; otherwise optional | Lifecycle/supersession diagnostics, reference edges, catalog, BOM, Trust Graph, diff, and CI reporting |
 | `renma.continues-with` | — | JSON-array string of non-empty Skill IDs or repository-relative `SKILL.md` paths | Canonical Skill only | Optional | Parsed separately for prepared Skill Discovery, Skill Index, discovery graph, route/cycle diagnostics, Readiness evidence, semantic diff, and CI; never a catalog dependency |
-| — | `applies_to` | YAML list or comma-separated scalar of Context IDs/paths | Context Lens only | Required | Context Lens target validation, `applies_to` catalog edges, inspect, graph, Readiness, BOM, Trust Graph, diff, and CI reporting |
-| — | `focus` | YAML list or comma-separated scalar | Context Lens only | Optional | Context Lens governance/meaningfulness checks and inspect presentation; no dependency edge |
-| — | `expected_outputs` | YAML list or comma-separated scalar | Context Lens only | Optional | Context Lens governance/meaningfulness checks and inspect presentation; no dependency edge |
+| — | `applies_to` | YAML list or comma-separated scalar of Context IDs/paths | Cataloged non-Skill assets via the general parser; supported authoring surface: Context Lens | Context Lens: required and target-validated; recommended authoring scope: Context Lens | Any catalog entry carrying a normalized value: metadata-declared `applies_to` dependency; Context Lens: requiredness, target resolution to Context Assets, Lens governance, inspect, graph, Readiness, BOM, Trust Graph, diff, and CI projections |
+| — | `focus` | YAML list or comma-separated scalar | Cataloged non-Skill assets via the general parser; supported authoring surface: Context Lens | Context Lens: optional; recommended authoring scope: Context Lens | General parser normalization and inspect presentation; Context Lens governance and meaningfulness checks; no dependency edge |
+| — | `expected_outputs` | YAML list or comma-separated scalar | Cataloged non-Skill assets via the general parser; supported authoring surface: Context Lens | Context Lens: optional; recommended authoring scope: Context Lens | General parser normalization and inspect presentation; Context Lens governance and meaningfulness checks; no dependency edge |
 | — | `token_budget_override` | Positive safe integer greater than the kind's default limit | Markdown assets initially classified as Context, Reference, Profile, or Example | Conditional; requires `token_budget_rationale` and is invalid when content is within the default limit | Scan token-budget decision and quality finding details only |
 | — | `token_budget_rationale` | Trimmed non-empty text | Same eligible support-asset kinds as `token_budget_override` | Required when an override is declared; otherwise non-operational | Scan token-budget decision evidence only |
 | — | `token_budget_reviewed_at` | Real ISO date `YYYY-MM-DD` | Same eligible support-asset kinds as `token_budget_override` | Optional only when an override is declared | Scan token-budget review provenance only; it does not create recurring freshness review |
@@ -325,9 +327,12 @@ precedence and diagnostic behavior.
 
 ### Consumer and inheritance boundaries
 
-Catalog dependencies come only from required/optional Context and Lens fields,
-`applies_to`, conflicts, and supersession references. `continues-with` is a
-separate Skill Discovery route declaration. `published-entrypoint` is separate
+Metadata-declared catalog dependencies come only from required/optional Context
+and Lens fields, `applies_to`, conflicts, and supersession references. Renma
+separately adds structurally derived static-support dependencies from
+deterministic Skill-local containment and static-reference evidence; those
+relationships are not frontmatter declarations. `continues-with` is a separate
+Skill Discovery route declaration. `published-entrypoint` is separate
 publication intent. Neither creates a catalog dependency or claims runtime
 selection, loading, or execution.
 

@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { validateAgentSkill } from "../src/agent-skills.js";
+import {
+  AGENT_SKILLS_TOP_LEVEL_FIELDS,
+  validateAgentSkill,
+} from "../src/agent-skills.js";
 import { buildCatalog } from "../src/catalog.js";
 import { parseDocument } from "../src/markdown.js";
 import {
@@ -15,9 +18,18 @@ import {
 import { resolveOperationalSecurityPolicy } from "../src/security-policy.js";
 import type { Artifact, ArtifactKind } from "../src/types.js";
 
-const START_MARKER = "<!-- renma-operational-metadata:start -->";
-const END_MARKER = "<!-- renma-operational-metadata:end -->";
+const PORTABLE_START_MARKER = "<!-- agent-skills-portable-fields:start -->";
+const PORTABLE_END_MARKER = "<!-- agent-skills-portable-fields:end -->";
+const OPERATIONAL_START_MARKER = "<!-- renma-operational-metadata:start -->";
+const OPERATIONAL_END_MARKER = "<!-- renma-operational-metadata:end -->";
 const MANUAL = readFileSync("docs/user-manual.md", "utf8");
+
+interface DocumentedPortableAgentSkillsRow {
+  topLevelField: string;
+  valueFormat: string;
+  requirement: string;
+  renmaBehavior: string;
+}
 
 interface DocumentedMetadataRow {
   skillKey?: string;
@@ -32,6 +44,64 @@ interface ExpectedMetadataMapping {
   skillKey?: string;
   nonSkillKey?: string;
 }
+
+test("portable Agent Skills table exactly covers the specification registry", () => {
+  assertPortableAgentSkillsTable(MANUAL);
+});
+
+test("portable Agent Skills table rejects a missing field", () => {
+  const fixture = MANUAL.replace(/^\| `license` \|.*\n/m, "");
+  assert.throws(
+    () => assertPortableAgentSkillsTable(fixture),
+    /missing portable field: license/,
+  );
+});
+
+test("portable Agent Skills table rejects an undocumented extra field", () => {
+  const fixture = MANUAL.replace(
+    PORTABLE_END_MARKER,
+    "| `vendor-field` | String | Optional | Not supported |\n" +
+      PORTABLE_END_MARKER,
+  );
+  assert.throws(
+    () => assertPortableAgentSkillsTable(fixture),
+    /undocumented portable field: vendor-field/,
+  );
+});
+
+test("portable Agent Skills table rejects a duplicate field", () => {
+  const nameRow = MANUAL.match(/^\| `name` \|.*$/m)?.[0];
+  assert.ok(nameRow);
+  const fixture = MANUAL.replace(
+    PORTABLE_END_MARKER,
+    `${nameRow}\n${PORTABLE_END_MARKER}`,
+  );
+  assert.throws(
+    () => assertPortableAgentSkillsTable(fixture),
+    /duplicate portable field: name/,
+  );
+});
+
+test("portable Agent Skills table markers must be present exactly once", () => {
+  assert.throws(
+    () =>
+      parsePortableAgentSkillsTable(MANUAL.replace(PORTABLE_START_MARKER, "")),
+    /expected exactly one portable start marker/,
+  );
+  assert.throws(
+    () => parsePortableAgentSkillsTable(`${PORTABLE_START_MARKER}\n${MANUAL}`),
+    /expected exactly one portable start marker/,
+  );
+  assert.throws(
+    () =>
+      parsePortableAgentSkillsTable(MANUAL.replace(PORTABLE_END_MARKER, "")),
+    /expected exactly one portable end marker/,
+  );
+  assert.throws(
+    () => parsePortableAgentSkillsTable(`${MANUAL}\n${PORTABLE_END_MARKER}`),
+    /expected exactly one portable end marker/,
+  );
+});
 
 test("authoritative metadata table exactly covers operational registries", () => {
   assertOperationalMetadataTable(MANUAL);
@@ -96,7 +166,10 @@ test("metadata table parser rejects a missing operational key", () => {
 test("metadata table parser rejects duplicate keys", () => {
   const ownerRow = MANUAL.match(/^\| `renma\.owner` \| `owner` \|.*$/m)?.[0];
   assert.ok(ownerRow);
-  const fixture = MANUAL.replace(END_MARKER, `${ownerRow}\n${END_MARKER}`);
+  const fixture = MANUAL.replace(
+    OPERATIONAL_END_MARKER,
+    `${ownerRow}\n${OPERATIONAL_END_MARKER}`,
+  );
   assert.throws(
     () => assertOperationalMetadataTable(fixture),
     /duplicate Skill key: renma\.owner/,
@@ -116,11 +189,15 @@ test("metadata table parser rejects an inaccurate Skill/non-Skill mapping", () =
 
 test("metadata table markers must be present exactly once and bound one table", () => {
   assert.throws(
-    () => parseOperationalMetadataTable(MANUAL.replace(START_MARKER, "")),
+    () =>
+      parseOperationalMetadataTable(
+        MANUAL.replace(OPERATIONAL_START_MARKER, ""),
+      ),
     /expected exactly one start marker/,
   );
   assert.throws(
-    () => parseOperationalMetadataTable(`${START_MARKER}\n${MANUAL}`),
+    () =>
+      parseOperationalMetadataTable(`${OPERATIONAL_START_MARKER}\n${MANUAL}`),
     /expected exactly one start marker/,
   );
 });
@@ -199,6 +276,28 @@ function assertOperationalMetadataTable(markdown: string): void {
   }
 }
 
+function assertPortableAgentSkillsTable(markdown: string): void {
+  const rows = parsePortableAgentSkillsTable(markdown);
+  const documentedFields = rows.map((row) => row.topLevelField);
+  assertUniqueValues(documentedFields, "portable field");
+
+  for (const expected of AGENT_SKILLS_TOP_LEVEL_FIELDS) {
+    assert.ok(
+      documentedFields.includes(expected),
+      `missing portable field: ${expected}`,
+    );
+  }
+  for (const documented of documentedFields) {
+    assert.ok(
+      AGENT_SKILLS_TOP_LEVEL_FIELDS.includes(
+        documented as (typeof AGENT_SKILLS_TOP_LEVEL_FIELDS)[number],
+      ),
+      `undocumented portable field: ${documented}`,
+    );
+  }
+  assert.deepEqual(documentedFields, [...AGENT_SKILLS_TOP_LEVEL_FIELDS]);
+}
+
 function expectedOperationalMappings(): ExpectedMetadataMapping[] {
   return [
     ...RENMA_CATALOG_METADATA_DEFINITIONS.map((definition) => ({
@@ -221,15 +320,17 @@ function expectedOperationalMappings(): ExpectedMetadataMapping[] {
 function parseOperationalMetadataTable(
   markdown: string,
 ): DocumentedMetadataRow[] {
-  const startCount = occurrences(markdown, START_MARKER);
-  const endCount = occurrences(markdown, END_MARKER);
+  const startCount = occurrences(markdown, OPERATIONAL_START_MARKER);
+  const endCount = occurrences(markdown, OPERATIONAL_END_MARKER);
   assert.equal(startCount, 1, "expected exactly one start marker");
   assert.equal(endCount, 1, "expected exactly one end marker");
-  const start = markdown.indexOf(START_MARKER);
-  const end = markdown.indexOf(END_MARKER);
+  const start = markdown.indexOf(OPERATIONAL_START_MARKER);
+  const end = markdown.indexOf(OPERATIONAL_END_MARKER);
   assert.ok(start < end, "metadata table markers are out of order");
 
-  const region = markdown.slice(start + START_MARKER.length, end).trim();
+  const region = markdown
+    .slice(start + OPERATIONAL_START_MARKER.length, end)
+    .trim();
   const lines = region.split(/\r?\n/).filter((line) => line.trim().length > 0);
   assert.ok(lines.length >= 3, "checked metadata table is missing");
   assert.deepEqual(parseMarkdownRow(lines[0]!), [
@@ -252,6 +353,43 @@ function parseOperationalMetadataTable(
       appliesTo: cells[3]!,
       authoringStatus: cells[4]!,
       effects: cells[5]!,
+    };
+  });
+}
+
+function parsePortableAgentSkillsTable(
+  markdown: string,
+): DocumentedPortableAgentSkillsRow[] {
+  const startCount = occurrences(markdown, PORTABLE_START_MARKER);
+  const endCount = occurrences(markdown, PORTABLE_END_MARKER);
+  assert.equal(startCount, 1, "expected exactly one portable start marker");
+  assert.equal(endCount, 1, "expected exactly one portable end marker");
+  const start = markdown.indexOf(PORTABLE_START_MARKER);
+  const end = markdown.indexOf(PORTABLE_END_MARKER);
+  assert.ok(start < end, "portable table markers are out of order");
+
+  const region = markdown
+    .slice(start + PORTABLE_START_MARKER.length, end)
+    .trim();
+  const lines = region.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  assert.ok(lines.length >= 3, "checked portable table is missing");
+  assert.deepEqual(parseMarkdownRow(lines[0]!), [
+    "Top-level field",
+    "Value format",
+    "Agent Skills requirement",
+    "Renma behavior",
+  ]);
+  assert.match(lines[1]!, /^\|(?:\s*:?-+:?\s*\|){4}$/);
+
+  return lines.slice(2).map((line, index) => {
+    const cells = parseMarkdownRow(line);
+    assert.equal(cells.length, 4, `portable row ${index + 1} has 4 cells`);
+    const topLevelField = codeFormattedKey(cells[0]!, "portable field");
+    return {
+      topLevelField,
+      valueFormat: cells[1]!,
+      requirement: cells[2]!,
+      renmaBehavior: cells[3]!,
     };
   });
 }
@@ -292,6 +430,12 @@ function optionalKey<Name extends "skillKey" | "nonSkillKey">(
   return { [name]: match[1] } as Partial<Record<Name, string>>;
 }
 
+function codeFormattedKey(cell: string, label: string): string {
+  const match = cell.match(/^`([^`]+)`$/);
+  assert.ok(match?.[1], `${label} must be one code-formatted key`);
+  return match[1];
+}
+
 function assertUniqueKeys(
   rows: DocumentedMetadataRow[],
   field: "skillKey" | "nonSkillKey",
@@ -303,6 +447,14 @@ function assertUniqueKeys(
     if (!key) continue;
     assert.ok(!seen.has(key), `duplicate ${label} key: ${key}`);
     seen.add(key);
+  }
+}
+
+function assertUniqueValues(values: readonly string[], label: string): void {
+  const seen = new Set<string>();
+  for (const value of values) {
+    assert.ok(!seen.has(value), `duplicate ${label}: ${value}`);
+    seen.add(value);
   }
 }
 
