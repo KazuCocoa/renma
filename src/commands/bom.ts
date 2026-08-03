@@ -2,6 +2,7 @@ import packageJson from "../../package.json" with { type: "json" };
 import { graphFromRepositorySnapshot, type GraphEdge } from "./graph.js";
 import {
   buildReadinessReport,
+  readinessDiagnosticsFromRepositorySnapshot,
   type ReadinessLevel,
   type ReadinessReport,
 } from "./readiness.js";
@@ -197,7 +198,11 @@ export function buildBomReport(
   const readinessReport = buildReadinessReport(
     graphReport,
     scanResult.findings,
-    scanResult.diagnostics,
+    readinessDiagnosticsFromRepositorySnapshot(
+      snapshot,
+      scanResult.diagnostics,
+      { includeSkillDiscovery: false },
+    ),
     scanResult.contextLens,
     scanResult.securityPolicyInventory,
     scanResult.agentSkills,

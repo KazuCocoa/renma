@@ -408,6 +408,7 @@ test("isolated, required, and optional suspension states project through Readine
   });
 
   const isolatedReadiness = await readiness(isolated.root);
+  assert.equal(isolatedReadiness.level, "ready");
   assert.equal(
     isolatedReadiness.checks.find((check) => check.id === "assets.lifecycle")
       ?.status,
@@ -416,6 +417,7 @@ test("isolated, required, and optional suspension states project through Readine
   assert.equal(isolatedReadiness.summary.diagnosticCounts.error, 0);
 
   const isolatedBom = await bom(isolated.root, {}, { omitGeneratedAt: true });
+  assert.equal(isolatedBom.readiness.level, "ready");
   const bomAsset = isolatedBom.assets[0];
   assert.equal(bomAsset?.statusReason, SUSPENSION_REASON);
   assert.equal(bomAsset?.lifecycle?.statusChangedAt, SUSPENSION_DATE);
@@ -460,6 +462,52 @@ test("isolated, required, and optional suspension states project through Readine
     diagnostics: [],
   };
   assert.match(formatCatalogMarkdown(catalogResult), /Status changed at/);
+
+  const incomplete = await RepositoryFixture.create({
+    prefix: "renma-suspended-incomplete-",
+    testContext: t,
+  });
+  await incomplete.context("contexts/suspended.md", {
+    id: "context.suspended",
+    owner: "qa-platform",
+    status: "suspended",
+    whenToUse: ["historical review"],
+    whenNotToUse: ["active composition"],
+  });
+  const incompleteReadiness = await readiness(incomplete.root);
+  const incompleteBom = await bom(
+    incomplete.root,
+    {},
+    {
+      omitGeneratedAt: true,
+    },
+  );
+  const readinessDiagnostic = incompleteReadiness.diagnostics?.find(
+    (diagnostic) =>
+      diagnostic.code ===
+      DIAGNOSTIC_IDS.META_SUSPENDED_STATUS_METADATA_INCOMPLETE,
+  );
+  const bomDiagnostic = incompleteBom.diagnostics.find(
+    (diagnostic) =>
+      diagnostic.code ===
+      DIAGNOSTIC_IDS.META_SUSPENDED_STATUS_METADATA_INCOMPLETE,
+  );
+  assert.equal(incompleteReadiness.level, "not_ready");
+  assert.equal(incompleteBom.readiness.level, "not_ready");
+  assert.equal(readinessDiagnostic?.severity, "error");
+  assert.equal(bomDiagnostic?.severity, "error");
+  assert.equal(bomDiagnostic?.message, readinessDiagnostic?.message);
+  assert.equal(
+    incompleteBom.readiness.summary.diagnosticCounts.error,
+    incompleteReadiness.summary.diagnosticCounts.error,
+  );
+  assert.ok(
+    incompleteBom.readiness.checks
+      .find((check) => check.id === "diagnostics.errors")
+      ?.evidence?.some(
+        (evidence) => evidence.message === readinessDiagnostic?.message,
+      ),
+  );
 
   const required = await RepositoryFixture.create({
     prefix: "renma-suspended-required-",

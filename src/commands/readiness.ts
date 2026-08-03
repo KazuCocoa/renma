@@ -182,6 +182,30 @@ export function readinessFromRepositorySnapshot(
   const scanResult = scanFromRepositorySnapshot(snapshot, {
     includeSkillDiscoveryDiagnostics: false,
   });
+  const diagnostics = readinessDiagnosticsFromRepositorySnapshot(
+    snapshot,
+    scanResult.diagnostics,
+    projectionOptions,
+  );
+  return buildReadinessReport(
+    graphReport,
+    scanResult.findings,
+    diagnostics,
+    scanResult.contextLens,
+    scanResult.securityPolicyInventory,
+    scanResult.agentSkills,
+    projectionOptions.includeSkillDiscovery === false
+      ? undefined
+      : snapshot.skillDiscovery,
+  );
+}
+
+/** Build the authoritative Readiness diagnostic collection for one snapshot. */
+export function readinessDiagnosticsFromRepositorySnapshot(
+  snapshot: RepositorySnapshot,
+  scanDiagnostics: readonly Diagnostic[],
+  projectionOptions: ReadinessProjectionOptions = {},
+): Diagnostic[] {
   const suspensionDiagnostics = [
     ...snapshot.catalogDiagnostics,
     ...(projectionOptions.includeSkillDiscovery === false
@@ -192,17 +216,7 @@ export function readinessFromRepositorySnapshot(
       diagnostic.code !== undefined &&
       SUSPENSION_READINESS_DIAGNOSTIC_IDS.has(diagnostic.code),
   );
-  return buildReadinessReport(
-    graphReport,
-    scanResult.findings,
-    [...scanResult.diagnostics, ...suspensionDiagnostics],
-    scanResult.contextLens,
-    scanResult.securityPolicyInventory,
-    scanResult.agentSkills,
-    projectionOptions.includeSkillDiscovery === false
-      ? undefined
-      : snapshot.skillDiscovery,
-  );
+  return [...scanDiagnostics, ...suspensionDiagnostics];
 }
 
 export function buildReadinessReport(

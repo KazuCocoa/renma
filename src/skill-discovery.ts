@@ -1700,7 +1700,7 @@ function inactiveTargetDiagnostic(route: DeclaredSkillRoute): Diagnostic {
     repairConstraints: discoveryRepairConstraints(),
     verificationSteps: routeVerificationSteps(code),
     llmHint:
-      "Preserve the intended continuation while reviewing a real active replacement. Correct or remove a stale declaration; do not reactivate or clone a Skill only to silence the warning.",
+      "Preserve the intended continuation while reviewing a real active replacement. Correct or remove a stale declaration; do not reactivate or clone a Skill only to silence the diagnostic.",
     details: {
       sourceId: route.sourceId,
       sourcePath: route.sourcePath,
