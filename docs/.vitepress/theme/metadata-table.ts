@@ -2,6 +2,7 @@ const SECTION_ID = "renma-operational-metadata-table";
 const TABLE_CLASS = "renma-metadata-table";
 const SHELL_CLASS = "renma-metadata-table-shell";
 const SHELL_LABEL = "Renma operational metadata table";
+const PAGE_CLASS = "renma-metadata-page";
 
 function findSectionTable(heading: HTMLElement): HTMLTableElement | undefined {
   const sectionMatch = /^H([1-6])$/.exec(heading.tagName);
@@ -30,7 +31,12 @@ export function enhanceOperationalMetadataTable(
   root: ParentNode = document,
 ): void {
   const heading = root.querySelector<HTMLElement>(`#${SECTION_ID}`);
-  if (heading === null) return;
+  if (heading === null) {
+    root
+      .querySelectorAll<HTMLElement>(`.VPDoc.${PAGE_CLASS}`)
+      .forEach((page) => page.classList.remove(PAGE_CLASS));
+    return;
+  }
 
   const table = findSectionTable(heading);
   if (table === undefined) return;
@@ -49,7 +55,10 @@ export function enhanceOperationalMetadataTable(
 
   shell.setAttribute("role", "region");
   shell.setAttribute("aria-label", SHELL_LABEL);
+  shell.id = `${SECTION_ID}-region`;
   shell.tabIndex = 0;
+
+  heading.closest<HTMLElement>(".VPDoc")?.classList.add(PAGE_CLASS);
 
   const headerCells = Array.from(
     table.tHead?.rows[0]?.cells ?? [],

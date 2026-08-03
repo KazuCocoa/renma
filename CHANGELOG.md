@@ -19,8 +19,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 ### Changed
 
 - Improved the operational metadata reference with responsive presentation,
-  sticky desktop headers and key columns, and accessible mobile rows while
-  preserving its authoritative Markdown source and documentation-drift tests.
+  sticky desktop headers and key columns, a wider technical-reference layout
+  with readable wrapping in the responsive page outline, and accessible mobile
+  rows while preserving its authoritative Markdown source and
+  documentation-drift tests.
 - Updated the remaining diagnostic and authoring documentation to delegate
   complete metadata inventory ownership to the User Manual while retaining
   feature-specific semantics and practical guidance.

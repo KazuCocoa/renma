@@ -189,6 +189,22 @@
   font-weight: 600;
 }
 
+@media (min-width: 768px) {
+  .VPDoc.renma-metadata-page.has-aside .content-container {
+    max-width: none;
+  }
+}
+
+.VPDoc.renma-metadata-page .VPDocAsideOutline .outline-link,
+body:has(.VPDoc.renma-metadata-page) .VPLocalNav .outline-link {
+  padding-block: 6px;
+  overflow: visible;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+
 @media (max-width: 767px) {
   .vp-doc .renma-metadata-table-shell {
     margin: 1.25rem 0;
