@@ -41,6 +41,8 @@ export const LEGACY_RENMA_SKILL_FIELDS = [
   "version",
   "owner",
   "status",
+  "status_reason",
+  "status_changed_at",
   "purpose",
   "last_reviewed_at",
   "review_cycle",

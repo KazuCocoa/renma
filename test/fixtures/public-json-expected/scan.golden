@@ -1468,8 +1468,8 @@
         "endLine": 4,
         "snippet": "status: active"
       },
-      "whyItMatters": "Lifecycle status is part of the repository governance contract. Invalid status values make it harder for humans and agents to understand whether a skill, context asset, or support file is experimental, stable, deprecated, or archived.",
-      "remediation": "Use one of the supported lifecycle status values: experimental, stable, deprecated, archived. Do not use migration or relationship states such as active or delegated as lifecycle status.",
+      "whyItMatters": "Lifecycle status is part of the repository governance contract. Invalid status values make it harder for humans and agents to understand whether a skill, context asset, or support file is experimental, stable, suspended, deprecated, or archived.",
+      "remediation": "Use one of the supported lifecycle status values: experimental, stable, suspended, deprecated, archived. Do not use migration or relationship states such as active or delegated as lifecycle status.",
       "constraints": [
         "Do not introduce runtime context resolution.",
         "Do not create prompt packages.",
@@ -2217,8 +2217,8 @@
         "findingSeverity": "medium",
         "category": "maintenance",
         "confidence": "high",
-        "remediation": "Use one of the supported lifecycle status values: experimental, stable, deprecated, archived. Do not use migration or relationship states such as active or delegated as lifecycle status.",
-        "whyItMatters": "Lifecycle status is part of the repository governance contract. Invalid status values make it harder for humans and agents to understand whether a skill, context asset, or support file is experimental, stable, deprecated, or archived.",
+        "remediation": "Use one of the supported lifecycle status values: experimental, stable, suspended, deprecated, archived. Do not use migration or relationship states such as active or delegated as lifecycle status.",
+        "whyItMatters": "Lifecycle status is part of the repository governance contract. Invalid status values make it harder for humans and agents to understand whether a skill, context asset, or support file is experimental, stable, suspended, deprecated, or archived.",
         "legacyConstraints": [
           "Do not introduce runtime context resolution.",
           "Do not create prompt packages.",

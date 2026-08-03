@@ -129,6 +129,37 @@ next Skill. See the [Skill Discovery Graph and Index contract](skill-discovery.m
 Use `renma.conflicts` only when two declared assets should not be used together
 without review. Do not use it as a substitute for a clear trigger description.
 
+## Suspend And Restore A Skill
+
+Use `suspended` when a Skill must remain inventoried but must temporarily stop
+participating in active dependency and Discovery flows. Record the reviewed
+transition with flat string metadata:
+
+```yaml
+metadata:
+  renma.status: suspended
+  renma.status-reason: Temporarily disabled while issue QE-1234 is corrected.
+  renma.status-changed-at: "2026-08-03"
+```
+
+A suspended Skill cannot be an effective published entrypoint or route target.
+Required active dependencies to it block Readiness; optional dependencies warn
+and remain visible for review. Renma does not restore a Skill on a timer. After
+the underlying issue is reviewed and verified, change all three values in one
+reviewed commit or pull request, for example:
+
+```yaml
+metadata:
+  renma.status: stable
+  renma.status-reason: Restored after QE-1234 was corrected and verified.
+  renma.status-changed-at: "2026-08-06"
+```
+
+`renma diff` and CI compare status, reason, and transition date independently;
+Git and pull-request history retain the full audit trail. Do not use
+`last-reviewed-at` as the lifecycle transition date, and do not infer or
+backfill either date from filesystem timestamps.
+
 ## Router, Workflow, And Operational Responsibilities
 
 A normal Skill may act as a published entrypoint, a broad router, an

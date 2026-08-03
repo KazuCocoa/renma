@@ -30,6 +30,20 @@ test("published Draft 2020-12 schemas validate representative generated reports"
   assertValid(validateBom, defaultBom);
   assertValid(validateBom, omittedBom);
   assertValid(validateBom, contextLensBom);
+  const suspendedBom = structuredClone(defaultBom);
+  const suspendedBomAsset = suspendedBom.assets[0];
+  assert.ok(suspendedBomAsset);
+  suspendedBomAsset.status = "suspended";
+  suspendedBomAsset.statusReason =
+    "Temporarily disabled while issue QE-1234 is corrected.";
+  suspendedBomAsset.statusChangedAt = "2026-08-03";
+  suspendedBomAsset.lifecycle = {
+    ...(suspendedBomAsset.lifecycle ?? {}),
+    status: "suspended",
+    statusReason: suspendedBomAsset.statusReason,
+    statusChangedAt: suspendedBomAsset.statusChangedAt,
+  };
+  assertValid(validateBom, suspendedBom);
   assert.equal(defaultBom.outputMode, "default");
   assert.equal(typeof defaultBom.generatedAt, "string");
   assert.equal(omittedBom.outputMode, "omit_generated_at");
@@ -115,6 +129,13 @@ test("published Draft 2020-12 schemas validate representative generated reports"
     );
   }
   assertValid(validateTrustGraph, graph);
+  const lifecycleEdge = requiredEdge(graph, "has_lifecycle_status");
+  assert.equal(lifecycleEdge.properties?.status, "suspended");
+  assert.equal(
+    lifecycleEdge.properties?.statusReason,
+    "Temporarily disabled while issue QE-1234 is corrected.",
+  );
+  assert.equal(lifecycleEdge.properties?.statusChangedAt, "2026-08-03");
 });
 
 test("BOM schema enforces output modes, timestamps, formats, and score bounds", async () => {
@@ -542,6 +563,9 @@ name: demo
 description: Run a governed helper. Use when published schema validation needs support provenance.
 metadata:
   renma.owner: qa-platform
+  renma.status: suspended
+  renma.status-reason: Temporarily disabled while issue QE-1234 is corrected.
+  renma.status-changed-at: "2026-08-03"
   renma.allowed-data: '["public"]'
   renma.network-allowed: "false"
   renma.external-upload-allowed: "false"

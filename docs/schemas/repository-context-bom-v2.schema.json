@@ -187,8 +187,16 @@
         "markdownParserEligible": { "type": "boolean" },
         "ownership": { "$ref": "#/$defs/ownership" },
         "status": {
-          "enum": ["experimental", "stable", "deprecated", "archived"]
+          "enum": [
+            "experimental",
+            "stable",
+            "suspended",
+            "deprecated",
+            "archived"
+          ]
         },
+        "statusReason": { "type": "string", "minLength": 1 },
+        "statusChangedAt": { "type": "string" },
         "version": { "type": "string" },
         "tags": { "type": "array", "items": { "type": "string" } },
         "lifecycle": {
@@ -196,8 +204,16 @@
           "additionalProperties": false,
           "properties": {
             "status": {
-              "enum": ["experimental", "stable", "deprecated", "archived"]
+              "enum": [
+                "experimental",
+                "stable",
+                "suspended",
+                "deprecated",
+                "archived"
+              ]
             },
+            "statusReason": { "type": "string", "minLength": 1 },
+            "statusChangedAt": { "type": "string" },
             "lastReviewedAt": { "type": "string" },
             "reviewCycle": { "type": "string" },
             "expiresAt": { "type": "string" }

@@ -233,7 +233,9 @@ implementation-owned registries.
 | — | `type` | Trimmed text; `context_lens` is the supported Lens discriminator | Non-Skill assets; only Context/Context Lens for Lens validation | Conditional when a file under a Context root must be classified as a Context Lens | Classification evidence, catalog kind, inspect, and Context Lens diagnostics |
 | `renma.version` | `version` | Trimmed text; a Context Lens accepts only `1` when present | Skill and cataloged non-Skill assets | Optional | Catalog, Context Lens validation, BOM, semantic diff, and CI reporting |
 | `renma.owner` | `owner` | Trimmed non-empty text | Skill and cataloged non-Skill assets | Context Lens requires it; recommended for shared Context; optional elsewhere | Declared/effective ownership, ownership reports, Readiness, BOM, Trust Graph, diff, and CI reporting |
-| `renma.status` | `status` | `experimental`, `stable`, `deprecated`, or `archived` | Skill and cataloged non-Skill assets | Optional lifecycle declaration | Lifecycle/freshness findings, dependency review, Discovery publication eligibility, catalog, Readiness, BOM, Trust Graph, diff, and CI reporting |
+| `renma.status` | `status` | `experimental`, `stable`, `suspended`, `deprecated`, or `archived` | Skill and cataloged non-Skill assets | Optional lifecycle declaration; `suspended` is temporarily inactive and requires reason/date evidence | Lifecycle/freshness findings, dependency review, Discovery publication eligibility, catalog, Readiness, BOM, Trust Graph, diff, and CI reporting |
+| `renma.status-reason` | `status_reason` | Trimmed non-empty text | Skill and cataloged non-Skill assets | Required when status is `suspended`; optional for other statuses | Reason for the latest reviewed lifecycle transition in catalog, inspect, Readiness, Discovery/Skill Index, BOM, Trust Graph, semantic diff, and CI reporting |
+| `renma.status-changed-at` | `status_changed_at` | Real ISO date `YYYY-MM-DD` | Skill and cataloged non-Skill assets | Required and blocking when status is `suspended`; optional for other statuses, but invalid declared dates warn | Date of the latest reviewed lifecycle transition in catalog, inspect, Readiness, Discovery/Skill Index, BOM, Trust Graph, semantic diff, and CI reporting |
 | `renma.purpose` | `purpose` | Trimmed non-empty text | Skill and cataloged non-Skill assets | Context Lens requires it; optional elsewhere | Catalog/inspect metadata and Context Lens governance diagnostics |
 | `renma.last-reviewed-at` | `last_reviewed_at` | Real ISO date `YYYY-MM-DD` | Skill and cataloged non-Skill assets | Optional; recommended when freshness is governed | Freshness diagnostics, catalog, Readiness, BOM, semantic diff, and CI reporting |
 | `renma.review-cycle` | `review_cycle` | `P<positive integer>D` | Skill and cataloged non-Skill assets | Conditional on cycle-based freshness review; meaningful with `last-reviewed-at` | Review-due calculation, freshness diagnostics, catalog, Readiness, BOM, diff, and CI reporting |
@@ -304,8 +306,21 @@ an alias for Renma security permission.
   content. It requires a non-empty rationale. `token_budget_reviewed_at` is
   optional but valid only alongside an override and does not imply a recurring
   review cycle.
-- Lifecycle status is exactly `experimental`, `stable`, `deprecated`, or
-  `archived`.
+- Lifecycle status is exactly `experimental`, `stable`, `suspended`,
+  `deprecated`, or `archived`. Experimental and stable are declared active;
+  suspended, deprecated, and archived are inactive for use. Omitted status
+  retains its existing use-eligible meaning.
+- `status_reason` describes the latest reviewed lifecycle transition, and
+  `status_changed_at` dates that transition. It is distinct from
+  `last_reviewed_at`, which records freshness review. A suspended asset requires
+  both a non-blank reason and a real calendar date; other statuses accept both
+  fields without requiring them.
+- Suspension preserves inventory and evidence but excludes the asset from
+  active dependency, composition, Skill publication, routing, reachability,
+  coverage, and cycle use. A required direct declaration from an active source
+  to a uniquely resolved suspended asset is an error; an optional declaration
+  is a warning. An isolated suspended asset is not a blocker merely because it
+  is suspended.
 - A security profile is a non-empty selected name. The name must resolve in
   `security.profiles`; a missing or cyclic chain is diagnosed rather than
   silently substituted.
@@ -324,6 +339,27 @@ value. Invalid recognized canonical security declarations fail closed and can
 retain restrictive inherited policy while preventing permissive inheritance;
 the [Security Policy Guide](security-policy.md) defines the field-specific
 precedence and diagnostic behavior.
+
+For example, suspend and later restore a Skill through two reviewed Git/PR
+changes:
+
+```yaml
+metadata:
+  renma.status: suspended
+  renma.status-reason: Temporarily disabled while issue QE-1234 is corrected.
+  renma.status-changed-at: "2026-08-03"
+```
+
+```yaml
+metadata:
+  renma.status: stable
+  renma.status-reason: Restored after QE-1234 was corrected and verified.
+  renma.status-changed-at: "2026-08-06"
+```
+
+Renma compares the three fields independently in semantic diff and CI evidence.
+It does not store lifecycle history, schedule automatic expiry, or restore an
+asset automatically; repository history remains the complete audit trail.
 
 ### Consumer and inheritance boundaries
 

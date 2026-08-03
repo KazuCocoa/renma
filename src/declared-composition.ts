@@ -10,6 +10,7 @@ import type {
   DependencyKind,
 } from "./model.js";
 import type { Evidence, Finding } from "./types/diagnostics.js";
+import { isLifecycleUsable } from "./lifecycle.js";
 
 export type CompositionMembership = "required" | "optional";
 export type CompositionRelationship =
@@ -24,6 +25,8 @@ export interface CompositionAsset {
   kind: AssetKind;
   sourcePath: string;
   status?: AssetStatus;
+  statusReason?: string;
+  statusChangedAt?: string;
   direct?: boolean;
 }
 
@@ -98,7 +101,9 @@ export interface CompositionLifecycleFinding {
   sourcePath: string;
   membership: CompositionMembership;
   isRoot: boolean;
-  status: "deprecated" | "archived";
+  status: "suspended" | "deprecated" | "archived";
+  statusReason?: string;
+  statusChangedAt?: string;
 }
 
 export interface DeclaredCompositionReport {
@@ -351,6 +356,13 @@ export function resolveDeclaredCompositionFromIndex(
   const optionalMismatch = kindMismatches.some(
     (mismatch) => mismatch.membership === "optional",
   );
+  const requiredSuspension = governance.lifecycle.some(
+    (finding) =>
+      !finding.isRoot &&
+      finding.membership === "required" &&
+      finding.status === "suspended" &&
+      isLifecycleUsable(root.metadata.status),
+  );
 
   return {
     root: compositionAsset(root),
@@ -366,7 +378,10 @@ export function resolveDeclaredCompositionFromIndex(
     optionalConflictCandidates: conflicts.optional,
     freshnessFindings: governance.freshness,
     lifecycleFindings: governance.lifecycle,
-    requiredComplete: unresolvedRequired.length === 0 && !requiredMismatch,
+    requiredComplete:
+      unresolvedRequired.length === 0 &&
+      !requiredMismatch &&
+      !requiredSuspension,
     optionalComplete: unresolvedOptional.length === 0 && !optionalMismatch,
     cycleFree: requiredCycles.length === 0 && optionalCycles.length === 0,
   };
@@ -1010,6 +1025,12 @@ function compositionAsset(asset: Asset, direct?: boolean): CompositionAsset {
     kind: asset.kind,
     sourcePath: asset.sourcePath,
     ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
+    ...(asset.metadata.statusReason
+      ? { statusReason: asset.metadata.statusReason }
+      : {}),
+    ...(asset.metadata.statusChangedAt
+      ? { statusChangedAt: asset.metadata.statusChangedAt }
+      : {}),
     ...(direct !== undefined ? { direct } : {}),
   };
 }
@@ -1220,6 +1241,7 @@ function compositionGovernanceFindings(
       });
     }
     if (
+      asset.metadata.status === "suspended" ||
       asset.metadata.status === "deprecated" ||
       asset.metadata.status === "archived"
     ) {
@@ -1229,6 +1251,12 @@ function compositionGovernanceFindings(
         membership,
         isRoot,
         status: asset.metadata.status,
+        ...(asset.metadata.statusReason
+          ? { statusReason: asset.metadata.statusReason }
+          : {}),
+        ...(asset.metadata.statusChangedAt
+          ? { statusChangedAt: asset.metadata.statusChangedAt }
+          : {}),
       });
     }
   }

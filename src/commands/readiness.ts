@@ -57,6 +57,7 @@ const WORKFLOW_COMPLETION_CRITERIA_FINDING_IDS = new Set<string>([
 ]);
 const DISCOVERY_PUBLICATION_DIAGNOSTIC_IDS = new Set<string>([
   DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT,
+  DIAGNOSTIC_IDS.DISCOVERY_SUSPENDED_PUBLISHED_ENTRYPOINT,
   DIAGNOSTIC_IDS.DISCOVERY_ENTRYPOINT_WITHOUT_USABLE_BOUNDARIES,
 ]);
 const DISCOVERY_ROUTE_VALIDITY_DIAGNOSTIC_IDS = new Set<string>([
@@ -64,9 +65,18 @@ const DISCOVERY_ROUTE_VALIDITY_DIAGNOSTIC_IDS = new Set<string>([
   DIAGNOSTIC_IDS.DISCOVERY_UNRESOLVED_DECLARED_ROUTE,
   DIAGNOSTIC_IDS.DISCOVERY_ROUTE_TARGET_NOT_SKILL,
   DIAGNOSTIC_IDS.DISCOVERY_INACTIVE_ROUTE_TARGET,
+  DIAGNOSTIC_IDS.DISCOVERY_SUSPENDED_ROUTE_TARGET,
   DIAGNOSTIC_IDS.DISCOVERY_DUPLICATE_DECLARED_ROUTE,
 ]);
 const DISCOVERY_EVIDENCE_LIMIT = QUALITY.presentation.topSummaryItemCap;
+const SUSPENSION_READINESS_DIAGNOSTIC_IDS = new Set<string>([
+  DIAGNOSTIC_IDS.META_SUSPENDED_STATUS_METADATA_INCOMPLETE,
+  DIAGNOSTIC_IDS.META_INVALID_STATUS_CHANGED_AT,
+  DIAGNOSTIC_IDS.META_REQUIRED_SUSPENDED_DEPENDENCY,
+  DIAGNOSTIC_IDS.META_OPTIONAL_SUSPENDED_DEPENDENCY,
+  DIAGNOSTIC_IDS.DISCOVERY_SUSPENDED_PUBLISHED_ENTRYPOINT,
+  DIAGNOSTIC_IDS.DISCOVERY_SUSPENDED_ROUTE_TARGET,
+]);
 export type ReadinessLevel = "ready" | "needs_attention" | "not_ready";
 export type ReadinessCheckStatus = "pass" | "warn" | "fail";
 export type ReadinessCheckSeverity = "info" | "warning" | "error";
@@ -172,10 +182,15 @@ export function readinessFromRepositorySnapshot(
   const scanResult = scanFromRepositorySnapshot(snapshot, {
     includeSkillDiscoveryDiagnostics: false,
   });
+  const diagnostics = readinessDiagnosticsFromRepositorySnapshot(
+    snapshot,
+    scanResult.diagnostics,
+    projectionOptions,
+  );
   return buildReadinessReport(
     graphReport,
     scanResult.findings,
-    scanResult.diagnostics,
+    diagnostics,
     scanResult.contextLens,
     scanResult.securityPolicyInventory,
     scanResult.agentSkills,
@@ -183,6 +198,25 @@ export function readinessFromRepositorySnapshot(
       ? undefined
       : snapshot.skillDiscovery,
   );
+}
+
+/** Build the authoritative Readiness diagnostic collection for one snapshot. */
+export function readinessDiagnosticsFromRepositorySnapshot(
+  snapshot: RepositorySnapshot,
+  scanDiagnostics: readonly Diagnostic[],
+  projectionOptions: ReadinessProjectionOptions = {},
+): Diagnostic[] {
+  const suspensionDiagnostics = [
+    ...snapshot.catalogDiagnostics,
+    ...(projectionOptions.includeSkillDiscovery === false
+      ? []
+      : snapshot.skillDiscoveryDiagnostics),
+  ].filter(
+    (diagnostic) =>
+      diagnostic.code !== undefined &&
+      SUSPENSION_READINESS_DIAGNOSTIC_IDS.has(diagnostic.code),
+  );
+  return [...scanDiagnostics, ...suspensionDiagnostics];
 }
 
 export function buildReadinessReport(
@@ -211,7 +245,10 @@ export function buildReadinessReport(
     graphReport.edges.length,
   );
   const lifecycleAssets = graphReport.nodes.filter(
-    (node) => node.status === "deprecated" || node.status === "archived",
+    (node) =>
+      node.status === "suspended" ||
+      node.status === "deprecated" ||
+      node.status === "archived",
   );
   const discoveryReadiness = buildSkillDiscoveryReadiness(skillDiscovery);
 
@@ -1331,7 +1368,11 @@ function workflowContextClosureCheck(graphReport: GraphReport): ReadinessCheck {
         },
       ];
     }
-    if (target.status === "deprecated" || target.status === "archived") {
+    if (
+      target.status === "suspended" ||
+      target.status === "deprecated" ||
+      target.status === "archived"
+    ) {
       return [
         {
           id: edge.from,
@@ -1404,7 +1445,11 @@ function workflowOptionalContextCheck(
         },
       ];
     }
-    if (target.status === "deprecated" || target.status === "archived") {
+    if (
+      target.status === "suspended" ||
+      target.status === "deprecated" ||
+      target.status === "archived"
+    ) {
       return [
         {
           id: edge.from,
@@ -1625,13 +1670,23 @@ function lifecycleCheck(nodes: GraphReport["nodes"]): ReadinessCheck {
     title: "Asset lifecycle",
     status: "pass",
     severity: "info",
-    summary: `${nodes.length} intentionally retained deprecated or archived asset${
+    summary: `${nodes.length} intentionally retained ${
+      nodes.some((node) => node.status === "suspended")
+        ? "inactive"
+        : "deprecated or archived"
+    } asset${
       nodes.length === 1 ? "" : "s"
     } cataloged; inactive assets do not reduce Readiness merely by existing.`,
     evidence: nodes.map((node) => ({
       id: node.id,
       path: node.sourcePath,
-      message: `Asset status is ${node.status}.`,
+      message: [
+        `Asset status is ${node.status}.`,
+        ...(node.statusReason ? [`Reason: ${node.statusReason}.`] : []),
+        ...(node.statusChangedAt
+          ? [`Changed at: ${node.statusChangedAt}.`]
+          : []),
+      ].join(" "),
     })),
   };
 }

@@ -116,6 +116,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
         "dependency-resolution.ts",
         "diagnostic-ids.ts",
         "freshness.ts",
+        "lifecycle.ts",
         "metadata-definitions.ts",
         "model.ts",
         "quality-profile.ts",

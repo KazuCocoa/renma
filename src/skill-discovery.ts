@@ -23,6 +23,7 @@ import type {
   MetadataFieldEvidence,
   ParsedDocument,
 } from "./types/metadata.js";
+import { isLifecycleUsable } from "./lifecycle.js";
 
 export const SKILL_ROUTE_USABILITY_REASONS = [
   "invalid-source",
@@ -120,6 +121,8 @@ export interface VisibleSkillIdentity {
   name?: string;
   description?: string;
   lifecycle?: AssetStatus;
+  lifecycleReason?: string;
+  lifecycleChangedAt?: string;
   ownership: AssetOwnership;
   agentSkillsValid: boolean;
   lifecycleActive: boolean;
@@ -139,6 +142,8 @@ export interface SkillRouteCandidateIdentity {
   sourcePath: string;
   kind: AssetKind;
   lifecycle?: AssetStatus;
+  lifecycleReason?: string;
+  lifecycleChangedAt?: string;
   matchedBy: Array<"id" | "path">;
 }
 
@@ -147,6 +152,8 @@ export interface ResolvedSkillRouteTarget {
   sourcePath: string;
   kind: AssetKind;
   lifecycle?: AssetStatus;
+  lifecycleReason?: string;
+  lifecycleChangedAt?: string;
   effectiveIdUnique: boolean;
   agentSkillsValid?: boolean;
 }
@@ -918,9 +925,7 @@ function visibleSkill(
   effectiveIdUnique: boolean,
   marker: CanonicalSkillPublicationField | undefined,
 ): VisibleSkillIdentity {
-  const lifecycleActive =
-    asset.metadata.status !== "deprecated" &&
-    asset.metadata.status !== "archived";
+  const lifecycleActive = isLifecycleUsable(asset.metadata.status);
   const routeEligibilityReasons: SkillRouteUsabilityReason[] = [];
   if (validation?.valid !== true)
     routeEligibilityReasons.push("invalid-source");
@@ -945,6 +950,12 @@ function visibleSkill(
     ...(validation?.name ? { name: validation.name } : {}),
     ...(validation?.description ? { description: validation.description } : {}),
     ...(asset.metadata.status ? { lifecycle: asset.metadata.status } : {}),
+    ...(asset.metadata.statusReason
+      ? { lifecycleReason: asset.metadata.statusReason }
+      : {}),
+    ...(asset.metadata.statusChangedAt
+      ? { lifecycleChangedAt: asset.metadata.statusChangedAt }
+      : {}),
     ownership: asset.ownership,
     agentSkillsValid: validation?.valid === true,
     lifecycleActive,
@@ -1129,14 +1140,18 @@ function publicationDiagnosticFor(
     : inactiveAttempt
       ? "Remove the stale publication attempt or review the lifecycle decision; do not reactivate or clone the Skill merely to publish it."
       : 'Use the exact YAML string "true" to request publication, or omit the marker.';
+  const suspendedAttempt = inactiveAttempt && skill.lifecycle === "suspended";
+  const code = suspendedAttempt
+    ? DIAGNOSTIC_IDS.DISCOVERY_SUSPENDED_PUBLISHED_ENTRYPOINT
+    : DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT;
   return {
-    code: DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT,
-    severity: "warning",
+    code,
+    severity: suspendedAttempt ? "error" : "warning",
     path: skill.sourcePath,
     message: `Skill "${skill.id}" cannot be published because ${reason}. ${action}`,
     ...(marker.evidence ? { evidence: marker.evidence } : {}),
     repairConstraints: publicationRepairConstraints(ambiguousMarker),
-    verificationSteps: publicationMarkerVerificationSteps(),
+    verificationSteps: publicationMarkerVerificationSteps(code),
     llmHint:
       "Preserve the intended bounded first-hop responsibility. Do not publish every structural root, fabricate or clone a Skill, reactivate an inactive Skill merely to publish it, or guess through ambiguous evidence.",
     details: {
@@ -1150,6 +1165,12 @@ function publicationDiagnosticFor(
         : {}),
       ...(marker.evidence ? { rawMarkerEvidence: marker.evidence } : {}),
       ...(skill.lifecycle ? { lifecycle: skill.lifecycle } : {}),
+      ...(skill.lifecycleReason
+        ? { lifecycleReason: skill.lifecycleReason }
+        : {}),
+      ...(skill.lifecycleChangedAt
+        ? { lifecycleChangedAt: skill.lifecycleChangedAt }
+        : {}),
       publicationRejectionReasons: skill.publication.rejectionReasons,
     },
   };
@@ -1497,6 +1518,12 @@ function candidateIdentities(
         sourcePath: asset.sourcePath,
         kind: asset.kind,
         ...(asset.metadata.status ? { lifecycle: asset.metadata.status } : {}),
+        ...(asset.metadata.statusReason
+          ? { lifecycleReason: asset.metadata.statusReason }
+          : {}),
+        ...(asset.metadata.statusChangedAt
+          ? { lifecycleChangedAt: asset.metadata.statusChangedAt }
+          : {}),
         matchedBy: [matchedBy],
       });
     }
@@ -1562,7 +1589,8 @@ function routeDiagnostics(
     route.resolvedTarget?.kind === "skill" &&
     skillsByPath.get(route.sourcePath)?.routeEligible === true &&
     route.resolvedTarget.agentSkillsValid === true &&
-    (route.resolvedTarget.lifecycle === "deprecated" ||
+    (route.resolvedTarget.lifecycle === "suspended" ||
+      route.resolvedTarget.lifecycle === "deprecated" ||
       route.resolvedTarget.lifecycle === "archived")
   ) {
     return [inactiveTargetDiagnostic(route)];
@@ -1659,18 +1687,20 @@ function wrongKindRouteDiagnostic(route: DeclaredSkillRoute): Diagnostic {
 
 function inactiveTargetDiagnostic(route: DeclaredSkillRoute): Diagnostic {
   const target = route.resolvedTarget!;
+  const suspended = target.lifecycle === "suspended";
+  const code = suspended
+    ? DIAGNOSTIC_IDS.DISCOVERY_SUSPENDED_ROUTE_TARGET
+    : DIAGNOSTIC_IDS.DISCOVERY_INACTIVE_ROUTE_TARGET;
   return {
-    code: DIAGNOSTIC_IDS.DISCOVERY_INACTIVE_ROUTE_TARGET,
-    severity: "warning",
+    code,
+    severity: suspended ? "error" : "warning",
     path: route.sourcePath,
     message: `Skill continuation ${route.declarationIndex} targets ${target.lifecycle} Skill "${target.id}" at ${target.sourcePath}. The declaration remains visible but is unusable for structural Discovery.`,
     evidence: route.evidence,
     repairConstraints: discoveryRepairConstraints(),
-    verificationSteps: routeVerificationSteps(
-      DIAGNOSTIC_IDS.DISCOVERY_INACTIVE_ROUTE_TARGET,
-    ),
+    verificationSteps: routeVerificationSteps(code),
     llmHint:
-      "Preserve the intended continuation while reviewing a real active replacement. Correct or remove a stale declaration; do not reactivate or clone a Skill only to silence the warning.",
+      "Preserve the intended continuation while reviewing a real active replacement. Correct or remove a stale declaration; do not reactivate or clone a Skill only to silence the diagnostic.",
     details: {
       sourceId: route.sourceId,
       sourcePath: route.sourcePath,
@@ -1678,6 +1708,14 @@ function inactiveTargetDiagnostic(route: DeclaredSkillRoute): Diagnostic {
       target: target.id,
       targetPath: target.sourcePath,
       targetStatus: target.lifecycle,
+      ...(target.lifecycleReason
+        ? { targetStatusReason: target.lifecycleReason }
+        : {}),
+      ...(target.lifecycleChangedAt
+        ? { targetStatusChangedAt: target.lifecycleChangedAt }
+        : {}),
+      relationship: "continues_with",
+      metadataKey: "metadata.renma.continues-with",
     },
   };
 }
@@ -1759,10 +1797,9 @@ function routeVerificationSteps(
   ];
 }
 
-function publicationMarkerVerificationSteps(): NonNullable<
-  Diagnostic["verificationSteps"]
-> {
-  const code = DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT;
+function publicationMarkerVerificationSteps(
+  code: string = DIAGNOSTIC_IDS.DISCOVERY_INVALID_PUBLISHED_ENTRYPOINT,
+): NonNullable<Diagnostic["verificationSteps"]> {
   return [
     {
       text: "Run the Discovery graph and inspect the Skill's publication marker and effective publication state.",
@@ -1807,6 +1844,12 @@ function resolvedTarget(
     sourcePath: asset.sourcePath,
     kind: asset.kind,
     ...(asset.metadata.status ? { lifecycle: asset.metadata.status } : {}),
+    ...(asset.metadata.statusReason
+      ? { lifecycleReason: asset.metadata.statusReason }
+      : {}),
+    ...(asset.metadata.statusChangedAt
+      ? { lifecycleChangedAt: asset.metadata.statusChangedAt }
+      : {}),
     effectiveIdUnique: idCounts.get(asset.id) === 1,
     ...(skill ? { agentSkillsValid: skill.agentSkillsValid } : {}),
   };

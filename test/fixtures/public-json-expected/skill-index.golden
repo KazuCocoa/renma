@@ -110,7 +110,7 @@
       {
         "severity": "warning",
         "path": "contexts/invalid-status.md",
-        "message": "Invalid status \"active\". Expected one of: experimental, stable, deprecated, archived.",
+        "message": "Invalid status \"active\". Expected one of: experimental, stable, suspended, deprecated, archived.",
         "evidence": {
           "path": "contexts/invalid-status.md",
           "startLine": 4,

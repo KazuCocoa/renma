@@ -370,7 +370,7 @@ test("current Skill Discovery docs preserve the static contract and boundaries",
   assert.match(contract, /"skill_discovery"[\s\S]*"adopted": true/);
   assert.match(
     contract,
-    /specification-valid canonical Agent Skill[\s\S]*not deprecated or archived[\s\S]*unique in effective asset ID/,
+    /specification-valid canonical Agent Skill[\s\S]*lifecycle-usable[\s\S]*status is omitted[\s\S]*unique in effective asset ID/,
   );
   assert.match(contract, /`DISCOVERY-ROUTE-CYCLE`/);
   assert.match(contract, /renma graph \. --view discovery/);

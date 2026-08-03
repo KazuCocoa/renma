@@ -23,9 +23,9 @@ const STATUS_FINDING = {
   severity: "medium",
   confidence: "high",
   whyItMatters:
-    "Lifecycle status is part of the repository governance contract. Invalid status values make it harder for humans and agents to understand whether a skill, context asset, or support file is experimental, stable, deprecated, or archived.",
+    "Lifecycle status is part of the repository governance contract. Invalid status values make it harder for humans and agents to understand whether a skill, context asset, or support file is experimental, stable, suspended, deprecated, or archived.",
   remediation:
-    "Use one of the supported lifecycle status values: experimental, stable, deprecated, archived. Do not use migration or relationship states such as active or delegated as lifecycle status.",
+    "Use one of the supported lifecycle status values: experimental, stable, suspended, deprecated, archived. Do not use migration or relationship states such as active or delegated as lifecycle status.",
   constraints: [
     "Do not introduce runtime context resolution.",
     "Do not create prompt packages.",
@@ -157,6 +157,30 @@ const CATALOG_FINDING_DEFINITION_LIST = [
     ...FRESHNESS_FINDING,
   },
   {
+    ...GENERIC_CATALOG_FINDING,
+    code: DIAGNOSTIC_IDS.META_INVALID_STATUS_CHANGED_AT,
+    title: "Lifecycle metadata uses an invalid status transition date",
+    severity: "medium",
+  },
+  {
+    ...GENERIC_CATALOG_FINDING,
+    code: DIAGNOSTIC_IDS.META_SUSPENDED_STATUS_METADATA_INCOMPLETE,
+    title: "Suspended lifecycle metadata is incomplete",
+    severity: "medium",
+  },
+  {
+    ...GENERIC_CATALOG_FINDING,
+    code: DIAGNOSTIC_IDS.META_REQUIRED_SUSPENDED_DEPENDENCY,
+    title: "Required dependency targets a suspended asset",
+    severity: "medium",
+  },
+  {
+    ...GENERIC_CATALOG_FINDING,
+    code: DIAGNOSTIC_IDS.META_OPTIONAL_SUSPENDED_DEPENDENCY,
+    title: "Optional dependency targets a suspended asset",
+    severity: "low",
+  },
+  {
     code: DIAGNOSTIC_IDS.META_FRONTMATTER_TOO_LARGE,
     title: "Frontmatter metadata is too large",
     ...METADATA_BUDGET_FINDING,
@@ -257,7 +281,7 @@ function findingFromCatalogDiagnostic(
     id: definition.code,
     title: definition.title,
     category: definition.category,
-    severity: definition.severity,
+    severity: diagnostic.severity === "error" ? "high" : definition.severity,
     confidence: definition.confidence,
     evidence: diagnostic.evidence ?? {
       path: diagnostic.path ?? "(catalog)",
@@ -269,7 +293,13 @@ function findingFromCatalogDiagnostic(
     remediation: definition.remediation,
     constraints: [...definition.constraints],
     verificationSteps: [...definition.verificationSteps],
-    llmHint: definition.llmHint,
+    ...(diagnostic.repairConstraints
+      ? { repairConstraints: diagnostic.repairConstraints }
+      : {}),
+    ...(diagnostic.verificationSteps
+      ? { verificationStepsV2: diagnostic.verificationSteps }
+      : {}),
+    llmHint: diagnostic.llmHint ?? definition.llmHint,
     ...(diagnostic.details ? { details: diagnostic.details } : {}),
   };
 }

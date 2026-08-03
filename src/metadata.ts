@@ -30,6 +30,7 @@ import {
 const STATUSES: AssetStatus[] = [
   "experimental",
   "stable",
+  "suspended",
   "deprecated",
   "archived",
 ];
@@ -404,6 +405,10 @@ export function parseAssetMetadata(document: ParsedDocument): {
     ? rawStatusText?.trim()
     : rawStatusText;
   const status = parseStatus(rawStatus);
+  const statusReason = optionalText(metadataText(source.values.status_reason));
+  const statusChangedAt = optionalText(
+    metadataText(source.values.status_changed_at),
+  );
   const lastReviewedAt = optionalText(
     metadataText(source.values.last_reviewed_at),
   );
@@ -481,6 +486,8 @@ export function parseAssetMetadata(document: ParsedDocument): {
     optionalText(metadataText(source.values.owner)),
   );
   assignOptional(metadata, "status", status);
+  assignOptional(metadata, "statusReason", statusReason);
+  assignOptional(metadata, "statusChangedAt", statusChangedAt);
   assignOptional(
     metadata,
     "purpose",
@@ -557,6 +564,32 @@ export function parseAssetMetadata(document: ParsedDocument): {
         DIAGNOSTIC_IDS.META_INVALID_EXPIRES_AT,
       ),
     );
+  }
+
+  const statusChangedAtValid =
+    statusChangedAt === undefined || isIsoDate(statusChangedAt);
+  if (!statusChangedAtValid) {
+    diagnostics.push(
+      statusChangedAtDiagnostic(document, source, status, statusChangedAt!),
+    );
+  }
+
+  if (status === "suspended") {
+    const missingFields = [
+      ...(statusReason === undefined ? ["status_reason"] : []),
+      ...(statusChangedAt === undefined ? ["status_changed_at"] : []),
+    ];
+    if (missingFields.length > 0) {
+      diagnostics.push(
+        suspendedMetadataIncompleteDiagnostic(
+          document,
+          source,
+          statusReason,
+          statusChangedAt,
+          missingFields,
+        ),
+      );
+    }
   }
 
   if (
@@ -798,6 +831,111 @@ function invalidMetadataDiagnostic(
     ...(evidence ? { evidence } : {}),
   };
   return code ? withDiagnosticId(code, diagnostic) : diagnostic;
+}
+
+function statusChangedAtDiagnostic(
+  document: ParsedDocument,
+  source: OperationalMetadataSource,
+  status: AssetStatus | undefined,
+  statusChangedAt: string,
+): Diagnostic {
+  const suspended = status === "suspended";
+  const evidence = metadataFieldEvidence(source, "status_changed_at");
+  return withDiagnosticId(DIAGNOSTIC_IDS.META_INVALID_STATUS_CHANGED_AT, {
+    severity: suspended ? "error" : "warning",
+    path: document.artifact.path,
+    message: `Invalid status_changed_at "${statusChangedAt}". Expected a real ISO calendar date in YYYY-MM-DD format.`,
+    ...(evidence ? { evidence } : {}),
+    repairConstraints: [
+      {
+        kind: "must_preserve",
+        text: "Preserve the reviewed lifecycle status and reason while correcting only the declared transition date.",
+      },
+      {
+        kind: "must_not_change",
+        text: "Do not infer the date from Git history, file timestamps, the current date, or pull-request metadata.",
+      },
+      {
+        kind: "requires_human_decision",
+        text: "Confirm the real date of the latest reviewed lifecycle transition.",
+      },
+    ],
+    verificationSteps: [
+      {
+        text: "Use a real YYYY-MM-DD calendar date and rerun metadata validation.",
+        command: "renma scan . --format json",
+        expected: `No ${DIAGNOSTIC_IDS.META_INVALID_STATUS_CHANGED_AT} diagnostic remains for this field.`,
+      },
+    ],
+    llmHint:
+      "Correct status_changed_at only from reviewed repository evidence. Do not invent, repair heuristically, or derive a transition date from Git or filesystem timestamps.",
+    details: {
+      assetId:
+        optionalText(metadataText(source.values.id)) ?? document.artifact.path,
+      sourcePath: document.artifact.path,
+      ...(status ? { status } : {}),
+      statusChangedAt,
+      metadataKey: source.canonicalSkill
+        ? `metadata.${CANONICAL_SKILL_METADATA_KEYS.status_changed_at}`
+        : NON_SKILL_CATALOG_METADATA_KEYS.status_changed_at,
+    },
+  });
+}
+
+function suspendedMetadataIncompleteDiagnostic(
+  document: ParsedDocument,
+  source: OperationalMetadataSource,
+  statusReason: string | undefined,
+  statusChangedAt: string | undefined,
+  missingFields: string[],
+): Diagnostic {
+  const statusEvidence = metadataFieldEvidence(source, "status");
+  return withDiagnosticId(
+    DIAGNOSTIC_IDS.META_SUSPENDED_STATUS_METADATA_INCOMPLETE,
+    {
+      severity: "error",
+      path: document.artifact.path,
+      message: `Suspended lifecycle metadata is incomplete. Add ${missingFields.join(" and ")} with reviewed transition evidence.`,
+      ...(statusEvidence ? { evidence: statusEvidence } : {}),
+      repairConstraints: [
+        {
+          kind: "must_preserve",
+          text: "Preserve the suspended asset, its contents, inventory evidence, and the reviewed reason/date declarations that already exist.",
+        },
+        {
+          kind: "must_not_change",
+          text: "Do not reactivate, archive, delete, automatically restore, or invent lifecycle evidence merely to clear this diagnostic.",
+        },
+        {
+          kind: "allowed_change",
+          text: "Add a non-blank reason and a real YYYY-MM-DD date for the latest reviewed lifecycle transition.",
+        },
+        {
+          kind: "requires_human_decision",
+          text: "Confirm the reason and date of the reviewed suspension decision.",
+        },
+      ],
+      verificationSteps: [
+        {
+          text: "Add the missing canonical lifecycle fields and rerun metadata validation.",
+          command: "renma scan . --format json",
+          expected: `No ${DIAGNOSTIC_IDS.META_SUSPENDED_STATUS_METADATA_INCOMPLETE} diagnostic remains for this asset.`,
+        },
+      ],
+      llmHint:
+        "Keep the asset suspended and add only human-reviewed lifecycle transition evidence. Skills use flat metadata.renma.status-reason and metadata.renma.status-changed-at strings; non-Skills use status_reason and status_changed_at.",
+      details: {
+        assetId:
+          optionalText(metadataText(source.values.id)) ??
+          document.artifact.path,
+        sourcePath: document.artifact.path,
+        status: "suspended",
+        missingFields,
+        ...(statusReason ? { statusReason } : {}),
+        ...(statusChangedAt ? { statusChangedAt } : {}),
+      },
+    },
+  );
 }
 
 function operationalMetadataSource(

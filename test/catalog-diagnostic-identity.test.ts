@@ -99,6 +99,7 @@ test("metadata and catalog producers attach every known conversion code", () => 
 id: context.invalid
 owner: qa
 status: active
+status_changed_at: 2026-02-30
 last_reviewed_at: yesterday
 expires_at: tomorrow
 review_cycle: P3M
@@ -171,6 +172,9 @@ when_not_to_use: runtime selection
 optional_context:
   - context.unknown
   - context.inactive
+  - context.suspended
+requires_context:
+  - context.suspended
 ---
 # Source
 `,
@@ -186,6 +190,34 @@ when_to_use: historical review
 when_not_to_use: current guidance
 ---
 # Inactive
+`,
+    ),
+    document(
+      "contexts/suspended.md",
+      "context",
+      `---
+id: context.suspended
+owner: qa
+status: suspended
+status_reason: Temporarily unavailable during reviewed maintenance.
+status_changed_at: 2026-08-03
+when_to_use: historical review
+when_not_to_use: current guidance
+---
+# Suspended
+`,
+    ),
+    document(
+      "contexts/incomplete-suspension.md",
+      "context",
+      `---
+id: context.incomplete-suspension
+owner: qa
+status: suspended
+when_to_use: historical review
+when_not_to_use: current guidance
+---
+# Incomplete Suspension
 `,
     ),
   ];

@@ -39,6 +39,8 @@ export interface InspectAssetSummary {
   kind: AssetKind;
   owner?: string;
   status?: AssetStatus;
+  statusReason?: string;
+  statusChangedAt?: string;
   tags: string[];
   purpose?: string;
   appliesTo: string[];

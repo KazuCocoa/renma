@@ -24,6 +24,8 @@ export interface ImpactAsset {
   kind: AssetKind;
   sourcePath: string;
   status?: AssetStatus;
+  statusReason?: string;
+  statusChangedAt?: string;
   direct: boolean;
 }
 
@@ -282,6 +284,12 @@ function impactAsset(asset: Asset, direct: boolean): ImpactAsset {
     kind: asset.kind,
     sourcePath: asset.sourcePath,
     ...(asset.metadata.status ? { status: asset.metadata.status } : {}),
+    ...(asset.metadata.statusReason
+      ? { statusReason: asset.metadata.statusReason }
+      : {}),
+    ...(asset.metadata.statusChangedAt
+      ? { statusChangedAt: asset.metadata.statusChangedAt }
+      : {}),
     direct,
   };
 }

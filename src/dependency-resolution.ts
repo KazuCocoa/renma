@@ -17,3 +17,26 @@ export function resolveDependencyTarget(
       normalizeDependencyReference(asset.sourcePath) === target,
   );
 }
+
+/**
+ * Resolve only when exact ID/path evidence identifies one asset. This is used
+ * by lifecycle gates, which must not select from duplicate or ambiguous input.
+ */
+export function resolveUniqueDependencyTarget(
+  dependency: Dependency,
+  assets: Asset[],
+): Asset | undefined {
+  const target = normalizeDependencyReference(dependency.to);
+  const matches = assets.filter(
+    (asset) =>
+      asset.id === dependency.to ||
+      normalizeDependencyReference(asset.sourcePath) === target,
+  );
+  const uniquePaths = new Map(
+    matches.map((asset) => [
+      normalizeDependencyReference(asset.sourcePath),
+      asset,
+    ]),
+  );
+  return uniquePaths.size === 1 ? [...uniquePaths.values()][0] : undefined;
+}

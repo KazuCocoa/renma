@@ -6,6 +6,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added reversible `suspended` lifecycle evidence for Skills and cataloged
+  non-Skill assets, including reviewed reason/date metadata, inactive
+  dependency and Discovery gates, Readiness evidence, public projections,
+  schemas, semantic diff, and CI-report visibility without runtime enforcement
+  or automatic restoration.
+
 ## [0.28.5] - 2026-08-03
 
 ### Added

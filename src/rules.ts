@@ -28,6 +28,7 @@ import {
   localSupportReachabilityDepth,
   staticSupportReferences,
 } from "./static-support.js";
+import { isLifecycleUsable } from "./lifecycle.js";
 
 type FindingDetails = Partial<
   Pick<
@@ -595,7 +596,12 @@ function contextLensAppliesToInactiveContextFindings(
     if (source?.kind !== "context_lens" || target?.kind !== "context") {
       return [];
     }
-    if (!isActiveAsset(source) || isActiveAsset(target)) return [];
+    if (
+      !isActiveAsset(source) ||
+      target.metadata.status === "suspended" ||
+      isActiveAsset(target)
+    )
+      return [];
 
     return [
       {
@@ -656,12 +662,7 @@ function orphanedContextAssetFindings(
 
   return entries.flatMap((entry) => {
     if (!isFirstClassSharedContext(entry)) return [];
-    if (
-      entry.metadata.status === "deprecated" ||
-      entry.metadata.status === "archived"
-    ) {
-      return [];
-    }
+    if (!isActiveAsset(entry)) return [];
     if (referencedPaths.has(entry.sourcePath)) return [];
 
     return [
@@ -702,10 +703,7 @@ function orphanedContextAssetFindings(
 }
 
 function isActiveAsset(entry: CatalogEntry): boolean {
-  return (
-    entry.metadata.status !== "deprecated" &&
-    entry.metadata.status !== "archived"
-  );
+  return isLifecycleUsable(entry.metadata.status);
 }
 
 interface CatalogReferenceResolver {
