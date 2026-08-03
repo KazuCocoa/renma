@@ -73,8 +73,8 @@ renma is most useful when agent knowledge is stored in predictable places:
   spellings are not Agent Skills-compatible.
 - `contexts/**` for shared context assets.
 - configurable prompt or documentation paths for reusable prompts and broader docs.
-- `renma.config.json` and `.renma.json` are the conventional repository
-  configuration filenames.
+- `renma.config.jsonc` is the recommended repository configuration filename;
+  existing `renma.config.json` and `.renma.json` files remain supported.
 
 Tool helper implementations usually belong under `tools/**`. They can be referenced from skills and commands, but they are not the same thing as user-facing documentation under `docs/**`.
 
@@ -191,7 +191,7 @@ Unknown `renma.*` keys and other vendors' valid string metadata are preserved
 but uninterpreted unless a current Renma registry recognizes them. Unknown
 top-level non-Skill fields may remain in parsed source evidence, but they are
 outside Renma's operational model unless a current parser is listed below.
-Repository JSON configuration has its own schema and is not frontmatter
+Repository JSONC/JSON configuration has its own schema and is not frontmatter
 metadata.
 
 Metadata is governance and static declaration evidence. It does not replace
@@ -970,10 +970,30 @@ Lens relative links; Renma validates the relationships but does not load them.
 Use `--config <path>` with commands that scan the repository:
 
 ```bash
-renma scan . --config renma.config.json
+renma scan . --config renma.config.jsonc
 ```
 
-The JSON configuration supports the same names used by the implementation, including:
+JSONC is JSON with line and block comments. Comments let maintainers preserve
+the human rationale for temporary governance exceptions, and are discarded
+during parsing rather than exposed to Renma diagnostics or reports. Renma does
+not execute configuration as JavaScript: `.js`, `.mjs`, and `.ts` configuration
+files are not supported. Existing `.json` configuration remains valid.
+
+For example:
+
+```jsonc
+{
+  "skill_discovery": {
+    "adopted": true,
+
+    // Keep this warning-only until existing repositories complete migration
+    // and maintainers have reviewed the observed warning quality.
+    "ci_policy": "warn"
+  }
+}
+```
+
+The configuration supports the same names used by the implementation, including:
 
 - `globs`: glob patterns to scan.
 - `exclude`: paths or path prefixes to skip.
@@ -1020,7 +1040,12 @@ Use `exclude` for files Renma should not scan. Use `suppressions` for audited ex
 
 Use a date in `YYYY-MM-DD` for temporary workarounds, or `"never"` when the exception is intentionally permanent. Permanent suppressions should still use narrow path patterns and a clear reason. Suppression path patterns are repository-relative and support exact paths, directory-prefix matches for non-glob patterns, `*` within one path segment, and `**` across directories.
 
-If `--config` is not provided, renma looks for repository config files such as `renma.config.json` or `.renma.json` while resolving the scan target.
+If `--config` is not provided, Renma checks the repository root in this order:
+`renma.config.jsonc`, `renma.config.json`, then `.renma.json`. More than one
+conventional file is an error because Renma does not choose, parse, or merge
+ambiguous repository configuration. An explicit `--config <path>` selects that
+`.json` or `.jsonc` file even when conventional files coexist; other extensions
+are rejected.
 
 Canonical Agent Skills entrypoints are:
 
@@ -1145,11 +1170,13 @@ renma init .
 renma init path/to/repository
 ```
 
-When neither conventional configuration file exists, `init` creates a minimal
-`renma.config.json` containing only the initial `fail_on` and `format` policy.
-The command never overwrites, parses, normalizes, migrates, or validates an
-existing `renma.config.json` or `.renma.json`. If both exist,
-`renma.config.json` takes precedence and neither file is changed.
+When no conventional configuration file exists, `init` creates a concise
+`renma.config.jsonc` containing the initial `fail_on` and `format` policy plus
+one comment demonstrating where to preserve the rationale for a temporary
+policy exception. The command never overwrites, parses, normalizes, migrates,
+or validates an existing `renma.config.jsonc`, `renma.config.json`, or
+`.renma.json`. If multiple conventional files exist, `init` reports the
+ambiguity and changes none of them.
 
 Use `init` when a repository wants to record explicit Renma adoption. Existing
 repositories can continue directly to `scan` because Renma operates with

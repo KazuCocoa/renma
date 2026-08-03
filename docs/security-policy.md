@@ -206,7 +206,7 @@ metadata:
 
 ### Reusable security profiles
 
-Use a security profile when many assets share the same policy, a team wants a reusable security contract, or policy should be centrally updated in `renma.config.json`.
+Use a security profile when many assets share the same policy, a team wants a reusable security contract, or policy should be centrally updated in the recommended `renma.config.jsonc` (or a supported existing JSON config).
 
 Configure profiles under `security.profiles`:
 

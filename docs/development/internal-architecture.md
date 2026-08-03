@@ -755,7 +755,8 @@ Resolution stages answer different questions and must remain separate.
 relative to one safe repository root. Evidence is considered in this order:
 
 1. an explicit repository root;
-2. the nearest valid `.git`, `renma.config.json`, or `.renma.json` marker;
+2. the nearest valid `.git`, `renma.config.jsonc`, `renma.config.json`, or
+   `.renma.json` marker;
 3. an unambiguous strong structural boundary such as `skills`, `.agents`,
    `contexts`, `context`, `lenses`, or `tools`, plus recognized root files such
    as `AGENTS.md`;

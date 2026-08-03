@@ -4,18 +4,23 @@ import { renmaCommand } from "../command-invocation.js";
 import { CONFIG_FILENAMES } from "../config.js";
 
 export const INITIAL_CONFIG_CONTENT = `{
+  // If this policy is temporarily weakened, record why and when to revisit it.
   "fail_on": "high",
   "format": "text"
 }
 `;
 
 export type InitState =
-  "created" | "primary-existing" | "legacy-existing" | "conflicting";
+  | "created"
+  | "primary-existing"
+  | "json-existing"
+  | "legacy-existing"
+  | "conflicting";
 
 export interface InitResult {
   state: InitState;
   primaryPath: string;
-  legacyPath: string;
+  existingPaths: string[];
 }
 
 /** Initialize repository-level Renma configuration without touching assets. */
@@ -25,26 +30,28 @@ export async function initializeRepository(root: string): Promise<InitResult> {
     throw new Error(`Initialization root ${root} is not a directory.`);
   }
 
-  const [primaryName, legacyName] = CONFIG_FILENAMES;
+  const [primaryName] = CONFIG_FILENAMES;
   const primaryPath = path.join(root, primaryName);
-  const legacyPath = path.join(root, legacyName);
-  const existing = await existingState(primaryPath, legacyPath);
-  if (existing) return { state: existing, primaryPath, legacyPath };
+  const conventionalPaths = CONFIG_FILENAMES.map((name) =>
+    path.join(root, name),
+  );
+  const existing = await existingState(conventionalPaths);
+  if (existing) return { ...existing, primaryPath };
 
   try {
     await writeFile(primaryPath, INITIAL_CONFIG_CONTENT, {
       encoding: "utf8",
       flag: "wx",
     });
-    return { state: "created", primaryPath, legacyPath };
+    return { state: "created", primaryPath, existingPaths: [] };
   } catch (error) {
     if (nodeErrorCode(error) !== "EEXIST") throw error;
 
-    const racedState = await existingState(primaryPath, legacyPath);
+    const racedState = await existingState(conventionalPaths);
     return {
-      state: racedState ?? "primary-existing",
+      state: racedState?.state ?? "primary-existing",
       primaryPath,
-      legacyPath,
+      existingPaths: racedState?.existingPaths ?? [primaryPath],
     };
   }
 }
@@ -62,7 +69,6 @@ export async function runInitCommand(root: string): Promise<number> {
   }
 
   const primary = displayPath(result.primaryPath);
-  const legacy = displayPath(result.legacyPath);
   if (result.state === "created") {
     const scan = root.startsWith("-")
       ? renmaCommand(["scan", "--", root]).display
@@ -83,15 +89,17 @@ export async function runInitCommand(root: string): Promise<number> {
   }
 
   if (result.state === "conflicting") {
-    process.stdout.write(
-      `Warning: both ${primary} and ${legacy} exist.\n` +
-        `${primary} takes precedence.\n` +
-        "No files were changed.\n",
+    console.error(
+      `Multiple Renma configuration files exist: ${result.existingPaths
+        .map(displayPath)
+        .join(
+          ", ",
+        )}. Renma requires one unambiguous repository configuration. Keep ${primary} when comments are desired and remove the other supported configuration files. No files were changed.`,
     );
-    return 0;
+    return 2;
   }
 
-  const existing = result.state === "primary-existing" ? primary : legacy;
+  const existing = displayPath(result.existingPaths[0] ?? primary);
   process.stdout.write(
     `Renma is already initialized with ${existing}.\n` +
       "No files were changed.\n",
@@ -99,17 +107,29 @@ export async function runInitCommand(root: string): Promise<number> {
   return 0;
 }
 
-async function existingState(
-  primaryPath: string,
-  legacyPath: string,
-): Promise<Exclude<InitState, "created"> | undefined> {
-  const [primaryExists, legacyExists] = await Promise.all([
-    pathExists(primaryPath),
-    pathExists(legacyPath),
-  ]);
-  if (primaryExists && legacyExists) return "conflicting";
-  if (primaryExists) return "primary-existing";
-  if (legacyExists) return "legacy-existing";
+async function existingState(conventionalPaths: readonly string[]): Promise<
+  | {
+      state: Exclude<InitState, "created">;
+      existingPaths: string[];
+    }
+  | undefined
+> {
+  const existingPaths = (
+    await Promise.all(
+      conventionalPaths.map(async (candidate) =>
+        (await pathExists(candidate)) ? candidate : undefined,
+      ),
+    )
+  ).filter((candidate) => candidate !== undefined);
+  if (existingPaths.length > 1) {
+    return { state: "conflicting", existingPaths };
+  }
+  const existingPath = existingPaths[0];
+  if (!existingPath) return undefined;
+  const index = conventionalPaths.indexOf(existingPath);
+  if (index === 0) return { state: "primary-existing", existingPaths };
+  if (index === 1) return { state: "json-existing", existingPaths };
+  if (index === 2) return { state: "legacy-existing", existingPaths };
   return undefined;
 }
 

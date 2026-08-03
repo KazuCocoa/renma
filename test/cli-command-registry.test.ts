@@ -100,7 +100,7 @@ test("the registry dispatches every command to its command-specific parser", asy
   const init = await captureConsole(() => main(["init", fixture.root]));
   assert.equal(init.code, 0);
   assert.match(init.stdout, /Renma is initialized for this repository/);
-  assert.match(await fixture.read("renma.config.json"), /"fail_on": "high"/);
+  assert.match(await fixture.read("renma.config.jsonc"), /"fail_on": "high"/);
 
   const cases: readonly {
     name: CommandName;

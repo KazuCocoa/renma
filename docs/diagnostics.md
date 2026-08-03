@@ -69,9 +69,9 @@ For marker-free directory-segment inference, only `.agents`, `skills`,
 `contexts`, `context`, `lenses`, and `tools` can positively establish a
 structural boundary. Recognized root filenames are handled separately:
 `AGENTS.md` may establish its containing directory as the structural root when
-no stronger repository marker is available, while `renma.config.json` and
-`.renma.json` normally establish the boundary through repository-marker
-detection. The support-like names `profiles`, `references`, `examples`,
+no stronger repository marker is available, while `renma.config.jsonc`,
+`renma.config.json`, and `.renma.json` normally establish the boundary through
+repository-marker detection. The support-like names `profiles`, `references`, `examples`,
 `scripts`, and `assets` are guards only: they can block a later boundary-like
 segment or contribute ambiguity evidence, but never establish a repository root
 by themselves.
@@ -146,7 +146,7 @@ later, more generic interpretation.
 | `lens-root` | A file under `lenses/**`. | The file is an independent Context Lens by structure. | That Lens targets, governance, or policy declarations are valid. |
 | `agent-root` | `AGENTS.md` or a file under `.agents/**` after higher-priority Skill entrypoint rules. | The file is repository agent guidance with independent scope. | That it is an Agent Skill, that its instructions are valid, or that governance is complete. |
 | `repository-tool` | A file under top-level `tools/**`. | The file is repository implementation with repository-support scope. | That it is an independently governed Context Asset. |
-| `config-file` | A filename matching `renma.config.json` or `.renma.json` after higher-priority rules. | The file is recognized as Renma configuration support. | That its contents are valid, effective for a particular target, or proof of asset governance. |
+| `config-file` | A filename matching `renma.config.jsonc`, `renma.config.json`, or `.renma.json` after higher-priority rules. | The file is recognized as Renma configuration support. | That its contents are valid, effective for a particular target, or proof of asset governance. |
 | `generic-reference` | A nested `references/` directory outside recognized independent and Skill-local asset boundaries. | The file receives the `reference` parsing or inventory role, but its scope remains unknown. | That it belongs to a Skill, may inherit governance, or is an independent Context Asset. |
 | `generic-example` | A nested `examples/` directory outside recognized independent and Skill-local asset boundaries. | The file receives the `example` parsing or inventory role, but its scope remains unknown. | That it belongs to a Skill, may inherit governance, or is independently governed. |
 | `generic-profile` | A nested `profiles/` directory outside recognized independent and Skill-local asset boundaries. | The file receives the `profile` parsing or inventory role, but its scope remains unknown. | That it is selected by a Skill, may inherit governance, or defines effective policy. |
@@ -985,7 +985,8 @@ The inventory distinguishes local metadata, inherited policy, effective policy,
 and no-effective-policy states. Trust Graph policy edges exist only for
 artifacts with effective policy and list every contributing policy source.
 
-Security profiles in `renma.config.json` retain the existing JSON schema.
+Security profiles in JSONC and existing JSON configuration retain the same
+configuration schema.
 Artifact-local explicit denials remain stricter than inherited profile or
 repository allowances, and network approvals remain separate from upload
 approvals. See the [Security Policy Guide](security-policy.md) for complete

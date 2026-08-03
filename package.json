@@ -157,6 +157,7 @@
     "vitepress": "^1.6.4"
   },
   "dependencies": {
+    "jsonc-parser": "^3.3.1",
     "mdast-util-from-markdown": "^2.0.3",
     "tldts": "^7.4.10",
     "yaml": "^2.9.0"
