@@ -61,7 +61,7 @@ test("initialized config is concise deterministic JSONC with rationale", async (
   assert.equal(result.state, "created");
   assert.equal(raw, INITIAL_CONFIG_CONTENT);
   assert.ok(raw.endsWith("\n"));
-  assert.match(raw, /temporarily weakened.*why and when to revisit/);
+  assert.match(raw, /rationale.*(?:temporary exception|disabled policy)/);
 });
 
 test("re-running init leaves the generated config unchanged", async () => {

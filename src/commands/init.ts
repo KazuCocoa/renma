@@ -4,7 +4,7 @@ import { renmaCommand } from "../command-invocation.js";
 import { CONFIG_FILENAMES } from "../config.js";
 
 export const INITIAL_CONFIG_CONTENT = `{
-  // If this policy is temporarily weakened, record why and when to revisit it.
+  // Record the rationale beside any temporary exception or disabled policy.
   "fail_on": "high",
   "format": "text"
 }
