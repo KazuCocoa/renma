@@ -6,6 +6,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.28.5] - 2026-08-03
+
 ### Added
 
 - Added one authoritative User Manual metadata reference covering portable
@@ -1971,7 +1973,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.28.4...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.28.5...HEAD
+[0.28.5]: https://github.com/KazuCocoa/renma/compare/v0.28.4...v0.28.5
 [0.28.4]: https://github.com/KazuCocoa/renma/compare/v0.28.3...v0.28.4
 [0.28.3]: https://github.com/KazuCocoa/renma/compare/v0.28.2...v0.28.3
 [0.28.2]: https://github.com/KazuCocoa/renma/compare/v0.28.1...v0.28.2
