@@ -6,6 +6,14 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+### Added
+
+- Added the experimental `execution-contract` JSON command for one exact Skill,
+  projecting deterministic direct/transitive executable relationships,
+  line-level and unresolved evidence, lifecycle and caller-provided revision
+  provenance, and bounded-analysis facts from one repository snapshot without
+  runtime observation or authorization semantics.
+
 ## [0.30.0] - 2026-08-04
 
 ### Added

@@ -11,6 +11,7 @@ const DEFAULT_FORMATS: Partial<Record<CommandName, string>> = {
   scan: "text",
   catalog: "json",
   graph: "json",
+  "execution-contract": "json",
   "skill-index": "markdown",
   "trust-graph": "json",
   readiness: "json",
@@ -30,6 +31,7 @@ const JSON_SHORTCUTS: Record<CommandName, boolean> = {
   scan: true,
   catalog: true,
   graph: true,
+  "execution-contract": true,
   "skill-index": true,
   "trust-graph": true,
   readiness: true,
@@ -121,6 +123,11 @@ test("the registry dispatches every command to its command-specific parser", asy
       name: "graph",
       argv: ["graph", "--view", "unknown"],
       expectedError: /--view must be one of/,
+    },
+    {
+      name: "execution-contract",
+      argv: ["execution-contract", "--format", "yaml"],
+      expectedError: /--format must be json/,
     },
     {
       name: "skill-index",

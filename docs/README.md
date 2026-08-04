@@ -58,6 +58,10 @@ document.
 - [Repository Context BOM v2](repository-context-bom.md) defines
   `renma.repository-context-bom.v2`, deterministic ordering, reproducibility,
   and the declared-manifest boundary.
+- [Experimental Execution Contract](execution-contract.md) defines the
+  `renma.experimental-execution-contract.v1` static `possible` relationship
+  artifact, single-snapshot guarantee, bounded completeness, and external
+  revision/hash binding boundary.
 - [Trust Graph v2](trust-graph.md) defines `renma.trustGraph.v2`, node and edge
   provenance, ordering, and the distinction between evidence and a trust score.
 - [Published JSON Schemas](https://github.com/KazuCocoa/renma/tree/main/docs/schemas)
