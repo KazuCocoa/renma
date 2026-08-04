@@ -6,6 +6,17 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-08-04
+
+### Added
+
+- Added JSONC repository configuration support with
+  `renma.config.jsonc` as the recommended filename, including deterministic
+  precedence, comment-preserving diagnostics, and JSON-compatible parsing.
+- Updated `renma init` to create a documented JSONC configuration while
+  preserving support for existing `renma.config.json` and `.renma.json`
+  files.
+
 ## [0.29.0] - 2026-08-03
 
 ### Added
@@ -1983,7 +1994,8 @@ Tag-only release. No GitHub Release entry was published for this version.
 - Added metadata governance, advisory diagnostics, local path checks, and semantic split suggestions.
 - Added the initial project documentation, architecture notes, package metadata, tests, and license.
 
-[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.29.0...HEAD
+[Unreleased]: https://github.com/KazuCocoa/renma/compare/v0.30.0...HEAD
+[0.30.0]: https://github.com/KazuCocoa/renma/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/KazuCocoa/renma/compare/v0.28.5...v0.29.0
 [0.28.5]: https://github.com/KazuCocoa/renma/compare/v0.28.4...v0.28.5
 [0.28.4]: https://github.com/KazuCocoa/renma/compare/v0.28.3...v0.28.4
