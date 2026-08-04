@@ -1,10 +1,12 @@
 import packageJson from "../../package.json" with { type: "json" };
 
 import type { ConfigOverrides } from "../config.js";
-import type {
-  ExecutableSurfaceDependency,
-  ExecutableSurfaceEntry,
-  ExecutableSurfaceInvocation,
+import { canonicalExecutableDependencyGraphEdges } from "../executable-dependency-resolution.js";
+import {
+  canonicalExecutableInvocationGraphEdges,
+  type ExecutableSurfaceDependency,
+  type ExecutableSurfaceEntry,
+  type ExecutableSurfaceInvocation,
 } from "../executable-surface-inventory.js";
 import type { Asset, AssetStatus } from "../model.js";
 import {
@@ -153,6 +155,11 @@ export interface ExecutionContractDependencyEvidence {
   occurrenceOrdinal: number;
 }
 
+interface CanonicalExecutableEvidenceKeys {
+  invocation: ReadonlySet<string>;
+  dependency: ReadonlySet<string>;
+}
+
 /** Collect once, then build every contract field from the same snapshot. */
 export async function executionContract(
   targetPath: string,
@@ -194,6 +201,10 @@ export function buildExecutionContract(
 
   const fullGraph = graphFromRepositorySnapshot(snapshot);
   const executableGraph = executableProjection(snapshot, fullGraph);
+  assertExecutableGraphIdentityNamespaceIsSafe(
+    executableGraph,
+    snapshot.executableSurfaceInventory.surfaces,
+  );
   const focusedExecutableGraph = executableProjection(
     snapshot,
     fullGraph,
@@ -221,6 +232,10 @@ export function buildExecutionContract(
     snapshot.executableSurfaceInventory.dependencies.filter((dependency) =>
       reachableScriptPaths.has(dependency.sourcePath),
     );
+  const canonicalEvidenceKeys = canonicalExecutableEvidenceKeys(
+    relevantInvocations,
+    relevantDependencies,
+  );
   const relationships = projectRelationships(
     subject,
     resolvedInvokes,
@@ -228,6 +243,7 @@ export function buildExecutionContract(
     surfacesByPath,
     relevantInvocations,
     relevantDependencies,
+    canonicalEvidenceKeys,
   );
   const topologicalEvidenceKeys = new Set(
     relationships.flatMap((relationship) =>
@@ -400,15 +416,37 @@ function assertExecutableSubjectIdentityIsSafe(
       `execution-contract cannot build a safe executable projection for ${subject.sourcePath} because Skill ID ${subject.id} is duplicated at: ${duplicatePaths.join(", ")}`,
     );
   }
-  if (
-    snapshot.executableSurfaceInventory.surfaces.some(
-      (surface) => surface.path === subject.id,
-    )
-  ) {
-    throw new Error(
-      `execution-contract cannot build a safe executable projection for ${subject.sourcePath} because Skill ID ${subject.id} collides with a repository-script path`,
-    );
+}
+
+function assertExecutableGraphIdentityNamespaceIsSafe(
+  report: GraphReport,
+  surfaces: readonly ExecutableSurfaceEntry[],
+): void {
+  const surfacePaths = new Set(surfaces.map((surface) => surface.path));
+  const skillPathsById = new Map<string, Set<string>>();
+  for (const node of report.nodes) {
+    if (node.executableRole !== "skill" || !surfacePaths.has(node.id)) continue;
+    const sourcePaths = skillPathsById.get(node.id) ?? new Set<string>();
+    sourcePaths.add(node.sourcePath);
+    skillPathsById.set(node.id, sourcePaths);
   }
+  const collisions = [...skillPathsById]
+    .map(([value, sourcePaths]) => ({
+      value,
+      sourcePaths: [...sourcePaths].sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    }))
+    .sort((left, right) => left.value.localeCompare(right.value));
+  if (collisions.length === 0) return;
+  throw new Error(
+    `execution-contract cannot build a safe executable projection because Skill IDs collide with repository-script paths: ${collisions
+      .map(
+        (collision) =>
+          `${JSON.stringify(collision.value)} (Skill source paths: ${collision.sourcePaths.join(", ")}; repository-script path: ${collision.value})`,
+      )
+      .join("; ")}`,
+  );
 }
 
 function executableProjection(
@@ -466,6 +504,7 @@ function projectRelationships(
   surfacesByPath: ReadonlyMap<string, ExecutableSurfaceEntry>,
   invocations: readonly ExecutableSurfaceInvocation[],
   dependencies: readonly ExecutableSurfaceDependency[],
+  canonicalEvidenceKeys: CanonicalExecutableEvidenceKeys,
 ): ExecutionContractRelationship[] {
   return edges
     .filter((edge) => depths.has(edge.from) && surfacesByPath.has(edge.to))
@@ -478,15 +517,24 @@ function projectRelationships(
           ? invocations
               .filter(
                 (invocation) =>
-                  canonicalResolution(invocation.resolution) &&
-                  invocation.normalizedTarget === edge.to,
+                  canonicalEvidenceKeys.invocation.has(
+                    executableEvidenceKey(
+                      invocation.sourcePath,
+                      invocation.normalizedTarget,
+                    ),
+                  ) && invocation.normalizedTarget === edge.to,
               )
               .map(projectInvocationEvidence)
           : dependencies
               .filter(
                 (dependency) =>
                   dependency.sourcePath === edge.from &&
-                  canonicalResolution(dependency.resolution) &&
+                  canonicalEvidenceKeys.dependency.has(
+                    executableEvidenceKey(
+                      dependency.sourcePath,
+                      dependency.normalizedTarget,
+                    ),
+                  ) &&
                   dependency.normalizedTarget === edge.to,
               )
               .map(projectDependencyEvidence);
@@ -636,8 +684,29 @@ function executionEvidenceKey(evidence: ExecutionContractEvidence): string {
   return JSON.stringify(evidence);
 }
 
-function canonicalResolution(resolution: string): boolean {
-  return resolution === "resolved" || resolution === "noncanonical";
+function canonicalExecutableEvidenceKeys(
+  invocations: readonly ExecutableSurfaceInvocation[],
+  dependencies: readonly ExecutableSurfaceDependency[],
+): CanonicalExecutableEvidenceKeys {
+  return {
+    invocation: new Set(
+      canonicalExecutableInvocationGraphEdges(invocations).map((edge) =>
+        executableEvidenceKey(edge.sourcePath, edge.normalizedTarget),
+      ),
+    ),
+    dependency: new Set(
+      canonicalExecutableDependencyGraphEdges(dependencies).map((edge) =>
+        executableEvidenceKey(edge.sourcePath, edge.normalizedTarget),
+      ),
+    ),
+  };
+}
+
+function executableEvidenceKey(
+  sourcePath: string,
+  normalizedTarget: string | undefined,
+): string {
+  return JSON.stringify([sourcePath, normalizedTarget]);
 }
 
 function normalizeSourcePath(value: string): string {

@@ -68,8 +68,8 @@ in-memory `RepositorySnapshot`. The command does not invoke the public `bom` or
 
 The authoritative artifact uses repository-relative identities and omits
 `generatedAt` and absolute checkout-root identity. With the same repository
-contents, configuration, Renma version, entrypoint, and supplied revision
-value, repeated JSON output is byte-identical.
+contents, configuration, Renma version, evaluation date, entrypoint, and
+supplied revision value, repeated JSON output is byte-identical.
 
 The document intentionally has no self-referential whole-document digest.
 External systems can bind the exact serialized bytes with SHA-256:

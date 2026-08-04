@@ -9,6 +9,8 @@ import {
   formatExecutionContractJson,
   type ExecutionContractReport,
 } from "../src/commands/execution-contract.js";
+import { canonicalExecutableDependencyGraphEdges } from "../src/executable-dependency-resolution.js";
+import { canonicalExecutableInvocationGraphEdges } from "../src/executable-surface-inventory.js";
 import {
   collectRepositorySnapshot,
   type RepositorySnapshot,
@@ -273,6 +275,47 @@ test("execution contract rejects unknown, non-Skill, ambiguous, and unsafe entry
   );
 });
 
+test("execution contract fails closed when an executable Skill ID collides with a repository-script path", async (t) => {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-execution-contract-identity-collision-",
+    testContext: t,
+  });
+  await fixture.skill("alpha", {
+    id: "skill.alpha",
+    body: ["# Alpha", "", "```bash", "bash tools/collision.sh", "```"].join(
+      "\n",
+    ),
+  });
+  await fixture.skill("beta", {
+    id: "tools/collision.sh",
+    body: ["# Beta", "", "```bash", "bash tools/second.sh", "```"].join("\n"),
+  });
+  await fixture.write("tools/collision.sh", "#!/bin/sh\nexit 0\n");
+  await fixture.write("tools/second.sh", "#!/bin/sh\nexit 0\n");
+
+  const first = await captureMain([
+    "execution-contract",
+    fixture.root,
+    "--entrypoint",
+    "skill.alpha",
+  ]);
+  const second = await captureMain([
+    "execution-contract",
+    fixture.root,
+    "--entrypoint",
+    "skill.alpha",
+  ]);
+
+  assert.equal(first.code, 2);
+  assert.equal(first.stdout, "");
+  assert.equal(first.stderr, second.stderr);
+  assert.match(
+    first.stderr,
+    /Skill IDs collide with repository-script paths: "tools\/collision\.sh" \(Skill source paths: skills\/beta\/SKILL\.md; repository-script path: tools\/collision\.sh\)/,
+  );
+  assert.doesNotMatch(first.stderr, /tools\/second\.sh/);
+});
+
 test("execution contract builder performs no collection after receiving one frozen snapshot", async (t) => {
   const fixture = await RepositoryFixture.create({
     prefix: "renma-execution-contract-snapshot-",
@@ -310,6 +353,137 @@ test("execution contract builder performs no collection after receiving one froz
     formatExecutionContractJson(first),
     formatExecutionContractJson(second),
   );
+});
+
+test("execution contract evidence membership and coverage follow the canonical executable helpers", async (t) => {
+  const fixture = await canonicalEvidenceFixture(t);
+  const snapshot = await collectRepositorySnapshot(fixture.root);
+  const inventory = snapshot.executableSurfaceInventory;
+  const invocationEdges = canonicalExecutableInvocationGraphEdges(
+    inventory.invocations,
+  );
+  const dependencyEdges = canonicalExecutableDependencyGraphEdges(
+    inventory.dependencies,
+  );
+  const invocationKeys = new Set(
+    invocationEdges.map((edge) => evidencePairKey(edge)),
+  );
+  const dependencyKeys = new Set(
+    dependencyEdges.map((edge) => evidencePairKey(edge)),
+  );
+  const expectedInvocationEvidenceCount = inventory.invocations.filter(
+    (invocation) =>
+      invocation.normalizedTarget !== undefined &&
+      invocationKeys.has(evidencePairKey(invocation)),
+  ).length;
+  const expectedDependencyEvidenceCount = inventory.dependencies.filter(
+    (dependency) =>
+      dependency.normalizedTarget !== undefined &&
+      dependencyKeys.has(evidencePairKey(dependency)),
+  ).length;
+
+  const report = buildExecutionContract(snapshot, {
+    entrypoint: "skill.canonical-evidence",
+  });
+  const directTargets = report.executableEvidence.relationships
+    .filter((relationship) => relationship.reachability === "direct")
+    .map((relationship) => relationship.to.sourcePath)
+    .sort((left, right) => left.localeCompare(right));
+  const transitivePairs = report.executableEvidence.relationships
+    .filter((relationship) => relationship.reachability === "transitive")
+    .map((relationship) =>
+      evidencePairKey({
+        sourcePath: relationship.from.sourcePath,
+        normalizedTarget: relationship.to.sourcePath,
+      }),
+    )
+    .sort((left, right) => left.localeCompare(right));
+  assert.deepEqual(
+    directTargets,
+    invocationEdges
+      .map((edge) => edge.normalizedTarget)
+      .sort((left, right) => left.localeCompare(right)),
+  );
+  assert.deepEqual(
+    transitivePairs,
+    dependencyEdges
+      .map((edge) => evidencePairKey(edge))
+      .sort((left, right) => left.localeCompare(right)),
+  );
+
+  const relationshipEvidence = report.executableEvidence.relationships.flatMap(
+    (relationship) => relationship.evidence,
+  );
+  const invocationEvidence = relationshipEvidence.filter(
+    (evidence) => evidence.type === "invocation",
+  );
+  const dependencyEvidence = relationshipEvidence.filter(
+    (evidence) => evidence.type === "dependency",
+  );
+  assert.equal(invocationEvidence.length, expectedInvocationEvidenceCount);
+  assert.equal(dependencyEvidence.length, expectedDependencyEvidenceCount);
+  assert.equal(
+    invocationEvidence.every(
+      (evidence) =>
+        evidence.normalizedTarget !== undefined &&
+        invocationKeys.has(evidencePairKey(evidence)),
+    ),
+    true,
+  );
+  assert.equal(
+    dependencyEvidence.every(
+      (evidence) =>
+        evidence.normalizedTarget !== undefined &&
+        dependencyKeys.has(evidencePairKey(evidence)),
+    ),
+    true,
+  );
+  assert.deepEqual(
+    [
+      ...new Set(relationshipEvidence.map((evidence) => evidence.resolution)),
+    ].sort((left, right) => left.localeCompare(right)),
+    ["noncanonical", "resolved"],
+  );
+
+  assert.deepEqual(
+    report.executableEvidence.unresolvedEvidence.map((evidence) => [
+      evidence.type,
+      evidence.resolution,
+      evidence.type === "invocation"
+        ? evidence.rawTarget
+        : evidence.rawSpecifier,
+    ]),
+    [
+      ["dependency", "missing", "../../orphan/scripts/missing.ts"],
+      ["invocation", "unsafe", "/opt/vendor/scripts/run.js"],
+    ],
+  );
+  assert.equal(
+    report.executableEvidence.relationships.find(
+      (relationship) =>
+        relationship.to.sourcePath === "skills/canonical-evidence/scripts/a.ts",
+    )?.evidence.length,
+    2,
+  );
+  assert.equal(
+    report.executableEvidence.relationships.find(
+      (relationship) =>
+        relationship.to.sourcePath === "skills/orphan/scripts/transitive.ts",
+    )?.evidence.length,
+    2,
+  );
+  assert.deepEqual(report.analysisBoundary.coverage, {
+    reachableRepositoryScriptCount: 3,
+    recognizedInvocationEvidenceCount: inventory.invocations.length,
+    recognizedDependencyEvidenceCount: inventory.dependencies.length,
+    topologicalInvocationEvidenceCount: expectedInvocationEvidenceCount,
+    topologicalDependencyEvidenceCount: expectedDependencyEvidenceCount,
+    nonTopologicalEvidenceCount:
+      inventory.invocations.length +
+      inventory.dependencies.length -
+      expectedInvocationEvidenceCount -
+      expectedDependencyEvidenceCount,
+  });
 });
 
 test("canonical relationship topology is invariant under evidence permutations and duplicates while multiplicity remains auditable", async (t) => {
@@ -431,6 +605,40 @@ async function propertyFixture(t: TestContext): Promise<RepositoryFixture> {
   return fixture;
 }
 
+async function canonicalEvidenceFixture(
+  t: TestContext,
+): Promise<RepositoryFixture> {
+  const fixture = await RepositoryFixture.create({
+    prefix: "renma-execution-contract-canonical-evidence-",
+    testContext: t,
+  });
+  await fixture.skill("canonical-evidence", {
+    id: "skill.canonical-evidence",
+    body: [
+      "# Canonical evidence",
+      "",
+      "```bash",
+      "node scripts/a.ts",
+      "node scripts/a.ts",
+      "node skills/orphan/scripts/direct.ts",
+      "node /opt/vendor/scripts/run.js",
+      "```",
+    ].join("\n"),
+  });
+  await fixture.write(
+    "skills/canonical-evidence/scripts/a.ts",
+    [
+      'import "../../orphan/scripts/transitive.ts";',
+      'import "../../orphan/scripts/transitive.ts";',
+      'import "../../orphan/scripts/missing.ts";',
+      "",
+    ].join("\n"),
+  );
+  await fixture.write("skills/orphan/scripts/direct.ts", "export {};\n");
+  await fixture.write("skills/orphan/scripts/transitive.ts", "export {};\n");
+  return fixture;
+}
+
 function snapshotWithEvidence(
   snapshot: RepositorySnapshot,
   evidence: Pick<
@@ -457,6 +665,13 @@ function relationshipTopology(report: ExecutionContractReport): unknown {
     reachability: relationship.reachability,
     minimumTargetDepth: relationship.minimumTargetDepth,
   }));
+}
+
+function evidencePairKey(evidence: {
+  sourcePath: string;
+  normalizedTarget?: string;
+}): string {
+  return JSON.stringify([evidence.sourcePath, evidence.normalizedTarget]);
 }
 
 async function captureMain(argv: string[]): Promise<{

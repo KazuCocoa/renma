@@ -1467,9 +1467,9 @@ The command calls repository collection once and derives every section from
 the same in-memory snapshot. It does not call the public BOM or graph commands,
 embed an absolute checkout root, add `generatedAt`, or calculate a
 self-referential document digest. Repeated output is byte-identical for the
-same repository contents, configuration, Renma version, entrypoint, and
-revision value. External consumers can hash the exact serialized JSON with
-SHA-256; hashing is performed by the caller.
+same repository contents, configuration, Renma version, evaluation date,
+entrypoint, and supplied revision value. External consumers can hash the exact
+serialized JSON with SHA-256; hashing is performed by the caller.
 
 `unresolvedEvidence` preserves relevant recognized evidence that did not
 become topology, including resolution classifications, raw targets or
