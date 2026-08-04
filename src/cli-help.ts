@@ -28,6 +28,11 @@ const OPTION_HELP = {
     description:
       "Exit 1 when scan findings meet severity: low, medium, high, or critical.",
   },
+  entrypoint: {
+    flags: "--entrypoint <skill-id-or-SKILL.md-path>",
+    description:
+      "Select one exact Skill ID or repository-relative SKILL.md path.",
+  },
   focus: {
     flags: "--focus <asset-id-or-path>",
     description:
@@ -72,6 +77,11 @@ const OPTION_HELP = {
   "omit-generated-at": {
     flags: "--omit-generated-at",
     description: "Omit the BOM run-time generatedAt timestamp.",
+  },
+  "source-revision": {
+    flags: "--source-revision <value>",
+    description:
+      "Record caller-provided revision provenance without Git verification.",
   },
   owner: {
     flags: "--owner <owner>",
@@ -277,6 +287,52 @@ export const COMMAND_HELP = [
       "json",
       "view",
       "focus",
+      "help",
+    ],
+  },
+  {
+    name: "execution-contract",
+    usage:
+      "renma execution-contract [repository] --entrypoint <skill-id-or-SKILL.md-path> [options]",
+    question:
+      "What executable relationships are statically possible from one Skill?",
+    purpose:
+      "Execution contract emits an experimental portable JSON artifact containing the canonical executable closure and exact bounded static evidence for one Skill.",
+    useWhen: [
+      "An external runtime tracer or correlator needs deterministic repository evidence to bind to later.",
+      "You need direct and transitive repository-script relationships from one exact Skill entrypoint.",
+      "You need unresolved evidence, lifecycle state, content hashes, and bounded-analysis facts without runtime observation.",
+    ],
+    doNotUseFor: [
+      "Proving that a relationship executed or must execute.",
+      "Authorizing a suspended Skill or any command execution.",
+      "Importing observations, verifying conformance, or asking Renma to inspect Git revision state.",
+    ],
+    examples: [
+      "renma execution-contract . --entrypoint skill.release-prep --format json",
+      "renma execution-contract . --entrypoint skills/release-prep/SKILL.md --source-revision <git-sha> --format json",
+    ],
+    interpretation: [
+      "The experimental schema is renma.experimental-execution-contract.v1 and carries no long-term compatibility promise.",
+      "Every invokes relationship has expectation possible; containment remains separate structural placement.",
+      "The command collects one repository snapshot and derives every field from that snapshot.",
+      "A caller-supplied source revision is recorded verbatim and marked unverified by Renma.",
+      "Zero unresolved rows does not prove complete runtime behavior because the static analyzers are intentionally bounded.",
+    ],
+    nextSteps: [
+      "Bind the exact serialized JSON externally with SHA-256 when a correlator needs artifact identity.",
+      "Use a caller-created detached worktree when generating historical evidence.",
+      "Treat runtime observation import and conformance verification as later phases.",
+    ],
+    options: [
+      "config",
+      "entrypoint",
+      "source-revision",
+      {
+        name: "format",
+        description: "Output format: json. Defaults to json.",
+      },
+      "json",
       "help",
     ],
   },

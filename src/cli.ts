@@ -4,6 +4,7 @@ import { runBomCommand } from "./commands/bom.js";
 import { runCatalogCommand } from "./commands/catalog.js";
 import { runCiReportCommand } from "./commands/ci-report.js";
 import { runDiffCommand } from "./commands/diff.js";
+import { runExecutionContractCommand } from "./commands/execution-contract.js";
 import {
   runGraphCommand,
   type GraphFormat,
@@ -51,6 +52,7 @@ type CliOptionConfig = {
 const CLI_OPTIONS = {
   config: { type: "string", short: "c" },
   "fail-on": { type: "string" },
+  entrypoint: { type: "string" },
   focus: { type: "string" },
   format: { type: "string" },
   from: { type: "string" },
@@ -61,6 +63,7 @@ const CLI_OPTIONS = {
   "omit-generated-at": { type: "boolean" },
   owner: { type: "string" },
   resources: { type: "string" },
+  "source-revision": { type: "string" },
   tags: { type: "string", multiple: true },
   title: { type: "string" },
   to: { type: "string" },
@@ -75,6 +78,7 @@ const COMMAND_DEFAULT_FORMATS = {
   scan: "text",
   catalog: "json",
   graph: "json",
+  "execution-contract": "json",
   "skill-index": "markdown",
   "trust-graph": "json",
   readiness: "json",
@@ -158,6 +162,12 @@ export const COMMAND_REGISTRY = {
     OPTIONAL_ROOT,
     COMMAND_DEFAULT_FORMATS.graph,
     ({ values, target }) => runGraph(values, target),
+  ),
+  "execution-contract": commandSpec(
+    "execution-contract",
+    OPTIONAL_ROOT,
+    COMMAND_DEFAULT_FORMATS["execution-contract"],
+    ({ values, target }) => runExecutionContract(values, target),
   ),
   "skill-index": commandSpec(
     "skill-index",
@@ -590,6 +600,39 @@ async function runGraph(values: CliValues, target: string): Promise<number> {
       graphOptions.focus = focus;
     }
     return await runGraphCommand(target, graphOptions);
+  } catch (error) {
+    return reportCommandError(error);
+  }
+}
+
+async function runExecutionContract(
+  values: CliValues,
+  target: string,
+): Promise<number> {
+  const format = values.json
+    ? "json"
+    : (stringValue(values.format) ??
+      COMMAND_DEFAULT_FORMATS["execution-contract"]);
+  if (format !== "json") {
+    return usageError(
+      "execution-contract",
+      "--format must be json for this experimental command.",
+    );
+  }
+  const entrypoint = stringValue(values.entrypoint);
+  if (!entrypoint) {
+    return usageError(
+      "execution-contract",
+      "execution-contract requires --entrypoint <skill-id-or-SKILL.md-path>.",
+    );
+  }
+  const sourceRevision = stringValue(values["source-revision"]);
+  try {
+    return await runExecutionContractCommand(target, {
+      entrypoint,
+      ...(sourceRevision === undefined ? {} : { sourceRevision }),
+      overrides: configOverrides(values),
+    });
   } catch (error) {
     return reportCommandError(error);
   }

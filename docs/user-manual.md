@@ -1110,7 +1110,7 @@ portable self-contained Agent Skills package.
 renma commands fall into a few groups:
 
 - Repository adoption: `init` records a minimal explicit repository policy without creating assets.
-- Inventory and ownership: `catalog` lists discovered assets and references, `ownership` summarizes owned and unowned assets, `graph` shows relationships between catalog nodes, `skill-index` shows static Skill Discovery first hops and declared continuations, `trust-graph` exposes deterministic trust evidence, and `bom` combines declared repository evidence into a reviewable Repository Context BOM.
+- Inventory and ownership: `catalog` lists discovered assets and references, `ownership` summarizes owned and unowned assets, `graph` shows relationships between catalog nodes, `skill-index` shows static Skill Discovery first hops and declared continuations, `trust-graph` exposes deterministic trust evidence, and `bom` combines declared repository evidence into a reviewable Repository Context BOM, and experimental `execution-contract` projects one Skill's portable executable evidence closure.
 - Local inspection and authoring: `guide` prints the deterministic pre-generation Skill authoring contract, `inspect` reads one file as an outline or exact line slice, `scaffold` creates starter assets or authoring prompts, `suggest-metadata` emits safe metadata retrofit guidance for existing assets, and `suggest-semantic-split` packages source context and helper commands so a human or coding agent can draft a split for mixed-purpose Markdown.
 - Review and CI: `scan` emits deterministic findings, `readiness` turns repository state into checks and a score, `diff` compares two refs, and `ci-report` formats the comparison for pull-request review.
 
@@ -1125,6 +1125,7 @@ These commands are related, but they answer different repository-review question
 | `scan` | What concrete problems were found? | Fixing diagnostics and CI checks | Finding list |
 | `catalog` | What assets exist? | Reviewing IDs, owners, lifecycle metadata, hashes, tags, and declared dependencies | Asset inventory |
 | `graph` | How are assets connected? | Inspecting dependencies and references | Asset relationship graph |
+| `execution-contract` | What executable relationships are statically possible from one Skill? | Binding a future external runtime trace to deterministic static repository evidence | Experimental `renma.experimental-execution-contract.v1` JSON |
 | `skill-index` | Where can static Skill Discovery begin and continue? | Finding published entrypoints, declared continuations, reachability, coverage, and exact review evidence | Compact Markdown or `renma.skill-index.v1` JSON |
 | `trust-graph` | What evidence helps reviewers decide whether assets are safe, owned, current, and usable enough? | Tracing owner, lifecycle, policy, dependency, reference, and diagnostic evidence per asset | Evidence graph |
 | `readiness` | Is the repository broadly ready for agent-facing use? | Maintainer summary and CI reporting | Repository-level scorecard |
@@ -1139,6 +1140,7 @@ In short:
 - `scan` lists problems.
 - `catalog` lists what assets exist.
 - `graph` shows structural relationships.
+- `execution-contract` packages one Skill's static possible executable closure.
 - `skill-index` shows static Skill Discovery entrypoints and continuations.
 - `trust-graph` connects trust-relevant evidence.
 - `readiness` summarizes repository health.
@@ -1150,6 +1152,7 @@ Examples:
 renma scan . --format json
 renma catalog . --format json
 renma graph . --format json
+renma execution-contract . --entrypoint skill.release-prep --format json
 renma skill-index .
 renma skill-index . --format json
 renma trust-graph . --format markdown
@@ -1431,6 +1434,76 @@ each new object is strict when present. BOM v2 and executable-surface inventory
 v1 versions are unchanged.
 
 By default, `generatedAt` records when the BOM was produced. Add `--omit-generated-at` when CI or review automation needs to avoid clock-based diffs. With the same checkout path, config path, repository contents, Renma version, and UTC evaluation date, repeated `--omit-generated-at` runs should produce byte-identical JSON. The option does not remove metadata freshness dates, suppress freshness diagnostics, normalize absolute `root` or `configPath`, hide file moves, or guarantee portable byte-for-byte output across runners.
+
+### `execution-contract`
+
+This experimental command generates one portable static-evidence contract for an exact Skill ID or
+repository-relative `SKILL.md` path:
+
+```bash
+renma execution-contract . \
+  --entrypoint skill.release-prep \
+  --format json
+
+renma execution-contract . \
+  --entrypoint skills/release-prep/SKILL.md \
+  --source-revision <git-sha> \
+  --format json
+```
+
+The schema identity is
+`renma.experimental-execution-contract.v1` with `stability: "experimental"`;
+this first shape has no long-term compatibility promise. Every canonical
+`invokes` relationship has `expectation: "possible"`. Direct and transitive
+repository-script relationships reuse the executable graph's canonical edge
+semantics, while line-level duplicates remain in each relationship's evidence.
+`contains` remains separate structural placement and is never traversed as
+invocation. Neither relationship implies ownership, exclusive belonging,
+required execution, runtime use, or authorization. A suspended Skill retains
+its declared lifecycle evidence, but generating its contract does not permit
+execution.
+
+The command calls repository collection once and derives every section from
+the same in-memory snapshot. It does not call the public BOM or graph commands,
+embed an absolute checkout root, add `generatedAt`, or calculate a
+self-referential document digest. Repeated output is byte-identical for the
+same repository contents, configuration, Renma version, entrypoint, and
+revision value. External consumers can hash the exact serialized JSON with
+SHA-256; hashing is performed by the caller.
+
+`unresolvedEvidence` preserves relevant recognized evidence that did not
+become topology, including resolution classifications, raw targets or
+specifiers, paths, lines, launchers/analyzers, candidates, and occurrence
+ordinals. Zero unresolved rows means only that no unresolved recognized static
+evidence was observed. The bounded analyzers do not prove absence of dynamic,
+unsupported, or runtime-only behavior, and this phase performs no drift or
+runtime comparison.
+
+`--source-revision` is recorded verbatim with `providedBy: "caller"` and
+`verifiedByRenma: false`. Renma does not invoke Git or claim that the value
+matches the analyzed files. For historical evidence, the caller creates a
+detached worktree and supplies the same commit:
+
+```bash
+revision=<git-sha>
+worktree=$(mktemp -d)
+
+git -C /path/to/repository worktree add --detach "$worktree/repository" "$revision"
+
+renma execution-contract "$worktree/repository" \
+  --entrypoint skill.release-prep \
+  --source-revision "$revision" \
+  --format json \
+  > execution-contract.json
+
+sha256sum execution-contract.json
+```
+
+Git/worktree creation and hashing are caller operations, not Renma operations.
+Observation schemas, runtime-log import, conformance verification, and
+allowed/required/forbidden, ordering, call-count, approval, and execution-policy
+semantics remain deferred. See the dedicated
+[Experimental Execution Contract](execution-contract.md) document.
 
 ### `skill-index`
 
@@ -2148,6 +2221,7 @@ let it select JSON.
 | `diff` | `json`, `markdown` |
 | `ci-report` | `json`, `markdown` |
 | `graph` | `json`, `markdown`, `mermaid` |
+| `execution-contract` | `json` |
 | `skill-index` | `json`, `markdown` |
 | `trust-graph` | `json`, `markdown` |
 | `inspect` | `text`, `json` |

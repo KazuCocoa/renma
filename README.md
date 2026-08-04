@@ -189,6 +189,7 @@ node dist/index.js scan . --fail-on high
 | `scan` | What concrete problems should be fixed? |
 | `catalog` | What assets and metadata exist? |
 | `graph` | How are assets and executable relationships connected? |
+| `execution-contract` | What executable relationships are statically possible from one Skill? |
 | `skill-index` | Where can static Skill Discovery begin and continue? |
 | `trust-graph` | What trust-relevant evidence is connected to each asset? |
 | `readiness` | Is the repository broadly prepared for agent-facing use? |
@@ -264,6 +265,7 @@ a trust score.
 - [Declared Impact](docs/declared-impact.md)
 - [Skill Discovery](docs/skill-discovery.md)
 - [Repository Context BOM v2](docs/repository-context-bom.md)
+- [Experimental Execution Contract](docs/execution-contract.md)
 - [Trust Graph v2](docs/trust-graph.md)
 - [Public Architecture](docs/development/architecture.md)
 - [Internal Architecture](docs/development/internal-architecture.md)

@@ -81,6 +81,10 @@ export default defineConfig({
             text: "Repository Context BOM",
             link: "/repository-context-bom",
           },
+          {
+            text: "Experimental Execution Contract",
+            link: "/execution-contract",
+          },
           { text: "Trust Graph", link: "/trust-graph" },
         ],
       },
