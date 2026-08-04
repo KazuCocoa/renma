@@ -301,7 +301,7 @@ export const COMMAND_HELP = [
     useWhen: [
       "An external runtime tracer or correlator needs deterministic repository evidence to bind to later.",
       "You need direct and transitive repository-script relationships from one exact Skill entrypoint.",
-      "You need unresolved evidence, lifecycle state, content hashes, and bounded-analysis facts without runtime observation.",
+      "You need unresolved evidence, lifecycle state, content hashes, a Renma-calculated selected-evidence digest, and bounded-analysis facts without runtime observation.",
     ],
     doNotUseFor: [
       "Proving that a relationship executed or must execute.",
@@ -316,11 +316,12 @@ export const COMMAND_HELP = [
       "The experimental schema is renma.experimental-execution-contract.v1 and carries no long-term compatibility promise.",
       "Every invokes relationship has expectation possible; containment remains separate structural placement.",
       "The command collects one repository snapshot and derives every field from that snapshot.",
+      "The always-present evidence digest binds the selected deterministic evidence projection without inspecting Git or checkout-root state.",
       "A caller-supplied source revision is recorded verbatim and marked unverified by Renma.",
       "Zero unresolved rows does not prove complete runtime behavior because the static analyzers are intentionally bounded.",
     ],
     nextSteps: [
-      "Bind the exact serialized JSON externally with SHA-256 when a correlator needs artifact identity.",
+      "Use the embedded evidence digest for selected-evidence identity and bind the exact serialized JSON externally with SHA-256 when a correlator needs artifact identity.",
       "Use a caller-created detached worktree when generating historical evidence.",
       "Treat runtime observation import and conformance verification as later phases.",
     ],

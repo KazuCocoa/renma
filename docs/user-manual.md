@@ -1465,11 +1465,41 @@ execution.
 
 The command calls repository collection once and derives every section from
 the same in-memory snapshot. It does not call the public BOM or graph commands,
-embed an absolute checkout root, add `generatedAt`, or calculate a
-self-referential document digest. Repeated output is byte-identical for the
-same repository contents, configuration, Renma version, evaluation date,
-entrypoint, and supplied revision value. External consumers can hash the exact
-serialized JSON with SHA-256; hashing is performed by the caller.
+embed an absolute checkout root, or add `generatedAt`. Repeated output is
+byte-identical for the same repository contents, configuration, Renma version,
+evaluation date, entrypoint, and supplied revision value.
+
+The artifact exposes three complementary identities:
+
+| Identity | Produced by | What it binds |
+| --- | --- | --- |
+| `sourceRevision` | Caller, optional and unverified | A supplied revision provenance value |
+| `evidenceDigest` | Renma, always present | The selected execution-contract evidence projection |
+| External SHA-256 | Caller, optional | Exact serialized JSON bytes, including `sourceRevision` when supplied |
+
+`evidenceDigest` uses SHA-256 with scope
+`selected_execution_contract_evidence_v1`. Renma calculates it from a
+versioned, domain-separated canonical payload containing the subject identity
+and content hash, projected executable surfaces and hashes/fingerprints,
+canonical and structural relationships, exact auditable relationship and
+unresolved evidence rows, bounded coverage/observation facts, and relevant
+diagnostics. Duplicate evidence remains digest-relevant even when topology is
+deduplicated.
+
+The embedded payload excludes `sourceRevision`, itself, absolute checkout-root
+identity, timestamps, and output formatting. It is independent of checkout
+location and caller revision labels, but changes with selected content or
+auditable evidence. Unrelated files outside the selected projection do not
+change it. Exact source-authored evidence is retained, including unsafe
+absolute targets recognized from repository content. The digest works for
+dirty working trees, non-Git directories, extracted archives, and other VCS
+checkouts without inspecting Git state. It is not a repository hash,
+repository snapshot hash, Git-tree hash, or complete filesystem hash.
+
+An external SHA-256 over `execution-contract.json` remains a separate exact-
+artifact identity. It covers the serialized formatting, optional
+`sourceRevision`, and embedded digest. That external hash is performed by the
+caller; Renma calculates the embedded selected-evidence digest.
 
 `unresolvedEvidence` preserves relevant recognized evidence that did not
 become topology, including resolution classifications, raw targets or
@@ -1480,9 +1510,10 @@ unsupported, or runtime-only behavior, and this phase performs no drift or
 runtime comparison.
 
 `--source-revision` is recorded verbatim with `providedBy: "caller"` and
-`verifiedByRenma: false`. Renma does not invoke Git or claim that the value
-matches the analyzed files. For historical evidence, the caller creates a
-detached worktree and supplies the same commit:
+`verifiedByRenma: false`. It complements the Renma evidence digest and is not a
+more authoritative version of that identity. Renma does not invoke Git or
+claim that the value matches the analyzed files. For historical evidence, the
+caller creates a detached worktree and supplies the same commit:
 
 ```bash
 revision=<git-sha>
@@ -1499,7 +1530,8 @@ renma execution-contract "$worktree/repository" \
 sha256sum execution-contract.json
 ```
 
-Git/worktree creation and hashing are caller operations, not Renma operations.
+Git/worktree creation and exact-artifact hashing are caller operations, not
+Renma operations.
 Observation schemas, runtime-log import, conformance verification, and
 allowed/required/forbidden, ordering, call-count, approval, and execution-policy
 semantics remain deferred. See the dedicated

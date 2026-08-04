@@ -110,6 +110,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
       "foundation",
       "shared primitives, configuration, and stable contracts",
       [
+        "canonical-json.ts",
         "command-invocation.ts",
         "config.ts",
         "dependency-selectors.ts",

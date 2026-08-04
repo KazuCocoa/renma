@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
 import path from "node:path";
 
+import { canonicalSha256 } from "./canonical-json.js";
 import type { SkillParentIndex } from "./catalog.js";
 import {
   classifyRepositorySkillPath,
@@ -1006,23 +1006,7 @@ function boundedSnippet(snippet: string): string {
 }
 
 function inventoryFingerprint(value: object): string {
-  return `sha256:${createHash("sha256")
-    .update(stableJson(value))
-    .digest("hex")}`;
-}
-
-function stableJson(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map(stableJson).join(",")}]`;
-  }
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    return `{${Object.keys(record)
-      .sort((left, right) => left.localeCompare(right))
-      .map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value);
+  return canonicalSha256(value);
 }
 
 function uniqueSorted<T extends string>(values: readonly T[]): T[] {

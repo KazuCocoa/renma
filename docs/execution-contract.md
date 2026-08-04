@@ -34,8 +34,9 @@ The artifact contains the generator identity; selected Skill ID, source path,
 content hash, and declared lifecycle evidence; reachable repository-script
 identities and fingerprints; canonical invocation relationships; separate
 structural containment; exact recognized evidence rows; bounded-analysis
-facts and limitations; and relevant diagnostics. It does not copy the complete
-Repository Context BOM.
+facts and limitations; relevant diagnostics; and an embedded Renma-calculated
+digest of that selected evidence. It does not copy the complete Repository
+Context BOM.
 
 ## Static `possible` Semantics
 
@@ -71,8 +72,58 @@ The authoritative artifact uses repository-relative identities and omits
 contents, configuration, Renma version, evaluation date, entrypoint, and
 supplied revision value, repeated JSON output is byte-identical.
 
-The document intentionally has no self-referential whole-document digest.
-External systems can bind the exact serialized bytes with SHA-256:
+## Three Complementary Identities
+
+The contract keeps three identities separate. None replaces or outranks the
+others:
+
+| Identity | Produced by | What it binds |
+| --- | --- | --- |
+| `sourceRevision` | Caller, optional and unverified | A revision value supplied as provenance |
+| `evidenceDigest` | Renma, always present | The selected execution-contract evidence projection |
+| External SHA-256 | Caller, optional | The exact serialized artifact bytes, including `sourceRevision` when supplied |
+
+### Embedded Renma Evidence Digest
+
+Every contract includes:
+
+```json
+{
+  "evidenceDigest": {
+    "algorithm": "sha256",
+    "value": "sha256:<hex>",
+    "scope": "selected_execution_contract_evidence_v1",
+    "calculatedBy": "renma"
+  }
+}
+```
+
+Renma calculates this value from a versioned, domain-separated canonical
+payload containing the selected subject identity and content hash, projected
+executable surfaces and their hashes/fingerprints, canonical and structural
+relationships, every auditable relationship and unresolved evidence row,
+bounded coverage/observation facts, and relevant diagnostics. Duplicate
+evidence rows remain digest-relevant even when canonical topology is
+deduplicated.
+
+The payload excludes `sourceRevision`, the digest field itself, absolute
+checkout-root identity, generated timestamps, and serialized JSON formatting.
+Changing only caller revision provenance therefore does not change the embedded
+digest. Changing selected content or evidence does; changing an unrelated file
+outside the projection does not. Source-authored raw evidence remains exact,
+including an unsafe absolute target when that is the recognized unresolved
+evidence—the excluded absolute identity is the checkout location, not text
+declared in repository content.
+
+This is not a repository hash, repository snapshot hash, Git-tree hash, or
+complete filesystem hash. It requires no Git repository and works for dirty
+working trees, non-Git directories, extracted archives, and other VCS
+checkouts.
+
+### External Exact-Artifact SHA-256
+
+The embedded digest is intentionally not a self-referential whole-document
+digest. External systems can separately bind the exact serialized bytes:
 
 ```bash
 renma execution-contract . \
@@ -83,7 +134,10 @@ renma execution-contract . \
 sha256sum execution-contract.json
 ```
 
-The caller performs the hashing; Renma does not.
+That external value covers JSON formatting and every serialized field,
+including `sourceRevision` when supplied and the embedded `evidenceDigest`.
+The caller performs exact-artifact hashing; Renma calculates only the embedded
+selected-evidence digest.
 
 ## Bounded Completeness
 
@@ -120,10 +174,12 @@ bounded. See the [User Manual](user-manual.md) for the supported syntax.
 }
 ```
 
-Renma does not invoke Git, inspect a branch or dirty state, or verify that the
-value matches the analyzed files. For a historical commit, the safe workflow
-is for the caller to create a detached worktree, analyze that worktree, and
-provide the same commit as external provenance:
+This optional provenance complements the embedded Renma evidence digest; it is
+not a more authoritative form of the same identity. Renma does not invoke Git,
+inspect a branch or dirty state, or verify that the value matches the analyzed
+files. For a historical commit, the safe workflow is for the caller to create
+a detached worktree, analyze that worktree, and provide the same commit as
+external provenance:
 
 ```bash
 revision=<git-sha>
@@ -140,7 +196,8 @@ renma execution-contract "$worktree/repository" \
 sha256sum execution-contract.json
 ```
 
-Git/worktree creation and hashing are caller operations, not Renma operations.
+Git/worktree creation and exact-artifact hashing are caller operations, not
+Renma operations.
 
 ## Deferred Phases
 

@@ -55,6 +55,19 @@ test("execution contract retains direct, transitive, duplicate, structural, unre
   });
   assert.deepEqual(
     {
+      algorithm: report.evidenceDigest.algorithm,
+      scope: report.evidenceDigest.scope,
+      calculatedBy: report.evidenceDigest.calculatedBy,
+    },
+    {
+      algorithm: "sha256",
+      scope: "selected_execution_contract_evidence_v1",
+      calculatedBy: "renma",
+    },
+  );
+  assert.match(report.evidenceDigest.value, /^sha256:[0-9a-f]{64}$/);
+  assert.deepEqual(
+    {
       id: report.subject.id,
       sourcePath: report.subject.sourcePath,
       status: report.subject.status,
@@ -215,6 +228,7 @@ test("execution contract accepts an exact SKILL.md path and omits absent revisio
   const report = JSON.parse(result.stdout) as ExecutionContractReport;
   assert.equal(report.subject.id, "skill.alpha");
   assert.equal(report.sourceRevision, undefined);
+  assert.match(report.evidenceDigest.value, /^sha256:[0-9a-f]{64}$/);
   assert.equal(
     report.analysisBoundary.observations.noUnresolvedStaticEvidenceObserved,
     true,
@@ -349,6 +363,184 @@ test("execution contract builder performs no collection after receiving one froz
   assert.equal(discoveries, 1);
   assert.equal(parses, parsedAtCollection);
   assert.equal(parsedAtCollection, snapshot.scannedFileCount);
+  assert.equal(
+    formatExecutionContractJson(first),
+    formatExecutionContractJson(second),
+  );
+});
+
+test("execution evidence digest is repeatable, always present, and independent of source revision provenance", async (t) => {
+  const fixture = await propertyFixture(t);
+  const snapshot = await collectRepositorySnapshot(fixture.root);
+  const withoutRevision = buildExecutionContract(snapshot, {
+    entrypoint: "skill.property",
+  });
+  const repeated = buildExecutionContract(snapshot, {
+    entrypoint: "skill.property",
+  });
+  const revisionA = buildExecutionContract(snapshot, {
+    entrypoint: "skill.property",
+    sourceRevision: "revision-a",
+  });
+  const revisionB = buildExecutionContract(snapshot, {
+    entrypoint: "skill.property",
+    sourceRevision: "revision-b",
+  });
+
+  assert.deepEqual(withoutRevision.evidenceDigest, {
+    algorithm: "sha256",
+    value: withoutRevision.evidenceDigest.value,
+    scope: "selected_execution_contract_evidence_v1",
+    calculatedBy: "renma",
+  });
+  assert.match(withoutRevision.evidenceDigest.value, /^sha256:[0-9a-f]{64}$/);
+  assert.equal(
+    repeated.evidenceDigest.value,
+    withoutRevision.evidenceDigest.value,
+  );
+  assert.equal(
+    revisionA.evidenceDigest.value,
+    withoutRevision.evidenceDigest.value,
+  );
+  assert.equal(
+    revisionB.evidenceDigest.value,
+    withoutRevision.evidenceDigest.value,
+  );
+  assert.notEqual(
+    formatExecutionContractJson(revisionA),
+    formatExecutionContractJson(revisionB),
+  );
+});
+
+test("execution evidence digest changes with selected content but ignores unrelated surface content", async (t) => {
+  const fixture = await digestFixture(t, "renma-execution-contract-digest-");
+  const baseline = buildExecutionContract(
+    await collectRepositorySnapshot(fixture.root),
+    { entrypoint: "skill.digest" },
+  );
+
+  await fixture.write("tools/unrelated.sh", "#!/bin/sh\necho changed\n");
+  const unrelatedChange = buildExecutionContract(
+    await collectRepositorySnapshot(fixture.root),
+    { entrypoint: "skill.digest" },
+  );
+  assert.equal(
+    unrelatedChange.evidenceDigest.value,
+    baseline.evidenceDigest.value,
+  );
+
+  await fixture.write(
+    "skills/digest/scripts/a.ts",
+    'export const marker = "changed";\n',
+  );
+  const reachableContentChange = buildExecutionContract(
+    await collectRepositorySnapshot(fixture.root),
+    { entrypoint: "skill.digest" },
+  );
+  assert.notEqual(
+    reachableContentChange.evidenceDigest.value,
+    baseline.evidenceDigest.value,
+  );
+
+  await fixture.write(
+    "skills/digest/scripts/a.ts",
+    'export const marker = "baseline";\n',
+  );
+  await fixture.skill("digest", {
+    id: "skill.digest",
+    body: `${digestSkillBody()}\n\nChanged subject guidance.`,
+  });
+  const subjectContentChange = buildExecutionContract(
+    await collectRepositorySnapshot(fixture.root),
+    { entrypoint: "skill.digest" },
+  );
+  assert.notEqual(
+    subjectContentChange.evidenceDigest.value,
+    baseline.evidenceDigest.value,
+  );
+});
+
+test("execution evidence digest covers canonical topology and duplicate auditable evidence independently", async (t) => {
+  const fixture = await digestFixture(
+    t,
+    "renma-execution-contract-digest-evidence-",
+  );
+  const snapshot = await collectRepositorySnapshot(fixture.root);
+  const invocation = snapshot.executableSurfaceInventory.invocations[0]!;
+  const baseline = buildExecutionContract(snapshot, {
+    entrypoint: "skill.digest",
+  });
+
+  const topologySnapshot = snapshotWithEvidence(snapshot, {
+    invocations: [
+      invocation,
+      {
+        ...invocation,
+        line: invocation.line + 1,
+        snippet: "node tools/extra.ts",
+        rawTarget: "tools/extra.ts",
+        normalizedTarget: "tools/extra.ts",
+        occurrenceOrdinal: 1,
+      },
+    ],
+    dependencies: snapshot.executableSurfaceInventory.dependencies,
+  });
+  const topologyChange = buildExecutionContract(topologySnapshot, {
+    entrypoint: "skill.digest",
+  });
+  assert.notDeepEqual(
+    relationshipTopology(topologyChange),
+    relationshipTopology(baseline),
+  );
+  assert.notEqual(
+    topologyChange.evidenceDigest.value,
+    baseline.evidenceDigest.value,
+  );
+
+  const duplicateSnapshot = snapshotWithEvidence(snapshot, {
+    invocations: [
+      invocation,
+      { ...invocation, occurrenceOrdinal: invocation.occurrenceOrdinal + 1 },
+    ],
+    dependencies: snapshot.executableSurfaceInventory.dependencies,
+  });
+  const duplicateEvidence = buildExecutionContract(duplicateSnapshot, {
+    entrypoint: "skill.digest",
+  });
+  assert.deepEqual(
+    relationshipTopology(duplicateEvidence),
+    relationshipTopology(baseline),
+  );
+  assert.equal(
+    duplicateEvidence.executableEvidence.relationships[0]?.evidence.length,
+    2,
+  );
+  assert.notEqual(
+    duplicateEvidence.evidenceDigest.value,
+    baseline.evidenceDigest.value,
+  );
+});
+
+test("execution evidence digest and portable JSON are independent of absolute checkout location", async (t) => {
+  const firstFixture = await digestFixture(
+    t,
+    "renma-execution-contract-digest-location-a-",
+  );
+  const secondFixture = await digestFixture(
+    t,
+    "renma-execution-contract-digest-location-b-",
+  );
+  const first = buildExecutionContract(
+    await collectRepositorySnapshot(firstFixture.root),
+    { entrypoint: "skill.digest" },
+  );
+  const second = buildExecutionContract(
+    await collectRepositorySnapshot(secondFixture.root),
+    { entrypoint: "skill.digest" },
+  );
+
+  assert.notEqual(firstFixture.root, secondFixture.root);
+  assert.equal(first.evidenceDigest.value, second.evidenceDigest.value);
   assert.equal(
     formatExecutionContractJson(first),
     formatExecutionContractJson(second),
@@ -603,6 +795,28 @@ async function propertyFixture(t: TestContext): Promise<RepositoryFixture> {
   );
   await fixture.write("tools/b.sh", "#!/bin/sh\nexit 0\n");
   return fixture;
+}
+
+async function digestFixture(
+  t: TestContext,
+  prefix: string,
+): Promise<RepositoryFixture> {
+  const fixture = await RepositoryFixture.create({ prefix, testContext: t });
+  await fixture.skill("digest", {
+    id: "skill.digest",
+    body: digestSkillBody(),
+  });
+  await fixture.write(
+    "skills/digest/scripts/a.ts",
+    'export const marker = "baseline";\n',
+  );
+  await fixture.write("tools/extra.ts", "export {};\n");
+  await fixture.write("tools/unrelated.sh", "#!/bin/sh\nexit 0\n");
+  return fixture;
+}
+
+function digestSkillBody(): string {
+  return ["# Digest", "", "```bash", "node scripts/a.ts", "```"].join("\n");
 }
 
 async function canonicalEvidenceFixture(

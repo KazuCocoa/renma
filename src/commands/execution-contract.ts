@@ -1,5 +1,6 @@
 import packageJson from "../../package.json" with { type: "json" };
 
+import { canonicalSha256 } from "../canonical-json.js";
 import type { ConfigOverrides } from "../config.js";
 import { canonicalExecutableDependencyGraphEdges } from "../executable-dependency-resolution.js";
 import {
@@ -25,6 +26,12 @@ import {
 
 export const EXPERIMENTAL_EXECUTION_CONTRACT_SCHEMA =
   "renma.experimental-execution-contract.v1" as const;
+export const EXECUTION_CONTRACT_EVIDENCE_DIGEST_SCOPE =
+  "selected_execution_contract_evidence_v1" as const;
+
+const EXECUTION_CONTRACT_EVIDENCE_DIGEST_DOMAIN =
+  "renma.experimental-execution-contract.evidence-digest" as const;
+const EXECUTION_CONTRACT_EVIDENCE_DIGEST_PAYLOAD_VERSION = 1 as const;
 
 export interface ExecutionContractOptions {
   entrypoint: string;
@@ -49,6 +56,12 @@ export interface ExecutionContractReport {
     value: string;
     providedBy: "caller";
     verifiedByRenma: false;
+  };
+  evidenceDigest: {
+    algorithm: "sha256";
+    value: string;
+    scope: typeof EXECUTION_CONTRACT_EVIDENCE_DIGEST_SCOPE;
+    calculatedBy: "renma";
   };
   subject: ExecutionContractSubject;
   executableEvidence: {
@@ -299,6 +312,41 @@ export function buildExecutionContract(
         .length,
     0,
   );
+  const executableEvidence: ExecutionContractReport["executableEvidence"] = {
+    inventorySchema: snapshot.executableSurfaceInventory.schema,
+    surfaces,
+    relationships,
+    structuralRelationships,
+    unresolvedEvidence,
+  };
+  const analysisBoundary: ExecutionContractReport["analysisBoundary"] = {
+    kind: "bounded_static_analysis",
+    coverage: {
+      reachableRepositoryScriptCount: reachableScriptPaths.size,
+      recognizedInvocationEvidenceCount: relevantInvocations.length,
+      recognizedDependencyEvidenceCount: relevantDependencies.length,
+      topologicalInvocationEvidenceCount,
+      topologicalDependencyEvidenceCount,
+      nonTopologicalEvidenceCount: unresolvedEvidence.length,
+    },
+    observations: {
+      driftAssessmentPerformed: false,
+      noUnresolvedStaticEvidenceObserved: unresolvedEvidence.length === 0,
+      runtimeOrUnsupportedBehaviorAbsenceProven: false,
+    },
+    limitations: [
+      "Only executable evidence recognized by Renma's bounded static analyzers is represented.",
+      "No unresolved static evidence observed does not prove the absence of dynamic, unsupported, or runtime-only behavior.",
+      "Relationships express possible static reachability only; they do not express required execution, ordering, call counts, approval, ownership, or authorization.",
+      "No runtime observation or conformance comparison was performed.",
+    ],
+  };
+  const evidenceDigest = calculateExecutionContractEvidenceDigest({
+    subject,
+    executableEvidence,
+    analysisBoundary,
+    diagnostics,
+  });
 
   return {
     schemaVersion: EXPERIMENTAL_EXECUTION_CONTRACT_SCHEMA,
@@ -323,36 +371,10 @@ export function buildExecutionContract(
             verifiedByRenma: false as const,
           },
         }),
+    evidenceDigest,
     subject,
-    executableEvidence: {
-      inventorySchema: snapshot.executableSurfaceInventory.schema,
-      surfaces,
-      relationships,
-      structuralRelationships,
-      unresolvedEvidence,
-    },
-    analysisBoundary: {
-      kind: "bounded_static_analysis",
-      coverage: {
-        reachableRepositoryScriptCount: reachableScriptPaths.size,
-        recognizedInvocationEvidenceCount: relevantInvocations.length,
-        recognizedDependencyEvidenceCount: relevantDependencies.length,
-        topologicalInvocationEvidenceCount,
-        topologicalDependencyEvidenceCount,
-        nonTopologicalEvidenceCount: unresolvedEvidence.length,
-      },
-      observations: {
-        driftAssessmentPerformed: false,
-        noUnresolvedStaticEvidenceObserved: unresolvedEvidence.length === 0,
-        runtimeOrUnsupportedBehaviorAbsenceProven: false,
-      },
-      limitations: [
-        "Only executable evidence recognized by Renma's bounded static analyzers is represented.",
-        "No unresolved static evidence observed does not prove the absence of dynamic, unsupported, or runtime-only behavior.",
-        "Relationships express possible static reachability only; they do not express required execution, ordering, call counts, approval, ownership, or authorization.",
-        "No runtime observation or conformance comparison was performed.",
-      ],
-    },
+    executableEvidence,
+    analysisBoundary,
     diagnostics,
   };
 }
@@ -682,6 +704,35 @@ function projectDependencyEvidence(
 
 function executionEvidenceKey(evidence: ExecutionContractEvidence): string {
   return JSON.stringify(evidence);
+}
+
+function calculateExecutionContractEvidenceDigest(input: {
+  subject: ExecutionContractSubject;
+  executableEvidence: ExecutionContractReport["executableEvidence"];
+  analysisBoundary: ExecutionContractReport["analysisBoundary"];
+  diagnostics: Diagnostic[];
+}): ExecutionContractReport["evidenceDigest"] {
+  const payload = {
+    domain: EXECUTION_CONTRACT_EVIDENCE_DIGEST_DOMAIN,
+    payloadVersion: EXECUTION_CONTRACT_EVIDENCE_DIGEST_PAYLOAD_VERSION,
+    scope: EXECUTION_CONTRACT_EVIDENCE_DIGEST_SCOPE,
+    evidence: {
+      subject: input.subject,
+      executableEvidence: input.executableEvidence,
+      analysisBoundary: {
+        kind: input.analysisBoundary.kind,
+        coverage: input.analysisBoundary.coverage,
+        observations: input.analysisBoundary.observations,
+      },
+      diagnostics: input.diagnostics,
+    },
+  };
+  return {
+    algorithm: "sha256",
+    value: canonicalSha256(payload),
+    scope: EXECUTION_CONTRACT_EVIDENCE_DIGEST_SCOPE,
+    calculatedBy: "renma",
+  };
 }
 
 function canonicalExecutableEvidenceKeys(
