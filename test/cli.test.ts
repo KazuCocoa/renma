@@ -454,6 +454,66 @@ test("config loads fail_on and CLI override takes precedence", async () => {
   assert.equal(fromConfig.configPath, "renma.config.json");
 });
 
+test("CLI explicitly loads JSONC configuration", async () => {
+  const root = await fixture();
+  const configPath = path.join(root, "review.jsonc");
+  await writeFile(
+    configPath,
+    `{
+  // Preserve why this review uses JSON output.
+  "format": "json"
+}
+`,
+  );
+
+  const result = await withCapturedConsole(() =>
+    main(["scan", root, "--config", configPath]),
+  );
+  const report = JSON.parse(result.stdout) as {
+    configPath?: string;
+    format: string;
+  };
+
+  assert.equal(result.code, 0);
+  assert.equal(result.stderr, "");
+  assert.equal(report.configPath, "review.jsonc");
+  assert.equal(report.format, "json");
+});
+
+test("CLI reports concise JSONC syntax locations without stack traces", async () => {
+  const root = await fixture();
+  await writeFile(
+    path.join(root, "renma.config.jsonc"),
+    '{\n  // rationale\n  "format":\n}\n',
+  );
+
+  const result = await withCapturedConsole(() => main(["scan", root]));
+
+  assert.equal(result.code, 2);
+  assert.equal(result.stdout, "");
+  assert.match(
+    result.stderr,
+    /renma\.config\.jsonc is not valid JSONC at line 4, column 1: ValueExpected/,
+  );
+  assert.doesNotMatch(result.stderr, /\n\s+at\s+|node:internal/);
+});
+
+test("CLI rejects executable explicit config extensions", async () => {
+  const root = await fixture();
+  const configPath = path.join(root, "renma.config.mjs");
+  await writeFile(configPath, "export default {};\n");
+
+  const result = await withCapturedConsole(() =>
+    main(["scan", root, "--config", configPath]),
+  );
+
+  assert.equal(result.code, 2);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /must use \.json or \.jsonc/);
+  assert.match(result.stderr, /\.mjs.*not supported/);
+  assert.doesNotMatch(result.stderr, /\n\s+at\s+|node:internal/);
+});
+
 test("config suppressions remove findings without skipping scanned files", async () => {
   const root = await fixture();
   await mkdir(path.join(root, "skills", "demo"), { recursive: true });
@@ -1724,9 +1784,9 @@ test("representative command help shows relevant boundaries and options", async 
         /renma init \[root\]/,
         /initializes repository-level Renma configuration/,
         /does not create Skills or Context Assets/,
-        /minimal renma\.config\.json/,
+        /concise renma\.config\.jsonc/,
         /never modified, even when it is empty, malformed, or customized/,
-        /renma\.config\.json takes precedence/,
+        /multiple conventional files.*ambiguity/i,
         /repositories can use Renma defaults without running init/i,
       ],
       excludes: [/--owner/, /--config/, /--json/],

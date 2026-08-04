@@ -2,5 +2,6 @@
   "fail_on": "high",
   "format": "text",
   "globs": ["skills/**/SKILL.md", "tools/**/*", "README.md"],
+  // The demo writes generated output here; it is not source governance evidence.
   "exclude": ["node_modules", "dist", ".git", "workspace"]
 }

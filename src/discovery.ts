@@ -115,7 +115,8 @@ export type RepositoryClassificationPathResolution =
       root: string;
       relativePath: string;
       absolutePath: string;
-      marker?: ".git" | "renma.config.json" | ".renma.json";
+      marker?:
+        ".git" | "renma.config.jsonc" | "renma.config.json" | ".renma.json";
     }
   | {
       state: "unresolved";
@@ -537,7 +538,11 @@ export function classifyAssetPath(
     };
   }
   const basename = path.posix.basename(currentPath);
-  if (basename === "renma.config.json" || basename === ".renma.json") {
+  if (
+    basename === "renma.config.jsonc" ||
+    basename === "renma.config.json" ||
+    basename === ".renma.json"
+  ) {
     return classification(
       "config",
       "repository-support",
@@ -598,13 +603,15 @@ function repositoryRelativePath(
 function nearestRepositoryMarker(startDirectory: string):
   | {
       root: string;
-      marker: ".git" | "renma.config.json" | ".renma.json";
+      marker:
+        ".git" | "renma.config.jsonc" | "renma.config.json" | ".renma.json";
     }
   | undefined {
   let directory = path.resolve(startDirectory);
   while (true) {
     for (const marker of [
       ".git",
+      "renma.config.jsonc",
       "renma.config.json",
       ".renma.json",
     ] as const) {
@@ -714,6 +721,7 @@ function structuralRepositoryBoundary(
   const basename = segments.at(-1);
   if (
     basename === "AGENTS.md" ||
+    basename === "renma.config.jsonc" ||
     basename === "renma.config.json" ||
     basename === ".renma.json"
   ) {

@@ -111,12 +111,13 @@ position never determines publication.
 
 ## Repository-wide adoption
 
-Repository-wide adoption is declared only in Renma JSON configuration:
+Repository-wide adoption is declared only in Renma JSONC or JSON configuration:
 
-```json
+```jsonc
 {
   "skill_discovery": {
     "adopted": true,
+    // Keep warning-only while maintainers review migration results.
     "ci_policy": "warn"
   }
 }

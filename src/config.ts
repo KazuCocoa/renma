@@ -1,5 +1,11 @@
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
+import {
+  getNodeValue,
+  parseTree,
+  printParseErrorCode,
+  type ParseError,
+} from "jsonc-parser";
 import type { LoadedConfig, ScanConfig } from "./types/configuration.js";
 import type {
   Severity,
@@ -13,7 +19,11 @@ const FORMATS = ["text", "json"] as const;
 const SKILL_DISCOVERY_CI_POLICY_MODES = ["off", "warn"] as const;
 
 /** Conventional repository configuration filenames in loading precedence. */
-export const CONFIG_FILENAMES = ["renma.config.json", ".renma.json"] as const;
+export const CONFIG_FILENAMES = [
+  "renma.config.jsonc",
+  "renma.config.json",
+  ".renma.json",
+] as const;
 
 /** Default scan configuration used when no config file or CLI overrides apply. */
 export const DEFAULT_CONFIG: ScanConfig = {
@@ -98,19 +108,29 @@ export async function loadConfig(
 }
 
 async function findDefaultConfig(root: string): Promise<string | undefined> {
-  for (const name of CONFIG_FILENAMES) {
-    const candidate = path.join(root, name);
-    try {
-      await access(candidate);
-      return candidate;
-    } catch {
-      // Try the next conventional name.
-    }
+  const candidates = CONFIG_FILENAMES.map((name) => path.join(root, name));
+  const existing = (
+    await Promise.all(
+      candidates.map(async (candidate) =>
+        (await pathExists(candidate)) ? candidate : undefined,
+      ),
+    )
+  ).filter((candidate) => candidate !== undefined);
+
+  if (existing.length > 1) {
+    throw new ConfigError(
+      `Multiple Renma configuration files found in ${root}: ${existing
+        .map((candidate) => path.basename(candidate))
+        .join(
+          ", ",
+        )}. Renma requires one unambiguous repository configuration and does not parse or merge multiple files. Keep renma.config.jsonc when comments are desired and remove the other supported configuration files.`,
+    );
   }
-  return undefined;
+  return existing[0];
 }
 
 async function readConfigFile(configPath: string): Promise<unknown> {
+  const format = configFormat(configPath);
   let raw: string;
   try {
     raw = await readFile(configPath, "utf8");
@@ -120,12 +140,49 @@ async function readConfigFile(configPath: string): Promise<unknown> {
     );
   }
 
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch (error) {
+  const errors: ParseError[] = [];
+  const tree = parseTree(raw, errors, {
+    allowEmptyContent: false,
+    allowTrailingComma: false,
+    disallowComments: format === "JSON",
+  });
+  const firstError = errors[0];
+  if (firstError) {
+    const location = sourceLocation(raw, firstError.offset);
     throw new ConfigError(
-      `Config file ${configPath} is not valid JSON: ${errorMessage(error)}`,
+      `Config file ${configPath} is not valid ${format} at line ${location.line}, column ${location.column}: ${printParseErrorCode(firstError.error)}.`,
     );
+  }
+  return tree ? (getNodeValue(tree) as unknown) : undefined;
+}
+
+function configFormat(configPath: string): "JSON" | "JSONC" {
+  const extension = path.extname(configPath);
+  if (extension === ".json") return "JSON";
+  if (extension === ".jsonc") return "JSONC";
+  throw new ConfigError(
+    `Unsupported config file extension for ${configPath}. Renma configuration files must use .json or .jsonc; executable .js, .mjs, and .ts configuration is not supported.`,
+  );
+}
+
+function sourceLocation(
+  source: string,
+  offset: number,
+): { line: number; column: number } {
+  const prefix = source.slice(0, offset);
+  const lastLineBreak = prefix.lastIndexOf("\n");
+  return {
+    line: prefix.split("\n").length,
+    column: offset - lastLineBreak,
+  };
+}
+
+async function pathExists(targetPath: string): Promise<boolean> {
+  try {
+    await access(targetPath);
+    return true;
+  } catch {
+    return false;
   }
 }
 

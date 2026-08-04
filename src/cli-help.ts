@@ -21,7 +21,7 @@ export type CommandOptionHelp =
 const OPTION_HELP = {
   config: {
     flags: "-c, --config <path>",
-    description: "Read Renma JSON config from path.",
+    description: "Read Renma .json or .jsonc config from path.",
   },
   "fail-on": {
     flags: "--fail-on <level>",
@@ -121,7 +121,7 @@ export const COMMAND_HELP = [
       "Init initializes repository-level Renma configuration. It does not create Skills or Context Assets. Init the repository; scaffold an asset.",
     useWhen: [
       "A repository wants to record explicit Renma adoption and pin its initial repository policy.",
-      "You want a minimal renma.config.json with the initial fail-on severity and output format.",
+      "You want a concise renma.config.jsonc with the initial fail-on severity, output format, and room for human-readable policy rationale.",
     ],
     doNotUseFor: [
       "Creating a Skill, Context Asset, Context Lens, example asset, or asset directory.",
@@ -131,9 +131,9 @@ export const COMMAND_HELP = [
     ],
     examples: ["renma init", "renma init .", "renma init path/to/repository"],
     interpretation: [
-      "When no conventional Renma configuration exists, init creates a minimal renma.config.json and prints next steps.",
-      "An existing renma.config.json or .renma.json is never modified, even when it is empty, malformed, or customized.",
-      "When both conventional files exist, renma.config.json takes precedence and init changes neither file.",
+      "When no conventional Renma configuration exists, init creates a concise renma.config.jsonc and prints next steps.",
+      "An existing renma.config.jsonc, renma.config.json, or .renma.json is never modified, even when it is empty, malformed, or customized.",
+      "When multiple conventional files exist, init reports the ambiguity and changes none of them.",
       "Repositories can use Renma defaults without running init; initialization records explicit repository policy.",
     ],
     nextSteps: [

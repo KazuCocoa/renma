@@ -234,7 +234,12 @@ test("repository boundaries prefer a nested repository marker over cwd containme
 });
 
 test("repository boundaries recognize every supported marker and prefer the nearest one", async () => {
-  for (const marker of [".git", "renma.config.json", ".renma.json"] as const) {
+  for (const marker of [
+    ".git",
+    "renma.config.jsonc",
+    "renma.config.json",
+    ".renma.json",
+  ] as const) {
     const workspace = await mkdtemp(
       path.join(os.tmpdir(), `renma-${marker.replaceAll(".", "-")}-marker-`),
     );
@@ -320,6 +325,7 @@ test("absolute targets outside cwd retain deterministic structural boundaries", 
   const root = await mkdtemp(path.join(os.tmpdir(), "renma-external-assets-"));
   const fixtures = [
     ["AGENTS.md", "agent-root", "agent"],
+    ["renma.config.jsonc", "config-file", "config"],
     ["renma.config.json", "config-file", "config"],
     [".agents/provider.md", "agent-root", "agent"],
     ["contexts/foo/references/tools/helper.md", "context-root", "context"],

@@ -8,7 +8,7 @@ thresholds and the deeper token-budget decision policy.
 `renma-quality` is Renma's internal quality-profile family. Reports identify
 the active profile as `renma-quality@<Renma package version>`, derived from
 `package.json` at build time. The source is `src/quality-profile.ts`. The current
-implementation does not expose quality overrides in `renma.config.json`; fixed
+implementation does not expose quality overrides in Renma configuration; fixed
 defaults preserve comparable repository reports. The internal shape is
 versioned so later releases can add declared overrides without scattering
 constants across rules.

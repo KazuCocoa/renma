@@ -225,8 +225,14 @@ contexts/
 lenses/
   testing/
     spec-review-boundary-values.md
-renma.config.json
+renma.config.jsonc
 ```
+
+`renma.config.jsonc` is the recommended repository configuration filename.
+JSONC is JSON with comments, so maintainers can preserve why a governance
+policy is temporarily relaxed without introducing executable configuration.
+Existing `renma.config.json` and `.renma.json` files remain supported; Renma
+does not support or execute `.mjs` configuration.
 
 `contexts/**` is the canonical independently governed Context Asset root;
 `context/**` remains accepted for compatibility. Canonical Skill-local support

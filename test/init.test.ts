@@ -26,10 +26,10 @@ test("init with no root initializes the current directory", async () => {
 
     assert.equal(result.code, 0);
     assert.equal(result.stderr, "");
-    assert.match(result.stdout, /^Created renma\.config\.json$/m);
+    assert.match(result.stdout, /^Created renma\.config\.jsonc$/m);
     assert.match(result.stdout, /^ {2}renma scan \.$/m);
     assert.equal(
-      await readFile(path.join(root, "renma.config.json"), "utf8"),
+      await readFile(path.join(root, "renma.config.jsonc"), "utf8"),
       INITIAL_CONFIG_CONTENT,
     );
   } finally {
@@ -45,7 +45,7 @@ test("init with an explicit root creates the config under that root", async () =
   assert.equal(result.stderr, "");
   assert.match(
     result.stdout,
-    new RegExp(`^Created ${escapeRegExp(root)}/renma\\.config\\.json$`, "m"),
+    new RegExp(`^Created ${escapeRegExp(root)}/renma\\.config\\.jsonc$`, "m"),
   );
   assert.match(
     result.stdout,
@@ -53,21 +53,21 @@ test("init with an explicit root creates the config under that root", async () =
   );
 });
 
-test("initialized config is deterministic minimal JSON with a final newline", async () => {
+test("initialized config is concise deterministic JSONC with rationale", async () => {
   const root = await fixture();
   const result = await initializeRepository(root);
-  const raw = await readFile(path.join(root, "renma.config.json"), "utf8");
+  const raw = await readFile(path.join(root, "renma.config.jsonc"), "utf8");
 
   assert.equal(result.state, "created");
   assert.equal(raw, INITIAL_CONFIG_CONTENT);
   assert.ok(raw.endsWith("\n"));
-  assert.deepEqual(JSON.parse(raw), { fail_on: "high", format: "text" });
+  assert.match(raw, /rationale.*(?:temporary exception|disabled policy)/);
 });
 
 test("re-running init leaves the generated config unchanged", async () => {
   const root = await fixture();
   const first = await withCapturedConsole(() => main(["init", root]));
-  const configPath = path.join(root, "renma.config.json");
+  const configPath = path.join(root, "renma.config.jsonc");
   const before = await stat(configPath);
   const content = await readFile(configPath, "utf8");
   const second = await withCapturedConsole(() => main(["init", root]));
@@ -91,7 +91,7 @@ test("existing customized, empty, and malformed primary configs are preserved", 
   for (const content of cases) {
     await t.test(JSON.stringify(content), async () => {
       const root = await fixture();
-      const configPath = path.join(root, "renma.config.json");
+      const configPath = path.join(root, "renma.config.jsonc");
       await writeFile(configPath, content);
 
       const result = await withCapturedConsole(() => main(["init", root]));
@@ -105,38 +105,54 @@ test("existing customized, empty, and malformed primary configs are preserved", 
   }
 });
 
-test("an existing legacy config prevents primary config creation", async () => {
-  const root = await fixture();
-  const legacyPath = path.join(root, ".renma.json");
-  const legacyContent = '{"format":"json"}\n';
-  await writeFile(legacyPath, legacyContent);
+test("every existing supported config prevents JSONC creation", async (t) => {
+  for (const filename of [
+    "renma.config.jsonc",
+    "renma.config.json",
+    ".renma.json",
+  ] as const) {
+    await t.test(filename, async () => {
+      const root = await fixture();
+      const existingPath = path.join(root, filename);
+      const content = '{"format":"json"}\n';
+      await writeFile(existingPath, content);
 
-  const result = await withCapturedConsole(() => main(["init", root]));
+      const result = await withCapturedConsole(() => main(["init", root]));
 
-  assert.equal(result.code, 0);
-  assert.match(result.stdout, /already initialized with .*\.renma\.json/);
-  assert.match(result.stdout, /No files were changed\./);
-  assert.equal(await readFile(legacyPath, "utf8"), legacyContent);
-  await assert.rejects(access(path.join(root, "renma.config.json")));
+      assert.equal(result.code, 0);
+      assert.equal(result.stderr, "");
+      assert.match(result.stdout, /already initialized with/);
+      assert.match(result.stdout, /No files were changed\./);
+      assert.equal(await readFile(existingPath, "utf8"), content);
+      if (filename !== "renma.config.jsonc") {
+        await assert.rejects(access(path.join(root, "renma.config.jsonc")));
+      }
+    });
+  }
 });
 
-test("both conventional configs produce a precedence warning without changes", async () => {
+test("multiple conventional configs produce an ambiguity error without changes", async () => {
   const root = await fixture();
-  const primaryPath = path.join(root, "renma.config.json");
+  const primaryPath = path.join(root, "renma.config.jsonc");
+  const jsonPath = path.join(root, "renma.config.json");
   const legacyPath = path.join(root, ".renma.json");
   await writeFile(primaryPath, "primary\n");
+  await writeFile(jsonPath, "json\n");
   await writeFile(legacyPath, "legacy\n");
 
   const result = await withCapturedConsole(() => main(["init", root]));
 
-  assert.equal(result.code, 0);
+  assert.equal(result.code, 2);
+  assert.equal(result.stdout, "");
   assert.match(
-    result.stdout,
-    /Warning: both .*renma\.config\.json and .*\.renma\.json exist/,
+    result.stderr,
+    /renma\.config\.jsonc, .*renma\.config\.json, .*\.renma\.json/,
   );
-  assert.match(result.stdout, /renma\.config\.json takes precedence/);
-  assert.match(result.stdout, /No files were changed\./);
+  assert.match(result.stderr, /one unambiguous repository configuration/);
+  assert.match(result.stderr, /Keep .*renma\.config\.jsonc/);
+  assert.match(result.stderr, /No files were changed\./);
   assert.equal(await readFile(primaryPath, "utf8"), "primary\n");
+  assert.equal(await readFile(jsonPath, "utf8"), "json\n");
   assert.equal(await readFile(legacyPath, "utf8"), "legacy\n");
 });
 
@@ -152,7 +168,7 @@ test("concurrent initialization uses exclusive creation", async () => {
     "primary-existing",
   ]);
   assert.equal(
-    await readFile(path.join(root, "renma.config.json"), "utf8"),
+    await readFile(path.join(root, "renma.config.jsonc"), "utf8"),
     INITIAL_CONFIG_CONTENT,
   );
 });
@@ -179,7 +195,7 @@ test("an explicitly supplied empty root cannot initialize the current directory"
     assert.equal(result.code, 2);
     assert.equal(result.stdout, "");
     assert.match(result.stderr, /Could not initialize Renma/);
-    await assert.rejects(access(path.join(root, "renma.config.json")));
+    await assert.rejects(access(path.join(root, "renma.config.jsonc")));
   } finally {
     process.chdir(previousCwd);
   }
@@ -193,7 +209,7 @@ test("an unresolved parent-segment root cannot initialize its lexical parent", a
   assert.equal(result.code, 2);
   assert.equal(result.stdout, "");
   assert.match(result.stderr, /Could not initialize Renma/);
-  await assert.rejects(access(path.join(parent, "renma.config.json")));
+  await assert.rejects(access(path.join(parent, "renma.config.jsonc")));
 });
 
 test("an existing regular file cannot be used as an initialization root", async () => {
@@ -208,8 +224,8 @@ test("an existing regular file cannot be used as an initialization root", async 
   assert.equal(result.stdout, "");
   assert.match(result.stderr, /is not a directory/);
   assert.equal(await readFile(root, "utf8"), content);
-  await assert.rejects(access(path.join(parent, "renma.config.json")));
-  await assert.rejects(access(path.join(root, "renma.config.json")));
+  await assert.rejects(access(path.join(parent, "renma.config.jsonc")));
+  await assert.rejects(access(path.join(root, "renma.config.jsonc")));
 });
 
 test("dash-prefixed roots use option separators in rendered next steps", async () => {
@@ -227,7 +243,7 @@ test("dash-prefixed roots use option separators in rendered next steps", async (
     assert.equal(result.code, 0);
     assert.equal(result.stderr, "");
     assert.equal(
-      await readFile(path.join(root, "renma.config.json"), "utf8"),
+      await readFile(path.join(root, "renma.config.jsonc"), "utf8"),
       INITIAL_CONFIG_CONTENT,
     );
     assert.match(result.stdout, /^ {2}renma scan -- -repo$/m);
