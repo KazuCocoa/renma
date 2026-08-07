@@ -187,14 +187,17 @@ test("profile changes report inherited provenance and complete sorted blast radi
   );
   assert.ok(
     result.policyChanges.every((change) =>
-      change.fields.every(
-        (field) =>
-          field.provenance.mode === "inherited" &&
-          field.provenance.sources.some(
-            (source) =>
-              source.type === "security_profile" && source.id === "shared",
-          ),
-      ),
+      change.fields.every((field) => {
+        assert.equal(field.provenance.mode, "inherited");
+        assert.deepEqual(field.provenance.sources, [
+          {
+            type: "security_profile",
+            id: "shared",
+            path: "renma.config.jsonc",
+          },
+        ]);
+        return true;
+      }),
     ),
   );
   assert.deepEqual(result.sharedPolicyChanges, [
@@ -273,6 +276,149 @@ test("repository destinations and command policy changes name repository provena
   );
 });
 
+test("added and removed plain assets retain inherited repository provenance", () => {
+  const path = "contexts/repository-inherited.md";
+  const input = artifact(path, "context", "# Repository inherited\n");
+  const config = securityConfig({
+    approvedDomains: ["api.example.com"],
+    disallowedCommands: ["curl"],
+  });
+  const evidence = collectSecurityPolicyAssetEvidence([input], config);
+  const ids = new Map([[path, "context.repository-inherited"]]);
+
+  for (const direction of ["added", "removed"] as const) {
+    const result = buildSecurityPolicyChanges({
+      fromAssets: direction === "added" ? [] : evidence,
+      toAssets: direction === "added" ? evidence : [],
+      fromConfig: config,
+      toConfig: config,
+      fromConfigPath: "renma.config.jsonc",
+      toConfigPath: "renma.config.jsonc",
+      fromAssetIdsByPath: ids,
+      toAssetIdsByPath: ids,
+    });
+
+    assert.deepEqual(
+      result.policyChanges[0]?.fields.map((field) => ({
+        field: field.field,
+        provenance: field.provenance,
+      })),
+      ["approvedNetworkDestinations", "disallowedCommands"].map((field) => ({
+        field,
+        provenance: {
+          mode: "inherited",
+          sources: [
+            {
+              type: "repository_config",
+              id: "security",
+              path: "renma.config.jsonc",
+            },
+          ],
+        },
+      })),
+      direction,
+    );
+    assert.deepEqual(result.sharedPolicyChanges, [], direction);
+  }
+});
+
+test("added and removed profile-selected assets are mixed with the effective child scalar", () => {
+  const path = "contexts/profile-selected.md";
+  const input = artifact(path, "context", policy({ securityProfile: "child" }));
+  const config = securityConfig({
+    disallowedCommands: ["curl"],
+    profiles: {
+      parent: profile({ networkAllowed: false }),
+      child: profile({ securityProfile: "parent", networkAllowed: true }),
+    },
+  });
+  const evidence = collectSecurityPolicyAssetEvidence([input], config);
+  const ids = new Map([[path, "context.profile-selected"]]);
+
+  for (const direction of ["added", "removed"] as const) {
+    const result = buildSecurityPolicyChanges({
+      fromAssets: direction === "added" ? [] : evidence,
+      toAssets: direction === "added" ? evidence : [],
+      fromConfig: config,
+      toConfig: config,
+      fromConfigPath: "renma.config.jsonc",
+      toConfigPath: "renma.config.jsonc",
+      fromAssetIdsByPath: ids,
+      toAssetIdsByPath: ids,
+    });
+
+    assert.deepEqual(result.policyChanges[0]?.fields[0]?.provenance, {
+      mode: "mixed",
+      sources: [
+        { type: "asset", id: "context.profile-selected", path },
+        {
+          type: "security_profile",
+          id: "child",
+          path: "renma.config.jsonc",
+        },
+      ],
+    });
+    assert.deepEqual(result.policyChanges[0]?.fields[1]?.provenance, {
+      mode: "inherited",
+      sources: [
+        {
+          type: "repository_config",
+          id: "security",
+          path: "renma.config.jsonc",
+        },
+      ],
+    });
+    assert.deepEqual(result.sharedPolicyChanges, []);
+  }
+});
+
+test("profile list provenance retains every genuine accumulating contributor", () => {
+  const path = "contexts/profile-list.md";
+  const config = securityConfig({
+    profiles: {
+      parent: profile({
+        approvedDomains: ["parent.example.com"],
+        disallowedCommands: ["curl"],
+      }),
+      child: profile({
+        securityProfile: "parent",
+        approvedDomains: ["child.example.com"],
+        disallowedCommands: ["wget"],
+      }),
+    },
+  });
+  const evidence = collectSecurityPolicyAssetEvidence(
+    [artifact(path, "context", policy({ securityProfile: "child" }))],
+    config,
+  );
+  const result = buildSecurityPolicyChanges({
+    fromAssets: [],
+    toAssets: evidence,
+    fromConfig: config,
+    toConfig: config,
+    fromConfigPath: "renma.config.jsonc",
+    toConfigPath: "renma.config.jsonc",
+    toAssetIdsByPath: new Map([[path, "context.profile-list"]]),
+  });
+
+  for (const field of result.policyChanges[0]?.fields ?? []) {
+    assert.equal(field.provenance.mode, "mixed");
+    assert.deepEqual(field.provenance.sources, [
+      { type: "asset", id: "context.profile-list", path },
+      {
+        type: "security_profile",
+        id: "child",
+        path: "renma.config.jsonc",
+      },
+      {
+        type: "security_profile",
+        id: "parent",
+        path: "renma.config.jsonc",
+      },
+    ]);
+  }
+});
+
 test("removing a local override records direct declaration and inherited profile provenance", () => {
   const path = "contexts/mixed.md";
   const config = securityConfig({
@@ -326,6 +472,130 @@ test("removing a local override records direct declaration and inherited profile
     },
   ]);
   assert.deepEqual(result.sharedPolicyChanges, []);
+});
+
+test("removing a local scalar override names only the last profile contributor", () => {
+  const path = "contexts/scalar-override.md";
+  const config = securityConfig({
+    profiles: {
+      root: profile({ networkAllowed: false }),
+      middle: profile({
+        securityProfile: "root",
+        networkAllowed: false,
+      }),
+      child: profile({
+        securityProfile: "middle",
+        networkAllowed: true,
+      }),
+    },
+  });
+  const result = buildSecurityPolicyChanges({
+    fromAssets: collectSecurityPolicyAssetEvidence(
+      [
+        artifact(
+          path,
+          "context",
+          policy({ securityProfile: "child", networkAllowed: false }),
+        ),
+      ],
+      config,
+    ),
+    toAssets: collectSecurityPolicyAssetEvidence(
+      [artifact(path, "context", policy({ securityProfile: "child" }))],
+      config,
+    ),
+    fromConfig: config,
+    toConfig: config,
+    fromConfigPath: "renma.config.jsonc",
+    toConfigPath: "renma.config.jsonc",
+    fromAssetIdsByPath: new Map([[path, "context.scalar-override"]]),
+    toAssetIdsByPath: new Map([[path, "context.scalar-override"]]),
+  });
+
+  assert.deepEqual(result.policyChanges[0]?.fields[0]?.provenance, {
+    mode: "mixed",
+    sources: [
+      { type: "asset", id: "context.scalar-override", path },
+      {
+        type: "security_profile",
+        id: "child",
+        path: "renma.config.jsonc",
+      },
+    ],
+  });
+});
+
+test("invalid canonical local scalars retain direct evidence when removed or corrected", () => {
+  const path = "skills/invalid-policy/SKILL.md";
+  const ids = new Map([[path, "skill.invalid-policy"]]);
+  const cases = [
+    {
+      name: "removed",
+      profileValue: true,
+      afterValue: undefined,
+    },
+    {
+      name: "corrected",
+      profileValue: false,
+      afterValue: true,
+    },
+  ] as const;
+
+  for (const fixture of cases) {
+    const config = securityConfig({
+      profiles: {
+        fallback: profile({ networkAllowed: fixture.profileValue }),
+      },
+    });
+    const fromAssets = collectSecurityPolicyAssetEvidence(
+      [artifact(path, "skill", canonicalSkillPolicy("invalid"))],
+      config,
+    );
+    const toAssets = collectSecurityPolicyAssetEvidence(
+      [
+        artifact(
+          path,
+          "skill",
+          canonicalSkillPolicy(
+            fixture.afterValue === undefined
+              ? undefined
+              : String(fixture.afterValue),
+          ),
+        ),
+      ],
+      config,
+    );
+    assert.deepEqual(fromAssets[0]?.declaredPolicy?.invalidDeclared, [
+      "networkAllowed",
+    ]);
+
+    const result = buildSecurityPolicyChanges({
+      fromAssets,
+      toAssets,
+      fromConfig: config,
+      toConfig: config,
+      fromConfigPath: "renma.config.jsonc",
+      toConfigPath: "renma.config.jsonc",
+      fromAssetIdsByPath: ids,
+      toAssetIdsByPath: ids,
+    });
+
+    assert.deepEqual(
+      result.policyChanges[0]?.fields[0]?.provenance,
+      {
+        mode: "mixed",
+        sources: [
+          { type: "asset", id: "skill.invalid-policy", path },
+          {
+            type: "security_profile",
+            id: "fallback",
+            path: "renma.config.jsonc",
+          },
+        ],
+      },
+      fixture.name,
+    );
+  }
 });
 
 test("owning Skill changes distinguish direct Skill and inherited support assets", () => {
@@ -440,6 +710,28 @@ test("duplicate asset IDs retain every path in shared-policy blast radius", () =
   assert.equal(result.sharedPolicyChanges[0]?.affectedAssets.length, 2);
 });
 
+test("missing contributor evidence reports unresolved provenance without guessing", () => {
+  const path = "contexts/compatibility.md";
+  const config = securityConfig({
+    profiles: { shared: profile({ networkAllowed: true }) },
+  });
+  const evidence = collectSecurityPolicyAssetEvidence(
+    [artifact(path, "context", policy({ securityProfile: "shared" }))],
+    config,
+  );
+
+  const result = buildSecurityPolicyChanges({
+    fromAssets: [],
+    toAssets: evidence,
+    toAssetIdsByPath: new Map([[path, "context.compatibility"]]),
+  });
+
+  assert.deepEqual(result.policyChanges[0]?.fields[0]?.provenance, {
+    mode: "unresolved",
+    sources: [],
+  });
+});
+
 interface PolicyInput {
   securityProfile?: string;
   allowedData?: string[];
@@ -484,6 +776,22 @@ function skillPolicy(networkAllowed: boolean): string {
     `  renma.network-allowed: "${networkAllowed}"`,
     "---",
     "# Demo",
+    "",
+  ].join("\n");
+}
+
+function canonicalSkillPolicy(networkAllowed: string | undefined): string {
+  return [
+    "---",
+    "name: invalid-policy",
+    "description: Deterministic fixture Skill with canonical policy metadata.",
+    "metadata:",
+    "  renma.security-profile: fallback",
+    ...(networkAllowed === undefined
+      ? []
+      : [`  renma.network-allowed: "${networkAllowed}"`]),
+    "---",
+    "# Invalid policy",
     "",
   ].join("\n");
 }

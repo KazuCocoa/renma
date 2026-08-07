@@ -48,6 +48,7 @@ import {
 import type { SkillDiscoveryIndex } from "../skill-discovery.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import { formatJsonDocument } from "../report.js";
+import { formatMarkdownInlineCode } from "../renderers/markdown-inline-code.js";
 
 const execFile = promisify(execFileCallback);
 
@@ -981,7 +982,7 @@ function formatSecurityPolicyAssetChange(
   change: SecurityPolicyAssetChange,
 ): string[] {
   const lines = [
-    `- ${markdownCode(change.asset.id)} (${markdownCode(change.asset.path)})`,
+    `- ${formatMarkdownInlineCode(change.asset.id)} (${formatMarkdownInlineCode(change.asset.path)})`,
   ];
   for (const field of change.fields) {
     lines.push(...formatSecurityPolicyFieldChange(field));
@@ -1044,7 +1045,7 @@ function formatSharedSecurityPolicyChange(
       .slice(0, DIFF_DETAIL_LIMIT)
       .map(
         (asset) =>
-          `  - ${markdownCode(asset.id)} (${markdownCode(asset.path)})`,
+          `  - ${formatMarkdownInlineCode(asset.id)} (${formatMarkdownInlineCode(asset.path)})`,
       ),
     ...formatPolicyOverflow(change.affectedAssets.length, 2),
   );
@@ -1054,6 +1055,10 @@ function formatSharedSecurityPolicyChange(
 function formatPolicyProvenance(
   provenance: SecurityPolicyChangeProvenance,
 ): string {
+  if (provenance.mode === "unresolved") {
+    if (provenance.sources.length === 0) return "provenance unresolved";
+    return `provenance unresolved; known source${provenance.sources.length === 1 ? "" : "s"}: ${provenance.sources.map(formatPolicySource).join(", ")}`;
+  }
   const mode =
     provenance.mode === "direct"
       ? "direct"
@@ -1064,15 +1069,17 @@ function formatPolicyProvenance(
 }
 
 function formatPolicySource(source: SecurityPolicyChangeSource): string {
-  const location = source.path ? ` at ${markdownCode(source.path)}` : "";
+  const location = source.path
+    ? ` at ${formatMarkdownInlineCode(source.path)}`
+    : "";
   if (source.type === "asset") {
-    return `asset ${markdownCode(source.id)}${location}`;
+    return `asset ${formatMarkdownInlineCode(source.id)}${location}`;
   }
   if (source.type === "owning_skill") {
-    return `owning Skill ${markdownCode(source.id)}${location}`;
+    return `owning Skill ${formatMarkdownInlineCode(source.id)}${location}`;
   }
   if (source.type === "security_profile") {
-    return `security profile ${markdownCode(source.id)}${location}`;
+    return `security profile ${formatMarkdownInlineCode(source.id)}${location}`;
   }
   return `repository security configuration${location}`;
 }
@@ -1107,7 +1114,10 @@ function formatPolicyScalar(value: boolean | null): string {
 }
 
 function formatPolicyValues(values: readonly string[]): string {
-  return values.slice(0, DIFF_DETAIL_LIMIT).map(markdownCode).join(", ");
+  return values
+    .slice(0, DIFF_DETAIL_LIMIT)
+    .map(formatMarkdownInlineCode)
+    .join(", ");
 }
 
 function formatPolicyOverflow(total: number, indent: number): string[] {
@@ -1115,10 +1125,6 @@ function formatPolicyOverflow(total: number, indent: number): string[] {
   return [
     `${" ".repeat(indent)}- ${total - DIFF_DETAIL_LIMIT} more not shown; see JSON for the full list.`,
   ];
-}
-
-function markdownCode(value: string): string {
-  return `\`${value.replaceAll("`", "\\`")}\``;
 }
 
 function formatFindingDelta(finding: FindingDelta): string {

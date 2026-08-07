@@ -49,7 +49,7 @@ export interface SecurityPolicyChangeSource {
 }
 
 export interface SecurityPolicyChangeProvenance {
-  mode: "direct" | "inherited" | "mixed";
+  mode: "direct" | "inherited" | "mixed" | "unresolved";
   sources: SecurityPolicyChangeSource[];
 }
 
@@ -133,6 +133,7 @@ const SCALAR_FIELDS = new Set<ReviewableSecurityPolicyField>([
 
 const EMPTY_DECLARED_POLICY: DeclaredSecurityPolicyEvidence = {
   fields: [],
+  invalidDeclared: [],
   allowedData: [],
   forbiddenInputs: [],
   networkAllowed: null,
@@ -301,7 +302,7 @@ function fieldProvenance(
 ): FieldProvenanceResult {
   const sources: SecurityPolicyChangeSource[] = [];
   const changedSharedSources: SecurityPolicyChangeSource[] = [];
-  const inheritedValueSources: SecurityPolicyChangeSource[] = [];
+  let exact = true;
   const current = after ?? before;
   if (!current) {
     throw new Error("Security policy change has no affected asset evidence.");
@@ -312,7 +313,7 @@ function fieldProvenance(
 
   const direct =
     owningSources.length === 0 &&
-    directDeclarationChanged(before?.evidence, after?.evidence, field);
+    directDeclarationChanged(input, before?.evidence, after?.evidence, field);
   if (direct) {
     sources.push({
       type: "asset",
@@ -324,21 +325,6 @@ function fieldProvenance(
   const selectedProfileChanged =
     (before?.evidence.selectedSecurityProfile ?? null) !==
     (after?.evidence.selectedSecurityProfile ?? null);
-  if (
-    selectedProfileChanged ||
-    localDeclarationPresenceChanged(before?.evidence, after?.evidence, field)
-  ) {
-    for (const profile of uniqueStrings([
-      ...(before?.evidence.profileChain ?? []),
-      ...(after?.evidence.profileChain ?? []),
-    ])) {
-      if (!profileSuppliesFieldValue(input, profile, field)) continue;
-      const source = profileSource(profile, input);
-      sources.push(source);
-      inheritedValueSources.push(source);
-    }
-  }
-
   for (const profile of uniqueStrings([
     ...(before?.evidence.profileChain ?? []),
     ...(after?.evidence.profileChain ?? []),
@@ -349,6 +335,24 @@ function fieldProvenance(
     changedSharedSources.push(source);
   }
 
+  if (
+    !before ||
+    !after ||
+    selectedProfileChanged ||
+    localDeclarationStateChanged(before.evidence, after.evidence, field) ||
+    changedSharedSources.length > 0
+  ) {
+    const beforeContributors = inheritedFieldSources(
+      input,
+      before,
+      "from",
+      field,
+    );
+    const afterContributors = inheritedFieldSources(input, after, "to", field);
+    sources.push(...beforeContributors.sources, ...afterContributors.sources);
+    exact = beforeContributors.exact && afterContributors.exact;
+  }
+
   if (repositoryFieldChanged(input, field)) {
     const source = repositorySource(input);
     sources.push(source);
@@ -356,67 +360,166 @@ function fieldProvenance(
   }
 
   if (sources.length === 0) {
-    sources.push(...fallbackSources(input, current, before, after));
+    const beforeContributors = inheritedFieldSources(
+      input,
+      before,
+      "from",
+      field,
+    );
+    const afterContributors = inheritedFieldSources(input, after, "to", field);
+    sources.push(...beforeContributors.sources, ...afterContributors.sources);
+    exact = exact && beforeContributors.exact && afterContributors.exact;
   }
 
-  const inherited =
-    owningSources.length > 0 ||
-    changedSharedSources.length > 0 ||
-    inheritedValueSources.length > 0 ||
-    !direct;
+  const normalizedSources = uniqueSources(sources);
+  const inherited = normalizedSources.some((source) => source.type !== "asset");
   return {
     provenance: {
-      mode: direct && inherited ? "mixed" : direct ? "direct" : "inherited",
-      sources: uniqueSources(sources),
+      mode:
+        !exact || normalizedSources.length === 0
+          ? "unresolved"
+          : direct && inherited
+            ? "mixed"
+            : direct
+              ? "direct"
+              : "inherited",
+      sources: normalizedSources,
     },
     changedSharedSources: uniqueSources(changedSharedSources),
   };
 }
 
-function localDeclarationPresenceChanged(
-  before: SecurityPolicyAssetEvidence | undefined,
-  after: SecurityPolicyAssetEvidence | undefined,
+function localDeclarationStateChanged(
+  before: SecurityPolicyAssetEvidence,
+  after: SecurityPolicyAssetEvidence,
   field: ReviewableSecurityPolicyField,
 ): boolean {
-  if (!before || !after) return false;
+  const beforeDeclared = before.declaredPolicy ?? EMPTY_DECLARED_POLICY;
+  const afterDeclared = after.declaredPolicy ?? EMPTY_DECLARED_POLICY;
   return (
-    (before.declaredPolicy ?? EMPTY_DECLARED_POLICY).fields.includes(field) !==
-    (after.declaredPolicy ?? EMPTY_DECLARED_POLICY).fields.includes(field)
+    beforeDeclared.fields.includes(field) !==
+      afterDeclared.fields.includes(field) ||
+    beforeDeclared.invalidDeclared.includes(field) !==
+      afterDeclared.invalidDeclared.includes(field)
   );
 }
 
 function profileSuppliesFieldValue(
-  input: SecurityPolicyDiffInput,
+  evidence: SecurityPolicyAssetEvidence,
+  config: SecurityConfig,
   profile: string,
   field: ReviewableSecurityPolicyField,
 ): boolean {
-  return [
-    profileValue(input.fromConfig?.profiles?.[profile], field),
-    profileValue(input.toConfig?.profiles?.[profile], field),
-  ].some((value) => (Array.isArray(value) ? value.length > 0 : value !== null));
+  const declared = evidence.declaredPolicy;
+  if (!declared) return false;
+  const chain = evidence.profileChain;
+  const profileIndex = chain.indexOf(profile);
+  const candidate = config.profiles?.[profile];
+  if (profileIndex < 0 || candidate === undefined) return false;
+
+  if (SCALAR_FIELDS.has(field)) {
+    if (declared.fields.includes(field)) return false;
+    const scalarField = field as ScalarSecurityPolicyField;
+    const contributor = [...chain]
+      .reverse()
+      .find((name) => config.profiles?.[name]?.[scalarField] !== undefined);
+    return (
+      contributor === profile &&
+      candidate[scalarField] === evidence.effectivePolicy[scalarField]
+    );
+  }
+
+  const listField = field as ListSecurityPolicyField;
+  if (
+    (listField === "allowedData" &&
+      (declared.fields.includes(listField) ||
+        declared.invalidDeclared.includes(listField))) ||
+    (listField === "forbiddenInputs" && declared.fields.includes(listField)) ||
+    ((listField === "approvedNetworkDestinations" ||
+      listField === "approvedUploadDestinations") &&
+      declared.invalidDeclared.includes(listField))
+  ) {
+    return false;
+  }
+
+  const effectiveValues = new Set(evidence.effectivePolicy[listField]);
+  const contribution = profileListContribution(
+    candidate,
+    profile,
+    chain,
+    config,
+    listField,
+  );
+  return contribution.some((value) => effectiveValues.has(value));
 }
 
 function directDeclarationChanged(
+  input: SecurityPolicyDiffInput,
   before: SecurityPolicyAssetEvidence | undefined,
   after: SecurityPolicyAssetEvidence | undefined,
   field: ReviewableSecurityPolicyField,
 ): boolean {
-  if (!before || !after) return true;
+  if (!before || !after) {
+    const existing = after ?? before;
+    return existing
+      ? endpointHasDirectEvidence(input, existing, after ? "to" : "from", field)
+      : false;
+  }
   if (
     (before.selectedSecurityProfile ?? null) !==
     (after.selectedSecurityProfile ?? null)
   ) {
-    return true;
+    const profileSelectionSuppliesField =
+      endpointProfileSuppliesField(input, before, "from", field) ||
+      endpointProfileSuppliesField(input, after, "to", field);
+    if (profileSelectionSuppliesField) return true;
   }
   const beforeDeclared = before.declaredPolicy ?? EMPTY_DECLARED_POLICY;
   const afterDeclared = after.declaredPolicy ?? EMPTY_DECLARED_POLICY;
   if (
     beforeDeclared.fields.includes(field) !==
-    afterDeclared.fields.includes(field)
+      afterDeclared.fields.includes(field) ||
+    beforeDeclared.invalidDeclared.includes(field) !==
+      afterDeclared.invalidDeclared.includes(field)
   ) {
     return true;
   }
   return !samePolicyValue(beforeDeclared[field], afterDeclared[field]);
+}
+
+function endpointHasDirectEvidence(
+  input: SecurityPolicyDiffInput,
+  evidence: SecurityPolicyAssetEvidence,
+  endpoint: "from" | "to",
+  field: ReviewableSecurityPolicyField,
+): boolean {
+  if (evidence.inheritedFrom) return false;
+  const declared = evidence.declaredPolicy;
+  return (
+    declared?.fields.includes(field) === true ||
+    declared?.invalidDeclared.includes(field) === true ||
+    endpointProfileSuppliesField(input, evidence, endpoint, field)
+  );
+}
+
+function endpointProfileSuppliesField(
+  input: SecurityPolicyDiffInput,
+  evidence: SecurityPolicyAssetEvidence,
+  endpoint: "from" | "to",
+  field: ReviewableSecurityPolicyField,
+): boolean {
+  if (
+    evidence.inheritedFrom ||
+    evidence.selectedSecurityProfile === undefined ||
+    evidence.declaredPolicy === undefined
+  ) {
+    return false;
+  }
+  const config = endpoint === "from" ? input.fromConfig : input.toConfig;
+  if (!config) return false;
+  return evidence.profileChain.some((profile) =>
+    profileSuppliesFieldValue(evidence, config, profile, field),
+  );
 }
 
 function uniqueOwningSources(
@@ -442,38 +545,116 @@ function uniqueOwningSources(
   );
 }
 
-function fallbackSources(
+function inheritedFieldSources(
   input: SecurityPolicyDiffInput,
-  current: PreparedAsset,
-  before: PreparedAsset | undefined,
-  after: PreparedAsset | undefined,
-): SecurityPolicyChangeSource[] {
-  const policySources = uniqueStrings([
-    ...(before?.evidence.policySources ?? []),
-    ...(after?.evidence.policySources ?? []),
-  ]) as SecurityPolicySource[];
-  return policySources.flatMap((source) => {
-    if (source === "owning_skill") {
-      return uniqueOwningSources(input, before, after);
+  asset: PreparedAsset | undefined,
+  endpoint: "from" | "to",
+  field: ReviewableSecurityPolicyField,
+): { sources: SecurityPolicyChangeSource[]; exact: boolean } {
+  if (!asset) return { sources: [], exact: true };
+
+  const evidence = asset.evidence;
+  const config = endpoint === "from" ? input.fromConfig : input.toConfig;
+  const configPath =
+    endpoint === "from" ? input.fromConfigPath : input.toConfigPath;
+  const sources: SecurityPolicyChangeSource[] = [];
+  let exact = true;
+
+  if (evidence.selectedSecurityProfile !== undefined) {
+    if (config === undefined || evidence.declaredPolicy === undefined) {
+      if (
+        evidence.policySources.includes("security_profile") &&
+        fieldHasEffectiveValue(evidence, field)
+      ) {
+        exact = false;
+      }
+    } else {
+      for (const profile of evidence.profileChain) {
+        if (!profileSuppliesFieldValue(evidence, config, profile, field)) {
+          continue;
+        }
+        sources.push(profileSource(profile, input, configPath));
+      }
     }
-    if (source === "security_profile") {
-      const profiles = uniqueStrings([
-        ...(before?.evidence.profileChain ?? []),
-        ...(after?.evidence.profileChain ?? []),
+  }
+
+  const repositoryKey = repositoryConfigKey(field);
+  if (repositoryKey !== undefined) {
+    if (config === undefined || evidence.declaredPolicy === undefined) {
+      if (
+        evidence.policySources.includes("repository_config") &&
+        fieldHasEffectiveValue(evidence, field)
+      ) {
+        exact = false;
+      }
+    } else if (repositorySuppliesFieldValue(evidence, config, field)) {
+      sources.push(repositorySource(input, configPath));
+    }
+  }
+
+  return { sources: uniqueSources(sources), exact };
+}
+
+function fieldHasEffectiveValue(
+  evidence: SecurityPolicyAssetEvidence,
+  field: ReviewableSecurityPolicyField,
+): boolean {
+  const value = evidence.effectivePolicy[field];
+  return Array.isArray(value) ? value.length > 0 : value !== null;
+}
+
+function profileListContribution(
+  profile: SecurityProfileConfig,
+  profileName: string,
+  chain: readonly string[],
+  config: SecurityConfig,
+  field: ListSecurityPolicyField,
+): string[] {
+  switch (field) {
+    case "allowedData": {
+      const lastClassContributor = [...chain]
+        .reverse()
+        .find(
+          (name) => config.profiles?.[name]?.allowedDataClass !== undefined,
+        );
+      return uniqueStrings([
+        ...(lastClassContributor === profileName && profile.allowedDataClass
+          ? [profile.allowedDataClass]
+          : []),
+        ...(profile.allowedData ?? []),
       ]);
-      return profiles.length > 0
-        ? profiles.map((profile) => profileSource(profile, input))
-        : [{ type: "security_profile" as const, id: "unknown" }];
     }
-    if (source === "repository_config") return [repositorySource(input)];
-    return [
-      {
-        type: "asset" as const,
-        id: current.identity.id,
-        path: current.identity.path,
-      },
-    ];
-  });
+    case "forbiddenInputs":
+      return uniqueStrings(profile.forbiddenInputs ?? []);
+    case "approvedNetworkDestinations":
+      return uniqueStrings(profile.approvedDomains ?? []);
+    case "approvedUploadDestinations":
+      return uniqueStrings(profile.approvedUploadDomains ?? []);
+    case "disallowedCommands":
+      return uniqueStrings(profile.disallowedCommands ?? []);
+  }
+}
+
+function repositorySuppliesFieldValue(
+  evidence: SecurityPolicyAssetEvidence,
+  config: SecurityConfig,
+  field: ReviewableSecurityPolicyField,
+): boolean {
+  const key = repositoryConfigKey(field);
+  if (!key) return false;
+  if (
+    (field === "approvedNetworkDestinations" ||
+      field === "approvedUploadDestinations") &&
+    evidence.declaredPolicy?.invalidDeclared.includes(field)
+  ) {
+    return false;
+  }
+  const effectiveValues = new Set(
+    evidence.effectivePolicy[field as ListSecurityPolicyField],
+  );
+  return uniqueStrings(config[key] ?? []).some((value) =>
+    effectiveValues.has(value),
+  );
 }
 
 function profileFieldChanged(
@@ -544,8 +725,9 @@ function repositoryConfigKey(
 function profileSource(
   profile: string,
   input: SecurityPolicyDiffInput,
+  endpointPath?: string,
 ): SecurityPolicyChangeSource {
-  const path = input.toConfigPath ?? input.fromConfigPath;
+  const path = endpointPath ?? input.toConfigPath ?? input.fromConfigPath;
   return {
     type: "security_profile",
     id: profile,
@@ -555,8 +737,9 @@ function profileSource(
 
 function repositorySource(
   input: SecurityPolicyDiffInput,
+  endpointPath?: string,
 ): SecurityPolicyChangeSource {
-  const path = input.toConfigPath ?? input.fromConfigPath;
+  const path = endpointPath ?? input.toConfigPath ?? input.fromConfigPath;
   return {
     type: "repository_config",
     id: "security",

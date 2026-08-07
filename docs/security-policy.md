@@ -810,6 +810,11 @@ concrete added and removed list values, and field-level provenance. Provenance
 distinguishes a direct asset-local declaration change from policy inherited
 through an owning Skill, reusable security profile, or repository security
 configuration; simultaneous local and shared changes are recorded as mixed.
+Asset addition or removal is direct only when the existing endpoint contains a
+local field declaration or profile selection. Scalar profile provenance names
+the last effective profile declaration, while accumulating lists retain every
+contributing profile. If the retained evidence cannot establish an exact
+field-level source, provenance is reported as unresolved instead of guessing.
 This is declared/effective-policy provenance, not an inference about which
 runtime action used the policy. A profile or repository-policy change also
 records its effective-policy blast radius: JSON retains the complete sorted

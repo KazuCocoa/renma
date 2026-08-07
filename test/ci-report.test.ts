@@ -6,6 +6,8 @@ import { join } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 import fc from "fast-check";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import type { Nodes } from "mdast";
 import {
   buildCiReportFromDiff,
   ciReport,
@@ -31,6 +33,7 @@ import {
   zeroSecurityPostureSummary,
 } from "../src/security-posture.js";
 import { buildSecurityDiffSummary } from "../src/security-diff.js";
+import { visibleMarkdownInlineValue } from "../src/renderers/markdown-inline-code.js";
 import type {
   ReviewableEffectiveSecurityPolicy,
   SecurityPolicyAssetChange,
@@ -846,6 +849,91 @@ test("policy Markdown is bounded while CI-report JSON retains complete values an
   assert.equal(
     parsed.diff.security.sharedPolicyChanges[0]?.affectedAssets.length,
     12,
+  );
+});
+
+test("policy Markdown safely renders every dynamic inline-code value without changing JSON", () => {
+  const report = sampleReport();
+  const id = "context.`review`";
+  const path = " contexts/``review.md ";
+  const profileName = " profile`name ";
+  const configPath = "renma\rconfig\n.jsonc";
+  const destination = "api``edge.example.com";
+  const allowedData = " internal ";
+  const command = "printf `date`\r\nnext";
+  const provenance = {
+    mode: "mixed" as const,
+    sources: [
+      { type: "asset" as const, id, path },
+      {
+        type: "security_profile" as const,
+        id: profileName,
+        path: configPath,
+      },
+    ],
+  };
+  report.diff.security.policyChanges = [
+    policyAssetChange({
+      id,
+      path,
+      before: reviewablePolicy({}),
+      after: reviewablePolicy({
+        selectedSecurityProfile: profileName,
+        profileChain: [profileName],
+        allowedData: [allowedData],
+        approvedNetworkDestinations: [destination],
+        disallowedCommands: [command],
+      }),
+      fields: [
+        {
+          kind: "list",
+          field: "approvedNetworkDestinations",
+          added: [destination],
+          removed: [],
+          provenance,
+        },
+        {
+          kind: "list",
+          field: "allowedData",
+          added: [allowedData],
+          removed: [],
+          provenance,
+        },
+        {
+          kind: "list",
+          field: "disallowedCommands",
+          added: [command],
+          removed: [],
+          provenance,
+        },
+      ],
+    }),
+  ];
+
+  const markdown = formatCiReport(report, "markdown");
+  const parsed = JSON.parse(formatCiReport(report, "json")) as CiReport;
+  const inlineValues = markdownInlineCodeValues(markdown);
+  for (const value of [
+    id,
+    path,
+    profileName,
+    configPath,
+    destination,
+    allowedData,
+    command,
+  ]) {
+    assert.ok(
+      inlineValues.includes(visibleMarkdownInlineValue(value)),
+      JSON.stringify(value),
+    );
+  }
+  assert.doesNotMatch(markdown, /\r/u);
+  assert.ok(markdown.includes("printf `date`\\r\\nnext"));
+  assert.equal(parsed.diff.security.policyChanges[0]?.asset.id, id);
+  assert.equal(parsed.diff.security.policyChanges[0]?.asset.path, path);
+  assert.deepEqual(
+    parsed.diff.security.policyChanges[0]?.after?.disallowedCommands,
+    [command],
   );
 });
 
@@ -2511,6 +2599,18 @@ function testPolicyProvenance(mode: "direct" | "inherited") {
           },
         ],
       };
+}
+
+function markdownInlineCodeValues(markdown: string): string[] {
+  const values: string[] = [];
+  const visit = (node: Nodes): void => {
+    if (node.type === "inlineCode") values.push(node.value);
+    if ("children" in node) {
+      for (const child of node.children) visit(child);
+    }
+  };
+  visit(fromMarkdown(markdown));
+  return values;
 }
 
 function policyDiffReport(options: {

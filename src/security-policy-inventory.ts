@@ -72,6 +72,7 @@ export interface EffectiveSecurityPolicyEvidence {
 /** Normalized asset-local declarations retained for deterministic diff provenance. */
 export interface DeclaredSecurityPolicyEvidence {
   fields: string[];
+  invalidDeclared: string[];
   allowedData: string[];
   forbiddenInputs: string[];
   networkAllowed: boolean | null;
@@ -572,6 +573,9 @@ function normalizeDeclaredPolicy(
 ): DeclaredSecurityPolicyEvidence {
   return {
     fields: [...policy.declared].sort((left, right) =>
+      left.localeCompare(right),
+    ),
+    invalidDeclared: [...policy.invalidDeclared].sort((left, right) =>
       left.localeCompare(right),
     ),
     allowedData: normalizeStringList([
