@@ -6,10 +6,15 @@ import { test } from "node:test";
 
 import { DEFAULT_CONFIG } from "../src/config.js";
 import {
+  classifyAssetPath,
   classifyAbsoluteSkillEntrypointPath,
   classifyRepositorySkillEntrypointPath,
+  classifyRepositorySkillPath,
   discoverArtifacts,
   normalizeRepositoryRelativePath,
+  RESERVED_SKILL_SUPPORT_DIRS,
+  SKILL_ROOTS,
+  SKILL_SUPPORT_DISCOVERY_MODE,
 } from "../src/discovery.js";
 
 test("repository-relative Skill paths normalize dots without escaping roots", () => {
@@ -67,25 +72,47 @@ test("repository Skill roots are anchored and do not restart in nested directori
   }
 });
 
-test("assets and existing reserved support directories are never Skill entrypoints", () => {
-  for (const supportDirectory of [
-    "assets",
-    "examples",
-    "profiles",
-    "references",
-    "scripts",
-  ]) {
-    for (const entrypoint of [
-      `skills/demo/${supportDirectory}/SKILL.md`,
-      `.agents/skills/demo/${supportDirectory}/SKILL.md`,
-      `skills/${supportDirectory}/SKILL.md`,
-      `.agents/skills/${supportDirectory}/SKILL.md`,
-    ]) {
+test("every reserved support directory has identical classification at both Skill roots", () => {
+  for (const root of SKILL_ROOTS) {
+    for (const supportDirectory of RESERVED_SKILL_SUPPORT_DIRS) {
+      const reservedRootPath = `${root}/${supportDirectory}/SKILL.md`;
+      const reservedRoot = classifyRepositorySkillPath(reservedRootPath);
       assert.equal(
-        classifyRepositorySkillEntrypointPath(entrypoint),
+        classifyRepositorySkillEntrypointPath(reservedRootPath),
         undefined,
-        entrypoint,
+        reservedRootPath,
       );
+      assert.deepEqual(reservedRoot, {
+        kind: "reserved-root",
+        currentPath: reservedRootPath,
+        root,
+        supportDirectory,
+      });
+
+      for (const relativeSupportPath of [
+        `${supportDirectory}/SKILL.md`,
+        `${supportDirectory}/vendor/SKILL.md`,
+      ]) {
+        const supportPath = `${root}/demo/${relativeSupportPath}`;
+        const support = classifyRepositorySkillPath(supportPath);
+        assert.equal(
+          classifyRepositorySkillEntrypointPath(supportPath),
+          undefined,
+          supportPath,
+        );
+        assert.equal(support?.kind, "support", supportPath);
+        if (support?.kind !== "support") continue;
+        assert.equal(support.root, root, supportPath);
+        assert.equal(support.skillDirectory, `${root}/demo`, supportPath);
+        assert.equal(support.skillName, "demo", supportPath);
+        assert.deepEqual(support.domainPath, [], supportPath);
+        assert.equal(
+          support.relativeToSkillDirectory,
+          relativeSupportPath,
+          supportPath,
+        );
+        assert.equal(support.supportDirectory, supportDirectory, supportPath);
+      }
     }
   }
   assert.equal(
@@ -94,6 +121,67 @@ test("assets and existing reserved support directories are never Skill entrypoin
     ),
     undefined,
   );
+});
+
+test("ordinary domain nesting remains valid while reserved segments block entrypoints", () => {
+  for (const skillPath of [
+    "skills/payments/refund/SKILL.md",
+    "skills/platform/ios/setup/SKILL.md",
+    ".agents/skills/payments/refund/SKILL.md",
+  ]) {
+    assert.equal(
+      classifyRepositorySkillEntrypointPath(skillPath)?.kind,
+      "canonical",
+      skillPath,
+    );
+    assert.equal(classifyRepositorySkillPath(skillPath)?.kind, "entrypoint");
+  }
+
+  for (const reservedPath of [
+    "skills/payments/references/refund/SKILL.md",
+    "skills/platform/assets/ios/setup/SKILL.md",
+    ".agents/skills/payments/scripts/refund/SKILL.md",
+  ]) {
+    assert.equal(
+      classifyRepositorySkillEntrypointPath(reservedPath),
+      undefined,
+      reservedPath,
+    );
+    assert.equal(
+      classifyRepositorySkillPath(reservedPath)?.kind,
+      "support",
+      reservedPath,
+    );
+  }
+});
+
+test("default support discovery globs preserve mode and root parity", () => {
+  for (const root of SKILL_ROOTS) {
+    const expected = RESERVED_SKILL_SUPPORT_DIRS.map((directory) =>
+      SKILL_SUPPORT_DISCOVERY_MODE[directory] === "markdown"
+        ? `${root}/**/${directory}/**/*.md`
+        : `${root}/**/${directory}/**/*`,
+    );
+    for (const glob of expected) {
+      assert.equal(DEFAULT_CONFIG.globs.includes(glob), true, glob);
+    }
+  }
+
+  assert.equal(
+    DEFAULT_CONFIG.globs.includes("skills/**/references/**/*"),
+    true,
+  );
+  assert.equal(
+    DEFAULT_CONFIG.globs.includes("skills/**/references/**/*.md"),
+    false,
+  );
+  assert.deepEqual(SKILL_SUPPORT_DISCOVERY_MODE, {
+    assets: "all-files",
+    examples: "markdown",
+    profiles: "markdown",
+    references: "all-files",
+    scripts: "all-files",
+  });
 });
 
 test("absolute Skill paths require one unambiguous repository root", () => {
@@ -179,5 +267,84 @@ test("artifact classification preserves nested support and outside-root kinds", 
       ),
       reservedPath,
     );
+  }
+});
+
+test("DEFAULT_CONFIG discovers Markdown and non-Markdown references equivalently at both Skill roots", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "renma-reference-roots-"));
+  const referenceFiles = [
+    "api.md",
+    "schema.json",
+    "sample.yaml",
+    "query.sql",
+    "data.txt",
+  ] as const;
+
+  for (const skillRoot of SKILL_ROOTS) {
+    const skillDirectory = `${skillRoot}/demo`;
+    const entrypoint = path.join(
+      root,
+      ...skillDirectory.split("/"),
+      "SKILL.md",
+    );
+    await mkdir(path.dirname(entrypoint), { recursive: true });
+    await writeFile(entrypoint, "# Demo\n");
+    for (const referenceFile of referenceFiles) {
+      const target = path.join(
+        root,
+        ...skillDirectory.split("/"),
+        "references",
+        referenceFile,
+      );
+      await mkdir(path.dirname(target), { recursive: true });
+      await writeFile(target, `fixture: ${referenceFile}\n`);
+    }
+  }
+
+  const discovered = await discoverArtifacts(root, DEFAULT_CONFIG);
+  assert.equal(discovered.artifacts.length, 12);
+
+  for (const skillRoot of SKILL_ROOTS) {
+    const skillDirectory = `${skillRoot}/demo`;
+    const entrypointPath = `${skillDirectory}/SKILL.md`;
+    assert.equal(
+      discovered.artifacts.find(({ path }) => path === entrypointPath)?.kind,
+      "skill",
+      entrypointPath,
+    );
+
+    for (const referenceFile of referenceFiles) {
+      const referencePath = `${skillDirectory}/references/${referenceFile}`;
+      const artifact = discovered.artifacts.find(
+        ({ path }) => path === referencePath,
+      );
+      const structural = classifyRepositorySkillPath(referencePath);
+      const classification = classifyAssetPath(referencePath);
+
+      assert.equal(artifact?.kind, "reference", referencePath);
+      assert.equal(artifact?.contentClassification, "text", referencePath);
+      assert.equal(
+        artifact?.markdownParserEligible,
+        referenceFile.endsWith(".md"),
+        referencePath,
+      );
+      assert.equal(structural?.kind, "support", referencePath);
+      if (structural?.kind === "support") {
+        assert.equal(structural.skillDirectory, skillDirectory, referencePath);
+        assert.equal(structural.supportDirectory, "references", referencePath);
+      }
+      assert.equal(classification.kind, "reference", referencePath);
+      assert.equal(classification.scope, "skill-local", referencePath);
+      assert.equal(
+        classification.matchedRule,
+        "skill-local-support",
+        referencePath,
+      );
+      assert.equal(
+        classifyRepositorySkillEntrypointPath(referencePath),
+        undefined,
+        referencePath,
+      );
+    }
   }
 });

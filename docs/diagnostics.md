@@ -76,6 +76,14 @@ repository-marker detection. The support-like names `profiles`, `references`, `e
 segment or contribute ambiguity evidence, but never establish a repository root
 by themselves.
 
+The `skills/**/SKILL.md` and `.agents/skills/**/SKILL.md` notation is qualified
+shorthand: a path that crosses one of those reserved support segments is not a
+Skill entrypoint. Renma reports the stable
+`LAYOUT-SKILL-ENTRYPOINT-UNDER-RESERVED-SUPPORT-DIR` guidance diagnostic for a
+Skill-looking basename there without turning the support path into an
+entrypoint or requiring a semantics-preserving repair. See the canonical
+[entrypoint path contract](agent-skills-compatibility.md#entrypoint-paths).
+
 > Classification describes how Renma interpreted repository structure. It does
 > not by itself prove ownership, policy, lifecycle, source-of-truth status, or
 > human intent.
@@ -139,7 +147,7 @@ later, more generic interpretation.
 
 | `matchedRule` | Repository evidence matched | Indicates | Must not be inferred |
 | --- | --- | --- | --- |
-| `skill-entrypoint` | A recognized canonical or historical Skill entrypoint shape under `skills/**` or `.agents/skills/**`. | The file is classified as a Skill entrypoint with independent scope. | That Agent Skills frontmatter is valid, that governance is complete, or that no migration is needed. |
+| `skill-entrypoint` | A recognized canonical or historical Skill entrypoint shape under `skills/**` or `.agents/skills/**` that does not cross a reserved Skill-support segment. | The file is classified as a Skill entrypoint with independent scope. | That Agent Skills frontmatter is valid, that governance is complete, or that no migration is needed. |
 | `skill-local-support` | A path inside `references/`, `profiles/`, `examples/`, `scripts/`, or `assets/` beneath a recognized Skill path shape. | The file has a structurally implied Skill parent candidate and Skill-local scope. | That the parent exists or inheritance is valid. Require `parentResolution: "resolved"` and governance evidence. |
 | `context-root` | A file under `contexts/**`. | The file is an independent Context Asset by structure; metadata may refine its `kind` to `context_lens`. | That owner, lifecycle, policy, or source-of-truth metadata is complete or valid. |
 | `context-root-legacy` | A file under the supported legacy `context/**` root. | The file is an independent Context Asset by the compatibility path rule. | That it is current, owned, authoritative, or should be moved automatically. |

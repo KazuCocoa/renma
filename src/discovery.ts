@@ -12,20 +12,27 @@ import {
   safeRepositoryPath,
   walkRepositoryFiles,
 } from "./repository-boundary.js";
+import {
+  findAbsoluteSkillRoots,
+  matchRepositorySkillRoot,
+  RESERVED_SKILL_SUPPORT_DIRS,
+  SKILL_SUPPORT_EXISTENCE_GLOBS,
+  type ReservedSkillSupportDirectory,
+  type SkillRoot,
+} from "./skill-path-contract.js";
+
+export {
+  RESERVED_SKILL_SUPPORT_DIRS,
+  SKILL_SUPPORT_DISCOVERY_MODE,
+  SKILL_ROOTS,
+  type ReservedSkillSupportDirectory,
+  type SkillRoot,
+} from "./skill-path-contract.js";
 
 const SKILL_LIKE_FILE_OUTSIDE_SKILLS_DIR_CODE =
   "LAYOUT-SKILL-LIKE-FILE-OUTSIDE-SKILLS-DIR";
 const SKILL_ENTRYPOINT_UNDER_RESERVED_SUPPORT_DIR_CODE =
   "LAYOUT-SKILL-ENTRYPOINT-UNDER-RESERVED-SUPPORT-DIR";
-export const RESERVED_SKILL_SUPPORT_DIRS = [
-  "assets",
-  "examples",
-  "profiles",
-  "references",
-  "scripts",
-] as const;
-export type ReservedSkillSupportDirectory =
-  (typeof RESERVED_SKILL_SUPPORT_DIRS)[number];
 const SKILL_LIKE_FILE_GLOBS = [
   "SKILL.md",
   "skill.md",
@@ -36,18 +43,6 @@ const SKILL_LIKE_FILE_GLOBS = [
   ".agents/**/SKILL.md",
   ".agents/**/skill.md",
   ".agents/**/*.skill.md",
-];
-const SKILL_SUPPORT_EXISTENCE_GLOBS = [
-  "skills/**/profiles/**/*",
-  "skills/**/references/**/*",
-  "skills/**/examples/**/*",
-  "skills/**/scripts/**/*",
-  "skills/**/assets/**/*",
-  ".agents/skills/**/profiles/**/*",
-  ".agents/skills/**/references/**/*",
-  ".agents/skills/**/examples/**/*",
-  ".agents/skills/**/scripts/**/*",
-  ".agents/skills/**/assets/**/*",
 ];
 const SKILL_LIKE_FILE_LLM_HINT =
   "No action is required unless this file is intended to be a Renma skill. If it is intended to be a skill, move it under skills/** or .agents/skills/**.";
@@ -78,7 +73,7 @@ export type RepositorySkillPath =
   | {
       kind: "entrypoint";
       currentPath: string;
-      root: "skills" | ".agents/skills";
+      root: SkillRoot;
       skillDirectory: string;
       skillName: string;
       domainPath: string[];
@@ -88,7 +83,7 @@ export type RepositorySkillPath =
   | {
       kind: "support";
       currentPath: string;
-      root: "skills" | ".agents/skills";
+      root: SkillRoot;
       skillDirectory: string;
       skillName: string;
       domainPath: string[];
@@ -98,7 +93,7 @@ export type RepositorySkillPath =
   | {
       kind: "reserved-root";
       currentPath: string;
-      root: "skills" | ".agents/skills";
+      root: SkillRoot;
       supportDirectory: ReservedSkillSupportDirectory;
     };
 
@@ -135,9 +130,9 @@ export function classifyRepositorySkillPath(
   const currentPath = normalizeRepositoryRelativePath(relativePath);
   if (!currentPath) return undefined;
   const segments = currentPath.split("/").filter(Boolean);
-  const rootEndIndex = repositorySkillRootEndIndex(segments);
-  if (rootEndIndex === undefined) return undefined;
-  const root = repositorySkillRoot(segments);
+  const rootMatch = matchRepositorySkillRoot(segments);
+  if (!rootMatch) return undefined;
+  const { endIndex: rootEndIndex, root } = rootMatch;
   const localSegments = segments.slice(rootEndIndex);
   const supportIndex = localSegments.findIndex(isReservedSkillSupportDirectory);
 
@@ -214,13 +209,17 @@ export function classifyAbsoluteSkillEntrypointPath(
 ): SkillEntrypointPath | undefined {
   const rawPath = toPosix(absolutePath);
   if (!isAbsoluteLike(rawPath)) return undefined;
-  const rawRoots = absoluteSkillRoots(rawPath.split("/").filter(Boolean));
+  const rawRoots = findAbsoluteSkillRoots(rawPath.split("/").filter(Boolean));
   if (rawRoots.length !== 1) return undefined;
   const currentPath = path.posix.normalize(rawPath);
   const segments = currentPath.split("/").filter(Boolean);
-  const roots = absoluteSkillRoots(segments);
+  const roots = findAbsoluteSkillRoots(segments);
   if (roots.length !== 1) return undefined;
-  return classifySkillEntrypointAtRoot(currentPath, segments, roots[0]!);
+  return classifySkillEntrypointAtRoot(
+    currentPath,
+    segments,
+    roots[0]!.endIndex,
+  );
 }
 
 /** Normalize a repository-relative Skill path without allowing root escape. */
@@ -1014,7 +1013,7 @@ function skillLikeLayoutDiagnostics(walkedFiles: string[]): Diagnostic[] {
         code: SKILL_ENTRYPOINT_UNDER_RESERVED_SUPPORT_DIR_CODE,
         severity: "info",
         path: relativePath,
-        message: `Detected a skill entrypoint under a reserved support directory name: ${relativePath}. The path segment "${reservedSupportSegment}" is reserved for skill-local support files. Rename the skill directory if this file is intended to define a Renma skill.`,
+        message: `Detected a Skill-looking file inside a reserved Skill-support directory: ${relativePath}. The path segment "${reservedSupportSegment}" is reserved for skill-local support files, so this path is not a Skill entrypoint. Rename the skill directory if this file is intended to define a Renma skill.`,
         llmHint: SKILL_ENTRYPOINT_UNDER_RESERVED_SUPPORT_DIR_LLM_HINT,
         details: {
           guidanceOnly: true,
@@ -1060,27 +1059,16 @@ function isReservedSkillSupportDirectory(
   return (RESERVED_SKILL_SUPPORT_DIRS as readonly string[]).includes(segment);
 }
 
-function repositorySkillRoot(segments: string[]): "skills" | ".agents/skills" {
-  return segments[0] === "skills" ? "skills" : ".agents/skills";
+function repositorySkillRoot(segments: string[]): SkillRoot {
+  const match = matchRepositorySkillRoot(segments);
+  if (!match) {
+    throw new Error("Expected a recognized repository Skill root.");
+  }
+  return match.root;
 }
 
 function repositorySkillRootEndIndex(segments: string[]): number | undefined {
-  if (segments[0] === "skills") return 1;
-  if (segments[0] === ".agents" && segments[1] === "skills") return 2;
-  return undefined;
-}
-
-function absoluteSkillRoots(segments: string[]): number[] {
-  const roots: number[] = [];
-  for (let index = 0; index < segments.length; index += 1) {
-    if (segments[index] === ".agents" && segments[index + 1] === "skills") {
-      roots.push(index + 2);
-      index += 1;
-    } else if (segments[index] === "skills") {
-      roots.push(index + 1);
-    }
-  }
-  return roots;
+  return matchRepositorySkillRoot(segments)?.endIndex;
 }
 
 function isAbsoluteLike(filePath: string): boolean {

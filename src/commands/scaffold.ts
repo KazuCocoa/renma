@@ -2,6 +2,11 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { normalizeAgentSkillDirectoryName } from "../agent-skills.js";
 import {
+  classifyAbsoluteSkillEntrypointPath,
+  classifyRepositorySkillEntrypointPath,
+  RESERVED_SKILL_SUPPORT_DIRS,
+} from "../discovery.js";
+import {
   RENMA_FIRST_AUTHORING_BOUNDARY,
   SKILL_AUTHORING_PRINCIPLE,
 } from "../guidance/skill-authoring.js";
@@ -368,6 +373,14 @@ function canonicalSkillName(targetPath: string): string {
   const normalizedPath = targetPath.replaceAll("\\", "/");
   if (path.posix.basename(normalizedPath) !== "SKILL.md") {
     throw new Error("Skill scaffolds require the canonical SKILL.md filename.");
+  }
+  const entrypoint =
+    classifyRepositorySkillEntrypointPath(normalizedPath) ??
+    classifyAbsoluteSkillEntrypointPath(normalizedPath);
+  if (entrypoint?.kind !== "canonical") {
+    throw new Error(
+      `Skill scaffolds require a canonical target under skills/ or .agents/skills/ without reserved Skill-support segments (${RESERVED_SKILL_SUPPORT_DIRS.join(", ")}).`,
+    );
   }
   const directory = path.posix.basename(path.posix.dirname(normalizedPath));
   const validation = normalizeAgentSkillDirectoryName(directory);

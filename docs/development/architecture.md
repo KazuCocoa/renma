@@ -69,9 +69,10 @@ unknown files remain discoverable and may contribute diagnostics without
 becoming catalog assets.
 
 Canonical Skill entrypoints are directory-based `SKILL.md` files under
-`skills/**` or `.agents/skills/**`. Historical Skill spellings remain accepted
-only where the documented compatibility contract says so. A custom scan glob
-does not turn an arbitrary path into a Skill.
+`skills/**` or `.agents/skills/**`, excluding paths that cross a reserved
+Skill-support directory. Historical Skill spellings remain accepted only where
+the documented compatibility contract says so. A custom scan glob does not
+turn an arbitrary path into a Skill.
 
 Shared Context Assets normally live under `contexts/`; `context/` remains an
 accepted compatibility root. Skill-local `references/`, `profiles/`,

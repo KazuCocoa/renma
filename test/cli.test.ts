@@ -2311,6 +2311,25 @@ test("scaffold file mode requires owner", async () => {
   assert.match(result.stderr, /requires --owner/);
 });
 
+test("scaffold rejects canonical-looking targets under reserved Skill-support directories", async () => {
+  const root = await fixture();
+  for (const relativeTarget of [
+    "skills/examples/SKILL.md",
+    "skills/demo/references/new/SKILL.md",
+    ".agents/skills/profiles/SKILL.md",
+    ".agents/skills/demo/assets/new/SKILL.md",
+  ]) {
+    const target = path.join(root, ...relativeTarget.split("/"));
+    const result = await withCapturedConsole(() =>
+      main(["scaffold", "skill", target, "--owner", "qa-platform"]),
+    );
+
+    assert.equal(result.code, 2, relativeTarget);
+    assert.match(result.stderr, /without reserved Skill-support segments/);
+    await assert.rejects(readFile(target, "utf8"), { code: "ENOENT" });
+  }
+});
+
 test("scaffold context can emit json", async () => {
   const result = await withCapturedConsole(() =>
     main([

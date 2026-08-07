@@ -11,11 +11,12 @@ Lenses, independently owned Context Assets, references, policies, lifecycle and
 ownership declarations, dependencies, and evidence organized across domains,
 products, teams, or workflows. That flexibility applies to the broader
 repository assets, not to arbitrary Skill roots: canonical Skill entrypoints in
-0.16.0 are discovered only under `skills/**/SKILL.md` and
-`.agents/skills/**/SKILL.md`. A custom scan glob does not make a path such as
-`docs/skills/demo/SKILL.md` a Skill. Renma is not an Agent Skills registry,
-runtime, or live router, and repository knowledge does not need to be embedded
-inside the supported Skill directories.
+0.16.0 use `SKILL.md` under the recognized `skills/` and `.agents/skills/`
+roots, subject to the reserved-directory exclusions in the
+[entrypoint path contract](#entrypoint-paths). A custom scan glob does not make
+a path such as `docs/skills/demo/SKILL.md` a Skill. Renma is not an Agent Skills
+registry, runtime, or live router, and repository knowledge does not need to be
+embedded inside the supported Skill directories.
 
 In this document, “pre-0.16 Renma Skill format” refers to the top-level Renma
 metadata syntax supported before Renma 0.16.0. It is the migration source
@@ -206,15 +207,59 @@ including multiline YAML values.
 
 ## Entrypoint Paths
 
-Canonical Agent Skills entrypoints use the exact filename:
+Canonical Agent Skills entrypoints follow this structural grammar:
+
+```text
+<skill-root>/<domain-segments...>/<skill-directory>/SKILL.md
+```
+
+`<skill-root>` is exactly `skills` or `.agents/skills`.
+`<domain-segments...>` may be empty, so one Skill directory is still required
+between the root and the exact `SKILL.md` filename. None of the directory
+segments between the root and `SKILL.md` may be one of the reserved
+Skill-support names: `assets`, `examples`, `profiles`, `references`, or
+`scripts`.
+
+Therefore these are valid structural candidates:
+
+```text
+skills/payment/SKILL.md
+skills/payments/refund/SKILL.md
+skills/platform/ios/setup/SKILL.md
+.agents/skills/payments/refund/SKILL.md
+```
+
+These are not Skill entrypoints:
+
+```text
+skills/references/SKILL.md
+skills/payment/references/SKILL.md
+skills/payment/references/vendor/SKILL.md
+.agents/skills/examples/SKILL.md
+```
+
+A reserved directory directly below a Skill root is a reserved support root
+without an owning Skill. Once an ordinary Skill directory precedes the reserved
+segment, the path is Skill-local support owned structurally by that logical
+Skill directory. Deeper directories do not restart Skill classification, even
+when a file is named `SKILL.md`.
+
+The familiar default glob notation remains a qualified shorthand for that
+grammar:
 
 ```text
 skills/**/SKILL.md
 .agents/skills/**/SKILL.md
 ```
 
+Glob matching controls which files discovery reads. The structural classifier
+still determines whether a discovered file is a Skill entrypoint, Skill-local
+support, or a reserved support root. Broadening a glob never turns support
+content into an independent Skill.
+
 Renma continues discovering historical `skill.md` and `*.skill.md` spellings
-under those roots so `scan` can report validation and migration diagnostics.
+under those roots, with the same reserved-directory exclusions, so `scan` can
+report validation and migration diagnostics.
 Discovery does not make those spellings Agent Skills-compatible.
 
 The entrypoint migration is explicit:
@@ -254,11 +299,11 @@ escapes its original `skills/` or `.agents/skills/` root, even if a later segmen
 would appear to re-enter it. User-facing structured command argv retains the
 exact path discovered by `scan` or supplied by the user.
 
-Inside an Agent Skill directory, `assets/`, `scripts/`, and `references/`
-contain Skill-local support material and are not treated as nested Skill roots.
-Renma also reserves its existing `examples/` and `profiles/` support
-directories. The same reserved names cannot be used as top-level Skill names
-under `skills/` or `.agents/skills/` without reserved-name guidance.
+Inside an Agent Skill directory, `assets/`, `examples/`, `profiles/`,
+`references/`, and `scripts/` contain Skill-local support material and are not
+treated as nested Skill roots. The same reserved names cannot be used as
+top-level Skill names under `skills/` or `.agents/skills/` without reserved-name
+guidance.
 
 ## Validation During Scan
 
