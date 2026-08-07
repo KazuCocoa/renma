@@ -809,7 +809,8 @@ Each asset change retains its canonical ID/path, normalized before/after policy,
 concrete added and removed list values, and field-level provenance. Provenance
 distinguishes a direct asset-local declaration change from policy inherited
 through an owning Skill, reusable security profile, or repository security
-configuration; simultaneous local and shared changes are recorded as mixed.
+configuration; a transition is mixed only when both direct and inherited
+evidence contributed to that effective boundary change.
 Asset addition or removal is direct only when the existing endpoint contains a
 local field declaration or profile selection. Scalar profile provenance names
 the last effective profile declaration, while accumulating lists retain every
@@ -827,9 +828,10 @@ list additions and removals are separate. Removed forbidden inputs, removed
 disallowed commands, and `humanApprovalRequired: true -> false` remain visible
 without being labeled improvements or regressions. Enabling network or upload
 access with no effective approved destinations renders `none declared`, not
-`unrestricted`. JSON remains complete and machine-readable. Markdown is bounded,
-does not expose policy fingerprints, and directs reviewers to JSON for omitted
-assets or values.
+`unrestricted`. When access becomes enabled, Markdown shows the bounded
+effective post-change destination scope even if the destination list did not
+change, and directs reviewers to JSON for omitted values. JSON remains complete
+and machine-readable. Markdown does not expose policy fingerprints.
 
 This diff reuses the same normalization, effective-policy resolution,
 provenance, and fingerprint semantics as Security Policy Inventory and the

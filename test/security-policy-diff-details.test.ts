@@ -419,6 +419,255 @@ test("profile list provenance retains every genuine accumulating contributor", (
   }
 });
 
+test("locally replaced lists exclude simultaneous suppressed profile changes", () => {
+  const path = "contexts/local-replacements.md";
+  const fromConfig = securityConfig({
+    profiles: {
+      shared: profile({
+        allowedData: ["profile-old"],
+        forbiddenInputs: ["profile-secret-old"],
+      }),
+    },
+  });
+  const toConfig = securityConfig({
+    profiles: {
+      shared: profile({
+        allowedData: ["profile-new"],
+        forbiddenInputs: ["profile-secret-new"],
+      }),
+    },
+  });
+  const ids = new Map([[path, "context.local-replacements"]]);
+  const result = buildSecurityPolicyChanges({
+    fromAssets: collectSecurityPolicyAssetEvidence(
+      [
+        artifact(
+          path,
+          "context",
+          policy({
+            securityProfile: "shared",
+            allowedData: ["local-old"],
+            forbiddenInputs: ["local-secret-old"],
+          }),
+        ),
+      ],
+      fromConfig,
+    ),
+    toAssets: collectSecurityPolicyAssetEvidence(
+      [
+        artifact(
+          path,
+          "context",
+          policy({
+            securityProfile: "shared",
+            allowedData: ["local-new"],
+            forbiddenInputs: ["local-secret-new"],
+          }),
+        ),
+      ],
+      toConfig,
+    ),
+    fromConfig,
+    toConfig,
+    fromConfigPath: "renma.config.jsonc",
+    toConfigPath: "renma.config.jsonc",
+    fromAssetIdsByPath: ids,
+    toAssetIdsByPath: ids,
+  });
+
+  assert.deepEqual(
+    result.policyChanges[0]?.fields.map((field) => ({
+      field: field.field,
+      provenance: field.provenance,
+    })),
+    ["allowedData", "forbiddenInputs"].map((field) => ({
+      field,
+      provenance: {
+        mode: "direct",
+        sources: [{ type: "asset", id: "context.local-replacements", path }],
+      },
+    })),
+  );
+  assert.deepEqual(result.sharedPolicyChanges, []);
+});
+
+test("overridden parent scalar changes do not create profile blast radius", () => {
+  const path = "contexts/overridden-parent.md";
+  const fromConfig = securityConfig({
+    profiles: {
+      parent: profile({ networkAllowed: false }),
+      child: profile({ securityProfile: "parent", networkAllowed: true }),
+    },
+  });
+  const toConfig = securityConfig({
+    profiles: {
+      parent: profile({ networkAllowed: true }),
+      child: profile({ securityProfile: "parent", networkAllowed: true }),
+    },
+  });
+  const ids = new Map([[path, "context.overridden-parent"]]);
+  const result = buildSecurityPolicyChanges({
+    fromAssets: collectSecurityPolicyAssetEvidence(
+      [
+        artifact(
+          path,
+          "context",
+          policy({ securityProfile: "child", networkAllowed: false }),
+        ),
+      ],
+      fromConfig,
+    ),
+    toAssets: collectSecurityPolicyAssetEvidence(
+      [artifact(path, "context", policy({ securityProfile: "child" }))],
+      toConfig,
+    ),
+    fromConfig,
+    toConfig,
+    fromConfigPath: "renma.config.jsonc",
+    toConfigPath: "renma.config.jsonc",
+    fromAssetIdsByPath: ids,
+    toAssetIdsByPath: ids,
+  });
+
+  assert.deepEqual(result.policyChanges[0]?.fields[0]?.provenance, {
+    mode: "mixed",
+    sources: [
+      { type: "asset", id: "context.overridden-parent", path },
+      {
+        type: "security_profile",
+        id: "child",
+        path: "renma.config.jsonc",
+      },
+    ],
+  });
+  assert.deepEqual(result.sharedPolicyChanges, []);
+});
+
+test("a changed profile parent link remains a shared source when it changes the effective contributor", () => {
+  const path = "contexts/parent-link.md";
+  const input = artifact(path, "context", policy({ securityProfile: "child" }));
+  const fromConfig = securityConfig({
+    profiles: {
+      "parent-old": profile({ networkAllowed: false }),
+      "parent-new": profile({ networkAllowed: true }),
+      child: profile({ securityProfile: "parent-old" }),
+    },
+  });
+  const toConfig = securityConfig({
+    profiles: {
+      "parent-old": profile({ networkAllowed: false }),
+      "parent-new": profile({ networkAllowed: true }),
+      child: profile({ securityProfile: "parent-new" }),
+    },
+  });
+  const ids = new Map([[path, "context.parent-link"]]);
+  const result = buildSecurityPolicyChanges({
+    fromAssets: collectSecurityPolicyAssetEvidence([input], fromConfig),
+    toAssets: collectSecurityPolicyAssetEvidence([input], toConfig),
+    fromConfig,
+    toConfig,
+    fromConfigPath: "renma.config.jsonc",
+    toConfigPath: "renma.config.jsonc",
+    fromAssetIdsByPath: ids,
+    toAssetIdsByPath: ids,
+  });
+
+  assert.deepEqual(result.policyChanges[0]?.fields[0]?.provenance, {
+    mode: "inherited",
+    sources: [
+      {
+        type: "security_profile",
+        id: "child",
+        path: "renma.config.jsonc",
+      },
+      {
+        type: "security_profile",
+        id: "parent-new",
+        path: "renma.config.jsonc",
+      },
+      {
+        type: "security_profile",
+        id: "parent-old",
+        path: "renma.config.jsonc",
+      },
+    ],
+  });
+  assert.deepEqual(result.sharedPolicyChanges, [
+    {
+      source: {
+        type: "security_profile",
+        id: "child",
+        path: "renma.config.jsonc",
+      },
+      changedFields: ["networkAllowed"],
+      affectedAssets: [{ id: "context.parent-link", path, kind: "context" }],
+    },
+  ]);
+});
+
+test("changed accumulating profile lists retain genuine shared contributors", () => {
+  const path = "contexts/accumulating-profile.md";
+  const input = artifact(
+    path,
+    "context",
+    policy({ securityProfile: "shared" }),
+  );
+  const fromConfig = securityConfig({
+    profiles: {
+      shared: profile({
+        approvedDomains: ["old.example.com"],
+        disallowedCommands: ["curl"],
+      }),
+    },
+  });
+  const toConfig = securityConfig({
+    profiles: {
+      shared: profile({
+        approvedDomains: ["new.example.com"],
+        disallowedCommands: ["wget"],
+      }),
+    },
+  });
+  const ids = new Map([[path, "context.accumulating-profile"]]);
+  const result = buildSecurityPolicyChanges({
+    fromAssets: collectSecurityPolicyAssetEvidence([input], fromConfig),
+    toAssets: collectSecurityPolicyAssetEvidence([input], toConfig),
+    fromConfig,
+    toConfig,
+    fromConfigPath: "renma.config.jsonc",
+    toConfigPath: "renma.config.jsonc",
+    fromAssetIdsByPath: ids,
+    toAssetIdsByPath: ids,
+  });
+
+  assert.deepEqual(
+    result.policyChanges[0]?.fields.map((field) => field.provenance),
+    ["approvedNetworkDestinations", "disallowedCommands"].map(() => ({
+      mode: "inherited",
+      sources: [
+        {
+          type: "security_profile",
+          id: "shared",
+          path: "renma.config.jsonc",
+        },
+      ],
+    })),
+  );
+  assert.deepEqual(result.sharedPolicyChanges, [
+    {
+      source: {
+        type: "security_profile",
+        id: "shared",
+        path: "renma.config.jsonc",
+      },
+      changedFields: ["approvedNetworkDestinations", "disallowedCommands"],
+      affectedAssets: [
+        { id: "context.accumulating-profile", path, kind: "context" },
+      ],
+    },
+  ]);
+});
+
 test("removing a local override records direct declaration and inherited profile provenance", () => {
   const path = "contexts/mixed.md";
   const config = securityConfig({

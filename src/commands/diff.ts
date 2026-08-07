@@ -989,18 +989,26 @@ function formatSecurityPolicyAssetChange(
     if (
       field.kind === "scalar" &&
       field.field === "networkAllowed" &&
-      field.after === true &&
-      change.after?.approvedNetworkDestinations.length === 0
+      field.after === true
     ) {
-      lines.push("  - Approved network destinations: none declared");
+      lines.push(
+        ...formatEffectiveDestinationScope(
+          "Effective approved network destinations after",
+          change.after?.approvedNetworkDestinations ?? [],
+        ),
+      );
     }
     if (
       field.kind === "scalar" &&
       field.field === "externalUploadAllowed" &&
-      field.after === true &&
-      change.after?.approvedUploadDestinations.length === 0
+      field.after === true
     ) {
-      lines.push("  - Approved upload destinations: none declared");
+      lines.push(
+        ...formatEffectiveDestinationScope(
+          "Effective approved upload destinations after",
+          change.after?.approvedUploadDestinations ?? [],
+        ),
+      );
     }
   }
   return lines;
@@ -1118,6 +1126,17 @@ function formatPolicyValues(values: readonly string[]): string {
     .slice(0, DIFF_DETAIL_LIMIT)
     .map(formatMarkdownInlineCode)
     .join(", ");
+}
+
+function formatEffectiveDestinationScope(
+  label: string,
+  values: readonly string[],
+): string[] {
+  if (values.length === 0) return [`  - ${label}: none declared`];
+  return [
+    `  - ${label}: ${formatPolicyValues(values)}`,
+    ...formatPolicyOverflow(values.length, 4),
+  ];
 }
 
 function formatPolicyOverflow(total: number, indent: number): string[] {

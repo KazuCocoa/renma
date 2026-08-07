@@ -53,7 +53,19 @@ test("User Manual documents bounded policy-boundary CI details and complete JSON
   );
   assert.match(
     manual,
-    /Markdown shows[\s\S]*bounded by the shared presentation limit;[\s\S]*JSON retains every asset and every value/,
+    /Markdown shows[\s\S]*bounded by the shared\s+presentation limit;[\s\S]*JSON retains every asset\s+and every value/,
+  );
+  assert.match(
+    manual,
+    /`direct`,\s+`inherited`, `mixed`, or `unresolved`[\s\S]*`mixed` means that both a direct asset[\s\S]*inherited evidence contributed/,
+  );
+  assert.match(
+    manual,
+    /`unresolved` means exact field-level attribution[\s\S]*known partial sources may remain/,
+  );
+  assert.match(
+    manual,
+    /access[\s\S]*becomes enabled[\s\S]*effective destination scope[\s\S]*shared\s+presentation limit[\s\S]*JSON retains the complete/,
   );
   assert.match(
     manual,

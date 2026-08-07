@@ -4,6 +4,10 @@ import type {
   SecurityPolicyAssetEvidence,
   SecurityPolicySource,
 } from "./security-policy-inventory.js";
+import {
+  resolveSecurityConfig,
+  type SecurityPolicy,
+} from "./security-policy.js";
 import type { ArtifactKind } from "./types/artifact.js";
 import type {
   SecurityConfig,
@@ -330,6 +334,14 @@ function fieldProvenance(
     ...(after?.evidence.profileChain ?? []),
   ])) {
     if (!profileFieldChanged(input, profile, field)) continue;
+    const contribution = changedProfileContributesToTransition(
+      input,
+      after,
+      profile,
+      field,
+    );
+    exact = exact && contribution.exact;
+    if (!contribution.contributes) continue;
     const source = profileSource(profile, input);
     sources.push(source);
     changedSharedSources.push(source);
@@ -671,6 +683,104 @@ function profileFieldChanged(
     profileValue(before, field),
     profileValue(after, field),
   );
+}
+
+function changedProfileContributesToTransition(
+  input: SecurityPolicyDiffInput,
+  after: PreparedAsset | undefined,
+  profile: string,
+  field: ReviewableSecurityPolicyField,
+): { contributes: boolean; exact: boolean } {
+  if (!after) return { contributes: false, exact: true };
+  if (
+    input.fromConfig === undefined ||
+    input.toConfig === undefined ||
+    after.evidence.declaredPolicy === undefined
+  ) {
+    return { contributes: false, exact: false };
+  }
+
+  const counterfactualProfiles = { ...(input.toConfig.profiles ?? {}) };
+  const beforeProfile = input.fromConfig.profiles?.[profile];
+  if (beforeProfile === undefined) {
+    delete counterfactualProfiles[profile];
+  } else {
+    counterfactualProfiles[profile] = beforeProfile;
+  }
+  const counterfactualConfig: SecurityConfig = {
+    ...input.toConfig,
+    profiles: counterfactualProfiles,
+  };
+  const counterfactualValue = effectiveFieldUnderConfig(
+    after.evidence,
+    counterfactualConfig,
+    field,
+  );
+  if (counterfactualValue === undefined) {
+    return { contributes: false, exact: false };
+  }
+  return {
+    contributes: !samePolicyValue(
+      after.evidence.effectivePolicy[field],
+      counterfactualValue,
+    ),
+    exact: true,
+  };
+}
+
+function effectiveFieldUnderConfig(
+  evidence: SecurityPolicyAssetEvidence,
+  config: SecurityConfig,
+  field: ReviewableSecurityPolicyField,
+): boolean | null | string[] | undefined {
+  const declared = evidence.declaredPolicy;
+  if (!declared) return undefined;
+  const policy: SecurityPolicy = {
+    ...(declared.networkAllowed === null
+      ? {}
+      : { networkAllowed: declared.networkAllowed }),
+    ...(declared.externalUploadAllowed === null
+      ? {}
+      : { externalUploadAllowed: declared.externalUploadAllowed }),
+    ...(declared.secretsAllowed === null
+      ? {}
+      : { secretsAllowed: declared.secretsAllowed }),
+    ...(declared.humanApprovalRequired === null
+      ? {}
+      : { humanApprovalRequired: declared.humanApprovalRequired }),
+    ...(evidence.selectedSecurityProfile
+      ? { securityProfile: evidence.selectedSecurityProfile }
+      : {}),
+    allowedData: [...declared.allowedData],
+    forbiddenInputs: [...declared.forbiddenInputs],
+    approvedNetworkDestinations: [...declared.approvedNetworkDestinations],
+    approvedUploadDestinations: [...declared.approvedUploadDestinations],
+    allowedFloatingDependencies: [],
+    disallowedCommands: [...declared.disallowedCommands],
+    declared: new Set(declared.fields),
+    invalidDeclared: new Set(declared.invalidDeclared),
+    lineByField: new Map(),
+    evidenceByField: new Map(),
+  };
+  const effective = resolveSecurityConfig(policy, config).policy;
+  if (SCALAR_FIELDS.has(field)) {
+    return effective[field as ScalarSecurityPolicyField] ?? null;
+  }
+  switch (field as ListSecurityPolicyField) {
+    case "allowedData":
+      return uniqueStrings([
+        ...(effective.allowedDataClass ? [effective.allowedDataClass] : []),
+        ...effective.allowedData,
+      ]);
+    case "forbiddenInputs":
+      return uniqueStrings(effective.forbiddenInputs);
+    case "approvedNetworkDestinations":
+      return uniqueStrings(effective.approvedNetworkDestinations);
+    case "approvedUploadDestinations":
+      return uniqueStrings(effective.approvedUploadDestinations);
+    case "disallowedCommands":
+      return uniqueStrings(effective.disallowedCommands);
+  }
 }
 
 function profileValue(

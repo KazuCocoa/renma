@@ -1973,21 +1973,29 @@ fields render as `before -> after`. Approved network destinations, approved
 upload destinations, allowed-data values, forbidden inputs, and disallowed
 commands render as separate added and removed values. Removed forbidden inputs
 and removed disallowed commands remain visible. If network or upload access
-becomes enabled while the resulting effective destination list is empty, the
-Markdown says `none declared`; it does not call that state unrestricted.
+becomes enabled, Markdown also shows the resulting effective destination scope,
+even when the destination list itself did not change. That scope uses the shared
+presentation limit and reports omitted values; an empty scope says `none declared`
+and is not described as unrestricted. JSON retains the complete
+post-change destination lists.
 
 JSON exposes the additive `diff.security.policyChanges` array with the complete
 normalized before/after effective-policy state, changed fields, canonical asset
 ID/path, and field-level provenance. Provenance labels a change `direct`,
-`inherited`, or `mixed` and names the asset, owning Skill, selected or changed
-security profile, and/or repository security configuration supported by the
-existing evidence. `diff.security.sharedPolicyChanges` groups a changed reusable
-profile or repository security configuration with the complete, deterministically
-sorted list of assets that receive an effective-policy change. Markdown shows
-the affected count and a sorted list bounded by the shared presentation limit;
-JSON retains every asset and every value. Declaration reordering and duplicate
-list values do not create semantic changes, and Markdown does not print policy
-fingerprints.
+`inherited`, `mixed`, or `unresolved` and names the asset, owning Skill,
+selected or changed security profile, and/or repository security configuration
+supported by the existing evidence. `mixed` means that both a direct asset
+decision and inherited evidence contributed to the effective boundary
+transition; unrelated local and shared declarations changing in the same diff
+do not make the result mixed. `unresolved` means exact field-level attribution
+cannot be established without guessing; known partial sources may remain in its
+source list. `diff.security.sharedPolicyChanges` groups a changed reusable
+profile or repository security configuration only with the complete,
+deterministically sorted list of assets for which that shared change contributed
+to an effective-policy transition. Markdown shows the affected count and a
+sorted list bounded by the shared presentation limit; JSON retains every asset
+and every value. Declaration reordering and duplicate list values do not create
+semantic changes, and Markdown does not print policy fingerprints.
 
 These policy details are a deterministic projection of static declared and
 effective Renma evidence. An approved destination is not the same as a

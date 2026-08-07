@@ -745,9 +745,23 @@ test("formatCiReport renders concrete policy boundary values and neutral undecla
     markdown,
     /Network allowed \(direct; source: asset `context\.review` at `contexts\/review\.md`\): false -> true/,
   );
-  assert.match(markdown, /Approved network destinations: none declared/);
+  assert.match(
+    markdown,
+    /Effective approved network destinations after: none declared/,
+  );
   assert.match(markdown, /External upload allowed .*: false -> true/);
-  assert.match(markdown, /Approved upload destinations: none declared/);
+  assert.match(
+    markdown,
+    /Effective approved upload destinations after: none declared/,
+  );
+  assert.match(
+    markdown,
+    /Approved network destinations .*\n {4}- Removed: `old\.example\.com`/,
+  );
+  assert.match(
+    markdown,
+    /Approved upload destinations .*\n {4}- Removed: `old-upload\.example\.com`/,
+  );
   assert.match(markdown, /Allowed data .*\n {4}- Added: `internal`/);
   assert.match(markdown, /Forbidden inputs .*\n {4}- Removed: `credentials`/);
   assert.match(markdown, /Secrets allowed .*: false -> true/);
@@ -770,6 +784,60 @@ test("formatCiReport renders concrete policy boundary values and neutral undecla
     ],
   );
   assert.equal(determineCiReportStatus(report.diff), statusBefore);
+});
+
+test("enabled permissions show unchanged effective destination scope without changing JSON", () => {
+  const report = sampleReport();
+  const networkDestinations = ["api.example.com", "api`two.example.com"];
+  const uploadDestinations = ["uploads.example.com"];
+  report.diff.security.policyChanges = [
+    policyAssetChange({
+      id: "context.unchanged-destinations",
+      path: "contexts/unchanged-destinations.md",
+      before: reviewablePolicy({
+        networkAllowed: false,
+        externalUploadAllowed: false,
+        approvedNetworkDestinations: networkDestinations,
+        approvedUploadDestinations: uploadDestinations,
+      }),
+      after: reviewablePolicy({
+        networkAllowed: true,
+        externalUploadAllowed: true,
+        approvedNetworkDestinations: networkDestinations,
+        approvedUploadDestinations: uploadDestinations,
+      }),
+      fields: [
+        scalarPolicyChange("networkAllowed", false, true),
+        scalarPolicyChange("externalUploadAllowed", false, true),
+      ],
+    }),
+  ];
+
+  const jsonBefore = formatCiReport(report, "json");
+  const markdown = formatCiReport(report, "markdown");
+  const jsonAfter = formatCiReport(report, "json");
+  const inlineValues = markdownInlineCodeValues(markdown);
+
+  assert.equal(jsonAfter, jsonBefore);
+  assert.match(
+    markdown,
+    /Effective approved network destinations after: `api\.example\.com`, ``api`two\.example\.com``/,
+  );
+  assert.match(
+    markdown,
+    /Effective approved upload destinations after: `uploads\.example\.com`/,
+  );
+  assert.ok(inlineValues.includes("api`two.example.com"));
+  assert.doesNotMatch(markdown, /Approved network destinations \(.*Added:/s);
+  const parsed = JSON.parse(jsonAfter) as CiReport;
+  assert.deepEqual(
+    parsed.diff.security.policyChanges[0]?.after?.approvedNetworkDestinations,
+    networkDestinations,
+  );
+  assert.deepEqual(
+    parsed.diff.security.policyChanges[0]?.fields.map((field) => field.field),
+    ["networkAllowed", "externalUploadAllowed"],
+  );
 });
 
 test("policy Markdown is bounded while CI-report JSON retains complete values and blast radius", () => {
@@ -839,6 +907,14 @@ test("policy Markdown is bounded while CI-report JSON retains complete values an
   assert.match(markdown, /`context\.10` \(`contexts\/10\.md`\)/);
   assert.doesNotMatch(markdown, /`context\.11` \(`contexts\/11\.md`\)/);
   assert.doesNotMatch(markdown, /`api-11\.example\.com`/);
+  assert.match(
+    markdown,
+    /Effective approved network destinations after: `api-01\.example\.com`, `api-02\.example\.com`, `api-03\.example\.com`, `api-04\.example\.com`, `api-05\.example\.com`, `api-06\.example\.com`, `api-07\.example\.com`, `api-08\.example\.com`, `api-09\.example\.com`, `api-10\.example\.com`\n {4}- 2 more not shown; see JSON for the full list\./,
+  );
+  assert.match(
+    markdown,
+    /Approved network destinations .*\n {4}- Added: `api-01\.example\.com`/,
+  );
   assert.match(markdown, /- 2 more not shown; see JSON for the full list\./);
   assert.equal(parsed.diff.security.policyChanges.length, 12);
   assert.equal(
