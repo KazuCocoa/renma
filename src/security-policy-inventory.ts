@@ -23,6 +23,21 @@ export interface PolicyBooleanCounts {
   unspecified: number;
 }
 
+export type ExternalUploadGovernanceState =
+  | "denied"
+  | "allowed_approval_required"
+  | "allowed_no_approval_required"
+  | "allowed_approval_unspecified"
+  | "unspecified";
+
+export interface ExternalUploadGovernanceCounts {
+  denied: number;
+  allowedApprovalRequired: number;
+  allowedNoApprovalRequired: number;
+  allowedApprovalUnspecified: number;
+  unspecified: number;
+}
+
 export interface SecurityPolicyInventorySummary {
   totalPolicyAssets: number;
   assetsWithLocalPolicyMetadata: number;
@@ -33,6 +48,7 @@ export interface SecurityPolicyInventorySummary {
   assetKinds: Record<InventoryArtifactKind, number>;
   networkAllowed: PolicyBooleanCounts;
   externalUploadAllowed: PolicyBooleanCounts;
+  externalUploadGovernance: ExternalUploadGovernanceCounts;
   secretsAllowed: PolicyBooleanCounts;
   humanApprovalRequired: PolicyBooleanCounts;
   approvedNetworkDestinationCount: number;
@@ -212,6 +228,13 @@ export function summarizeSecurityPolicyAssetEvidence(
       summary.externalUploadAllowed,
       policy.externalUploadAllowed,
     );
+    countExternalUploadGovernance(
+      summary.externalUploadGovernance,
+      externalUploadGovernanceState(
+        policy.externalUploadAllowed,
+        policy.humanApprovalRequired,
+      ),
+    );
     countPolicyBoolean(summary.secretsAllowed, policy.secretsAllowed);
     countPolicyBoolean(
       summary.humanApprovalRequired,
@@ -353,6 +376,7 @@ export function zeroSecurityPolicyInventorySummary(): SecurityPolicyInventorySum
     assetKinds: zeroAssetKinds(),
     networkAllowed: zeroPolicyBooleanCounts(),
     externalUploadAllowed: zeroPolicyBooleanCounts(),
+    externalUploadGovernance: zeroExternalUploadGovernanceCounts(),
     secretsAllowed: zeroPolicyBooleanCounts(),
     humanApprovalRequired: zeroPolicyBooleanCounts(),
     approvedNetworkDestinationCount: 0,
@@ -481,6 +505,50 @@ function zeroPolicyBooleanCounts(): PolicyBooleanCounts {
     false: 0,
     unspecified: 0,
   };
+}
+
+function zeroExternalUploadGovernanceCounts(): ExternalUploadGovernanceCounts {
+  return {
+    denied: 0,
+    allowedApprovalRequired: 0,
+    allowedNoApprovalRequired: 0,
+    allowedApprovalUnspecified: 0,
+    unspecified: 0,
+  };
+}
+
+export function externalUploadGovernanceState(
+  externalUploadAllowed: boolean | null | undefined,
+  humanApprovalRequired: boolean | null | undefined,
+): ExternalUploadGovernanceState {
+  if (externalUploadAllowed === false) return "denied";
+  if (externalUploadAllowed !== true) return "unspecified";
+  if (humanApprovalRequired === true) return "allowed_approval_required";
+  if (humanApprovalRequired === false) return "allowed_no_approval_required";
+  return "allowed_approval_unspecified";
+}
+
+function countExternalUploadGovernance(
+  counts: ExternalUploadGovernanceCounts,
+  state: ExternalUploadGovernanceState,
+): void {
+  switch (state) {
+    case "denied":
+      counts.denied += 1;
+      break;
+    case "allowed_approval_required":
+      counts.allowedApprovalRequired += 1;
+      break;
+    case "allowed_no_approval_required":
+      counts.allowedNoApprovalRequired += 1;
+      break;
+    case "allowed_approval_unspecified":
+      counts.allowedApprovalUnspecified += 1;
+      break;
+    case "unspecified":
+      counts.unspecified += 1;
+      break;
+  }
 }
 
 function countPolicyBoolean(

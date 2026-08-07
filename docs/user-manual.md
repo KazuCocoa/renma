@@ -287,6 +287,34 @@ may remain useful to authors, and `suggest-metadata` may inspect it, but
 `parseAssetMetadata()` does not normalize it. Likewise, `allowed-tools` is not
 an alias for Renma security permission.
 
+### External-upload governance reporting
+
+`external_upload_allowed` and `requires_human_approval` remain independent
+fields. Security Policy Inventory derives an additive combined count only after
+the existing effective-policy resolver has applied local declarations,
+profiles, repository configuration, and owning-Skill inheritance:
+
+| External upload | Human approval | Inventory presentation |
+| --- | --- | --- |
+| `false` | any value | Upload denied |
+| `true` | `true` | Upload allowed; approval required |
+| `true` | `false` | Upload allowed; approval not required |
+| `true` | unspecified | Upload allowed; approval requirement unspecified |
+| unspecified | any value | Upload permission unspecified |
+
+Both values being `true` means the effective static policy permits upload and
+also requires human approval. Denied upload stays denied regardless of approval
+metadata, and unspecified upload permission is never inferred as allowed from
+an approval requirement. Approved upload destinations remain separate and do
+not grant permission.
+
+Renma reports this governance evidence in scan, Readiness, BOM, diff, and CI
+inventory output. It does not execute an upload, request or record approval,
+prove approval occurred, or enforce the requirement at runtime; the runtime or
+agent layer must honor it. The reporting projection does not change effective
+policy fingerprints, findings, Readiness scoring, or the separate scalar
+transition rules for upload permission and human approval.
+
 ### Consolidated value formats and rejection rules
 
 - Text fields become trimmed, non-empty strings where the parser defines text

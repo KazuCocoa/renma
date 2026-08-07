@@ -728,9 +728,19 @@ function formatSecurityPolicyInventoryMarkdown(
     `| Network allowed | ${inventory.networkAllowed.true} |`,
     `| Network denied | ${inventory.networkAllowed.false} |`,
     `| Network unspecified | ${inventory.networkAllowed.unspecified} |`,
-    `| Upload allowed | ${inventory.externalUploadAllowed.true} |`,
-    `| Upload denied | ${inventory.externalUploadAllowed.false} |`,
-    `| Upload unspecified | ${inventory.externalUploadAllowed.unspecified} |`,
+    ...(inventory.externalUploadGovernance
+      ? [
+          `| Upload denied | ${inventory.externalUploadGovernance.denied} |`,
+          `| Upload allowed; approval required | ${inventory.externalUploadGovernance.allowedApprovalRequired} |`,
+          `| Upload allowed; approval not required | ${inventory.externalUploadGovernance.allowedNoApprovalRequired} |`,
+          `| Upload allowed; approval requirement unspecified | ${inventory.externalUploadGovernance.allowedApprovalUnspecified} |`,
+          `| Upload permission unspecified | ${inventory.externalUploadGovernance.unspecified} |`,
+        ]
+      : [
+          `| Upload allowed | ${inventory.externalUploadAllowed.true} |`,
+          `| Upload denied | ${inventory.externalUploadAllowed.false} |`,
+          `| Upload unspecified | ${inventory.externalUploadAllowed.unspecified} |`,
+        ]),
     `| Secrets allowed | ${inventory.secretsAllowed.true} |`,
     `| Secrets denied | ${inventory.secretsAllowed.false} |`,
     `| Secrets unspecified | ${inventory.secretsAllowed.unspecified} |`,

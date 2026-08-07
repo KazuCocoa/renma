@@ -79,6 +79,19 @@ test("published Draft 2020-12 schemas validate representative generated reports"
   ).executableSurfaceInventory;
   assertValid(validateBom, olderV2WithoutExecutableSurfaceInventory);
 
+  const olderV2WithoutUploadGovernance = structuredClone(defaultBom);
+  delete (
+    olderV2WithoutUploadGovernance.securityPolicyInventory as unknown as Record<
+      string,
+      unknown
+    >
+  ).externalUploadGovernance;
+  delete (
+    olderV2WithoutUploadGovernance.readiness.summary
+      .securityPolicyInventory as unknown as Record<string, unknown>
+  ).externalUploadGovernance;
+  assertValid(validateBom, olderV2WithoutUploadGovernance);
+
   const v027StyleBom = structuredClone(defaultBom);
   const v027Inventory = v027StyleBom.executableSurfaceInventory as unknown as {
     summary: Record<string, unknown>;
@@ -174,6 +187,20 @@ test("BOM schema enforces output modes, timestamps, formats, and score bounds", 
   const negativePolicyCount = structuredClone(defaultBom);
   negativePolicyCount.securityPolicyInventory.policySources.owning_skill = -1;
   assertInvalid(validateBom, negativePolicyCount, "minimum");
+
+  const negativeUploadGovernanceCount = structuredClone(defaultBom);
+  negativeUploadGovernanceCount.securityPolicyInventory.externalUploadGovernance.allowedApprovalRequired =
+    -1;
+  assertInvalid(validateBom, negativeUploadGovernanceCount, "minimum");
+
+  const incompleteUploadGovernance = structuredClone(defaultBom);
+  delete (
+    incompleteUploadGovernance.securityPolicyInventory
+      .externalUploadGovernance as Partial<
+      typeof incompleteUploadGovernance.securityPolicyInventory.externalUploadGovernance
+    >
+  ).allowedApprovalUnspecified;
+  assertInvalid(validateBom, incompleteUploadGovernance, "required");
 
   const negativeSurfaceCount = structuredClone(defaultBom);
   negativeSurfaceCount.executableSurfaceInventory.summary.totalSurfaces = -1;

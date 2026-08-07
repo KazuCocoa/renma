@@ -568,6 +568,9 @@
         "assetKinds": { "$ref": "#/$defs/assetKindCounts" },
         "networkAllowed": { "$ref": "#/$defs/booleanCounts" },
         "externalUploadAllowed": { "$ref": "#/$defs/booleanCounts" },
+        "externalUploadGovernance": {
+          "$ref": "#/$defs/externalUploadGovernanceCounts"
+        },
         "secretsAllowed": { "$ref": "#/$defs/booleanCounts" },
         "humanApprovalRequired": { "$ref": "#/$defs/booleanCounts" },
         "approvedNetworkDestinationCount": {
@@ -1126,6 +1129,24 @@
       "properties": {
         "true": { "type": "integer", "minimum": 0 },
         "false": { "type": "integer", "minimum": 0 },
+        "unspecified": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "externalUploadGovernanceCounts": {
+      "type": "object",
+      "required": [
+        "denied",
+        "allowedApprovalRequired",
+        "allowedNoApprovalRequired",
+        "allowedApprovalUnspecified",
+        "unspecified"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "denied": { "type": "integer", "minimum": 0 },
+        "allowedApprovalRequired": { "type": "integer", "minimum": 0 },
+        "allowedNoApprovalRequired": { "type": "integer", "minimum": 0 },
+        "allowedApprovalUnspecified": { "type": "integer", "minimum": 0 },
         "unspecified": { "type": "integer", "minimum": 0 }
       }
     },

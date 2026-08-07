@@ -200,6 +200,13 @@
       "false": 7,
       "unspecified": 0
     },
+    "externalUploadGovernance": {
+      "denied": 7,
+      "allowedApprovalRequired": 0,
+      "allowedNoApprovalRequired": 0,
+      "allowedApprovalUnspecified": 0,
+      "unspecified": 0
+    },
     "secretsAllowed": {
       "true": 0,
       "false": 7,

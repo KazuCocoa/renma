@@ -38,6 +38,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   line-level and unresolved evidence, lifecycle and caller-provided revision
   provenance, and bounded-analysis facts from one repository snapshot without
   runtime observation or authorization semantics.
+- Added five-way external-upload governance counts to Security Policy Inventory
+  so denied, approval-required, approval-not-required, approval-unspecified, and
+  upload-permission-unspecified states remain explicit across Readiness, BOM,
+  scan, diff, and CI reporting.
 
 ### Changed
 
@@ -93,6 +97,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   `security.ci_policy: "fail"` can change CI-report status for repositories that
   weaken effective security policy without explicitly configuring another
   mode.
+- Security Policy Inventory JSON additively emits
+  `externalUploadGovernance` while retaining the independent
+  `externalUploadAllowed` and `humanApprovalRequired` counts. BOM stays v2; its
+  published schema accepts older v2 inventories without the new field and
+  strictly validates all five nested counts when the field is present.
 
 ## [0.30.0] - 2026-08-04
 

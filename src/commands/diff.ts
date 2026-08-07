@@ -1155,8 +1155,18 @@ export function formatSecurityChanges(
     `- Effective policy from owning Skills: ${formatSignedNumber(policyInventory.policySources.owning_skill)}`,
     `- Network allowed: ${formatSignedNumber(policyInventory.networkAllowed.true)}`,
     `- Network denied: ${formatSignedNumber(policyInventory.networkAllowed.false)}`,
-    `- External upload allowed: ${formatSignedNumber(policyInventory.externalUploadAllowed.true)}`,
-    `- External upload denied: ${formatSignedNumber(policyInventory.externalUploadAllowed.false)}`,
+    ...(policyInventory.externalUploadGovernance
+      ? [
+          `- Upload denied: ${formatSignedNumber(policyInventory.externalUploadGovernance.denied)}`,
+          `- Upload allowed; approval required: ${formatSignedNumber(policyInventory.externalUploadGovernance.allowedApprovalRequired)}`,
+          `- Upload allowed; approval not required: ${formatSignedNumber(policyInventory.externalUploadGovernance.allowedNoApprovalRequired)}`,
+          `- Upload allowed; approval requirement unspecified: ${formatSignedNumber(policyInventory.externalUploadGovernance.allowedApprovalUnspecified)}`,
+          `- Upload permission unspecified: ${formatSignedNumber(policyInventory.externalUploadGovernance.unspecified)}`,
+        ]
+      : [
+          `- External upload allowed: ${formatSignedNumber(policyInventory.externalUploadAllowed.true)}`,
+          `- External upload denied: ${formatSignedNumber(policyInventory.externalUploadAllowed.false)}`,
+        ]),
     `- Secrets allowed: ${formatSignedNumber(policyInventory.secretsAllowed.true)}`,
     `- Secrets denied: ${formatSignedNumber(policyInventory.secretsAllowed.false)}`,
     `- Human approval required: ${formatSignedNumber(policyInventory.humanApprovalRequired.true)}`,

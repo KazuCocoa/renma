@@ -316,6 +316,32 @@ Keep approval wording close to the action it guards, especially for uploads, ext
 
 `approvedDomains` does not imply upload approval. Network access and upload permission are separate decisions.
 
+`external_upload_allowed` and `requires_human_approval` are also independent.
+When both effective values are `true`, external upload is permitted by the
+static policy and the static policy also requires human approval. Renma reports
+that relationship as `Upload allowed; approval required`; it does not execute
+the upload, request approval, or prove that approval occurred. The runtime or
+agent layer is responsible for honoring the requirement.
+
+Security Policy Inventory derives one reporting-only upload governance state
+from the already resolved effective values:
+
+| Effective external upload | Effective human approval | Reported governance state |
+| --- | --- | --- |
+| `false` | any value | Upload denied |
+| `true` | `true` | Upload allowed; approval required |
+| `true` | `false` | Upload allowed; approval not required |
+| `true` | unspecified | Upload allowed; approval requirement unspecified |
+| unspecified | any value | Upload permission unspecified |
+
+Denial remains denial regardless of approval metadata. Unspecified upload
+permission does not become allowed merely because human approval is required.
+Approved upload destinations remain a third independent policy dimension: a
+non-empty destination list does not grant upload permission. The combined state
+is derived after local/profile/repository and owning-Skill resolution, adds no
+new resolution rule, and is not an additional effective-policy fingerprint
+input.
+
 For Skills, use `renma.approved-network-destinations` and
 `renma.approved-upload-destinations` JSON-array strings. For non-Skill assets,
 use top-level `approved_network_destinations` and
@@ -792,9 +818,12 @@ policy from repository configuration without an owning Skill and traceable
 inheritance evidence.
 
 The inventory reports local, inherited, effective, and missing-effective
-coverage; network/upload/secrets booleans; human approval requirements; approved
-destinations; forbidden inputs; disallowed commands; and profile resolution
-counts. It is reporting-only and does not enforce runtime behavior.
+coverage; the independent network/upload/secrets booleans and human approval
+requirement; the combined external-upload governance counts described above;
+approved destinations; forbidden inputs; disallowed commands; and profile
+resolution counts. Readiness, BOM, scan JSON, and diff/CI inventory reporting
+carry the additive combined projection. It is reporting-only and does not
+enforce runtime behavior.
 
 The Executable Surface Inventory exposes a separate invocation-context view.
 For each recognized static helper invocation it correlates the already prepared

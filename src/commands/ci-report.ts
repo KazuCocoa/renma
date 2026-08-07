@@ -1723,6 +1723,15 @@ function formatSecurityPolicyInventorySection(
     `- Target effective policy from security profiles: ${target.policySources.security_profile}`,
     `- Target effective policy from repository config: ${target.policySources.repository_config}`,
     `- Target effective policy from owning Skills: ${target.policySources.owning_skill}`,
+    ...(target.externalUploadGovernance
+      ? [
+          `- Target upload denied: ${target.externalUploadGovernance.denied}`,
+          `- Target upload allowed; approval required: ${target.externalUploadGovernance.allowedApprovalRequired}`,
+          `- Target upload allowed; approval not required: ${target.externalUploadGovernance.allowedNoApprovalRequired}`,
+          `- Target upload allowed; approval requirement unspecified: ${target.externalUploadGovernance.allowedApprovalUnspecified}`,
+          `- Target upload permission unspecified: ${target.externalUploadGovernance.unspecified}`,
+        ]
+      : []),
     `- Target referenced security profiles: ${target.securityProfiles.referenced}`,
     `- Target missing security profiles: ${target.securityProfiles.missing}`,
     `- Target approved network destinations: ${target.approvedNetworkDestinationCount}`,

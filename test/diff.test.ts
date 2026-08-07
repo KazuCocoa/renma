@@ -1443,6 +1443,15 @@ function policyInventory(
   inventory.networkAllowed.false = input.networkDenied ?? 0;
   inventory.externalUploadAllowed.true = input.uploadAllowed ?? 0;
   inventory.externalUploadAllowed.false = input.uploadDenied ?? 0;
+  inventory.externalUploadGovernance.denied = input.uploadDenied ?? 0;
+  inventory.externalUploadGovernance.allowedNoApprovalRequired =
+    input.uploadAllowed ?? 0;
+  inventory.externalUploadGovernance.unspecified = Math.max(
+    0,
+    inventory.totalPolicyAssets -
+      inventory.externalUploadGovernance.denied -
+      inventory.externalUploadGovernance.allowedNoApprovalRequired,
+  );
   inventory.secretsAllowed.true = input.secretsAllowed ?? 0;
   inventory.secretsAllowed.false = input.secretsDenied ?? 0;
   inventory.humanApprovalRequired.true = input.humanApprovalRequired ?? 0;

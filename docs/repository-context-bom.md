@@ -205,6 +205,13 @@ inventory evidence. Coverage and readiness percentages are constrained to
 `0..100`. Security posture top-finding entries require an ID, non-negative
 count, and maximum severity. Security policy `assetKinds` is a complete count
 map containing every generated artifact kind, including zero values.
+Current output additively emits `externalUploadGovernance` in each security
+policy inventory. Its five required counts distinguish denied upload, upload
+allowed with approval required, upload allowed with approval not required,
+upload allowed with the approval requirement unspecified, and unspecified
+upload permission. The field is optional at the BOM v2 schema compatibility
+boundary so older v2 documents remain valid; when present, its nested shape is
+closed and all five counts are required. BOM v2 is unchanged.
 
 Representative top-level JSON (nested objects are shortened for readability;
 the schema defines every nested field):
