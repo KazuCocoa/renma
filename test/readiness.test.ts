@@ -635,6 +635,12 @@ test("readiness markdown prints a compact reviewable report", async () => {
   const markdown = formatReadinessMarkdown(await readiness(root));
 
   assert.match(markdown, /^# Agent Readiness/m);
+  assert.match(markdown, /^- Status: Ready with advisories$/m);
+  assert.match(markdown, /^- Level: ready$/m);
+  assert.match(markdown, /^- Score: 100$/m);
+  assert.match(markdown, /^- Failing checks: 0$/m);
+  assert.match(markdown, /^- Warning checks: 0$/m);
+  assert.match(markdown, /^- Findings: 1 \(non-blocking for Readiness\)$/m);
   assert.match(markdown, /\| Total assets \| 1 \|/);
   assert.match(markdown, /^## Workflow Readiness$/m);
   assert.match(markdown, /\| Skill entrypoints \| 1 \|/);
@@ -651,6 +657,126 @@ test("readiness markdown prints a compact reviewable report", async () => {
   assert.match(markdown, /\| workflow\.clarity \| pass \| info \|/);
   assert.match(markdown, /\| workflow\.required_inputs \| pass \| info \|/);
   assert.match(markdown, /\| workflow\.completion_criteria \| pass \| info \|/);
+});
+
+test("readiness markdown presents a completely clean ready report as Ready", () => {
+  const report = buildReadinessReport(securityGraphReport());
+  const markdown = formatReadinessMarkdown(report);
+
+  assert.equal(report.score, 100);
+  assert.equal(report.level, "ready");
+  assert.equal(report.findings, undefined);
+  assert.equal(report.diagnostics, undefined);
+  assert.equal(
+    report.checks.some((check) => check.status === "warn"),
+    false,
+  );
+  assert.match(markdown, /^- Status: Ready$/m);
+  assert.match(markdown, /^- Level: ready$/m);
+  assert.match(markdown, /^- Score: 100$/m);
+  assert.match(markdown, /^- Failing checks: 0$/m);
+  assert.match(markdown, /^- Warning checks: 0$/m);
+  assert.match(markdown, /^- Findings: 0$/m);
+  assert.doesNotMatch(markdown, /Ready with advisories/);
+});
+
+test("readiness markdown presents ready score 100 findings as non-blocking advisories", () => {
+  const report = buildReadinessReport(securityGraphReport(), [
+    readinessFinding("QUAL-SKILL-TOKEN-BUDGET", "medium"),
+  ]);
+  const markdown = formatReadinessMarkdown(report);
+  const json = JSON.parse(formatReadinessJson(report)) as Record<
+    string,
+    unknown
+  >;
+
+  assert.equal(report.score, 100);
+  assert.equal(report.level, "ready");
+  assert.equal(
+    report.checks.some((check) => check.status === "fail"),
+    false,
+  );
+  assert.match(markdown, /^- Status: Ready with advisories$/m);
+  assert.match(markdown, /^- Level: ready$/m);
+  assert.match(markdown, /^- Score: 100$/m);
+  assert.match(markdown, /^- Failing checks: 0$/m);
+  assert.match(markdown, /^- Warning checks: 0$/m);
+  assert.match(markdown, /^- Findings: 1 \(non-blocking for Readiness\)$/m);
+  assert.match(markdown, /^## Non-blocking Findings$/m);
+  assert.match(
+    markdown,
+    /These findings remain actionable, but they do not currently make this repository Not Ready\./,
+  );
+  assert.doesNotMatch(markdown, /^- Status: (?:Needs attention|Not ready)$/m);
+  assert.doesNotMatch(markdown, /^## Findings$/m);
+  assert.equal("displayStatus" in json, false);
+  assert.equal("advisoryCount" in json, false);
+  assert.equal("readyWithAdvisories" in json, false);
+});
+
+test("readiness markdown derives ready advisories from warning checks", () => {
+  const report = buildReadinessReport(securityGraphReport(), [
+    readinessFinding("MAINT-ASSET-EXPIRED", "medium"),
+  ]);
+  const markdown = formatReadinessMarkdown(report);
+
+  assert.equal(report.score, 100);
+  assert.equal(report.level, "ready");
+  assert.equal(
+    report.checks.find((check) => check.id === "assets.freshness")?.status,
+    "warn",
+  );
+  assert.match(markdown, /^- Status: Ready with advisories$/m);
+  assert.match(markdown, /^- Warning checks: 1$/m);
+});
+
+test("readiness markdown derives ready advisories from warning diagnostics only", () => {
+  const warningReport = buildReadinessReport(
+    securityGraphReport(),
+    [],
+    [{ severity: "warning", message: "Review this repository warning." }],
+  );
+  const infoReport = buildReadinessReport(
+    securityGraphReport(),
+    [],
+    [{ severity: "info", message: "Informational repository evidence." }],
+  );
+
+  assert.equal(warningReport.score, 100);
+  assert.equal(warningReport.level, "ready");
+  assert.match(
+    formatReadinessMarkdown(warningReport),
+    /^- Status: Ready with advisories$/m,
+  );
+  assert.match(formatReadinessMarkdown(infoReport), /^- Status: Ready$/m);
+});
+
+test("readiness markdown keeps needs_attention distinct from ready advisories", async () => {
+  const root = await fixture();
+  await writeSkill(root, "demo", {});
+
+  const report = await readiness(root);
+  const markdown = formatReadinessMarkdown(report);
+
+  assert.equal(report.level, "needs_attention");
+  assert.match(markdown, /^- Status: Needs attention$/m);
+  assert.match(markdown, /^- Level: needs_attention$/m);
+  assert.doesNotMatch(markdown, /^- Status: Ready with advisories$/m);
+});
+
+test("readiness markdown exposes failing checks for not_ready reports", () => {
+  const report = buildReadinessReport(securityGraphReport(), [
+    readinessFinding("SEC-UNAPPROVED-NETWORK-DESTINATION", "high", "violation"),
+  ]);
+  const markdown = formatReadinessMarkdown(report);
+
+  assert.equal(report.score, 100);
+  assert.equal(report.level, "not_ready");
+  assert.match(markdown, /^- Status: Not ready$/m);
+  assert.match(markdown, /^- Level: not_ready$/m);
+  assert.match(markdown, /^- Failing checks: [1-9]\d*$/m);
+  assert.match(markdown, /^## Findings$/m);
+  assert.doesNotMatch(markdown, /^## Non-blocking Findings$/m);
 });
 
 test("readiness includes Context Lens diagnostics and fails blocking issues", async () => {
@@ -742,6 +868,33 @@ test("readiness CLI supports --json", async () => {
     )?.status,
     "pass",
   );
+});
+
+test("readiness CLI exits 0 for ready with advisories", async () => {
+  const root = await fixture();
+  await mkdir(path.join(root, "contexts", "testing"), { recursive: true });
+  await writeFile(
+    path.join(root, "contexts", "testing", "workflow.md"),
+    [
+      "---",
+      "id: testing.workflow",
+      "owner: docs",
+      "expires_at: 2000-01-01",
+      "---",
+      "",
+      "# Workflow Context",
+      "",
+    ].join("\n"),
+  );
+
+  const result = await withCapturedConsole(() =>
+    main(["readiness", root, "--format", "markdown"]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /^- Status: Ready with advisories$/m);
+  assert.match(result.stdout, /^- Level: ready$/m);
 });
 
 test("readiness CLI exits 1 for needs_attention", async () => {

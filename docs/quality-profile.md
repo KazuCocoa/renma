@@ -150,6 +150,15 @@ findings, diagnostic errors, and unresolved required graph closure remain
 blocking even when the numeric score would otherwise pass. Deprecated or
 archived assets have no existence penalty.
 
+Readiness answers whether a repository passes these gates; it does not require
+the report to contain zero findings. A `ready` report may still have actionable,
+non-blocking findings, warning checks, or warning diagnostics. Markdown labels
+that case `Ready with advisories` and labels a clean `ready` report `Ready`.
+These are presentation labels only: the JSON level remains `ready`,
+`needs_attention`, or `not_ready`, and advisory presence or count adds no score,
+check, workflow percentage, CI, or exit-code effect. Finding severity and
+Readiness blocking semantics remain separate dimensions.
+
 The 0.23.0 Skill Discovery checks are visibility-first and have no separate
 score weight. Partial or not-adopted coverage never subtracts points, and a
 cycle warning alone never creates a hard failure. Authoritative coverage and

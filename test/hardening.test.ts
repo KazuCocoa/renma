@@ -130,7 +130,7 @@ test("readiness markdown limits findings while JSON stays complete", () => {
   const markdown = formatReadinessMarkdown(report);
   const json = JSON.parse(formatReadinessJson(report)) as ReadinessReport;
 
-  assert.match(markdown, /## Findings/);
+  assert.match(markdown, /## Non-blocking Findings/);
   assert.match(
     markdown,
     /- TEST-001 \[medium\/quality\] skills\/demo\/SKILL\.md:1-2/,

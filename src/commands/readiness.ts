@@ -909,14 +909,50 @@ function contextLensSummaryLine(report: ReadinessReport): string {
   return `- Context Lens: ${lens.detected ? "detected" : "not detected"} (${lens.validLensCount}/${lens.totalLensCount} valid, ${lens.diagnosticCounts.error} errors, ${lens.diagnosticCounts.warning} warnings)`;
 }
 
+type ReadinessDisplayStatus =
+  "Ready" | "Ready with advisories" | "Needs attention" | "Not ready";
+
+function hasReadinessAdvisories(report: ReadinessReport): boolean {
+  return (
+    report.checks.some((check) => check.status === "warn") ||
+    report.diagnostics?.some(
+      (diagnostic) => diagnostic.severity === "warning",
+    ) === true ||
+    (report.findings?.length ?? 0) > 0
+  );
+}
+
+function readinessDisplayStatus(
+  report: ReadinessReport,
+): ReadinessDisplayStatus {
+  if (report.level === "needs_attention") return "Needs attention";
+  if (report.level === "not_ready") return "Not ready";
+  return hasReadinessAdvisories(report) ? "Ready with advisories" : "Ready";
+}
+
 export function formatReadinessMarkdown(report: ReadinessReport): string {
+  const failingCheckCount = report.checks.filter(
+    (check) => check.status === "fail",
+  ).length;
+  const warningCheckCount = report.checks.filter(
+    (check) => check.status === "warn",
+  ).length;
+  const findingCount = report.findings?.length ?? 0;
   const lines = [
     "# Agent Readiness",
     "",
     `- Root: ${report.root}`,
     ...(report.configPath ? [`- Config: ${report.configPath}`] : []),
+    `- Status: ${readinessDisplayStatus(report)}`,
     `- Level: ${report.level}`,
     `- Score: ${report.score}`,
+    `- Failing checks: ${failingCheckCount}`,
+    `- Warning checks: ${warningCheckCount}`,
+    `- Findings: ${findingCount}${
+      report.level === "ready" && findingCount > 0
+        ? " (non-blocking for Readiness)"
+        : ""
+    }`,
     workflowReadinessSummaryLine(report),
     graphResolutionSummaryLine(report),
     ownershipSummaryLine(report),
@@ -987,7 +1023,18 @@ export function formatReadinessMarkdown(report: ReadinessReport): string {
   }
 
   if (report.findings?.length) {
-    lines.push("", "## Findings", "");
+    const readyFindings = report.level === "ready";
+    lines.push(
+      "",
+      readyFindings ? "## Non-blocking Findings" : "## Findings",
+      "",
+    );
+    if (readyFindings) {
+      lines.push(
+        "These findings remain actionable, but they do not currently make this repository Not Ready.",
+        "",
+      );
+    }
     const displayedFindings = selectMarkdownFindings(report.findings);
     for (const finding of displayedFindings) {
       lines.push(`- ${formatMarkdownFinding(finding)}`);
