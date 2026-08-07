@@ -35,11 +35,11 @@ When one of these advisory limits is exceeded, the finding exposes `measured`,
 `limit`, `overBy`, and the deterministic rounded `overPercent` in
 `estimated_tokens`, and repeats the comparison in normal scan guidance. For a
 support asset, `limit` is the effective threshold: the default when an override
-is absent or invalid, and the explicit reviewed override when one is active.
+is absent or invalid, and the active declared override when one is in force.
 The finding retains both `defaultLimit` and `effectiveLimit`, so an active
 override does not hide Renma's normal policy. Invalid metadata never raises the
 effective limit, and a valid override suppresses no finding above its own
-reviewed value.
+effective value.
 
 Markdown findings can also include up to three largest heading-based review
 candidates. Renma selects H2 sections beneath a single H1 title when available;

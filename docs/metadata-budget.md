@@ -39,10 +39,10 @@ make diagnostics pass.
 Token-budget counts are deterministic estimates, not exact model-token counts.
 Exceeded-budget findings report the measured estimate, the active limit, the
 absolute overage, and a rounded overage percentage. With no valid override, the
-active limit is the asset kind's default. With a valid reviewed override, Renma
+active limit is the asset kind's default. With an active declared override, Renma
 keeps both the original default and the effective override visible and compares
-the asset against the override. An override is an explicit reviewed limit, not
-a suppression: an asset above it still produces
+the asset against the override. An active override is an explicit declared
+limit, not a suppression: an asset above it still produces
 `QUAL-SUPPORT-ASSET-TOKEN-BUDGET`, while an asset at or below it does not.
 
 For Markdown assets, the finding also lists at most three of the largest

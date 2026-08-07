@@ -1986,14 +1986,14 @@ function contextBudgetFindings(document: ParsedDocument): Finding[] {
 
   const overage = tokenBudgetOverage(estimatedTokens, effectiveLimit);
   const measurementSummary = overrideActive
-    ? `The ${document.artifact.kind} is approximately ${estimatedTokens} estimated tokens. The default advisory limit is ${defaultLimit} tokens, and the active reviewed override is ${effectiveLimit} tokens. It is ${overage.overBy} tokens (~${overage.overPercent}%) over the active limit.`
+    ? `The ${document.artifact.kind} is approximately ${estimatedTokens} estimated tokens. The default advisory limit is ${defaultLimit} tokens, and the active declared override is ${effectiveLimit} tokens. It is ${overage.overBy} tokens (~${overage.overPercent}%) over the active limit.`
     : `The ${document.artifact.kind} is approximately ${estimatedTokens} estimated tokens against the default ${defaultLimit}-token advisory limit, ${overage.overBy} tokens (~${overage.overPercent}%) over the limit.`;
   const sectionReview = formatTokenBudgetSectionReview(sectionCandidates);
   const candidateGuidance =
     sectionCandidates.length > 0 ? "Inspect these large sections. " : "";
   const decisionGuidance = overrideActive
     ? `${candidateGuidance}Ask the user whether a meaningful semantic split preserves coherence and execution order. Split it only after the user agrees. If the asset should remain intentionally long, review the existing explicit token-budget decision with the user; never increase it merely to make this diagnostic disappear.`
-    : `${candidateGuidance}Ask the user whether a meaningful semantic split preserves coherence and execution order. Split it only after the user agrees. If the user confirms the asset should remain intentionally long, a reviewed override may record that decision; never add one only to silence the finding.`;
+    : `${candidateGuidance}Ask the user whether a meaningful semantic split preserves coherence and execution order. Split it only after the user agrees. If the user confirms the asset should remain intentionally long, a declared override may record that decision; never add one only to silence the finding.`;
 
   findings.push(
     documentFinding(

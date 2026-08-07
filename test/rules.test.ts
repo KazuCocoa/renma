@@ -2040,8 +2040,9 @@ token_budget_rationale: Intentionally coherent.`,
   );
   assert.match(
     overOverride?.remediation ?? "",
-    /active reviewed override is 5200 tokens/,
+    /active declared override is 5200 tokens/,
   );
+  assert.doesNotMatch(overOverride?.remediation ?? "", /reviewed override/i);
   assert.doesNotMatch(
     overOverride?.remediation ?? "",
     /increase token_budget_override|increase the override/i,
