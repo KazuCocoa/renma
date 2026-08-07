@@ -21,7 +21,11 @@ import { runRuleRegistry, type Rule } from "./rule-engine.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
 import { estimateTokens, markdownBody } from "./token-estimator.js";
 import type { Evidence, Finding, Severity } from "./types/diagnostics.js";
-import type { MetadataValue, ParsedDocument } from "./types/metadata.js";
+import type {
+  MetadataFieldEvidence,
+  MetadataValue,
+  ParsedDocument,
+} from "./types/metadata.js";
 import type { ScanConfig } from "./types/configuration.js";
 import type { RepositoryPathState } from "./repository-paths.js";
 import {
@@ -57,7 +61,7 @@ const REMOTE_PATTERN =
 const ENV_COPY_PATTERN =
   /\b(?:process\.env|env)\b.*\b(?:spawn|exec|execFile|system|subprocess|child_process)\b|\b(?:spawn|exec|execFile|system|subprocess|child_process)\b.*\b(?:process\.env|env)\b/i;
 const USER_LOCAL_PATH_PATTERN =
-  /(?:^|[^a-z0-9_])(?:\/Users\/[^\s/\\]+|\/home\/[^\s/\\]+|[A-Za-z]:\\Users\\[^\s\\]+)(?:\/|$)/iu;
+  /(?:^|[^a-z0-9_])((?:\/Users\/[^\s/\\]+|\/home\/[^\s/\\]+|[A-Za-z]:\\Users\\[^\s\\]+)(?:\/|$))/iu;
 
 const QUALITY = DEFAULT_QUALITY_PROFILE;
 const MAX_LOCAL_SUPPORT_REFERENCE_HOPS =
@@ -475,6 +479,7 @@ function unknownReferenceFindings(
 ): Finding[] {
   return dependencies.flatMap((dependency) => {
     if (resolver.resolve(dependency.to)) return [];
+    const source = resolver.resolve(dependency.from);
 
     return [
       {
@@ -485,10 +490,15 @@ function unknownReferenceFindings(
         confidence: "high",
         evidence:
           dependency.evidence ??
-          metadataFindingEvidence(
-            dependency.sourcePath,
-            `Unresolved ${dependency.kind} reference: ${dependency.to}`,
-          ),
+          (source
+            ? catalogEntryScopeEvidence(
+                source,
+                `Unresolved ${dependency.kind} reference: ${dependency.to}`,
+              )
+            : metadataFindingEvidence(
+                dependency.sourcePath,
+                `Unresolved ${dependency.kind} reference: ${dependency.to}`,
+              )),
         whyItMatters:
           "Declared references make repository relationships visible to catalog, graph, and validation reports. Unknown references make skills and context assets harder for humans and agents to trust.",
         remediation:
@@ -547,10 +557,15 @@ function referenceDeprecatedAssetFindings(
         confidence: "high",
         evidence:
           dependency.evidence ??
-          metadataFindingEvidence(
-            dependency.sourcePath,
-            `Reference to ${target.metadata.status} asset: ${dependency.to}`,
-          ),
+          (source
+            ? catalogEntryScopeEvidence(
+                source,
+                `Reference to ${target.metadata.status} asset: ${dependency.to}`,
+              )
+            : metadataFindingEvidence(
+                dependency.sourcePath,
+                `Reference to ${target.metadata.status} asset: ${dependency.to}`,
+              )),
         whyItMatters:
           "Declared references to deprecated or archived assets can keep old knowledge in active repository paths. If a canonical replacement exists, assets should usually reference that replacement directly.",
         remediation:
@@ -608,8 +623,8 @@ function orphanedContextLensFindings(
         category: "maintenance",
         severity: "low",
         confidence: "medium",
-        evidence: metadataFindingEvidence(
-          entry.sourcePath,
+        evidence: catalogEntryScopeEvidence(
+          entry,
           "Active context lens has no incoming requires_lens or optional_lens references from skills.",
         ),
         whyItMatters:
@@ -666,8 +681,8 @@ function contextLensAppliesToInactiveContextFindings(
         confidence: "high",
         evidence:
           dependency.evidence ??
-          metadataFindingEvidence(
-            dependency.sourcePath,
+          catalogEntryScopeEvidence(
+            source,
             `Context lens applies_to inactive context: ${dependency.to}`,
           ),
         whyItMatters:
@@ -726,8 +741,8 @@ function orphanedContextAssetFindings(
         category: "maintenance",
         severity: "low",
         confidence: "medium",
-        evidence: metadataFindingEvidence(
-          entry.sourcePath,
+        evidence: catalogEntryScopeEvidence(
+          entry,
           "Shared context asset has no incoming declared references.",
         ),
         whyItMatters:
@@ -819,7 +834,17 @@ function metadataFieldFindingEvidence(
     };
   }
 
-  return metadataFindingEvidence(entry.sourcePath, fallbackSnippet);
+  return catalogEntryScopeEvidence(entry, fallbackSnippet);
+}
+
+function catalogEntryScopeEvidence(
+  entry: Pick<CatalogEntry, "sourcePath" | "metadataFields">,
+  fallbackSnippet: string,
+): Evidence {
+  return (
+    earliestMetadataScopeEvidence(entry.metadataFields) ??
+    metadataFindingEvidence(entry.sourcePath, fallbackSnippet)
+  );
 }
 
 /** Return whether a severity is at least as severe as a configured threshold. */
@@ -915,6 +940,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
         "quality",
         "medium",
         "Add frontmatter description so agents can route to the skill intentionally.",
+        { evidence: metadataScopeEvidence(document) },
       ),
     );
   } else if (
@@ -930,6 +956,11 @@ function shapeFindings(document: ParsedDocument): Finding[] {
         "quality",
         "low",
         `Expand frontmatter description to at least ${QUALITY.descriptionMinChars} characters with usage routing guidance.`,
+        {
+          evidence:
+            exactMetadataFieldEvidence(document.metadataFields.description) ??
+            documentScopeEvidence(document),
+        },
       ),
     );
   }
@@ -991,17 +1022,21 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     );
   }
 
-  if (
-    document.artifact.kind === "skill" &&
-    USER_LOCAL_PATH_PATTERN.test(text)
-  ) {
+  const userLocalPathMatch = USER_LOCAL_PATH_PATTERN.exec(text);
+  if (document.artifact.kind === "skill" && userLocalPathMatch) {
+    const matchedPath = userLocalPathMatch[1] ?? userLocalPathMatch[0];
+    const matchedPathOffset =
+      userLocalPathMatch.index + userLocalPathMatch[0].indexOf(matchedPath);
+    const userLocalPathLine = lineForOffset(text, matchedPathOffset);
     findings.push(
-      documentFinding(
+      findingAt(
         document,
         DIAGNOSTIC_IDS.QUAL_USER_LOCAL_PATHS,
         "Skill uses hardcoded user home paths in instructions",
         "quality",
         "medium",
+        userLocalPathLine,
+        lineText(document, userLocalPathLine),
         "Use repo-relative or environment-agnostic paths in skill instructions. If a local path is unavoidable, parameterize it and avoid hardcoding a user-specific home directory such as `/Users/alice/...` or `/home/alice/...`.",
       ),
     );
@@ -2549,7 +2584,7 @@ function declaredDependencyLayoutFindings(
       category: "structure",
       severity: "low",
       confidence: "medium",
-      evidence: metadataFindingEvidence(source.sourcePath, target),
+      evidence: catalogEntryScopeEvidence(source, target),
       whyItMatters:
         "Declared context references should resolve through canonical contexts/**, skills/**, .agents/skills/**, or tools/** repository paths.",
       remediation:
@@ -2663,23 +2698,15 @@ function documentFinding(
   category: Finding["category"],
   severity: Severity,
   remediation: string,
-  details: FindingDetails = {},
+  details: FindingDetails & { evidence?: Evidence } = {},
 ): Finding {
-  const firstContentLine = document.lines.findIndex(
-    (line) => line.trim().length > 0,
-  );
-  const lineNumber = firstContentLine >= 0 ? firstContentLine + 1 : 1;
   return {
     id,
     title,
     category,
     severity,
     confidence: "medium",
-    evidence: evidence(
-      document,
-      lineNumber,
-      document.lines[firstContentLine] ?? "",
-    ),
+    evidence: details.evidence ?? documentScopeEvidence(document),
     whyItMatters:
       details.whyItMatters ??
       "Clear skill structure helps agents choose the right workflow and report useful evidence.",
@@ -2692,6 +2719,94 @@ function documentFinding(
     ...(details.riskClass ? { riskClass: details.riskClass } : {}),
     ...(details.details ? { details: details.details } : {}),
   };
+}
+
+function documentScopeEvidence(document: ParsedDocument): Evidence {
+  const heading = document.headings.reduce<
+    ParsedDocument["headings"][number] | undefined
+  >(
+    (earliest, candidate) =>
+      earliest === undefined || candidate.line < earliest.line
+        ? candidate
+        : earliest,
+    undefined,
+  );
+  if (heading) {
+    return evidence(document, heading.line, lineText(document, heading.line));
+  }
+
+  const bodyLineIndex = markdownBodyLineIndexes(document).find((index) =>
+    isMeaningfulScopeLine(document.lines[index] ?? ""),
+  );
+  if (bodyLineIndex !== undefined) {
+    return evidence(
+      document,
+      bodyLineIndex + 1,
+      document.lines[bodyLineIndex] ?? "",
+    );
+  }
+
+  const metadataEvidence = earliestMetadataScopeEvidence(
+    document.metadataFields,
+  );
+  if (metadataEvidence) return metadataEvidence;
+
+  const fallbackLineIndex = document.lines.findIndex(isMeaningfulScopeLine);
+  if (fallbackLineIndex >= 0) {
+    return evidence(
+      document,
+      fallbackLineIndex + 1,
+      document.lines[fallbackLineIndex] ?? "",
+    );
+  }
+
+  return evidence(document, 1, "");
+}
+
+function metadataScopeEvidence(document: ParsedDocument): Evidence {
+  return (
+    earliestMetadataScopeEvidence(document.metadataFields) ??
+    documentScopeEvidence(document)
+  );
+}
+
+function earliestMetadataScopeEvidence(
+  fields: Readonly<Record<string, MetadataFieldEvidence>>,
+): Evidence | undefined {
+  const entry = Object.entries(fields).sort(
+    ([leftKey, left], [rightKey, right]) =>
+      left.startLine - right.startLine || compareStableText(leftKey, rightKey),
+  )[0];
+  if (!entry) return undefined;
+  const [, field] = entry;
+  return {
+    path: field.path,
+    startLine: field.startLine,
+    endLine: field.endLine,
+    snippet: field.raw.trim().slice(0, 240),
+  };
+}
+
+function exactMetadataFieldEvidence(
+  field: MetadataFieldEvidence | undefined,
+): Evidence | undefined {
+  if (!field) return undefined;
+  return {
+    path: field.path,
+    startLine: field.startLine,
+    endLine: field.endLine,
+    snippet: field.raw,
+  };
+}
+
+function compareStableText(left: string, right: string): number {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
+function isMeaningfulScopeLine(line: string): boolean {
+  const trimmed = line.trim();
+  return trimmed.length > 0 && trimmed !== "---" && trimmed !== "...";
 }
 
 function evidence(

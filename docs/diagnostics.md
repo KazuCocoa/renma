@@ -608,9 +608,12 @@ recognize.
 `evidence` always contains `path`, `startLine`, `endLine`, and `snippet`.
 Line numbers are one-based and inclusive. Paths identify the scanned source
 reported by Renma; consumers should not parse `snippet` to recover identity or
-location. Findings use stable source order: evidence path first, then start line.
-That order is for deterministic review and does not replace severity or
-confidence when prioritizing work.
+location. Renma anchors diagnostics to the most specific source evidence it has.
+When a diagnostic represents missing document-level guidance, the location
+identifies the affected document scope rather than pretending the missing
+content exists at a source line. Findings use stable source order: evidence path
+first, then start line. That order is for deterministic review and does not
+replace severity or confidence when prioritizing work.
 
 ## Discovery Diagnostics
 
