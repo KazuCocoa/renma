@@ -18,6 +18,7 @@ const SEVERITIES = ["low", "medium", "high", "critical"] as const;
 const FORMATS = ["text", "json"] as const;
 const SKILL_DISCOVERY_CI_POLICY_MODES = ["off", "warn"] as const;
 const SECURITY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
+const SCAN_BOUNDARY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 
 /** Conventional repository configuration filenames in loading precedence. */
 export const CONFIG_FILENAMES = [
@@ -60,6 +61,9 @@ export const DEFAULT_CONFIG: ScanConfig = {
   maxDepth: DEFAULT_QUALITY_PROFILE.scan.defaultMaxDepth,
   concurrency: DEFAULT_QUALITY_PROFILE.scan.defaultConcurrency,
   suppressions: [],
+  scanBoundary: {
+    ciPolicy: "fail",
+  },
   layout: {
     workflowAliases: {},
   },
@@ -206,6 +210,7 @@ function normalizeConfig(
     "max_depth",
     "concurrency",
     "suppressions",
+    "scan_boundary",
     "layout",
     "security",
     "skill_discovery",
@@ -239,6 +244,8 @@ function normalizeConfig(
     config.concurrency = positiveInteger("concurrency", value.concurrency);
   if (value.suppressions !== undefined)
     config.suppressions = suppressionArray(value.suppressions);
+  if (value.scan_boundary !== undefined)
+    config.scanBoundary = scanBoundaryPolicy(value.scan_boundary);
 
   if (value.layout !== undefined) config.layout = layoutPolicy(value.layout);
   if (value.security !== undefined)
@@ -246,6 +253,30 @@ function normalizeConfig(
   if (value.skill_discovery !== undefined)
     config.skillDiscovery = skillDiscoveryPolicy(value.skill_discovery);
   return config;
+}
+
+function scanBoundaryPolicy(value: unknown): ScanConfig["scanBoundary"] {
+  if (!isRecord(value)) {
+    throw new ConfigError("scan_boundary must be an object.");
+  }
+  const allowed = new Set(["ci_policy"]);
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) {
+      throw new ConfigError(
+        `Unknown scan_boundary config key "${key}". Allowed keys: ci_policy.`,
+      );
+    }
+  }
+  return {
+    ciPolicy:
+      value.ci_policy === undefined
+        ? "fail"
+        : enumValue(
+            "scan_boundary.ci_policy",
+            value.ci_policy,
+            SCAN_BOUNDARY_CI_POLICY_MODES,
+          ),
+  };
 }
 
 function skillDiscoveryPolicy(value: unknown): ScanConfig["skillDiscovery"] {

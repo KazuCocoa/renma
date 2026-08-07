@@ -1085,8 +1085,8 @@ test("formatDiff renders legacy reports without a Discovery section", () => {
     unknown
   >;
   const expectedMarkdown = formatDiff(fullReport, "markdown").replace(
-    /\n## Skill Discovery Changes\n[\s\S]*?\n## Catalog/,
-    "\n## Catalog",
+    /\n## Skill Discovery Changes\n[\s\S]*?\n## Scan Boundary/,
+    "\n## Scan Boundary",
   );
 
   assert.equal(markdown, expectedMarkdown);

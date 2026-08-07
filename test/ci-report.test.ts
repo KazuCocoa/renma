@@ -2319,7 +2319,7 @@ test("removing contradictory instructions without relaxing policy remains valid 
   }
 });
 
-test("ci report omits suppressed high findings introduced between git refs", async () => {
+test("ci report retains evidence for a high finding suppressed on both refs", async () => {
   const repo = await createSuppressedFindingRepo();
   try {
     const headScan = await scan(repo, { format: "json" });
@@ -2330,6 +2330,11 @@ test("ci report omits suppressed high findings introduced between git refs", asy
     assert.equal(headScan.scannedFileCount, 1);
     assert.ok(
       !headScan.findings.some((finding) => finding.id === "SEC-LITERAL-SECRET"),
+    );
+    assert.ok(
+      headScan.suppressedFindings.some(
+        (item) => item.finding.id === "SEC-LITERAL-SECRET",
+      ),
     );
     assert.ok(
       !report.diff.findings.added.some(
@@ -2346,8 +2351,8 @@ test("ci report omits suppressed high findings introduced between git refs", asy
       false,
     );
     assert.match(markdown, /^## Skill Discovery Changes$/m);
-    assert.doesNotMatch(markdown, /SEC-LITERAL-SECRET/);
-    assert.doesNotMatch(json, /SEC-LITERAL-SECRET/);
+    assert.match(markdown, /SEC-LITERAL-SECRET/);
+    assert.match(json, /SEC-LITERAL-SECRET/);
   } finally {
     await rm(repo, { force: true, recursive: true });
   }
@@ -2487,6 +2492,13 @@ function sampleReport(): CiReport {
       buildSecurityDiffSummary({ addedFindings: [], removedFindings: [] }),
       { from: "fail", to: "fail" },
     ),
+    scanBoundaryPolicy: {
+      schemaVersion: "renma.scan-boundary-ci-policy.v1",
+      configured: { from: "fail", to: "fail", effective: "fail" },
+      outcome: "pass",
+      matchCount: 0,
+      matches: [],
+    },
     securityPosture: {
       added: zeroSecurityPostureSummary(),
       resolved: zeroSecurityPostureSummary(),

@@ -94,6 +94,17 @@ export interface SuppressionConfig {
   expires?: SuppressionExpiration;
 }
 
+/** Retained evidence for a finding omitted from the active finding set. */
+export interface SuppressedFindingEvidence {
+  suppression: {
+    id: string;
+    matchedPath: string;
+    reason: string;
+    expires: SuppressionExpiration;
+  };
+  finding: Finding;
+}
+
 /** Supported suppression expiration values. */
 export type SuppressionExpiration = "never" | `${number}-${number}-${number}`;
 

@@ -6,6 +6,7 @@ import type {
   ExecutableSurfaceInvocation,
 } from "./executable-surface-inventory.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
+import { visibleMarkdownInlineValue } from "./renderers/markdown-inline-code.js";
 
 const EXECUTABLE_SURFACE_TEXT_LIMIT =
   DEFAULT_QUALITY_PROFILE.presentation.topSummaryItemCap;
@@ -33,6 +34,7 @@ export function formatText(result: ScanResult): string {
     `Renma scan`,
     `Root: ${result.root}`,
     `Config: ${result.configPath ?? "(defaults)"}`,
+    `Scan boundary: ${result.scanBoundary.globs.length} include globs, ${result.scanBoundary.exclude.length} exclusions, max depth ${result.scanBoundary.maxDepth}, max file size ${result.scanBoundary.maxFileSizeBytes} bytes, ${result.scanBoundary.activeSuppressions.length} active suppressions`,
     `Files scanned: ${result.scannedFileCount}`,
     `Agent Skills: ${result.agentSkills.validSkillCount}/${result.agentSkills.totalSkillCount} valid (${result.agentSkills.invalidSkillCount} invalid, ${result.agentSkills.legacySkillCount} legacy, ${result.agentSkills.hybridSkillCount} hybrid)`,
     ...(result.contextLens
@@ -44,6 +46,7 @@ export function formatText(result: ScanResult): string {
     `Diagnostics: ${result.diagnostics.length}`,
     `Exit threshold: ${result.exitThreshold}`,
     `Findings: ${result.findings.length}`,
+    `Suppressed findings retained: ${result.suppressedFindings.length}`,
     ...(result.executableSurfaceInventory
       ? formatExecutableSurfaceInventoryText(result.executableSurfaceInventory)
       : []),
@@ -91,6 +94,19 @@ export function formatText(result: ScanResult): string {
     if (finding.verificationSteps && finding.verificationSteps.length > 0)
       lines.push(`  verify: ${finding.verificationSteps.join("; ")}`);
     if (finding.llmHint) lines.push(`  llm: ${finding.llmHint}`);
+  }
+
+  for (const item of result.suppressedFindings) {
+    lines.push("");
+    lines.push(
+      `SUPPRESSED ${item.finding.severity.toUpperCase()} ${item.finding.id}: ${item.finding.title}`,
+    );
+    lines.push(
+      `  ${item.finding.evidence.path}:${item.finding.evidence.startLine}`,
+    );
+    lines.push(
+      `  suppression: ${item.suppression.matchedPath}; expires ${item.suppression.expires}; reason: ${visibleMarkdownInlineValue(item.suppression.reason)}`,
+    );
   }
 
   return `${lines.join("\n")}\n`;

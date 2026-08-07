@@ -8,6 +8,16 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
+- Added canonical `renma.scan-boundary.v1` evidence to scan and diff output,
+  including config identity, exact runtime coverage declarations, limits, and
+  active suppressions, plus retained structured `suppressedFindings` evidence.
+- Added `scan_boundary.ci_policy` with fail-closed `off`, `warn`, and `fail`
+  governance, defaulting to `fail`, stable `scan_boundary_ci.*` matches, and a
+  `renma.scan-boundary-ci-policy.v1` CI evaluation.
+- Added deterministic target-path endpoint-coverage union evidence as
+  `renma.ci-evidence-boundary.v1`, preventing target-only globs, exclusions,
+  limits, or suppressions from hiding CI enforcement findings.
+
 - Added canonical per-asset effective scalar/list security-policy transitions
   to semantic diff output, preserving canonical asset identity, exact
   boolean/`unspecified` states or added/removed values, and provenance without
@@ -26,6 +36,18 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Changed suppression application to keep active findings disjoint from a
+  complete suppression ledger. CI trusts a common exact rule ID and normalized
+  path scope only while active on both revisions and uses the stricter endpoint
+  expiration;
+  reason changes are audit metadata and do not affect equivalence.
+- Changed scan-boundary identity to preserve runtime-significant glob and
+  exclusion syntax exactly, and made repository-controlled suppression reasons
+  single-line visible values in Markdown and terminal reports.
+- Changed `ci-report` to fail by default on scan-boundary weakening and to avoid
+  describing a finding reduction as verified remediation when coverage or
+  suppression trust changed.
+
 - Changed `ci-report` so a default-mode security-policy relaxation fails with
   exit code `1`, while `warn` promotes only `PASS` to `WARN` and `off` leaves
   status unchanged. A finding decrease that accompanies policy relaxation is
@@ -36,6 +58,12 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   disallowed-command removals.
 
 ### Compatibility
+
+- Scan JSON adds `scanBoundary` and `suppressedFindings`; semantic diff JSON
+  adds top-level `scanBoundary` and `findings.suppressed`; CI-report JSON adds
+  top-level `scanBoundaryPolicy` with its effective enforcement boundary.
+  Existing BOM and Trust Graph schemas are unchanged because those artifacts
+  do not embed the scan/diff/CI suppression ledger.
 
 - Newly generated semantic diff JSON adds `security.policyTransitions`, and
   CI-report JSON adds top-level `securityPolicy`. Transition rows are now a

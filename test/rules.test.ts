@@ -2435,6 +2435,15 @@ status: stable
 test("text report calls out clean scans", () => {
   const result: ScanResult = {
     root: "/repo",
+    scanBoundary: {
+      schemaVersion: "renma.scan-boundary.v1",
+      configPath: null,
+      globs: [],
+      exclude: [],
+      maxFileSizeBytes: 1,
+      maxDepth: 1,
+      activeSuppressions: [],
+    },
     scannedFileCount: 1,
     format: "text",
     agentSkills: {
@@ -2450,6 +2459,7 @@ test("text report calls out clean scans", () => {
       results: [],
     },
     findings: [],
+    suppressedFindings: [],
     diagnostics: [],
     diagnosticsV2: [],
     reviewBundles: [],

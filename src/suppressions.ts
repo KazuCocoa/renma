@@ -2,45 +2,67 @@ import type {
   Diagnostic,
   Finding,
   SuppressionConfig,
+  SuppressedFindingEvidence,
 } from "./types/diagnostics.js";
 
-/** Apply active config suppressions by removing matching findings from reports. */
+/** Apply active suppressions while retaining an auditable ledger of every match. */
 export function applySuppressions(
   findings: Finding[],
   suppressions: SuppressionConfig[],
   today = new Date(),
-): { findings: Finding[]; diagnostics: Diagnostic[] } {
+): {
+  findings: Finding[];
+  suppressedFindings: SuppressedFindingEvidence[];
+  diagnostics: Diagnostic[];
+} {
   if (suppressions.length === 0) {
-    return { findings, diagnostics: [] };
+    return { findings, suppressedFindings: [], diagnostics: [] };
   }
 
   const todayKey = today.toISOString().slice(0, 10);
   const diagnostics = expiredSuppressionDiagnostics(suppressions, todayKey);
-  const activeSuppressions = suppressions.filter(
-    (suppression) => !isExpired(suppression, todayKey),
-  );
+  const activeSuppressions = suppressions
+    .filter((suppression) => !isExpired(suppression, todayKey))
+    .sort(compareSuppressions);
+  const retained: Finding[] = [];
+  const suppressedFindings: SuppressedFindingEvidence[] = [];
+  for (const finding of findings) {
+    const match = firstSuppressionMatch(finding, activeSuppressions);
+    if (!match) {
+      retained.push(finding);
+      continue;
+    }
+    suppressedFindings.push({
+      suppression: {
+        id: match.suppression.id,
+        matchedPath: match.matchedPath,
+        reason: match.suppression.reason,
+        expires: match.suppression.expires ?? "never",
+      },
+      finding,
+    });
+  }
 
   return {
-    findings: findings.filter(
-      (finding) =>
-        !activeSuppressions.some((suppression) =>
-          matchesSuppression(finding, suppression),
-        ),
-    ),
+    findings: retained,
+    suppressedFindings,
     diagnostics,
   };
 }
 
-function matchesSuppression(
+function firstSuppressionMatch(
   finding: Finding,
-  suppression: SuppressionConfig,
-): boolean {
-  return (
-    finding.id === suppression.id &&
-    suppression.paths.some((pattern) =>
-      pathPatternMatches(pattern, finding.evidence.path),
-    )
-  );
+  suppressions: readonly SuppressionConfig[],
+): { suppression: SuppressionConfig; matchedPath: string } | undefined {
+  for (const suppression of suppressions) {
+    if (finding.id !== suppression.id) continue;
+    const matchedPath = [...suppression.paths]
+      .map(normalizePath)
+      .sort((left, right) => left.localeCompare(right))
+      .find((pattern) => pathPatternMatches(pattern, finding.evidence.path));
+    if (matchedPath !== undefined) return { suppression, matchedPath };
+  }
+  return undefined;
 }
 
 function expiredSuppressionDiagnostics(
@@ -113,6 +135,21 @@ function normalizePath(value: string): string {
     .replaceAll("\\", "/")
     .replace(/^\.\/+/, "")
     .replace(/\/+$/, "");
+}
+
+function compareSuppressions(
+  left: SuppressionConfig,
+  right: SuppressionConfig,
+): number {
+  return (
+    left.id.localeCompare(right.id) ||
+    [...left.paths]
+      .sort()
+      .join("\0")
+      .localeCompare([...right.paths].sort().join("\0")) ||
+    (left.expires ?? "never").localeCompare(right.expires ?? "never") ||
+    left.reason.localeCompare(right.reason)
+  );
 }
 
 function escapeRegExp(value: string): string {

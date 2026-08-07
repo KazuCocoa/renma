@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { pathPatternMatches } from "../src/suppressions.js";
+import { applySuppressions, pathPatternMatches } from "../src/suppressions.js";
+import type { Finding } from "../src/types/diagnostics.js";
 
 test("suppression path matcher supports exact path matches", () => {
   assert.equal(
@@ -36,4 +37,48 @@ test("suppression path matcher normalizes backslashes", () => {
     pathPatternMatches("skills\\demo\\**", "skills/demo/SKILL.md"),
     true,
   );
+});
+
+test("suppression application omits active findings but retains structured evidence", () => {
+  const finding: Finding = {
+    id: "SEC-LITERAL-SECRET",
+    title: "Literal secret",
+    category: "safety",
+    severity: "high",
+    confidence: "high",
+    riskClass: "violation",
+    evidence: {
+      path: "skills/demo/SKILL.md",
+      startLine: 8,
+      endLine: 8,
+      snippet: 'api_key = "fake"',
+    },
+    whyItMatters: "test",
+    remediation: "test",
+  };
+  const result = applySuppressions(
+    [finding],
+    [
+      {
+        id: finding.id,
+        paths: ["skills/demo/**"],
+        reason: "reviewed fixture",
+        expires: "never",
+      },
+    ],
+    new Date("2026-08-07T00:00:00.000Z"),
+  );
+
+  assert.deepEqual(result.findings, []);
+  assert.deepEqual(result.suppressedFindings, [
+    {
+      suppression: {
+        id: finding.id,
+        matchedPath: "skills/demo/**",
+        reason: "reviewed fixture",
+        expires: "never",
+      },
+      finding,
+    },
+  ]);
 });

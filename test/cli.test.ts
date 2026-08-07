@@ -831,7 +831,7 @@ test("invalid suppression configs are rejected", async () => {
   }
 });
 
-test("scan output omits suppressed findings", async () => {
+test("scan output keeps suppressed findings separate and visible as evidence", async () => {
   const root = await fixture();
   await mkdir(path.join(root, "skills", "demo"), { recursive: true });
   await writeFile(
@@ -856,6 +856,7 @@ test("scan output omits suppressed findings", async () => {
   const json = await withCapturedConsole(() => main(["scan", root, "--json"]));
   const report = JSON.parse(json.stdout) as {
     findings: Array<{ id: string }>;
+    suppressedFindings: Array<{ finding: { id: string } }>;
   };
   const secretFinding = report.findings.find(
     (finding) => finding.id === "SEC-LITERAL-SECRET",
@@ -863,15 +864,17 @@ test("scan output omits suppressed findings", async () => {
 
   assert.equal(json.code, 0);
   assert.equal(secretFinding, undefined);
+  assert.ok(
+    report.suppressedFindings.some(
+      (item) => item.finding.id === "SEC-LITERAL-SECRET",
+    ),
+  );
 
   const text = await withCapturedConsole(() => main(["scan", root]));
 
   assert.equal(text.code, 0);
-  assert.doesNotMatch(text.stdout, /SEC-LITERAL-SECRET/);
-  assert.doesNotMatch(
-    text.stdout,
-    /Fixture intentionally includes a fake secret/,
-  );
+  assert.match(text.stdout, /SUPPRESSED HIGH SEC-LITERAL-SECRET/);
+  assert.match(text.stdout, /Fixture intentionally includes a fake secret/);
 });
 
 test("CLI honors format from config", async () => {
