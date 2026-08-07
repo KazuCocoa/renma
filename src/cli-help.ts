@@ -64,6 +64,11 @@ const OPTION_HELP = {
     flags: "-h, --help",
     description: "Show this help page without running the command.",
   },
+  handoff: {
+    flags: "--handoff <path>",
+    description:
+      "Read a caller-declared Skill authoring handoff, validate its structure, and apply its structural values. This is not proof of human review or domain truth.",
+  },
   "include-owned": {
     flags: "--include-owned",
     description: "Include flat owned asset details in ownership output.",
@@ -801,8 +806,8 @@ export const COMMAND_HELP = [
     ],
     nextSteps: [
       "Clarify the task, investigate relevant evidence, and retain the complete unresolved and Blocking sets instead of inventing or hiding answers.",
-      "Pass the creation gate and define the smallest non-redundant asset graph.",
-      "Run renma scaffold skill, then scaffold or reuse only justified Context Assets.",
+      "When no Blocking authoring decision remains, define the smallest non-redundant asset graph and record a renma.skill-authoring-handoff.v1 exchange artifact.",
+      "Run renma scaffold skill <agreed-path> --handoff <handoff.json>, then separately scaffold or reuse only justified Context Assets.",
       "Complete the focused workflow and run renma scan . --fail-on high.",
       "Classify findings, inspect applicable evidence, re-enter the gate for boundary changes, apply only uniquely supported repairs, rerun, and require human review.",
     ],
@@ -835,6 +840,7 @@ export const COMMAND_HELP = [
     ],
     examples: [
       "renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform",
+      "renma scaffold skill skills/testing/spec-review/SKILL.md --handoff /tmp/spec-review-handoff.json",
       "renma scaffold context contexts/testing/boundary-value-analysis.md --owner qa-platform",
       "renma scaffold context_lens lenses/testing/spec-review-boundary-values.md --owner qa-platform",
       "renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform --format prompt",
@@ -843,6 +849,10 @@ export const COMMAND_HELP = [
     interpretation: [
       "File mode creates the scaffold file at the target path and refuses to overwrite existing files.",
       "Prompt and JSON modes print to stdout instead of creating the scaffold file.",
+      "--handoff is optional and supported only for Skill scaffolds. The file may be outside the repository and is consumed without network access.",
+      "A supplied handoff is caller-declared authoring evidence. Renma validates its shape, zero declared Blocking decisions, target agreement, identity, and asset-graph consistency; it does not prove that clarification or human review occurred, every blocker was discovered, sources are authoritative, or domain claims are true.",
+      "With --handoff, the positional target remains the explicit side-effect boundary and must match assetGraph.skill.path after safe normalization. Do not combine --handoff with --id, --title, --owner, --tags, or --resources.",
+      "Proposed reversible defaults and Unresolved Deferred decisions may remain when progression.blocking is empty.",
       "--resources creates only selected empty directories and never placeholder files.",
       "Generated scaffold content is a starting structure, not a complete asset.",
       "For Skills, first use renma guide skill to establish the smallest asset structure and repository boundaries; use platform-native Skill authoring guidance only to refine semantics within those boundaries.",
@@ -861,17 +871,18 @@ export const COMMAND_HELP = [
       {
         name: "format",
         description:
-          "Output format: file, prompt, or json. Defaults to file. File mode writes the scaffold to the target path and requires --owner. Prompt and JSON modes print to stdout instead of creating the target file.",
+          "Output format: file, prompt, or json. Defaults to file. File mode writes the scaffold to the target path and requires --owner for direct scaffolds; a Skill --handoff supplies its owner. Prompt and JSON modes print to stdout instead of creating the target file.",
       },
       {
         name: "owner",
         description:
-          "Set owner metadata on the scaffold. Required when --format file is used.",
+          "Set owner metadata on the scaffold. Required when --format file is used. A Skill --handoff supplies its owner instead.",
       },
       "id",
       "title",
       "tags",
       "resources",
+      "handoff",
       "help",
     ],
   },
@@ -1044,8 +1055,10 @@ export function renderGlobalHelp(version: string): string {
     "",
     "Start here: new skill",
     "  renma guide skill",
-    "  define the smallest intended asset structure",
-    "  renma scaffold skill skills/<name>/SKILL.md --owner <owner>",
+    "  let an external LLM clarify and investigate until no Blocking authoring decision remains",
+    "  record renma.skill-authoring-handoff.v1 with the smallest intended asset structure",
+    "  renma scaffold skill skills/<name>/SKILL.md --owner <owner>  # existing direct path",
+    "  renma scaffold skill skills/<name>/SKILL.md --handoff <handoff.json>",
     "  scaffold or reuse justified Context Assets",
     "  complete the focused workflow; use platform-native Skill authoring guidance only within Renma boundaries",
     "  renma scan . --fail-on high",

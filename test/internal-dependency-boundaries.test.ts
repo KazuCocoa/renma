@@ -161,6 +161,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
         "scan-boundary.ts",
         "security-policy-inventory.ts",
         "security-policy.ts",
+        "skill-authoring-handoff.ts",
         "skill-discovery.ts",
         "skill-migration.ts",
         "static-support.ts",

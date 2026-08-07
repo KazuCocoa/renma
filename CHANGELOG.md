@@ -8,6 +8,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
+- Added the versioned `renma.skill-authoring-handoff.v1` exchange contract,
+  published JSON Schema, guide construction template, and optional Skill-only
+  `scaffold --handoff <path>` workflow with pre-write gate, target, identity,
+  relationship, and resource validation. Existing direct scaffold use remains
+  compatible.
 - Added `executable_surface.ci_policy` with `off`, `warn`, and `fail` modes,
   defaulting to `off`, stricter archived-endpoint selection, stable
   `executable_surface_ci.*` matches sourced from canonical executable diff

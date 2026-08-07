@@ -66,7 +66,7 @@ code. A clean Renma scan is repository evidence, not a security proof.
 The review boundary is:
 
 ```text
-LLM proposes. Renma verifies. Human approves.
+LLM investigates and proposes. Renma validates deterministic structure and repository evidence. Human reviews and approves.
 ```
 
 ```mermaid
@@ -99,8 +99,22 @@ for the exact current and compatibility forms.
 
 Run `renma guide skill` before generating a new Skill. It prints a deterministic
 clarification and creation-gate protocol for the consuming LLM. Renma remains
-non-interactive: the LLM investigates and proposes, Renma verifies the resulting
-repository, and a human approves meaningful decisions.
+non-interactive: the LLM investigates and proposes, Renma validates supplied
+structure and the resulting repository evidence it can determine, and a human
+reviews meaningful decisions. Renma does not certify caller-declared human or
+domain truth.
+
+After no declared Blocking authoring decision remains, the external LLM can
+write `renma.skill-authoring-handoff.v1` and invoke:
+
+```bash
+renma scaffold skill skills/example/SKILL.md --handoff /tmp/example-handoff.json
+```
+
+The handoff remains an external exchange artifact. Renma validates its shape,
+target agreement, canonical identity, declared relationships, and zero blocker
+state before any write; Proposed reversible defaults and Unresolved Deferred
+items may remain. Existing scaffold use with `--owner` remains supported.
 
 After the gate, platform-native Skill authoring guidance may refine semantics
 inside the agreed Renma asset graph. It is not the authority for Renma metadata,
@@ -271,6 +285,7 @@ a trust score.
 - [Repository Context BOM v2](docs/repository-context-bom.md)
 - [Experimental Execution Contract](docs/execution-contract.md)
 - [Trust Graph v2](docs/trust-graph.md)
+- [Skill Authoring Handoff v1 Schema](docs/schemas/skill-authoring-handoff-v1.schema.json)
 - [Public Architecture](docs/development/architecture.md)
 - [Internal Architecture](docs/development/internal-architecture.md)
 - [Product Design](docs/development/design.md)
@@ -279,5 +294,5 @@ a trust score.
 - [Examples](https://github.com/KazuCocoa/renma/tree/main/examples)
 
 ```text
-LLM proposes. Renma verifies. Human approves.
+LLM investigates and proposes. Renma validates deterministic structure and repository evidence. Human reviews and approves.
 ```

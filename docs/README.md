@@ -65,8 +65,8 @@ document.
 - [Trust Graph v2](trust-graph.md) defines `renma.trustGraph.v2`, node and edge
   provenance, ordering, and the distinction between evidence and a trust score.
 - [Published JSON Schemas](https://github.com/KazuCocoa/renma/tree/main/docs/schemas)
-  contains the machine-readable BOM v2 and Trust Graph v2 contracts shipped in
-  the npm package.
+  contains the machine-readable BOM v2, Trust Graph v2, and Skill Authoring
+  Handoff v1 contracts shipped in the npm package.
 
 ## Development
 

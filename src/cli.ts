@@ -54,6 +54,7 @@ const CLI_OPTIONS = {
   entrypoint: { type: "string" },
   focus: { type: "string" },
   format: { type: "string" },
+  handoff: { type: "string" },
   from: { type: "string" },
   base: { type: "string" },
   "include-owned": { type: "boolean" },
@@ -388,8 +389,32 @@ async function runScaffold(
     );
   }
 
+  const handoffPath = stringValue(values.handoff);
+  if (values.handoff !== undefined && !handoffPath?.trim()) {
+    return usageError("scaffold", "--handoff requires a non-empty path.");
+  }
+  if (handoffPath && kindValue !== "skill") {
+    return usageError(
+      "scaffold",
+      "--handoff is supported only for skill scaffolds.",
+    );
+  }
+  const conflictingHandoffOptions = [
+    "id",
+    "title",
+    "owner",
+    "tags",
+    "resources",
+  ].filter((name) => values[name] !== undefined);
+  if (handoffPath && conflictingHandoffOptions.length > 0) {
+    return usageError(
+      "scaffold",
+      `--handoff cannot be combined with ${conflictingHandoffOptions.map((name) => `--${name}`).join(", ")}.`,
+    );
+  }
+
   const owner = stringValue(values.owner);
-  if (format === "file" && !owner) {
+  if (format === "file" && !owner && !handoffPath) {
     return usageError(
       "scaffold",
       "scaffold --format file requires --owner <owner>.",
@@ -401,6 +426,7 @@ async function runScaffold(
     targetPath,
     format,
   };
+  if (handoffPath) scaffoldOptions.handoffPath = handoffPath;
   const id = stringValue(values.id);
   const title = stringValue(values.title);
   const tags = stringListValue(values.tags);
