@@ -47,7 +47,7 @@ test("Security Policy Guide documents the current Skill and non-Skill syntax bou
   );
   assert.match(
     guide,
-    /security_policy_ci\.network_relaxed[\s\S]*security_policy_ci\.human_approval_removed[\s\S]*not considered verified remediation/,
+    /security_policy_ci\.network_relaxed[\s\S]*security_policy_ci\.approved_network_destination_added[\s\S]*security_policy_ci\.allowed_data_added[\s\S]*security_policy_ci\.forbidden_input_removed[\s\S]*security_policy_ci\.disallowed_command_removed[\s\S]*not considered verified remediation/,
   );
 });
 
@@ -86,7 +86,11 @@ test("User Manual documents bounded policy-boundary CI details and complete JSON
   );
   assert.match(
     manual,
-    /security_policy_ci\.network_relaxed[\s\S]*security_policy_ci\.human_approval_removed/,
+    /security_policy_ci\.network_relaxed[\s\S]*security_policy_ci\.approved_network_destination_added[\s\S]*security_policy_ci\.allowed_data_added[\s\S]*security_policy_ci\.forbidden_input_removed[\s\S]*security_policy_ci\.disallowed_command_removed/,
+  );
+  assert.match(
+    manual,
+    /Adding an approved network destination[\s\S]*allowed-data value[\s\S]*Removing a forbidden input or disallowed command[\s\S]*relaxation/,
   );
   assert.match(
     manual,

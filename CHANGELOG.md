@@ -8,10 +8,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
-- Added canonical per-asset effective boolean security-policy transitions to
-  semantic diff output, preserving canonical asset identity, exact
-  boolean/`unspecified` states, and provenance without relying on cancelable
-  aggregate inventory counts.
+- Added canonical per-asset effective scalar/list security-policy transitions
+  to semantic diff output, preserving canonical asset identity, exact
+  boolean/`unspecified` states or added/removed values, and provenance without
+  relying on cancelable aggregate inventory counts.
 - Added `security.ci_policy` with `off`, `warn`, and `fail` modes, defaulting to
   `fail` and resolving the stricter mode across both compared revisions. Stable
   `security_policy_ci.*` matches now make policy weakening explicitly
@@ -31,11 +31,18 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   status unchanged. A finding decrease that accompanies policy relaxation is
   no longer described as verified remediation. Single-revision `scan`,
   `scan --fail-on`, and Readiness semantics are unchanged.
+- Expanded security-policy relaxation governance to approved network/upload
+  destination additions, allowed-data additions, forbidden-input removals, and
+  disallowed-command removals.
 
 ### Compatibility
 
 - Newly generated semantic diff JSON adds `security.policyTransitions`, and
-  CI-report JSON adds top-level `securityPolicy`. These additive fields are the
+  CI-report JSON adds top-level `securityPolicy`. Transition rows are now a
+  discriminated `kind: "scalar" | "list"` union; scalar rows carry
+  `fromState`/`toState`, while list rows carry `added`/`removed`. CI matches use
+  the same `kind` discriminator and add an explicit relaxation `direction`
+  plus `addedValues` or `removedValues` for list matches. These fields are the
   authoritative transition and evaluation representations; existing aggregate
   inventory deltas remain summaries only. The new default
   `security.ci_policy: "fail"` can change CI-report status for repositories that

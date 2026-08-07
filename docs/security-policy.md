@@ -149,14 +149,14 @@ future automation can reason about declared data boundaries consistently.
 
 Recommended vocabulary:
 
-| Value | Meaning |
+| Value                                    | Meaning                                                                                                               |
 | --- | --- |
-| `repo-local-files` | Files inside the target repository or scan root. |
-| `skill-bundled-context` | Context files bundled with or explicitly declared by the skill. |
-| `referenced-authenticated-internal-docs` | Authenticated internal documents explicitly referenced by the skill or its context assets. |
-| `sanitized-ci-diagnostics` | CI logs, test results, and failure diagnostics that have been sanitized or redacted before being provided to the LLM. |
-| `public-docs` | Publicly available documentation, specifications, or references. |
-| `disclosed-user-provided-data` | Data explicitly provided or disclosed by the user for the current task. |
+| `repo-local-files`                       | Files inside the target repository or scan root.                                                                      |
+| `skill-bundled-context`                  | Context files bundled with or explicitly declared by the skill.                                                       |
+| `referenced-authenticated-internal-docs` | Authenticated internal documents explicitly referenced by the skill or its context assets.                            |
+| `sanitized-ci-diagnostics`               | CI logs, test results, and failure diagnostics that have been sanitized or redacted before being provided to the LLM. |
+| `public-docs`                            | Publicly available documentation, specifications, or references.                                                      |
+| `disclosed-user-provided-data`           | Data explicitly provided or disclosed by the user for the current task.                                               |
 
 Important: allowed-data metadata does not grant broad access to all matching data. For
 example, `referenced-authenticated-internal-docs` means authenticated internal
@@ -260,7 +260,7 @@ Use repo-level `security.approvedDomains`, `security.approvedUploadDomains`, or 
 ```
 
 `security.ci_policy` governs revision-to-revision weakening of effective
-boolean policy boundaries. It accepts `"off"`, `"warn"`, or `"fail"` and
+scalar and list policy boundaries. It accepts `"off"`, `"warn"`, or `"fail"` and
 defaults to `"fail"`. CI reads the value from both revisions and uses the
 stricter mode under `off < warn < fail`, so changing `fail` to `off` in the
 same revision as a relaxation cannot bypass review.
@@ -406,13 +406,13 @@ no-disclosure guard.
 `SEC-UNPINNED-DEPENDENCY-INSTALL` combines structured command and selector
 analysis with established bounded compatibility fallback:
 
-| Dependency form | Analysis level |
+| Dependency form                                 | Analysis level                           |
 | --- | --- |
 | npm, pnpm, and Yarn direct install/add commands | Structured command and selector analysis |
-| pip-style and `uv pip` direct install commands | Structured command and selector analysis |
-| Homebrew formula installs | Existing bounded compatibility fallback |
-| Docker image pull/run commands | Existing bounded compatibility fallback |
-| Other forms | Not currently analyzed |
+| pip-style and `uv pip` direct install commands  | Structured command and selector analysis |
+| Homebrew formula installs                       | Existing bounded compatibility fallback  |
+| Docker image pull/run commands                  | Existing bounded compatibility fallback  |
+| Other forms                                     | Not currently analyzed                   |
 
 npm and PyPI findings receive structured dependency details. Homebrew and
 Docker retain their established conservative fallback behavior; this extension
@@ -836,22 +836,29 @@ records its effective-policy blast radius: JSON retains the complete sorted
 affected-asset list, while Markdown uses the shared presentation limit and
 reports how many entries were omitted.
 
-For matched assets, JSON also retains canonical per-asset boolean transitions
-in `diff.security.policyTransitions`. Each row contains the canonical asset
-identity, property, `fromState`, `toState`, and provenance. Asset additions and
-deletions do not create transitions because they have no earlier or later
-boundary for the same matched asset. Aggregate inventory deltas remain useful
-summaries, but policy-relaxation evaluation uses these transition rows; opposite
-changes on two assets therefore cannot cancel each other.
+For matched assets, JSON also retains canonical per-asset scalar/list
+transitions in `diff.security.policyTransitions`. Every row contains the
+canonical asset identity, property, provenance, and a `kind` discriminator.
+Scalar rows carry `fromState`/`toState`; list rows carry the complete normalized
+`added`/`removed` values. Asset additions and deletions do not create
+transitions because they have no earlier or later boundary for the same matched
+asset. Aggregate inventory deltas remain useful summaries, but
+policy-relaxation evaluation uses these transition rows; opposite changes on
+two assets therefore cannot cancel each other.
 
 Relaxation follows effective diagnostic semantics:
 
-| Property | Restrictive state | Relaxation |
+| Property                      | Restrictive state                        | Relaxation                                |
 | --- | --- | --- |
-| `networkAllowed` | `false` | `false -> true` or `false -> unspecified` |
-| `externalUploadAllowed` | `false` | `false -> true` or `false -> unspecified` |
-| `secretsAllowed` | `false` | `false -> true` or `false -> unspecified` |
-| `humanApprovalRequired` | `true` | `true -> false` or `true -> unspecified` |
+| `networkAllowed`              | `false`                                  | `false -> true` or `false -> unspecified` |
+| `externalUploadAllowed`       | `false`                                  | `false -> true` or `false -> unspecified` |
+| `secretsAllowed`              | `false`                                  | `false -> true` or `false -> unspecified` |
+| `humanApprovalRequired`       | `true`                                   | `true -> false` or `true -> unspecified`  |
+| `approvedNetworkDestinations` | values outside the approved set          | approved value added                      |
+| `approvedUploadDestinations`  | values outside the approved set          | approved value added                      |
+| `allowedData`                 | values outside the allowed data boundary | allowed value added                       |
+| `forbiddenInputs`             | values in the forbidden set              | forbidden value removed                   |
+| `disallowedCommands`          | values in the disallowed set             | disallowed value removed                  |
 
 For permission fields, only effective `false` prohibits matching instructions;
 `true` and `unspecified` are therefore in the same non-restrictive tier for
@@ -861,16 +868,19 @@ Consequently, `true <-> unspecified` is neutral for permission fields and
 `false <-> unspecified` is neutral for approval. Moving from `unspecified` to
 the restrictive state is tightening, not relaxation. `Unspecified` is not a
 runtime permission grant; it means Renma has no effective declaration for that
-property.
+property. Removing an approved/allowed value or adding a
+forbidden/disallowed value is tightening. A list replacement can contain both
+tightening and relaxation; the canonical transition preserves both sides, and
+the CI match carries the values from the relaxation side.
 
 Direct `diff` Markdown puts a bounded per-asset `Security policy relaxations`
-summary before aggregate security metrics. CI-report keeps the relaxation
-outcome and affected transitions visible near the report summary, with the full
-security evidence also available under `Full report details`. Booleans use
-`before -> after`; list additions and removals are separate. Removed forbidden
-inputs, removed disallowed commands, and
-`humanApprovalRequired: true -> false` remain visible without being labeled
-improvements or regressions. Enabling network or upload access with no effective
+summary before an explicit `Aggregate security metrics` subsection. CI-report
+keeps the relaxation outcome and affected transitions visible near the report
+summary, with the full security evidence also available under `Full report
+details`. Booleans use `before -> after`; list relaxations name the added
+allowed value or removed restricted value. Other list additions and removals
+remain visible in the effective-boundary detail without being labeled as
+improvements. Enabling network or upload access with no effective
 approved destinations renders `none declared`, not `unrestricted`. When access
 becomes enabled, Markdown shows the bounded effective post-change destination
 scope even if the destination list did not change, and directs reviewers to
@@ -887,10 +897,16 @@ for this report.
 
 The dedicated `renma.security-policy-ci-policy.v1` evaluation uses stable match
 IDs `security_policy_ci.network_relaxed`,
+`security_policy_ci.approved_network_destination_added`,
 `security_policy_ci.external_upload_relaxed`,
-`security_policy_ci.secrets_relaxed`, and
-`security_policy_ci.human_approval_removed`. Every match retains the affected
-asset and exact transition. With the default `fail` mode, any match makes
+`security_policy_ci.approved_upload_destination_added`,
+`security_policy_ci.allowed_data_added`,
+`security_policy_ci.forbidden_input_removed`,
+`security_policy_ci.secrets_relaxed`,
+`security_policy_ci.human_approval_removed`, and
+`security_policy_ci.disallowed_command_removed`. Every match retains the
+affected asset, property, relaxation direction, provenance, and exact scalar
+states or weakening-side list values. With the default `fail` mode, any match makes
 `ci-report` fail and exit `1`; `warn` promotes only `PASS` to `WARN`, and `off`
 does not affect status. Transition evidence and matches remain visible when the
 gate is off. An existing failure is never downgraded.
@@ -912,22 +928,22 @@ instruction does not contradict an effective policy that allows it.
 
 Use this table to choose the right kind of fix. For full finding definitions, see [Diagnostics Reference](diagnostics.md).
 
-| Finding | Usually means | What to change | Fix area |
+| Finding                                   | Usually means                                                                                                                        | What to change                                                                                                                                                                                                                                                                                                                                                              | Fix area                                   |
 | --- | --- | --- | --- |
-| `SEC-SUSPICIOUS-BIDI-CONTROL` | Original source contains a bidi formatting control that can change displayed order. | Inspect the escaped code point and make the smallest character-level fix; require human confirmation if it is intentional. | Any discovered UTF-8 text artifact |
-| `SEC-SUSPICIOUS-INVISIBLE-CHARACTER` | Original source contains a high-signal invisible/deprecated control, non-leading BOM, or ASCII-token-internal ZWJ/ZWNJ. | Remove or visibly replace only the reported character while preserving legitimate multilingual text, or use a narrow reasoned suppression if verified necessary. | Any discovered UTF-8 text artifact |
-| `SEC-INVALID-CANONICAL-POLICY-METADATA` | A recognized Skill `metadata.renma.*` security value has an invalid encoding. | Confirm the intended policy, then replace it with the exact documented string encoding; do not guess a permissive value. | Skill metadata |
-| `SEC-MISSING-POLICY-METADATA` | Sensitive instructions lack a declared policy. | Add local policy fields or select a configured security profile using the syntax for that asset kind. | Metadata |
-| `SEC-INSTRUCTION-VIOLATES-POLICY` | Body text asks for behavior denied by policy. | Rewrite the instruction or adjust policy only after review. | Body text and metadata |
-| `SEC-MISSING-HUMAN-APPROVAL-GUARD` | A sensitive action lacks nearby approval wording. | Add explicit human approval close to the action. | Body text |
-| `SEC-UNAPPROVED-NETWORK-DESTINATION` | An instruction contacts a host outside approved network destinations. | Enumerate the actual required domains in asset/profile/repo network approvals after review. | Body text, metadata, or config |
-| `SEC-UNAPPROVED-UPLOAD-DESTINATION` | An upload target is not in upload approvals. | Use an approved upload target or update upload approvals intentionally. | Body text, metadata, or config |
-| `SEC-FORBIDDEN-INPUT-INSTRUCTION` | The asset asks for data listed in its forbidden-input policy. | Remove the request or replace it with redaction and placeholder guidance. | Body text and metadata |
-| `SEC-SECRET-MATERIAL-INSTRUCTION` | Instructions may expose private keys, tokens, credentials, or secret files. | Remove secret collection or disclosure instructions. | Body text |
-| `SEC-SAFEGUARD-BYPASS-INSTRUCTION` | Instructions disable checks, weaken policy, skip approval, suppress warnings, or choose a riskier fallback. | Preserve the safeguard; stop and report missing authority, then rescan without relaxation or suppression. | Body text |
-| `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION` | External, attached, logged, downloaded, or tool-produced content is treated as executable authority. | Treat it as untrusted data, preserve provenance, validate facts, and keep actions under reviewed local authority. | Body text |
-| `SEC-UNBOUNDED-EXTERNAL-SOURCE-TRAVERSAL` | Explicit recursive source traversal has no local scope or termination boundary. | Add scope, relevance, visited/cycle, cap, failure-stop, and unresolved-scope guidance in the same section. | Body text |
-| `SEC-DESTRUCTIVE-COMMAND` | A destructive command appears without enough local safety context. | Remove it, scope it tightly, or add explicit approval and recovery guidance. | Body text |
-| `SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD` | `sudo` or similar privileged action lacks guardrails. | Add prerequisites, confirmation, rollback, and verification guidance. | Body text |
-| `SEC-UNPINNED-REMOTE-SCRIPT` | A remote script is executed without an immutable source or verification. | Pin and verify the source, or avoid remote execution. | Body text |
-| `SEC-UNPINNED-DEPENDENCY-INSTALL` | A structured npm/PyPI install or compatibility-fallback Homebrew/Docker command contains floating or unresolved dependency evidence. | Use repository evidence and established conventions for a reviewed exact package selector, supported versioned formula, or explicit non-floating image tag/digest. Fail-closed variables apply only where structurally supported, and asset-local allowances apply only to exact `npm:`/`pypi:` selectors. Never invent a value or claim uninspected sources were verified. | Body text or npm/PyPI asset-local metadata |
+| `SEC-SUSPICIOUS-BIDI-CONTROL`             | Original source contains a bidi formatting control that can change displayed order.                                                  | Inspect the escaped code point and make the smallest character-level fix; require human confirmation if it is intentional.                                                                                                                                                                                                                                                  | Any discovered UTF-8 text artifact         |
+| `SEC-SUSPICIOUS-INVISIBLE-CHARACTER`      | Original source contains a high-signal invisible/deprecated control, non-leading BOM, or ASCII-token-internal ZWJ/ZWNJ.              | Remove or visibly replace only the reported character while preserving legitimate multilingual text, or use a narrow reasoned suppression if verified necessary.                                                                                                                                                                                                            | Any discovered UTF-8 text artifact         |
+| `SEC-INVALID-CANONICAL-POLICY-METADATA`   | A recognized Skill `metadata.renma.*` security value has an invalid encoding.                                                        | Confirm the intended policy, then replace it with the exact documented string encoding; do not guess a permissive value.                                                                                                                                                                                                                                                    | Skill metadata                             |
+| `SEC-MISSING-POLICY-METADATA`             | Sensitive instructions lack a declared policy.                                                                                       | Add local policy fields or select a configured security profile using the syntax for that asset kind.                                                                                                                                                                                                                                                                       | Metadata                                   |
+| `SEC-INSTRUCTION-VIOLATES-POLICY`         | Body text asks for behavior denied by policy.                                                                                        | Rewrite the instruction or adjust policy only after review.                                                                                                                                                                                                                                                                                                                 | Body text and metadata                     |
+| `SEC-MISSING-HUMAN-APPROVAL-GUARD`        | A sensitive action lacks nearby approval wording.                                                                                    | Add explicit human approval close to the action.                                                                                                                                                                                                                                                                                                                            | Body text                                  |
+| `SEC-UNAPPROVED-NETWORK-DESTINATION`      | An instruction contacts a host outside approved network destinations.                                                                | Enumerate the actual required domains in asset/profile/repo network approvals after review.                                                                                                                                                                                                                                                                                 | Body text, metadata, or config             |
+| `SEC-UNAPPROVED-UPLOAD-DESTINATION`       | An upload target is not in upload approvals.                                                                                         | Use an approved upload target or update upload approvals intentionally.                                                                                                                                                                                                                                                                                                     | Body text, metadata, or config             |
+| `SEC-FORBIDDEN-INPUT-INSTRUCTION`         | The asset asks for data listed in its forbidden-input policy.                                                                        | Remove the request or replace it with redaction and placeholder guidance.                                                                                                                                                                                                                                                                                                   | Body text and metadata                     |
+| `SEC-SECRET-MATERIAL-INSTRUCTION`         | Instructions may expose private keys, tokens, credentials, or secret files.                                                          | Remove secret collection or disclosure instructions.                                                                                                                                                                                                                                                                                                                        | Body text                                  |
+| `SEC-SAFEGUARD-BYPASS-INSTRUCTION`        | Instructions disable checks, weaken policy, skip approval, suppress warnings, or choose a riskier fallback.                          | Preserve the safeguard; stop and report missing authority, then rescan without relaxation or suppression.                                                                                                                                                                                                                                                                   | Body text                                  |
+| `SEC-UNTRUSTED-CONTENT-AS-INSTRUCTION`    | External, attached, logged, downloaded, or tool-produced content is treated as executable authority.                                 | Treat it as untrusted data, preserve provenance, validate facts, and keep actions under reviewed local authority.                                                                                                                                                                                                                                                           | Body text                                  |
+| `SEC-UNBOUNDED-EXTERNAL-SOURCE-TRAVERSAL` | Explicit recursive source traversal has no local scope or termination boundary.                                                      | Add scope, relevance, visited/cycle, cap, failure-stop, and unresolved-scope guidance in the same section.                                                                                                                                                                                                                                                                  | Body text                                  |
+| `SEC-DESTRUCTIVE-COMMAND`                 | A destructive command appears without enough local safety context.                                                                   | Remove it, scope it tightly, or add explicit approval and recovery guidance.                                                                                                                                                                                                                                                                                                | Body text                                  |
+| `SEC-PRIVILEGED-COMMAND-WITHOUT-GUARD`    | `sudo` or similar privileged action lacks guardrails.                                                                                | Add prerequisites, confirmation, rollback, and verification guidance.                                                                                                                                                                                                                                                                                                       | Body text                                  |
+| `SEC-UNPINNED-REMOTE-SCRIPT`              | A remote script is executed without an immutable source or verification.                                                             | Pin and verify the source, or avoid remote execution.                                                                                                                                                                                                                                                                                                                       | Body text                                  |
+| `SEC-UNPINNED-DEPENDENCY-INSTALL`         | A structured npm/PyPI install or compatibility-fallback Homebrew/Docker command contains floating or unresolved dependency evidence. | Use repository evidence and established conventions for a reviewed exact package selector, supported versioned formula, or explicit non-floating image tag/digest. Fail-closed variables apply only where structurally supported, and asset-local allowances apply only to exact `npm:`/`pypi:` selectors. Never invent a value or claim uninspected sources were verified. | Body text or npm/PyPI asset-local metadata |

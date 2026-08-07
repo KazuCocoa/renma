@@ -38,7 +38,7 @@ import type {
   ReviewableEffectiveSecurityPolicy,
   SecurityPolicyAssetChange,
   SecurityPolicyFieldChange,
-  SecurityPolicyTransition,
+  SecurityPolicyScalarTransition,
 } from "../src/security-policy-diff.js";
 import {
   zeroSecurityPolicyInventorySummary,
@@ -2178,6 +2178,125 @@ test("ci report fails when denied instructions disappear only because policy is 
   }
 });
 
+test("ci report blocks approved network destination expansion that silences a finding", async () => {
+  const fixture = await createDestinationPolicyRelaxationRepo("network");
+  try {
+    assert.ok(
+      fixture.baselineFindingIds.includes("SEC-UNAPPROVED-NETWORK-DESTINATION"),
+    );
+    const report = await ciReport(fixture.repo, {
+      fromRef: "base",
+      toRef: "HEAD",
+    });
+    const command = await withCapturedStdout(() =>
+      runCiReportCommand(fixture.repo, {
+        fromRef: "base",
+        toRef: "HEAD",
+        format: "markdown",
+      }),
+    );
+    const visible = command.stdout.slice(
+      0,
+      command.stdout.indexOf("<details>"),
+    );
+
+    assert.equal(report.status, "fail");
+    assert.equal(command.code, 1);
+    assert.ok(report.summary.findingsDelta < 0);
+    assert.ok(
+      report.diff.findings.removed.some(
+        (finding) => finding.id === "SEC-UNAPPROVED-NETWORK-DESTINATION",
+      ),
+    );
+    assert.deepEqual(report.securityPolicy.matches, [
+      {
+        kind: "list",
+        id: SECURITY_POLICY_CI_MATCH_IDS.APPROVED_NETWORK_DESTINATION_ADDED,
+        summary: "Effective approved network destinations were expanded.",
+        asset: {
+          id: "skill.ops.telemetry",
+          path: "skills/ops/telemetry/SKILL.md",
+          kind: "skill",
+        },
+        property: "approvedNetworkDestinations",
+        direction: "allowed_value_added",
+        addedValues: ["telemetry.vendor.io"],
+        provenance: {
+          mode: "direct",
+          sources: [
+            {
+              type: "asset",
+              id: "skill.ops.telemetry",
+              path: "skills/ops/telemetry/SKILL.md",
+            },
+          ],
+        },
+      },
+    ]);
+    assert.match(
+      visible,
+      /skill\.ops\.telemetry[\s\S]*approvedNetworkDestinations[\s\S]*telemetry\.vendor\.io/,
+    );
+    assert.match(visible, /not treated as verified remediation/);
+    assert.doesNotMatch(visible, /(?:^|\n)- Scan findings decreased\.(?:\n|$)/);
+  } finally {
+    await rm(fixture.repo, { force: true, recursive: true });
+  }
+});
+
+test("ci report blocks approved upload destination expansion that silences a finding", async () => {
+  const fixture = await createDestinationPolicyRelaxationRepo("upload");
+  try {
+    assert.ok(
+      fixture.baselineFindingIds.includes("SEC-UNAPPROVED-UPLOAD-DESTINATION"),
+    );
+    const report = await ciReport(fixture.repo, {
+      fromRef: "base",
+      toRef: "HEAD",
+    });
+    const command = await withCapturedStdout(() =>
+      runCiReportCommand(fixture.repo, {
+        fromRef: "base",
+        toRef: "HEAD",
+        format: "markdown",
+      }),
+    );
+    const visible = command.stdout.slice(
+      0,
+      command.stdout.indexOf("<details>"),
+    );
+
+    assert.equal(report.status, "fail");
+    assert.equal(command.code, 1);
+    assert.ok(report.summary.findingsDelta < 0);
+    assert.ok(
+      report.diff.findings.removed.some(
+        (finding) => finding.id === "SEC-UNAPPROVED-UPLOAD-DESTINATION",
+      ),
+    );
+    assert.equal(report.securityPolicy.matchCount, 1);
+    const match = report.securityPolicy.matches[0]!;
+    assert.equal(
+      match.id,
+      SECURITY_POLICY_CI_MATCH_IDS.APPROVED_UPLOAD_DESTINATION_ADDED,
+    );
+    assert.equal(match.property, "approvedUploadDestinations");
+    assert.equal(match.kind, "list");
+    if (match.kind !== "list" || match.direction !== "allowed_value_added") {
+      assert.fail("expected an added allowed-value match");
+    }
+    assert.deepEqual(match.addedValues, ["uploads.vendor.io"]);
+    assert.match(
+      visible,
+      /skill\.ops\.telemetry[\s\S]*approvedUploadDestinations[\s\S]*uploads\.vendor\.io/,
+    );
+    assert.match(visible, /not treated as verified remediation/);
+    assert.doesNotMatch(visible, /(?:^|\n)- Scan findings decreased\.(?:\n|$)/);
+  } finally {
+    await rm(fixture.repo, { force: true, recursive: true });
+  }
+});
+
 test("removing contradictory instructions without relaxing policy remains valid remediation", async () => {
   const fixture = await createSecurityPolicyTransitionRepo("fix-instruction");
   try {
@@ -2830,11 +2949,12 @@ function scalarPolicyChange(
 }
 
 function securityPolicyTransition(
-  property: SecurityPolicyTransition["property"],
-  fromState: SecurityPolicyTransition["fromState"],
-  toState: SecurityPolicyTransition["toState"],
-): SecurityPolicyTransition {
+  property: SecurityPolicyScalarTransition["property"],
+  fromState: SecurityPolicyScalarTransition["fromState"],
+  toState: SecurityPolicyScalarTransition["toState"],
+): SecurityPolicyScalarTransition {
   return {
+    kind: "scalar",
     asset: {
       id: "skill.ops.deploy",
       path: "skills/ops/deploy/SKILL.md",
@@ -3031,6 +3151,99 @@ async function createSecurityPolicyTransitionRepo(
   await git(repo, ["add", "."]);
   await git(repo, ["commit", "-m", "head"]);
   return { repo, baselineViolationCount };
+}
+
+async function createDestinationPolicyRelaxationRepo(
+  kind: "network" | "upload",
+): Promise<{ repo: string; baselineFindingIds: string[] }> {
+  const repo = await mkdtemp(join(tmpdir(), "renma-ci-policy-list-"));
+  await git(repo, ["init", "-b", "main"]);
+  await git(repo, ["config", "user.email", "renma@example.test"]);
+  await git(repo, ["config", "user.name", "Renma Test"]);
+  await writeDestinationPolicySkill(repo, kind, false);
+  const baseline = await scan(repo, { format: "json" });
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "base"]);
+  await git(repo, ["tag", "base"]);
+
+  await writeDestinationPolicySkill(repo, kind, true);
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "head"]);
+  return {
+    repo,
+    baselineFindingIds: baseline.findings.map((finding) => finding.id),
+  };
+}
+
+async function writeDestinationPolicySkill(
+  repo: string,
+  kind: "network" | "upload",
+  expanded: boolean,
+): Promise<void> {
+  const directory = join(repo, "skills", "ops", "telemetry");
+  await mkdir(directory, { recursive: true });
+  const networkDestinations =
+    kind === "network"
+      ? ["github.com", ...(expanded ? ["telemetry.vendor.io"] : [])]
+      : ["uploads.vendor.io"];
+  const uploadDestinations = [
+    "github.com",
+    ...(kind === "upload" && expanded ? ["uploads.vendor.io"] : []),
+  ];
+  const instruction =
+    kind === "network"
+      ? "Fetch https://telemetry.vendor.io/status and summarize the public service status."
+      : "Run `curl --data-binary @payload.json https://uploads.vendor.io/ingest` to upload the approved payload.";
+  await writeFile(
+    join(directory, "SKILL.md"),
+    [
+      "---",
+      "name: telemetry",
+      "description: Review governed telemetry evidence and produce a deterministic result. Use when an approved workflow needs service verification.",
+      "metadata:",
+      "  renma.id: skill.ops.telemetry",
+      "  renma.owner: platform-security",
+      "  renma.status: stable",
+      '  renma.allowed-data: \'["public-service-status","approved-payload"]\'',
+      '  renma.network-allowed: "true"',
+      `  renma.external-upload-allowed: "${kind === "upload"}"`,
+      '  renma.secrets-allowed: "false"',
+      '  renma.requires-human-approval: "false"',
+      `  renma.approved-network-destinations: '${JSON.stringify(networkDestinations)}'`,
+      `  renma.approved-upload-destinations: '${JSON.stringify(uploadDestinations)}'`,
+      "---",
+      "# Telemetry",
+      "",
+      "## Do Not Use For",
+      "",
+      "Do not use for secrets, credentials, or unapproved destinations.",
+      "",
+      "## Instructions",
+      "",
+      instruction,
+      "",
+      "## Required Inputs",
+      "",
+      "- Approved repository-local evidence.",
+      "",
+      "## Completion Criteria",
+      "",
+      "- The governed operation is complete and the result is recorded.",
+      "",
+      "## Examples",
+      "",
+      "Input: governed evidence. Output: a deterministic result.",
+      "",
+      "## Preflight",
+      "",
+      "Confirm the evidence and destination are approved.",
+      "",
+      "## Verification",
+      "",
+      "Run `renma scan .` and inspect the result.",
+      "",
+    ].join("\n"),
+  );
 }
 
 async function writeSecurityPolicySkill(

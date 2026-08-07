@@ -13,18 +13,21 @@ import type {
   SecurityPolicyAssetEvidence,
 } from "../src/security-policy-inventory.js";
 import type {
+  ListSecurityPolicyField,
   SecurityPolicyBooleanState,
-  SecurityPolicyTransition,
+  SecurityPolicyListTransition,
+  SecurityPolicyScalarTransition,
 } from "../src/security-policy-diff.js";
 
 test("obvious permission and approval weakening transitions are relaxations", () => {
-  const cases: Array<[SecurityPolicyTransition["property"], boolean, boolean]> =
-    [
-      ["networkAllowed", false, true],
-      ["externalUploadAllowed", false, true],
-      ["secretsAllowed", false, true],
-      ["humanApprovalRequired", true, false],
-    ];
+  const cases: Array<
+    [SecurityPolicyScalarTransition["property"], boolean, boolean]
+  > = [
+    ["networkAllowed", false, true],
+    ["externalUploadAllowed", false, true],
+    ["secretsAllowed", false, true],
+    ["humanApprovalRequired", true, false],
+  ];
 
   for (const [property, fromState, toState] of cases) {
     assert.equal(
@@ -38,13 +41,14 @@ test("obvious permission and approval weakening transitions are relaxations", ()
 });
 
 test("tightening transitions are not relaxations", () => {
-  const cases: Array<[SecurityPolicyTransition["property"], boolean, boolean]> =
-    [
-      ["networkAllowed", true, false],
-      ["externalUploadAllowed", true, false],
-      ["secretsAllowed", true, false],
-      ["humanApprovalRequired", false, true],
-    ];
+  const cases: Array<
+    [SecurityPolicyScalarTransition["property"], boolean, boolean]
+  > = [
+    ["networkAllowed", true, false],
+    ["externalUploadAllowed", true, false],
+    ["secretsAllowed", true, false],
+    ["humanApprovalRequired", false, true],
+  ];
 
   for (const [property, fromState, toState] of cases) {
     assert.equal(
@@ -60,7 +64,7 @@ test("tightening transitions are not relaxations", () => {
 test("unspecified transitions follow effective restrictive-state semantics", () => {
   const cases: Array<
     [
-      SecurityPolicyTransition["property"],
+      SecurityPolicyScalarTransition["property"],
       SecurityPolicyBooleanState,
       SecurityPolicyBooleanState,
       boolean,
@@ -121,11 +125,15 @@ test("canonical transitions retain each matched asset when aggregate counts canc
   });
 
   assert.deepEqual(
-    diff.policyTransitions.map((item) => ({
-      id: item.asset.id,
-      from: item.fromState,
-      to: item.toState,
-    })),
+    diff.policyTransitions.map((item) =>
+      item.kind === "scalar"
+        ? {
+            id: item.asset.id,
+            from: item.fromState,
+            to: item.toState,
+          }
+        : { id: item.asset.id, added: item.added, removed: item.removed },
+    ),
     [
       { id: "skill.a", from: false, to: true },
       { id: "skill.b", from: true, to: false },
@@ -151,11 +159,19 @@ test("canonical transitions serialize missing effective booleans as unspecified"
   });
 
   assert.deepEqual(
-    diff.policyTransitions.map(({ property, fromState, toState }) => ({
-      property,
-      fromState,
-      toState,
-    })),
+    diff.policyTransitions.map((item) =>
+      item.kind === "scalar"
+        ? {
+            property: item.property,
+            fromState: item.fromState,
+            toState: item.toState,
+          }
+        : {
+            property: item.property,
+            added: item.added,
+            removed: item.removed,
+          },
+    ),
     [
       {
         property: "networkAllowed",
@@ -192,6 +208,145 @@ test("multiple assets and properties remain independently auditable", () => {
       [SECURITY_POLICY_CI_MATCH_IDS.SECRETS_RELAXED, "skill.b"],
       [SECURITY_POLICY_CI_MATCH_IDS.HUMAN_APPROVAL_REMOVED, "skill.b"],
     ],
+  );
+});
+
+test("list-policy expansion and restriction removal are relaxations", () => {
+  const transitions: SecurityPolicyListTransition[] = [
+    listTransition("approvedNetworkDestinations", ["telemetry.vendor.io"], []),
+    listTransition("approvedUploadDestinations", ["uploads.vendor.io"], []),
+    listTransition("allowedData", ["customer-records"], []),
+    listTransition("forbiddenInputs", [], ["credentials"]),
+    listTransition("disallowedCommands", [], ["curl"]),
+  ];
+
+  for (const item of transitions) {
+    assert.equal(isSecurityPolicyRelaxation(item), true, item.property);
+  }
+
+  const evaluation = evaluateSecurityPolicyCiPolicy(
+    { policyTransitions: transitions },
+    { from: "fail", to: "fail" },
+  );
+  assert.equal(evaluation.outcome, "fail");
+  assert.deepEqual(
+    evaluation.matches.map((match) => ({
+      id: match.id,
+      direction: match.direction,
+      values:
+        match.kind === "scalar"
+          ? []
+          : match.direction === "allowed_value_added"
+            ? match.addedValues
+            : match.removedValues,
+    })),
+    [
+      {
+        id: SECURITY_POLICY_CI_MATCH_IDS.APPROVED_NETWORK_DESTINATION_ADDED,
+        direction: "allowed_value_added",
+        values: ["telemetry.vendor.io"],
+      },
+      {
+        id: SECURITY_POLICY_CI_MATCH_IDS.APPROVED_UPLOAD_DESTINATION_ADDED,
+        direction: "allowed_value_added",
+        values: ["uploads.vendor.io"],
+      },
+      {
+        id: SECURITY_POLICY_CI_MATCH_IDS.ALLOWED_DATA_ADDED,
+        direction: "allowed_value_added",
+        values: ["customer-records"],
+      },
+      {
+        id: SECURITY_POLICY_CI_MATCH_IDS.FORBIDDEN_INPUT_REMOVED,
+        direction: "restricted_value_removed",
+        values: ["credentials"],
+      },
+      {
+        id: SECURITY_POLICY_CI_MATCH_IDS.DISALLOWED_COMMAND_REMOVED,
+        direction: "restricted_value_removed",
+        values: ["curl"],
+      },
+    ],
+  );
+});
+
+test("opposite list-policy directions are tightening rather than relaxation", () => {
+  const transitions: SecurityPolicyListTransition[] = [
+    listTransition("approvedNetworkDestinations", [], ["api.example.com"]),
+    listTransition("approvedUploadDestinations", [], ["upload.example.com"]),
+    listTransition("allowedData", [], ["customer-records"]),
+    listTransition("forbiddenInputs", ["credentials"], []),
+    listTransition("disallowedCommands", ["curl"], []),
+  ];
+
+  for (const item of transitions) {
+    assert.equal(isSecurityPolicyRelaxation(item), false, item.property);
+  }
+  assert.equal(
+    evaluateSecurityPolicyCiPolicy(
+      { policyTransitions: transitions },
+      { from: "fail", to: "fail" },
+    ).matchCount,
+    0,
+  );
+});
+
+test("effective list-policy changes become canonical per-asset CI evidence", () => {
+  const path = "skills/example/SKILL.md";
+  const ids = new Map([[path, "skill.example"]]);
+  const diff = buildSecurityPolicyChanges({
+    fromAssets: [
+      listPolicyEvidence(path, {
+        approvedNetworkDestinations: ["github.com"],
+        approvedUploadDestinations: ["github.com"],
+        allowedData: ["public"],
+        forbiddenInputs: ["credentials"],
+        disallowedCommands: ["curl"],
+      }),
+    ],
+    toAssets: [
+      listPolicyEvidence(path, {
+        approvedNetworkDestinations: ["github.com", "telemetry.vendor.io"],
+        approvedUploadDestinations: ["github.com", "uploads.vendor.io"],
+        allowedData: ["public", "customer-records"],
+        forbiddenInputs: [],
+        disallowedCommands: [],
+      }),
+    ],
+    fromAssetIdsByPath: ids,
+    toAssetIdsByPath: ids,
+  });
+  const evaluation = evaluateSecurityPolicyCiPolicy(diff, {
+    from: "fail",
+    to: "fail",
+  });
+
+  assert.deepEqual(
+    diff.policyTransitions.map((item) => item.property),
+    [
+      "approvedNetworkDestinations",
+      "approvedUploadDestinations",
+      "allowedData",
+      "forbiddenInputs",
+      "disallowedCommands",
+    ],
+  );
+  assert.deepEqual(
+    evaluation.matches.map((match) => match.id),
+    [
+      SECURITY_POLICY_CI_MATCH_IDS.APPROVED_NETWORK_DESTINATION_ADDED,
+      SECURITY_POLICY_CI_MATCH_IDS.APPROVED_UPLOAD_DESTINATION_ADDED,
+      SECURITY_POLICY_CI_MATCH_IDS.ALLOWED_DATA_ADDED,
+      SECURITY_POLICY_CI_MATCH_IDS.FORBIDDEN_INPUT_REMOVED,
+      SECURITY_POLICY_CI_MATCH_IDS.DISALLOWED_COMMAND_REMOVED,
+    ],
+  );
+  assert.ok(
+    evaluation.matches.every(
+      (match) =>
+        match.asset.id === "skill.example" &&
+        match.provenance.mode === "direct",
+    ),
   );
 });
 
@@ -254,12 +409,13 @@ test("new and deleted assets do not produce policy transitions", () => {
 
 function transition(
   assetId: string,
-  property: SecurityPolicyTransition["property"],
+  property: SecurityPolicyScalarTransition["property"],
   fromState: SecurityPolicyBooleanState,
   toState: SecurityPolicyBooleanState,
-): SecurityPolicyTransition {
+): SecurityPolicyScalarTransition {
   const path = `skills/${assetId.split(".").at(-1)}/SKILL.md`;
   return {
+    kind: "scalar",
     asset: { id: assetId, path, kind: "skill" },
     property,
     fromState,
@@ -267,6 +423,25 @@ function transition(
     provenance: {
       mode: "direct",
       sources: [{ type: "asset", id: assetId, path }],
+    },
+  };
+}
+
+function listTransition(
+  property: ListSecurityPolicyField,
+  added: string[],
+  removed: string[],
+): SecurityPolicyListTransition {
+  const path = "skills/example/SKILL.md";
+  return {
+    kind: "list",
+    asset: { id: "skill.example", path, kind: "skill" },
+    property,
+    added,
+    removed,
+    provenance: {
+      mode: "direct",
+      sources: [{ type: "asset", id: "skill.example", path }],
     },
   };
 }
@@ -310,5 +485,40 @@ function policyEvidence(
       disallowedCommands: [],
     },
     evidence: { policyFields: [] },
+  };
+}
+
+function listPolicyEvidence(
+  path: string,
+  values: {
+    approvedNetworkDestinations: string[];
+    approvedUploadDestinations: string[];
+    allowedData: string[];
+    forbiddenInputs: string[];
+    disallowedCommands: string[];
+  },
+): SecurityPolicyAssetEvidence {
+  const evidence = policyEvidence(path, null);
+  const fields: ListSecurityPolicyField[] = [
+    "approvedNetworkDestinations",
+    "approvedUploadDestinations",
+    "allowedData",
+    "forbiddenInputs",
+    "disallowedCommands",
+  ];
+  return {
+    ...evidence,
+    hasLocalPolicyMetadata: true,
+    hasEffectivePolicy: true,
+    policySources: ["local"],
+    declaredPolicy: {
+      ...evidence.declaredPolicy!,
+      fields,
+      ...values,
+    },
+    effectivePolicy: {
+      ...evidence.effectivePolicy,
+      ...values,
+    },
   };
 }

@@ -940,11 +940,10 @@ export function formatSecurityChanges(
           "",
           ...relaxations
             .slice(0, DIFF_DETAIL_LIMIT)
-            .map(
-              (transition) =>
-                `- ${formatMarkdownInlineCode(transition.asset.id)} (${formatMarkdownInlineCode(transition.asset.path)}): ${transition.property} ${transition.fromState} -> ${transition.toState}`,
-            ),
+            .map(formatSecurityPolicyRelaxation),
           ...formatPolicyOverflow(relaxations.length, 0),
+          "",
+          "### Aggregate security metrics",
           "",
         ]
       : []),
@@ -1001,6 +1000,28 @@ export function formatSecurityChanges(
     );
   }
   return lines;
+}
+
+function formatSecurityPolicyRelaxation(
+  relaxation: ReturnType<typeof securityPolicyRelaxations>[number],
+): string {
+  const asset = `${formatMarkdownInlineCode(relaxation.asset.id)} (${formatMarkdownInlineCode(relaxation.asset.path)})`;
+  if (relaxation.kind === "scalar") {
+    return `- ${asset}: ${relaxation.property} ${relaxation.fromState} -> ${relaxation.toState}`;
+  }
+  const values =
+    relaxation.direction === "allowed_value_added"
+      ? relaxation.addedValues
+      : relaxation.removedValues;
+  const action =
+    relaxation.direction === "allowed_value_added"
+      ? "allowed value added"
+      : "restricted value removed";
+  const overflow =
+    values.length > DIFF_DETAIL_LIMIT
+      ? `; ${values.length - DIFF_DETAIL_LIMIT} more not shown`
+      : "";
+  return `- ${asset}: ${relaxation.property} — ${action}: ${formatPolicyValues(values)}${overflow}`;
 }
 
 function formatSecurityPolicyAssetChange(

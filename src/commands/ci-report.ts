@@ -313,7 +313,7 @@ function reviewNotes(
   }
   if (securityPolicy.matchCount > 0) {
     const suffix =
-      securityPolicy.matchCount === 1 ? "transition" : "transitions";
+      securityPolicy.matchCount === 1 ? "relaxation" : "relaxations";
     notes.push(
       `Security policy relaxation matched ${securityPolicy.matchCount} ${suffix}; explicit human security review is required.`,
     );
@@ -389,7 +389,7 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     "securityPolicy" in report ? report.securityPolicy : undefined;
   if (securityPolicy && securityPolicy.matchCount > 0) {
     const suffix =
-      securityPolicy.matchCount === 1 ? "transition" : "transitions";
+      securityPolicy.matchCount === 1 ? "relaxation" : "relaxations";
     const effect =
       securityPolicy.configured.effective === "off"
         ? "GATE OFF"
@@ -695,7 +695,27 @@ function formatSecurityPolicyRelaxationSection(
 }
 
 function formatSecurityPolicyCiMatch(match: SecurityPolicyCiMatch): string {
-  return `${formatMarkdownInlineCode(match.asset.id)} (${formatMarkdownInlineCode(match.asset.path)}): ${match.property} ${match.fromState} -> ${match.toState} (${match.id})`;
+  const asset = `${formatMarkdownInlineCode(match.asset.id)} (${formatMarkdownInlineCode(match.asset.path)})`;
+  if (match.kind === "scalar") {
+    return `${asset}: ${match.property} ${match.fromState} -> ${match.toState} (${match.id})`;
+  }
+  const values =
+    match.direction === "allowed_value_added"
+      ? match.addedValues
+      : match.removedValues;
+  const action =
+    match.direction === "allowed_value_added"
+      ? "allowed value added"
+      : "restricted value removed";
+  const renderedValues = values
+    .slice(0, MAX_LIST_ITEMS)
+    .map(formatMarkdownInlineCode)
+    .join(", ");
+  const overflow =
+    values.length > MAX_LIST_ITEMS
+      ? `; ${values.length - MAX_LIST_ITEMS} more not shown; see JSON for the full list`
+      : "";
+  return `${asset}: ${match.property} — ${action}: ${renderedValues}${overflow} (${match.id})`;
 }
 
 function formatReviewNotes(report: CiReportFormatInput): string[] {

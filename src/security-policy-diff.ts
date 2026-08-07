@@ -37,7 +37,7 @@ export type ScalarSecurityPolicyField =
 
 export type SecurityPolicyBooleanState = boolean | "unspecified";
 
-type ListSecurityPolicyField = Exclude<
+export type ListSecurityPolicyField = Exclude<
   ReviewableSecurityPolicyField,
   ScalarSecurityPolicyField
 >;
@@ -101,14 +101,29 @@ export interface SecurityPolicyAssetChange {
   fields: SecurityPolicyFieldChange[];
 }
 
-/** Canonical matched-asset evidence for one effective boolean policy transition. */
-export interface SecurityPolicyTransition {
+interface SecurityPolicyTransitionBase {
   asset: SecurityPolicyAffectedAsset;
+  provenance: SecurityPolicyChangeProvenance;
+}
+
+/** Canonical matched-asset evidence for one effective boolean policy transition. */
+export interface SecurityPolicyScalarTransition extends SecurityPolicyTransitionBase {
+  kind: "scalar";
   property: ScalarSecurityPolicyField;
   fromState: SecurityPolicyBooleanState;
   toState: SecurityPolicyBooleanState;
-  provenance: SecurityPolicyChangeProvenance;
 }
+
+/** Canonical matched-asset evidence for one effective list policy transition. */
+export interface SecurityPolicyListTransition extends SecurityPolicyTransitionBase {
+  kind: "list";
+  property: ListSecurityPolicyField;
+  added: string[];
+  removed: string[];
+}
+
+export type SecurityPolicyTransition =
+  SecurityPolicyScalarTransition | SecurityPolicyListTransition;
 
 export interface SharedSecurityPolicyChange {
   source: SecurityPolicyChangeSource & {
@@ -242,13 +257,25 @@ function buildSecurityPolicyTransitions(
     // Asset creation and deletion have no prior/future boundary to relax.
     if (change.before === null || change.after === null) return [];
     return change.fields.flatMap((field): SecurityPolicyTransition[] => {
-      if (field.kind !== "scalar") return [];
+      if (field.kind === "scalar") {
+        return [
+          {
+            kind: "scalar",
+            asset: change.asset,
+            property: field.field,
+            fromState: policyBooleanState(field.before),
+            toState: policyBooleanState(field.after),
+            provenance: field.provenance,
+          },
+        ];
+      }
       return [
         {
+          kind: "list",
           asset: change.asset,
           property: field.field,
-          fromState: policyBooleanState(field.before),
-          toState: policyBooleanState(field.after),
+          added: field.added,
+          removed: field.removed,
           provenance: field.provenance,
         },
       ];

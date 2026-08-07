@@ -120,32 +120,75 @@ test("direct effective policy changes retain normalized scalar and list details"
   ]);
   assert.equal(JSON.stringify(result).includes("fingerprint"), false);
   assert.deepEqual(
-    result.policyTransitions.map((transition) => ({
-      asset: transition.asset,
-      property: transition.property,
-      fromState: transition.fromState,
-      toState: transition.toState,
-    })),
+    result.policyTransitions.map((transition) =>
+      transition.kind === "scalar"
+        ? {
+            kind: transition.kind,
+            asset: transition.asset,
+            property: transition.property,
+            fromState: transition.fromState,
+            toState: transition.toState,
+          }
+        : {
+            kind: transition.kind,
+            asset: transition.asset,
+            property: transition.property,
+            added: transition.added,
+            removed: transition.removed,
+          },
+    ),
     [
       {
+        kind: "scalar",
         asset: { id: "context.review", path, kind: "context" },
         property: "networkAllowed",
         fromState: false,
         toState: true,
       },
       {
+        kind: "list",
+        asset: { id: "context.review", path, kind: "context" },
+        property: "approvedNetworkDestinations",
+        added: ["new.example.com"],
+        removed: ["old.example.com"],
+      },
+      {
+        kind: "scalar",
         asset: { id: "context.review", path, kind: "context" },
         property: "externalUploadAllowed",
         fromState: false,
         toState: true,
       },
       {
+        kind: "list",
+        asset: { id: "context.review", path, kind: "context" },
+        property: "approvedUploadDestinations",
+        added: ["new-upload.example.com"],
+        removed: ["old-upload.example.com"],
+      },
+      {
+        kind: "list",
+        asset: { id: "context.review", path, kind: "context" },
+        property: "allowedData",
+        added: ["confidential"],
+        removed: [],
+      },
+      {
+        kind: "list",
+        asset: { id: "context.review", path, kind: "context" },
+        property: "forbiddenInputs",
+        added: [],
+        removed: ["credentials"],
+      },
+      {
+        kind: "scalar",
         asset: { id: "context.review", path, kind: "context" },
         property: "secretsAllowed",
         fromState: false,
         toState: true,
       },
       {
+        kind: "scalar",
         asset: { id: "context.review", path, kind: "context" },
         property: "humanApprovalRequired",
         fromState: true,

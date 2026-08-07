@@ -907,6 +907,7 @@ test("formatDiff surfaces canonical per-asset security policy relaxations before
   );
   report.security.policyTransitions = [
     {
+      kind: "scalar",
       asset: {
         id: "skill.ops.deploy",
         path: "skills/ops/deploy/SKILL.md",
@@ -915,6 +916,27 @@ test("formatDiff surfaces canonical per-asset security policy relaxations before
       property: "networkAllowed",
       fromState: false,
       toState: true,
+      provenance: {
+        mode: "direct",
+        sources: [
+          {
+            type: "asset",
+            id: "skill.ops.deploy",
+            path: "skills/ops/deploy/SKILL.md",
+          },
+        ],
+      },
+    },
+    {
+      kind: "list",
+      asset: {
+        id: "skill.ops.deploy",
+        path: "skills/ops/deploy/SKILL.md",
+        kind: "skill",
+      },
+      property: "approvedNetworkDestinations",
+      added: ["telemetry.vendor.io"],
+      removed: [],
       provenance: {
         mode: "direct",
         sources: [
@@ -936,13 +958,22 @@ test("formatDiff surfaces canonical per-asset security policy relaxations before
     markdown,
     /skill\.ops\.deploy[\s\S]*networkAllowed false -> true/,
   );
+  assert.match(
+    markdown,
+    /approvedNetworkDestinations — allowed value added: `telemetry\.vendor\.io`/,
+  );
   assert.ok(
     markdown.indexOf("### Security policy relaxations") <
+      markdown.indexOf("### Aggregate security metrics"),
+  );
+  assert.ok(
+    markdown.indexOf("### Aggregate security metrics") <
       markdown.indexOf("- Added security findings:"),
   );
-  assert.deepEqual(parsed.security.policyTransitions, [
-    report.security.policyTransitions[0],
-  ]);
+  assert.deepEqual(
+    parsed.security.policyTransitions,
+    report.security.policyTransitions,
+  );
 });
 
 test("formatDiff deterministically exposes corrected invocation states", () => {
