@@ -114,6 +114,10 @@ export function evaluateExecutableSurfaceCiPolicy(
   configured: ExecutableSurfaceCiConfiguration,
 ): ExecutableSurfaceCiEvaluation {
   const effective = effectiveExecutableSurfaceCiPolicy(configured);
+  const addedSurfacePaths = new Set(diff.addedSurfacePaths ?? []);
+  const removedSurfacePaths = new Set(diff.removedSurfacePaths ?? []);
+  const isExistingSurfaceTransition = (path: string): boolean =>
+    !addedSurfacePaths.has(path) && !removedSurfacePaths.has(path);
   const matches: ExecutableSurfaceCiMatch[] = [
     ...(diff.addedSurfacePaths ?? []).map((path) => ({
       id: EXECUTABLE_SURFACE_CI_MATCH_IDS.SURFACE_ADDED,
@@ -178,26 +182,32 @@ export function evaluateExecutableSurfaceCiPolicy(
         summary:
           "An existing invocation became ambiguous across effective security policies.",
       })),
-    ...(diff.newlyUnreachableSkillLocalPaths ?? []).map((path) => ({
-      id: EXECUTABLE_SURFACE_CI_MATCH_IDS.SKILL_LOCAL_REACHABILITY_LOST,
-      kind: "surface" as const,
-      path,
-      summary:
-        "A Skill-local executable surface became structurally unreachable.",
-    })),
-    ...(diff.surfacesLostStaticInvocationReachability ?? []).map((path) => ({
-      id: EXECUTABLE_SURFACE_CI_MATCH_IDS.STATIC_INVOCATION_REACHABILITY_LOST,
-      kind: "surface" as const,
-      path,
-      summary: "An executable surface lost static invocation reachability.",
-    })),
-    ...(diff.newlyTransitivelyReachableSurfacePaths ?? []).map((path) => ({
-      id: EXECUTABLE_SURFACE_CI_MATCH_IDS.TRANSITIVE_REACHABILITY_ADDED,
-      kind: "surface" as const,
-      path,
-      summary:
-        "An existing executable surface became newly statically transitively reachable.",
-    })),
+    ...(diff.newlyUnreachableSkillLocalPaths ?? [])
+      .filter(isExistingSurfaceTransition)
+      .map((path) => ({
+        id: EXECUTABLE_SURFACE_CI_MATCH_IDS.SKILL_LOCAL_REACHABILITY_LOST,
+        kind: "surface" as const,
+        path,
+        summary:
+          "A Skill-local executable surface became structurally unreachable.",
+      })),
+    ...(diff.surfacesLostStaticInvocationReachability ?? [])
+      .filter(isExistingSurfaceTransition)
+      .map((path) => ({
+        id: EXECUTABLE_SURFACE_CI_MATCH_IDS.STATIC_INVOCATION_REACHABILITY_LOST,
+        kind: "surface" as const,
+        path,
+        summary: "An executable surface lost static invocation reachability.",
+      })),
+    ...(diff.newlyTransitivelyReachableSurfacePaths ?? [])
+      .filter(isExistingSurfaceTransition)
+      .map((path) => ({
+        id: EXECUTABLE_SURFACE_CI_MATCH_IDS.TRANSITIVE_REACHABILITY_ADDED,
+        kind: "surface" as const,
+        path,
+        summary:
+          "An existing executable surface became newly statically transitively reachable.",
+      })),
   ].sort(compareMatches);
 
   return {

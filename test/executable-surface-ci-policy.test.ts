@@ -181,6 +181,178 @@ test("problematic dependency match consumes canonical JS analyzer evidence", asy
   });
 });
 
+test("removed directly invoked surface is not a static reachability-loss policy match", async (t) => {
+  const root = await realDiffFixture(t);
+  await writeSkill(root, ["```bash", "node tools/helper.mjs", "```"]);
+  await writeExecutable(root, "tools/helper.mjs");
+  const before = await executableInventory(root);
+
+  await writeSkill(root, []);
+  await rm(join(root, "tools", "helper.mjs"));
+  const after = await executableInventory(root);
+  const diff = buildExecutableSurfaceDiff(before, after);
+  const evaluation = evaluateExecutableSurfaceCiPolicy(diff, {
+    from: "fail",
+    to: "fail",
+  });
+
+  assert.ok(diff.removedSurfacePaths.includes("tools/helper.mjs"));
+  assert.ok(
+    !hasSurfaceMatch(
+      evaluation,
+      EXECUTABLE_SURFACE_CI_MATCH_IDS.STATIC_INVOCATION_REACHABILITY_LOST,
+      "tools/helper.mjs",
+    ),
+  );
+  assert.ok(
+    !evaluation.matches.some(
+      (match) => match.id === EXECUTABLE_SURFACE_CI_MATCH_IDS.SURFACE_ADDED,
+    ),
+  );
+});
+
+test("removed transitively reachable surface is not a static reachability-loss policy match", async (t) => {
+  const root = await realDiffFixture(t);
+  await writeSkill(root, ["```bash", "node tools/a.mjs", "```"]);
+  await writeExecutable(root, "tools/a.mjs", 'import "./b.mjs";\n');
+  await writeExecutable(root, "tools/b.mjs");
+  const before = await executableInventory(root);
+
+  await writeExecutable(root, "tools/a.mjs");
+  await rm(join(root, "tools", "b.mjs"));
+  const after = await executableInventory(root);
+  const diff = buildExecutableSurfaceDiff(before, after);
+  const evaluation = evaluateExecutableSurfaceCiPolicy(diff, {
+    from: "fail",
+    to: "fail",
+  });
+
+  assert.ok(diff.removedSurfacePaths.includes("tools/b.mjs"));
+  assert.ok(
+    !hasSurfaceMatch(
+      evaluation,
+      EXECUTABLE_SURFACE_CI_MATCH_IDS.STATIC_INVOCATION_REACHABILITY_LOST,
+      "tools/b.mjs",
+    ),
+  );
+});
+
+test("new unreachable Skill-local script is owned only by surface-added policy", async (t) => {
+  const root = await realDiffFixture(t);
+  await writeSkill(root, []);
+  const before = await executableInventory(root);
+
+  await writeExecutable(root, "skills/demo/scripts/new.sh", "#!/bin/sh\n");
+  const after = await executableInventory(root);
+  const diff = buildExecutableSurfaceDiff(before, after);
+  const evaluation = evaluateExecutableSurfaceCiPolicy(diff, {
+    from: "fail",
+    to: "fail",
+  });
+
+  assert.ok(diff.addedSurfacePaths.includes("skills/demo/scripts/new.sh"));
+  assert.ok(
+    diff.newlyUnreachableSkillLocalPaths.includes("skills/demo/scripts/new.sh"),
+  );
+  assert.ok(
+    hasSurfaceMatch(
+      evaluation,
+      EXECUTABLE_SURFACE_CI_MATCH_IDS.SURFACE_ADDED,
+      "skills/demo/scripts/new.sh",
+    ),
+  );
+  assert.ok(
+    !hasSurfaceMatch(
+      evaluation,
+      EXECUTABLE_SURFACE_CI_MATCH_IDS.SKILL_LOCAL_REACHABILITY_LOST,
+      "skills/demo/scripts/new.sh",
+    ),
+  );
+});
+
+test("new transitively reachable executable is owned only by surface-added policy", async (t) => {
+  const root = await realDiffFixture(t);
+  await writeSkill(root, ["```bash", "node tools/a.mjs", "```"]);
+  await writeExecutable(root, "tools/a.mjs");
+  const before = await executableInventory(root);
+
+  await writeExecutable(root, "tools/a.mjs", 'import "./b.mjs";\n');
+  await writeExecutable(root, "tools/b.mjs");
+  const after = await executableInventory(root);
+  const diff = buildExecutableSurfaceDiff(before, after);
+  const evaluation = evaluateExecutableSurfaceCiPolicy(diff, {
+    from: "fail",
+    to: "fail",
+  });
+
+  assert.ok(diff.addedSurfacePaths.includes("tools/b.mjs"));
+  assert.ok(
+    diff.newlyTransitivelyReachableSurfacePaths.includes("tools/b.mjs"),
+  );
+  assert.ok(
+    hasSurfaceMatch(
+      evaluation,
+      EXECUTABLE_SURFACE_CI_MATCH_IDS.SURFACE_ADDED,
+      "tools/b.mjs",
+    ),
+  );
+  assert.ok(
+    !hasSurfaceMatch(
+      evaluation,
+      EXECUTABLE_SURFACE_CI_MATCH_IDS.TRANSITIVE_REACHABILITY_ADDED,
+      "tools/b.mjs",
+    ),
+  );
+});
+
+test("true existing-surface reachability transitions remain policy matches", async (t) => {
+  const root = await realDiffFixture(t);
+  await writeSkill(root, [
+    "[Local helper](scripts/local.sh)",
+    "",
+    "```bash",
+    "node tools/direct.mjs",
+    "node tools/a.mjs",
+    "```",
+  ]);
+  await writeExecutable(root, "skills/demo/scripts/local.sh", "#!/bin/sh\n");
+  await writeExecutable(root, "tools/direct.mjs");
+  await writeExecutable(root, "tools/a.mjs");
+  await writeExecutable(root, "tools/b.mjs");
+  const before = await executableInventory(root);
+
+  await writeSkill(root, ["```bash", "node tools/a.mjs", "```"]);
+  await writeExecutable(root, "tools/a.mjs", 'import "./b.mjs";\n');
+  const after = await executableInventory(root);
+  const diff = buildExecutableSurfaceDiff(before, after);
+  const evaluation = evaluateExecutableSurfaceCiPolicy(diff, {
+    from: "fail",
+    to: "fail",
+  });
+
+  assert.ok(
+    hasSurfaceMatch(
+      evaluation,
+      EXECUTABLE_SURFACE_CI_MATCH_IDS.SKILL_LOCAL_REACHABILITY_LOST,
+      "skills/demo/scripts/local.sh",
+    ),
+  );
+  assert.ok(
+    hasSurfaceMatch(
+      evaluation,
+      EXECUTABLE_SURFACE_CI_MATCH_IDS.STATIC_INVOCATION_REACHABILITY_LOST,
+      "tools/direct.mjs",
+    ),
+  );
+  assert.ok(
+    hasSurfaceMatch(
+      evaluation,
+      EXECUTABLE_SURFACE_CI_MATCH_IDS.TRANSITIVE_REACHABILITY_ADDED,
+      "tools/b.mjs",
+    ),
+  );
+});
+
 test("policy ambiguity is directional and resolving ambiguity is not a match", () => {
   const diff = neutralDiff();
   diff.invocationGovernanceChangesWithMultipleEffectivePolicyFingerprints = [
@@ -280,6 +452,65 @@ function neutralDiff(): ExecutableSurfaceDiff {
   return buildExecutableSurfaceDiff(
     zeroExecutableSurfaceInventory(),
     zeroExecutableSurfaceInventory(),
+  );
+}
+
+async function realDiffFixture(t: test.TestContext): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), "renma-executable-ci-real-diff-"));
+  t.after(() => rm(root, { force: true, recursive: true }));
+  await writeFile(
+    join(root, "renma.config.json"),
+    JSON.stringify({
+      globs: ["skills/**/SKILL.md", "skills/**/scripts/**/*", "tools/**/*"],
+    }),
+  );
+  return root;
+}
+
+async function writeSkill(root: string, bodyLines: string[]): Promise<void> {
+  const skillDirectory = join(root, "skills", "demo");
+  await mkdir(skillDirectory, { recursive: true });
+  await writeFile(
+    join(skillDirectory, "SKILL.md"),
+    [
+      "---",
+      "name: demo",
+      "description: Review executable reachability evidence. Use when deterministic CI policy regression coverage is required.",
+      "metadata:",
+      "  renma.id: skill.demo",
+      "  renma.owner: test",
+      "  renma.status: stable",
+      "---",
+      "# Demo",
+      "",
+      ...bodyLines,
+      "",
+    ].join("\n"),
+  );
+}
+
+async function writeExecutable(
+  root: string,
+  relativePath: string,
+  content = "export const value = 1;\n",
+): Promise<void> {
+  const absolutePath = join(root, ...relativePath.split("/"));
+  await mkdir(join(absolutePath, ".."), { recursive: true });
+  await writeFile(absolutePath, content);
+}
+
+async function executableInventory(root: string) {
+  return (await collectRepositorySnapshot(root)).executableSurfaceInventory;
+}
+
+function hasSurfaceMatch(
+  evaluation: ReturnType<typeof evaluateExecutableSurfaceCiPolicy>,
+  id: (typeof EXECUTABLE_SURFACE_CI_MATCH_IDS)[keyof typeof EXECUTABLE_SURFACE_CI_MATCH_IDS],
+  path: string,
+): boolean {
+  return evaluation.matches.some(
+    (match) =>
+      match.id === id && match.kind === "surface" && match.path === path,
   );
 }
 
