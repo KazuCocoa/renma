@@ -3,6 +3,11 @@ name: Code Quality and Unit Tests
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   lint-format-and-test:
@@ -24,7 +29,7 @@ jobs:
           mode: firewall-free
 
       - name: Install dependencies
-        run: sfw npm install
+        run: sfw npm ci
 
       - name: List installed packages
         run: npm list --depth=0
@@ -43,6 +48,84 @@ jobs:
 
       - run: npm run build
         name: Build
+
+      - name: Run Unit Tests
+        run: npm run test
+
+      - name: Verify package contents
+        run: npm run verify:package
+
+      - name: Validate merged main with Renma
+        id: post_merge_scan
+        if: github.event_name == 'push'
+        continue-on-error: true
+        run: node dist/index.js scan . --fail-on high --strict
+
+      - name: Resolve previous main revision
+        id: previous_main
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [[ -z "${BEFORE_SHA}" || "${BEFORE_SHA}" =~ ^0+$ ]]; then
+            echo "available=false" >> "${GITHUB_OUTPUT}"
+            echo "No previous revision was supplied; skipping the revision comparison."
+          elif git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+            echo "available=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "available=false" >> "${GITHUB_OUTPUT}"
+            echo "Previous revision ${BEFORE_SHA} is unavailable; skipping the revision comparison."
+          fi
+
+      - name: Validate merged main revision comparison
+        id: post_merge_comparison
+        if: >-
+          github.event_name == 'push' &&
+          steps.previous_main.outputs.available == 'true'
+        continue-on-error: true
+        env:
+          FROM_SHA: ${{ github.event.before }}
+          TO_SHA: ${{ github.sha }}
+        run: |
+          node dist/index.js ci-report . \
+            --from "${FROM_SHA}" \
+            --to "${TO_SHA}" \
+            --format markdown \
+            --fail-on-status warn
+
+      - name: Enforce post-merge Renma validation
+        if: >-
+          github.event_name == 'push' &&
+          (steps.post_merge_scan.outcome == 'failure' ||
+          steps.post_merge_comparison.outcome == 'failure')
+        run: exit 1
+
+  minimum-node-compatibility:
+    name: Minimum supported Node compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Read minimum supported Node version
+        id: minimum-node
+        run: echo "version=$(node scripts/min-supported-node.mjs)" >> "${GITHUB_OUTPUT}"
+
+      - name: Setup minimum supported Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ steps.minimum-node.outputs.version }}
+
+      - uses: SocketDev/action@v1
+        with:
+          mode: firewall-free
+
+      - name: Install dependencies
+        run: sfw npm ci
+
+      - name: Build
+        run: npm run build
 
       - name: Run Unit Tests
         run: npm run test
