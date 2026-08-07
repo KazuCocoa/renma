@@ -288,7 +288,11 @@ test("Authoring Guide preserves the Renma and platform responsibility boundary",
     authoring,
     /`renma guide skill` remains deterministic and non-interactive[\s\S]*the consuming LLM conducts the conversation/,
   );
-  assert.match(authoring, /LLM proposes\. Renma verifies\. Human approves\./);
+  assert.match(
+    authoring,
+    /external LLM investigates and proposes, Renma\s+validates supplied structure.*human reviews meaningful decisions/is,
+  );
+  assert.match(authoring, /does not certify that a handoff's conversation/);
   assert.match(authoring, /Do not run two independent generators/);
   assert.match(
     authoring,

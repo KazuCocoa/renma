@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/KazuCocoa/renma/blob/main/docs/schemas/skill-authoring-handoff-v1.schema.json",
+  "title": "Renma Skill Authoring Handoff v1",
+  "description": "Caller-declared Skill authoring evidence. Structural validity does not prove that clarification, source review, or human approval occurred or that declared facts are true.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "topic",
+    "currentUnderstanding",
+    "progression",
+    "skillContract",
+    "assetGraph",
+    "sourceAuthorities",
+    "securityDecisions",
+    "runtimeUnknownHandling"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "renma.skill-authoring-handoff.v1" },
+    "topic": { "const": "skill" },
+    "currentUnderstanding": { "$ref": "#/$defs/currentUnderstanding" },
+    "progression": { "$ref": "#/$defs/progression" },
+    "skillContract": { "$ref": "#/$defs/skillContract" },
+    "assetGraph": { "$ref": "#/$defs/assetGraph" },
+    "sourceAuthorities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sourceAuthority" }
+    },
+    "securityDecisions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/securityDecision" }
+    },
+    "runtimeUnknownHandling": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/runtimeUnknownHandling" }
+    }
+  },
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "uniqueStrings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonEmptyString" }
+    },
+    "currentUnderstanding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confirmed", "proposed", "unresolved"],
+      "properties": {
+        "confirmed": { "$ref": "#/$defs/uniqueStrings" },
+        "proposed": { "$ref": "#/$defs/uniqueStrings" },
+        "unresolved": { "$ref": "#/$defs/uniqueStrings" }
+      }
+    },
+    "progression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blocking", "reversibleDefaults", "deferred"],
+      "properties": {
+        "blocking": { "$ref": "#/$defs/uniqueStrings" },
+        "reversibleDefaults": { "$ref": "#/$defs/uniqueStrings" },
+        "deferred": { "$ref": "#/$defs/uniqueStrings" }
+      }
+    },
+    "skillContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recurringTask",
+        "expectedResult",
+        "requiredInputs",
+        "completionCriteria",
+        "failureBehavior",
+        "useWhen",
+        "doNotUseWhen"
+      ],
+      "properties": {
+        "recurringTask": { "$ref": "#/$defs/nonEmptyString" },
+        "expectedResult": { "$ref": "#/$defs/nonEmptyString" },
+        "requiredInputs": { "$ref": "#/$defs/uniqueStrings" },
+        "completionCriteria": { "$ref": "#/$defs/uniqueStrings" },
+        "failureBehavior": { "$ref": "#/$defs/uniqueStrings" },
+        "useWhen": { "$ref": "#/$defs/uniqueStrings" },
+        "doNotUseWhen": { "$ref": "#/$defs/uniqueStrings" }
+      }
+    },
+    "assetGraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["skill", "supportingAssets"],
+      "properties": {
+        "skill": { "$ref": "#/$defs/skill" },
+        "supportingAssets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/supportingAsset" }
+        }
+      }
+    },
+    "skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "id",
+        "title",
+        "owner",
+        "tags",
+        "resources",
+        "requiresContext",
+        "optionalContext",
+        "requiresLens",
+        "optionalLens"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^(?:skills|\\.agents/skills)/.+/SKILL\\.md$"
+        },
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "owner": {
+          "allOf": [
+            { "$ref": "#/$defs/nonEmptyString" },
+            { "not": { "const": "unowned" } }
+          ]
+        },
+        "tags": { "$ref": "#/$defs/uniqueStrings" },
+        "resources": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["references", "scripts", "assets"] }
+        },
+        "requiresContext": { "$ref": "#/$defs/uniqueStrings" },
+        "optionalContext": { "$ref": "#/$defs/uniqueStrings" },
+        "requiresLens": { "$ref": "#/$defs/uniqueStrings" },
+        "optionalLens": { "$ref": "#/$defs/uniqueStrings" }
+      }
+    },
+    "supportingAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id",
+        "path",
+        "disposition",
+        "relationship",
+        "justification"
+      ],
+      "properties": {
+        "kind": { "enum": ["context", "context_lens"] },
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "path": { "$ref": "#/$defs/nonEmptyString" },
+        "disposition": { "enum": ["reuse", "create"] },
+        "relationship": { "enum": ["required", "optional"] },
+        "justification": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "sourceAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "status"],
+      "properties": {
+        "source": { "$ref": "#/$defs/nonEmptyString" },
+        "status": {
+          "enum": ["provided", "consulted", "designated_unconsulted"]
+        },
+        "authority": { "$ref": "#/$defs/nonEmptyString" },
+        "evidence": { "$ref": "#/$defs/uniqueStrings" }
+      }
+    },
+    "securityDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "state"],
+      "properties": {
+        "decision": { "$ref": "#/$defs/nonEmptyString" },
+        "state": { "enum": ["confirmed", "proposed", "unresolved"] },
+        "rationale": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "runtimeUnknownHandling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unknown", "behavior"],
+      "properties": {
+        "unknown": { "$ref": "#/$defs/nonEmptyString" },
+        "behavior": { "enum": ["ask", "report", "defer", "stop"] },
+        "condition": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    }
+  }
+}

@@ -13,6 +13,12 @@ import {
   SKILL_AUTHORING_PRINCIPLE,
 } from "../guidance/skill-authoring.js";
 import { formatJsonDocument } from "../report.js";
+import {
+  readSkillAuthoringHandoff,
+  validateSkillAuthoringHandoffIdentityAndGraph,
+  validateSkillAuthoringHandoffTarget,
+  type SkillAuthoringHandoff,
+} from "../skill-authoring-handoff.js";
 
 export type ScaffoldKind = "skill" | "context" | "context_lens";
 export type ScaffoldFormat = "file" | "prompt" | "json";
@@ -27,6 +33,7 @@ export interface ScaffoldOptions {
   owner?: string;
   tags?: string[];
   resources?: ScaffoldResource[];
+  handoffPath?: string;
 }
 
 export interface ScaffoldBundle {
@@ -40,12 +47,20 @@ export interface ScaffoldBundle {
   format: ScaffoldFormat;
   content: string;
   prompt: string;
+  handoff?: SkillAuthoringHandoff;
 }
 
 export async function runScaffoldCommand(
   options: ScaffoldOptions,
 ): Promise<number> {
-  const bundle = buildScaffoldBundle(options);
+  const handoff = options.handoffPath
+    ? await readSkillAuthoringHandoff(options.handoffPath)
+    : undefined;
+  if (handoff) {
+    validateSkillAuthoringHandoffTarget(handoff, options.targetPath);
+    validateSkillAuthoringHandoffIdentityAndGraph(handoff);
+  }
+  const bundle = buildScaffoldBundle(options, handoff);
 
   if (options.format === "json") {
     process.stdout.write(formatJsonDocument(bundle));
@@ -66,19 +81,48 @@ export async function runScaffoldCommand(
   }
   process.stdout.write(
     `Created ${options.targetPath}\n${
-      options.kind === "skill" ? `\n${renderSkillNextSteps()}\n` : ""
+      options.kind === "skill"
+        ? `\n${renderSkillNextSteps(handoff !== undefined)}\n`
+        : ""
     }`,
   );
   return CLI_EXIT.success;
 }
 
-export function buildScaffoldBundle(options: ScaffoldOptions): ScaffoldBundle {
-  const id = options.id ?? inferId(options.kind, options.targetPath);
-  const title = options.title ?? titleFromId(id);
-  const owner = options.owner ?? "unowned";
-  const tags =
-    options.tags && options.tags.length > 0 ? options.tags : ["authoring"];
-  const resources = [...new Set(options.resources ?? [])].sort();
+export function buildScaffoldBundle(
+  options: ScaffoldOptions,
+  handoff?: SkillAuthoringHandoff,
+): ScaffoldBundle {
+  if (handoff && options.kind !== "skill") {
+    throw new CliUserError("--handoff is supported only for skill scaffolds.");
+  }
+  if (
+    handoff &&
+    (options.id !== undefined ||
+      options.title !== undefined ||
+      options.owner !== undefined ||
+      options.tags !== undefined ||
+      options.resources !== undefined)
+  ) {
+    throw new CliUserError(
+      "--handoff cannot be combined with --id, --title, --owner, --tags, or --resources.",
+    );
+  }
+  const suppliedSkill = handoff?.assetGraph.skill;
+  const id =
+    suppliedSkill?.id ??
+    options.id ??
+    inferId(options.kind, options.targetPath);
+  const title = suppliedSkill?.title ?? options.title ?? titleFromId(id);
+  const owner = suppliedSkill?.owner ?? options.owner ?? "unowned";
+  const tags = suppliedSkill
+    ? [...suppliedSkill.tags]
+    : options.tags && options.tags.length > 0
+      ? options.tags
+      : ["authoring"];
+  const resources = suppliedSkill
+    ? [...suppliedSkill.resources]
+    : [...new Set(options.resources ?? [])].sort();
   if (options.kind !== "skill" && resources.length > 0) {
     throw new CliUserError(
       "--resources is supported only for skill scaffolds.",
@@ -92,12 +136,22 @@ export function buildScaffoldBundle(options: ScaffoldOptions): ScaffoldBundle {
           title,
           owner,
           tags,
+          ...(suppliedSkill
+            ? {
+                relationships: {
+                  requiresContext: suppliedSkill.requiresContext,
+                  optionalContext: suppliedSkill.optionalContext,
+                  requiresLens: suppliedSkill.requiresLens,
+                  optionalLens: suppliedSkill.optionalLens,
+                },
+              }
+            : {}),
         })
       : options.kind === "context_lens"
         ? renderContextLensScaffold({ id, title, owner, tags })
         : renderContextScaffold({ id, title, owner, tags });
 
-  return {
+  const bundle: ScaffoldBundle = {
     kind: options.kind,
     path: options.targetPath,
     id,
@@ -116,8 +170,11 @@ export function buildScaffoldBundle(options: ScaffoldOptions): ScaffoldBundle {
       tags,
       resources,
       content,
+      ...(handoff ? { handoff } : {}),
     }),
   };
+  if (handoff) bundle.handoff = handoff;
+  return bundle;
 }
 
 function renderSkillScaffold(metadata: {
@@ -126,7 +183,14 @@ function renderSkillScaffold(metadata: {
   title: string;
   owner: string;
   tags: string[];
+  relationships?: {
+    requiresContext: string[];
+    optionalContext: string[];
+    requiresLens: string[];
+    optionalLens: string[];
+  };
 }): string {
+  const relationships = metadata.relationships;
   return `---
 name: ${metadata.name}
 description: Replace this description with clear routing guidance. Use when the intended workflow applies.
@@ -137,9 +201,15 @@ metadata:
   renma.owner: ${yamlString(metadata.owner)}
   renma.status: experimental
   renma.tags: ${yamlString(JSON.stringify(metadata.tags))}
-  renma.requires-context: '[]'
-  renma.optional-context: '[]'
-  renma.conflicts: '[]'
+  renma.requires-context: ${yamlString(JSON.stringify(relationships?.requiresContext ?? []))}
+  renma.optional-context: ${yamlString(JSON.stringify(relationships?.optionalContext ?? []))}
+${
+  relationships
+    ? `  renma.requires-lens: ${yamlString(JSON.stringify(relationships.requiresLens))}
+  renma.optional-lens: ${yamlString(JSON.stringify(relationships.optionalLens))}
+`
+    : ""
+}  renma.conflicts: '[]'
 ---
 
 # ${metadata.title}
@@ -288,6 +358,7 @@ function renderPrompt(input: {
   tags: string[];
   resources: ScaffoldResource[];
   content: string;
+  handoff?: SkillAuthoringHandoff;
 }): string {
   const skillGuidance =
     input.kind === "skill"
@@ -313,9 +384,12 @@ function renderPrompt(input: {
           "- Keep the focused task and workflow in the Skill, and keep independently maintained or source-authoritative knowledge in Context Assets.",
         ]
       : [];
+  const handoffSection = input.handoff
+    ? `${renderAuthoringHandoffPrompt(input.handoff)}\n\n`
+    : "";
   return `Create a Renma ${input.kind} asset at \`${input.targetPath}\`.
 
-Use this metadata exactly:
+${handoffSection}Use this metadata exactly:
 
 - id: \`${input.id}\`
 - title: \`${input.title}\`
@@ -356,7 +430,75 @@ ${contextLensGuidance.join("\n")}
 `;
 }
 
-function renderSkillNextSteps(): string {
+function renderAuthoringHandoffPrompt(handoff: SkillAuthoringHandoff): string {
+  const contract = handoff.skillContract;
+  return `Authoring handoff
+
+Schema: ${handoff.schemaVersion}
+This is caller-declared authoring evidence. Renma validated its supplied structure and internal consistency; it did not prove the conversation, human review, source authority, completeness of the blocker set, or domain truth.
+
+Current understanding
+Confirmed:
+${promptList(handoff.currentUnderstanding.confirmed)}
+Proposed:
+${promptList(handoff.currentUnderstanding.proposed)}
+Unresolved:
+${promptList(handoff.currentUnderstanding.unresolved)}
+
+Progression
+Blocking: ${handoff.progression.blocking.length}
+Reversible defaults:
+${promptList(handoff.progression.reversibleDefaults)}
+Deferred:
+${promptList(handoff.progression.deferred)}
+
+Skill contract
+Recurring task: ${contract.recurringTask}
+Expected result: ${contract.expectedResult}
+Required inputs:
+${promptList(contract.requiredInputs)}
+Completion criteria:
+${promptList(contract.completionCriteria)}
+Failure behavior:
+${promptList(contract.failureBehavior)}
+Use when:
+${promptList(contract.useWhen)}
+Do not use when:
+${promptList(contract.doNotUseWhen)}
+
+Asset graph
+${JSON.stringify(handoff.assetGraph, null, 2)}
+
+Declared source authorities
+${JSON.stringify(handoff.sourceAuthorities, null, 2)}
+
+Recorded security decisions
+${JSON.stringify(handoff.securityDecisions, null, 2)}
+
+Runtime unknown handling
+${JSON.stringify(handoff.runtimeUnknownHandling, null, 2)}
+
+Use the supplied handoff as the current authoring state. Do not promote Proposed or Unresolved facts to Confirmed. Do not invent omitted domain or governance truth or infer broader security permission. Re-enter clarification if new evidence creates a Blocking authoring decision. Preserve caller-provided facts directly; do not synthesize new semantic prose from them.`;
+}
+
+function promptList(items: readonly string[]): string {
+  return items.length > 0
+    ? items.map((item) => `- ${item}`).join("\n")
+    : "- None declared.";
+}
+
+function renderSkillNextSteps(fromHandoff = false): string {
+  if (fromHandoff) {
+    return [
+      "Next steps:",
+      "1. Author within the supplied handoff's asset boundary without promoting Proposed or Unresolved state to Confirmed.",
+      "2. Create supporting assets only through separate explicit scaffold commands when intended.",
+      "3. Re-enter clarification if new evidence creates a Blocking decision or changes the agreed asset boundary.",
+      "4. Run `renma scan . --fail-on high` and inspect catalog, graph, and readiness evidence.",
+      "5. Fix relevant findings and rerun validation.",
+      "6. Have a human review meaningful semantic changes and unresolved decisions before merging.",
+    ].join("\n");
+  }
   return [
     "Next steps:",
     "1. Run `renma guide skill` and confirm this is the smallest non-redundant intended asset structure.",

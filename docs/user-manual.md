@@ -16,8 +16,10 @@ user-provided artifacts, repository evidence, and permitted authoritative
 source content, separate confirmed facts from proposals and unresolved human
 truth, classify progression separately, and ask one to three focused questions
 per batch while retaining the complete blocker set. Renma itself remains
-non-interactive. This elaborates the existing boundary: **LLM proposes. Renma
-verifies. Human approves.**
+non-interactive. The external LLM investigates and proposes, Renma validates
+the supplied structure and repository evidence it can determine, and a human
+reviews meaningful decisions. Renma does not independently certify that an
+authoring conversation occurred or that caller-declared domain facts are true.
 
 Before applying progression, distinguish decisions needed to author the Skill
 contract from runtime task unknowns the finished Skill should detect, report,
@@ -30,6 +32,31 @@ constraints, completion criteria, and ambiguity-resolving examples only within
 the agreed Renma boundaries. It is not the authority for Renma metadata,
 Context placement, file count, source-of-truth representation, or support files
 and scripts.
+
+For agent workflows, the consuming LLM records the result in the versioned
+`renma.skill-authoring-handoff.v1` exchange contract after the supplied state
+declares no remaining Blocking decisions. The handoff is caller-declared
+authoring evidence, not a Renma asset or conversation file:
+
+```text
+renma guide skill
+  -> external LLM clarifies and reviews available evidence
+  -> no declared Blocking authoring decision remains
+  -> external LLM writes renma.skill-authoring-handoff.v1 JSON
+  -> renma scaffold skill <agreed-path> --handoff <handoff.json>
+  -> external LLM authors within the scaffold
+  -> renma scan / catalog / graph / readiness
+  -> human review
+```
+
+Renma reads this file locally, validates its version, bounded structure,
+declared gate state, canonical Skill identity, target agreement, relationship
+consistency, and resource kinds, then applies the supplied structural values.
+It does not prove that clarification happened, every blocker was discovered,
+a designated source is authoritative or was consulted, a human approved every
+decision, or the declared facts are true. Proposed reversible defaults and
+Unresolved Deferred items may remain; only a non-empty `progression.blocking`
+list prevents scaffolding.
 
 ## Install And Build
 
@@ -631,8 +658,10 @@ Read these reports together:
 
 When creating a Skill, run `renma guide skill`; let the consuming LLM clarify
 human truth, inspect relevant evidence, and pass the creation gate; then define
-the smallest intended asset graph, run `scaffold skill` once, create or reuse
-only justified Context Assets, complete the focused workflow, and validate with
+the smallest intended asset graph, record a
+`renma.skill-authoring-handoff.v1` exchange artifact, run
+`scaffold skill <path> --handoff <handoff.json>` once, create or reuse only
+justified Context Assets, complete the focused workflow, and validate with
 `renma scan . --fail-on high`. For deeper authoring guidance, see the
 [Authoring Guide](authoring-guide.md). For rule details, see the
 [Diagnostics Reference](diagnostics.md).
@@ -734,8 +763,9 @@ clarification gate.
 ```mermaid
 flowchart LR
   Guide["Run renma guide skill"] --> Clarify["LLM clarifies truth and batches blockers"]
-  Clarify --> Structure["Pass the gate and define the smallest asset structure"]
-  Structure --> Scaffold["Run renma scaffold skill once"]
+  Clarify --> Structure["Declare no blockers and define the smallest asset structure"]
+  Structure --> Handoff["Write renma.skill-authoring-handoff.v1"]
+  Handoff --> Scaffold["Run renma scaffold skill --handoff once"]
   Scaffold --> Context["Scaffold or reuse justified Context"]
   Context --> Complete["Complete the focused workflow"]
   Complete --> Validate["Run renma scan . --fail-on high"]
@@ -781,13 +811,29 @@ finished Skill later according to its own runtime behavior.
    [Authoring Guide](authoring-guide.md#progression-and-question-batches) for the
    complete batching and boundary-reconsideration protocol.
 
-2. Run the Renma generator once for the target path.
+2. After the supplied state declares no Blocking decisions, have the external
+   LLM write a `renma.skill-authoring-handoff.v1` JSON file. Its
+   `currentUnderstanding` preserves Confirmed, Proposed, and Unresolved state;
+   `progression` separately preserves Blocking, Reversible default, and Deferred
+   state. It also records the core Skill contract, one Skill node, planned
+   supporting Context or Context Lens nodes, local resources, source-authority
+   status, security decisions, and runtime-unknown handling. It contains no
+   finished Markdown or complete implementation plan.
+
+3. Run the Renma generator once for the explicit target path.
 
 ```bash
-renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
+renma scaffold skill skills/testing/spec-review/SKILL.md \
+  --handoff /tmp/spec-review-handoff.json
 ```
 
-3. Open and review the generated Skill.
+The positional target must agree with `assetGraph.skill.path` after safe
+normalization. `--handoff` cannot be combined with `--id`, `--title`, `--owner`,
+`--tags`, or `--resources`; the handoff is the single structural authority.
+Existing direct use with `--owner` remains supported when no handoff is
+provided.
+
+4. Open and review the generated Skill.
 
 `scaffold` creates a starter file, not a complete production-ready Skill. Use
 platform-native Skill authoring guidance only to refine the description,
@@ -810,7 +856,7 @@ If refinement reveals a justified asset-boundary change, stop structural edits,
 record it as Proposed or Unresolved, inspect evidence, and re-enter the creation
 gate before changing the structure.
 
-4. Add a Context Asset when knowledge is reusable across Skills, has independent
+5. Add a Context Asset when knowledge is reusable across Skills, has independent
    ownership or lifecycle, is maintained separately, is an authoritative source
    of truth, or has another explicit reason for independent review and
    governance. Source-of-truth status alone is sufficient; correctness
@@ -838,14 +884,14 @@ authoring agent. For runtime access, review the supported allowed-data, network,
 approved-destination, external-upload, secrets, and human-approval policy. Keep
 the Skill body, Context instructions, and effective policy aligned.
 
-5. Connect the Skill to Context Assets.
+6. Connect the Skill to Context Assets.
 
 In a canonical Skill, add `renma.requires-context` or
 `renma.optional-context` under `metadata` as JSON-array strings. These fields
 create static repository graph relationships. They do
 not make Renma choose runtime context for an agent.
 
-6. Run repository validation.
+7. Run repository validation.
 
 ```bash
 renma scan . --fail-on high
@@ -2510,6 +2556,13 @@ conversation state.
 A short request is enough to begin; no `--interactive` option or upfront plan
 document is required.
 
+Both projections describe the small
+`renma.skill-authoring-handoff.v1` contract. JSON includes a structured
+`handoff` section with its purpose, trust boundary, construction rules, and a
+template; the default prompt includes a concise template rather than a full
+JSON Schema. The consuming LLM creates a filled handoff only after no declared
+Blocking authoring decision remains. `guide` never fills or writes one itself.
+
 The protocol is domain-neutral and structurally separate from its optional
 illustrations. Renma does not classify a request by matching it to a built-in
 example or ask the LLM to choose the closest one. The consuming LLM applies the
@@ -2543,6 +2596,7 @@ Context Assets. `scaffold` does not initialize repository-level configuration.
 
 ```bash
 renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform
+renma scaffold skill skills/testing/spec-review/SKILL.md --handoff /tmp/spec-review-handoff.json
 renma scaffold context contexts/testing/boundary-value-analysis.md --owner qa-platform
 renma scaffold context_lens lenses/testing/spec-review-boundary-values.md --owner qa-platform
 renma scaffold skill skills/testing/spec-review/SKILL.md --owner qa-platform --format prompt
@@ -2558,6 +2612,42 @@ verification steps before depending on it in automation.
 metadata. For a Skill scaffold, `--resources` creates only the selected empty
 `references`, `scripts`, or `assets` directories; it never creates placeholder
 files or accepts other resource directory names.
+
+`--handoff <path>` is an additive Skill-only workflow. The exchange file may
+be outside the repository and is read without network access. Before any
+filesystem side effect, Renma reads and parses it, requires
+`schemaVersion: "renma.skill-authoring-handoff.v1"` and `topic: "skill"`,
+checks that `progression.blocking` is empty, confirms safe target-path agreement,
+validates canonical `skills/**/SKILL.md` or `.agents/skills/**/SKILL.md`
+identity and Agent Skills naming, rejects blank IDs, titles, and owners or
+`owner: "unowned"`, and validates unique non-overlapping Context and Lens
+relationships, planned supporting-asset consistency, Context justifications,
+and the supported `references`, `scripts`, and `assets` resource kinds.
+
+All handoff failures are caller errors (exit `2`) and create no target or
+resource directory. A non-empty blocker list is not a policy-report failure
+and therefore never exits `1`. The positional target remains the explicit
+side-effect boundary. Do not combine `--handoff` with `--id`, `--title`,
+`--owner`, `--tags`, or `--resources`; no precedence or merge is attempted.
+
+For a valid handoff, scaffold applies the supplied `id`, `title`, `owner`,
+`tags`, `resources`, `requiresContext`, `optionalContext`, `requiresLens`, and
+`optionalLens` values directly. File mode writes the deterministic placeholder
+Skill plus only declared local resource directories. Planned supporting
+Context and Lens assets are recorded but never created by that invocation.
+Prompt mode includes the supplied decision sets, Skill contract, asset graph,
+source authorities, security decisions, and runtime-unknown handling for the
+authoring LLM. JSON mode adds the structured `handoff` projection to the normal
+bundle. Temporary Confirmed / Proposed / Unresolved and Blocking / Reversible
+default / Deferred state is not written into `SKILL.md`, and Renma does not
+synthesize polished prose from the supplied contract.
+
+The published [Skill Authoring Handoff v1 JSON
+Schema](schemas/skill-authoring-handoff-v1.schema.json) bounds the exchange
+shape. Cross-field checks remain deterministic TypeScript validation. Schema
+or structural success is not proof that the conversation occurred, the blocker
+set is complete, a source was actually authoritative or consulted, human review
+occurred, or domain declarations are true.
 
 For a Context Lens, replace every placeholder `purpose`, `applies_to`, `focus`,
 and `expected_outputs` value with repository-grounded content. Every

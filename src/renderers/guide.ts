@@ -1,6 +1,7 @@
 import type {
   SkillAuthoringClarificationExample,
   SkillAuthoringGuidance,
+  SkillAuthoringHandoffGuidance,
   SkillAuthoringIllustration,
   SkillAuthoringInteraction,
   SkillAuthoringProgressionSummary,
@@ -17,6 +18,9 @@ export function renderSkillGuidePrompt(
     "",
     "Interactive authoring protocol",
     ...renderInteraction(guidance.interaction),
+    "",
+    "Structured guide-to-scaffold handoff",
+    ...renderHandoffGuidance(guidance.handoff),
     "",
     "Authoring workflow",
     ...renderNumbered(guidance.workflow),
@@ -48,12 +52,30 @@ export function renderSkillGuidePrompt(
     "Verification",
     ...renderNumbered(guidance.verification),
     "",
-    "Boundary: LLM proposes. Renma verifies. Human approves. During authoring, the consuming LLM investigates, proposes, asks, and edits; the user supplies domain and governance truth; Renma provides deterministic rules and repository evidence.",
+    "Boundary: the external LLM investigates and proposes, Renma validates the supplied structure, and a human reviews meaningful decisions. Renma does not certify that the handoff's authoring or domain claims are true.",
   ].join("\n");
 }
 
 export function renderSkillGuideJson(guidance: SkillAuthoringGuidance): string {
   return JSON.stringify(guidance, null, 2);
+}
+
+function renderHandoffGuidance(
+  handoff: SkillAuthoringHandoffGuidance,
+): string[] {
+  return [
+    `Schema: ${handoff.schemaVersion}`,
+    handoff.purpose,
+    handoff.boundary,
+    "",
+    "Construction rules:",
+    ...renderBullets(handoff.rules),
+    "",
+    "Template (replace placeholder values; remove unused list entries):",
+    "```json",
+    JSON.stringify(handoff.template, null, 2),
+    "```",
+  ];
 }
 
 function renderIllustration(

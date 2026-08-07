@@ -922,6 +922,14 @@ may reuse small exported authoring invariants, but must not duplicate the full
 guide. The guidance source may import canonical metadata definitions; metadata
 and renderers must not import command modules.
 
+`src/skill-authoring-handoff.ts` is a repository-layer exchange-contract
+parser and validator. It owns the versioned v1 types, local JSON read and parse
+boundary, bounded shape checks, caller-declared gate check, safe target
+normalization, canonical Skill identity, and asset-graph consistency. The guide
+may reuse its low-level version and types; scaffold orchestrates it before any
+write. The module does not inspect repository contents, call a model, fetch a
+source, or claim that caller-declared authoring facts are true.
+
 The `interaction` object owns normative opening, phase, truth-source,
 epistemic, unknown-scope, progression, disposition, question, gate,
 validation, persistence, and handoff rules. `illustrationRules` and the

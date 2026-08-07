@@ -45,10 +45,12 @@ and source authority. The central principle is:
 protocol; the consuming LLM conducts the conversation and investigates
 applicable evidence, the user supplies domain and governance truth, Renma
 supplies deterministic rules and repository evidence, and a human approves
-meaningful decisions. This elaborates—not replaces—the product boundary:
-**LLM proposes. Renma verifies. Human approves.** Renma does not accept task
-text, ask questions, retain conversation state, interpret answers, or create
-assets.
+meaningful decisions. The external LLM investigates and proposes, Renma
+validates supplied structure and deterministic repository evidence, and the
+human reviews meaningful decisions. Renma does not accept task text, ask
+questions, retain conversation state, interpret answers, or create assets from
+the guide. It does not certify that a handoff's conversation, human review,
+source authority, blocker completeness, or domain facts are true.
 
 When the user asks to create a Skill, the consuming LLM starts with
 clarification instead of file creation:
@@ -60,6 +62,7 @@ understand
   -> ask one to three focused questions per batch and retain queued blockers
   -> propose the smallest asset structure
   -> pass the creation gate when no blocker remains
+  -> write a renma.skill-authoring-handoff.v1 exchange artifact
   -> scaffold and author
   -> validate
   -> repair, investigate, ask again, or justify no change
@@ -387,7 +390,8 @@ Use this sequence for a new Skill:
 renma guide skill
   -> clarify human truth and inspect applicable evidence
   -> pass the creation gate and define the smallest intended asset structure
-  -> renma scaffold skill
+  -> external LLM writes renma.skill-authoring-handoff.v1
+  -> renma scaffold skill <agreed-path> --handoff <handoff.json>
   -> scaffold or reuse justified Context Assets
   -> complete the focused workflow
   -> renma scan . --fail-on high
@@ -476,22 +480,57 @@ inputs, exceptions, failure behavior, safety constraints, completion criteria,
 and unresolved uncertainty, and remove generic introductions, conclusions, and
 boilerplate. Concise does not mean omitting important decisions.
 
-### 2. Generate one repository-compatible starting point
+### 2. Record the structured authoring handoff
+
+After no Blocking authoring decision remains, the external LLM or coding agent
+records the current decisions in `renma.skill-authoring-handoff.v1`. The guide's
+JSON output exposes construction rules and a template; the default prompt gives
+a concise version. Renma does not create or fill the exchange file.
+
+The handoff keeps these layers separate:
+
+- Confirmed, Proposed, and Unresolved current understanding;
+- Blocking, Reversible default, and Deferred progression;
+- the recurring task, expected result, required inputs, completion criteria,
+  failure behavior, and positive/negative usage boundaries;
+- the canonical Skill path, identity, owner, tags, local resources, and
+  required/optional Context and Lens relationships;
+- planned supporting Context or Context Lens assets and each independent
+  maintenance or governance justification; and
+- declared source-authority status, security decisions, and runtime ask,
+  report, defer, or stop behavior.
+
+The handoff is intentionally not a complete Skill AST, a second metadata
+system, a conversation transcript, finished Markdown, or a complete
+implementation plan. Proposed reversible defaults and Unresolved Deferred
+items may remain. Only `progression.blocking` must be empty.
+
+This is caller-declared authoring evidence. Renma validates its bounded shape
+and internal consistency but does not prove that the clarification happened,
+the human reviewed every decision, the blocker set is complete, an external
+source is authoritative or was consulted, or the domain facts are true. The
+source states `provided`, `consulted`, and `designated_unconsulted` preserve the
+difference between supplied or reviewed content and authority designation.
+
+### 3. Generate one repository-compatible starting point
 
 Run the Renma generator once:
 
 ```bash
 renma scaffold skill skills/testing/spec-review/SKILL.md \
-  --id skill.testing.spec-review \
-  --title "Spec Review" \
-  --owner qa-platform \
-  --tags testing,spec-review
+  --handoff /tmp/spec-review-handoff.json
 ```
 
 The target must be a canonical `SKILL.md` under `skills/**` or
-`.agents/skills/**`. File mode refuses to overwrite an existing file and
-requires an explicit owner. The output is a deterministic starting point, not
-a finished Skill.
+`.agents/skills/**` and must match `assetGraph.skill.path` after safe
+normalization. File mode refuses to overwrite an existing file. The handoff
+must supply a non-empty explicit owner other than `unowned`. The output is a
+deterministic starting point, not a finished Skill.
+
+The handoff is optional: existing direct scaffolding with `--owner` and
+optional `--id`, `--title`, `--tags`, and `--resources` remains supported.
+When `--handoff` is present, those five structural options are forbidden so
+there is no dual authority.
 
 Use `--resources` only for directories with a current, justified responsibility.
 It creates requested empty directories and no placeholder files. In the
@@ -517,7 +556,29 @@ target.
 writing the file. `--format json` prints the existing structured bundle. These
 modes do not reserve or create the target path.
 
-### 3. Review and complete the scaffold
+Before file mode calls `mkdir` or `writeFile`, Renma parses the handoff and
+validates its schema version, zero declared blockers, target agreement,
+canonical identity and Agent Skills name, Context/Lens set uniqueness and
+required/optional separation, supporting graph consistency, Context placement
+justification, and supported local resource kinds. Any failure exits `2` and
+creates no Skill file or resource directories. A planned supporting asset is
+never automatically created; one scaffold invocation owns one explicit target
+file side effect.
+
+For a valid handoff, file mode writes exact `id`, `title`, `owner`, `tags`,
+`resources`, `requiresContext`, `optionalContext`, `requiresLens`, and
+`optionalLens` structural values. It does not write temporary authoring-state
+headings or synthesize polished prose from the Skill contract. Prompt mode
+passes the decision state, contract, graph, sources, security decisions, and
+runtime-unknown handling to the consuming LLM. JSON mode adds the handoff as a
+structured projection rather than flattening it into prose.
+
+The published [Skill Authoring Handoff v1 JSON
+Schema](schemas/skill-authoring-handoff-v1.schema.json) documents the bounded
+exchange shape. Semantic cross-field validation remains in Renma's TypeScript
+implementation.
+
+### 4. Review and complete the scaffold
 
 Within the Renma boundaries, use platform-native Skill authoring guidance to
 complete:
@@ -1136,7 +1197,8 @@ files. The expected sequence is:
 run renma guide skill
   -> conduct Renma clarification
   -> pass the creation gate
-  -> create the Renma scaffold
+  -> write renma.skill-authoring-handoff.v1
+  -> create the Renma scaffold with --handoff
   -> use skill-creator only for semantic refinement
 ```
 
@@ -1151,7 +1213,9 @@ After passing the gate, a safe request is:
 ```text
 First run `renma guide skill`, conduct focused clarification, and resolve the
 blocking creation-gate decisions. Create
-`skills/testing/spec-review/SKILL.md` with `renma scaffold skill`. Then use
+the caller-declared `renma.skill-authoring-handoff.v1` exchange artifact and
+create `skills/testing/spec-review/SKILL.md` with `renma scaffold skill
+skills/testing/spec-review/SKILL.md --handoff <handoff.json>`. Then use
 skill-creator only to refine its trigger description, ordered instructions,
 usage boundaries, required inputs, constraints, completion criteria, and
 ambiguity-resolving examples. Preserve its Renma metadata, Context placement,
@@ -1183,5 +1247,5 @@ Before human approval, confirm that:
 The operating principle remains:
 
 ```text
-LLM proposes. Renma verifies. Human approves.
+LLM investigates and proposes. Renma validates deterministic structure and repository evidence. Human reviews and approves.
 ```

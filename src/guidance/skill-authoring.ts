@@ -1,4 +1,8 @@
 import { CANONICAL_SKILL_METADATA_KEYS } from "../metadata.js";
+import {
+  SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION,
+  type SkillAuthoringHandoff,
+} from "../skill-authoring-handoff.js";
 
 export const SKILL_AUTHORING_PRINCIPLE =
   "Create the smallest non-redundant Renma asset graph that preserves execution clarity and traceability.";
@@ -83,6 +87,7 @@ export interface SkillAuthoringGuidance {
   topic: "skill";
   renmaVersion: string;
   principle: string;
+  handoff: SkillAuthoringHandoffGuidance;
   interaction: SkillAuthoringInteraction;
   workflow: string[];
   placementRules: string[];
@@ -93,6 +98,14 @@ export interface SkillAuthoringGuidance {
   illustrationRules: string[];
   illustrations: SkillAuthoringIllustration[];
   verification: string[];
+}
+
+export interface SkillAuthoringHandoffGuidance {
+  schemaVersion: typeof SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION;
+  purpose: string;
+  boundary: string;
+  rules: string[];
+  template: SkillAuthoringHandoff;
 }
 
 /** Build the single structured source used by every Skill guide projection. */
@@ -107,6 +120,66 @@ export function buildSkillAuthoringGuidance(
     topic: "skill",
     renmaVersion,
     principle: SKILL_AUTHORING_PRINCIPLE,
+    handoff: {
+      schemaVersion: SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION,
+      purpose:
+        "Record caller-declared authoring decisions after no Blocking decision remains, then pass them from an external LLM or agent to `renma scaffold skill <path> --handoff <handoff.json>`.",
+      boundary:
+        "The handoff records supplied authoring evidence. Renma validates its structure and internal consistency; it does not prove that clarification occurred, every blocker was discovered, sources are authoritative, human review occurred, or declared facts are true.",
+      rules: [
+        "Construct the handoff only after the supplied authoring state declares no remaining Blocking decisions. Proposed reversible defaults and Unresolved Deferred decisions may remain in their original epistemic classes.",
+        "Keep the handoff small: creation-gate state, the core Skill contract, the smallest asset graph, ownership, declared Context and Lens relationships, local resource decisions, and significant source, security, and runtime-unknown decisions.",
+        "Do not include finished Markdown, a conversation transcript, question history, private reasoning, or a complete implementation plan.",
+        "Use provided, consulted, and designated_unconsulted source states without treating source designation as proof that source content was consulted.",
+        "Do not infer required versus optional relationships, ownership, domain truth, or broader security permission. Every planned Context requires an independent maintenance or governance justification.",
+        "Keep the positional scaffold target equal to assetGraph.skill.path after safe normalization. One scaffold invocation creates only that explicit target and declared Skill-local resource directories, never supporting assets.",
+      ],
+      template: {
+        schemaVersion: SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION,
+        topic: "skill",
+        currentUnderstanding: {
+          confirmed: ["Replace with evidence-backed confirmed facts."],
+          proposed: ["Replace with reversible proposed choices, if any."],
+          unresolved: [
+            "Replace with explicitly non-blocking unknowns, if any.",
+          ],
+        },
+        progression: {
+          blocking: [],
+          reversibleDefaults: [
+            "Replace with visible safe reversible defaults, if any.",
+          ],
+          deferred: ["Replace with visible deferred decisions, if any."],
+        },
+        skillContract: {
+          recurringTask: "Replace with the focused recurring task.",
+          expectedResult: "Replace with the expected result.",
+          requiredInputs: [],
+          completionCriteria: [],
+          failureBehavior: [],
+          useWhen: [],
+          doNotUseWhen: [],
+        },
+        assetGraph: {
+          skill: {
+            path: "skills/example/SKILL.md",
+            id: "skill.example",
+            title: "Example",
+            owner: "replace-with-explicit-owner",
+            tags: [],
+            resources: [],
+            requiresContext: [],
+            optionalContext: [],
+            requiresLens: [],
+            optionalLens: [],
+          },
+          supportingAssets: [],
+        },
+        sourceAuthorities: [],
+        securityDecisions: [],
+        runtimeUnknownHandling: [],
+      },
+    },
     interaction: {
       openingRule:
         "When a user asks to create a Skill with `renma guide skill`, begin with interactive clarification. Do not create files immediately.",
@@ -229,12 +302,13 @@ export function buildSkillAuthoringGuidance(
         "Platform-native Skill authoring guidance must not independently add metadata, Context Assets, scripts, examples, or support files outside the agreed structure.",
         "Platform-native Skill authoring guidance must not create a second target file through another generator.",
         "If semantic refinement reveals a justified asset-boundary change, stop structural edits and return the need to the Renma clarification protocol as Proposed or Unresolved; inspect evidence and re-enter the creation gate instead of silently changing files, metadata, Context relationships, scripts, examples, or support assets.",
+        `When no Blocking authoring decision remains, construct a caller-declared ${SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION} handoff and invoke \`renma scaffold skill <agreed-path> --handoff <handoff.json>\`. Keep Proposed, Unresolved, Reversible default, and Deferred state distinct; the supplied handoff declares readiness but does not prove the creation gate independently passed.`,
         "Renma remains non-interactive: the consuming LLM investigates, proposes, asks, and edits; the user supplies domain and governance truth; Renma provides deterministic authoring rules and repository evidence; a human approves meaningful decisions.",
       ],
     },
     workflow: [
       "Follow the normative interactive phases above from clarification through human review, including creation-gate re-entry whenever asset boundaries may change.",
-      "After the gate passes, use `renma scaffold` for the agreed structure, author within it, run relevant Renma verification, and complete human review.",
+      `After the supplied state declares no Blocking decisions, record a ${SKILL_AUTHORING_HANDOFF_SCHEMA_VERSION} handoff, use \`renma scaffold skill <agreed-path> --handoff <handoff.json>\`, author within the agreed structure, run relevant Renma validation, and complete human review.`,
     ],
     placementRules: [
       "Skill: keep the focused task contract in `SKILL.md`: positive and negative selection boundaries, required inputs and evidence, ordered steps and decisions, constraints and failure behavior, expected output, completion criteria, and verification.",
