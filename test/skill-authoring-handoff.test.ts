@@ -259,6 +259,126 @@ test("supporting Context and Lens relationships accept Renma ID-or-path forms wi
   }
 });
 
+test("known supporting asset aliases cannot overlap required and optional relationships", async (t) => {
+  const cases: Array<{
+    name: string;
+    kind: "context" | "context_lens";
+    id: string;
+    mutate: (handoff: SkillAuthoringHandoff) => void;
+  }> = [
+    {
+      name: "required Context by ID and optional Context by path",
+      kind: "context",
+      id: "context.testing.boundaries",
+      mutate: (handoff) => {
+        handoff.assetGraph.skill.optionalContext.push(
+          "contexts/testing/boundaries.md",
+        );
+      },
+    },
+    {
+      name: "required Context by path and optional Context by ID",
+      kind: "context",
+      id: "context.testing.boundaries",
+      mutate: (handoff) => {
+        handoff.assetGraph.skill.requiresContext = [
+          "contexts/testing/boundaries.md",
+        ];
+        handoff.assetGraph.skill.optionalContext.push(
+          "context.testing.boundaries",
+        );
+      },
+    },
+    {
+      name: "required Context by ID and optional Context by dot-relative path",
+      kind: "context",
+      id: "context.testing.boundaries",
+      mutate: (handoff) => {
+        handoff.assetGraph.skill.optionalContext.push(
+          "./contexts/testing/boundaries.md",
+        );
+      },
+    },
+    {
+      name: "required Lens by ID and optional Lens by path",
+      kind: "context_lens",
+      id: "lens.testing.risk",
+      mutate: (handoff) => {
+        handoff.assetGraph.skill.optionalLens.push("lenses/testing/risk.md");
+      },
+    },
+  ];
+
+  for (const fixture of cases) {
+    await t.test(fixture.name, async () => {
+      const root = await mkdtemp(
+        path.join(os.tmpdir(), "renma-handoff-alias-overlap-"),
+      );
+      const handoffPath = path.join(root, "handoff.json");
+      const target = path.join(root, "skills", "example", "SKILL.md");
+      const handoff = gateReadyHandoff();
+      fixture.mutate(handoff);
+      await writeHandoff(handoffPath, handoff);
+
+      const result = await capture(() =>
+        main(["scaffold", "skill", target, "--handoff", handoffPath]),
+      );
+
+      assert.equal(result.code, 2);
+      assert.equal(result.stdout, "");
+      assert.match(
+        result.stderr,
+        new RegExp(
+          `Supporting ${fixture.kind} "${fixture.id.replaceAll(".", "\\.")}" appears in both required and optional Skill relationship sets`,
+        ),
+      );
+      await assertNoScaffoldSideEffects(target);
+    });
+  }
+});
+
+test("distinct required and optional supporting assets remain valid", async () => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "renma-handoff-distinct-relationships-"),
+  );
+  const handoffPath = path.join(root, "handoff.json");
+  const target = path.join(root, "skills", "example", "SKILL.md");
+  const handoff = gateReadyHandoff();
+  handoff.assetGraph.skill.requiresContext = [
+    "./contexts/testing/boundaries.md",
+  ];
+  handoff.assetGraph.skill.optionalContext = ["context.testing.examples"];
+  handoff.assetGraph.skill.requiresLens = ["lenses/testing/risk.md"];
+  await writeHandoff(handoffPath, handoff);
+
+  const result = await capture(() =>
+    main([
+      "scaffold",
+      "skill",
+      target,
+      "--handoff",
+      handoffPath,
+      "--format",
+      "json",
+    ]),
+  );
+
+  assert.equal(result.code, 0);
+  assert.equal(result.stderr, "");
+  const bundle = JSON.parse(result.stdout) as {
+    handoff: SkillAuthoringHandoff;
+  };
+  assert.deepEqual(bundle.handoff.assetGraph.skill.requiresContext, [
+    "./contexts/testing/boundaries.md",
+  ]);
+  assert.deepEqual(bundle.handoff.assetGraph.skill.optionalContext, [
+    "context.testing.examples",
+  ]);
+  assert.deepEqual(bundle.handoff.assetGraph.skill.requiresLens, [
+    "lenses/testing/risk.md",
+  ]);
+});
+
 test("a supporting asset cannot be satisfied by a relationship of the wrong kind", async () => {
   const root = await mkdtemp(
     path.join(os.tmpdir(), "renma-handoff-wrong-kind-"),

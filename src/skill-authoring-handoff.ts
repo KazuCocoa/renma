@@ -291,6 +291,7 @@ export function validateSkillAuthoringHandoffIdentityAndGraph(
       asset.path,
       `assetGraph.supportingAssets entry "${asset.id}"`,
     );
+    rejectKnownSupportingAssetRelationshipOverlap(skill, asset);
     validateSupportingRelationship(skill, asset);
   }
 }
@@ -586,17 +587,46 @@ function validateSupportingRelationship(
       : asset.relationship === "required"
         ? skill.requiresLens
         : skill.optionalLens;
-  const normalizedAssetPath = normalizeDependencyReference(asset.path);
-  const represented = relationshipSet.some(
-    (reference) =>
-      reference === asset.id ||
-      normalizeDependencyReference(reference) === normalizedAssetPath,
+  const represented = relationshipSet.some((reference) =>
+    relationshipRepresentsSupportingAsset(reference, asset),
   );
   if (!represented) {
     throw new CliUserError(
       `Supporting ${asset.kind} "${asset.id}" is marked ${asset.relationship} but is absent from the matching Skill relationship list.`,
     );
   }
+}
+
+function rejectKnownSupportingAssetRelationshipOverlap(
+  skill: SkillAuthoringSkillAsset,
+  asset: SkillAuthoringSupportingAsset,
+): void {
+  const required =
+    asset.kind === "context" ? skill.requiresContext : skill.requiresLens;
+  const optional =
+    asset.kind === "context" ? skill.optionalContext : skill.optionalLens;
+  const appearsInRequired = required.some((reference) =>
+    relationshipRepresentsSupportingAsset(reference, asset),
+  );
+  const appearsInOptional = optional.some((reference) =>
+    relationshipRepresentsSupportingAsset(reference, asset),
+  );
+  if (appearsInRequired && appearsInOptional) {
+    throw new CliUserError(
+      `Supporting ${asset.kind} "${asset.id}" appears in both required and optional Skill relationship sets through its declared ID or path.`,
+    );
+  }
+}
+
+function relationshipRepresentsSupportingAsset(
+  reference: string,
+  asset: SkillAuthoringSupportingAsset,
+): boolean {
+  return (
+    reference === asset.id ||
+    normalizeDependencyReference(reference) ===
+      normalizeDependencyReference(asset.path)
+  );
 }
 
 function isCallerCorrectableHandoffReadError(error: unknown): boolean {
