@@ -1001,6 +1001,10 @@ For example:
     // A reviewed revision cannot narrow what CI is able to inspect or retain.
     "ci_policy": "fail"
   },
+  "executable_surface": {
+    // High-signal executable contract changes require explicit review.
+    "ci_policy": "warn"
+  },
   "skill_discovery": {
     "adopted": true,
 
@@ -1032,6 +1036,10 @@ The configuration supports the same names used by the implementation, including:
 - `scan_boundary`: revision-review policy for changes to `globs`, `exclude`,
   `max_file_size_bytes`, `max_depth`, and `suppressions`. `ci_policy` supports
   `off`, `warn`, and `fail` and defaults to `fail`.
+- `executable_surface`: revision-review policy for high-signal changes already
+  present in the canonical executable-surface diff. `ci_policy` supports
+  `off`, `warn`, and `fail` and defaults to `off`. `renma init` does not enable
+  it.
 - `skill_discovery`: strict repository-wide Skill Discovery configuration.
   Supported keys are boolean `adopted` and string `ci_policy`. The policy
   supports only `off` and `warn`, defaults to `off`, and `warn` requires
@@ -1293,6 +1301,13 @@ security-policy correlation. Invocation rows retain launcher, target, source
 line, exact resolution state, and invocation-context governance evidence.
 Current rows also include bounded static executable dependency evidence and a
 per-surface `direct`, `transitive`, or `unreached` projection.
+
+These layers have separate responsibilities: the executable surface inventory
+describes executable behavior Renma can statically observe in one revision;
+the executable surface diff describes what changed between two revisions; and
+`executable_surface.ci_policy` selects which high-signal diff transitions
+affect `ci-report` status. Evidence generation does not depend on enabling the
+policy.
 
 Executable TypeScript surface extensions are `.ts`, `.mts`, and `.cts`, in
 addition to the established JavaScript, Python, and shell extensions. `.tsx`
@@ -2039,8 +2054,9 @@ analyzer counts, new dependency evidence for review, dependency resolution
 changes, newly transitive surfaces, and surfaces that lost static invocation
 reachability. The bounded dependency and governance lists use neutral evidence
 terminology, omit complete fingerprints, and do not enter
-`newProblematicInvocations`. They do not affect the CI verdict,
-readiness score, failure threshold, or review policy. Newly generated JSON includes the complete
+`newProblematicInvocations`. The detailed evidence does not by itself affect
+the CI verdict; the separate executable-surface CI evaluator consumes only its
+documented high-signal item-level transitions. Newly generated JSON includes the complete
 `renma.skill-discovery-diff.v1` value once at top-level `skillDiscovery` plus
 one `renma.skill-discovery-ci-policy.v1` evaluation at top-level
 `skillDiscoveryPolicy`. It also includes one
@@ -2048,7 +2064,10 @@ one `renma.skill-discovery-ci-policy.v1` evaluation at top-level
 the nested `diff.security.policyTransitions` array is the canonical per-asset
 scalar/list transition evidence consumed by that evaluation. New reports also
 include `renma.scan-boundary-ci-policy.v1` at top-level `scanBoundaryPolicy`.
-Its `effectiveBoundary` is `renma.ci-evidence-boundary.v1`: target repository
+Reports also include `renma.executable-surface-ci-policy.v1` at top-level
+`executableSurfacePolicy`, with archived `from`, `to`, and stricter `effective`
+modes, outcome, match count, and complete structured matches. The scan-boundary
+evaluation's `effectiveBoundary` is `renma.ci-evidence-boundary.v1`: target repository
 paths are evaluated against both archived endpoint coverage predicates and the
 inspected-path union is retained. `sourceBoundaries` (ordered base then target)
 and `inspectedPaths` are authoritative; flattened glob, exclusion, and limit
@@ -2231,6 +2250,72 @@ verified remediation. Markdown renders repository-controlled suppression
 reasons as single-line inline code, and terminal text exposes line breaks and
 control characters visibly instead of interpreting them.
 
+Executable-surface CI review is configured independently:
+
+```json
+{
+  "executable_surface": {
+    "ci_policy": "warn"
+  }
+}
+```
+
+The default is `off` for backward compatibility: executable inventory and diff
+evidence continue to be generated, but matching changes remain informational.
+`warn` makes a matching change contribute `WARN`; `fail` makes it contribute
+`FAIL`. CI reads the actual configuration archived at both endpoints and uses
+the stricter mode under `off < warn < fail`, so a target revision cannot bypass
+an existing gate with `fail -> warn`, `fail -> off`, or `warn -> off`.
+
+The initial policy consumes item-level evidence already present in the
+canonical `ExecutableSurfaceDiff`. Its stable matches are:
+
+- `executable_surface_ci.surface_added` from `addedSurfacePaths`.
+- `executable_surface_ci.problematic_invocation_added` from
+  `newProblematicInvocations`.
+- `executable_surface_ci.problematic_dependency_added` from
+  `newProblematicDependencies`.
+- `executable_surface_ci.invocation_policy_evidence_missing` from
+  `newInvocationsWithoutEffectivePolicyEvidence`.
+- `executable_surface_ci.invocation_policy_evidence_lost` from
+  `invocationsLostEffectivePolicyEvidence`.
+- `executable_surface_ci.invocation_policy_ambiguous` from newly added
+  multi-fingerprint invocations and existing invocations whose target-side
+  fingerprint count changes from at most one to more than one.
+- `executable_surface_ci.skill_local_reachability_lost` from
+  `newlyUnreachableSkillLocalPaths`.
+- `executable_surface_ci.static_invocation_reachability_lost` from
+  `surfacesLostStaticInvocationReachability`.
+- `executable_surface_ci.transitive_reachability_added` from
+  `newlyTransitivelyReachableSurfacePaths`.
+
+One invocation may retain multiple independent policy reasons, so `matchCount`
+counts reasons rather than unique source lines. Matches are deterministically
+ordered and retain exact path, source line, target, occurrence, resolution, and
+governance transition evidence appropriate to their kind. Markdown presents a
+bounded `## Executable Surface CI Policy` projection; JSON retains all matches
+without duplicating them into the canonical executable diff.
+
+Ordinary content-only edits to an existing executable, surface removal,
+resolved dependency addition, resolved invocation addition with complete and
+unambiguous policy evidence, interpreter-only changes, line-only movement,
+reference-count-only changes, resolved problematic evidence, policy-evidence
+improvements, ambiguity resolution, and reachability improvements do not match
+by themselves. If one of those changes also causes an explicitly matched
+transition, that transition remains reviewable.
+
+For `ci-report`, the evaluator consumes the same enforcement-view
+`report.diff.executableSurface` collected under the union of base and target
+scan-boundary coverage. It never performs a target-local rescan, so adding a
+tool while removing its target glob cannot hide that surface from this policy.
+The scan-boundary policy may independently match the narrowing. Direct
+`renma diff` remains observation-only and gains no status or exit policy.
+
+This is static evidence. Renma does not execute scripts, prove runtime
+reachability, infer that a file is malicious, replace SAST, or perform general
+language-level semantic or data-flow analysis. “Transitively reachable” means
+reachable in the bounded static dependency graph, not observed execution.
+
 Asset details in diff and CI-report JSON use canonical `declaredOwner` and
 `effectiveOwner` values. CI-report Markdown always renders both values so
 declared, inherited, and unowned states remain explicit.
@@ -2277,8 +2362,9 @@ Serialized reports that predate the Discovery fields continue to format without
 a synthetic Discovery section. A report that contains `skillDiscovery` but no
 `skillDiscoveryPolicy` retains its observation-only Discovery section without an
 invented policy result. Earlier serialized reports without `securityPolicy` or
-`diff.security.policyTransitions` also continue to format, while newly built
-reports always emit both fields.
+`diff.security.policyTransitions`, or without `executableSurfacePolicy`, also
+continue to format, while newly built reports always emit the current policy
+fields.
 
 Repository Context BOM artifacts describe declared repository state, not prompt assembly, context injection, agent execution, actual LLM runtime usage, or telemetry. Use `renma bom . --format json` when CI needs a machine-readable manifest and `renma bom . --format markdown` for review comments or artifacts. For v2 compatibility and reproducibility details, see the [Repository Context BOM contract](repository-context-bom.md).
 

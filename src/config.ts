@@ -23,6 +23,7 @@ const FORMATS = ["text", "json"] as const;
 const SKILL_DISCOVERY_CI_POLICY_MODES = ["off", "warn"] as const;
 const SECURITY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const SCAN_BOUNDARY_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
+const EXECUTABLE_SURFACE_CI_POLICY_MODES = ["off", "warn", "fail"] as const;
 const SECURITY_PROFILE_ALIAS_GROUPS = {
   allowedDataClass: ["allowedDataClass", "allowed_data_class"],
   networkAllowed: ["networkAllowed", "network_allowed"],
@@ -68,6 +69,9 @@ export const DEFAULT_CONFIG: ScanConfig = {
   suppressions: [],
   scanBoundary: {
     ciPolicy: "fail",
+  },
+  executableSurface: {
+    ciPolicy: "off",
   },
   layout: {
     workflowAliases: {},
@@ -216,6 +220,7 @@ function normalizeConfig(
     "concurrency",
     "suppressions",
     "scan_boundary",
+    "executable_surface",
     "layout",
     "security",
     "skill_discovery",
@@ -251,6 +256,10 @@ function normalizeConfig(
     config.suppressions = suppressionArray(value.suppressions);
   if (value.scan_boundary !== undefined)
     config.scanBoundary = scanBoundaryPolicy(value.scan_boundary);
+  if (value.executable_surface !== undefined)
+    config.executableSurface = executableSurfacePolicy(
+      value.executable_surface,
+    );
 
   if (value.layout !== undefined) config.layout = layoutPolicy(value.layout);
   if (value.security !== undefined)
@@ -258,6 +267,32 @@ function normalizeConfig(
   if (value.skill_discovery !== undefined)
     config.skillDiscovery = skillDiscoveryPolicy(value.skill_discovery);
   return config;
+}
+
+function executableSurfacePolicy(
+  value: unknown,
+): ScanConfig["executableSurface"] {
+  if (!isRecord(value)) {
+    throw new ConfigError("executable_surface must be an object.");
+  }
+  const allowed = new Set(["ci_policy"]);
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) {
+      throw new ConfigError(
+        `Unknown executable_surface config key "${key}". Allowed keys: ci_policy.`,
+      );
+    }
+  }
+  return {
+    ciPolicy:
+      value.ci_policy === undefined
+        ? "off"
+        : enumValue(
+            "executable_surface.ci_policy",
+            value.ci_policy,
+            EXECUTABLE_SURFACE_CI_POLICY_MODES,
+          ),
+  };
 }
 
 function scanBoundaryPolicy(value: unknown): ScanConfig["scanBoundary"] {

@@ -8,6 +8,11 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Added
 
+- Added `executable_surface.ci_policy` with `off`, `warn`, and `fail` modes,
+  defaulting to `off`, stricter archived-endpoint selection, stable
+  `executable_surface_ci.*` matches sourced from canonical executable diff
+  evidence, and a top-level `renma.executable-surface-ci-policy.v1` CI-report
+  evaluation.
 - Added canonical `renma.scan-boundary.v1` evidence to scan and diff output,
   including config identity, exact runtime coverage declarations, limits, and
   active suppressions, plus retained structured `suppressedFindings` evidence.
@@ -36,6 +41,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Changed
 
+- Changed `ci-report` to compose executable-surface policy outcomes with its
+  existing semantic, Skill Discovery, security, and scan-boundary outcomes.
+  The evaluator consumes the PR #177 enforcement-view executable diff, while
+  direct `diff`, Readiness, and `--fail-on-status` semantics remain unchanged.
 - Made the canonical Skill-root grammar explicit and symmetric across
   `skills/` and `.agents/skills/`, centralized reserved support discovery
   rules, broadened `skills/**/references/**/*` to include non-Markdown
@@ -64,6 +73,9 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 
 ### Compatibility
 
+- CI-report JSON adds top-level `executableSurfacePolicy`. The executable
+  inventory and semantic diff remain policy-free, and the default `off` mode
+  preserves prior status behavior while retaining informational matches.
 - Scan JSON adds `scanBoundary` and `suppressedFindings`; semantic diff JSON
   adds top-level `scanBoundary` and `findings.suppressed`; CI-report JSON adds
   top-level `scanBoundaryPolicy` with its effective enforcement boundary.

@@ -205,6 +205,17 @@
     "matchCount": 0,
     "matches": []
   },
+  "executableSurfacePolicy": {
+    "schemaVersion": "renma.executable-surface-ci-policy.v1",
+    "configured": {
+      "from": "off",
+      "to": "off",
+      "effective": "off"
+    },
+    "outcome": "pass",
+    "matchCount": 0,
+    "matches": []
+  },
   "securityPosture": {
     "added": {
       "totalSecurityFindings": 0,

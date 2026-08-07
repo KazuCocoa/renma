@@ -32,6 +32,7 @@ import { RepositoryFixture } from "./repository-fixture.js";
 import type { DiffReport } from "../src/commands/diff.js";
 import { zeroContextLensSummary } from "../src/context-lens.js";
 import { buildExecutableSurfaceDiff } from "../src/executable-surface-diff.js";
+import { evaluateExecutableSurfaceCiPolicy } from "../src/executable-surface-ci-policy.js";
 import {
   summarizeExecutableSurfaceInventory,
   type ExecutableSurfaceDependency,
@@ -2601,6 +2602,13 @@ function sampleReport(): CiReport {
       matchCount: 0,
       matches: [],
     },
+    executableSurfacePolicy: evaluateExecutableSurfaceCiPolicy(
+      buildExecutableSurfaceDiff(
+        zeroExecutableSurfaceInventory(),
+        zeroExecutableSurfaceInventory(),
+      ),
+      { from: "off", to: "off" },
+    ),
     securityPosture: {
       added: zeroSecurityPostureSummary(),
       resolved: zeroSecurityPostureSummary(),
