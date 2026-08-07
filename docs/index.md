@@ -51,6 +51,7 @@ npx renma readiness . --format markdown
   reference and covers current CLI workflows and commands.
 - [Authoring Guide](authoring-guide.md) defines Skill and Context authoring
   workflows.
+- [Changelog](changelog.md) records release history and compatibility notes.
 - [Agent Skills Compatibility and Migration](agent-skills-compatibility.md)
   defines canonical and migration-only Skill forms.
 - [Diagnostics Reference](diagnostics.md) and

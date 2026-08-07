@@ -31,8 +31,7 @@ LLM proposes. Renma verifies. Human approves.
 
 Current contracts live in [architecture.md](architecture.md),
 [design.md](design.md), and the [documentation index](../README.md).
-Historical release detail belongs only in
-[CHANGELOG.md](https://github.com/KazuCocoa/renma/blob/main/CHANGELOG.md).
+Historical release detail belongs only in the [Changelog](../changelog.md).
 
 ## Stabilization Priorities
 

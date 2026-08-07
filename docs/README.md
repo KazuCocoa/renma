@@ -87,8 +87,8 @@ document.
   records the durable rationale behind the current static Discovery boundary;
   the current operational contract remains in
   [Skill Discovery](skill-discovery.md).
-- [Changelog](https://github.com/KazuCocoa/renma/blob/main/CHANGELOG.md) owns chronological release history,
-  version-specific changes, and compatibility notes.
+- [Changelog](changelog.md) owns chronological release history, version-specific
+  changes, and compatibility notes.
 
 ## Examples
 

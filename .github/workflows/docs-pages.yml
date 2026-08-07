@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "docs/**"
+      - "CHANGELOG.md"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/docs-pages.yml"

@@ -236,9 +236,8 @@ documented deep imports, and compatibility re-exports are compatibility-sensitiv
 New projections should reuse the shared repository snapshot and remain additive
 unless a separately reviewed contract permits a breaking change.
 
-Release history belongs in
-[CHANGELOG.md](https://github.com/KazuCocoa/renma/blob/main/CHANGELOG.md). Current open candidates
-and explicit non-commitments belong in [plan.md](plan.md).
+Release history belongs in the [Changelog](../changelog.md). Current open
+candidates and explicit non-commitments belong in [plan.md](plan.md).
 
 ```text
 LLM proposes. Renma verifies. Human approves.

@@ -20,7 +20,7 @@ Readiness integration, semantic diff, and CI review policy are documented in
 the [Skill Discovery Graph and Index contract](../skill-discovery.md).
 Implementation ownership and snapshot invariants are documented in
 [Internal Architecture](internal-architecture.md). Release history belongs in
-[CHANGELOG.md](https://github.com/KazuCocoa/renma/blob/main/CHANGELOG.md).
+the [Changelog](../changelog.md).
 
 This document retains only the durable product rationale and open design
 questions. It is not a release sequence or a second copy of the current

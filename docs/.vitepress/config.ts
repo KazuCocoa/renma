@@ -54,6 +54,7 @@ export default defineConfig({
           { text: "Authoring Guide", link: "/authoring-guide" },
         ],
       },
+      { text: "Changelog", link: "/changelog" },
       { text: `v${packageJson.version}`, link: packageUrl },
     ],
     sidebar: [
@@ -64,6 +65,7 @@ export default defineConfig({
           { text: "Documentation Index", link: "/README" },
           { text: "User Manual", link: "/user-manual" },
           { text: "Authoring Guide", link: "/authoring-guide" },
+          { text: "Changelog", link: "/changelog" },
         ],
       },
       {

@@ -1275,9 +1275,10 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
   change-review-oriented Markdown, and original-declaration-direction Mermaid
   output. Invalid incoming declarations remain visible without establishing a
   valid impact route.
-- Added the focused [Declared Impact contract](docs/declared-impact.md), graph
-  view comparison, practical change-review guidance, and resolver, graph, CLI,
-  renderer, cycle, invalid-declaration, and high-path-count DAG tests.
+- Added the focused
+  [Declared Impact contract](https://kazucocoa.github.io/renma/declared-impact.html),
+  graph view comparison, practical change-review guidance, and resolver, graph,
+  CLI, renderer, cycle, invalid-declaration, and high-path-count DAG tests.
 
 ### Changed
 
