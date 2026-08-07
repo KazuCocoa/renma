@@ -36,6 +36,29 @@ Split only after the user agrees. Use an override only when the user confirms
 the asset should remain intentionally long, and never recommend one merely to
 make diagnostics pass.
 
+Token-budget counts are deterministic estimates, not exact model-token counts.
+Exceeded-budget findings report the measured estimate, the active limit, the
+absolute overage, and a rounded overage percentage. With no valid override, the
+active limit is the asset kind's default. With a valid reviewed override, Renma
+keeps both the original default and the effective override visible and compares
+the asset against the override. An override is an explicit reviewed limit, not
+a suppression: an asset above it still produces
+`QUAL-SUPPORT-ASSET-TOKEN-BUDGET`, while an asset at or below it does not.
+
+For Markdown assets, the finding also lists at most three of the largest
+heading-based sections as review candidates. Renma measures each selected
+section from its heading through the next heading at the same or a shallower
+depth, ranks by estimated tokens, and breaks ties by source line. Nested
+headings stay inside their selected parent, so they are not double-counted as
+independent top candidates. This section review is separate from the canonical
+support-asset measurement, which remains the full file. A candidate is not an
+automatic split point or destination assignment. Semantic ownership determines
+whether reviewed material stays in `SKILL.md`, moves to Skill-local
+`references/`, becomes deterministic implementation in `scripts/`, supplies
+output resources in `assets/`, or belongs in independently owned `contexts/`.
+If no useful headings exist, review the asset manually rather than adding or
+splitting headings by token count alone.
+
 Renma records and validates this declaration; it cannot prove that a human
 actually reviewed the asset. `token_budget_reviewed_at` is declared provenance,
 not independently verified evidence.

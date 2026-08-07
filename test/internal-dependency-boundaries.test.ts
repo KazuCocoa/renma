@@ -189,6 +189,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
       "skill-discovery-diff.ts",
       "suppressions.ts",
       "strict-scan.ts",
+      "token-budget-analysis.ts",
       "trust-graph.ts",
     ]),
     ...topLevelModules("renderers", "top-level presentation compatibility", [

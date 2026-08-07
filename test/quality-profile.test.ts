@@ -161,9 +161,13 @@ test("Skill budgets measure body after frontmatter at exact boundaries", () => {
   assert.deepEqual(aboveLow?.details, {
     measured: 2001,
     limit: 2000,
+    overBy: 1,
+    overPercent: 0,
     unit: "estimated_tokens",
     profile: RENMA_QUALITY_PROFILE_VERSION,
     measurement: "markdown_body_after_frontmatter",
+    sectionMeasurement: "markdown_body_sections",
+    sectionCandidates: [],
     source: "renma_quality_policy",
   });
 
@@ -173,6 +177,8 @@ test("Skill budgets measure body after frontmatter at exact boundaries", () => {
   );
   assert.equal(aboveStrong?.severity, "medium");
   assert.equal(aboveStrong?.details?.limit, 5000);
+  assert.equal(aboveStrong?.details?.overBy, 1);
+  assert.equal(aboveStrong?.details?.overPercent, 0);
   assert.equal(estimateTokens(markdownBody(skillWithBodyTokens(5001))), 5001);
 });
 
@@ -194,9 +200,16 @@ test("content budgets use the shared estimator at each exact boundary", () => {
     assert.equal(finding?.severity, "low");
     assert.equal(finding?.details?.measured, limit + 1);
     assert.equal(finding?.details?.limit, limit);
+    assert.equal(finding?.details?.overBy, 1);
+    assert.equal(finding?.details?.overPercent, 0);
     assert.equal(finding?.details?.unit, "estimated_tokens");
     assert.equal(finding?.details?.profile, RENMA_QUALITY_PROFILE_VERSION);
     assert.equal(finding?.details?.measurement, "full_file");
+    assert.equal(
+      finding?.details?.sectionMeasurement,
+      "markdown_body_sections",
+    );
+    assert.deepEqual(finding?.details?.sectionCandidates, []);
   }
 });
 
