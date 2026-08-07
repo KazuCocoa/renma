@@ -66,6 +66,55 @@ const REQUIRED_INPUTS_PATTERN =
   /\b(?:required inputs?|inputs|input requirements?|required information|prerequisites?|required context|required files|required permissions?|permission requirements?|environment requirements?|before running,\s*provide|before you begin,\s*provide|the user must provide|needs the following|target files|permissions required|environment required)\b|\brequires:/;
 const COMPLETION_CRITERIA_PATTERN =
   /\b(?:completion criteria|completion checklist|success criteria|success requirements|done criteria|done when|definition of done|acceptance criteria|deliverables?|final response|final answer|expected outcomes?|expected results?|expected output|required output|output requirements?|report should include|patch should include|when complete|workflow is complete|the workflow is complete after|task is complete|counts as complete|completion requirements?|stop when|do not finish until)\b/;
+const VERIFICATION_HEADING_PATTERNS: readonly RegExp[] = [
+  /^(?:success\s+)?verification$/iu,
+  /^verify$/iu,
+  /^validation$/iu,
+  /^validate$/iu,
+  /^testing$/iu,
+  /^tests?$/iu,
+  /^post[-\s]checks$/iu,
+];
+const VERIFICATION_BODY_PATTERNS: readonly RegExp[] = [
+  /\b(?:verify|verified|verifies|verifying|verification)\b/iu,
+  /\b(?:validate|validated|validates|validating|validation)\b/iu,
+  /\b(?:test|tests|tested|testing)\b/iu,
+  /\bconfirm\s+(?:the\s+)?(?:results?|outputs?)\b/iu,
+  /\bexpected\s+(?:outputs?|results?|behaviou?r)\b/iu,
+];
+const ROUTING_HEADING_PATTERNS: readonly RegExp[] = [
+  /^when\s+to\s+use$/iu,
+  /^use\s+when$/iu,
+  /^use\s+(?:this\s+skill\s+|this\s+)?for$/iu,
+  /^use\s+this\s+skill$/iu,
+  /^choose\s+this\s+skill\s+(?:when|for)$/iu,
+  /^when\s+this\s+skill\s+applies$/iu,
+  /^routing$/iu,
+  /^triggers?$/iu,
+  /^context\s+route$/iu,
+  /^mixin$/iu,
+];
+const ROUTING_BODY_PATTERNS: readonly RegExp[] = [
+  /\buse\s+this\s+skill\b/iu,
+  /\bwhen\s+to\s+use\b/iu,
+  /\buse\s+when\b/iu,
+  /\buse\s+(?:this\s+skill\s+|this\s+)?for\b/iu,
+  /\bchoose\s+this\s+skill\s+(?:when|for)\b/iu,
+  /\bwhen\s+this\s+skill\s+applies\b/iu,
+  /\btriggers?\b/iu,
+  /\brouting\b/iu,
+  /\bcontext\s+route\b/iu,
+  /\bmixin\b/iu,
+];
+const ROUTING_DESCRIPTION_PATTERNS: readonly RegExp[] = [
+  /\bwhen\s+to\s+use\b/iu,
+  /\buse\s+when\b/iu,
+  /\buse\s+this\s+skill\s+(?:when|for)\b/iu,
+  /\buse\s+this\s+for\b/iu,
+  /\buse\s+for\b/iu,
+  /\bchoose\s+this\s+skill\s+(?:when|for)\b/iu,
+  /\bwhen\s+this\s+skill\s+applies\b/iu,
+];
 const REUSABLE_CONTEXT_HEADING_PATTERNS: Array<[RegExp, string]> = [
   [/\bplatform facts?\b/i, "Platform Facts"],
   [/\breusable troubleshooting\b/i, "Reusable Troubleshooting"],
@@ -966,9 +1015,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     );
   }
 
-  if (
-    !/use this skill|when to use|trigger|routing|context route|mixin/.test(text)
-  ) {
+  if (!hasRoutingClarity(document, metadataText(description) ?? "")) {
     findings.push(
       documentFinding(
         document,
@@ -1077,7 +1124,7 @@ function shapeFindings(document: ParsedDocument): Finding[] {
     );
   }
 
-  if (!/verify|validation|test|confirm result|expected output/.test(text)) {
+  if (!hasVerificationGuidance(document)) {
     findings.push(
       documentFinding(
         document,
@@ -1116,6 +1163,44 @@ function shapeFindings(document: ParsedDocument): Finding[] {
   }
 
   return findings;
+}
+
+function hasVerificationGuidance(document: ParsedDocument): boolean {
+  if (
+    document.headings.some((heading) =>
+      VERIFICATION_HEADING_PATTERNS.some((pattern) =>
+        pattern.test(heading.text.trim()),
+      ),
+    )
+  ) {
+    return true;
+  }
+
+  const body = markdownBody(document.artifact.content);
+  return VERIFICATION_BODY_PATTERNS.some((pattern) => pattern.test(body));
+}
+
+function hasRoutingClarity(
+  document: ParsedDocument,
+  description: string,
+): boolean {
+  if (
+    ROUTING_DESCRIPTION_PATTERNS.some((pattern) => pattern.test(description))
+  ) {
+    return true;
+  }
+  if (
+    document.headings.some((heading) =>
+      ROUTING_HEADING_PATTERNS.some((pattern) =>
+        pattern.test(heading.text.trim()),
+      ),
+    )
+  ) {
+    return true;
+  }
+
+  const body = markdownBody(document.artifact.content);
+  return ROUTING_BODY_PATTERNS.some((pattern) => pattern.test(body));
 }
 
 function reusableContextCandidateFinding(

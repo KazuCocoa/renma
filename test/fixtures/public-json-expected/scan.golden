@@ -231,16 +231,16 @@
     "schemaVersion": "renma.trustGraph.v2",
     "summary": {
       "assetCount": 7,
-      "nodeCount": 19,
-      "edgeCount": 33,
-      "findingCount": 8,
+      "nodeCount": 18,
+      "edgeCount": 32,
+      "findingCount": 7,
       "nodeTypeCounts": {
         "asset": 7,
         "owner": 1,
         "lifecycle_status": 2,
         "security_profile": 0,
         "effective_policy": 1,
-        "diagnostic": 8
+        "diagnostic": 7
       },
       "edgeTypeCounts": {
         "owned_by": 6,
@@ -253,13 +253,13 @@
         "selects_security_profile": 0,
         "inherits_policy": 0,
         "has_effective_policy": 7,
-        "has_diagnostic": 8
+        "has_diagnostic": 7
       },
       "findingSeverityCounts": {
         "critical": 0,
         "high": 0,
         "medium": 4,
-        "low": 4,
+        "low": 3,
         "error": 0,
         "warning": 0,
         "info": 0
@@ -268,7 +268,7 @@
         "violation": 0,
         "suspicious": 0,
         "advisory": 0,
-        "unclassified": 8
+        "unclassified": 7
       }
     },
     "nodes": [
@@ -526,27 +526,6 @@
             "startLine": 8,
             "endLine": 8,
             "snippet": "  renma.requires-context: '[\"context.valid\",\"context.invalid-status\",\"context.missing-boundary\",\"context.placeholder\",\"context.inactive\",\"context.missing-owner\",\"context.unknown\"]'"
-          }
-        ]
-      },
-      {
-        "id": "diagnostic:14bab776c574a5b3",
-        "type": "diagnostic",
-        "label": "QUAL-MISSING-ROUTING-CLARITY",
-        "properties": {
-          "source": "finding",
-          "severity": "low",
-          "message": "Skill lacks routing clarity",
-          "id": "QUAL-MISSING-ROUTING-CLARITY",
-          "title": "Skill lacks routing clarity",
-          "path": "skills/review/SKILL.md"
-        },
-        "evidence": [
-          {
-            "path": "skills/review/SKILL.md",
-            "startLine": 1,
-            "endLine": 1,
-            "snippet": "---"
           }
         ]
       },
@@ -1351,20 +1330,6 @@
         ]
       },
       {
-        "id": "edge:f95012fca624d825",
-        "from": "asset:skill.review",
-        "to": "diagnostic:14bab776c574a5b3",
-        "type": "has_diagnostic",
-        "evidence": [
-          {
-            "path": "skills/review/SKILL.md",
-            "startLine": 1,
-            "endLine": 1,
-            "snippet": "---"
-          }
-        ]
-      },
-      {
         "id": "edge:9a85b471ab74c436",
         "from": "asset:skill.review",
         "to": "diagnostic:29c9d035e3c0ff57",
@@ -1448,20 +1413,6 @@
           "startLine": 8,
           "endLine": 8,
           "snippet": "  - TBD"
-        }
-      },
-      {
-        "source": "finding",
-        "id": "QUAL-MISSING-ROUTING-CLARITY",
-        "title": "Skill lacks routing clarity",
-        "severity": "low",
-        "message": "Skill lacks routing clarity",
-        "path": "skills/review/SKILL.md",
-        "evidence": {
-          "path": "skills/review/SKILL.md",
-          "startLine": 1,
-          "endLine": 1,
-          "snippet": "---"
         }
       },
       {
@@ -1659,21 +1610,6 @@
           "recognizedRoot": "contexts"
         }
       }
-    },
-    {
-      "id": "QUAL-MISSING-ROUTING-CLARITY",
-      "title": "Skill lacks routing clarity",
-      "category": "quality",
-      "severity": "low",
-      "confidence": "medium",
-      "evidence": {
-        "path": "skills/review/SKILL.md",
-        "startLine": 1,
-        "endLine": 1,
-        "snippet": "---"
-      },
-      "whyItMatters": "Clear skill structure helps agents choose the right workflow and report useful evidence.",
-      "remediation": "Add concise routing language: when to use the skill, whether it invokes other skills, or whether it is a utility skill for single operations."
     },
     {
       "id": "META-UNKNOWN-REFERENCE",
@@ -1882,7 +1818,7 @@
           "Do not automatically rewrite references during scan.",
           "Preserve compatibility shims when they are intentionally needed."
         ],
-        "diagnosticId": "MAINT-REFERENCE-DEPRECATED-ASSET@skills/review/SKILL.md:L8#6",
+        "diagnosticId": "MAINT-REFERENCE-DEPRECATED-ASSET@skills/review/SKILL.md:L8#5",
         "source": "finding",
         "facts": {
           "source": "skill.review",
@@ -2381,7 +2317,7 @@
           "Do not create prompt packages.",
           "Do not silently rewrite metadata during scan."
         ],
-        "diagnosticId": "META-UNKNOWN-DEPENDENCY@skills/review/SKILL.md:L8#7",
+        "diagnosticId": "META-UNKNOWN-DEPENDENCY@skills/review/SKILL.md:L8#6",
         "source": "finding",
         "facts": {
           "source": "skill.review",
@@ -2492,7 +2428,7 @@
           "Do not infer missing dependencies with an LLM during scan.",
           "Only validate declared repository relationships."
         ],
-        "diagnosticId": "META-UNKNOWN-REFERENCE@skills/review/SKILL.md:L8#5",
+        "diagnosticId": "META-UNKNOWN-REFERENCE@skills/review/SKILL.md:L8#4",
         "source": "finding",
         "facts": {
           "source": "skill.review",
@@ -2508,54 +2444,6 @@
             "recognizedRoot": "skills"
           }
         }
-      }
-    },
-    {
-      "version": 2,
-      "code": "QUAL-MISSING-ROUTING-CLARITY",
-      "severity": "warning",
-      "message": "Skill lacks routing clarity",
-      "repairPolicy": "preserve_semantics",
-      "location": {
-        "path": "skills/review/SKILL.md",
-        "startLine": 1,
-        "endLine": 1,
-        "snippet": "---"
-      },
-      "repairConstraints": [
-        {
-          "kind": "must_preserve",
-          "text": "Fix the underlying semantic issue, not just the warning count. Update the asset so it accurately represents the real dependencies, references, network requirements, and runtime behavior."
-        },
-        {
-          "kind": "must_not_change",
-          "text": "Do not remove, weaken, relocate, or bypass declarations only to make the diagnostic disappear."
-        },
-        {
-          "kind": "must_preserve",
-          "text": "Preserve existing repository semantics and reviewable evidence while making the smallest repair."
-        },
-        {
-          "kind": "must_not_change",
-          "text": "Do not introduce runtime context selection, prompt assembly, or hidden scan-time rewrites."
-        }
-      ],
-      "verificationSteps": [
-        {
-          "text": "Run Renma scan again and confirm this diagnostic no longer appears.",
-          "command": "renma scan",
-          "expected": "No diagnostics with code QUAL-MISSING-ROUTING-CLARITY are reported."
-        }
-      ],
-      "llmHint": "Use the evidence, repair constraints, and verification steps to make the smallest reviewable patch.",
-      "details": {
-        "findingSeverity": "low",
-        "category": "quality",
-        "confidence": "medium",
-        "remediation": "Add concise routing language: when to use the skill, whether it invokes other skills, or whether it is a utility skill for single operations.",
-        "whyItMatters": "Clear skill structure helps agents choose the right workflow and report useful evidence.",
-        "diagnosticId": "QUAL-MISSING-ROUTING-CLARITY@skills/review/SKILL.md:L1#4",
-        "source": "finding"
       }
     }
   ],
@@ -2625,27 +2513,6 @@
       "llmHint": "Review these diagnostics together and make the smallest patch that satisfies their shared evidence."
     },
     {
-      "id": "code-review:qual-missing-routing-clarity:skills/review/skill.md",
-      "title": "QUAL-MISSING-ROUTING-CLARITY review",
-      "summary": "1 diagnostics share the same code and source.",
-      "severity": "warning",
-      "diagnosticCodes": [
-        "QUAL-MISSING-ROUTING-CLARITY"
-      ],
-      "diagnosticIds": [
-        "QUAL-MISSING-ROUTING-CLARITY@skills/review/SKILL.md:L1#4"
-      ],
-      "affectedFiles": [
-        "skills/review/SKILL.md"
-      ],
-      "suggestedReviewOrder": [
-        "Inspect skills/review/SKILL.md",
-        "Apply the repair constraints before editing.",
-        "Rerun Renma scan."
-      ],
-      "llmHint": "Review these diagnostics together and make the smallest patch that satisfies their shared evidence."
-    },
-    {
       "id": "dependency-review:skills/review/skill.md",
       "title": "Dependency/reference review: skills/review/SKILL.md",
       "summary": "1 dependency or reference diagnostics affect the same source.",
@@ -2654,7 +2521,7 @@
         "MAINT-REFERENCE-DEPRECATED-ASSET"
       ],
       "diagnosticIds": [
-        "MAINT-REFERENCE-DEPRECATED-ASSET@skills/review/SKILL.md:L8#6"
+        "MAINT-REFERENCE-DEPRECATED-ASSET@skills/review/SKILL.md:L8#5"
       ],
       "affectedAssets": [
         "context.inactive",
@@ -2683,8 +2550,8 @@
         "META-UNKNOWN-REFERENCE"
       ],
       "diagnosticIds": [
-        "META-UNKNOWN-DEPENDENCY@skills/review/SKILL.md:L8#7",
-        "META-UNKNOWN-REFERENCE@skills/review/SKILL.md:L8#5"
+        "META-UNKNOWN-DEPENDENCY@skills/review/SKILL.md:L8#6",
+        "META-UNKNOWN-REFERENCE@skills/review/SKILL.md:L8#4"
       ],
       "affectedAssets": [
         "context.unknown",

@@ -63,6 +63,20 @@ and `assets/` directories are valid. See the official
 | `lowHeadingDensityMinTokens` | 400 | body `estimated_tokens`, with fewer than 2 headings | low | Renma | Long prose can still be intentionally linear | `QUAL-LOW-HEADING-DENSITY` | 0.18.0 | possibly |
 | `lowHeadingDensityMinHeadings` | 2 | headings | low | Renma | Navigation heuristic only | same | 0.18.0 | possibly |
 
+Routing clarity is deterministic evidence, not a description-length check. An
+explicit selection phrase may appear in the effective Agent Skill description,
+an Agent's description metadata, or the Markdown body. Common authoring forms
+include `Use when`, `When to use`, `Use this Skill`, `Routing`, and explicit
+trigger language. A description that only summarizes output does not satisfy
+`QUAL-MISSING-ROUTING-CLARITY`.
+
+Verification guidance is detected only in parsed Markdown headings and body
+text; unrelated frontmatter does not count. Renma recognizes common bounded
+forms such as `Verification`, `Validation`, `verify`, `validate`, `testing`, and
+`expected output` or `expected result`. This advisory detects the presence of
+static success-checking guidance; it does not judge whether a command is correct
+or the checks are exhaustive.
+
 ## Metadata advisories
 
 | Field | Value | Unit and trigger | Severity | Source | Rationale and false-positive risk | Diagnostic | Reviewed | Configurable later |

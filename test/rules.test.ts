@@ -99,6 +99,303 @@ description: [not, a, string]
   assert.equal(invalid.agentSkills.results[0]?.valid, false);
 });
 
+test("Verification heading is recognized as verification guidance regression", async () => {
+  const root = await fixture();
+  const artifactPath = await writeQualityDocument(root, {
+    kind: "skill",
+    name: "verification-heading",
+    description:
+      "Use when a repository workflow needs a deterministic artifact review.",
+    body: "## Verification\nReview the generated artifact before finishing.",
+  });
+
+  const result = await scan(root);
+  assert.equal(
+    hasFinding(result, "QUAL-MISSING-VERIFICATION", artifactPath),
+    false,
+  );
+});
+
+test("verification guidance recognizes bounded heading, lexical, and outcome forms", async () => {
+  const root = await fixture();
+  const signals = [
+    [
+      "Validation heading",
+      "## Validation\nCompare the generated artifact with its source.",
+    ],
+    ["verify", "Verify the result before finishing."],
+    ["verified", "The generated output is verified before finishing."],
+    ["verifies", "The final check verifies the generated output."],
+    ["verifying", "Finish by verifying the generated output."],
+    ["verification", "Verification is complete when the command exits zero."],
+    ["validate", "Validate the generated output."],
+    ["validated", "The generated output is validated before handoff."],
+    ["validates", "The command validates the generated output."],
+    ["validating", "Finish by validating the generated output."],
+    ["validation", "Validation completes before the final response."],
+    ["test", "Run the integration test before returning the result."],
+    ["tests", "Run the tests before returning the result."],
+    ["tested", "The generated output is tested before handoff."],
+    ["testing", "Testing runs before completion."],
+    ["confirm result", "Confirm the result before finishing."],
+    ["confirm output", "Confirm output before finishing."],
+    ["expected output", "The expected output is a zero exit code."],
+    ["expected result", "The expected result is an unchanged artifact."],
+    ["expected behavior", "The expected behavior is a clean exit."],
+    [
+      "post-check heading",
+      "## Post-checks\nInspect the generated artifact before finishing.",
+    ],
+  ] as const;
+
+  for (const [index, [, body]] of signals.entries()) {
+    await writeQualityDocument(root, {
+      kind: "skill",
+      name: `verification-${index}`,
+      description:
+        "Use when a repository workflow needs a deterministic artifact review.",
+      body,
+    });
+  }
+
+  const result = await scan(root);
+  for (const [index, [label]] of signals.entries()) {
+    const artifactPath = `skills/verification-${index}/SKILL.md`;
+    assert.equal(
+      hasFinding(result, "QUAL-MISSING-VERIFICATION", artifactPath),
+      false,
+      label,
+    );
+  }
+});
+
+test("verification guidance ignores lexical fragments and frontmatter evidence", async () => {
+  const root = await fixture();
+  const fixtures = [
+    {
+      name: "absent",
+      description:
+        "Use when a repository artifact needs a deterministic source review.",
+      body: "Inspect the generated artifact before returning it.",
+    },
+    {
+      name: "bounded",
+      description:
+        "Use when a repository artifact needs a deterministic source review.",
+      body: "Cache invalidation updates the latest artifact before handoff.",
+    },
+    {
+      name: "frontmatter-only",
+      description:
+        "Use when a generated artifact requires verification review.",
+      extraFrontmatter: ["metadata:", "  renma.note: verification"],
+      body: "Inspect the generated artifact before returning it.",
+    },
+  ] as const;
+
+  for (const fixture of fixtures) {
+    await writeQualityDocument(root, { kind: "skill", ...fixture });
+  }
+
+  const result = await scan(root);
+  for (const fixture of fixtures) {
+    const artifactPath = `skills/${fixture.name}/SKILL.md`;
+    const finding = result.findings.find(
+      (candidate) =>
+        candidate.id === "QUAL-MISSING-VERIFICATION" &&
+        candidate.evidence.path === artifactPath,
+    );
+    assert.equal(finding?.category, "quality", fixture.name);
+    assert.equal(finding?.severity, "medium", fixture.name);
+  }
+});
+
+test("routing clarity recognizes explicit language in resolved Skill descriptions", async () => {
+  const root = await fixture();
+  const descriptions = [
+    "Review pull requests. Use when correctness, security, or maintainability needs review.",
+    "Review pull requests. Use this Skill when a proposed change needs review.",
+    "Use for repository-level pull request review.",
+    "Use this Skill for repository-level pull request review.",
+    "Choose this Skill when a proposed change needs review.",
+    "Choose this Skill for repository-level pull request review.",
+    "Review pull requests. Use this for repository-level review.",
+  ] as const;
+
+  for (const [index, description] of descriptions.entries()) {
+    await writeQualityDocument(root, {
+      kind: "skill",
+      name: `routing-description-${index}`,
+      description,
+      body: "## Verification\nVerify the structured findings before handoff.",
+    });
+  }
+
+  const result = await scan(root);
+  for (const [index, description] of descriptions.entries()) {
+    assert.equal(
+      hasFinding(
+        result,
+        "QUAL-MISSING-ROUTING-CLARITY",
+        `skills/routing-description-${index}/SKILL.md`,
+      ),
+      false,
+      description,
+    );
+  }
+});
+
+test("routing clarity preserves established body forms and recognizes Use when", async () => {
+  const root = await fixture();
+  const signals = [
+    "## When to use\nReview repository-level pull requests.",
+    "Use this Skill to review repository-level pull requests.",
+    "## Use when\nReview repository-level pull requests.",
+    "## Routing\nSelect this workflow for pull request review.",
+    "## Trigger\nA pull request needs structured review.",
+    "Triggers: a pull request needs structured review.",
+    "Context route: repository-level pull request review.",
+    "Mixin: repository-level review guidance.",
+    "When this Skill applies, review the proposed change.",
+    "Choose this Skill when a proposed change needs review.",
+    "Use for repository-level pull request review.",
+  ] as const;
+
+  for (const [index, signal] of signals.entries()) {
+    await writeQualityDocument(root, {
+      kind: "skill",
+      name: `routing-body-${index}`,
+      description: "Reviews source code and produces structured findings.",
+      body: `${signal}\n\n## Verification\nVerify the structured findings before handoff.`,
+    });
+  }
+
+  const result = await scan(root);
+  for (const [index, signal] of signals.entries()) {
+    assert.equal(
+      hasFinding(
+        result,
+        "QUAL-MISSING-ROUTING-CLARITY",
+        `skills/routing-body-${index}/SKILL.md`,
+      ),
+      false,
+      signal,
+    );
+  }
+});
+
+test("routing clarity composes legitimate description and body evidence", async () => {
+  const root = await fixture();
+  const fixtures = [
+    { name: "description", descriptionRouting: true, bodyRouting: false },
+    { name: "body", descriptionRouting: false, bodyRouting: true },
+    { name: "both", descriptionRouting: true, bodyRouting: true },
+    { name: "neither", descriptionRouting: false, bodyRouting: false },
+  ] as const;
+
+  for (const fixture of fixtures) {
+    await writeQualityDocument(root, {
+      kind: "skill",
+      name: `routing-${fixture.name}`,
+      description: fixture.descriptionRouting
+        ? "Use when a proposed change needs structured review."
+        : "Reviews source code and produces structured findings.",
+      body: [
+        fixture.bodyRouting
+          ? "## Use when\nReview repository-level pull requests."
+          : "## Workflow\nReview the proposed change.",
+        "## Verification\nVerify the structured findings before handoff.",
+      ].join("\n\n"),
+    });
+  }
+
+  const result = await scan(root);
+  for (const fixture of fixtures) {
+    assert.equal(
+      hasFinding(
+        result,
+        "QUAL-MISSING-ROUTING-CLARITY",
+        `skills/routing-${fixture.name}/SKILL.md`,
+      ),
+      !fixture.descriptionRouting && !fixture.bodyRouting,
+      fixture.name,
+    );
+  }
+});
+
+test("routing clarity ignores bounded fragments and unrelated frontmatter", async () => {
+  const root = await fixture();
+  const artifactPath = await writeQualityDocument(root, {
+    kind: "skill",
+    name: "routing-bounded",
+    description: "Reviews source code and produces structured findings.",
+    extraFrontmatter: ["metadata:", "  renma.note: routing trigger"],
+    body: [
+      "Reuse this Skill's output in another workflow.",
+      "Cache prerouting can retrigger the operation.",
+      "## Verification",
+      "Verify the structured findings before handoff.",
+    ].join("\n\n"),
+  });
+
+  const result = await scan(root);
+  const finding = result.findings.find(
+    (candidate) =>
+      candidate.id === "QUAL-MISSING-ROUTING-CLARITY" &&
+      candidate.evidence.path === artifactPath,
+  );
+  assert.equal(finding?.category, "quality");
+  assert.equal(finding?.severity, "low");
+});
+
+test("Agent documents retain routing and verification quality behavior", async () => {
+  const root = await fixture();
+  const descriptionPath = await writeQualityDocument(root, {
+    kind: "agent",
+    name: "description-evidence",
+    description: "Use when a proposed change needs structured review.",
+    body: "## Verification\nInspect the structured findings before handoff.",
+  });
+  const bodyPath = await writeQualityDocument(root, {
+    kind: "agent",
+    name: "body-evidence",
+    description: "Reviews source code and produces structured findings.",
+    body: [
+      "## Use when",
+      "Review repository-level pull requests.",
+      "Validate the structured findings before handoff.",
+    ].join("\n\n"),
+  });
+  const missingPath = await writeQualityDocument(root, {
+    kind: "agent",
+    name: "missing-evidence",
+    description: "Reviews source code and produces structured findings.",
+    body: "Reuse this Skill's output after cache invalidation updates the latest artifact.",
+  });
+
+  const result = await scan(root);
+  for (const artifactPath of [descriptionPath, bodyPath]) {
+    assert.equal(
+      hasFinding(result, "QUAL-MISSING-ROUTING-CLARITY", artifactPath),
+      false,
+      artifactPath,
+    );
+    assert.equal(
+      hasFinding(result, "QUAL-MISSING-VERIFICATION", artifactPath),
+      false,
+      artifactPath,
+    );
+  }
+  assert.equal(
+    hasFinding(result, "QUAL-MISSING-ROUTING-CLARITY", missingPath),
+    true,
+  );
+  assert.equal(
+    hasFinding(result, "QUAL-MISSING-VERIFICATION", missingPath),
+    true,
+  );
+});
+
 test("scan preserves local support reachability and profile findings", async () => {
   const root = await fixture();
   const skillDir = path.join(root, "skills", "demo");
@@ -2241,6 +2538,46 @@ async function writeSkill(
   await writeFile(
     path.join(skillDir, "SKILL.md"),
     canonicalSkillFixture(`skills/${name}/SKILL.md`, content),
+  );
+}
+
+async function writeQualityDocument(
+  root: string,
+  options: {
+    kind: "skill" | "agent";
+    name: string;
+    description: string;
+    body: string;
+    extraFrontmatter?: readonly string[];
+  },
+): Promise<string> {
+  const relativePath =
+    options.kind === "skill"
+      ? `skills/${options.name}/SKILL.md`
+      : `.agents/${options.name}.md`;
+  const absolutePath = path.join(root, ...relativePath.split("/"));
+  await mkdir(path.dirname(absolutePath), { recursive: true });
+  const frontmatter = [
+    ...(options.kind === "skill" ? [`name: ${options.name}`] : []),
+    `description: ${JSON.stringify(options.description)}`,
+    ...(options.extraFrontmatter ?? []),
+  ];
+  await writeFile(
+    absolutePath,
+    ["---", ...frontmatter, "---", "# Quality fixture", options.body, ""].join(
+      "\n",
+    ),
+  );
+  return relativePath;
+}
+
+function hasFinding(
+  result: ScanResult,
+  id: string,
+  artifactPath: string,
+): boolean {
+  return result.findings.some(
+    (finding) => finding.id === id && finding.evidence.path === artifactPath,
   );
 }
 

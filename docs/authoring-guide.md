@@ -968,6 +968,20 @@ metadata compact and put detailed instructions in the body. Preserve unknown
 existing vendor metadata during review, but do not manufacture provider-specific
 metadata without a requirement.
 
+Treat the Agent Skill `description` as routing metadata, not only as a summary.
+Use explicit selection language such as `Use when ...` when the activation
+boundary fits there; Renma also accepts clear routing guidance in the Skill
+body, including `When to use`, `Routing`, and trigger-oriented sections. A
+description that only says what output the Skill produces does not establish
+when or why it should be selected.
+
+Keep recognizable result-checking guidance in the Markdown body. A concise
+`Verification`, `Validation`, or `Testing` section is sufficient, and inline
+instructions using forms such as `verify`, `validate`, or `expected result` are
+also supported. A verification-related word in frontmatter alone does not
+establish workflow verification. These advisories are deterministic authoring
+checks; they do not evaluate whether a stated test is correct or exhaustive.
+
 For a temporary lifecycle stop, preserve the asset and set
 `renma.status: suspended` together with a reviewed, non-blank
 `renma.status-reason` and real `YYYY-MM-DD` `renma.status-changed-at`. Non-Skill
