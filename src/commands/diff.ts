@@ -12,6 +12,13 @@ import {
   buildSecurityDiffSummary,
   type SecurityDiffSummary,
 } from "../security-diff.js";
+import type {
+  SecurityPolicyAssetChange,
+  SecurityPolicyChangeProvenance,
+  SecurityPolicyChangeSource,
+  SecurityPolicyFieldChange,
+  SharedSecurityPolicyChange,
+} from "../security-policy-diff.js";
 import type { ContextLensSummary } from "../context-lens.js";
 import type { SecurityPolicyInventorySummary } from "../security-policy-inventory.js";
 import {
@@ -24,6 +31,8 @@ import {
 } from "../executable-surface-inventory.js";
 import type { ConfigOverrides } from "../config.js";
 import type { SkillDiscoveryCiPolicyMode } from "../types/configuration.js";
+import type { SecurityConfig } from "../types/configuration.js";
+import type { SecurityPolicyAssetEvidence } from "../security-policy-inventory.js";
 import {
   collectRepositorySnapshot,
   type RepositoryCollectionInstrumentation,
@@ -39,6 +48,7 @@ import {
 import type { SkillDiscoveryIndex } from "../skill-discovery.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import { formatJsonDocument } from "../report.js";
+import { formatMarkdownInlineCode } from "../renderers/markdown-inline-code.js";
 
 const execFile = promisify(execFileCallback);
 
@@ -178,6 +188,9 @@ export interface DiffSnapshot {
   graph: GraphReport;
   discovery?: SkillDiscoveryIndex;
   executableSurfaceInventory?: ExecutableSurfaceInventory;
+  securityPolicies?: SecurityPolicyAssetEvidence[];
+  securityConfig?: SecurityConfig;
+  configPath?: string;
 }
 
 export interface DiffCollectionInstrumentation {
@@ -455,6 +468,14 @@ function buildDiffReportProjection(
       removedFindings,
       fromPolicyInventory: fromEndpoint.securityPolicyInventory,
       toPolicyInventory: toEndpoint.securityPolicyInventory,
+      fromAssets: fromSnapshot.securityPolicies,
+      toAssets: toSnapshot.securityPolicies,
+      fromConfig: fromSnapshot.securityConfig,
+      toConfig: toSnapshot.securityConfig,
+      fromConfigPath: fromSnapshot.configPath,
+      toConfigPath: toSnapshot.configPath,
+      fromAssetIdsByPath: assetIdsByPath(fromSnapshot.graph),
+      toAssetIdsByPath: assetIdsByPath(toSnapshot.graph),
     }),
     findings: {
       added: addedFindings,
@@ -901,7 +922,7 @@ export function formatSecurityChanges(
       addedFindings: [],
       removedFindings: [],
     });
-  return [
+  const lines = [
     `- Added security findings: ${posture.added.totalSecurityFindings}`,
     `- Resolved security findings: ${posture.resolved.totalSecurityFindings}`,
     `- Added violations: ${posture.added.riskClasses.violation}`,
@@ -931,6 +952,197 @@ export function formatSecurityChanges(
     `- Forbidden inputs: ${formatSignedNumber(policyInventory.forbiddenInputCount)}`,
     `- Missing security profiles: ${formatSignedNumber(policyInventory.securityProfiles.missing)}`,
     `- Cyclic security profiles: ${formatSignedNumber(policyInventory.securityProfiles.cyclic)}`,
+  ];
+  const policyChanges = security?.policyChanges ?? [];
+  const sharedPolicyChanges = security?.sharedPolicyChanges ?? [];
+  if (policyChanges.length > 0) {
+    lines.push(
+      "",
+      "### Effective security policy boundary changes",
+      "",
+      ...policyChanges
+        .slice(0, DIFF_DETAIL_LIMIT)
+        .flatMap(formatSecurityPolicyAssetChange),
+      ...formatPolicyOverflow(policyChanges.length, 0),
+    );
+  }
+  if (sharedPolicyChanges.length > 0) {
+    lines.push("", "### Shared policy blast radius", "");
+    lines.push(
+      ...sharedPolicyChanges
+        .slice(0, DIFF_DETAIL_LIMIT)
+        .flatMap(formatSharedSecurityPolicyChange),
+      ...formatPolicyOverflow(sharedPolicyChanges.length, 0),
+    );
+  }
+  return lines;
+}
+
+function formatSecurityPolicyAssetChange(
+  change: SecurityPolicyAssetChange,
+): string[] {
+  const lines = [
+    `- ${formatMarkdownInlineCode(change.asset.id)} (${formatMarkdownInlineCode(change.asset.path)})`,
+  ];
+  for (const field of change.fields) {
+    lines.push(...formatSecurityPolicyFieldChange(field));
+    if (
+      field.kind === "scalar" &&
+      field.field === "networkAllowed" &&
+      field.after === true
+    ) {
+      lines.push(
+        ...formatEffectiveDestinationScope(
+          "Effective approved network destinations after",
+          change.after?.approvedNetworkDestinations ?? [],
+        ),
+      );
+    }
+    if (
+      field.kind === "scalar" &&
+      field.field === "externalUploadAllowed" &&
+      field.after === true
+    ) {
+      lines.push(
+        ...formatEffectiveDestinationScope(
+          "Effective approved upload destinations after",
+          change.after?.approvedUploadDestinations ?? [],
+        ),
+      );
+    }
+  }
+  return lines;
+}
+
+function formatSecurityPolicyFieldChange(
+  change: SecurityPolicyFieldChange,
+): string[] {
+  const label = securityPolicyFieldLabel(change.field);
+  const provenance = formatPolicyProvenance(change.provenance);
+  if (change.kind === "scalar") {
+    return [
+      `  - ${label} (${provenance}): ${formatPolicyScalar(change.before)} -> ${formatPolicyScalar(change.after)}`,
+    ];
+  }
+  const lines = [`  - ${label} (${provenance}):`];
+  if (change.added.length > 0) {
+    lines.push(
+      `    - Added: ${formatPolicyValues(change.added)}`,
+      ...formatPolicyOverflow(change.added.length, 4),
+    );
+  }
+  if (change.removed.length > 0) {
+    lines.push(
+      `    - Removed: ${formatPolicyValues(change.removed)}`,
+      ...formatPolicyOverflow(change.removed.length, 4),
+    );
+  }
+  return lines;
+}
+
+function formatSharedSecurityPolicyChange(
+  change: SharedSecurityPolicyChange,
+): string[] {
+  const count = change.affectedAssets.length;
+  const noun = count === 1 ? "asset receives" : "assets receive";
+  const lines = [
+    `- ${formatPolicySource(change.source)}: ${count} ${noun} an effective policy change; fields: ${change.changedFields.map(securityPolicyFieldLabel).join(", ")}`,
+  ];
+  lines.push(
+    ...change.affectedAssets
+      .slice(0, DIFF_DETAIL_LIMIT)
+      .map(
+        (asset) =>
+          `  - ${formatMarkdownInlineCode(asset.id)} (${formatMarkdownInlineCode(asset.path)})`,
+      ),
+    ...formatPolicyOverflow(change.affectedAssets.length, 2),
+  );
+  return lines;
+}
+
+function formatPolicyProvenance(
+  provenance: SecurityPolicyChangeProvenance,
+): string {
+  if (provenance.mode === "unresolved") {
+    if (provenance.sources.length === 0) return "provenance unresolved";
+    return `provenance unresolved; known source${provenance.sources.length === 1 ? "" : "s"}: ${provenance.sources.map(formatPolicySource).join(", ")}`;
+  }
+  const mode =
+    provenance.mode === "direct"
+      ? "direct"
+      : provenance.mode === "inherited"
+        ? "inherited"
+        : "direct and inherited";
+  return `${mode}; source${provenance.sources.length === 1 ? "" : "s"}: ${provenance.sources.map(formatPolicySource).join(", ")}`;
+}
+
+function formatPolicySource(source: SecurityPolicyChangeSource): string {
+  const location = source.path
+    ? ` at ${formatMarkdownInlineCode(source.path)}`
+    : "";
+  if (source.type === "asset") {
+    return `asset ${formatMarkdownInlineCode(source.id)}${location}`;
+  }
+  if (source.type === "owning_skill") {
+    return `owning Skill ${formatMarkdownInlineCode(source.id)}${location}`;
+  }
+  if (source.type === "security_profile") {
+    return `security profile ${formatMarkdownInlineCode(source.id)}${location}`;
+  }
+  return `repository security configuration${location}`;
+}
+
+function securityPolicyFieldLabel(
+  field: SecurityPolicyFieldChange["field"],
+): string {
+  switch (field) {
+    case "networkAllowed":
+      return "Network allowed";
+    case "approvedNetworkDestinations":
+      return "Approved network destinations";
+    case "externalUploadAllowed":
+      return "External upload allowed";
+    case "approvedUploadDestinations":
+      return "Approved upload destinations";
+    case "allowedData":
+      return "Allowed data";
+    case "forbiddenInputs":
+      return "Forbidden inputs";
+    case "secretsAllowed":
+      return "Secrets allowed";
+    case "humanApprovalRequired":
+      return "Human approval required";
+    case "disallowedCommands":
+      return "Disallowed commands";
+  }
+}
+
+function formatPolicyScalar(value: boolean | null): string {
+  return value === null ? "unspecified" : String(value);
+}
+
+function formatPolicyValues(values: readonly string[]): string {
+  return values
+    .slice(0, DIFF_DETAIL_LIMIT)
+    .map(formatMarkdownInlineCode)
+    .join(", ");
+}
+
+function formatEffectiveDestinationScope(
+  label: string,
+  values: readonly string[],
+): string[] {
+  if (values.length === 0) return [`  - ${label}: none declared`];
+  return [
+    `  - ${label}: ${formatPolicyValues(values)}`,
+    ...formatPolicyOverflow(values.length, 4),
+  ];
+}
+
+function formatPolicyOverflow(total: number, indent: number): string[] {
+  if (total <= DIFF_DETAIL_LIMIT) return [];
+  return [
+    `${" ".repeat(indent)}- ${total - DIFF_DETAIL_LIMIT} more not shown; see JSON for the full list.`,
   ];
 }
 
@@ -988,6 +1200,11 @@ async function snapshot(
         ? { discovery: repositorySnapshot.skillDiscovery }
         : {}),
       executableSurfaceInventory: repositorySnapshot.executableSurfaceInventory,
+      securityPolicies: repositorySnapshot.securityPolicies,
+      securityConfig: repositorySnapshot.config.security,
+      ...(repositorySnapshot.configPath
+        ? { configPath: repositorySnapshot.configPath }
+        : {}),
     },
     skillDiscoveryCiPolicy: repositorySnapshot.config.skillDiscovery.ciPolicy,
   };
@@ -1008,6 +1225,10 @@ function endpoint(snapshot: DiffSnapshot): DiffEndpoint {
     contextLens: snapshot.readiness.summary.contextLens,
     securityPolicyInventory: snapshot.readiness.summary.securityPolicyInventory,
   };
+}
+
+function assetIdsByPath(graph: GraphReport): Map<string, string> {
+  return new Map(graph.nodes.map((node) => [node.sourcePath, node.id]));
 }
 
 function changedAssets(

@@ -798,9 +798,60 @@ owning Skill, while `owning_skill` identifies the inheritance channel.
 
 ### Security-aware semantic diff
 
-`renma diff` and `renma ci-report` can summarize how security posture and effective security policy inventory changed between two revisions.
+`renma diff` and `renma ci-report` summarize how security posture and effective
+security policy inventory changed between two revisions. In addition to
+aggregate inventory deltas, they project review-focused effective-policy changes
+for network allowance and approved network destinations, external-upload
+allowance and approved upload destinations, allowed data, forbidden inputs,
+secret handling, human approval, and disallowed commands.
 
-The diff uses existing static findings and existing policy metadata/config summaries. It does not add new detectors, change runtime behavior, change scan `fail_on`, change readiness scoring, or change CI pass/warn/fail status.
+Each asset change retains its canonical ID/path, normalized before/after policy,
+concrete added and removed list values, and field-level provenance. Provenance
+distinguishes a direct asset-local declaration change from policy inherited
+through an owning Skill, reusable security profile, or repository security
+configuration; a transition is mixed only when both direct and inherited
+evidence contributed to that effective boundary change.
+Asset addition or removal is direct only when the existing endpoint contains a
+local field declaration or profile selection. Scalar profile provenance names
+the last effective profile declaration, while accumulating lists retain every
+contributing profile. For accumulating lists, each changed profile or repository
+source is compared by its normalized effective declaration additions and
+removals against the effective field transition. When multiple changed sources
+supply the same added or removed value, every such source remains attributable;
+local replacements and invalid fail-closed destinations still suppress sources
+that cannot contribute. A changed profile parent link is retained when its
+reachable contributor-chain delta supplies the transition. If the retained
+evidence cannot establish an exact field-level source, provenance is reported as
+unresolved instead of guessing.
+This is declared/effective-policy provenance, not an inference about which
+runtime action used the policy. A profile or repository-policy change also
+records its effective-policy blast radius: JSON retains the complete sorted
+affected-asset list, while Markdown uses the shared presentation limit and
+reports how many entries were omitted.
+
+The Markdown details appear only when policy evidence changed and remain under
+the CI report's `Full report details` disclosure. Booleans use `before -> after`;
+list additions and removals are separate. Removed forbidden inputs, removed
+disallowed commands, and `humanApprovalRequired: true -> false` remain visible
+without being labeled improvements or regressions. Enabling network or upload
+access with no effective approved destinations renders `none declared`, not
+`unrestricted`. When access becomes enabled, Markdown shows the bounded
+effective post-change destination scope even if the destination list did not
+change, and directs reviewers to JSON for omitted values. JSON remains complete
+and machine-readable. Markdown does not expose policy fingerprints.
+
+This diff reuses the same normalization, effective-policy resolution,
+provenance, and fingerprint semantics as Security Policy Inventory and the
+Trust Graph. Declaration order and duplicate values therefore do not create a
+change. Approved-policy destinations remain distinct from destinations that
+static instruction evidence mentions, and both remain distinct from an observed
+runtime connection or upload. Renma adds no target detector or runtime evidence
+for this report.
+
+The diff uses existing static findings and existing policy metadata/config
+evidence. It is reporting-only: it does not add detectors, infer permissions,
+change runtime behavior or enforcement, change `scan --fail-on`, change
+Readiness scoring or level, or change CI pass/warn/fail status or exit behavior.
 
 ## Common Security Diagnostics
 

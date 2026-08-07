@@ -69,6 +69,21 @@ export interface EffectiveSecurityPolicyEvidence {
   disallowedCommands: string[];
 }
 
+/** Normalized asset-local declarations retained for deterministic diff provenance. */
+export interface DeclaredSecurityPolicyEvidence {
+  fields: string[];
+  invalidDeclared: string[];
+  allowedData: string[];
+  forbiddenInputs: string[];
+  networkAllowed: boolean | null;
+  externalUploadAllowed: boolean | null;
+  secretsAllowed: boolean | null;
+  humanApprovalRequired: boolean | null;
+  approvedNetworkDestinations: string[];
+  approvedUploadDestinations: string[];
+  disallowedCommands: string[];
+}
+
 export type SecurityProfileResolution =
   "none" | "resolved" | "missing" | "cyclic";
 
@@ -82,6 +97,8 @@ export interface SecurityPolicyAssetEvidence {
   selectedSecurityProfile?: string;
   profileResolution: SecurityProfileResolution;
   profileChain: string[];
+  /** Present on collected evidence; optional for compatibility-built evidence. */
+  declaredPolicy?: DeclaredSecurityPolicyEvidence;
   effectivePolicy: EffectiveSecurityPolicyEvidence;
   evidence: {
     selectedSecurityProfile?: Evidence;
@@ -299,6 +316,7 @@ export function collectSecurityPolicyAssetEvidence(
         ...(selectedSecurityProfile ? { selectedSecurityProfile } : {}),
         profileResolution: profileResolution(selectedSecurityProfile, chain),
         profileChain: chain.profiles.map((item) => item.name),
+        declaredPolicy: normalizeDeclaredPolicy(parsedPolicy),
         effectivePolicy: normalizeEffectivePolicy(policy),
         evidence: {
           ...(selectedSecurityProfileEvidence
@@ -547,6 +565,35 @@ function normalizeEffectivePolicy(
       .update(JSON.stringify(summary))
       .digest("hex")}`,
     ...summary,
+  };
+}
+
+function normalizeDeclaredPolicy(
+  policy: SecurityPolicy,
+): DeclaredSecurityPolicyEvidence {
+  return {
+    fields: [...policy.declared].sort((left, right) =>
+      left.localeCompare(right),
+    ),
+    invalidDeclared: [...policy.invalidDeclared].sort((left, right) =>
+      left.localeCompare(right),
+    ),
+    allowedData: normalizeStringList([
+      ...(policy.allowedDataClass ? [policy.allowedDataClass] : []),
+      ...policy.allowedData,
+    ]),
+    forbiddenInputs: normalizeStringList(policy.forbiddenInputs),
+    networkAllowed: policy.networkAllowed ?? null,
+    externalUploadAllowed: policy.externalUploadAllowed ?? null,
+    secretsAllowed: policy.secretsAllowed ?? null,
+    humanApprovalRequired: policy.humanApprovalRequired ?? null,
+    approvedNetworkDestinations: normalizeStringList(
+      policy.approvedNetworkDestinations,
+    ),
+    approvedUploadDestinations: normalizeStringList(
+      policy.approvedUploadDestinations,
+    ),
+    disallowedCommands: normalizeStringList(policy.disallowedCommands),
   };
 }
 

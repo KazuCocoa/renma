@@ -6,6 +6,8 @@ import { join } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 import fc from "fast-check";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import type { Nodes } from "mdast";
 import {
   buildCiReportFromDiff,
   ciReport,
@@ -31,6 +33,12 @@ import {
   zeroSecurityPostureSummary,
 } from "../src/security-posture.js";
 import { buildSecurityDiffSummary } from "../src/security-diff.js";
+import { visibleMarkdownInlineValue } from "../src/renderers/markdown-inline-code.js";
+import type {
+  ReviewableEffectiveSecurityPolicy,
+  SecurityPolicyAssetChange,
+  SecurityPolicyFieldChange,
+} from "../src/security-policy-diff.js";
 import {
   zeroSecurityPolicyInventorySummary,
   type SecurityPolicyInventorySummary,
@@ -673,6 +681,344 @@ test("formatCiReport includes security changes from the semantic diff", () => {
   assert.match(
     markdown.slice(0, markdown.indexOf("<details>")),
     /- Finding\/policy changes: findings \+1\/-1; security policy metrics ~9/,
+  );
+});
+
+test("formatCiReport renders concrete policy boundary values and neutral undeclared destinations", () => {
+  const report = sampleReport();
+  const statusBefore = determineCiReportStatus(report.diff);
+  report.diff.security.policyChanges = [
+    policyAssetChange({
+      id: "context.review",
+      path: "contexts/review.md",
+      before: reviewablePolicy({
+        networkAllowed: false,
+        externalUploadAllowed: false,
+        secretsAllowed: false,
+        humanApprovalRequired: true,
+        approvedNetworkDestinations: ["old.example.com"],
+        approvedUploadDestinations: ["old-upload.example.com"],
+        forbiddenInputs: ["credentials"],
+        disallowedCommands: ["curl"],
+      }),
+      after: reviewablePolicy({
+        networkAllowed: true,
+        externalUploadAllowed: true,
+        secretsAllowed: true,
+        humanApprovalRequired: false,
+        allowedData: ["internal"],
+      }),
+      fields: [
+        scalarPolicyChange("networkAllowed", false, true),
+        listPolicyChange(
+          "approvedNetworkDestinations",
+          [],
+          ["old.example.com"],
+        ),
+        scalarPolicyChange("externalUploadAllowed", false, true),
+        listPolicyChange(
+          "approvedUploadDestinations",
+          [],
+          ["old-upload.example.com"],
+        ),
+        listPolicyChange("allowedData", ["internal"], []),
+        listPolicyChange("forbiddenInputs", [], ["credentials"]),
+        scalarPolicyChange("secretsAllowed", false, true),
+        scalarPolicyChange("humanApprovalRequired", true, false),
+        listPolicyChange("disallowedCommands", [], ["curl"]),
+      ],
+    }),
+  ];
+
+  const markdown = formatCiReport(report, "markdown");
+  const json = JSON.parse(formatCiReport(report, "json")) as CiReport;
+
+  assert.ok(
+    markdown.indexOf("### Effective security policy boundary changes") >
+      markdown.indexOf("<summary>Full report details</summary>"),
+  );
+  assert.match(
+    markdown.slice(0, markdown.indexOf("<details>")),
+    /security policy boundaries ~1/,
+  );
+  assert.match(
+    markdown,
+    /Network allowed \(direct; source: asset `context\.review` at `contexts\/review\.md`\): false -> true/,
+  );
+  assert.match(
+    markdown,
+    /Effective approved network destinations after: none declared/,
+  );
+  assert.match(markdown, /External upload allowed .*: false -> true/);
+  assert.match(
+    markdown,
+    /Effective approved upload destinations after: none declared/,
+  );
+  assert.match(
+    markdown,
+    /Approved network destinations .*\n {4}- Removed: `old\.example\.com`/,
+  );
+  assert.match(
+    markdown,
+    /Approved upload destinations .*\n {4}- Removed: `old-upload\.example\.com`/,
+  );
+  assert.match(markdown, /Allowed data .*\n {4}- Added: `internal`/);
+  assert.match(markdown, /Forbidden inputs .*\n {4}- Removed: `credentials`/);
+  assert.match(markdown, /Secrets allowed .*: false -> true/);
+  assert.match(markdown, /Human approval required .*: true -> false/);
+  assert.match(markdown, /Disallowed commands .*\n {4}- Removed: `curl`/);
+  assert.doesNotMatch(markdown, /sha256:/i);
+  assert.equal(json.diff.security.policyChanges.length, 1);
+  assert.deepEqual(
+    json.diff.security.policyChanges[0]?.fields.map((field) => field.field),
+    [
+      "networkAllowed",
+      "approvedNetworkDestinations",
+      "externalUploadAllowed",
+      "approvedUploadDestinations",
+      "allowedData",
+      "forbiddenInputs",
+      "secretsAllowed",
+      "humanApprovalRequired",
+      "disallowedCommands",
+    ],
+  );
+  assert.equal(determineCiReportStatus(report.diff), statusBefore);
+});
+
+test("enabled permissions show unchanged effective destination scope without changing JSON", () => {
+  const report = sampleReport();
+  const networkDestinations = ["api.example.com", "api`two.example.com"];
+  const uploadDestinations = ["uploads.example.com"];
+  report.diff.security.policyChanges = [
+    policyAssetChange({
+      id: "context.unchanged-destinations",
+      path: "contexts/unchanged-destinations.md",
+      before: reviewablePolicy({
+        networkAllowed: false,
+        externalUploadAllowed: false,
+        approvedNetworkDestinations: networkDestinations,
+        approvedUploadDestinations: uploadDestinations,
+      }),
+      after: reviewablePolicy({
+        networkAllowed: true,
+        externalUploadAllowed: true,
+        approvedNetworkDestinations: networkDestinations,
+        approvedUploadDestinations: uploadDestinations,
+      }),
+      fields: [
+        scalarPolicyChange("networkAllowed", false, true),
+        scalarPolicyChange("externalUploadAllowed", false, true),
+      ],
+    }),
+  ];
+
+  const jsonBefore = formatCiReport(report, "json");
+  const markdown = formatCiReport(report, "markdown");
+  const jsonAfter = formatCiReport(report, "json");
+  const inlineValues = markdownInlineCodeValues(markdown);
+
+  assert.equal(jsonAfter, jsonBefore);
+  assert.match(
+    markdown,
+    /Effective approved network destinations after: `api\.example\.com`, ``api`two\.example\.com``/,
+  );
+  assert.match(
+    markdown,
+    /Effective approved upload destinations after: `uploads\.example\.com`/,
+  );
+  assert.ok(inlineValues.includes("api`two.example.com"));
+  assert.doesNotMatch(markdown, /Approved network destinations \(.*Added:/s);
+  const parsed = JSON.parse(jsonAfter) as CiReport;
+  assert.deepEqual(
+    parsed.diff.security.policyChanges[0]?.after?.approvedNetworkDestinations,
+    networkDestinations,
+  );
+  assert.deepEqual(
+    parsed.diff.security.policyChanges[0]?.fields.map((field) => field.field),
+    ["networkAllowed", "externalUploadAllowed"],
+  );
+});
+
+test("policy Markdown is bounded while CI-report JSON retains complete values and blast radius", () => {
+  const report = sampleReport();
+  const assets = Array.from({ length: 12 }, (_, index) => {
+    const ordinal = String(index + 1).padStart(2, "0");
+    return {
+      id: `context.${ordinal}`,
+      path: `contexts/${ordinal}.md`,
+      kind: "context" as const,
+    };
+  });
+  report.diff.security.policyChanges = assets.map((asset, index) =>
+    policyAssetChange({
+      ...asset,
+      before: reviewablePolicy({ networkAllowed: false }),
+      after: reviewablePolicy({
+        networkAllowed: true,
+        approvedNetworkDestinations:
+          index === 0
+            ? Array.from(
+                { length: 12 },
+                (_, valueIndex) =>
+                  `api-${String(valueIndex + 1).padStart(2, "0")}.example.com`,
+              )
+            : [],
+      }),
+      fields: [
+        scalarPolicyChange("networkAllowed", false, true, "inherited"),
+        ...(index === 0
+          ? [
+              listPolicyChange(
+                "approvedNetworkDestinations",
+                Array.from(
+                  { length: 12 },
+                  (_, valueIndex) =>
+                    `api-${String(valueIndex + 1).padStart(2, "0")}.example.com`,
+                ),
+                [],
+                "inherited",
+              ),
+            ]
+          : []),
+      ],
+    }),
+  );
+  report.diff.security.sharedPolicyChanges = [
+    {
+      source: {
+        type: "security_profile",
+        id: "shared",
+        path: "renma.config.jsonc",
+      },
+      changedFields: ["networkAllowed", "approvedNetworkDestinations"],
+      affectedAssets: assets,
+    },
+  ];
+
+  const markdown = formatCiReport(report, "markdown");
+  const parsed = JSON.parse(formatCiReport(report, "json")) as CiReport;
+
+  assert.match(markdown, /### Shared policy blast radius/);
+  assert.match(
+    markdown,
+    /security profile `shared` at `renma\.config\.jsonc`: 12 assets receive an effective policy change/,
+  );
+  assert.match(markdown, /`context\.10` \(`contexts\/10\.md`\)/);
+  assert.doesNotMatch(markdown, /`context\.11` \(`contexts\/11\.md`\)/);
+  assert.doesNotMatch(markdown, /`api-11\.example\.com`/);
+  assert.match(
+    markdown,
+    /Effective approved network destinations after: `api-01\.example\.com`, `api-02\.example\.com`, `api-03\.example\.com`, `api-04\.example\.com`, `api-05\.example\.com`, `api-06\.example\.com`, `api-07\.example\.com`, `api-08\.example\.com`, `api-09\.example\.com`, `api-10\.example\.com`\n {4}- 2 more not shown; see JSON for the full list\./,
+  );
+  assert.match(
+    markdown,
+    /Approved network destinations .*\n {4}- Added: `api-01\.example\.com`/,
+  );
+  assert.match(markdown, /- 2 more not shown; see JSON for the full list\./);
+  assert.equal(parsed.diff.security.policyChanges.length, 12);
+  assert.equal(
+    parsed.diff.security.policyChanges[0]?.after?.approvedNetworkDestinations
+      .length,
+    12,
+  );
+  assert.equal(
+    parsed.diff.security.sharedPolicyChanges[0]?.affectedAssets.length,
+    12,
+  );
+});
+
+test("policy Markdown safely renders every dynamic inline-code value without changing JSON", () => {
+  const report = sampleReport();
+  const id = "context.`review`";
+  const path = " contexts/``review.md ";
+  const profileName = " profile`name ";
+  const configPath = "renma\rconfig\n.jsonc";
+  const destination = "api``edge.example.com";
+  const allowedData = " internal ";
+  const command = "printf `date`\r\nnext";
+  const provenance = {
+    mode: "mixed" as const,
+    sources: [
+      { type: "asset" as const, id, path },
+      {
+        type: "security_profile" as const,
+        id: profileName,
+        path: configPath,
+      },
+    ],
+  };
+  report.diff.security.policyChanges = [
+    policyAssetChange({
+      id,
+      path,
+      before: reviewablePolicy({}),
+      after: reviewablePolicy({
+        selectedSecurityProfile: profileName,
+        profileChain: [profileName],
+        allowedData: [allowedData],
+        approvedNetworkDestinations: [destination],
+        disallowedCommands: [command],
+      }),
+      fields: [
+        {
+          kind: "list",
+          field: "approvedNetworkDestinations",
+          added: [destination],
+          removed: [],
+          provenance,
+        },
+        {
+          kind: "list",
+          field: "allowedData",
+          added: [allowedData],
+          removed: [],
+          provenance,
+        },
+        {
+          kind: "list",
+          field: "disallowedCommands",
+          added: [command],
+          removed: [],
+          provenance,
+        },
+      ],
+    }),
+  ];
+
+  const markdown = formatCiReport(report, "markdown");
+  const parsed = JSON.parse(formatCiReport(report, "json")) as CiReport;
+  const inlineValues = markdownInlineCodeValues(markdown);
+  for (const value of [
+    id,
+    path,
+    profileName,
+    configPath,
+    destination,
+    allowedData,
+    command,
+  ]) {
+    assert.ok(
+      inlineValues.includes(visibleMarkdownInlineValue(value)),
+      JSON.stringify(value),
+    );
+  }
+  assert.doesNotMatch(markdown, /\r/u);
+  assert.ok(markdown.includes("printf `date`\\r\\nnext"));
+  assert.equal(parsed.diff.security.policyChanges[0]?.asset.id, id);
+  assert.equal(parsed.diff.security.policyChanges[0]?.asset.path, path);
+  assert.deepEqual(
+    parsed.diff.security.policyChanges[0]?.after?.disallowedCommands,
+    [command],
+  );
+});
+
+test("unchanged effective policies do not add an empty policy detail section", () => {
+  const markdown = formatCiReport(sampleReport(), "markdown");
+
+  assert.doesNotMatch(
+    markdown,
+    /### Effective security policy boundary changes|### Shared policy blast radius/,
   );
 });
 
@@ -1617,6 +1963,18 @@ test("ci report keeps an owner-covered Skill, resolved edge, and fail-closed pol
     });
     assert.equal(report.skillDiscoveryPolicy.configured.effective, "off");
     assert.equal(report.skillDiscoveryPolicy.outcome, "pass");
+    const addedSkillPolicy = json.diff.security.policyChanges.find(
+      (change) => change.asset.id === "skill.repository.contribute-skill",
+    );
+    assert.ok(addedSkillPolicy);
+    assert.equal(addedSkillPolicy.before, null);
+    assert.equal(addedSkillPolicy.after?.networkAllowed, false);
+    assert.equal(
+      addedSkillPolicy.fields.find((field) => field.field === "networkAllowed")
+        ?.provenance.mode,
+      "direct",
+    );
+    assert.equal(JSON.stringify(json.diff.security).includes("sha256:"), false);
     assert.match(
       markdown,
       /- Ownership: 1\/1 \(100%\) -> 2\/2 \(100%\) \(\+0 pp\)/,
@@ -2213,6 +2571,122 @@ function policyInventory(
   inventory.securityProfiles.referenced = input.referencedSecurityProfiles ?? 0;
   inventory.securityProfiles.missing = input.missingSecurityProfiles ?? 0;
   return inventory;
+}
+
+function policyAssetChange(input: {
+  id: string;
+  path: string;
+  kind?: "context";
+  before: ReviewableEffectiveSecurityPolicy;
+  after: ReviewableEffectiveSecurityPolicy;
+  fields: SecurityPolicyFieldChange[];
+}): SecurityPolicyAssetChange {
+  return {
+    asset: {
+      id: input.id,
+      path: input.path,
+      kind: input.kind ?? "context",
+    },
+    before: input.before,
+    after: input.after,
+    fields: input.fields,
+  };
+}
+
+function reviewablePolicy(
+  overrides: Partial<ReviewableEffectiveSecurityPolicy>,
+): ReviewableEffectiveSecurityPolicy {
+  return {
+    hasEffectivePolicy: true,
+    policySources: ["local"],
+    selectedSecurityProfile: null,
+    profileChain: [],
+    allowedData: [],
+    forbiddenInputs: [],
+    networkAllowed: null,
+    externalUploadAllowed: null,
+    secretsAllowed: null,
+    humanApprovalRequired: null,
+    approvedNetworkDestinations: [],
+    approvedUploadDestinations: [],
+    disallowedCommands: [],
+    ...overrides,
+  };
+}
+
+type ScalarPolicyField = Extract<
+  SecurityPolicyFieldChange,
+  { kind: "scalar" }
+>["field"];
+type ListPolicyField = Extract<
+  SecurityPolicyFieldChange,
+  { kind: "list" }
+>["field"];
+
+function scalarPolicyChange(
+  field: ScalarPolicyField,
+  before: boolean | null,
+  after: boolean | null,
+  mode: "direct" | "inherited" = "direct",
+): SecurityPolicyFieldChange {
+  return {
+    kind: "scalar",
+    field,
+    before,
+    after,
+    provenance: testPolicyProvenance(mode),
+  };
+}
+
+function listPolicyChange(
+  field: ListPolicyField,
+  added: string[],
+  removed: string[],
+  mode: "direct" | "inherited" = "direct",
+): SecurityPolicyFieldChange {
+  return {
+    kind: "list",
+    field,
+    added,
+    removed,
+    provenance: testPolicyProvenance(mode),
+  };
+}
+
+function testPolicyProvenance(mode: "direct" | "inherited") {
+  return mode === "direct"
+    ? {
+        mode,
+        sources: [
+          {
+            type: "asset" as const,
+            id: "context.review",
+            path: "contexts/review.md",
+          },
+        ],
+      }
+    : {
+        mode,
+        sources: [
+          {
+            type: "security_profile" as const,
+            id: "shared",
+            path: "renma.config.jsonc",
+          },
+        ],
+      };
+}
+
+function markdownInlineCodeValues(markdown: string): string[] {
+  const values: string[] = [];
+  const visit = (node: Nodes): void => {
+    if (node.type === "inlineCode") values.push(node.value);
+    if ("children" in node) {
+      for (const child of node.children) visit(child);
+    }
+  };
+  visit(fromMarkdown(markdown));
+  return values;
 }
 
 function policyDiffReport(options: {

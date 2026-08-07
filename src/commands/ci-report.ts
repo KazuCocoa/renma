@@ -529,6 +529,12 @@ function formatChangeOverview(
       0,
       countNonZeroNumbers(report.diff.security?.policyInventory),
     ],
+    [
+      "security policy boundaries",
+      0,
+      0,
+      report.diff.security?.policyChanges?.length ?? 0,
+    ],
   ]);
 
   return [

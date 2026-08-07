@@ -7,6 +7,12 @@ import {
   type PolicyBooleanCounts,
   type SecurityPolicyInventorySummary,
 } from "./security-policy-inventory.js";
+import {
+  buildSecurityPolicyChanges,
+  type SecurityPolicyAssetChange,
+  type SecurityPolicyDiffInput,
+  type SharedSecurityPolicyChange,
+} from "./security-policy-diff.js";
 
 export interface SecurityPostureDelta {
   added: SecurityPostureSummary;
@@ -49,27 +55,32 @@ export interface SecurityPolicyInventoryDelta {
 export interface SecurityDiffSummary {
   posture: SecurityPostureDelta;
   policyInventory: SecurityPolicyInventoryDelta;
+  policyChanges: SecurityPolicyAssetChange[];
+  sharedPolicyChanges: SharedSecurityPolicyChange[];
 }
 
-export function buildSecurityDiffSummary(input: {
-  addedFindings: Array<{
-    id: string;
-    severity: string;
-    riskClass?: string | undefined;
-  }>;
-  removedFindings: Array<{
-    id: string;
-    severity: string;
-    riskClass?: string | undefined;
-  }>;
-  fromPolicyInventory?: SecurityPolicyInventorySummary | undefined;
-  toPolicyInventory?: SecurityPolicyInventorySummary | undefined;
-}): SecurityDiffSummary {
+export function buildSecurityDiffSummary(
+  input: {
+    addedFindings: Array<{
+      id: string;
+      severity: string;
+      riskClass?: string | undefined;
+    }>;
+    removedFindings: Array<{
+      id: string;
+      severity: string;
+      riskClass?: string | undefined;
+    }>;
+    fromPolicyInventory?: SecurityPolicyInventorySummary | undefined;
+    toPolicyInventory?: SecurityPolicyInventorySummary | undefined;
+  } & SecurityPolicyDiffInput,
+): SecurityDiffSummary {
   const fromPolicyInventory =
     input.fromPolicyInventory ?? zeroSecurityPolicyInventorySummary();
   const toPolicyInventory =
     input.toPolicyInventory ?? zeroSecurityPolicyInventorySummary();
 
+  const policyDetails = buildSecurityPolicyChanges(input);
   return {
     posture: {
       added: summarizeSecurityPosture(input.addedFindings),
@@ -79,6 +90,7 @@ export function buildSecurityDiffSummary(input: {
       toPolicyInventory,
       fromPolicyInventory,
     ),
+    ...policyDetails,
   };
 }
 
