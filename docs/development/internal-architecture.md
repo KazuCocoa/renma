@@ -581,7 +581,8 @@ neutral detail list without adding them to path-problem evidence.
 
 CI calls `executeDiff()` once. It exposes the diff's Discovery projection at
 top level, evaluates the two snapshot policy modes as
-`skillDiscoveryPolicy`, and retains a compatibility-shaped nested diff. It
+`skillDiscoveryPolicy`, evaluates both snapshot `security.ci_policy` modes as
+`securityPolicy`, and retains a compatibility-shaped nested diff. It
 does not recollect, reload configuration, reconstruct Discovery, or run a
 second comparison.
 
@@ -592,6 +593,15 @@ files, import commands, render Markdown, or mutate input. A separate pure
 status helper composes `fail > warn > pass`; Discovery policy can only request
 `WARN`, and `WARN` keeps exit `0`. Review-note construction appends one policy
 note after preserving existing reasons. Cycles never create a match.
+
+The pure `security-policy-ci-policy` module selects the stricter
+`off < warn < fail` mode and consumes only canonical matched-asset boolean
+transitions produced by `security-policy-diff`. Permission `false` and approval
+`true` are the restrictive effective states. Matches retain asset identity,
+exact states, property, and provenance; aggregate inventory deltas never drive
+the gate. Security policy can request `WARN` or `FAIL`, and default `FAIL`
+produces the command's normal exit code `1` without changing single-revision
+scan or Readiness semantics.
 
 CI Markdown uses the shared presentation cap, while JSON retains the complete
 diff and policy evaluation once each. Formatters accept reports that lack the

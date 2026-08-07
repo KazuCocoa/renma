@@ -29,11 +29,13 @@ export const REVIEWABLE_SECURITY_POLICY_FIELDS = [
 export type ReviewableSecurityPolicyField =
   (typeof REVIEWABLE_SECURITY_POLICY_FIELDS)[number];
 
-type ScalarSecurityPolicyField =
+export type ScalarSecurityPolicyField =
   | "networkAllowed"
   | "externalUploadAllowed"
   | "secretsAllowed"
   | "humanApprovalRequired";
+
+export type SecurityPolicyBooleanState = boolean | "unspecified";
 
 type ListSecurityPolicyField = Exclude<
   ReviewableSecurityPolicyField,
@@ -99,6 +101,15 @@ export interface SecurityPolicyAssetChange {
   fields: SecurityPolicyFieldChange[];
 }
 
+/** Canonical matched-asset evidence for one effective boolean policy transition. */
+export interface SecurityPolicyTransition {
+  asset: SecurityPolicyAffectedAsset;
+  property: ScalarSecurityPolicyField;
+  fromState: SecurityPolicyBooleanState;
+  toState: SecurityPolicyBooleanState;
+  provenance: SecurityPolicyChangeProvenance;
+}
+
 export interface SharedSecurityPolicyChange {
   source: SecurityPolicyChangeSource & {
     type: "security_profile" | "repository_config";
@@ -151,6 +162,7 @@ const EMPTY_DECLARED_POLICY: DeclaredSecurityPolicyEvidence = {
 
 export function buildSecurityPolicyChanges(input: SecurityPolicyDiffInput): {
   policyChanges: SecurityPolicyAssetChange[];
+  policyTransitions: SecurityPolicyTransition[];
   sharedPolicyChanges: SharedSecurityPolicyChange[];
 } {
   const fromPrepared = prepareAssets(
@@ -207,8 +219,10 @@ export function buildSecurityPolicyChanges(input: SecurityPolicyDiffInput): {
     ];
   });
 
+  const sortedPolicyChanges = policyChanges.sort(compareAssetChanges);
   return {
-    policyChanges: policyChanges.sort(compareAssetChanges),
+    policyChanges: sortedPolicyChanges,
+    policyTransitions: buildSecurityPolicyTransitions(sortedPolicyChanges),
     sharedPolicyChanges: [...sharedImpacts.values()]
       .map(({ source, fields, assets }) => ({
         source,
@@ -219,6 +233,31 @@ export function buildSecurityPolicyChanges(input: SecurityPolicyDiffInput): {
       }))
       .sort((left, right) => compareSources(left.source, right.source)),
   };
+}
+
+function buildSecurityPolicyTransitions(
+  changes: readonly SecurityPolicyAssetChange[],
+): SecurityPolicyTransition[] {
+  return changes.flatMap((change) => {
+    // Asset creation and deletion have no prior/future boundary to relax.
+    if (change.before === null || change.after === null) return [];
+    return change.fields.flatMap((field): SecurityPolicyTransition[] => {
+      if (field.kind !== "scalar") return [];
+      return [
+        {
+          asset: change.asset,
+          property: field.field,
+          fromState: policyBooleanState(field.before),
+          toState: policyBooleanState(field.after),
+          provenance: field.provenance,
+        },
+      ];
+    });
+  });
+}
+
+function policyBooleanState(value: boolean | null): SecurityPolicyBooleanState {
+  return value === null ? "unspecified" : value;
 }
 
 function prepareAssets(

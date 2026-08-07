@@ -31,6 +31,7 @@ import {
 } from "../executable-surface-inventory.js";
 import type { ConfigOverrides } from "../config.js";
 import type { SkillDiscoveryCiPolicyMode } from "../types/configuration.js";
+import type { SecurityCiPolicyMode } from "../types/configuration.js";
 import type { SecurityConfig } from "../types/configuration.js";
 import type { SecurityPolicyAssetEvidence } from "../security-policy-inventory.js";
 import {
@@ -49,6 +50,7 @@ import type { SkillDiscoveryIndex } from "../skill-discovery.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
 import { formatJsonDocument } from "../report.js";
 import { formatMarkdownInlineCode } from "../renderers/markdown-inline-code.js";
+import { securityPolicyRelaxations } from "../security-policy-ci-policy.js";
 
 const execFile = promisify(execFileCallback);
 
@@ -204,6 +206,10 @@ export interface DiffExecutionContext {
     from: SkillDiscoveryCiPolicyMode;
     to: SkillDiscoveryCiPolicyMode;
   };
+  securityPolicyCiPolicy: {
+    from: SecurityCiPolicyMode;
+    to: SecurityCiPolicyMode;
+  };
 }
 
 interface DiffOptions {
@@ -314,6 +320,10 @@ async function executeDiffWithProjection(
         skillDiscoveryCiPolicy: {
           from: fromCollected.skillDiscoveryCiPolicy,
           to: toCollected.skillDiscoveryCiPolicy,
+        },
+        securityPolicyCiPolicy: {
+          from: fromCollected.securityPolicyCiPolicy,
+          to: toCollected.securityPolicyCiPolicy,
         },
       };
     } else {
@@ -922,7 +932,22 @@ export function formatSecurityChanges(
       addedFindings: [],
       removedFindings: [],
     });
+  const relaxations = security ? securityPolicyRelaxations(security) : [];
   const lines = [
+    ...(relaxations.length > 0
+      ? [
+          "### Security policy relaxations",
+          "",
+          ...relaxations
+            .slice(0, DIFF_DETAIL_LIMIT)
+            .map(
+              (transition) =>
+                `- ${formatMarkdownInlineCode(transition.asset.id)} (${formatMarkdownInlineCode(transition.asset.path)}): ${transition.property} ${transition.fromState} -> ${transition.toState}`,
+            ),
+          ...formatPolicyOverflow(relaxations.length, 0),
+          "",
+        ]
+      : []),
     `- Added security findings: ${posture.added.totalSecurityFindings}`,
     `- Resolved security findings: ${posture.resolved.totalSecurityFindings}`,
     `- Added violations: ${posture.added.riskClasses.violation}`,
@@ -1168,6 +1193,7 @@ async function snapshot(
 ): Promise<{
   snapshot: DiffSnapshot;
   skillDiscoveryCiPolicy: SkillDiscoveryCiPolicyMode;
+  securityPolicyCiPolicy: SecurityCiPolicyMode;
 }> {
   const root = join(tempRoot, label);
   const archivePath = join(tempRoot, `${label}.tar`);
@@ -1207,6 +1233,8 @@ async function snapshot(
         : {}),
     },
     skillDiscoveryCiPolicy: repositorySnapshot.config.skillDiscovery.ciPolicy,
+    securityPolicyCiPolicy:
+      repositorySnapshot.config.security.ciPolicy ?? "fail",
   };
 }
 

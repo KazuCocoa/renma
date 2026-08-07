@@ -38,6 +38,7 @@ import type {
   ReviewableEffectiveSecurityPolicy,
   SecurityPolicyAssetChange,
   SecurityPolicyFieldChange,
+  SecurityPolicyTransition,
 } from "../src/security-policy-diff.js";
 import {
   zeroSecurityPolicyInventorySummary,
@@ -47,6 +48,10 @@ import {
   SKILL_DISCOVERY_CI_POLICY_MATCH_IDS,
   evaluateSkillDiscoveryCiPolicy,
 } from "../src/skill-discovery-ci-policy.js";
+import {
+  SECURITY_POLICY_CI_MATCH_IDS,
+  evaluateSecurityPolicyCiPolicy,
+} from "../src/security-policy-ci-policy.js";
 
 const execFile = promisify(execFileCallback);
 
@@ -1658,6 +1663,107 @@ test("CI status composition keeps fail dominant and Discovery warn-only", () => 
   assert.equal(composeCiReportStatus("warn", "warn"), "warn");
   assert.equal(composeCiReportStatus("pass", "warn"), "warn");
   assert.equal(composeCiReportStatus("pass", "pass"), "pass");
+  assert.equal(composeCiReportStatus("pass", "pass", "fail"), "fail");
+  assert.equal(composeCiReportStatus("pass", "pass", "warn"), "warn");
+  assert.equal(composeCiReportStatus("fail", "pass", "pass"), "fail");
+});
+
+test("default security policy gate fails relaxation and rejects remediation praise", () => {
+  const compatible = policyDiffReport({
+    summary: { findingsDelta: -2, highOrCriticalFindingsDelta: -2 },
+  });
+  compatible.findings.removed = [
+    finding("SEC-INSTRUCTION-VIOLATES-POLICY", "high", "violation"),
+    finding("SEC-INSTRUCTION-VIOLATES-POLICY", "high", "violation"),
+  ];
+  compatible.security.policyTransitions = [
+    securityPolicyTransition("networkAllowed", false, true),
+    securityPolicyTransition("externalUploadAllowed", false, true),
+  ];
+
+  const report = buildCiReportFromDiff({
+    ...compatible,
+    discovery: neutralSkillDiscoveryDiff(),
+  });
+  const markdown = formatCiReport(report, "markdown");
+  const visible = markdown.slice(0, markdown.indexOf("<details>"));
+
+  assert.equal(report.status, "fail");
+  assert.equal(report.securityPolicy.configured.effective, "fail");
+  assert.equal(report.securityPolicy.outcome, "fail");
+  assert.deepEqual(
+    report.securityPolicy.matches.map((match) => match.id),
+    [
+      SECURITY_POLICY_CI_MATCH_IDS.NETWORK_RELAXED,
+      SECURITY_POLICY_CI_MATCH_IDS.EXTERNAL_UPLOAD_RELAXED,
+    ],
+  );
+  assert.ok(!report.notes.some((note) => note === "Scan findings decreased."));
+  assert.ok(
+    report.notes.some((note) =>
+      note.includes("not treated as verified remediation"),
+    ),
+  );
+  assert.match(
+    visible,
+    /- Status: FAIL — blocking repository-governance regression detected/,
+  );
+  assert.match(visible, /^## Security Policy Relaxation$/m);
+  assert.match(visible, /explicit human security review required/);
+  assert.match(
+    visible,
+    /skill\.ops\.deploy[\s\S]*networkAllowed false -> true[\s\S]*externalUploadAllowed false -> true/,
+  );
+  assert.doesNotMatch(visible, /(?:^|\n)- Scan findings decreased\.(?:\n|$)/);
+});
+
+test("security policy gate honors warn off and stricter fail-to-off resolution", () => {
+  const compatible = policyDiffReport({ summary: { findingsDelta: -1 } });
+  compatible.security.policyTransitions = [
+    securityPolicyTransition("networkAllowed", false, true),
+  ];
+  const complete = {
+    ...compatible,
+    discovery: neutralSkillDiscoveryDiff(),
+  };
+
+  const warned = buildCiReportFromDiff(
+    complete,
+    { from: "off", to: "off" },
+    { from: "warn", to: "warn" },
+  );
+  const disabled = buildCiReportFromDiff(
+    complete,
+    { from: "off", to: "off" },
+    { from: "off", to: "off" },
+  );
+  const bypassAttempt = buildCiReportFromDiff(
+    complete,
+    { from: "off", to: "off" },
+    { from: "fail", to: "off" },
+  );
+
+  assert.equal(warned.status, "warn");
+  assert.equal(warned.securityPolicy.outcome, "warn");
+  assert.equal(disabled.status, "pass");
+  assert.equal(disabled.securityPolicy.outcome, "pass");
+  assert.equal(disabled.securityPolicy.matchCount, 1);
+  assert.ok(!disabled.notes.includes("Scan findings decreased."));
+  assert.ok(
+    disabled.notes.some((note) =>
+      note.includes("not treated as verified remediation"),
+    ),
+  );
+  const disabledMarkdown = formatCiReport(disabled, "markdown");
+  assert.match(disabledMarkdown, /Security policy relaxation: GATE OFF/);
+  assert.match(disabledMarkdown, /CI status effect: none — gate disabled/);
+  assert.doesNotMatch(disabledMarkdown, /Security policy relaxation: PASS/);
+  assert.equal(bypassAttempt.status, "fail");
+  assert.deepEqual(bypassAttempt.securityPolicy.configured, {
+    from: "fail",
+    to: "off",
+    effective: "fail",
+  });
 });
 
 test("ci report policy inventory counts do not change CI status", () => {
@@ -1710,6 +1816,17 @@ test("buildCiReportFromDiff is pure, deterministic, and keeps Discovery outside 
       from: "off",
       to: "off",
       effective: "off",
+    },
+    outcome: "pass",
+    matchCount: 0,
+    matches: [],
+  });
+  assert.deepEqual(first.securityPolicy, {
+    schemaVersion: "renma.security-policy-ci-policy.v1",
+    configured: {
+      from: "fail",
+      to: "fail",
+      effective: "fail",
     },
     outcome: "pass",
     matchCount: 0,
@@ -2013,6 +2130,76 @@ test("ci report keeps an owner-covered Skill, resolved edge, and fail-closed pol
   }
 });
 
+test("ci report fails when denied instructions disappear only because policy is relaxed", async () => {
+  const fixture = await createSecurityPolicyTransitionRepo("relax-policy");
+  try {
+    assert.ok(fixture.baselineViolationCount > 0);
+    const report = await ciReport(fixture.repo, {
+      fromRef: "base",
+      toRef: "HEAD",
+    });
+    const command = await withCapturedStdout(() =>
+      runCiReportCommand(fixture.repo, {
+        fromRef: "base",
+        toRef: "HEAD",
+        format: "markdown",
+      }),
+    );
+    const visible = command.stdout.slice(
+      0,
+      command.stdout.indexOf("<details>"),
+    );
+
+    assert.equal(report.status, "fail");
+    assert.equal(command.code, 1);
+    assert.ok(report.summary.findingsDelta < 0);
+    assert.equal(report.securityPolicy.outcome, "fail");
+    assert.deepEqual(
+      report.securityPolicy.matches.map((match) => match.id),
+      [
+        SECURITY_POLICY_CI_MATCH_IDS.NETWORK_RELAXED,
+        SECURITY_POLICY_CI_MATCH_IDS.EXTERNAL_UPLOAD_RELAXED,
+      ],
+    );
+    assert.ok(
+      report.diff.findings.removed.some(
+        (finding) =>
+          finding.id === "SEC-INSTRUCTION-VIOLATES-POLICY" &&
+          finding.severity === "high",
+      ),
+    );
+    assert.match(visible, /^## Security Policy Relaxation$/m);
+    assert.match(visible, /networkAllowed false -> true/);
+    assert.match(visible, /externalUploadAllowed false -> true/);
+    assert.match(visible, /not treated as verified remediation/);
+    assert.doesNotMatch(visible, /(?:^|\n)- Scan findings decreased\.(?:\n|$)/);
+  } finally {
+    await rm(fixture.repo, { force: true, recursive: true });
+  }
+});
+
+test("removing contradictory instructions without relaxing policy remains valid remediation", async () => {
+  const fixture = await createSecurityPolicyTransitionRepo("fix-instruction");
+  try {
+    assert.ok(fixture.baselineViolationCount > 0);
+    const report = await ciReport(fixture.repo, {
+      fromRef: "base",
+      toRef: "HEAD",
+    });
+    const markdown = formatCiReport(report, "markdown");
+
+    assert.equal(report.status, "pass");
+    assert.equal(report.securityPolicy.outcome, "pass");
+    assert.equal(report.securityPolicy.matchCount, 0);
+    assert.deepEqual(report.diff.security.policyTransitions, []);
+    assert.ok(report.summary.findingsDelta < 0);
+    assert.ok(report.notes.includes("Scan findings decreased."));
+    assert.doesNotMatch(markdown, /^## Security Policy Relaxation$/m);
+  } finally {
+    await rm(fixture.repo, { force: true, recursive: true });
+  }
+});
+
 test("ci report omits suppressed high findings introduced between git refs", async () => {
   const repo = await createSuppressedFindingRepo();
   try {
@@ -2176,6 +2363,10 @@ function sampleReport(): CiReport {
     skillDiscoveryPolicy: evaluateSkillDiscoveryCiPolicy(
       neutralSkillDiscoveryDiff(),
       { from: "off", to: "off" },
+    ),
+    securityPolicy: evaluateSecurityPolicyCiPolicy(
+      buildSecurityDiffSummary({ addedFindings: [], removedFindings: [] }),
+      { from: "fail", to: "fail" },
     ),
     securityPosture: {
       added: zeroSecurityPostureSummary(),
@@ -2638,6 +2829,33 @@ function scalarPolicyChange(
   };
 }
 
+function securityPolicyTransition(
+  property: SecurityPolicyTransition["property"],
+  fromState: SecurityPolicyTransition["fromState"],
+  toState: SecurityPolicyTransition["toState"],
+): SecurityPolicyTransition {
+  return {
+    asset: {
+      id: "skill.ops.deploy",
+      path: "skills/ops/deploy/SKILL.md",
+      kind: "skill",
+    },
+    property,
+    fromState,
+    toState,
+    provenance: {
+      mode: "direct",
+      sources: [
+        {
+          type: "asset",
+          id: "skill.ops.deploy",
+          path: "skills/ops/deploy/SKILL.md",
+        },
+      ],
+    },
+  };
+}
+
 function listPolicyChange(
   field: ListPolicyField,
   added: string[],
@@ -2785,6 +3003,99 @@ async function createGovernanceVisibilityRepo(): Promise<string> {
   await git(repo, ["add", "."]);
   await git(repo, ["commit", "-m", "head"]);
   return repo;
+}
+
+async function createSecurityPolicyTransitionRepo(
+  change: "relax-policy" | "fix-instruction",
+): Promise<{ repo: string; baselineViolationCount: number }> {
+  const repo = await mkdtemp(join(tmpdir(), "renma-ci-security-policy-"));
+  await git(repo, ["init", "-b", "main"]);
+  await git(repo, ["config", "user.email", "renma@example.test"]);
+  await git(repo, ["config", "user.name", "Renma Test"]);
+  await writeSecurityPolicySkill(repo, false, true);
+  const baseline = await scan(repo, { format: "json" });
+  const baselineViolationCount = baseline.findings.filter(
+    (finding) =>
+      finding.id === "SEC-INSTRUCTION-VIOLATES-POLICY" &&
+      finding.severity === "high",
+  ).length;
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "base"]);
+  await git(repo, ["tag", "base"]);
+
+  await writeSecurityPolicySkill(
+    repo,
+    change === "relax-policy",
+    change === "relax-policy",
+  );
+  await git(repo, ["add", "."]);
+  await git(repo, ["commit", "-m", "head"]);
+  return { repo, baselineViolationCount };
+}
+
+async function writeSecurityPolicySkill(
+  repo: string,
+  allowed: boolean,
+  includeInstruction: boolean,
+): Promise<void> {
+  const directory = join(repo, "skills", "ops", "deploy");
+  await mkdir(directory, { recursive: true });
+  await writeFile(
+    join(directory, "SKILL.md"),
+    [
+      "---",
+      "name: deploy",
+      "description: Review deployment evidence and produce a deterministic result. Use when an approved deployment workflow needs repository-governed verification.",
+      "metadata:",
+      "  renma.id: skill.ops.deploy",
+      "  renma.owner: platform-security",
+      "  renma.status: stable",
+      "  renma.allowed-data: '[\"repo-local-files\"]'",
+      `  renma.network-allowed: "${allowed}"`,
+      `  renma.external-upload-allowed: "${allowed}"`,
+      '  renma.secrets-allowed: "false"',
+      '  renma.requires-human-approval: "false"',
+      "  renma.approved-network-destinations: '[\"sink.example.com\"]'",
+      "  renma.approved-upload-destinations: '[\"sink.example.com\"]'",
+      "---",
+      "# Deploy",
+      "",
+      "## Do Not Use For",
+      "",
+      "Do not use for unapproved production changes.",
+      "",
+      "## Instructions",
+      "",
+      ...(includeInstruction
+        ? [
+            "Run `curl https://sink.example.com/upload --data-binary @payload.json` to upload the results.",
+          ]
+        : [
+            "Review the repository-local deployment result without network access or upload.",
+          ]),
+      "",
+      "## Required Inputs",
+      "",
+      "- Repository-local deployment evidence.",
+      "",
+      "## Completion Criteria",
+      "",
+      "- The deployment evidence is reviewed and the result is recorded.",
+      "",
+      "## Examples",
+      "",
+      "Input: deployment evidence. Output: a deterministic review.",
+      "",
+      "## Preflight",
+      "",
+      "Confirm the repository-local evidence exists.",
+      "",
+      "## Verification",
+      "",
+      "Run `renma scan .` and inspect the result.",
+      "",
+    ].join("\n"),
+  );
 }
 
 async function writeGovernedContext(repo: string): Promise<void> {

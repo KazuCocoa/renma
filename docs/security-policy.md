@@ -250,6 +250,7 @@ Use repo-level `security.approvedDomains`, `security.approvedUploadDomains`, or 
 ```json
 {
   "security": {
+    "ci_policy": "fail",
     "approvedDomains": ["github.com"],
     "approvedUploadDomains": [],
     "disallowedCommands": ["gh gist create"],
@@ -257,6 +258,12 @@ Use repo-level `security.approvedDomains`, `security.approvedUploadDomains`, or 
   }
 }
 ```
+
+`security.ci_policy` governs revision-to-revision weakening of effective
+boolean policy boundaries. It accepts `"off"`, `"warn"`, or `"fail"` and
+defaults to `"fail"`. CI reads the value from both revisions and uses the
+stricter mode under `off < warn < fail`, so changing `fail` to `off` in the
+same revision as a relaxation cannot bypass review.
 
 ### Choosing where to put policy
 
@@ -829,16 +836,46 @@ records its effective-policy blast radius: JSON retains the complete sorted
 affected-asset list, while Markdown uses the shared presentation limit and
 reports how many entries were omitted.
 
-The Markdown details appear only when policy evidence changed and remain under
-the CI report's `Full report details` disclosure. Booleans use `before -> after`;
-list additions and removals are separate. Removed forbidden inputs, removed
-disallowed commands, and `humanApprovalRequired: true -> false` remain visible
-without being labeled improvements or regressions. Enabling network or upload
-access with no effective approved destinations renders `none declared`, not
-`unrestricted`. When access becomes enabled, Markdown shows the bounded
-effective post-change destination scope even if the destination list did not
-change, and directs reviewers to JSON for omitted values. JSON remains complete
-and machine-readable. Markdown does not expose policy fingerprints.
+For matched assets, JSON also retains canonical per-asset boolean transitions
+in `diff.security.policyTransitions`. Each row contains the canonical asset
+identity, property, `fromState`, `toState`, and provenance. Asset additions and
+deletions do not create transitions because they have no earlier or later
+boundary for the same matched asset. Aggregate inventory deltas remain useful
+summaries, but policy-relaxation evaluation uses these transition rows; opposite
+changes on two assets therefore cannot cancel each other.
+
+Relaxation follows effective diagnostic semantics:
+
+| Property | Restrictive state | Relaxation |
+| --- | --- | --- |
+| `networkAllowed` | `false` | `false -> true` or `false -> unspecified` |
+| `externalUploadAllowed` | `false` | `false -> true` or `false -> unspecified` |
+| `secretsAllowed` | `false` | `false -> true` or `false -> unspecified` |
+| `humanApprovalRequired` | `true` | `true -> false` or `true -> unspecified` |
+
+For permission fields, only effective `false` prohibits matching instructions;
+`true` and `unspecified` are therefore in the same non-restrictive tier for
+transition governance. For approval, only effective `true` requires nearby
+approval; `false` and `unspecified` are in the same non-restrictive tier.
+Consequently, `true <-> unspecified` is neutral for permission fields and
+`false <-> unspecified` is neutral for approval. Moving from `unspecified` to
+the restrictive state is tightening, not relaxation. `Unspecified` is not a
+runtime permission grant; it means Renma has no effective declaration for that
+property.
+
+Direct `diff` Markdown puts a bounded per-asset `Security policy relaxations`
+summary before aggregate security metrics. CI-report keeps the relaxation
+outcome and affected transitions visible near the report summary, with the full
+security evidence also available under `Full report details`. Booleans use
+`before -> after`; list additions and removals are separate. Removed forbidden
+inputs, removed disallowed commands, and
+`humanApprovalRequired: true -> false` remain visible without being labeled
+improvements or regressions. Enabling network or upload access with no effective
+approved destinations renders `none declared`, not `unrestricted`. When access
+becomes enabled, Markdown shows the bounded effective post-change destination
+scope even if the destination list did not change, and directs reviewers to
+JSON for omitted values. JSON remains complete and machine-readable. Markdown
+does not expose policy fingerprints.
 
 This diff reuses the same normalization, effective-policy resolution,
 provenance, and fingerprint semantics as Security Policy Inventory and the
@@ -848,10 +885,28 @@ static instruction evidence mentions, and both remain distinct from an observed
 runtime connection or upload. Renma adds no target detector or runtime evidence
 for this report.
 
-The diff uses existing static findings and existing policy metadata/config
-evidence. It is reporting-only: it does not add detectors, infer permissions,
-change runtime behavior or enforcement, change `scan --fail-on`, change
-Readiness scoring or level, or change CI pass/warn/fail status or exit behavior.
+The dedicated `renma.security-policy-ci-policy.v1` evaluation uses stable match
+IDs `security_policy_ci.network_relaxed`,
+`security_policy_ci.external_upload_relaxed`,
+`security_policy_ci.secrets_relaxed`, and
+`security_policy_ci.human_approval_removed`. Every match retains the affected
+asset and exact transition. With the default `fail` mode, any match makes
+`ci-report` fail and exit `1`; `warn` promotes only `PASS` to `WARN`, and `off`
+does not affect status. Transition evidence and matches remain visible when the
+gate is off. An existing failure is never downgraded.
+
+Renma permits declared security policies to evolve, but weakening a security
+boundary is a reviewable security event. A reduction in scan findings caused by
+policy relaxation is not considered verified remediation, and CI-report does
+not emit the generic positive remediation note in that case. Fixing or removing
+the contradictory instruction while retaining the stricter policy remains
+valid remediation.
+
+This comparison uses existing static findings and policy metadata/config
+evidence. It does not add single-revision detectors, infer runtime permissions,
+change runtime behavior or enforcement, change `scan --fail-on`, or change
+Readiness scoring or level. Normal `scan` semantics remain unchanged: an
+instruction does not contradict an effective policy that allows it.
 
 ## Common Security Diagnostics
 

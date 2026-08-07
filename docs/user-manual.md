@@ -983,6 +983,10 @@ For example:
 
 ```jsonc
 {
+  "security": {
+    // Weakening an effective security boundary requires explicit review.
+    "ci_policy": "fail"
+  },
   "skill_discovery": {
     "adopted": true,
 
@@ -1006,7 +1010,9 @@ The configuration supports the same names used by the implementation, including:
 - `fail_on`: scan exit threshold: `low`, `medium`, `high`, or `critical`.
 - `format`: default `scan` output format.
 - `layout`: compatibility-only `tool_namespace` and `workflow_aliases` input retained for existing configurations. These fields are validated and normalized but do not currently change findings or force Skill-local support migration.
-- `security`: command, network, upload, and profile policy.
+- `security`: command, network, upload, profile, and revision-review policy.
+  `ci_policy` supports `off`, `warn`, and `fail`, defaults to `fail`, and
+  governs effective boolean security-policy relaxations in `ci-report`.
 - `skill_discovery`: strict repository-wide Skill Discovery configuration.
   Supported keys are boolean `adopted` and string `ci_policy`. The policy
   supports only `off` and `warn`, defaults to `off`, and `warn` requires
@@ -1940,8 +1946,11 @@ terminology, omit complete fingerprints, and do not enter
 readiness score, failure threshold, or review policy. Newly generated JSON includes the complete
 `renma.skill-discovery-diff.v1` value once at top-level `skillDiscovery` plus
 one `renma.skill-discovery-ci-policy.v1` evaluation at top-level
-`skillDiscoveryPolicy`; the existing nested `diff` remains Discovery- and
-policy-free. Diff endpoints also expose the readiness ownership numerator,
+`skillDiscoveryPolicy`. It also includes one
+`renma.security-policy-ci-policy.v1` evaluation at top-level `securityPolicy`;
+the nested `diff.security.policyTransitions` array is the canonical per-asset
+transition evidence consumed by that evaluation. The existing nested `diff`
+remains Discovery-policy-free. Diff endpoints also expose the readiness ownership numerator,
 eligible-asset denominator, and coverage percentage while retaining the
 existing `summary.ownershipCoverageDelta` field.
 
@@ -2005,13 +2014,62 @@ sorted list bounded by the shared presentation limit; JSON retains every asset
 and every value. Declaration reordering and duplicate list values do not create
 semantic changes, and Markdown does not print policy fingerprints.
 
+JSON also exposes `diff.security.policyTransitions` for matched assets. Each
+row retains canonical asset ID/path/kind, one of `networkAllowed`,
+`externalUploadAllowed`, `secretsAllowed`, or `humanApprovalRequired`, exact
+boolean-or-`unspecified` from/to states, and provenance. New and deleted assets
+do not produce transition rows. Aggregate inventory counts are summaries only;
+CI policy consumes these per-asset rows, so a relaxation on one asset and a
+tightening on another cannot cancel.
+
+For network, external upload, and secrets, effective `false` is restrictive:
+`false -> true` and `false -> unspecified` are relaxations. For human approval,
+effective `true` is restrictive: `true -> false` and `true -> unspecified` are
+relaxations. Under current effective diagnostic semantics,
+`true <-> unspecified` is neutral for permission fields and
+`false <-> unspecified` is neutral for approval; moving from `unspecified` to
+the restrictive state is tightening. `Unspecified` remains absence of an
+effective declaration, not a runtime permission grant.
+
 These policy details are a deterministic projection of static declared and
 effective Renma evidence. An approved destination is not the same as a
 destination mentioned in instructions, and neither is evidence that a runtime
 connection or upload occurred. The projection adds no target detector, runtime
-monitoring, permission inference, or enforcement. It does not classify a policy
-change as an improvement or regression and does not change CI status or exit
-behavior, `scan --fail-on`, Readiness score, or Readiness level.
+monitoring, permission inference, or enforcement. The security transition gate
+classifies only the boolean relaxations above for revision review; it does not
+change `scan --fail-on`, Readiness score, or Readiness level.
+
+Direct `diff` Markdown shows a bounded `Security policy relaxations` list before
+aggregate Security Changes metrics. CI-report keeps a matching policy outcome
+and per-asset transitions visible above the collapsed details. Stable match IDs
+are `security_policy_ci.network_relaxed`,
+`security_policy_ci.external_upload_relaxed`,
+`security_policy_ci.secrets_relaxed`, and
+`security_policy_ci.human_approval_removed`.
+
+Configure this review policy independently from Skill Discovery:
+
+```json
+{
+  "security": {
+    "ci_policy": "fail"
+  }
+}
+```
+
+The default is `fail`. CI reads both archived revisions and selects the stricter
+mode under `off < warn < fail`; a simultaneous `fail -> off` change therefore
+cannot bypass the gate. A match under `fail` makes CI-report `FAIL` and exit
+`1`; under `warn` it promotes `PASS` to `WARN`; under `off` it has no status
+effect, while transition evidence and matches remain visible. No security
+outcome downgrades an existing failure.
+
+Renma permits declared security policies to evolve, but weakening a security
+boundary is a reviewable security event. A reduction in scan findings caused by
+policy relaxation is not considered verified remediation. CI-report suppresses
+the generic `Scan findings decreased.` praise and explicitly says the decrease
+is not verified remediation when both occur. Removing or correcting the
+contradictory instruction without relaxing policy remains valid remediation.
 
 Asset details in diff and CI-report JSON use canonical `declaredOwner` and
 `effectiveOwner` values. CI-report Markdown always renders both values so
@@ -2058,7 +2116,9 @@ behavior.
 Serialized reports that predate the Discovery fields continue to format without
 a synthetic Discovery section. A report that contains `skillDiscovery` but no
 `skillDiscoveryPolicy` retains its observation-only Discovery section without an
-invented policy result.
+invented policy result. Earlier serialized reports without `securityPolicy` or
+`diff.security.policyTransitions` also continue to format, while newly built
+reports always emit both fields.
 
 Repository Context BOM artifacts describe declared repository state, not prompt assembly, context injection, agent execution, actual LLM runtime usage, or telemetry. Use `renma bom . --format json` when CI needs a machine-readable manifest and `renma bom . --format markdown` for review comments or artifacts. For v2 compatibility and reproducibility details, see the [Repository Context BOM contract](repository-context-bom.md).
 

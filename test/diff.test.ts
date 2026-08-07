@@ -899,6 +899,52 @@ test("formatDiff renders markdown summaries", () => {
   assert.equal(parsed.security.policyInventory.totalPolicyAssets, 2);
 });
 
+test("formatDiff surfaces canonical per-asset security policy relaxations before aggregate metrics", () => {
+  const report = buildDiffReport(
+    "/repo",
+    snapshot("base", {}),
+    snapshot("head", {}),
+  );
+  report.security.policyTransitions = [
+    {
+      asset: {
+        id: "skill.ops.deploy",
+        path: "skills/ops/deploy/SKILL.md",
+        kind: "skill",
+      },
+      property: "networkAllowed",
+      fromState: false,
+      toState: true,
+      provenance: {
+        mode: "direct",
+        sources: [
+          {
+            type: "asset",
+            id: "skill.ops.deploy",
+            path: "skills/ops/deploy/SKILL.md",
+          },
+        ],
+      },
+    },
+  ];
+
+  const markdown = formatDiff(report, "markdown");
+  const parsed = JSON.parse(formatDiff(report, "json"));
+
+  assert.match(markdown, /^### Security policy relaxations$/m);
+  assert.match(
+    markdown,
+    /skill\.ops\.deploy[\s\S]*networkAllowed false -> true/,
+  );
+  assert.ok(
+    markdown.indexOf("### Security policy relaxations") <
+      markdown.indexOf("- Added security findings:"),
+  );
+  assert.deepEqual(parsed.security.policyTransitions, [
+    report.security.policyTransitions[0],
+  ]);
+});
+
 test("formatDiff deterministically exposes corrected invocation states", () => {
   const report = buildDiffReport(
     "/repo",

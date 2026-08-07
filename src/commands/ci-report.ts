@@ -39,6 +39,13 @@ import {
   type SkillDiscoveryCiPolicyEvaluation,
   type SkillDiscoveryCiPolicyMatch,
 } from "../skill-discovery-ci-policy.js";
+import {
+  evaluateSecurityPolicyCiPolicy,
+  type SecurityPolicyCiConfiguration,
+  type SecurityPolicyCiEvaluation,
+  type SecurityPolicyCiMatch,
+} from "../security-policy-ci-policy.js";
+import { formatMarkdownInlineCode } from "../renderers/markdown-inline-code.js";
 
 export type CiReportFormat = DiffFormat;
 export type CiReportStatus = "pass" | "warn" | "fail";
@@ -82,6 +89,7 @@ export interface CiReport {
   summary: DiffReport["summary"];
   skillDiscovery: SkillDiscoveryDiff;
   skillDiscoveryPolicy: SkillDiscoveryCiPolicyEvaluation;
+  securityPolicy: SecurityPolicyCiEvaluation;
   securityPosture: {
     added: SecurityPostureSummary;
     resolved: SecurityPostureSummary;
@@ -92,10 +100,13 @@ export interface CiReport {
 
 export type CiReportFormatInput =
   | CiReport
-  | (Omit<CiReport, "diff" | "skillDiscoveryPolicy"> & {
+  | (Omit<CiReport, "diff" | "skillDiscoveryPolicy" | "securityPolicy"> & {
       diff: CiFormatCompatibleDiffReport;
     })
-  | (Omit<CiReport, "diff" | "skillDiscovery" | "skillDiscoveryPolicy"> & {
+  | (Omit<
+      CiReport,
+      "diff" | "skillDiscovery" | "skillDiscoveryPolicy" | "securityPolicy"
+    > & {
       diff: CiFormatCompatibleDiffReport;
     });
 
@@ -138,6 +149,7 @@ export async function ciReport(
   return buildCiReportFromDiff(
     execution.report,
     execution.skillDiscoveryCiPolicy,
+    execution.securityPolicyCiPolicy,
   );
 }
 
@@ -147,6 +159,10 @@ export function buildCiReportFromDiff(
     from: "off",
     to: "off",
   },
+  configuredSecurityPolicy: SecurityPolicyCiConfiguration = {
+    from: "fail",
+    to: "fail",
+  },
 ): CiReport {
   const { discovery, ...ciCompatibleDiff } = report;
   const existingStatus = determineCiReportStatus(ciCompatibleDiff);
@@ -154,9 +170,14 @@ export function buildCiReportFromDiff(
     discovery,
     configuredPolicy,
   );
+  const securityPolicy = evaluateSecurityPolicyCiPolicy(
+    ciCompatibleDiff.security,
+    configuredSecurityPolicy,
+  );
   const status = composeCiReportStatus(
     existingStatus,
     skillDiscoveryPolicy.outcome,
+    securityPolicy.outcome,
   );
   const securityPosture = {
     added: summarizeSecurityPosture(ciCompatibleDiff.findings.added),
@@ -171,12 +192,14 @@ export function buildCiReportFromDiff(
     summary: ciCompatibleDiff.summary,
     skillDiscovery: discovery,
     skillDiscoveryPolicy,
+    securityPolicy,
     securityPosture,
     notes: reviewNotes(
       ciCompatibleDiff,
       status,
       securityPosture.added,
       skillDiscoveryPolicy,
+      securityPolicy,
     ),
     diff: ciCompatibleDiff,
   };
@@ -216,9 +239,15 @@ export function determineCiReportStatus(
 export function composeCiReportStatus(
   existingStatus: CiReportStatus,
   discoveryPolicyOutcome: SkillDiscoveryCiPolicyEvaluation["outcome"],
+  securityPolicyOutcome: SecurityPolicyCiEvaluation["outcome"] = "pass",
 ): CiReportStatus {
-  if (existingStatus === "fail") return "fail";
-  if (existingStatus === "warn" || discoveryPolicyOutcome === "warn")
+  if (existingStatus === "fail" || securityPolicyOutcome === "fail")
+    return "fail";
+  if (
+    existingStatus === "warn" ||
+    discoveryPolicyOutcome === "warn" ||
+    securityPolicyOutcome === "warn"
+  )
     return "warn";
   return "pass";
 }
@@ -254,6 +283,7 @@ function reviewNotes(
   status: CiReportStatus,
   addedSecurityPosture: SecurityPostureSummary,
   skillDiscoveryPolicy: SkillDiscoveryCiPolicyEvaluation,
+  securityPolicy: SecurityPolicyCiEvaluation,
 ): string[] {
   const notes: string[] = [];
 
@@ -278,8 +308,20 @@ function reviewNotes(
   if (report.summary.ownershipCoverageDelta > 0) {
     notes.push("Ownership coverage improved.");
   }
-  if (report.summary.findingsDelta < 0) {
+  if (report.summary.findingsDelta < 0 && securityPolicy.matchCount === 0) {
     notes.push("Scan findings decreased.");
+  }
+  if (securityPolicy.matchCount > 0) {
+    const suffix =
+      securityPolicy.matchCount === 1 ? "transition" : "transitions";
+    notes.push(
+      `Security policy relaxation matched ${securityPolicy.matchCount} ${suffix}; explicit human security review is required.`,
+    );
+    if (report.summary.findingsDelta < 0) {
+      notes.push(
+        "Scan findings decreased alongside a declared security policy relaxation; this is not treated as verified remediation.",
+      );
+    }
   }
   if (skillDiscoveryPolicy.outcome === "warn") {
     const suffix = skillDiscoveryPolicy.matchCount === 1 ? "change" : "changes";
@@ -343,6 +385,23 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
       `- High/critical findings: ${formatDelta(report.summary.highOrCriticalFindingsDelta)}`,
     );
   }
+  const securityPolicy =
+    "securityPolicy" in report ? report.securityPolicy : undefined;
+  if (securityPolicy && securityPolicy.matchCount > 0) {
+    const suffix =
+      securityPolicy.matchCount === 1 ? "transition" : "transitions";
+    const effect =
+      securityPolicy.configured.effective === "off"
+        ? "GATE OFF"
+        : securityPolicy.outcome.toUpperCase();
+    summaryLines.push(
+      `- Security policy relaxation: ${effect} — ${securityPolicy.matchCount} ${suffix}; explicit human security review required`,
+    );
+  }
+  const securityPolicyLines =
+    securityPolicy && securityPolicy.matchCount > 0
+      ? ["", ...formatSecurityPolicyRelaxationSection(securityPolicy)]
+      : [];
 
   const detailLines = [
     "## Readiness",
@@ -406,6 +465,7 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     "",
     ...summaryLines,
     ...formatChangeOverview(report, executableSurface),
+    ...securityPolicyLines,
     "",
     "## Review Notes",
     "",
@@ -535,6 +595,10 @@ function formatChangeOverview(
       0,
       report.diff.security?.policyChanges?.length ?? 0,
     ],
+    [
+      "security policy relaxations",
+      "securityPolicy" in report ? report.securityPolicy.matchCount : 0,
+    ],
   ]);
 
   return [
@@ -598,6 +662,40 @@ function countNonZeroNumbers(value: unknown): number {
     (count, item) => count + countNonZeroNumbers(item),
     0,
   );
+}
+
+function formatSecurityPolicyRelaxationSection(
+  policy: SecurityPolicyCiEvaluation,
+): string[] {
+  const { from, to, effective } = policy.configured;
+  const configured =
+    from === to
+      ? [`- CI review policy: ${from}`]
+      : [
+          `- CI review policy: ${from} -> ${to}`,
+          `- Effective CI review policy: ${effective}`,
+        ];
+  return [
+    "## Security Policy Relaxation",
+    "",
+    ...configured,
+    ...(effective === "off"
+      ? [
+          "- CI status effect: none — gate disabled; explicit human security review required",
+        ]
+      : [
+          `- Policy outcome: ${policy.outcome.toUpperCase()} — explicit human security review required`,
+        ]),
+    "",
+    ...policy.matches
+      .slice(0, MAX_LIST_ITEMS)
+      .map((match) => `- ${formatSecurityPolicyCiMatch(match)}`),
+    ...formatOverflow(policy.matches.length),
+  ];
+}
+
+function formatSecurityPolicyCiMatch(match: SecurityPolicyCiMatch): string {
+  return `${formatMarkdownInlineCode(match.asset.id)} (${formatMarkdownInlineCode(match.asset.path)}): ${match.property} ${match.fromState} -> ${match.toState} (${match.id})`;
 }
 
 function formatReviewNotes(report: CiReportFormatInput): string[] {

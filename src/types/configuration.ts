@@ -25,7 +25,11 @@ export interface SecurityConfig {
   approvedUploadDomains: string[];
   disallowedCommands: string[];
   profiles?: Record<string, SecurityProfileConfig> | undefined;
+  /** CI review mode for effective security-policy relaxations. Defaults to fail. */
+  ciPolicy?: SecurityCiPolicyMode | undefined;
 }
+
+export type SecurityCiPolicyMode = "off" | "warn" | "fail";
 
 export type SkillDiscoveryCiPolicyMode = "off" | "warn";
 
