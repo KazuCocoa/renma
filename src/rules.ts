@@ -94,7 +94,7 @@ const VERIFICATION_BODY_PATTERNS: readonly RegExp[] = [
 ];
 const NEGATED_VERIFICATION_PATTERNS: readonly RegExp[] = [
   /\b(?:do\s+not|don['’]t|never|must\s+not|should\s+not|cannot|can['’]t)\s+(?:be\s+)?(?:verify|verified|verifies|verifying|validate|validated|validates|validating|test|tested|testing|confirm)\b/iu,
-  /\b(?:do\s+not|don['’]t|never|must\s+not|should\s+not)\s+(?:run|execute|perform)\s+(?:(?:the|an?)\s+)?(?:(?:unit|integration|end-to-end|e2e|acceptance|regression|smoke)\s+)?(?:tests?|verification|validation)\b/iu,
+  /\b(?:do\s+not|don['’]t|never|must\s+not|should\s+not)\s+(?:run|execute|perform)\s+(?:(?:(?:the|an?)\s+)?(?:(?:unit|integration|end-to-end|e2e|acceptance|regression|smoke)\s+)?(?:tests?|verification|validation)|(?:npm|pnpm|yarn|bun)\s+tests?)\b/iu,
 ];
 const ROUTING_HEADING_PATTERNS: readonly RegExp[] = [
   /^when\s+to\s+use$/iu,
@@ -120,8 +120,6 @@ const ROUTING_BODY_PATTERNS: readonly RegExp[] = [
 const ROUTING_DESCRIPTION_PATTERNS: readonly RegExp[] = [
   ...ROUTING_BODY_PATTERNS,
 ];
-const NEGATED_ROUTING_PATTERN =
-  /\b(?:do\s+not|don['’]t|never|must\s+not|should\s+not|cannot|can['’]t)\s+(?:choose|use)\b/iu;
 const REUSABLE_CONTEXT_HEADING_PATTERNS: Array<[RegExp, string]> = [
   [/\bplatform facts?\b/i, "Platform Facts"],
   [/\breusable troubleshooting\b/i, "Reusable Troubleshooting"],
@@ -1183,13 +1181,15 @@ function hasVerificationGuidance(document: ParsedDocument): boolean {
     return true;
   }
 
-  return markdownBodyGuidanceStatements(document).some(
-    (statement) =>
+  return markdownBodyGuidanceStatements(document).some((statement) => {
+    const normalized = normalizeInlineCodeForGuidance(statement);
+    return (
       !NEGATED_VERIFICATION_PATTERNS.some((pattern) =>
-        pattern.test(statement),
+        pattern.test(normalized),
       ) &&
-      VERIFICATION_BODY_PATTERNS.some((pattern) => pattern.test(statement)),
-  );
+      VERIFICATION_BODY_PATTERNS.some((pattern) => pattern.test(normalized))
+    );
+  });
 }
 
 function hasRoutingClarity(
@@ -1218,10 +1218,8 @@ function hasPositiveRoutingStatement(
   value: string,
   patterns: readonly RegExp[],
 ): boolean {
-  return guidanceStatements(value).some(
-    (statement) =>
-      !NEGATED_ROUTING_PATTERN.test(statement) &&
-      patterns.some((pattern) => pattern.test(statement)),
+  return guidanceStatements(value).some((statement) =>
+    patterns.some((pattern) => pattern.test(statement)),
   );
 }
 
@@ -1233,7 +1231,7 @@ function markdownBodyGuidanceStatements(document: ParsedDocument): string[] {
 
 function guidanceStatements(value: string): string[] {
   return value
-    .split(/(?:\r?\n|[.!?;](?:\s+|$))/u)
+    .split(/(?:\r?\n|[.!?;](?:\s+|$)|,\s+(?:but|however)\s+)/iu)
     .map((statement) =>
       statement
         .trim()
@@ -1242,6 +1240,10 @@ function guidanceStatements(value: string): string[] {
         .replace(/^(?:(?:>\s*)|(?:[-*+]\s+)|(?:\d+[.)]\s+))+/u, ""),
     )
     .filter(Boolean);
+}
+
+function normalizeInlineCodeForGuidance(value: string): string {
+  return value.replace(/(`+)([^`\r\n]+)\1/gu, "$2");
 }
 
 function reusableContextCandidateFinding(

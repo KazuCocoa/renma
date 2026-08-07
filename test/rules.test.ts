@@ -143,8 +143,15 @@ test("verification guidance recognizes bounded heading, lexical, and outcome for
     ],
     ["test", "Run the integration test before returning the result."],
     ["tests", "Run the tests before returning the result."],
+    ["inline npm test", "Run `npm test` before finishing."],
+    ["inline pnpm test", "Run `pnpm test` before returning the result."],
+    ["inline yarn test", "Execute `yarn test` and review the result."],
     ["tested", "The generated output is tested before handoff."],
     ["testing", "Testing runs before completion."],
+    [
+      "mixed verification clauses",
+      "Verify the generated output, but do not test production services.",
+    ],
     ["confirm result", "Confirm the result before finishing."],
     ["confirm output", "Confirm output before finishing."],
     ["expected output", "The expected output is a zero exit code."],
@@ -246,6 +253,18 @@ test("verification guidance ignores lexical fragments and frontmatter evidence",
       description:
         "Use when a repository artifact needs a deterministic source review.",
       body: "Do not run the integration tests locally.",
+    },
+    {
+      name: "inline-command-name",
+      description:
+        "Use when a repository artifact needs a deterministic source review.",
+      body: "The package script is named `npm test`.",
+    },
+    {
+      name: "negated-inline-command",
+      description:
+        "Use when a repository artifact needs a deterministic source review.",
+      body: "Do not run `npm test` locally.",
     },
   ] as const;
 
@@ -471,6 +490,45 @@ test("positive and negative routing remain independent evidence dimensions", asy
     hasFinding(result, "QUAL-MISSING-NEGATIVE-ROUTING", artifactPath),
     false,
   );
+});
+
+test("mixed positive and negative routing clauses retain positive evidence", async () => {
+  const root = await fixture();
+  const fixtures = [
+    {
+      name: "body",
+      description: "Reviews source code and produces structured findings.",
+      body: "Use this Skill when reviewing pull requests, but do not use this Skill for releases.",
+    },
+    {
+      name: "description",
+      description:
+        "Use this for repository review, but never use it for deployment.",
+      body: "Review the proposed change and return structured findings.",
+    },
+  ] as const;
+
+  for (const fixture of fixtures) {
+    await writeQualityDocument(root, {
+      kind: "skill",
+      ...fixture,
+      name: `routing-mixed-${fixture.name}`,
+      body: `${fixture.body}\n\n## Verification\nVerify the structured findings before handoff.`,
+    });
+  }
+
+  const result = await scan(root);
+  for (const fixture of fixtures) {
+    assert.equal(
+      hasFinding(
+        result,
+        "QUAL-MISSING-ROUTING-CLARITY",
+        `skills/routing-mixed-${fixture.name}/SKILL.md`,
+      ),
+      false,
+      fixture.name,
+    );
+  }
 });
 
 test("Agent documents retain routing and verification quality behavior", async () => {
