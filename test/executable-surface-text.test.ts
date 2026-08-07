@@ -403,6 +403,14 @@ function scanResult(
       maxDepth: 1,
       activeSuppressions: [],
     },
+    inspectionCoverage: {
+      schemaVersion: "renma.inspection-coverage.v1",
+      expectedPathCount: 0,
+      inspectedPathCount: 0,
+      complete: true,
+      inspectedPaths: [],
+      blockingIssues: [],
+    },
     scannedFileCount: 13,
     format: "text",
     agentSkills: {

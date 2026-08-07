@@ -1,5 +1,6 @@
 import {
   executeDiff,
+  formatInspectionCoverageChange,
   formatSecurityChanges,
   type AssetChange,
   type AssetDelta,
@@ -53,9 +54,14 @@ import {
   type ScanBoundaryCiMatch,
 } from "../scan-boundary-ci-policy.js";
 import type { EffectiveCiScanBoundaryEvidence } from "../scan-boundary.js";
+import {
+  zeroInspectionCoverageDiff,
+  type InspectionCoverageDiff,
+} from "../inspection-coverage.js";
 
 export type CiReportFormat = DiffFormat;
 export type CiReportStatus = "pass" | "warn" | "fail";
+export type CiReportFailureThreshold = "fail" | "warn";
 type CiCompatibleExecutableSurfaceDiff = Omit<
   ExecutableSurfaceDiff,
   | "newInvocationsWithMultipleEffectivePolicyFingerprints"
@@ -149,11 +155,24 @@ interface ReportFinding {
 
 export async function runCiReportCommand(
   targetPath: string,
-  options: CiReportOptions & { format: CiReportFormat },
+  options: CiReportOptions & {
+    format: CiReportFormat;
+    failOnStatus?: CiReportFailureThreshold;
+  },
 ): Promise<number> {
   const report = await ciReport(targetPath, options);
   process.stdout.write(formatCiReport(report, options.format));
-  return report.status === "fail" ? 1 : 0;
+  return ciReportStatusMeets(report.status, options.failOnStatus ?? "fail")
+    ? 1
+    : 0;
+}
+
+/** Keep semantic report status independent from the caller's exit policy. */
+export function ciReportStatusMeets(
+  status: CiReportStatus,
+  threshold: CiReportFailureThreshold,
+): boolean {
+  return status === "fail" || (threshold === "warn" && status === "warn");
 }
 
 export async function ciReport(
@@ -258,6 +277,8 @@ export function determineCiReportStatus(
   }
 
   if (
+    hasReadinessRegression(report) ||
+    inspectionCoverageDiff(report).regressions.length > 0 ||
     report.summary.readinessScoreDelta < 0 ||
     report.summary.ownershipCoverageDelta < 0 ||
     report.summary.graphResolutionDelta < 0 ||
@@ -267,6 +288,30 @@ export function determineCiReportStatus(
   }
 
   return "pass";
+}
+
+function hasReadinessRegression(report: CiCompatibleDiffReport): boolean {
+  const levels = new Map([
+    ["not_ready", 0],
+    ["needs_attention", 1],
+    ["ready", 2],
+  ]);
+  const fromLevel = levels.get(report.from.readinessLevel);
+  const toLevel = levels.get(report.to.readinessLevel);
+  if (fromLevel !== undefined && toLevel !== undefined && toLevel < fromLevel) {
+    return true;
+  }
+  return report.readiness.checkChanges.some(
+    (change) =>
+      (change.fromStatus === "pass" || change.fromStatus === "absent") &&
+      (change.toStatus === "fail" || change.toSeverity === "error"),
+  );
+}
+
+function inspectionCoverageDiff(
+  report: Pick<CiCompatibleDiffReport, "inspectionCoverage">,
+): InspectionCoverageDiff {
+  return report.inspectionCoverage ?? zeroInspectionCoverageDiff();
 }
 
 export function composeCiReportStatus(
@@ -345,6 +390,14 @@ function reviewNotes(
   if (report.summary.readinessScoreDelta < 0) {
     notes.push("Readiness score decreased.");
   }
+  if (hasReadinessRegression(report)) {
+    notes.push("Readiness level or a blocking readiness check regressed.");
+  }
+  if (inspectionCoverageDiff(report).regressions.length > 0) {
+    notes.push(
+      "Review newly incomplete inspection coverage for expected agent-facing artifacts.",
+    );
+  }
   if (report.summary.ownershipCoverageDelta > 0) {
     notes.push("Ownership coverage improved.");
   }
@@ -393,6 +446,8 @@ function reviewNotes(
 }
 
 function formatCiReportMarkdown(report: CiReportFormatInput): string {
+  const inspectionCoverage =
+    report.diff.inspectionCoverage ?? zeroInspectionCoverageDiff();
   const executableSurface =
     report.diff.executableSurface ??
     buildExecutableSurfaceDiff(
@@ -439,6 +494,11 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
   if (report.summary.highOrCriticalFindingsDelta !== 0) {
     summaryLines.push(
       `- High/critical findings: ${formatDelta(report.summary.highOrCriticalFindingsDelta)}`,
+    );
+  }
+  if (inspectionCoverage.regressions.length > 0) {
+    summaryLines.push(
+      `- Inspection coverage regressions: ${inspectionCoverage.regressions.length}`,
     );
   }
   const securityPolicy =
@@ -502,6 +562,24 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     "## Readiness Check Changes",
     "",
     ...formatReadinessCheckChanges(report.diff.readiness.checkChanges),
+    "",
+    "## Inspection Coverage",
+    "",
+    `- Expected paths: ${inspectionCoverage.from.expectedPathCount} -> ${inspectionCoverage.to.expectedPathCount}`,
+    `- Inspected paths: ${inspectionCoverage.from.inspectedPathCount} -> ${inspectionCoverage.to.inspectedPathCount}`,
+    `- Blocking issues: ${inspectionCoverage.from.blockingIssueCount} -> ${inspectionCoverage.to.blockingIssueCount}`,
+    `- Regressions: ${inspectionCoverage.regressions.length}`,
+    `- Resolved issues: ${inspectionCoverage.resolvedIssues.length}`,
+    ...(inspectionCoverage.regressions.length > 0
+      ? [
+          "",
+          "### Inspection coverage regressions",
+          "",
+          ...inspectionCoverage.regressions.map(
+            (change) => `- ${formatInspectionCoverageChange(change)}`,
+          ),
+        ]
+      : []),
     ...skillDiscoveryLines,
     "",
     "## Executable Surface Changes",
@@ -596,6 +674,11 @@ function formatChangeOverview(
     ["graph unresolved", report.diff.graph.newUnresolvedEdges.length],
     ["graph resolved", report.diff.graph.resolvedEdges.length],
     ["readiness checks", 0, 0, report.diff.readiness.checkChanges.length],
+    [
+      "inspection coverage",
+      inspectionCoverageDiff(report.diff).regressions.length,
+      inspectionCoverageDiff(report.diff).resolvedIssues.length,
+    ],
     [
       "Skill Discovery",
       0,

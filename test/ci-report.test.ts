@@ -1,16 +1,25 @@
 import assert from "node:assert/strict";
 import { execFile as execFileCallback } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, matchesGlob } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 import fc from "fast-check";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import type { Nodes } from "mdast";
+import { main } from "../src/cli.js";
 import {
   buildCiReportFromDiff,
   ciReport,
+  ciReportStatusMeets,
   composeCiReportStatus,
   determineCiReportStatus,
   formatCiReport,
@@ -18,6 +27,7 @@ import {
   type CiReport,
   type CiReportFormatInput,
 } from "../src/commands/ci-report.js";
+import { RepositoryFixture } from "./repository-fixture.js";
 import type { DiffReport } from "../src/commands/diff.js";
 import { zeroContextLensSummary } from "../src/context-lens.js";
 import { buildExecutableSurfaceDiff } from "../src/executable-surface-diff.js";
@@ -1658,6 +1668,97 @@ test("ci report policy warns on readiness score decrease", () => {
   assert.equal(determineCiReportStatus(report), "warn");
 });
 
+test("ci report policy warns when readiness level becomes worse without a score delta", () => {
+  const report = policyDiffReport({});
+  report.from.readinessLevel = "ready";
+  report.to.readinessLevel = "not_ready";
+  report.summary.readinessLevelChanged = true;
+
+  assert.equal(determineCiReportStatus(report), "warn");
+});
+
+test("ci report policy warns when a passing readiness check becomes failing or error", () => {
+  const report = policyDiffReport({
+    checkChanges: [
+      {
+        id: "diagnostics.errors",
+        title: "Error diagnostics",
+        fromStatus: "pass",
+        toStatus: "fail",
+        fromSeverity: "info",
+        toSeverity: "error",
+        summaryChanged: true,
+      },
+    ],
+  });
+
+  assert.equal(determineCiReportStatus(report), "warn");
+});
+
+test("ci report policy warns when a new blocking readiness check appears", () => {
+  const report = policyDiffReport({
+    checkChanges: [
+      {
+        id: "new.blocking_check",
+        title: "New blocking check",
+        fromStatus: "absent",
+        toStatus: "fail",
+        fromSeverity: "absent",
+        toSeverity: "error",
+        summaryChanged: true,
+      },
+    ],
+  });
+
+  assert.equal(determineCiReportStatus(report), "warn");
+});
+
+test("ci-report failure threshold covers every PASS/WARN/FAIL combination", () => {
+  assert.equal(ciReportStatusMeets("pass", "fail"), false);
+  assert.equal(ciReportStatusMeets("warn", "fail"), false);
+  assert.equal(ciReportStatusMeets("fail", "fail"), true);
+  assert.equal(ciReportStatusMeets("pass", "warn"), false);
+  assert.equal(ciReportStatusMeets("warn", "warn"), true);
+  assert.equal(ciReportStatusMeets("fail", "warn"), true);
+});
+
+test("ci report policy warns on a newly blocking inspection-coverage issue", () => {
+  const report = policyDiffReport({});
+  report.inspectionCoverage = {
+    schemaVersion: "renma.inspection-coverage-diff.v1",
+    from: {
+      expectedPathCount: 1,
+      inspectedPathCount: 1,
+      blockingIssueCount: 0,
+    },
+    to: {
+      expectedPathCount: 1,
+      inspectedPathCount: 0,
+      blockingIssueCount: 1,
+    },
+    regressions: [
+      {
+        path: "skills/payment/SKILL.md",
+        fromState: "parsed",
+        toState: "symlink",
+        scope: "exact",
+        previouslyInspectedPaths: ["skills/payment/SKILL.md"],
+        classification: {
+          kind: "skill",
+          scope: "independent",
+          matchedRule: "skill-entrypoint",
+          reasonCode: "under-canonical-skill-root",
+          reason: "Canonical Skill entrypoint.",
+        },
+        strictBlocking: true,
+      },
+    ],
+    resolvedIssues: [],
+  };
+
+  assert.equal(determineCiReportStatus(report), "warn");
+});
+
 test("CI status composition keeps fail dominant and Discovery warn-only", () => {
   assert.equal(composeCiReportStatus("fail", "warn"), "fail");
   assert.equal(composeCiReportStatus("warn", "warn"), "warn");
@@ -3026,6 +3127,231 @@ function testPolicyProvenance(mode: "direct" | "inherited") {
         ],
       };
 }
+
+test("coverage regression stays WARN and --fail-on-status warn blocks it", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.initializeGit();
+  await fixture.skill("payment", {
+    owner: "payments",
+    status: "stable",
+  });
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "base"]);
+  await fixture.git(["tag", "base"]);
+
+  await rm(fixture.resolve("skills/payment/SKILL.md"));
+  await fixture.write("replacement.md", "# Replacement\n");
+  await symlink(
+    "../../replacement.md",
+    fixture.resolve("skills/payment/SKILL.md"),
+  );
+  await fixture.git(["add", "-A"]);
+  await fixture.git(["commit", "-m", "replace Skill with symlink"]);
+
+  const report = await ciReport(fixture.root, {
+    fromRef: "base",
+    toRef: "HEAD",
+  });
+  const command = await withCapturedStdout(() =>
+    main([
+      "ci-report",
+      fixture.root,
+      "--from",
+      "base",
+      "--to",
+      "HEAD",
+      "--format",
+      "markdown",
+      "--fail-on-status",
+      "warn",
+    ]),
+  );
+
+  assert.equal(report.status, "warn");
+  assert.equal(command.code, 1);
+  assert.deepEqual(
+    report.diff.inspectionCoverage.regressions.map((change) => ({
+      path: change.path,
+      fromState: change.fromState,
+      toState: change.toState,
+    })),
+    [
+      {
+        path: "skills/payment/SKILL.md",
+        fromState: "parsed",
+        toState: "symlink",
+      },
+    ],
+  );
+  assert.match(
+    command.stdout,
+    /Inspection coverage regressions:[\s\S]*skills\/payment\/SKILL\.md[\s\S]*parsed -> symlink/,
+  );
+});
+
+test("Skill directory symlink is a subtree coverage regression from an exact path", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  await fixture.initializeGit();
+  await fixture.skill("payment", {
+    owner: "payments",
+    status: "stable",
+  });
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "base"]);
+  await fixture.git(["tag", "base"]);
+
+  await rm(fixture.resolve("skills/payment"), { recursive: true });
+  await fixture.skill("hidden-payment/SKILL.md", {
+    owner: "payments",
+    status: "stable",
+  });
+  await symlink("../hidden-payment", fixture.resolve("skills/payment"));
+  await fixture.git(["add", "-A"]);
+  await fixture.git(["commit", "-m", "replace Skill directory with symlink"]);
+
+  const report = await ciReport(fixture.root, {
+    fromRef: "base",
+    toRef: "HEAD",
+  });
+  const ciCommand = await withCapturedStdout(() =>
+    main([
+      "ci-report",
+      fixture.root,
+      "--from",
+      "base",
+      "--to",
+      "HEAD",
+      "--format",
+      "markdown",
+      "--fail-on-status",
+      "warn",
+    ]),
+  );
+  const strictCommand = await withCapturedStdout(() =>
+    main([
+      "scan",
+      fixture.root,
+      "--fail-on",
+      "high",
+      "--format",
+      "json",
+      "--strict",
+    ]),
+  );
+
+  assert.equal(report.status, "warn");
+  assert.equal(ciCommand.code, 1);
+  assert.equal(strictCommand.code, 1);
+  assert.deepEqual(
+    report.diff.inspectionCoverage.regressions.map((change) => ({
+      path: change.path,
+      fromState: change.fromState,
+      toState: change.toState,
+      scope: change.scope,
+      affectedBoundary: change.affectedBoundary,
+      previouslyInspectedPaths: change.previouslyInspectedPaths,
+    })),
+    [
+      {
+        path: "skills/payment",
+        fromState: "parsed",
+        toState: "symlink",
+        scope: "subtree",
+        affectedBoundary: "skills",
+        previouslyInspectedPaths: ["skills/payment/SKILL.md"],
+      },
+    ],
+  );
+  assert.match(
+    ciCommand.stdout,
+    /skills\/payment[\s\S]*parsed -> symlink \(subtree; skills boundary\)[\s\S]*previously inspected[\s\S]*skills\/payment\/SKILL\.md/,
+  );
+  const strictJson = JSON.parse(strictCommand.stdout) as {
+    agentSkills: { totalSkillCount: number };
+    inspectionCoverage: {
+      blockingIssues: Array<{ path: string; scope: string }>;
+    };
+  };
+  assert.equal(strictJson.agentSkills.totalSkillCount, 0);
+  assert.deepEqual(
+    strictJson.inspectionCoverage.blockingIssues.map(({ path, scope }) => ({
+      path,
+      scope,
+    })),
+    [{ path: "skills/payment", scope: "subtree" }],
+  );
+});
+
+test("character-class glob retains subtree coverage across revisions", async (t) => {
+  const fixture = await RepositoryFixture.create({ testContext: t });
+  const configuredGlob = "skills/domain/[ab]/payment/SKILL.md";
+  const baselineSkillPath = "skills/domain/a/payment/SKILL.md";
+  assert.equal(matchesGlob(baselineSkillPath, configuredGlob), true);
+  await fixture.initializeGit();
+  await fixture.writeConfig({ globs: [configuredGlob] });
+  await fixture.skill(baselineSkillPath, {
+    owner: "payments",
+    status: "stable",
+  });
+  await fixture.git(["add", "."]);
+  await fixture.git(["commit", "-m", "base"]);
+  await fixture.git(["tag", "base"]);
+
+  await rm(fixture.resolve("skills/domain"), { recursive: true });
+  await fixture.skill("hidden-domain/a/payment/SKILL.md", {
+    owner: "payments",
+    status: "stable",
+  });
+  await symlink("../hidden-domain", fixture.resolve("skills/domain"));
+  await fixture.git(["add", "-A"]);
+  await fixture.git(["commit", "-m", "block custom-glob Skill subtree"]);
+
+  const report = await ciReport(fixture.root, {
+    fromRef: "base",
+    toRef: "HEAD",
+  });
+  const command = await withCapturedStdout(() =>
+    main([
+      "ci-report",
+      fixture.root,
+      "--from",
+      "base",
+      "--to",
+      "HEAD",
+      "--format",
+      "markdown",
+      "--fail-on-status",
+      "warn",
+    ]),
+  );
+
+  assert.equal(report.status, "warn");
+  assert.equal(command.code, 1);
+  assert.deepEqual(
+    report.diff.inspectionCoverage.regressions.map((change) => ({
+      path: change.path,
+      fromState: change.fromState,
+      toState: change.toState,
+      scope: change.scope,
+      affectedBoundary: change.affectedBoundary,
+      previouslyInspectedPaths: change.previouslyInspectedPaths,
+    })),
+    [
+      {
+        path: "skills/domain",
+        fromState: "parsed",
+        toState: "symlink",
+        scope: "subtree",
+        affectedBoundary: "skills",
+        previouslyInspectedPaths: [baselineSkillPath],
+      },
+    ],
+  );
+  assert.match(
+    command.stdout,
+    /skills\/domain[\s\S]*parsed -> symlink \(subtree; skills boundary\)[\s\S]*skills\/domain\/a\/payment\/SKILL\.md/,
+  );
+});
 
 function markdownInlineCodeValues(markdown: string): string[] {
   const values: string[] = [];

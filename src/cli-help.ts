@@ -28,6 +28,11 @@ const OPTION_HELP = {
     description:
       "Exit 1 when scan findings meet severity: low, medium, high, or critical.",
   },
+  strict: {
+    flags: "--strict",
+    description:
+      "Fail on threshold findings, invalid Agent Skills, error diagnostics, or blocking inspection-coverage issues.",
+  },
   entrypoint: {
     flags: "--entrypoint <skill-id-or-SKILL.md-path>",
     description:
@@ -45,6 +50,10 @@ const OPTION_HELP = {
   from: {
     flags: "--from <ref>",
     description: "Git ref to use as the comparison baseline.",
+  },
+  "fail-on-status": {
+    flags: "--fail-on-status <status>",
+    description: "CI-report execution threshold: fail (default) or warn.",
   },
   help: {
     flags: "-h, --help",
@@ -172,12 +181,15 @@ export const COMMAND_HELP = [
       "renma scan .",
       "renma scan . --format json",
       "renma scan . --fail-on high",
+      "renma scan . --fail-on high --strict",
     ],
     interpretation: [
       "Text output is a human-readable finding list.",
       "JSON output includes structured diagnostics, review bundles, and guidance intended for downstream tools and coding agents.",
       "Agent Skills migration commands use structured command and args fields in JSON; text display paths use POSIX shell quoting when needed.",
       "When repair constraints or verification steps are present, follow them instead of broadening the edit.",
+      "Without --strict, scan exits according to the active finding threshold. Strict mode additionally rejects invalid Agent Skills, error diagnostics, and blocking inspection-coverage issues; warnings and suppressed findings are not generally made fatal.",
+      "Inspection coverage reports whether expected first-class agent-facing paths were actually inspected. Renma does not follow symlinks.",
     ],
     nextSteps: [
       "Inspect evidence before editing.",
@@ -188,6 +200,7 @@ export const COMMAND_HELP = [
     options: [
       "config",
       "fail-on",
+      "strict",
       {
         name: "format",
         description: "Output format: text or json. Defaults to text.",
@@ -615,11 +628,12 @@ export const COMMAND_HELP = [
     examples: [
       "renma ci-report . --from main --to HEAD --format markdown",
       "renma ci-report . --from origin/main --to HEAD --format json",
+      "renma ci-report . --from origin/main --to HEAD --fail-on-status warn",
     ],
     interpretation: [
       "The report combines deterministic evidence for review.",
       "Skill Discovery changes are observation-only and do not affect CI status or exits.",
-      "PASS and WARN exit 0; FAIL exits 1; usage errors exit 2.",
+      "PASS and WARN exit 0; FAIL exits 1 by default. With --fail-on-status warn, WARN and FAIL exit 1. The option changes execution policy, not report status, and is never read from repository configuration.",
       "Reviewers should still inspect meaningful semantic changes.",
     ],
     nextSteps: [
@@ -631,6 +645,7 @@ export const COMMAND_HELP = [
       "config",
       "from",
       "to",
+      "fail-on-status",
       {
         name: "format",
         description: "Output format: json or markdown. Defaults to markdown.",

@@ -1903,8 +1903,9 @@ test("representative command help shows relevant boundaries and options", async 
         /pull-request-oriented summary/,
         /Output format: json or markdown\. Defaults to markdown\./,
         /PASS and WARN exit 0; FAIL exits 1/,
+        /--fail-on-status <status>/,
       ],
-      excludes: [/--focus/, /--fail-on/],
+      excludes: [/--focus/, /--fail-on <level>/],
     },
     {
       name: "inspect",

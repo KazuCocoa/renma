@@ -6,6 +6,7 @@ import type { Artifact, ArtifactKind } from "./types/artifact.js";
 import type { AssetClassificationEvidence } from "./types/classification.js";
 import type { Diagnostic } from "./types/diagnostics.js";
 import type { ScanConfig } from "./types/configuration.js";
+import type { RepositoryPathState } from "./repository-paths.js";
 import { DIAGNOSTIC_IDS } from "./diagnostic-ids.js";
 import {
   safeRepositoryPath,
@@ -815,8 +816,13 @@ export async function discoverArtifacts(
   artifacts: Artifact[];
   diagnostics: Diagnostic[];
   discoveredPaths: ReadonlySet<string>;
+  skippedPathStates: ReadonlyMap<string, RepositoryPathState>;
+  blockedTraversalPaths: ReadonlySet<string>;
+  traversedDirectoryPaths: ReadonlySet<string>;
 }> {
   const diagnostics: Diagnostic[] = [];
+  const skippedPathStates = new Map<string, RepositoryPathState>();
+  const blockedTraversalPaths = new Set<string>();
   const walked = await walkRepositoryFiles(root, {
     maxDepth: config.maxDepth,
     excluded: (relativePath) => isExcluded(relativePath, config.exclude),
@@ -832,6 +838,16 @@ export async function discoverArtifacts(
       details: { state: "symlink" },
     })),
   );
+  for (const symlinkPath of walked.symlinks) {
+    skippedPathStates.set(symlinkPath, "symlink");
+    blockedTraversalPaths.add(symlinkPath);
+  }
+  for (const { path: deepPath, kind } of walked.depthLimited) {
+    skippedPathStates.set(deepPath, "deep");
+    if (kind === "directory" || kind === "symlink") {
+      blockedTraversalPaths.add(deepPath);
+    }
+  }
   diagnostics.push(
     ...walked.unreadable.map(({ path: unreadablePath, error }) => ({
       severity: "error" as const,
@@ -839,6 +855,10 @@ export async function discoverArtifacts(
       message: `Could not safely enumerate repository path: ${error}`,
     })),
   );
+  for (const { path: unreadablePath } of walked.unreadable) {
+    skippedPathStates.set(unreadablePath, "unreadable");
+    blockedTraversalPaths.add(unreadablePath);
+  }
   const paths = new Set(
     walked.files.filter((relativePath) =>
       config.globs.some((pattern) => path.matchesGlob(relativePath, pattern)),
@@ -868,6 +888,8 @@ export async function discoverArtifacts(
       try {
         const inspected = await safeRepositoryPath(root, relativePath);
         if (inspected.state === "symlink") {
+          skippedPathStates.set(relativePath, "symlink");
+          blockedTraversalPaths.add(relativePath);
           diagnostics.push({
             severity: "warning",
             path: relativePath,
@@ -876,6 +898,10 @@ export async function discoverArtifacts(
           return undefined;
         }
         if (inspected.state !== "present") {
+          skippedPathStates.set(
+            relativePath,
+            inspected.state === "unreadable" ? "unreadable" : "absent",
+          );
           diagnostics.push({
             severity: "error",
             path: relativePath,
@@ -886,6 +912,7 @@ export async function discoverArtifacts(
         const info = inspected.stats;
         if (!info.isFile()) return undefined;
         if (info.size > config.maxFileSizeBytes) {
+          skippedPathStates.set(relativePath, "oversize");
           diagnostics.push({
             severity: "warning",
             path: relativePath,
@@ -910,6 +937,7 @@ export async function discoverArtifacts(
           content,
         } satisfies Artifact;
       } catch (error) {
+        skippedPathStates.set(relativePath, "unreadable");
         diagnostics.push({
           severity: "error",
           path: relativePath,
@@ -927,6 +955,9 @@ export async function discoverArtifacts(
     diagnostics,
     // Preserve existence evidence before exclusion/depth/content parsing.
     discoveredPaths,
+    skippedPathStates,
+    blockedTraversalPaths,
+    traversedDirectoryPaths: new Set(walked.traversedDirectories),
   };
 }
 

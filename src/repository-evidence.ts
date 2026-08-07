@@ -59,6 +59,8 @@ export interface RepositorySnapshotCore {
   readonly artifacts: Artifact[];
   readonly documents: ParsedDocument[];
   readonly discoveredPaths: ReadonlySet<string>;
+  readonly skippedPathStates: ReadonlyMap<string, RepositoryPathState>;
+  readonly blockedTraversalPaths: ReadonlySet<string>;
   readonly discoveryDiagnostics: Diagnostic[];
   readonly executableDependencyCandidates: ExecutableDependencyCandidate[];
 }
@@ -198,6 +200,8 @@ export async function collectRepositorySnapshotCore(
     artifacts,
     diagnostics: discoveryDiagnostics,
     discoveredPaths,
+    skippedPathStates,
+    blockedTraversalPaths,
   } = await discoverWithBoundarySources(root, config, evidenceBoundarySources);
   const documents = artifacts.map((artifact) => {
     instrumentation?.onDocumentParse?.(artifact.path);
@@ -219,6 +223,8 @@ export async function collectRepositorySnapshotCore(
     artifacts,
     documents,
     discoveredPaths,
+    skippedPathStates,
+    blockedTraversalPaths,
     discoveryDiagnostics,
     executableDependencyCandidates,
   });
@@ -251,6 +257,7 @@ export async function collectRepositorySnapshot(
     core.root,
     [
       ...repositoryPaths,
+      ...core.skippedPathStates.keys(),
       ...repositoryPathCandidates(
         core.documents,
         catalog.catalog,
@@ -259,6 +266,7 @@ export async function collectRepositorySnapshot(
     ],
     core.artifacts,
     core.repositoryPathConfig,
+    core.skippedPathStates,
   );
   return createRepositorySnapshot(
     core,
@@ -285,6 +293,9 @@ async function discoverWithBoundarySources(
   const artifacts = new Map<string, Artifact>();
   const diagnostics = new Map<string, Diagnostic>();
   const discoveredPaths = new Set<string>();
+  const skippedPathStates = new Map<string, RepositoryPathState>();
+  const blockedTraversalPaths = new Set<string>();
+  const traversedDirectoryPaths = new Set<string>();
   for (const discovery of discoveries) {
     for (const artifact of discovery.artifacts) {
       artifacts.set(artifact.path, artifact);
@@ -295,6 +306,18 @@ async function discoverWithBoundarySources(
     for (const discoveredPath of discovery.discoveredPaths) {
       discoveredPaths.add(discoveredPath);
     }
+    for (const [skippedPath, state] of discovery.skippedPathStates) {
+      skippedPathStates.set(skippedPath, state);
+    }
+    for (const blockedPath of discovery.blockedTraversalPaths) {
+      blockedTraversalPaths.add(blockedPath);
+    }
+    for (const traversedPath of discovery.traversedDirectoryPaths) {
+      traversedDirectoryPaths.add(traversedPath);
+    }
+  }
+  for (const traversedPath of traversedDirectoryPaths) {
+    blockedTraversalPaths.delete(traversedPath);
   }
   return {
     artifacts: [...artifacts.values()].sort((left, right) =>
@@ -304,6 +327,9 @@ async function discoverWithBoundarySources(
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([, diagnostic]) => diagnostic),
     discoveredPaths,
+    skippedPathStates,
+    blockedTraversalPaths,
+    traversedDirectoryPaths,
   };
 }
 

@@ -2444,6 +2444,14 @@ test("text report calls out clean scans", () => {
       maxDepth: 1,
       activeSuppressions: [],
     },
+    inspectionCoverage: {
+      schemaVersion: "renma.inspection-coverage.v1",
+      expectedPathCount: 0,
+      inspectedPathCount: 0,
+      complete: true,
+      inspectedPaths: [],
+      blockingIssues: [],
+    },
     scannedFileCount: 1,
     format: "text",
     agentSkills: {
@@ -2470,5 +2478,5 @@ test("text report calls out clean scans", () => {
 
   assert.match(textReport, /Diagnostics: 0/);
   assert.match(textReport, /Findings: 0/);
-  assert.match(textReport, /No rule findings\./);
+  assert.match(textReport, /No rule findings after complete inspection\./);
 });
