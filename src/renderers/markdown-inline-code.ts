@@ -1,4 +1,7 @@
-const MARKDOWN_LINE_BREAK_ESCAPES = new Map<string, string>([
+const VISIBLE_CONTROL_ESCAPES = new Map<string, string>([
+  ["\0", "\\0"],
+  ["\b", "\\b"],
+  ["\t", "\\t"],
   ["\r", "\\r"],
   ["\n", "\\n"],
   ["\v", "\\v"],
@@ -29,7 +32,9 @@ export function formatMarkdownInlineCode(value: string): string {
 
 export function visibleMarkdownInlineValue(value: string): string {
   return value.replace(
-    /[\r\n\v\f\u0085\u2028\u2029]/g,
-    (character) => MARKDOWN_LINE_BREAK_ESCAPES.get(character) ?? character,
+    /[\p{Cc}\u2028\u2029]/gu,
+    (character) =>
+      VISIBLE_CONTROL_ESCAPES.get(character) ??
+      `\\u${character.codePointAt(0)!.toString(16).padStart(4, "0")}`,
   );
 }

@@ -6,6 +6,7 @@ import type {
   ExecutableSurfaceInvocation,
 } from "./executable-surface-inventory.js";
 import { DEFAULT_QUALITY_PROFILE } from "./quality-profile.js";
+import { visibleMarkdownInlineValue } from "./renderers/markdown-inline-code.js";
 
 const EXECUTABLE_SURFACE_TEXT_LIMIT =
   DEFAULT_QUALITY_PROFILE.presentation.topSummaryItemCap;
@@ -104,7 +105,7 @@ export function formatText(result: ScanResult): string {
       `  ${item.finding.evidence.path}:${item.finding.evidence.startLine}`,
     );
     lines.push(
-      `  suppression: ${item.suppression.matchedPath}; expires ${item.suppression.expires}; reason: ${item.suppression.reason}`,
+      `  suppression: ${item.suppression.matchedPath}; expires ${item.suppression.expires}; reason: ${visibleMarkdownInlineValue(item.suppression.reason)}`,
     );
   }
 

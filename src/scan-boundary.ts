@@ -72,8 +72,11 @@ export function canonicalScanBoundary(
   return {
     schemaVersion: "renma.scan-boundary.v1",
     configPath: source.configPath,
-    globs: normalizedStrings(source.globs),
-    exclude: normalizedStrings(source.exclude),
+    // Discovery passes both declarations directly to its runtime predicates.
+    // Preserve their exact identity here so evidence cannot collapse syntax
+    // that path.matchesGlob() or isExcluded() still distinguishes.
+    globs: sortedExactStrings(source.globs),
+    exclude: sortedExactStrings(source.exclude),
     maxFileSizeBytes: source.maxFileSizeBytes,
     maxDepth: source.maxDepth,
     activeSuppressions: canonicalSuppressions(source.suppressions, todayKey),
@@ -93,7 +96,7 @@ export function effectiveCiScanBoundary(
     schemaVersion: "renma.ci-evidence-boundary.v1",
     coverageModel: "target_path_endpoint_coverage_union",
     configPath: null,
-    globs: normalizedStrings(canonicalSources.flatMap((item) => item.globs)),
+    globs: sortedExactStrings(canonicalSources.flatMap((item) => item.globs)),
     // This is the common exact exclusion declaration. Actual coverage is the
     // union of the source predicates above, not a reinterpreted merged glob.
     exclude: commonStrings(canonicalSources.map((item) => item.exclude)),
@@ -106,21 +109,38 @@ export function effectiveCiScanBoundary(
       evaluationDateKey(today),
     ),
     sourceBoundaries: canonicalSources,
-    inspectedPaths: normalizedStrings(inspectedPaths),
+    inspectedPaths: sortedExactStrings(inspectedPaths),
   };
 }
 
-/** Suppressions trusted on both revisions; reason-only changes remain equivalent. */
+/**
+ * Suppression scopes trusted on both revisions at the evaluation date.
+ *
+ * Reason-only changes remain equivalent. The trusted lifetime is the stricter
+ * endpoint lifetime (`never` is positive infinity), so tightening does not
+ * reactivate a finding and weakening cannot extend base trust.
+ */
 export function trustedCiSuppressions(
   from: readonly SuppressionConfig[],
   to: readonly SuppressionConfig[],
   today: Date | string = new Date(),
 ): SuppressionConfig[] {
   const todayKey = evaluationDateKey(today);
-  const targetScopes = new Set(activeSuppressionScopes(to, todayKey).keys());
-  return [...activeSuppressionScopes(from, todayKey)]
-    .filter(([key]) => targetScopes.has(key))
-    .map(([, suppression]) => suppression)
+  const fromScopes = activeSuppressionScopes(from, todayKey);
+  const toScopes = activeSuppressionScopes(to, todayKey);
+  return [...fromScopes]
+    .flatMap(([key, previous]): SuppressionConfig[] => {
+      const next = toScopes.get(key);
+      if (!next) return [];
+      return [
+        {
+          id: previous.id,
+          paths: [previous.path],
+          reason: previous.reason,
+          expires: stricterExpiration(previous.expires, next.expires),
+        },
+      ];
+    })
     .sort(compareSuppressionConfigs);
 }
 
@@ -136,12 +156,10 @@ export function suppressionIsActive(
   );
 }
 
-export function suppressionEnforcementKey(
-  suppression: SuppressionConfig,
-): string {
+function suppressionSortKey(suppression: SuppressionConfig): string {
   return [
     suppression.id,
-    normalizedStrings(suppression.paths).join("\0"),
+    normalizedSuppressionPaths(suppression.paths).join("\0"),
     suppression.expires ?? "never",
   ].join("\0\0");
 }
@@ -160,16 +178,20 @@ function canonicalSuppressions(
     .filter((suppression) => suppressionIsActive(suppression, todayKey))
     .map((suppression) => ({
       id: suppression.id,
-      paths: normalizedStrings(suppression.paths),
+      paths: normalizedSuppressionPaths(suppression.paths),
       reason: suppression.reason,
       expires: suppression.expires ?? "never",
     }))
     .sort(compareCanonicalSuppressions);
 }
 
-function normalizedStrings(values: readonly string[]): string[] {
-  return [...new Set(values.map(normalizePattern))].sort((left, right) =>
-    left.localeCompare(right),
+function sortedExactStrings(values: readonly string[]): string[] {
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+}
+
+function normalizedSuppressionPaths(values: readonly string[]): string[] {
+  return [...new Set(values.map(normalizeSuppressionPath))].sort(
+    (left, right) => left.localeCompare(right),
   );
 }
 
@@ -179,7 +201,7 @@ function commonStrings(collections: readonly string[][]): string[] {
   return first.filter((value) => rest.every((items) => items.includes(value)));
 }
 
-function normalizePattern(value: string): string {
+function normalizeSuppressionPath(value: string): string {
   return value
     .replaceAll("\\", "/")
     .replace(/^\.\/+/, "")
@@ -213,29 +235,58 @@ function compareSuppressionConfigs(
   left: SuppressionConfig,
   right: SuppressionConfig,
 ): number {
-  return suppressionEnforcementKey(left).localeCompare(
-    suppressionEnforcementKey(right),
-  );
+  return suppressionSortKey(left).localeCompare(suppressionSortKey(right));
+}
+
+interface ActiveSuppressionScope {
+  id: string;
+  path: string;
+  reason: string;
+  expires: SuppressionExpiration;
 }
 
 function activeSuppressionScopes(
   suppressions: readonly SuppressionConfig[],
   todayKey: string,
-): Map<string, SuppressionConfig> {
-  const scopes = new Map<string, SuppressionConfig>();
+): Map<string, ActiveSuppressionScope> {
+  const scopes = new Map<string, ActiveSuppressionScope>();
   for (const suppression of suppressions) {
     if (!suppressionIsActive(suppression, todayKey)) continue;
-    for (const path of normalizedStrings(suppression.paths)) {
+    for (const path of normalizedSuppressionPaths(suppression.paths)) {
       const scoped = {
         id: suppression.id,
-        paths: [path],
+        path,
         reason: suppression.reason,
-        ...(suppression.expires === undefined
-          ? {}
-          : { expires: suppression.expires }),
+        expires: suppression.expires ?? "never",
       };
-      scopes.set(suppressionEnforcementKey(scoped), scoped);
+      const key = suppressionScopeKey(scoped.id, scoped.path);
+      const existing = scopes.get(key);
+      if (
+        !existing ||
+        expirationRank(scoped.expires) > expirationRank(existing.expires) ||
+        (scoped.expires === existing.expires &&
+          scoped.reason.localeCompare(existing.reason) < 0)
+      ) {
+        scopes.set(key, scoped);
+      }
     }
   }
   return scopes;
+}
+
+function suppressionScopeKey(id: string, path: string): string {
+  return `${id}\0${path}`;
+}
+
+function stricterExpiration(
+  left: SuppressionExpiration,
+  right: SuppressionExpiration,
+): SuppressionExpiration {
+  return expirationRank(left) <= expirationRank(right) ? left : right;
+}
+
+function expirationRank(expires: SuppressionExpiration): number {
+  return expires === "never"
+    ? Number.POSITIVE_INFINITY
+    : Date.parse(`${expires}T00:00:00.000Z`);
 }

@@ -11,6 +11,11 @@ import {
   formatCiReport,
   runCiReportCommand,
 } from "../src/commands/ci-report.js";
+import { formatText } from "../src/report.js";
+import {
+  formatMarkdownInlineCode,
+  visibleMarkdownInlineValue,
+} from "../src/renderers/markdown-inline-code.js";
 import { scan } from "../src/scanner.js";
 import { SCAN_BOUNDARY_CI_MATCH_IDS } from "../src/scan-boundary-ci-policy.js";
 
@@ -69,6 +74,87 @@ for (const narrowedGlobs of [[], ["skills/public/**/SKILL.md"]]) {
     }
   });
 }
+
+for (const runtimeNarrowerGlob of [
+  "./skills/**/SKILL.md",
+  "skills/**/SKILL.md/",
+]) {
+  test(`config-only include change to ${runtimeNarrowerGlob} remains reviewable`, async () => {
+    const repo = await createRepo({ globs: ["skills/**/SKILL.md"] });
+    try {
+      await writeConfig(repo, { globs: [runtimeNarrowerGlob] });
+      await commit(repo, "change include syntax only");
+
+      const targetLocal = await scan(repo, { format: "json" });
+      const report = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+
+      assert.equal(targetLocal.scannedFileCount, 0);
+      assert.equal(report.status, "fail");
+      assert.equal(report.diff.findings.added.some(isLiteralSecret), false);
+      assert.ok(
+        report.scanBoundaryPolicy.matches.some(
+          (match) =>
+            match.id === SCAN_BOUNDARY_CI_MATCH_IDS.GLOB_REMOVED &&
+            match.change.kind === "glob" &&
+            match.change.pattern === "skills/**/SKILL.md",
+        ),
+      );
+      assert.deepEqual(report.diff.scanBoundary.to.globs, [
+        runtimeNarrowerGlob,
+      ]);
+      assert.ok(
+        report.scanBoundaryPolicy.effectiveBoundary?.inspectedPaths.includes(
+          "skills/demo/SKILL.md",
+        ),
+      );
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+    }
+  });
+}
+
+test("config-only exclusion trailing-slash change cannot erase weakening evidence", async () => {
+  const repo = await createRepo({
+    globs: ["skills/**/SKILL.md"],
+    exclude: [...DEFAULT_EXCLUDE, "skills/demo/"],
+  });
+  try {
+    await writeConfig(repo, {
+      globs: ["skills/**/SKILL.md"],
+      exclude: [...DEFAULT_EXCLUDE, "skills/demo"],
+    });
+    await commit(repo, "change exclusion syntax only");
+
+    const targetLocal = await scan(repo, { format: "json" });
+    const report = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+
+    assert.equal(targetLocal.scannedFileCount, 0);
+    assert.equal(report.status, "fail");
+    assert.ok(
+      report.scanBoundaryPolicy.matches.some(
+        (match) =>
+          match.id === SCAN_BOUNDARY_CI_MATCH_IDS.EXCLUSION_ADDED &&
+          match.change.kind === "exclusion" &&
+          match.change.pattern === "skills/demo",
+      ),
+    );
+    assert.ok(
+      report.diff.scanBoundary.changes.some(
+        (change) =>
+          change.kind === "exclusion" &&
+          change.change === "removed" &&
+          change.pattern === "skills/demo/",
+      ),
+    );
+    assert.ok(
+      report.scanBoundaryPolicy.effectiveBoundary?.inspectedPaths.includes(
+        "skills/demo/SKILL.md",
+      ),
+    );
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
 
 test("CI ignores a target-only exclusion when collecting enforcement evidence", async () => {
   const repo = await createRepo({ globs: ["skills/**/SKILL.md"] });
@@ -249,10 +335,151 @@ test("suppression path and lifetime expansion are reviewable and fail closed", a
         SCAN_BOUNDARY_CI_MATCH_IDS.SUPPRESSION_LIFETIME_EXTENDED,
       ],
     );
-    assert.equal(
-      report.scanBoundaryPolicy.effectiveBoundary?.activeSuppressions.length,
-      0,
+    assert.deepEqual(
+      report.scanBoundaryPolicy.effectiveBoundary?.activeSuppressions.map(
+        ({ id, paths, expires }) => ({ id, paths, expires }),
+      ),
+      [
+        {
+          id: "SEC-LITERAL-SECRET",
+          paths: ["skills/other/**"],
+          expires: "2090-01-01",
+        },
+      ],
     );
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
+test("suppression lifetime shortening keeps an unchanged HIGH finding suppressed", async () => {
+  const repo = await createRepo(
+    {
+      globs: ["skills/**/SKILL.md"],
+      suppressions: [suppression(["skills/demo/**"], "never")],
+    },
+    secretBody(),
+  );
+  try {
+    await writeConfig(repo, {
+      globs: ["skills/**/SKILL.md"],
+      suppressions: [suppression(["skills/demo/**"], "2090-01-01")],
+    });
+    await commit(repo, "shorten suppression lifetime");
+
+    const report = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+
+    assert.equal(report.status, "pass");
+    assert.equal(report.scanBoundaryPolicy.matchCount, 0);
+    assert.equal(report.diff.findings.added.some(isLiteralSecret), false);
+    assert.ok(
+      report.diff.scanBoundary.changes.some(
+        (change) =>
+          change.kind === "suppression" &&
+          change.change === "lifetime_shortened" &&
+          change.direction === "tightening",
+      ),
+    );
+    assert.deepEqual(
+      report.scanBoundaryPolicy.effectiveBoundary?.activeSuppressions.map(
+        ({ id, paths, expires }) => ({ id, paths, expires }),
+      ),
+      [
+        {
+          id: "SEC-LITERAL-SECRET",
+          paths: ["skills/demo/**"],
+          expires: "2090-01-01",
+        },
+      ],
+    );
+  } finally {
+    await rm(repo, { force: true, recursive: true });
+  }
+});
+
+for (const { mode, expectedStatus, expectedOutcome } of [
+  { mode: "fail", expectedStatus: "fail", expectedOutcome: "fail" },
+  { mode: "warn", expectedStatus: "warn", expectedOutcome: "warn" },
+  { mode: "off", expectedStatus: "pass", expectedOutcome: "pass" },
+] as const) {
+  test(`suppression lifetime extension is governed by ${mode} without an artificial HIGH finding`, async () => {
+    const repo = await createRepo(
+      {
+        globs: ["skills/**/SKILL.md"],
+        scan_boundary: { ci_policy: mode },
+        suppressions: [suppression(["skills/demo/**"], "2090-01-01")],
+      },
+      secretBody(),
+    );
+    try {
+      await writeConfig(repo, {
+        globs: ["skills/**/SKILL.md"],
+        scan_boundary: { ci_policy: mode },
+        suppressions: [suppression(["skills/demo/**"], "never")],
+      });
+      await commit(repo, "extend suppression lifetime");
+
+      const report = await ciReport(repo, { fromRef: "base", toRef: "HEAD" });
+
+      assert.equal(report.status, expectedStatus);
+      assert.equal(report.scanBoundaryPolicy.outcome, expectedOutcome);
+      assert.deepEqual(
+        report.scanBoundaryPolicy.matches.map((match) => match.id),
+        [SCAN_BOUNDARY_CI_MATCH_IDS.SUPPRESSION_LIFETIME_EXTENDED],
+      );
+      assert.equal(report.diff.findings.added.some(isLiteralSecret), false);
+      assert.equal(
+        report.scanBoundaryPolicy.effectiveBoundary?.activeSuppressions[0]
+          ?.expires,
+        "2090-01-01",
+      );
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+    }
+  });
+}
+
+test("suppression reasons cannot inject Markdown or terminal report lines", async () => {
+  const reason =
+    "first line\n`ticks`\n# forged suppression heading\n<details data-forged>\n\u001b[31mred\u001b[0m";
+  const repo = await createRepo(
+    {
+      globs: ["skills/**/SKILL.md"],
+      suppressions: [
+        {
+          ...suppression(["skills/demo/**"], "never"),
+          reason,
+        },
+      ],
+    },
+    secretBody(),
+  );
+  try {
+    await writeFile(join(repo, "README.md"), "Boundary fixture update.\n");
+    await commit(repo, "leave suppression active");
+
+    const scanResult = await scan(repo, { format: "json" });
+    const text = formatText(scanResult);
+    const markdown = formatCiReport(
+      await ciReport(repo, { fromRef: "base", toRef: "HEAD" }),
+      "markdown",
+    );
+    const suppressionHeading = markdown.indexOf("### Suppression Evidence");
+    const suppressedAtBase = markdown.indexOf("- Suppressed at base:");
+    const targetEvidenceHeading = markdown.indexOf(
+      "#### Target Suppressed Finding Evidence",
+    );
+
+    assert.ok(suppressionHeading >= 0);
+    assert.ok(suppressedAtBase > suppressionHeading);
+    assert.ok(targetEvidenceHeading > suppressedAtBase);
+    assert.ok(markdown.includes(formatMarkdownInlineCode(reason)));
+    assert.ok(text.includes(visibleMarkdownInlineValue(reason)));
+    assert.doesNotMatch(markdown, /^# forged suppression heading$/m);
+    assert.doesNotMatch(markdown, /^<details data-forged>$/m);
+    assert.doesNotMatch(text, /^# forged suppression heading$/m);
+    assert.doesNotMatch(markdown, /\u001b/);
+    assert.doesNotMatch(text, /\u001b/);
   } finally {
     await rm(repo, { force: true, recursive: true });
   }

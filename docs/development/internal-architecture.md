@@ -610,8 +610,12 @@ scan or Readiness semantics.
 `scan-boundary` owns canonical endpoint/effective coverage evidence and the
 intersection of enforcement-equivalent active suppressions. The effective CI
 collector runs each endpoint predicate against target paths and unions the
-artifacts, so no glob-subset heuristic is authoritative. `scan-boundary-diff`
-retains independent weakening and tightening facts. The pure
+artifacts, so no glob-subset heuristic is authoritative. Canonical glob and
+exclusion identity preserves exact runtime declarations; only deterministic
+sorting and exact-value deduplication occur. Suppression scope identity follows
+its separate normalized matcher, and a scope active on both endpoints receives
+the stricter expiration as its trusted CI lifetime. `scan-boundary-diff` retains
+independent weakening and tightening facts. The pure
 `scan-boundary-ci-policy` module selects the stricter `off < warn < fail` mode,
 matches exact weakening rows under `scan_boundary_ci.*`, and composes its
 outcome with existing CI status. Suppression application returns disjoint

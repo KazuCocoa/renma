@@ -312,15 +312,15 @@ function evidenceBoundaryConfig(
   sources: readonly ScanBoundarySource[],
 ): ScanConfig {
   const excludes =
-    sources.length === 0 ? [] : normalizedPatterns(sources[0]!.exclude);
+    sources.length === 0 ? [] : sortedExactPatterns(sources[0]!.exclude);
   return {
     ...semanticConfig,
-    globs: normalizedPatterns(sources.flatMap((source) => source.globs)),
+    globs: sortedExactPatterns(sources.flatMap((source) => source.globs)),
     exclude: excludes.filter((candidate) =>
       sources
         .slice(1)
         .every((source) =>
-          normalizedPatterns(source.exclude).includes(candidate),
+          sortedExactPatterns(source.exclude).includes(candidate),
         ),
     ),
     maxFileSizeBytes: Math.max(
@@ -343,10 +343,8 @@ function boundaryConfig(
   };
 }
 
-function normalizedPatterns(values: readonly string[]): string[] {
-  return [...new Set(values.map((value) => value.replaceAll("\\", "/")))].sort(
-    (left, right) => left.localeCompare(right),
-  );
+function sortedExactPatterns(values: readonly string[]): string[] {
+  return [...new Set(values)].sort((left, right) => left.localeCompare(right));
 }
 
 /** Explicitly prepare the named pure projections from one collected core. */

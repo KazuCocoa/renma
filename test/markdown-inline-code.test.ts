@@ -52,3 +52,13 @@ test("Markdown inline code exposes line-breaking characters on one line", () => 
     assert.equal(inlineCode.value, visible);
   }
 });
+
+test("Markdown inline code renders terminal control characters visibly", () => {
+  const value = "tab\tbackspace\bescape\u001bdelete\u007f";
+  const visible = "tab\\tbackspace\\bescape\\u001bdelete\\u007f";
+  const rendered = formatMarkdownInlineCode(value);
+
+  assert.equal(visibleMarkdownInlineValue(value), visible);
+  assert.doesNotMatch(rendered, /\p{Cc}/u);
+  assert.match(rendered, /\\u001b/);
+});

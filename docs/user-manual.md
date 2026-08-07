@@ -1932,8 +1932,12 @@ identity uses the sorted maximal component member IDs.
 The `renma.scan-boundary-diff.v1` section separately records canonical endpoint
 boundaries and every exact weakening or tightening fact. Its endpoint evidence
 uses `renma.scan-boundary.v1` and contains config path (or `null` for defaults),
-sorted normalized globs and exclusions, maximum file size and depth, and active
-suppression declarations. Suppressed finding ledgers remain available under the
+sorted exact glob and exclusion declarations, maximum file size and depth, and
+active suppression declarations. Exact string identity is intentional because
+runtime discovery passes those declarations directly to `path.matchesGlob` and
+the exclusion predicate; evidence does not erase leading `./`, trailing `/`, or
+backslash differences. Suppression paths remain separately normalized according
+to their runtime matcher. Suppressed finding ledgers remain available under the
 finding diff. The other semantic sections report facts only and do not affect
 the direct `diff` command exit code. Markdown caps detailed lists and directs
 readers to JSON for omitted entries.
@@ -2142,12 +2146,18 @@ or suppression scopes rather than aggregate counts. The IDs are
 CI enforcement scans the target through the union of the base and target path
 coverage predicates. This both preserves base-trusted coverage and admits new
 target coverage without heuristic glob-language subset reasoning. A
-suppression affects that enforcement view only when its normalized rule, paths,
-and expiration are active and enforcement-equivalent on both revisions;
-reason-only edits do not invalidate it. Target-only additions, path expansion,
-or lifetime extension remain evidence but cannot hide a finding. When a finding
+suppression affects that enforcement view only for an exact rule ID and
+normalized path scope active on both revisions at the evaluation date. Its
+trusted expiration is the stricter endpoint lifetime (`never` is positive
+infinity), so tightening
+does not reactivate an unchanged finding and weakening cannot extend base trust.
+Reason-only edits do not invalidate enforcement equivalence, and path scopes are
+intersected without broadening. Target-only additions, path expansion, or
+lifetime extension remain evidence but cannot hide a finding. When a finding
 count falls alongside boundary weakening, CI does not call the reduction
-verified remediation.
+verified remediation. Markdown renders repository-controlled suppression
+reasons as single-line inline code, and terminal text exposes line breaks and
+control characters visibly instead of interpreting them.
 
 Asset details in diff and CI-report JSON use canonical `declaredOwner` and
 `effectiveOwner` values. CI-report Markdown always renders both values so

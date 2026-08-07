@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import path from "node:path";
 import test from "node:test";
 
 import { DEFAULT_CONFIG } from "../src/config.js";
+import { isExcluded } from "../src/discovery.js";
 import {
   canonicalScanBoundary,
   scanBoundarySource,
@@ -16,7 +18,7 @@ import type { ScanConfig } from "../src/types/configuration.js";
 
 const TODAY = "2026-08-07";
 
-test("canonical scan boundary normalizes ordering and exposes active suppressions", () => {
+test("canonical scan boundary sorts exact runtime patterns and exposes active suppressions", () => {
   const config = boundaryConfig({
     globs: ["skills/**/SKILL.md", "./README.md", "skills/**/SKILL.md"],
     exclude: ["dist/", "node_modules", ".git"],
@@ -43,8 +45,8 @@ test("canonical scan boundary normalizes ordering and exposes active suppression
     {
       schemaVersion: "renma.scan-boundary.v1",
       configPath: "renma.config.json",
-      globs: ["README.md", "skills/**/SKILL.md"],
-      exclude: [".git", "dist", "node_modules"],
+      globs: ["./README.md", "skills/**/SKILL.md"],
+      exclude: [".git", "dist/", "node_modules"],
       maxFileSizeBytes: config.maxFileSizeBytes,
       maxDepth: config.maxDepth,
       activeSuppressions: [
@@ -57,6 +59,89 @@ test("canonical scan boundary normalizes ordering and exposes active suppression
       ],
     },
   );
+});
+
+test("canonical boundary identity preserves runtime-significant pattern syntax", () => {
+  const declarations = {
+    workingGlob: "skills/**/SKILL.md",
+    leadingDotGlob: "./skills/**/SKILL.md",
+    trailingSlashGlob: "skills/**/SKILL.md/",
+    trailingSlashExclude: "skills/private/",
+    directoryExclude: "skills/private",
+  };
+  const boundary = canonicalScanBoundary(
+    scanBoundarySource(
+      boundaryConfig({
+        globs: [
+          declarations.trailingSlashGlob,
+          declarations.workingGlob,
+          declarations.leadingDotGlob,
+        ],
+        exclude: [
+          declarations.directoryExclude,
+          declarations.trailingSlashExclude,
+        ],
+      }),
+    ),
+    TODAY,
+  );
+
+  assert.deepEqual(boundary.globs, [
+    declarations.leadingDotGlob,
+    declarations.workingGlob,
+    declarations.trailingSlashGlob,
+  ]);
+  assert.deepEqual(boundary.exclude, [
+    declarations.directoryExclude,
+    declarations.trailingSlashExclude,
+  ]);
+
+  const skillPath = "skills/demo/SKILL.md";
+  assert.equal(path.matchesGlob(skillPath, declarations.workingGlob), true);
+  assert.equal(path.matchesGlob(skillPath, declarations.leadingDotGlob), false);
+  assert.equal(
+    path.matchesGlob(skillPath, declarations.trailingSlashGlob),
+    false,
+  );
+  assert.equal(
+    isExcluded("skills/private/evil/SKILL.md", [
+      declarations.trailingSlashExclude,
+    ]),
+    false,
+  );
+  assert.equal(
+    isExcluded("skills/private/evil/SKILL.md", [declarations.directoryExclude]),
+    true,
+  );
+});
+
+test("canonically equivalent declarations have equivalent runtime coverage", () => {
+  const fromConfig = boundaryConfig({
+    globs: ["README.md", "skills/**/SKILL.md", "README.md"],
+    exclude: ["dist", ".git", "dist"],
+  });
+  const toConfig = boundaryConfig({
+    globs: ["skills/**/SKILL.md", "README.md"],
+    exclude: ["dist", ".git"],
+  });
+  assert.deepEqual(
+    canonicalScanBoundary(scanBoundarySource(fromConfig), TODAY),
+    canonicalScanBoundary(scanBoundarySource(toConfig), TODAY),
+  );
+
+  for (const candidate of [
+    "README.md",
+    "skills/demo/SKILL.md",
+    "skills/demo/reference.md",
+    "dist/SKILL.md",
+    ".git/config",
+  ]) {
+    assert.equal(
+      runtimeBoundaryIncludes(fromConfig, candidate),
+      runtimeBoundaryIncludes(toConfig, candidate),
+      candidate,
+    );
+  }
 });
 
 test("boundary diff preserves simultaneous weakening and tightening facts", () => {
@@ -181,7 +266,7 @@ test("suppression additions and lifetime extensions gate while tightening does n
   );
 });
 
-test("CI trusts only enforcement-equivalent active suppressions on both sides", () => {
+test("CI trusts the stricter active lifetime for common rule/path scopes", () => {
   const common = {
     id: "SEC-A",
     paths: ["skills/a/**"],
@@ -198,7 +283,23 @@ test("CI trusts only enforcement-equivalent active suppressions on both sides", 
   );
   assert.deepEqual(
     trustedCiSuppressions([common], [{ ...common, expires: "never" }], TODAY),
-    [],
+    [common],
+  );
+  assert.deepEqual(
+    trustedCiSuppressions(
+      [{ ...common, expires: "never" }],
+      [{ ...common, expires: "2090-01-01" }],
+      TODAY,
+    ),
+    [{ ...common, expires: "2090-01-01" }],
+  );
+  assert.deepEqual(
+    trustedCiSuppressions(
+      [{ ...common, expires: "2090-01-01" }],
+      [{ ...common, expires: "2080-01-01" }],
+      TODAY,
+    ),
+    [{ ...common, expires: "2080-01-01" }],
   );
   assert.deepEqual(
     trustedCiSuppressions(
@@ -208,7 +309,25 @@ test("CI trusts only enforcement-equivalent active suppressions on both sides", 
     ),
     [common],
   );
+  assert.deepEqual(
+    trustedCiSuppressions(
+      [{ ...common, expires: "2025-01-01" }],
+      [{ ...common, expires: "never" }],
+      TODAY,
+    ),
+    [],
+  );
 });
+
+function runtimeBoundaryIncludes(
+  config: ScanConfig,
+  candidate: string,
+): boolean {
+  return (
+    config.globs.some((pattern) => path.matchesGlob(candidate, pattern)) &&
+    !isExcluded(candidate, config.exclude)
+  );
+}
 
 function boundaryConfig(overrides: Partial<ScanConfig>): ScanConfig {
   return {

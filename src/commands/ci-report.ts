@@ -526,18 +526,20 @@ function formatCiReportMarkdown(report: CiReportFormatInput): string {
     ...formatFindingSection("Resolved", report.diff.findings.removed),
     ...("suppressed" in report.diff.findings
       ? [
+          "### Suppression Evidence",
+          "",
           `- Suppressed at base: ${report.diff.findings.suppressed.from.length}`,
           `- Suppressed at target: ${report.diff.findings.suppressed.to.length}`,
           ...(report.diff.findings.suppressed.to.length > 0
             ? [
                 "",
-                "### Target Suppressed Finding Evidence",
+                "#### Target Suppressed Finding Evidence",
                 "",
                 ...report.diff.findings.suppressed.to
                   .slice(0, MAX_LIST_ITEMS)
                   .map(
                     (item) =>
-                      `- ${item.finding.severity.toUpperCase()} ${formatMarkdownInlineCode(item.finding.id)} at ${formatMarkdownInlineCode(item.finding.evidence.path)}; matched ${formatMarkdownInlineCode(item.suppression.matchedPath)}; expires ${item.suppression.expires}; reason: ${item.suppression.reason}`,
+                      `- ${item.finding.severity.toUpperCase()} ${formatMarkdownInlineCode(item.finding.id)} at ${formatMarkdownInlineCode(item.finding.evidence.path)}; matched ${formatMarkdownInlineCode(item.suppression.matchedPath)}; expires ${item.suppression.expires}; reason: ${formatMarkdownInlineCode(item.suppression.reason)}`,
                   ),
                 ...formatOverflow(report.diff.findings.suppressed.to.length),
               ]

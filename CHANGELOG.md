@@ -9,8 +9,8 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 ### Added
 
 - Added canonical `renma.scan-boundary.v1` evidence to scan and diff output,
-  including config identity, normalized coverage inputs, limits, and active
-  suppressions, plus retained structured `suppressedFindings` evidence.
+  including config identity, exact runtime coverage declarations, limits, and
+  active suppressions, plus retained structured `suppressedFindings` evidence.
 - Added `scan_boundary.ci_policy` with fail-closed `off`, `warn`, and `fail`
   governance, defaulting to `fail`, stable `scan_boundary_ci.*` matches, and a
   `renma.scan-boundary-ci-policy.v1` CI evaluation.
@@ -37,9 +37,13 @@ This project follows the spirit of [Keep a Changelog](https://keepachangelog.com
 ### Changed
 
 - Changed suppression application to keep active findings disjoint from a
-  complete suppression ledger. CI trusts a suppression only when its
-  enforcement semantics are active and equivalent on both revisions; reason
-  changes are audit metadata and do not affect equivalence.
+  complete suppression ledger. CI trusts a common exact rule ID and normalized
+  path scope only while active on both revisions and uses the stricter endpoint
+  expiration;
+  reason changes are audit metadata and do not affect equivalence.
+- Changed scan-boundary identity to preserve runtime-significant glob and
+  exclusion syntax exactly, and made repository-controlled suppression reasons
+  single-line visible values in Markdown and terminal reports.
 - Changed `ci-report` to fail by default on scan-boundary weakening and to avoid
   describing a finding reduction as verified remediation when coverage or
   suppression trust changed.
