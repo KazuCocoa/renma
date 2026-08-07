@@ -190,6 +190,8 @@ test("helper commands resolve relative to every canonical Skill shape", async ()
       ],
       sourcePath,
     );
+    assert.equal(unresolved[0]?.evidence.startLine, 6, sourcePath);
+    assert.equal(unresolved[0]?.evidence.endLine, 6, sourcePath);
   }
   assert.equal(
     result.findings.some(

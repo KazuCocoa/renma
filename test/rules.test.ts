@@ -99,6 +99,172 @@ description: [not, a, string]
   assert.equal(invalid.agentSkills.results[0]?.valid, false);
 });
 
+test("document-scope absence findings anchor to the first Markdown heading", async () => {
+  const root = await fixture();
+  const skillPath = "skills/evidence-demo/SKILL.md";
+  const absolutePath = path.join(root, ...skillPath.split("/"));
+  await mkdir(path.dirname(absolutePath), { recursive: true });
+  await writeFile(
+    absolutePath,
+    `---
+name: evidence-demo
+description: Reviews an artifact.
+---
+
+# Evidence Demo
+
+## Workflow
+
+Perform the operation.
+`,
+  );
+
+  const result = await scan(root);
+  const absenceIds = [
+    "QUAL-MISSING-VERIFICATION",
+    "QUAL-MISSING-ROUTING-CLARITY",
+    "QUAL-MISSING-REQUIRED-INPUTS",
+    "QUAL-MISSING-COMPLETION-CRITERIA",
+  ] as const;
+
+  for (const id of absenceIds) {
+    const finding = result.findings.find(
+      (candidate) =>
+        candidate.id === id && candidate.evidence.path === skillPath,
+    );
+    assert.ok(finding, id);
+    assert.equal(finding.evidence.startLine, 6, id);
+    assert.equal(finding.evidence.endLine, 6, id);
+    assert.equal(finding.evidence.snippet, "# Evidence Demo", id);
+    assert.notEqual(finding.evidence.snippet, "---", id);
+  }
+
+  const verificationDiagnostic = result.diagnosticsV2.find(
+    (diagnostic) => diagnostic.code === "QUAL-MISSING-VERIFICATION",
+  );
+  assert.equal(verificationDiagnostic?.location?.startLine, 6);
+  assert.equal(verificationDiagnostic?.location?.snippet, "# Evidence Demo");
+  const diagnosticId = verificationDiagnostic?.details?.diagnosticId;
+  assert.equal(typeof diagnosticId, "string");
+  assert.match(String(diagnosticId), /@skills\/evidence-demo\/SKILL\.md:L6#/u);
+  assert.ok(
+    result.reviewBundles.some((bundle) =>
+      bundle.diagnosticIds?.includes(String(diagnosticId)),
+    ),
+  );
+
+  const trustGraphFinding = result.trustGraph?.findings.find(
+    (finding) => finding.id === "QUAL-MISSING-VERIFICATION",
+  );
+  assert.equal(trustGraphFinding?.evidence?.startLine, 6);
+  assert.equal(trustGraphFinding?.evidence?.snippet, "# Evidence Demo");
+  const trustGraphNode = result.trustGraph?.nodes.find(
+    (node) =>
+      node.type === "diagnostic" &&
+      node.properties?.id === "QUAL-MISSING-VERIFICATION",
+  );
+  assert.equal(trustGraphNode?.evidence?.[0]?.startLine, 6);
+  assert.equal(trustGraphNode?.evidence?.[0]?.snippet, "# Evidence Demo");
+});
+
+test("document-scope findings fall back to Markdown body content without a heading", async () => {
+  const root = await fixture();
+  const skillPath = "skills/no-heading/SKILL.md";
+  const absolutePath = path.join(root, ...skillPath.split("/"));
+  await mkdir(path.dirname(absolutePath), { recursive: true });
+  await writeFile(
+    absolutePath,
+    `---
+name: no-heading
+description: Reviews an artifact.
+---
+
+Perform the workflow.
+`,
+  );
+
+  const result = await scan(root);
+  const finding = result.findings.find(
+    (candidate) =>
+      candidate.id === "QUAL-MISSING-VERIFICATION" &&
+      candidate.evidence.path === skillPath,
+  );
+
+  assert.equal(finding?.evidence.startLine, 6);
+  assert.equal(finding?.evidence.endLine, 6);
+  assert.equal(finding?.evidence.snippet, "Perform the workflow.");
+  assert.notEqual(finding?.evidence.snippet, "---");
+});
+
+test("document-scope findings use metadata when no Markdown scope exists", async () => {
+  const root = await fixture();
+  const profilePath = "skills/demo/profiles/metadata-only.md";
+  const absolutePath = path.join(root, ...profilePath.split("/"));
+  await mkdir(path.dirname(absolutePath), { recursive: true });
+  await writeFile(
+    absolutePath,
+    `---
+id: profile.metadata-only
+owner: platform
+---
+`,
+  );
+
+  const result = await scan(root);
+  const finding = result.findings.find(
+    (candidate) =>
+      candidate.id === "PROF-MISSING-BASE" &&
+      candidate.evidence.path === profilePath,
+  );
+
+  assert.equal(finding?.evidence.startLine, 2);
+  assert.equal(finding?.evidence.endLine, 2);
+  assert.equal(finding?.evidence.snippet, "id: profile.metadata-only");
+});
+
+test("missing description findings prefer metadata and retain a safe empty fallback", async () => {
+  const root = await fixture();
+  const metadataPath = "skills/missing-description/SKILL.md";
+  const minimalPath = "skills/minimal/SKILL.md";
+  for (const [relativePath, content] of [
+    [
+      metadataPath,
+      `---
+name: missing-description
+license: MIT
+---
+
+# Missing Description
+`,
+    ],
+    [minimalPath, "---\n---\n"],
+  ] as const) {
+    const absolutePath = path.join(root, ...relativePath.split("/"));
+    await mkdir(path.dirname(absolutePath), { recursive: true });
+    await writeFile(absolutePath, content);
+  }
+
+  const result = await scan(root);
+  const metadataFinding = result.findings.find(
+    (candidate) =>
+      candidate.id === "QUAL-MISSING-DESCRIPTION" &&
+      candidate.evidence.path === metadataPath,
+  );
+  assert.equal(metadataFinding?.evidence.startLine, 2);
+  assert.equal(metadataFinding?.evidence.endLine, 2);
+  assert.equal(metadataFinding?.evidence.snippet, "name: missing-description");
+
+  const minimalFinding = result.findings.find(
+    (candidate) =>
+      candidate.id === "QUAL-MISSING-DESCRIPTION" &&
+      candidate.evidence.path === minimalPath,
+  );
+  assert.equal(minimalFinding?.evidence.startLine, 1);
+  assert.equal(minimalFinding?.evidence.endLine, 1);
+  assert.equal(minimalFinding?.evidence.snippet, "");
+  assert.notEqual(minimalFinding?.evidence.snippet, "---");
+});
+
 test("Verification heading is recognized as verification guidance regression", async () => {
   const root = await fixture();
   const artifactPath = await writeQualityDocument(root, {
@@ -2078,6 +2244,14 @@ Run npm test.
   );
 
   assert.equal(skillBudgetFinding?.evidence.path, "skills/large/SKILL.md");
+  assert.equal(skillBudgetFinding?.evidence.startLine, 5);
+  assert.equal(skillBudgetFinding?.evidence.endLine, 5);
+  assert.equal(skillBudgetFinding?.evidence.snippet, "# Large Skill");
+  assert.notEqual(skillBudgetFinding?.evidence.snippet, "---");
+  assert.equal(typeof skillBudgetFinding?.details?.measured, "number");
+  assert.ok(Number(skillBudgetFinding?.details?.measured) > 2000);
+  assert.equal(skillBudgetFinding?.details?.limit, 2000);
+  assert.equal(skillBudgetFinding?.details?.unit, "estimated_tokens");
   assert.match(skillBudgetFinding?.whyItMatters ?? "", /Long Skill bodies/);
   assert.ok(
     skillBudgetFinding?.constraints?.includes(
@@ -2467,9 +2641,44 @@ Verify the result with a command.
   );
 
   const result = await scan(root);
-  const ids = result.findings.map((finding) => finding.id);
+  const localPathFinding = result.findings.find(
+    (finding) => finding.id === "QUAL-USER-LOCAL-PATHS",
+  );
 
-  assert.ok(ids.includes("QUAL-USER-LOCAL-PATHS"));
+  assert.equal(localPathFinding?.evidence.startLine, 8);
+  assert.equal(localPathFinding?.evidence.endLine, 8);
+  assert.equal(
+    localPathFinding?.evidence.snippet,
+    "Use /Users/😺/ for temporary files.",
+  );
+});
+
+test("hardcoded user paths in frontmatter retain exact source evidence", async () => {
+  const root = await fixture();
+  const skillDir = path.join(root, "skills", "frontmatter-path");
+  await mkdir(skillDir, { recursive: true });
+  await writeFile(
+    path.join(skillDir, "SKILL.md"),
+    `---
+name: frontmatter-path
+description: Use this Skill for files under /Users/alice/project.
+---
+
+# Frontmatter Path
+`,
+  );
+
+  const result = await scan(root);
+  const finding = result.findings.find(
+    (candidate) => candidate.id === "QUAL-USER-LOCAL-PATHS",
+  );
+
+  assert.equal(finding?.evidence.startLine, 3);
+  assert.equal(finding?.evidence.endLine, 3);
+  assert.equal(
+    finding?.evidence.snippet,
+    "description: Use this Skill for files under /Users/alice/project.",
+  );
 });
 
 test("scan allows portable home path placeholders in skill instructions", async () => {
@@ -2675,11 +2884,14 @@ status: stable
   );
 
   const result = await scan(root);
-  const orphanPaths = result.findings
-    .filter((finding) => finding.id === "MAINT-ORPHANED-CONTEXT-ASSET")
-    .map((finding) => finding.evidence.path);
+  const orphan = result.findings.find(
+    (finding) => finding.id === "MAINT-ORPHANED-CONTEXT-ASSET",
+  );
 
-  assert.deepEqual(orphanPaths, ["contexts/shared/orphan.md"]);
+  assert.equal(orphan?.evidence.path, "contexts/shared/orphan.md");
+  assert.equal(orphan?.evidence.startLine, 2);
+  assert.equal(orphan?.evidence.endLine, 2);
+  assert.equal(orphan?.evidence.snippet, "id: shared.orphan");
 });
 
 test("scan does not report archived or deprecated contexts as orphaned", async () => {
