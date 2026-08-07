@@ -52,6 +52,7 @@ type CliOptionConfig = {
 const CLI_OPTIONS = {
   config: { type: "string", short: "c" },
   "fail-on": { type: "string" },
+  "fail-on-status": { type: "string" },
   entrypoint: { type: "string" },
   focus: { type: "string" },
   format: { type: "string" },
@@ -64,6 +65,7 @@ const CLI_OPTIONS = {
   owner: { type: "string" },
   resources: { type: "string" },
   "source-revision": { type: "string" },
+  strict: { type: "boolean" },
   tags: { type: "string", multiple: true },
   title: { type: "string" },
   to: { type: "string" },
@@ -456,7 +458,9 @@ async function runScan(values: CliValues, target: string): Promise<number> {
     ...(format ? { format } : {}),
   };
   try {
-    return await runScanCommand(target, overrides);
+    return await runScanCommand(target, overrides, {
+      strict: values.strict === true,
+    });
   } catch (error) {
     return reportCommandError(error);
   }
@@ -548,6 +552,18 @@ async function runCiReport(values: CliValues, target: string): Promise<number> {
     return usageError("ci-report", "--format must be either json or markdown.");
   }
 
+  const failOnStatusValue = stringValue(values["fail-on-status"]);
+  if (
+    failOnStatusValue !== undefined &&
+    failOnStatusValue !== "fail" &&
+    failOnStatusValue !== "warn"
+  ) {
+    return usageError(
+      "ci-report",
+      "--fail-on-status must be either fail or warn.",
+    );
+  }
+
   const overrides = configOverrides(values);
 
   try {
@@ -555,6 +571,7 @@ async function runCiReport(values: CliValues, target: string): Promise<number> {
       fromRef,
       toRef,
       format,
+      failOnStatus: failOnStatusValue ?? "fail",
       overrides,
     });
   } catch (error) {

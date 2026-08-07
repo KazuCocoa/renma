@@ -151,6 +151,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
         "executable-dependency-resolution.ts",
         "executable-surface-inventory.ts",
         "helper-command-evidence.ts",
+        "inspection-coverage.ts",
         "metadata.ts",
         "repository-boundary.ts",
         "repository-evidence.ts",
@@ -185,6 +186,7 @@ const TOP_LEVEL_MODULE_LAYERS: ReadonlyMap<string, LayerClassification> =
       "skill-discovery-ci-policy.ts",
       "skill-discovery-diff.ts",
       "suppressions.ts",
+      "strict-scan.ts",
       "trust-graph.ts",
     ]),
     ...topLevelModules("renderers", "top-level presentation compatibility", [

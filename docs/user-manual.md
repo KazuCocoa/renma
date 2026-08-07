@@ -1029,8 +1029,10 @@ The configuration supports the same names used by the implementation, including:
   does not enable adoption or the CI policy.
 
 For `scan`, `--fail-on` and `--format` override the corresponding configuration
-values. Other commands use their documented command-specific format defaults
-and flags.
+values. `--strict` is caller-selected execution policy and is never loaded from
+repository configuration. Likewise, `ci-report --fail-on-status` is a
+CI-integrator exit threshold, not repository policy. Other commands use their
+documented command-specific format defaults and flags.
 
 Within a canonical Skill entrypoint or one of its classified support documents,
 helper commands may use `scripts/helper.mjs` or `./scripts/helper.mjs`; Renma
@@ -1223,9 +1225,31 @@ Scans a target path and prints findings.
 renma scan .
 renma scan . --format json
 renma scan . --fail-on high
+renma scan . --fail-on high --strict
 ```
 
-Use `--fail-on` in CI when findings at or above a severity should fail the job. The JSON output includes findings, evidence, diagnostics, `diagnosticsV2`, `reviewBundles`, `trustGraph`, `executableSurfaceInventory`, and summary data that other tools can consume.
+Without `--strict`, `scan` retains its finding-threshold contract: active
+findings at or above `--fail-on` fail the command. Strict scan supplements that
+threshold and also fails for a specification-invalid Agent Skill, any Renma
+`error` diagnostic, or a blocking inspection-coverage issue. It does not make
+warnings generally fatal, and active suppressions keep their existing meaning.
+A below-threshold finding remains below threshold in strict mode.
+
+Every scan includes `renma.inspection-coverage.v1` JSON evidence. It counts
+expected first-class agent-facing paths, paths actually represented in parsed
+semantic evidence, and blocking issues. Canonical Skill entrypoints and other
+deterministically classified first-class agent-facing assets are blocking when
+they are symlinks, unreadable, oversized, depth-limited, or otherwise present
+but unavailable to semantic inspection. Explicit scan-boundary exclusion is
+not a single-revision coverage failure. Ordinary unsupported repository files
+do not turn strict scan into a requirement to parse every file. Renma never
+follows repository symlinks.
+
+Human-readable output states whether inspection was complete, so zero findings
+with blocking coverage issues is not described as a complete result. The JSON
+output includes findings, evidence, diagnostics, `diagnosticsV2`,
+`reviewBundles`, `trustGraph`, `executableSurfaceInventory`, inspection
+coverage, and summary data that other tools can consume.
 
 Output includes scan findings, discovery or catalog diagnostics, the effective exit threshold, and evidence paths or snippets for each finding. `diagnosticsV2` adds typed repair constraints, structured verification steps, and concise LLM hints; `reviewBundles` groups related diagnostics for code review.
 
@@ -1949,9 +1973,23 @@ Formats a diff result for CI or pull-request review.
 ```bash
 renma ci-report . --from main --to HEAD --format markdown
 renma ci-report . --from main --to HEAD --format json
+renma ci-report . --from main --to HEAD --fail-on-status warn
 ```
 
-The report summarizes readiness deltas, graph-resolution changes, added and removed findings, and policy-relevant status. It is CI-oriented: `PASS` and `WARN` exit `0`, `FAIL` exits `1`, and usage, command, or configuration errors exit `2`.
+The report summarizes readiness deltas, graph-resolution changes, added and
+removed findings, inspection-coverage regressions, and policy-relevant status.
+By default (`--fail-on-status fail`), `PASS` and `WARN` exit `0` and `FAIL`
+exits `1`. With `--fail-on-status warn`, `PASS` exits `0` while `WARN` and
+`FAIL` exit `1`. The threshold never changes the semantic report status and is
+never read from repository configuration. Usage, command, or configuration
+errors exit `2`.
+
+A worse readiness level, a previously passing readiness check becoming
+failing/error, a new blocking readiness check, or a newly introduced blocking
+inspection-coverage issue makes the report at least `WARN`; an independently
+failing condition remains `FAIL`. Existing baseline coverage issues are not
+revision regressions. Target-state rejection of an already-existing issue is
+the responsibility of `scan --strict`.
 
 Output includes a CI status (`PASS`, `WARN`, or `FAIL`), a summary, readiness
 changes, graph changes, review-focused finding changes, and Skill Discovery
@@ -2464,20 +2502,26 @@ Prefer JSON in automation and markdown for human review in pull requests. Use Me
 A typical CI flow is:
 
 1. Build renma.
-2. Run `renma scan . --fail-on high`.
+2. Run `renma scan . --fail-on high --strict`.
 3. Run `renma readiness . --format json` and store the result as an artifact.
 4. Compare refs with `renma diff . --from main --to HEAD`.
-5. Publish `renma ci-report . --from main --to HEAD --format markdown` in the
-   pull-request summary.
+5. Publish and enforce
+   `renma ci-report . --from main --to HEAD --format markdown --fail-on-status warn`
+   in the pull-request summary.
 
 Example:
 
 ```bash
 npm run build
-renma scan . --fail-on high
+renma scan . --fail-on high --strict
 renma readiness . --format json > renma-readiness.json
-renma ci-report . --from main --to HEAD --format markdown
+renma ci-report . --from main --to HEAD --format markdown --fail-on-status warn
 ```
+
+These gates are complementary: strict scan validates the current target state,
+while the WARN threshold rejects meaningful review-time regressions. Security
+policy governance and scan-boundary governance remain independent contributors
+to the CI-report status.
 
 `renma readiness` exits `1` when blocking diagnostics make the repository not ready, including Context Lens governance errors such as duplicate lens IDs, missing required fields, or unresolved `applies_to` targets.
 

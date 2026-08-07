@@ -108,6 +108,7 @@ export async function collectRepositoryPathStates(
   candidates: Iterable<string>,
   artifacts: Artifact[],
   config: ScanConfig,
+  skippedPathStates: ReadonlyMap<string, RepositoryPathState> = new Map(),
 ): Promise<ReadonlyMap<string, RepositoryPathState>> {
   const parsed = new Set(artifacts.map((artifact) => artifact.path));
   const states = new Map<string, RepositoryPathState>();
@@ -116,6 +117,11 @@ export async function collectRepositoryPathStates(
   )) {
     const normalized = normalizeRepositoryPath(candidate);
     if (!normalized) continue;
+    const skippedState = skippedPathStates.get(normalized);
+    if (skippedState && !parsed.has(normalized)) {
+      states.set(normalized, skippedState);
+      continue;
+    }
     try {
       const inspected = await safeRepositoryPath(root, normalized);
       if (inspected.state === "symlink") {

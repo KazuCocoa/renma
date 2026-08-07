@@ -51,6 +51,12 @@ import {
 } from "../skill-discovery-diff.js";
 import type { SkillDiscoveryIndex } from "../skill-discovery.js";
 import { DEFAULT_QUALITY_PROFILE } from "../quality-profile.js";
+import {
+  buildInspectionCoverageDiff,
+  type InspectionCoverage,
+  type InspectionCoverageDiff,
+  zeroInspectionCoverage,
+} from "../inspection-coverage.js";
 import { formatJsonDocument } from "../report.js";
 import { formatMarkdownInlineCode } from "../renderers/markdown-inline-code.js";
 import { securityPolicyRelaxations } from "../security-policy-ci-policy.js";
@@ -107,6 +113,7 @@ export interface DiffReport {
   executableSurface: ExecutableSurfaceDiff;
   security: SecurityDiffSummary;
   scanBoundary: ScanBoundaryDiff;
+  inspectionCoverage: InspectionCoverageDiff;
   findings: {
     added: FindingDelta[];
     removed: FindingDelta[];
@@ -220,6 +227,7 @@ export interface DiffSnapshot {
   securityPolicies?: SecurityPolicyAssetEvidence[];
   securityConfig?: SecurityConfig;
   scanBoundary?: ScanBoundaryEvidence;
+  inspectionCoverage?: InspectionCoverage;
   configPath?: string;
   suppressedFindings?: SuppressedFindingEvidence[];
 }
@@ -581,6 +589,10 @@ function buildDiffReportProjection(
       toAssetIdsByPath: assetIdsByPath(toSnapshot.graph),
     }),
     scanBoundary: buildScanBoundaryDiff(fromScanBoundary, toScanBoundary),
+    inspectionCoverage: buildInspectionCoverageDiff(
+      fromSnapshot.inspectionCoverage ?? zeroInspectionCoverage(),
+      toSnapshot.inspectionCoverage ?? zeroInspectionCoverage(),
+    ),
     findings: {
       added: addedFindings,
       removed: removedFindings,
@@ -662,6 +674,25 @@ function formatDiffMarkdown(report: DiffReportFormatInput): string {
     `- Target active suppressions: ${report.scanBoundary.to.activeSuppressions.length}`,
     `- Boundary changes: ${report.scanBoundary.changes.length}`,
     ...report.scanBoundary.changes.map(formatScanBoundaryChange),
+    "",
+    "## Inspection Coverage",
+    "",
+    `- Expected paths: ${report.inspectionCoverage.from.expectedPathCount} -> ${report.inspectionCoverage.to.expectedPathCount}`,
+    `- Inspected paths: ${report.inspectionCoverage.from.inspectedPathCount} -> ${report.inspectionCoverage.to.inspectedPathCount}`,
+    `- Blocking issues: ${report.inspectionCoverage.from.blockingIssueCount} -> ${report.inspectionCoverage.to.blockingIssueCount}`,
+    `- Regressions: ${report.inspectionCoverage.regressions.length}`,
+    `- Resolved issues: ${report.inspectionCoverage.resolvedIssues.length}`,
+    ...(report.inspectionCoverage.regressions.length > 0
+      ? [
+          "",
+          "### Inspection coverage regressions",
+          "",
+          ...report.inspectionCoverage.regressions.map(
+            (change) =>
+              `- ${formatMarkdownInlineCode(change.path)}: ${change.fromState} -> ${change.toState}`,
+          ),
+        ]
+      : []),
     "",
     "## Catalog",
     "",
@@ -1435,6 +1466,7 @@ function projectDiffSnapshot(
           repositorySnapshot.configPath,
         ),
       ),
+      inspectionCoverage: scanResult.inspectionCoverage,
       suppressedFindings: scanResult.suppressedFindings,
       ...(repositorySnapshot.configPath
         ? { configPath: repositorySnapshot.configPath }
@@ -1527,7 +1559,19 @@ function checkChanges(
     .flatMap((check) => {
       const id = stringField(check, "id");
       const previous = fromById.get(id);
-      if (!previous) return [];
+      if (!previous) {
+        return [
+          {
+            id,
+            title: stringField(check, "title"),
+            fromStatus: "absent",
+            toStatus: stringField(check, "status"),
+            fromSeverity: "absent",
+            toSeverity: stringField(check, "severity"),
+            summaryChanged: true,
+          },
+        ];
+      }
       const change = {
         id,
         title: stringField(check, "title"),

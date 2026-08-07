@@ -36,6 +36,7 @@ export function formatText(result: ScanResult): string {
     `Config: ${result.configPath ?? "(defaults)"}`,
     `Scan boundary: ${result.scanBoundary.globs.length} include globs, ${result.scanBoundary.exclude.length} exclusions, max depth ${result.scanBoundary.maxDepth}, max file size ${result.scanBoundary.maxFileSizeBytes} bytes, ${result.scanBoundary.activeSuppressions.length} active suppressions`,
     `Files scanned: ${result.scannedFileCount}`,
+    `Inspection coverage: ${result.inspectionCoverage.inspectedPathCount}/${result.inspectionCoverage.expectedPathCount} expected agent-facing paths inspected (${result.inspectionCoverage.blockingIssues.length} blocking issues)`,
     `Agent Skills: ${result.agentSkills.validSkillCount}/${result.agentSkills.totalSkillCount} valid (${result.agentSkills.invalidSkillCount} invalid, ${result.agentSkills.legacySkillCount} legacy, ${result.agentSkills.hybridSkillCount} hybrid)`,
     ...(result.contextLens
       ? [
@@ -68,8 +69,21 @@ export function formatText(result: ScanResult): string {
     }
   }
 
+  if (result.inspectionCoverage.blockingIssues.length > 0) {
+    lines.push("", "Inspection Coverage Issues");
+    for (const issue of result.inspectionCoverage.blockingIssues) {
+      lines.push(
+        `  BLOCKING ${issue.path}: ${issue.state} (${issue.classification.kind}) — ${issue.reason}`,
+      );
+    }
+  }
+
   if (result.findings.length === 0) {
-    lines.push("No rule findings.");
+    lines.push(
+      result.inspectionCoverage.complete
+        ? "No rule findings after complete inspection."
+        : "No rule findings, but expected agent-facing content could not be inspected.",
+    );
   }
 
   for (const diagnostic of result.diagnostics) {

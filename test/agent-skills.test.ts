@@ -683,7 +683,7 @@ test("text output distinguishes Agent Skills issues from rule findings", async (
   const text = formatText({ ...result, findings: [] });
 
   assert.match(text, /INVALID skills\/legacy\/SKILL\.md/);
-  assert.match(text, /No rule findings\./);
+  assert.match(text, /No rule findings after complete inspection\./);
   assert.doesNotMatch(text, /No findings\./);
 });
 

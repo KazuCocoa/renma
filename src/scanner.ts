@@ -8,6 +8,7 @@ import {
   type RepositorySnapshot,
 } from "./repository-evidence.js";
 import { detectRepeatedContextPatterns } from "./repeated-context.js";
+import { buildInspectionCoverage } from "./inspection-coverage.js";
 import { runRules } from "./rules.js";
 import { securityDiagnosticFindings } from "./security-diagnostics.js";
 import { summarizeSecurityPolicyAssetEvidence } from "./security-policy-inventory.js";
@@ -148,6 +149,10 @@ export function scanFromRepositorySnapshot(
             snapshot.artifacts.map((artifact) => artifact.path),
             evaluationDate,
           ),
+    inspectionCoverage: buildInspectionCoverage(
+      snapshot.repositoryPathStates,
+      snapshot.core.repositoryPathConfig,
+    ),
     scannedFileCount: snapshot.scannedFileCount,
     format: snapshot.config.format,
     agentSkills: snapshot.agentSkills,

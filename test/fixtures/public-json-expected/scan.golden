@@ -38,6 +38,22 @@
     "maxDepth": 16,
     "activeSuppressions": []
   },
+  "inspectionCoverage": {
+    "schemaVersion": "renma.inspection-coverage.v1",
+    "expectedPathCount": 7,
+    "inspectedPathCount": 7,
+    "complete": true,
+    "inspectedPaths": [
+      "contexts/inactive.md",
+      "contexts/invalid-status.md",
+      "contexts/missing-boundary.md",
+      "contexts/missing-owner.md",
+      "contexts/placeholder.md",
+      "contexts/valid.md",
+      "skills/review/SKILL.md"
+    ],
+    "blockingIssues": []
+  },
   "scannedFileCount": 7,
   "format": "json",
   "agentSkills": {

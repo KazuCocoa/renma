@@ -10,6 +10,7 @@ export type SafeRepositoryPathResult =
 export interface RepositoryWalkResult {
   files: string[];
   symlinks: string[];
+  depthLimited: string[];
   unreadable: Array<{ path: string; error: string }>;
 }
 
@@ -24,6 +25,7 @@ export async function walkRepositoryFiles(
   const result: RepositoryWalkResult = {
     files: [],
     symlinks: [],
+    depthLimited: [],
     unreadable: [],
   };
   const absoluteRoot = path.resolve(root);
@@ -65,7 +67,10 @@ export async function walkRepositoryFiles(
         : entry.name;
       if (options.excluded(relativePath)) continue;
       const entryDepth = depth + 1;
-      if (entryDepth > options.maxDepth) continue;
+      if (entryDepth > options.maxDepth) {
+        result.depthLimited.push(relativePath);
+        continue;
+      }
       if (entry.isSymbolicLink) {
         result.symlinks.push(relativePath);
       } else if (entry.isDirectory) {
